@@ -442,8 +442,12 @@ abstract class MetadataDalWriteTest implements IDalTestable {
         var origTag = dummyTag(origDef, INCLUDE_HEADER);
         var origId = UUID.fromString(origTag.getHeader().getObjectId());
 
-        dal.preallocateObjectId(TEST_TENANT, ObjectType.DATA, origId);
-        dal.savePreallocatedObject(TEST_TENANT, origTag);
+        dal.preallocateObjectIds(
+                TEST_TENANT,
+                Collections.singletonList(ObjectType.DATA),
+                Collections.singletonList(origId)
+        );
+        dal.savePreallocatedObjects(TEST_TENANT, Collections.singletonList(origTag));
         var result = dal.loadTag(TEST_TENANT, ObjectType.DATA, origId, 1, 1);
 
         assertEquals(origTag, result);
@@ -471,9 +475,17 @@ abstract class MetadataDalWriteTest implements IDalTestable {
 
         var id1 = UUID.randomUUID();
 
-        dal.preallocateObjectId(TEST_TENANT, ObjectType.DATA, id1);
+        dal.preallocateObjectIds(
+                TEST_TENANT,
+                Collections.singletonList(ObjectType.DATA),
+                Collections.singletonList(id1)
+        );
         assertThrows(EMetadataDuplicate.class,
-                () -> dal.preallocateObjectId(TEST_TENANT, ObjectType.DATA, id1));
+                () -> dal.preallocateObjectIds(
+                        TEST_TENANT,
+                        Collections.singletonList(ObjectType.DATA),
+                        Collections.singletonList(id1)
+                ));
 
         var obj2 = dummyTagForObjectType(ObjectType.MODEL);
         var id2 = UUID.fromString(obj2.getHeader().getObjectId());
@@ -492,12 +504,16 @@ abstract class MetadataDalWriteTest implements IDalTestable {
         var obj1 = dummyTagForObjectType(ObjectType.MODEL);
 
         assertThrows(EMetadataNotFound.class,
-                () -> dal.savePreallocatedObject(TEST_TENANT, obj1));
+                () -> dal.savePreallocatedObjects(TEST_TENANT, Collections.singletonList(obj1)));
 
         var obj2 = dummyTagForObjectType(ObjectType.DATA);
         var id2 = UUID.fromString(obj2.getHeader().getObjectId());
 
-        dal.preallocateObjectId(TEST_TENANT, ObjectType.DATA, id2);
+        dal.preallocateObjectIds(
+                TEST_TENANT,
+                Collections.singletonList(ObjectType.DATA),
+                Collections.singletonList(id2)
+        );
 
         assertThrows(EMetadataNotFound.class,
                 () -> dal.savePreallocatedObjects(TEST_TENANT, List.of(obj1, obj2)));
@@ -509,15 +525,23 @@ abstract class MetadataDalWriteTest implements IDalTestable {
         var obj1 = dummyTagForObjectType(ObjectType.MODEL);
         var id1 = UUID.fromString(obj1.getHeader().getObjectId());
 
-        dal.preallocateObjectId(TEST_TENANT, ObjectType.DATA, id1);
+        dal.preallocateObjectIds(
+                TEST_TENANT,
+                Collections.singletonList(ObjectType.DATA),
+                Collections.singletonList(id1)
+        );
 
         assertThrows(EMetadataWrongType.class,
-                () -> dal.savePreallocatedObject(TEST_TENANT, obj1));
+                () -> dal.savePreallocatedObjects(TEST_TENANT, Collections.singletonList(obj1)));
 
         var obj2 = dummyTagForObjectType(ObjectType.DATA);
         var id2 = UUID.fromString(obj2.getHeader().getObjectId());
 
-        dal.preallocateObjectId(TEST_TENANT, ObjectType.DATA, id2);
+        dal.preallocateObjectIds(
+                TEST_TENANT,
+                Collections.singletonList(ObjectType.DATA),
+                Collections.singletonList(id2)
+        );
 
         assertThrows(EMetadataWrongType.class,
                 () -> dal.savePreallocatedObjects(TEST_TENANT, List.of(obj1, obj2)));

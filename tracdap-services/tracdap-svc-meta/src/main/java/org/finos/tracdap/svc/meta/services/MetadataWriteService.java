@@ -246,20 +246,7 @@ public class MetadataWriteService {
     }
 
     public TagHeader preallocateId(String tenant, ObjectType objectType) {
-
-        // New random ID
-        var objectId = UUID.randomUUID();
-
-        // Header for preallocated IDs does not include an object or tag version
-        var preallocatedHeader = TagHeader.newBuilder()
-                .setObjectType(objectType)
-                .setObjectId(objectId.toString())
-                .build();
-
-        // Save as a preallocated ID in the DAL
-        dal.preallocateObjectId(tenant, objectType, objectId);
-
-        return preallocatedHeader;
+        return preallocateIdBatch(tenant, Collections.singletonList(objectType)).get(0);
     }
 
     public List<TagHeader> preallocateIdBatch(String tenant, List<ObjectType> objectTypes) {
@@ -292,7 +279,7 @@ public class MetadataWriteService {
                 tagUpdates
         );
 
-        dal.savePreallocatedObject(tenant, newTag);
+        dal.savePreallocatedObjects(tenant, Collections.singletonList(newTag));
 
         return newTag.getHeader();
     }

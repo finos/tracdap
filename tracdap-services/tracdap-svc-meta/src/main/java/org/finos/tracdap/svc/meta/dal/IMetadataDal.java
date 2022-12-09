@@ -32,11 +32,7 @@ public interface IMetadataDal {
 
     void saveNewTags(String tenant, List<Tag> tags);
 
-    void preallocateObjectId(String tenant, ObjectType objectType, UUID objectId);
-
     void preallocateObjectIds(String tenant, List<ObjectType> objectTypes, List<UUID> objectIds);
-
-    void savePreallocatedObject(String tenant, Tag tag);
 
     void savePreallocatedObjects(String tenant, List<Tag> tags);
 
