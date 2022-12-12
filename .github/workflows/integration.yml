@@ -16,12 +16,115 @@ on:
 
 # Use baseline language versions for integration builds
 env:
-  JAVA_VERSION: 11
+  JAVA_VERSION: 17
   JAVA_DISTRIBUTION: zulu
   PYTHON_VERSION: "3.11"
+  NODE_VERSION: 18
 
 
 jobs:
+
+  full-stack:
+
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Setup - Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: ${{ env.JAVA_DISTRIBUTION }}
+          java-version: ${{ env.JAVA_VERSION }}
+
+          # Turn on Gradle dependency caching
+          cache: gradle
+
+      - name: Setup -Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Platform - Build distribution files
+        run: ./gradlew installDist
+
+      - name: Platform - Install the sandbox
+        run: |
+          VERSION=`dev/version.sh`
+          mkdir -p build/dist/tracdap-sandbox-${VERSION}
+          for MODULE in build/modules/*/install/*; do
+            cp -R $MODULE/* build/dist/tracdap-sandbox-${VERSION}
+          done
+          cd build/dist
+          ln -s tracdap-sandbox-${VERSION}/ current
+
+      # Currently not starting svc-orch, we'd need to build the runtime and deploy an execution venv
+      # OUr JavaScript tests only do data and metadata so far, no spawning / checking jobs
+      # We should aim to get there though!
+
+      - name: Platform - Run setup tools
+        run: |
+          cd build/dist/current
+          deploy_dir=`pwd`
+          
+          mkdir metadata
+          mkdir -p data/storage1
+          
+          echo SECRET_KEY=xHjFeFlo$k= >> etc/env.sh
+          sed -i "s#/path/to#${deploy_dir}#g" etc/trac-platform.yaml
+          sed -i '/jwtExpiry: 86400/a \ \ disableAuth: true' etc/trac-platform.yaml
+          
+          bin/auth-tool run --task create_root_auth_key EC 256
+          bin/deploy-metadb run --task deploy_schema
+          bin/deploy-metadb run --task add_tenant ACME_CORP "ACME Rockets always get the Coyote!"
+
+      - name: Platform - Start
+        run: |
+          cd build/dist/current
+          
+          bin/tracdap-svc-meta start
+          bin/tracdap-svc-data start
+          bin/tracdap-gateway start
+
+      - name: Web API - Install dependencies
+        run: |
+          cd tracdap-api/packages/web
+          npm install
+
+      - name: Web API - Set TRAC version
+        run: |
+          cd tracdap-api/packages/web
+          npm run tracVersion:posix
+
+      - name: Web API - Build package
+        run: |
+          cd tracdap-api/packages/web
+          npm run buildApi
+
+      - name: Examples - Install dependencies
+        run: |
+          cd examples/apps/javascript
+          npm install
+
+      - name: Examples - Run all
+        run: |
+          cd examples/apps/javascript
+          npm run examples
+
+      - name: Platform - Shut down
+        if: always()
+        run: |
+          cd build/dist/current
+          
+          bin/tracdap-gateway stop
+          bin/tracdap-svc-data stop
+          bin/tracdap-svc-meta stop
+  
 
   slow-tests:
 
