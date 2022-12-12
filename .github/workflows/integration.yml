@@ -24,7 +24,7 @@ env:
 
 jobs:
 
-  full-stack:
+  web-api:
 
     runs-on: ubuntu-latest
     timeout-minutes: 20
