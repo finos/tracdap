@@ -32,13 +32,24 @@ public class JwtProcessor extends JwtValidator {
 
     public static JwtProcessor configure(AuthenticationConfig authConfig, PlatformInfo platformInfo, KeyPair keyPair) {
 
-        if (keyPair == null) {
+        // Allow disabling signing in non-prod environments only
+        if (authConfig.getDisableSigning()) {
 
-            // Allow disabling signing in non-prod environments only
-            if (authConfig.getDisableSigning() && !platformInfo.getProduction())
-                return new JwtProcessor(authConfig, Algorithm.none());
-            else
-                throw new EStartup("Root authentication key is not available (do you need to run auth-tool)?");
+            if (platformInfo.getProduction()) {
+
+                var message = String.format(
+                        "Token signing must be enabled in production environment [%s]",
+                        platformInfo.getEnvironment());
+
+                throw new EStartup(message);
+            }
+
+            return new JwtProcessor(authConfig, Algorithm.none());
+        }
+
+        // If the key pair is missing but signing is not disabled, this is an error
+        if (keyPair == null) {
+            throw new EStartup("Root authentication key is not available (do you need to run auth-tool)?");
         }
 
         var algorithm = chooseAlgorithm(keyPair);
