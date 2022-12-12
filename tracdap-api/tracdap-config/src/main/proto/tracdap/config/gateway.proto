@@ -27,6 +27,8 @@ message GatewayConfig {
 
   map<string, string> config = 1;
 
+  PlatformInfo platformInfo = 7;
+
   AuthenticationConfig authentication = 6;
 
   repeated GwRoute routes = 2;

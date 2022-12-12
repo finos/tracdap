@@ -45,15 +45,6 @@ message PlatformConfig {
 }
 
 
-message PlatformInfo {
-
-  string environment = 1;
-  bool production = 2;
-
-  map<string, string> deploymentInfo = 3;
-}
-
-
 message MetadataConfig {
 
   PluginConfig database = 1;
