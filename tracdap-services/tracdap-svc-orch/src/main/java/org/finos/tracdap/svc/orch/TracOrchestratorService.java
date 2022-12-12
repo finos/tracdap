@@ -131,6 +131,7 @@ public class TracOrchestratorService extends CommonServiceBase {
 
             var authentication = AuthInterceptor.setupAuth(
                     platformConfig.getAuthentication(),
+                    platformConfig.getPlatformInfo(),
                     configManager);
 
             this.server = NettyServerBuilder
