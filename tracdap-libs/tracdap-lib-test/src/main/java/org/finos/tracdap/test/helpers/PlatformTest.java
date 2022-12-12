@@ -146,33 +146,33 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
     private ManagedChannel orchChannel;
 
     public TracMetadataApiGrpc.TracMetadataApiFutureStub metaClientFuture() {
-        var userCreds = new GrpcClientAuth(authToken);
-        return TracMetadataApiGrpc.newFutureStub(metaChannel).withCallCredentials(userCreds);
+        var client = TracMetadataApiGrpc.newFutureStub(metaChannel);
+        return GrpcClientAuth.applyIfAvailable(client, authToken);
     }
 
     public TracMetadataApiGrpc.TracMetadataApiBlockingStub metaClientBlocking() {
-        var userCreds = new GrpcClientAuth(authToken);
-        return TracMetadataApiGrpc.newBlockingStub(metaChannel).withCallCredentials(userCreds);
+        var client = TracMetadataApiGrpc.newBlockingStub(metaChannel);
+        return GrpcClientAuth.applyIfAvailable(client, authToken);
     }
 
     public TrustedMetadataApiGrpc.TrustedMetadataApiBlockingStub metaClientTrustedBlocking() {
-        var userCreds = new GrpcClientAuth(authToken);
-        return TrustedMetadataApiGrpc.newBlockingStub(metaChannel).withCallCredentials(userCreds);
+        var client = TrustedMetadataApiGrpc.newBlockingStub(metaChannel);
+        return GrpcClientAuth.applyIfAvailable(client, authToken);
     }
 
     public TracDataApiGrpc.TracDataApiStub dataClient() {
-        var userCreds = new GrpcClientAuth(authToken);
-        return TracDataApiGrpc.newStub(dataChannel).withCallCredentials(userCreds);
+        var client = TracDataApiGrpc.newStub(dataChannel);
+        return GrpcClientAuth.applyIfAvailable(client, authToken);
     }
 
     public TracDataApiGrpc.TracDataApiBlockingStub dataClientBlocking() {
-        var userCreds = new GrpcClientAuth(authToken);
-        return TracDataApiGrpc.newBlockingStub(dataChannel).withCallCredentials(userCreds);
+        var client = TracDataApiGrpc.newBlockingStub(dataChannel);
+        return GrpcClientAuth.applyIfAvailable(client, authToken);
     }
 
     public TracOrchestratorApiGrpc.TracOrchestratorApiBlockingStub orchClientBlocking() {
-        var userCreds = new GrpcClientAuth(authToken);
-        return TracOrchestratorApiGrpc.newBlockingStub(orchChannel).withCallCredentials(userCreds);
+        var client = TracOrchestratorApiGrpc.newBlockingStub(orchChannel);
+        return GrpcClientAuth.applyIfAvailable(client, authToken);
     }
 
     public Path storageRootDir() {
@@ -336,12 +336,13 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         configMgr.prepareSecrets();
 
         var platformConfig = configMgr.loadRootConfigObject(PlatformConfig.class);
+        var platformInfo = platformConfig.getPlatformInfo();
         var authConfig = platformConfig.getAuthentication();
 
         var publicKey = configMgr.loadPublicKey(ConfigKeys.TRAC_AUTH_PUBLIC_KEY);
         var privateKey = configMgr.loadPrivateKey(ConfigKeys.TRAC_AUTH_PRIVATE_KEY);
         var keyPair = new KeyPair(publicKey, privateKey);
-        var jwt = JwtProcessor.configure(authConfig, keyPair);
+        var jwt = JwtProcessor.configure(authConfig, platformInfo, keyPair);
 
         var userInfo = new UserInfo();
         userInfo.setUserId("platform_testing");
