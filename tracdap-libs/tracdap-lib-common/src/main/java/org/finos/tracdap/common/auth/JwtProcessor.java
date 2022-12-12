@@ -19,7 +19,9 @@ package org.finos.tracdap.common.auth;
 import com.auth0.jwt.HeaderParams;
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.algorithms.Algorithm;
+import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.config.AuthenticationConfig;
+import org.finos.tracdap.config.PlatformInfo;
 
 import java.security.KeyPair;
 import java.time.Instant;
@@ -28,7 +30,16 @@ import java.util.Map;
 
 public class JwtProcessor extends JwtValidator {
 
-    public static JwtProcessor configure(AuthenticationConfig authConfig, KeyPair keyPair) {
+    public static JwtProcessor configure(AuthenticationConfig authConfig, PlatformInfo platformInfo, KeyPair keyPair) {
+
+        if (keyPair == null) {
+
+            // Allow disabling signing in non-prod environments only
+            if (authConfig.getDisableSigning() && !platformInfo.getProduction())
+                return new JwtProcessor(authConfig, Algorithm.none());
+            else
+                throw new EStartup("Root authentication key is not available (do you need to run auth-tool)?");
+        }
 
         var algorithm = chooseAlgorithm(keyPair);
         return new JwtProcessor(authConfig, algorithm);
