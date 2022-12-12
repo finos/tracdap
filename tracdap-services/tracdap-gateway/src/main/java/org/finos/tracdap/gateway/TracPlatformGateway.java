@@ -224,7 +224,7 @@ public class TracPlatformGateway extends CommonServiceBase {
         var privateKey = configManager.loadPrivateKey(ConfigKeys.TRAC_AUTH_PRIVATE_KEY);
         var keyPair = new KeyPair(publicKey, privateKey);
 
-        return JwtProcessor.configure(gatewayConfig.getAuthentication(), keyPair);
+        return JwtProcessor.configure(gatewayConfig.getAuthentication(), gatewayConfig.getPlatformInfo(), keyPair);
     }
 
     public static void main(String[] args) {

@@ -121,7 +121,7 @@ public class FileService {
 
         state.objectTimestamp = Instant.now();
 
-        var client = metaApi.withCallCredentials(new GrpcClientAuth(state.authToken));
+        var client = GrpcClientAuth.applyIfAvailable(metaApi, state.authToken);
 
         return CompletableFuture.completedFuture(null)
 
@@ -243,7 +243,7 @@ public class FileService {
 
     private CompletionStage<Void> loadMetadata(String tenant, TagSelector fileSelector, RequestState state) {
 
-        var client = metaApi.withCallCredentials(new GrpcClientAuth(state.authToken));
+        var client = GrpcClientAuth.applyIfAvailable(metaApi, state.authToken);
         var request = requestForSelector(tenant, fileSelector);
 
         return grpcWrap
@@ -257,7 +257,7 @@ public class FileService {
 
     private CompletionStage<Void> loadStorageMetadata(String tenant, RequestState state) {
 
-        var client = metaApi.withCallCredentials(new GrpcClientAuth(state.authToken));
+        var client = GrpcClientAuth.applyIfAvailable(metaApi, state.authToken);
         var request = requestForSelector(tenant, state.file.getStorageId());
 
         return grpcWrap
@@ -271,7 +271,7 @@ public class FileService {
 
     private CompletionStage<TagHeader> saveMetadata(String tenant, RequestState state) {
 
-        var client = metaApi.withCallCredentials(new GrpcClientAuth(state.authToken));
+        var client = GrpcClientAuth.applyIfAvailable(metaApi, state.authToken);
 
         var priorStorageId = selectorFor(state.preAllocStorageId);
         var storageReq = buildCreateObjectReq(tenant, priorStorageId, state.storage, state.storageTags);
@@ -287,7 +287,7 @@ public class FileService {
 
     private CompletionStage<TagHeader> saveMetadata(String tenant, RequestState state, RequestState prior) {
 
-        var client = metaApi.withCallCredentials(new GrpcClientAuth(state.authToken));
+        var client = GrpcClientAuth.applyIfAvailable(metaApi, state.authToken);
 
         var priorStorageId = selectorFor(prior.storageId);
         var storageReq = buildCreateObjectReq(tenant, priorStorageId, state.storage, state.storageTags);

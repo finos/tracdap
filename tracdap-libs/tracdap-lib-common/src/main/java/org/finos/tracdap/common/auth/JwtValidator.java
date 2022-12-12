@@ -25,6 +25,7 @@ import com.auth0.jwt.RegisteredClaims;
 import com.auth0.jwt.algorithms.Algorithm;
 import com.auth0.jwt.exceptions.JWTVerificationException;
 import org.finos.tracdap.config.AuthenticationConfig;
+import org.finos.tracdap.config.PlatformInfo;
 
 import java.security.KeyPair;
 import java.security.PublicKey;
@@ -47,10 +48,29 @@ public class JwtValidator {
 
     private final JWTVerifier verifier;
 
-    public static JwtValidator configure(AuthenticationConfig authConfig, PublicKey publicKey) {
+    public static JwtValidator configure(AuthenticationConfig authConfig, PlatformInfo platformInfo, PublicKey publicKey) {
+
+        // Allow disabling signing in non-prod environments only
+        if (authConfig.getDisableSigning()) {
+
+            if (platformInfo.getProduction()) {
+
+                var message = String.format(
+                        "Token signing must be enabled in production environment [%s]",
+                        platformInfo.getEnvironment());
+
+                throw new EStartup(message);
+            }
+
+            return new JwtProcessor(authConfig, Algorithm.none());
+        }
+
+        // If the key pair is missing but signing is not disabled, this is an error
+        if (publicKey == null) {
+            throw new EStartup("Root authentication key is not available (do you need to run auth-tool)?");
+        }
 
         var algorithm = chooseAlgorithm(publicKey);
-
         return new JwtValidator(authConfig, algorithm);
     }
 
@@ -149,18 +169,18 @@ public class JwtValidator {
 
         if (keyAlgo.equals("RSA")) {
 
-            if (keySize >= 512)
+            if (keySize >= 3072)
                 return Algorithm.RSA512((RSAPublicKey)  keyPair.getPublic(), (RSAPrivateKey) keyPair.getPrivate());
 
-            if (keySize >= 384)
+            if (keySize >= 2048)
                 return Algorithm.RSA384((RSAPublicKey)  keyPair.getPublic(), (RSAPrivateKey) keyPair.getPrivate());
 
-            if (keySize >= 256)
+            if (keySize >= 1024)
                 return Algorithm.RSA256((RSAPublicKey)  keyPair.getPublic(), (RSAPrivateKey) keyPair.getPrivate());
         }
 
         var message = String.format("" +
-                "Root authentication keys are not available, no JWT singing / validation algorithm for [algorithM: %s, key size: %s]",
+                        "Root authentication keys are not available, no JWT singing / validation algorithm for [algorithM: %s, key size: %s]",
                 keyAlgo, keySize);
 
         throw new EStartup(message);

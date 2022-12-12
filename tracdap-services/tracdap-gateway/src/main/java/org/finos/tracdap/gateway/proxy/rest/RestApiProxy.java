@@ -139,9 +139,7 @@ public class RestApiProxy extends Http2ChannelDuplexHandler {
                         callState.stream = stream;
 
                         var authToken = AuthHelpers.getAuthToken(headers);
-
-                        if (authToken != null)
-                            callState.options = callState.options.withCallCredentials(new GrpcClientAuth(authToken));
+                        callState.options = GrpcClientAuth.applyIfAvailable(callState.options, authToken);
 
                         callStateMap.put(stream, callState);
                     }

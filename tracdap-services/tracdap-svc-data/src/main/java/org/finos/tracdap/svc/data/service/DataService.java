@@ -241,7 +241,7 @@ public class DataService {
 
     private CompletionStage<Void> loadMetadata(String tenant, TagSelector dataSelector, RequestState state) {
 
-        var client = metaClient.withCallCredentials(new GrpcClientAuth(state.authToken));
+        var client = GrpcClientAuth.applyIfAvailable(metaClient, state.authToken);
         var request = MetadataBuilders.requestForSelector(tenant, dataSelector);
 
         return grpcWrap
@@ -257,7 +257,7 @@ public class DataService {
 
     private CompletionStage<Void> loadStorageAndExternalSchema(String tenant, RequestState state) {
 
-        var client = metaClient.withCallCredentials(new GrpcClientAuth(state.authToken));
+        var client = GrpcClientAuth.applyIfAvailable(metaClient, state.authToken);
         var request = MetadataBuilders.requestForBatch(tenant, state.data.getStorageId(), state.data.getSchemaId());
 
         return grpcWrap
@@ -277,7 +277,7 @@ public class DataService {
 
     private CompletionStage<Void> loadStorageAndEmbeddedSchema(String tenant, RequestState state) {
 
-        var client = metaClient.withCallCredentials(new GrpcClientAuth(state.authToken));
+        var client = GrpcClientAuth.applyIfAvailable(metaClient, state.authToken);
         var request = MetadataBuilders.requestForSelector(tenant, state.data.getStorageId());
 
         return grpcWrap
@@ -294,7 +294,7 @@ public class DataService {
 
     private CompletionStage<SchemaDefinition> resolveSchema(DataWriteRequest request, RequestState state) {
 
-        var client = metaClient.withCallCredentials(new GrpcClientAuth(state.authToken));
+        var client = GrpcClientAuth.applyIfAvailable(metaClient, state.authToken);
 
         if (request.hasSchema()) {
             state.schema = request.getSchema();
@@ -340,7 +340,7 @@ public class DataService {
 
     private CompletionStage<Void> preallocateIds(DataWriteRequest request, RequestState state) {
 
-        var client = metaClient.withCallCredentials(new GrpcClientAuth(state.authToken));
+        var client = GrpcClientAuth.applyIfAvailable(metaClient, state.authToken);
 
         var preAllocDataReq = MetadataBuilders.preallocateRequest(request.getTenant(), ObjectType.DATA);
         var preAllocStorageReq = MetadataBuilders.preallocateRequest(request.getTenant(), ObjectType.STORAGE);
@@ -356,7 +356,7 @@ public class DataService {
 
     private CompletionStage<TagHeader> saveMetadata(DataWriteRequest request, RequestState state) {
 
-        var client = metaClient.withCallCredentials(new GrpcClientAuth(state.authToken));
+        var client = GrpcClientAuth.applyIfAvailable(metaClient, state.authToken);
 
         var priorStorageId = selectorFor(state.preAllocStorageId);
         var storageReq = MetadataBuilders.buildCreateObjectReq(request.getTenant(), priorStorageId, state.storage, state.storageTags);
@@ -372,7 +372,7 @@ public class DataService {
 
     private CompletionStage<TagHeader> saveMetadata(DataWriteRequest request, RequestState state, RequestState prior) {
 
-        var client = metaClient.withCallCredentials(new GrpcClientAuth(state.authToken));
+        var client = GrpcClientAuth.applyIfAvailable(metaClient, state.authToken);
 
         var priorStorageId = selectorFor(prior.storageId);
         var storageReq = MetadataBuilders.buildCreateObjectReq(request.getTenant(), priorStorageId, state.storage, state.storageTags);

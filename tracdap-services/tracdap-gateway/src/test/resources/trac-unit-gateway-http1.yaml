@@ -16,6 +16,10 @@ config:
   secret.type: PKCS12
   secret.url: secrets.p12
 
+platformInfo:
+  environment: UNIT_TESTS
+  production: false
+
 authentication:
 
   jwtIssuer: http://localhost:8080/

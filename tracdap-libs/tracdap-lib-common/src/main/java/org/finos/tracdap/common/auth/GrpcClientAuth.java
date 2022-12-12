@@ -17,8 +17,10 @@
 package org.finos.tracdap.common.auth;
 
 import io.grpc.CallCredentials;
+import io.grpc.CallOptions;
 import io.grpc.Metadata;
 import io.grpc.Status;
+import io.grpc.stub.AbstractStub;
 
 import java.util.concurrent.Executor;
 
@@ -27,7 +29,23 @@ public class GrpcClientAuth extends CallCredentials {
 
     private final String token;
 
-    public GrpcClientAuth(String token) {
+    public static <T extends AbstractStub<T>>  T applyIfAvailable(T client, String token) {
+
+        if (token != null && !token.isBlank())
+            return client.withCallCredentials((new GrpcClientAuth(token)));
+        else
+            return client;
+    }
+
+    public static CallOptions applyIfAvailable(CallOptions callOptions, String token) {
+
+        if (token != null && !token.isBlank())
+            return callOptions.withCallCredentials((new GrpcClientAuth(token)));
+        else
+            return callOptions;
+    }
+
+    private GrpcClientAuth(String token) {
         this.token = token;
     }
 

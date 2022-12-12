@@ -16,12 +16,14 @@
 
 package org.finos.tracdap.common.auth;
 
+import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.config.AuthenticationConfig;
 
 import com.auth0.jwt.HeaderParams;
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.algorithms.Algorithm;
 
+import org.finos.tracdap.config.PlatformInfo;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -37,6 +39,7 @@ import java.util.Map;
 public class JwtProcessorTest {
 
     static AuthenticationConfig authConfig;
+    static PlatformInfo platformInfo;
     static KeyPair keyPair;
 
     JwtProcessor jwt;
@@ -47,6 +50,11 @@ public class JwtProcessorTest {
         authConfig = AuthenticationConfig.newBuilder()
                 .setJwtIssuer("https://trac.example.com/trac/platform")
                 .setJwtExpiry(7200)
+                .build();
+
+        platformInfo = PlatformInfo.newBuilder()
+                .setEnvironment("TEST_PRODUCTION")
+                .setProduction(true)
                 .build();
 
         var keySize = 1024;
@@ -61,7 +69,7 @@ public class JwtProcessorTest {
     @BeforeEach
     void setupJwt() {
 
-        jwt = JwtProcessor.configure(authConfig, keyPair);
+        jwt = JwtProcessor.configure(authConfig, platformInfo, keyPair);
     }
 
     @Test
@@ -120,7 +128,7 @@ public class JwtProcessorTest {
 
         var altKeyPair = keyGen.generateKeyPair();
 
-        var altJwt = JwtProcessor.configure(authConfig, altKeyPair);
+        var altJwt = JwtProcessor.configure(authConfig, platformInfo, altKeyPair);
 
         var userInfo = new UserInfo();
         userInfo.setUserId("fb2876");
@@ -146,7 +154,7 @@ public class JwtProcessorTest {
                 .setJwtExpiry(7200)
                 .build();
 
-        var altJwt = JwtProcessor.configure(altAuthConfig, keyPair);
+        var altJwt = JwtProcessor.configure(altAuthConfig, platformInfo, keyPair);
 
         var userInfo = new UserInfo();
         userInfo.setUserId("fb2876");
@@ -172,7 +180,7 @@ public class JwtProcessorTest {
                 .setJwtExpiry(1)
                 .build();
 
-        var altJwt = JwtProcessor.configure(altAuthConfig, keyPair);
+        var altJwt = JwtProcessor.configure(altAuthConfig, platformInfo, keyPair);
 
         var userInfo = new UserInfo();
         userInfo.setUserId("fb2876");
@@ -184,5 +192,41 @@ public class JwtProcessorTest {
 
         var result = altJwt.decodeAndValidate(token);
         Assertions.assertFalse(result.isValid());
+    }
+
+    @Test
+    void disableSigningNonProd() {
+
+        var altAuthConfig = AuthenticationConfig.newBuilder()
+                .setDisableSigning(true)
+                .build();
+
+        var altEnvironment = PlatformInfo.newBuilder()
+                .setEnvironment("TEST_NON_PROD")
+                .setProduction(false)
+                .build();
+
+        var altJwt = JwtProcessor.configure(altAuthConfig, altEnvironment, keyPair);
+
+        var userInfo = new UserInfo();
+        userInfo.setUserId("fb2876");
+        userInfo.setDisplayName("Fred Blogs Jnr.");
+
+        var token = altJwt.encodeToken(userInfo);
+        var rtSession = altJwt.decodeAndValidate(token);
+        var rtUserInfo = rtSession.getUserInfo();
+
+        Assertions.assertEquals(userInfo.getUserId(), rtUserInfo.getUserId());
+        Assertions.assertEquals(userInfo.getDisplayName(), rtUserInfo.getDisplayName());
+    }
+
+    @Test
+    void disableSigningInProduction() {
+
+        var altAuthConfig = AuthenticationConfig.newBuilder()
+                .setDisableSigning(true)
+                .build();
+
+        Assertions.assertThrows(EStartup.class, () -> JwtProcessor.configure(altAuthConfig, platformInfo, keyPair));
     }
 }

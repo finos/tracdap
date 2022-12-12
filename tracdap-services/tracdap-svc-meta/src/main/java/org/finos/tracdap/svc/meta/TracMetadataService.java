@@ -119,6 +119,7 @@ public class TracMetadataService extends CommonServiceBase {
 
             var authentication = AuthInterceptor.setupAuth(
                     platformConfig.getAuthentication(),
+                    platformConfig.getPlatformInfo(),
                     configManager);
 
             // Create the main server

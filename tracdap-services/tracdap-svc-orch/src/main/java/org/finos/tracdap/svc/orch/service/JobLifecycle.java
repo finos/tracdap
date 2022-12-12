@@ -124,7 +124,7 @@ public class JobLifecycle {
                 .addAllSelector(orderedSelectors)
                 .build();
 
-        var client = metaClient.withCallCredentials(new GrpcClientAuth(jobState.ownerToken));
+        var client = GrpcClientAuth.applyIfAvailable(metaClient, jobState.ownerToken);
         var batchResponse = grpcWrap.unaryCall(READ_BATCH_METHOD, batchRequest, client::readBatch);
 
         return loadResourcesResponse(jobState, orderedKeys, batchResponse);
@@ -200,7 +200,7 @@ public class JobLifecycle {
             JobState jobState, Instant jobTimestamp,
             String resultKey, MetadataWriteRequest idRequest) {
 
-        var client = metaClient.withCallCredentials(new GrpcClientAuth(jobState.ownerToken));
+        var client = GrpcClientAuth.applyIfAvailable(metaClient, jobState.ownerToken);
 
         var preallocatedId = grpcWrap.unaryCall(PREALLOCATE_ID_METHOD, idRequest, client::preallocateId);
         var resultId = MetadataUtil.nextObjectVersion(preallocatedId, jobTimestamp);
@@ -266,7 +266,7 @@ public class JobLifecycle {
                 .addAllTagUpdates(freeJobAttrs)
                 .build();
 
-        var client = metaClient.withCallCredentials(new GrpcClientAuth(jobState.ownerToken));
+        var client = GrpcClientAuth.applyIfAvailable(metaClient, jobState.ownerToken);
 
         var jobId = grpcWrap.unaryCall(
                 CREATE_OBJECT_METHOD, jobWriteReq,
@@ -307,7 +307,7 @@ public class JobLifecycle {
 
     private TagHeader saveResultMetadata(JobState jobState, MetadataWriteRequest update) {
 
-        var client = metaClient.withCallCredentials(new GrpcClientAuth(jobState.ownerToken));
+        var client = GrpcClientAuth.applyIfAvailable(metaClient, jobState.ownerToken);
 
         if (!update.hasDefinition())
             return grpcWrap.unaryCall(UPDATE_TAG_METHOD, update, client::updateTag);

@@ -21,6 +21,7 @@ import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.config.AuthenticationConfig;
+import org.finos.tracdap.config.PlatformInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -29,18 +30,51 @@ public class AuthInterceptor implements ServerInterceptor {
 
     private static final String BEARER_AUTH_PREFIX = "bearer ";
 
+    private static final String AUTH_DISABLED_USER_ID = "no_auth";
+    private static final String AUTH_DISABLED_USER_NAME = "Authentication Disabled";
+
     private static final Logger log = LoggerFactory.getLogger(AuthInterceptor.class);
 
+    private final AuthenticationConfig authConfig;
     private final JwtValidator jwt;
 
-    public static AuthInterceptor setupAuth(AuthenticationConfig authConfig, ConfigManager configManager) {
+    public static AuthInterceptor setupAuth(
+            AuthenticationConfig authConfig,
+            PlatformInfo platformInfo,
+            ConfigManager configManager) {
 
-        if (configManager.hasSecret(ConfigKeys.TRAC_AUTH_PUBLIC_KEY)) {
+        // Do not allow turning off the authentication mechanism in production!
+        if (platformInfo.getProduction()) {
+
+            if (authConfig.getDisableAuth() || authConfig.getDisableSigning()) {
+
+                var message = String.format(
+                        "Authentication and token signing must be enabled in production environment [%s]",
+                        platformInfo.getEnvironment());
+
+                log.error(message);
+                throw new EStartup(message);
+            }
+        }
+
+        if (authConfig.getDisableAuth()) {
+
+            log.warn("!!!!! AUTHENTICATION IS DISABLED (do not use this setting in production)");
+
+            return new AuthInterceptor(authConfig, null);
+        }
+        else if (authConfig.getDisableSigning()) {
+
+            log.warn("!!!!! SIGNATURE VALIDATION IS DISABLED (do not use this setting in production)");
+
+            var jwt = JwtValidator.configure(authConfig, platformInfo, null);
+            return new AuthInterceptor(authConfig, jwt);
+        }
+        else if (configManager.hasSecret(ConfigKeys.TRAC_AUTH_PUBLIC_KEY)) {
 
             var publicKey = configManager.loadPublicKey(ConfigKeys.TRAC_AUTH_PUBLIC_KEY);
-            var jwt = JwtValidator.configure(authConfig, publicKey);
-
-            return new AuthInterceptor(jwt);
+            var jwt = JwtValidator.configure(authConfig, platformInfo, publicKey);
+            return new AuthInterceptor(authConfig, jwt);
         }
         else {
 
@@ -54,7 +88,8 @@ public class AuthInterceptor implements ServerInterceptor {
         }
     }
 
-    AuthInterceptor(JwtValidator jwt) {
+    AuthInterceptor(AuthenticationConfig authConfig, JwtValidator jwt) {
+        this.authConfig = authConfig;
         this.jwt = jwt;
     }
 
@@ -66,13 +101,32 @@ public class AuthInterceptor implements ServerInterceptor {
 
         // This is a basic check for valid credential, i.e. authentication only
 
+        if (authConfig.getDisableAuth()) {
+
+            log.warn("AUTHENTICATE: DISABLED {}", call.getMethodDescriptor().getFullMethodName());
+
+            var userInfo = new UserInfo();
+            userInfo.setUserId(AUTH_DISABLED_USER_ID);
+            userInfo.setDisplayName(AUTH_DISABLED_USER_NAME);
+
+            var ctx = Context.current()
+                    .withValue(AuthConstants.AUTH_TOKEN_KEY, "")
+                    .withValue(AuthConstants.USER_INFO_KEY, userInfo);
+
+            return Contexts.interceptCall(ctx, call, headers, next);
+        }
+
         var token = headers.get(AuthConstants.AUTH_METADATA_KEY);
 
         if (token == null) {
 
-            log.error("No authentication provided");
+            var message = "No authentication provided";
 
-            var status = Status.UNAUTHENTICATED.withDescription("No authentication provided");
+            log.error("AUTHENTICATE: FAILED {} [{}]",
+                    call.getMethodDescriptor().getFullMethodName(),
+                    message);
+
+            var status = Status.UNAUTHENTICATED.withDescription(message);
             var trailers = new Metadata();
 
             call.close(status, trailers);
@@ -94,7 +148,9 @@ public class AuthInterceptor implements ServerInterceptor {
 
         if (!sessionInfo.isValid()) {
 
-            log.error(sessionInfo.getErrorMessage());
+            log.error("AUTHENTICATE: FAILED {} [{}]",
+                    call.getMethodDescriptor().getFullMethodName(),
+                    sessionInfo.getErrorMessage());
 
             var status = Status.UNAUTHENTICATED.withDescription(sessionInfo.getErrorMessage());
             var trailers = new Metadata();
@@ -107,6 +163,21 @@ public class AuthInterceptor implements ServerInterceptor {
         // Put the user info object into the context to make it available in the service implementation
 
         var userInfo = sessionInfo.getUserInfo();
+
+        if (authConfig.getDisableSigning()) {
+            log.warn("AUTHENTICATE: SUCCEEDED WITHOUT VALIDATION {} [{} <{}>]",
+                    call.getMethodDescriptor().getFullMethodName(),
+                    userInfo.getDisplayName(),
+                    userInfo.getUserId());
+        }
+        else {
+            log.info("AUTHENTICATE: SUCCEEDED {} [{} <{}>]",
+                    call.getMethodDescriptor().getFullMethodName(),
+                    userInfo.getDisplayName(),
+                    userInfo.getUserId());
+        }
+
+        // Auth complete, put details into the current call context
 
         var ctx = Context.current()
                 .withValue(AuthConstants.AUTH_TOKEN_KEY, token)
