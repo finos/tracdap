@@ -30,6 +30,9 @@ public class AuthInterceptor implements ServerInterceptor {
 
     private static final String BEARER_AUTH_PREFIX = "bearer ";
 
+    private static final String AUTH_DISABLED_USER_ID = "no_auth";
+    private static final String AUTH_DISABLED_USER_NAME = "Authentication Disabled";
+
     private static final Logger log = LoggerFactory.getLogger(AuthInterceptor.class);
 
     private final AuthenticationConfig authConfig;
@@ -103,8 +106,8 @@ public class AuthInterceptor implements ServerInterceptor {
             log.warn("AUTHENTICATE: DISABLED {}", call.getMethodDescriptor().getFullMethodName());
 
             var userInfo = new UserInfo();
-            userInfo.setUserId("auth_disabled");
-            userInfo.setDisplayName("Unauthenticated User");
+            userInfo.setUserId(AUTH_DISABLED_USER_ID);
+            userInfo.setDisplayName(AUTH_DISABLED_USER_NAME);
 
             var ctx = Context.current()
                     .withValue(AuthConstants.AUTH_TOKEN_KEY, "")
