@@ -18,6 +18,11 @@ config:
   secret.url: secrets.p12
 
 
+platformInfo:
+  environment: SANDBOX
+  production: false
+
+
 authentication:
 
   jwtIssuer: http://localhost:8080/
