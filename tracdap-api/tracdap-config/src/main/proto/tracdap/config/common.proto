@@ -41,4 +41,7 @@ message AuthenticationConfig {
   optional sint32 jwtExpiry = 2;
 
   optional PluginConfig provider = 3;
+
+  bool disableAuth = 4;
+  bool disableSigning = 5;
 }
