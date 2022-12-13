@@ -21,12 +21,14 @@ import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.common.db.JdbcDialect;
-import org.finos.tracdap.svc.meta.dal.IMetadataDal;
+import org.finos.tracdap.svc.meta.dal.*;
 
+import org.finos.tracdap.svc.meta.dal.operations.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.sql.DataSource;
+import java.sql.Connection;
 import java.sql.SQLException;
 import java.time.Instant;
 import java.time.OffsetDateTime;
@@ -34,6 +36,7 @@ import java.time.ZoneOffset;
 import java.util.*;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 
 public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
@@ -99,107 +102,116 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
     // So, use the same implementation for save one and save many
     // I.e. no special optimisation for saving a single item, even though this is the common case
 
-    @Override
-    public void saveNewObjects(String tenant, List<Tag> tags) {
 
-        var parts = separateParts(tags);
+    @Override
+    public void runWriteOperations(String tenant, List<DalWriteOperation> operations) {
+        if (operations.isEmpty()) {
+            return;
+        }
+
+        var parts = separateParts(operations.get(0));
 
         wrapTransaction(conn -> {
+                prepareMappingTable(conn);
+                var tenantId = tenants.getTenantId(conn, tenant);
 
-            prepareMappingTable(conn);
+                for (var operation : operations) {
+                    handleOperation(conn, tenantId, operation);
+                }
+            },
+            (error, code) ->  JdbcError.handleDuplicateObjectId(error, code, parts),
+            (error, code) -> JdbcError.handleMissingItem(error, code, parts),
+            (error, code) ->  JdbcError.handleWrongObjectType(error, code, parts)
+        );
+    }
 
-            var tenantId = tenants.getTenantId(conn, tenant);
+    private void handleOperation(Connection conn, short tenantId, DalWriteOperation operation) throws SQLException {
+        if (operation instanceof WriteOperationWithTag) {
+            handleWriteOperationWithTag(conn, tenantId, (WriteOperationWithTag)operation);
+        } else if (operation instanceof PreallocateObjectId) {
+            handlePreallocateObjectId(conn, tenantId, (PreallocateObjectId)operation);
+        } else {
+            throw new RuntimeException("invalid DalWriteOperation");
+        }
+    }
 
+    private void handlePreallocateObjectId(Connection conn, short tenantId, PreallocateObjectId operation) throws SQLException {
+        writeBatch.writeObjectId(conn, tenantId, separateParts(operation));
+    }
+
+    private void handleWriteOperationWithTag(Connection conn, short tenantId, WriteOperationWithTag operation) throws SQLException {
+        var parts = separateParts(operation);
+
+        long[] defPk;
+
+        if (operation instanceof SaveNewObject) {
             long[] objectPk = writeBatch.writeObjectId(conn, tenantId, parts);
-            long[] defPk = writeBatch.writeObjectDefinition(conn, tenantId, objectPk, parts);
-            long[] tagPk = writeBatch.writeTagRecord(conn, tenantId, defPk, parts);
-            writeBatch.writeTagAttrs(conn, tenantId, tagPk, parts);
-        },
-        (error, code) ->  JdbcError.handleDuplicateObjectId(error, code, parts));
+            defPk = writeBatch.writeObjectDefinition(conn, tenantId, objectPk, parts);
+        } else {
+            var objectType = readBatch.readObjectTypeById(conn, tenantId, parts.objectId);
+            checkObjectTypes(parts, objectType);
+
+            if (operation instanceof SaveNewTag) {
+                defPk = readBatch.lookupDefinitionPk(conn, tenantId, objectType.keys, parts.objectVersion);
+                writeBatch.closeTagRecord(conn, tenantId, defPk, parts);
+            } else {
+                if (operation instanceof SaveNewVersion) {
+                    writeBatch.closeObjectDefinition(conn, tenantId, objectType.keys, parts);
+                } else if (!(operation instanceof SavePreallocatedObject)) {
+                    throw new RuntimeException("invalid DalWriteOperation");
+                }
+
+                defPk = writeBatch.writeObjectDefinition(conn, tenantId, objectType.keys, parts);
+            }
+        }
+
+        long[] tagPk = writeBatch.writeTagRecord(conn, tenantId, defPk, parts);
+        writeBatch.writeTagAttrs(conn, tenantId, tagPk, parts);
+    }
+
+    @Override
+    public void saveNewObjects(String tenant, List<Tag> tags) {
+        runWriteOperations(
+                tenant,
+                tags.stream().map(SaveNewObject::new)
+                        .collect(Collectors.toList())
+        );
     }
 
     @Override
     public void saveNewVersions(String tenant, List<Tag> tags) {
-
-        var parts = separateParts(tags);
-
-        wrapTransaction(conn -> {
-
-            prepareMappingTable(conn);
-
-            var tenantId = tenants.getTenantId(conn, tenant);
-            var objectType = readBatch.readObjectTypeById(conn, tenantId, parts.objectId);
-            checkObjectTypes(parts, objectType);
-
-            writeBatch.closeObjectDefinition(conn, tenantId, objectType.keys, parts);
-            long[] defPk = writeBatch.writeObjectDefinition(conn, tenantId, objectType.keys, parts);
-            long[] tagPk = writeBatch.writeTagRecord(conn, tenantId, defPk, parts);
-            writeBatch.writeTagAttrs(conn, tenantId, tagPk, parts);
-        },
-        (error, code) -> JdbcError.handleMissingItem(error, code, parts),
-        (error, code) ->  JdbcError.handleDuplicateObjectId(error, code, parts),
-        (error, code) ->  JdbcError.newVersion_WrongType(error, code, parts));
+        runWriteOperations(
+                tenant,
+                tags.stream().map(SaveNewVersion::new)
+                        .collect(Collectors.toList())
+        );
     }
 
     @Override
     public void saveNewTags(String tenant, List<Tag> tags) {
-
-        var parts = separateParts(tags);
-
-        wrapTransaction(conn -> {
-
-            prepareMappingTable(conn);
-
-            var tenantId = tenants.getTenantId(conn, tenant);
-            var objectType = readBatch.readObjectTypeById(conn, tenantId, parts.objectId);
-            checkObjectTypes(parts, objectType);
-
-            long[] defPk = readBatch.lookupDefinitionPk(conn, tenantId, objectType.keys, parts.objectVersion);
-            writeBatch.closeTagRecord(conn, tenantId, defPk, parts);
-            long[] tagPk = writeBatch.writeTagRecord(conn, tenantId, defPk, parts);
-            writeBatch.writeTagAttrs(conn, tenantId, tagPk, parts);
-        },
-        (error, code) -> JdbcError.handleMissingItem(error, code, parts),
-        (error, code) ->  JdbcError.handleDuplicateObjectId(error, code, parts),
-        (error, code) ->  JdbcError.newTag_WrongType(error, code, parts));
+        runWriteOperations(
+                tenant,
+                tags.stream().map(SaveNewTag::new)
+                        .collect(Collectors.toList())
+        );
     }
 
     @Override
     public void preallocateObjectIds(String tenant, List<ObjectType> objectTypes, List<UUID> objectIds) {
+        List<DalWriteOperation> operations = IntStream.range(0, objectTypes.size())
+                .mapToObj(i -> new PreallocateObjectId(objectTypes.get(i), objectIds.get(i)))
+                .collect(Collectors.toList());
 
-        var parts = separateParts(objectTypes, objectIds);
-
-        wrapTransaction(conn -> {
-
-            prepareMappingTable(conn);
-
-            var tenantId = tenants.getTenantId(conn, tenant);
-
-            writeBatch.writeObjectId(conn, tenantId, parts);
-        },
-        (error, code) ->  JdbcError.handleDuplicateObjectId(error, code, parts));
+        runWriteOperations(tenant, operations);
     }
 
     @Override
     public void savePreallocatedObjects(String tenant, List<Tag> tags) {
-
-        var parts = separateParts(tags);
-
-        wrapTransaction(conn -> {
-
-            prepareMappingTable(conn);
-
-            var tenantId = tenants.getTenantId(conn, tenant);
-            var objectType = readBatch.readObjectTypeById(conn, tenantId, parts.objectId);
-            checkObjectTypes(parts, objectType);
-
-            long[] defPk = writeBatch.writeObjectDefinition(conn, tenantId, objectType.keys, parts);
-            long[] tagPk = writeBatch.writeTagRecord(conn, tenantId, defPk, parts);
-            writeBatch.writeTagAttrs(conn, tenantId, tagPk, parts);
-        },
-        (error, code) -> JdbcError.handleMissingItem(error, code, parts),   // TODO: different errors
-        (error, code) ->  JdbcError.handleDuplicateObjectId(error, code, parts),  // TODO: different errors
-        (error, code) ->  JdbcError.savePreallocated_WrongType(error, code, parts));
+        runWriteOperations(
+                tenant,
+                tags.stream().map(SavePreallocatedObject::new)
+                        .collect(Collectors.toList())
+        );
     }
 
 
@@ -410,6 +422,23 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
         ObjectDefinition[] definition;
 
         TagSelector[] selector;
+    }
+
+    private ObjectParts separateParts(DalWriteOperation operation) {
+        if (operation instanceof WriteOperationWithTag) {
+            var op = (WriteOperationWithTag) operation;
+
+            return separateParts(Collections.singletonList(op.getTag()));
+        } else if (operation instanceof PreallocateObjectId) {
+            var op = (PreallocateObjectId) operation;
+
+            return separateParts(
+                    Collections.singletonList(op.getObjectType()),
+                    Collections.singletonList(op.getObjectId())
+            );
+        } else {
+            throw new RuntimeException("invalid DalWriteOperation");
+        }
     }
 
     private ObjectParts separateParts(List<Tag> tags) {

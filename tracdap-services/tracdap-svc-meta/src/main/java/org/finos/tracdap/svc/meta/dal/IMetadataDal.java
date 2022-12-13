@@ -17,6 +17,7 @@
 package org.finos.tracdap.svc.meta.dal;
 
 import org.finos.tracdap.metadata.*;
+import org.finos.tracdap.svc.meta.dal.operations.DalWriteOperation;
 
 import java.util.List;
 import java.util.UUID;
@@ -29,6 +30,8 @@ public interface IMetadataDal {
     void stop();
 
     List<TenantInfo> listTenants();
+
+    void runWriteOperations(String tenant, List<DalWriteOperation> operations);
 
     void saveNewObjects(String tenant, List<Tag> tags);
 
