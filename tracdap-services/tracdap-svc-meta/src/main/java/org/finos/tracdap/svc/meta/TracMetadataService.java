@@ -94,9 +94,16 @@ public class TracMetadataService extends CommonServiceBase {
             // Handles different SQL dialects and authentication mechanisms etc.
             var platformConfig = configManager.loadRootConfigObject(PlatformConfig.class);
 
+            // TODO: Move this onto standard plugin loading mechanism
             var metaDbConfig = platformConfig.getMetadata().getDatabase();
             var dalProps = new Properties();
             dalProps.putAll(metaDbConfig.getPropertiesMap());
+
+            for (var secret : metaDbConfig.getSecretsMap().entrySet()) {
+                var secretKey = secret.getKey();
+                var secretValue = configManager.loadPassword(secret.getValue());
+                dalProps.put(secretKey, secretValue);
+            }
 
             var dialect = JdbcSetup.getSqlDialect(dalProps, "");
             dataSource = JdbcSetup.createDatasource(dalProps, "");
