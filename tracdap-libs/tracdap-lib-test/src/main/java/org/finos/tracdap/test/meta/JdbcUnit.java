@@ -52,13 +52,13 @@ public class JdbcUnit implements BeforeAllCallback, BeforeEachCallback, AfterEac
         var jdbcUrl = String.format(JDBC_URL_TEMPLATE, dbId);
 
         var props = new Properties();
-        props.setProperty("unit.jdbcUrl", jdbcUrl);
-        props.setProperty("unit.dialect", "H2");
-        props.setProperty("unit.h2.user", "trac");
-        props.setProperty("unit.h2.pass", "trac");
-        props.setProperty("unit.pool.size", "2");
+        props.setProperty("jdbcUrl", jdbcUrl);
+        props.setProperty("dialect", "H2");
+        props.setProperty("h2.user", "trac");
+        props.setProperty("h2.pass", "trac");
+        props.setProperty("pool.size", "2");
 
-        source = JdbcSetup.createDatasource(props, "unit");
+        source = JdbcSetup.createDatasource(props, "");
 
         // Find project root dir
         var tracRepoDir = Paths.get(".").toAbsolutePath();
