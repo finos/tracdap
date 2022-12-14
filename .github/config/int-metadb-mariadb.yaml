@@ -36,9 +36,10 @@ metadata:
       dialect: MARIADB
       jdbcUrl: //metadb:3306/trac
       mariadb.user: trac_admin
-      mariadb.password: trac_admin
       pool.size: 2
       pool.overflow: 5
+    secrets:
+      mariadb.password: metadb_secret
 
 instances:
   meta:

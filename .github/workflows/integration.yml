@@ -242,6 +242,7 @@ jobs:
               MYSQL_DATABASE: trac,
               MYSQL_USER: trac_admin,
               MYSQL_PASSWORD: trac_admin,
+              METADB_SECRET: trac_admin,
               MYSQL_ALLOW_EMPTY_PASSWORD: yes }
 
           - { DB_NAME: MariaDB,
@@ -254,6 +255,7 @@ jobs:
               MYSQL_DATABASE: trac,
               MYSQL_USER: trac_admin,
               MYSQL_PASSWORD: trac_admin,
+              METADB_SECRET: trac_admin,
               MYSQL_ALLOW_EMPTY_PASSWORD: yes }
 
           - { DB_NAME: PostgreSQL,
@@ -265,6 +267,7 @@ jobs:
               TRAC_SECRET_KEY: hjXks83bX=wxMr,
               POSTGRES_DB: trac,
               POSTGRES_USER: trac_admin,
+              METADB_SECRET: trac_admin,
               POSTGRES_PASSWORD: trac_admin }
 
           - { DB_NAME: SQLServer,
@@ -276,7 +279,8 @@ jobs:
               TRAC_SECRET_KEY: unHkj>weN2jSl,
               MSSQL_PID: Developer,
               ACCEPT_EULA: Y,
-              SA_PASSWORD: "tR4c_aDm!n" }
+              SA_PASSWORD: "tR4c_aDm!n",
+              METADB_SECRET: "tR4c_aDm!n" }
 
     env: ${{ matrix.database }}
 
@@ -313,6 +317,8 @@ jobs:
         run: |
           ./gradlew secret-tool:run --args="--config ${{ env.TRAC_CONFIG_FILE }} --task init_secrets"
           ./gradlew secret-tool:run --args="--config ${{ env.TRAC_CONFIG_FILE }} --task create_root_auth_key EC 256"
+          
+          echo ${{ env.TRAC_DB_SECRET }} | ./gradlew secret-tool:run --args="--config ${{ env.TRAC_CONFIG_FILE }} --task add_secret metadb_secret"
 
       # The name and description of the test tenant are verified in one of the test cases so they need to match
       # MetadataReapApiTest listTenants()
@@ -359,7 +365,8 @@ jobs:
               BUILD_aws_storage: true,
               TRAC_CONFIG_FILE: '.github/config/int-storage-s3.yaml',
               TRAC_SECRET_KEY: storage_s3_secrets,
-              S3_BUCKET: not-configured }
+              S3_BUCKET: not-configured,
+              STORGE_SECRET: "not_configured" }
 
 
     env: ${{ matrix.storage }}
@@ -387,6 +394,8 @@ jobs:
         run: |
           ./gradlew secret-tool:run --args="--config ${{ env.TRAC_CONFIG_FILE }} --task init_secrets"
           ./gradlew secret-tool:run --args="--config ${{ env.TRAC_CONFIG_FILE }} --task create_root_auth_key EC 256"
+          
+          echo ${{ env.STORAGE_SECRET }} | ./gradlew secret-tool:run --args="--config ${{ env.TRAC_CONFIG_FILE }} --task add_secret storage_secret"
 
       # No need to prepare DB, it is done by the platform test setup
 

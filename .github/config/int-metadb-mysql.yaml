@@ -36,9 +36,10 @@ metadata:
       dialect: MYSQL
       jdbcUrl: //metadb:3306/trac
       mysql.user: trac_admin
-      mysql.password: trac_admin
       pool.size: 2
       pool.overflow: 5
+    secrets:
+      mysql.password: metadb_secret
 
 instances:
   meta:
