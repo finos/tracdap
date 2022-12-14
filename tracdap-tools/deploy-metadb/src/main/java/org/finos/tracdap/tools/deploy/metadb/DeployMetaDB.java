@@ -31,7 +31,6 @@ import org.slf4j.LoggerFactory;
 import javax.sql.DataSource;
 import java.sql.SQLException;
 import java.util.List;
-import java.util.Properties;
 
 
 /**
@@ -79,25 +78,15 @@ public class DeployMetaDB {
         var platformConfig = configManager.loadRootConfigObject(PlatformConfig.class);
 
         var metaDbConfig = platformConfig.getMetadata().getDatabase();
-        var dalProps = new Properties();
-        dalProps.putAll(metaDbConfig.getPropertiesMap());
 
-        // TODO: Move this onto standard plugin loading mechanism
-        for (var secret : metaDbConfig.getSecretsMap().entrySet()) {
-            var secretKey = secret.getKey();
-            var secretValue = configManager.loadPassword(secret.getValue());
-            dalProps.put(secretKey, secretValue);
-        }
-
-        var dialect = JdbcSetup.getSqlDialect(dalProps);
+        var dialect = JdbcSetup.getSqlDialect(metaDbConfig);
+        var dataSource = JdbcSetup.createDatasource(configManager, metaDbConfig);
 
         // Pick up DB deploy scripts depending on the SQL dialect
         var scriptsLocation = String.format(SCHEMA_LOCATION, dialect.name().toLowerCase());
 
         log.info("SQL Dialect: " + dialect);
         log.info("Scripts location: " + scriptsLocation);
-
-        var dataSource = JdbcSetup.createDatasource(dalProps);
 
         try {
 
