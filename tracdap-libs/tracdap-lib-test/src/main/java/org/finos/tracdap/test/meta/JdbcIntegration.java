@@ -16,30 +16,29 @@
 
 package org.finos.tracdap.test.meta;
 
+import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.db.JdbcSetup;
 import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.common.startup.Startup;
 import org.finos.tracdap.common.util.InterfaceLogging;
-import org.finos.tracdap.common.db.JdbcDialect;
 import org.finos.tracdap.config.PlatformConfig;
+import org.finos.tracdap.config.PluginConfig;
 import org.finos.tracdap.svc.meta.dal.IMetadataDal;
 import org.finos.tracdap.svc.meta.dal.jdbc.JdbcMetadataDal;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.extension.*;
 
-import javax.sql.DataSource;
 import java.nio.file.Paths;
-import java.util.Properties;
 
 
-public class JdbcIntegration implements BeforeAllCallback, BeforeEachCallback, AfterEachCallback, AfterAllCallback {
+public class JdbcIntegration implements BeforeAllCallback, BeforeEachCallback, AfterEachCallback {
 
     private static final String TRAC_CONFIG_FILE = "TRAC_CONFIG_FILE";
     private static final String TRAC_SECRET_KEY = "TRAC_SECRET_KEY";
 
-    private JdbcDialect dialect;
-    private DataSource source;
+    private ConfigManager configManager;
+    private PluginConfig metaDbConfig;
     private JdbcMetadataDal dal;
 
     @Override
@@ -56,13 +55,10 @@ public class JdbcIntegration implements BeforeAllCallback, BeforeEachCallback, A
         if (configFile == null || configFile.isBlank())
             throw new EStartup("Missing environment variable for integration testing: " + TRAC_CONFIG_FILE);
 
-        var configManager = Startup.quickConfig(workingDir, configFile, keystoreKey);
+        configManager = Startup.quickConfig(workingDir, configFile, keystoreKey);
 
         var platformConfig = configManager.loadRootConfigObject(PlatformConfig.class);
-        var metaDbConfig = platformConfig.getMetadata().getDatabase();
-
-        dialect = JdbcSetup.getSqlDialect(metaDbConfig);
-        source = JdbcSetup.createDatasource(configManager, metaDbConfig);
+        metaDbConfig = platformConfig.getMetadata().getDatabase();
     }
 
     @Override
@@ -73,10 +69,11 @@ public class JdbcIntegration implements BeforeAllCallback, BeforeEachCallback, A
         if (testClass.isEmpty() || !IDalTestable.class.isAssignableFrom(testClass.get()))
             Assertions.fail("JUnit extension for DAL testing requires the test class to implement IDalTestable");
 
-        var dal = new JdbcMetadataDal(dialect, source);
-        dal.start();
+        var dialect = JdbcSetup.getSqlDialect(metaDbConfig);
+        var source = JdbcSetup.createDatasource(configManager, metaDbConfig);
 
-        this.dal = dal;
+        dal = new JdbcMetadataDal(dialect, source);
+        dal.start();
 
         var dalWithLogging = InterfaceLogging.wrap(dal, IMetadataDal.class);
         var testInstance = context.getTestInstance();
@@ -90,14 +87,9 @@ public class JdbcIntegration implements BeforeAllCallback, BeforeEachCallback, A
     @Override
     public void afterEach(ExtensionContext context) {
 
-        if (dal != null)
+        if (dal != null) {
             dal.stop();
-    }
-
-    @Override
-    public void afterAll(ExtensionContext context) {
-
-        JdbcSetup.destroyDatasource(source);
-        source = null;
+            dal = null;
+        }
     }
 }
