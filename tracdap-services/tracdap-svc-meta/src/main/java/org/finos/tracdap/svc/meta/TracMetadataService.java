@@ -105,8 +105,8 @@ public class TracMetadataService extends CommonServiceBase {
                 dalProps.put(secretKey, secretValue);
             }
 
-            var dialect = JdbcSetup.getSqlDialect(dalProps, "");
-            dataSource = JdbcSetup.createDatasource(dalProps, "");
+            var dialect = JdbcSetup.getSqlDialect(dalProps);
+            dataSource = JdbcSetup.createDatasource(dalProps);
 
             // Construct the DAL using a direct executor, as per the comments above
             dal = new JdbcMetadataDal(dialect, dataSource);

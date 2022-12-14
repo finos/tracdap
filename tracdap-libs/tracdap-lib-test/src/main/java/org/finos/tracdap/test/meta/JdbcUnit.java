@@ -58,7 +58,7 @@ public class JdbcUnit implements BeforeAllCallback, BeforeEachCallback, AfterEac
         props.setProperty("h2.pass", "trac");
         props.setProperty("pool.size", "2");
 
-        source = JdbcSetup.createDatasource(props, "");
+        source = JdbcSetup.createDatasource(props);
 
         // Find project root dir
         var tracRepoDir = Paths.get(".").toAbsolutePath();

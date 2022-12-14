@@ -89,7 +89,7 @@ public class DeployMetaDB {
             dalProps.put(secretKey, secretValue);
         }
 
-        var dialect = JdbcSetup.getSqlDialect(dalProps, "");
+        var dialect = JdbcSetup.getSqlDialect(dalProps);
 
         // Pick up DB deploy scripts depending on the SQL dialect
         var scriptsLocation = String.format(SCHEMA_LOCATION, dialect.name().toLowerCase());
@@ -97,7 +97,7 @@ public class DeployMetaDB {
         log.info("SQL Dialect: " + dialect);
         log.info("Scripts location: " + scriptsLocation);
 
-        var dataSource = JdbcSetup.createDatasource(dalProps, "");
+        var dataSource = JdbcSetup.createDatasource(dalProps);
 
         try {
 

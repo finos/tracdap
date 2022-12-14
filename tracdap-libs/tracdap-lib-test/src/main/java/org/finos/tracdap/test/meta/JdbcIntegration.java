@@ -69,8 +69,8 @@ public class JdbcIntegration implements BeforeAllCallback, BeforeEachCallback, A
             dalProps.put(secretKey, secretValue);
         }
 
-        dialect = JdbcSetup.getSqlDialect(dalProps, "");
-        source = JdbcSetup.createDatasource(dalProps, "");
+        dialect = JdbcSetup.getSqlDialect(dalProps);
+        source = JdbcSetup.createDatasource(dalProps);
     }
 
     @Override
