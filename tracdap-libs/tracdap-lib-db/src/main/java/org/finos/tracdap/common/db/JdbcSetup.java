@@ -61,6 +61,9 @@ public class JdbcSetup {
 
     public static DataSource createDatasource(ConfigManager configManager, PluginConfig config) {
 
+        // This is the same behavior as the plugin manager when it loads standard plugins
+        // Needed when data sources are created in isolation, e.g. tests and the DB deploy tool
+
         var properties = new Properties();
         properties.putAll(config.getPropertiesMap());
 
