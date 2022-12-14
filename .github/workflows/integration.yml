@@ -313,16 +313,16 @@ jobs:
         run: ./gradlew trac-svc-meta:testClasses
 
       # Auth tool will also create the secrets file if it doesn't exist
-      - name: Prepare Auth Keys
+      - name: Prepare secrets
         run: |
           ./gradlew secret-tool:run --args="--config ${{ env.TRAC_CONFIG_FILE }} --task init_secrets"
           ./gradlew secret-tool:run --args="--config ${{ env.TRAC_CONFIG_FILE }} --task create_root_auth_key EC 256"
           
-          echo ${{ env.TRAC_DB_SECRET }} | ./gradlew secret-tool:run --args="--config ${{ env.TRAC_CONFIG_FILE }} --task add_secret metadb_secret"
+          echo "${METADB_SECRET}" | ./gradlew secret-tool:run --args="--config ${{ env.TRAC_CONFIG_FILE }} --task add_secret metadb_secret"
 
       # The name and description of the test tenant are verified in one of the test cases so they need to match
       # MetadataReapApiTest listTenants()
-      - name: Prepare Database
+      - name: Prepare database
         run: |
           ./gradlew deploy-metadb:run --args="\
           --config ${{ env.TRAC_CONFIG_FILE }} \
@@ -330,7 +330,7 @@ jobs:
           --task deploy_schema \
           --task add_tenant ACME_CORP 'Test tenant [ACME_CORP]'"
 
-      - name: Integration Tests
+      - name: Integration tests
         run: ./gradlew trac-svc-meta:integration -DintegrationTags="int-metadb"
 
       # If the tests fail, make the output available for download
@@ -390,16 +390,16 @@ jobs:
         run: ./gradlew testClasses
 
       # Auth tool will also create the secrets file if it doesn't exist
-      - name: Prepare Auth Keys
+      - name: Prepare secrets
         run: |
           ./gradlew secret-tool:run --args="--config ${{ env.TRAC_CONFIG_FILE }} --task init_secrets"
           ./gradlew secret-tool:run --args="--config ${{ env.TRAC_CONFIG_FILE }} --task create_root_auth_key EC 256"
           
-          echo ${{ env.STORAGE_SECRET }} | ./gradlew secret-tool:run --args="--config ${{ env.TRAC_CONFIG_FILE }} --task add_secret storage_secret"
+          echo "${STORAGE_SECRET}" | ./gradlew secret-tool:run --args="--config ${{ env.TRAC_CONFIG_FILE }} --task add_secret storage_secret"
 
       # No need to prepare DB, it is done by the platform test setup
 
-      - name: Integration Tests
+      - name: Integration tests
         run: ./gradlew integration -DintegrationTags="int-storage"
 
       # If the tests fail, make the output available for download
