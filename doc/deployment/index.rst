@@ -14,6 +14,7 @@ Deployment
 
     sandbox
     platform
+    secrets
     metadata_store
     authentication
     storage
