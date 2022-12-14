@@ -22,12 +22,12 @@ apply from: "${rootProject.projectDir.path}/gradle/base-java.gradle"
 apply from: "${rootProject.projectDir.path}/gradle/functions.gradle"
 
 
-description = "Set up and manage authentication keys and configuration for TRAC D.A.P."
+description = "Set up and manage secrets and other sensifitive configuration for TRAC D.A.P."
 
 // Put tools into a separate package group
 group = "org.finos.tracdap.tools"
 
-ext.addVersionInfo(sourceSets.getByName("main"), "TRAC Deploy Meta DB")
+ext.addVersionInfo(sourceSets.getByName("main"), "TRAC Secret Tool")
 
 application {
     mainClass.set("org.finos.tracdap.tools.auth.AuthTool")
