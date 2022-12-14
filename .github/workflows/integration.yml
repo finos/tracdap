@@ -79,7 +79,8 @@ jobs:
           sed -i "s#/path/to#${deploy_dir}#g" etc/trac-platform.yaml
           sed -i '/jwtExpiry: 86400/a \ \ disableAuth: true' etc/trac-platform.yaml
           
-          bin/auth-tool run --task create_root_auth_key EC 256
+          bin/secret-tool run --task init_secrets
+          bin/secret-tool run --task create_root_auth_key EC 256
           bin/deploy-metadb run --task deploy_schema
           bin/deploy-metadb run --task add_tenant ACME_CORP "ACME Rockets always get the Coyote!"
 
@@ -310,10 +311,8 @@ jobs:
       # Auth tool will also create the secrets file if it doesn't exist
       - name: Prepare Auth Keys
         run: |
-          ./gradlew auth-tool:run --args="\
-          --config ${{ env.TRAC_CONFIG_FILE }} \
-          --secret-key ${{ env.TRAC_SECRET_KEY }} \
-          --task create_root_auth_key EC 256"
+          ./gradlew secret-tool:run --args="--config ${{ env.TRAC_CONFIG_FILE }} --task init_secrets"
+          ./gradlew secret-tool:run --args="--config ${{ env.TRAC_CONFIG_FILE }} --task create_root_auth_key EC 256"
 
       # The name and description of the test tenant are verified in one of the test cases so they need to match
       # MetadataReapApiTest listTenants()
@@ -386,10 +385,8 @@ jobs:
       # Auth tool will also create the secrets file if it doesn't exist
       - name: Prepare Auth Keys
         run: |
-          ./gradlew auth-tool:run --args="\
-          --config ${{ env.TRAC_CONFIG_FILE }} \
-          --secret-key ${{ env.TRAC_SECRET_KEY }} \
-          --task create_root_auth_key EC 256"
+          ./gradlew secret-tool:run --args="--config ${{ env.TRAC_CONFIG_FILE }} --task init_secrets"
+          ./gradlew secret-tool:run --args="--config ${{ env.TRAC_CONFIG_FILE }} --task create_root_auth_key EC 256"
 
       # No need to prepare DB, it is done by the platform test setup
 
