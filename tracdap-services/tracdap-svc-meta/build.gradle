@@ -83,6 +83,10 @@ dependencies {
 // Note SQL driver plugins are enabled in tracdap-lib-db
 ext.enableBuildTimePlugins(["config"])
 
+// Compiling dependent targets does not require processResources to be executed by default
+// E.g. running tests from the IDE will not trigger processResources - this can cause confusion!
+// This dependency ensures resources are always processed, even for partial builds
+compileJava.dependsOn(processResources)
 
 // Bring DDL files into test JAR as resources
 processTestResources {
