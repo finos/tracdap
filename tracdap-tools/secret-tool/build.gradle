@@ -30,7 +30,7 @@ group = "org.finos.tracdap.tools"
 ext.addVersionInfo(sourceSets.getByName("main"), "TRAC Secret Tool")
 
 application {
-    mainClass.set("org.finos.tracdap.tools.auth.AuthTool")
+    mainClass.set("org.finos.tracdap.tools.secrets.SecretTool")
     tasks.run.workingDir = rootProject.projectDir
 }
 
