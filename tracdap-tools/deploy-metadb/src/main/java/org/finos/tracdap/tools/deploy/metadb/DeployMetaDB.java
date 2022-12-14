@@ -82,6 +82,13 @@ public class DeployMetaDB {
         var dalProps = new Properties();
         dalProps.putAll(metaDbConfig.getPropertiesMap());
 
+        // TODO: Move this onto standard plugin loading mechanism
+        for (var secret : metaDbConfig.getSecretsMap().entrySet()) {
+            var secretKey = secret.getKey();
+            var secretValue = configManager.loadPassword(secret.getValue());
+            dalProps.put(secretKey, secretValue);
+        }
+
         var dialect = JdbcSetup.getSqlDialect(dalProps, "");
 
         // Pick up DB deploy scripts depending on the SQL dialect
