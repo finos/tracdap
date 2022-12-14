@@ -61,7 +61,7 @@ dependencies {
     // Give tests access to the deploy tools to set up services for integration
 
     api project(':deploy-metadb')
-    api project(':auth-tool')
+    api project(':secret-tool')
 }
 
 

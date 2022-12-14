@@ -67,10 +67,10 @@ project(":tracdap-gateway").projectDir = file("tracdap-services/tracdap-gateway"
 // Tools and utilities
 
 include 'deploy-metadb'
-project(":deploy-metadb").projectDir = file("tracdap-tools/deploy-metadb")
+include 'secret-tool'
 
-include 'auth-tool'
-project(":auth-tool").projectDir = file("tracdap-tools/auth-tool")
+project(":deploy-metadb").projectDir = file("tracdap-tools/deploy-metadb")
+project(":secret-tool").projectDir = file("tracdap-tools/secret-tool")
 
 
 // Plugins
