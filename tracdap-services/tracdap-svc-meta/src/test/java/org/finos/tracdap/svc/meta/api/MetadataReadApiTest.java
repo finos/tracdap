@@ -69,7 +69,7 @@ abstract class MetadataReadApiTest {
     }
 
     // Include this test case for integration against different database backends
-    @org.junit.jupiter.api.Tag("integration")
+    @Tag("integration")
     @Tag("int-metadb")
     static class IntegrationTest extends MetadataReadApiTest {
 

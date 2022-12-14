@@ -36,12 +36,13 @@ import java.util.UUID;
 import static org.finos.tracdap.test.meta.TestData.TEST_TENANT;
 
 
-public class JdbcUnit implements BeforeAllCallback, BeforeEachCallback, AfterEachCallback, AfterAllCallback {
+public class JdbcUnit implements BeforeAllCallback, BeforeEachCallback, AfterEachCallback {
 
     private static final String SCRIPT_LOCATION = "tracdap-services/tracdap-svc-meta/src/schema/h2/rollout";
 
     private static final String JDBC_URL_TEMPLATE = "mem:%s;DB_CLOSE_DELAY=-1";
 
+    private Properties properties;
     private DataSource source;
     private JdbcMetadataDal dal;
 
@@ -51,42 +52,52 @@ public class JdbcUnit implements BeforeAllCallback, BeforeEachCallback, AfterEac
         var dbId = UUID.randomUUID();
         var jdbcUrl = String.format(JDBC_URL_TEMPLATE, dbId);
 
-        var props = new Properties();
-        props.setProperty("jdbcUrl", jdbcUrl);
-        props.setProperty("dialect", "H2");
-        props.setProperty("h2.user", "trac");
-        props.setProperty("h2.pass", "trac");
-        props.setProperty("pool.size", "2");
+        properties = new Properties();
+        properties.setProperty("jdbcUrl", jdbcUrl);
+        properties.setProperty("dialect", "H2");
+        properties.setProperty("h2.user", "trac");
+        properties.setProperty("h2.pass", "trac");
+        properties.setProperty("pool.size", "2");
 
-        source = JdbcSetup.createDatasource(props);
+        try {
 
-        // Find project root dir
-        var tracRepoDir = Paths.get(".").toAbsolutePath();
-        while (!Files.exists(tracRepoDir.resolve("tracdap-api")))
-            tracRepoDir = tracRepoDir.getParent();
+            source = JdbcSetup.createDatasource(properties);
 
-        var scriptLocation = "filesystem:" + tracRepoDir.resolve(SCRIPT_LOCATION);
+            // Find project root dir
+            var tracRepoDir = Paths.get(".").toAbsolutePath();
+            while (!Files.exists(tracRepoDir.resolve("tracdap-api")))
+                tracRepoDir = tracRepoDir.getParent();
 
-        // Use Flyway to deploy the schema
-        var flyway = Flyway.configure()
-                .dataSource(source)
-                .locations(scriptLocation)
-                .sqlMigrationPrefix("")
-                .sqlMigrationSuffixes(".sql", ".ddl", ".dml")
-                .load();
+            var scriptLocation = "filesystem:" + tracRepoDir.resolve(SCRIPT_LOCATION);
 
-        flyway.migrate();
+            // Use Flyway to deploy the schema
+            var flyway = Flyway.configure()
+                    .dataSource(source)
+                    .locations(scriptLocation)
+                    .sqlMigrationPrefix("")
+                    .sqlMigrationSuffixes(".sql", ".ddl", ".dml")
+                    .load();
 
-        // Create the test tenant
-        var tenantStmt = "insert into tenant (tenant_id, tenant_code, description) values (?, ?, ?)";
+            flyway.migrate();
 
-        try (var conn = source.getConnection(); var stmt = conn.prepareStatement(tenantStmt)) {
+            // Create the test tenant
+            var tenantStmt = "insert into tenant (tenant_id, tenant_code, description) values (?, ?, ?)";
 
-            stmt.setShort(1, (short) 1);
-            stmt.setString(2, TEST_TENANT);
-            stmt.setString(3, "Test tenant");
+            try (var conn = source.getConnection(); var stmt = conn.prepareStatement(tenantStmt)) {
 
-            stmt.execute();
+                stmt.setShort(1, (short) 1);
+                stmt.setString(2, TEST_TENANT);
+                stmt.setString(3, "Test tenant");
+
+                stmt.execute();
+            }
+        }
+        finally {
+
+            if (source != null) {
+                JdbcSetup.destroyDatasource(source);
+                source = null;
+            }
         }
     }
 
@@ -98,10 +109,9 @@ public class JdbcUnit implements BeforeAllCallback, BeforeEachCallback, AfterEac
         if (testClass.isEmpty() || !IDalTestable.class.isAssignableFrom(testClass.get()))
             Assertions.fail("JUnit extension for DAL testing requires the test class to implement IDalTestable");
 
-        var dal = new JdbcMetadataDal(JdbcDialect.H2, source);
-        dal.startup();
-
-        this.dal = dal;
+        source = JdbcSetup.createDatasource(properties);
+        dal = new JdbcMetadataDal(JdbcDialect.H2, source);
+        dal.start();
 
         var dalWithLogging = InterfaceLogging.wrap(dal, IMetadataDal.class);
         var testInstance = context.getTestInstance();
@@ -115,14 +125,10 @@ public class JdbcUnit implements BeforeAllCallback, BeforeEachCallback, AfterEac
     @Override
     public void afterEach(ExtensionContext context) {
 
-        if (dal != null)
-            dal.shutdown();
-    }
-
-    @Override
-    public void afterAll(ExtensionContext context) {
-
-        JdbcSetup.destroyDatasource(source);
-        source = null;
+        if (dal != null) {
+            dal.stop();
+            dal = null;
+            source = null;
+        }
     }
 }

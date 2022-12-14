@@ -57,20 +57,12 @@ public class JdbcIntegration implements BeforeAllCallback, BeforeEachCallback, A
             throw new EStartup("Missing environment variable for integration testing: " + TRAC_CONFIG_FILE);
 
         var configManager = Startup.quickConfig(workingDir, configFile, keystoreKey);
+
         var platformConfig = configManager.loadRootConfigObject(PlatformConfig.class);
-
         var metaDbConfig = platformConfig.getMetadata().getDatabase();
-        var dalProps = new Properties();
-        dalProps.putAll(metaDbConfig.getPropertiesMap());
 
-        for (var secret : metaDbConfig.getSecretsMap().entrySet()) {
-            var secretKey = secret.getKey();
-            var secretValue = configManager.loadPassword(secret.getValue());
-            dalProps.put(secretKey, secretValue);
-        }
-
-        dialect = JdbcSetup.getSqlDialect(dalProps);
-        source = JdbcSetup.createDatasource(dalProps);
+        dialect = JdbcSetup.getSqlDialect(metaDbConfig);
+        source = JdbcSetup.createDatasource(configManager, metaDbConfig);
     }
 
     @Override
@@ -82,7 +74,7 @@ public class JdbcIntegration implements BeforeAllCallback, BeforeEachCallback, A
             Assertions.fail("JUnit extension for DAL testing requires the test class to implement IDalTestable");
 
         var dal = new JdbcMetadataDal(dialect, source);
-        dal.startup();
+        dal.start();
 
         this.dal = dal;
 
@@ -99,7 +91,7 @@ public class JdbcIntegration implements BeforeAllCallback, BeforeEachCallback, A
     public void afterEach(ExtensionContext context) {
 
         if (dal != null)
-            dal.shutdown();
+            dal.stop();
     }
 
     @Override
