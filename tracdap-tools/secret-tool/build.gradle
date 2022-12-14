@@ -34,6 +34,11 @@ application {
     tasks.run.workingDir = rootProject.projectDir
 }
 
+run {
+    // Allow console input when running as a Gradle task in CI
+    standardInput = System.in
+}
+
 dependencies {
 
     implementation project(':tracdap-api-config')
