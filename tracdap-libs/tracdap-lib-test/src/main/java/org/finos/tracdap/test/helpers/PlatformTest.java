@@ -30,7 +30,7 @@ import org.finos.tracdap.common.plugin.PluginManager;
 import org.finos.tracdap.common.startup.StandardArgs;
 import org.finos.tracdap.config.InstanceConfig;
 import org.finos.tracdap.config.PlatformConfig;
-import org.finos.tracdap.tools.auth.AuthTool;
+import org.finos.tracdap.tools.secrets.SecretTool;
 import org.finos.tracdap.tools.deploy.metadb.DeployMetaDB;
 import org.finos.tracdap.svc.data.TracDataService;
 import org.finos.tracdap.svc.meta.TracMetadataService;
@@ -318,7 +318,7 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         // Running the auth tool will create the secrets file and add the public / private keys for auth
 
         var authTasks = new ArrayList<StandardArgs.Task>();
-        authTasks.add(StandardArgs.task(AuthTool.CREATE_ROOT_AUTH_KEY, List.of("EC", "256"), ""));
+        authTasks.add(StandardArgs.task(SecretTool.CREATE_ROOT_AUTH_KEY, List.of("EC", "256"), ""));
         ServiceHelpers.runAuthTool(tracDir, platformConfigUrl, secretKey, authTasks);
 
         // Authentication is mandatory, so we need to build a token in order to test at the API level

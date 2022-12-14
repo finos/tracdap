@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.tools.auth;
+package org.finos.tracdap.tools.secrets;
 
 
 import org.finos.tracdap.common.config.ConfigKeys;
@@ -45,7 +45,7 @@ import java.util.Map;
 import java.util.Scanner;
 
 
-public class AuthTool {
+public class SecretTool {
 
     public final static String INIT_SECRETS = "init_secrets";
     public final static String ADD_SECRET = "add_secret";
@@ -83,7 +83,7 @@ public class AuthTool {
      * Construct a new instance of the auth tool
      * @param configManager A prepared instance of ConfigManager
      */
-    public AuthTool(ConfigManager configManager, String secretKey) {
+    public SecretTool(ConfigManager configManager, String secretKey) {
 
         this.configManager = configManager;
         this.secretKey = secretKey;
@@ -459,14 +459,14 @@ public class AuthTool {
             // Do not use secrets during start up
             // This tool is often used to create the secrets file
 
-            var startup = Startup.useCommandLine(AuthTool.class, args, AUTH_TOOL_TASKS);
+            var startup = Startup.useCommandLine(SecretTool.class, args, AUTH_TOOL_TASKS);
             startup.runStartupSequence(/* useSecrets = */ false);
 
             var config = startup.getConfig();
             var tasks = startup.getArgs().getTasks();
             var secretKey = startup.getArgs().getSecretKey();
 
-            var tool = new AuthTool(config, secretKey);
+            var tool = new SecretTool(config, secretKey);
             tool.runTasks(tasks);
 
             System.exit(0);

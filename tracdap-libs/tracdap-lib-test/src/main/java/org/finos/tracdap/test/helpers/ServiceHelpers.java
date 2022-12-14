@@ -22,7 +22,7 @@ import org.finos.tracdap.common.plugin.PluginManager;
 import org.finos.tracdap.common.service.CommonServiceBase;
 import org.finos.tracdap.common.startup.StandardArgs;
 import org.finos.tracdap.common.startup.Startup;
-import org.finos.tracdap.tools.auth.AuthTool;
+import org.finos.tracdap.tools.secrets.SecretTool;
 import org.finos.tracdap.tools.deploy.metadb.DeployMetaDB;
 import org.finos.tracdap.svc.meta.TracMetadataService;
 
@@ -39,11 +39,11 @@ public class ServiceHelpers {
         // Do not use secrets during start up for the auth tool
         // The auth tool is often used to create the secrets file
 
-        var startup = Startup.useConfigFile(AuthTool.class, workingDir, configPath.toString(), keystoreKey);
+        var startup = Startup.useConfigFile(SecretTool.class, workingDir, configPath.toString(), keystoreKey);
         startup.runStartupSequence(/* useSecrets = */ false);
 
         var config = startup.getConfig();
-        var authTool = new AuthTool(config, keystoreKey);
+        var authTool = new SecretTool(config, keystoreKey);
 
         authTool.runTasks(tasks);
     }

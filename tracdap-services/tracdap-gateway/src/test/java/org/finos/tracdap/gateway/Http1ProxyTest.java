@@ -21,7 +21,7 @@ import org.finos.tracdap.common.startup.Startup;
 
 import io.netty.handler.codec.http.*;
 import org.finos.tracdap.test.helpers.ServiceHelpers;
-import org.finos.tracdap.tools.auth.AuthTool;
+import org.finos.tracdap.tools.secrets.SecretTool;
 import org.junit.jupiter.api.*;
 
 import java.nio.charset.StandardCharsets;
@@ -65,7 +65,7 @@ public class Http1ProxyTest {
         Assertions.assertNotNull(configFile);
 
         var authTasks = new ArrayList<StandardArgs.Task>();
-        authTasks.add(StandardArgs.task(AuthTool.CREATE_ROOT_AUTH_KEY, List.of("EC", "256"), ""));
+        authTasks.add(StandardArgs.task(SecretTool.CREATE_ROOT_AUTH_KEY, List.of("EC", "256"), ""));
         ServiceHelpers.runAuthTool(rootDir, configFile, secretKey, authTasks);
 
 
