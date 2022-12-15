@@ -50,10 +50,29 @@ are required. The *prefix* property is optional, if specified it will be used as
 in the bucket. TRAC follows the convention of using path-like object keys, so backslashes can be used in the
 prefix if desired.
 
+.. code-block:: yaml
+
+  storage:
+
+    buckets:
+
+      DATA_BUCKET_1:
+        protocol: S3
+        properties:
+          region: <aws_region>
+          bucket: <aws_bucket_name>
+          prefix: <storage_prefix>
+          credentials: default
+
+
 Credentials can be supplied in various different ways. For deployments where all the TRAC services are running
-in AWS, the •default• mechanism allows permissions to be managed using AWS roles without need for further
-configuration in TRAC. This is the preferred mechanism for deployments where it is available. If the TRAC
-services are not running in AWS the *static* method can be used to authenticate with an access key.
+in AWS, the •default• mechanism shown above allows permissions to be managed using AWS roles without need for
+further configuration in TRAC. This is the preferred mechanism for deployments where it is available.
+
+It is also possible to authenticate with an access key, for example if the TRAC services are running outside AWS.
+You can use the secrets mechanism to secure the access key by storing the secret part in the secret store.
+In this example you would need to add a secret to the store called *data_bucket_1_secret_key*.
+See :doc:`secrets` for more details on how to configure secrets.
 
 .. code-block:: yaml
 
@@ -61,17 +80,13 @@ services are not running in AWS the *static* method can be used to authenticate 
 
     buckets:
 
-      TEST_PLUGIN:
+      DATA_BUCKET_1:
         protocol: S3
         properties:
           region: <aws_region>
           bucket: <aws_bucket_name>
           prefix: <storage_prefix>
-
-          # For credentials supplied automatically by AWS assigned roles
-          credentials: default
-
-          # Or for credentials assigned to an explicit IAM user
           credentials: static
           accessKeyId: <aws_access_key_id>
-          secretAccessKey: <aws_secret_access_key>
+        secrets:
+          secretAccessKey: data_bucket_1_secret_key
