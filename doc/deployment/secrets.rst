@@ -88,7 +88,9 @@ We have created a utility called *secret-tool*, which can be used to manage secr
 using TRAC-style tasks. By default secret-tool will operate on the keystore configured in your TRAC platform
 config file.
 
-To complete the example above, suppose we wanted to add the secret *acme_bucket_secret_key* into the keystore:
+To create a new secret store, the *init_secrets* task is available. This will create the keystore file
+referenced in the TRAC platform config if it does not exist, and protected with the secret key set in
+the *TRAC_SECRET_KEY* environment variable.
 
 .. tab-set::
 
@@ -99,7 +101,6 @@ To complete the example above, suppose we wanted to add the secret *acme_bucket_
 
             cd /opt/trac/current
             bin/secret-tool run --task init_secrets
-            bin/secret-tool run --task add_secret acme_bucket_secret_key
 
     .. tab-item:: Windows
         :sync: platform_windows
@@ -108,6 +109,23 @@ To complete the example above, suppose we wanted to add the secret *acme_bucket_
 
             cd /d C:\trac\tracdap-sandbox-<version>
             bin\secret-tool.bat run --task init_secrets
+
+Now to complete the example above, suppose we wanted to add the secret *acme_bucket_secret_key* into the keystore:
+
+.. tab-set::
+
+    .. tab-item:: Linux / macOS
+        :sync: platform_linux
+
+        .. code-block:: shell
+
+            bin/secret-tool run --task add_secret acme_bucket_secret_key
+
+    .. tab-item:: Windows
+        :sync: platform_windows
+
+        .. code-block:: batch
+
             bin\secret-tool.bat run --task add_secret acme_bucket_secret_key
 
 The tool will prompt you for the value of the secret, which will not be displayed on the console.

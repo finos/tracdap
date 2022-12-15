@@ -29,7 +29,8 @@ the platform and gateway config files.
 You will also need to add an authentication block in both config files, specifying the issuer
 and expiry times for JWT tokens. If you know the DNS address that TRAC will be served from you
 could use this as the JWT issuer, other options could be the user ID of a service account you
-have set up to run TRAC, or a TRAC reserved identifier such as "trac_system".
+have set up to run TRAC, or a TRAC reserved identifier such as "trac_system". The root authentication
+key is stored in the secret store, so make sure you have a secret store configured too.
 
 .. code-block:: yaml
 
@@ -41,13 +42,12 @@ have set up to run TRAC, or a TRAC reserved identifier such as "trac_system".
       jwtIssuer: http://localhost:8080/
       jwtExpiry: 7200
 
-The auth-tool utility can be used to generate the root signing key, it will be written into the
-secret store. The available key types are elliptic curve (EC) or RSA. Elliptic curve keys are
-considered to give better security with better performance at lower key sizes. For this reason
-we recommended EC 256 keys.
+The secret-tool utility can be used to generate the root signing key. The available key types are
+elliptic curve (EC) or RSA. Elliptic curve keys are considered to give better security with better
+performance at lower key sizes. For this reason we recommended EC 256 keys.
 
-Make sure you have set the *TRAC_SECRET_KEY* environment variable before running *auth_tool*. For
-sandbox deployments, this can be set in *etc/env.sh* (or *etc\\env.bat* on Windows).
+Make sure you have initialized the secret store and set the *TRAC_SECRET_KEY* environment variable
+before running *secret-tool*. For more details on the *secret-tool*, see :doc:`secrets`.
 
 .. tab-set::
 
@@ -57,7 +57,7 @@ sandbox deployments, this can be set in *etc/env.sh* (or *etc\\env.bat* on Windo
         .. code-block:: shell
 
             cd /opt/trac/current
-            bin/auth-tool run --task create_root_auth_key EC 256
+            bin/secret-tool run --task create_root_auth_key EC 256
 
     .. tab-item:: Windows
         :sync: platform_windows
@@ -65,7 +65,7 @@ sandbox deployments, this can be set in *etc/env.sh* (or *etc\\env.bat* on Windo
         .. code-block:: batch
 
             cd /d C:\trac\tracdap-sandbox-<version>
-            bin\auth-tool.bat run --task create_root_auth_key EC 256
+            bin\secret-tool.bat run --task create_root_auth_key EC 256
 
 .. note::
     Running the *create_root_auth_key* command a second time will replace the root authentication key,
@@ -109,7 +109,7 @@ these settings into the *config* section of the gateway config file.
       users.url: local_users.p12
       users.key: local_users_key
 
-You will need to initialize the user database and add at least one user. The *auth-tool* utility will let
+You will need to initialize the user database and add at least one user. The *secret-tool* utility will let
 you do this. The add_user command is interactive and will ask for details to create a user. You can remove
 users later using the *delete_user* command.
 
@@ -121,10 +121,10 @@ users later using the *delete_user* command.
         .. code-block:: shell
 
             cd /opt/trac/current
-            bin/auth-tool run --task init_trac_users
-            bin/auth-tool run --task add_user
+            bin/secret-tool run --task init_trac_users
+            bin/secret-tool run --task add_user
 
-            bin/auth-tool run --task delete_user <user_id>
+            bin/secret-tool run --task delete_user <user_id>
 
     .. tab-item:: Windows
         :sync: platform_windows
@@ -132,10 +132,10 @@ users later using the *delete_user* command.
         .. code-block:: batch
 
             cd /d C:\trac\tracdap-sandbox-<version>
-            bin\auth-tool.bat run --task init_trac_users
-            bin\auth-tool.bat run --task add_user
+            bin\secret-tool.bat run --task init_trac_users
+            bin\secret-tool.bat run --task add_user
 
-            bin\auth-tool.bat run --task delete_user <user_id>
+            bin\secret-tool.bat run --task delete_user <user_id>
 
 Once the user database is created you can enable the basic authentication provider. To do this,
 replace the provider section in the authentication block of the gateway config file and set the
