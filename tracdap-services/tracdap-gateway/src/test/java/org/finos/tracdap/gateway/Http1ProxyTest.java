@@ -38,12 +38,12 @@ public class Http1ProxyTest {
 
     private static final String HTTP1_PROXY_TEST_CONFIG = "/trac-unit-gateway-http1.yaml";
 
-    private static final String TEST_URL_SAMPLE_DOC = "/static/docs/design_principals.md";
+    private static final String TEST_URL_SAMPLE_DOC = "/static/docs/index.rst";
     private static final String TEST_URL_MISSING_DOC = "/static/docs/does_not_exist.md";
     private static final String TEST_URL_SERVER_DOWN = "/static/server_down/foo.md";
     private static final String TEST_URL_SERVER_TIMEOUT = "/static/server_timeout/bar.md";
 
-    private static final String TEST_FILE_LOCAL_PATH = "doc/design_principals.md";
+    private static final String TEST_FILE_LOCAL_PATH = "doc/index.rst";
     private static final short TEST_GW_PORT = 8080;
     private static final long TEST_TIMEOUT = 10 * 1000;  // 10 second timeout
 
