@@ -193,6 +193,10 @@ created above. For examples of how to configure other SQL dialects, see the depl
     :language: yaml
     :lines: 31 - 43
 
+.. note::
+    H2 is mostly used in development scenarios where the password is not sensitive.
+    If you want to use a secret for the H2 password, see :doc:`secrets`.
+
 The *storage* section allows you to configure one or more storage buckets to hold primary data. In TRAC,
 a "bucket" is any storage location that can hold files, which could be a cloud storage bucket on a cloud
 platform but can also be a local folder. Other protocols such as network storage or HDFS can also be
