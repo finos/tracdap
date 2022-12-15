@@ -38,6 +38,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static org.finos.tracdap.common.metadata.MetadataCodec.encodeValue;
@@ -47,6 +48,10 @@ import static org.finos.tracdap.common.metadata.MetadataUtil.selectorFor;
 
 public class JobLifecycle {
 
+    private static final MethodDescriptor<MetadataWriteBatchRequest, MetadataWriteBatchResponse> UPDATE_OBJECT_BATCH_METHOD = TrustedMetadataApiGrpc.getUpdateObjectBatchMethod();
+    private static final MethodDescriptor<MetadataWriteBatchRequest, MetadataWriteBatchResponse> CREATE_OBJECT_BATCH_METHOD = TrustedMetadataApiGrpc.getCreateObjectBatchMethod();
+    private static final MethodDescriptor<MetadataWriteBatchRequest, MetadataWriteBatchResponse> UPDATE_TAG_BATCH_METHOD = TrustedMetadataApiGrpc.getUpdateTagBatchMethod();
+    private static final MethodDescriptor<MetadataWriteBatchRequest, MetadataWriteBatchResponse> CREATE_PREALLOCATED_OBJECT_BATCH_METHOD = TrustedMetadataApiGrpc.getCreatePreallocatedObjectBatchMethod();
     private static final MethodDescriptor<MetadataWriteRequest, TagHeader> CREATE_OBJECT_METHOD = TrustedMetadataApiGrpc.getCreateObjectMethod();
     private static final MethodDescriptor<MetadataWriteBatchRequest, MetadataWriteBatchResponse> PREALLOCATE_ID_BATCH_METHOD = TrustedMetadataApiGrpc.getPreallocateIdBatchMethod();
     private static final MethodDescriptor<MetadataBatchRequest, MetadataBatchResponse> READ_BATCH_METHOD = TrustedMetadataApiGrpc.getReadBatchMethod();
@@ -64,6 +69,91 @@ public class JobLifecycle {
         this.platformConfig = platformConfig;
         this.metaClient = metaClient;
         this.grpcWrap = new GrpcClientWrap(getClass());
+    }
+
+    /**
+     * Add a request without sending it.
+     */
+    private static void addUpdateToBatchMetadataAPI(BatchMetadataWriteAPI batchMetadataWriteAPI, MetadataWriteRequest update) {
+        var targetList = batchMetadataWriteAPI.updateObject;
+
+        if (!update.hasDefinition()) {
+            targetList = batchMetadataWriteAPI.updateTag;
+        } else if (!update.hasPriorVersion()) {
+            targetList = batchMetadataWriteAPI.createObject;
+        } else if (update.getPriorVersion().getObjectVersion() < OBJECT_FIRST_VERSION) {
+            targetList = batchMetadataWriteAPI.createPreallocatedObject;
+        }
+
+        targetList.add(scrapTenant(update));
+    }
+
+    /**
+     * Send all requests in a batch manner. Clear the requests after the operation.
+     */
+    private void sendBatchMetadataWriteAPI(
+            JobState jobState,
+            BatchMetadataWriteAPI batchMetadataWriteAPI
+    ) {
+        var tenant = jobState.tenant;
+        var metadataClient = GrpcClientAuth.applyIfAvailable(metaClient, jobState.ownerToken);
+        callApi(
+                tenant,
+                CREATE_PREALLOCATED_OBJECT_BATCH_METHOD,
+                metadataClient::createPreallocatedObjectBatch,
+                batchMetadataWriteAPI.createPreallocatedObject
+        );
+
+        callApi(
+                tenant,
+                CREATE_OBJECT_BATCH_METHOD,
+                metadataClient::createObjectBatch,
+                batchMetadataWriteAPI.createObject
+        );
+
+        callApi(
+                tenant,
+                UPDATE_OBJECT_BATCH_METHOD,
+                metadataClient::updateObjectBatch,
+                batchMetadataWriteAPI.updateObject
+        );
+
+        callApi(
+                tenant,
+                UPDATE_TAG_BATCH_METHOD,
+                metadataClient::updateTagBatch,
+                batchMetadataWriteAPI.updateTag
+        );
+    }
+
+    private void callApi(
+            String tenant,
+            MethodDescriptor<MetadataWriteBatchRequest, MetadataWriteBatchResponse> methodDescriptor,
+            Function<MetadataWriteBatchRequest, MetadataWriteBatchResponse> methodImpl,
+            List<MetadataWriteRequest> requests
+    ) {
+        if (requests.isEmpty()) {
+            return;
+        }
+
+        grpcWrap.unaryCall(
+                methodDescriptor,
+                MetadataWriteBatchRequest.newBuilder()
+                        .setTenant(tenant)
+                        .addAllRequests(requests)
+                        .build(),
+                methodImpl);
+
+        requests.clear();
+    }
+
+    /**
+     * Remove tenant from write request.
+     * Necessary when you want to add the request to a batch write request.
+     */
+    private static MetadataWriteRequest scrapTenant(MetadataWriteRequest request) {
+        return MetadataWriteRequest.newBuilder(request)
+                .clearTenant().build();
     }
 
     JobState assembleAndValidate(JobState jobState) {
@@ -205,7 +295,7 @@ public class JobLifecycle {
 
         for (var key : keys) {
             var request = newResultIds.get(key);
-            request = BatchMetadataWriteAPI.scrapTenant(request);
+            request = scrapTenant(request);
 
             requests.add(request);
         }
@@ -318,19 +408,17 @@ public class JobLifecycle {
                 ? buildJobSucceededUpdate(jobState)
                 : buildJobFailedUpdate(jobState);
 
-        var resultMetadata = new BatchMetadataWriteAPI(
-                jobState.tenant,
-                GrpcClientAuth.applyIfAvailable(metaClient, jobState.ownerToken),
-                grpcWrap);
+        var resultMetadata = new BatchMetadataWriteAPI();
 
         for (var update : metaUpdates) {
 
             var update_ = applyJobAttrs(jobState, update);
-            resultMetadata.add(update_);
+            addUpdateToBatchMetadataAPI(resultMetadata, update_);
         }
 
-        resultMetadata.add(jobUpdate);
-        resultMetadata.send();
+        addUpdateToBatchMetadataAPI(resultMetadata, jobUpdate);
+
+        sendBatchMetadataWriteAPI(jobState, resultMetadata);
     }
 
     private MetadataWriteRequest buildJobSucceededUpdate(JobState jobState) {
