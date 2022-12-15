@@ -24,6 +24,10 @@ import java.util.UUID;
 
 public interface IMetadataDal {
 
+    void start();
+
+    void stop();
+
     List<TenantInfo> listTenants();
 
     void saveNewObjects(String tenant, List<Tag> tags);

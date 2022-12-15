@@ -72,9 +72,8 @@ public class TracMetadataService extends CommonServiceBase {
     private final PluginManager pluginManager;
     private final ConfigManager configManager;
 
-    private DataSource dataSource;
     private ExecutorService executor;
-    private JdbcMetadataDal dal;
+    private IMetadataDal dal;
     private Server server;
 
     public TracMetadataService(PluginManager pluginManager, ConfigManager configManager) {
@@ -94,16 +93,14 @@ public class TracMetadataService extends CommonServiceBase {
             // Handles different SQL dialects and authentication mechanisms etc.
             var platformConfig = configManager.loadRootConfigObject(PlatformConfig.class);
 
+            // Load the DAL service using the plugin loader mechanism
             var metaDbConfig = platformConfig.getMetadata().getDatabase();
+            dal = pluginManager.createService(IMetadataDal.class, configManager, metaDbConfig);
+            dal.start();
+
+            // Metadata DB props contains config need for the executor pool size
             var dalProps = new Properties();
             dalProps.putAll(metaDbConfig.getPropertiesMap());
-
-            var dialect = JdbcSetup.getSqlDialect(dalProps, "");
-            dataSource = JdbcSetup.createDatasource(dalProps, "");
-
-            // Construct the DAL using a direct executor, as per the comments above
-            dal = new JdbcMetadataDal(dialect, dataSource);
-            dal.startup();
 
             executor = createPrimaryExecutor(dalProps);
 
@@ -159,10 +156,8 @@ public class TracMetadataService extends CommonServiceBase {
         if (!server.isTerminated())
             server.shutdownNow();
 
-        dal.shutdown();
+        dal.stop();
         executor.shutdown();
-
-        JdbcSetup.destroyDatasource(dataSource);
 
         return 0;
     }

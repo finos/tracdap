@@ -16,6 +16,7 @@
 
 package org.finos.tracdap.svc.meta.dal.jdbc;
 
+import org.finos.tracdap.common.db.JdbcSetup;
 import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.exception.EStartup;
@@ -37,7 +38,9 @@ import java.util.stream.Collectors;
 
 public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
 
-    private final Logger log;
+    private final Logger log = LoggerFactory.getLogger(getClass());
+
+    private final DataSource dataSource;
 
     private final JdbcTenantImpl tenants;
     private final JdbcReadImpl readSingle;
@@ -50,7 +53,7 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
 
         super(dialect, dataSource);
 
-        log = LoggerFactory.getLogger(getClass());
+        this.dataSource = dataSource;
 
         tenants = new JdbcTenantImpl();
         readSingle = new JdbcReadImpl();
@@ -59,7 +62,8 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
         search = new JdbcSearchImpl();
     }
 
-    public void startup() {
+    @Override
+    public void start() {
 
         try {
             // Synchronous database call, avoid futures / callbacks during the startup sequence!
@@ -74,9 +78,10 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
         }
     }
 
-    public void shutdown() {
+    @Override
+    public void stop() {
 
-        // Noop
+        JdbcSetup.destroyDatasource(dataSource);
     }
 
     @Override

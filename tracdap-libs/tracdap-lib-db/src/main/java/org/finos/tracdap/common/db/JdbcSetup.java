@@ -16,10 +16,12 @@
 
 package org.finos.tracdap.common.db;
 
+import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.common.exception.ETracInternal;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
+import org.finos.tracdap.config.PluginConfig;
 import org.slf4j.LoggerFactory;
 
 import javax.sql.DataSource;
@@ -32,13 +34,22 @@ public class JdbcSetup {
     private static final String DIALECT_PROPERTY = "dialect";
     private static final String JDBC_URL_PROPERTY = "jdbcUrl";
 
-    public static JdbcDialect getSqlDialect(Properties props, String configBase) {
+    public static JdbcDialect getSqlDialect(PluginConfig config) {
 
-        var dialectPropKey = configBase + DIALECT_PROPERTY;
-        var dialect = props.getProperty(dialectPropKey, null);
+        var dialect = config.getPropertiesOrDefault(DIALECT_PROPERTY, null);
+        return checkSqlDialect(dialect);
+    }
+
+    public static JdbcDialect getSqlDialect(Properties properties) {
+
+        var dialect = properties.getProperty(DIALECT_PROPERTY, null);
+        return checkSqlDialect(dialect);
+    }
+
+    private static JdbcDialect checkSqlDialect(String dialect) {
 
         if (dialect == null || dialect.isBlank())
-            throw new EStartup("Missing required config property: " + dialectPropKey);
+            throw new EStartup("Missing required config property: " + DIALECT_PROPERTY);
 
         try {
             return Enum.valueOf(JdbcDialect.class, dialect);
@@ -48,10 +59,27 @@ public class JdbcSetup {
         }
     }
 
-    public static DataSource createDatasource(Properties props, String configBase) {
+    public static DataSource createDatasource(ConfigManager configManager, PluginConfig config) {
+
+        // This is the same behavior as the plugin manager when it loads standard plugins
+        // Needed when data sources are created in isolation, e.g. tests and the DB deploy tool
+
+        var properties = new Properties();
+        properties.putAll(config.getPropertiesMap());
+
+        for (var secret : config.getSecretsMap().entrySet()) {
+            var secretKey = secret.getKey();
+            var secretValue = configManager.loadPassword(secret.getValue());
+            properties.put(secretKey, secretValue);
+        }
+
+        return createDatasource(properties);
+    }
+
+    public static DataSource createDatasource(Properties properties) {
 
         try {
-            var hikariProps = createHikariProperties(props, configBase);
+            var hikariProps = createHikariProperties(properties);
 
             var config = new HikariConfig(hikariProps);
             var source = new HikariDataSource(config);
@@ -90,25 +118,19 @@ public class JdbcSetup {
         hikariSource.close();
     }
 
-    private static Properties createHikariProperties(Properties props, String configBase) {
+    private static Properties createHikariProperties(Properties properties) {
 
-        // Properties may be either qualified or unqualified (i.e. configBase is empty)
-        // Properties for JDBC are specified without a leading dot, to allow for unqualified props
-        // So, the config base is not blank it must end with a dot
-        if (!configBase.isEmpty() && !configBase.endsWith("."))
-            configBase = configBase + ".";
-
-        var dialect = getSqlDialect(props, configBase);
-        var jdbcUrl = buildJdbcUrl(props, configBase, dialect);
+        var dialect = getSqlDialect(properties);
+        var jdbcUrl = buildJdbcUrl(properties, dialect);
 
         var hikariProps = new Properties();
         hikariProps.setProperty("jdbcUrl", jdbcUrl);
 
-        copyDialectProperties(props, hikariProps, configBase, dialect);
+        copyDialectProperties(properties, hikariProps, dialect);
 
         hikariProps.setProperty("poolName", "dal_worker_pool");
 
-        var poolSize = props.getProperty(configBase + "pool.size");
+        var poolSize = properties.getProperty("pool.size");
 
         if (poolSize != null && !poolSize.isBlank())
             hikariProps.setProperty("maximumPoolSize", poolSize);
@@ -116,22 +138,16 @@ public class JdbcSetup {
         return hikariProps;
     }
 
-    private static String buildJdbcUrl(Properties rootProps, String configBase, JdbcDialect dialect) {
+    private static String buildJdbcUrl(Properties rootProps, JdbcDialect dialect) {
 
-        var jdbcUrlProperty = configBase + JDBC_URL_PROPERTY;
-        var jdbcUrlFromConfig = rootProps.getProperty(jdbcUrlProperty);
+        var jdbcUrlFromConfig = rootProps.getProperty(JDBC_URL_PROPERTY);
 
         return String.format("jdbc:%s:%s", dialect.name().toLowerCase(), jdbcUrlFromConfig);
     }
 
-    private static void copyDialectProperties(
-            Properties rootProps, Properties hikariProps,
-            String configBase, JdbcDialect dialect) {
+    private static void copyDialectProperties(Properties rootProps, Properties hikariProps, JdbcDialect dialect) {
 
-        var dialectPrefixFormat = "%s%s.";  // Trailing dot is required!
-        var dialectPrefix = String.format(
-                dialectPrefixFormat,
-                configBase, dialect.name().toLowerCase());
+        var dialectPrefix = dialect.name().toLowerCase() + ".";  // Trailing dot is required!
 
         for (var propKey : rootProps.stringPropertyNames()) {
 

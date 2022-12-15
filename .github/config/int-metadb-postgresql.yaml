@@ -36,9 +36,10 @@ metadata:
       dialect: POSTGRESQL
       jdbcUrl: //metadb:5432/trac
       postgresql.user: trac_admin
-      postgresql.password: trac_admin
       pool.size: 2
       pool.overflow: 5
+    secrets:
+      postgresql.password: metadb_secret
 
 instances:
   meta:

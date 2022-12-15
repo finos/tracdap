@@ -51,6 +51,9 @@ public class PluginServiceInfo {
     /** Standard service types for execution services **/
     public static final String EXECUTION_SERVICE_TYPE = "EXECUTION";
 
+    /** Standard service type for the metadata DAL **/
+    public static final String METADATA_DAL_SERVICE_TYPE = "METADATA_DAL";
+
     /**
      * Mapping of known service interfaces to service types.
      *
@@ -64,7 +67,8 @@ public class PluginServiceInfo {
             Map.entry("org.finos.tracdap.common.codec.ICodec", FORMAT_SERVICE_TYPE),
             Map.entry("org.finos.tracdap.common.storage.IFileStorage", FILE_STORAGE_SERVICE_TYPE),
             Map.entry("org.finos.tracdap.common.storage.IDataStorage", DATA_STORAGE_SERVICE_TYPE),
-            Map.entry("org.finos.tracdap.common.exec.IBatchExecutor", EXECUTION_SERVICE_TYPE));
+            Map.entry("org.finos.tracdap.common.exec.IBatchExecutor", EXECUTION_SERVICE_TYPE),
+            Map.entry("org.finos.tracdap.svc.meta.dal.IMetadataDal", METADATA_DAL_SERVICE_TYPE));
 
     private final Class<?> serviceClass;
     private final String serviceName;

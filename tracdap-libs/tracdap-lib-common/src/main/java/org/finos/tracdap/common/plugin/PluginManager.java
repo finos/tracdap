@@ -100,7 +100,8 @@ public class PluginManager implements IPluginManager {
                 }
             }
             catch (ServiceConfigurationError e) {
-                // continue
+
+                StartupLog.log(this, Level.WARN, e.getMessage());
             }
         }
     }

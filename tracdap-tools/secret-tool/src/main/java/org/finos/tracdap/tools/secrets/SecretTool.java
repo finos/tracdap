@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.tools.auth;
+package org.finos.tracdap.tools.secrets;
 
 
 import org.finos.tracdap.common.config.ConfigKeys;
@@ -45,9 +45,11 @@ import java.util.Map;
 import java.util.Scanner;
 
 
-public class AuthTool {
+public class SecretTool {
 
     public final static String INIT_SECRETS = "init_secrets";
+    public final static String ADD_SECRET = "add_secret";
+    public final static String DELETE_SECRET = "delete_secret";
 
     public final static String CREATE_ROOT_AUTH_KEY = "create_root_auth_key";
     public final static String ROTATE_ROOT_AUTH_KEY = "rotate_root_auth_key";
@@ -58,10 +60,12 @@ public class AuthTool {
 
     private final static List<StandardArgs.Task> AUTH_TOOL_TASKS = List.of(
             StandardArgs.task(INIT_SECRETS, "Initialize the secrets store"),
+            StandardArgs.task(ADD_SECRET, List.of("alias"), "Add a secret to the secret store (you will be prompted for the secret)"),
+            StandardArgs.task(DELETE_SECRET, List.of("alias"), "Delete a secret from the secret store"),
             StandardArgs.task(CREATE_ROOT_AUTH_KEY, List.of("ALGORITHM", "BITS"), "Create the root signing key for authentication tokens"),
             StandardArgs.task(INIT_TRAC_USERS, "Create a new TRAC user database (only required if SSO is not deployed)"),
             StandardArgs.task(ADD_USER, "Add a new user to the TRAC user database"),
-            StandardArgs.task(DELETE_USER, "USER_ID", "Add a new user to the TRAC user database"));
+            StandardArgs.task(DELETE_USER, "USER_ID", "Delete a user from the TRAC user database"));
 
     // Must match what is used by auth providers
     private static final String DISPLAY_NAME_ATTR = "displayName";
@@ -79,7 +83,7 @@ public class AuthTool {
      * Construct a new instance of the auth tool
      * @param configManager A prepared instance of ConfigManager
      */
-    public AuthTool(ConfigManager configManager, String secretKey) {
+    public SecretTool(ConfigManager configManager, String secretKey) {
 
         this.configManager = configManager;
         this.secretKey = secretKey;
@@ -118,6 +122,12 @@ public class AuthTool {
                 if (INIT_SECRETS.equals(task.getTaskName()))
                     initSecrets();
 
+                else if (ADD_SECRET.equals(task.getTaskName()))
+                    addSecret(task.getTaskArg(0));
+
+                else if (DELETE_SECRET.equals(task.getTaskName()))
+                    deleteSecret(task.getTaskArg(0));
+
                 else if (CREATE_ROOT_AUTH_KEY.equals(task.getTaskName()))
                     createRootAuthKey(task.getTaskArg(0), task.getTaskArg(1));
 
@@ -147,6 +157,26 @@ public class AuthTool {
     private void initSecrets() throws IOException, GeneralSecurityException {
 
         var keystore = loadKeystore(secretType, keystorePath, secretKey, true);
+        saveKeystore(keystorePath, secretKey, keystore);
+    }
+
+    private void addSecret(String alias) throws Exception {
+
+        var secret = consoleReadPassword("Enter secret for [%s]: ", alias);
+
+        var keystore = loadKeystore(secretType, keystorePath, secretKey, true);
+
+        CryptoHelpers.writeTextEntry(keystore, secretKey, alias, secret);
+
+        saveKeystore(keystorePath, secretKey, keystore);
+    }
+
+    private void deleteSecret(String alias) throws Exception {
+
+        var keystore = loadKeystore(secretType, keystorePath, secretKey, true);
+
+        CryptoHelpers.deleteEntry(keystore, alias);
+
         saveKeystore(keystorePath, secretKey, keystore);
     }
 
@@ -429,14 +459,14 @@ public class AuthTool {
             // Do not use secrets during start up
             // This tool is often used to create the secrets file
 
-            var startup = Startup.useCommandLine(AuthTool.class, args, AUTH_TOOL_TASKS);
+            var startup = Startup.useCommandLine(SecretTool.class, args, AUTH_TOOL_TASKS);
             startup.runStartupSequence(/* useSecrets = */ false);
 
             var config = startup.getConfig();
             var tasks = startup.getArgs().getTasks();
             var secretKey = startup.getArgs().getSecretKey();
 
-            var tool = new AuthTool(config, secretKey);
+            var tool = new SecretTool(config, secretKey);
             tool.runTasks(tasks);
 
             System.exit(0);

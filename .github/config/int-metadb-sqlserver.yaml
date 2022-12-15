@@ -37,9 +37,10 @@ metadata:
       jdbcUrl: //metadb:1433
       sqlserver.databaseName: master
       sqlserver.user: sa
-      sqlserver.password: tR4c_aDm!n
       pool.size: 2
       pool.overflow: 5
+    secrets:
+      sqlserver.password: metadb_secret
 
 instances:
   meta:

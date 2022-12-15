@@ -21,7 +21,7 @@ import org.finos.tracdap.common.startup.Startup;
 
 import io.netty.handler.codec.http.*;
 import org.finos.tracdap.test.helpers.ServiceHelpers;
-import org.finos.tracdap.tools.auth.AuthTool;
+import org.finos.tracdap.tools.secrets.SecretTool;
 import org.junit.jupiter.api.*;
 
 import java.nio.charset.StandardCharsets;
@@ -38,12 +38,12 @@ public class Http1ProxyTest {
 
     private static final String HTTP1_PROXY_TEST_CONFIG = "/trac-unit-gateway-http1.yaml";
 
-    private static final String TEST_URL_SAMPLE_DOC = "/static/docs/design_principals.md";
+    private static final String TEST_URL_SAMPLE_DOC = "/static/docs/index.rst";
     private static final String TEST_URL_MISSING_DOC = "/static/docs/does_not_exist.md";
     private static final String TEST_URL_SERVER_DOWN = "/static/server_down/foo.md";
     private static final String TEST_URL_SERVER_TIMEOUT = "/static/server_timeout/bar.md";
 
-    private static final String TEST_FILE_LOCAL_PATH = "doc/design_principals.md";
+    private static final String TEST_FILE_LOCAL_PATH = "doc/index.rst";
     private static final short TEST_GW_PORT = 8080;
     private static final long TEST_TIMEOUT = 10 * 1000;  // 10 second timeout
 
@@ -65,7 +65,7 @@ public class Http1ProxyTest {
         Assertions.assertNotNull(configFile);
 
         var authTasks = new ArrayList<StandardArgs.Task>();
-        authTasks.add(StandardArgs.task(AuthTool.CREATE_ROOT_AUTH_KEY, List.of("EC", "256"), ""));
+        authTasks.add(StandardArgs.task(SecretTool.CREATE_ROOT_AUTH_KEY, List.of("EC", "256"), ""));
         ServiceHelpers.runAuthTool(rootDir, configFile, secretKey, authTasks);
 
 

@@ -193,6 +193,10 @@ created above. For examples of how to configure other SQL dialects, see the depl
     :language: yaml
     :lines: 31 - 43
 
+.. note::
+    H2 is mostly used in development scenarios where the password is not sensitive.
+    If you want to use a secret for the H2 password, see :doc:`secrets`.
+
 The *storage* section allows you to configure one or more storage buckets to hold primary data. In TRAC,
 a "bucket" is any storage location that can hold files, which could be a cloud storage bucket on a cloud
 platform but can also be a local folder. Other protocols such as network storage or HDFS can also be
@@ -288,15 +292,15 @@ Setup tools
 -----------
 
 TRAC D.A.P. comes with a few tools to simplify the deployment. There are two we need to use for a
-sandbox setup, *auth-tool* and *deploy-metadb*.
+sandbox setup, *secret-tool* and *deploy-metadb*.
 
-**Auth Tool**
+**Secret Tool**
 
-The *auth-tool* utility is used to manage secrets, certificates and other sensitive configuration.
+The *secret-tool* utility is used to manage secrets, certificates and other sensitive configuration.
 It can also be used to manage users if you are using a local user database. The tool will write secrets
 to the secret store configured in the platform configuration. If this is a local keystore file and it
 does not exist then it will be created. Make sure you have set the *TRAC_SECRET_KEY* environment variable
-before using *auth-tool*.
+before using *secret-tool*.
 
 For the sandbox setup we need a minimum of one secret, the root authentication key.
 This key is used by TRAC to sign and verify its internal JWT tokens.
@@ -312,7 +316,8 @@ so for this reason we recommended EC 256 keys.
         .. code-block:: shell
 
             cd /opt/trac/current
-            bin/auth-tool run --task create_root_auth_key EC 256
+            bin/secret-tool run --task init_secrets
+            bin/secret-tool run --task create_root_auth_key EC 256
 
     .. tab-item:: Windows
         :sync: platform_windows
@@ -320,7 +325,8 @@ so for this reason we recommended EC 256 keys.
         .. code-block:: batch
 
             cd /d C:\trac\tracdap-sandbox-<version>
-            bin\auth-tool.bat run --task create_root_auth_key EC 256
+            bin\secret-tool.bat run --task init_secrets
+            bin\secret-tool.bat run --task create_root_auth_key EC 256
 
 .. note::
     Running the *create_root_auth_key* command a second time will replace the root authentication key,

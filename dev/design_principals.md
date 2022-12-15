@@ -15,6 +15,8 @@ choices. Suggestions / discussion are very welcome!
 
 3. Simplicity (should always be on the list)!
 
+   * As simple as possible, but no simpler
+
 4. Prefer open standards
 
 5. Minimise dependencies
