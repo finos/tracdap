@@ -66,8 +66,8 @@ message StorageConfig {
 
 message TenantConfig {
 
-  string defaultBucket = 1;
-  string defaultFormat = 2;
+  optional string defaultBucket = 1;
+  optional string defaultFormat = 2;
 }
 
 

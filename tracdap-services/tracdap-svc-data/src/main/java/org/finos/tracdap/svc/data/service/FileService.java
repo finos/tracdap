@@ -113,7 +113,7 @@ public class FileService {
         var dataCtx = new DataContext(execCtx.eventLoopExecutor(), arrowAllocator);
 
         // Currently tenant config is optional for single-tenant deployments, fall back to global defaults
-        var bucket = tenantConfig.containsKey(tenant)
+        var bucket = tenantConfig.containsKey(tenant) && tenantConfig.get(tenant).hasDefaultBucket()
                 ? tenantConfig.get(tenant).getDefaultBucket()
                 : storageConfig.getDefaultBucket();
 
@@ -192,7 +192,7 @@ public class FileService {
         var dataCtx = new DataContext(execCtx.eventLoopExecutor(), arrowAllocator);
 
         // Currently tenant config is optional for single-tenant deployments, fall back to global defaults
-        var bucket = tenantConfig.containsKey(tenant)
+        var bucket = tenantConfig.containsKey(tenant) && tenantConfig.get(tenant).hasDefaultBucket()
                 ? tenantConfig.get(tenant).getDefaultBucket()
                 : storageConfig.getDefaultBucket();
 

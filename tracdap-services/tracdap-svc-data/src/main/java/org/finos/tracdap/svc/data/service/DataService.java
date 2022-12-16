@@ -596,13 +596,20 @@ public class DataService {
     private StorageItem buildStorageItem(String tenant, String storagePath, OffsetDateTime objectTimestamp) {
 
         // Currently tenant config is optional for single-tenant deployments, fall back to global defaults
-        var storageBucket = tenantConfig.containsKey(tenant)
-                ? tenantConfig.get(tenant).getDefaultBucket()
-                : storageConfig.getDefaultBucket();
 
-        var storageFormat = tenantConfig.containsKey(tenant)
-                ? tenantConfig.get(tenant).getDefaultFormat()
-                : storageConfig.getDefaultFormat();
+        var storageBucket = storageConfig.getDefaultBucket();
+        var storageFormat = storageConfig.getDefaultFormat();
+
+        if (tenantConfig.containsKey(tenant)) {
+
+            var tenantDefaults = tenantConfig.get(tenant);
+
+            if (tenantDefaults.hasDefaultBucket())
+                storageBucket = tenantDefaults.getDefaultBucket();
+
+            if (tenantDefaults.hasDefaultFormat())
+                storageFormat = tenantDefaults.getDefaultFormat();
+        }
 
         // For the time being, data has one incarnation and a single storage copy
 

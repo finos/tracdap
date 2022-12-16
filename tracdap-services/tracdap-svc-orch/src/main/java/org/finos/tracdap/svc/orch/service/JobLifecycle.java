@@ -348,16 +348,14 @@ public class JobLifecycle {
         if (platformConfig.containsTenants(jobState.tenant)) {
 
             var tenantConfig = platformConfig.getTenantsOrThrow(jobState.tenant);
-            var tenantBucket = tenantConfig.getDefaultBucket();
-            var tenantFormat = tenantConfig.getDefaultFormat();
 
             var storageUpdate = storageConfig.toBuilder();
 
-            if (!tenantBucket.isEmpty())
-                storageUpdate.setDefaultBucket(tenantBucket);
+            if (tenantConfig.hasDefaultBucket())
+                storageUpdate.setDefaultBucket(tenantConfig.getDefaultBucket());
 
-            if (!tenantFormat.isEmpty())
-                storageUpdate.setDefaultFormat(tenantFormat);
+            if (tenantConfig.hasDefaultFormat())
+                storageUpdate.setDefaultFormat(tenantConfig.getDefaultFormat());
 
             storageConfig = storageUpdate.build();
         }
