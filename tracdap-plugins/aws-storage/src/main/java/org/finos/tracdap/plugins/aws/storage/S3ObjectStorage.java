@@ -39,6 +39,7 @@ import io.netty.buffer.ByteBuf;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.net.URI;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Properties;
@@ -53,9 +54,10 @@ import static org.finos.tracdap.common.storage.StorageErrors.ExplicitError.*;
 
 public class S3ObjectStorage implements IFileStorage {
 
-    public static final String REGION_PROPERTY = "region";
     public static final String BUCKET_PROPERTY = "bucket";
     public static final String PREFIX_PROPERTY = "prefix";
+    public static final String REGION_PROPERTY = "region";
+    public static final String ENDPOINT_PROPERTY = "endpoint";
 
     public static final String CREDENTIALS_PROPERTY = "credentials";
     public static final String CREDENTIALS_DEFAULT = "default";
@@ -66,10 +68,11 @@ public class S3ObjectStorage implements IFileStorage {
     private final Logger log = LoggerFactory.getLogger(getClass());
 
     private final String storageKey;
-    private final Region region;
+    private final AwsCredentialsProvider credentials;
     private final String bucket;
     private final StoragePath prefix;
-    private final AwsCredentialsProvider credentials;
+    private final Region region;
+    private final URI endpoint;
 
     private final StorageErrors errors;
 
@@ -80,13 +83,15 @@ public class S3ObjectStorage implements IFileStorage {
 
         this.storageKey = properties.getProperty(IStorageManager.PROP_STORAGE_KEY);
 
-        var region = properties.getProperty(REGION_PROPERTY);
         var bucket = properties.getProperty(BUCKET_PROPERTY);
         var prefix = properties.getProperty(PREFIX_PROPERTY);
+        var region = properties.getProperty(REGION_PROPERTY);
+        var endpoint = properties.getProperty(ENDPOINT_PROPERTY);
 
-        this.region = Region.of(region);
         this.bucket = bucket;
         this.prefix = prefix != null ? StoragePath.forPath(prefix) : StoragePath.root();
+        this.region = region != null ? Region.of(region) : null;
+        this.endpoint = endpoint != null ? URI.create(endpoint) : null;
 
         this.credentials = setupCredentials(properties);
 
@@ -151,14 +156,20 @@ public class S3ObjectStorage implements IFileStorage {
                 .advancedOption(SdkAdvancedAsyncClientOption.FUTURE_COMPLETION_EXECUTOR, Runnable::run)
                 .build();
 
-        this.client = S3AsyncClient.builder()
-                .region(region)
-                .credentialsProvider(credentials)
+        var clientBuilder = S3AsyncClient.builder()
                 .httpClientBuilder(httpClient)
                 .asyncConfiguration(async)
-                .build();
+                .credentialsProvider(credentials);
 
-        log.info("Created S3 storage, region = [{}], bucket = [{}], prefix = [{}]", region, bucket, prefix);
+        if (region != null)
+            clientBuilder.region(region);
+
+        if (endpoint != null)
+            clientBuilder.endpointOverride(endpoint);
+
+        this.client = clientBuilder.build();
+
+        log.info("Created S3 storage, bucket = [{}], prefix = [{}]", bucket, prefix);
     }
 
     @Override
