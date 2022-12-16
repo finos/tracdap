@@ -16,6 +16,7 @@
 
 package org.finos.tracdap.gateway;
 
+import io.netty.handler.codec.http.websocketx.WebSocketServerProtocolConfig;
 import org.finos.tracdap.common.auth.JwtProcessor;
 import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.config.ConfigManager;
@@ -34,6 +35,8 @@ import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.util.concurrent.DefaultThreadFactory;
+import org.finos.tracdap.gateway.routing.Http1Router;
+import org.finos.tracdap.gateway.routing.Http2Router;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -111,10 +114,29 @@ public class TracPlatformGateway extends CommonServiceBase {
             // JWT processor is responsible for signing and validating auth tokens
             var jwtProcessor = setupJwtAuth(configManager);
 
+            // Handlers for all support protocols
+            var http1Handler = ProtocolSetup.setup(connId -> new Http1Router(routes, connId));
+            var http2Handler = ProtocolSetup.setup(connId -> new Http2Router(gatewayConfig.getRoutesList()));
+
+            var  webSocketsHandler = (ProtocolSetup<WebSocketServerProtocolConfig>) null;
+
+            // TODO: Websockets support is in client streaming feature branch
+            // Adding patches incrementally
+
+//            var webSocketOptions = WebSocketServerProtocolConfig.newBuilder()
+//                    .subprotocols("grpc-websockets")
+//                    .allowExtensions(true)
+//                    .build();
+//
+//            var webSocketsHandler = ProtocolSetup.setup(
+//                    connId -> new WebSocketsRouter(routes, connId),
+//                    webSocketOptions);
+
             // The protocol negotiator is the top level initializer for new inbound connections
             var protocolNegotiator = new ProtocolNegotiator(
-                    gatewayConfig, routes,
-                    authProvider, jwtProcessor);
+                    gatewayConfig, authProvider, jwtProcessor,
+                    http1Handler, http2Handler,
+                    webSocketsHandler);
 
             // TODO: Review configuration of thread pools and channel options
 
