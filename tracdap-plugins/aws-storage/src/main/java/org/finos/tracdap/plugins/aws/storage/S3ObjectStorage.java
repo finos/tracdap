@@ -89,9 +89,9 @@ public class S3ObjectStorage implements IFileStorage {
         var endpoint = properties.getProperty(ENDPOINT_PROPERTY);
 
         this.bucket = bucket;
-        this.prefix = prefix != null ? StoragePath.forPath(prefix) : StoragePath.root();
-        this.region = region != null ? Region.of(region) : null;
-        this.endpoint = endpoint != null ? URI.create(endpoint) : null;
+        this.prefix = prefix != null && !prefix.isBlank() ? StoragePath.forPath(prefix) : StoragePath.root();
+        this.region = region != null && !region.isBlank() ? Region.of(region) : null;
+        this.endpoint = endpoint != null && !endpoint.isBlank() ? URI.create(endpoint) : null;
 
         this.credentials = setupCredentials(properties);
 
