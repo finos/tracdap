@@ -40,6 +40,8 @@ message PlatformConfig {
 
   PluginConfig executor = 9;
 
+  map<string, TenantConfig> tenants = 10;
+
   InstantMap instances = 3;
   ServiceMap services = 4;
 }
@@ -59,6 +61,13 @@ message StorageConfig {
 
   string defaultBucket = 2;
   string defaultFormat = 3;
+}
+
+
+message TenantConfig {
+
+  optional string defaultBucket = 1;
+  optional string defaultFormat = 2;
 }
 
 
