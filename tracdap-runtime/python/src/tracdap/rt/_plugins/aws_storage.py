@@ -41,9 +41,10 @@ class S3ObjectStorage(IFileStorage):
 
     # https://arrow.apache.org/docs/python/filesystems.html
 
-    REGION_PROPERTY = "region"
     BUCKET_PROPERTY = "bucket"
     PREFIX_PROPERTY = "prefix"
+    REGION_PROPERTY = "region"
+    ENDPOINT_PROPERTY = "endpoint"
 
     CREDENTIALS_PROPERTY = "credentials"
     CREDENTIALS_DEFAULT = "default"
@@ -59,16 +60,24 @@ class S3ObjectStorage(IFileStorage):
         self._config = config
         self._options = options
 
-        self._region = config.properties[self.REGION_PROPERTY]
         self._bucket = config.properties[self.BUCKET_PROPERTY]
         self._prefix = config.properties[self.PREFIX_PROPERTY] if self.PREFIX_PROPERTY in config.properties else ""
+        self._region = config.properties[self.REGION_PROPERTY] if self.REGION_PROPERTY in config.properties else None
+        self._endpoint = config.properties[self.ENDPOINT_PROPERTY] if self.ENDPOINT_PROPERTY in config.properties else None
 
         credentials_params = self.setup_credentials(config.properties)
 
-        self.__client = boto3.client(
-            service_name="s3",
-            region_name=self._region,
-            **credentials_params)
+        client_args = {
+            "service_name": "s3",
+            **credentials_params}
+
+        if self._region is not None:
+            client_args["region_name"] = self._region
+
+        if self._endpoint is not None:
+            client_args["endpoint_url"] = self._endpoint
+
+        self.__client = boto3.client(**client_args)
 
     def setup_credentials(self, properties: dict):
 
