@@ -18,8 +18,10 @@ package org.finos.tracdap.svc.meta.dal.operations;
 
 import org.finos.tracdap.metadata.Tag;
 
+import java.util.List;
+
 public final class SaveNewObject extends WriteOperationWithTag {
-    public SaveNewObject(Tag tag) {
-        super(tag);
+    public SaveNewObject(List<Tag> tags) {
+        super(tags);
     }
 }

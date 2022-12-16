@@ -18,23 +18,24 @@ package org.finos.tracdap.svc.meta.dal.operations;
 
 import org.finos.tracdap.metadata.ObjectType;
 
+import java.util.List;
 import java.util.UUID;
 
 public final class PreallocateObjectId extends DalWriteOperation {
-    final private ObjectType objectType;
-    final private UUID objectId;
+    final private List<ObjectType> objectTypes;
+    final private List<UUID> objectIds;
 
-    public PreallocateObjectId(ObjectType objectType, UUID objectId) {
-        this.objectType = objectType;
-        this.objectId = objectId;
+    public PreallocateObjectId(List<ObjectType> objectTypes, List<UUID> objectIds) {
+        this.objectTypes = objectTypes;
+        this.objectIds = objectIds;
     }
 
-    public ObjectType getObjectType() {
-        return objectType;
+    public List<ObjectType> getObjectTypes() {
+        return objectTypes;
     }
 
-    public UUID getObjectId() {
-        return objectId;
+    public List<UUID> getObjectIds() {
+        return objectIds;
     }
 }
 

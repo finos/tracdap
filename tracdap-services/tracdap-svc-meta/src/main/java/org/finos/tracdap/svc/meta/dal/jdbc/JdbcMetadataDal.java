@@ -171,47 +171,27 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
 
     @Override
     public void saveNewObjects(String tenant, List<Tag> tags) {
-        runWriteOperations(
-                tenant,
-                tags.stream().map(SaveNewObject::new)
-                        .collect(Collectors.toList())
-        );
+        runWriteOperations(tenant, Collections.singletonList(new SaveNewObject(tags)));
     }
 
     @Override
     public void saveNewVersions(String tenant, List<Tag> tags) {
-        runWriteOperations(
-                tenant,
-                tags.stream().map(SaveNewVersion::new)
-                        .collect(Collectors.toList())
-        );
+        runWriteOperations(tenant, Collections.singletonList(new SaveNewVersion(tags)));
     }
 
     @Override
     public void saveNewTags(String tenant, List<Tag> tags) {
-        runWriteOperations(
-                tenant,
-                tags.stream().map(SaveNewTag::new)
-                        .collect(Collectors.toList())
-        );
+        runWriteOperations(tenant, Collections.singletonList(new SaveNewTag(tags)));
     }
 
     @Override
     public void preallocateObjectIds(String tenant, List<ObjectType> objectTypes, List<UUID> objectIds) {
-        List<DalWriteOperation> operations = IntStream.range(0, objectTypes.size())
-                .mapToObj(i -> new PreallocateObjectId(objectTypes.get(i), objectIds.get(i)))
-                .collect(Collectors.toList());
-
-        runWriteOperations(tenant, operations);
+        runWriteOperations(tenant, Collections.singletonList(new PreallocateObjectId(objectTypes, objectIds)));
     }
 
     @Override
     public void savePreallocatedObjects(String tenant, List<Tag> tags) {
-        runWriteOperations(
-                tenant,
-                tags.stream().map(SavePreallocatedObject::new)
-                        .collect(Collectors.toList())
-        );
+        runWriteOperations(tenant, Collections.singletonList(new SavePreallocatedObject(tags)));
     }
 
 
@@ -428,14 +408,11 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
         if (operation instanceof WriteOperationWithTag) {
             var op = (WriteOperationWithTag) operation;
 
-            return separateParts(Collections.singletonList(op.getTag()));
+            return separateParts(op.getTags());
         } else if (operation instanceof PreallocateObjectId) {
             var op = (PreallocateObjectId) operation;
 
-            return separateParts(
-                    Collections.singletonList(op.getObjectType()),
-                    Collections.singletonList(op.getObjectId())
-            );
+            return separateParts(op.getObjectTypes(), op.getObjectIds());
         } else {
             throw new RuntimeException("invalid DalWriteOperation");
         }

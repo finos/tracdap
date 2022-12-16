@@ -18,8 +18,10 @@ package org.finos.tracdap.svc.meta.dal.operations;
 
 import org.finos.tracdap.metadata.Tag;
 
+import java.util.List;
+
 public final class SavePreallocatedObject extends WriteOperationWithTag {
-    public SavePreallocatedObject(Tag tag) {
-        super(tag);
+    public SavePreallocatedObject(List<Tag> tags) {
+        super(tags);
     }
 }

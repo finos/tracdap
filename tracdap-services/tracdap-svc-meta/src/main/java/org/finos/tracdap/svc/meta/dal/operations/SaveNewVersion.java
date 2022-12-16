@@ -18,8 +18,10 @@ package org.finos.tracdap.svc.meta.dal.operations;
 
 import org.finos.tracdap.metadata.Tag;
 
+import java.util.List;
+
 public final class SaveNewVersion extends WriteOperationWithTag {
-    public SaveNewVersion(Tag tag) {
-        super(tag);
+    public SaveNewVersion(List<Tag> tags) {
+        super(tags);
     }
 }

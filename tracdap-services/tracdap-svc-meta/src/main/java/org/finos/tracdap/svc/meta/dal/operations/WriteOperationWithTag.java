@@ -18,14 +18,16 @@ package org.finos.tracdap.svc.meta.dal.operations;
 
 import org.finos.tracdap.metadata.Tag;
 
-public class WriteOperationWithTag extends DalWriteOperation {
-    private final Tag tag;
+import java.util.List;
 
-    public WriteOperationWithTag(Tag tag) {
-        this.tag = tag;
+public class WriteOperationWithTag extends DalWriteOperation {
+    private final List<Tag> tags;
+
+    public WriteOperationWithTag(List<Tag> tags) {
+        this.tags = tags;
     }
 
-    public Tag getTag() {
-        return tag;
+    public List<Tag> getTags() {
+        return tags;
     }
 }
