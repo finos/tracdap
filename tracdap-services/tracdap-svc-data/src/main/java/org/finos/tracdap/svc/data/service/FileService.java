@@ -26,6 +26,7 @@ import org.finos.tracdap.common.data.IDataContext;
 import org.finos.tracdap.common.exception.EMetadataDuplicate;
 import org.finos.tracdap.common.metadata.MetadataUtil;
 import org.finos.tracdap.config.StorageConfig;
+import org.finos.tracdap.config.TenantConfig;
 import org.finos.tracdap.metadata.*;
 
 import org.finos.tracdap.common.exception.EDataSize;
@@ -42,6 +43,7 @@ import org.slf4j.LoggerFactory;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -73,6 +75,7 @@ public class FileService {
     private final Logger log = LoggerFactory.getLogger(getClass());
 
     private final StorageConfig storageConfig;
+    private final Map<String, TenantConfig> tenantConfig;
     private final BufferAllocator arrowAllocator;
     private final IStorageManager storageManager;
     private final TrustedMetadataApiFutureStub metaApi;
@@ -83,11 +86,13 @@ public class FileService {
 
     public FileService(
             StorageConfig storageConfig,
+            Map<String, TenantConfig> tenantConfig,
             BufferAllocator arrowAllocator,
             IStorageManager storageManager,
             TrustedMetadataApiFutureStub metaApi) {
 
         this.storageConfig = storageConfig;
+        this.tenantConfig = tenantConfig;
         this.arrowAllocator = arrowAllocator;
         this.storageManager = storageManager;
         this.metaApi = metaApi;
@@ -106,6 +111,11 @@ public class FileService {
         state.authToken = authToken;
 
         var dataCtx = new DataContext(execCtx.eventLoopExecutor(), arrowAllocator);
+
+        // Currently tenant config is optional for single-tenant deployments, fall back to global defaults
+        var bucket = tenantConfig.containsKey(tenant)
+                ? tenantConfig.get(tenant).getDefaultBucket()
+                : storageConfig.getDefaultBucket();
 
         // This timestamp is set in the storage definition to timestamp storage incarnations/copies
         // It is also used in the physical storage path
@@ -142,7 +152,7 @@ public class FileService {
                 // Build definition objects
                 .thenAccept(x -> state.file = createFileDef(state.fileId, name, mimeType, state.storageId))
                 .thenAccept(x -> state.storage = createStorageDef(
-                        storageConfig.getDefaultBucket(),  state.objectTimestamp,
+                        bucket,  state.objectTimestamp,
                         state.fileId, name, mimeType))
 
                 // Write file content stream to the storage layer
@@ -181,6 +191,11 @@ public class FileService {
 
         var dataCtx = new DataContext(execCtx.eventLoopExecutor(), arrowAllocator);
 
+        // Currently tenant config is optional for single-tenant deployments, fall back to global defaults
+        var bucket = tenantConfig.containsKey(tenant)
+                ? tenantConfig.get(tenant).getDefaultBucket()
+                : storageConfig.getDefaultBucket();
+
         return CompletableFuture.completedFuture(null)
 
                 // Load all prior metadata (file and storage)
@@ -193,7 +208,7 @@ public class FileService {
                 // Build definition objects
                 .thenAccept(x -> state.file = updateFileDef(prior.file, state.fileId, name, mimeType))
                 .thenAccept(x -> state.storage = updateStorageDef(
-                        prior.storage, storageConfig.getDefaultBucket(), state.objectTimestamp,
+                        prior.storage, bucket, state.objectTimestamp,
                         state.fileId, name, mimeType))
 
                 .thenAccept(x -> validator.validateVersion(state.file, prior.file))

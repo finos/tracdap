@@ -144,13 +144,15 @@ public class TracDataService extends CommonServiceBase {
             storage = new StorageManager(pluginManager);
             storage.initStorage(platformConfig.getStorage(), formats, serviceGroup);
 
+            var tenantConfig = platformConfig.getTenantsMap();
+
             // Check default storage and format are available
             checkDefaultStorageAndFormat(storage, formats, storageConfig);
 
             var metaClient = prepareMetadataClient(platformConfig, clientChannelType);
 
-            var fileSvc = new FileService(storageConfig, arrowAllocator, storage, metaClient);
-            var dataSvc = new DataService(storageConfig, arrowAllocator, storage, formats, metaClient);
+            var fileSvc = new FileService(storageConfig, tenantConfig, arrowAllocator, storage, metaClient);
+            var dataSvc = new DataService(storageConfig, tenantConfig, arrowAllocator, storage, formats, metaClient);
             var dataApi = new TracDataApi(dataSvc, fileSvc);
 
             var authentication = AuthInterceptor.setupAuth(
