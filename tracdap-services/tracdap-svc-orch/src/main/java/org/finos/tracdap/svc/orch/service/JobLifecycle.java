@@ -282,10 +282,9 @@ public class JobLifecycle {
     }
 
     JobState allocateResultIds(
-            JobState jobState,
-            Instant jobTimestamp,
-            Map<String, MetadataWriteRequest> newResultIds
-    ) {
+            JobState jobState, Instant jobTimestamp,
+            Map<String, MetadataWriteRequest> newResultIds) {
+
         if (newResultIds.isEmpty()) {
             return jobState;
         }
@@ -343,8 +342,28 @@ public class JobLifecycle {
                 .putAllResultMapping(jobState.resultMapping)
                 .build();
 
+        var storageConfig = platformConfig.getStorage();
+
+        // Pass down tenant storage overrides if they are configured (the runtime doesn't know about tenants atm)
+        if (platformConfig.containsTenants(jobState.tenant)) {
+
+            var tenantConfig = platformConfig.getTenantsOrThrow(jobState.tenant);
+            var tenantBucket = tenantConfig.getDefaultBucket();
+            var tenantFormat = tenantConfig.getDefaultFormat();
+
+            var storageUpdate = storageConfig.toBuilder();
+
+            if (!tenantBucket.isEmpty())
+                storageUpdate.setDefaultBucket(tenantBucket);
+
+            if (!tenantFormat.isEmpty())
+                storageUpdate.setDefaultFormat(tenantFormat);
+
+            storageConfig = storageUpdate.build();
+        }
+
         jobState.sysConfig = RuntimeConfig.newBuilder()
-                .setStorage(platformConfig.getStorage())
+                .setStorage(storageConfig)
                 .putAllRepositories(platformConfig.getRepositoriesMap())
                 .build();
 
