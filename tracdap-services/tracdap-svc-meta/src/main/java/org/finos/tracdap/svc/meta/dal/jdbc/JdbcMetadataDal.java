@@ -35,6 +35,7 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.*;
 import java.util.UUID;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -109,6 +110,8 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
             return;
         }
 
+        ensureNoRepeatedOperations(operations);
+
         var parts = separateParts(operations.get(0));
 
         wrapTransaction(conn -> {
@@ -123,6 +126,18 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
             (error, code) -> JdbcError.handleMissingItem(error, code, parts),
             (error, code) ->  JdbcError.handleWrongObjectType(error, code, parts)
         );
+    }
+
+    private void ensureNoRepeatedOperations(List<DalWriteOperation> operations) {
+        var counts = operations.stream()
+                .map(DalWriteOperation::getClass)
+                .collect(Collectors.groupingBy(Function.identity(), Collectors.counting()));
+
+        var operationRepeated = counts.values().stream().anyMatch(cnt -> cnt > 1);
+
+        if (operationRepeated) {
+            throw new RuntimeException("some DAL write operation was repeated");
+        }
     }
 
     private void handleOperation(Connection conn, short tenantId, DalWriteOperation operation) throws SQLException {
