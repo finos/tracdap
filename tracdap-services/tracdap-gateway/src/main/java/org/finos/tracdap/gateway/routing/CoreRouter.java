@@ -248,12 +248,9 @@ abstract class CoreRouter extends ChannelDuplexHandler {
             ctx.close();
         }
 
-        log.info("queue size: " + target.outboundQueue.size());
-
         var outboundHead = target.outboundQueue.poll();
 
         while (outboundHead != null) {
-            log.info("Writing outbound head");
             target.channel.write(outboundHead);
             outboundHead = target.outboundQueue.poll();
         }
