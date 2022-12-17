@@ -18,7 +18,7 @@ package org.finos.tracdap.gateway.proxy.grpc;
 
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.config.GwRoute;
-import org.finos.tracdap.gateway.proxy.http.Http1to2Framing;
+import org.finos.tracdap.gateway.proxy.http.Http1to2Proxy;
 
 import io.netty.channel.*;
 import io.netty.handler.codec.http2.*;
@@ -86,7 +86,7 @@ public class GrpcProxyBuilder extends ChannelInitializer<Channel> {
 
         if (sourceHttpVersion == 1) {
 
-            pipeline.addLast(HTTP_1_TO_2_FRAMING, new Http1to2Framing(routeConfig, connId));
+            pipeline.addLast(HTTP_1_TO_2_FRAMING, new Http1to2Proxy(routeConfig, connId));
             pipeline.addLast(HTTP_1_ROUTER_LINK, routerLink);
         }
         else if (sourceHttpVersion == 2) {
