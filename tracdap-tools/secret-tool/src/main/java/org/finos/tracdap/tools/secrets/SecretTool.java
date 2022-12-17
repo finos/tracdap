@@ -82,6 +82,7 @@ public class SecretTool {
     /**
      * Construct a new instance of the auth tool
      * @param configManager A prepared instance of ConfigManager
+     * @param secretKey Master key for reading / writing the secret store
      */
     public SecretTool(ConfigManager configManager, String secretKey) {
 
