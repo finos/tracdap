@@ -16,14 +16,12 @@
 
 package org.finos.tracdap.gateway.proxy.grpc;
 
-import io.netty.buffer.ByteBuf;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.config.GwRoute;
 import org.finos.tracdap.gateway.proxy.http.Http1to2Framing;
 
 import io.netty.channel.*;
 import io.netty.handler.codec.http2.*;
-import io.netty.handler.logging.LogLevel;
 import org.finos.tracdap.gateway.proxy.http.Http2FlowControl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -69,7 +67,8 @@ public class GrpcProxyBuilder extends ChannelInitializer<Channel> {
         var pipeline = channel.pipeline();
 
         var initialSettings = new Http2Settings()
-                .maxFrameSize(16 * 1024);
+                .maxFrameSize(Http2FlowControl.DEFAULT_MAX_FRAME_SIZE)
+                .initialWindowSize(Http2FlowControl.DEFAULT_INITIAL_WINDOW_SIZE);
 
         var http2Codec = Http2FrameCodecBuilder.forClient()
                 .initialSettings(initialSettings)
@@ -78,8 +77,10 @@ public class GrpcProxyBuilder extends ChannelInitializer<Channel> {
                 .validateHeaders(true)
                 .build();
 
+        var http2FlowControl = new Http2FlowControl(connId, http2Codec, initialSettings);
+
         pipeline.addLast(HTTP2_FRAME_CODEC, http2Codec);
-        pipeline.addLast(HTTP2_FLOW_CTRL, new Http2FlowControl());
+        pipeline.addLast(HTTP2_FLOW_CTRL, http2FlowControl);
         pipeline.addLast(GRPC_PROXY_HANDLER, new GrpcProxy(connId));
         pipeline.addLast(GRPC_WEB_PROXY_HANDLER, new GrpcWebProxy(connId));
 
