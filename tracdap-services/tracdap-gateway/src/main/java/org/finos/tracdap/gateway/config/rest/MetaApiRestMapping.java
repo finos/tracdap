@@ -33,6 +33,8 @@ public class MetaApiRestMapping {
      * This config is expressed using Google's HTTP API annotations in the API proto files
      * To use the proto files authoritatively, we need to write a generator that understands those annotations
      * As a quick work-around, the REST mappings are duplicated here in code
+     *
+     * @return REST route mapping for the metadata API
      */
 
     public static List<RestApiMethod<?, ?, ?>> metaApiRoutes() {

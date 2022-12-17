@@ -33,7 +33,7 @@ import javax.annotation.Nonnull;
  * which will be the last handler on a client-side channel. In the case of an unhandled
  * error on the server-side channel, the router link is also responsible for either
  * handling and relaying the error or, if the error cannot be handled cleanly, closing
- * the client-side channel.</>
+ * the client-side channel.</p>
  *
  * <p>There is only one router link implementation for all routed protocols.
  * The router link does not inspect or translate the content of messages.</p>
