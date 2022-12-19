@@ -19,6 +19,7 @@ package org.finos.tracdap.gateway.proxy.http;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPromise;
 import io.netty.handler.codec.http2.*;
+import io.netty.util.ReferenceCountUtil;
 import org.finos.tracdap.common.exception.ETracInternal;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.slf4j.Logger;
@@ -74,75 +75,64 @@ public class Http2FlowControl extends Http2ChannelDuplexHandler {
     }
 
     @Override
-    public void channelActive(ChannelHandlerContext ctx) {
+    public void channelActive(@Nonnull ChannelHandlerContext ctx) {
 
-        log.debug("Channel active");
+        if (log.isDebugEnabled())
+            log.debug("conn = {}, target = {}, channel active", connId, ctx.channel().remoteAddress());
+
         writable = true;
 
         // do not fire channelActive, wait for the handshake to complete
     }
 
     @Override
-    public void channelInactive(ChannelHandlerContext ctx) {
+    public void channelInactive(@Nonnull ChannelHandlerContext ctx) {
 
-        log.debug("Channel inactive");
+        if (log.isDebugEnabled())
+            log.debug("conn = {}, target = {}, channel inactive", connId, ctx.channel().remoteAddress());
+
         writable = false;
 
         ctx.fireChannelInactive();
     }
 
     @Override
-    public void channelWritabilityChanged(ChannelHandlerContext ctx) {
-
-        writable = ctx.channel().isWritable();
-
-        log.debug("Writability changed: [{}]", writable);
-
-//        while (connWritable && !writeQueue.isEmpty()) {
-//
-//            log.trace("Sending a message from the queue...");
-//
-//            var queued = writeQueue.remove();
-//            ctx.write(queued.getKey(), queued.getValue());
-//
-//            writable = ctx.channel().isWritable();
-//        }
-
-        ctx.fireChannelWritabilityChanged();
-    }
-
-    @Override
     public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) throws Exception {
 
-        if (!(msg instanceof Http2Frame))
-            throw new EUnexpected();
+        try {
 
-        var frame = (Http2Frame) msg;
+            if (!(msg instanceof Http2Frame))
+                throw new EUnexpected();
 
-        if (frame.name().equals("HEADERS")) {
+            var frame = (Http2Frame) msg;
 
-            var headersFrame = (Http2HeadersFrame) frame;
-            processOutboundHeaders(ctx, headersFrame, promise);
+            if (frame.name().equals("HEADERS")) {
+
+                var headersFrame = (Http2HeadersFrame) frame;
+                processOutboundHeaders(ctx, headersFrame, promise);
+            }
+            else if (frame.name().equals("DATA")) {
+
+                var dataFrame = (Http2DataFrame) frame;
+                processOutboundData(ctx, dataFrame, promise);
+            }
+
+            // Client code should not be sending other HTTP frame types down the pipe
+            // Since this is controlled inside the gateway, it can be treated as an internal error
+
+            else {
+
+                log.error("conn = {}, unexpected outbound HTTP/2 frame [{}]", connId, frame.name());
+                throw new EUnexpected();
+            }
         }
-
-        else if (frame.name().equals("DATA")) {
-
-            var dataFrame = (Http2DataFrame) frame;
-            processOutboundData(ctx, dataFrame, promise);
-        }
-
-        // Client code should not be sending other HTTP frame types down the pipe
-        // Since this is controlled inside the gateway, it can be treated as an internal error
-
-        else {
-
-            log.error("conn = {}, unexpected outbound HTTP/2 frame [{}]", connId, frame.name());
-            throw new EUnexpected();
+        finally {
+            ReferenceCountUtil.release(msg);
         }
     }
 
     @Override
-    public void flush(ChannelHandlerContext ctx) throws Exception {
+    public void flush(ChannelHandlerContext ctx) {
 
         log.warn("Real flush called");
         ctx.flush();
@@ -151,54 +141,63 @@ public class Http2FlowControl extends Http2ChannelDuplexHandler {
     @Override
     public void channelRead(@Nonnull ChannelHandlerContext ctx, @Nonnull Object msg) throws Exception {
 
-        if (!(msg instanceof Http2Frame))
-            throw new EUnexpected();
+        try {
 
-        var frame = (Http2Frame) msg;
+            if (!(msg instanceof Http2Frame))
+                throw new EUnexpected();
 
-        if (frame.name().equals("DATA")) {
+            var frame = (Http2Frame) msg;
 
-            var dataFrame = (Http2DataFrame) msg;
-            processInboundData(ctx, dataFrame);
+            if (frame.name().equals("DATA")) {
 
-            ctx.fireChannelRead(dataFrame);
+                var dataFrame = (Http2DataFrame) msg;
+                processInboundData(ctx, dataFrame);
+
+                // Frame is being sent up the pipe, do not release
+                dataFrame.retain();
+
+                ctx.fireChannelRead(dataFrame);
+            }
+
+            else if (frame.name().equals("HEADERS")) {
+
+                var headersFrame = (Http2HeadersFrame) frame;
+                processInboundHeaders(ctx, headersFrame);
+
+                ctx.fireChannelRead(frame);
+            }
+
+            else if (frame.name().equals("SETTINGS")) {
+
+                var settingFrame = (Http2SettingsFrame) frame;
+                processSettings(ctx, settingFrame);
+
+            }
+
+            else if (frame.name().equals("SETTINGS(ACK)")) {
+
+                processSettingsAck(ctx);
+            }
+
+            else if (frame.name().equals("WINDOW_UPDATE")) {
+
+                var windowFrame = (Http2WindowUpdateFrame) frame;
+                processWindowUpdate(ctx, windowFrame);
+            }
+
+            else if (frame.name().equals("PING")) {
+
+                var pingFrame = (Http2PingFrame) frame;
+                processPing(ctx, pingFrame);
+            }
+
+            else {
+
+                log.warn("conn = {}, unhandled HTTP/2 frame [{}]", connId, frame.name());
+            }
         }
-
-        else if (frame.name().equals("HEADERS")) {
-
-            var headersFrame = (Http2HeadersFrame) frame;
-            processInboundHeaders(ctx, headersFrame);
-
-            ctx.fireChannelRead(frame);
-        }
-
-        else if (frame.name().equals("SETTINGS")) {
-
-            var settingFrame = (Http2SettingsFrame) frame;
-            processSettings(ctx, settingFrame);
-
-        }
-
-        else if (frame.name().equals("SETTINGS(ACK)")) {
-
-            processSettingsAck(ctx);
-        }
-
-        else if (frame.name().equals("WINDOW_UPDATE")) {
-
-            var windowFrame = (Http2WindowUpdateFrame) frame;
-            processWindowUpdate(ctx, windowFrame);
-        }
-
-        else if (frame.name().equals("PING")) {
-
-            var pingFrame = (Http2PingFrame) frame;
-            processPing(ctx, pingFrame);
-        }
-
-        else {
-
-            log.warn("conn = {}, unhandled HTTP/2 frame [{}]", connId, frame.name());
+        finally  {
+            ReferenceCountUtil.release(msg);
         }
     }
 
@@ -206,16 +205,13 @@ public class Http2FlowControl extends Http2ChannelDuplexHandler {
 
         var stream = headersFrame.stream();
 
-        if (stream.id() < 0) {
+        if (stream.id() < 0)
             createStream(stream);
-        }
-
-        if (headersFrame.isEndStream()) {
-
-            ctx.flush();
-        }
 
         ctx.write(headersFrame, promise);
+
+        if (headersFrame.isEndStream())
+            ctx.flush();
     }
 
     private void processOutboundData(ChannelHandlerContext ctx, Http2DataFrame dataFrame, ChannelPromise promise) {
@@ -229,11 +225,7 @@ public class Http2FlowControl extends Http2ChannelDuplexHandler {
             throw new ETracInternal(message);
         }
 
-        var sendDirect =
-                ready &&
-                        // connWriteWindow >= frameSize &&
-                        streamState.writeWindow >= frameSize &&
-                        streamState.writeQueue.isEmpty();
+        var sendDirect = ready && streamState.writeWindow >= frameSize && streamState.writeQueue.isEmpty();
 
         if (sendDirect) {
 
@@ -241,24 +233,6 @@ public class Http2FlowControl extends Http2ChannelDuplexHandler {
 
             sliceAndSend(ctx, dataFrame, promise);
         }
-//        else  if (ready && streamState.writeQueue.isEmpty() && streamState.writeWindow > 0) {
-//
-//            log.info("Sending a partial frame");
-//
-//            var sendSlice = dataFrame.content().slice(0, streamState.writeWindow).retain();
-//            var sendFrame = new DefaultHttp2DataFrame(sendSlice);
-//
-//            var queueSlice = dataFrame.content().slice(streamState.writeWindow, frameSize - streamState.writeWindow).retain();
-//            var queueFrame = new DefaultHttp2DataFrame(queueSlice, dataFrame.isEndStream());
-//
-//            streamState.writeWindow -= sendSlice.readableBytes();
-//            ctx.write(sendFrame);
-//
-//            streamState.writeQueue.add(Map.entry(queueFrame, promise));
-//
-//            ReferenceCountUtil.release(dataFrame);
-//        }
-
         else {
 
             log.info("Queuing data frame, ready = [{}], writeWindow = [{}], writeQueue = [{}], totalSent = [{}]",
@@ -270,10 +244,8 @@ public class Http2FlowControl extends Http2ChannelDuplexHandler {
             streamState.writeQueue.add(Map.entry(dataFrame, promise));
         }
 
-        if (dataFrame.isEndStream()) {
-
+        if (dataFrame.isEndStream())
             ctx.flush();
-        }
     }
 
     private void processInboundHeaders(ChannelHandlerContext ctx, Http2HeadersFrame headersFrame) {
