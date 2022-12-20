@@ -74,23 +74,7 @@ class JdbcError {
         }
     }
 
-    static void newVersion_WrongType(SQLException error, JdbcErrorCode code, JdbcMetadataDal.ObjectParts parts) {
-
-        if (code == JdbcErrorCode.WRONG_OBJECT_TYPE) {
-            var message = MessageFormat.format(WRONG_OBJECT_TYPE, "");
-            throw new EMetadataWrongType(message, error);
-        }
-    }
-
-    static void newTag_WrongType(SQLException error, JdbcErrorCode code, JdbcMetadataDal.ObjectParts parts) {
-
-        if (code == JdbcErrorCode.WRONG_OBJECT_TYPE) {
-            var message = MessageFormat.format(WRONG_OBJECT_TYPE, "");
-            throw new EMetadataWrongType(message, error);
-        }
-    }
-
-    static void savePreallocated_WrongType(SQLException error, JdbcErrorCode code, JdbcMetadataDal.ObjectParts parts) {
+    static void handleWrongObjectType(SQLException error, JdbcErrorCode code, JdbcMetadataDal.ObjectParts parts) {
 
         if (code == JdbcErrorCode.WRONG_OBJECT_TYPE) {
             var message = MessageFormat.format(WRONG_OBJECT_TYPE, "");
