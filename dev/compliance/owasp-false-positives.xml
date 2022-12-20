@@ -115,7 +115,7 @@
     <!-- Either way, it relies on core devs keeping an eye on outstanding security issues -->
 
     <suppress>
-        <packageUrl regex="true">^pkg:maven/io\.netty/netty\-*.@4.1.86.Final$</packageUrl>
+        <packageUrl regex="true">^pkg:maven/io\.netty/netty\-.*@4.1.86.Final$</packageUrl>
         <cve>CVE-2022-41915</cve>
     </suppress>
 
