@@ -17,6 +17,7 @@
 package org.finos.tracdap.svc.meta.dal.jdbc;
 
 import org.finos.tracdap.common.db.JdbcSetup;
+import org.finos.tracdap.common.exception.ETracInternal;
 import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.exception.EStartup;
@@ -136,17 +137,19 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
         var operationRepeated = counts.values().stream().anyMatch(cnt -> cnt > 1);
 
         if (operationRepeated) {
-            throw new RuntimeException("some DAL write operation was repeated");
+            throw new ETracInternal("some DAL write operation was repeated");
         }
     }
 
     private void handleOperation(Connection conn, short tenantId, DalWriteOperation operation) throws SQLException {
         if (operation instanceof WriteOperationWithTag) {
             handleWriteOperationWithTag(conn, tenantId, (WriteOperationWithTag)operation);
-        } else if (operation instanceof PreallocateObjectId) {
+        }
+        else if (operation instanceof PreallocateObjectId) {
             handlePreallocateObjectId(conn, tenantId, (PreallocateObjectId)operation);
-        } else {
-            throw new RuntimeException("invalid DalWriteOperation");
+        }
+        else {
+            throw new ETracInternal("invalid DalWriteOperation");
         }
     }
 
@@ -160,28 +163,54 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
         long[] defPk;
 
         if (operation instanceof SaveNewObject) {
-            long[] objectPk = writeBatch.writeObjectId(conn, tenantId, parts);
-            defPk = writeBatch.writeObjectDefinition(conn, tenantId, objectPk, parts);
-        } else {
-            var objectType = readBatch.readObjectTypeById(conn, tenantId, parts.objectId);
-            checkObjectTypes(parts, objectType);
-
-            if (operation instanceof SaveNewTag) {
-                defPk = readBatch.lookupDefinitionPk(conn, tenantId, objectType.keys, parts.objectVersion);
-                writeBatch.closeTagRecord(conn, tenantId, defPk, parts);
-            } else {
-                if (operation instanceof SaveNewVersion) {
-                    writeBatch.closeObjectDefinition(conn, tenantId, objectType.keys, parts);
-                } else if (!(operation instanceof SavePreallocatedObject)) {
-                    throw new RuntimeException("invalid DalWriteOperation");
-                }
-
-                defPk = writeBatch.writeObjectDefinition(conn, tenantId, objectType.keys, parts);
-            }
+            defPk = getDefPkForSaveNewObject(conn, tenantId, parts);
+        }
+        else if (operation instanceof SaveNewTag) {
+            defPk = getDefPkForSaveNewTag(conn, tenantId, parts);
+        }
+        else if (operation instanceof SaveNewVersion) {
+            defPk = getDefPkForSaveNewVersion(conn, tenantId, parts);
+        }
+        else if (operation instanceof SavePreallocatedObject) {
+            defPk = getDefPkForSavePreallocatedObject(conn, tenantId, parts);
+        }
+        else {
+            throw new ETracInternal("invalid DalWriteOperation");
         }
 
         long[] tagPk = writeBatch.writeTagRecord(conn, tenantId, defPk, parts);
         writeBatch.writeTagAttrs(conn, tenantId, tagPk, parts);
+    }
+
+    private long[] getDefPkForSavePreallocatedObject(Connection conn, short tenantId, ObjectParts parts) throws SQLException {
+        var objectType = readBatch.readObjectTypeById(conn, tenantId, parts.objectId);
+        checkObjectTypes(parts, objectType);
+
+        return writeBatch.writeObjectDefinition(conn, tenantId, objectType.keys, parts);
+    }
+
+    private long[] getDefPkForSaveNewTag(Connection conn, short tenantId, ObjectParts parts) throws SQLException {
+        var objectType = readBatch.readObjectTypeById(conn, tenantId, parts.objectId);
+        checkObjectTypes(parts, objectType);
+
+        var defPk = readBatch.lookupDefinitionPk(conn, tenantId, objectType.keys, parts.objectVersion);
+        writeBatch.closeTagRecord(conn, tenantId, defPk, parts);
+
+        return defPk;
+    }
+
+    private long[] getDefPkForSaveNewVersion(Connection conn, short tenantId, ObjectParts parts) throws SQLException {
+        var objectType = readBatch.readObjectTypeById(conn, tenantId, parts.objectId);
+        checkObjectTypes(parts, objectType);
+
+        writeBatch.closeObjectDefinition(conn, tenantId, objectType.keys, parts);
+
+        return writeBatch.writeObjectDefinition(conn, tenantId, objectType.keys, parts);
+    }
+
+    private long[] getDefPkForSaveNewObject(Connection conn, short tenantId, ObjectParts parts) throws SQLException {
+        var objectPk = writeBatch.writeObjectId(conn, tenantId, parts);
+        return writeBatch.writeObjectDefinition(conn, tenantId, objectPk, parts);
     }
 
     @Override
@@ -429,7 +458,7 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
 
             return separateParts(op.getObjectTypes(), op.getObjectIds());
         } else {
-            throw new RuntimeException("invalid DalWriteOperation");
+            throw new ETracInternal("invalid DalWriteOperation");
         }
     }
 
