@@ -105,4 +105,18 @@
         <cve>CVE-2022-45868</cve>
     </suppress>
 
+    <!-- This is a new vulnerability in all Netty components, no fix version is available yet -->
+    <!-- We can't hold up other changes / fixes while we wait for the fix from Netty -->
+    <!-- So, adding a false positive -->
+
+    <!-- This does bring into question whether forcing compliance to pass before merging is the right strategy -->
+    <!-- On balance, I think it gets more attention on security issues, they get resolved more quickly -->
+    <!-- But it is a trade-off, having to mark issues as false positives until the fix comes out -->
+    <!-- Either way, it relies on core devs keeping an eye on outstanding security issues -->
+
+    <suppress>
+        <packageUrl regex="true">^pkg:maven/io\.netty/netty\-.*@4.1.86.Final$</packageUrl>
+        <cve>CVE-2022-41915</cve>
+    </suppress>
+
 </suppressions>
