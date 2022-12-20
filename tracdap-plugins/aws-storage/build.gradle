@@ -36,6 +36,13 @@ dependencies {
     implementation group: 'software.amazon.awssdk', name: 'netty-nio-client', version: "$aws_sdk_version"
     implementation group: 'software.amazon.awssdk', name: 's3', version: "$aws_sdk_version"
 
+    // Force Netty onto the same version as the rest of the TRAC platform
+    // Do not run different versions of Netty inside the same service / JVM
+    implementation group: 'io.netty', name: 'netty-common', version: "$netty_version"
+    implementation group: 'io.netty', name: 'netty-buffer', version: "$netty_version"
+    implementation group: 'io.netty', name: 'netty-codec-http2', version: "$netty_version"
+    implementation group: 'io.netty', name: 'netty-transport-classes-epoll', version: "$netty_version"
+
     // AWS SDK uses Reactive Streams
     // Only the latest version has a good license (MIT-0, prior versions were Creative Commons)
     implementation group: 'org.reactivestreams', name: 'reactive-streams', version: "$reactive_streams_version"
