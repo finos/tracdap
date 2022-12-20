@@ -61,7 +61,7 @@ ext {
 
     // Plugins
 
-    aws_sdk_version = '2.18.25'
+    aws_sdk_version = '2.19.0'
 
     // AWS SDK uses Reactive Streams
     // Only the latest version has a good license (MIT-0, prior versions were Creative Commons)
