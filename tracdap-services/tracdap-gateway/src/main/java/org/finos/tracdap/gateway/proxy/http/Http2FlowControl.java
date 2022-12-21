@@ -334,13 +334,14 @@ public class Http2FlowControl extends Http2ChannelDuplexHandler {
             var frameSize = dataFrame.content().readableBytes();
             var promise = queueHead.getValue();
 
-            if (state.writeWindow >= frameSize) {
+            // Stop processing if the write window fills up
+            if (frameSize > state.writeWindow)
+                break;
 
-                state.writeQueue.remove();
-                dispatchFrame(ctx, state, dataFrame, promise);
+            state.writeQueue.remove();
+            dispatchFrame(ctx, state, dataFrame, promise);
 
-                framesSent += 1;
-            }
+            framesSent += 1;
         }
 
         if (framesSent > 0) {
