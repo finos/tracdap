@@ -18,7 +18,7 @@ package org.finos.tracdap.gateway.proxy.rest;
 
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.gateway.exec.Route;
-import org.finos.tracdap.gateway.proxy.http.Http1to2Framing;
+import org.finos.tracdap.gateway.proxy.http.Http1to2Proxy;
 
 import io.netty.channel.*;
 import io.netty.handler.codec.http2.Http2FrameCodecBuilder;
@@ -56,7 +56,7 @@ public class RestApiProxyBuilder extends ChannelInitializer<Channel> {
     }
 
     @Override
-    protected void initChannel(Channel channel) throws Exception {
+    protected void initChannel(Channel channel) {
 
         log.info("conn = {}, Init REST proxy channel", connId);
 
@@ -90,7 +90,7 @@ public class RestApiProxyBuilder extends ChannelInitializer<Channel> {
 
         if (sourceHttpVersion == 1) {
 
-            pipeline.addLast(new Http1to2Framing(routeConfig.getConfig(), connId));
+            pipeline.addLast(new Http1to2Proxy(routeConfig.getConfig(), connId));
             pipeline.addLast(routerLink);
         }
         else if (sourceHttpVersion == 2) {

@@ -33,7 +33,7 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
 
-public class Http1to2Framing extends Http2ChannelDuplexHandler {
+public class Http1to2Proxy extends Http2ChannelDuplexHandler {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
@@ -45,7 +45,7 @@ public class Http1to2Framing extends Http2ChannelDuplexHandler {
 
     private int inboundSeqId;
 
-    public Http1to2Framing(GwRoute routeConfig, int connId) {
+    public Http1to2Proxy(GwRoute routeConfig, int connId) {
 
         this.routeConfig = routeConfig;
         this.connId = connId;
