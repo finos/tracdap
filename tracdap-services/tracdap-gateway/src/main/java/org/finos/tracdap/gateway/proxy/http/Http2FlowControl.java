@@ -363,9 +363,17 @@ public class Http2FlowControl extends Http2ChannelDuplexHandler {
 
     private void processInboundHeaders(ChannelHandlerContext ctx, Http2HeadersFrame headersFrame) {
 
+        // Currently this handler is only used on the proxy side, so there are no new inbound streams
+        // If it is applied on the client side, we can log new inbound streams here
+        // We'd also need to create the stream state for new streams
+
         ctx.fireChannelRead(headersFrame);
 
         // No special handling for inbound EOS
+
+        if (log.isDebugEnabled() && headersFrame.isEndStream()) {
+            log.debug("conn = {}, target = {}, EOS for inbound stream [{}]", connId, target, headersFrame.stream().id());
+        }
     }
 
     private void processInboundData(ChannelHandlerContext ctx, Http2DataFrame dataFrame) {
@@ -385,6 +393,10 @@ public class Http2FlowControl extends Http2ChannelDuplexHandler {
         ctx.fireChannelRead(dataFrame);
 
         // No special handling for inbound EOS
+
+        if (log.isDebugEnabled() && dataFrame.isEndStream()) {
+            log.debug("conn = {}, target = {}, EOS for inbound stream [{}]", connId, target, dataFrame.stream().id());
+        }
     }
 
     private void processPing(ChannelHandlerContext ctx, Http2PingFrame pingFrame) {
