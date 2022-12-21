@@ -16,6 +16,7 @@
 
 package org.finos.tracdap.gateway.proxy.grpc;
 
+import io.netty.handler.logging.LogLevel;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.config.GwRoute;
 import org.finos.tracdap.gateway.proxy.http.Http1to2Proxy;
@@ -36,26 +37,32 @@ public class GrpcProxyBuilder extends ChannelInitializer<Channel> {
     private static final String HTTP2_FLOW_CTRL = "HTTP2_FLOW_CTRL";
     private static final String GRPC_PROXY_HANDLER = "GRPC_PROXY_HANDLER";
     private static final String GRPC_WEB_PROXY_HANDLER = "GRPC_WEB_PROXY_HANDLER";
-    private static final String HTTP_1_TO_2_FRAMING = "HTTP_1_TO_2_FRAMING";
-    private static final String HTTP_1_ROUTER_LINK = "HTTP_1_ROUTER_LINK";
+    private static final String GRPC_WEBSOCKETS_TRANSLATOR = "GRPC_WEBSOCKETS_TRANSLATOR";
+    private static final String HTTP_1_TO_2_PROXY = "HTTP_1_TO_2_PROXY";
+    private static final String CORE_ROUTER_LINK = "CORE_ROUTER_LINK";
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
     private final GwRoute routeConfig;
-    private final int sourceHttpVersion;
     private final ChannelDuplexHandler routerLink;
+
     private final int connId;
+    private final int httpProtocol;
+    private final GrpcProtocol grpcProtocol;
 
     public GrpcProxyBuilder(
             GwRoute routeConfig,
-            int sourceHttpVersion,
             ChannelDuplexHandler routerLink,
-            int connId) {
+            int connId,
+            int httpProtocol,
+            GrpcProtocol grpcProtocol) {
 
         this.routeConfig = routeConfig;
-        this.sourceHttpVersion = sourceHttpVersion;
         this.routerLink = routerLink;
+
         this.connId = connId;
+        this.httpProtocol = httpProtocol;
+        this.grpcProtocol = grpcProtocol;
     }
 
     @Override
@@ -68,6 +75,8 @@ public class GrpcProxyBuilder extends ChannelInitializer<Channel> {
 
         var pipeline = channel.pipeline();
 
+        // Set up foundation HTTP/2 proxy channel
+
         var initialSettings = new Http2Settings()
                 .maxFrameSize(Http2FlowControl.HTTP2_DEFAULT_MAX_FRAME_SIZE)
                 .initialWindowSize(Http2FlowControl.HTTP2_DEFAULT_INITIAL_WINDOW_SIZE);
@@ -76,24 +85,48 @@ public class GrpcProxyBuilder extends ChannelInitializer<Channel> {
                 .initialSettings(initialSettings)
                 .autoAckSettingsFrame(true)
                 .autoAckPingFrame(true)
-                .validateHeaders(true)
-                .build();
+                .validateHeaders(true);
+
+        // For trace logging, add an HTTP/2 frame logger
+        // Use DEBUG level, setting log level = TRACE on the frame logger logs the content of data frames
+        if (log.isTraceEnabled())
+            http2Codec.frameLogger(new Http2FrameLogger(LogLevel.DEBUG));
 
         var http2FlowControl = new Http2FlowControl(connId, target, initialSettings);
 
-        pipeline.addLast(HTTP2_FRAME_CODEC, http2Codec);
+        pipeline.addLast(HTTP2_FRAME_CODEC, http2Codec.build());
         pipeline.addLast(HTTP2_FLOW_CTRL, http2FlowControl);
-        pipeline.addLast(GRPC_PROXY_HANDLER, new GrpcProxy(connId));
-        pipeline.addLast(GRPC_WEB_PROXY_HANDLER, new GrpcWebProxy(connId));
 
-        if (sourceHttpVersion == 1) {
+        // Now add the gRPC protocol handlers
 
-            pipeline.addLast(HTTP_1_TO_2_FRAMING, new Http1to2Proxy(routeConfig, connId));
-            pipeline.addLast(HTTP_1_ROUTER_LINK, routerLink);
+        switch (grpcProtocol) {
+
+            case GRPC:
+                pipeline.addLast(GRPC_PROXY_HANDLER, new GrpcProxy(connId));
+                break;
+
+            case GRPC_WEB:
+                pipeline.addLast(GRPC_PROXY_HANDLER, new GrpcProxy(connId));
+                pipeline.addLast(GRPC_WEB_PROXY_HANDLER, new GrpcWebProxy(connId));
+                break;
+
+            case GRPC_WEBSOCKETS:
+                pipeline.addLast(GRPC_PROXY_HANDLER, new GrpcProxy(connId));
+                pipeline.addLast(GRPC_WEB_PROXY_HANDLER, new GrpcWebProxy(connId));
+                pipeline.addLast(GRPC_WEBSOCKETS_TRANSLATOR, new WebSocketsTranslator(connId));
+                break;
         }
-        else if (sourceHttpVersion == 2) {
 
-            throw new RuntimeException("HTTP/2 source connection for REST not implemented yet");
+        // Finally, add the HTTP proxy and router link, which are closest to the core router
+
+        if (httpProtocol == 1) {
+
+            pipeline.addLast(HTTP_1_TO_2_PROXY, new Http1to2Proxy(routeConfig, connId));
+            pipeline.addLast(CORE_ROUTER_LINK, routerLink);
+        }
+        else if (httpProtocol == 2) {
+
+            throw new RuntimeException("HTTP/2 source connection for gRPC / REST not implemented yet");
         }
         else
             throw new EUnexpected();
