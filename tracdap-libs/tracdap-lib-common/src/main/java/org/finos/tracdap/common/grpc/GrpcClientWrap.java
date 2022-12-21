@@ -26,80 +26,24 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.function.Function;
 
-
+/**
+ * Deprecated class.
+ */
 public class GrpcClientWrap {
 
-    private final Logger log;
-
-    public GrpcClientWrap(Class<?> serviceClass) {
-        this.log = LoggerFactory.getLogger(serviceClass);
-    }
+    public GrpcClientWrap(Class<?> serviceClass) {}
 
     public <TRequest, TResponse>
     TResponse unaryCall(
             MethodDescriptor<TRequest, TResponse> method, TRequest request,
             Function<TRequest, TResponse> methodImpl) {
-
-        try {
-
-            log.info("CLIENT CALL START: [{}]", methodDisplayName(method));
-
-            var result = methodImpl.apply(request);
-
-            return handleResult(method, result, null);
-        }
-        catch (Exception error) {
-
-            return handleResult(method, null, error);
-        }
+        return methodImpl.apply(request);
     }
 
     public <TRequest, TResponse>
     CompletionStage<TResponse> unaryAsync(
             MethodDescriptor<TRequest, TResponse> method, TRequest request,
             Function<TRequest, ListenableFuture<TResponse>> methodImpl) {
-
-        try {
-
-            log.info("CLIENT CALL START: [{}]", methodDisplayName(method));
-
-            return Futures
-                    .javaFuture(methodImpl.apply(request))
-                    .handle((result, error) -> handleResult(method, result, error));
-        }
-        catch (Exception error) {
-
-            return CompletableFuture.supplyAsync(() -> handleResult(method, null, error));
-        }
-    }
-
-    private <TResponse>
-    TResponse handleResult(MethodDescriptor<?, ?> method, TResponse result, Throwable error) {
-
-        if (error == null) {
-
-            log.info("CLIENT CALL SUCCEEDED: [{}]", methodDisplayName(method));
-
-            return result;
-        }
-        else {
-
-            var grpcError = GrpcErrorMapping.processError(error);
-
-            log.error("CLIENT CALL FAILED: [{}] {}",
-                    methodDisplayName(method),
-                    grpcError.getMessage(), grpcError);
-
-            throw grpcError;
-        }
-    }
-
-    private String methodDisplayName(MethodDescriptor<?, ?> method) {
-
-        var serviceName = method.getServiceName();
-        var shortServiceName = serviceName == null ? null : serviceName.substring(serviceName.lastIndexOf(".") + 1);
-        var methodName = method.getBareMethodName();
-
-        return String.format("%s.%s()", shortServiceName, methodName);
+        return Futures.javaFuture(methodImpl.apply(request));
     }
 }
