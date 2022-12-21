@@ -72,7 +72,10 @@ public class WebSocketsRouter extends CoreRouter {
             upgradeComplete = true;
 
             log.info("conn = {}, websockets handshake complete, sub-protocol = [{}]", connId, handshake.selectedSubprotocol());
-            log.info(handshake.requestHeaders().toString());
+
+            if (log.isTraceEnabled()) {
+                log.trace("conn = {}, handshake headers: {}", connId, handshake.requestHeaders().toString());
+            }
         }
         else {
             super.userEventTriggered(ctx, evt);
@@ -240,37 +243,44 @@ public class WebSocketsRouter extends CoreRouter {
             // Report an error in websockets if the route is not found
             if (route == null) {
                 var statusCode = WebSocketCloseStatus.ENDPOINT_UNAVAILABLE;
-                var message = String.format("No route found for [%s]", uri.getPath());
+                var message = String.format("No route found for [%s]", upgradeUri);
                 reportErrorAndClose(ctx, message, statusCode, /* cause = */ null);
                 return;
             }
+
+            // If the target is not active, create a new connection (For WS it will always be a new connection)
+            // This should always succeed inline, errors may be reported later
+            target = getOrCreateTarget(ctx, route);
 
             firstMessageReceived = true;
             routeId = route.getIndex();
 
             // The first frame in grpc-websockets holds encoded HTTP headers
             // We want to add the headers from the upgrade request, particularly path
-            frame = addUpgradeHeaders(frame);
 
-            target = getOrCreateTarget(ctx, route);
+            frame.retain();
+            frame = addUpgradeHeaders(frame);
         }
         else {
 
             target = getTarget(routeId);
+
+            // This could happen if the proxy route has closed while messages are still coming in
+            // There is no way to recover, so we have to close the client connection
+            if (target == null) {
+                var statusCode = WebSocketCloseStatus.ENDPOINT_UNAVAILABLE;
+                var message = String.format("Proxy connection has been closed for [%s]", upgradeUri);
+                reportErrorAndClose(ctx, message, statusCode, /* cause = */ null);
+                return;
+            }
+
+            frame.retain();
         }
-
-        // We already checked the route
-        // What happens if the target connection has been closed?
-        if (target == null)
-            throw new EUnexpected();
-
-        // Ready to write the frame, time to retain a copy
-        ReferenceCountUtil.retain(frame);
-
-        relayMessage(target, frame);
 
         // We don't know when the incoming stream finishes, without digging into the contents of the stream
         // Simplify by flushing for each message, the proxy queues will buffer anyway
+
+        relayMessage(target, frame);
         flushMessages(target);
     }
 
