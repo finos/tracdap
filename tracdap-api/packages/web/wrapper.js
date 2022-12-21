@@ -103,6 +103,11 @@
         GoogleTransport.prototype._grpcWebUnary = function(method, descriptor, request, callback) {
 
             this.grpcWeb.rpcCall(method.name, request, this.rpcMetadata, descriptor, callback);
+
+            // For stream.on("metadata") and stream.on("status")
+            // If status == OK, call _processResponseMetadata()
+            // This will update cookies and session info sent by TRAC
+            // Share implementation with TRAC transport
         }
 
         GoogleTransport.prototype._grpcWebServerStreaming = function(method, descriptor, request, callback) {
@@ -113,10 +118,10 @@
             stream.on("end", () => callback(null, null));
             stream.on("error", err => callback(err, null));
 
-            // TODO: Do we need to do anything with these two messages?
-
-            stream.on("metadata", metadata => console.log("gRPC Metadata: " + JSON.stringify(metadata)));
-            stream.on("status", status => console.log("gRPC Status: " + JSON.stringify(status)));
+            // For stream.on("metadata") and stream.on("status")
+            // If status == OK, call _processResponseMetadata()
+            // This will update cookies and session info sent by TRAC
+            // Share implementation with TRAC transport
         }
 
         return GoogleTransport;
