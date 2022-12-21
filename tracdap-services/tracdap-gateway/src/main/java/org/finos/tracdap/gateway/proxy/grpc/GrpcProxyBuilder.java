@@ -31,9 +31,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nonnull;
+import java.net.SocketAddress;
 
 
 public class GrpcProxyBuilder extends ChannelInitializer<Channel> {
+
+    private static final String DATA_API_NAME = "TracDataApi";
 
     private static final String HTTP2_PREFACE_HANDLER = "HTTP2_PREFACE";
     private static final String HTTP2_FRAME_CODEC = "HTTP2_FRAME_CODEC";
@@ -79,10 +82,35 @@ public class GrpcProxyBuilder extends ChannelInitializer<Channel> {
         var pipeline = channel.pipeline();
 
         // Set up foundation HTTP/2 proxy channel
+        setupHttp2(pipeline, target);
 
-        var initialSettings = new Http2Settings()
-                .maxFrameSize(Http2FlowControl.HTTP2_DEFAULT_MAX_FRAME_SIZE)
-                .initialWindowSize(Http2FlowControl.HTTP2_DEFAULT_INITIAL_WINDOW_SIZE);
+        // Now add the gRPC protocol handlers
+        setupGrpcTranslation(pipeline);
+
+        // Finally, add the HTTP proxy and router link, which are closest to the core router
+        setupRouterLink(pipeline);
+    }
+
+    private void setupHttp2(ChannelPipeline pipeline, SocketAddress target) {
+
+        var initialSettings = (Http2Settings) null;
+
+        // Use a larger initial frame / window size for data transfers
+
+        if (isDataRoute()) {
+
+            log.info("conn = {}, target = {}, configured for bulk data transfer", connId, target);
+
+            initialSettings = new Http2Settings()
+                    .maxFrameSize(Http2FlowControl.TRAC_DATA_MAX_FRAME_SIZE)
+                    .initialWindowSize(Http2FlowControl.TRAC_DATA_INITIAL_WINDOW_SIZE);
+        }
+        else {
+
+            initialSettings = new Http2Settings()
+                    .maxFrameSize(Http2FlowControl.HTTP2_DEFAULT_MAX_FRAME_SIZE)
+                    .initialWindowSize(Http2FlowControl.HTTP2_DEFAULT_INITIAL_WINDOW_SIZE);
+        }
 
         var http2Codec = Http2FrameCodecBuilder.forClient()
                 .initialSettings(initialSettings)
@@ -99,8 +127,9 @@ public class GrpcProxyBuilder extends ChannelInitializer<Channel> {
 
         pipeline.addLast(HTTP2_FRAME_CODEC, http2Codec.build());
         pipeline.addLast(HTTP2_FLOW_CTRL, http2FlowControl);
+    }
 
-        // Now add the gRPC protocol handlers
+    private void setupGrpcTranslation(ChannelPipeline pipeline) {
 
         switch (grpcProtocol) {
 
@@ -122,8 +151,9 @@ public class GrpcProxyBuilder extends ChannelInitializer<Channel> {
             default:
                 throw new EUnexpected();
         }
+    }
 
-        // Finally, add the HTTP proxy and router link, which are closest to the core router
+    private void setupRouterLink(ChannelPipeline pipeline) {
 
         switch (httpProtocol) {
 
@@ -145,5 +175,10 @@ public class GrpcProxyBuilder extends ChannelInitializer<Channel> {
 
                 throw new ENetworkHttp(HttpResponseStatus.HTTP_VERSION_NOT_SUPPORTED.code(), message);
         }
+    }
+
+    private boolean isDataRoute() {
+
+        return routeConfig.getMatch().getPath().contains(DATA_API_NAME);
     }
 }

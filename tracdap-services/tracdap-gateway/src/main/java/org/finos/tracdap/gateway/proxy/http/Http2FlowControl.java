@@ -54,8 +54,8 @@ public class Http2FlowControl extends Http2ChannelDuplexHandler {
     public static final int HTTP2_DEFAULT_MAX_FRAME_SIZE = 1 << 14;
 
     // Alternate initial settings to use for data transfer endpoints
-    public static final int TRAC_DATA_INITIAL_WINDOW_SIZE = (1 << 19);
-    public static final int TRAC_DATA_MAX_FRAME_SIZE = (1 << 16) - 1;
+    public static final int TRAC_DATA_INITIAL_WINDOW_SIZE = (1 << 19) - 1;
+    public static final int TRAC_DATA_MAX_FRAME_SIZE = (1 << 16);
 
     private static final boolean INBOUND_DIRECTION = true;
     private static final boolean OUTBOUND_DIRECTION = false;
