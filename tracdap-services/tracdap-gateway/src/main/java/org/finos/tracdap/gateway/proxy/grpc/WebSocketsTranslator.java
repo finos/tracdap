@@ -16,6 +16,7 @@
 
 package org.finos.tracdap.gateway.proxy.grpc;
 
+import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPromise;
@@ -26,6 +27,7 @@ import io.netty.handler.codec.http.websocketx.WebSocketFrame;
 import io.netty.handler.codec.http2.*;
 import io.netty.util.ReferenceCountUtil;
 
+import org.finos.tracdap.common.exception.ENetwork;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -51,10 +53,12 @@ public class WebSocketsTranslator extends Http2ChannelDuplexHandler {
 
     private final int connId;
 
+    // Outbound LPM state
     private Http2FrameStream requestStream;
     private final byte[] prefixBytes;
     private int prefixRemaining;
-    private long lpmRemaining;
+    private int lpmRemaining;
+    private boolean eosFlag;
 
     public WebSocketsTranslator(int connId) {
 
@@ -71,11 +75,10 @@ public class WebSocketsTranslator extends Http2ChannelDuplexHandler {
     @Override
     public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) throws Exception {
 
-        // Outbound messages are processed in to stages
-        // First an aggregation stage, which assembles data from fragmented WS frames into a single buffer
-        // Then each complete frame is processed as a single item
-        // There is no requirement to line up frames / fragments with gRPC messages,
-        // But it does make everything a lot easier!
+        // Outbound data has to be processed on the way through
+        // The WS EOS marker bytes need to be removed
+        // Also we add an explicit outbound EOS to the translated stream
+        // Downstream handlers should not need to look at message content to get EOS
 
         try {
 
@@ -109,15 +112,9 @@ public class WebSocketsTranslator extends Http2ChannelDuplexHandler {
         }
     }
 
-    @Override
-    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
-
-        log.error(cause.getMessage(), cause);
-
-        super.exceptionCaught(ctx, cause);
-    }
-
     private void processOutboundHeaders(ChannelHandlerContext ctx, BinaryWebSocketFrame wsFrame, ChannelPromise promise) {
+
+        // The initial WS headers come in a binary frame, they are converted into an HTTP/2 headers frame
 
         requestStream = this.newStream();
 
@@ -133,91 +130,126 @@ public class WebSocketsTranslator extends Http2ChannelDuplexHandler {
 
     private void processOutboundData(ChannelHandlerContext ctx, BinaryWebSocketFrame wsFrame, ChannelPromise promise) {
 
+        // After the initial headers, we can sniff the stream to pick out LPMs
+        // We need to read the prefix, then skip ahead to next message
+        // Slices are sent with the WS EOS markers removed (i.e. one byte is removed between messages)
+
+        // Try to slice as little as possible and don't hold any buffers after a frame is processed
+        // Don't try to get 1 LPM per frame (adds complexity, they get broken apart anyway)
+
         try {
 
             var frameBytes = wsFrame.content();
             var frameSize = frameBytes.readableBytes();
-            var frameOffset = 0;
             var lpmOffset = 0;
-            var eos = (short) 0;
 
             if (log.isTraceEnabled())
                 log.trace("conn = {}, outbound data frame: size = [{}]", connId, frameSize);
 
-            while (frameOffset < frameSize) {
+            while (frameBytes.readerIndex() < frameSize && !eosFlag) {
 
                 // If this is a new LPM, start by looking for the websocket EOS flag
                 if (lpmRemaining == 0 && prefixRemaining == 0) {
 
-                    eos = frameBytes.getUnsignedByte(frameOffset);
-                    frameOffset += 1;
-                    lpmOffset += 1;
+                    sniffWsPrefix(frameBytes);
 
-                    if (eos != 0)
+                    // If the EOS marker is received, do not process more LPMs (it should be the last one)
+                    // Otherwise prepare to read an LPM, starting at the current reader index
+                    if (eosFlag)
                         break;
-                    else
+                    else {
                         prefixRemaining = LPM_PREFIX_LENGTH;
+                        lpmOffset = frameBytes.readerIndex();
+                    }
                 }
 
-                // After EOS = 0, expect an LPM prefix
+                // So long as EOS = 0, expect an LPM prefix next
                 if (prefixRemaining > 0) {
-
-                    var prefixAvailable = Math.min(frameSize - frameOffset, LPM_PREFIX_LENGTH);
-                    var prefixOffset = LPM_PREFIX_LENGTH - prefixRemaining;
-
-                    frameBytes.getBytes(frameOffset, prefixBytes, prefixOffset, prefixAvailable);
-
-                    prefixRemaining -= prefixAvailable;
-                    frameOffset += prefixAvailable;
-
-                    if (prefixRemaining == 0) {
-
-                        // Compression flag not currently used
-                        // Any compressed data, just pass it through as-is!
-
-                        lpmRemaining = GrpcUtils.readLpmLength(prefixBytes);
-                    }
-
-                    if (log.isTraceEnabled() && lpmRemaining > 0) {
-                        log.trace("conn = {}, outbound LPM, length = {}, compress = {}", connId, lpmRemaining, GrpcUtils.readLpmFlag(prefixBytes));
-                    }
+                    sniffLpmPrefix(frameBytes);
                 }
 
-                // Skip over all available bytes to the end of the LPM
+                // Consume bytes until the end of the frame or LPM, whichever comes sooner
                 if (lpmRemaining > 0) {
-
-                    var lpmAvailable = Math.min(frameSize - frameOffset, lpmRemaining);
-
-                    lpmRemaining -= lpmAvailable;
-                    frameOffset += lpmAvailable;
+                    consumeLpmBytes(ctx, frameBytes, lpmOffset);
                 }
-
-                var lpmSlice = frameBytes.slice(lpmOffset, frameOffset - lpmOffset).retain();
-                var lpmFrame = new DefaultHttp2DataFrame(lpmSlice).stream(requestStream);
-                ctx.write(lpmFrame);
             }
 
-            if (frameOffset != frameSize) {
-                log.error("conn = {}, invalid grpc websockets stream", connId);
-                throw new EUnexpected();  // todo error
+            if (frameBytes.readerIndex() != frameSize) {
+                log.error("conn = {}, invalid gRPC data stream (websockets), message offsets don't add up", connId);
+                throw new ENetwork("Invalid gRPC data stream (websockets)");
             }
 
-            if (eos != 0) {
-
-                if (log.isTraceEnabled()) {
-                    log.trace("conn = {}, EOS marker seen, sending outbound EOS", connId);
-                }
-
-                var eosFrame = new DefaultHttp2DataFrame(Unpooled.EMPTY_BUFFER, true).stream(requestStream);
-                ctx.write(eosFrame);
-                ctx.flush();
+            // When the EOS marker appears, send an explicit EOS down the pipe
+            // (don't rely on handlers inspecting the data stream)
+            if (eosFlag) {
+                sendExplicitEos(ctx);
             }
 
             promise.setSuccess();
         }
         catch (Throwable e) {
             promise.setFailure(e);
+            throw e;
         }
+    }
+
+    private void sniffWsPrefix(ByteBuf frameBytes) {
+
+        var eos = frameBytes.readUnsignedByte();
+
+        // Once EOS flag is set, it should not be unset
+        if (eos != 0)
+            eosFlag = true;
+    }
+
+    private void sniffLpmPrefix(ByteBuf frameBytes) {
+
+        var prefixAvailable = Math.min(frameBytes.readableBytes(), LPM_PREFIX_LENGTH);
+        var prefixOffset = LPM_PREFIX_LENGTH - prefixRemaining;
+
+        frameBytes.readBytes(prefixBytes, prefixOffset, prefixAvailable);
+
+        prefixRemaining -= prefixAvailable;
+
+        if (prefixRemaining == 0) {
+
+            // Compression flag not currently used
+            // Any compressed data, just pass it through as-is!
+
+            lpmRemaining = (int) GrpcUtils.readLpmLength(prefixBytes);
+        }
+
+        if (log.isTraceEnabled() && lpmRemaining > 0) {
+            log.trace("conn = {}, outbound LPM, length = {}, compress = {}", connId, lpmRemaining, GrpcUtils.readLpmFlag(prefixBytes));
+        }
+    }
+
+    private void consumeLpmBytes(ChannelHandlerContext ctx, ByteBuf frameBytes, int lpmOffset) {
+
+        // If a portion of the prefix has been read in this frame, those bytes need to be included
+        // The slice includes the LPM prefix and message, but not the WS EOS marker bytes
+        var slicePrefixSize = frameBytes.readerIndex() - lpmOffset;
+
+        var lpmAvailable = Math.min(frameBytes.readableBytes(), lpmRemaining);
+        var lpmSliceSize = slicePrefixSize + lpmAvailable;
+
+        var lpmSlice = frameBytes.slice(lpmOffset, lpmSliceSize).retain();
+        var lpmFrame = new DefaultHttp2DataFrame(lpmSlice).stream(requestStream);
+        ctx.write(lpmFrame);
+
+        frameBytes.readerIndex(frameBytes.readerIndex() + lpmAvailable);
+        lpmRemaining -= lpmAvailable;
+    }
+
+    private void sendExplicitEos(ChannelHandlerContext ctx) {
+
+        if (log.isTraceEnabled()) {
+            log.trace("conn = {}, EOS marker seen, sending outbound EOS", connId);
+        }
+
+        var eosFrame = new DefaultHttp2DataFrame(Unpooled.EMPTY_BUFFER, true).stream(requestStream);
+        ctx.write(eosFrame);
+        ctx.flush();
     }
 
 
