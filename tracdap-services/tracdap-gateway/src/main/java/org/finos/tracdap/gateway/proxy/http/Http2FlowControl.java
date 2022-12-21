@@ -28,7 +28,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nonnull;
-import java.net.SocketAddress;
 import java.util.*;
 
 
@@ -67,7 +66,7 @@ public class Http2FlowControl extends Http2ChannelDuplexHandler {
     private final Logger log = LoggerFactory.getLogger(getClass());
 
     private final int connId;
-    private final SocketAddress target;
+    private final String target;
 
     private final Http2Settings inboundSettings;  // We do not try to modify settings after the connection starts
     private Http2Settings outboundSettings;
@@ -77,7 +76,7 @@ public class Http2FlowControl extends Http2ChannelDuplexHandler {
     private final Map<Http2FrameStream, StreamState> streams;
 
 
-    public Http2FlowControl(int connId, SocketAddress target, Http2Settings inboundSettings) {
+    public Http2FlowControl(int connId, String target, Http2Settings inboundSettings) {
 
         this.connId = connId;
         this.target = target;
@@ -472,8 +471,11 @@ public class Http2FlowControl extends Http2ChannelDuplexHandler {
 
             if (windowAdjustment != 0) {
 
-                log.warn("conn = {}, target = {}, settings update, window size adjustment [{}]",
-                        connId, target, windowAdjustment);
+                if (log.isTraceEnabled()) {
+
+                    log.trace("conn = {}, target = {}, settings update, window size adjustment [{}]",
+                            connId, target, windowAdjustment);
+                }
 
                 for (var streamState : streams.values())
                     streamState.writeWindow += windowAdjustment;
@@ -543,7 +545,7 @@ public class Http2FlowControl extends Http2ChannelDuplexHandler {
 
         if (stream.id() == 0) {
 
-            log.warn("conn = {}, target = {}, unexpected increment on connection write window, increment = [{}]",
+            log.warn("conn = {}, target = {}, unexpected update on connection main window, increment = [{}]",
                     connId, target, windowFrame.windowSizeIncrement());
 
             return;

@@ -56,6 +56,8 @@ public class GrpcProxyBuilder extends ChannelInitializer<Channel> {
     private final HttpProtocol httpProtocol;
     private final GrpcProtocol grpcProtocol;
 
+    private final String target;
+
     public GrpcProxyBuilder(
             GwRoute routeConfig,
             ChannelDuplexHandler routerLink,
@@ -69,12 +71,14 @@ public class GrpcProxyBuilder extends ChannelInitializer<Channel> {
         this.connId = connId;
         this.httpProtocol = httpProtocol;
         this.grpcProtocol = grpcProtocol;
+
+        this.target = String.format("%s:%d",
+                routeConfig.getTarget().getHost(),
+                routeConfig.getTarget().getPort());
     }
 
     @Override
     protected void initChannel(@Nonnull Channel channel) {
-
-        var target = channel.remoteAddress();
 
         if (log.isDebugEnabled())
             log.debug("conn = {}, target = {}, init gRPC proxy channel", connId, target);
@@ -82,7 +86,7 @@ public class GrpcProxyBuilder extends ChannelInitializer<Channel> {
         var pipeline = channel.pipeline();
 
         // Set up foundation HTTP/2 proxy channel
-        setupHttp2(pipeline, target);
+        setupHttp2(pipeline);
 
         // Now add the gRPC protocol handlers
         setupGrpcTranslation(pipeline);
@@ -91,7 +95,7 @@ public class GrpcProxyBuilder extends ChannelInitializer<Channel> {
         setupRouterLink(pipeline);
     }
 
-    private void setupHttp2(ChannelPipeline pipeline, SocketAddress target) {
+    private void setupHttp2(ChannelPipeline pipeline) {
 
         var initialSettings = (Http2Settings) null;
 
@@ -99,7 +103,8 @@ public class GrpcProxyBuilder extends ChannelInitializer<Channel> {
 
         if (isDataRoute()) {
 
-            log.info("conn = {}, target = {}, configured for bulk data transfer", connId, target);
+            if (log.isDebugEnabled())
+                log.debug("conn = {}, target = {}, using settings for bulk data transfer", connId, target);
 
             initialSettings = new Http2Settings()
                     .maxFrameSize(Http2FlowControl.TRAC_DATA_MAX_FRAME_SIZE)
