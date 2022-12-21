@@ -120,30 +120,17 @@ function loadStreamingData(dataId) {
         const stream = tracdap.setup.newStream(dataApi);
 
         // Hold the responses here until the stream is complete
-        let response = null;
-        let buffer = []
+        const messages = []
 
         // Make an initial call to start the download stream
-        // The first message that comes back has all the response fields, except the data
-        // Save this as the main response object
-        stream.readDataset(request).then(msg => response = msg);
+        stream.readDataset(request).catch(reject);
 
-        // Subsequent messages contain chunks of data, stash these until the stream is complete
-        stream.on("data", msg => msg.content && buffer.push(msg.content));
+        // When messages come in, stash them until the stream is complete
+        stream.on("data", msg => messages.push(msg));
 
-        // Once the stream finishes we need to aggregate the response data (there will be a helper function)
+        // Once the stream finishes we can aggregate the messages into a single response
         stream.on("end", () => {
-
-            const size = 0 + buffer.map(x => x.byteLength).reduce((acc, x) => acc + x, 0);
-            const content = new Uint8Array(size);
-            let offset = 0;
-
-            buffer.forEach(buf => {
-                content.set(buf, offset);
-                offset += buf.byteLength;
-            });
-
-            response.content = content;
+            const response = tracdap.utils.aggregateResponse(messages);
             resolve(response);
         });
 

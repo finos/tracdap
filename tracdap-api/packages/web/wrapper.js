@@ -783,6 +783,51 @@
 
     })();
 
+    $root.tracdap.utils = (function() {
+
+        /**
+         * Namespace utils.
+         * @memberof tracdap
+         * @namespace
+         */
+        const utils = {};
+
+        /**
+         * Aggregate a list of messages returned by a streaming data download
+         *
+         * @function aggregateResponse
+         * @memberof tracdap.utils
+         *
+         * @template TMessage extends $protobuf.rpc.Message
+         * @param {TMessage[]} messages A list of the messages to be aggregated
+         * @return {TMessage} A single aggregated message, with the content of the entire download stream
+         */
+        utils.aggregateResponse = function (messages) {
+
+            if (messages === null || messages.length === 0)
+                throw new Error("No response was received")
+
+            const response = messages[0];
+            const dataMessages = messages.slice(1);
+
+            const size = dataMessages.map(msg => msg.content.byteLength).reduce((acc, x) => acc + x, 0);
+            const content = new Uint8Array(size);
+            let offset = 0;
+
+            dataMessages.forEach(msg => {
+                content.set(msg.content.buffer, offset);
+                offset += msg.content.byteLength;
+            });
+
+            response.content = content;
+
+            return response;
+        }
+
+        return utils;
+
+    })();
+
     const api_mapping = $API_MAPPING;
 
     $root.tracdap = {
