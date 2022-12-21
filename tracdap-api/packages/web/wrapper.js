@@ -405,8 +405,12 @@
                     if (queueSize < LPM_PREFIX_LENGTH)
                         return;
 
+                    // Here we pull out the underlying buffer, so make sure to use the byte offset
+                    // Otherwise we'll get whatever is at index 0 in the physical buffer, which can be anything
+
                     const prefix = this._pollReceiveQueue(LPM_PREFIX_LENGTH);
-                    const prefixView = new DataView(prefix.buffer);
+                    const prefixView = new DataView(prefix.buffer, prefix.byteOffset, prefix.byteLength);
+
                     this.rcvFlag = prefixView.getUint8(0);
                     this.rcvLength = prefixView.getUint32(1, false);
                 }
@@ -447,10 +451,9 @@
 
             while (offset < nBytes) {
 
-                let frame0 = this._pollReceiveQueueUpto(nBytes - offset);
-                buffer.set(frame0, offset);
-
-                offset += frame0.byteLength;
+                let frame = this._pollReceiveQueueUpto(nBytes - offset);
+                buffer.set(frame, offset);
+                offset += frame.byteLength;
             }
 
             return buffer;
@@ -466,13 +469,15 @@
 
             if (frame.byteLength > nBytes) {
 
-                // May need to use slice if bytesOffset doesn't stick
-                // new Uint8Array(frame.buffer.slice(nBytes));
+                // Avoid physical copy on the underlying buffers
+                // Now we have to be careful to use the byteOffset anywhere we reference the buffer directly
 
+                const consumed = new Uint8Array(frame.buffer, frame.byteOffset, nBytes);
                 const remaining = new Uint8Array(frame.buffer, frame.byteOffset + nBytes);
+
                 this.rcvQueue.unshift(remaining);
 
-                return new Uint8Array(frame.buffer, frame.byteOffset, nBytes);
+                return consumed;
             }
         }
 
@@ -815,7 +820,7 @@
             let offset = 0;
 
             dataMessages.forEach(msg => {
-                content.set(msg.content.buffer, offset);
+                content.set(msg.content, offset);
                 offset += msg.content.byteLength;
             });
 
