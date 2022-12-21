@@ -119,7 +119,6 @@
             stream.on("status", status => console.log("gRPC Status: " + JSON.stringify(status)));
         }
 
-
         return GoogleTransport;
 
     })();
@@ -149,7 +148,6 @@
             this.host = host;
             this.port = port;
             this.options = options;
-            this.options.debug = true;
 
             this.hostAddress = `${protocol}://${host}:${port}`;
             this.urlPrefix = options["browser"] ? "" : this.hostAddress;
@@ -507,7 +505,7 @@
 
             this.options.debug && console.log("TracTransport _wsHandlerError")
 
-            this.ws.close();
+            this.ws.close(1006, "close on error");
 
             const status = grpc.StatusCode.UNKNOWN;
             const message = event.reason;
@@ -596,7 +594,11 @@
                 else
                     this._receiveMessage(lpm.message);
 
-                lpm = this._pollLpmQueue(this.rcvQueue);
+                // Avoid final poll after the queue is empty
+                if (this.rcvQueue.length > 0)
+                    lpm = this._pollLpmQueue(this.rcvQueue);
+                else
+                    lpm = null;
             }
         }
 
@@ -620,11 +622,18 @@
             const filteredHeaders = this._filterResponseHeaders(headers);
             Object.assign(this.responseMetadata, filteredHeaders);
 
-            // Instead of calling _handleComplete directly, close the WS and wait for _wsHandleClose
-            // This prevents close events coming in after completion (can create noise in error cases)
+            // The message exchange is always complete when the grpc-status header / trailer is received
             if (GRPC_STATUS_HEADER in this.responseMetadata) {
+
                 this.rcvDone = true;
-                this.ws.close();
+
+                // Always shut down the channel before processing _handleComplete
+                // But, also avoid duplicate close() requests, if it's already down that's fine
+
+                if (this.ws.readyState === WebSocket.CLOSED)
+                    this._handleComplete()
+                else
+                    this.ws.close(1000, "clean shutdown");
             }
         }
 
@@ -744,7 +753,7 @@
 
             // Send a WS close, in case it has not already been done
 
-            this.ws.close();
+            this.ws.close(1006, "close on error");
 
             // In an error condition make sure not to keep a reference to any data
 
@@ -1024,7 +1033,7 @@
             if (!serviceClass.hasOwnProperty("_serviceName"))
                 throw new Error("Service class must specify gRPC service in _serviceName (this is a bug)")
 
-            const protocol = window.location.protocol;
+            const protocol = window.location.protocol.replace(":", "");  // Remove trailing colon
             let host, port;
 
             const hostAndPort = window.location.host;
