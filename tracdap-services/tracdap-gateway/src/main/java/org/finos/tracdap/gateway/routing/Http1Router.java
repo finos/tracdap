@@ -21,6 +21,7 @@ import org.finos.tracdap.gateway.exec.Route;
 import org.finos.tracdap.gateway.proxy.grpc.GrpcProtocol;
 import org.finos.tracdap.gateway.proxy.http.Http1ProxyBuilder;
 import org.finos.tracdap.gateway.proxy.grpc.GrpcProxyBuilder;
+import org.finos.tracdap.gateway.proxy.http.HttpProtocol;
 import org.finos.tracdap.gateway.proxy.rest.RestApiProxyBuilder;
 
 import io.netty.channel.*;
@@ -279,13 +280,22 @@ public class Http1Router extends CoreRouter {
         switch (routeConfig.getConfig().getRouteType()) {
 
             case HTTP:
-                return new Http1ProxyBuilder(routeConfig.getConfig(), link, connId);
+
+                return new Http1ProxyBuilder(
+                        routeConfig.getConfig(), link, connId);
 
             case GRPC:
-                return new GrpcProxyBuilder(routeConfig.getConfig(), link, connId, SOURCE_IS_HTTP_1, GrpcProtocol.GRPC_WEB);
+
+                return new GrpcProxyBuilder(
+                        routeConfig.getConfig(), link, connId,
+                        HttpProtocol.HTTP_1_1,
+                        GrpcProtocol.GRPC_WEB);
 
             case REST:
-                return new RestApiProxyBuilder(routeConfig, SOURCE_IS_HTTP_1, link, ctx.executor(), connId);
+
+                return new RestApiProxyBuilder(
+                        routeConfig, link, ctx.executor(), connId,
+                        HttpProtocol.HTTP_1_1);
 
             default:
                 throw new EUnexpected();

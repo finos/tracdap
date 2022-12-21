@@ -16,7 +16,9 @@
 
 package org.finos.tracdap.gateway.proxy.grpc;
 
+import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.logging.LogLevel;
+import org.finos.tracdap.common.exception.ENetworkHttp;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.config.GwRoute;
 import org.finos.tracdap.gateway.proxy.http.Http1to2Proxy;
@@ -24,6 +26,7 @@ import org.finos.tracdap.gateway.proxy.http.Http1to2Proxy;
 import io.netty.channel.*;
 import io.netty.handler.codec.http2.*;
 import org.finos.tracdap.gateway.proxy.http.Http2FlowControl;
+import org.finos.tracdap.gateway.proxy.http.HttpProtocol;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -47,14 +50,14 @@ public class GrpcProxyBuilder extends ChannelInitializer<Channel> {
     private final ChannelDuplexHandler routerLink;
 
     private final int connId;
-    private final int httpProtocol;
+    private final HttpProtocol httpProtocol;
     private final GrpcProtocol grpcProtocol;
 
     public GrpcProxyBuilder(
             GwRoute routeConfig,
             ChannelDuplexHandler routerLink,
             int connId,
-            int httpProtocol,
+            HttpProtocol httpProtocol,
             GrpcProtocol grpcProtocol) {
 
         this.routeConfig = routeConfig;
@@ -115,20 +118,32 @@ public class GrpcProxyBuilder extends ChannelInitializer<Channel> {
                 pipeline.addLast(GRPC_WEB_PROXY_HANDLER, new GrpcWebProxy(connId));
                 pipeline.addLast(GRPC_WEBSOCKETS_TRANSLATOR, new WebSocketsTranslator(connId));
                 break;
+
+            default:
+                throw new EUnexpected();
         }
 
         // Finally, add the HTTP proxy and router link, which are closest to the core router
 
-        if (httpProtocol == 1) {
+        switch (httpProtocol) {
 
-            pipeline.addLast(HTTP_1_TO_2_PROXY, new Http1to2Proxy(routeConfig, connId));
-            pipeline.addLast(CORE_ROUTER_LINK, routerLink);
-        }
-        else if (httpProtocol == 2) {
+            case HTTP_1_0:
+            case HTTP_1_1:
+                pipeline.addLast(HTTP_1_TO_2_PROXY, new Http1to2Proxy(routeConfig, connId));
+                pipeline.addLast(CORE_ROUTER_LINK, routerLink);
+                break;
 
-            throw new RuntimeException("HTTP/2 source connection for gRPC / REST not implemented yet");
+            case WEBSOCKETS:
+                pipeline.addLast(CORE_ROUTER_LINK, routerLink);
+                break;
+
+            default:
+
+                var message = String.format(
+                        "HTTP protocol version [%s] is not supported for target [%s]",
+                        httpProtocol.name(), routeConfig.getRouteName());
+
+                throw new ENetworkHttp(HttpResponseStatus.HTTP_VERSION_NOT_SUPPORTED.code(), message);
         }
-        else
-            throw new EUnexpected();
     }
 }
