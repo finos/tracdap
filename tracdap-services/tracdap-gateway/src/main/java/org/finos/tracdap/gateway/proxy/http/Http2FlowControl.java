@@ -272,6 +272,9 @@ public class Http2FlowControl extends Http2ChannelDuplexHandler {
             throw new ETracInternal(message);
         }
 
+        // Frame will be consumed, so retain it now
+        dataFrame.retain();
+
         if (state.writeWindow >= frameSize && state.writeQueue.isEmpty())
             dispatchFrame(ctx, state, dataFrame, promise);
         else
