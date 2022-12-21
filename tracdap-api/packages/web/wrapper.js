@@ -447,7 +447,7 @@
 
             while (offset < nBytes) {
 
-                let frame0 = this._pollReceiveQueueUpto(nBytes);
+                let frame0 = this._pollReceiveQueueUpto(nBytes - offset);
                 buffer.set(frame0, offset);
 
                 offset += frame0.byteLength;
