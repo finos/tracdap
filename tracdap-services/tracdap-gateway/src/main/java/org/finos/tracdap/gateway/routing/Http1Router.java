@@ -41,8 +41,6 @@ public class Http1Router extends CoreRouter {
     // See also CoreRouter
     // Code for all the router classes could be simplified
 
-    private static final int SOURCE_IS_HTTP_1 = 1;
-
     private static final List<RequestStatus> REQUEST_STATUS_FINISHED = List.of(
             RequestStatus.COMPLETED,
             RequestStatus.FAILED);
@@ -197,10 +195,7 @@ public class Http1Router extends CoreRouter {
         // Retain, in case this is a FullHttpRequest including content
         ReferenceCountUtil.retain(req);
 
-        if (target.channelActiveFuture.isSuccess())
-            target.channel.write(req);
-        else
-            target.outboundQueue.add(req);
+        relayMessage(target, req);
     }
 
     private void processRequestContent(ChannelHandlerContext ctx, HttpContent msg) {
@@ -227,10 +222,7 @@ public class Http1Router extends CoreRouter {
 
         msg.retain();
 
-        if (target.channel.isActive())
-            target.channel.write(msg);
-        else
-            target.outboundQueue.add(msg);
+        relayMessage(target, msg);
     }
 
     private void processEndOfRequest(ChannelHandlerContext ctx, LastHttpContent msg) {
@@ -264,8 +256,9 @@ public class Http1Router extends CoreRouter {
         if (target == null)
             throw new EUnexpected();
 
-        if (target.channelActiveFuture.isSuccess())
-            target.channel.flush();
+        // Do not re-send message, it is already sent, we just need to flush
+
+        flushMessages(target);
     }
 
     // -----------------------------------------------------------------------------------------------------------------
