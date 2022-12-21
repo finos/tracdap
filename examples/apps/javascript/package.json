@@ -19,7 +19,7 @@
   },
   "type": "module",
   "dependencies": {
-    "apache-arrow": "^6.0.1",
+    "apache-arrow": "^10.0.1",
     "tracdap-web-api": "file:../../../tracdap-api/packages/web",
     "xhr2": "^0.2.1",
     "ws": "^8.11.0"

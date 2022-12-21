@@ -41,7 +41,8 @@ function loadArrowData(dataId) {
     return dataApi.readSmallDataset(request).then(response => {
 
         // Create an Arrow table directly from the binary content of the response
-        const table = arrow.Table.from([response.content]);
+        const table = new arrow.tableFromIPC(response.content);
+        table.length = table.numRows;
 
         return {schema: response.schema, data: table};
     })
@@ -59,7 +60,7 @@ export async function main() {
 
     console.log("Displaying arrow data")
 
-    const accessor = (table, row, col) => table.getColumnAt(col).get(row);
+    const accessor = (table, row, col) => table.getChildAt(col).get(row);
 
     renderTable(schema, data, accessor);
 
