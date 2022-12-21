@@ -83,7 +83,7 @@ class LoggingClientCall<ReqT, RespT> extends ClientCall<ReqT, RespT> {
         if (cause != null) {
             var grpcError = GrpcErrorMapping.processError(cause);
             log.error(
-                    "CLIENT CALL FAILED: [{}] {}",
+                    "CLIENT CALL CANCELLED: [{}] {}",
                     methodName,
                     grpcError.getMessage(),
                     grpcError
