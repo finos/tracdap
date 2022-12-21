@@ -516,9 +516,11 @@
                 }
             })
 
+            // Instead of calling _handleComplete directly, close the WS and wait for _wsHandleClose
+            // This prevents close events coming in after completion (can create noise in error cases)
             if (GRPC_STATUS_HEADER in this.responseMetadata) {
                 this.rcvDone = true;
-                this._handleComplete();
+                this.ws.close();
             }
         }
 
