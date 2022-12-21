@@ -17,14 +17,17 @@
 
 // To run these examples outside of a browser, XMLHttpRequest is required
 import xhr2 from 'xhr2';
+import WebSocket from "ws";
 global.XMLHttpRequest = xhr2.XMLHttpRequest;
+global.WebSocket = WebSocket;
 
 
 const ALL_EXAMPLES = [
     "hello_world",
     "metadata_mojo",
     "using_data",
-    "arrow"
+    "arrow",
+    "streaming"
 ]
 
 async function runExample(exampleName) {
