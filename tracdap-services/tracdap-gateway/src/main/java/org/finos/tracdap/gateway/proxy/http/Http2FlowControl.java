@@ -18,8 +18,10 @@ package org.finos.tracdap.gateway.proxy.http;
 
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPromise;
+import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http2.*;
 import io.netty.util.ReferenceCountUtil;
+import org.finos.tracdap.common.exception.ENetworkHttp;
 import org.finos.tracdap.common.exception.ETracInternal;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.slf4j.Logger;
@@ -34,6 +36,11 @@ public class Http2FlowControl extends Http2ChannelDuplexHandler {
 
     // See the HTTP/2 RFC for reference:
     // https://httpwg.org/specs/rfc7540.html
+
+    // TODO: Handle RST_STREAM and GOAWAY inbound frames
+
+    // Currently this handler only works on the proxy side, it will need updating to work on the client side
+    // Stream create / destroy operations would need to be supported on both inbound and outbound frames
 
     // This implementation does not try to propagate flow control through the GW or on to the client connection
     // Instead writes are buffered in this class, reads are sent on immediately
@@ -259,6 +266,7 @@ public class Http2FlowControl extends Http2ChannelDuplexHandler {
         var frameSize = dataFrame.content().readableBytes();
 
         if (state == null) {
+            // Treat as internal - state should have been created when the headers frame was sent
             var message = String.format("No HTTP/2 stream state available for stream [%d]", dataFrame.stream().id());
             log.error(message);
             throw new ETracInternal(message);
@@ -367,12 +375,16 @@ public class Http2FlowControl extends Http2ChannelDuplexHandler {
         // If it is applied on the client side, we can log new inbound streams here
         // We'd also need to create the stream state for new streams
 
-        ctx.fireChannelRead(headersFrame);
-
-        // No special handling for inbound EOS
-
         if (log.isDebugEnabled() && headersFrame.isEndStream()) {
             log.debug("conn = {}, target = {}, EOS for inbound stream [{}]", connId, target, headersFrame.stream().id());
+        }
+
+        ctx.fireChannelRead(headersFrame);
+
+        // For the same reason, CLOSE events should always occur on inbound frames
+
+        if (headersFrame.stream().state() == Http2Stream.State.CLOSED) {
+            destroyStreamState(headersFrame.stream());
         }
     }
 
@@ -392,10 +404,15 @@ public class Http2FlowControl extends Http2ChannelDuplexHandler {
         dataFrame.retain();
         ctx.fireChannelRead(dataFrame);
 
-        // No special handling for inbound EOS
-
         if (log.isDebugEnabled() && dataFrame.isEndStream()) {
             log.debug("conn = {}, target = {}, EOS for inbound stream [{}]", connId, target, dataFrame.stream().id());
+        }
+
+        // Flow control currently applied on the proxy side only, not the client side
+        // So CLOSE events should always occur on inbound frames
+
+        if (dataFrame.stream().state() == Http2Stream.State.CLOSED) {
+            destroyStreamState(dataFrame.stream());
         }
     }
 
@@ -575,6 +592,40 @@ public class Http2FlowControl extends Http2ChannelDuplexHandler {
     private StreamState getStreamState(Http2FrameStream stream) {
 
         return streams.get(stream);
+    }
+
+    private void destroyStreamState(Http2FrameStream stream) {
+
+        // Try not to throw errors during clean-up
+
+        var state = streams.remove(stream);
+
+        // Stream might be abandoned before it was properly initialised
+        if (state == null) {
+            log.warn("conn = {}, target = {}, stream [{}] destroyed before it was initialized", connId, target, stream.id());
+            return;
+        }
+
+        var queueMsg = state.writeQueue.poll();
+
+        if (queueMsg != null) {
+
+            log.warn("conn = {}, target = {}, stream [{}] destroyed before all data had been sent", connId, target, stream.id());
+
+            do {
+                var frame = queueMsg.getKey();
+                var promise = queueMsg.getValue();
+
+                var message = "Data was not fully sent";
+                var error = new ENetworkHttp(HttpResponseStatus.BAD_GATEWAY.code(), message);
+
+                ReferenceCountUtil.release(frame);
+                promise.setFailure(error);
+
+                queueMsg = state.writeQueue.poll();
+
+            } while (queueMsg != null);
+        }
     }
 
     private Http2Settings fillDefaultSettings(Http2Settings settings) {
