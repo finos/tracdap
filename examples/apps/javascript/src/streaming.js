@@ -15,23 +15,21 @@
  */
 
 import {tracdap} from 'tracdap-web-api';
-
-import {loadFromDisk} from './util';
 import fs from 'fs';
 
 // Create the Data API
-const rpcOptions = {transport: "trac", debug: true};
-const dataRpc = tracdap.setup.rpcImplForTarget(tracdap.api.TracDataApi, "http", "localhost", 8080, rpcOptions);
-const dataApi = new tracdap.api.TracDataApi(dataRpc);
+const transportOptions = {transport: "trac", debug: false};
+const transport = tracdap.setup.transportForTarget(tracdap.api.TracDataApi, "http", "localhost", 8080, transportOptions);
+const dataApi = new tracdap.api.TracDataApi(transport);
 
+// Location of a large file to use as an example
 const LARGE_CSV_FILE = "../../../tracdap-services/tracdap-svc-data/src/test/resources/large_csv_data_100000.csv";
 
 
 async function saveStreamingData(csvData) {
 
-    console.log("Start streaming upload");
-
-    // Build the schema definition we want to save
+    // Schema definition for the data we want to save
+    // You can also use a pre-loaded schema ID
     const schema = tracdap.metadata.SchemaDefinition.create({
 
         schemaType: tracdap.SchemaType.TABLE,
@@ -48,10 +46,11 @@ async function saveStreamingData(csvData) {
         }
     });
 
+    // Create a request object to save the data, this is the first message that will be sent
+    // It is just like createSmallDataset, but without the content
     const request0 = tracdap.api.DataWriteRequest.create({
 
         tenant: "ACME_CORP",
-
         schema: schema,
         format: "text/csv",
 
@@ -62,125 +61,116 @@ async function saveStreamingData(csvData) {
         ]
     });
 
+    // The upload stream is set up as a promise
+    // The stream will run until it either completes or fails, and the result will come back on the promise
+
     return new Promise((resolve, reject) => {
 
+        // You have to call newStream before using a streaming operation
+        // This is needed so events on different streams don't get mixed up
+        // TRAC will not let you run two streams on the same instance
         const stream = tracdap.setup.newStream(dataApi);
 
-        const saveResult = stream.createDataset(request0)
-            .then(result => resolve(result))
-            .catch(e => reject(e));
-        // .catch(err => console.log(("CLIENT CODE: Got error: " + err.message)));
+        // To start the upload, call the API method as normal with your first request object
+        // The success / failure of this call is passed back through resolve/reject on the promise
 
-        let chunkCount = 0
+        stream.createDataset(request0)
+            .then(resolve)
+            .catch(reject);
+
+        // Now handle the events on you data stream, by forwarding them to the API stream
+        // In this example, csvDAta is a stream of chunks loaded from the file system
+        // Each chunk needs to be wrapped in a message, by setting the "content" field
+        // All the other fields in the message should be left blank
 
         csvData.on('data', chunk => {
-            chunkCount += 1;
-            stream.createDataset(tracdap.api.DataWriteRequest.create({content: chunk}))
+            const msg = tracdap.api.DataWriteRequest.create({content: chunk});
+            stream.createDataset(msg)
         });
-        csvData.on('close', () => {console.log("EOS, total chunks = " + chunkCount); stream.end();});
-        // csvData.on('error', e => stream.end());
 
-        // stream.createDataset(data1)
-        //stream.end(true);
-        // stream.createDataset(data2)
-        // stream.createDataset(data3)
-        // stream.end();
+        // Make sure to forward the complete and error signals on the input stream as well
+        // This will make sure the stream is either finished or cancelled
+        // And let errors be sent back on the promise
 
-        // stream.on("data", e => {
-        //     console.log(JSON.stringify(e));
-        // });
-
-        // return saveResult;
-
+        csvData.on('close', () => stream.end());
+        csvData.on('error', () => stream.end(true));
     });
 }
 
 
 function loadStreamingData(dataId) {
 
-    // Ask for the dataset in Arrow IPC stream format
+    // Ask for the dataset in CSV format so we can easily count the rows
     const request = tracdap.api.DataReadRequest.create({
 
         tenant: "ACME_CORP",
-
         selector: dataId,
         format: "text/csv"
     });
 
+    // In this example, the result of the download stream is aggregated into a single message
+    // To display data in the browser, the entire dataset must be loaded in memory
+    // Aggregating the data and returning a single promise keeps the streaming logic contained
+
+    // Just like the upload method, set up the stream operation as a promise
+
     return new Promise((resolve, reject) => {
 
+        // You have to call newStream before using a streaming operation
         const stream = tracdap.setup.newStream(dataApi);
 
-        let allText = ""
+        // Hold the responses here until the stream is complete
+        let response = null;
+        let buffer = []
 
-        stream.on("data", response => {
+        // Make an initial call to start the download stream
+        // The first message that comes back has all the response fields, except the data
+        // Save this as the main response object
+        stream.readDataset(request).then(msg => response = msg);
 
-            console.log("CLIENT CODE: Got a message");
-            if (response.content) {
-                const text = new TextDecoder().decode(response.content);
-                allText += text;
-                //console.log(text);
-            }
-            else {
-                console.log("no content");
-            }
-        });
+        // Subsequent messages contain chunks of data, stash these until the stream is complete
+        stream.on("data", msg => msg.content && buffer.push(msg.content));
 
+        // Once the stream finishes we need to aggregate the response data (there will be a helper function)
         stream.on("end", () => {
 
-            console.log(`Got ${allText.split("\n").length} lines`);
-            resolve(allText);
+            const size = 0 + buffer.map(x => x.byteLength).reduce((acc, x) => acc + x, 0);
+            const content = new Uint8Array(size);
+            let offset = 0;
+
+            buffer.forEach(buf => {
+                content.set(buf, offset);
+                offset += buf.byteLength;
+            });
+
+            response.content = content;
+            resolve(response);
         });
+
+        // Handle the error signal to make sure errors are reported back through the promise
         stream.on("error", reject);
-
-        stream.readDataset(request).then(msg0 => {
-
-
-
-        })
-
-        // stream.on("end", () => {
-        //
-        //     console.log("CLIENT CODE: Got end of stream");
-        //     resolve();
-        // })
-        //
-        // stream.on("error", err => {
-        //
-        //     console.log("CLIENT CODE: Got an error: " + err.status + ", " + err.message);
-        //     reject(err);
-        // })
-
-        return stream
     });
 }
 
 export async function main() {
 
-    console.log("Looking for a schema to use...")
-    const csvData = fs.createReadStream(LARGE_CSV_FILE);  // await loadFromDisk(LARGE_CSV_FILE);
+    console.log("Start streaming upload");
 
-    const dataId = await saveStreamingData(csvData);
+    const csvStream = fs.createReadStream(LARGE_CSV_FILE);
+    const dataId = await saveStreamingData(csvStream);
 
-    console.log(JSON.stringify(dataId));
+    console.log("Uploaded dataset, here is the ID:")
+    console.log(JSON.stringify(dataId, null, 2));
 
-    // const x = tracdap.metadata.TagHeader.decode(dataId);
-    // console.log(JSON.stringify(x));
+    console.log("Start streaming download");
 
-    await loadStreamingData(dataId);
-    await loadStreamingData(dataId);
-    await loadStreamingData(dataId);
-    await loadStreamingData(dataId);
-    await loadStreamingData(dataId);
-    await loadStreamingData(dataId);
-    await loadStreamingData(dataId);
+    const dataResult = await loadStreamingData(dataId);
 
-    const csvData2 = fs.createReadStream(LARGE_CSV_FILE);  // await loadFromDisk(LARGE_CSV_FILE);
-    const dataId2 = await saveStreamingData(csvData2);
+    const schema = dataResult.schema;
+    const csvData = new TextDecoder().decode(dataResult.content);
+    const csvRows = csvData.split("\n").length - 1;  // quick row count, minus one row for the header!
 
-
-    await loadStreamingData(dataId2);
-
-    console.log("All done");
+    console.log(`Data download has been aggregated, there are ${csvRows} rows, here is the schema:`)
+    console.log(JSON.stringify(schema, null, 2));
 }
 
