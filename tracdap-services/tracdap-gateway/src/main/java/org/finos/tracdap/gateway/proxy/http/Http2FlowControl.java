@@ -26,72 +26,81 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nonnull;
+import java.net.SocketAddress;
 import java.util.*;
+
 
 public class Http2FlowControl extends Http2ChannelDuplexHandler {
 
-    public static final int DEFAULT_INITIAL_WINDOW_SIZE = (1 << 16) - 1;
-    public static final int DEFAULT_MAX_FRAME_SIZE = 1 << 14;
+    // See the HTTP/2 RFC for reference:
+    // https://httpwg.org/specs/rfc7540.html
+
+    // This implementation does not try to propagate flow control through the GW or on to the client connection
+    // Instead writes are buffered in this class, reads are sent on immediately
+    // True flow control could be achieved using custom events to start / stop the flow in both directions
+    // One approach would be to use an on/off flag with some buffering capacity
+    // Given the layers of translation, this may be simpler than requesting explicit numbers of bytes / messages
+
+    // Default HTTP/2 settings values as per the protocol
+    // If values are not specified in initial settings, these are the implicit defaults
+    public static final int HTTP2_DEFAULT_INITIAL_WINDOW_SIZE = (1 << 16) - 1;
+    public static final int HTTP2_DEFAULT_MAX_FRAME_SIZE = 1 << 14;
+
+    // Alternate initial settings to use for data transfer endpoints
+    public static final int TRAC_DATA_INITIAL_WINDOW_SIZE = (1 << 19);
+    public static final int TRAC_DATA_MAX_FRAME_SIZE = (1 << 16) - 1;
+
+    private static final boolean INBOUND_DIRECTION = true;
+    private static final boolean OUTBOUND_DIRECTION = false;
+
+    // Flags indicating whether ping / settings frames are auto-acked in the HTTP/2 codec
+    private static final boolean AUTO_ACK_PING = true;
+    private static final boolean AUTO_ACK_SETTINGS = true;
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
     private final int connId;
-
-    private final Http2FrameCodec codec;
-    private final Map<Http2FrameStream, StreamState> streams;
-
-    private boolean writable;
-    private boolean outboundHandshake;
-    private boolean inboundHandshake;
+    private final SocketAddress target;
 
     private final Http2Settings inboundSettings;  // We do not try to modify settings after the connection starts
     private Http2Settings outboundSettings;
+    private boolean outboundHandshake;
+    private boolean inboundHandshake;
 
-    private int totalSent = 0;
+    private final Map<Http2FrameStream, StreamState> streams;
 
-    private boolean ready;
-//    private int connWriteWindow;
-//    private int connReadWindow;
 
-    public Http2FlowControl(int connId, Http2FrameCodec codec, Http2Settings inboundSettings) {
+    public Http2FlowControl(int connId, SocketAddress target, Http2Settings inboundSettings) {
 
         this.connId = connId;
+        this.target = target;
 
-        this.codec = codec;
+        this.inboundSettings = fillDefaultSettings(inboundSettings);
+        this.outboundSettings = null;  // waiting for handshake
+
         this.streams = new HashMap<>();
-
-        this.inboundSettings = inboundSettings;
-
-        if (inboundSettings.initialWindowSize() == null)
-            this.inboundSettings.initialWindowSize(DEFAULT_INITIAL_WINDOW_SIZE);
-
-        if (inboundSettings.maxFrameSize() == null)
-            this.inboundSettings.maxFrameSize(DEFAULT_MAX_FRAME_SIZE);
-
-        this.writable = false;
-        this.ready = false;
-//        this.connWriteWindow = 0;
-//        this.connReadWindow = inboundSettings.initialWindowSize();
     }
 
     @Override
     public void channelActive(@Nonnull ChannelHandlerContext ctx) {
 
         if (log.isDebugEnabled())
-            log.debug("conn = {}, target = {}, channel active", connId, ctx.channel().remoteAddress());
+            log.debug("conn = {}, target = {}, channel active", connId, target);
 
-        writable = true;
+        // Do not fire the channel active event until the handshake is complete
+        // If the channel somehow re-activates after the handshake, check the outbound queues for messages
 
-        // do not fire channelActive, wait for the handshake to complete
+        if (inboundHandshake && outboundHandshake) {
+            ctx.fireChannelActive();
+            processAllQueues(ctx);
+        }
     }
 
     @Override
     public void channelInactive(@Nonnull ChannelHandlerContext ctx) {
 
         if (log.isDebugEnabled())
-            log.debug("conn = {}, target = {}, channel inactive", connId, ctx.channel().remoteAddress());
-
-        writable = false;
+            log.debug("conn = {}, target = {}, channel inactive", connId, target);
 
         ctx.fireChannelInactive();
     }
@@ -101,10 +110,15 @@ public class Http2FlowControl extends Http2ChannelDuplexHandler {
 
         try {
 
-            if (!(msg instanceof Http2Frame))
+            if (!(msg instanceof Http2Frame)) {
+                log.error("conn = {}, target = {}, unexpected outbound message of type [{}]", connId, target, msg.getClass().getName());
                 throw new EUnexpected();
+            }
 
             var frame = (Http2Frame) msg;
+
+            if (log.isTraceEnabled())
+                logFrameTrace(frame, OUTBOUND_DIRECTION);
 
             if (frame.name().equals("HEADERS")) {
 
@@ -122,7 +136,7 @@ public class Http2FlowControl extends Http2ChannelDuplexHandler {
 
             else {
 
-                log.error("conn = {}, unexpected outbound HTTP/2 frame [{}]", connId, frame.name());
+                log.error("conn = {}, target = {}, unexpected outbound HTTP/2 frame [{}]", connId, target, frame.name());
                 throw new EUnexpected();
             }
         }
@@ -134,7 +148,10 @@ public class Http2FlowControl extends Http2ChannelDuplexHandler {
     @Override
     public void flush(ChannelHandlerContext ctx) {
 
-        log.warn("Real flush called");
+        if (log.isTraceEnabled()) {
+            log.trace("conn = {}, target = {}, outbound flush", connId, target);
+        }
+
         ctx.flush();
     }
 
@@ -143,35 +160,32 @@ public class Http2FlowControl extends Http2ChannelDuplexHandler {
 
         try {
 
-            if (!(msg instanceof Http2Frame))
+            if (!(msg instanceof Http2Frame)) {
+                log.error("conn = {}, target = {}, unexpected outbound message of type [{}]", connId, target, msg.getClass().getName());
                 throw new EUnexpected();
+            }
 
             var frame = (Http2Frame) msg;
+
+            if (log.isTraceEnabled())
+                logFrameTrace(frame, INBOUND_DIRECTION);
 
             if (frame.name().equals("DATA")) {
 
                 var dataFrame = (Http2DataFrame) msg;
                 processInboundData(ctx, dataFrame);
-
-                // Frame is being sent up the pipe, do not release
-                dataFrame.retain();
-
-                ctx.fireChannelRead(dataFrame);
             }
 
             else if (frame.name().equals("HEADERS")) {
 
                 var headersFrame = (Http2HeadersFrame) frame;
                 processInboundHeaders(ctx, headersFrame);
-
-                ctx.fireChannelRead(frame);
             }
 
             else if (frame.name().equals("SETTINGS")) {
 
                 var settingFrame = (Http2SettingsFrame) frame;
                 processSettings(ctx, settingFrame);
-
             }
 
             else if (frame.name().equals("SETTINGS(ACK)")) {
@@ -193,7 +207,7 @@ public class Http2FlowControl extends Http2ChannelDuplexHandler {
 
             else {
 
-                log.warn("conn = {}, unhandled HTTP/2 frame [{}]", connId, frame.name());
+                log.warn("conn = {}, target = {}, unhandled HTTP/2 frame [{}]", connId, target, frame.name());
             }
         }
         finally  {
@@ -201,162 +215,252 @@ public class Http2FlowControl extends Http2ChannelDuplexHandler {
         }
     }
 
+
+    // -----------------------------------------------------------------------------------------------------------------
+    // OUTBOUND FRAMES
+    // -----------------------------------------------------------------------------------------------------------------
+
+
     private void processOutboundHeaders(ChannelHandlerContext ctx, Http2HeadersFrame headersFrame, ChannelPromise promise) {
 
         var stream = headersFrame.stream();
 
-        if (stream.id() < 0)
-            createStream(stream);
+        if (stream.id() < 0) {
+
+            if (log.isDebugEnabled()) {
+
+                // Use a promise listener, because stream ID is not set until the first frame is written
+                promise.addListener(
+                        x -> log.debug("conn = {}, target = {}, new outbound stream [{}]",
+                        connId, target, stream.id()));
+            }
+
+            createStreamState(stream);
+        }
 
         ctx.write(headersFrame, promise);
 
-        if (headersFrame.isEndStream())
+        if (headersFrame.isEndStream()) {
+
+            if (log.isDebugEnabled()) {
+
+                promise.addListener(
+                        x -> log.debug("conn = {}, target = {}, EOS for outbound stream [{}]",
+                        connId, target, stream.id()));
+            }
+
             ctx.flush();
+        }
     }
 
     private void processOutboundData(ChannelHandlerContext ctx, Http2DataFrame dataFrame, ChannelPromise promise) {
 
-        var streamState = streams.get(dataFrame.stream());
+        var state = streams.get(dataFrame.stream());
         var frameSize = dataFrame.content().readableBytes();
 
-        if (streamState == null) {
+        if (state == null) {
             var message = String.format("No HTTP/2 stream state available for stream [%d]", dataFrame.stream().id());
             log.error(message);
             throw new ETracInternal(message);
         }
 
-        var sendDirect = ready && streamState.writeWindow >= frameSize && streamState.writeQueue.isEmpty();
-
-        if (sendDirect) {
-
-            log.info("Sending direct, available window = [{}], totalSent = [{}]", streamState.writeWindow, totalSent);
-
-            sliceAndSend(ctx, dataFrame, promise);
-        }
-        else {
-
-            log.info("Queuing data frame, ready = [{}], writeWindow = [{}], writeQueue = [{}], totalSent = [{}]",
-                    ready, streamState.writeWindow, streamState.writeQueue.size(), totalSent);
-
-            if (streamState.writeQueue.isEmpty())
-                ctx.flush();
-
-            streamState.writeQueue.add(Map.entry(dataFrame, promise));
-        }
-
-        if (dataFrame.isEndStream())
-            ctx.flush();
+        if (state.writeWindow >= frameSize && state.writeQueue.isEmpty())
+            dispatchFrame(ctx, state, dataFrame, promise);
+        else
+            queueFrame(state, dataFrame, promise);
     }
+
+    private void dispatchFrame(ChannelHandlerContext ctx, StreamState state, Http2DataFrame dataFrame, ChannelPromise promise) {
+
+        var frameSize = dataFrame.content().readableBytes();
+
+        if (log.isTraceEnabled()) {
+
+            log.trace("conn = {}, target = {}, dispatch data frame, size = [{}], eos = [{}], window = [{}], queue = [{}]",
+                    connId, target, frameSize, dataFrame.isEndStream(),
+                    state.writeWindow, state.writeQueue.size());
+        }
+
+        ctx.write(dataFrame, promise);
+        state.writeWindow -= frameSize;
+
+        if (dataFrame.isEndStream()) {
+
+            if (log.isDebugEnabled()) {
+                log.debug("conn = {}, target = {}, EOS for outbound stream [{}]", connId, target, dataFrame.stream().id());
+            }
+
+            ctx.flush();
+        }
+    }
+
+    private void queueFrame(StreamState state, Http2DataFrame dataFrame, ChannelPromise promise) {
+
+        var frameSize = dataFrame.content().readableBytes();
+
+        if (log.isTraceEnabled()) {
+
+            log.trace("conn = {}, target = {}, queue data frame, size = [{}], eos = [{}], window = [{}], queue = [{}]",
+                    connId, target, frameSize, dataFrame.isEndStream(),
+                    state.writeWindow, state.writeQueue.size());
+        }
+
+        state.writeQueue.add(Map.entry(dataFrame, promise));
+    }
+
+    private void processQueue(ChannelHandlerContext ctx, int streamId, StreamState state) {
+
+        int framesSent = 0;
+
+        if (log.isTraceEnabled()) {
+            log.trace("conn = {}, target = {}, processing write queue for stream [{}]", connId, target, streamId);
+        }
+
+        while (!state.writeQueue.isEmpty()) {
+
+            var queueHead = state.writeQueue.peek();
+            var dataFrame = (Http2DataFrame) queueHead.getKey();
+            var frameSize = dataFrame.content().readableBytes();
+            var promise = queueHead.getValue();
+
+            if (state.writeWindow >= frameSize) {
+
+                state.writeQueue.remove();
+                dispatchFrame(ctx, state, dataFrame, promise);
+
+                framesSent += 1;
+            }
+        }
+
+        if (framesSent > 0) {
+
+            if (log.isTraceEnabled()) {
+                log.trace("conn = {}, target = {}, sent [{}] queued frames on stream [{}]", connId, target, framesSent, streamId);
+            }
+
+            ctx.flush();
+        }
+    }
+
+    private void processAllQueues(ChannelHandlerContext ctx) {
+
+        if (log.isTraceEnabled())
+            log.trace("conn = {}, target = {}, process all outbound queues", connId, target);
+
+        for (var stream : streams.entrySet()) {
+
+            var streamId = stream.getKey().id();
+            var state = stream.getValue();
+            processQueue(ctx, streamId, state);
+        }
+    }
+
+
+    // -----------------------------------------------------------------------------------------------------------------
+    // INBOUND FRAMES
+    // -----------------------------------------------------------------------------------------------------------------
+
 
     private void processInboundHeaders(ChannelHandlerContext ctx, Http2HeadersFrame headersFrame) {
 
-        if (headersFrame.isEndStream()) {
+        ctx.fireChannelRead(headersFrame);
 
-            log.info("Got inbound EOS");
-
-            // todo
-        }
+        // No special handling for inbound EOS
     }
 
     private void processInboundData(ChannelHandlerContext ctx, Http2DataFrame dataFrame) {
 
-        var state = streams.get(dataFrame.stream());
+        // HTTP/2 frame codec and decoder handle flow control, sending window_update when required
+        // Client code only needs to notify the codec that data frames have been consumed
+        // To avoid unexpected interplay with byte counting in the codec, it is simplest to notify for each frame
+
+        // Note: Not flushing the flow frame, leaving that logic to the codec implementation
 
         var dataSize = dataFrame.content().readableBytes();
-//        var windowFrame = new DefaultHttp2WindowUpdateFrame(dataSize).stream(dataFrame.stream());
-//        ctx.write(windowFrame);
-//        ctx.flush();
+        var windowFrame = new DefaultHttp2WindowUpdateFrame(dataSize).stream(dataFrame.stream());
+        ctx.write(windowFrame);
 
+        // Frame is being sent up the pipe, do not release
+        dataFrame.retain();
+        ctx.fireChannelRead(dataFrame);
 
-        state.readWindow -= dataSize;
-
-        if (state.readWindow < inboundSettings.initialWindowSize() / 2.0 - 1) {
-
-            var windowIncrement = inboundSettings.initialWindowSize() - state.readWindow;
-            var windowFrame = new DefaultHttp2WindowUpdateFrame(windowIncrement).stream(dataFrame.stream());
-            ctx.write(windowFrame);
-            ctx.flush();
-
-            state.readWindow += windowIncrement;
-        }
-
-        if (dataFrame.isEndStream()) {
-
-            log.info("Got inbound EOS");
-
-            // todo
-        }
+        // No special handling for inbound EOS
     }
 
     private void processPing(ChannelHandlerContext ctx, Http2PingFrame pingFrame) {
 
         // If this is a ping, reply with a pong
+        // Not needed if auto ack ping is set in the HTTP/2 codec
 
-        if (!pingFrame.ack()) {
+        if (!AUTO_ACK_PING && !pingFrame.ack()) {
             var pongFrame = new DefaultHttp2PingFrame(pingFrame.content(), true);
-            //ctx.write(pongFrame);
+            ctx.write(pongFrame);
+            ctx.flush();
         }
     }
 
     private void processSettings(ChannelHandlerContext ctx, Http2SettingsFrame settingsFrame) {
 
-        if (outboundSettings == null) {
+        if (!outboundHandshake) {
 
-            Http2Settings.defaultSettings();
+            // Initial settings frame from the server
+            // Store these settings, infer any missing values as the HTTP/2 defaults
 
-            outboundSettings = settingsFrame.settings();
+            outboundSettings = fillDefaultSettings(settingsFrame.settings());
             outboundHandshake = true;
 
-            if (outboundSettings.initialWindowSize() == null) {
-                log.info("Using default initial window size");
-                outboundSettings.initialWindowSize(DEFAULT_INITIAL_WINDOW_SIZE);
+            if (log.isTraceEnabled()) {
+
+                log.trace("conn = {}, target = {}, initial outbound settings, max frame = [{}], window = [{}]",
+                        connId, target,
+                        outboundSettings.maxFrameSize(),
+                        outboundSettings.initialWindowSize());
             }
 
-            if (outboundSettings.maxFrameSize() == null) {
-                log.info("Using default max frame size");
-                outboundSettings.maxFrameSize(DEFAULT_MAX_FRAME_SIZE);
-            }
+            if (inboundHandshake && ctx.channel().isActive()) {
 
-//            connWriteWindow = outboundSettings.initialWindowSize();
+                if (log.isDebugEnabled()) {
+                    log.debug("conn = {}, target = {}, http/2 handshake complete", connId, target);
+                }
 
-            //ctx.write(Http2SettingsAckFrame.INSTANCE);
-
-            if (writable && inboundHandshake && !ready) {
-                ready = true;
                 ctx.fireChannelActive();
-                sendAllQueues(ctx);
+                processAllQueues(ctx);
             }
         }
+
         else {
 
             // If there is a new window size setting, apply the adjustment to all active streams
             // The remote host may not send WINDOW_UPDATE until the new capacity is exhausted
 
-            if (settingsFrame.settings().initialWindowSize() != null) {
+            var priorWindowSize = outboundSettings.initialWindowSize();
+            var newWindowSize = settingsFrame.settings().initialWindowSize();
+            var windowAdjustment = newWindowSize - priorWindowSize;
 
-                var priorWindowSize = outboundSettings.initialWindowSize();
-                var newWindowSize = settingsFrame.settings().initialWindowSize();
-                var windowAdjustment = newWindowSize - priorWindowSize;
+            if (windowAdjustment != 0) {
 
-                log.warn("Applying window size adjustment of [{}]", windowAdjustment);
+                log.warn("conn = {}, target = {}, settings update, window size adjustment [{}]",
+                        connId, target, windowAdjustment);
 
                 for (var streamState : streams.values())
                     streamState.writeWindow += windowAdjustment;
             }
 
+            // Store all updates to the outbound settings
+
             outboundSettings.putAll(settingsFrame.settings());
 
-//            try {
-//                codec.encoder().remoteSettings(settingsFrame.settings());
-//            }
-//            catch (Http2Exception e) {
-//                throw new EUnexpected(e);
-//            }
+            // If the outbound windows are increased, try to send any buffered frames
 
-            //ctx.write(Http2SettingsAckFrame.INSTANCE);
+            if (windowAdjustment > 0)
+                processAllQueues(ctx);
+        }
 
-            if (settingsFrame.settings().initialWindowSize() != null)
-                sendAllQueues(ctx);
+        // No need to send the ACK if autoAckSettingFrame(true) is set in the HTTP/2 codec
+
+        if (!AUTO_ACK_SETTINGS) {
+            ctx.write(Http2SettingsAckFrame.INSTANCE);
+            ctx.flush();
         }
     }
 
@@ -364,12 +468,26 @@ public class Http2FlowControl extends Http2ChannelDuplexHandler {
 
         if (!inboundHandshake) {
 
+            // Ack frame for our initial settings
+
             inboundHandshake = true;
 
-            if (writable && outboundHandshake && !ready) {
-                ready = true;
+            if (log.isTraceEnabled()) {
+
+                log.trace("conn = {}, target = {}, initial inbound settings, max frame = [{}], window = [{}]",
+                        connId, target,
+                        inboundSettings.maxFrameSize(),
+                        inboundSettings.initialWindowSize());
+            }
+
+            if (outboundHandshake && ctx.channel().isActive()) {
+
+                if (log.isDebugEnabled()) {
+                    log.debug("conn = {}, target = {}, http/2 handshake complete", connId, target);
+                }
+
                 ctx.fireChannelActive();
-                sendAllQueues(ctx);
+                processAllQueues(ctx);
             }
         }
     }
@@ -377,112 +495,125 @@ public class Http2FlowControl extends Http2ChannelDuplexHandler {
     private void processWindowUpdate(ChannelHandlerContext ctx, Http2WindowUpdateFrame windowFrame) {
 
         if (windowFrame.windowSizeIncrement() <= 0) {
-            // todo: error, close connection
+
+            log.error("conn = {}, target = {}, invalid HTTP/2 window update, increment = [{}]",
+                    connId, target, windowFrame.windowSizeIncrement());
+
+            ctx.close();
         }
 
         var stream = windowFrame.stream();
 
-        // Updates to the connection-wide window
+        // Updates to the connection-wide window should be managed internally by the frame codec
+        // If these message appear on the channel, ignore them with a warning
+        // (this would be a change in behavior, perhaps due to TRAC using some different settings somewhere)
+
         if (stream.id() == 0) {
 
-            log.warn("(UNEXPECTED) Increment global write window [{}]", windowFrame.windowSizeIncrement());
+            log.warn("conn = {}, target = {}, unexpected increment on connection write window, increment = [{}]",
+                    connId, target, windowFrame.windowSizeIncrement());
 
-//            connWriteWindow += windowFrame.windowSizeIncrement();
-            // sendAllQueues(ctx);
+            return;
         }
 
-        // Updates to individual stream windows
-        else {
+        var state = getStreamState(stream);
 
-            var state = streams.get(stream);
+        // WINDOW_UPDATE on a closed stream is not an error, it can be safely ignored
+        // https://httpwg.org/specs/rfc7540.html#WINDOW_UPDATE
+        if (state == null)
+            return;
 
-            // WINDOW_UPDATE on a closed stream is not an error
-            // https://httpwg.org/specs/rfc7540.html#WINDOW_UPDATE
-            if (state == null)
-                return;
+        // A real window update on an active stream
+        // Check the stream buffer queue and start sending messages if there are any pending
 
-            state.writeWindow += windowFrame.windowSizeIncrement();
+        state.writeWindow += windowFrame.windowSizeIncrement();
 
-            log.warn("Increment stream [{}] write window by [{}], available window = [{}]",
-                    stream.id(), windowFrame.windowSizeIncrement(), state.writeWindow);
+        if (log.isTraceEnabled()) {
 
-            sendQueue(ctx, stream);
+            log.trace("conn = {}, target = {}, window update, stream = [{}], increment = [{}], new window = [{}]",
+                    connId, target, windowFrame.stream().id(),
+                    windowFrame.windowSizeIncrement(),
+                    state.writeWindow);
         }
+
+        processQueue(ctx, stream.id(), state);
     }
 
-    private void createStream(Http2FrameStream stream) {
+
+    // -----------------------------------------------------------------------------------------------------------------
+    // HELPERS
+    // -----------------------------------------------------------------------------------------------------------------
+
+
+    private static class StreamState {
+
+        int writeWindow;
+        Queue<Map.Entry<Http2Frame, ChannelPromise>> writeQueue;
+    }
+
+    private void createStreamState(Http2FrameStream stream) {
 
         var state = new StreamState();
-        state.readWindow = inboundSettings.initialWindowSize();
         state.writeWindow = outboundSettings.initialWindowSize();
         state.writeQueue = new ArrayDeque<>();
 
         streams.put(stream, state);
     }
 
-    private void sendAllQueues(ChannelHandlerContext ctx) {
+    private StreamState getStreamState(Http2FrameStream stream) {
 
-        log.info("Sending all queues");
-
-        var streamIds = streams.keySet();
-
-        for (var streamId : streamIds)
-            sendQueue(ctx, streamId);
+        return streams.get(stream);
     }
 
-    private void sendQueue(ChannelHandlerContext ctx, Http2FrameStream streamId) {
+    private Http2Settings fillDefaultSettings(Http2Settings settings) {
 
-        log.info("Sending from queue for stream [{}]...", streamId);
-
-        var streamState = streams.get(streamId);
-
-        if (streamState == null)
-            return;  // todo
-
-        while (!streamState.writeQueue.isEmpty()) {
-
-            var queueHead = streamState.writeQueue.peek();
-            var dataFrame = (Http2DataFrame) queueHead.getKey();
-            var frameSize = dataFrame.content().readableBytes();
-            var promise = queueHead.getValue();
-
-            if (ready && streamState.writeWindow >= frameSize) {
-
-                log.info("Sending queued frame");
-
-                streamState.writeQueue.remove();
-                sliceAndSend(ctx, dataFrame, promise);
-            }
-            else {
-
-                log.info("Cannot send more, ready = [{}], writeWindow = [{}], totalSent = [{}]", ready, streamState.writeWindow, totalSent);
-
-                ctx.flush();
-
-                return;
-            }
+        if (settings.initialWindowSize() == null) {
+            settings.initialWindowSize(HTTP2_DEFAULT_INITIAL_WINDOW_SIZE);
         }
 
-        log.info("All queued frames have been sent, writeWindow = [{}]", streamState.writeWindow);
+        if (settings.maxFrameSize() == null) {
+            settings.maxFrameSize(HTTP2_DEFAULT_MAX_FRAME_SIZE);
+        }
+
+        return settings;
     }
 
-    private void sliceAndSend(ChannelHandlerContext ctx, Http2DataFrame dataFrame, ChannelPromise promise) {
+    private void logFrameTrace(Http2Frame frame, boolean direction) {
 
-        var frameSize = dataFrame.content().readableBytes();
+        var logDirection = direction == INBOUND_DIRECTION ? "inbound" : "outbound";
 
-        log.info("Sending slice size = [{}]", frameSize);
-        ctx.write(dataFrame, promise);
+        if (frame instanceof Http2DataFrame) {
 
-        var stream = streams.get(dataFrame.stream());
-        stream.writeWindow -= frameSize;
-        totalSent += frameSize;
-    }
+            var dataFrame = (Http2DataFrame) frame;
 
-    private static class StreamState {
+            log.trace("conn = {}, target = {}, {} frame [{}], stream = {}, size = [{}], eos = [{}]",
+                    connId, target, logDirection, dataFrame.name(),
+                    dataFrame.stream().id(),
+                    dataFrame.content().readableBytes(),
+                    dataFrame.isEndStream());
 
-        int readWindow;
-        int writeWindow;
+        }
+        else if (frame instanceof Http2HeadersFrame) {
 
-        Queue<Map.Entry<Object, ChannelPromise>> writeQueue;
+            var headersFrame = (Http2HeadersFrame) frame;
+
+            log.trace("conn = {}, target = {}, {} frame [{}], stream = [{}], eos = [{}]",
+                    connId, target, logDirection, headersFrame.name(),
+                    headersFrame.stream().id(),
+                    headersFrame.isEndStream());
+        }
+        else if (frame instanceof Http2StreamFrame) {
+
+            var streamFrame = (Http2StreamFrame) frame;
+
+            log.trace("conn = {}, target = {}, {} frame [{}], stream = [{}",
+                    connId, target, logDirection, streamFrame.name(),
+                    streamFrame.stream().id());
+        }
+        else {
+
+            log.trace("conn = {}, target = {}, {} frame [{}]",
+                    connId, target, logDirection, frame.name());
+        }
     }
 }

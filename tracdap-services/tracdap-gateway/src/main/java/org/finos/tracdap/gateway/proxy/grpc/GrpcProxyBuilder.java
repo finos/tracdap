@@ -61,14 +61,16 @@ public class GrpcProxyBuilder extends ChannelInitializer<Channel> {
     @Override
     protected void initChannel(@Nonnull Channel channel) {
 
+        var target = channel.remoteAddress();
+
         if (log.isDebugEnabled())
-            log.debug("conn = {}, Init gRPC proxy channel", connId);
+            log.debug("conn = {}, target = {}, init gRPC proxy channel", connId, target);
 
         var pipeline = channel.pipeline();
 
         var initialSettings = new Http2Settings()
-                .maxFrameSize(Http2FlowControl.DEFAULT_MAX_FRAME_SIZE)
-                .initialWindowSize(Http2FlowControl.DEFAULT_INITIAL_WINDOW_SIZE);
+                .maxFrameSize(Http2FlowControl.HTTP2_DEFAULT_MAX_FRAME_SIZE)
+                .initialWindowSize(Http2FlowControl.HTTP2_DEFAULT_INITIAL_WINDOW_SIZE);
 
         var http2Codec = Http2FrameCodecBuilder.forClient()
                 .initialSettings(initialSettings)
@@ -77,7 +79,7 @@ public class GrpcProxyBuilder extends ChannelInitializer<Channel> {
                 .validateHeaders(true)
                 .build();
 
-        var http2FlowControl = new Http2FlowControl(connId, http2Codec, initialSettings);
+        var http2FlowControl = new Http2FlowControl(connId, target, initialSettings);
 
         pipeline.addLast(HTTP2_FRAME_CODEC, http2Codec);
         pipeline.addLast(HTTP2_FLOW_CTRL, http2FlowControl);
