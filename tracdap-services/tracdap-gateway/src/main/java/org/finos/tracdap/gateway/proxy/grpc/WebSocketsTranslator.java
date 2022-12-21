@@ -20,6 +20,8 @@ import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPromise;
 import io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame;
+import io.netty.handler.codec.http.websocketx.CloseWebSocketFrame;
+import io.netty.handler.codec.http.websocketx.WebSocketCloseStatus;
 import io.netty.handler.codec.http.websocketx.WebSocketFrame;
 import io.netty.handler.codec.http2.*;
 import io.netty.util.ReferenceCountUtil;
@@ -27,6 +29,8 @@ import io.netty.util.ReferenceCountUtil;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import javax.annotation.Nonnull;
 
 
 public class WebSocketsTranslator extends Http2ChannelDuplexHandler {
@@ -46,18 +50,17 @@ public class WebSocketsTranslator extends Http2ChannelDuplexHandler {
     private final Logger log = LoggerFactory.getLogger(getClass());
 
     private final int connId;
-    private final ByteQueue requestQueue;
-    private final ByteQueue responseQueue;
 
     private Http2FrameStream requestStream;
+    private final ByteQueue requestQueue;
     private boolean requestPrefixExpected;
     private long requestLpmRemaining;
-    private long responseLpmRemaining;
 
     public WebSocketsTranslator(int connId) {
+
         this.connId = connId;
+
         this.requestQueue = new ByteQueue();
-        this.responseQueue = new ByteQueue();
     }
 
 
@@ -216,11 +219,11 @@ public class WebSocketsTranslator extends Http2ChannelDuplexHandler {
 
 
     @Override
-    public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
+    public void channelRead(@Nonnull ChannelHandlerContext ctx, @Nonnull Object msg) throws Exception {
 
-        // For inbound frames, the sequence is one header frame followed by zero or more data frames
-        // Trailers are already encoded into a data frame by the gRPC-Web proxy layer,
-        // No additional processing is needed for grpc-websockets
+        // The client must account for LPM / frame boundaries being misaligned, it can't be reliably prevented
+        // Since we don't need to inspect the response stream, it can just pass it through with minimal processing
+        // The HTTP/2 EOS marker can signal the request is complete
 
         try {
 
@@ -231,40 +234,45 @@ public class WebSocketsTranslator extends Http2ChannelDuplexHandler {
             }
 
             var frame = (Http2Frame) msg;
+            var eos = false;
 
-            // No changes to the content of header frames, just encode to bytes and send up the wire
+            // Handlers for incoming HTTP/2 frames
 
             if (frame instanceof Http2HeadersFrame) {
-                processInboundHeaders(ctx, (Http2HeadersFrame) frame);
-            }
 
-            // Data frames are already in LPM and trailers are already encoded
-            // Individual messages may be split over multiple HTTP/2 data frames
-            // This processing aggregates using the LPM prefix, so one message ends up in one WS data frame
-            // Client code should not assume that frames don't get fragmented on their way out though!
+                var headersFrame = (Http2HeadersFrame) frame;
+                processInboundHeaders(ctx, headersFrame);
+
+                eos = headersFrame.isEndStream();
+            }
 
             else if (frame instanceof Http2DataFrame) {
 
-                // Data frames contain a stream of LPMs, which do not align with frame boundaries
-                // Push the frame content into a byte queue, and process incoming LPM blocks from there
-
                 var dataFrame = (Http2DataFrame) frame;
-                responseQueue.pushBytes(dataFrame.content().retain());
+                processInboundData(ctx, dataFrame);
 
-                while (responseQueue.hasAnyBytes())
-                    processInboundLpm(ctx);
+                eos = dataFrame.isEndStream();
             }
-
-            // TODO: Send custom event to trigger close after trailers complete?
-
-            // This may allow some communication with the handler framing the HTTP/2 content
-            // E.g. the HTTP 1 -> 2 framer, web sockets framer or router link
 
             else {
 
-                log.warn("conn = {}, Unexpected inbound HTTP/2 frame [{}] reached the web sockets translator",
-                        connId, frame.name());
+                // Drop unexpected frame types with a warning (e.g. a stray ping)!
+                log.warn("conn = {}, unexpected inbound frame [{}] in web sockets translator", connId, frame.name());
             }
+
+            // grpc-websockets protocol only supports one call per connection
+            // If the response is completed (HTTP/2 EOS), send an explicit CLOSE frame to the client
+            // Anyway, the client will know anyway when it gets a trailers frame with grpc-status
+            // But this is more definite and guards against unexpected error conditions
+
+            if (eos) {
+
+                var closeFrame = new CloseWebSocketFrame(WebSocketCloseStatus.NORMAL_CLOSURE);
+                ctx.fireChannelRead(closeFrame);
+                ctx.flush();
+            }
+
+
         }
         catch (Throwable e) {
             closeEverything();
@@ -279,8 +287,10 @@ public class WebSocketsTranslator extends Http2ChannelDuplexHandler {
 
     private void processInboundHeaders(ChannelHandlerContext ctx, Http2HeadersFrame frame) {
 
+        // No changes to the content of header frames, just encode as LPM and send up the wire
+
         if (log.isTraceEnabled())
-            log.trace("conn = {}, Inbound headers frame: {}", connId, frame.headers().toString());
+            log.trace("conn = {}, inbound {}} frame: {}", connId, frame.name(), frame.headers().toString());
 
         var wsContent = GrpcUtils.lpmHeaders(frame.headers(), ctx.alloc());
         var wsFrame = new BinaryWebSocketFrame(wsContent);
@@ -288,48 +298,19 @@ public class WebSocketsTranslator extends Http2ChannelDuplexHandler {
         ctx.fireChannelRead(wsFrame);
     }
 
-    private void processInboundLpm(ChannelHandlerContext ctx) {
+    private void processInboundData(ChannelHandlerContext ctx, Http2DataFrame frame) {
 
-        // If this is a new LPM block, try to read the prefix
-        if (responseLpmRemaining == 0) {
+        // Data frames are sent through as-is
+        // It may be that LPM and frame boundaries are not aligned
+        // But since there is no need to inspect the LPM, that doesn't matter
 
-            if (responseQueue.hasBytes(GrpcUtils.LPM_PREFIX_LENGTH)) {
+        if (log.isTraceEnabled())
+            log.trace("conn = {}, inbound {} frame: size = [{}]", connId, frame.name(), frame.content().readableBytes());
 
-                var prefix = responseQueue.peekBytes(GrpcUtils.LPM_PREFIX_LENGTH);
+        var wsContent = frame.content().retain();
+        var wsFrame = new BinaryWebSocketFrame(wsContent);
 
-                try {
-                    var compressFlag = prefix.readUnsignedByte();
-                    var trailers = (compressFlag & (1 << 7)) != 0;
-                    var compress = (compressFlag & 1) != 0;
-                    var length = prefix.readUnsignedInt();
-
-                    if (log.isTraceEnabled()) {
-
-                        log.trace(
-                                "conn = {}, Inbound LPM, trailers = {}, compress = {}, length = {}",
-                                connId, trailers, compress, length);
-                    }
-
-                    // Include the prefix length in the remaining bytes, prefix must be sent down the pipe
-                    responseLpmRemaining = GrpcUtils.LPM_PREFIX_LENGTH + length;
-                }
-                finally {
-                    prefix.release();
-                }
-            }
-        }
-
-        // Pass on as much content as possible up to the end of the block
-        // Trailer frames are already encoded by the gRPC-Web translation layer, so can be treated as normal
-        if (responseLpmRemaining > 0) {
-
-            var chunkSize = Math.min(responseLpmRemaining, responseQueue.availableBytes());
-            var chunkContent = responseQueue.popBytes((int) chunkSize);
-            responseLpmRemaining -= chunkSize;
-
-            var dataFrame = new BinaryWebSocketFrame(chunkContent);
-            ctx.fireChannelRead(dataFrame);
-        }
+        ctx.fireChannelRead(wsFrame);
     }
 
     private void closeEverything() {
@@ -341,13 +322,8 @@ public class WebSocketsTranslator extends Http2ChannelDuplexHandler {
             requestQueue.destroyQueue();
         }
 
-        if (responseQueue.hasAnyBytes()) {
-            responseQueue.destroyQueue();
-        }
-
         requestStream = null;
         requestPrefixExpected = false;
         requestLpmRemaining = 0;
-        responseLpmRemaining = 0;
     }
 }
