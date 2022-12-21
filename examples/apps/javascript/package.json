@@ -20,9 +20,10 @@
   "type": "module",
   "dependencies": {
     "apache-arrow": "^10.0.1",
+    "node-fetch": "^3.3.0",
     "tracdap-web-api": "file:../../../tracdap-api/packages/web",
-    "xhr2": "^0.2.1",
-    "ws": "^8.11.0"
+    "ws": "^8.11.0",
+    "xhr2": "^0.2.1"
   },
   "scripts": {
     "examples": "node --experimental-specifier-resolution=node run_examples.js"
