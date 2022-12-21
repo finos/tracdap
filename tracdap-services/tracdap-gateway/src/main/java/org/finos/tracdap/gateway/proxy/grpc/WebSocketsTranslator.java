@@ -32,6 +32,8 @@ import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nonnull;
 
+import static org.finos.tracdap.gateway.proxy.grpc.GrpcUtils.LPM_PREFIX_LENGTH;
+
 
 public class WebSocketsTranslator extends Http2ChannelDuplexHandler {
 
@@ -45,22 +47,19 @@ public class WebSocketsTranslator extends Http2ChannelDuplexHandler {
     // The main use case for this transport is streaming upload of large datasets,
     // So the overhead of creating a channel is acceptable in that case
 
-    private static final int WS_LPM_PREFIX_LENGTH = 1;
-
     private final Logger log = LoggerFactory.getLogger(getClass());
 
     private final int connId;
 
     private Http2FrameStream requestStream;
-    private final ByteQueue requestQueue;
-    private boolean requestPrefixExpected;
-    private long requestLpmRemaining;
+    private final byte[] prefixBytes;
+    private int prefixRemaining;
+    private long lpmRemaining;
 
     public WebSocketsTranslator(int connId) {
 
         this.connId = connId;
-
-        this.requestQueue = new ByteQueue();
+        this.prefixBytes = new byte[LPM_PREFIX_LENGTH];
     }
 
 
@@ -98,30 +97,10 @@ public class WebSocketsTranslator extends Http2ChannelDuplexHandler {
             // The first request in the stream is the headers frame, which has special processing
             if (requestStream == null) {
                 processOutboundHeaders(ctx, wsFrame, promise);
-                return;
             }
-
-            // After the headers come a stream of LPMs, which do not align with WS frame boundaries
-            // Push the frame content into a byte queue, and process incoming LPM blocks from there
-            try {
-
-                requestQueue.pushBytes(wsFrame.content().retain());
-
-                while (requestQueue.availableBytes() > 0)
-                    processOutboundLpm(ctx);
-
-                promise.setSuccess();
+            else {
+                processOutboundData(ctx, wsFrame, promise);
             }
-            catch (Throwable e) {
-                promise.setFailure(e);
-                throw e;
-            }
-        }
-
-        // If there is an error, clean up everything
-        catch (Throwable e) {
-            closeEverything();
-            throw e;
         }
 
         // Always release the incoming message, this has been processed
@@ -130,85 +109,114 @@ public class WebSocketsTranslator extends Http2ChannelDuplexHandler {
         }
     }
 
+    @Override
+    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
+
+        log.error(cause.getMessage(), cause);
+
+        super.exceptionCaught(ctx, cause);
+    }
+
     private void processOutboundHeaders(ChannelHandlerContext ctx, BinaryWebSocketFrame wsFrame, ChannelPromise promise) {
 
         requestStream = this.newStream();
 
+        var frameSize = wsFrame.content().readableBytes();
         var headers = GrpcUtils.decodeHeadersFrame(wsFrame.content());
 
         if (log.isTraceEnabled())
-            log.trace("conn = {}, Outbound headers frame: {}", connId, headers);
+            log.trace("conn = {}, outbound headers frame: size = [{}], {}", connId, frameSize, headers);
 
         var headersFrame = new DefaultHttp2HeadersFrame(headers).stream(requestStream);
         ctx.write(headersFrame, promise);
     }
 
-    private void processOutboundLpm(ChannelHandlerContext ctx) {
+    private void processOutboundData(ChannelHandlerContext ctx, BinaryWebSocketFrame wsFrame, ChannelPromise promise) {
 
-        // If this is a new LPM block, read the WS EOS prefix to check for EOS
-        if (requestLpmRemaining == 0 && !requestPrefixExpected) {
+        try {
 
-            // Always available when requestQueue.hasAnyBytes()
-            var wsPrefix = requestQueue.popBytes(WS_LPM_PREFIX_LENGTH);
+            var frameBytes = wsFrame.content();
+            var frameSize = frameBytes.readableBytes();
+            var frameOffset = 0;
+            var lpmOffset = 0;
+            var eos = (short) 0;
 
-            try {
+            if (log.isTraceEnabled())
+                log.trace("conn = {}, outbound data frame: size = [{}]", connId, frameSize);
 
-                var eos = wsPrefix.readUnsignedByte();
+            while (frameOffset < frameSize) {
 
-                if (eos == 0)
-                    requestPrefixExpected = true;
+                // If this is a new LPM, start by looking for the websocket EOS flag
+                if (lpmRemaining == 0 && prefixRemaining == 0) {
 
-                else {
+                    eos = frameBytes.getUnsignedByte(frameOffset);
+                    frameOffset += 1;
+                    lpmOffset += 1;
 
-                    log.trace("conn = {}, Outbound EOS marker", connId);
-
-                    var eosFrame = new DefaultHttp2DataFrame(Unpooled.EMPTY_BUFFER, true).stream(requestStream);
-                    ctx.write(eosFrame);
+                    if (eos != 0)
+                        break;
+                    else
+                        prefixRemaining = LPM_PREFIX_LENGTH;
                 }
+
+                // After EOS = 0, expect an LPM prefix
+                if (prefixRemaining > 0) {
+
+                    var prefixAvailable = Math.min(frameSize - frameOffset, LPM_PREFIX_LENGTH);
+                    var prefixOffset = LPM_PREFIX_LENGTH - prefixRemaining;
+
+                    frameBytes.getBytes(frameOffset, prefixBytes, prefixOffset, prefixAvailable);
+
+                    prefixRemaining -= prefixAvailable;
+                    frameOffset += prefixAvailable;
+
+                    if (prefixRemaining == 0) {
+
+                        // Compression flag not currently used
+                        // Any compressed data, just pass it through as-is!
+
+                        lpmRemaining = GrpcUtils.readLpmLength(prefixBytes);
+                    }
+
+                    if (log.isTraceEnabled() && lpmRemaining > 0) {
+                        log.trace("conn = {}, outbound LPM, length = {}, compress = {}", connId, lpmRemaining, GrpcUtils.readLpmFlag(prefixBytes));
+                    }
+                }
+
+                // Skip over all available bytes to the end of the LPM
+                if (lpmRemaining > 0) {
+
+                    var lpmAvailable = Math.min(frameSize - frameOffset, lpmRemaining);
+
+                    lpmRemaining -= lpmAvailable;
+                    frameOffset += lpmAvailable;
+                }
+
+                var lpmSlice = frameBytes.slice(lpmOffset, frameOffset - lpmOffset).retain();
+                var lpmFrame = new DefaultHttp2DataFrame(lpmSlice).stream(requestStream);
+                ctx.write(lpmFrame);
             }
-            finally {
-                wsPrefix.release();
+
+            if (frameOffset != frameSize) {
+                log.error("conn = {}, invalid grpc websockets stream", connId);
+                throw new EUnexpected();  // todo error
             }
+
+            if (eos != 0) {
+
+                if (log.isTraceEnabled()) {
+                    log.trace("conn = {}, EOS marker seen, sending outbound EOS", connId);
+                }
+
+                var eosFrame = new DefaultHttp2DataFrame(Unpooled.EMPTY_BUFFER, true).stream(requestStream);
+                ctx.write(eosFrame);
+                ctx.flush();
+            }
+
+            promise.setSuccess();
         }
-
-        // After receiving EOS == 0, there should be an LPM prefix
-        // We need to peek at this to get the length of the block
-        if (requestPrefixExpected) {
-
-            if (requestQueue.hasBytes(GrpcUtils.LPM_PREFIX_LENGTH)) {
-
-                var prefix = requestQueue.peekBytes(GrpcUtils.LPM_PREFIX_LENGTH);
-
-                try {
-                    var compress = prefix.readUnsignedByte() != 0;
-                    var length = prefix.readUnsignedInt();
-
-                    if (log.isTraceEnabled())
-                        log.trace("conn = {}, Outbound LPM, compress = {}, length = {}", connId, compress, length);
-
-                    // Include the prefix length in the remaining bytes, prefix must be sent down the pipe
-                    requestLpmRemaining = GrpcUtils.LPM_PREFIX_LENGTH + length;
-                    requestPrefixExpected = false;
-                }
-                finally {
-                    prefix.release();
-                }
-            }
-        }
-
-        // Pass on as much content as possible up to the end of the block
-        if (requestLpmRemaining > 0) {
-
-            var chunkSize = Math.min(requestLpmRemaining, requestQueue.availableBytes());
-
-//            if (chunkSize > 15 * 1024)
-//                chunkSize = 8 * 1024;
-
-            var chunkContent = requestQueue.popBytes((int) chunkSize);
-            requestLpmRemaining -= chunkSize;
-
-            var dataFrame = new DefaultHttp2DataFrame(chunkContent).stream(requestStream);
-            ctx.write(dataFrame);
+        catch (Throwable e) {
+            promise.setFailure(e);
         }
     }
 
@@ -274,10 +282,6 @@ public class WebSocketsTranslator extends Http2ChannelDuplexHandler {
 
 
         }
-        catch (Throwable e) {
-            closeEverything();
-            throw e;
-        }
 
         // Always release the message, this has been processed
         finally {
@@ -311,19 +315,5 @@ public class WebSocketsTranslator extends Http2ChannelDuplexHandler {
         var wsFrame = new BinaryWebSocketFrame(wsContent);
 
         ctx.fireChannelRead(wsFrame);
-    }
-
-    private void closeEverything() {
-
-        // Clean up everything in the event of an error
-        // In normal processing, resources will be closed as they are dispatched
-
-        if (requestQueue.hasAnyBytes()) {
-            requestQueue.destroyQueue();
-        }
-
-        requestStream = null;
-        requestPrefixExpected = false;
-        requestLpmRemaining = 0;
     }
 }
