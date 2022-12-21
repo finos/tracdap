@@ -66,16 +66,14 @@
                 ? protocol + "://" + host + ":" + port
                 : ""
 
-            this.rpcMetadata = {
-                "TE": "trailers"
-            }
+            this.rpcMetadata = {}
 
             this.grpcWeb = new grpc.GrpcWebClientBase({format: 'binary'});
 
-            console.log("Created gRPC transport with host address [" + this.hostAddress + "]");
+            this.options.debug && console.log(`GoogleTransport created, host address = [${this.hostAddress}]`);
         }
 
-        GoogleTransport.prototype.rpcImpl =function(method, request, callback) {
+        GoogleTransport.prototype.rpcImpl = function(method, request, callback) {
 
             try {
 
@@ -139,7 +137,6 @@
             "content-type": "application/grpc-web+proto",
             "accept": "application/grpc-web+proto",
             "x-grpc-web": 1,
-            "te": "trailers"
         }
 
         function TracTransport(serviceName, protocol, host, port, options) {
@@ -153,7 +150,7 @@
 
             this.hostAddress = `${protocol}://${host}:${port}`;
 
-            console.log("Created with host address: " + this.hostAddress);
+            this.options.debug && console.log(`TracTransport created, host address = [${this.hostAddress}]`);
 
             // Empty RPC metadata for now
             this.requestMetadata = {};
@@ -172,7 +169,7 @@
 
         TracTransport.prototype.setRpcInfo = function(method, callback) {
 
-            this.options.debug  && console.log("TracTransport setRpcInfo")
+            this.options.debug && console.log("TracTransport setRpcInfo")
 
             this.methodName = method.name;
 
@@ -205,7 +202,7 @@
 
         TracTransport.prototype.rpcImpl = function(method, request, callback) {
 
-            this.options.debug  && console.log("TracTransport rpcImpl")
+            this.options.debug && console.log("TracTransport rpcImpl")
 
             if (this.ws == null) {
                 this.setRpcInfo(method, callback)
@@ -234,7 +231,7 @@
 
         TracTransport.prototype._wsConnect = function() {
 
-            this.options.debug  && console.log("TracTransport _wsConnect")
+            this.options.debug && console.log("TracTransport _wsConnect")
 
             const ws = new WebSocket(this.methodUrl, "grpc-websockets");
             ws.binaryType = "arraybuffer";
@@ -249,7 +246,7 @@
 
         TracTransport.prototype._wsHandleOpen = function () {
 
-            this.options.debug  && console.log("TracTransport _wsHandleOpen")
+            this.options.debug && console.log("TracTransport _wsHandleOpen")
 
             // This is to match the protocol used by improbable eng
             // In their implementation, header frame is not wrapped as an LPM
@@ -262,7 +259,7 @@
 
         TracTransport.prototype._wsHandleClose = function(event) {
 
-            this.options.debug  && console.log("TracTransport _wsHandleClose")
+            this.options.debug && console.log("TracTransport _wsHandleClose")
 
             if (this.finished) {
 
@@ -286,14 +283,14 @@
 
         TracTransport.prototype._wsHandleMessage = function(event) {
 
-            this.options.debug  && console.log("TracTransport _wsHandleMessage")
+            this.options.debug && console.log("TracTransport _wsHandleMessage")
 
             this._receiveFrame(event.data)
         }
 
         TracTransport.prototype._wsHandlerError = function(event) {
 
-            this.options.debug  && console.log("TracTransport _wsHandlerError")
+            this.options.debug && console.log("TracTransport _wsHandlerError")
 
             this.ws.close();
 
@@ -310,7 +307,7 @@
 
         TracTransport.prototype._wsSendMessage = function(msg) {
 
-            this.options.debug  && console.log("TracTransport _wsSendMessage")
+            this.options.debug && console.log("TracTransport _wsSendMessage")
 
             const frame = this._wrapMessage(msg, /* wsProtocol = */ true)
 
@@ -322,7 +319,7 @@
 
         TracTransport.prototype._wsSendEos = function() {
 
-            this.options.debug  && console.log("TracTransport _wsSendEos")
+            this.options.debug && console.log("TracTransport _wsSendEos")
 
             const frame = new Uint8Array([1]);
 
@@ -336,13 +333,13 @@
 
         TracTransport.prototype._wsFlushSendQueue = function () {
 
-            this.options.debug  && console.log("TracTransport _wsFlushSendQueue")
+            this.options.debug && console.log("TracTransport _wsFlushSendQueue")
 
             while (this.sendQueue.length > 0 && this.ws.readyState === WebSocket.OPEN) {
 
                 const frame = this.sendQueue.shift();
 
-                this.options.debug  && console.log("TracTransport _wsFlushSendQueue: frame size " + frame.byteLength)
+                this.options.debug && console.log("TracTransport _wsFlushSendQueue: frame size " + frame.byteLength)
 
                 this.ws.send(frame);
             }
@@ -367,9 +364,10 @@
 
             const wsEos = 0;
             const wsPrefix = wsProtocol ? 1 : 0;
-
-            let flag = 0;
+            const flag = 0;
             const length = msg.byteLength;
+
+            this.options.debug && console.log(`TracTransport _wrapMessage: ws = ${wsProtocol}, eos = ${wsEos}, compress = ${flag}, length = ${length}`)
 
             const lpm = new Uint8Array(msg.byteLength + LPM_PREFIX_LENGTH + wsPrefix)
             const lpmView = new DataView(lpm.buffer, 0, LPM_PREFIX_LENGTH + wsPrefix);
@@ -380,8 +378,6 @@
             lpmView.setUint8(0 + wsPrefix, flag);
             lpmView.setUint32(1 + wsPrefix, length, false);
             lpm.set(msg, LPM_PREFIX_LENGTH + wsPrefix)
-
-            console.log(`Wrapped frame: ws = ${wsProtocol}, eos = ${wsEos}, compress = ${flag}, length = ${length}`)
 
             return lpm
         }
@@ -394,7 +390,7 @@
 
         TracTransport.prototype._receiveFrame = function(frame) {
 
-            this.options.debug  && console.log(`TracTransport _wsReceiveFrame, bytes = [${frame.byteLength}]`)
+            this.options.debug && console.log(`TracTransport _wsReceiveFrame, bytes = [${frame.byteLength}]`)
 
             this.rcvQueue.push(new Uint8Array(frame));
 
@@ -482,7 +478,7 @@
 
         TracTransport.prototype._receiveMessage = function(msg) {
 
-            this.options.debug  && console.log(`TracTransport _receiveMessage, bytes = [${msg.byteLength}]`)
+            this.options.debug && console.log(`TracTransport _receiveMessage, bytes = [${msg.byteLength}]`)
 
             if (this.serverStreaming)
                 this.callback(null, msg);
@@ -493,7 +489,7 @@
 
         TracTransport.prototype._receiveHeaders = function (msg) {
 
-            this.options.debug  && console.log("TracTransport _receiveHeaders")
+            this.options.debug && console.log("TracTransport _receiveHeaders")
 
             const decoder = new TextDecoder();
             const headerText = decoder.decode(msg);
@@ -507,11 +503,11 @@
 
                     const sep = line.indexOf(":", 1);
                     const key = line.substring(0, sep);
-                    const value = line.substring(sep + 1);
+                    const value = line.substring(sep + 1).trim();
 
-                    console.log(`${key}: ${value}`);
+                    this.options.debug && console.log(`Response header [${key}] = [${value}]`);
 
-                    this.responseMetadata[key] = value.trim();
+                    this.responseMetadata[key] = value;
                 }
             })
 
@@ -529,10 +525,10 @@
 
         TracTransport.prototype._handleComplete = function() {
 
-            this.options.debug  && console.log("TracTransport _handleComplete")
+            this.options.debug && console.log("TracTransport _handleComplete")
 
             if (this.finished) {
-                console.log("_handleComplete called after the method already finished");
+                this.options.debug && console.log("_handleComplete called after the method already finished");
                 return;
             }
 
@@ -580,10 +576,10 @@
 
         TracTransport.prototype._handlerError = function (status, message) {
 
-            this.options.debug  && console.log("TracTransport _handlerError", status, message)
+            this.options.debug && console.log("TracTransport _handlerError", status, message)
 
             if (this.finished) {
-                console.log("_handlerError called after the method already finished");
+                this.options.debug && console.log("_handlerError called after the method already finished");
                 return;
             }
 
@@ -643,17 +639,21 @@
         /**
          * Create an rpcImpl that connects to a specific target
          *
+         * <p>Deprecated since version 0.5.6, use transportForTarget() instead</p>
+         *
          * @function rpcImplForTarget
          * @memberof tracdap.setup
+         *
+         * @deprecated Since version 0.5.6, use transportForTarget() instead
          *
          * @param serviceClass {ServiceType} The service class to create an rpcImpl for
          * @param {string} protocol The protocol to use for connection (either "http" or "https")
          * @param {string} host The host to connect to
          * @param {number} port The port to connect to
          *
-         * @param options {object} Options to control the behaviour of the transport
-         * @param options.transport {("google"|"trac")} Controls which transport implementation to use for gRPC-Web
-         * @param options.debug {boolean} Turn on debug logging
+         * @param {object=} options Options to control the behaviour of the transport
+         * @param {("google"|"trac")} options.transport Controls which transport implementation to use for gRPC-Web
+         * @param {boolean} options.debug Turn on debug logging
          *
          * @returns {$protobuf.RPCImpl} An rpcImpl function that can be used with the specified service class
          */
@@ -668,14 +668,18 @@
         /**
          * Create an rpcImpl for use in a web browser, requests will be sent to the page origin server
          *
+         * <p>Deprecated since version 0.5.6, use transportForBrowser() instead</p>
+         *
          * @function rpcImplForBrowser
          * @memberof tracdap.setup
          *
+         * @deprecated Since version 0.5.6, use transportForBrowser() instead<
+         *
          * @param serviceClass {ServiceType} The service class to create an rpcImpl for
          *
-         * @param options {object} Options to control the behaviour of the transport
-         * @param options.transport {("google"|"trac")} Controls which transport implementation to use for gRPC-Web
-         * @param options.debug {boolean} Turn on debug logging
+         * @param {object=} options Options to control the behaviour of the transport
+         * @param {("google"|"trac")} options.transport Controls which transport implementation to use for gRPC-Web
+         * @param {boolean} options.debug Turn on debug logging
          *
          * @returns {$protobuf.RPCImpl} An rpcImpl function that can be used with the specified service class
          */
@@ -692,9 +696,9 @@
         }
 
         /**
-         * Create one of the TRAC API service interfaces for a specific service address, ready to make API calls
+         * Create an rpcImpl that connects to a specific target
          *
-         * @function serviceForTarget
+         * @function transportForTarget
          * @memberof tracdap.setup
          *
          * @param serviceClass {ServiceType} The service class to create an rpcImpl for
@@ -702,36 +706,44 @@
          * @param {string} host The host to connect to
          * @param {number} port The port to connect to
          *
-         * @param options {object} Options to control the behaviour of the transport
-         * @param options.transport {("google"|"trac")} Controls which transport implementation to use for gRPC-Web
-         * @param options.debug {boolean} Turn on debug logging
+         * @param {object=} options Options to control the behaviour of the transport
+         * @param {("google"|"trac")} options.transport Controls which transport implementation to use for gRPC-Web
+         * @param {boolean} options.debug Turn on debug logging
          *
-         * @returns {serviceClass} An instance of the service class, ready to be used for API calls
+         * @returns {$protobuf.RPCImpl} An rpcImpl function that can be used with the specified service class
          */
-        setup.serviceForTarget = function(serviceClass, protocol, host, port, options = {}) {
+        setup.transportForTarget = function(serviceClass, protocol, host, port, options = {}) {
 
-            const rpcImpl = setup.rpcImplForTarget(serviceClass, protocol, host, port, options);
-            return new serviceClass(rpcImpl);
+            if (!serviceClass.hasOwnProperty("_serviceName"))
+                throw new Error("Service class must specify gRPC service in _serviceName (this is a bug)")
+
+            return createRpcImpl(serviceClass._serviceName, protocol, host, port, options);
         }
 
         /**
-         * Create one of the TRAC API service interfaces for use in the browser, ready to make API calls
+         * Create an rpcImpl for use in a web browser, requests will be sent to the page origin server
          *
-         * @function serviceForBrowser
+         * @function transportForBrowser
          * @memberof tracdap.setup
          *
          * @param serviceClass {ServiceType} The service class to create an rpcImpl for
          *
-         * @param options {object} Options to control the behaviour of the transport
-         * @param options.transport {("google"|"trac")} Controls which transport implementation to use for gRPC-Web
-         * @param options.debug {boolean} Turn on debug logging
+         * @param {object=} options Options to control the behaviour of the transport
+         * @param {("google"|"trac")} options.transport Controls which transport implementation to use for gRPC-Web
+         * @param {boolean} options.debug Turn on debug logging
          *
-         * @returns {serviceClass} An instance of the service class, ready to be used for API calls
+         * @returns {$protobuf.RPCImpl} An rpcImpl function that can be used with the specified service class
          */
-        setup.serviceForBrowser = function(serviceClass, options = {}) {
+        setup.transportForBrowser = function(serviceClass, options = {}) {
 
-            const rpcImpl = setup.rpcImplForBrowser(serviceClass, options);
-            return new serviceClass(rpcImpl);
+            if (!serviceClass.hasOwnProperty("_serviceName"))
+                throw new Error("Service class must specify gRPC service in _serviceName (this is a bug)")
+
+            const protocol = window.location.protocol;
+            const host = window.location.host;
+            const port = window.location.port;
+
+            return createRpcImpl(serviceClass._serviceName, protocol, host, port, options);
         }
 
         /**
