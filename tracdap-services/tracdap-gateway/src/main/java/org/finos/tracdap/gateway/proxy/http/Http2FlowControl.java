@@ -28,7 +28,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nonnull;
-import java.net.SocketAddress;
 import java.util.*;
 
 
@@ -54,8 +53,8 @@ public class Http2FlowControl extends Http2ChannelDuplexHandler {
     public static final int HTTP2_DEFAULT_MAX_FRAME_SIZE = 1 << 14;
 
     // Alternate initial settings to use for data transfer endpoints
-    public static final int TRAC_DATA_INITIAL_WINDOW_SIZE = (1 << 19);
-    public static final int TRAC_DATA_MAX_FRAME_SIZE = (1 << 16) - 1;
+    public static final int TRAC_DATA_INITIAL_WINDOW_SIZE = (1 << 19) - 1;
+    public static final int TRAC_DATA_MAX_FRAME_SIZE = (1 << 16);
 
     private static final boolean INBOUND_DIRECTION = true;
     private static final boolean OUTBOUND_DIRECTION = false;
@@ -67,7 +66,7 @@ public class Http2FlowControl extends Http2ChannelDuplexHandler {
     private final Logger log = LoggerFactory.getLogger(getClass());
 
     private final int connId;
-    private final SocketAddress target;
+    private final String target;
 
     private final Http2Settings inboundSettings;  // We do not try to modify settings after the connection starts
     private Http2Settings outboundSettings;
@@ -77,7 +76,7 @@ public class Http2FlowControl extends Http2ChannelDuplexHandler {
     private final Map<Http2FrameStream, StreamState> streams;
 
 
-    public Http2FlowControl(int connId, SocketAddress target, Http2Settings inboundSettings) {
+    public Http2FlowControl(int connId, String target, Http2Settings inboundSettings) {
 
         this.connId = connId;
         this.target = target;
@@ -272,6 +271,9 @@ public class Http2FlowControl extends Http2ChannelDuplexHandler {
             throw new ETracInternal(message);
         }
 
+        // Frame will be consumed, so retain it now
+        dataFrame.retain();
+
         if (state.writeWindow >= frameSize && state.writeQueue.isEmpty())
             dispatchFrame(ctx, state, dataFrame, promise);
         else
@@ -331,13 +333,14 @@ public class Http2FlowControl extends Http2ChannelDuplexHandler {
             var frameSize = dataFrame.content().readableBytes();
             var promise = queueHead.getValue();
 
-            if (state.writeWindow >= frameSize) {
+            // Stop processing if the write window fills up
+            if (frameSize > state.writeWindow)
+                break;
 
-                state.writeQueue.remove();
-                dispatchFrame(ctx, state, dataFrame, promise);
+            state.writeQueue.remove();
+            dispatchFrame(ctx, state, dataFrame, promise);
 
-                framesSent += 1;
-            }
+            framesSent += 1;
         }
 
         if (framesSent > 0) {
@@ -468,8 +471,11 @@ public class Http2FlowControl extends Http2ChannelDuplexHandler {
 
             if (windowAdjustment != 0) {
 
-                log.warn("conn = {}, target = {}, settings update, window size adjustment [{}]",
-                        connId, target, windowAdjustment);
+                if (log.isTraceEnabled()) {
+
+                    log.trace("conn = {}, target = {}, settings update, window size adjustment [{}]",
+                            connId, target, windowAdjustment);
+                }
 
                 for (var streamState : streams.values())
                     streamState.writeWindow += windowAdjustment;
@@ -539,7 +545,7 @@ public class Http2FlowControl extends Http2ChannelDuplexHandler {
 
         if (stream.id() == 0) {
 
-            log.warn("conn = {}, target = {}, unexpected increment on connection write window, increment = [{}]",
+            log.warn("conn = {}, target = {}, unexpected update on connection main window, increment = [{}]",
                     connId, target, windowFrame.windowSizeIncrement());
 
             return;

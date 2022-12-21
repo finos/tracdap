@@ -289,6 +289,45 @@ abstract class CoreRouter extends ChannelDuplexHandler {
         }
     }
 
+    protected final void relayMessage(TargetChannelState target, Object msg) {
+
+        if (target.channelActiveFuture.isSuccess()) {
+
+            if (log.isTraceEnabled()) {
+
+                log.trace("conn = {}, target = {}, relaying message",
+                        connId, target.channel.remoteAddress());
+            }
+
+            target.channel.write(msg);
+        }
+        else {
+
+            if (log.isTraceEnabled()) {
+
+                log.trace("conn = {}, target = {}, queuing message, queue size = [{}]",
+                        connId, target.channel.remoteAddress(),
+                        target.outboundQueue.size());
+            }
+
+            target.outboundQueue.add(msg);
+        }
+    }
+
+    protected final void flushMessages(TargetChannelState target) {
+
+        if (target.channelActiveFuture.isSuccess()) {
+
+            if (log.isTraceEnabled()) {
+
+                log.trace("conn = {}, target = {}, flushing messages",
+                        connId, target.channel.remoteAddress());
+            }
+
+            target.channel.flush();
+        }
+    }
+
     protected final TargetChannelState getOrCreateTarget(ChannelHandlerContext ctx, Route route) {
 
         var routeId = route.getIndex();

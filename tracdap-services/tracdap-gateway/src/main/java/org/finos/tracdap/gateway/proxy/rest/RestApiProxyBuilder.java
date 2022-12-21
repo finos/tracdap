@@ -16,7 +16,8 @@
 
 package org.finos.tracdap.gateway.proxy.rest;
 
-import org.finos.tracdap.common.exception.EUnexpected;
+import io.netty.handler.codec.http.HttpResponseStatus;
+import org.finos.tracdap.common.exception.ENetworkHttp;
 import org.finos.tracdap.gateway.exec.Route;
 import org.finos.tracdap.gateway.proxy.http.Http1to2Proxy;
 
@@ -27,6 +28,8 @@ import io.netty.handler.codec.http2.Http2Settings;
 import io.netty.handler.logging.LogLevel;
 
 import io.netty.util.concurrent.EventExecutor;
+import org.finos.tracdap.gateway.proxy.http.HttpProtocol;
+import org.finos.tracdap.gateway.routing.CoreRouterLink;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,23 +39,23 @@ public class RestApiProxyBuilder extends ChannelInitializer<Channel> {
     private final Logger log = LoggerFactory.getLogger(getClass());
 
     private final Route routeConfig;
-    private final int sourceHttpVersion;
-    private final ChannelDuplexHandler routerLink;
+    private final CoreRouterLink routerLink;
     private final EventExecutor executor;
     private final int connId;
+    private final HttpProtocol httpProtocol;
 
     public RestApiProxyBuilder(
             Route routeConfig,
-            int sourceHttpVersion,
-            ChannelDuplexHandler routerLink,
+            CoreRouterLink routerLink,
             EventExecutor executor,
-            int connId) {
+            int connId,
+            HttpProtocol httpProtocol) {
 
         this.routeConfig = routeConfig;
-        this.sourceHttpVersion = sourceHttpVersion;
         this.routerLink = routerLink;
         this.executor = executor;
         this.connId = connId;
+        this.httpProtocol = httpProtocol;
     }
 
     @Override
@@ -88,16 +91,18 @@ public class RestApiProxyBuilder extends ChannelInitializer<Channel> {
 
         // Router link
 
-        if (sourceHttpVersion == 1) {
+        if (httpProtocol == HttpProtocol.HTTP_1_0 || httpProtocol == HttpProtocol.HTTP_1_1) {
 
             pipeline.addLast(new Http1to2Proxy(routeConfig.getConfig(), connId));
             pipeline.addLast(routerLink);
         }
-        else if (sourceHttpVersion == 2) {
+        else {
 
-            throw new RuntimeException("HTTP/2 source connection for REST not implemented yet");
+            var message = String.format(
+                    "HTTP protocol version [%s] is not supported for target [%s]",
+                    httpProtocol.name(), routeConfig.getConfig().getRouteName());
+
+            throw new ENetworkHttp(HttpResponseStatus.HTTP_VERSION_NOT_SUPPORTED.code(), message);
         }
-        else
-            throw new EUnexpected();
     }
 }

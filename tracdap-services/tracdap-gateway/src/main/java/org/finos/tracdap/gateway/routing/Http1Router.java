@@ -18,8 +18,10 @@ package org.finos.tracdap.gateway.routing;
 
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.gateway.exec.Route;
+import org.finos.tracdap.gateway.proxy.grpc.GrpcProtocol;
 import org.finos.tracdap.gateway.proxy.http.Http1ProxyBuilder;
 import org.finos.tracdap.gateway.proxy.grpc.GrpcProxyBuilder;
+import org.finos.tracdap.gateway.proxy.http.HttpProtocol;
 import org.finos.tracdap.gateway.proxy.rest.RestApiProxyBuilder;
 
 import io.netty.channel.*;
@@ -38,8 +40,6 @@ public class Http1Router extends CoreRouter {
 
     // See also CoreRouter
     // Code for all the router classes could be simplified
-
-    private static final int SOURCE_IS_HTTP_1 = 1;
 
     private static final List<RequestStatus> REQUEST_STATUS_FINISHED = List.of(
             RequestStatus.COMPLETED,
@@ -195,10 +195,7 @@ public class Http1Router extends CoreRouter {
         // Retain, in case this is a FullHttpRequest including content
         ReferenceCountUtil.retain(req);
 
-        if (target.channelActiveFuture.isSuccess())
-            target.channel.write(req);
-        else
-            target.outboundQueue.add(req);
+        relayMessage(target, req);
     }
 
     private void processRequestContent(ChannelHandlerContext ctx, HttpContent msg) {
@@ -225,10 +222,7 @@ public class Http1Router extends CoreRouter {
 
         msg.retain();
 
-        if (target.channel.isActive())
-            target.channel.write(msg);
-        else
-            target.outboundQueue.add(msg);
+        relayMessage(target, msg);
     }
 
     private void processEndOfRequest(ChannelHandlerContext ctx, LastHttpContent msg) {
@@ -262,8 +256,9 @@ public class Http1Router extends CoreRouter {
         if (target == null)
             throw new EUnexpected();
 
-        if (target.channelActiveFuture.isSuccess())
-            target.channel.flush();
+        // Do not re-send message, it is already sent, we just need to flush
+
+        flushMessages(target);
     }
 
     // -----------------------------------------------------------------------------------------------------------------
@@ -278,13 +273,22 @@ public class Http1Router extends CoreRouter {
         switch (routeConfig.getConfig().getRouteType()) {
 
             case HTTP:
-                return new Http1ProxyBuilder(routeConfig.getConfig(), link, connId);
+
+                return new Http1ProxyBuilder(
+                        routeConfig.getConfig(), link, connId);
 
             case GRPC:
-                return new GrpcProxyBuilder(routeConfig.getConfig(), SOURCE_IS_HTTP_1, link, connId);
+
+                return new GrpcProxyBuilder(
+                        routeConfig.getConfig(), link, connId,
+                        HttpProtocol.HTTP_1_1,
+                        GrpcProtocol.GRPC_WEB);
 
             case REST:
-                return new RestApiProxyBuilder(routeConfig, SOURCE_IS_HTTP_1, link, ctx.executor(), connId);
+
+                return new RestApiProxyBuilder(
+                        routeConfig, link, ctx.executor(), connId,
+                        HttpProtocol.HTTP_1_1);
 
             default:
                 throw new EUnexpected();
