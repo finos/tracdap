@@ -16,6 +16,8 @@
 
 package org.finos.tracdap.common.auth;
 
+import org.finos.tracdap.common.auth.internal.UserInfo;
+
 import io.grpc.Context;
 import io.grpc.Metadata;
 
