@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.gateway.auth;
+package org.finos.tracdap.common.auth.external;
 
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaders;
@@ -26,6 +26,10 @@ import java.util.stream.Collectors;
 
 
 public class AuthHelpers {
+
+    // This may become unnecessary after a time
+    // Internal auth will rely on token being in a known location, guaranteed by external auth
+    // External auth has a set of utilities for finding the TRAC token in any of the places it could possible be...
 
     private static final String BEARER_AUTH_PREFIX = "bearer ";
 

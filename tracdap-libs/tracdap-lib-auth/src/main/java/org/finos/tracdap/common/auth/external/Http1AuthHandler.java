@@ -14,10 +14,9 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.gateway.auth;
+package org.finos.tracdap.common.auth.external;
 
-import org.finos.tracdap.common.auth.IAuthProvider;
-import org.finos.tracdap.common.auth.JwtProcessor;
+import org.finos.tracdap.common.auth.internal.JwtProcessor;
 
 import io.netty.channel.ChannelDuplexHandler;
 import io.netty.channel.ChannelHandlerContext;
@@ -30,8 +29,8 @@ import io.netty.handler.codec.http.cookie.DefaultCookie;
 import io.netty.handler.codec.http.cookie.ServerCookieEncoder;
 import io.netty.util.ReferenceCountUtil;
 
-import org.finos.tracdap.common.auth.SessionInfo;
-import org.finos.tracdap.common.auth.UserInfo;
+import org.finos.tracdap.common.auth.internal.SessionInfo;
+import org.finos.tracdap.common.auth.internal.UserInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
