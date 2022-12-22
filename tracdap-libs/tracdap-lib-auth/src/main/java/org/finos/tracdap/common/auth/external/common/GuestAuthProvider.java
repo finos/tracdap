@@ -19,7 +19,7 @@ package org.finos.tracdap.common.auth.external.common;
 import org.finos.tracdap.common.auth.internal.UserInfo;
 import org.finos.tracdap.common.config.ISecretLoader;
 import org.finos.tracdap.common.exception.EStartup;
-import org.finos.tracdap.common.auth.IAuthProvider;
+import org.finos.tracdap.common.auth.external.IAuthProvider;
 
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.HttpRequest;

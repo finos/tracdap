@@ -14,10 +14,11 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.auth;
+package org.finos.tracdap.common.auth.external;
 
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.HttpRequest;
+import org.finos.tracdap.common.auth.internal.UserInfo;
 import org.finos.tracdap.common.config.ISecretLoader;
 
 
