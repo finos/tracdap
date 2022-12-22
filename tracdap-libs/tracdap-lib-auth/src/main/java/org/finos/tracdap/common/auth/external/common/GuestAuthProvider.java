@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.auth.standard;
+package org.finos.tracdap.common.auth.external.common;
 
-import org.finos.tracdap.common.auth.UserInfo;
+import org.finos.tracdap.common.auth.internal.UserInfo;
 import org.finos.tracdap.common.config.ISecretLoader;
 import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.common.auth.IAuthProvider;
