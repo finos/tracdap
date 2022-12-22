@@ -14,9 +14,10 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.auth;
+package org.finos.tracdap.common.auth.internal;
 
 import io.grpc.*;
+import org.finos.tracdap.common.auth.AuthConstants;
 import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.exception.EStartup;
@@ -26,19 +27,19 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class AuthInterceptor implements ServerInterceptor {
+public class GrpcServerAuth implements ServerInterceptor {
 
     private static final String BEARER_AUTH_PREFIX = "bearer ";
 
     private static final String AUTH_DISABLED_USER_ID = "no_auth";
     private static final String AUTH_DISABLED_USER_NAME = "Authentication Disabled";
 
-    private static final Logger log = LoggerFactory.getLogger(AuthInterceptor.class);
+    private static final Logger log = LoggerFactory.getLogger(GrpcServerAuth.class);
 
     private final AuthenticationConfig authConfig;
     private final JwtValidator jwt;
 
-    public static AuthInterceptor setupAuth(
+    public static GrpcServerAuth setupAuth(
             AuthenticationConfig authConfig,
             PlatformInfo platformInfo,
             ConfigManager configManager) {
@@ -61,20 +62,20 @@ public class AuthInterceptor implements ServerInterceptor {
 
             log.warn("!!!!! AUTHENTICATION IS DISABLED (do not use this setting in production)");
 
-            return new AuthInterceptor(authConfig, null);
+            return new GrpcServerAuth(authConfig, null);
         }
         else if (authConfig.getDisableSigning()) {
 
             log.warn("!!!!! SIGNATURE VALIDATION IS DISABLED (do not use this setting in production)");
 
             var jwt = JwtValidator.configure(authConfig, platformInfo, null);
-            return new AuthInterceptor(authConfig, jwt);
+            return new GrpcServerAuth(authConfig, jwt);
         }
         else if (configManager.hasSecret(ConfigKeys.TRAC_AUTH_PUBLIC_KEY)) {
 
             var publicKey = configManager.loadPublicKey(ConfigKeys.TRAC_AUTH_PUBLIC_KEY);
             var jwt = JwtValidator.configure(authConfig, platformInfo, publicKey);
-            return new AuthInterceptor(authConfig, jwt);
+            return new GrpcServerAuth(authConfig, jwt);
         }
         else {
 
@@ -88,7 +89,7 @@ public class AuthInterceptor implements ServerInterceptor {
         }
     }
 
-    AuthInterceptor(AuthenticationConfig authConfig, JwtValidator jwt) {
+    GrpcServerAuth(AuthenticationConfig authConfig, JwtValidator jwt) {
         this.authConfig = authConfig;
         this.jwt = jwt;
     }
