@@ -16,10 +16,12 @@
 
 package org.finos.tracdap.svc.data.service;
 
+import com.google.common.util.concurrent.ListenableFuture;
 import org.apache.arrow.memory.BufferAllocator;
 import org.finos.tracdap.api.*;
 import org.finos.tracdap.api.TrustedMetadataApiGrpc.TrustedMetadataApiFutureStub;
 import org.finos.tracdap.common.auth.GrpcClientAuth;
+import org.finos.tracdap.common.concurrent.Futures;
 import org.finos.tracdap.common.concurrent.IExecutionContext;
 import org.finos.tracdap.common.data.DataContext;
 import org.finos.tracdap.common.data.IDataContext;
@@ -30,7 +32,6 @@ import org.finos.tracdap.config.TenantConfig;
 import org.finos.tracdap.metadata.*;
 
 import org.finos.tracdap.common.exception.EDataSize;
-import org.finos.tracdap.common.grpc.GrpcClientWrap;
 import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.storage.IFileStorage;
 import org.finos.tracdap.common.storage.IStorageManager;
@@ -66,12 +67,6 @@ public class FileService {
 
     private static final String BACKSLASH = "/";
 
-    private static final MethodDescriptor<MetadataReadRequest, Tag> READ_OBJECT_METHOD = TrustedMetadataApiGrpc.getReadObjectMethod();
-    private static final MethodDescriptor<MetadataBatchRequest, MetadataBatchResponse> READ_BATCH_METHOD = TrustedMetadataApiGrpc.getReadBatchMethod();
-    private static final MethodDescriptor<MetadataWriteRequest, TagHeader> PREALLOCATE_ID_METHOD = TrustedMetadataApiGrpc.getPreallocateIdMethod();
-    private static final MethodDescriptor<MetadataWriteRequest, TagHeader> CREATE_PREALLOCATED_METHOD = TrustedMetadataApiGrpc.getCreatePreallocatedObjectMethod();
-    private static final MethodDescriptor<MetadataWriteRequest, TagHeader> UPDATE_OBJECT_METHOD = TrustedMetadataApiGrpc.getUpdateObjectMethod();
-
     private final Logger log = LoggerFactory.getLogger(getClass());
 
     private final StorageConfig storageConfig;
@@ -80,7 +75,6 @@ public class FileService {
     private final IStorageManager storageManager;
     private final TrustedMetadataApiFutureStub metaApi;
 
-    private final GrpcClientWrap grpcWrap = new GrpcClientWrap(getClass());
     private final Validator validator = new Validator();
     private final Random random = new Random();
 
@@ -137,7 +131,7 @@ public class FileService {
 
                 // Call meta svc to preallocate file object ID
                 .thenApply(x -> preallocateRequest(tenant, ObjectType.FILE))
-                .thenCompose(req -> grpcWrap.unaryAsync(PREALLOCATE_ID_METHOD, req, client::preallocateId))
+                .thenCompose(req -> Futures.javaFuture(client.preallocateId(req)))
                 .thenAccept(fileId -> state.preAllocFileId = fileId)
 
                 // Preallocate ID comes back with version 0, bump to get ID for first real version
@@ -145,7 +139,7 @@ public class FileService {
 
                 // Also pre-allocate for storage
                 .thenApply(x -> preallocateRequest(tenant, ObjectType.STORAGE))
-                .thenCompose(req -> grpcWrap.unaryAsync(PREALLOCATE_ID_METHOD, req, client::preallocateId))
+                .thenCompose(req -> Futures.javaFuture(client.preallocateId(req)))
                 .thenAccept(storageId -> state.preAllocStorageId = storageId)
                 .thenAccept(x -> state.storageId = bumpVersion(state.preAllocStorageId))
 
@@ -261,8 +255,7 @@ public class FileService {
         var client = GrpcClientAuth.applyIfAvailable(metaApi, state.authToken);
         var request = requestForSelector(tenant, fileSelector);
 
-        return grpcWrap
-                .unaryAsync(READ_OBJECT_METHOD, request, client::readObject)
+        return Futures.javaFuture(client.readObject(request))
                 .thenAccept(tag -> {
                     state.fileId = tag.getHeader();
                     state.file = tag.getDefinition().getFile();
@@ -275,8 +268,7 @@ public class FileService {
         var client = GrpcClientAuth.applyIfAvailable(metaApi, state.authToken);
         var request = requestForSelector(tenant, state.file.getStorageId());
 
-        return grpcWrap
-                .unaryAsync(READ_OBJECT_METHOD, request, client::readObject)
+        return Futures.javaFuture(client.readObject(request))
                 .thenAccept(tag -> {
 
                     state.storageId = tag.getHeader();
@@ -294,10 +286,8 @@ public class FileService {
         var priorFileId = selectorFor(state.preAllocFileId);
         var fileReq = buildCreateObjectReq(tenant, priorFileId, state.file, state.fileTags);
 
-        return grpcWrap
-                .unaryAsync(CREATE_PREALLOCATED_METHOD, storageReq, client::createPreallocatedObject)
-                .thenCompose(x -> grpcWrap
-                .unaryAsync(CREATE_PREALLOCATED_METHOD, fileReq, client::createPreallocatedObject));
+        return Futures.javaFuture(client.createPreallocatedObject(storageReq))
+                .thenCompose(x -> Futures.javaFuture(client.createPreallocatedObject(fileReq)));
     }
 
     private CompletionStage<TagHeader> saveMetadata(String tenant, RequestState state, RequestState prior) {
@@ -310,10 +300,8 @@ public class FileService {
         var priorFileId = selectorFor(prior.fileId);
         var fileReq = buildCreateObjectReq(tenant, priorFileId, state.file, state.fileTags);
 
-        return grpcWrap
-                .unaryAsync(UPDATE_OBJECT_METHOD, storageReq, client::updateObject)
-                .thenCompose(x -> grpcWrap
-                .unaryAsync(UPDATE_OBJECT_METHOD, fileReq, client::updateObject));
+        return Futures.javaFuture(client.updateObject(storageReq))
+                .thenCompose(x -> Futures.javaFuture(client.updateObject(fileReq)));
     }
 
     private CompletionStage<Long> writeDataItem(

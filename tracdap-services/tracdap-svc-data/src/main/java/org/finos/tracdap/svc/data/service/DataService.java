@@ -16,8 +16,10 @@
 
 package org.finos.tracdap.svc.data.service;
 
+import com.google.common.util.concurrent.ListenableFuture;
 import org.finos.tracdap.api.*;
 import org.finos.tracdap.common.auth.GrpcClientAuth;
+import org.finos.tracdap.common.concurrent.Futures;
 import org.finos.tracdap.common.data.ArrowSchema;
 import org.finos.tracdap.common.data.DataPipeline;
 import org.finos.tracdap.common.exception.EMetadataDuplicate;
@@ -30,7 +32,6 @@ import org.finos.tracdap.common.concurrent.IExecutionContext;
 import org.finos.tracdap.common.data.DataContext;
 import org.finos.tracdap.common.data.IDataContext;
 import org.finos.tracdap.common.exception.EUnexpected;
-import org.finos.tracdap.common.grpc.GrpcClientWrap;
 import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.metadata.MetadataUtil;
 import org.finos.tracdap.common.metadata.PartKeys;
@@ -63,12 +64,6 @@ public class DataService {
     private static final String DATA_ITEM_TEMPLATE = "data/%s/%s/%s/snap-%d/delta-%d";
     private static final String STORAGE_PATH_TEMPLATE = "data/%s/%s/%s/snap-%d/delta-%d-x%06x";
 
-    private static final MethodDescriptor<MetadataReadRequest, Tag> READ_OBJECT_METHOD = TrustedMetadataApiGrpc.getReadObjectMethod();
-    private static final MethodDescriptor<MetadataBatchRequest, MetadataBatchResponse> READ_BATCH_METHOD = TrustedMetadataApiGrpc.getReadBatchMethod();
-    private static final MethodDescriptor<MetadataWriteRequest, TagHeader> PREALLOCATE_ID_METHOD = TrustedMetadataApiGrpc.getPreallocateIdMethod();
-    private static final MethodDescriptor<MetadataWriteRequest, TagHeader> CREATE_PREALLOCATED_METHOD = TrustedMetadataApiGrpc.getCreatePreallocatedObjectMethod();
-    private static final MethodDescriptor<MetadataWriteRequest, TagHeader> UPDATE_OBJECT_METHOD = TrustedMetadataApiGrpc.getUpdateObjectMethod();
-
     private final Logger log = LoggerFactory.getLogger(getClass());
 
     private final StorageConfig storageConfig;
@@ -80,8 +75,6 @@ public class DataService {
 
     private final Validator validator = new Validator();
     private final Random random = new Random();
-
-    private final GrpcClientWrap grpcWrap = new GrpcClientWrap(getClass());
 
     public DataService(
             StorageConfig storageConfig,
@@ -248,8 +241,7 @@ public class DataService {
         var client = GrpcClientAuth.applyIfAvailable(metaClient, state.authToken);
         var request = MetadataBuilders.requestForSelector(tenant, dataSelector);
 
-        return grpcWrap
-                .unaryAsync(READ_OBJECT_METHOD, request, client::readObject)
+        return Futures.javaFuture(client.readObject(request))
                 .thenAccept(tag -> {
                     state.dataId = tag.getHeader();
                     state.data = tag.getDefinition().getData();
@@ -264,8 +256,7 @@ public class DataService {
         var client = GrpcClientAuth.applyIfAvailable(metaClient, state.authToken);
         var request = MetadataBuilders.requestForBatch(tenant, state.data.getStorageId(), state.data.getSchemaId());
 
-        return grpcWrap
-                .unaryAsync(READ_BATCH_METHOD, request, client::readBatch)
+        return Futures.javaFuture(client.readBatch(request))
                 .thenAccept(response -> {
 
                     var storageTag = response.getTag(0);
@@ -284,8 +275,7 @@ public class DataService {
         var client = GrpcClientAuth.applyIfAvailable(metaClient, state.authToken);
         var request = MetadataBuilders.requestForSelector(tenant, state.data.getStorageId());
 
-        return grpcWrap
-                .unaryAsync(READ_OBJECT_METHOD, request, client::readObject)
+        return Futures.javaFuture(client.readObject(request))
                 .thenAccept(tag -> {
 
                     state.storageId = tag.getHeader();
@@ -309,7 +299,7 @@ public class DataService {
 
             var schemaReq = MetadataBuilders.requestForSelector(request.getTenant(), request.getSchemaId());
 
-            return grpcWrap.unaryAsync(READ_OBJECT_METHOD, schemaReq, client::readObject)
+            return Futures.javaFuture(client.readObject(schemaReq))
                     .thenApply(tag -> state.schema = tag.getDefinition().getSchema());
         }
 
@@ -351,10 +341,10 @@ public class DataService {
 
         return CompletableFuture.completedFuture(0)
 
-                .thenCompose(x -> grpcWrap.unaryAsync(PREALLOCATE_ID_METHOD, preAllocDataReq, client::preallocateId))
+                .thenCompose(x -> Futures.javaFuture(client.preallocateId(preAllocDataReq)))
                 .thenAccept(dataId -> state.preAllocDataId = dataId)
 
-                .thenCompose(x -> grpcWrap.unaryAsync(PREALLOCATE_ID_METHOD, preAllocStorageReq, client::preallocateId))
+                .thenCompose(x -> Futures.javaFuture(client.preallocateId(preAllocStorageReq)))
                 .thenAccept(storageId -> state.preAllocStorageId = storageId);
     }
 
@@ -368,10 +358,8 @@ public class DataService {
         var priorDataId = selectorFor(state.preAllocDataId);
         var dataReq = MetadataBuilders.buildCreateObjectReq(request.getTenant(), priorDataId, state.data, state.dataTags);
 
-        return grpcWrap
-                .unaryAsync(CREATE_PREALLOCATED_METHOD, storageReq, client::createPreallocatedObject)
-                .thenCompose(x -> grpcWrap
-                        .unaryAsync(CREATE_PREALLOCATED_METHOD, dataReq, client::createPreallocatedObject));
+        return Futures.javaFuture(client.createPreallocatedObject(storageReq))
+                .thenCompose(x -> Futures.javaFuture(client.createPreallocatedObject(dataReq)));
     }
 
     private CompletionStage<TagHeader> saveMetadata(DataWriteRequest request, RequestState state, RequestState prior) {
@@ -384,10 +372,8 @@ public class DataService {
         var priorDataId = selectorFor(prior.dataId);
         var dataReq = MetadataBuilders.buildCreateObjectReq(request.getTenant(), priorDataId, state.data, state.dataTags);
 
-        return grpcWrap
-                .unaryAsync(UPDATE_OBJECT_METHOD, storageReq, client::updateObject)
-                .thenCompose(x -> grpcWrap
-                        .unaryAsync(UPDATE_OBJECT_METHOD, dataReq, client::updateObject));
+        return Futures.javaFuture(client.updateObject(storageReq))
+                .thenCompose(x -> Futures.javaFuture(client.updateObject(dataReq)));
     }
 
     private RequestState buildMetadata(DataWriteRequest request, RequestState state, OffsetDateTime objectTimestamp) {
