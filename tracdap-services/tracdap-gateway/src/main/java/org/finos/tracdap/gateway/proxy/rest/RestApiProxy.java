@@ -16,7 +16,8 @@
 
 package org.finos.tracdap.gateway.proxy.rest;
 
-import org.finos.tracdap.common.auth.GrpcClientAuth;
+import org.finos.tracdap.common.auth.external.AuthHelpers;
+import org.finos.tracdap.common.auth.internal.GrpcClientAuth;
 import org.finos.tracdap.common.exception.EInputValidation;
 import org.finos.tracdap.common.exception.EUnexpected;
 
@@ -36,9 +37,8 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPromise;
 import io.netty.handler.codec.http.*;
 import io.netty.handler.codec.http2.*;
-
 import io.netty.util.concurrent.EventExecutor;
-import org.finos.tracdap.gateway.auth.AuthHelpers;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
