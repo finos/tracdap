@@ -25,6 +25,7 @@ import org.finos.tracdap.common.auth.internal.JwtValidator;
 import org.finos.tracdap.common.auth.internal.SessionInfo;
 import org.finos.tracdap.common.auth.internal.UserInfo;
 
+import org.finos.tracdap.common.exception.EUnexpected;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -32,7 +33,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 
-public class AuthProcessor <THeaders extends AuthHeaders> {
+public class AuthLogic<THeaders extends AuthHeaders> {
 
     private static final String TRAC_AUTH_TOKEN_HEADER = "trac_auth_token";
     private static final String TRAC_AUTH_SESSION_EXPIRY_HEADER = "trac_auth_session_expiry";
@@ -54,14 +55,7 @@ public class AuthProcessor <THeaders extends AuthHeaders> {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
-    private final boolean routeeType;
-
     private final JwtValidator jwt = null;
-
-
-    public AuthProcessor(boolean routeType) {
-        this.routeeType = routeType;
-    }
 
 
     public SessionInfo checkExistingAuth(AuthHeaders headers) {
@@ -82,17 +76,29 @@ public class AuthProcessor <THeaders extends AuthHeaders> {
         return null;
     }
 
-    public THeaders filterRequestHeaders(THeaders headers) {
+    public THeaders updateAuthHeaders(THeaders headers, SessionInfo session, RouteType routeType) {
+
+        var filtered = removeAllAuthHeaders(headers);
+
+        switch (routeType) {
+            case BROWSER_ROUTE:
+                return addHeadersForBrowser(filtered, session);
+            case API_ROUTE:
+                return addHeadersForApi(filtered, session);
+            case PLATFORM_ROUTE:
+                return addHeadersForPlatform(filtered, session);
+            default:
+                throw new EUnexpected();
+        }
+    }
+
+    public THeaders removeAllAuthHeaders(THeaders headers) {
 
         var cookies = extractCookies(headers);
 
         var filteredHeaders = filterHeaders(headers);
         var filteredCookies = filterCookies(cookies);
 
-        return null;
-    }
-
-    public THeaders filterResponseHeaders(THeaders headers) {
         return null;
     }
 

@@ -40,16 +40,13 @@ public class Http1Auth extends ChannelDuplexHandler {
     public static final boolean FRONT_FACING = true;
     public static final boolean BACK_FACING = false;
 
-    public static final boolean BROWSER_ROUTE = false;
-    public static final boolean API_ROUTE = true;
-
     private final Logger log = LoggerFactory.getLogger(getClass());
 
-    private final int connId;
+    private final RouteType routeType;
     private final boolean authDirection;
-    private final boolean routeType;
+    private final int connId;
 
-    private final AuthProcessor<HeaderDecorator> authProcessor;
+    private final AuthLogic<HeaderDecorator> authProcessor;
     private final IAuthProviderNew browserAuthProvider;
     private final IAuthProviderNew apiAuthProvider;
 
@@ -58,15 +55,15 @@ public class Http1Auth extends ChannelDuplexHandler {
 
 
     public Http1Auth(
-            int connId, boolean direction, boolean routeType,
+            RouteType routeType, boolean direction,int connId,
             IAuthProviderNew browserAuthProvider,
             IAuthProviderNew apiAuthProvider) {
 
-        this.connId = connId;
         this.authDirection = direction;
         this.routeType = routeType;
+        this.connId = connId;
 
-        this.authProcessor = new AuthProcessor<>(routeType);
+        this.authProcessor = new AuthLogic<>();
         this.browserAuthProvider = browserAuthProvider;
         this.apiAuthProvider = apiAuthProvider;
     }
@@ -162,10 +159,10 @@ public class Http1Auth extends ChannelDuplexHandler {
         if (session != null) {
             authResult = AuthResult.AUTHORIZED(session.getUserInfo());
         }
-        else if (routeType == BROWSER_ROUTE && browserAuthProvider != null) {
+        else if (routeType == RouteType.BROWSER_ROUTE && browserAuthProvider != null) {
             authResult = browserAuthProvider.attemptAuth(ctx, headers);
         }
-        else if (routeType == API_ROUTE  && apiAuthProvider != null) {
+        else if (routeType == RouteType.API_ROUTE && apiAuthProvider != null) {
             authResult = apiAuthProvider.attemptAuth(ctx, headers);
         }
         else {
@@ -196,17 +193,17 @@ public class Http1Auth extends ChannelDuplexHandler {
         // Strip out any existing auth headers and other noise
         // This message is heading to the core platform, so it only needs the TRAC auth info
 
-        var original = new HeaderDecorator(request.headers());
-        var filtered = authProcessor.filterRequestHeaders(original);
-        var headers = authProcessor.addHeadersForPlatform(filtered, session);
+        var updatedHeaders = authProcessor.updateAuthHeaders(
+                new HeaderDecorator(request.headers()), session,
+                RouteType.PLATFORM_ROUTE);
 
-        var modifiedRequest = new DefaultHttpRequest(
+        var updatedRequest = new DefaultHttpRequest(
                 request.protocolVersion(), request.method(),
-                request.uri(), headers);
+                request.uri(), updatedHeaders);
 
         // For front-facing handlers requests come on the read side, back-facing is reversed
 
-        bidiSend(ctx, modifiedRequest, promise, authDirection);
+        bidiSend(ctx, updatedRequest, promise, authDirection);
     }
 
     private void rejectRequest(ChannelHandlerContext ctx, HttpRequest request, ChannelPromise promise) {
@@ -252,24 +249,17 @@ public class Http1Auth extends ChannelDuplexHandler {
 
         // First filter out any auth-related headers from the response
 
-        var original = new HeaderDecorator(response.headers());
-        var filtered = authProcessor.filterResponseHeaders(original);
+        var updatedHeaders = authProcessor.updateAuthHeaders(
+                new HeaderDecorator(response.headers()),
+                session, routeType);
 
-        // Now add in headers for the TRAC token mechanism
-        // Headers are different from browsers and API clients
-
-        HeaderDecorator headers;
-
-        if (routeType == BROWSER_ROUTE)
-            headers = authProcessor.addHeadersForBrowser(filtered, session);
-        else
-            headers = authProcessor.addHeadersForApi(filtered, session);
-
-        var modifiedResponse = new DefaultHttpResponse(response.protocolVersion(), response.status(), headers);
+        var updatedResponse = new DefaultHttpResponse(
+                response.protocolVersion(),
+                response.status(), updatedHeaders);
 
         // This is a response message, so invert the direction flag !!
 
-        bidiSend(ctx, modifiedResponse, promise, !authDirection);
+        bidiSend(ctx, updatedResponse, promise, !authDirection);
     }
 
     public static final class HeaderDecorator extends DefaultHttpHeaders implements AuthHeaders{
