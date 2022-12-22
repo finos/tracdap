@@ -16,19 +16,17 @@
 
 package org.finos.tracdap.common.auth.external;
 
+import org.finos.tracdap.common.auth.internal.SessionInfo;
+import org.finos.tracdap.common.auth.internal.UserInfo;
+import org.finos.tracdap.common.config.ConfigDefaults;
+import org.finos.tracdap.common.exception.EUnexpected;
+import org.finos.tracdap.config.AuthenticationConfig;
 
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.cookie.Cookie;
 import io.netty.handler.codec.http.cookie.ServerCookieDecoder;
 
-import org.finos.tracdap.common.auth.internal.JwtValidator;
-import org.finos.tracdap.common.auth.internal.SessionInfo;
-import org.finos.tracdap.common.auth.internal.UserInfo;
-
-import org.finos.tracdap.common.exception.EUnexpected;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -42,9 +40,6 @@ public class AuthLogic<THeaders extends AuthHeaders> {
 
     private static final String BEARER_PREFIX = "bearer ";
 
-    private static final boolean API_ROUTE = true;
-    private static final boolean WEB_ROUTE = false;
-
     private static final List<String> TRAC_GRPC_FILTERED_HEADERS = List.of(
             TRAC_AUTH_TOKEN_HEADER,
             TRAC_AUTH_SESSION_EXPIRY_HEADER,
@@ -53,68 +48,23 @@ public class AuthLogic<THeaders extends AuthHeaders> {
             HttpHeaderNames.AUTHORIZATION.toString(),
             HttpHeaderNames.COOKIE.toString());
 
-    private final Logger log = LoggerFactory.getLogger(getClass());
 
-    private final JwtValidator jwt = null;
+    public String findTracAuthToken(THeaders headers) {
 
+        var bearerToken = findTracBearerAuthToken(headers);
 
-    public SessionInfo checkExistingAuth(AuthHeaders headers) {
+        if (bearerToken == null)
+            return null;
 
-//        var cookies = extractCookies(headers);
-//
-//        var token = findTokenInHeaders(headers);
-//        var session = jwt.decodeAndValidate(token);
-
-        return null;
+        if (bearerToken.toLowerCase().startsWith(BEARER_PREFIX))
+            return bearerToken.substring(BEARER_PREFIX.length());
+        else
+            return bearerToken;
     }
 
-    public SessionInfo newSession(UserInfo userInfo) {
-        return null;
-    }
-
-    public SessionInfo updateSession(SessionInfo sessionInfo) {
-        return null;
-    }
-
-    public THeaders updateAuthHeaders(THeaders headers, SessionInfo session, RouteType routeType) {
-
-        var filtered = removeAllAuthHeaders(headers);
-
-        switch (routeType) {
-            case BROWSER_ROUTE:
-                return addHeadersForBrowser(filtered, session);
-            case API_ROUTE:
-                return addHeadersForApi(filtered, session);
-            case PLATFORM_ROUTE:
-                return addHeadersForPlatform(filtered, session);
-            default:
-                throw new EUnexpected();
-        }
-    }
-
-    public THeaders removeAllAuthHeaders(THeaders headers) {
+    private String findTracBearerAuthToken(THeaders headers) {
 
         var cookies = extractCookies(headers);
-
-        var filteredHeaders = filterHeaders(headers);
-        var filteredCookies = filterCookies(cookies);
-
-        return null;
-    }
-
-    public THeaders addHeadersForPlatform(THeaders header, SessionInfo session) {
-        return null;
-    }
-
-    public THeaders addHeadersForBrowser(THeaders header, SessionInfo session) {
-        return null;
-    }
-
-    public THeaders addHeadersForApi(THeaders headers, SessionInfo session) {
-        return null;
-    }
-
-    private String findTokenInHeaders(AuthHeaders headers, List<Cookie> cookies) {
 
         var tracAuthHeader = findHeader(headers, TRAC_AUTH_TOKEN_HEADER);
         if (tracAuthHeader != null) return tracAuthHeader;
@@ -133,7 +83,7 @@ public class AuthLogic<THeaders extends AuthHeaders> {
         return null;
     }
 
-    private String findHeader(AuthHeaders headers, String headerName) {
+    private String findHeader(THeaders headers, String headerName) {
 
         if (headers.contains(headerName))
             return headers.get(headerName).toString();
@@ -162,6 +112,79 @@ public class AuthLogic<THeaders extends AuthHeaders> {
             cookies.addAll(ServerCookieDecoder.LAX.decodeAll(header.toString()));
 
         return cookies;
+    }
+
+    public SessionInfo newSession(UserInfo userInfo, AuthenticationConfig authConfig) {
+
+        var configExpiry = ConfigDefaults.readOrDefault(authConfig.getJwtExpiry(), ConfigDefaults.DEFAULT_JWT_EXPIRY);
+        var configLimit = ConfigDefaults.readOrDefault(authConfig.getJwtLimit(), ConfigDefaults.DEFAULT_JWT_LIMIT);
+
+        var issue = Instant.now();
+        var expiry = issue.plusSeconds(configExpiry);
+        var limit = issue.plusSeconds(configLimit);
+
+        var session = new SessionInfo();
+        session.setUserInfo(userInfo);
+        session.setIssueTime(issue);
+        session.setExpiryTime(expiry);
+        session.setLimitTime(limit);
+        session.setValid(true);
+
+        return session;
+    }
+
+    public SessionInfo refreshSession(SessionInfo session, AuthenticationConfig authConfig) {
+
+        var latestIssue = session.getIssueTime();
+        var originalLimit = session.getLimitTime();
+
+        var refreshTime = ConfigDefaults.readOrDefault(authConfig.getJwtRefresh(), ConfigDefaults.DEFAULT_JWT_REFRESH);
+        var configExpiry = ConfigDefaults.readOrDefault(authConfig.getJwtExpiry(), ConfigDefaults.DEFAULT_JWT_EXPIRY);
+
+        // If the refresh time hasn't elapsed yet, return the original session without modification
+        if (latestIssue.plusSeconds(refreshTime).isAfter(Instant.now()))
+            return session;
+
+        var newIssue = Instant.now();
+        var newExpiry = newIssue.plusSeconds(configExpiry);
+        var limitedExpiry = newExpiry.isBefore(originalLimit) ? newExpiry : originalLimit;
+
+        var newSession = new SessionInfo();
+        newSession.setUserInfo(session.getUserInfo());
+        newSession.setIssueTime(newIssue);
+        newSession.setExpiryTime(limitedExpiry);
+        newSession.setLimitTime(originalLimit);
+
+        // Session remains valid until time ticks past the original limit time, i.e. issue > limit
+        newSession.setValid(newIssue.isBefore(originalLimit));
+
+        return newSession;
+    }
+
+    public THeaders updateAuthHeaders(THeaders headers, SessionInfo session, RouteType routeType) {
+
+        var filtered = removeAllAuthHeaders(headers);
+
+        switch (routeType) {
+            case BROWSER_ROUTE:
+                return addHeadersForBrowser(filtered, session);
+            case API_ROUTE:
+                return addHeadersForApi(filtered, session);
+            case PLATFORM_ROUTE:
+                return addHeadersForPlatform(filtered, session);
+            default:
+                throw new EUnexpected();
+        }
+    }
+
+    public THeaders removeAllAuthHeaders(THeaders headers) {
+
+        var cookies = extractCookies(headers);
+
+        var filteredHeaders = filterHeaders(headers);
+        var filteredCookies = filterCookies(cookies);
+
+        return null;
     }
 
     private THeaders filterHeaders(THeaders headers) {
@@ -197,4 +220,17 @@ public class AuthLogic<THeaders extends AuthHeaders> {
 
         return filtered;
     }
+
+    public THeaders addHeadersForPlatform(THeaders header, SessionInfo session) {
+        return null;
+    }
+
+    public THeaders addHeadersForBrowser(THeaders header, SessionInfo session) {
+        return null;
+    }
+
+    public THeaders addHeadersForApi(THeaders headers, SessionInfo session) {
+        return null;
+    }
+
 }

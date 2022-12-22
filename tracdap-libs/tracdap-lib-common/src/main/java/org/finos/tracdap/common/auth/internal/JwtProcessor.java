@@ -60,10 +60,8 @@ public class JwtProcessor extends JwtValidator {
         super(authConfig, algorithm);
     }
 
-    public String encodeToken(UserInfo userInfo) {
 
-        var issueTime = Instant.now();
-        var expiryTime = issueTime.plusSeconds(expiry);
+    public String encodeToken(SessionInfo session) {
 
         var header = Map.of(
                 HeaderParams.TYPE, "jwt",
@@ -71,11 +69,12 @@ public class JwtProcessor extends JwtValidator {
 
         var jwt = JWT.create()
                 .withHeader(header)
+                .withSubject(session.getUserInfo().getUserId())
                 .withIssuer(issuer)
-                .withIssuedAt(issueTime)
-                .withExpiresAt(expiryTime)
-                .withSubject(userInfo.getUserId())
-                .withClaim(JWT_NAME_CLAIM, userInfo.getDisplayName());
+                .withIssuedAt(session.getIssueTime())
+                .withExpiresAt(session.getExpiryTime())
+                .withClaim(JWT_LIMIT_CLAIM, session.getLimitTime())
+                .withClaim(JWT_NAME_CLAIM, session.getUserInfo().getDisplayName());
 
         return jwt.sign(algorithm).trim();
     }

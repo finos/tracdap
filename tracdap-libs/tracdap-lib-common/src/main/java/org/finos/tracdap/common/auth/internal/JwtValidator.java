@@ -16,6 +16,7 @@
 
 package org.finos.tracdap.common.auth.internal;
 
+import org.finos.tracdap.common.config.ConfigDefaults;
 import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.common.exception.EUnexpected;
 
@@ -39,8 +40,7 @@ import java.time.Instant;
 public class JwtValidator {
 
     protected static final String JWT_NAME_CLAIM = "name";
-
-    private static final int DEFAULT_EXPIRY = 3600;
+    protected static final String JWT_LIMIT_CLAIM = "limit";
 
     protected final Algorithm algorithm;
     protected final String issuer;
@@ -79,7 +79,7 @@ public class JwtValidator {
         this.algorithm = algorithm;
 
         this.issuer = authConfig.getJwtIssuer();
-        this.expiry = authConfig.hasJwtExpiry() ? authConfig.getJwtExpiry() : DEFAULT_EXPIRY;
+        this.expiry = ConfigDefaults.readOrDefault(authConfig.getJwtExpiry(), ConfigDefaults.DEFAULT_JWT_EXPIRY);
 
         this.verifier = JWT
                 .require(algorithm)

@@ -22,9 +22,11 @@ import io.netty.channel.ChannelPromise;
 import io.netty.handler.codec.http.*;
 
 import io.netty.util.ReferenceCountUtil;
+import org.finos.tracdap.common.auth.internal.JwtProcessor;
 import org.finos.tracdap.common.auth.internal.SessionInfo;
 import org.finos.tracdap.common.exception.EAuthorization;
 import org.finos.tracdap.common.exception.EUnexpected;
+import org.finos.tracdap.config.AuthenticationConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -46,16 +48,21 @@ public class Http1Auth extends ChannelDuplexHandler {
     private final boolean authDirection;
     private final int connId;
 
-    private final AuthLogic<HeaderDecorator> authProcessor;
+    private final AuthenticationConfig authConfig;
+
+    private final AuthLogic<HeaderDecorator> authLogic;
+    private final JwtProcessor jwtProcessor;
     private final IAuthProviderNew browserAuthProvider;
     private final IAuthProviderNew apiAuthProvider;
 
     private AuthResult authResult = AuthResult.FAILED();
     private SessionInfo session;
-
+    private String token;
 
     public Http1Auth(
             RouteType routeType, boolean direction,int connId,
+            AuthenticationConfig authConfig,
+            JwtProcessor jwtProcessor,
             IAuthProviderNew browserAuthProvider,
             IAuthProviderNew apiAuthProvider) {
 
@@ -63,7 +70,10 @@ public class Http1Auth extends ChannelDuplexHandler {
         this.routeType = routeType;
         this.connId = connId;
 
-        this.authProcessor = new AuthLogic<>();
+        this.authConfig = authConfig;
+
+        this.authLogic = new AuthLogic<>();
+        this.jwtProcessor = jwtProcessor;
         this.browserAuthProvider = browserAuthProvider;
         this.apiAuthProvider = apiAuthProvider;
     }
@@ -87,6 +97,7 @@ public class Http1Auth extends ChannelDuplexHandler {
 
             if ((msg instanceof HttpRequest)) {
                 var request = (HttpRequest) msg;
+                processAuthentication(ctx, request, promise);
                 processRequest(ctx, request, promise);
             }
 
@@ -146,17 +157,19 @@ public class Http1Auth extends ChannelDuplexHandler {
             ctx.flush();
     }
 
-    private void processRequest(ChannelHandlerContext ctx, HttpRequest request, ChannelPromise promise) {
+    private void processAuthentication(ChannelHandlerContext ctx, HttpRequest request, ChannelPromise promise) {
 
         // TRAC auth token takes priority -look for this first, then try to validate
 
         var headers = new HeaderDecorator(request.headers());
+        token = authLogic.findTracAuthToken(new HeaderDecorator(request.headers()));
 
-        session = authProcessor.checkExistingAuth(headers);
+        if (token != null)
+            session = jwtProcessor.decodeAndValidate(token);
 
         // If the TRAC token is not available or not valid, fall back to a primary auth mechanism (if possible)
 
-        if (session != null) {
+        if (session != null && session.isValid()) {
             authResult = AuthResult.AUTHORIZED(session.getUserInfo());
         }
         else if (routeType == RouteType.BROWSER_ROUTE && browserAuthProvider != null) {
@@ -173,42 +186,41 @@ public class Http1Auth extends ChannelDuplexHandler {
 
         if (authResult.getCode() == AuthResultCode.AUTHORIZED) {
 
-            if (session == null)
-                session = authProcessor.newSession(authResult.getUserInfo());
-            else
-                session = authProcessor.updateSession(session);
+            // Session update is created for new sessions, or sessions that have ticket past their refresh time
+            var sessionUpdate = (session == null)
+                    ? authLogic.newSession(authResult.getUserInfo(), authConfig)
+                    : authLogic.refreshSession(session, authConfig);
 
-            // Since authorization succeeded we can forward on the request message
-            forwardRequest(ctx, request, promise);
-        }
-
-        else {
-
-            rejectRequest(ctx, request, promise);
+            // If the session has been updated, regenerate the token and store the new details
+            if (sessionUpdate != session) {
+                token = jwtProcessor.encodeToken(sessionUpdate);
+                session = sessionUpdate;
+            }
         }
     }
 
-    private void forwardRequest(ChannelHandlerContext ctx, HttpRequest request, ChannelPromise promise) {
-
-        // Strip out any existing auth headers and other noise
-        // This message is heading to the core platform, so it only needs the TRAC auth info
-
-        var updatedHeaders = authProcessor.updateAuthHeaders(
-                new HeaderDecorator(request.headers()), session,
-                RouteType.PLATFORM_ROUTE);
-
-        var updatedRequest = new DefaultHttpRequest(
-                request.protocolVersion(), request.method(),
-                request.uri(), updatedHeaders);
-
-        // For front-facing handlers requests come on the read side, back-facing is reversed
-
-        bidiSend(ctx, updatedRequest, promise, authDirection);
-    }
-
-    private void rejectRequest(ChannelHandlerContext ctx, HttpRequest request, ChannelPromise promise) {
+    private void processRequest(ChannelHandlerContext ctx, HttpRequest request, ChannelPromise promise) {
 
         switch (authResult.getCode()) {
+
+            case AUTHORIZED:
+
+                // Strip out any existing auth headers and other noise
+                // This message is heading to the core platform, so it only needs the TRAC auth info
+
+                var updatedHeaders = authLogic.updateAuthHeaders(
+                        new HeaderDecorator(request.headers()), session,
+                        RouteType.PLATFORM_ROUTE);
+
+                var updatedRequest = new DefaultHttpRequest(
+                        request.protocolVersion(), request.method(),
+                        request.uri(), updatedHeaders);
+
+                // For front-facing handlers requests come on the read side, back-facing is reversed
+
+                bidiSend(ctx, updatedRequest, promise, authDirection);
+
+                break;
 
             case REDIRECTED:
 
@@ -249,7 +261,7 @@ public class Http1Auth extends ChannelDuplexHandler {
 
         // First filter out any auth-related headers from the response
 
-        var updatedHeaders = authProcessor.updateAuthHeaders(
+        var updatedHeaders = authLogic.updateAuthHeaders(
                 new HeaderDecorator(response.headers()),
                 session, routeType);
 

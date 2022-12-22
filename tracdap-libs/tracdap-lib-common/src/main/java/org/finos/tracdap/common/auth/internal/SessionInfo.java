@@ -25,6 +25,7 @@ public class SessionInfo {
 
     private Instant issueTime;
     private Instant expiryTime;
+    private Instant limitTime;
 
     private UserInfo userInfo;
 
@@ -58,6 +59,14 @@ public class SessionInfo {
 
     public void setExpiryTime(Instant expiryTime) {
         this.expiryTime = expiryTime;
+    }
+
+    public Instant getLimitTime() {
+        return limitTime;
+    }
+
+    public void setLimitTime(Instant limitTime) {
+        this.limitTime = limitTime;
     }
 
     public UserInfo getUserInfo() {
