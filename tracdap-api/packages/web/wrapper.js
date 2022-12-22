@@ -62,9 +62,8 @@
             this.serviceName = serviceName;
             this.options = options;
 
-            this.hostAddress = protocol
-                ? protocol + "://" + host + ":" + port
-                : ""
+            this.hostAddress = protocol + "://" + host + ":" + port;
+            this.urlPrefix = options["browser"] ? "" : this.hostAddress;
 
             this.rpcMetadata = {}
 
@@ -77,7 +76,7 @@
 
             try {
 
-                const methodUrl = `${this.hostAddress}/${this.serviceName}/${method.name}`;
+                const methodUrl = `${this.urlPrefix}/${this.serviceName}/${method.name}`;
 
                 const methodType = (method.name in METHOD_TYPE_MAP)
                     ? METHOD_TYPE_MAP[method.name]
@@ -104,6 +103,11 @@
         GoogleTransport.prototype._grpcWebUnary = function(method, descriptor, request, callback) {
 
             this.grpcWeb.rpcCall(method.name, request, this.rpcMetadata, descriptor, callback);
+
+            // For stream.on("metadata") and stream.on("status")
+            // If status == OK, call _processResponseMetadata()
+            // This will update cookies and session info sent by TRAC
+            // Share implementation with TRAC transport
         }
 
         GoogleTransport.prototype._grpcWebServerStreaming = function(method, descriptor, request, callback) {
@@ -114,12 +118,11 @@
             stream.on("end", () => callback(null, null));
             stream.on("error", err => callback(err, null));
 
-            // TODO: Do we need to do anything with these two messages?
-
-            stream.on("metadata", metadata => console.log("gRPC Metadata: " + JSON.stringify(metadata)));
-            stream.on("status", status => console.log("gRPC Status: " + JSON.stringify(status)));
+            // For stream.on("metadata") and stream.on("status")
+            // If status == OK, call _processResponseMetadata()
+            // This will update cookies and session info sent by TRAC
+            // Share implementation with TRAC transport
         }
-
 
         return GoogleTransport;
 
@@ -133,11 +136,14 @@
 
         const LPM_PREFIX_LENGTH = 5;
 
-        const WS_HEADERS = {
+        const STANDARD_REQUEST_HEADERS = {
             "content-type": "application/grpc-web+proto",
             "accept": "application/grpc-web+proto",
             "x-grpc-web": 1,
         }
+
+        const FILTER_RESPONSE_HEADERS = ["cookie", "set-cookie", "authorization"]
+
 
         function TracTransport(serviceName, protocol, host, port, options) {
 
@@ -149,14 +155,16 @@
             this.options = options;
 
             this.hostAddress = `${protocol}://${host}:${port}`;
+            this.urlPrefix = options["browser"] ? "" : this.hostAddress;
 
             this.options.debug && console.log(`TracTransport created, host address = [${this.hostAddress}]`);
 
-            // Empty RPC metadata for now
-            this.requestMetadata = {};
-            this.responseMetadata = {};
-            this.response = null;
+            // Store method type of the first requested call
+            // A unary call may be followed by more unary calls on the same transport
+            // For streaming calls, the transport can only be used once
+            this.methodType = null;
 
+            // Internal state related to a single streaming call
             this.ws = null;
             this.sendQueue = [];
             this.sendDone = false;
@@ -165,16 +173,70 @@
             this.rcvLength = -1;
             this.rcvDone = false;
             this.finished = false;
+
+            // Response state for a single streaming call
+            // Responses are  held until the final status is seen and the connection closed
+            this.responseMetadata = {};
+            this.response = null;
         }
 
-        TracTransport.prototype.setRpcInfo = function(method, callback) {
 
-            this.options.debug && console.log("TracTransport setRpcInfo")
+        // -------------------------------------------------------------------------------------------------------------
+        // PROTOBUF.JS API
+        // -------------------------------------------------------------------------------------------------------------
 
-            this.methodName = method.name;
 
-            this.methodType = (this.methodName in METHOD_TYPE_MAP)
-                ? METHOD_TYPE_MAP[this.methodName]
+        TracTransport.prototype.rpcImpl = function(method, request, callback) {
+
+            this.options.debug && console.log("TracTransport rpcImpl")
+
+            let firstMessage = false;
+
+            if (this.methodType === null) {
+
+                firstMessage = true;
+
+                if (method === null || method.name === null) {
+                    throw new Error("TRAC Web API: Internal error (method not supplied");
+                }
+                else {
+                    this._setMethodInfo(method, callback)
+                }
+            }
+
+            if (this.methodType === grpc.MethodType.UNARY) {
+
+                if (method === null || method.name === null) {
+                    throw new Error("TRAC Web API: Internal error (method not supplied");
+                }
+
+                this._fetchCall(method, request, callback);
+            }
+            else {
+
+                // For streaming calls, try to raise errors if client code uses the same stream twice
+                // Harder to do for client streaming, because multiple messages are expected
+
+                if (this.methodType === grpc.MethodType.SERVER_STREAMING && !firstMessage) {
+                    throw new Error("TRAC Web API: Streaming calls cannot be reused (create a new stream with tracdap.setup.newStream()");
+                }
+
+                if (this.methodType === grpc.MethodType.CLIENT_STREAMING || this.methodType === grpc.MethodType.BIDI_STREAMING) {
+                    if (method !== null && method.name !== this.methodName) {
+                        throw new Error("TRAC Web API: Streaming calls cannot be reused (create a new stream with tracdap.setup.newStream()");
+                    }
+                }
+
+                this._wsCall(method, request);
+            }
+        }
+
+        TracTransport.prototype._setMethodInfo = function(method, callback) {
+
+            this.options.debug && console.log("TracTransport _setMethodInfo")
+
+            this.methodType = (method.name in METHOD_TYPE_MAP)
+                ? METHOD_TYPE_MAP[method.name]
                 : grpc.MethodType.UNARY;
 
             this.serverStreaming =
@@ -189,28 +251,190 @@
                 ? this.protocol
                 : this.wsProtocol;
 
-            this.methodUrl = `${methodProtocol}://${this.host}:${this.port}/${this.serviceName}/${this.methodName}`;
+            // For streaming calls, hold extra information about the method
+            // (needed for processing subsequent messages in the stream)
 
-            this.callback = callback;
+            if (this.methodType !== grpc.MethodType.UNARY) {
+                this.methodName = method.name;
+                this.methodUrl = `${methodProtocol}://${this.host}:${this.port}/${this.serviceName}/${this.methodName}`;
+                this.callback = callback;
+            }
         }
 
 
         // -------------------------------------------------------------------------------------------------------------
-        // PROTOBUF.JS API
+        // FETCH API
         // -------------------------------------------------------------------------------------------------------------
 
 
-        TracTransport.prototype.rpcImpl = function(method, request, callback) {
+        TracTransport.prototype._fetchCall = function(method, request, callback) {
 
-            this.options.debug && console.log("TracTransport rpcImpl")
+            this.options.debug && console.log(`TracTransport _fetchCall, method = [${method.name}]`)
 
-            if (this.ws == null) {
-                this.setRpcInfo(method, callback)
-                this._wsConnect();
+            const methodUrl = `${this.urlPrefix}/${this.serviceName}/${method.name}`;
+
+            const headers = {}
+            Object.assign(headers, STANDARD_REQUEST_HEADERS);
+
+            const body = this._wrapLpm(request, /* wsProtocol = */ false);
+
+            const params = {
+                method: "POST",
+                headers: headers,
+                body: body
             }
 
-            if (method !== null && method.name !== this.methodName) {  // or request is complete / failed
-                // todo error: streaming transport can only be used for a single request
+            fetch(methodUrl, params)
+                .then(response => this._fetchResponse(method, response, callback))
+                .catch(error => this._fetchError(method, error, callback));
+        }
+
+        TracTransport.prototype._fetchResponse = function(method, response, callback) {
+
+            this.options.debug && console.log(`TracTransport _fetchResponse, method = [${method.name}]`)
+
+            // First check for HTTP / network errors
+
+            if (!response.ok) {
+                const responseStatus = grpc.StatusCode.UNKNOWN;
+                const responseMessage = `Network error (${response.status} ${response.statusText})`
+                const error = {status: responseStatus, message: responseMessage};
+                callback(error, null);
+                return;
+            }
+
+            // For failed calls, failed grpc-status code can sometime be in the HTTP headers
+            // In this case return an error straight away, there response will not have a body
+
+            const grpcStatus = response.headers.get("grpc-status");
+            const grpcMessage = response.headers.get("grpc-message");
+
+            if (grpcStatus !== null && grpcStatus !== grpc.StatusCode.OK) {
+                const error = {status: grpcStatus, message: grpcMessage};
+                callback(error, null);
+                return;
+            }
+
+            // Response headers look ok, go on to reading the response body
+
+            return response.arrayBuffer().then(body => this._fetchBody(method, response, body, callback));
+        }
+
+        TracTransport.prototype._fetchBody = function(method, response, body, callback) {
+
+            this.options.debug && console.log(`TracTransport _fetchBody, method = [${method.name}]`)
+
+            // grpc-web body contains both content and trailers
+            // Decode adds trailers into headers, and gets the response content
+
+            const decoded = this._fetchDecode(response, body, callback);
+            const headers = decoded.headers;
+            const content = decoded.content;
+
+            // After a full response, grpc-status should always be present
+
+            if (!("grpc-status" in headers)) {
+                const responseStatus = grpc.StatusCode.UNKNOWN;
+                const responseMessage = `Network error (response status not available)`
+                const error = { status: responseStatus, message: responseMessage };
+                callback(error, null);
+                return;
+            }
+
+            // If grpc-status != 0, that is always an error
+
+            const grpcStatus = Number.parseInt(headers["grpc-status"]);
+            const grpcMessage = headers["grpc-message"];
+
+            if (grpcStatus !== grpc.StatusCode.OK) {
+                const error = {status: grpcStatus, message: grpcMessage};
+                callback(error, null);
+                return;
+            }
+
+            // Processing response headers updates the session with any new cookies from TRAC
+            // This should only happen for successful requests
+
+            this._processResponseMetadata(headers);
+
+            // Everything checks out, we can accept the result
+
+            callback(null, content);
+        }
+
+        TracTransport.prototype._fetchDecode = function(response, body) {
+
+            this.options.debug && console.log(`TracTransport _fetchDecode`)
+
+            // Body should contain one message for content and one for trailers
+
+            const bodyData = new Uint8Array(body);
+            const lpmQueue = []
+
+            this._pushLpmQueue(bodyData, lpmQueue);
+
+            const grpcContent = this._pollLpmQueue(lpmQueue);
+            const grpcTrailers = this._pollLpmQueue(lpmQueue);
+
+            // The entire body should be consumed, with one message of content and one of trailers
+            if (lpmQueue.length !== 0 || grpcContent.trailers || !grpcTrailers.trailers) {
+                throw new Error(`Network error (response contains unexpected data)`);
+            }
+
+            // Copy both HTTP headers and LPM trailers into one map
+
+            const headers = {};
+
+            const keys = response.headers.keys();
+
+            for (let header = keys.next(); header.value; header = keys.next()) {
+                headers[header.value] = response.headers.get(header.value);
+            }
+
+            const trailers = new TextDecoder()
+                .decode(grpcTrailers.message)
+                .trim().split(/\r\n/);
+
+            for (let i = 0; i < trailers.length; i++) {
+                const trailer = trailers[i];
+                const sep = trailer.indexOf(":");
+                const key = trailer.substring(0, sep);
+                const value = trailer.substring(sep + 1).trim();
+                headers[key] = decodeURI(value);
+            }
+
+            const filteredHeaders = this._filterResponseHeaders(headers);
+
+            // Return headers and content
+
+            return {
+                headers: filteredHeaders,
+                content: grpcContent.message
+            }
+        }
+
+        TracTransport.prototype._fetchError = function(method, error, callback) {
+
+            this.options.debug && console.log(`TracTransport _fetchDecode, method = [${method.name}]`)
+
+            // An exception occurred processing the call
+            // Use UNKNOWN status code with the exception error message
+
+            const errorResponse = {status: grpc.StatusCode.UNKNOWN, message: error.toString()};
+            callback(errorResponse, null);
+        }
+
+        // -------------------------------------------------------------------------------------------------------------
+        // WEB SOCKETS API
+        // -------------------------------------------------------------------------------------------------------------
+
+
+        TracTransport.prototype._wsCall = function (method, request) {
+
+            this.options.debug && console.log("TracTransport _wsCall")
+
+            if (this.ws === null) {
+                this._wsConnect();
             }
 
             if (request === null)
@@ -222,12 +446,6 @@
                 this._wsSendEos();
             }
         }
-
-
-        // -------------------------------------------------------------------------------------------------------------
-        // WEB SOCKETS API
-        // -------------------------------------------------------------------------------------------------------------
-
 
         TracTransport.prototype._wsConnect = function() {
 
@@ -251,7 +469,7 @@
             // This is to match the protocol used by improbable eng
             // In their implementation, header frame is not wrapped as an LPM
 
-            const headerMsg = this._encodeHeaders(WS_HEADERS);
+            const headerMsg = this._encodeHeaders(STANDARD_REQUEST_HEADERS);
             this.ws.send(headerMsg);
 
             this._wsFlushSendQueue();
@@ -292,7 +510,7 @@
 
             this.options.debug && console.log("TracTransport _wsHandlerError")
 
-            this.ws.close();
+            this.ws.close(1006, "close on error");
 
             const status = grpc.StatusCode.UNKNOWN;
             const message = event.reason;
@@ -309,7 +527,7 @@
 
             this.options.debug && console.log("TracTransport _wsSendMessage")
 
-            const frame = this._wrapMessage(msg, /* wsProtocol = */ true)
+            const frame = this._wrapLpm(msg, /* wsProtocol = */ true)
 
             if (this.ws != null && this.ws.readyState === WebSocket.OPEN)
                 this.ws.send(frame);
@@ -360,28 +578,6 @@
             return encoder.encode(headerText);
         }
 
-        TracTransport.prototype._wrapMessage = function(msg, wsProtocol = false) {
-
-            const wsEos = 0;
-            const wsPrefix = wsProtocol ? 1 : 0;
-            const flag = 0;
-            const length = msg.byteLength;
-
-            this.options.debug && console.log(`TracTransport _wrapMessage: ws = ${wsProtocol}, eos = ${wsEos}, compress = ${flag}, length = ${length}`)
-
-            const lpm = new Uint8Array(msg.byteLength + LPM_PREFIX_LENGTH + wsPrefix)
-            const lpmView = new DataView(lpm.buffer, 0, LPM_PREFIX_LENGTH + wsPrefix);
-
-            if (wsProtocol)
-                lpmView.setUint8(0, wsEos);
-
-            lpmView.setUint8(0 + wsPrefix, flag);
-            lpmView.setUint32(1 + wsPrefix, length, false);
-            lpm.set(msg, LPM_PREFIX_LENGTH + wsPrefix)
-
-            return lpm
-        }
-
 
         // -------------------------------------------------------------------------------------------------------------
         // MESSAGE RECEIVING
@@ -392,92 +588,57 @@
 
             this.options.debug && console.log(`TracTransport _wsReceiveFrame, bytes = [${frame.byteLength}]`)
 
-            this.rcvQueue.push(new Uint8Array(frame));
+            this._pushLpmQueue(new Uint8Array(frame), this.rcvQueue);
 
-            while (this.rcvQueue.length > 0) {
+            let lpm = this._pollLpmQueue(this.rcvQueue);
 
-                const queueSize = this.rcvQueue
-                    .map(buf => buf.byteLength)
-                    .reduce((x, y) => x + y, 0);
+            while (lpm !== null) {
 
-                if (this.rcvLength < 0) {
-
-                    if (queueSize < LPM_PREFIX_LENGTH)
-                        return;
-
-                    // Here we pull out the underlying buffer, so make sure to use the byte offset
-                    // Otherwise we'll get whatever is at index 0 in the physical buffer, which can be anything
-
-                    const prefix = this._pollReceiveQueue(LPM_PREFIX_LENGTH);
-                    const prefixView = new DataView(prefix.buffer, prefix.byteOffset, prefix.byteLength);
-
-                    this.rcvFlag = prefixView.getUint8(0);
-                    this.rcvLength = prefixView.getUint32(1, false);
-                }
-
-                if (queueSize < LPM_PREFIX_LENGTH + this.rcvLength)
-                    return;
-
-                const msg = this._pollReceiveQueue(this.rcvLength);
-
-                const compress = this.rcvFlag & 1;
-                const trailers = this.rcvFlag & (1 << 7);
-
-                // todo: handle decompression if required
-                if (compress)
-                    throw new Error("Incoming messages is compressed, but compression is not supported yet");
-
-                this.rcvFlag = 0;
-                this.rcvLength = -1;
-
-                if (trailers)
-                    this._receiveHeaders(msg)
+                if (lpm.trailers)
+                    this._receiveHeaders(lpm.message)
                 else
-                    this._receiveMessage(msg)
+                    this._receiveMessage(lpm.message);
+
+                // Avoid final poll after the queue is empty
+                if (this.rcvQueue.length > 0)
+                    lpm = this._pollLpmQueue(this.rcvQueue);
+                else
+                    lpm = null;
             }
         }
 
-        TracTransport.prototype._pollReceiveQueue = function(nBytes) {
+        TracTransport.prototype._receiveHeaders = function (msg) {
 
-            let frame0 = this._pollReceiveQueueUpto(nBytes);
+            this.options.debug && console.log("TracTransport _receiveHeaders")
 
-            if (frame0.byteLength === nBytes) {
-                return frame0;
-            }
+            const decoder = new TextDecoder();
+            const headerText = decoder.decode(msg);
+            const headerLines = headerText.trim().split("\r\n")
 
-            const buffer = new Uint8Array(nBytes);
-            let offset = frame0.byteLength;
-            buffer.set(frame0);
+            const headers = {}
 
-            while (offset < nBytes) {
+            headerLines.forEach(line => {
 
-                let frame = this._pollReceiveQueueUpto(nBytes - offset);
-                buffer.set(frame, offset);
-                offset += frame.byteLength;
-            }
+                const sep = line.indexOf(":", 1);
+                const key = line.substring(0, sep);
+                headers[key] = line.substring(sep + 1).trim();
+            })
 
-            return buffer;
-        }
+            const filteredHeaders = this._filterResponseHeaders(headers);
+            Object.assign(this.responseMetadata, filteredHeaders);
 
-        TracTransport.prototype._pollReceiveQueueUpto = function(nBytes) {
+            // The message exchange is always complete when the grpc-status header / trailer is received
+            if (GRPC_STATUS_HEADER in this.responseMetadata) {
 
-            let frame = this.rcvQueue.shift();
+                this.rcvDone = true;
 
-            if (frame.byteLength <= nBytes) {
-                return frame;
-            }
+                // Always shut down the channel before processing _handleComplete
+                // But, also avoid duplicate close() requests, if it's already down that's fine
 
-            if (frame.byteLength > nBytes) {
-
-                // Avoid physical copy on the underlying buffers
-                // Now we have to be careful to use the byteOffset anywhere we reference the buffer directly
-
-                const consumed = new Uint8Array(frame.buffer, frame.byteOffset, nBytes);
-                const remaining = new Uint8Array(frame.buffer, frame.byteOffset + nBytes);
-
-                this.rcvQueue.unshift(remaining);
-
-                return consumed;
+                if (this.ws.readyState === WebSocket.CLOSED)
+                    this._handleComplete()
+                else
+                    this.ws.close(1000, "clean shutdown");
             }
         }
 
@@ -492,43 +653,41 @@
             }
         }
 
-        TracTransport.prototype._receiveHeaders = function (msg) {
-
-            this.options.debug && console.log("TracTransport _receiveHeaders")
-
-            const decoder = new TextDecoder();
-            const headerText = decoder.decode(msg);
-            const headerLines = headerText.split("\r\n")
-
-            headerLines.forEach(line => {
-
-                if (line !== "") {
-
-                    // TODO: Should we filter out special HTTP values like :status: ?
-
-                    const sep = line.indexOf(":", 1);
-                    const key = line.substring(0, sep);
-                    const value = line.substring(sep + 1).trim();
-
-                    this.options.debug && console.log(`Response header [${key}] = [${value}]`);
-
-                    this.responseMetadata[key] = value;
-                }
-            })
-
-            // Instead of calling _handleComplete directly, close the WS and wait for _wsHandleClose
-            // This prevents close events coming in after completion (can create noise in error cases)
-            if (GRPC_STATUS_HEADER in this.responseMetadata) {
-                this.rcvDone = true;
-                this.ws.close();
-            }
-        }
-
 
         // -------------------------------------------------------------------------------------------------------------
         // RESULT HANDLING
         // -------------------------------------------------------------------------------------------------------------
 
+
+        TracTransport.prototype._filterResponseHeaders = function(headers) {
+
+            this.options.debug && console.log("TracTransport _filterResponseHeaders")
+
+            const filteredHeaders = {};
+
+            for (let key in headers) {
+
+                if (key.startsWith(":"))
+                    continue;
+
+                if (key.toLowerCase() in FILTER_RESPONSE_HEADERS)
+                    continue;
+
+                filteredHeaders[key] = headers[key];
+            }
+
+            return filteredHeaders;
+        }
+
+        TracTransport.prototype._processResponseMetadata = function(metadata) {
+
+            this.options.debug && console.log("TracTransport _processResponseMetadata")
+
+            if ("trac_auth_token" in metadata) {
+
+                // TODO: Set cookies
+            }
+        }
 
         TracTransport.prototype._handleComplete = function() {
 
@@ -563,21 +722,28 @@
                     this.callback(error, null);
                 }
 
-                else if (this.serverStreaming)
-                    this.callback(null, null);
-
-                else if (this.response != null)
-                    this.callback(null, this.response);
-
-                else {
+                else if (this.response === null && !this.serverStreaming) {
                     const status = grpc.StatusCode.UNKNOWN;
-                    const message = "The server replied but did not send a valid response";  // todo message
+                    const message = "The reply from th server had no content and no error message";
                     const error = {status: status, message: message, metadata: this.responseMetadata}
                     this.callback(error, null);
                 }
+
+                // At this point everything checks out
+                else {
+
+                    // Response metadata is only processed for successful calls
+                    // This will update cookies with new session data from TRAC
+                    this._processResponseMetadata(this.responseMetadata);
+
+                    // Send the final result message
+                    if (this.serverStreaming)
+                        this.callback(null, null);
+                    else
+                        this.callback(null, this.response);
+                }
             }
 
-            this.ws.close();
             this.finished = true;
         }
 
@@ -590,6 +756,10 @@
                 return;
             }
 
+            // Send a WS close, in case it has not already been done
+
+            this.ws.close(1006, "close on error");
+
             // In an error condition make sure not to keep a reference to any data
 
             this.finished = true;
@@ -600,6 +770,138 @@
 
             this.callback(error, null);
         }
+
+
+        // -------------------------------------------------------------------------------------------------------------
+        // LPM ENCODE / DECODE
+        // -------------------------------------------------------------------------------------------------------------
+
+
+        TracTransport.prototype._wrapLpm = function(msg, wsProtocol = false) {
+
+            const wsEos = 0;
+            const wsPrefix = wsProtocol ? 1 : 0;
+            const flag = 0;
+            const length = msg.byteLength;
+
+            this.options.debug && console.log(`TracTransport _wrapLpm: ws = ${wsProtocol}, eos = ${wsEos}, compress = ${flag}, length = ${length}`)
+
+            const lpm = new Uint8Array(msg.byteLength + LPM_PREFIX_LENGTH + wsPrefix)
+            const lpmView = new DataView(lpm.buffer, 0, LPM_PREFIX_LENGTH + wsPrefix);
+
+            if (wsProtocol)
+                lpmView.setUint8(0, wsEos);
+
+            lpmView.setUint8(0 + wsPrefix, flag);
+            lpmView.setUint32(1 + wsPrefix, length, false);
+            lpm.set(msg, LPM_PREFIX_LENGTH + wsPrefix)
+
+            return lpm
+        }
+
+        TracTransport.prototype._pushLpmQueue = function(frame, queue) {
+
+            this.options.debug && console.log(`TracTransport _pushLpmQueue, bytes = [${frame.byteLength}], queue length = [${queue.length}]`)
+
+            queue.push(frame);
+        }
+
+        TracTransport.prototype._pollLpmQueue = function(queue) {
+
+            this.options.debug && console.log(`TracTransport _pollLpmQueue, queue length = [${queue.length}]`)
+
+            if (queue.length === 0)
+                return null;
+
+            const queueSize = queue
+                .map(buf => buf.byteLength)
+                .reduce((acc, x) => acc + x, 0);
+
+            if (queueSize < LPM_PREFIX_LENGTH)
+                return null;
+
+            // Here we pull out the underlying buffer, so make sure to use the byte offset
+            // Otherwise we'll get whatever is at index 0 in the physical buffer, which can be anything
+
+            const prefix = this._pollByteQueue(LPM_PREFIX_LENGTH, queue);
+            const prefixView = new DataView(prefix.buffer, prefix.byteOffset, prefix.byteLength);
+
+            const lpmFlag = prefixView.getUint8(0);
+            const lpmLength = prefixView.getUint32(1, false);
+
+            // Whole LPM is not available yet, push the prefix back into the head of the queue
+            if (queueSize - LPM_PREFIX_LENGTH < lpmLength) {
+                queue.unshift(prefix);
+                return null;
+            }
+
+            const msg = this._pollByteQueue(lpmLength, queue);
+
+            const compress = lpmFlag & 1;
+            const trailers = lpmFlag & (1 << 7);
+
+            // todo: handle decompression if required
+            if (compress)
+                throw new Error("Incoming messages is compressed, but compression is not supported yet");
+
+            // Got a valid LPM - we need to return a structure to carry some information about it
+
+            const lpmInfo = {};
+            lpmInfo.length = lpmLength;
+            lpmInfo.trailers = trailers;
+            lpmInfo.message = msg;
+
+            return lpmInfo;
+        }
+
+        TracTransport.prototype._pollByteQueue = function(nBytes, queue) {
+
+            this.options.debug && console.log(`TracTransport _pollByteQueue, nBytes = [${nBytes}], queue length = [${queue.length}]`)
+
+            let frame0 = this._pollByteQueueUpto(nBytes, queue);
+
+            if (frame0.byteLength === nBytes) {
+                return frame0;
+            }
+
+            const buffer = new Uint8Array(nBytes);
+            let offset = frame0.byteLength;
+            buffer.set(frame0);
+
+            while (offset < nBytes) {
+
+                let frame = this._pollByteQueueUpto(nBytes - offset, queue);
+                buffer.set(frame, offset);
+                offset += frame.byteLength;
+            }
+
+            return buffer;
+        }
+
+        TracTransport.prototype._pollByteQueueUpto = function(nBytes, queue) {
+
+            this.options.debug && console.log(`TracTransport _pollByteQueueUpto, nBytes = [${nBytes}], queue length = [${queue.length}]`)
+
+            let frame = queue.shift();
+
+            if (frame.byteLength <= nBytes) {
+                return frame;
+            }
+
+            if (frame.byteLength > nBytes) {
+
+                // Avoid physical copy on the underlying buffers
+                // Now we have to be careful to use the byteOffset anywhere we reference the buffer directly
+
+                const consumed = new Uint8Array(frame.buffer, frame.byteOffset, nBytes);
+                const remaining = new Uint8Array(frame.buffer, frame.byteOffset + nBytes);
+
+                queue.unshift(remaining);
+
+                return consumed;
+            }
+        }
+
 
         return TracTransport;
 
@@ -666,10 +968,7 @@
          */
         setup.rpcImplForTarget = function(serviceClass, protocol, host, port, options = {}) {
 
-            if (!serviceClass.hasOwnProperty("_serviceName"))
-                throw new Error("Service class must specify gRPC service in _serviceName (this is a bug)")
-
-            return createRpcImpl(serviceClass._serviceName, protocol, host, port, options);
+            return setup.transportForTarget(serviceClass, protocol, host, port, options);
         }
 
         /**
@@ -692,14 +991,7 @@
          */
         setup.rpcImplForBrowser = function(serviceClass, options = {}) {
 
-            if (!serviceClass.hasOwnProperty("_serviceName"))
-                throw new Error("Service class must specify gRPC service in _serviceName (this is a bug)")
-
-            const protocol = window.location.protocol;
-            const host = window.location.host;
-            const port = window.location.port;
-
-            return createRpcImpl(serviceClass._serviceName, protocol, host, port, options);
+            return setup.transportForBrowser(serviceClass, options);
         }
 
         /**
@@ -746,11 +1038,26 @@
             if (!serviceClass.hasOwnProperty("_serviceName"))
                 throw new Error("Service class must specify gRPC service in _serviceName (this is a bug)")
 
-            const protocol = window.location.protocol;
-            const host = window.location.host;
-            const port = window.location.port;
+            const protocol = window.location.protocol.replace(":", "");  // Remove trailing colon
+            let host, port;
 
-            return createRpcImpl(serviceClass._serviceName, protocol, host, port, options);
+            const hostAndPort = window.location.host;
+            const separator = hostAndPort.indexOf(":");
+
+            if (separator < 0) {
+                host = hostAndPort;
+                port = protocol === "https" ? 443 : 80;
+            }
+            else {
+                host = hostAndPort.substring(0, separator);
+                port = hostAndPort.substring(separator + 1);
+            }
+
+            const browserOptions = {}
+            browserOptions["browser"] = true;
+            Object.assign(options, browserOptions);
+
+            return createRpcImpl(serviceClass._serviceName, protocol, host, port, browserOptions);
         }
 
         /**

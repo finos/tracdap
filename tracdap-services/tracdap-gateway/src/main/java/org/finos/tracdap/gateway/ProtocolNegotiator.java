@@ -349,9 +349,15 @@ public class ProtocolNegotiator extends ChannelInitializer<SocketChannel> {
             pipeline.addAfter(HTTP_1_CODEC, WS_COMPRESSION, new WebSocketServerCompressionHandler());
 
             // Configure the WS protocol handler - path must match the URI in the upgrade request
+
+            // Do not auto-reply to close frames as this can lead to protocol errors
+            // Chrome in particular is very fussy and will fail a whole request if the close sequence is wrong
+            // The close sequence is managed with the client explicitly in WebSocketsRouter
+
             var wsConfig = webSocketsHandler.config()
                     .toBuilder()
                     .websocketPath(req.uri())
+                    .handleCloseFrames(false)
                     .build();
 
             pipeline.addAfter(WS_COMPRESSION, WS_FRAME_CODEC, new WebSocketServerProtocolHandler(wsConfig));

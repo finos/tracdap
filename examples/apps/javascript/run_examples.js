@@ -17,8 +17,10 @@
 
 // To run these examples outside of a browser, XMLHttpRequest is required
 import xhr2 from 'xhr2';
+import fetch from "node-fetch";
 import WebSocket from "ws";
 global.XMLHttpRequest = xhr2.XMLHttpRequest;
+global.fetch = fetch;
 global.WebSocket = WebSocket;
 
 

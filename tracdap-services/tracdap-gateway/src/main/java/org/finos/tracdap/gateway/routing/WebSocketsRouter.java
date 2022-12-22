@@ -48,9 +48,11 @@ public class WebSocketsRouter extends CoreRouter {
     private final Logger log = LoggerFactory.getLogger(getClass());
 
     private String upgradeUri;
+    private int routeId = -1;
+
     private boolean upgradeComplete = false;
     private boolean firstMessageReceived = false;
-    private int routeId = -1;
+    private boolean closeFrameSent = false;
 
     public WebSocketsRouter(List<Route> routes, int connId) {
         super(routes, connId, WEBSOCKETS_PROTOCOL);
@@ -167,11 +169,26 @@ public class WebSocketsRouter extends CoreRouter {
                         connId, frame.content().readableBytes(), frame.getClass().getSimpleName());
             }
 
-            // Assume outbound frames are good since they are coming from the gateway core
-            // Pass them "as-is" to the client
+            if (frame instanceof CloseWebSocketFrame) {
 
-            ReferenceCountUtil.retain(msg);
-            ctx.write(frame, promise);
+                // Explicit handling of the close sequence is required
+
+                var closeFrame = (CloseWebSocketFrame) frame;
+                processOutboundCloseFrame(ctx, closeFrame, promise);
+            }
+
+            else {
+
+                // Assume outbound frames are good to relay, since they come from the gateway core
+
+                // Make sure not to send any frames after the close frame is sent!
+                // Google Chrome in particular will fail the entire request if the close sequence is wrong
+
+                if (!closeFrameSent) {
+                    ReferenceCountUtil.retain(msg);
+                    ctx.write(frame, promise);
+                }
+            }
         }
         finally {
             destroyAssociation(msg);
@@ -315,10 +332,64 @@ public class WebSocketsRouter extends CoreRouter {
 
     private void processInboundCloseFrame(ChannelHandlerContext ctx, CloseWebSocketFrame frame) {
 
-        log.info("conn = {}, received close request with code [{}]: {}",
-                connId, frame.statusCode(), frame.reasonText());
+        // If both sides have sent a close frame already, then ok to close immediately
+        if (closeFrameSent) {
 
-        ctx.close();
+            log.info("conn = {}, received close response, code = [{}]: {}",
+                    connId, frame.statusCode(), frame.reasonText());
+
+            ctx.close();
+        }
+
+        // Otherwise this is a new request, send the response frame before closing the channel
+        else {
+
+            log.info("conn = {}, received close request, code = [{}]: {}",
+                    connId, frame.statusCode(), frame.reasonText());
+
+            var closeResponse = new CloseWebSocketFrame(frame.statusCode(), frame.reasonText());
+            var closePromise = ctx.newPromise();
+
+            log.info("conn = {}, sending close response, code = [{}]: {}",
+                    connId, frame.statusCode(), frame.reasonText());
+
+            closeFrameSent = true;
+
+            ctx.write(closeResponse, closePromise);
+            ctx.flush();
+
+            closePromise.addListener(x -> ctx.close());
+        }
+    }
+
+
+    // -----------------------------------------------------------------------------------------------------------------
+    // OUTBOUND FRAME HANDLING
+    // -----------------------------------------------------------------------------------------------------------------
+
+    private void processOutboundCloseFrame(ChannelHandlerContext ctx, CloseWebSocketFrame frame, ChannelPromise promise) {
+
+        // An outbound close frame comes from the proxy back end, it is not a response to a client request
+        // We will always need to wait for the client to respond
+        // If a client request had been received, the response would be processed already
+
+        if (closeFrameSent) {
+
+            log.warn("conn = {}, ignoring duplicate outbound close request [{}]: {}",
+                    connId, frame.statusCode(), frame.reasonText());
+        }
+
+        else {
+
+            log.info("conn = {}, sending close request, code = [{}]: {}",
+                    connId, frame.statusCode(), frame.reasonText());
+
+            ReferenceCountUtil.retain(frame);
+            closeFrameSent = true;
+
+            ctx.write(frame, promise);
+            ctx.flush();
+        }
     }
 
 

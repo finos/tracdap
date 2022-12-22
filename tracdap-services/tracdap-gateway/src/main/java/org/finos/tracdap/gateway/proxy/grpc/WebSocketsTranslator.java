@@ -307,7 +307,7 @@ public class WebSocketsTranslator extends Http2ChannelDuplexHandler {
 
             if (eos) {
 
-                var closeFrame = new CloseWebSocketFrame(WebSocketCloseStatus.NORMAL_CLOSURE);
+                var closeFrame = new CloseWebSocketFrame(WebSocketCloseStatus.NORMAL_CLOSURE, "request complete");
                 ctx.fireChannelRead(closeFrame);
                 ctx.flush();
             }
