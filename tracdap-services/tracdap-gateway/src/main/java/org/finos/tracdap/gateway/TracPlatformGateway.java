@@ -16,28 +16,29 @@
 
 package org.finos.tracdap.gateway;
 
-import io.netty.handler.codec.http.websocketx.WebSocketServerProtocolConfig;
-import org.finos.tracdap.common.auth.JwtProcessor;
+import org.finos.tracdap.common.auth.internal.JwtProcessor;
+import org.finos.tracdap.common.auth.external.IAuthProvider;
 import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.common.plugin.PluginManager;
 import org.finos.tracdap.common.service.CommonServiceBase;
 import org.finos.tracdap.config.GatewayConfig;
-import org.finos.tracdap.common.auth.IAuthProvider;
 import org.finos.tracdap.gateway.config.helpers.ConfigTranslator;
 import org.finos.tracdap.gateway.exec.Route;
 import org.finos.tracdap.gateway.exec.RouteBuilder;
+import org.finos.tracdap.gateway.routing.Http1Router;
+import org.finos.tracdap.gateway.routing.Http2Router;
+import org.finos.tracdap.gateway.routing.WebSocketsRouter;
 
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
+import io.netty.handler.codec.http.websocketx.WebSocketServerProtocolConfig;
 import io.netty.util.concurrent.DefaultThreadFactory;
-import org.finos.tracdap.gateway.routing.Http1Router;
-import org.finos.tracdap.gateway.routing.Http2Router;
-import org.finos.tracdap.gateway.routing.WebSocketsRouter;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
