@@ -82,6 +82,9 @@ class LoggingClientCall<ReqT, RespT> extends ClientCall<ReqT, RespT> {
     public void cancel(@Nullable String message, @Nullable Throwable cause) {
         if (cause != null) {
             var grpcError = GrpcErrorMapping.processError(cause);
+            // There is GrpcErrorMapping.processError,
+            // because the exact type of the cause is not known.
+
             log.error(
                     "CLIENT CALL CANCELLED: [{}] {}",
                     methodName,
@@ -132,6 +135,10 @@ class LoggingClientCallListener<RespT> extends ClientCall.Listener<RespT> {
         }
         else {
             var grpcError = status.asRuntimeException();
+            // There is no GrpcErrorMapping.processError, because:
+            // 1) grpcError is always StatusRuntimeException
+            // 2) GrpcErrorMapping.processError passes through StatusRuntimeException
+
             log.error(
                     "CLIENT CALL FAILED: [{}] {}",
                     methodName,
