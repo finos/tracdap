@@ -156,7 +156,7 @@ public class TracDataService extends CommonServiceBase {
             var dataSvc = new DataService(storageConfig, tenantConfig, arrowAllocator, storage, formats, metaClient);
             var dataApi = new TracDataApi(dataSvc, fileSvc);
 
-            var authentication = AuthInterceptor.setupAuth(
+            var authentication = GrpcServerAuth.setupAuth(
                     platformConfig.getAuthentication(),
                     platformConfig.getPlatformInfo(),
                     configManager);
