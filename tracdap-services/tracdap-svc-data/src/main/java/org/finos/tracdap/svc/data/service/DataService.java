@@ -18,7 +18,7 @@ package org.finos.tracdap.svc.data.service;
 
 import com.google.common.util.concurrent.ListenableFuture;
 import org.finos.tracdap.api.*;
-import org.finos.tracdap.common.auth.GrpcClientAuth;
+import org.finos.tracdap.common.auth.internal.GrpcClientAuth;
 import org.finos.tracdap.common.concurrent.Futures;
 import org.finos.tracdap.common.data.ArrowSchema;
 import org.finos.tracdap.common.data.DataPipeline;

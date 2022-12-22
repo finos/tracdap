@@ -18,7 +18,7 @@ package org.finos.tracdap.svc.meta.services;
 
 import org.finos.tracdap.api.MetadataWriteRequest;
 import org.finos.tracdap.common.auth.AuthConstants;
-import org.finos.tracdap.common.auth.UserInfo;
+import org.finos.tracdap.common.auth.internal.UserInfo;
 import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.metadata.MetadataConstants;
@@ -29,7 +29,6 @@ import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;

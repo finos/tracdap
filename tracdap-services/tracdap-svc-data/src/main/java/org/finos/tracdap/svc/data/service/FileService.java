@@ -20,7 +20,7 @@ import com.google.common.util.concurrent.ListenableFuture;
 import org.apache.arrow.memory.BufferAllocator;
 import org.finos.tracdap.api.*;
 import org.finos.tracdap.api.TrustedMetadataApiGrpc.TrustedMetadataApiFutureStub;
-import org.finos.tracdap.common.auth.GrpcClientAuth;
+import org.finos.tracdap.common.auth.internal.GrpcClientAuth;
 import org.finos.tracdap.common.concurrent.Futures;
 import org.finos.tracdap.common.concurrent.IExecutionContext;
 import org.finos.tracdap.common.data.DataContext;
