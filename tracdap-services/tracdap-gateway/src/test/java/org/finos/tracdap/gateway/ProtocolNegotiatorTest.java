@@ -20,7 +20,7 @@ import io.netty.channel.ChannelDuplexHandler;
 import io.netty.channel.ChannelPromise;
 import io.netty.handler.codec.http.websocketx.TextWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.WebSocketServerProtocolConfig;
-import org.finos.tracdap.common.auth.external.IAuthProvider;
+import org.finos.tracdap.common.auth.external.OldAuthProviderInterface;
 import org.finos.tracdap.common.auth.internal.JwtProcessor;
 import org.finos.tracdap.common.auth.internal.UserInfo;
 import org.finos.tracdap.common.config.ISecretLoader;
@@ -308,7 +308,7 @@ public class ProtocolNegotiatorTest {
         }
     }
 
-    private static class DummyAuthProvider implements IAuthProvider {
+    private static class DummyAuthProvider implements OldAuthProviderInterface {
 
         @Override
         public boolean wantTracUsers() {

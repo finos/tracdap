@@ -16,10 +16,10 @@
 
 package org.finos.tracdap.common.auth.external.common;
 
+import org.finos.tracdap.common.auth.external.*;
 import org.finos.tracdap.common.auth.internal.UserInfo;
 import org.finos.tracdap.common.config.ISecretLoader;
 import org.finos.tracdap.common.exception.EStartup;
-import org.finos.tracdap.common.auth.external.IAuthProvider;
 
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.HttpRequest;
@@ -54,17 +54,7 @@ public class GuestAuthProvider implements IAuthProvider {
     }
 
     @Override
-    public boolean wantTracUsers() {
-        return false;
-    }
-
-    @Override
-    public void setTracUsers(ISecretLoader userDb) {
-        // no-op
-    }
-
-    @Override
-    public UserInfo newAuth(ChannelHandlerContext ctx, HttpRequest req) {
+    public AuthResult attemptAuth(ChannelHandlerContext ctx, AuthHeaders headers) {
 
         log.info("AUTHENTICATION: Using guest authentication [{}]", guestId);
 
@@ -72,11 +62,6 @@ public class GuestAuthProvider implements IAuthProvider {
         user.setUserId(guestId);
         user.setDisplayName(guestName);
 
-        return user;
-    }
-
-    @Override
-    public UserInfo translateAuth(ChannelHandlerContext ctx, HttpRequest req, String authInfo) {
-        return null;
+        return new AuthResult(AuthResultCode.AUTHORIZED, user);
     }
 }

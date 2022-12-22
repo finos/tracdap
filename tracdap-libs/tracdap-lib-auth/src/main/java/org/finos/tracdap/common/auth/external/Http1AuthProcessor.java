@@ -37,40 +37,38 @@ import java.util.Spliterator;
 import java.util.function.Consumer;
 
 
-public class Http1Auth extends ChannelDuplexHandler {
+public class Http1AuthProcessor extends ChannelDuplexHandler {
 
     public static final boolean FRONT_FACING = true;
     public static final boolean BACK_FACING = false;
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
-    private final RouteType routeType;
-    private final boolean authDirection;
-    private final int connId;
-
     private final AuthenticationConfig authConfig;
+    private final boolean authDirection;
+
+    private final int connId;
 
     private final AuthLogic<HeaderDecorator> authLogic;
     private final JwtProcessor jwtProcessor;
-    private final IAuthProviderNew browserAuthProvider;
-    private final IAuthProviderNew apiAuthProvider;
+    private final IAuthProvider browserAuthProvider;
+    private final IAuthProvider apiAuthProvider;
 
     private AuthResult authResult = AuthResult.FAILED();
     private SessionInfo session;
     private String token;
+    private boolean isApi;
 
-    public Http1Auth(
-            RouteType routeType, boolean direction,int connId,
+    public Http1AuthProcessor(
             AuthenticationConfig authConfig,
+            boolean direction,int connId,
             JwtProcessor jwtProcessor,
-            IAuthProviderNew browserAuthProvider,
-            IAuthProviderNew apiAuthProvider) {
-
-        this.authDirection = direction;
-        this.routeType = routeType;
-        this.connId = connId;
+            IAuthProvider browserAuthProvider,
+            IAuthProvider apiAuthProvider) {
 
         this.authConfig = authConfig;
+        this.authDirection = direction;
+        this.connId = connId;
 
         this.authLogic = new AuthLogic<>();
         this.jwtProcessor = jwtProcessor;
@@ -97,7 +95,7 @@ public class Http1Auth extends ChannelDuplexHandler {
 
             if ((msg instanceof HttpRequest)) {
                 var request = (HttpRequest) msg;
-                processAuthentication(ctx, request, promise);
+                processAuthentication(ctx, request);
                 processRequest(ctx, request, promise);
             }
 
@@ -157,12 +155,24 @@ public class Http1Auth extends ChannelDuplexHandler {
             ctx.flush();
     }
 
-    private void processAuthentication(ChannelHandlerContext ctx, HttpRequest request, ChannelPromise promise) {
+    private void processAuthentication(ChannelHandlerContext ctx, HttpRequest request) {
 
         // TRAC auth token takes priority -look for this first, then try to validate
 
         var headers = new HeaderDecorator(request.headers());
-        token = authLogic.findTracAuthToken(new HeaderDecorator(request.headers()));
+
+        // We want to know if this is request is for web browsing or an API call
+        // It will affect how some responses get sent back, this method is crude but effective!
+        // To be 100% we could pass in the matcher used by the routers.....
+
+        if (headers.contains(HttpHeaderNames.CONTENT_TYPE)) {
+            var contentType = headers.get(HttpHeaderNames.CONTENT_TYPE);
+            isApi = contentType.startsWith("application/");
+        }
+
+        // Start the auth process by looking for the TRAC auth token
+
+        token = authLogic.findTracAuthToken(new HeaderDecorator(request.headers()), AuthLogic.SERVER_COOKIE);
 
         if (token != null)
             session = jwtProcessor.decodeAndValidate(token);
@@ -172,11 +182,11 @@ public class Http1Auth extends ChannelDuplexHandler {
         if (session != null && session.isValid()) {
             authResult = AuthResult.AUTHORIZED(session.getUserInfo());
         }
-        else if (routeType == RouteType.BROWSER_ROUTE && browserAuthProvider != null) {
-            authResult = browserAuthProvider.attemptAuth(ctx, headers);
-        }
-        else if (routeType == RouteType.API_ROUTE && apiAuthProvider != null) {
+        else if (isApi && apiAuthProvider != null) {
             authResult = apiAuthProvider.attemptAuth(ctx, headers);
+        }
+        else if (!isApi && browserAuthProvider != null) {
+            authResult = browserAuthProvider.attemptAuth(ctx, headers);
         }
         else {
             authResult = AuthResult.FAILED();
@@ -197,6 +207,8 @@ public class Http1Auth extends ChannelDuplexHandler {
                 session = sessionUpdate;
             }
         }
+
+
     }
 
     private void processRequest(ChannelHandlerContext ctx, HttpRequest request, ChannelPromise promise) {
@@ -209,8 +221,8 @@ public class Http1Auth extends ChannelDuplexHandler {
                 // This message is heading to the core platform, so it only needs the TRAC auth info
 
                 var updatedHeaders = authLogic.updateAuthHeaders(
-                        new HeaderDecorator(request.headers()), session,
-                        RouteType.PLATFORM_ROUTE);
+                        new HeaderDecorator(request.headers()), new HeaderDecorator(),
+                        token, session, RouteType.PLATFORM_ROUTE, AuthLogic.SERVER_COOKIE);
 
                 var updatedRequest = new DefaultHttpRequest(
                         request.protocolVersion(), request.method(),
@@ -261,9 +273,11 @@ public class Http1Auth extends ChannelDuplexHandler {
 
         // First filter out any auth-related headers from the response
 
+        var routeType = isApi ? RouteType.API_ROUTE : RouteType.BROWSER_ROUTE;
+
         var updatedHeaders = authLogic.updateAuthHeaders(
-                new HeaderDecorator(response.headers()),
-                session, routeType);
+                new HeaderDecorator(response.headers()), new HeaderDecorator(),
+                token, session, routeType, AuthLogic.CLIENT_COOKIE);
 
         var updatedResponse = new DefaultHttpResponse(
                 response.protocolVersion(),
@@ -275,6 +289,10 @@ public class Http1Auth extends ChannelDuplexHandler {
     }
 
     public static final class HeaderDecorator extends DefaultHttpHeaders implements AuthHeaders{
+
+        public HeaderDecorator() {
+
+        }
 
         public HeaderDecorator(HttpHeaders headers) {
             for (var header : headers)

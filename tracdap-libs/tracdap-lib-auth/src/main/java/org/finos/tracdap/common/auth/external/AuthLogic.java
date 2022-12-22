@@ -16,6 +16,7 @@
 
 package org.finos.tracdap.common.auth.external;
 
+import io.netty.handler.codec.http.cookie.*;
 import org.finos.tracdap.common.auth.internal.SessionInfo;
 import org.finos.tracdap.common.auth.internal.UserInfo;
 import org.finos.tracdap.common.config.ConfigDefaults;
@@ -23,10 +24,9 @@ import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.config.AuthenticationConfig;
 
 import io.netty.handler.codec.http.HttpHeaderNames;
-import io.netty.handler.codec.http.cookie.Cookie;
-import io.netty.handler.codec.http.cookie.ServerCookieDecoder;
 
 import java.time.Instant;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -34,24 +34,27 @@ import java.util.List;
 public class AuthLogic<THeaders extends AuthHeaders> {
 
     private static final String TRAC_AUTH_TOKEN_HEADER = "trac_auth_token";
-    private static final String TRAC_AUTH_SESSION_EXPIRY_HEADER = "trac_auth_session_expiry";
+    private static final String TRAC_AUTH_EXPIRY_GMT = "trac_auth_expiry_gmt";
     private static final String TRAC_USER_ID_HEADER = "trac_user_idn";
     private static final String TRAC_USER_NAME_HEADER = "trac_user_name";
 
+    private static final String TRAC_AUTH_PREFIX = "trac_auth_";
+    private static final String TRAC_USER_PREFIX = "trac_user_";
+
+    public static final boolean CLIENT_COOKIE = true;
+    public static final boolean SERVER_COOKIE = false;
+
+    private static final List<String> RESTRICTED_HEADERS = List.of(
+            HttpHeaderNames.AUTHORIZATION.toString(),
+            HttpHeaderNames.COOKIE.toString(),
+            HttpHeaderNames.SET_COOKIE.toString());
+
     private static final String BEARER_PREFIX = "bearer ";
 
-    private static final List<String> TRAC_GRPC_FILTERED_HEADERS = List.of(
-            TRAC_AUTH_TOKEN_HEADER,
-            TRAC_AUTH_SESSION_EXPIRY_HEADER,
-            TRAC_USER_ID_HEADER,
-            TRAC_USER_NAME_HEADER,
-            HttpHeaderNames.AUTHORIZATION.toString(),
-            HttpHeaderNames.COOKIE.toString());
 
+    public String findTracAuthToken(THeaders headers, boolean cookieDirection) {
 
-    public String findTracAuthToken(THeaders headers) {
-
-        var bearerToken = findTracBearerAuthToken(headers);
+        var bearerToken = findTracBearerAuthToken(headers, cookieDirection);
 
         if (bearerToken == null)
             return null;
@@ -62,9 +65,9 @@ public class AuthLogic<THeaders extends AuthHeaders> {
             return bearerToken;
     }
 
-    private String findTracBearerAuthToken(THeaders headers) {
+    private String findTracBearerAuthToken(THeaders headers, boolean cookieDirection) {
 
-        var cookies = extractCookies(headers);
+        var cookies = extractCookies(headers, cookieDirection);
 
         var tracAuthHeader = findHeader(headers, TRAC_AUTH_TOKEN_HEADER);
         if (tracAuthHeader != null) return tracAuthHeader;
@@ -103,9 +106,11 @@ public class AuthLogic<THeaders extends AuthHeaders> {
         return null;
     }
 
-    private List<Cookie> extractCookies(THeaders headers) {
+    private List<Cookie> extractCookies(THeaders headers, boolean cookieDirection) {
 
-        var cookieHeaders = headers.getAll(HttpHeaderNames.COOKIE);
+        var cookieHeader = cookieDirection == CLIENT_COOKIE ? HttpHeaderNames.SET_COOKIE : HttpHeaderNames.COOKIE;
+
+        var cookieHeaders = headers.getAll(cookieHeader);
         var cookies = new ArrayList<Cookie>();
 
         for (var header : cookieHeaders)
@@ -161,47 +166,57 @@ public class AuthLogic<THeaders extends AuthHeaders> {
         return newSession;
     }
 
-    public THeaders updateAuthHeaders(THeaders headers, SessionInfo session, RouteType routeType) {
+    public THeaders updateAuthHeaders(
+            THeaders headers, THeaders emptyHeaders,
+            String token, SessionInfo session,
+            RouteType routeType, boolean cookieDirection) {
 
-        var filtered = removeAllAuthHeaders(headers);
+        var filtered = removeAllAuthHeaders(headers, emptyHeaders, cookieDirection);
 
         switch (routeType) {
             case BROWSER_ROUTE:
-                return addHeadersForBrowser(filtered, session);
+                return addHeadersForBrowser(filtered, token, session);
             case API_ROUTE:
-                return addHeadersForApi(filtered, session);
+                return addHeadersForApi(filtered, token, session);
             case PLATFORM_ROUTE:
-                return addHeadersForPlatform(filtered, session);
+                return addHeadersForPlatform(filtered, token);
             default:
                 throw new EUnexpected();
         }
     }
 
-    public THeaders removeAllAuthHeaders(THeaders headers) {
+    public THeaders removeAllAuthHeaders(THeaders headers, THeaders emptyHeaders, boolean cookieDirection) {
 
-        var cookies = extractCookies(headers);
+        var cookies = extractCookies(headers, cookieDirection);
 
-        var filteredHeaders = filterHeaders(headers);
+        var filteredHeaders = filterHeaders(headers, emptyHeaders);
         var filteredCookies = filterCookies(cookies);
 
-        return null;
+        var cookieHeader = cookieDirection == CLIENT_COOKIE ? HttpHeaderNames.SET_COOKIE : HttpHeaderNames.COOKIE;
+
+        for (var cookie : filteredCookies) {
+            filteredHeaders.add(cookieHeader, ServerCookieEncoder.STRICT.encode(cookie));
+        }
+
+        return filteredHeaders;
     }
 
-    private THeaders filterHeaders(THeaders headers) {
-
-        var filtered = headers; //  todo (THeaders) headers.getClass().getConstructor().newInstance();
+    private THeaders filterHeaders(THeaders headers, THeaders newHeaders) {
 
         for (var header : headers) {
 
-            var headerName = header.getKey().toString().toLowerCase();
+            var headerName = header.getKey().toLowerCase();
 
-            if (TRAC_GRPC_FILTERED_HEADERS.contains(headerName))
+            if (headerName.startsWith(TRAC_AUTH_PREFIX) || headerName.startsWith(TRAC_USER_PREFIX))
                 continue;
 
-            filtered.add(header.getKey(), header.getValue());
+            if (RESTRICTED_HEADERS.contains(headerName))
+                continue;
+
+            newHeaders.add(headerName, header.getValue());
         }
 
-        return filtered;
+        return newHeaders;
     }
 
     private List<Cookie> filterCookies(List<Cookie> cookies) {
@@ -212,7 +227,10 @@ public class AuthLogic<THeaders extends AuthHeaders> {
 
             var cookieName = cookie.name().toLowerCase();
 
-            if (TRAC_GRPC_FILTERED_HEADERS.contains(cookieName))
+            if (cookieName.startsWith(TRAC_AUTH_PREFIX) || cookieName.startsWith(TRAC_USER_PREFIX))
+                continue;
+
+            if (RESTRICTED_HEADERS.contains(cookieName))
                 continue;
 
             filtered.add(cookie);
@@ -221,16 +239,53 @@ public class AuthLogic<THeaders extends AuthHeaders> {
         return filtered;
     }
 
-    public THeaders addHeadersForPlatform(THeaders header, SessionInfo session) {
-        return null;
+    public THeaders addHeadersForPlatform(THeaders headers, String token) {
+
+        // The platform only cares about the token, that is the definitive source of session info
+
+        headers.add(TRAC_AUTH_TOKEN_HEADER, token);
+        return headers;
     }
 
-    public THeaders addHeadersForBrowser(THeaders header, SessionInfo session) {
-        return null;
+    public THeaders addHeadersForApi(THeaders headers, String token, SessionInfo session) {
+
+        // For API calls send session info back in headers, these come through as gRPC metadata
+        // The web API package will use JavaScript to store these as cookies (cookies get lost over grpc-web)
+        // They are also easier to work with in non-browser contexts
+
+        var expiryFmt = DateTimeFormatter.ISO_INSTANT.format(session.getExpiryTime());
+
+        headers.add(TRAC_AUTH_TOKEN_HEADER, token);
+        headers.add(TRAC_AUTH_EXPIRY_GMT, expiryFmt);
+        headers.add(TRAC_USER_ID_HEADER, session.getUserInfo().getUserId());
+        headers.add(TRAC_USER_NAME_HEADER, session.getUserInfo().getDisplayName());
+
+        return headers;
     }
 
-    public THeaders addHeadersForApi(THeaders headers, SessionInfo session) {
-        return null;
+    public THeaders addHeadersForBrowser(THeaders headers, String token, SessionInfo session) {
+
+        // For browser requests, send the session info back as cookies, this is by far the easiest approach
+        // The web API package will look for a valid auth token cookie and send it as a header if available
+
+        var expiryFmt = DateTimeFormatter.ISO_INSTANT.format(session.getExpiryTime());
+
+        setClientCookie(headers, TRAC_AUTH_TOKEN_HEADER, token);
+        setClientCookie(headers, TRAC_AUTH_EXPIRY_GMT, expiryFmt);
+        setClientCookie(headers, TRAC_USER_ID_HEADER, session.getUserInfo().getUserId());
+        setClientCookie(headers, TRAC_USER_NAME_HEADER, session.getUserInfo().getDisplayName());
+
+        return headers;
     }
 
+    private void setClientCookie(THeaders headers, CharSequence cookieName, String cookieValue) {
+
+        var cookie = new DefaultCookie(cookieName.toString(), cookieValue);
+        cookie.setMaxAge(Cookie.UNDEFINED_MAX_AGE);  // remove cookie on browser close
+        cookie.setSameSite(CookieHeaderNames.SameSite.Strict);
+        cookie.setSecure(true);
+        cookie.setHttpOnly(false);  // allow access to JavaScript
+
+        headers.add(HttpHeaderNames.SET_COOKIE, ServerCookieEncoder.STRICT.encode(cookie));
+    }
 }

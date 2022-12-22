@@ -16,8 +16,8 @@
 
 package org.finos.tracdap.gateway;
 
-import org.finos.tracdap.common.auth.internal.JwtProcessor;
 import org.finos.tracdap.common.auth.external.IAuthProvider;
+import org.finos.tracdap.common.auth.internal.JwtProcessor;
 import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.exception.EStartup;
@@ -109,9 +109,9 @@ public class TracPlatformGateway extends CommonServiceBase {
 
             var authProviderConfig = gatewayConfig.getAuthentication().getProvider();
             var authProvider = pluginManager.createService(IAuthProvider.class, configManager, authProviderConfig);
-
-            if (authProvider.wantTracUsers())
-                authProvider.setTracUsers(configManager.getUserDb());
+//
+//            if (authProvider.wantTracUsers())
+//                authProvider.setTracUsers(configManager.getUserDb());
 
             // JWT processor is responsible for signing and validating auth tokens
             var jwtProcessor = setupJwtAuth(configManager);

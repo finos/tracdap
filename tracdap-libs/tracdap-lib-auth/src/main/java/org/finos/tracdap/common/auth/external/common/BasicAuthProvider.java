@@ -17,7 +17,7 @@
 package org.finos.tracdap.common.auth.external.common;
 
 import org.finos.tracdap.common.auth.internal.UserInfo;
-import org.finos.tracdap.common.auth.external.IAuthProvider;
+import org.finos.tracdap.common.auth.external.OldAuthProviderInterface;
 
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.*;
@@ -31,7 +31,7 @@ import java.util.Base64;
 import java.util.Properties;
 
 
-public class BasicAuthProvider implements IAuthProvider {
+public class BasicAuthProvider implements OldAuthProviderInterface {
 
     private static final Logger log = LoggerFactory.getLogger(BasicAuthProvider.class);
 

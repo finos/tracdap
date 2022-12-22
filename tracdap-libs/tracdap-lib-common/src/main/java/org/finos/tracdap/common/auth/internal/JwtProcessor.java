@@ -79,5 +79,16 @@ public class JwtProcessor extends JwtValidator {
         return jwt.sign(algorithm).trim();
     }
 
+    @Deprecated
+    public String encodeToken(UserInfo user) {
+
+        var session = new SessionInfo();
+        session.setUserInfo(user);
+        session.setIssueTime(Instant.now());
+        session.setExpiryTime(Instant.now().plusSeconds(3600));
+        session.setLimitTime(Instant.now().plusSeconds(86400));
+
+        return encodeToken(session);
+    }
 
 }

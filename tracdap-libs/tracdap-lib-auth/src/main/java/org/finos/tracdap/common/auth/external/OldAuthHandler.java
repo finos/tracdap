@@ -42,7 +42,7 @@ import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 
 
-public class Http1AuthHandler extends ChannelDuplexHandler {
+public class OldAuthHandler extends ChannelDuplexHandler {
 
     private static final String BEARER_AUTH_PREFIX = "bearer ";
 
@@ -55,7 +55,7 @@ public class Http1AuthHandler extends ChannelDuplexHandler {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
-    private final IAuthProvider provider;
+    private final OldAuthProviderInterface provider;
     private final JwtProcessor jwtProcessor;
 
     private boolean authOk = false;
@@ -63,7 +63,7 @@ public class Http1AuthHandler extends ChannelDuplexHandler {
     private SessionInfo sessionInfo;
 
 
-    public Http1AuthHandler(IAuthProvider provider, JwtProcessor jwtProcessor) {
+    public OldAuthHandler(OldAuthProviderInterface provider, JwtProcessor jwtProcessor) {
         this.provider = provider;
         this.jwtProcessor = jwtProcessor;
     }
