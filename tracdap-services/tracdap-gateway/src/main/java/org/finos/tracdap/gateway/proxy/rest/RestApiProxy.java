@@ -17,7 +17,7 @@
 package org.finos.tracdap.gateway.proxy.rest;
 
 import org.finos.tracdap.common.auth.external.AuthHelpers;
-import org.finos.tracdap.common.auth.internal.GrpcClientAuth;
+import org.finos.tracdap.common.auth.GrpcClientAuth;
 import org.finos.tracdap.common.exception.EInputValidation;
 import org.finos.tracdap.common.exception.EUnexpected;
 

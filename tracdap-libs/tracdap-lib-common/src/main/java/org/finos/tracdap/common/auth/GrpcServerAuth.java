@@ -14,10 +14,11 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.auth.internal;
+package org.finos.tracdap.common.auth;
 
 import io.grpc.*;
-import org.finos.tracdap.common.auth.AuthConstants;
+import org.finos.tracdap.common.auth.internal.JwtValidator;
+import org.finos.tracdap.common.auth.internal.UserInfo;
 import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.exception.EStartup;

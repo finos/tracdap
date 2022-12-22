@@ -16,11 +16,9 @@
 
 package org.finos.tracdap.svc.data.service;
 
-import com.google.common.util.concurrent.ListenableFuture;
 import org.apache.arrow.memory.BufferAllocator;
-import org.finos.tracdap.api.*;
 import org.finos.tracdap.api.TrustedMetadataApiGrpc.TrustedMetadataApiFutureStub;
-import org.finos.tracdap.common.auth.internal.GrpcClientAuth;
+import org.finos.tracdap.common.auth.GrpcClientAuth;
 import org.finos.tracdap.common.concurrent.Futures;
 import org.finos.tracdap.common.concurrent.IExecutionContext;
 import org.finos.tracdap.common.data.DataContext;
@@ -37,7 +35,6 @@ import org.finos.tracdap.common.storage.IFileStorage;
 import org.finos.tracdap.common.storage.IStorageManager;
 import org.finos.tracdap.common.validation.Validator;
 
-import io.grpc.MethodDescriptor;
 import io.netty.buffer.ByteBuf;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

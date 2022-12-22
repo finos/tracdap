@@ -14,14 +14,13 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.auth.internal;
+package org.finos.tracdap.common.auth;
 
 import io.grpc.CallCredentials;
 import io.grpc.CallOptions;
 import io.grpc.Metadata;
 import io.grpc.Status;
 import io.grpc.stub.AbstractStub;
-import org.finos.tracdap.common.auth.AuthConstants;
 
 import java.util.concurrent.Executor;
 

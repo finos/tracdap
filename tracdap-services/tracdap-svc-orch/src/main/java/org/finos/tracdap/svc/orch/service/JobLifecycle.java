@@ -17,7 +17,7 @@
 package org.finos.tracdap.svc.orch.service;
 
 import org.finos.tracdap.api.*;
-import org.finos.tracdap.common.auth.internal.GrpcClientAuth;
+import org.finos.tracdap.common.auth.GrpcClientAuth;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.metadata.MetadataUtil;
@@ -28,7 +28,6 @@ import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.svc.orch.cache.JobState;
 import org.finos.tracdap.svc.orch.jobs.JobLogic;
 
-import io.grpc.MethodDescriptor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

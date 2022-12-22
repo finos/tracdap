@@ -16,7 +16,7 @@
 
 package org.finos.tracdap.svc.meta;
 
-import org.finos.tracdap.common.auth.internal.GrpcServerAuth;
+import org.finos.tracdap.common.auth.GrpcServerAuth;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.common.plugin.PluginManager;
