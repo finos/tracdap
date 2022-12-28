@@ -233,7 +233,11 @@ message SearchParameters {
   /// The type of object to search for
   ObjectType objectType = 1;
 
-  /// A search expression based on tag attributes
+  /**
+   * A search expression based on tag attributes.
+   *
+   * This field is optional. If no search parameters are given, then all objects are returned.
+   */
   SearchExpression search = 2;
 
   /**

@@ -101,7 +101,7 @@ class JdbcSearchQueryBuilder {
         // Build query parts for the main search expression and version / temporal handling
 
         var queryParts = new JdbcSearchQuery(0, 0, List.of());
-        queryParts = buildSearchExpr(queryParts, searchParameters.getSearch());
+        queryParts = buildSearchExpr(queryParts, searchParameters.hasSearch() ? searchParameters.getSearch() : null);
         queryParts = buildAsOfCondition(queryParts, searchParameters);
         queryParts = buildPriorVersions(queryParts, searchParameters);
         queryParts = buildPriorTags(queryParts, searchParameters);
@@ -150,6 +150,10 @@ class JdbcSearchQueryBuilder {
     // -----------------------------------------------------------------------------------------------------------------
 
     JdbcSearchQuery buildSearchExpr(JdbcSearchQuery baseQuery, SearchExpression searchExpr) {
+
+        // If there is no search condition, do not add any conditions to the base query
+        if (searchExpr == null)
+            return baseQuery;
 
         switch (searchExpr.getExprCase()) {
 
