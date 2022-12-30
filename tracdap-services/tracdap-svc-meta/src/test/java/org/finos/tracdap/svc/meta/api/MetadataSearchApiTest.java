@@ -624,6 +624,19 @@ abstract class MetadataSearchApiTest {
     }
 
     @Test
+    void invalidSearch_nullParams() {
+
+        var searchRequest = MetadataSearchRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .clearSearchParams()
+                .build();
+
+        // noinspection ResultOfMethodCallIgnored
+        var error = assertThrows(StatusRuntimeException.class, () -> searchApi.search(searchRequest));
+        assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
+    }
+
+    @Test
     void invalidSearch_badParams() {
 
         // An invalid search request
