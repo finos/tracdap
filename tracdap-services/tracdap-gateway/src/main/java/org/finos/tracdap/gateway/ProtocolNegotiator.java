@@ -16,7 +16,7 @@
 
 package org.finos.tracdap.gateway;
 
-import org.finos.tracdap.common.auth.external.Http1AuthProcessor;
+import org.finos.tracdap.common.auth.external.Http1AuthHandler;
 import org.finos.tracdap.common.auth.external.IAuthProvider;
 import org.finos.tracdap.common.auth.internal.JwtProcessor;
 import org.finos.tracdap.config.GatewayConfig;
@@ -277,9 +277,9 @@ public class ProtocolNegotiator extends ChannelInitializer<SocketChannel> {
             // E.g. this can redirect the user to federated auth services
             // Different approaches are needed for system-to-system auth
 
-            var authHandler = new Http1AuthProcessor(
+            var authHandler = new Http1AuthHandler(
                     config.getAuthentication(),
-                    Http1AuthProcessor.FRONT_FACING,
+                    Http1AuthHandler.FRONT_FACING,
                     conn, jwtProcessor,
                     authProvider, null);
 

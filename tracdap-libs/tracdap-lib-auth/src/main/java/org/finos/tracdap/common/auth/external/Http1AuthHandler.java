@@ -33,7 +33,7 @@ import org.slf4j.LoggerFactory;
 import javax.annotation.Nonnull;
 
 
-public class Http1AuthProcessor extends ChannelDuplexHandler {
+public class Http1AuthHandler extends ChannelDuplexHandler {
 
     public static final boolean FRONT_FACING = true;
     public static final boolean BACK_FACING = false;
@@ -54,7 +54,7 @@ public class Http1AuthProcessor extends ChannelDuplexHandler {
     private String token;
     private boolean isApi;
 
-    public Http1AuthProcessor(
+    public Http1AuthHandler(
             AuthenticationConfig authConfig,
             boolean direction,int connId,
             JwtProcessor jwtProcessor,
