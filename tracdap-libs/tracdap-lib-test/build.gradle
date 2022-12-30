@@ -30,6 +30,7 @@ dependencies {
     api project(":tracdap-api-services")
 
     api project(':tracdap-lib-common')
+    api project(':tracdap-lib-auth')
     api project(':tracdap-lib-db')
     api project(':tracdap-lib-data')
 
