@@ -25,6 +25,8 @@ import org.finos.tracdap.config.AuthenticationConfig;
 
 import io.netty.handler.codec.http.HttpHeaderNames;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -32,6 +34,9 @@ import java.util.List;
 
 
 public class AuthLogic<THeaders extends AuthHeaders> {
+
+    public static final boolean CLIENT_COOKIE = true;
+    public static final boolean SERVER_COOKIE = false;
 
     private static final String TRAC_AUTH_TOKEN_HEADER = "trac_auth_token";
     private static final String TRAC_AUTH_EXPIRY_GMT = "trac_auth_expiry_gmt";
@@ -41,8 +46,7 @@ public class AuthLogic<THeaders extends AuthHeaders> {
     private static final String TRAC_AUTH_PREFIX = "trac_auth_";
     private static final String TRAC_USER_PREFIX = "trac_user_";
 
-    public static final boolean CLIENT_COOKIE = true;
-    public static final boolean SERVER_COOKIE = false;
+    private static final String NULL_AUTH_TOKEN = null;
 
     private static final List<String> RESTRICTED_HEADERS = List.of(
             HttpHeaderNames.AUTHORIZATION.toString(),
@@ -54,18 +58,20 @@ public class AuthLogic<THeaders extends AuthHeaders> {
 
     public String findTracAuthToken(THeaders headers, boolean cookieDirection) {
 
-        var bearerToken = findTracBearerAuthToken(headers, cookieDirection);
+        var rawToken = findRawAuthToken(headers, cookieDirection);
 
-        if (bearerToken == null)
+        if (rawToken == null)
             return null;
 
-        if (bearerToken.toLowerCase().startsWith(BEARER_PREFIX))
-            return bearerToken.substring(BEARER_PREFIX.length());
+        // Remove the "bearer" prefix if the auth token header is stored that way
+
+        if (rawToken.toLowerCase().startsWith(BEARER_PREFIX))
+            return rawToken.substring(BEARER_PREFIX.length());
         else
-            return bearerToken;
+            return rawToken;
     }
 
-    private String findTracBearerAuthToken(THeaders headers, boolean cookieDirection) {
+    private String findRawAuthToken(THeaders headers, boolean cookieDirection) {
 
         var cookies = extractCookies(headers, cookieDirection);
 
@@ -83,7 +89,7 @@ public class AuthLogic<THeaders extends AuthHeaders> {
 
         // Run out of places to look!
 
-        return null;
+        return NULL_AUTH_TOKEN;
     }
 
     private String findHeader(THeaders headers, String headerName) {
@@ -253,12 +259,17 @@ public class AuthLogic<THeaders extends AuthHeaders> {
         // The web API package will use JavaScript to store these as cookies (cookies get lost over grpc-web)
         // They are also easier to work with in non-browser contexts
 
-        var expiryFmt = DateTimeFormatter.ISO_INSTANT.format(session.getExpiryTime());
+        // We use URL encoding to avoid issues with non-ascii characters
+        // This also matches the way auth headers are sent back to browsers in cookies
+
+        var expiry = DateTimeFormatter.ISO_INSTANT.format(session.getExpiryTime());
+        var userId = URLEncoder.encode(session.getUserInfo().getUserId(), StandardCharsets.US_ASCII);
+        var userName = URLEncoder.encode(session.getUserInfo().getDisplayName(), StandardCharsets.US_ASCII);
 
         headers.add(TRAC_AUTH_TOKEN_HEADER, token);
-        headers.add(TRAC_AUTH_EXPIRY_GMT, expiryFmt);
-        headers.add(TRAC_USER_ID_HEADER, session.getUserInfo().getUserId());
-        headers.add(TRAC_USER_NAME_HEADER, session.getUserInfo().getDisplayName());
+        headers.add(TRAC_AUTH_EXPIRY_GMT, expiry);
+        headers.add(TRAC_USER_ID_HEADER, userId);
+        headers.add(TRAC_USER_NAME_HEADER, userName);
 
         return headers;
     }
@@ -268,12 +279,18 @@ public class AuthLogic<THeaders extends AuthHeaders> {
         // For browser requests, send the session info back as cookies, this is by far the easiest approach
         // The web API package will look for a valid auth token cookie and send it as a header if available
 
-        var expiryFmt = DateTimeFormatter.ISO_INSTANT.format(session.getExpiryTime());
+        // We use URL encoding to avoid issues with non-ascii characters
+        // Cookies are a lot stricter than regular headers so this is required
+        // The other option is base 64, but URL encoding is more readable for humans
+
+        var expiry = DateTimeFormatter.ISO_INSTANT.format(session.getExpiryTime());
+        var userId = URLEncoder.encode(session.getUserInfo().getUserId(), StandardCharsets.US_ASCII);
+        var userName = URLEncoder.encode(session.getUserInfo().getDisplayName(), StandardCharsets.US_ASCII);
 
         setClientCookie(headers, TRAC_AUTH_TOKEN_HEADER, token);
-        setClientCookie(headers, TRAC_AUTH_EXPIRY_GMT, expiryFmt);
-        setClientCookie(headers, TRAC_USER_ID_HEADER, session.getUserInfo().getUserId());
-        setClientCookie(headers, TRAC_USER_NAME_HEADER, session.getUserInfo().getDisplayName());
+        setClientCookie(headers, TRAC_AUTH_EXPIRY_GMT, expiry);
+        setClientCookie(headers, TRAC_USER_ID_HEADER, userId);
+        setClientCookie(headers, TRAC_USER_NAME_HEADER, userName);
 
         return headers;
     }
