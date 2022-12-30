@@ -22,6 +22,7 @@ import org.finos.tracdap.api.TracMetadataApiGrpc;
 import org.finos.tracdap.api.TracOrchestratorApiGrpc;
 import org.finos.tracdap.api.TrustedMetadataApiGrpc;
 import org.finos.tracdap.common.auth.GrpcClientAuth;
+import org.finos.tracdap.common.auth.external.AuthLogic;
 import org.finos.tracdap.common.auth.internal.JwtProcessor;
 import org.finos.tracdap.common.auth.internal.UserInfo;
 import org.finos.tracdap.common.config.ConfigKeys;
@@ -348,7 +349,9 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         userInfo.setUserId("platform_testing");
         userInfo.setDisplayName("Platform testing user");
 
-        authToken = jwt.encodeToken(userInfo);
+        var session = AuthLogic.newSession(userInfo, authConfig);
+
+        authToken = jwt.encodeToken(session);
     }
 
     void prepareDatabase() {
