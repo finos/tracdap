@@ -31,10 +31,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nonnull;
-import java.util.List;
-import java.util.Map;
-import java.util.Spliterator;
-import java.util.function.Consumer;
 
 
 public class Http1AuthProcessor extends ChannelDuplexHandler {
@@ -155,9 +151,7 @@ public class Http1AuthProcessor extends ChannelDuplexHandler {
 
     private void processAuthentication(ChannelHandlerContext ctx, HttpRequest request) {
 
-        // TRAC auth token takes priority -look for this first, then try to validate
-
-        var headers = new HeaderDecorator(request.headers());
+        var headers = new Http1AuthHeaders(request.headers());
 
         // We want to know if this is request is for web browsing or an API call
         // It will affect how some responses get sent back, this method is crude but effective!
@@ -169,11 +163,10 @@ public class Http1AuthProcessor extends ChannelDuplexHandler {
         }
 
         // Start the auth process by looking for the TRAC auth token
+        // If there is already a valid session, this takes priority
 
-        token = AuthLogic.findTracAuthToken(new HeaderDecorator(request.headers()), AuthLogic.SERVER_COOKIE);
-
-        if (token != null)
-            session = jwtProcessor.decodeAndValidate(token);
+        token = AuthLogic.findTracAuthToken(headers, AuthLogic.SERVER_COOKIE);
+        session = (token != null) ? jwtProcessor.decodeAndValidate(token) : null;
 
         // If the TRAC token is not available or not valid, fall back to a primary auth mechanism (if possible)
 
@@ -218,13 +211,16 @@ public class Http1AuthProcessor extends ChannelDuplexHandler {
                 // Strip out any existing auth headers and other noise
                 // This message is heading to the core platform, so it only needs the TRAC auth info
 
+                var headers = new Http1AuthHeaders(request.headers());
+                var emptyHeaders = new Http1AuthHeaders();
+
                 var updatedHeaders = AuthLogic.updateAuthHeaders(
-                        new HeaderDecorator(request.headers()), new HeaderDecorator(),
-                        token, session, RouteType.PLATFORM_ROUTE, AuthLogic.SERVER_COOKIE);
+                        headers, emptyHeaders, token, session,
+                        RouteType.PLATFORM_ROUTE, AuthLogic.SERVER_COOKIE);
 
                 var updatedRequest = new DefaultHttpRequest(
                         request.protocolVersion(), request.method(),
-                        request.uri(), updatedHeaders);
+                        request.uri(), updatedHeaders.headers());
 
                 // For front-facing handlers requests come on the read side, back-facing is reversed
 
@@ -271,60 +267,20 @@ public class Http1AuthProcessor extends ChannelDuplexHandler {
 
         // First filter out any auth-related headers from the response
 
+        var headers = new Http1AuthHeaders(response.headers());
+        var emptyHeaders = new Http1AuthHeaders();
         var routeType = isApi ? RouteType.API_ROUTE : RouteType.BROWSER_ROUTE;
 
         var updatedHeaders = AuthLogic.updateAuthHeaders(
-                new HeaderDecorator(response.headers()), new HeaderDecorator(),
-                token, session, routeType, AuthLogic.CLIENT_COOKIE);
+                headers, emptyHeaders, token, session,
+                routeType, AuthLogic.CLIENT_COOKIE);
 
         var updatedResponse = new DefaultHttpResponse(
                 response.protocolVersion(),
-                response.status(), updatedHeaders);
+                response.status(), updatedHeaders.headers());
 
         // This is a response message, so invert the direction flag !!
 
         bidiSend(ctx, updatedResponse, promise, !authDirection);
-    }
-
-    public static final class HeaderDecorator extends DefaultHttpHeaders implements AuthHeaders{
-
-        public HeaderDecorator() {
-
-        }
-
-        public HeaderDecorator(HttpHeaders headers) {
-            for (var header : headers)
-                add((CharSequence) header.getKey(), header.getValue());
-        }
-
-        @Override
-        public void add(CharSequence header, CharSequence value) {
-            super.add(header, value);
-        }
-
-        @Override
-        public boolean contains(CharSequence header) {
-            return super.contains(header);
-        }
-
-        @Override
-        public String get(CharSequence header) {
-            return super.get(header);
-        }
-
-        @Override
-        public List<String> getAll(CharSequence header) {
-            return super.getAll(header);
-        }
-
-        @Override
-        public void forEach(Consumer<? super Map.Entry<String, String>> action) {
-            super.forEach(action);
-        }
-
-        @Override
-        public Spliterator<Map.Entry<String, String>> spliterator() {
-            return super.spliterator();
-        }
     }
 }

@@ -310,7 +310,7 @@ public class ProtocolNegotiatorTest {
     private static class DummyAuthProvider implements IAuthProvider {
 
         @Override
-        public AuthResult attemptAuth(ChannelHandlerContext ctx, AuthHeaders headers) {
+        public AuthResult attemptAuth(ChannelHandlerContext ctx, IAuthHeaders headers) {
 
             var user = new UserInfo();
             user.setUserId("test_user");

@@ -18,11 +18,9 @@ package org.finos.tracdap.common.auth.external.common;
 
 import org.finos.tracdap.common.auth.external.*;
 import org.finos.tracdap.common.auth.internal.UserInfo;
-import org.finos.tracdap.common.config.ISecretLoader;
 import org.finos.tracdap.common.exception.EStartup;
 
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.handler.codec.http.HttpRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -54,7 +52,7 @@ public class GuestAuthProvider implements IAuthProvider {
     }
 
     @Override
-    public AuthResult attemptAuth(ChannelHandlerContext ctx, AuthHeaders headers) {
+    public AuthResult attemptAuth(ChannelHandlerContext ctx, IAuthHeaders headers) {
 
         log.info("AUTHENTICATION: Using guest authentication [{}]", guestId);
 

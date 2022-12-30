@@ -20,7 +20,7 @@ import java.util.List;
 import java.util.Map;
 
 
-public interface AuthHeaders extends Iterable<Map.Entry<String, String>> {
+public interface IAuthHeaders extends Iterable<Map.Entry<String, String>> {
 
     void add(CharSequence header, CharSequence value);
 
@@ -28,5 +28,5 @@ public interface AuthHeaders extends Iterable<Map.Entry<String, String>> {
 
     CharSequence get(CharSequence header);
 
-    List<? super String> getAll(CharSequence header);
+    List<? extends CharSequence> getAll(CharSequence header);
 }
