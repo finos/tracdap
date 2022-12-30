@@ -24,7 +24,6 @@ import org.finos.tracdap.config.AuthenticationConfig;
 import org.finos.tracdap.config.PlatformInfo;
 
 import java.security.KeyPair;
-import java.time.Instant;
 import java.util.Map;
 
 
@@ -60,7 +59,6 @@ public class JwtProcessor extends JwtValidator {
         super(authConfig, algorithm);
     }
 
-
     public String encodeToken(SessionInfo session) {
 
         var header = Map.of(
@@ -77,18 +75,6 @@ public class JwtProcessor extends JwtValidator {
                 .withClaim(JWT_NAME_CLAIM, session.getUserInfo().getDisplayName());
 
         return jwt.sign(algorithm).trim();
-    }
-
-    @Deprecated
-    public String encodeToken(UserInfo user) {
-
-        var session = new SessionInfo();
-        session.setUserInfo(user);
-        session.setIssueTime(Instant.now());
-        session.setExpiryTime(Instant.now().plusSeconds(3600));
-        session.setLimitTime(Instant.now().plusSeconds(86400));
-
-        return encodeToken(session);
     }
 
 }
