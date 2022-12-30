@@ -33,11 +33,13 @@ import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
 import static org.finos.tracdap.common.metadata.MetadataCodec.encodeNativeObject;
 import static org.finos.tracdap.common.metadata.MetadataCodec.encodeValue;
 import static org.finos.tracdap.test.meta.TestData.*;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.*;
 
 
 abstract class MetadataSearchApiTest {
@@ -91,6 +93,60 @@ abstract class MetadataSearchApiTest {
             searchApi = platform.metaClientBlocking();
             writeApi = platform.metaClientTrustedBlocking();
         }
+    }
+
+    @Test
+    void trivialSearch() {
+
+        var someAttr = "trivialSearch_WHICH_DROIDS";
+
+        var obj1 = TestData.dummyDataDef();
+        var obj2 = TestData.dummyDataDef();
+
+        var tag1 = Tag.newBuilder()
+                .setDefinition(obj1)
+                .putAttrs(someAttr, encodeValue("alpha"))
+                .build();
+
+        var tag2 = Tag.newBuilder()
+                .setDefinition(obj2)
+                .putAttrs(someAttr, encodeValue("beta"))
+                .build();
+
+        var save1 = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.DATA)
+                .setDefinition(obj1)
+                .addAllTagUpdates(tagUpdatesForAttrs(tag1.getAttrsMap()))
+                .build();
+
+        var save2 = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.DATA)
+                .setDefinition(obj2)
+                .addAllTagUpdates(tagUpdatesForAttrs(tag2.getAttrsMap()))
+                .build();
+
+        var objectIds = Stream.of(save1, save2)
+                .map(s -> writeApi.createObject(s).getObjectId())
+                .collect(Collectors.toSet());
+
+        var searchRequest = MetadataSearchRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSearchParams(
+                        SearchParameters.newBuilder()
+                                .setObjectType(ObjectType.DATA)
+                )
+                .build();
+
+        var searchResult = searchApi.search(searchRequest);
+        var foundIds = searchResult.getSearchResultList().stream()
+                        .map(s -> s.getHeader().getObjectId())
+                        .collect(Collectors.toSet());
+
+        // The metadata system can contain objects from other tests.
+        // We check, that we got IDs of the objects from this test.
+        assertTrue(foundIds.containsAll(objectIds));
     }
 
     @Test
@@ -578,17 +634,6 @@ abstract class MetadataSearchApiTest {
         // noinspection ResultOfMethodCallIgnored
         var error = assertThrows(StatusRuntimeException.class, () -> searchApi.search(searchRequest));
         assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
-
-        var searchRequest2 = MetadataSearchRequest.newBuilder()
-                .setTenant(TEST_TENANT)
-                .setSearchParams(SearchParameters.newBuilder()
-                .setObjectType(ObjectType.DATA)
-                .clearSearch())
-                .build();
-
-        // noinspection ResultOfMethodCallIgnored
-        var error2 = assertThrows(StatusRuntimeException.class, () -> searchApi.search(searchRequest2));
-        assertEquals(Status.Code.INVALID_ARGUMENT, error2.getStatus().getCode());
     }
 
     @Test

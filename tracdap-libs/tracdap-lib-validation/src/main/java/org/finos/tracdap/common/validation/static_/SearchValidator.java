@@ -115,7 +115,7 @@ public class SearchValidator {
         // Note - there is an open issue to relax this, i.e. allow searches for all objects of a given type
 
         ctx = ctx.push(SP_SEARCH)
-                .apply(CommonValidators::required)
+                .apply(CommonValidators::optional)
                 .apply(SearchValidator::searchExpression, SearchExpression.class)
                 .pop();
 
