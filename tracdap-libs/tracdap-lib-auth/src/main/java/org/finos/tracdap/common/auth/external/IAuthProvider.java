@@ -18,8 +18,21 @@ package org.finos.tracdap.common.auth.external;
 
 
 import io.netty.channel.ChannelHandlerContext;
+import org.finos.tracdap.common.config.ISecretLoader;
+
 
 public interface IAuthProvider {
 
     AuthResult attemptAuth(ChannelHandlerContext ctx, IAuthHeaders headers);
+
+    // These methods allow using the TRAC user DB for basic auth
+    // TODO: Find a more elegant solution
+
+    default boolean wantTracUsers() {
+        return false;
+    }
+
+    default void setTracUsers(ISecretLoader userDb) {
+        // no-op
+    }
 }
