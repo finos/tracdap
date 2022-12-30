@@ -36,8 +36,6 @@ public class TracOrchestratorApi extends TracOrchestratorApiGrpc.TracOrchestrato
     private static final MethodDescriptor<JobRequest, JobStatus> VALIDATE_JOB_METHOD = TracOrchestratorApiGrpc.getValidateJobMethod();
     private static final MethodDescriptor<JobRequest, JobStatus> SUBMIT_JOB_METHOD = TracOrchestratorApiGrpc.getSubmitJobMethod();
     private static final MethodDescriptor<JobStatusRequest, JobStatus> CHECK_JOB_METHOD = TracOrchestratorApiGrpc.getCheckJobMethod();
-    private static final MethodDescriptor<JobStatusRequest, JobStatus> FOLLOW_JOB_METHOD = TracOrchestratorApiGrpc.getFollowJobMethod();
-    private static final MethodDescriptor<JobStatusRequest, JobStatus> CANCEL_JOB_METHOD = TracOrchestratorApiGrpc.getCancelJobMethod();
 
     private final Validator validator;
     private final JobApiService orchestrator;
@@ -47,14 +45,14 @@ public class TracOrchestratorApi extends TracOrchestratorApiGrpc.TracOrchestrato
 
         this.validator = new Validator();
         this.orchestrator = orchestrator;
-        this.grpcWrap = new GrpcServerWrap(getClass());
+        this.grpcWrap = new GrpcServerWrap();
     }
 
     @Override
     public void validateJob(JobRequest request, StreamObserver<JobStatus> responseObserver) {
 
         grpcWrap.unaryCall(
-                VALIDATE_JOB_METHOD, request, responseObserver,
+                request, responseObserver,
                 apiFunc(VALIDATE_JOB_METHOD, orchestrator::validateJob));
     }
 
@@ -62,7 +60,7 @@ public class TracOrchestratorApi extends TracOrchestratorApiGrpc.TracOrchestrato
     public void submitJob(JobRequest request, StreamObserver<JobStatus> responseObserver) {
 
         grpcWrap.unaryCall(
-                SUBMIT_JOB_METHOD, request, responseObserver,
+                request, responseObserver,
                 apiFunc(SUBMIT_JOB_METHOD, orchestrator::submitJob));
     }
 
@@ -70,7 +68,7 @@ public class TracOrchestratorApi extends TracOrchestratorApiGrpc.TracOrchestrato
     public void checkJob(JobStatusRequest request, StreamObserver<JobStatus> responseObserver) {
 
         grpcWrap.unaryCall(
-                CHECK_JOB_METHOD, request, responseObserver,
+                request, responseObserver,
                 apiFunc(CHECK_JOB_METHOD, orchestrator::checkJob));
     }
 
