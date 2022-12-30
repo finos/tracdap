@@ -33,7 +33,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 
-public class AuthLogic<THeaders extends AuthHeaders> {
+public class AuthLogic {
 
     public static final boolean CLIENT_COOKIE = true;
     public static final boolean SERVER_COOKIE = false;
@@ -56,7 +56,12 @@ public class AuthLogic<THeaders extends AuthHeaders> {
     private static final String BEARER_PREFIX = "bearer ";
 
 
-    public String findTracAuthToken(THeaders headers, boolean cookieDirection) {
+    // Logic class, do not allow creating instances
+    private AuthLogic() {}
+
+
+    public static <THeaders extends AuthHeaders>
+    String findTracAuthToken(THeaders headers, boolean cookieDirection) {
 
         var rawToken = findRawAuthToken(headers, cookieDirection);
 
@@ -71,7 +76,8 @@ public class AuthLogic<THeaders extends AuthHeaders> {
             return rawToken;
     }
 
-    private String findRawAuthToken(THeaders headers, boolean cookieDirection) {
+    private static <THeaders extends AuthHeaders>
+    String findRawAuthToken(THeaders headers, boolean cookieDirection) {
 
         var cookies = extractCookies(headers, cookieDirection);
 
@@ -92,7 +98,8 @@ public class AuthLogic<THeaders extends AuthHeaders> {
         return NULL_AUTH_TOKEN;
     }
 
-    private String findHeader(THeaders headers, String headerName) {
+    private static <THeaders extends AuthHeaders>
+    String findHeader(THeaders headers, String headerName) {
 
         if (headers.contains(headerName))
             return headers.get(headerName).toString();
@@ -100,7 +107,7 @@ public class AuthLogic<THeaders extends AuthHeaders> {
         return null;
     }
 
-    private String findCookie(List<Cookie> cookies, String cookieName) {
+    private static String findCookie(List<Cookie> cookies, String cookieName) {
 
         for (var cookie : cookies) {
             if (cookie.name().equals(cookieName)) {
@@ -112,7 +119,8 @@ public class AuthLogic<THeaders extends AuthHeaders> {
         return null;
     }
 
-    private List<Cookie> extractCookies(THeaders headers, boolean cookieDirection) {
+    private static <THeaders extends AuthHeaders>
+    List<Cookie> extractCookies(THeaders headers, boolean cookieDirection) {
 
         var cookieHeader = cookieDirection == CLIENT_COOKIE ? HttpHeaderNames.SET_COOKIE : HttpHeaderNames.COOKIE;
 
@@ -125,7 +133,7 @@ public class AuthLogic<THeaders extends AuthHeaders> {
         return cookies;
     }
 
-    public SessionInfo newSession(UserInfo userInfo, AuthenticationConfig authConfig) {
+    public static SessionInfo newSession(UserInfo userInfo, AuthenticationConfig authConfig) {
 
         var configExpiry = ConfigDefaults.readOrDefault(authConfig.getJwtExpiry(), ConfigDefaults.DEFAULT_JWT_EXPIRY);
         var configLimit = ConfigDefaults.readOrDefault(authConfig.getJwtLimit(), ConfigDefaults.DEFAULT_JWT_LIMIT);
@@ -144,7 +152,7 @@ public class AuthLogic<THeaders extends AuthHeaders> {
         return session;
     }
 
-    public SessionInfo refreshSession(SessionInfo session, AuthenticationConfig authConfig) {
+    public static SessionInfo refreshSession(SessionInfo session, AuthenticationConfig authConfig) {
 
         var latestIssue = session.getIssueTime();
         var originalLimit = session.getLimitTime();
@@ -172,7 +180,25 @@ public class AuthLogic<THeaders extends AuthHeaders> {
         return newSession;
     }
 
-    public THeaders updateAuthHeaders(
+    public static <THeaders extends AuthHeaders>
+    THeaders removeAllAuthHeaders(THeaders headers, THeaders emptyHeaders, boolean cookieDirection) {
+
+        var cookies = extractCookies(headers, cookieDirection);
+
+        var filteredHeaders = filterHeaders(headers, emptyHeaders);
+        var filteredCookies = filterCookies(cookies);
+
+        var cookieHeader = cookieDirection == CLIENT_COOKIE ? HttpHeaderNames.SET_COOKIE : HttpHeaderNames.COOKIE;
+
+        for (var cookie : filteredCookies) {
+            filteredHeaders.add(cookieHeader, ServerCookieEncoder.STRICT.encode(cookie));
+        }
+
+        return filteredHeaders;
+    }
+
+    public static <THeaders extends AuthHeaders>
+    THeaders updateAuthHeaders(
             THeaders headers, THeaders emptyHeaders,
             String token, SessionInfo session,
             RouteType routeType, boolean cookieDirection) {
@@ -191,23 +217,8 @@ public class AuthLogic<THeaders extends AuthHeaders> {
         }
     }
 
-    public THeaders removeAllAuthHeaders(THeaders headers, THeaders emptyHeaders, boolean cookieDirection) {
-
-        var cookies = extractCookies(headers, cookieDirection);
-
-        var filteredHeaders = filterHeaders(headers, emptyHeaders);
-        var filteredCookies = filterCookies(cookies);
-
-        var cookieHeader = cookieDirection == CLIENT_COOKIE ? HttpHeaderNames.SET_COOKIE : HttpHeaderNames.COOKIE;
-
-        for (var cookie : filteredCookies) {
-            filteredHeaders.add(cookieHeader, ServerCookieEncoder.STRICT.encode(cookie));
-        }
-
-        return filteredHeaders;
-    }
-
-    private THeaders filterHeaders(THeaders headers, THeaders newHeaders) {
+    private static <THeaders extends AuthHeaders>
+    THeaders filterHeaders(THeaders headers, THeaders newHeaders) {
 
         for (var header : headers) {
 
@@ -225,7 +236,7 @@ public class AuthLogic<THeaders extends AuthHeaders> {
         return newHeaders;
     }
 
-    private List<Cookie> filterCookies(List<Cookie> cookies) {
+    private static List<Cookie> filterCookies(List<Cookie> cookies) {
 
         var filtered = new ArrayList<Cookie>();
 
@@ -245,7 +256,8 @@ public class AuthLogic<THeaders extends AuthHeaders> {
         return filtered;
     }
 
-    public THeaders addHeadersForPlatform(THeaders headers, String token) {
+    public static <THeaders extends AuthHeaders>
+    THeaders addHeadersForPlatform(THeaders headers, String token) {
 
         // The platform only cares about the token, that is the definitive source of session info
 
@@ -253,7 +265,8 @@ public class AuthLogic<THeaders extends AuthHeaders> {
         return headers;
     }
 
-    public THeaders addHeadersForApi(THeaders headers, String token, SessionInfo session) {
+    public static <THeaders extends AuthHeaders>
+    THeaders addHeadersForApi(THeaders headers, String token, SessionInfo session) {
 
         // For API calls send session info back in headers, these come through as gRPC metadata
         // The web API package will use JavaScript to store these as cookies (cookies get lost over grpc-web)
@@ -274,7 +287,8 @@ public class AuthLogic<THeaders extends AuthHeaders> {
         return headers;
     }
 
-    public THeaders addHeadersForBrowser(THeaders headers, String token, SessionInfo session) {
+    public static <THeaders extends AuthHeaders>
+    THeaders addHeadersForBrowser(THeaders headers, String token, SessionInfo session) {
 
         // For browser requests, send the session info back as cookies, this is by far the easiest approach
         // The web API package will look for a valid auth token cookie and send it as a header if available
@@ -295,7 +309,8 @@ public class AuthLogic<THeaders extends AuthHeaders> {
         return headers;
     }
 
-    private void setClientCookie(THeaders headers, CharSequence cookieName, String cookieValue) {
+    private static <THeaders extends AuthHeaders>
+    void setClientCookie(THeaders headers, CharSequence cookieName, String cookieValue) {
 
         var cookie = new DefaultCookie(cookieName.toString(), cookieValue);
         cookie.setMaxAge(Cookie.UNDEFINED_MAX_AGE);  // remove cookie on browser close

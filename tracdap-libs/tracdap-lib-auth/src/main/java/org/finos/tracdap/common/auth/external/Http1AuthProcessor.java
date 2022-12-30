@@ -49,7 +49,6 @@ public class Http1AuthProcessor extends ChannelDuplexHandler {
 
     private final int connId;
 
-    private final AuthLogic<HeaderDecorator> authLogic;
     private final JwtProcessor jwtProcessor;
     private final IAuthProvider browserAuthProvider;
     private final IAuthProvider apiAuthProvider;
@@ -70,7 +69,6 @@ public class Http1AuthProcessor extends ChannelDuplexHandler {
         this.authDirection = direction;
         this.connId = connId;
 
-        this.authLogic = new AuthLogic<>();
         this.jwtProcessor = jwtProcessor;
         this.browserAuthProvider = browserAuthProvider;
         this.apiAuthProvider = apiAuthProvider;
@@ -172,7 +170,7 @@ public class Http1AuthProcessor extends ChannelDuplexHandler {
 
         // Start the auth process by looking for the TRAC auth token
 
-        token = authLogic.findTracAuthToken(new HeaderDecorator(request.headers()), AuthLogic.SERVER_COOKIE);
+        token = AuthLogic.findTracAuthToken(new HeaderDecorator(request.headers()), AuthLogic.SERVER_COOKIE);
 
         if (token != null)
             session = jwtProcessor.decodeAndValidate(token);
@@ -198,8 +196,8 @@ public class Http1AuthProcessor extends ChannelDuplexHandler {
 
             // Session update is created for new sessions, or sessions that have ticket past their refresh time
             var sessionUpdate = (session == null)
-                    ? authLogic.newSession(authResult.getUserInfo(), authConfig)
-                    : authLogic.refreshSession(session, authConfig);
+                    ? AuthLogic.newSession(authResult.getUserInfo(), authConfig)
+                    : AuthLogic.refreshSession(session, authConfig);
 
             // If the session has been updated, regenerate the token and store the new details
             if (sessionUpdate != session) {
@@ -220,7 +218,7 @@ public class Http1AuthProcessor extends ChannelDuplexHandler {
                 // Strip out any existing auth headers and other noise
                 // This message is heading to the core platform, so it only needs the TRAC auth info
 
-                var updatedHeaders = authLogic.updateAuthHeaders(
+                var updatedHeaders = AuthLogic.updateAuthHeaders(
                         new HeaderDecorator(request.headers()), new HeaderDecorator(),
                         token, session, RouteType.PLATFORM_ROUTE, AuthLogic.SERVER_COOKIE);
 
@@ -275,7 +273,7 @@ public class Http1AuthProcessor extends ChannelDuplexHandler {
 
         var routeType = isApi ? RouteType.API_ROUTE : RouteType.BROWSER_ROUTE;
 
-        var updatedHeaders = authLogic.updateAuthHeaders(
+        var updatedHeaders = AuthLogic.updateAuthHeaders(
                 new HeaderDecorator(response.headers()), new HeaderDecorator(),
                 token, session, routeType, AuthLogic.CLIENT_COOKIE);
 
