@@ -20,7 +20,6 @@ import org.finos.tracdap.common.auth.external.IAuthProvider;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.plugin.PluginServiceInfo;
 import org.finos.tracdap.common.plugin.TracPlugin;
-import org.finos.tracdap.common.auth.external.OldAuthProviderInterface;
 
 import java.util.List;
 import java.util.Properties;
