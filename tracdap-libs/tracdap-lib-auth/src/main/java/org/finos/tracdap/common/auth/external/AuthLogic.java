@@ -218,7 +218,7 @@ public class AuthLogic {
 
         for (var header : headers) {
 
-            var headerName = header.getKey().toLowerCase();
+            var headerName = header.getKey().toString().toLowerCase();
 
             if (headerName.startsWith(TRAC_AUTH_PREFIX) || headerName.startsWith(TRAC_USER_PREFIX))
                 continue;

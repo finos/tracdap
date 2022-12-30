@@ -20,13 +20,13 @@ import java.util.List;
 import java.util.Map;
 
 
-public interface IAuthHeaders extends Iterable<Map.Entry<String, String>> {
+public interface IAuthHeaders extends Iterable<Map.Entry<CharSequence, CharSequence>> {
 
-    void add(CharSequence header, CharSequence value);
+    void add(CharSequence name, CharSequence value);
 
-    boolean contains(CharSequence header);
+    boolean contains(CharSequence name);
 
-    CharSequence get(CharSequence header);
+    CharSequence get(CharSequence name);
 
-    List<? extends CharSequence> getAll(CharSequence header);
+    List<? extends CharSequence> getAll(CharSequence name);
 }

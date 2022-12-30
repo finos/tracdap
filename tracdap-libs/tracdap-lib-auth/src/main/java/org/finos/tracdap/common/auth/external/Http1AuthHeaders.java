@@ -22,8 +22,6 @@ import io.netty.handler.codec.http.HttpHeaders;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Spliterator;
-import java.util.function.Consumer;
 
 
 public class Http1AuthHeaders implements IAuthHeaders {
@@ -43,37 +41,27 @@ public class Http1AuthHeaders implements IAuthHeaders {
     }
 
     @Override
-    public void add(CharSequence header, CharSequence value) {
-        headers.add(header, value);
+    public void add(CharSequence name, CharSequence value) {
+        headers.add(name, value);
     }
 
     @Override
-    public boolean contains(CharSequence header) {
-        return headers.contains(header);
+    public boolean contains(CharSequence name) {
+        return headers.contains(name);
     }
 
     @Override
-    public String get(CharSequence header) {
-        return headers.get(header);
+    public String get(CharSequence name) {
+        return headers.get(name);
     }
 
     @Override
-    public List<String> getAll(CharSequence header) {
-        return headers.getAll(header);
+    public List<? extends CharSequence> getAll(CharSequence name) {
+        return headers.getAll(name);
     }
 
     @Override
-    public Iterator<Map.Entry<String, String>> iterator() {
-        return headers.iteratorAsString();
-    }
-
-    @Override
-    public Spliterator<Map.Entry<String, String>> spliterator() {
-        return headers.spliterator();
-    }
-
-    @Override
-    public void forEach(Consumer<? super Map.Entry<String, String>> action) {
-        headers.forEach(action);
+    public Iterator<Map.Entry<CharSequence, CharSequence>> iterator() {
+        return headers.iteratorCharSequence();
     }
 }
