@@ -17,6 +17,7 @@
 package org.finos.tracdap.common.auth.external;
 
 import io.netty.handler.codec.http.cookie.*;
+import org.finos.tracdap.common.auth.AuthConstants;
 import org.finos.tracdap.common.auth.internal.SessionInfo;
 import org.finos.tracdap.common.auth.internal.UserInfo;
 import org.finos.tracdap.common.config.ConfigDefaults;
@@ -27,6 +28,7 @@ import io.netty.handler.codec.http.HttpHeaderNames;
 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -35,18 +37,16 @@ import java.util.List;
 
 public class AuthLogic {
 
+    public static final String TRAC_AUTH_TOKEN_HEADER = AuthConstants.TRAC_AUTH_TOKEN;
+    public static final String TRAC_AUTH_EXPIRY_HEADER = "trac_auth_expiry";
+    public static final String TRAC_USER_ID_HEADER = "trac_user_id";
+    public static final String TRAC_USER_NAME_HEADER = "trac_user_name";
+
+    public static final String TRAC_AUTH_PREFIX = "trac_auth_";
+    public static final String TRAC_USER_PREFIX = "trac_user_";
+
     public static final boolean CLIENT_COOKIE = true;
     public static final boolean SERVER_COOKIE = false;
-
-    private static final String TRAC_AUTH_TOKEN_HEADER = "trac_auth_token";
-    private static final String TRAC_AUTH_EXPIRY_GMT = "trac_auth_expiry_gmt";
-    private static final String TRAC_USER_ID_HEADER = "trac_user_idn";
-    private static final String TRAC_USER_NAME_HEADER = "trac_user_name";
-
-    private static final String TRAC_AUTH_PREFIX = "trac_auth_";
-    private static final String TRAC_USER_PREFIX = "trac_user_";
-
-    private static final String NULL_AUTH_TOKEN = null;
 
     private static final List<String> RESTRICTED_HEADERS = List.of(
             HttpHeaderNames.AUTHORIZATION.toString(),
@@ -54,6 +54,8 @@ public class AuthLogic {
             HttpHeaderNames.SET_COOKIE.toString());
 
     private static final String BEARER_PREFIX = "bearer ";
+
+    private static final String NULL_AUTH_TOKEN = null;
 
 
     // Logic class, do not allow creating instances
@@ -142,7 +144,7 @@ public class AuthLogic {
         session.setUserInfo(userInfo);
         session.setIssueTime(issue);
         session.setExpiryTime(expiry);
-        session.setLimitTime(limit);
+        session.setExpiryLimit(limit);
         session.setValid(true);
 
         return session;
@@ -151,13 +153,13 @@ public class AuthLogic {
     public static SessionInfo refreshSession(SessionInfo session, AuthenticationConfig authConfig) {
 
         var latestIssue = session.getIssueTime();
-        var originalLimit = session.getLimitTime();
+        var originalLimit = session.getExpiryLimit();
 
-        var refreshTime = ConfigDefaults.readOrDefault(authConfig.getJwtRefresh(), ConfigDefaults.DEFAULT_JWT_REFRESH);
+        var configRefresh = ConfigDefaults.readOrDefault(authConfig.getJwtRefresh(), ConfigDefaults.DEFAULT_JWT_REFRESH);
         var configExpiry = ConfigDefaults.readOrDefault(authConfig.getJwtExpiry(), ConfigDefaults.DEFAULT_JWT_EXPIRY);
 
         // If the refresh time hasn't elapsed yet, return the original session without modification
-        if (latestIssue.plusSeconds(refreshTime).isAfter(Instant.now()))
+        if (latestIssue.plusSeconds(configRefresh).isAfter(Instant.now()))
             return session;
 
         var newIssue = Instant.now();
@@ -168,9 +170,9 @@ public class AuthLogic {
         newSession.setUserInfo(session.getUserInfo());
         newSession.setIssueTime(newIssue);
         newSession.setExpiryTime(limitedExpiry);
-        newSession.setLimitTime(originalLimit);
+        newSession.setExpiryLimit(originalLimit);
 
-        // Session remains valid until time ticks past the original limit time, i.e. issue > limit
+        // Session remains valid until time ticks past the original limit time, i.e. issue < limit
         newSession.setValid(newIssue.isBefore(originalLimit));
 
         return newSession;
@@ -276,7 +278,7 @@ public class AuthLogic {
         var userName = URLEncoder.encode(session.getUserInfo().getDisplayName(), StandardCharsets.US_ASCII);
 
         headers.add(TRAC_AUTH_TOKEN_HEADER, token);
-        headers.add(TRAC_AUTH_EXPIRY_GMT, expiry);
+        headers.add(TRAC_AUTH_EXPIRY_HEADER, expiry);
         headers.add(TRAC_USER_ID_HEADER, userId);
         headers.add(TRAC_USER_NAME_HEADER, userName);
 
@@ -297,21 +299,40 @@ public class AuthLogic {
         var userId = URLEncoder.encode(session.getUserInfo().getUserId(), StandardCharsets.US_ASCII);
         var userName = URLEncoder.encode(session.getUserInfo().getDisplayName(), StandardCharsets.US_ASCII);
 
-        setClientCookie(headers, TRAC_AUTH_TOKEN_HEADER, token);
-        setClientCookie(headers, TRAC_AUTH_EXPIRY_GMT, expiry);
-        setClientCookie(headers, TRAC_USER_ID_HEADER, userId);
-        setClientCookie(headers, TRAC_USER_NAME_HEADER, userName);
+        setClientCookie(headers, TRAC_AUTH_TOKEN_HEADER, token, session.getExpiryTime(), true);
+        setClientCookie(headers, TRAC_AUTH_EXPIRY_HEADER, expiry, session.getExpiryTime(), false);
+        setClientCookie(headers, TRAC_USER_ID_HEADER, userId, session.getExpiryTime(), false);
+        setClientCookie(headers, TRAC_USER_NAME_HEADER, userName, session.getExpiryTime(), false);
 
         return headers;
     }
 
-    private static void setClientCookie(IAuthHeaders headers, CharSequence cookieName, String cookieValue) {
+    private static void setClientCookie(
+            IAuthHeaders headers, CharSequence cookieName, String cookieValue,
+            Instant expiry, boolean isAuthToken) {
 
         var cookie = new DefaultCookie(cookieName.toString(), cookieValue);
-        cookie.setMaxAge(Cookie.UNDEFINED_MAX_AGE);  // remove cookie on browser close
+
+        // TODO: Can we know the value to set for domain?
+
+        // Do not allow sending TRAC tokens to other end points
         cookie.setSameSite(CookieHeaderNames.SameSite.Strict);
-        cookie.setSecure(true);
-        cookie.setHttpOnly(false);  // allow access to JavaScript
+
+        // Make sure cookies are sent to the API endpoints, even if the UI is served from a sub path
+        cookie.setPath("/");
+
+        // TRAC session cookies will expire when the session expires
+        if (expiry != null) {
+            var secondsToExpiry = Duration.between(Instant.now(), expiry).getSeconds();
+            var maxAge = Math.max(secondsToExpiry, 0);
+            cookie.setMaxAge(maxAge);
+        }
+        // Otherwise let the cookie live for the lifetime of the browser session
+        else
+            cookie.setMaxAge(Cookie.UNDEFINED_MAX_AGE);  // remove cookie on browser close
+
+        // Restrict to HTTP access for the auth token, allow JavaScript access for everything else
+        cookie.setHttpOnly(isAuthToken);
 
         headers.add(HttpHeaderNames.SET_COOKIE, ServerCookieEncoder.STRICT.encode(cookie));
     }
