@@ -70,16 +70,16 @@ Start by importing the TRAC API package:
     :linenos:
     :lineno-start: 17
 
-We need two things to create the TRAC connection, an RPC connector and an instance of the
-TRAC API class. You can use tracdap.setup to create an RPC connector that works in the browser.
+We need two things to create the TRAC connection, an RPC transport and an instance of the
+TRAC API class. You can use tracdap.setup to create an RPC transport that works in the browser.
 
 .. code-block:: javascript
     :linenos:
     :lineno-start: 19
 
-    // Use tracdap.setup to create an RPC connector pointed at your TRAC server
+    // Use tracdap.setup to create an RPC transport pointed at your TRAC server
     // The browser RPC connector will send all requests to the page origin server
-    const metaApiRpcImpl = tracdap.setup.rpcImplForBrowser(tracdap.api.TracMetadataApi);
+    const metaTransport = tracdap.setup.transportForBrowser(tracdap.api.TracMetadataApi);
 
 This assumes you have set up routing through the TRAC gateway as described in the previous section.
 

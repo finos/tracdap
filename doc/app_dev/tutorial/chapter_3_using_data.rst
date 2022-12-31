@@ -11,7 +11,7 @@ under *examples/apps/javascript*.
 Connecting to the data API
 ==========================
 
-In order to use the data API, we will need an RPC connector and an instance of the API class.
+In order to use the data API, we will need an RPC transport and an instance of the API class.
 Here is how to set them up for a browser-based app:
 
 .. code-block:: JavaScript
@@ -19,8 +19,8 @@ Here is how to set them up for a browser-based app:
     :lineno-start: 22
 
     // Create the Data API
-    const dataApiRpcImpl = tracdap.setup.rpcImplForBrowser(tracdap.api.TracDataApi);
-    const dataApi = new tracdap.api.TracDataApi(dataApiRpcImpl);
+    const dataTransport = tracdap.setup.transportForBrowser(tracdap.api.TracDataApi);
+    const dataApi = new tracdap.api.TracDataApi(dataTransport);
 
 For a Node.js or standalone environment, create a connector pointing at your TRAC instance:
 
