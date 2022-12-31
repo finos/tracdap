@@ -71,7 +71,7 @@ public class JwtProcessor extends JwtValidator {
                 .withIssuer(issuer)
                 .withIssuedAt(session.getIssueTime())
                 .withExpiresAt(session.getExpiryTime())
-                .withClaim(JWT_LIMIT_CLAIM, session.getLimitTime())
+                .withClaim(JWT_LIMIT_CLAIM, session.getExpiryLimit())
                 .withClaim(JWT_NAME_CLAIM, session.getUserInfo().getDisplayName());
 
         return jwt.sign(algorithm).trim();
