@@ -21,14 +21,15 @@ import org.finos.tracdap.config.GwProtocol;
 import org.finos.tracdap.gateway.exec.Route;
 import org.finos.tracdap.gateway.proxy.grpc.GrpcProtocol;
 import org.finos.tracdap.gateway.proxy.grpc.GrpcProxyBuilder;
+import org.finos.tracdap.gateway.proxy.http.HttpProtocol;
 
 import io.netty.buffer.Unpooled;
 import io.netty.channel.*;
+import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.websocketx.*;
 import io.netty.util.ReferenceCountUtil;
 
-import org.finos.tracdap.gateway.proxy.http.HttpProtocol;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -44,10 +45,12 @@ public class WebSocketsRouter extends CoreRouter {
 
     private static final String WEBSOCKETS_PROTOCOL = "websockets";
     private static final Duration CLOSE_ON_ERROR_TIMEOUT = Duration.ofSeconds(5);
+    private static final String TRAC_HEADER_PREFIX = "trac_";
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
     private String upgradeUri;
+    private HttpHeaders upgradeHeaders;
     private int routeId = -1;
 
     private boolean upgradeComplete = false;
@@ -70,7 +73,9 @@ public class WebSocketsRouter extends CoreRouter {
         if (evt instanceof WebSocketServerProtocolHandler.HandshakeComplete) {
 
             var handshake = (WebSocketServerProtocolHandler.HandshakeComplete) evt;
+
             upgradeUri = handshake.requestUri();
+            upgradeHeaders = handshake.requestHeaders();
             upgradeComplete = true;
 
             log.info("conn = {}, websockets handshake complete, sub-protocol = [{}]", connId, handshake.selectedSubprotocol());
@@ -400,10 +405,28 @@ public class WebSocketsRouter extends CoreRouter {
 
     private BinaryWebSocketFrame addUpgradeHeaders(BinaryWebSocketFrame firstFrame) {
 
-        var extraHeaders =
-                ":method: POST\r\n" +
-                ":scheme: http\r\n" +
-                ":path: " + upgradeUri + "\r\n";
+        // Passing through a very restricted set of headers from the upgrade request
+        // This is all that is needed currently for the platform services to work
+        // In particular the auth token header will be passed through
+        // The list could be expanded if needed in future
+
+        var extraHeaders = new StringBuilder();
+
+        extraHeaders.append(":method: POST\r\n");
+        extraHeaders.append(":scheme: http\r\n");
+        extraHeaders.append(":path: ").append(upgradeUri).append("\r\n");
+
+        for (var header : upgradeHeaders) {
+
+            var headerName = header.getKey().toLowerCase();
+
+            if (headerName.startsWith(TRAC_HEADER_PREFIX)) {
+                extraHeaders.append(header.getKey().toLowerCase());
+                extraHeaders.append(": ");
+                extraHeaders.append(header.getValue());
+                extraHeaders.append("\r\n");
+            }
+        }
 
         var extraHeaderBytes = Unpooled.copiedBuffer(extraHeaders, StandardCharsets.US_ASCII);
 

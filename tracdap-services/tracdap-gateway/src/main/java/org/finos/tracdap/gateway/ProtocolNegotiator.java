@@ -278,10 +278,8 @@ public class ProtocolNegotiator extends ChannelInitializer<SocketChannel> {
             // Different approaches are needed for system-to-system auth
 
             var authHandler = new Http1AuthHandler(
-                    config.getAuthentication(),
-                    Http1AuthHandler.FRONT_FACING,
-                    conn, jwtProcessor,
-                    authProvider, null);
+                    config.getAuthentication(), conn,
+                    jwtProcessor, authProvider, null);
 
             pipeline.addAfter(HTTP_1_TIMEOUT, HTTP_1_AUTH, authHandler);
 
@@ -356,11 +354,19 @@ public class ProtocolNegotiator extends ChannelInitializer<SocketChannel> {
             var pipeline = ctx.pipeline();
             var remoteSocket = ctx.channel().remoteAddress();
             var protocol = upgrade.protocol();
+            var conn = connId.getAndIncrement();
 
             log.info("Selected protocol: {} {}", remoteSocket, protocol);
 
             pipeline.addAfter(WS_INITIALIZER, HTTP_1_CODEC, new HttpServerCodec());
-            pipeline.addAfter(HTTP_1_CODEC, WS_COMPRESSION, new WebSocketServerCompressionHandler());
+
+            var authHandler = new Http1AuthHandler(
+                    config.getAuthentication(), conn,
+                    jwtProcessor, authProvider, null);
+
+            pipeline.addAfter(HTTP_1_CODEC, HTTP_1_AUTH, authHandler);
+
+            pipeline.addAfter(HTTP_1_AUTH, WS_COMPRESSION, new WebSocketServerCompressionHandler());
 
             // Configure the WS protocol handler - path must match the URI in the upgrade request
 

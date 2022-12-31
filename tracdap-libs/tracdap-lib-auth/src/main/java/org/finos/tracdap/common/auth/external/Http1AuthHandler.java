@@ -16,17 +16,16 @@
 
 package org.finos.tracdap.common.auth.external;
 
+import org.finos.tracdap.common.auth.internal.JwtProcessor;
+import org.finos.tracdap.common.auth.internal.SessionInfo;
+import org.finos.tracdap.config.AuthenticationConfig;
+
 import io.netty.channel.ChannelDuplexHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPromise;
 import io.netty.handler.codec.http.*;
-
 import io.netty.util.ReferenceCountUtil;
-import org.finos.tracdap.common.auth.internal.JwtProcessor;
-import org.finos.tracdap.common.auth.internal.SessionInfo;
-import org.finos.tracdap.common.exception.EAuthorization;
-import org.finos.tracdap.common.exception.EUnexpected;
-import org.finos.tracdap.config.AuthenticationConfig;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -35,13 +34,10 @@ import javax.annotation.Nonnull;
 
 public class Http1AuthHandler extends ChannelDuplexHandler {
 
-    public static final boolean FRONT_FACING = true;
-    public static final boolean BACK_FACING = false;
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
     private final AuthenticationConfig authConfig;
-    private final boolean authDirection;
 
     private final int connId;
 
@@ -55,14 +51,12 @@ public class Http1AuthHandler extends ChannelDuplexHandler {
     private boolean wantCookies;
 
     public Http1AuthHandler(
-            AuthenticationConfig authConfig,
-            boolean direction,int connId,
+            AuthenticationConfig authConfig, int connId,
             JwtProcessor jwtProcessor,
             IAuthProvider browserAuthProvider,
             IAuthProvider apiAuthProvider) {
 
         this.authConfig = authConfig;
-        this.authDirection = direction;
         this.connId = connId;
 
         this.jwtProcessor = jwtProcessor;
@@ -73,59 +67,33 @@ public class Http1AuthHandler extends ChannelDuplexHandler {
     @Override
     public void channelRead(@Nonnull ChannelHandlerContext ctx, @Nonnull Object msg) {
 
-        bidiMessageHandler(ctx, msg, null, FRONT_FACING);
-    }
-
-    @Override
-    public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) {
-
-        bidiMessageHandler(ctx, msg, promise, BACK_FACING);
-    }
-
-    private void bidiMessageHandler(ChannelHandlerContext ctx, Object msg, ChannelPromise promise, boolean msgDirection) {
-
         try {
             // HTTP/1 auth works purely on the request object
+            // Each new request will re-run the auth processing
 
             if ((msg instanceof HttpRequest)) {
                 var request = (HttpRequest) msg;
                 processAuthentication(ctx, request);
-                processRequest(ctx, request, promise);
             }
 
-            // If authorization failed, drop messages silently after the request
+            // If authorization failed a response has already been sent
+            // Do not pass any further messages down the pipe
 
             if (authResult.getCode() != AuthResultCode.AUTHORIZED)
                 return;
 
-            if (msg instanceof HttpResponse) {
-                var response = (HttpResponse) msg;
-                processResponse(ctx, response, promise);
+            // Authentication succeeded, allow messages to flow on the connection
+
+            // Special handling for request objects, apply translation to the headers
+            if (msg instanceof HttpRequest) {
+                var request = (HttpRequest) msg;
+                processRequest(ctx, request);
             }
 
-            // Content messages need special handling, to account for "full" HTTP request / response messages
-            // These include the headers and body all in one message
-            // Since the headers are already processed, we need to separate the body
-
-            if (msg instanceof HttpContent) {
-
-                var originalMsg = (HttpContent) msg;
-                var content = originalMsg.content().retain();
-
-                var relayMsg = (msg instanceof LastHttpContent)
-                        ? new DefaultLastHttpContent(content)
-                        : new DefaultHttpContent(content);
-
-                bidiSend(ctx, relayMsg, promise, msgDirection);
-            }
-
-            // Any other message types are unexpected, are not impossible and should be allowed
-            // E.g. signalling with custom events or control frames for alternate protocols
-            // Anyway we know we have request, response and auth already
-
-            else if (!(msg instanceof HttpRequest) && !(msg instanceof HttpResponse)) {
-
-                bidiSend(ctx, msg, promise, msgDirection);
+            // Everything else flows straight through
+            else {
+                ReferenceCountUtil.retain(msg);
+                ctx.fireChannelRead(msg);
             }
         }
         finally {
@@ -133,22 +101,31 @@ public class Http1AuthHandler extends ChannelDuplexHandler {
         }
     }
 
-    private void bidiSend(ChannelHandlerContext ctx, Object msg, ChannelPromise promise, boolean direction) {
+    @Override
+    public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) {
 
-        if (direction == FRONT_FACING)
-            ctx.fireChannelRead(msg);
-        else if (promise != null)
-            ctx.write(msg, promise);
-        else
-            ctx.write(msg);
-    }
+        try {
 
-    private void bidiFlush(ChannelHandlerContext ctx, boolean direction) {
+            // Authentication has always succeeded by this point
+            // Otherwise no request is made to the platform, so no response would be sent
 
-        if (direction == FRONT_FACING)
-            ctx.fireChannelReadComplete();
-        else
-            ctx.flush();
+            // This does not account for pipelining, which is disabled by default in modern browsers
+
+            // Special handling for response objects, apply translation to the headers
+            if (msg instanceof HttpResponse) {
+                var response = (HttpResponse) msg;
+                processResponse(ctx, response, promise);
+            }
+
+            // Everything else flows straight through
+            else {
+                ReferenceCountUtil.retain(msg);
+                ctx.write(msg, promise);
+            }
+        }
+        finally {
+            ReferenceCountUtil.release(msg);
+        }
     }
 
     private void processAuthentication(ChannelHandlerContext ctx, HttpRequest request) {
@@ -157,6 +134,8 @@ public class Http1AuthHandler extends ChannelDuplexHandler {
         // If there is already a valid session, this takes priority
 
         var headers = new Http1AuthHeaders(request.headers());
+
+        log.info("Inbound auth headers: {}", request.headers().toString());
 
         token = AuthLogic.findTracAuthToken(headers, AuthLogic.SERVER_COOKIE);
         session = (token != null) ? jwtProcessor.decodeAndValidate(token) : null;
@@ -200,6 +179,23 @@ public class Http1AuthHandler extends ChannelDuplexHandler {
             }
         }
 
+        if (authResult.getCode() == AuthResultCode.FAILED) {
+
+            // Basic unauthorized response
+            // Could try to put the auth result message here maybe?
+
+            var responseHeaders = new DefaultHttpHeaders();
+            var response = new DefaultHttpResponse(
+                    request.protocolVersion(),
+                    HttpResponseStatus.UNAUTHORIZED,
+                    responseHeaders);
+
+            // Sending a response, so invert the auth direction
+
+            ctx.write(response);
+            ctx.flush();
+        }
+
         // Decide whether to send the auth response as headers or cookies
         // Always send cookies for browser routes
         // For API routes the client can set a header to prefer cookies in the response
@@ -207,82 +203,67 @@ public class Http1AuthHandler extends ChannelDuplexHandler {
         wantCookies = !isApi || headers.contains(AuthLogic.TRAC_AUTH_COOKIES_HEADER);
     }
 
-    private void processRequest(ChannelHandlerContext ctx, HttpRequest request, ChannelPromise promise) {
+    private void processRequest(ChannelHandlerContext ctx, HttpRequest request) {
 
-        switch (authResult.getCode()) {
+        var headers = new Http1AuthHeaders(request.headers());
+        var emptyHeaders = new Http1AuthHeaders();
 
-            case AUTHORIZED:
+        var relayHeaders = AuthLogic.setPlatformAuthHeaders(headers, emptyHeaders, token);
 
-                // Strip out any existing auth headers and other noise
-                // This message is heading to the core platform, so it only needs the TRAC auth info
+        if (request instanceof FullHttpRequest) {
 
-                var headers = new Http1AuthHeaders(request.headers());
-                var emptyHeaders = new Http1AuthHeaders();
+            var relayContent = ((FullHttpRequest) request).content().retain();
 
-                var updatedHeaders = AuthLogic.setPlatformAuthHeaders(headers, emptyHeaders, token);
+            var relayRequest = new DefaultFullHttpRequest(
+                    request.protocolVersion(),
+                    request.method(),
+                    request.uri(),
+                    relayContent,
+                    relayHeaders.headers(),
+                    new DefaultHttpHeaders());
 
-                var updatedRequest = new DefaultHttpRequest(
-                        request.protocolVersion(), request.method(),
-                        request.uri(), updatedHeaders.headers());
+            ctx.fireChannelRead(relayRequest);
+        }
+        else {
 
-                // For front-facing handlers requests come on the read side, back-facing is reversed
+            var relayRequest = new DefaultHttpRequest(
+                    request.protocolVersion(),
+                    request.method(),
+                    request.uri(),
+                    relayHeaders.headers());
 
-                bidiSend(ctx, updatedRequest, promise, authDirection);
-
-                break;
-
-            case REDIRECTED:
-
-                // primary auth provider already responded to the client
-                // We don't need to do anything, just drop the messages
-
-                // What should we do with the promise on a back-facing channel?
-                // It should fail, but if the user is redirecting, we don't want to crash and hang up the connection!
-
-                if (authDirection == BACK_FACING)
-                    promise.setFailure(new EAuthorization("Authorization in progress, please retry after"));
-
-                break;
-
-            case FAILED:
-
-                // Basic unauthorized response
-                // Could try to put the auth result message here maybe?
-
-                var responseHeaders = new DefaultHttpHeaders();
-                var response = new DefaultHttpResponse(
-                        request.protocolVersion(),
-                        HttpResponseStatus.UNAUTHORIZED,
-                        responseHeaders);
-
-                // Sending a response, so invert the auth direction
-
-                bidiSend(ctx, response, promise, !authDirection);
-                bidiFlush(ctx, !authDirection);
-
-                break;
-
-            default:
-
-                throw new EUnexpected();
+            ctx.fireChannelRead(relayRequest);
         }
     }
 
     private void processResponse(ChannelHandlerContext ctx, HttpResponse response, ChannelPromise promise) {
 
-        // First filter out any auth-related headers from the response
-
         var headers = new Http1AuthHeaders(response.headers());
         var emptyHeaders = new Http1AuthHeaders();
 
-        var updatedHeaders = AuthLogic.setClientAuthHeaders(headers, emptyHeaders, token, session, wantCookies);
+        var relayHeaders = AuthLogic.setClientAuthHeaders(headers, emptyHeaders, token, session, wantCookies);
 
-        var updatedResponse = new DefaultHttpResponse(
-                response.protocolVersion(),
-                response.status(), updatedHeaders.headers());
+        if (response instanceof FullHttpResponse) {
 
-        // This is a response message, so invert the direction flag !!
+            var relayContent = ((FullHttpResponse) response).content().retain();
 
-        bidiSend(ctx, updatedResponse, promise, !authDirection);
+            var relayResponse = new DefaultFullHttpResponse(
+                    response.protocolVersion(),
+                    response.status(),
+                    relayContent,
+                    relayHeaders.headers(),
+                    new DefaultHttpHeaders());
+
+            ctx.write(relayResponse, promise);
+        }
+        else {
+
+            var relayResponse = new DefaultHttpResponse(
+                    response.protocolVersion(),
+                    response.status(),
+                    relayHeaders.headers());
+
+            ctx.write(relayResponse, promise);
+        }
     }
 }
