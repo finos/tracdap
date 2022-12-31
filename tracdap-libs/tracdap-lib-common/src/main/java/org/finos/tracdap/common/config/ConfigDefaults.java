@@ -27,7 +27,7 @@ public class ConfigDefaults {
 
     public static final int DEFAULT_JWT_EXPIRY = 3600;    // 1 hour
     public static final int DEFAULT_JWT_LIMIT = 57600;    // 16 hours
-    public static final int DEFAULT_JWT_REFRESH = 60;     // 5 minutes
+    public static final int DEFAULT_JWT_REFRESH = 300;     // 5 minutes
 
 
     public static int readOrDefault(int configValue, int defaultValue) {
