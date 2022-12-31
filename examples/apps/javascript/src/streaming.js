@@ -18,9 +18,9 @@ import {tracdap} from 'tracdap-web-api';
 import fs from 'fs';
 
 // Create the Data API
-const transportOptions = {transport: "trac", debug: false};
-const transport = tracdap.setup.transportForTarget(tracdap.api.TracDataApi, "http", "localhost", 8080, transportOptions);
-const dataApi = new tracdap.api.TracDataApi(transport);
+const transportOptions = {transport: "trac"};
+const dataTransport = tracdap.setup.transportForTarget(tracdap.api.TracDataApi, "http", "localhost", 8080, transportOptions);
+const dataApi = new tracdap.api.TracDataApi(dataTransport);
 
 // Location of a large file to use as an example
 const LARGE_CSV_FILE = "../../../tracdap-services/tracdap-svc-data/src/test/resources/large_csv_data_100000.csv";
