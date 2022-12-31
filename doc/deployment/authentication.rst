@@ -29,8 +29,21 @@ the platform and gateway config files.
 You will also need to add an authentication block in both config files, specifying the issuer
 and expiry times for JWT tokens. If you know the DNS address that TRAC will be served from you
 could use this as the JWT issuer, other options could be the user ID of a service account you
-have set up to run TRAC, or a TRAC reserved identifier such as "trac_system". The root authentication
+have set up to run TRAC, or a TRAC reserved identifier such as "trac_platform". The root authentication
 key is stored in the secret store, so make sure you have a secret store configured too.
+
+As long as TRAC has a valid JWT token for a user (or connected system), it does not need to reauthenticate.
+Expiry of the TRAC tokens is managed by the expiry, limit and refresh parameters:
+
+* jwtExpiry: Token expiry time in seconds, if the user is inactive
+* jwtLimit: Hard limit on the token expiry time, whether the user is active or not
+* jwtRefresh: Time in seconds after which tokens will be refreshed
+
+In this example the user will be given a token for one hour when they log in. TRAC will check the token
+on every API call, if the token is older than the refresh time the user will be given a new token with
+the expiry time extended back to one hour. The limit is set to 16 hours, the token cannot be extended
+past that time even if the user remains active. When the token expires or the limit is reached the user
+will have to log in again.
 
 .. code-block:: yaml
 
@@ -40,7 +53,9 @@ key is stored in the secret store, so make sure you have a secret store configur
 
     authentication:
       jwtIssuer: http://localhost:8080/
-      jwtExpiry: 7200
+      jwtExpiry: 3600
+      jwtLimit: 57600
+      jwtRefresh: 300
 
 The secret-tool utility can be used to generate the root signing key. The available key types are
 elliptic curve (EC) or RSA. Elliptic curve keys are considered to give better security with better
