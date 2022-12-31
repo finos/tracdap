@@ -17,8 +17,7 @@
 package org.finos.tracdap.svc.data;
 
 import org.finos.tracdap.api.TrustedMetadataApiGrpc;
-import org.finos.tracdap.common.auth.AuthInterceptor;
-import org.finos.tracdap.common.grpc.LoggingClientInterceptor;
+import org.finos.tracdap.common.auth.GrpcServerAuth;
 import org.finos.tracdap.config.ServiceConfig;
 import org.finos.tracdap.config.PlatformConfig;
 
@@ -152,15 +151,11 @@ public class TracDataService extends CommonServiceBase {
 
             var metaClient = prepareMetadataClient(platformConfig, clientChannelType);
 
-            var fileSvcMetaClient = metaClient.withInterceptors(new LoggingClientInterceptor(FileService.class));
-            var fileSvc = new FileService(storageConfig, tenantConfig, arrowAllocator, storage, fileSvcMetaClient);
-
-            var dataSvcMetaClient = metaClient.withInterceptors(new LoggingClientInterceptor(DataService.class));
-            var dataSvc = new DataService(storageConfig, tenantConfig, arrowAllocator, storage, formats, dataSvcMetaClient);
-
+            var fileSvc = new FileService(storageConfig, tenantConfig, arrowAllocator, storage, metaClient);
+            var dataSvc = new DataService(storageConfig, tenantConfig, arrowAllocator, storage, formats, metaClient);
             var dataApi = new TracDataApi(dataSvc, fileSvc);
 
-            var authentication = AuthInterceptor.setupAuth(
+            var authentication = GrpcServerAuth.setupAuth(
                     platformConfig.getAuthentication(),
                     platformConfig.getPlatformInfo(),
                     configManager);

@@ -20,10 +20,9 @@ import io.netty.channel.ChannelDuplexHandler;
 import io.netty.channel.ChannelPromise;
 import io.netty.handler.codec.http.websocketx.TextWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.WebSocketServerProtocolConfig;
-import org.finos.tracdap.common.auth.IAuthProvider;
-import org.finos.tracdap.common.auth.JwtProcessor;
-import org.finos.tracdap.common.auth.UserInfo;
-import org.finos.tracdap.common.config.ISecretLoader;
+import org.finos.tracdap.common.auth.external.*;
+import org.finos.tracdap.common.auth.internal.JwtProcessor;
+import org.finos.tracdap.common.auth.internal.UserInfo;
 import org.finos.tracdap.config.AuthenticationConfig;
 import org.finos.tracdap.config.GatewayConfig;
 
@@ -311,26 +310,13 @@ public class ProtocolNegotiatorTest {
     private static class DummyAuthProvider implements IAuthProvider {
 
         @Override
-        public boolean wantTracUsers() {
-            return false;
-        }
+        public AuthResult attemptAuth(ChannelHandlerContext ctx, IAuthHeaders headers) {
 
-        @Override
-        public void setTracUsers(ISecretLoader userDb) {
-
-        }
-
-        @Override
-        public UserInfo newAuth(ChannelHandlerContext ctx, HttpRequest req) {
             var user = new UserInfo();
             user.setUserId("test_user");
             user.setDisplayName("Test User");
-            return user;
-        }
 
-        @Override
-        public UserInfo translateAuth(ChannelHandlerContext ctx, HttpRequest req, String authInfo) {
-            return null;
+            return new AuthResult(AuthResultCode.AUTHORIZED, user);
         }
     }
 }

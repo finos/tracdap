@@ -47,7 +47,9 @@ message PlatformInfo {
 message AuthenticationConfig {
 
   string jwtIssuer = 1;
-  optional sint32 jwtExpiry = 2;
+  sint32 jwtExpiry = 2;
+  sint32 jwtLimit = 6;
+  sint32 jwtRefresh = 7;
 
   optional PluginConfig provider = 3;
 

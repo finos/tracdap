@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.auth;
+package org.finos.tracdap.common.auth.internal;
 
 import java.time.Instant;
 
@@ -25,6 +25,7 @@ public class SessionInfo {
 
     private Instant issueTime;
     private Instant expiryTime;
+    private Instant expiryLimit;
 
     private UserInfo userInfo;
 
@@ -58,6 +59,14 @@ public class SessionInfo {
 
     public void setExpiryTime(Instant expiryTime) {
         this.expiryTime = expiryTime;
+    }
+
+    public Instant getExpiryLimit() {
+        return expiryLimit;
+    }
+
+    public void setExpiryLimit(Instant expiryLimit) {
+        this.expiryLimit = expiryLimit;
     }
 
     public UserInfo getUserInfo() {

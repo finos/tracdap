@@ -14,27 +14,25 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.auth;
+package org.finos.tracdap.common.auth.external;
 
 
-public class UserInfo {
+import io.netty.channel.ChannelHandlerContext;
+import org.finos.tracdap.common.config.ISecretLoader;
 
-    private String userId;
-    private String displayName;
 
-    public String getUserId() {
-        return userId;
+public interface IAuthProvider {
+
+    AuthResult attemptAuth(ChannelHandlerContext ctx, IAuthHeaders headers);
+
+    // These methods allow using the TRAC user DB for basic auth
+    // TODO: Find a more elegant solution
+
+    default boolean wantTracUsers() {
+        return false;
     }
 
-    public void setUserId(String userId) {
-        this.userId = userId;
-    }
-
-    public String getDisplayName() {
-        return displayName;
-    }
-
-    public void setDisplayName(String displayName) {
-        this.displayName = displayName;
+    default void setTracUsers(ISecretLoader userDb) {
+        // no-op
     }
 }

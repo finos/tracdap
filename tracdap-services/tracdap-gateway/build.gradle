@@ -48,6 +48,7 @@ dependencies {
     implementation project(':tracdap-api-config')
     implementation project(':tracdap-api-services')
     implementation project(':tracdap-lib-common')
+    implementation project(':tracdap-lib-auth')
 
     // Core framework - Netty + gRPC
     implementation group: 'io.netty', name: 'netty-common', version: "$netty_version"
@@ -75,7 +76,7 @@ dependencies {
 }
 
 // Add any plugin dependencies enabled at build time
-ext.enableBuildTimePlugins(["config"])
+ext.enableBuildTimePlugins(["config", "auth"])
 
 
 distributions {

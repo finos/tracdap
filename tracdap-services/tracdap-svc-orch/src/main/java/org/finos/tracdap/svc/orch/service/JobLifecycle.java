@@ -28,7 +28,6 @@ import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.svc.orch.cache.JobState;
 import org.finos.tracdap.svc.orch.jobs.JobLogic;
 
-import io.grpc.MethodDescriptor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

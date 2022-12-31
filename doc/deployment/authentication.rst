@@ -18,29 +18,19 @@ The JWT mechanism is owned by the platform, and cannot be extended.
 Root Authentication Key
 -----------------------
 
-The authentication system requires a root authentication key, that is used by the platform to sign
-and validate JWT tokens. In order to set up the key you must have secrets configured, in both
-the platform and gateway config files.
-
 .. note::
     If you have already set up your root authentication key as described in the
     :ref:`sandbox quick start guide <deployment/sandbox:Setup Tools>` then you can skip this step.
 
-You will also need to add an authentication block in both config files, specifying the issuer
-and expiry times for JWT tokens. If you know the DNS address that TRAC will be served from you
-could use this as the JWT issuer, other options could be the user ID of a service account you
-have set up to run TRAC, or a TRAC reserved identifier such as "trac_system". The root authentication
-key is stored in the secret store, so make sure you have a secret store configured too.
+The authentication system requires a root authentication key, that is used by the platform to sign
+and validate JWT tokens. The root authentication key is stored in the secret store, so make sure
+you have a secret store configured in both the platform and gateway config files.
 
 .. code-block:: yaml
 
     config:
       secret.type: PKCS12
       secret.url: secrets.p12
-
-    authentication:
-      jwtIssuer: http://localhost:8080/
-      jwtExpiry: 7200
 
 The secret-tool utility can be used to generate the root signing key. The available key types are
 elliptic curve (EC) or RSA. Elliptic curve keys are considered to give better security with better
@@ -70,6 +60,37 @@ before running *secret-tool*. For more details on the *secret-tool*, see :doc:`s
 .. note::
     Running the *create_root_auth_key* command a second time will replace the root authentication key,
     which will invalidate any existing JWT tokens.
+
+
+JWT configuration
+-----------------
+
+You will need to add an authentication block in both config files, specifying the issuer
+and expiry times for JWT tokens. If you know the DNS address that TRAC will be served from you
+could use this as the JWT issuer, other options could be the user ID of a service account you
+have set up to run TRAC, or a TRAC reserved identifier such as "trac_platform".
+
+As long as TRAC has a valid JWT token for a user (or connected system), it does not need to reauthenticate.
+Expiry of the TRAC tokens is managed by the expiry, limit and refresh parameters:
+
+* jwtExpiry: Token expiry time in seconds, if the user is inactive
+* jwtLimit: Hard limit on the token expiry time, whether the user is active or not
+* jwtRefresh: Time in seconds after which tokens will be refreshed
+
+In this example the user will be given a token for one hour when they log in. TRAC will check the token
+on every API call, if the token is older than the refresh time the user will be given a new token with
+the expiry time extended back to one hour. The limit is set to 16 hours, the token cannot be extended
+past that time even if the user remains active. When the token expires or the limit is reached the user
+will have to log in again.
+
+.. code-block:: yaml
+
+    authentication:
+      jwtIssuer: trac.platform@acme.corp
+      jwtExpiry: 3600
+      jwtLimit: 57600
+      jwtRefresh: 300
+
 
 Providers
 ---------

@@ -17,7 +17,7 @@
 package org.finos.tracdap.svc.orch;
 
 import org.finos.tracdap.api.TrustedMetadataApiGrpc;
-import org.finos.tracdap.common.auth.AuthInterceptor;
+import org.finos.tracdap.common.auth.GrpcServerAuth;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.common.grpc.LoggingClientInterceptor;
@@ -131,7 +131,7 @@ public class TracOrchestratorService extends CommonServiceBase {
             var orchestrator = new JobApiService(jobLifecycle, jobCache);
             var orchestratorApi = new TracOrchestratorApi(orchestrator);
 
-            var authentication = AuthInterceptor.setupAuth(
+            var authentication = GrpcServerAuth.setupAuth(
                     platformConfig.getAuthentication(),
                     platformConfig.getPlatformInfo(),
                     configManager);

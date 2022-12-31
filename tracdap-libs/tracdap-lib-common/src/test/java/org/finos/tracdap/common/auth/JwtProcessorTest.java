@@ -16,6 +16,9 @@
 
 package org.finos.tracdap.common.auth;
 
+import org.finos.tracdap.common.auth.external.AuthLogic;
+import org.finos.tracdap.common.auth.internal.JwtProcessor;
+import org.finos.tracdap.common.auth.internal.UserInfo;
 import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.config.AuthenticationConfig;
 
@@ -79,7 +82,8 @@ public class JwtProcessorTest {
         userInfo.setUserId("fb2876");
         userInfo.setDisplayName("Fred Blogs Jnr.");
 
-        var token = jwt.encodeToken(userInfo);
+        var session = AuthLogic.newSession(userInfo, authConfig);
+        var token = jwt.encodeToken(session);
         var rtSession = jwt.decodeAndValidate(token);
         var rtUserInfo = rtSession.getUserInfo();
 
@@ -134,8 +138,9 @@ public class JwtProcessorTest {
         userInfo.setUserId("fb2876");
         userInfo.setDisplayName("Fred Blogs Jnr.");
 
-        var token = jwt.encodeToken(userInfo);
-        var altToken = altJwt.encodeToken(userInfo);
+        var session = AuthLogic.newSession(userInfo, authConfig);
+        var token = jwt.encodeToken(session);
+        var altToken = altJwt.encodeToken(session);
 
         var result = altJwt.decodeAndValidate(token);
         var altResult =  jwt.decodeAndValidate(altToken);
@@ -160,8 +165,9 @@ public class JwtProcessorTest {
         userInfo.setUserId("fb2876");
         userInfo.setDisplayName("Fred Blogs Jnr.");
 
-        var token = jwt.encodeToken(userInfo);
-        var altToken = altJwt.encodeToken(userInfo);
+        var session = AuthLogic.newSession(userInfo, authConfig);
+        var token = jwt.encodeToken(session);
+        var altToken = altJwt.encodeToken(session);
 
         var result = altJwt.decodeAndValidate(token);
         var altResult =  jwt.decodeAndValidate(altToken);
@@ -186,7 +192,8 @@ public class JwtProcessorTest {
         userInfo.setUserId("fb2876");
         userInfo.setDisplayName("Fred Blogs Jnr.");
 
-        var token = altJwt.encodeToken(userInfo);
+        var session = AuthLogic.newSession(userInfo, altAuthConfig);
+        var token = altJwt.encodeToken(session);
 
         Thread.sleep(2000);
 
@@ -212,7 +219,8 @@ public class JwtProcessorTest {
         userInfo.setUserId("fb2876");
         userInfo.setDisplayName("Fred Blogs Jnr.");
 
-        var token = altJwt.encodeToken(userInfo);
+        var session = AuthLogic.newSession(userInfo, authConfig);
+        var token = altJwt.encodeToken(session);
         var rtSession = altJwt.decodeAndValidate(token);
         var rtUserInfo = rtSession.getUserInfo();
 

@@ -65,7 +65,9 @@
             this.hostAddress = protocol + "://" + host + ":" + port;
             this.urlPrefix = options["browser"] ? "" : this.hostAddress;
 
-            this.rpcMetadata = {}
+            this.rpcMetadata = {
+                "trac_auth_cookies": "true"  // request the auth response is sent back in cookies
+            }
 
             this.grpcWeb = new grpc.GrpcWebClientBase({format: 'binary'});
 
@@ -140,6 +142,9 @@
             "content-type": "application/grpc-web+proto",
             "accept": "application/grpc-web+proto",
             "x-grpc-web": 1,
+            "x-user-agent": "trac-web-transport",  // TODO: version
+
+            "trac_auth_cookies": "true"  // request the auth response is sent back in cookies
         }
 
         const FILTER_RESPONSE_HEADERS = ["cookie", "set-cookie", "authorization"]
@@ -1055,7 +1060,7 @@
 
             const browserOptions = {}
             browserOptions["browser"] = true;
-            Object.assign(options, browserOptions);
+            Object.assign(browserOptions, options);
 
             return createRpcImpl(serviceClass._serviceName, protocol, host, port, browserOptions);
         }

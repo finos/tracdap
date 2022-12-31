@@ -24,8 +24,9 @@ platformInfo:
 
 
 authentication:
-  jwtIssuer: http://localhost:8080/
-  jwtExpiry: 86400
+  jwtIssuer: trac_platform
+  jwtExpiry: 3600
+  jwtLimit: 57600
 
 
 metadata:

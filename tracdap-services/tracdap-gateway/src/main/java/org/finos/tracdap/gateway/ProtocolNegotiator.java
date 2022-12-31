@@ -16,10 +16,10 @@
 
 package org.finos.tracdap.gateway;
 
-import org.finos.tracdap.common.auth.JwtProcessor;
+import org.finos.tracdap.common.auth.external.Http1AuthHandler;
+import org.finos.tracdap.common.auth.external.IAuthProvider;
+import org.finos.tracdap.common.auth.internal.JwtProcessor;
 import org.finos.tracdap.config.GatewayConfig;
-import org.finos.tracdap.gateway.auth.Http1AuthHandler;
-import org.finos.tracdap.common.auth.IAuthProvider;
 
 import io.netty.channel.*;
 import io.netty.channel.socket.SocketChannel;
@@ -63,6 +63,7 @@ public class ProtocolNegotiator extends ChannelInitializer<SocketChannel> {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
+    private final GatewayConfig config;
     private final int idleTimeout;
     private final IAuthProvider authProvider;
     private final JwtProcessor jwtProcessor;
@@ -77,6 +78,8 @@ public class ProtocolNegotiator extends ChannelInitializer<SocketChannel> {
             GatewayConfig config, IAuthProvider authProvider, JwtProcessor jwtProcessor,
             ProtocolSetup<?> http1Handler, ProtocolSetup<?> http2Handler,
             ProtocolSetup<WebSocketServerProtocolConfig> webSocketsHandler) {
+
+        this.config = config;
 
         this.idleTimeout = config.getIdleTimeout() > 0
                 ? config.getIdleTimeout()
@@ -256,6 +259,7 @@ public class ProtocolNegotiator extends ChannelInitializer<SocketChannel> {
             var pipeline = ctx.pipeline();
             var remoteSocket = ctx.channel().remoteAddress();
             var protocol = "HTTP/1";
+            var conn = connId.getAndIncrement();
 
             log.info("Selected protocol: {} {}", remoteSocket, protocol);
 
@@ -268,13 +272,21 @@ public class ProtocolNegotiator extends ChannelInitializer<SocketChannel> {
             var idleHandler = new IdleStateHandler(MAX_TIMEOUT, MAX_TIMEOUT, idleTimeout, TimeUnit.SECONDS);
             pipeline.addAfter(HTTP_1_KEEPALIVE, HTTP_1_TIMEOUT, idleHandler);
 
-            var authHandler = new Http1AuthHandler(authProvider, jwtProcessor);
+            // auth processor asks for two auth providers, a browse-based one and an api-based one
+            // Currently we are only passing in a browser-based provider
+            // E.g. this can redirect the user to federated auth services
+            // Different approaches are needed for system-to-system auth
+
+            var authHandler = new Http1AuthHandler(
+                    config.getAuthentication(), conn,
+                    jwtProcessor, authProvider);
+
             pipeline.addAfter(HTTP_1_TIMEOUT, HTTP_1_AUTH, authHandler);
 
             // The main HTTP/1 handler
-            pipeline.addLast(http1Handler.create(connId.getAndIncrement()));
+            pipeline.addLast(http1Handler.create(conn));
 
-            // Since this handler is not based on ChannelInitializer,
+            // Since this handler is not based on ChannelInitializer
             // We need to remove it explicitly and re-trigger the first message
             pipeline.remove(this);
             ctx.fireChannelRead(msg);
@@ -342,11 +354,19 @@ public class ProtocolNegotiator extends ChannelInitializer<SocketChannel> {
             var pipeline = ctx.pipeline();
             var remoteSocket = ctx.channel().remoteAddress();
             var protocol = upgrade.protocol();
+            var conn = connId.getAndIncrement();
 
             log.info("Selected protocol: {} {}", remoteSocket, protocol);
 
             pipeline.addAfter(WS_INITIALIZER, HTTP_1_CODEC, new HttpServerCodec());
-            pipeline.addAfter(HTTP_1_CODEC, WS_COMPRESSION, new WebSocketServerCompressionHandler());
+
+            var authHandler = new Http1AuthHandler(
+                    config.getAuthentication(), conn,
+                    jwtProcessor, authProvider);
+
+            pipeline.addAfter(HTTP_1_CODEC, HTTP_1_AUTH, authHandler);
+
+            pipeline.addAfter(HTTP_1_AUTH, WS_COMPRESSION, new WebSocketServerCompressionHandler());
 
             // Configure the WS protocol handler - path must match the URI in the upgrade request
 

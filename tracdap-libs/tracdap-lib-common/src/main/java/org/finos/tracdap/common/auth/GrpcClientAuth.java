@@ -59,7 +59,7 @@ public class GrpcClientAuth extends CallCredentials {
         else {
 
             var authHeaders = new Metadata();
-            authHeaders.put(AuthConstants.AUTH_METADATA_KEY, token);
+            authHeaders.put(AuthConstants.AUTH_TOKEN_METADATA_KEY, token);
 
             applier.apply(authHeaders);
         }

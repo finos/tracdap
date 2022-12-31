@@ -16,16 +16,14 @@
 
 package org.finos.tracdap.svc.meta;
 
-import org.finos.tracdap.common.auth.AuthInterceptor;
+import org.finos.tracdap.common.auth.GrpcServerAuth;
 import org.finos.tracdap.common.config.ConfigManager;
-import org.finos.tracdap.common.db.JdbcSetup;
 import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.common.plugin.PluginManager;
 import org.finos.tracdap.common.service.CommonServiceBase;
 import org.finos.tracdap.common.util.InterfaceLogging;
 import org.finos.tracdap.config.PlatformConfig;
 import org.finos.tracdap.svc.meta.dal.IMetadataDal;
-import org.finos.tracdap.svc.meta.dal.jdbc.JdbcMetadataDal;
 import org.finos.tracdap.svc.meta.services.MetadataReadService;
 import org.finos.tracdap.svc.meta.services.MetadataSearchService;
 import org.finos.tracdap.svc.meta.services.MetadataWriteService;
@@ -39,7 +37,6 @@ import org.finos.tracdap.svc.meta.api.TrustedMetadataApi;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.sql.DataSource;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.Properties;
@@ -114,7 +111,7 @@ public class TracMetadataService extends CommonServiceBase {
             var publicApi = new TracMetadataApi(readService, writeService, searchService);
             var trustedApi = new TrustedMetadataApi(readService, writeService, searchService);
 
-            var authentication = AuthInterceptor.setupAuth(
+            var authentication = GrpcServerAuth.setupAuth(
                     platformConfig.getAuthentication(),
                     platformConfig.getPlatformInfo(),
                     configManager);

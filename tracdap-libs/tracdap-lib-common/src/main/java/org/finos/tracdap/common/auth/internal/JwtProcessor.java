@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.auth;
+package org.finos.tracdap.common.auth.internal;
 
 import com.auth0.jwt.HeaderParams;
 import com.auth0.jwt.JWT;
@@ -24,7 +24,6 @@ import org.finos.tracdap.config.AuthenticationConfig;
 import org.finos.tracdap.config.PlatformInfo;
 
 import java.security.KeyPair;
-import java.time.Instant;
 import java.util.Map;
 
 
@@ -60,10 +59,7 @@ public class JwtProcessor extends JwtValidator {
         super(authConfig, algorithm);
     }
 
-    public String encodeToken(UserInfo userInfo) {
-
-        var issueTime = Instant.now();
-        var expiryTime = issueTime.plusSeconds(expiry);
+    public String encodeToken(SessionInfo session) {
 
         var header = Map.of(
                 HeaderParams.TYPE, "jwt",
@@ -71,14 +67,14 @@ public class JwtProcessor extends JwtValidator {
 
         var jwt = JWT.create()
                 .withHeader(header)
+                .withSubject(session.getUserInfo().getUserId())
                 .withIssuer(issuer)
-                .withIssuedAt(issueTime)
-                .withExpiresAt(expiryTime)
-                .withSubject(userInfo.getUserId())
-                .withClaim(JWT_NAME_CLAIM, userInfo.getDisplayName());
+                .withIssuedAt(session.getIssueTime())
+                .withExpiresAt(session.getExpiryTime())
+                .withClaim(JWT_LIMIT_CLAIM, session.getExpiryLimit())
+                .withClaim(JWT_NAME_CLAIM, session.getUserInfo().getDisplayName());
 
         return jwt.sign(algorithm).trim();
     }
-
 
 }

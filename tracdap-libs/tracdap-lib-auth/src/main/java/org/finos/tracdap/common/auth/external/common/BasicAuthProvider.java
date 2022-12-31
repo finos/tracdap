@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.auth.standard;
+package org.finos.tracdap.common.auth.external.common;
 
-import org.finos.tracdap.common.auth.UserInfo;
-import org.finos.tracdap.common.auth.IAuthProvider;
+import org.finos.tracdap.common.auth.external.*;
+import org.finos.tracdap.common.auth.internal.UserInfo;
 
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.*;
@@ -43,6 +43,7 @@ public class BasicAuthProvider implements IAuthProvider {
 
     public BasicAuthProvider(Properties properties) {
 
+        // TODO: Pass info on the users DB source through the plugin properties
     }
 
     @Override
@@ -56,37 +57,24 @@ public class BasicAuthProvider implements IAuthProvider {
     }
 
     @Override
-    public UserInfo newAuth(ChannelHandlerContext ctx, HttpRequest req) {
+    public AuthResult attemptAuth(ChannelHandlerContext ctx, IAuthHeaders headers) {
 
-        log.info("AUTHENTICATION: Using basic authentication");
+        if (!headers.contains(HttpHeaderNames.AUTHORIZATION)) {
+            log.info("No authorization provided, new authorization required");
+            return requestAuth(ctx);
+        }
 
-        var headers = new DefaultHttpHeaders();
-        headers.add(HttpHeaderNames.WWW_AUTHENTICATE, "Basic realm=\"trac_auth_realm\", charset=\"UTF-8\"");
-
-        var response = new DefaultHttpResponse(
-                req.protocolVersion(),
-                HttpResponseStatus.UNAUTHORIZED,
-                headers);
-
-        ctx.writeAndFlush(response);
-        ctx.close();
-
-        return null;
-    }
-
-    @Override
-    public UserInfo translateAuth(ChannelHandlerContext ctx, HttpRequest req, String authInfo) {
-
-        var prefixEnd = Math.min(BASIC_AUTH_PREFIX.length(), authInfo.length());
-        var prefix = authInfo.substring(0, prefixEnd);
+        var authHeader = headers.get(HttpHeaderNames.AUTHORIZATION).toString();
+        var prefixEnd = Math.min(BASIC_AUTH_PREFIX.length(), authHeader.length());
+        var prefix = authHeader.substring(0, prefixEnd);
 
         // If the authorization header is not understood, trigger a new auth workflow
         if (!prefix.equalsIgnoreCase(BASIC_AUTH_PREFIX)) {
             log.warn("Invalid authorization header, re-authorization required");
-            return newAuth(ctx, req);
+            return requestAuth(ctx);
         }
 
-        var basicAuthData = authInfo.substring(BASIC_AUTH_PREFIX.length());
+        var basicAuthData = authHeader.substring(BASIC_AUTH_PREFIX.length());
         var decodedData = Base64.getDecoder().decode(basicAuthData);
         var userAndPass = new String(decodedData, StandardCharsets.UTF_8);
         var separator = userAndPass.indexOf(':');
@@ -94,17 +82,37 @@ public class BasicAuthProvider implements IAuthProvider {
         // Separator must be found and cannot be at position zero (i.e. no empty usernames)
         if (separator < 1) {
             log.warn("Invalid authorization header, re-authorization required");
-            return newAuth(ctx, req);
+            return requestAuth(ctx);
         }
 
-        var user = userAndPass.substring(0, separator);
-        var pass = userAndPass.substring(separator + 1);
+        var username = userAndPass.substring(0, separator);
+        var password = userAndPass.substring(separator + 1);
 
-        if (!checkPassword(user, pass)) {
-            return newAuth(ctx, req);
+        if (!checkPassword(username, password)) {
+            return requestAuth(ctx);
         }
 
-        return getUserInfo(user);
+        var userInfo = getUserInfo(username);
+
+        return new AuthResult(AuthResultCode.AUTHORIZED, userInfo);
+    }
+
+    public AuthResult requestAuth(ChannelHandlerContext ctx) {
+
+        log.info("AUTHENTICATION: Using basic authentication");
+
+        var headers = new DefaultHttpHeaders();
+        headers.add(HttpHeaderNames.WWW_AUTHENTICATE, "Basic realm=\"trac_auth_realm\", charset=\"UTF-8\"");
+
+        var response = new DefaultHttpResponse(
+                HttpVersion.HTTP_1_1,
+                HttpResponseStatus.UNAUTHORIZED,
+                headers);
+
+        ctx.writeAndFlush(response);
+        ctx.close();
+
+        return new AuthResult(AuthResultCode.REDIRECTED, ""); // TODO: message
     }
 
     private boolean checkPassword(String user, String pass) {

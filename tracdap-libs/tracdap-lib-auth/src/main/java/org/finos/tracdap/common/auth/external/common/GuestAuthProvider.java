@@ -14,15 +14,13 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.auth.standard;
+package org.finos.tracdap.common.auth.external.common;
 
-import org.finos.tracdap.common.auth.UserInfo;
-import org.finos.tracdap.common.config.ISecretLoader;
+import org.finos.tracdap.common.auth.external.*;
+import org.finos.tracdap.common.auth.internal.UserInfo;
 import org.finos.tracdap.common.exception.EStartup;
-import org.finos.tracdap.common.auth.IAuthProvider;
 
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.handler.codec.http.HttpRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -54,17 +52,7 @@ public class GuestAuthProvider implements IAuthProvider {
     }
 
     @Override
-    public boolean wantTracUsers() {
-        return false;
-    }
-
-    @Override
-    public void setTracUsers(ISecretLoader userDb) {
-        // no-op
-    }
-
-    @Override
-    public UserInfo newAuth(ChannelHandlerContext ctx, HttpRequest req) {
+    public AuthResult attemptAuth(ChannelHandlerContext ctx, IAuthHeaders headers) {
 
         log.info("AUTHENTICATION: Using guest authentication [{}]", guestId);
 
@@ -72,11 +60,6 @@ public class GuestAuthProvider implements IAuthProvider {
         user.setUserId(guestId);
         user.setDisplayName(guestName);
 
-        return user;
-    }
-
-    @Override
-    public UserInfo translateAuth(ChannelHandlerContext ctx, HttpRequest req, String authInfo) {
-        return null;
+        return new AuthResult(AuthResultCode.AUTHORIZED, user);
     }
 }
