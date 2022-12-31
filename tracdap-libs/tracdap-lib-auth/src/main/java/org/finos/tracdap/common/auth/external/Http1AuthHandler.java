@@ -137,8 +137,10 @@ public class Http1AuthHandler extends ChannelDuplexHandler {
 
         if (direction == FRONT_FACING)
             ctx.fireChannelRead(msg);
-        else
+        else if (promise != null)
             ctx.write(msg, promise);
+        else
+            ctx.write(msg);
     }
 
     private void bidiFlush(ChannelHandlerContext ctx, boolean direction) {
@@ -252,8 +254,10 @@ public class Http1AuthHandler extends ChannelDuplexHandler {
                         HttpResponseStatus.UNAUTHORIZED,
                         responseHeaders);
 
-                bidiSend(ctx, response, promise, authDirection);
-                bidiFlush(ctx, authDirection);
+                // Sending a response, so invert the auth direction
+
+                bidiSend(ctx, response, promise, !authDirection);
+                bidiFlush(ctx, !authDirection);
 
                 break;
 
