@@ -52,7 +52,7 @@ public class Http1AuthHandler extends ChannelDuplexHandler {
     private AuthResult authResult = AuthResult.FAILED();
     private SessionInfo session;
     private String token;
-    private boolean isApi;
+    private boolean wantCookies;
 
     public Http1AuthHandler(
             AuthenticationConfig authConfig,
@@ -153,24 +153,23 @@ public class Http1AuthHandler extends ChannelDuplexHandler {
 
     private void processAuthentication(ChannelHandlerContext ctx, HttpRequest request) {
 
-        var headers = new Http1AuthHeaders(request.headers());
-
-        // We want to know if this is request is for web browsing or an API call
-        // It will affect how some responses get sent back, this method is crude but effective!
-        // To be 100% we could pass in the matcher used by the routers.....
-
-        if (headers.contains(HttpHeaderNames.CONTENT_TYPE)) {
-            var contentType = headers.get(HttpHeaderNames.CONTENT_TYPE);
-            isApi = contentType.startsWith("application/");
-        }
-
         // Start the auth process by looking for the TRAC auth token
         // If there is already a valid session, this takes priority
+
+        var headers = new Http1AuthHeaders(request.headers());
 
         token = AuthLogic.findTracAuthToken(headers, AuthLogic.SERVER_COOKIE);
         session = (token != null) ? jwtProcessor.decodeAndValidate(token) : null;
 
         // If the TRAC token is not available or not valid, fall back to a primary auth mechanism (if possible)
+
+        // We want to know if this is request is for web browsing or an API call
+        // It will affect how primary auth is done and how auth responses are sent back
+        // This method is crude but effective, to be 100% we need the matcher used int the routers...
+
+        var isApi =
+                headers.contains(HttpHeaderNames.CONTENT_TYPE) &&
+                headers.get(HttpHeaderNames.CONTENT_TYPE).startsWith("application/");
 
         if (session != null && session.isValid()) {
             authResult = AuthResult.AUTHORIZED(session.getUserInfo());
@@ -201,7 +200,11 @@ public class Http1AuthHandler extends ChannelDuplexHandler {
             }
         }
 
+        // Decide whether to send the auth response as headers or cookies
+        // Always send cookies for browser routes
+        // For API routes the client can set a header to prefer cookies in the response
 
+        wantCookies = !isApi || headers.contains(AuthLogic.TRAC_AUTH_COOKIES_HEADER);
     }
 
     private void processRequest(ChannelHandlerContext ctx, HttpRequest request, ChannelPromise promise) {
@@ -216,9 +219,7 @@ public class Http1AuthHandler extends ChannelDuplexHandler {
                 var headers = new Http1AuthHeaders(request.headers());
                 var emptyHeaders = new Http1AuthHeaders();
 
-                var updatedHeaders = AuthLogic.updateAuthHeaders(
-                        headers, emptyHeaders, token, session,
-                        RouteType.PLATFORM_ROUTE, AuthLogic.SERVER_COOKIE);
+                var updatedHeaders = AuthLogic.setPlatformAuthHeaders(headers, emptyHeaders, token);
 
                 var updatedRequest = new DefaultHttpRequest(
                         request.protocolVersion(), request.method(),
@@ -273,11 +274,8 @@ public class Http1AuthHandler extends ChannelDuplexHandler {
 
         var headers = new Http1AuthHeaders(response.headers());
         var emptyHeaders = new Http1AuthHeaders();
-        var routeType = isApi ? RouteType.API_ROUTE : RouteType.BROWSER_ROUTE;
 
-        var updatedHeaders = AuthLogic.updateAuthHeaders(
-                headers, emptyHeaders, token, session,
-                routeType, AuthLogic.CLIENT_COOKIE);
+        var updatedHeaders = AuthLogic.setClientAuthHeaders(headers, emptyHeaders, token, session, wantCookies);
 
         var updatedResponse = new DefaultHttpResponse(
                 response.protocolVersion(),

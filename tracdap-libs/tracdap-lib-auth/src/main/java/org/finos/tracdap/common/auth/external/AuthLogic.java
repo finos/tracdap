@@ -21,7 +21,6 @@ import org.finos.tracdap.common.auth.AuthConstants;
 import org.finos.tracdap.common.auth.internal.SessionInfo;
 import org.finos.tracdap.common.auth.internal.UserInfo;
 import org.finos.tracdap.common.config.ConfigDefaults;
-import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.config.AuthenticationConfig;
 
 import io.netty.handler.codec.http.HttpHeaderNames;
@@ -39,6 +38,7 @@ public class AuthLogic {
 
     public static final String TRAC_AUTH_TOKEN_HEADER = AuthConstants.TRAC_AUTH_TOKEN;
     public static final String TRAC_AUTH_EXPIRY_HEADER = "trac_auth_expiry";
+    public static final String TRAC_AUTH_COOKIES_HEADER = "trac_auth_cookies";
     public static final String TRAC_USER_ID_HEADER = "trac_user_id";
     public static final String TRAC_USER_NAME_HEADER = "trac_user_name";
 
@@ -60,7 +60,6 @@ public class AuthLogic {
 
     // Logic class, do not allow creating instances
     private AuthLogic() {}
-
 
     public static String findTracAuthToken(IAuthHeaders headers, boolean cookieDirection) {
 
@@ -110,7 +109,6 @@ public class AuthLogic {
 
         for (var cookie : cookies) {
             if (cookie.name().equals(cookieName)) {
-                // TODO: Other fields in the cooke can make it specific, domain etc.
                 return cookie.value();
             }
         }
@@ -179,7 +177,28 @@ public class AuthLogic {
     }
 
     public static <THeaders extends IAuthHeaders>
-    THeaders removeAllAuthHeaders(THeaders headers, THeaders emptyHeaders, boolean cookieDirection) {
+    THeaders setPlatformAuthHeaders(THeaders headers, THeaders emptyHeaders, String token) {
+
+        var filtered = removeAuthHeaders(headers, emptyHeaders, SERVER_COOKIE);
+
+        return addPlatformAuthHeaders(filtered, token);
+    }
+
+    public static <THeaders extends IAuthHeaders>
+    THeaders setClientAuthHeaders(
+            THeaders headers, THeaders emptyHeaders,
+            String token, SessionInfo session, boolean wantCookies) {
+
+        var filtered = removeAuthHeaders(headers, emptyHeaders, CLIENT_COOKIE);
+
+        if (wantCookies)
+            return addClientAuthCookies(filtered, token, session);
+        else
+            return addClientAuthHeaders(filtered, token, session);
+    }
+
+    private static <THeaders extends IAuthHeaders>
+    THeaders removeAuthHeaders(THeaders headers, THeaders emptyHeaders, boolean cookieDirection) {
 
         var cookies = extractCookies(headers, cookieDirection);
 
@@ -195,26 +214,6 @@ public class AuthLogic {
         return filteredHeaders;
     }
 
-    public static <THeaders extends IAuthHeaders>
-    THeaders updateAuthHeaders(
-            THeaders headers, THeaders emptyHeaders,
-            String token, SessionInfo session,
-            RouteType routeType, boolean cookieDirection) {
-
-        var filtered = removeAllAuthHeaders(headers, emptyHeaders, cookieDirection);
-
-        switch (routeType) {
-            case BROWSER_ROUTE:
-                return addHeadersForBrowser(filtered, token, session);
-            case API_ROUTE:
-                return addHeadersForApi(filtered, token, session);
-            case PLATFORM_ROUTE:
-                return addHeadersForPlatform(filtered, token);
-            default:
-                throw new EUnexpected();
-        }
-    }
-
     private static <THeaders extends IAuthHeaders>
     THeaders filterHeaders(THeaders headers, THeaders newHeaders) {
 
@@ -228,7 +227,7 @@ public class AuthLogic {
             if (RESTRICTED_HEADERS.contains(headerName))
                 continue;
 
-            newHeaders.add(headerName, header.getValue());
+            newHeaders.add(header.getKey(), header.getValue());
         }
 
         return newHeaders;
@@ -254,17 +253,18 @@ public class AuthLogic {
         return filtered;
     }
 
-    public static <THeaders extends IAuthHeaders>
-    THeaders addHeadersForPlatform(THeaders headers, String token) {
+    private static <THeaders extends IAuthHeaders>
+    THeaders addPlatformAuthHeaders(THeaders headers, String token) {
 
         // The platform only cares about the token, that is the definitive source of session info
 
         headers.add(TRAC_AUTH_TOKEN_HEADER, token);
+
         return headers;
     }
 
-    public static <THeaders extends IAuthHeaders>
-    THeaders addHeadersForApi(THeaders headers, String token, SessionInfo session) {
+    private static <THeaders extends IAuthHeaders>
+    THeaders addClientAuthHeaders(THeaders headers, String token, SessionInfo session) {
 
         // For API calls send session info back in headers, these come through as gRPC metadata
         // The web API package will use JavaScript to store these as cookies (cookies get lost over grpc-web)
@@ -285,8 +285,8 @@ public class AuthLogic {
         return headers;
     }
 
-    public static <THeaders extends IAuthHeaders>
-    THeaders addHeadersForBrowser(THeaders headers, String token, SessionInfo session) {
+    private static <THeaders extends IAuthHeaders>
+    THeaders addClientAuthCookies(THeaders headers, String token, SessionInfo session) {
 
         // For browser requests, send the session info back as cookies, this is by far the easiest approach
         // The web API package will look for a valid auth token cookie and send it as a header if available
