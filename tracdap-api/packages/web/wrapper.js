@@ -142,6 +142,8 @@
             "content-type": "application/grpc-web+proto",
             "accept": "application/grpc-web+proto",
             "x-grpc-web": 1,
+            "x-user-agent": "trac-web-transport",  // TODO: version
+
             "trac_auth_cookies": "true"  // request the auth response is sent back in cookies
         }
 
@@ -1058,7 +1060,7 @@
 
             const browserOptions = {}
             browserOptions["browser"] = true;
-            Object.assign(options, browserOptions);
+            Object.assign(browserOptions, options);
 
             return createRpcImpl(serviceClass._serviceName, protocol, host, port, browserOptions);
         }
