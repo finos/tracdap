@@ -42,8 +42,7 @@ public class Http1AuthHandler extends ChannelDuplexHandler {
     private final int connId;
 
     private final JwtProcessor jwtProcessor;
-    private final IAuthProvider browserAuthProvider;
-    private final IAuthProvider apiAuthProvider;
+    private final IAuthProvider authProvider;
 
     private AuthResult authResult = AuthResult.FAILED();
     private SessionInfo session;
@@ -53,15 +52,13 @@ public class Http1AuthHandler extends ChannelDuplexHandler {
     public Http1AuthHandler(
             AuthenticationConfig authConfig, int connId,
             JwtProcessor jwtProcessor,
-            IAuthProvider browserAuthProvider,
-            IAuthProvider apiAuthProvider) {
+            IAuthProvider authProvider) {
 
         this.authConfig = authConfig;
         this.connId = connId;
 
         this.jwtProcessor = jwtProcessor;
-        this.browserAuthProvider = browserAuthProvider;
-        this.apiAuthProvider = apiAuthProvider;
+        this.authProvider = authProvider;
     }
 
     @Override
@@ -135,8 +132,6 @@ public class Http1AuthHandler extends ChannelDuplexHandler {
 
         var headers = new Http1AuthHeaders(request.headers());
 
-        log.info("Inbound auth headers: {}", request.headers().toString());
-
         token = AuthLogic.findTracAuthToken(headers, AuthLogic.SERVER_COOKIE);
         session = (token != null) ? jwtProcessor.decodeAndValidate(token) : null;
 
@@ -153,14 +148,9 @@ public class Http1AuthHandler extends ChannelDuplexHandler {
         if (session != null && session.isValid()) {
             authResult = AuthResult.AUTHORIZED(session.getUserInfo());
         }
-        else if (isApi && apiAuthProvider != null) {
-            authResult = apiAuthProvider.attemptAuth(ctx, headers);
-        }
-        else if (!isApi && browserAuthProvider != null) {
-            authResult = browserAuthProvider.attemptAuth(ctx, headers);
-        }
         else {
-            authResult = AuthResult.FAILED();
+            // Only one auth provider available atm, for both browser and API routes
+            authResult = authProvider.attemptAuth(ctx, headers);
         }
 
         // If necessary, create or update the user session depending on the auth result
@@ -181,6 +171,8 @@ public class Http1AuthHandler extends ChannelDuplexHandler {
 
         if (authResult.getCode() == AuthResultCode.FAILED) {
 
+            log.error("conn = {}, authentication failed", connId);
+
             // Basic unauthorized response
             // Could try to put the auth result message here maybe?
 
@@ -194,6 +186,7 @@ public class Http1AuthHandler extends ChannelDuplexHandler {
 
             ctx.write(response);
             ctx.flush();
+            ctx.close();
         }
 
         // Decide whether to send the auth response as headers or cookies

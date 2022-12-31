@@ -279,7 +279,7 @@ public class ProtocolNegotiator extends ChannelInitializer<SocketChannel> {
 
             var authHandler = new Http1AuthHandler(
                     config.getAuthentication(), conn,
-                    jwtProcessor, authProvider, null);
+                    jwtProcessor, authProvider);
 
             pipeline.addAfter(HTTP_1_TIMEOUT, HTTP_1_AUTH, authHandler);
 
@@ -362,7 +362,7 @@ public class ProtocolNegotiator extends ChannelInitializer<SocketChannel> {
 
             var authHandler = new Http1AuthHandler(
                     config.getAuthentication(), conn,
-                    jwtProcessor, authProvider, null);
+                    jwtProcessor, authProvider);
 
             pipeline.addAfter(HTTP_1_CODEC, HTTP_1_AUTH, authHandler);
 
