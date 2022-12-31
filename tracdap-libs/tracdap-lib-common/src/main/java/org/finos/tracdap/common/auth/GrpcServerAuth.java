@@ -118,7 +118,7 @@ public class GrpcServerAuth implements ServerInterceptor {
             return Contexts.interceptCall(ctx, call, headers, next);
         }
 
-        var token = headers.get(AuthConstants.AUTH_METADATA_KEY);
+        var token = headers.get(AuthConstants.AUTH_TOKEN_METADATA_KEY);
 
         if (token == null) {
 
