@@ -179,7 +179,7 @@ the gateway config file.
 .. literalinclude:: ../../dist/template/etc/trac-platform.yaml
     :name: trac_platform_yaml_authentication
     :language: yaml
-    :lines: 26 - 28
+    :lines: 26 - 29
 
 The *metadata* section describes how and where the TRAC metadata will be stored. The current implementation
 uses SQL to store metadata and several common SQL dialects are supported. The default sandbox config uses the
@@ -191,7 +191,7 @@ created above. For examples of how to configure other SQL dialects, see the depl
 .. literalinclude:: ../../dist/template/etc/trac-platform.yaml
     :name: trac_platform_yaml_metadata
     :language: yaml
-    :lines: 31 - 43
+    :lines: 32 - 44
 
 .. note::
     H2 is mostly used in development scenarios where the password is not sensitive.
@@ -210,7 +210,7 @@ The sample configuration contains one storage bucket, you just need to specify a
 .. literalinclude:: ../../dist/template/etc/trac-platform.yaml
     :name: trac_platform_yaml_storage
     :language: yaml
-    :lines: 46 - 57
+    :lines: 47 - 58
 
 .. note::
     Pay particular attention to the bucket key, which is *STORAGE1* in this example.
@@ -225,7 +225,7 @@ You can add multiple repositories if required, so long as each one has a unique 
 .. literalinclude:: ../../dist/template/etc/trac-platform.yaml
     :name: trac_platform_yaml_repositories
     :language: yaml
-    :lines: 60 - 66
+    :lines: 61 - 67
 
 The last thing you need to add in the platform config is an executor. The example config is already set up
 with a local executor, so you just need to add the path for the VENV you built in the deployment step.
@@ -233,7 +233,7 @@ with a local executor, so you just need to add the path for the VENV you built i
 .. literalinclude:: ../../dist/template/etc/trac-platform.yaml
     :name: trac_platform_yaml_executor
     :language: yaml
-    :lines: 68 - 72
+    :lines: 69 - 73
 
 There are two more sections in the platform config, *services* and *instances*. The *services* section sets
 up the service properties for each service, most importantly the ports they should run on. The *instances*
