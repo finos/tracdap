@@ -128,7 +128,7 @@ public class JwtValidator {
         }
         catch (JWTVerificationException | NumberFormatException e) {
 
-            var message = String.format("Authentication failed: %s", e.getMessage());
+            var message = String.format("Session is not valid: %s", e.getMessage());
 
             var sessionInfo = new SessionInfo();
             sessionInfo.setValid(false);
