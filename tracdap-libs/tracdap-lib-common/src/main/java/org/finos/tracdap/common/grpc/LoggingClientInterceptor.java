@@ -40,7 +40,7 @@ public class LoggingClientInterceptor implements ClientInterceptor {
         var nextCall = next.newCall(method, callOptions);
         var methodName = methodDisplayName(method);
 
-        return new LoggingClientCall<>(log, methodName, nextCall);
+        return new LoggingClientCall<>(nextCall, log, methodName);
     }
 
     private String methodDisplayName(MethodDescriptor<?, ?> method) {
@@ -53,29 +53,23 @@ public class LoggingClientInterceptor implements ClientInterceptor {
 }
 
 
-class LoggingClientCall<ReqT, RespT> extends ClientCall<ReqT, RespT> {
+class LoggingClientCall<ReqT, RespT> extends ForwardingClientCall.SimpleForwardingClientCall<ReqT, RespT> {
     private final Logger log;
     private final String methodName;
-    private final ClientCall<ReqT, RespT> nextCall;
 
-    LoggingClientCall(Logger log, String methodName, ClientCall<ReqT, RespT> nextCall) {
+    LoggingClientCall(ClientCall<ReqT, RespT> delegate, Logger log, String methodName) {
+        super(delegate);
         this.log = log;
         this.methodName = methodName;
-        this.nextCall = nextCall;
     }
 
     @Override
     public void start(ClientCall.Listener<RespT> responseListener, Metadata headers) {
         log.info("CLIENT CALL START: [{}]", methodName);
 
-        var loggingResponseListener = new LoggingClientCallListener<>(log, methodName, responseListener);
+        var loggingResponseListener = new LoggingClientCallListener<>(responseListener, log, methodName);
 
-        nextCall.start(loggingResponseListener, headers);
-    }
-
-    @Override
-    public void request(int numMessages) {
-        nextCall.request(numMessages);
+        super.start(loggingResponseListener, headers);
     }
 
     @Override
@@ -93,39 +87,18 @@ class LoggingClientCall<ReqT, RespT> extends ClientCall<ReqT, RespT> {
             );
         }
 
-        nextCall.cancel(message, cause);
-    }
-
-    @Override
-    public void halfClose() {
-        nextCall.halfClose();
-    }
-
-    @Override
-    public void sendMessage(ReqT message) {
-        nextCall.sendMessage(message);
+        super.cancel(message, cause);
     }
 }
 
-class LoggingClientCallListener<RespT> extends ClientCall.Listener<RespT> {
+class LoggingClientCallListener<RespT> extends ForwardingClientCallListener.SimpleForwardingClientCallListener<RespT> {
     private final Logger log;
     private final String methodName;
-    final private ClientCall.Listener<RespT> listener;
 
-    LoggingClientCallListener(Logger log, String methodName, ClientCall.Listener<RespT> listener) {
+    LoggingClientCallListener(ClientCall.Listener<RespT> delegate, Logger log, String methodName) {
+        super(delegate);
         this.log = log;
         this.methodName = methodName;
-        this.listener = listener;
-    }
-
-    @Override
-    public void onHeaders(Metadata headers) {
-        listener.onHeaders(headers);
-    }
-
-    @Override
-    public void onMessage(RespT message) {
-        listener.onMessage(message);
     }
 
     @Override
@@ -147,11 +120,7 @@ class LoggingClientCallListener<RespT> extends ClientCall.Listener<RespT> {
             );
         }
 
-        listener.onClose(status, trailers);
+        super.onClose(status, trailers);
     }
 
-    @Override
-    public void onReady() {
-        listener.onReady();
-    }
 }
