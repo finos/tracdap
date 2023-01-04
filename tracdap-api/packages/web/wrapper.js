@@ -1112,6 +1112,30 @@
         const utils = {};
 
         /**
+         * Create an event source from a JavaScript ReadableStream object
+         *
+         * @param {ReadableStream} stream A JavaScript ReadableStream object
+         * @return {$protobuf.EventEmitter} An event emitter for the supplied stream
+         */
+        utils.streamToEmitter = function(stream) {
+
+            const emitter = new $protobuf.EventEmitter();
+
+            const writer = new WritableStream({
+
+                write(chunk) { emitter.emit("data", chunk); },
+                close() { emitter.emit("end"); },
+                abort(error) { emitter.emit("error", error); }
+            })
+
+            stream.pipeTo(writer)
+                .then(_ => writer.close())
+                .catch(err => writer.abort(err));
+
+            return emitter;
+        }
+
+        /**
          * Aggregate a list of messages returned by a streaming data download
          *
          * @function aggregateResponse
