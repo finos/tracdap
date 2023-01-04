@@ -50,77 +50,76 @@ public class LoggingClientInterceptor implements ClientInterceptor {
 
         return String.format("%s.%s()", shortServiceName, methodName);
     }
-}
 
 
-class LoggingClientCall<ReqT, RespT> extends ForwardingClientCall.SimpleForwardingClientCall<ReqT, RespT> {
-    private final Logger log;
-    private final String methodName;
+    private static class LoggingClientCall<ReqT, RespT> extends ForwardingClientCall.SimpleForwardingClientCall<ReqT, RespT> {
+        private final Logger log;
+        private final String methodName;
 
-    LoggingClientCall(ClientCall<ReqT, RespT> delegate, Logger log, String methodName) {
-        super(delegate);
-        this.log = log;
-        this.methodName = methodName;
-    }
-
-    @Override
-    public void start(ClientCall.Listener<RespT> responseListener, Metadata headers) {
-        log.info("CLIENT CALL START: [{}]", methodName);
-
-        var loggingResponseListener = new LoggingClientCallListener<>(responseListener, log, methodName);
-
-        super.start(loggingResponseListener, headers);
-    }
-
-    @Override
-    public void cancel(@Nullable String message, @Nullable Throwable cause) {
-        if (cause != null) {
-            var grpcError = GrpcErrorMapping.processError(cause);
-            // There is GrpcErrorMapping.processError,
-            // because the exact type of the cause is not known.
-
-            log.error(
-                    "CLIENT CALL CANCELLED: [{}] {}",
-                    methodName,
-                    grpcError.getMessage(),
-                    grpcError
-            );
+        LoggingClientCall(ClientCall<ReqT, RespT> delegate, Logger log, String methodName) {
+            super(delegate);
+            this.log = log;
+            this.methodName = methodName;
         }
 
-        super.cancel(message, cause);
-    }
-}
+        @Override
+        public void start(ClientCall.Listener<RespT> responseListener, Metadata headers) {
+            log.info("CLIENT CALL START: [{}]", methodName);
 
-class LoggingClientCallListener<RespT> extends ForwardingClientCallListener.SimpleForwardingClientCallListener<RespT> {
-    private final Logger log;
-    private final String methodName;
+            var loggingResponseListener = new LoggingClientCallListener<>(responseListener, log, methodName);
 
-    LoggingClientCallListener(ClientCall.Listener<RespT> delegate, Logger log, String methodName) {
-        super(delegate);
-        this.log = log;
-        this.methodName = methodName;
-    }
-
-    @Override
-    public void onClose(Status status, Metadata trailers) {
-        if (status.isOk()) {
-            log.info("CLIENT CALL SUCCEEDED: [{}]", methodName);
-        }
-        else {
-            var grpcError = status.asRuntimeException();
-            // There is no GrpcErrorMapping.processError, because:
-            // 1) grpcError is always StatusRuntimeException
-            // 2) GrpcErrorMapping.processError passes through StatusRuntimeException
-
-            log.error(
-                    "CLIENT CALL FAILED: [{}] {}",
-                    methodName,
-                    grpcError.getMessage(),
-                    grpcError
-            );
+            super.start(loggingResponseListener, headers);
         }
 
-        super.onClose(status, trailers);
+        @Override
+        public void cancel(@Nullable String message, @Nullable Throwable cause) {
+            if (cause != null) {
+                var grpcError = GrpcErrorMapping.processError(cause);
+                // There is GrpcErrorMapping.processError,
+                // because the exact type of the cause is not known.
+
+                log.error(
+                        "CLIENT CALL CANCELLED: [{}] {}",
+                        methodName,
+                        grpcError.getMessage(),
+                        grpcError
+                );
+            }
+
+            super.cancel(message, cause);
+        }
     }
 
+    private static class LoggingClientCallListener<RespT> extends ForwardingClientCallListener.SimpleForwardingClientCallListener<RespT> {
+        private final Logger log;
+        private final String methodName;
+
+        LoggingClientCallListener(ClientCall.Listener<RespT> delegate, Logger log, String methodName) {
+            super(delegate);
+            this.log = log;
+            this.methodName = methodName;
+        }
+
+        @Override
+        public void onClose(Status status, Metadata trailers) {
+            if (status.isOk()) {
+                log.info("CLIENT CALL SUCCEEDED: [{}]", methodName);
+            } else {
+                var grpcError = status.asRuntimeException();
+                // There is no GrpcErrorMapping.processError, because:
+                // 1) grpcError is always StatusRuntimeException
+                // 2) GrpcErrorMapping.processError passes through StatusRuntimeException
+
+                log.error(
+                        "CLIENT CALL FAILED: [{}] {}",
+                        methodName,
+                        grpcError.getMessage(),
+                        grpcError
+                );
+            }
+
+            super.onClose(status, trailers);
+        }
+
+    }
 }
