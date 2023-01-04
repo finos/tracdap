@@ -21,8 +21,6 @@ import org.finos.tracdap.common.auth.AuthConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.annotation.Nullable;
-
 public class LoggingServerInterceptor implements ServerInterceptor {
     private final Logger log;
 
@@ -36,144 +34,62 @@ public class LoggingServerInterceptor implements ServerInterceptor {
             Metadata headers,
             ServerCallHandler<ReqT, RespT> next
     ) {
-        var loggingCall = new LoggingServerCall<>(log, call);
+        var loggingCall = new LoggingServerCall<>(call, log);
         var listener = next.startCall(loggingCall, headers);
-        return new LoggingListener<>(log, listener, call.getMethodDescriptor());
-    }
-}
-
-class LoggingServerCall<ReqT, RespT> extends ServerCall<ReqT, RespT> {
-    private final Logger log;
-    private final ServerCall<ReqT, RespT> call;
-
-    public LoggingServerCall(Logger log, ServerCall<ReqT, RespT> call) {
-        this.log = log;
-        this.call = call;
+        return new LoggingListener<>(listener, log, call.getMethodDescriptor());
     }
 
-    @Override
-    public void request(int numMessages) {
-        call.request(numMessages);
-    }
 
-    @Override
-    public void sendHeaders(Metadata headers) {
-        call.sendHeaders(headers);
-    }
+    private static class LoggingServerCall<ReqT, RespT> extends ForwardingServerCall.SimpleForwardingServerCall<ReqT, RespT> {
+        private final Logger log;
 
-    @Override
-    public void sendMessage(RespT message) {
-        call.sendMessage(message);
-    }
+        public LoggingServerCall(ServerCall<ReqT, RespT> delegate, Logger log) {
+            super(delegate);
 
-    @Override
-    public boolean isReady() {
-        return call.isReady();
-    }
-
-    @Override
-    public void close(Status status, Metadata trailers) {
-        call.close(status, trailers);
-
-        var method = getMethodDescriptor();
-
-        if (status.isOk()) {
-            log.info("API CALL SUCCEEDED: [{}]", method.getBareMethodName());
+            this.log = log;
         }
-        else {
-            var grpcError = status.asRuntimeException();
-            // There is no GrpcErrorMapping.processError, because:
-            // 1) grpcError is always StatusRuntimeException
-            // 2) GrpcErrorMapping.processError passes through StatusRuntimeException
 
-            log.error("API CALL FAILED: [{}] {}", method.getBareMethodName(), grpcError.getMessage(), grpcError);
+        @Override
+        public void close(Status status, Metadata trailers) {
+            super.close(status, trailers);
+
+            var method = getMethodDescriptor();
+
+            if (status.isOk()) {
+                log.info("API CALL SUCCEEDED: [{}]", method.getBareMethodName());
+            } else {
+                var grpcError = status.asRuntimeException();
+                // There is no GrpcErrorMapping.processError, because:
+                // 1) grpcError is always StatusRuntimeException
+                // 2) GrpcErrorMapping.processError passes through StatusRuntimeException
+
+                log.error("API CALL FAILED: [{}] {}", method.getBareMethodName(), grpcError.getMessage(), grpcError);
+            }
         }
     }
 
-    @Override
-    public boolean isCancelled() {
-        return call.isCancelled();
-    }
+    private static class LoggingListener<ReqT> extends ForwardingServerCallListener.SimpleForwardingServerCallListener<ReqT> {
+        private final Logger log;
+        private final MethodDescriptor<ReqT, ?> method;
 
-    @Override
-    @ExperimentalApi("https://github.com/grpc/grpc-java/issues/1704")
-    public void setMessageCompression(boolean enabled) {
-        call.setMessageCompression(enabled);
-    }
+        public LoggingListener(ServerCall.Listener<ReqT> delegate, Logger log, MethodDescriptor<ReqT, ?> method) {
+            super(delegate);
 
-    @Override
-    @ExperimentalApi("https://github.com/grpc/grpc-java/issues/1704")
-    public void setCompression(String compressor) {
-        call.setCompression(compressor);
-    }
+            this.log = log;
+            this.method = method;
+        }
 
-    @Override
-    @ExperimentalApi("https://github.com/grpc/grpc-java/issues/4692")
-    public SecurityLevel getSecurityLevel() {
-        return call.getSecurityLevel();
-    }
+        @Override
+        public void onMessage(ReqT message) {
+            var userInfo = AuthConstants.USER_INFO_KEY.get();
 
-    @Override
-    @ExperimentalApi("https://github.com/grpc/grpc-java/issues/1779")
-    public Attributes getAttributes() {
-        return call.getAttributes();
-    }
+            log.info("API CALL START: [{}] [{} <{}>] ({})",
+                    method.getBareMethodName(),
+                    userInfo.getDisplayName(),
+                    userInfo.getUserId(),
+                    method.getType());
 
-    @Override
-    @ExperimentalApi("https://github.com/grpc/grpc-java/issues/2924")
-    @Nullable
-    public String getAuthority() {
-        return call.getAuthority();
-    }
-
-    @Override
-    public MethodDescriptor<ReqT, RespT> getMethodDescriptor() {
-        return call.getMethodDescriptor();
-    }
-}
-
-class LoggingListener<ReqT> extends ServerCall.Listener<ReqT> {
-    private final Logger log;
-    private final ServerCall.Listener<ReqT> listener;
-    private final MethodDescriptor<ReqT, ?> method;
-
-    public LoggingListener(Logger log, ServerCall.Listener<ReqT> listener, MethodDescriptor<ReqT, ?> method) {
-
-        this.log = log;
-        this.listener = listener;
-        this.method = method;
-    }
-
-    @Override
-    public void onMessage(ReqT message) {
-        var userInfo = AuthConstants.USER_INFO_KEY.get();
-
-        log.info("API CALL START: [{}] [{} <{}>] ({})",
-                method.getBareMethodName(),
-                userInfo.getDisplayName(),
-                userInfo.getUserId(),
-                method.getType());
-
-        listener.onMessage(message);
-    }
-
-    @Override
-    public void onHalfClose() {
-        listener.onHalfClose();
-    }
-
-    @Override
-    public void onCancel() {
-        listener.onCancel();
-    }
-
-    @Override
-    public void onComplete() {
-        listener.onComplete();
-    }
-
-    @Override
-    public void onReady() {
-        listener.onReady();
+            super.onMessage(message);
+        }
     }
 }
