@@ -40,7 +40,7 @@ public class LoggingClientInterceptor implements ClientInterceptor {
         var nextCall = next.newCall(method, callOptions);
         var methodName = methodDisplayName(method);
 
-        return new LoggingClientCall<>(log, methodName, nextCall);
+        return new LoggingClientCall<>(nextCall, log, methodName);
     }
 
     private String methodDisplayName(MethodDescriptor<?, ?> method) {
@@ -50,108 +50,76 @@ public class LoggingClientInterceptor implements ClientInterceptor {
 
         return String.format("%s.%s()", shortServiceName, methodName);
     }
-}
 
 
-class LoggingClientCall<ReqT, RespT> extends ClientCall<ReqT, RespT> {
-    private final Logger log;
-    private final String methodName;
-    private final ClientCall<ReqT, RespT> nextCall;
+    private static class LoggingClientCall<ReqT, RespT> extends ForwardingClientCall.SimpleForwardingClientCall<ReqT, RespT> {
+        private final Logger log;
+        private final String methodName;
 
-    LoggingClientCall(Logger log, String methodName, ClientCall<ReqT, RespT> nextCall) {
-        this.log = log;
-        this.methodName = methodName;
-        this.nextCall = nextCall;
-    }
-
-    @Override
-    public void start(ClientCall.Listener<RespT> responseListener, Metadata headers) {
-        log.info("CLIENT CALL START: [{}]", methodName);
-
-        var loggingResponseListener = new LoggingClientCallListener<>(log, methodName, responseListener);
-
-        nextCall.start(loggingResponseListener, headers);
-    }
-
-    @Override
-    public void request(int numMessages) {
-        nextCall.request(numMessages);
-    }
-
-    @Override
-    public void cancel(@Nullable String message, @Nullable Throwable cause) {
-        if (cause != null) {
-            var grpcError = GrpcErrorMapping.processError(cause);
-            // There is GrpcErrorMapping.processError,
-            // because the exact type of the cause is not known.
-
-            log.error(
-                    "CLIENT CALL CANCELLED: [{}] {}",
-                    methodName,
-                    grpcError.getMessage(),
-                    grpcError
-            );
+        LoggingClientCall(ClientCall<ReqT, RespT> delegate, Logger log, String methodName) {
+            super(delegate);
+            this.log = log;
+            this.methodName = methodName;
         }
 
-        nextCall.cancel(message, cause);
-    }
+        @Override
+        public void start(ClientCall.Listener<RespT> responseListener, Metadata headers) {
+            log.info("CLIENT CALL START: [{}]", methodName);
 
-    @Override
-    public void halfClose() {
-        nextCall.halfClose();
-    }
+            var loggingResponseListener = new LoggingClientCallListener<>(responseListener, log, methodName);
 
-    @Override
-    public void sendMessage(ReqT message) {
-        nextCall.sendMessage(message);
-    }
-}
-
-class LoggingClientCallListener<RespT> extends ClientCall.Listener<RespT> {
-    private final Logger log;
-    private final String methodName;
-    final private ClientCall.Listener<RespT> listener;
-
-    LoggingClientCallListener(Logger log, String methodName, ClientCall.Listener<RespT> listener) {
-        this.log = log;
-        this.methodName = methodName;
-        this.listener = listener;
-    }
-
-    @Override
-    public void onHeaders(Metadata headers) {
-        listener.onHeaders(headers);
-    }
-
-    @Override
-    public void onMessage(RespT message) {
-        listener.onMessage(message);
-    }
-
-    @Override
-    public void onClose(Status status, Metadata trailers) {
-        if (status.isOk()) {
-            log.info("CLIENT CALL SUCCEEDED: [{}]", methodName);
-        }
-        else {
-            var grpcError = status.asRuntimeException();
-            // There is no GrpcErrorMapping.processError, because:
-            // 1) grpcError is always StatusRuntimeException
-            // 2) GrpcErrorMapping.processError passes through StatusRuntimeException
-
-            log.error(
-                    "CLIENT CALL FAILED: [{}] {}",
-                    methodName,
-                    grpcError.getMessage(),
-                    grpcError
-            );
+            super.start(loggingResponseListener, headers);
         }
 
-        listener.onClose(status, trailers);
+        @Override
+        public void cancel(@Nullable String message, @Nullable Throwable cause) {
+            if (cause != null) {
+                var grpcError = GrpcErrorMapping.processError(cause);
+                // There is GrpcErrorMapping.processError,
+                // because the exact type of the cause is not known.
+
+                log.error(
+                        "CLIENT CALL CANCELLED: [{}] {}",
+                        methodName,
+                        grpcError.getMessage(),
+                        grpcError
+                );
+            }
+
+            super.cancel(message, cause);
+        }
     }
 
-    @Override
-    public void onReady() {
-        listener.onReady();
+    private static class LoggingClientCallListener<RespT> extends ForwardingClientCallListener.SimpleForwardingClientCallListener<RespT> {
+        private final Logger log;
+        private final String methodName;
+
+        LoggingClientCallListener(ClientCall.Listener<RespT> delegate, Logger log, String methodName) {
+            super(delegate);
+            this.log = log;
+            this.methodName = methodName;
+        }
+
+        @Override
+        public void onClose(Status status, Metadata trailers) {
+            if (status.isOk()) {
+                log.info("CLIENT CALL SUCCEEDED: [{}]", methodName);
+            } else {
+                var grpcError = status.asRuntimeException();
+                // There is no GrpcErrorMapping.processError, because:
+                // 1) grpcError is always StatusRuntimeException
+                // 2) GrpcErrorMapping.processError passes through StatusRuntimeException
+
+                log.error(
+                        "CLIENT CALL FAILED: [{}] {}",
+                        methodName,
+                        grpcError.getMessage(),
+                        grpcError
+                );
+            }
+
+            super.onClose(status, trailers);
+        }
+
     }
 }
