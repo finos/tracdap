@@ -21,6 +21,7 @@ import org.finos.tracdap.common.auth.GrpcServerAuth;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.common.grpc.LoggingClientInterceptor;
+import org.finos.tracdap.common.grpc.LoggingServerInterceptor;
 import org.finos.tracdap.common.plugin.PluginManager;
 import org.finos.tracdap.common.service.CommonServiceBase;
 import org.finos.tracdap.config.PlatformConfig;
@@ -138,6 +139,7 @@ public class TracOrchestratorService extends CommonServiceBase {
 
             this.server = NettyServerBuilder
                     .forPort(orchestratorConfig.getPort())
+                    .intercept(new LoggingServerInterceptor(TracOrchestratorService.class))
                     .intercept(authentication)
                     .addService(orchestratorApi)
 

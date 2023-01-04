@@ -48,7 +48,6 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
     private static final MethodDescriptor<DataReadRequest, DataReadResponse> READ_DATASET_METHOD = TracDataApiGrpc.getReadDatasetMethod();
 
     private static final MethodDescriptor<DataWriteRequest, TagHeader> CREATE_SMALL_DATASET_METHOD = TracDataApiGrpc.getCreateSmallDatasetMethod();
-    private static final MethodDescriptor<DataWriteRequest, TagHeader> UPDATE_SMALL_DATASET_METHOD = TracDataApiGrpc.getUpdateSmallDatasetMethod();
     private static final MethodDescriptor<DataReadRequest, DataReadResponse> READ_SMALL_DATASET_METHOD = TracDataApiGrpc.getReadSmallDatasetMethod();
 
     private static final MethodDescriptor<FileWriteRequest, TagHeader> CREATE_FILE_METHOD = TracDataApiGrpc.getCreateFileMethod();
@@ -72,7 +71,7 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
         this.fileService = fileService;
 
         this.validator = new Validator();
-        this.grpcWrap = new GrpcServerWrap(getClass());
+        this.grpcWrap = new GrpcServerWrap();
     }
 
 
@@ -83,73 +82,73 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
     @Override
     public StreamObserver<DataWriteRequest> createDataset(StreamObserver<TagHeader> responseObserver) {
 
-        return grpcWrap.clientStreaming(CREATE_DATASET_METHOD, responseObserver, this::createDataset);
+        return grpcWrap.clientStreaming(responseObserver, this::createDataset);
     }
 
     @Override
     public void createSmallDataset(DataWriteRequest request, StreamObserver<TagHeader> responseObserver) {
 
-        grpcWrap.unaryAsync(CREATE_SMALL_DATASET_METHOD, request, responseObserver, this::createSmallDataset);
+        grpcWrap.unaryAsync(request, responseObserver, this::createSmallDataset);
     }
 
     @Override
     public StreamObserver<DataWriteRequest> updateDataset(StreamObserver<TagHeader> responseObserver) {
 
-        return grpcWrap.clientStreaming(UPDATE_DATASET_METHOD, responseObserver, this::updateDataset);
+        return grpcWrap.clientStreaming(responseObserver, this::updateDataset);
     }
 
     @Override
     public void updateSmallDataset(DataWriteRequest request, StreamObserver<TagHeader> responseObserver) {
 
-        grpcWrap.unaryAsync(UPDATE_SMALL_DATASET_METHOD, request, responseObserver, this::updateSmallDataset);
+        grpcWrap.unaryAsync(request, responseObserver, this::updateSmallDataset);
     }
 
     @Override
     public void readDataset(DataReadRequest request, StreamObserver<DataReadResponse> responseObserver) {
 
-        grpcWrap.serverStreaming(READ_DATASET_METHOD, request, responseObserver, this::readDataset);
+        grpcWrap.serverStreaming(request, responseObserver, this::readDataset);
     }
 
     @Override
     public void readSmallDataset(DataReadRequest request, StreamObserver<DataReadResponse> responseObserver) {
 
-        grpcWrap.unaryAsync(READ_SMALL_DATASET_METHOD, request, responseObserver, this::readSmallDataset);
+        grpcWrap.unaryAsync(request, responseObserver, this::readSmallDataset);
     }
 
     @Override
     public StreamObserver<FileWriteRequest> createFile(StreamObserver<TagHeader> responseObserver) {
 
-        return grpcWrap.clientStreaming(CREATE_FILE_METHOD, responseObserver, this::createFile);
+        return grpcWrap.clientStreaming(responseObserver, this::createFile);
     }
 
     @Override
     public void createSmallFile(FileWriteRequest request, StreamObserver<TagHeader> responseObserver) {
 
-        grpcWrap.unaryAsync(CREATE_SMALL_FILE_METHOD, request, responseObserver, this::createSmallFile);
+        grpcWrap.unaryAsync(request, responseObserver, this::createSmallFile);
     }
 
     @Override
     public StreamObserver<FileWriteRequest> updateFile(StreamObserver<TagHeader> responseObserver) {
 
-        return grpcWrap.clientStreaming(UPDATE_FILE_METHOD, responseObserver, this::updateFile);
+        return grpcWrap.clientStreaming(responseObserver, this::updateFile);
     }
 
     @Override
     public void updateSmallFile(FileWriteRequest request, StreamObserver<TagHeader> responseObserver) {
 
-        grpcWrap.unaryAsync(UPDATE_SMALL_FILE_METHOD, request, responseObserver, this::updateSSmallFile);
+        grpcWrap.unaryAsync(request, responseObserver, this::updateSSmallFile);
     }
 
     @Override
     public void readFile(FileReadRequest request, StreamObserver<FileReadResponse> responseObserver) {
 
-        grpcWrap.serverStreaming(READ_FILE_METHOD, request, responseObserver, this::readFile);
+        grpcWrap.serverStreaming(request, responseObserver, this::readFile);
     }
 
     @Override
     public void readSmallFile(FileReadRequest request, StreamObserver<FileReadResponse> responseObserver) {
 
-        grpcWrap.unaryAsync(READ_SMALL_FILE_METHOD, request, responseObserver, this::readSmallFile);
+        grpcWrap.unaryAsync(request, responseObserver, this::readSmallFile);
     }
 
 
