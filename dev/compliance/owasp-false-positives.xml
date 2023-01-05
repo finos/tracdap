@@ -18,7 +18,18 @@
 <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
 
 
-    <!-- Java platform false positives -->
+    <!-- ====================== -->
+    <!-- Wrong package detected -->
+    <!-- ====================== -->
+
+    <!--
+    These are false positives where the vulnerability relates to an entirely different package,
+    i.e. the check is mis-identifying the pacakge. These will always be false positives and can
+    be left here indefinitely.
+
+    E.g. Vulnerabilities in mysql should never be reported against flyway-mysql,
+    they are different packages with different versioning schemes.
+    -->
 
     <!-- flyway-mysql driver is detected as part of MySQL -->
     <suppress>
@@ -62,6 +73,38 @@
         <cpe>cpe:/a:flat_project:flat</cpe>
     </suppress>
 
+    <!-- Two utils libs in the AWS SDK mis-identified as part of an old abandoned utils project -->
+    <!-- https://www.cve.org/CVERecord?id=CVE-2021-4277 -->
+    <!-- https://github.com/fredsmith/utils/commit/dbab1b66955eeb3d76b34612b358307f5c4e3944 -->
+
+    <suppress>
+        <packageUrl regex="true">^pkg:maven/software\.amazon\.awssdk/json\-utils@.*$</packageUrl>
+        <cpe>cpe:/a:utils_project:utils</cpe>
+    </suppress>
+
+    <suppress>
+        <packageUrl regex="true">^pkg:maven/software\.amazon\.awssdk/utils@.*$</packageUrl>
+        <cpe>cpe:/a:utils_project:utils</cpe>
+    </suppress>
+
+
+
+    <!-- ================== -->
+    <!-- Special exceptions -->
+    <!-- ================== -->
+
+    <!--
+    The remaining exclusions are special exceptions, added on a case-by-case basis.
+    For example, vulnerabilities relating to a feature that is not being used.
+
+    Since unaddressed vulnerabilities block merging, new vulnerabilities with no fix available are also added here.
+    This does bring into question whether forcing compliance to pass before merging is the right strategy.
+    On balance I think this approach gets more attention on security issues, so they get resolved more quickly.
+    But it is a trade-off, having to mark issues as false positives until the fix comes out.
+    Either way, it relies on core devs keeping an eye on outstanding security issues.
+    -->
+
+
     <!-- The H2 developers maintain this CVE is not a security vulnerability and have not issued a fix -->
     <!-- The vulnerability only applies when an H2 web console service is running -->
     <!-- https://github.com/h2database/h2database/issues/3175 -->
@@ -99,13 +142,7 @@
     </suppress>
 
     <!-- This is a new vulnerability in all Netty components, no fix version is available yet -->
-    <!-- We can't hold up other changes / fixes while we wait for the fix from Netty -->
     <!-- So, adding a false positive -->
-
-    <!-- This does bring into question whether forcing compliance to pass before merging is the right strategy -->
-    <!-- On balance, I think it gets more attention on security issues, they get resolved more quickly -->
-    <!-- But it is a trade-off, having to mark issues as false positives until the fix comes out -->
-    <!-- Either way, it relies on core devs keeping an eye on outstanding security issues -->
 
     <suppress>
         <packageUrl regex="true">^pkg:maven/io\.netty/netty\-.*@4.1.86.Final$</packageUrl>
