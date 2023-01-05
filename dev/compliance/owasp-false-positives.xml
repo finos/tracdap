@@ -70,19 +70,6 @@
         <vulnerabilityName>CVE-2018-14335</vulnerabilityName>
     </suppress>
 
-    <!-- This vulnerability is in AWS hotpatch, not the base log4j libraries -->
-    <!-- We are not using AWS hotpatch -->
-
-    <suppress>
-        <packageUrl regex="true">^pkg:maven/org\.apache\.logging\.log4j/log4j\-api@.*$</packageUrl>
-        <vulnerabilityName>CVE-2022-33915</vulnerabilityName>
-    </suppress>
-
-    <suppress>
-        <packageUrl regex="true">^pkg:maven/org\.apache\.logging\.log4j/log4j\-core@.*$</packageUrl>
-        <vulnerabilityName>CVE-2022-33915</vulnerabilityName>
-    </suppress>
-
     <!-- This issue in SnakeYAML has no fix available yet -->
     <!-- Developers are discussing whether this is a false positive -->
     <!-- We don't expose YAML in service APIs, it is only used for config parsing and offline runs -->
