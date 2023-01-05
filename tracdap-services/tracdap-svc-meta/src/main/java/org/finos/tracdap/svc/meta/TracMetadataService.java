@@ -19,6 +19,7 @@ package org.finos.tracdap.svc.meta;
 import org.finos.tracdap.common.auth.GrpcServerAuth;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.exception.EStartup;
+import org.finos.tracdap.common.grpc.ErrorMappingInterceptor;
 import org.finos.tracdap.common.grpc.LoggingServerInterceptor;
 import org.finos.tracdap.common.plugin.PluginManager;
 import org.finos.tracdap.common.service.CommonServiceBase;
@@ -126,6 +127,7 @@ public class TracMetadataService extends CommonServiceBase {
                     .forPort(servicePort)
                     .intercept(new LoggingServerInterceptor(TracMetadataApi.class))
                     .intercept(authentication)
+                    .intercept(new ErrorMappingInterceptor())
                     .addService(publicApi)
                     .addService(trustedApi)
                     .executor(executor)

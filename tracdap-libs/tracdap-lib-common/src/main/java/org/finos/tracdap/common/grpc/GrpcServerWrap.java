@@ -99,8 +99,7 @@ public class GrpcServerWrap {
             responseObserver.onCompleted();
         }
         else {
-            var grpcError = GrpcErrorMapping.processError(error);
-            responseObserver.onError(grpcError);
+            responseObserver.onError(error);
         }
 
         return null;

@@ -20,6 +20,7 @@ import org.finos.tracdap.api.TrustedMetadataApiGrpc;
 import org.finos.tracdap.common.auth.GrpcServerAuth;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.exception.EStartup;
+import org.finos.tracdap.common.grpc.ErrorMappingInterceptor;
 import org.finos.tracdap.common.grpc.LoggingClientInterceptor;
 import org.finos.tracdap.common.grpc.LoggingServerInterceptor;
 import org.finos.tracdap.common.plugin.PluginManager;
@@ -141,6 +142,7 @@ public class TracOrchestratorService extends CommonServiceBase {
                     .forPort(orchestratorConfig.getPort())
                     .intercept(new LoggingServerInterceptor(TracOrchestratorService.class))
                     .intercept(authentication)
+                    .intercept(new ErrorMappingInterceptor())
                     .addService(orchestratorApi)
 
                     .channelType(channelType)
