@@ -56,6 +56,12 @@
         <cpe>cpe:/a:apache:commons_net</cpe>
     </suppress>
 
+    <!-- Flat buffers detected as flat_project, a JavaScript library: https://github.com/hughsk/flat -->
+    <suppress>
+        <packageUrl regex="true">^pkg:maven/com\.google\.flatbuffers/flatbuffers\-java@.*$</packageUrl>
+        <cpe>cpe:/a:flat_project:flat</cpe>
+    </suppress>
+
     <!-- The H2 developers maintain this CVE is not a security vulnerability and have not issued a fix -->
     <!-- The vulnerability only applies when an H2 web console service is running -->
     <!-- https://github.com/h2database/h2database/issues/3175 -->
