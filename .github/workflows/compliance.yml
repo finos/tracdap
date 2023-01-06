@@ -58,8 +58,10 @@ jobs:
           key: compliance-cache-data
           path: ./build/compliance-cache
 
-      - name: OWASP dependency check
-        run: ./gradlew dependencyCheckAggregate
+      # Disabled because OWASP is broken, re-enable as soon as the fix is published
+      # https://github.com/jeremylong/DependencyCheck/issues/5220
+      # - name: OWASP dependency checkout
+      #   run: ./gradlew dependencyCheckAggregate
 
       - name: License check
         run: ./gradlew checkLicense
