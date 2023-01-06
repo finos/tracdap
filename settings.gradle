@@ -77,6 +77,13 @@ project(":secret-tool").projectDir = file("tracdap-tools/secret-tool")
 
 // Plugins
 
+include 'sql-postgresql'
+include 'sql-sqlserver'
+
+project(":sql-postgresql").projectDir = file("tracdap-plugins/sql-postgresql")
+project(":sql-sqlserver").projectDir = file("tracdap-plugins/sql-sqlserver")
+
+
 // AWS config plugin still uses AWS v1 API - needs porting to V2
 //include 'aws-config'
 //project(":aws-config").projectDir = file("tracdap-plugins/aws-config")
