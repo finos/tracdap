@@ -22,6 +22,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class LoggingServerInterceptor implements ServerInterceptor {
+
     private final Logger log;
 
     public LoggingServerInterceptor(Class<?> apiClass) {
@@ -32,32 +33,37 @@ public class LoggingServerInterceptor implements ServerInterceptor {
     public <ReqT, RespT> ServerCall.Listener<ReqT> interceptCall(
             ServerCall<ReqT, RespT> call,
             Metadata headers,
-            ServerCallHandler<ReqT, RespT> next
-    ) {
-        var loggingCall = new LoggingServerCall<>(call, log);
-        var listener = next.startCall(loggingCall, headers);
-        return new LoggingListener<>(listener, log, call.getMethodDescriptor());
+            ServerCallHandler<ReqT, RespT> next) {
+
+        var method = call.getMethodDescriptor();
+        var userInfo = AuthConstants.USER_INFO_KEY.get();
+
+        log.info("API CALL START: [{}] [{} <{}>] ({})",
+                method.getBareMethodName(),
+                userInfo.getDisplayName(),
+                userInfo.getUserId(),
+                method.getType());
+
+        var loggingCall = new LoggingServerCall<>(call);
+
+        return next.startCall(loggingCall, headers);
     }
 
+    private class LoggingServerCall<ReqT, RespT> extends ForwardingServerCall.SimpleForwardingServerCall<ReqT, RespT> {
 
-    private static class LoggingServerCall<ReqT, RespT> extends ForwardingServerCall.SimpleForwardingServerCall<ReqT, RespT> {
-        private final Logger log;
-
-        public LoggingServerCall(ServerCall<ReqT, RespT> delegate, Logger log) {
+        public LoggingServerCall(ServerCall<ReqT, RespT> delegate) {
             super(delegate);
-
-            this.log = log;
         }
 
         @Override
         public void close(Status status, Metadata trailers) {
-            super.close(status, trailers);
 
             var method = getMethodDescriptor();
 
             if (status.isOk()) {
                 log.info("API CALL SUCCEEDED: [{}]", method.getBareMethodName());
-            } else {
+            }
+            else {
                 var grpcError = status.asRuntimeException();
                 // There is no GrpcErrorMapping.processError, because:
                 // 1) grpcError is always StatusRuntimeException
@@ -65,31 +71,8 @@ public class LoggingServerInterceptor implements ServerInterceptor {
 
                 log.error("API CALL FAILED: [{}] {}", method.getBareMethodName(), grpcError.getMessage(), grpcError);
             }
-        }
-    }
 
-    private static class LoggingListener<ReqT> extends ForwardingServerCallListener.SimpleForwardingServerCallListener<ReqT> {
-        private final Logger log;
-        private final MethodDescriptor<ReqT, ?> method;
-
-        public LoggingListener(ServerCall.Listener<ReqT> delegate, Logger log, MethodDescriptor<ReqT, ?> method) {
-            super(delegate);
-
-            this.log = log;
-            this.method = method;
-        }
-
-        @Override
-        public void onMessage(ReqT message) {
-            var userInfo = AuthConstants.USER_INFO_KEY.get();
-
-            log.info("API CALL START: [{}] [{} <{}>] ({})",
-                    method.getBareMethodName(),
-                    userInfo.getDisplayName(),
-                    userInfo.getUserId(),
-                    method.getType());
-
-            super.onMessage(message);
+            delegate().close(status, trailers);
         }
     }
 }
