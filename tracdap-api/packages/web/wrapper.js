@@ -1052,16 +1052,14 @@
          *
          * @deprecated Since version 0.5.6, use transportForTarget() instead
          *
-         * @param serviceClass {ServiceType} The service class to create an rpcImpl for
+         * @param {ServiceType} serviceClass The service class to create an rpcImpl for
          * @param {string} protocol The protocol to use for connection (either "http" or "https")
          * @param {string} host The host to connect to
          * @param {number} port The port to connect to
-         *
          * @param {object=} options Options to control the behaviour of the transport
          * @param {("google"|"trac")} options.transport Controls which transport implementation to use for gRPC-Web
          * @param {boolean} options.debug Turn on debug logging
-         *
-         * @returns {$protobuf.RPCImpl} An rpcImpl function that can be used with the specified service class
+         * @return {$protobuf.RPCImpl} An rpcImpl function that can be used with the specified service class
          */
         setup.rpcImplForTarget = function(serviceClass, protocol, host, port, options = {}) {
 
@@ -1078,13 +1076,11 @@
          *
          * @deprecated Since version 0.5.6, use transportForBrowser() instead<
          *
-         * @param serviceClass {ServiceType} The service class to create an rpcImpl for
-         *
+         * @param {ServiceType} serviceClass The service class to create an rpcImpl for
          * @param {object=} options Options to control the behaviour of the transport
          * @param {("google"|"trac")} options.transport Controls which transport implementation to use for gRPC-Web
          * @param {boolean} options.debug Turn on debug logging
-         *
-         * @returns {$protobuf.RPCImpl} An rpcImpl function that can be used with the specified service class
+         * @return {$protobuf.RPCImpl} An rpcImpl function that can be used with the specified service class
          */
         setup.rpcImplForBrowser = function(serviceClass, options = {}) {
 
@@ -1097,16 +1093,14 @@
          * @function transportForTarget
          * @memberof tracdap.setup
          *
-         * @param serviceClass {ServiceType} The service class to create an rpcImpl for
+         * @param {ServiceType} serviceClass The service class to create an rpcImpl for
          * @param {string} protocol The protocol to use for connection (either "http" or "https")
          * @param {string} host The host to connect to
          * @param {number} port The port to connect to
-         *
          * @param {object=} options Options to control the behaviour of the transport
          * @param {("google"|"trac")} options.transport Controls which transport implementation to use for gRPC-Web
          * @param {boolean} options.debug Turn on debug logging
-         *
-         * @returns {$protobuf.RPCImpl} An rpcImpl function that can be used with the specified service class
+         * @return {$protobuf.RPCImpl} An rpcImpl function that can be used with the specified service class
          */
         setup.transportForTarget = function(serviceClass, protocol, host, port, options = {}) {
 
@@ -1122,13 +1116,11 @@
          * @function transportForBrowser
          * @memberof tracdap.setup
          *
-         * @param serviceClass {ServiceType} The service class to create an rpcImpl for
-         *
+         * @param {ServiceType} serviceClass The service class to create an rpcImpl for
          * @param {object=} options Options to control the behaviour of the transport
          * @param {("google"|"trac")} options.transport Controls which transport implementation to use for gRPC-Web
          * @param {boolean} options.debug Turn on debug logging
-         *
-         * @returns {$protobuf.RPCImpl} An rpcImpl function that can be used with the specified service class
+         * @return {$protobuf.RPCImpl} An rpcImpl function that can be used with the specified service class
          */
         setup.transportForBrowser = function(serviceClass, options = {}) {
 
@@ -1171,8 +1163,7 @@
          * @memberOf tracdap.setup
          *
          * @template TService extends $protobuf.rpc.Service
-         * @param service {TService} An existing client that will be used to construct the stream
-         *
+         * @param {TService} service An existing client that will be used to construct the stream
          * @return {TService} A streaming client instance, ready to call
          */
         setup.newStream = function(service) {
@@ -1210,7 +1201,7 @@
          * @memberof tracdap.utils
          *
          * @param {ReadableStream} stream A JavaScript ReadableStream object
-         * @return {$protobuf.EventEmitter} An event emitter for the supplied stream
+         * @return {$protobuf.util.EventEmitter} An event emitter for the supplied stream
          */
         utils.streamToEmitter = function(stream) {
 
@@ -1246,7 +1237,7 @@
          * @function aggregateStreamContent
          * @memberof tracdap.utils
          *
-         * @template TMessage extends $protobuf.rpc.Message
+         * @template TMessage extends $protobuf.Message
          * @param {TMessage[]} messages A list of the messages with content to be aggregated
          * @return {TMessage} A single aggregated message, with the content of the entire download stream
          */
