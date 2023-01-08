@@ -15,13 +15,17 @@
  */
 
 
-// To run these examples outside of a browser, XMLHttpRequest is required
+// To run these examples outside of a browser, XMLHttpRequest and WebSocket are required
 import xhr2 from 'xhr2';
-import fetch from "node-fetch";
 import WebSocket from "ws";
 global.XMLHttpRequest = xhr2.XMLHttpRequest;
-global.fetch = fetch;
 global.WebSocket = WebSocket;
+
+// Node supplies fetch since Node 18
+// If it is missing, try to import it from the node-fetch package
+if (!global.hasOwnProperty("fetch")) {
+    import("node-fetch").then(_fetch => {global.fetch = _fetch;})
+}
 
 
 const ALL_EXAMPLES = [
