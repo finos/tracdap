@@ -45,11 +45,11 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class ProtocolNegotiator extends ChannelInitializer<SocketChannel> {
 
     private static final String PROTOCOL_SELECTOR_HANDLER = "protocol_selector";
+    private static final String CLIENT_TIMEOUT = "client_timeout";
 
     private static final String HTTP_1_INITIALIZER = "http_1_initializer";
     private static final String HTTP_1_CODEC = "http_1_codec";
     private static final String HTTP_1_KEEPALIVE = "http_1_keepalive";
-    private static final String HTTP_1_TIMEOUT = "http_1_timeout";
     private static final String HTTP_1_AUTH = "http_1_auth";
 
     private static final String HTTP_2_CODEC = "http_2_codec";
@@ -268,9 +268,9 @@ public class ProtocolNegotiator extends ChannelInitializer<SocketChannel> {
 
             // For connections that are kept alive, we need to handle timeouts
             // This idle state handler will trigger idle events after the configured timeout
-            // The main Http1Router is responsible for handling the idle events
+            // The CoreRouter class is responsible for handling the idle events
             var idleHandler = new IdleStateHandler(MAX_TIMEOUT, MAX_TIMEOUT, idleTimeout, TimeUnit.SECONDS);
-            pipeline.addAfter(HTTP_1_KEEPALIVE, HTTP_1_TIMEOUT, idleHandler);
+            pipeline.addAfter(HTTP_1_KEEPALIVE, CLIENT_TIMEOUT, idleHandler);
 
             // auth processor asks for two auth providers, a browse-based one and an api-based one
             // Currently we are only passing in a browser-based provider
@@ -281,7 +281,7 @@ public class ProtocolNegotiator extends ChannelInitializer<SocketChannel> {
                     config.getAuthentication(), conn,
                     jwtProcessor, authProvider);
 
-            pipeline.addAfter(HTTP_1_TIMEOUT, HTTP_1_AUTH, authHandler);
+            pipeline.addAfter(CLIENT_TIMEOUT, HTTP_1_AUTH, authHandler);
 
             // The main HTTP/1 handler
             pipeline.addLast(http1Handler.create(conn));
@@ -360,11 +360,17 @@ public class ProtocolNegotiator extends ChannelInitializer<SocketChannel> {
 
             pipeline.addAfter(WS_INITIALIZER, HTTP_1_CODEC, new HttpServerCodec());
 
+            // WebSockets connections also need to use idle handler
+            // E.g. buggy client code might forget to send the EOS signal or close the connection
+            // The CoreRouter class is responsible for handling the idle events
+            var idleHandler = new IdleStateHandler(MAX_TIMEOUT, MAX_TIMEOUT, idleTimeout, TimeUnit.SECONDS);
+            pipeline.addAfter(HTTP_1_CODEC, CLIENT_TIMEOUT, idleHandler);
+
             var authHandler = new Http1AuthHandler(
                     config.getAuthentication(), conn,
                     jwtProcessor, authProvider);
 
-            pipeline.addAfter(HTTP_1_CODEC, HTTP_1_AUTH, authHandler);
+            pipeline.addAfter(CLIENT_TIMEOUT, HTTP_1_AUTH, authHandler);
 
             pipeline.addAfter(HTTP_1_AUTH, WS_COMPRESSION, new WebSocketServerCompressionHandler());
 
