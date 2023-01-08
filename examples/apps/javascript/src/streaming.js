@@ -88,12 +88,18 @@ async function saveStreamingData(csvData) {
             stream.createDataset(msg)
         });
 
-        // Make sure to forward the complete and error signals on the input stream as well
-        // This will make sure the stream is either finished or cancelled
-        // And let errors be sent back on the promise
+        // Call .end() when the input stream completes
 
         csvData.on('end', () => stream.end());
-        csvData.on('error', () => stream.end(true));
+
+        // If there is an error reading the input data stream, we need to cancel the upload
+        // This is to prevent a half-sent dataset from being saved
+        // Calling .cancel() does not result in an error on the stream, so call reject() explicitly
+
+        csvData.on('error', err => {
+            stream.cancel();
+            reject(err);
+        });
     });
 }
 
