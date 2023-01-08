@@ -78,8 +78,8 @@ async function saveStreamingData(csvData) {
             .then(resolve)
             .catch(reject);
 
-        // Now handle the events on you data stream, by forwarding them to the API stream
-        // In this example, csvDAta is a stream of chunks loaded from the file system
+        // Now handle the events on your data stream, by forwarding them to the API stream
+        // In this example, csvData is a stream of chunks loaded from the file system
         // Each chunk needs to be wrapped in a message, by setting the "content" field
         // All the other fields in the message should be left blank
 
@@ -141,7 +141,7 @@ function loadStreamingData(dataId) {
         });
 
         // Handle the error signal to make sure errors are reported back through the promise
-        stream.on("error", reject);
+        stream.on("error", err => reject(err));
     });
 }
 
