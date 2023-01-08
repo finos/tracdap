@@ -97,6 +97,10 @@ abstract class CoreRouter extends ChannelDuplexHandler {
 
         log.info("conn = {}, router removed", connId);
         super.handlerRemoved(ctx);
+
+        // Make sure any target connections that are still open are shut down cleanly
+        var targetKeys = new ArrayList<>(this.targets.keySet());
+        targetKeys.forEach(this::closeAndRemoveTarget);
     }
 
     @Override
@@ -347,6 +351,20 @@ abstract class CoreRouter extends ChannelDuplexHandler {
     protected final TargetChannelState getTarget(int routeId) {
 
         return targets.getOrDefault(routeId, null);
+    }
+
+    protected final void closeAndRemoveTarget(int routeId) {
+
+        var target = this.targets.remove(routeId);
+
+        if (target != null) {
+
+            for (var obj : target.outboundQueue)
+                ReferenceCountUtil.release(obj);
+
+            if (target.channel.isOpen())
+                target.channel.close();
+        }
     }
 
     final void associateRoute(Object msg, int routeIndex) {
