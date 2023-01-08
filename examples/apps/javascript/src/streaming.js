@@ -92,7 +92,7 @@ async function saveStreamingData(csvData) {
         // This will make sure the stream is either finished or cancelled
         // And let errors be sent back on the promise
 
-        csvData.on('close', () => stream.end());
+        csvData.on('end', () => stream.end());
         csvData.on('error', () => stream.end(true));
     });
 }
