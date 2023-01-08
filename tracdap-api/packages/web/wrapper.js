@@ -1112,16 +1112,53 @@
         const utils = {};
 
         /**
-         * Aggregate a list of messages returned by a streaming data download
+         * Create an event source from a JavaScript ReadableStream object
          *
-         * @function aggregateResponse
+         * @function streamToEmitter
+         * @memberof tracdap.utils
+         *
+         * @param {ReadableStream} stream A JavaScript ReadableStream object
+         * @return {$protobuf.EventEmitter} An event emitter for the supplied stream
+         */
+        utils.streamToEmitter = function(stream) {
+
+            const emitter = new $protobuf.util.EventEmitter();
+
+            const writer = new WritableStream({
+
+                write(chunk) {
+                    emitter.emit("data", chunk);
+                },
+
+                close() {
+                    emitter.emit("end");
+                    emitter.emit("close");
+                },
+
+                abort(error) {
+                    emitter.emit("error", error);
+                    emitter.emit("close");
+                }
+            });
+
+            stream.pipeTo(writer)
+                .then(_ => writer.close())
+                .catch(err => writer.abort(err));
+
+            return emitter;
+        }
+
+        /**
+         * Aggregate the content from a list of messages returned by a streaming data or file download
+         *
+         * @function aggregateDataContent
          * @memberof tracdap.utils
          *
          * @template TMessage extends $protobuf.rpc.Message
-         * @param {TMessage[]} messages A list of the messages to be aggregated
+         * @param {TMessage[]} messages A list of the messages with content to be aggregated
          * @return {TMessage} A single aggregated message, with the content of the entire download stream
          */
-        utils.aggregateResponse = function (messages) {
+        utils.aggregateDataContent = function (messages) {
 
             if (messages === null || messages.length === 0)
                 throw new Error("No response was received")

@@ -92,7 +92,7 @@ async function saveStreamingData(csvData) {
         // This will make sure the stream is either finished or cancelled
         // And let errors be sent back on the promise
 
-        csvData.on('close', () => stream.end());
+        csvData.on('end', () => stream.end());
         csvData.on('error', () => stream.end(true));
     });
 }
@@ -119,19 +119,19 @@ function loadStreamingData(dataId) {
         // You have to call newStream before using a streaming operation
         const stream = tracdap.setup.newStream(dataApi);
 
-        // Hold the responses here until the stream is complete
-        const messages = []
-
         // Make an initial call to start the download stream
         stream.readDataset(request).catch(reject);
+
+        // Hold the responses here until the stream is complete
+        const messages = []
 
         // When messages come in, stash them until the stream is complete
         stream.on("data", msg => messages.push(msg));
 
         // Once the stream finishes we can aggregate the messages into a single response
         stream.on("end", () => {
-            const response = tracdap.utils.aggregateResponse(messages);
-            resolve(response);
+            const dataContent = tracdap.utils.aggregateDataContent(messages);
+            resolve(dataContent);
         });
 
         // Handle the error signal to make sure errors are reported back through the promise
