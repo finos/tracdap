@@ -60,12 +60,12 @@ class S3ObjectStorage(IFileStorage):
         self._config = config
         self._options = options
 
-        self._bucket = config.properties[self.BUCKET_PROPERTY]
-        self._prefix = config.properties[self.PREFIX_PROPERTY] if self.PREFIX_PROPERTY in config.properties else ""
-        self._region = config.properties[self.REGION_PROPERTY] if self.REGION_PROPERTY in config.properties else None
-        self._endpoint = config.properties[self.ENDPOINT_PROPERTY] if self.ENDPOINT_PROPERTY in config.properties else None
+        self._bucket = _util.get_plugin_property(self._config, self.BUCKET_PROPERTY)
+        self._prefix = _util.get_plugin_property(self._config, self.PREFIX_PROPERTY) or ""
+        self._region = _util.get_plugin_property(self._config, self.REGION_PROPERTY)
+        self._endpoint = _util.get_plugin_property(self._config, self.ENDPOINT_PROPERTY)
 
-        credentials_params = self.setup_credentials(config.properties)
+        credentials_params = self.setup_credentials()
 
         client_args = {
             "service_name": "s3",
@@ -79,9 +79,9 @@ class S3ObjectStorage(IFileStorage):
 
         self.__client = boto3.client(**client_args)
 
-    def setup_credentials(self, properties: dict):
+    def setup_credentials(self):
 
-        mechanism = properties[self.CREDENTIALS_PROPERTY] if self.CREDENTIALS_PROPERTY in properties else self.CREDENTIALS_DEFAULT
+        mechanism = _util.get_plugin_property(self._config, self.CREDENTIALS_PROPERTY) or self.CREDENTIALS_DEFAULT
 
         if mechanism.lower() == self.CREDENTIALS_DEFAULT:
             self._log.info(f"Using [{self.CREDENTIALS_DEFAULT}] credentials mechanism")
@@ -89,8 +89,8 @@ class S3ObjectStorage(IFileStorage):
 
         if mechanism.lower() == self.CREDENTIALS_STATIC:
 
-            access_key_id = properties[self.ACCESS_KEY_ID_PROPERTY]
-            secret_access_key = properties[self.SECRET_ACCESS_KEY_PROPERTY]
+            access_key_id = _util.get_plugin_property(self._config, self.ACCESS_KEY_ID_PROPERTY)
+            secret_access_key = _util.get_plugin_property(self._config, self.SECRET_ACCESS_KEY_PROPERTY)
 
             self._log.info(
                 f"Using [{self.CREDENTIALS_STATIC}] credentials mechanism, " +

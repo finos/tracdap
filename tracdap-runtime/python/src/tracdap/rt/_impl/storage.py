@@ -387,12 +387,14 @@ FormatManager.register_data_format(
 
 class LocalFileStorage(IFileStorage):
 
+    ROOT_PATH_PROPERTY = "rootPath"
+
     def __init__(self, config: _cfg.PluginConfig, options: dict = None):
 
         self._log = _util.logger_for_object(self)
         self._options = options or {}
 
-        root_path_config = config.properties.get("rootPath")  # TODO: Config / constants
+        root_path_config = _util.get_plugin_property(config, self.ROOT_PATH_PROPERTY)
 
         if not root_path_config or root_path_config.isspace():
             err = f"Storage root path not set"
