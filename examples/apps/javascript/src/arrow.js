@@ -23,8 +23,8 @@ import {loadFromDisk} from './util';
 import * as arrow from 'apache-arrow';
 
 // Create the Data API
-const dataApiRpcImpl = tracdap.setup.rpcImplForTarget(tracdap.api.TracDataApi, "http", "localhost", 8080);
-const dataApi = new tracdap.api.TracDataApi(dataApiRpcImpl);
+const dataTransport = tracdap.setup.transportForTarget(tracdap.api.TracDataApi, "http", "localhost", 8080);
+const dataApi = new tracdap.api.TracDataApi(dataTransport);
 
 
 function loadArrowData(dataId) {

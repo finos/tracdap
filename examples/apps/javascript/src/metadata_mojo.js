@@ -18,8 +18,8 @@ import {tracdap} from 'tracdap-web-api';
 
 import {loadTag} from "./hello_world";
 
-const metaApiRpcImpl = tracdap.setup.rpcImplForTarget(tracdap.api.TracMetadataApi, "http", "localhost", 8080);
-const metaApi = new tracdap.api.TracMetadataApi(metaApiRpcImpl);
+const metaTransport = tracdap.setup.transportForTarget(tracdap.api.TracMetadataApi, "http", "localhost", 8080);
+const metaApi = new tracdap.api.TracMetadataApi(metaTransport);
 
 
 export function searchForSchema() {

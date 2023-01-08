@@ -16,12 +16,12 @@
 
 import {tracdap} from 'tracdap-web-api';
 
-// Use tracdap.setup to create an RPC connector pointed at your TRAC server
-// For code that will run in the browser, use rpcImplForBrowser to direct requests to the origin server
-const metaApiRpcImpl = tracdap.setup.rpcImplForTarget(tracdap.api.TracMetadataApi, "http", "localhost", 8080);
+// Use tracdap.setup to create an RPC transport pointed at your TRAC server
+// For code that will run in the browser, use transportForBrowser to direct requests to the origin server
+const metaTransport = tracdap.setup.transportForTarget(tracdap.api.TracMetadataApi, "http", "localhost", 8080);
 
 // Create a TRAC API instance for the Metadata API
-const metaApi = new tracdap.api.TracMetadataApi(metaApiRpcImpl);
+const metaApi = new tracdap.api.TracMetadataApi(metaTransport);
 
 
 export function createSchema() {

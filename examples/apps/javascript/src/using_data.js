@@ -20,8 +20,8 @@ import {searchForSchema} from './metadata_mojo';
 import {loadFromDisk} from './util';
 
 // Create the Data API
-const dataApiRpcImpl = tracdap.setup.rpcImplForTarget(tracdap.api.TracDataApi, "http", "localhost", 8080);
-const dataApi = new tracdap.api.TracDataApi(dataApiRpcImpl);
+const dataTransport = tracdap.setup.transportForTarget(tracdap.api.TracDataApi, "http", "localhost", 8080);
+const dataApi = new tracdap.api.TracDataApi(dataTransport);
 
 
 export function saveDataToTrac(schemaId, csvData) {

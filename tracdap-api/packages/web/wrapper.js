@@ -1243,14 +1243,14 @@
         /**
          * Aggregate the content from a list of messages returned by a streaming data or file download
          *
-         * @function aggregateDataContent
+         * @function aggregateStreamContent
          * @memberof tracdap.utils
          *
          * @template TMessage extends $protobuf.rpc.Message
          * @param {TMessage[]} messages A list of the messages with content to be aggregated
          * @return {TMessage} A single aggregated message, with the content of the entire download stream
          */
-        utils.aggregateDataContent = function (messages) {
+        utils.aggregateStreamContent = function (messages) {
 
             if (messages === null || messages.length === 0)
                 throw new Error("No response was received")
