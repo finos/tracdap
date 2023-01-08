@@ -55,6 +55,100 @@
     const DEFAULT_TRANSPORT = "google"
 
 
+    // Streaming upload cancellation
+
+    // ProtobufJS does not currently provide a cancel() function to abort streaming uploads
+    // This is a work-around that can be used in client code until such a function is provided
+    // Setting rpcImpl = null will prevent any further messages from being sent
+    // If the EOS message has not been sent TRAC will make the call timeout, so it will not complete
+    // An error will propagate back to client code because the connection was closed unexpectedly
+    // To avoid delays, client code should report an error immediately after calling cancel
+
+    // A more sophisticated implementation would send signals into rpcImpl
+    // These signals could be used by the transport to terminate the connection
+    // However, this would be better done as part of the protobufjs framework itself
+    // I have raised a ticket for consideration
+    // If it doesn't get into the framework we can add the signal mechanism here instead
+
+    // https://github.com/protobufjs/protobuf.js/issues/1849
+
+
+    /**
+     * Cancel an existing stream.
+     *
+     * <p>A request can only be cancelled before the complete request has been sent.
+     * Cancelling a request after it is fully sent has no effect.</p>
+     *
+     * <p>For unary requests and download streams (server streaming),
+     * the entire request is sent in a single message so these request cannot be cancelled.
+     * For upload (client streaming) and bidirectional streams,
+     * the request can be any time before .end() is called.</p>
+     *
+     * @function cancel
+     * @memberof tracdap.api.TracMetadataApi
+     * @instance
+     * @returns {tracdap.api.TracMetadataApi}
+     */
+    Object.defineProperty($root.tracdap.api.TracMetadataApi.prototype.cancel = function cancel() {
+
+        if (this.rpcImpl) {
+            this.rpcImpl = null;
+        }
+        return this;
+
+    }, "name", { value: "cancel" });
+
+    /**
+     * Cancel an existing stream.
+     *
+     * <p>A request can only be cancelled before the complete request has been sent.
+     * Cancelling a request after it is fully sent has no effect.</p>
+     *
+     * <p>For unary requests and download streams (server streaming),
+     * the entire request is sent in a single message so these request cannot be cancelled.
+     * For upload (client streaming) and bidirectional streams,
+     * the request can be any time before .end() is called.</p>
+     *
+     * @function cancel
+     * @memberof tracdap.api.TracDataApi
+     * @instance
+     * @returns {tracdap.api.TracDataApi}
+     */
+    Object.defineProperty($root.tracdap.api.TracDataApi.prototype.cancel = function cancel() {
+
+        if (this.rpcImpl) {
+            this.rpcImpl = null;
+        }
+        return this;
+
+    }, "name", { value: "cancel" });
+
+    /**
+     * Cancel an existing stream.
+     *
+     * <p>A request can only be cancelled before the complete request has been sent.
+     * Cancelling a request after it is fully sent has no effect.</p>
+     *
+     * <p>For unary requests and download streams (server streaming),
+     * the entire request is sent in a single message so these request cannot be cancelled.
+     * For upload (client streaming) and bidirectional streams,
+     * the request can be any time before .end() is called.</p>
+     *
+     * @function cancel
+     * @memberof tracdap.api.TracOrchestratorApi
+     * @instance
+     * @returns {tracdap.api.TracOrchestratorApi}
+     */
+    Object.defineProperty($root.tracdap.api.TracOrchestratorApi.prototype.cancel = function cancel() {
+
+        if (this.rpcImpl) {
+            this.rpcImpl = null;
+        }
+        return this;
+
+    }, "name", { value: "cancel" });
+
+
     const GoogleTransport = (function() {
 
         function GoogleTransport(serviceName, protocol, host, port, options) {
@@ -106,10 +200,9 @@
 
             this.grpcWeb.rpcCall(method.name, request, this.rpcMetadata, descriptor, callback);
 
-            // For stream.on("metadata") and stream.on("status")
-            // If status == OK, call _processResponseMetadata()
-            // This will update cookies and session info sent by TRAC
-            // Share implementation with TRAC transport
+            // Currently no need to process the "metadata" and "status" events
+            // Anyway "status" is handled by the grpc-web framework
+            // Auth headers come back in cookies and are handled by the browser
         }
 
         GoogleTransport.prototype._grpcWebServerStreaming = function(method, descriptor, request, callback) {
@@ -120,10 +213,9 @@
             stream.on("end", () => callback(null, null));
             stream.on("error", err => callback(err, null));
 
-            // For stream.on("metadata") and stream.on("status")
-            // If status == OK, call _processResponseMetadata()
-            // This will update cookies and session info sent by TRAC
-            // Share implementation with TRAC transport
+            // Currently no need to process the "metadata" and "status" events
+            // Anyway "status" is handled by the grpc-web framework
+            // Auth headers come back in cookies and are handled by the browser
         }
 
         return GoogleTransport;
