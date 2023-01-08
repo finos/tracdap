@@ -6,11 +6,15 @@ This tutorial is based on the *streaming.js* example, which can be found in the
 `TRAC GitHub Repository <https://github.com/finos/tracdap>`_
 under *examples/apps/javascript*.
 
+.. note::
+
+    This example shows how to create and read a dataset using streaming upload and download operations.
+    The same approach can be used to update datasets or to create, update and read files.
 
 Data transport
 --------------
 
-The gRPC transport provided by Google in grpc-web does not yet support streaming uploads[1].
+The gRPC transport provided by Google in grpc-web does not yet support streaming uploads.
 Fortunately, TRAC provides a gRPC transport that does support streaming for both uploads
 and downloads, using a web sockets implementation based on the work by Improbable Eng.
 
@@ -47,31 +51,12 @@ The first message contains all the settings needed in a :class:`DataWriteRequest
 but no content. The following messages contain content only with no other settings,
 this content will usually come from a streaming source.
 
-Let's create the streaming source first. The example code uses the Node *fs* module:
-
-.. literalinclude:: ../../../examples/apps/javascript/src/streaming.js
-    :language: JavaScript
-    :lines: 146
-    :linenos:
-    :lineno-start: 146
-
-In a browser application you could use the fetch API on a selected file. Since TRAC uses the Protobuf.js
-EventEmitter pattern, you will need to convert the ReadableStream return by fetch() into an EventEmitter.
-TRAC provides a utility function to help with this:
-
-.. code-block:: javascript
-    :linenos:
-    :lineno-start: 146
-
-        const csvFetch = fetch("file://local/file.csv");
-        const csvStream = csvFetch.then(response => tracdap.util.emitterForReadableStream(response.body))
-
-TODO: write the emitter converter util
-
-Once the source is open, create the initial message. We are going to send data in CSV format,
-to send the content directly from the file stream without transformation.
+First let's create the initial request message. We are going to send data in CSV format,
+so that we can stream data straight from a file to the TRAC data API without any transformation.
 This example uses an embedded schema, but a schemaId for an external schema is also fine.
-Tag attributes can be set as normal.
+Tag attributes can be set as normal. The initial request message goes through the same validation
+as a request to :meth:`readSmallDataset() <tracdap.api.TracDataApi.readSmallDataset>`,
+except that the content can be empty.
 
 .. literalinclude:: ../../../examples/apps/javascript/src/streaming.js
     :language: JavaScript
@@ -79,14 +64,43 @@ Tag attributes can be set as normal.
     :linenos:
     :lineno-start: 49
 
-To set up the streaming call, we need to use the *newStream()* method in the web API
-setup module. It is important to call this method for every new streaming call and
-each stream can only be used once, otherwise messages from different calls will be mixed
-in a single stream.
+Now let's create the streaming source. The example code uses the *fs* module from Node.js
+to create an input stream, then passes the stream into the upload function:
+
+.. literalinclude:: ../../../examples/apps/javascript/src/streaming.js
+    :language: JavaScript
+    :lines: 156
+    :linenos:
+    :lineno-start: 156
+
+In a browser application, your source is most likely to be an HTML file input control.
+The file input control supports streaming using the
+`web streams API <https://developer.mozilla.org/en-US/docs/Web/API/Streams_API>`_,
+which is different from the event streams used in Node.js and Protobuf.js.
+TRAC provides a utility function to create an event stream, using a web ReadableStream as the source.
+
+.. code-block:: javascript
+    :linenos:
+    :lineno-start: 156
+
+        const csvInput = document.getElementById("input_id");
+        const csvFile = csvInput.files[0];
+        const csvStream = tracdap.utils.streamToEmitter(csvFile.stream());
+
+.. note::
+
+    To stream data from memory you can use
+    `Blob.stream() <https://developer.mozilla.org/en-US/docs/Web/API/Blob/stream>`_
+    with *streamToEmitter()*.
 
 We're going to create a promise for the stream, which will complete when the streaming upload finishes.
 Although we are sending a stream of messages to the server there will only be a single reply,
 which can be a success or failure.
+
+To set up the streaming call, we need to use the *newStream()* method in the web API
+setup module. It is important to call this method for every new streaming call and
+each stream can only be used once, otherwise messages from different calls will be mixed
+in a single stream.
 
 .. literalinclude:: ../../../examples/apps/javascript/src/streaming.js
     :language: JavaScript
@@ -94,8 +108,10 @@ which can be a success or failure.
     :linenos:
     :lineno-start: 64
 
-After creating the stream, start by sending the initial message. The API call returns a future,
-which can be used to handle the result of the whole stream upload operation:
+After creating the stream, start by sending the initial message.
+This will start the streaming upload operation.
+This initial API call returns a future which holds the result of the whole operation,
+so we can use this to complete the promise.
 
 .. literalinclude:: ../../../examples/apps/javascript/src/streaming.js
     :language: JavaScript
@@ -103,39 +119,91 @@ which can be used to handle the result of the whole stream upload operation:
     :linenos:
     :lineno-start: 74
 
-Now we can start sending content, by relaying data events on the source stream.
-In this example the stream event we want to relay is "data", and we are putting
-each chunk directly into a :class:`DataWriteRequest<tracdap.api.DataWriteRequest>`
-as content. This is by far the simplest approach.
-
-If you do want to perform any transformations they can be applied here, remember
-chunks can break at any point including inside a record or even inside a multi-byte
-character in a string.
+Now the upload stream is open, we need to relay data from the source stream.
+To do this we can handle the "data" event on the source stream which supplies
+chunks of data from the input source. To send them to the upload stream,
+each chunk needs to be wrapped in a :class:`DataWriteRequest<tracdap.api.DataWriteRequest>`.
+The "end" event signals that the source stream is complete.
 
 .. literalinclude:: ../../../examples/apps/javascript/src/streaming.js
     :language: JavaScript
-    :lines: 81 - 90
+    :lines: 81 - 94
     :linenos:
     :lineno-start: 81
 
-The last thing we need to do is handle errors and completion on the source stream.
-For our example using the *fs* stream source, that looks like this:
+The last thing is to handle any errors that occur on the source stream.
+These are different from errors in the upload stream, which were handled earlier by *.catch(reject)*.
+
+If there is an error in the source stream, we need to cancel the upload operation.
+Calling *cancel()* will eventually produce an error on the upload stream,
+but this will be an "operation cancelled" error with no information about what went wrong in the source.
+Instead we want to reject the promise explicitly, to pass on the error information from the source stream.
 
 .. literalinclude:: ../../../examples/apps/javascript/src/streaming.js
     :language: JavaScript
-    :lines: 91 - 98
+    :lines: 95 - 104
     :linenos:
-    :lineno-start: 91
+    :lineno-start: 95
 
 Streaming download
 ------------------
 
 To download a data stream we make a single request and get back a stream of messages.
+The first message in the stream will contain all the metadata and no content.
+Subsequent messages will contain only content.
 
-TODO
+.. note::
+
+    This example shows how to use a download stream and collect the result in memory.
+    It is a useful approach for datasets that are too big to download with
+    :meth:`readSmallDataset() <tracdap.api.TracDataApi.readSmallDataset>`,
+    but where you still want to keep the whole dataset to display, sort, filter etc.
+
+To start you need to create a :class:`DataReadRequest <tracdap.api.DataReadRequest>`.
+This is exactly the same as the request used to call
+:meth:`readSmallDataset() <tracdap.api.TracDataApi.readSmallDataset>`.
 
 .. literalinclude:: ../../../examples/apps/javascript/src/streaming.js
     :language: JavaScript
-    :lines: 101 - 141
+    :lines: 110 - 116
     :linenos:
-    :lineno-start: 101
+    :lineno-start: 110
+
+Since we are going to collect the response data into a single message,
+we can set up the streaming operation as a promise just like the upload operation.
+The promise will complete once all the data is collected and aggregated.
+If there are any errors during the operation, the promise will be rejected.
+
+.. literalinclude:: ../../../examples/apps/javascript/src/streaming.js
+    :language: JavaScript
+    :lines: 118 - 127
+    :linenos:
+    :lineno-start: 118
+
+The next step is to set up event handlers for the download stream.
+There are three events to process: "data", "end" and "error".
+In this example we will just collect the response messages from the
+"data" events until they have all been received, and then use a TRAC
+utility function to aggregate them into a single
+:class:`DataReadResponse <tracdap.api.DataReadResponse>`.
+
+.. note::
+
+    The *aggregateStreamContent()* function works for both
+    :class:`DataReadResponse <tracdap.api.DataReadResponse>` and
+    :class:`FileReadResponse <tracdap.api.FileReadResponse>` messages.
+
+.. literalinclude:: ../../../examples/apps/javascript/src/streaming.js
+    :language: JavaScript
+    :lines: 129 - 142
+    :linenos:
+    :lineno-start: 129
+
+Now everything is ready, the final step is to make an API call
+to start the download stream.
+
+.. literalinclude:: ../../../examples/apps/javascript/src/streaming.js
+    :language: JavaScript
+    :lines: 144 - 149
+    :linenos:
+    :lineno-start: 144
