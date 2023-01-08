@@ -39,14 +39,16 @@ __REPO_USER_KEY = "username"
 __REPO_PASS_KEY = "password"
 
 
-def _get_credentials(url: urllib.parse.ParseResult, properties: tp.Dict[str, str]):
+def _get_credentials(url: urllib.parse.ParseResult, plugin_config: _cfg.PluginConfig):
 
-    if __REPO_TOKEN_KEY in properties:
-        return properties[__REPO_TOKEN_KEY]
+    token = _util.get_plugin_property(plugin_config, __REPO_TOKEN_KEY)
+    username = _util.get_plugin_property(plugin_config, __REPO_USER_KEY)
+    password = _util.get_plugin_property(plugin_config, __REPO_PASS_KEY)
 
-    if __REPO_USER_KEY in properties and __REPO_PASS_KEY in properties:
-        username = properties[__REPO_USER_KEY]
-        password = properties[__REPO_PASS_KEY]
+    if token is not None:
+        return token
+
+    if username is not None and password is not None:
         return f"{username}:{password}"
 
     if url.username:
@@ -66,7 +68,7 @@ def _apply_credentials(url: urllib.parse.ParseResult, credentials: str):
 
     else:
         location_sep = url.netloc.index("@")
-        location = f"{credentials}@{url.netloc[location_sep:]}"
+        location = f"{credentials}@{url.netloc[location_sep + 1:]}"
 
     return url._replace(netloc=location)
 
@@ -101,7 +103,7 @@ class LocalRepository(IModelRepository):
 
     def __init__(self, repo_config: _cfg.PluginConfig):
         self._repo_config = repo_config
-        self._repo_url = self._repo_config.properties[self.REPO_URL_KEY]
+        self._repo_url = _util.get_plugin_property(self._repo_config, self.REPO_URL_KEY)
 
         if not self._repo_url:
             raise _ex.EConfigParse(f"Missing required property [{self.REPO_URL_KEY}] in local repository config")
@@ -135,13 +137,13 @@ class GitRepository(IModelRepository):
         self._repo_config = repo_config
         self._log = _util.logger_for_object(self)
 
-        repo_url_prop = self._repo_config.properties.get(self.REPO_URL_KEY)
+        repo_url_prop = _util.get_plugin_property(self._repo_config, self.REPO_URL_KEY)
 
         if not repo_url_prop:
             raise _ex.EConfigParse(f"Missing required property [{self.REPO_URL_KEY}] in Git repository config")
 
         repo_url = urllib.parse.urlparse(repo_url_prop)
-        credentials = _get_credentials(repo_url, repo_config.properties)
+        credentials = _get_credentials(repo_url, repo_config)
 
         self._repo_url = _apply_credentials(repo_url, credentials)
 
@@ -256,8 +258,7 @@ class PyPiRepository(IModelRepository):
 
         self._log.info(f"Checkout location: [{checkout_dir}]")
 
-        repo_props = self._repo_config.properties
-        pip_index = repo_props.get(self.PIP_INDEX_KEY)
+        pip_index = _util.get_plugin_property(self._repo_config, self.PIP_INDEX_KEY)
 
         if pip_index is None:
             raise _ex.EConfigParse(f"Missing required property [{self.PIP_INDEX_KEY}] in PyPi repository config")
@@ -266,7 +267,7 @@ class PyPiRepository(IModelRepository):
         json_package_path = self.JSON_PACKAGE_PATH.format(json_root_url.path, model_def.package, model_def.version)
         json_package_url = json_root_url._replace(path=json_package_path)
 
-        credentials = _get_credentials(json_root_url, self._repo_config.properties)
+        credentials = _get_credentials(json_root_url, self._repo_config)
         json_root_url = _apply_credentials(json_package_url, credentials)
 
         json_headers = {"accept": "application/json"}
