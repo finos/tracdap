@@ -26,7 +26,7 @@ const dataApi = new tracdap.api.TracDataApi(dataTransport);
 const LARGE_CSV_FILE = "../../../tracdap-services/tracdap-svc-data/src/test/resources/large_csv_data_100000.csv";
 
 
-async function saveStreamingData(csvData) {
+async function saveStreamingData(csvStream) {
 
     // Schema definition for the data we want to save
     // You can also use a pre-loaded schema ID
@@ -78,29 +78,30 @@ async function saveStreamingData(csvData) {
             .then(resolve)
             .catch(reject);
 
-        // Now handle the events on your data stream, by forwarding them to the API stream
-        // In this example, csvData is a stream of chunks loaded from the file system
+        // Now handle the events on your source stream, by forwarding them to the upload stream
+        // In this example, csvStream is a stream of chunks loaded from the file system
         // Each chunk needs to be wrapped in a message, by setting the "content" field
         // All the other fields in the message should be left blank
 
-        csvData.on('data', chunk => {
+        csvStream.on('data', chunk => {
             const msg = tracdap.api.DataWriteRequest.create({content: chunk});
             stream.createDataset(msg)
         });
 
-        // Call .end() when the input stream completes
+        // Once the source stream completes, signal that the upload stream is also complete
 
-        csvData.on('end', () => stream.end());
+        csvStream.on('end', () => stream.end());
 
         // If there is an error reading the input data stream, we need to cancel the upload
         // This is to prevent a half-sent dataset from being saved
         // Calling .cancel() does not result in an error on the stream, so call reject() explicitly
 
-        csvData.on('error', err => {
+        csvStream.on('error', err => {
             stream.cancel();
             reject(err);
         });
-    });
+
+    }); // End of streaming operation promise
 }
 
 
@@ -114,7 +115,7 @@ function loadStreamingData(dataId) {
         format: "text/csv"
     });
 
-    // In this example, the result of the download stream is aggregated into a single message
+    // In this example, the messages from the download stream are aggregated into a single response message
     // To display data in the browser, the entire dataset must be loaded in memory
     // Aggregating the data and returning a single promise keeps the streaming logic contained
 
@@ -125,24 +126,27 @@ function loadStreamingData(dataId) {
         // You have to call newStream before using a streaming operation
         const stream = tracdap.setup.newStream(dataApi);
 
-        // Make an initial call to start the download stream
-        stream.readDataset(request).catch(reject);
-
         // Hold the responses here until the stream is complete
-        const messages = []
+        const messages = [];
 
         // When messages come in, stash them until the stream is complete
         stream.on("data", msg => messages.push(msg));
 
         // Once the stream finishes we can aggregate the messages into a single response
         stream.on("end", () => {
-            const dataContent = tracdap.utils.aggregateDataContent(messages);
-            resolve(dataContent);
+            const response = tracdap.utils.aggregateStreamContent(messages);
+            resolve(response);
         });
 
         // Handle the error signal to make sure errors are reported back through the promise
         stream.on("error", err => reject(err));
-    });
+
+        // Make the initial API call to start the download stream
+        // It is not necessary to use a .then() or .catch() block,
+        // because responses are processed on the stream
+        stream.readDataset(request);
+
+    }); // End of streaming operation promise
 }
 
 export async function main() {
