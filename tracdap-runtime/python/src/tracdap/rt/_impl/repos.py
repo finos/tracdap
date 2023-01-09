@@ -14,6 +14,7 @@
 
 from __future__ import annotations
 
+import re
 import subprocess
 import subprocess as sp
 import urllib.parse
@@ -227,6 +228,7 @@ class GitRepository(IModelRepository):
 
 class PyPiRepository(IModelRepository):
 
+    SIMPLE_PACKAGE_PATH = "{}/{}/"
     JSON_PACKAGE_PATH = "{}/{}/{}/json"
 
     PIP_INDEX_KEY = "pipIndex"
@@ -238,8 +240,12 @@ class PyPiRepository(IModelRepository):
 
         self._repo_config = repo_config
 
-        if self.PIP_INDEX_KEY not in self._repo_config.properties:
-            raise _ex.EConfigParse(f"Missing required property [{self.PIP_INDEX_KEY}] in PyPi repository config")
+        self._pip_index = _util.get_plugin_property(self._repo_config, self.PIP_INDEX_KEY)
+        self._pip_index_url = _util.get_plugin_property(self._repo_config, self.PIP_INDEX_URL_KEY)
+
+        if self._pip_index is None and self._pip_index_url is None:
+            message = f"Neither [{self.PIP_INDEX_KEY}] nor [{self.PIP_INDEX_URL_KEY} is set in PyPi repository config"
+            raise _ex.EConfigParse(message)
 
     def checkout_key(self, model_def: _meta.ModelDefinition):
         return model_def.version
@@ -258,29 +264,96 @@ class PyPiRepository(IModelRepository):
 
         self._log.info(f"Checkout location: [{checkout_dir}]")
 
-        pip_index = _util.get_plugin_property(self._repo_config, self.PIP_INDEX_KEY)
+        if self._pip_index_url is not None:
+            package_filename, package_url = self._pypi_simple_query(model_def)
 
-        if pip_index is None:
-            raise _ex.EConfigParse(f"Missing required property [{self.PIP_INDEX_KEY}] in PyPi repository config")
+        else:
+            package_filename, package_url = self._pypi_json_query(model_def)
 
-        json_root_url = urllib.parse.urlparse(pip_index)
-        json_package_path = self.JSON_PACKAGE_PATH.format(json_root_url.path, model_def.package, model_def.version)
-        json_package_url = json_root_url._replace(path=json_package_path)
+        self._log.info(f"Downloading [{package_filename}]")
 
-        credentials = _get_credentials(json_root_url, self._repo_config)
-        json_root_url = _apply_credentials(json_package_url, credentials)
+        download_req = requests.get(package_url.geturl())
+        content = download_req.content
+        elapsed = download_req.elapsed
 
+        self._log.info(f"Downloaded [{len(content) / 1024:.1f}] KB in [{elapsed.total_seconds():.1f}] seconds")
+
+        download_whl = zipfile.ZipFile(io.BytesIO(download_req.content))
+        download_whl.extractall(checkout_dir)
+
+        self._log.info(f"Unpacked [{len(download_whl.filelist)}] files")
+        self._log.info(f"PyPI checkout succeeded for {model_def.package} {model_def.version}")
+
+        return self.package_path(model_def, checkout_dir)
+
+    def _pypi_simple_query(self, model_def: _meta.ModelDefinition):
+
+        # PEP describing PyPI simple protocol
+        # https://peps.python.org/pep-0691/
+
+        simple_root_url = urllib.parse.urlparse(self._pip_index_url)
+        simple_headers = {"accept": "application/vnd.pypi.simple.v1+json"}
+
+        credentials = _get_credentials(simple_root_url, self._repo_config)
+
+        package_req = self._pypi_package_query(
+            self.SIMPLE_PACKAGE_PATH, simple_root_url, simple_headers,
+            credentials, model_def)
+
+        package_obj = package_req.json()
+        package_name = package_obj.get("name") or ""
+        files = package_obj.get("files") or []
+
+        name_pattern = package_name.replace("-", "_")  # dash is replaced by underscore in wheel names
+        version_pattern = model_def.version.replace(".", "\\.")
+        file_pattern = re.compile(f"^{name_pattern}-{version_pattern}-(?P<target>.*)\\.whl")
+
+        matches = []
+
+        for file_info in files:
+
+            filename = file_info.get("filename") or ""
+            yanked = file_info.get("yanked")
+            match = file_pattern.match(filename)
+
+            if match and not yanked:
+
+                url = file_info.get("url")
+                target = match.group("target")
+
+                match_info = filename, url, target
+                matches.append(match_info)
+
+        if len(matches) == 0:
+            message = f"No package found for [{package_name}] version [{model_def.version}]"
+            self._log.error(message)
+            raise _ex.EModelRepo(message)
+
+        if len(matches) > 1:
+            message = f"Multiple packages found for [{package_name}] version [{model_def.version}]" + \
+                      f" (targets: " + ", ".join(map(lambda m: m[2], matches)) + ")"
+            self._log.error(message)
+            raise _ex.EModelRepo(message)
+
+        filename, url, target = matches[0]
+
+        self._log.info(f"Found package [{package_name}] version [{model_def.version}], target = [{target}]")
+
+        package_url = urllib.parse.urlparse(url)
+        package_url = _apply_credentials(package_url, credentials)
+
+        return filename, package_url
+
+    def _pypi_json_query(self, model_def: _meta.ModelDefinition):
+
+        json_root_url = urllib.parse.urlparse(self._pip_index)
         json_headers = {"accept": "application/json"}
 
-        self._log.info(f"Package query: {_util.log_safe_url(json_root_url)}")
+        credentials = _get_credentials(json_root_url, self._repo_config)
 
-        package_req = requests.get(json_package_url.geturl(), headers=json_headers)
-
-        if package_req.status_code != requests.codes.OK:
-            status_code_name = requests.codes.name[package_req.status_code]
-            message = f"Package lookup failed: [{package_req.status_code}] {status_code_name}"
-            self._log.error(message)
-            raise _ex.EModelRepo(message)  # todo status code for access, not found etc
+        package_req = self._pypi_package_query(
+            self.JSON_PACKAGE_PATH, json_root_url, json_headers,
+            credentials, model_def)
 
         package_obj = package_req.json()
         package_info = package_obj.get("info") or {}
@@ -304,24 +377,26 @@ class PyPiRepository(IModelRepository):
         package_url_info = bdist_urls[0]
         package_filename = package_url_info.get("filename")
         package_url = urllib.parse.urlparse(package_url_info.get("url"))
-
         package_url = _apply_credentials(package_url, credentials)
 
-        self._log.info(f"Downloading [{package_filename}]")
+        return package_filename, package_url
 
-        download_req = requests.get(package_url.geturl())
-        content = download_req.content
-        elapsed = download_req.elapsed
+    def _pypi_package_query(self, package_path_template, root_url, headers, credentials, model_def):
 
-        self._log.info(f"Downloaded [{len(content) / 1024:.1f}] KB in [{elapsed.total_seconds():.1f}] seconds")
+        root_url = _apply_credentials(root_url, credentials)
+        package_path = package_path_template.format(root_url.path, model_def.package, model_def.version)
+        package_url = root_url._replace(path=package_path)
 
-        download_whl = zipfile.ZipFile(io.BytesIO(download_req.content))
-        download_whl.extractall(checkout_dir)
+        self._log.info(f"Package query: {_util.log_safe_url(package_url)}")
 
-        self._log.info(f"Unpacked [{len(download_whl.filelist)}] files")
-        self._log.info(f"PyPI checkout succeeded for {model_def.package} {model_def.version}")
+        package_req = requests.get(package_url.geturl(), headers=headers)
 
-        return self.package_path(model_def, checkout_dir)
+        if package_req.status_code != requests.codes.OK:
+            message = f"Package lookup failed: [{package_req.status_code}] {package_req.reason}"
+            self._log.error(message)
+            raise _ex.EModelRepo(message)  # todo status code for access, not found etc
+
+        return package_req
 
 
 class RepositoryManager:
