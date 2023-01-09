@@ -34,6 +34,10 @@ public class GrpcErrorMapping {
     private static final Logger log = LoggerFactory.getLogger(GrpcErrorMapping.class);
 
     public static StatusRuntimeException processError(Throwable error) {
+        return processErrorToStatus(error).asRuntimeException();
+    }
+
+    public static Status processErrorToStatus(Throwable error) {
 
         // Unwrap future/streaming completion errors
         if (error instanceof CompletionException)
@@ -48,8 +52,7 @@ public class GrpcErrorMapping {
             var upstreamError = (StatusException) error;
 
             return upstreamError.getStatus()
-                    .withCause(upstreamError)
-                    .asRuntimeException();
+                    .withCause(upstreamError);
         }
 
         if (error instanceof StatusRuntimeException) {
@@ -57,8 +60,7 @@ public class GrpcErrorMapping {
             var upstreamError = (StatusRuntimeException) error;
 
             return upstreamError.getStatus()
-                    .withCause(upstreamError)
-                    .asRuntimeException();
+                    .withCause(upstreamError);
         }
 
         // Make sure internal errors are always reported as internal and the error description is masked
@@ -67,8 +69,7 @@ public class GrpcErrorMapping {
 
             return Status.fromCode(Status.Code.INTERNAL)
                     .withDescription(Status.INTERNAL.getDescription())
-                    .withCause(error)
-                    .asRuntimeException();
+                    .withCause(error);
         }
 
         // For "public" errors, try to look up an error code mapping
@@ -84,8 +85,7 @@ public class GrpcErrorMapping {
 
                 return Status.fromCode(errorCode)
                         .withDescription(error.getMessage())
-                        .withCause(error)
-                        .asRuntimeException();
+                        .withCause(error);
             }
             else {
 
@@ -96,8 +96,7 @@ public class GrpcErrorMapping {
 
                 return Status.fromCode(Status.Code.INTERNAL)
                         .withDescription(Status.INTERNAL.getDescription())
-                        .withCause(error)
-                        .asRuntimeException();
+                        .withCause(error);
             }
         }
 
@@ -109,8 +108,7 @@ public class GrpcErrorMapping {
 
         return Status.fromCode(Status.Code.INTERNAL)
                 .withDescription(Status.INTERNAL.getDescription())
-                .withCause(error)
-                .asRuntimeException();
+                .withCause(error);
     }
 
 

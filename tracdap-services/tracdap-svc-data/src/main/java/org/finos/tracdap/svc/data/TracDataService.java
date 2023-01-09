@@ -18,6 +18,8 @@ package org.finos.tracdap.svc.data;
 
 import org.finos.tracdap.api.TrustedMetadataApiGrpc;
 import org.finos.tracdap.common.auth.GrpcServerAuth;
+import org.finos.tracdap.common.grpc.ErrorMappingInterceptor;
+import org.finos.tracdap.common.grpc.LoggingClientInterceptor;
 import org.finos.tracdap.common.grpc.LoggingServerInterceptor;
 import org.finos.tracdap.config.ServiceConfig;
 import org.finos.tracdap.config.PlatformConfig;
@@ -178,6 +180,7 @@ public class TracDataService extends CommonServiceBase {
                     // Interceptors
                     .intercept(new LoggingServerInterceptor(TracDataApi.class))
                     .intercept(authentication)
+                    .intercept(new ErrorMappingInterceptor())
                     .intercept(execRegister.registerExecContext())
 
                     .build();
