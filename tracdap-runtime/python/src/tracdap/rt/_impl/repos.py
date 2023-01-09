@@ -288,6 +288,9 @@ class PyPiRepository(IModelRepository):
 
     def _pypi_simple_query(self, model_def: _meta.ModelDefinition):
 
+        # PEP describing PyPI simple protocol
+        # https://peps.python.org/pep-0691/
+
         simple_root_url = urllib.parse.urlparse(self._pip_index_url)
         simple_headers = {"accept": "application/vnd.pypi.simple.v1+json"}
 
