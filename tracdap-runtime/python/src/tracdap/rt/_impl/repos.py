@@ -14,6 +14,7 @@
 
 from __future__ import annotations
 
+import json.decoder
 import re
 import subprocess
 import subprocess as sp
@@ -234,6 +235,19 @@ class PyPiRepository(IModelRepository):
     PIP_INDEX_KEY = "pipIndex"
     PIP_INDEX_URL_KEY = "pipIndexUrl"
 
+    PIP_SIMPLE_FORMAT_KEY = "pipSimpleFormat"
+    PIP_SIMPLE_FORMAT_JSON = "json"
+    PIP_SIMPLE_FORMAT_HTML = "html"
+    PIP_SIMPLE_FORMAT_DEFAULT = PIP_SIMPLE_FORMAT_JSON
+
+    PIP_SIMPLE_CONTENT_TYPES = {
+        PIP_SIMPLE_FORMAT_JSON: "application/vnd.pypi.simple.v1+json",
+        PIP_SIMPLE_FORMAT_HTML: "text/html"
+    }
+
+    PIP_SIMPLE_TYPE_JSON = "application/vnd.pypi.simple.v1+json"
+    PIP_SIMPLE_TYPE_HTML = "text/html"
+
     def __init__(self, repo_config: _cfg.PluginConfig):
 
         self._log = _util.logger_for_object(self)
@@ -242,6 +256,7 @@ class PyPiRepository(IModelRepository):
 
         self._pip_index = _util.get_plugin_property(self._repo_config, self.PIP_INDEX_KEY)
         self._pip_index_url = _util.get_plugin_property(self._repo_config, self.PIP_INDEX_URL_KEY)
+        self._pip_simple_format = _util.get_plugin_property(self._repo_config, self.PIP_SIMPLE_FORMAT_KEY)
 
         if self._pip_index is None and self._pip_index_url is None:
             message = f"Neither [{self.PIP_INDEX_KEY}] nor [{self.PIP_INDEX_URL_KEY} is set in PyPi repository config"
@@ -292,7 +307,8 @@ class PyPiRepository(IModelRepository):
         # https://peps.python.org/pep-0691/
 
         simple_root_url = urllib.parse.urlparse(self._pip_index_url)
-        simple_headers = {"accept": "application/vnd.pypi.simple.v1+json"}
+        simple_content_type = self._pypi_simple_content_type()
+        simple_headers = {"accept": simple_content_type}
 
         credentials = _get_credentials(simple_root_url, self._repo_config)
 
@@ -300,49 +316,133 @@ class PyPiRepository(IModelRepository):
             self.SIMPLE_PACKAGE_PATH, simple_root_url, simple_headers,
             credentials, model_def)
 
-        package_obj = package_req.json()
-        package_name = package_obj.get("name") or ""
-        files = package_obj.get("files") or []
+        received_content_type = package_req.headers.get("content-type")
 
-        name_pattern = package_name.replace("-", "_")  # dash is replaced by underscore in wheel names
-        version_pattern = model_def.version.replace(".", "\\.")
-        file_pattern = re.compile(f"^{name_pattern}-{version_pattern}-(?P<target>.*)\\.whl")
-
-        matches = []
-
-        for file_info in files:
-
-            filename = file_info.get("filename") or ""
-            yanked = file_info.get("yanked")
-            match = file_pattern.match(filename)
-
-            if match and not yanked:
-
-                url = file_info.get("url")
-                target = match.group("target")
-
-                match_info = filename, url, target
-                matches.append(match_info)
-
-        if len(matches) == 0:
-            message = f"No package found for [{package_name}] version [{model_def.version}]"
-            self._log.error(message)
-            raise _ex.EModelRepo(message)
-
-        if len(matches) > 1:
-            message = f"Multiple packages found for [{package_name}] version [{model_def.version}]" + \
-                      f" (targets: " + ", ".join(map(lambda m: m[2], matches)) + ")"
-            self._log.error(message)
-            raise _ex.EModelRepo(message)
-
-        filename, url, target = matches[0]
-
-        self._log.info(f"Found package [{package_name}] version [{model_def.version}], target = [{target}]")
+        if received_content_type == self.PIP_SIMPLE_TYPE_JSON:
+            filename, url = self._pypi_simple_parse_json(package_req, model_def)
+        elif received_content_type == self.PIP_SIMPLE_TYPE_HTML:
+            filename, url = self._pypi_simple_parse_html(package_req, model_def)
+        else:
+            err = f"Invalid response from package repository: Content type = [{received_content_type}]"
+            self._log.error(err)
+            raise _ex.EModelRepo(err)
 
         package_url = urllib.parse.urlparse(url)
         package_url = _apply_credentials(package_url, credentials)
 
         return filename, package_url
+
+    def _pypi_simple_content_type(self):
+
+        if self._pip_simple_format in self.PIP_SIMPLE_CONTENT_TYPES:
+            return self.PIP_SIMPLE_CONTENT_TYPES[self._pip_simple_format]
+
+        if self._pip_simple_format is None:
+            return self.PIP_SIMPLE_CONTENT_TYPES[self.PIP_SIMPLE_FORMAT_DEFAULT]
+
+        self._log.warning(f"Unknown PyPI format [{self._pip_simple_format}], using [{self.PIP_SIMPLE_FORMAT_DEFAULT}]")
+
+        return self.PIP_SIMPLE_CONTENT_TYPES[self.PIP_SIMPLE_FORMAT_DEFAULT]
+
+    def _pypi_simple_parse_json(self, request, model_def):
+
+        try:
+
+            package_obj = request.json()
+            package_name = package_obj.get("name") or ""
+            files = package_obj.get("files") or []
+
+            name_pattern = package_name.replace("-", "_")  # dash is replaced by underscore in wheel names
+            version_pattern = model_def.version.replace(".", "\\.")
+            file_pattern = re.compile(f"^{name_pattern}-{version_pattern}-(?P<target>.*)\\.whl")
+
+            matches = []
+
+            for file_info in files:
+
+                filename = file_info.get("filename") or ""
+                yanked = file_info.get("yanked")
+                match = file_pattern.match(filename)
+
+                if match and not yanked:
+
+                    url = file_info.get("url")
+                    target = match.group("target")
+
+                    match_info = filename, url, target
+                    matches.append(match_info)
+
+            if len(matches) == 0:
+                message = f"No package found for [{package_name}] version [{model_def.version}]"
+                self._log.error(message)
+                raise _ex.EModelRepo(message)
+
+            if len(matches) > 1:
+                message = f"Multiple packages found for [{package_name}] version [{model_def.version}]" + \
+                          f" (targets: " + ", ".join(map(lambda m: m[2], matches)) + ")"
+                self._log.error(message)
+                raise _ex.EModelRepo(message)
+
+            filename, url, target = matches[0]
+
+            self._log.info(f"Found package [{package_name}] version [{model_def.version}], target = [{target}]")
+
+            return filename, url
+
+        except json.decoder.JSONDecodeError as e:
+
+            self._log.error(f"Invalid response from package repository: {str(e)}")
+            raise _ex.EModelRepo("Invalid response from package repository") from e
+
+    def _pypi_simple_parse_html(self, request, model_def):
+
+        try:
+
+            package_obj = request.text
+            package_name = package_obj.get("name") or ""
+            files = package_obj.get("files") or []
+
+            name_pattern = package_name.replace("-", "_")  # dash is replaced by underscore in wheel names
+            version_pattern = model_def.version.replace(".", "\\.")
+            file_pattern = re.compile(f"^{name_pattern}-{version_pattern}-(?P<target>.*)\\.whl")
+
+            matches = []
+
+            for file_info in files:
+
+                filename = file_info.get("filename") or ""
+                yanked = file_info.get("yanked")
+                match = file_pattern.match(filename)
+
+                if match and not yanked:
+
+                    url = file_info.get("url")
+                    target = match.group("target")
+
+                    match_info = filename, url, target
+                    matches.append(match_info)
+
+            if len(matches) == 0:
+                message = f"No package found for [{package_name}] version [{model_def.version}]"
+                self._log.error(message)
+                raise _ex.EModelRepo(message)
+
+            if len(matches) > 1:
+                message = f"Multiple packages found for [{package_name}] version [{model_def.version}]" + \
+                          f" (targets: " + ", ".join(map(lambda m: m[2], matches)) + ")"
+                self._log.error(message)
+                raise _ex.EModelRepo(message)
+
+            filename, url, target = matches[0]
+
+            self._log.info(f"Found package [{package_name}] version [{model_def.version}], target = [{target}]")
+
+            return filename, url
+
+        except json.decoder.JSONDecodeError as e:  # todo
+
+            self._log.error(f"Invalid response from package repository: {str(e)}")
+            raise _ex.EModelRepo("Invalid response from package repository") from e
 
     def _pypi_json_query(self, model_def: _meta.ModelDefinition):
 
