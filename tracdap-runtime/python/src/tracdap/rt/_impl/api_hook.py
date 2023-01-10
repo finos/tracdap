@@ -28,6 +28,8 @@ from tracdap.rt.api.hook import _RuntimeHook  # noqa
 from tracdap.rt.api.hook import _Named  # noqa
 
 
+# TODO: Should API guard move into a validation module?
+
 class ApiGuard:
 
     # The metaclass for generic types varies between versions of the typing library
@@ -58,6 +60,11 @@ class ApiGuard:
 
             for value in values:
                 cls._validate_arg(method.__name__, param, value)
+
+    @classmethod
+    def check_type(cls, return_type: _tp.Type, value: _tp.Any) -> bool:
+
+        return cls._validate_type(return_type, value)
 
     @classmethod
     def _select_arg(
@@ -113,7 +120,7 @@ class ApiGuard:
     @classmethod
     def _validate_arg(cls, method_name: str, parameter: inspect.Parameter, value: _tp.Any):
 
-        if not cls._validate_arg_inner(parameter.annotation, value):
+        if not cls._validate_type(parameter.annotation, value):
 
             expected_type = cls._type_name(parameter.annotation)
             actual_type = cls._type_name(type(value)) if value is not None else str(None)
@@ -125,7 +132,7 @@ class ApiGuard:
             raise _ex.ERuntimeValidation(err)
 
     @classmethod
-    def _validate_arg_inner(cls, param_type: _tp.Type, value: _tp.Any) -> bool:
+    def _validate_type(cls, param_type: _tp.Type, value: _tp.Any) -> bool:
 
         if param_type == _tp.Any:
             return True
@@ -140,13 +147,13 @@ class ApiGuard:
             if origin is _Named:
 
                 named_type = args[0]
-                return isinstance(value, _Named) and isinstance(value.item, named_type)
+                return isinstance(value, _Named) and cls._validate_type(named_type, value.item)
 
             # _tp.Union also covers _tp.Optional, which is shorthand for _tp.Union[_type, None]
             if origin is _tp.Union:
 
                 for union_type in args:
-                    if cls._validate_arg_inner(union_type, value):
+                    if cls._validate_type(union_type, value):
                         return True
 
                 return False
@@ -154,11 +161,23 @@ class ApiGuard:
             if origin is list:
 
                 list_type = args[0]
-                return isinstance(value, list) and all(map(lambda v: isinstance(v, list_type), value))
+                return isinstance(value, list) and \
+                    all(map(lambda v: cls._validate_type(list_type, v), value))
+
+            if origin is dict:
+
+                key_type = args[0]
+                value_type = args[1]
+
+                return isinstance(value, dict) and \
+                    all(map(lambda k: cls._validate_type(key_type, k), value.keys())) and \
+                    all(map(lambda v: cls._validate_type(value_type, v), value.values()))
 
             raise _ex.ETracInternal(f"Validation of [{origin.__name__}] generic parameters is not supported yet")
 
         # Validate everything else as a concrete type
+
+        # TODO: Recursive validation of types for class members using field annotations
 
         return isinstance(value, param_type)
 
