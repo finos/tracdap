@@ -235,8 +235,8 @@ class _TypeValidator:
 
 class _StaticValidator:
 
-    __identifier_pattern = re.compile("^[a-zA-Z_]\\w+$", re.ASCII)
-    __reserved_identifier_pattern = re.compile("^(_|trac_)", re.ASCII)
+    __identifier_pattern = re.compile("\\A[a-zA-Z_]\\w+\\Z", re.ASCII)
+    __reserved_identifier_pattern = re.compile("\\A(_|trac_)", re.ASCII)
 
     _log: logging.Logger = util.logger_for_namespace(__name__)
 
