@@ -176,7 +176,7 @@ class ImportModelTest(unittest.TestCase):
         loader = models.ModelLoader(sys_config, self.scratch_dir)
 
         model_class = SampleModel
-        model_def = loader.scan_model(model_class)
+        model_def = loader.scan_model(meta.ModelDefinition(), model_class)
 
         self.assertIsInstance(model_def, meta.ModelDefinition)
 
