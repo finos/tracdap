@@ -27,19 +27,6 @@ from tracdap.rt.api.hook import _RuntimeHook  # noqa
 from tracdap.rt.api.hook import _Named  # noqa
 
 
-class ApiGuard:
-
-    @classmethod
-    def validate_signature(cls, method: _tp.Callable, *args, **kwargs):
-
-        _val.validate_signature(method, *args, **kwargs)
-
-    @classmethod
-    def check_type(cls, expected_type: _tp.Type, value: _tp.Any) -> bool:
-
-        return _val.check_type(expected_type, value)
-
-
 class RuntimeHookImpl(_RuntimeHook):
 
     _T = _tp.TypeVar("_T")
