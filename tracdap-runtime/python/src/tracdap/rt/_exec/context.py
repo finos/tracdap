@@ -22,10 +22,10 @@ import pandas as pd
 import tracdap.rt.api as _api
 import tracdap.rt.metadata as _meta
 import tracdap.rt.exceptions as _ex
-import tracdap.rt._impl.api_hook as _api_hook  # noqa
 import tracdap.rt._impl.type_system as _types  # noqa
 import tracdap.rt._impl.data as _data  # noqa
 import tracdap.rt._impl.util as _util  # noqa
+import tracdap.rt._impl.validation as _val  # noqa
 
 
 class TracContextImpl(_api.TracContext):
@@ -78,7 +78,7 @@ class TracContextImpl(_api.TracContext):
 
     def get_parameter(self, parameter_name: str) -> tp.Any:
 
-        _api_hook.ApiGuard.validate_signature(self.get_parameter, parameter_name)
+        _val.validate_signature(self.get_parameter, parameter_name)
 
         self.__val.check_param_not_null(parameter_name)
         self.__val.check_param_valid_identifier(parameter_name)
@@ -90,7 +90,7 @@ class TracContextImpl(_api.TracContext):
 
     def get_schema(self, dataset_name: str) -> _meta.SchemaDefinition:
 
-        _api_hook.ApiGuard.validate_signature(self.get_schema, dataset_name)
+        _val.validate_signature(self.get_schema, dataset_name)
 
         self.__val.check_dataset_name_not_null(dataset_name)
         self.__val.check_dataset_valid_identifier(dataset_name)
@@ -109,7 +109,7 @@ class TracContextImpl(_api.TracContext):
 
     def get_pandas_table(self, dataset_name: str, use_temporal_objects: tp.Optional[bool] = None) -> pd.DataFrame:
 
-        _api_hook.ApiGuard.validate_signature(self.get_pandas_table, dataset_name, use_temporal_objects)
+        _val.validate_signature(self.get_pandas_table, dataset_name, use_temporal_objects)
 
         part_key = _data.DataPartKey.for_root()
 
@@ -136,7 +136,7 @@ class TracContextImpl(_api.TracContext):
 
     def put_pandas_table(self, dataset_name: str, dataset: pd.DataFrame):
 
-        _api_hook.ApiGuard.validate_signature(self.put_pandas_table, dataset_name, dataset)
+        _val.validate_signature(self.put_pandas_table, dataset_name, dataset)
 
         part_key = _data.DataPartKey.for_root()
 
@@ -165,7 +165,7 @@ class TracContextImpl(_api.TracContext):
 
     def log(self) -> logging.Logger:
 
-        _api_hook.ApiGuard.validate_signature(self.log)
+        _val.validate_signature(self.log)
 
         return self.__model_log
 

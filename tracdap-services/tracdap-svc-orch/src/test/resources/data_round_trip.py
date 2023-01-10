@@ -30,18 +30,18 @@ class DataRoundTripModel(trac.TracModel):
 
     def define_parameters(self) -> tp.Dict[str, trac.ModelParameter]:
 
-        return trac.declare_parameters(
+        return trac.define_parameters(
             trac.P("use_spark", trac.BasicType.BOOLEAN, default_value=False, label="Use Spark for round trip testing"))
 
     def define_inputs(self) -> tp.Dict[str, trac.ModelInputSchema]:
 
-        round_trip_input = trac.declare_input_table(self.ROUND_TRIP_FIELDS)
+        round_trip_input = trac.define_input_table(self.ROUND_TRIP_FIELDS)
 
         return {"round_trip_input": round_trip_input}
 
     def define_outputs(self) -> tp.Dict[str, trac.ModelOutputSchema]:
 
-        round_trip_output = trac.declare_input_table(self.ROUND_TRIP_FIELDS)
+        round_trip_output = trac.define_output_table(self.ROUND_TRIP_FIELDS)
 
         return {"round_trip_output": round_trip_output}
 

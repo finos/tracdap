@@ -21,7 +21,7 @@ import subprocess as sp
 import tracdap.rt.api as api
 import tracdap.rt.metadata as meta
 import tracdap.rt.config as config
-import tracdap.rt._impl.api_hook as api_hook  # noqa
+import tracdap.rt._impl.static_api as api_hook  # noqa
 import tracdap.rt._impl.models as models  # noqa
 import tracdap.rt._impl.util as util  # noqa
 
@@ -61,7 +61,7 @@ class ImportModelTest(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls) -> None:
-        api_hook.RuntimeHookImpl.register_impl()
+        api_hook.StaticApiImpl.register_impl()
         util.configure_logging()
 
     def setUp(self) -> None:
@@ -176,7 +176,7 @@ class ImportModelTest(unittest.TestCase):
         loader = models.ModelLoader(sys_config, self.scratch_dir)
 
         model_class = SampleModel
-        model_def = loader.scan_model(model_class)
+        model_def = loader.scan_model(meta.ModelDefinition(), model_class)
 
         self.assertIsInstance(model_def, meta.ModelDefinition)
 

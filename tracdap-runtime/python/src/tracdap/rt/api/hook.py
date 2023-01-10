@@ -37,29 +37,29 @@ class _Named(_tp.Generic[_T]):
     item: _T
 
 
-class _RuntimeHook:
+class _StaticApiHook:
 
-    __runtime_hook: _RuntimeHook = None
+    __static_api_hook: _StaticApiHook = None
 
     @classmethod
     def _is_registered(cls) -> bool:
-        return cls.__runtime_hook is not None
+        return cls.__static_api_hook is not None
 
     @classmethod
-    def _register(cls, hook: _RuntimeHook):
+    def _register(cls, hook: _StaticApiHook):
 
         if cls._is_registered():
-            raise _ex.ETracInternal(f"TRAC runtime API initialized twice")
+            raise _ex.ETracInternal(f"TRAC API hook registered twice")
 
-        cls.__runtime_hook = hook
+        cls.__static_api_hook = hook
 
     @classmethod
-    def runtime(cls) -> _RuntimeHook:
+    def get_instance(cls) -> _StaticApiHook:
 
         if not cls._is_registered():
-            raise _ex.ETracInternal(f"TRAC runtime API is not initialized")
+            raise _ex.ETracInternal(f"TRAC API hook is not initialized")
 
-        return cls.__runtime_hook
+        return cls.__static_api_hook
 
     @_abc.abstractmethod
     def define_attributes(

@@ -34,7 +34,7 @@ import tracdap.rt._impl.config_parser as _cparse  # noqa
 import tracdap.rt._impl.util as util  # noqa
 import tracdap.rt._impl.models as _models  # noqa
 import tracdap.rt._impl.storage as _storage  # noqa
-import tracdap.rt._impl.api_hook as _hook  # noqa
+import tracdap.rt._impl.static_api as _static_api  # noqa
 
 
 @dc.dataclass
@@ -121,7 +121,7 @@ class TracRuntime:
 
             # Plugins will be loaded here, before config
 
-            _hook.RuntimeHookImpl.register_impl()
+            _static_api.StaticApiImpl.register_impl()
 
             # Load sys and job config (or use embedded)
 

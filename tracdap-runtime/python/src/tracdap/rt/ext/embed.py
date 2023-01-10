@@ -14,7 +14,7 @@
 
 import tracdap.rt.config as _cfg
 import tracdap.rt._exec.runtime as _rt  # noqa
-import tracdap.rt._impl.api_hook as _apis  # noqa
+import tracdap.rt._impl.validation as _val  # noqa
 
 
 class __EmbeddedRuntime:
@@ -38,7 +38,7 @@ class __EmbeddedRuntime:
 
     def run_job_(self, job_config: _cfg.JobConfig):
 
-        _apis.ApiGuard.validate_signature(self.run_job_, job_config)
+        _val.validate_signature(self.run_job_, job_config)
 
         self.__runtime.submit_job(job_config)
 
@@ -47,7 +47,7 @@ class __EmbeddedRuntime:
 
 def create_runtime(sys_config: _cfg.RuntimeConfig, dev_mode: bool = False):
 
-    _apis.ApiGuard.validate_signature(create_runtime, sys_config, dev_mode)
+    _val.validate_signature(create_runtime, sys_config, dev_mode)
 
     runtime = _rt.TracRuntime(sys_config, dev_mode=dev_mode)
     runtime.pre_start()
@@ -57,6 +57,6 @@ def create_runtime(sys_config: _cfg.RuntimeConfig, dev_mode: bool = False):
 
 def run_job(runtime: __EmbeddedRuntime, job_config: _cfg.JobConfig) -> _cfg.JobResult:
 
-    _apis.ApiGuard.validate_signature(run_job, runtime, job_config)
+    _val.validate_signature(run_job, runtime, job_config)
 
     return runtime.run_job_(job_config)

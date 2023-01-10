@@ -90,4 +90,9 @@ message ModelDefinition {
     map<string, ModelParameter> parameters = 7;
     map<string, ModelInputSchema> inputs = 8;
     map<string, ModelOutputSchema> outputs = 9;
+
+    /**
+     * Static attributes defined in model code
+     */
+    map<string, Value> staticAttributes = 12;
 }

@@ -21,7 +21,7 @@ import tracdap.rt.metadata as meta
 import tracdap.rt.config as config
 import tracdap.rt.ext.embed as embed
 
-import tracdap.rt._impl.api_hook as api_hook  # noqa
+import tracdap.rt._impl.static_api as api_hook  # noqa
 
 _ROOT_DIR = pathlib.Path(__file__).parent \
     .joinpath("../../../../..") \
@@ -31,7 +31,7 @@ _ROOT_DIR = pathlib.Path(__file__).parent \
 class ModelApiTest(unittest.TestCase):
 
     def setUp(self):
-        api_hook.RuntimeHookImpl.register_impl()
+        api_hook.StaticApiImpl.register_impl()
 
     def test_embedded_job(self):
 

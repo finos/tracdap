@@ -207,7 +207,7 @@ class TracModel:
     .. seealso:: :py:class:`TracContext`
     """
 
-    def define_attributes(self) -> _tp.List[TagUpdate]:  # noqa
+    def define_attributes(self) -> _tp.Dict[str, Value]:  # noqa
 
         """
         Define attributes that will be associated with the model when it is loaded into the TRAC platform
@@ -220,16 +220,16 @@ class TracModel:
         Multivalued attributes can be supplied as lists, in which case the attribute type must be given explicitly.
         Controlled attributes (starting with trac\\_ or \\_) are not allowed and will fail validation.
 
-        To define attributes in code, always use the define_* function in the :py:mod:`tracdap.rt.api` package.
-        This will ensure attributes are defined the correct format with all the required fields.
+        To define attributes in code, always use the define_* functions in the :py:mod:`tracdap.rt.api` package.
+        This will ensure attributes are defined in the correct format with all the required fields.
         Attributes that are defined in the wrong format or with required fields missing
         will result in a model validation failure.
 
         :return: A set of attributes that will be applied to the model when it is loaded into the TRAC platform
-        :rtype: List[:py:class:`TagUpdate <tracdap.rt.metadata.TagUpdate>`]
+        :rtype: Dict[str, :py:class:`Value <tracdap.rt.metadata.Value>`]
         """
 
-        return []
+        return {}
 
     @_abc.abstractmethod
     def define_parameters(self) -> _tp.Dict[str, ModelParameter]:

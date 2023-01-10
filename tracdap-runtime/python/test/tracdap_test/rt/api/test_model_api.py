@@ -13,7 +13,7 @@
 #  limitations under the License.
 
 import tracdap.rt.api as trac
-import tracdap.rt._impl.api_hook as api_hook  # noqa
+import tracdap.rt._impl.static_api as api_hook  # noqa
 
 import typing as tp
 
@@ -51,7 +51,7 @@ class SampleModel(trac.TracModel):
 class ModelApiTest(unittest.TestCase):
 
     def setUp(self):
-        api_hook.RuntimeHookImpl.register_impl()
+        api_hook.StaticApiImpl.register_impl()
         self.sample_model = SampleModel()
 
     def test_sample_model(self):
