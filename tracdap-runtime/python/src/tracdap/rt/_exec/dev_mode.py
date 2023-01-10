@@ -297,16 +297,7 @@ class DevModeTranslator:
             outputs={})
 
         model_class = model_loader.load_model_class("DEV_MODE_TRANSLATION", skeleton_modeL_def)
-        model_scan = model_loader.scan_model(model_class)
-
-        model_def = _meta.ModelDefinition(  # noqa
-            language="python",
-            repository="trac_integrated",
-            entryPoint=model_entry_point,
-
-            parameters=model_scan.parameters,
-            inputs=model_scan.inputs,
-            outputs=model_scan.outputs)
+        model_def = model_loader.scan_model(skeleton_modeL_def, model_class)
 
         model_object = _meta.ObjectDefinition(
             objectType=_meta.ObjectType.MODEL,
