@@ -113,13 +113,14 @@ class ModelRepositoriesTest(unittest.TestCase):
 
         self.assertTrue(package_dir.joinpath("tracdap").exists())
 
-    def test_checkout_pypi_simple(self):
+    def test_checkout_pypi_simple_json(self):
 
         sys_config = config.RuntimeConfig()
         sys_config.repositories["pypi_test"] = config.PluginConfig(
             protocol="pypi",
             properties={
                 "pipIndexUrl": "https://pypi.python.org/simple",
+                "pipSimpleFormat": "json",  # This is the default
                 "username": "pypi_TEST_USER",
                 "password": "pypi_TEST_PASSWORD"})
 
@@ -143,3 +144,36 @@ class ModelRepositoriesTest(unittest.TestCase):
         package_dir = repo.do_checkout(model_def, checkout_dir)
 
         self.assertTrue(package_dir.joinpath("tracdap").exists())
+
+    def test_checkout_pypi_simple_html(self):
+
+        sys_config = config.RuntimeConfig()
+        sys_config.repositories["pypi_test"] = config.PluginConfig(
+            protocol="pypi",
+            properties={
+                "pipIndexUrl": "https://pypi.python.org/simple",
+                "pipSimpleFormat": "html",
+                "username": "pypi_TEST_USER",
+                "password": "pypi_TEST_PASSWORD"})
+
+        model_def = meta.ModelDefinition(
+            language="python",
+            repository="pypi_test",
+            package="tracdap-runtime",
+            version="0.5.0",
+            entryPoint="tutorial.hello_world.HelloWorldModel"
+        )
+
+        repo_mgr = repos.RepositoryManager(sys_config)
+        repo = repo_mgr.get_repository("pypi_test")
+
+        checkout_key = repo.checkout_key(model_def)
+        checkout_subdir = pathlib.Path(checkout_key)
+
+        checkout_dir = self.scratch_dir.joinpath(model_def.repository, checkout_subdir)
+        checkout_dir.mkdir(mode=0o750, parents=True, exist_ok=False)
+
+        package_dir = repo.do_checkout(model_def, checkout_dir)
+
+        self.assertTrue(package_dir.joinpath("tracdap").exists())
+
