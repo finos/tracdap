@@ -14,40 +14,46 @@
 
 import inspect
 import logging
-import typing as _tp
+import typing as tp
 
-import tracdap.rt.exceptions as _ex
-import tracdap.rt._impl.util as _util
+import tracdap.rt.metadata as meta
+import tracdap.rt.exceptions as ex
+import tracdap.rt._impl.util as util
 
+# _Named placeholder type from API hook is needed for API type checking
 from tracdap.rt.api.hook import _Named  # noqa
 
 
-def validate_signature(method: _tp.Callable, *args, **kwargs):
+def validate_signature(method: tp.Callable, *args, **kwargs):
     _TypeValidator.validate_signature(method, *args, **kwargs)
 
 
-def validate_return_type(method: _tp.Callable, value: _tp.Any):
+def validate_return_type(method: tp.Callable, value: tp.Any):
     _TypeValidator.validate_return_type(method, value)
 
 
-def check_type(expected_type: _tp.Type, value: _tp.Any) -> bool:
+def check_type(expected_type: tp.Type, value: tp.Any) -> bool:
     return _TypeValidator.check_type(expected_type, value)
+
+
+def quick_validate_model_def(model_def: meta.ModelDefinition):
+    _StaticValidator.quick_validate_model_def(model_def)
 
 
 class _TypeValidator:
 
     # The metaclass for generic types varies between versions of the typing library
     # To work around this, detect the correct metaclass by inspecting a generic type variable
-    __generic_metaclass = type(_tp.List[object])
+    __generic_metaclass = type(tp.List[object])
 
     # Cache method signatures to avoid inspection on every call
     # Inspecting a function signature can take ~ half a second in Python 3.7
-    __method_cache: _tp.Dict[str, inspect.Signature] = dict()
+    __method_cache: tp.Dict[str, inspect.Signature] = dict()
 
-    _log: logging.Logger = _util.logger_for_namespace(__package__)
+    _log: logging.Logger = util.logger_for_namespace(__package__)
 
     @classmethod
-    def validate_signature(cls, method: _tp.Callable, *args, **kwargs):
+    def validate_signature(cls, method: tp.Callable, *args, **kwargs):
 
         if method.__name__ in cls.__method_cache:
             signature = cls.__method_cache[method.__name__]
@@ -66,7 +72,7 @@ class _TypeValidator:
                 cls._validate_arg(method.__name__, param, value)
 
     @classmethod
-    def validate_return_type(cls, method: _tp.Callable, value: _tp.Any):
+    def validate_return_type(cls, method: tp.Callable, value: tp.Any):
 
         if method.__name__ in cls.__method_cache:
             signature = cls.__method_cache[method.__name__]
@@ -80,17 +86,17 @@ class _TypeValidator:
             err = f"Invalid API return type for [{method.__name__}()]: " + \
                   f"Expected [{signature.return_annotation}], got [{type(value)}]"
             cls._log.error(err)
-            raise _ex.ERuntimeValidation(err)
+            raise ex.ERuntimeValidation(err)
 
     @classmethod
-    def check_type(cls, expected_type: _tp.Type, value: _tp.Any) -> bool:
+    def check_type(cls, expected_type: tp.Type, value: tp.Any) -> bool:
 
         return cls._validate_type(expected_type, value)
 
     @classmethod
     def _select_arg(
             cls, method_name: str, parameter: inspect.Parameter, positional_index,
-            *args, **kwargs) -> _tp.List[_tp.Any]:
+            *args, **kwargs) -> tp.List[tp.Any]:
 
         if parameter.kind == inspect.Parameter.POSITIONAL_ONLY:
 
@@ -100,7 +106,7 @@ class _TypeValidator:
             else:
                 err = f"Invalid API call [{method_name}()]: Missing required parameter [{parameter.name}]"
                 cls._log.error(err)
-                raise _ex.ERuntimeValidation(err)
+                raise ex.ERuntimeValidation(err)
 
         if parameter.kind == inspect.Parameter.KEYWORD_ONLY:
 
@@ -110,7 +116,7 @@ class _TypeValidator:
             else:
                 err = f"Invalid API call [{method_name}()]: Missing required parameter [{parameter.name}]"
                 cls._log.error(err)
-                raise _ex.ERuntimeValidation(err)
+                raise ex.ERuntimeValidation(err)
 
         if parameter.kind == inspect.Parameter.POSITIONAL_OR_KEYWORD:
 
@@ -123,7 +129,7 @@ class _TypeValidator:
             else:
                 err = f"Invalid API call [{method_name}()]: Missing required parameter [{parameter.name}]"
                 cls._log.error(err)
-                raise _ex.ERuntimeValidation(err)
+                raise ex.ERuntimeValidation(err)
 
         if parameter.kind == inspect.Parameter.VAR_POSITIONAL:
 
@@ -134,12 +140,12 @@ class _TypeValidator:
 
         if parameter.kind == inspect.Parameter.VAR_KEYWORD:
 
-            raise _ex.ETracInternal("Validation of VAR_KEYWORD params is not supported yet")
+            raise ex.ETracInternal("Validation of VAR_KEYWORD params is not supported yet")
 
-        raise _ex.EUnexpected("Invalid method signature in runtime API (this is a bug)")
+        raise ex.EUnexpected("Invalid method signature in runtime API (this is a bug)")
 
     @classmethod
-    def _validate_arg(cls, method_name: str, parameter: inspect.Parameter, value: _tp.Any):
+    def _validate_arg(cls, method_name: str, parameter: inspect.Parameter, value: tp.Any):
 
         if not cls._validate_type(parameter.annotation, value):
 
@@ -150,18 +156,18 @@ class _TypeValidator:
                   + f" (expected [{expected_type}], got [{actual_type}])"
 
             cls._log.error(err)
-            raise _ex.ERuntimeValidation(err)
+            raise ex.ERuntimeValidation(err)
 
     @classmethod
-    def _validate_type(cls, expected_type: _tp.Type, value: _tp.Any) -> bool:
+    def _validate_type(cls, expected_type: tp.Type, value: tp.Any) -> bool:
 
-        if expected_type == _tp.Any:
+        if expected_type == tp.Any:
             return True
 
         if isinstance(expected_type, cls.__generic_metaclass):
 
-            origin = _util.get_origin(expected_type)
-            args = _util.get_args(expected_type)
+            origin = util.get_origin(expected_type)
+            args = util.get_args(expected_type)
 
             # The generic type "_Named" is defined in the TRAC API so needs to be supported
             # This type is used for passing named intermediate values between the define_ methods
@@ -171,7 +177,7 @@ class _TypeValidator:
                 return isinstance(value, _Named) and cls._validate_type(named_type, value.item)
 
             # _tp.Union also covers _tp.Optional, which is shorthand for _tp.Union[_type, None]
-            if origin is _tp.Union:
+            if origin is tp.Union:
 
                 for union_type in args:
                     if cls._validate_type(union_type, value):
@@ -194,7 +200,7 @@ class _TypeValidator:
                     all(map(lambda k: cls._validate_type(key_type, k), value.keys())) and \
                     all(map(lambda v: cls._validate_type(value_type, v), value.values()))
 
-            raise _ex.ETracInternal(f"Validation of [{origin.__name__}] generic parameters is not supported yet")
+            raise ex.ETracInternal(f"Validation of [{origin.__name__}] generic parameters is not supported yet")
 
         # Validate everything else as a concrete type
 
@@ -203,24 +209,57 @@ class _TypeValidator:
         return isinstance(value, expected_type)
 
     @classmethod
-    def _type_name(cls, type_var: _tp.Type) -> str:
+    def _type_name(cls, type_var: tp.Type) -> str:
 
         if isinstance(type_var, cls.__generic_metaclass):
 
-            origin = _util.get_origin(type_var)
-            args = _util.get_args(type_var)
+            origin = util.get_origin(type_var)
+            args = util.get_args(type_var)
 
             if origin is _Named:
                 named_type = cls._type_name(args[0])
                 return f"Named[{named_type}]"
 
-            if origin is _tp.Union:
+            if origin is tp.Union:
                 return "|".join(map(cls._type_name, args))
 
             if origin is list:
                 list_type = cls._type_name(args[0])
                 return f"List[{list_type}]"
 
-            raise _ex.ETracInternal(f"Validation of [{origin.__name__}] generic parameters is not supported yet")
+            raise ex.ETracInternal(f"Validation of [{origin.__name__}] generic parameters is not supported yet")
 
         return type_var.__name__
+
+
+class _StaticValidator:
+
+    _log: logging.Logger = util.logger_for_namespace(__package__)
+
+    @classmethod
+    def quick_validate_model_def(cls, model_def: meta.ModelDefinition):
+
+        # Note: This method must raise EModelValidation on failure, rather than any other validation error type
+        # This will be important when comprehensive metadata validation is added to the runtime
+        # If the standard static validator is used, validation errors must be caught and re-raised as EModelValidation
+
+        attrs_type_check = _TypeValidator.check_type(tp.Dict[str, meta.Value], model_def.staticAttributes)
+        params_type_check = _TypeValidator.check_type(tp.Dict[str, meta.ModelParameter], model_def.parameters)
+        inputs_type_check = _TypeValidator.check_type(tp.Dict[str, meta.ModelInputSchema], model_def.inputs)
+        outputs_type_check = _TypeValidator.check_type(tp.Dict[str, meta.ModelOutputSchema], model_def.outputs)
+
+        if not attrs_type_check:
+            cls._fail(f"Invalid model attributes: define_attributes() returned the wrong type")
+        if not params_type_check:
+            cls._fail(f"Invalid model parameters: define_parameters() returned the wrong type")
+        if not inputs_type_check:
+            cls._fail(f"Invalid model inputs: define_inputs() returned the wrong type")
+        if not outputs_type_check:
+            cls._fail(f"Invalid model outputs: define_outputs() returned the wrong type")
+
+        # TODO: Semantic validation
+
+    @classmethod
+    def _fail(cls, err: str):
+        cls._log.error(str)
+        raise ex.EModelValidation(err)

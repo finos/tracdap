@@ -170,7 +170,7 @@ class ModelLoader:
             model_def.inputs = inputs
             model_def.outputs = outputs
 
-            self._scan_model_validation(attributes, parameters, inputs, outputs)
+            _val.quick_validate_model_def(model_def)
 
             for attr_name, attr_value in attributes.items():
                 self.__log.info(f"Attribute [{attr_name}] - {_types.MetadataCodec.decode_value(attr_value)}")
@@ -193,25 +193,3 @@ class ModelLoader:
 
             self.__log.error(msg, exc_info=True)
             raise _ex.EModelValidation(msg) from e
-
-    def _scan_model_validation(self, attributes, parameters, inputs, outputs):
-
-        attrs_type_check = _val.check_type(tp.Dict[str, _meta.Value], attributes)
-        params_type_check = _val.check_type(tp.Dict[str, _meta.ModelParameter], parameters)
-        inputs_type_check = _val.check_type(tp.Dict[str, _meta.ModelInputSchema], inputs)
-        outputs_type_check = _val.check_type(tp.Dict[str, _meta.ModelOutputSchema], outputs)
-
-        if not attrs_type_check:
-            self._fail(f"Invalid model attributes: define_attributes() returned the wrong type")
-        if not params_type_check:
-            self._fail(f"Invalid model parameters: define_parameters() returned the wrong type")
-        if not inputs_type_check:
-            self._fail(f"Invalid model inputs: define_inputs() returned the wrong type")
-        if not outputs_type_check:
-            self._fail(f"Invalid model outputs: define_outputs() returned the wrong type")
-
-        # TODO: Semantic validation
-
-    def _fail(self, err: str):
-        self.__log.error(str)
-        raise _ex.EModelValidation(err)
