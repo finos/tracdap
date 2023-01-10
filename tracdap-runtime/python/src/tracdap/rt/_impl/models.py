@@ -16,16 +16,18 @@ from __future__ import annotations
 
 import typing as tp
 import pathlib
+import copy
 
 import tracdap.rt.api as _api
 import tracdap.rt.metadata as _meta
 import tracdap.rt.config as _cfg
 import tracdap.rt.exceptions as _ex
 
-import tracdap.rt._impl.util as _util
 import tracdap.rt._impl.type_system as _types
 import tracdap.rt._impl.repos as _repos
 import tracdap.rt._impl.shim as _shim
+import tracdap.rt._impl.util as _util
+import tracdap.rt._impl.validation as _val
 
 
 class ModelLoader:
@@ -149,25 +151,8 @@ class ModelLoader:
             scope_state.model_cache[model_key] = model_class
             return model_class
 
-    def scan_model_attrs(self, model_class: _api.TracModel.__class__) -> _cfg.TagUpdateList:
-
-        model: _api.TracModel = object.__new__(model_class)
-        model_class.__init__(model)
-
-        attributes = model.define_attributes()
-
-        for attr in attributes:
-
-            if attr.attrName.startswith("trac_") or attr.attrName.startswith("_"):
-                err = f"Controlled attribute [{attr.attrName}] cannot be defined in model code"
-                self.__log.error(err)
-                raise _ex.EModelValidation(err)
-
-            self.__log.info(f"Attribute [{attr.attrName}] - {_types.MetadataCodec.decode_value(attr.value)}")
-
-        return _cfg.TagUpdateList(attributes)
-
-    def scan_model(self, model_class: _api.TracModel.__class__) -> _meta.ModelDefinition:
+    def scan_model(self, model_stub: _meta.ModelDefinition, model_class: _api.TracModel.__class__) \
+            -> _meta.ModelDefinition:
 
         try:
 
@@ -179,12 +164,16 @@ class ModelLoader:
             inputs = model.define_inputs()
             outputs = model.define_outputs()
 
-            # TODO: Model validation
+            model_def = copy.copy(model_stub)
+            model_def.staticAttributes = attributes
+            model_def.parameters = parameters
+            model_def.inputs = inputs
+            model_def.outputs = outputs
 
-            model_def = _meta.ModelDefinition()
-            model_def.parameters.update(parameters)
-            model_def.inputs.update(inputs)
-            model_def.outputs.update(outputs)
+            self._scan_model_validation(attributes, parameters, inputs, outputs)
+
+            for attr_name, attr_value in attributes.items():
+                self.__log.info(f"Attribute [{attr_name}] - {_types.MetadataCodec.decode_value(attr_value)}")
 
             for name, param in model_def.parameters.items():
                 self.__log.info(f"Parameter [{name}] - {param.paramType.basicType.name}")
@@ -204,3 +193,25 @@ class ModelLoader:
 
             self.__log.error(msg, exc_info=True)
             raise _ex.EModelValidation(msg) from e
+
+    def _scan_model_validation(self, attributes, parameters, inputs, outputs):
+
+        attrs_type_check = _val.check_type(tp.Dict[str, _meta.Value], attributes)
+        params_type_check = _val.check_type(tp.Dict[str, _meta.ModelParameter], parameters)
+        inputs_type_check = _val.check_type(tp.Dict[str, _meta.ModelInputSchema], inputs)
+        outputs_type_check = _val.check_type(tp.Dict[str, _meta.ModelOutputSchema], outputs)
+
+        if not attrs_type_check:
+            self._fail(f"Invalid model attributes: define_attributes() returned the wrong type")
+        if not params_type_check:
+            self._fail(f"Invalid model parameters: define_parameters() returned the wrong type")
+        if not inputs_type_check:
+            self._fail(f"Invalid model inputs: define_inputs() returned the wrong type")
+        if not outputs_type_check:
+            self._fail(f"Invalid model outputs: define_outputs() returned the wrong type")
+
+        # TODO: Semantic validation
+
+    def _fail(self, err: str):
+        self.__log.error(str)
+        raise _ex.EModelValidation(err)
