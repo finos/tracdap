@@ -42,6 +42,8 @@ class ApiGuard:
 
 class RuntimeHookImpl(_RuntimeHook):
 
+    _T = _tp.TypeVar("_T")
+
     @classmethod
     def register_impl(cls):
 
@@ -56,24 +58,13 @@ class RuntimeHookImpl(_RuntimeHook):
 
             log.warning("Runtime API hook is already registered")
 
-    def define_attributes(
-            self, *attrs: _tp.Union[_meta.TagUpdate, _tp.List[_meta.TagUpdate]]) \
-            -> _tp.List[_meta.TagUpdate]:
-
-        ApiGuard.validate_signature(self.define_attributes, *attrs)
-
-        if len(attrs) == 1 and isinstance(attrs[0], list):
-            return attrs[0]
-        else:
-            return [*attrs]
-
     def define_attribute(
             self, attr_name: str, attr_value: _tp.Any,
             attr_type: _tp.Optional[_meta.BasicType] = None,
             categorical: bool = False) \
-            -> _meta.TagUpdate:
+            -> _Named[_meta.Value]:
 
-        ApiGuard.validate_signature(self.define_attribute, attr_name, attr_value, attr_type, categorical)
+        _val.validate_signature(self.define_attribute, attr_name, attr_value, attr_type, categorical)
 
         if isinstance(attr_value, list) and attr_type is None:
             raise _ex.EModelValidation(f"Attribute type must be specified for multi-valued attribute [{attr_name}]")
@@ -90,14 +81,22 @@ class RuntimeHookImpl(_RuntimeHook):
             type_desc = _meta.TypeDescriptor(attr_type)
             trac_value = _type_system.MetadataCodec.convert_value(attr_value, type_desc)
 
-        return _meta.TagUpdate(_meta.TagOperation.CREATE_OR_APPEND_ATTR, attr_name, trac_value)
+        return _Named(attr_name, trac_value)
+
+    def define_attributes(
+            self, *attrs: _tp.Union[_Named[_meta.Value], _tp.List[_Named[_meta.Value]]]) \
+            -> _tp.Dict[str, _meta.Value]:
+
+        _val.validate_signature(self.define_attributes, *attrs)
+
+        return self._build_named_dict(*attrs)
 
     def define_parameter(
             self, param_name: str, param_type: _tp.Union[_meta.TypeDescriptor, _meta.BasicType],
             label: str, default_value: _tp.Optional[_tp.Any] = None) \
             -> _Named[_meta.ModelParameter]:
 
-        ApiGuard.validate_signature(self.define_parameter, param_name, param_type, label, default_value)
+        _val.validate_signature(self.define_parameter, param_name, param_type, label, default_value)
 
         if isinstance(param_type, _meta.TypeDescriptor):
             param_type_descriptor = param_type
@@ -113,12 +112,9 @@ class RuntimeHookImpl(_RuntimeHook):
             self, *params: _tp.Union[_Named[_meta.ModelParameter], _tp.List[_Named[_meta.ModelParameter]]]) \
             -> _tp.Dict[str, _meta.ModelParameter]:
 
-        ApiGuard.validate_signature(self.define_parameters, *params)
+        _val.validate_signature(self.define_parameters, *params)
 
-        if len(params) == 1 and isinstance(params[0], list):
-            return {p.item_name: p.item for p in params[0]}
-        else:
-            return {p.item_name: p.item for p in params}
+        return self._build_named_dict(*params)
 
     def define_field(
             self, field_name: str, field_type: _meta.BasicType, label: str,
@@ -126,7 +122,7 @@ class RuntimeHookImpl(_RuntimeHook):
             format_code: _tp.Optional[str] = None, field_order: _tp.Optional[int] = None) \
             -> _meta.FieldSchema:
 
-        ApiGuard.validate_signature(
+        _val.validate_signature(
             self.define_field, field_name, field_type, label,
             business_key, categorical, format_code, field_order)
 
@@ -144,7 +140,7 @@ class RuntimeHookImpl(_RuntimeHook):
             schema_type: _meta.SchemaType = _meta.SchemaType.TABLE) \
             -> _meta.SchemaDefinition:
 
-        ApiGuard.validate_signature(self.define_schema, *fields, schema_type=schema_type)
+        _val.validate_signature(self.define_schema, *fields, schema_type=schema_type)
 
         if schema_type == _meta.SchemaType.TABLE:
 
@@ -158,7 +154,7 @@ class RuntimeHookImpl(_RuntimeHook):
             schema_type: _meta.SchemaType = _meta.SchemaType.TABLE) \
             -> _meta.SchemaDefinition:
 
-        ApiGuard.validate_signature(self.load_schema, package, schema_file, schema_type)
+        _val.validate_signature(self.load_schema, package, schema_file, schema_type)
 
         return _schemas.SchemaLoader.load_schema(package, schema_file)
 
@@ -166,7 +162,7 @@ class RuntimeHookImpl(_RuntimeHook):
             self, *fields: _tp.Union[_meta.FieldSchema, _tp.List[_meta.FieldSchema]]) \
             -> _meta.ModelInputSchema:
 
-        ApiGuard.validate_signature(self.define_input_table, *fields)
+        _val.validate_signature(self.define_input_table, *fields)
 
         schema_def = self.define_schema(*fields, schema_type=_meta.SchemaType.TABLE)
         return _meta.ModelInputSchema(schema=schema_def)
@@ -175,10 +171,20 @@ class RuntimeHookImpl(_RuntimeHook):
             self, *fields: _tp.Union[_meta.FieldSchema, _tp.List[_meta.FieldSchema]]) \
             -> _meta.ModelOutputSchema:
 
-        ApiGuard.validate_signature(self.define_output_table, *fields)
+        _val.validate_signature(self.define_output_table, *fields)
 
         schema_def = self.define_schema(*fields, schema_type=_meta.SchemaType.TABLE)
         return _meta.ModelOutputSchema(schema=schema_def)
+
+    @staticmethod
+    def _build_named_dict(
+            *attrs: _tp.Union[_Named[_T], _tp.List[_Named[_T]]]) \
+            -> _tp.Dict[str, _T]:
+
+        if len(attrs) == 1 and isinstance(attrs[0], list):
+            return {a.item_name: a.item for a in attrs[0]}
+        else:
+            return {a.item_name: a.item for a in attrs}
 
     @staticmethod
     def _build_table_schema(
