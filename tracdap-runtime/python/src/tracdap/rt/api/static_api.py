@@ -17,7 +17,7 @@ from __future__ import annotations
 import typing as _tp
 import types as _ts
 
-from .hook import _RuntimeHook
+from .hook import _StaticApiHook
 from .hook import _Named
 
 # Import metadata domain objects into the API namespace
@@ -46,8 +46,8 @@ def define_attributes(*attrs: _tp.Union[TagUpdate, _tp.List[TagUpdate]]) -> _tp.
     :rtype: List[:py:class:`TagUpdate <tracdap.rt.metadata.TagUpdate>`]
     """
 
-    rh = _RuntimeHook.runtime()
-    return rh.define_attributes(*attrs)
+    sa = _StaticApiHook.get_instance()
+    return sa.define_attributes(*attrs)
 
 
 def define_attribute(
@@ -83,8 +83,8 @@ def define_attribute(
     :rtype: :py:class:`TagUpdate <tracdap.rt.metadata.TagUpdate>`
     """
 
-    rh = _RuntimeHook.runtime()
-    return rh.define_attribute(attr_name, attr_value, attr_type, categorical)
+    sa = _StaticApiHook.get_instance()
+    return sa.define_attribute(attr_name, attr_value, attr_type, categorical)
 
 
 def A(  # noqa
@@ -144,8 +144,8 @@ def define_parameter(
     :rtype: _Named[:py:class:`ModelParameter <tracdap.rt.metadata.ModelParameter>`]
     """
 
-    rh = _RuntimeHook.runtime()
-    return rh.define_parameter(param_name, param_type, label, default_value)
+    sa = _StaticApiHook.get_instance()
+    return sa.define_parameter(param_name, param_type, label, default_value)
 
 
 def declare_parameter(
@@ -213,8 +213,8 @@ def define_parameters(
     :rtype: Dict[str, :py:class:`ModelParameter <tracdap.rt.metadata.ModelParameter>`]
     """
 
-    rh = _RuntimeHook.runtime()
-    return rh.define_parameters(*params)
+    sa = _StaticApiHook.get_instance()
+    return sa.define_parameters(*params)
 
 
 def declare_parameters(
@@ -278,9 +278,9 @@ def define_field(
     :rtype: :py:class:`FieldSchema <tracdap.rt.metadata.FieldSchema>`
     """
 
-    rh = _RuntimeHook.runtime()
+    sa = _StaticApiHook.get_instance()
 
-    return rh.define_field(
+    return sa.define_field(
         field_name, field_type, label,
         business_key, categorical,
         format_code, field_order)
@@ -373,8 +373,8 @@ def define_schema(
     :rtype: :py:class:`SchemaDefinition <tracdap.rt.metadata.SchemaDefinition>`
     """
 
-    rh = _RuntimeHook.runtime()
-    return rh.define_schema(*fields, schema_type=schema_type)
+    sa = _StaticApiHook.get_instance()
+    return sa.define_schema(*fields, schema_type=schema_type)
 
 
 def load_schema(
@@ -412,8 +412,8 @@ def load_schema(
     :rtype: :py:class:`SchemaDefinition <tracdap.rt.metadata.SchemaDefinition>`
     """
 
-    rh = _RuntimeHook.runtime()
-    return rh.load_schema(package, schema_file, schema_type=schema_type)
+    sa = _StaticApiHook.get_instance()
+    return sa.load_schema(package, schema_file, schema_type=schema_type)
 
 
 def define_input_table(
@@ -434,8 +434,8 @@ def define_input_table(
     :rtype: :py:class:`ModelInputSchema <tracdap.rt.metadata.ModelInputSchema>`
     """
 
-    rh = _RuntimeHook.runtime()
-    return rh.define_input_table(*fields)
+    sa = _StaticApiHook.get_instance()
+    return sa.define_input_table(*fields)
 
 
 def declare_input_table(
@@ -472,8 +472,8 @@ def define_output_table(
     :rtype: :py:class:`ModelOutputSchema <tracdap.rt.metadata.ModelOutputSchema>`
     """
 
-    rh = _RuntimeHook.runtime()
-    return rh.define_output_table(*fields)
+    sa = _StaticApiHook.get_instance()
+    return sa.define_output_table(*fields)
 
 
 def declare_output_table(

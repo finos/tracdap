@@ -19,31 +19,22 @@ import tracdap.rt.metadata as _meta
 import tracdap.rt.exceptions as _ex
 import tracdap.rt._impl.schemas as _schemas
 import tracdap.rt._impl.type_system as _type_system
-import tracdap.rt._impl.util as _util
 import tracdap.rt._impl.validation as _val
 
 # Import hook interfaces into this module namespace
-from tracdap.rt.api.hook import _RuntimeHook  # noqa
+from tracdap.rt.api.hook import _StaticApiHook  # noqa
 from tracdap.rt.api.hook import _Named  # noqa
 
 
-class RuntimeHookImpl(_RuntimeHook):
+class StaticApiImpl(_StaticApiHook):
 
     _T = _tp.TypeVar("_T")
 
     @classmethod
     def register_impl(cls):
 
-        log = _util.logger_for_class(cls)
-
-        if not _RuntimeHook._is_registered():
-
-            log.info("Registering runtime API hook...")
-            _RuntimeHook._register(RuntimeHookImpl())
-
-        else:
-
-            log.warning("Runtime API hook is already registered")
+        if not _StaticApiHook._is_registered():
+            _StaticApiHook._register(StaticApiImpl())
 
     def define_attribute(
             self, attr_name: str, attr_value: _tp.Any,
