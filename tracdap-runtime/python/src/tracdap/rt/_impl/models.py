@@ -179,10 +179,6 @@ class ModelLoader:
             inputs = model.define_inputs()
             outputs = model.define_outputs()
 
-            for parameter in parameters.values():
-                if parameter.defaultValue is not None:
-                    parameter.defaultValue = _types.MetadataCodec.encode_value(parameter.defaultValue)
-
             # TODO: Model validation
 
             model_def = _meta.ModelDefinition()

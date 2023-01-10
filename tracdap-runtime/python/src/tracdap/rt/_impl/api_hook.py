@@ -253,6 +253,9 @@ class RuntimeHookImpl(_RuntimeHook):
         else:
             param_type_descriptor = _meta.TypeDescriptor(param_type, None, None)
 
+        if default_value is not None and not isinstance(default_value, _meta.Value):
+            default_value = _type_system.MetadataCodec.encode_value(default_value)
+
         return _Named(param_name, _meta.ModelParameter(param_type_descriptor, label, default_value))
 
     def define_parameters(
