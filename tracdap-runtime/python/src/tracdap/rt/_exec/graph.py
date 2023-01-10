@@ -348,6 +348,8 @@ class ImportModelNode(Node[meta.ObjectDefinition]):
 @_node_type
 class ImportAttrsNode(Node[cfg.TagUpdateList]):
 
+    # TODO: Remove this node, now staticAttributes are kept on model def
+
     model_scope: str
     import_details: meta.ImportModelJob
 

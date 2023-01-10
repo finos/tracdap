@@ -14,7 +14,6 @@
 
 from __future__ import annotations
 
-import copy
 import datetime
 import abc
 import random
@@ -502,20 +501,17 @@ class ImportModelFunc(NodeFunction[meta.ObjectDefinition]):
 
     def _execute(self, ctx: NodeContext) -> meta.ObjectDefinition:
 
-        stub_model_def = _model_def_for_import(self.node.import_details)
+        model_stub = _model_def_for_import(self.node.import_details)
 
-        model_class = self._models.load_model_class(self.node.model_scope, stub_model_def)
-        model_scan = self._models.scan_model(model_class)
-
-        model_def = copy.copy(stub_model_def)
-        model_def.parameters = model_scan.parameters
-        model_def.inputs = model_scan.inputs
-        model_def.outputs = model_scan.outputs
+        model_class = self._models.load_model_class(self.node.model_scope, model_stub)
+        model_def = self._models.scan_model(model_stub, model_class)
 
         return meta.ObjectDefinition(meta.ObjectType.MODEL, model=model_def)
 
 
 class ImportAttrsFunc(NodeFunction[_config.TagUpdateList]):
+
+    # TODO: Remove this function, now staticAttributes are kept on model def
 
     def __init__(self, node: ImportAttrsNode, models: _models.ModelLoader):
         self.node = node
@@ -523,10 +519,19 @@ class ImportAttrsFunc(NodeFunction[_config.TagUpdateList]):
 
     def _execute(self, ctx: NodeContext) -> _config.TagUpdateList:
 
-        stub_model_def = _model_def_for_import(self.node.import_details)
+        model_stub = _model_def_for_import(self.node.import_details)
+        model_class = self._models.load_model_class(self.node.model_scope, model_stub)
+        model_def = self._models.scan_model(model_stub, model_class)
 
-        model_class = self._models.load_model_class(self.node.model_scope, stub_model_def)
-        return self._models.scan_model_attrs(model_class)
+        updates = []
+
+        for attr_name, attr_value in model_def.staticAttributes.items():
+
+            updates.append(meta.TagUpdate(
+                attrName=attr_name, value=attr_value,
+                operation=meta.TagOperation.CREATE_OR_REPLACE_ATTR))
+
+        return cfg.TagUpdateList(updates)
 
 
 class RunModelFunc(NodeFunction[Bundle[_data.DataView]]):
