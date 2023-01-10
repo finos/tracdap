@@ -14,6 +14,7 @@
 
 import inspect
 import logging
+import re
 import typing as tp
 
 import tracdap.rt.metadata as meta
@@ -50,7 +51,7 @@ class _TypeValidator:
     # Inspecting a function signature can take ~ half a second in Python 3.7
     __method_cache: tp.Dict[str, inspect.Signature] = dict()
 
-    _log: logging.Logger = util.logger_for_namespace(__package__)
+    _log: logging.Logger = util.logger_for_namespace(__name__)
 
     @classmethod
     def validate_signature(cls, method: tp.Callable, *args, **kwargs):
@@ -234,10 +235,16 @@ class _TypeValidator:
 
 class _StaticValidator:
 
-    _log: logging.Logger = util.logger_for_namespace(__package__)
+    __identifier_pattern = re.compile("^[a-zA-Z_]\\w+$", re.ASCII)
+    __reserved_identifier_pattern = re.compile("^(_|trac_)", re.ASCII)
+
+    _log: logging.Logger = util.logger_for_namespace(__name__)
 
     @classmethod
     def quick_validate_model_def(cls, model_def: meta.ModelDefinition):
+
+        # This is a quick validation that only checks for valid unique identifiers
+        # Other checks, e.g. table field type is primitive, are not included yet
 
         # Note: This method must raise EModelValidation on failure, rather than any other validation error type
         # This will be important when comprehensive metadata validation is added to the runtime
@@ -257,9 +264,82 @@ class _StaticValidator:
         if not outputs_type_check:
             cls._fail(f"Invalid model outputs: define_outputs() returned the wrong type")
 
-        # TODO: Semantic validation
+        cls._valid_identifiers(model_def.staticAttributes.keys(), "model attribute")
+        cls._valid_identifiers(model_def.parameters.keys(), "model parameter")
+        cls._valid_identifiers(model_def.inputs.keys(), "model input")
+        cls._valid_identifiers(model_def.outputs.keys(), "model output")
+
+        cls._case_insensitive_duplicates(model_def.staticAttributes.keys(), "model attribute")
+        cls._case_insensitive_duplicates(model_def.parameters.keys(), "model parameter")
+        cls._case_insensitive_duplicates(model_def.inputs.keys(), "model input")
+        cls._case_insensitive_duplicates(model_def.outputs.keys(), "model output")
+
+        # Note unique context does not include static attributes
+        # They are not part of the runtime context, so there is no need to constrain them
+        unique_ctx = {}
+        cls._unique_context_check(unique_ctx, model_def.parameters.keys(), "model parameter")
+        cls._unique_context_check(unique_ctx, model_def.inputs.keys(), "model input")
+        cls._unique_context_check(unique_ctx, model_def.outputs.keys(), "model output")
+
+        cls._check_table_fields(model_def.inputs)
+        cls._check_table_fields(model_def.outputs)
 
     @classmethod
-    def _fail(cls, err: str):
-        cls._log.error(str)
-        raise ex.EModelValidation(err)
+    def _check_table_fields(cls, inputs_or_outputs):
+
+        for input_name, input_schema in inputs_or_outputs.items():
+
+            fields = input_schema.schema.table.fields
+            field_names = list(map(lambda f: f.fieldName, fields))
+            property_type = f"field in [{input_name}]"
+
+            cls._valid_identifiers(field_names, property_type)
+            cls._case_insensitive_duplicates(field_names, property_type)
+
+    @classmethod
+    def _valid_identifiers(cls, keys, property_type):
+
+        for key in keys:
+            if not cls.__identifier_pattern.match(key):
+                cls._fail(f"Invalid {property_type}: [{key}] is not a valid identifier")
+            if cls.__reserved_identifier_pattern.match(key):
+                cls._fail(f"Invalid {property_type}: [{key}] is a reserved identifier")
+
+    @classmethod
+    def _case_insensitive_duplicates(cls, items, property_type):
+
+        known_items = {}
+
+        for item_case in items:
+
+            lower_case = item_case.lower()
+            prior_case = known_items.get(lower_case)
+
+            if prior_case is None:
+                known_items[lower_case] = item_case
+
+            elif item_case == prior_case:
+                err = f"[{item_case}] is included more than once as a {property_type}"
+                cls._fail(err)
+
+            else:
+                err = f"[{prior_case}] and [{item_case}] are both included as a {property_type} but differ only by case"
+                cls._fail(err)
+
+    @classmethod
+    def _unique_context_check(cls, unique_ctx, items, property_type):
+
+        for item in items:
+
+            lower_item = item.lower()
+
+            if lower_item in unique_ctx:
+                err = f"Model {property_type} [{item}] is already defined as a {unique_ctx[lower_item]}"
+                cls._fail(err)
+
+            unique_ctx[lower_item] = property_type
+
+    @classmethod
+    def _fail(cls, message: str):
+        cls._log.error(message)
+        raise ex.EModelValidation(message)
