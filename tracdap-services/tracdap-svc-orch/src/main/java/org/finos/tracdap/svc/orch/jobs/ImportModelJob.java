@@ -188,6 +188,14 @@ public class ImportModelJob implements IJobLogic {
                 .setValue(encodeValue(modelDef.getEntryPoint()))
                 .build());
 
+        if (modelDef.hasPath()) {
+
+            modelReq.addTagUpdates(TagUpdate.newBuilder()
+                    .setAttrName(TRAC_MODEL_PATH)
+                    .setValue(encodeValue(modelDef.getPath()))
+                    .build());
+        }
+
         return List.of(modelReq.build());
     }
 }
