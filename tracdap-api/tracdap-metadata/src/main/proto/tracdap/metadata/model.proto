@@ -85,7 +85,7 @@ message ModelDefinition {
 
     string entryPoint = 5;
 
-    string path = 3;
+    optional string path = 3;
 
     map<string, ModelParameter> parameters = 7;
     map<string, ModelInputSchema> inputs = 8;
