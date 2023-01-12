@@ -57,6 +57,7 @@ public abstract class RunModelTest {
         protected String useTracRepo() { return "TRAC_LOCAL_REPO"; }
     }
 
+    @Disabled("Models on main not in sync with latest changes")
     @EnabledIfEnvironmentVariable(named = "GITHUB_ACTIONS", matches = "true", disabledReason = "Only run in CI")
     public static class GitRepoTest extends RunFlowTest {
         protected String useTracRepo() { return "TRAC_GIT_REPO"; }
