@@ -46,12 +46,12 @@ public abstract class ModelAttrsTest {
 
     protected abstract String useTracRepo();
 
-    public static class LocalRepoTest extends RunFlowTest {
+    public static class LocalRepoTest extends ModelAttrsTest {
         protected String useTracRepo() { return "TRAC_LOCAL_REPO"; }
     }
 
     @EnabledIfEnvironmentVariable(named = "GITHUB_ACTIONS", matches = "true", disabledReason = "Only run in CI")
-    public static class GitRepoTest extends RunFlowTest {
+    public static class GitRepoTest extends ModelAttrsTest {
         protected String useTracRepo() { return "TRAC_GIT_REPO"; }
     }
 
