@@ -27,9 +27,8 @@ import org.finos.tracdap.metadata.ImportModelJob;
 import org.finos.tracdap.test.helpers.GitHelpers;
 import org.finos.tracdap.test.helpers.PlatformTest;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.junit.jupiter.api.extension.RegisterExtension;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -39,19 +38,25 @@ import java.util.List;
 import static org.finos.tracdap.svc.orch.jobs.Helpers.runJob;
 
 
-public abstract class ModelAttrsTest {
+@Tag("integration")
+@Tag("int-e2e")
+public abstract class ImportModelTest {
 
     private static final String TEST_TENANT = "ACME_CORP";
     private static final String E2E_CONFIG = "config/trac-e2e.yaml";
 
+    // Test model import using different repo types
+    // This will test the E2E model loading mechanism
+    // The same mechanism is used for model import and model run
+    // So we don't need to test all combinations of model run from different repo types
+
     protected abstract String useTracRepo();
 
-    public static class LocalRepoTest extends ModelAttrsTest {
+    public static class LocalRepoTest extends ImportModelTest {
         protected String useTracRepo() { return "TRAC_LOCAL_REPO"; }
     }
 
-    @EnabledIfEnvironmentVariable(named = "GITHUB_ACTIONS", matches = "true", disabledReason = "Only run in CI")
-    public static class GitRepoTest extends ModelAttrsTest {
+    public static class GitRepoTest extends ImportModelTest {
         protected String useTracRepo() { return "TRAC_GIT_REPO"; }
     }
 
@@ -78,11 +83,11 @@ public abstract class ModelAttrsTest {
                 .setLanguage("python")
                 .setRepository(useTracRepo())
                 .setPath("examples/models/python/src")
-                .setEntryPoint("tutorial.using_data.UsingDataModel")
+                .setEntryPoint("tutorial.schema_files.SchemaFilesModel")
                 .setVersion(modelVersion)
                 .addModelAttrs(TagUpdate.newBuilder()
                         .setAttrName("e2e_test_model")
-                        .setValue(MetadataCodec.encodeValue("run_model:using_data")))
+                        .setValue(MetadataCodec.encodeValue("import_model:schema_files")))
                 .build();
 
         var jobRequest = JobRequest.newBuilder()
@@ -92,8 +97,11 @@ public abstract class ModelAttrsTest {
                         .setImportModel(importModel))
                 .addJobAttrs(TagUpdate.newBuilder()
                         .setAttrName("e2e_test_job")
-                        .setValue(MetadataCodec.encodeValue("run_model:import_model")))
+                        .setValue(MetadataCodec.encodeValue("import_model:schema_files")))
                 .build();
+
+        // Developer note: This test will fail running locally if the latest commit is not pushed to GitHub
+        // It doesn't need to be merged, but the commit must exist on your origin / fork
 
         var jobStatus = runJob(orchClient, jobRequest);
         var jobKey = MetadataUtil.objectKey(jobStatus.getJobId());
@@ -126,8 +134,8 @@ public abstract class ModelAttrsTest {
         var modelDef = modelTag.getDefinition().getModel();
         var modelAttr = modelTag.getAttrsOrThrow("e2e_test_model");
 
-        Assertions.assertEquals("run_model:using_data", MetadataCodec.decodeStringValue(modelAttr));
-        Assertions.assertEquals("tutorial.using_data.UsingDataModel", modelDef.getEntryPoint());
+        Assertions.assertEquals("import_model:schema_files", MetadataCodec.decodeStringValue(modelAttr));
+        Assertions.assertEquals("tutorial.schema_files.SchemaFilesModel", modelDef.getEntryPoint());
         Assertions.assertTrue(modelDef.getParametersMap().containsKey("eur_usd_rate"));
         Assertions.assertTrue(modelDef.getInputsMap().containsKey("customer_loans"));
         Assertions.assertTrue(modelDef.getOutputsMap().containsKey("profit_by_region"));
@@ -138,6 +146,6 @@ public abstract class ModelAttrsTest {
 
         Assertions.assertInstanceOf(String.class, MetadataCodec.decodeValue(descriptionAttr));
         Assertions.assertEquals("retail_products", MetadataCodec.decodeValue(segmentAttr));
-        Assertions.assertEquals(List.of("loans", "uk", "examples"), MetadataCodec.decodeValue(classifiersAttr));
+        Assertions.assertEquals(List.of("loans", "uk", "examples"), MetadataCodec.decodeArrayValue(classifiersAttr));
     }
 }
