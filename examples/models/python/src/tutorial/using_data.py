@@ -72,7 +72,7 @@ class UsingDataModel(trac.TracModel):
             trac.F("loan_amount", trac.DECIMAL, label="Principal loan amount"),
             trac.F("total_pymnt", trac.DECIMAL, label="Total amount repaid"),
             trac.F("region", trac.STRING, label="Customer home region", categorical=True),
-            trac.F("loan_condition_cat", trac.INTEGER, label="Loan condition category", categorical=True))
+            trac.F("loan_condition_cat", trac.INTEGER, label="Loan condition category"))
 
         return {"customer_loans": customer_loans}
 
