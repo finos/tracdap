@@ -322,12 +322,16 @@ class PyPiRepository(IModelRepository):
                 self.SIMPLE_PACKAGE_PATH, simple_root_url, simple_headers,
                 credentials, model_def)
 
-            received_content_type = package_req.headers.get("content-type")
+            # Default content type is text/html
+            # Content type can contain modifiers, e.g. text/html; charset=utf-8
+            # We only want the mime type part
+            received_content_type = package_req.headers.get("content-type") or self.PIP_SIMPLE_TYPE_HTML
+            received_mime_type = received_content_type.split(";")[0].strip()
 
-            if received_content_type == self.PIP_SIMPLE_TYPE_JSON:
+            if received_mime_type == self.PIP_SIMPLE_TYPE_JSON:
                 filename, url = self._pypi_simple_parse_response(model_def, package_req.json())
 
-            elif received_content_type == self.PIP_SIMPLE_TYPE_HTML:
+            elif received_mime_type == self.PIP_SIMPLE_TYPE_HTML:
                 package_parser = _PypiSimpleHtmlParser(model_def.package, package_req.url)
                 package_parser.feed(package_req.text)
                 filename, url = self._pypi_simple_parse_response(model_def, package_parser.response)
