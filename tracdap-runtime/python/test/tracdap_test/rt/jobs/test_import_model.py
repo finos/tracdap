@@ -56,7 +56,7 @@ class ImportModelTest(unittest.TestCase):
                 language="python",
                 repository="unit_test_repo",
                 path="examples/models/python/src",
-                entryPoint="tutorial.hello_world.HelloWorldModel",
+                entryPoint="tutorial.using_data.UsingDataModel",
                 version=self.commit_hash))
 
         job_config = cfg.JobConfig(job_id, job_def)
