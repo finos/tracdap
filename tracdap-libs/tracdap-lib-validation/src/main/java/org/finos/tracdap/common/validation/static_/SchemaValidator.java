@@ -37,8 +37,7 @@ public class SchemaValidator {
     private static final List<BasicType> ALLOWED_BUSINESS_KEY_TYPES = List.of(
             BasicType.STRING, BasicType.INTEGER, BasicType.DATE);
 
-    private static final List<BasicType> ALLOWED_CATEGORICAL_TYPES = List.of(
-            BasicType.STRING, BasicType.INTEGER);
+    private static final List<BasicType> ALLOWED_CATEGORICAL_TYPES = List.of(BasicType.STRING);
 
     private static final Descriptors.Descriptor SCHEMA_DEFINITION;
     private static final Descriptors.FieldDescriptor SD_SCHEMA_TYPE;

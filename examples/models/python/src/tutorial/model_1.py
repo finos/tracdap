@@ -33,7 +33,7 @@ class FirstModel(trac.TracModel):
             trac.F("loan_amount", trac.DECIMAL, label="Principal loan amount"),
             trac.F("total_pymnt", trac.DECIMAL, label="Total amount repaid"),
             trac.F("region", trac.STRING, label="Customer home region", categorical=True),
-            trac.F("loan_condition_cat", trac.INTEGER, label="Loan condition category", categorical=True))
+            trac.F("loan_condition_cat", trac.INTEGER, label="Loan condition category"))
 
         currency_data = trac.define_input_table(
             trac.F("ccy_code", trac.STRING, label="Currency code", categorical=True),
