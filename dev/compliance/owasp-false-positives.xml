@@ -87,6 +87,13 @@
         <cpe>cpe:/a:utils_project:utils</cpe>
     </suppress>
 
+    <!-- Vulnerabilities in the YAML implementation for Go language detected as yaml_project -->
+    <!-- Come on OWASP - we're not even using the GO language! -->
+
+    <suppress>
+        <packageUrl regex="true">^pkg:maven/org\.yaml/snakeyaml@.*$</packageUrl>
+        <cpe>cpe:2.3:a:yaml_project:yaml:*:*:*:*:*:go:*:*</cpe>
+    </suppress>
 
 
     <!-- ================== -->
