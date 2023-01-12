@@ -238,6 +238,21 @@ class _StaticValidator:
     __identifier_pattern = re.compile("\\A[a-zA-Z_]\\w+\\Z", re.ASCII)
     __reserved_identifier_pattern = re.compile("\\A(_|trac_)", re.ASCII)
 
+    __PRIMITIVE_TYPES = [
+        meta.BasicType.BOOLEAN,
+        meta.BasicType.INTEGER,
+        meta.BasicType.FLOAT,
+        meta.BasicType.DECIMAL,
+        meta.BasicType.STRING,
+        meta.BasicType.DATE,
+        meta.BasicType.DATETIME,
+    ]
+
+    __BUSINESS_KEY_TYPES = [
+        meta.BasicType.STRING,
+        meta.BasicType.INTEGER,
+        meta.BasicType.DATE]
+
     _log: logging.Logger = util.logger_for_namespace(__name__)
 
     @classmethod
@@ -289,12 +304,36 @@ class _StaticValidator:
 
         for input_name, input_schema in inputs_or_outputs.items():
 
+            cls._log.info(f"Checking {input_name}")
+
             fields = input_schema.schema.table.fields
             field_names = list(map(lambda f: f.fieldName, fields))
             property_type = f"field in [{input_name}]"
 
             cls._valid_identifiers(field_names, property_type)
             cls._case_insensitive_duplicates(field_names, property_type)
+
+            for field in fields:
+                cls._check_single_field(field, property_type)
+
+    @classmethod
+    def _check_single_field(cls, field: meta.FieldSchema, property_type):
+
+        # Valid identifier and not trac reserved checked separately
+
+        cls._log.info(field.fieldName)
+
+        if field.fieldOrder < 0:
+            cls._fail(f"Invalid {property_type}: [{field.fieldName}] fieldOrder < 0")
+
+        if field.fieldType not in cls.__PRIMITIVE_TYPES:
+            cls._fail(f"Invalid {property_type}: [{field.fieldName}] fieldType is not a primitive type")
+
+        if field.businessKey and field.fieldType not in cls.__BUSINESS_KEY_TYPES:
+            cls._fail(f"Invalid {property_type}: [{field.fieldName}] fieldType {field.fieldType} used as business key")
+
+        if field.categorical and field.fieldType != meta.BasicType.STRING:
+            cls._fail(f"Invalid {property_type}: [{field.fieldName}] fieldType {field.fieldType} used as categorical")
 
     @classmethod
     def _valid_identifiers(cls, keys, property_type):
