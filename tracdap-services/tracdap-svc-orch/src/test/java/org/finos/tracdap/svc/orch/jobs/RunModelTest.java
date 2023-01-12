@@ -28,7 +28,6 @@ import org.finos.tracdap.test.helpers.PlatformTest;
 import com.google.protobuf.ByteString;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.Tag;
-import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.junit.jupiter.api.extension.RegisterExtension;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -45,22 +44,17 @@ import static org.finos.tracdap.svc.orch.jobs.Helpers.runJob;
 @Tag("integration")
 @Tag("int-e2e")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
-public abstract class RunModelTest {
+public class RunModelTest {
 
     private static final String TEST_TENANT = "ACME_CORP";
     private static final String E2E_CONFIG = "config/trac-e2e.yaml";
     private static final String INPUT_PATH = "examples/models/python/data/inputs/loan_final313_100_shortform.csv";
 
-    protected abstract String useTracRepo();
+    // Only test E2E run model using the local repo
+    // E2E model loading with different repo types is tested in ImportModelTest
+    // We don't need to test all combinations of model run from different repo types
 
-    public static class LocalRepoTest extends RunModelTest {
-        protected String useTracRepo() { return "TRAC_LOCAL_REPO"; }
-    }
-
-    @EnabledIfEnvironmentVariable(named = "GITHUB_ACTIONS", matches = "true", disabledReason = "Only run in CI")
-    public static class GitRepoTest extends RunModelTest {
-        protected String useTracRepo() { return "TRAC_GIT_REPO"; }
-    }
+    protected String useTracRepo() { return "TRAC_LOCAL_REPO"; }
 
     @RegisterExtension
     private static final PlatformTest platform = PlatformTest.forConfig(E2E_CONFIG)
