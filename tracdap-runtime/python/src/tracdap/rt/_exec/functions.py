@@ -201,10 +201,6 @@ class BuildJobResultFunc(NodeFunction[_config.JobResult]):
             obj_def = _ctx_lookup(node_id, ctx)
             job_result.results[obj_id] = obj_def
 
-        for obj_id, node_id in self.node.attrs.items():
-            attrs = _ctx_lookup(node_id, ctx)
-            job_result.attrs[obj_id] = attrs
-
         for bundle_id in self.node.bundles:
             bundle = _ctx_lookup(bundle_id, ctx)
             job_result.results.update(bundle.items())
@@ -509,31 +505,6 @@ class ImportModelFunc(NodeFunction[meta.ObjectDefinition]):
         return meta.ObjectDefinition(meta.ObjectType.MODEL, model=model_def)
 
 
-class ImportAttrsFunc(NodeFunction[_config.TagUpdateList]):
-
-    # TODO: Remove this function, now staticAttributes are kept on model def
-
-    def __init__(self, node: ImportAttrsNode, models: _models.ModelLoader):
-        self.node = node
-        self._models = models
-
-    def _execute(self, ctx: NodeContext) -> _config.TagUpdateList:
-
-        model_stub = _model_def_for_import(self.node.import_details)
-        model_class = self._models.load_model_class(self.node.model_scope, model_stub)
-        model_def = self._models.scan_model(model_stub, model_class)
-
-        updates = []
-
-        for attr_name, attr_value in model_def.staticAttributes.items():
-
-            updates.append(meta.TagUpdate(
-                attrName=attr_name, value=attr_value,
-                operation=meta.TagOperation.CREATE_OR_REPLACE_ATTR))
-
-        return cfg.TagUpdateList(updates)
-
-
 class RunModelFunc(NodeFunction[Bundle[_data.DataView]]):
 
     def __init__(self, node: RunModelNode, model_class: _api.TracModel.__class__):
@@ -650,9 +621,6 @@ class FunctionResolver:
     def resolve_import_model_node(self, node: ImportModelNode):
         return ImportModelFunc(node, self._models)
 
-    def resolve_import_attrs_node(self, node: ImportAttrsNode):
-        return ImportAttrsFunc(node, self._models)
-
     def resolve_run_model_node(self, node: RunModelNode) -> NodeFunction:
 
         model_class = self._models.load_model_class(node.model_scope, node.model_def)
@@ -683,6 +651,5 @@ class FunctionResolver:
         SaveDataNode: resolve_save_data,
         DynamicDataSpecNode: resolve_dynamic_data_spec,
         RunModelNode: resolve_run_model_node,
-        ImportModelNode: resolve_import_model_node,
-        ImportAttrsNode: resolve_import_attrs_node
+        ImportModelNode: resolve_import_model_node
     }

@@ -106,17 +106,13 @@ class GraphBuilder:
         import_id = NodeId.of("trac_import_model", job_namespace, meta.ObjectDefinition)
         import_node = ImportModelNode(import_id, model_scope, import_details, explicit_deps=[job_push_id])
 
-        import_attrs_id = NodeId.of("trac_import_attrs", job_namespace, config.TagUpdateList)
-        import_attrs_node = ImportAttrsNode(import_attrs_id, model_scope, import_details, explicit_deps=[import_id])
-
-        main_section = GraphSection(nodes={import_id: import_node, import_attrs_id: import_attrs_node})
+        main_section = GraphSection(nodes={import_id: import_node})
 
         # Build job-level metadata outputs
 
         result_section = cls.build_job_results(
             job_config, job_namespace, result_spec,
             objects={new_model_key: import_id},
-            attrs={new_model_key: import_attrs_id},
             explicit_deps=[job_push_id, *main_section.must_run])
 
         return cls._join_sections(main_section, result_section)
@@ -330,7 +326,6 @@ class GraphBuilder:
     def build_job_results(
             cls, job_config: cfg.JobConfig, job_namespace: NodeNamespace, result_spec: JobResultSpec,
             objects: tp.Dict[str, NodeId[meta.ObjectDefinition]] = None,
-            attrs: tp.Dict[str, NodeId[config.TagUpdateList]] = None,
             bundles: tp.List[NodeId[ObjectBundle]] = None,
             explicit_deps: tp.Optional[tp.List[NodeId]] = None) \
             -> GraphSection:
@@ -341,12 +336,9 @@ class GraphBuilder:
 
             results_inputs = set(objects.values())
 
-            if attrs is not None:
-                results_inputs.update(attrs.values())
-
             build_result_node = BuildJobResultNode(
                 build_result_id, job_config.jobId,
-                objects=objects, attrs=attrs, explicit_deps=explicit_deps)
+                objects=objects, explicit_deps=explicit_deps)
 
         elif bundles is not None:
 
