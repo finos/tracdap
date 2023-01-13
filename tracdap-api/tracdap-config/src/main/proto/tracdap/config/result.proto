@@ -39,5 +39,10 @@ message JobResult {
   string statusMessage = 3;
 
   map<string, metadata.ObjectDefinition> results = 4;
-  map<string, TagUpdateList> attrs = 5;
+
+  // Separate explicit attrs not passed back by any job type
+  // Reserve the field though, it's likely we'll need it in future
+  // map<string, TagUpdateList> attrs = 5;
+  reserved "attrs";
+  reserved 5;
 }
