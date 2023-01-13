@@ -17,6 +17,7 @@
 package org.finos.tracdap.svc.orch.service;
 
 import org.finos.tracdap.api.MetadataWriteRequest;
+import org.finos.tracdap.api.UniversalMetadataWriteBatchRequest;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -31,4 +32,21 @@ class BatchMetadataWriteAPI {
     final List<MetadataWriteRequest> updateObject = new ArrayList<>();
     final List<MetadataWriteRequest> updateTag = new ArrayList<>();
 
+    public UniversalMetadataWriteBatchRequest asRequest(String tenant) {
+        return UniversalMetadataWriteBatchRequest.newBuilder()
+                .setTenant(tenant)
+                .addAllCreatePreallocatedObjects(createPreallocatedObject)
+                .addAllCreateObjects(createObject)
+                .addAllUpdateObjects(updateObject)
+                .addAllUpdateTags(updateTag)
+                .build();
+    }
+
+    public boolean isEmpty() {
+        return
+                createPreallocatedObject.isEmpty() &&
+                createObject.isEmpty() &&
+                updateObject.isEmpty() &&
+                updateTag.isEmpty();
+    }
 }

@@ -74,59 +74,25 @@ public class JobLifecycle {
             targetList = batchMetadataWriteAPI.createPreallocatedObject;
         }
 
-        targetList.add(scrapTenant(update));
+        targetList.add(update);
     }
 
     /**
-     * Send all requests in a batch manner. Clear the requests after the operation.
+     * Send all requests in a batch manner.
      */
     private void sendBatchMetadataWriteAPI(
             JobState jobState,
             BatchMetadataWriteAPI batchMetadataWriteAPI
     ) {
-        var tenant = jobState.tenant;
-        var metadataClient = GrpcClientAuth.applyIfAvailable(metaClient, jobState.ownerToken);
-        callApi(
-                tenant,
-                metadataClient::createPreallocatedObjectBatch,
-                batchMetadataWriteAPI.createPreallocatedObject
-        );
-
-        callApi(
-                tenant,
-                metadataClient::createObjectBatch,
-                batchMetadataWriteAPI.createObject
-        );
-
-        callApi(
-                tenant,
-                metadataClient::updateObjectBatch,
-                batchMetadataWriteAPI.updateObject
-        );
-
-        callApi(
-                tenant,
-                metadataClient::updateTagBatch,
-                batchMetadataWriteAPI.updateTag
-        );
-    }
-
-    private void callApi(
-            String tenant,
-            Function<MetadataWriteBatchRequest, MetadataWriteBatchResponse> methodImpl,
-            List<MetadataWriteRequest> requests
-    ) {
-        if (requests.isEmpty()) {
+        if (batchMetadataWriteAPI.isEmpty()) {
             return;
         }
 
-        var request = MetadataWriteBatchRequest.newBuilder()
-                .setTenant(tenant)
-                .addAllRequests(requests)
-                .build();
-        methodImpl.apply(request);
+        var tenant = jobState.tenant;
+        var metadataClient = GrpcClientAuth.applyIfAvailable(metaClient, jobState.ownerToken);
 
-        requests.clear();
+        var request = batchMetadataWriteAPI.asRequest(tenant);
+        metadataClient.universalWrite(request);
     }
 
     /**

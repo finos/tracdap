@@ -31,6 +31,33 @@ import "google/api/annotations.proto";
 
 
 /**
+ * Request to create or update a batch of objects in the TRAC metadata store.
+ *
+ * Tenant in requests must be null.
+ *
+ * @see TracMetadataApi
+ */
+message UniversalMetadataWriteBatchRequest {
+
+  /**
+   * Tenant code for the requested operation, always required.
+   */
+  string tenant = 1;
+
+  /**
+   * Requests to be realized in batch.
+   *
+   * Tenant in requests must be null.
+   */
+
+  repeated MetadataWriteRequest createPreallocatedObjects = 2;
+  repeated MetadataWriteRequest createObjects = 3;
+  repeated MetadataWriteRequest updateObjects = 4;
+  repeated MetadataWriteRequest updateTags = 5;
+};
+
+
+/**
  * Trusted API reading, writing and searching for objects in the TRAC metadata store.
  *
  * This API is only available to other components of the TRAC platform, it is
@@ -45,6 +72,18 @@ import "google/api/annotations.proto";
  * @see TracMetadataApi
  */
 service TrustedMetadataApi {
+  /**
+   * Perform all operations in UniversalMetadataWriteBatchRequest
+   * in the TRAC metadata store.
+   *
+   * This call runs without restriction on which types of object can be saved.
+   */
+  rpc universalWrite (UniversalMetadataWriteBatchRequest) returns (MetadataWriteBatchResponse) {
+    option (google.api.http) = {
+      post: "/{tenant}/trusted/universal-write-batch"
+      body: "*"
+    };
+  }
 
   /**
    * Create a new object in the TRAC metadata store.

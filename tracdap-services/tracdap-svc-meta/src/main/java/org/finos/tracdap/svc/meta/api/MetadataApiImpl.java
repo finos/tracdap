@@ -29,6 +29,7 @@ import io.grpc.MethodDescriptor;
 import io.grpc.Status;
 
 import java.util.Collections;
+import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -224,6 +225,16 @@ public class MetadataApiImpl {
                 .build();
     }
 
+    public MetadataWriteBatchResponse universalWrite(UniversalMetadataWriteBatchRequest request) {
+
+        validateRequest(TrustedMetadataApiGrpc.getUniversalWriteMethod(), request);
+
+        var tagHeaders = writeService.universalWrite(request);
+        return MetadataWriteBatchResponse.newBuilder()
+                .addAllHeaders(tagHeaders)
+                .build();
+    }
+
     Tag readObject(MetadataReadRequest request) {
 
         validateRequest(READ_OBJECT_METHOD, request);
@@ -296,4 +307,5 @@ public class MetadataApiImpl {
 
         validator.validateFixedMethod(request, protoMethod);
     }
+
 }
