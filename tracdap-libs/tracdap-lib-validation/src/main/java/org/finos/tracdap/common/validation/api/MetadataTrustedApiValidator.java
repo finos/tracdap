@@ -105,19 +105,19 @@ public class MetadataTrustedApiValidator {
                 .pop();
 
         ctx = ctx.pushRepeated(field(UNIVERSAL_METADATA_WRITE_BATCH_REQUEST, UniversalMetadataWriteBatchRequest.CREATEOBJECTS_FIELD_NUMBER))
-                .applyRepeated(MetadataTrustedApiValidator::createObjectBatch, MetadataWriteBatchRequest.class)
+                .applyRepeated(MetadataTrustedApiValidator::createObject, MetadataWriteRequest.class)
                 .pop();
 
         ctx = ctx.pushRepeated(field(UNIVERSAL_METADATA_WRITE_BATCH_REQUEST, UniversalMetadataWriteBatchRequest.CREATEPREALLOCATEDOBJECTS_FIELD_NUMBER))
-                .applyRepeated(MetadataTrustedApiValidator::createPreallocatedObjectBatch, MetadataWriteBatchRequest.class)
+                .applyRepeated(MetadataTrustedApiValidator::createPreallocatedObject, MetadataWriteRequest.class)
                 .pop();
 
         ctx = ctx.pushRepeated(field(UNIVERSAL_METADATA_WRITE_BATCH_REQUEST, UniversalMetadataWriteBatchRequest.UPDATEOBJECTS_FIELD_NUMBER))
-                .applyRepeated(MetadataTrustedApiValidator::updateObjectBatch, MetadataWriteBatchRequest.class)
+                .applyRepeated(MetadataTrustedApiValidator::updateObject, MetadataWriteRequest.class)
                 .pop();
 
         ctx = ctx.pushRepeated(field(UNIVERSAL_METADATA_WRITE_BATCH_REQUEST, UniversalMetadataWriteBatchRequest.UPDATETAGS_FIELD_NUMBER))
-                .applyRepeated(MetadataTrustedApiValidator::updateTagBatch, MetadataWriteBatchRequest.class)
+                .applyRepeated(MetadataTrustedApiValidator::updateTag, MetadataWriteRequest.class)
                 .pop();
 
         return ctx;
