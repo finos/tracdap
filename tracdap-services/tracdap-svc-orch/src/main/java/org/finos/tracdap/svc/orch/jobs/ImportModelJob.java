@@ -145,9 +145,12 @@ public class ImportModelJob implements IJobLogic {
                 .setDefinition(modelObj);
 
         // Add attrs defined in the model code
-        if (jobResult.containsAttrs(modelKey)) {
-            var modelAttrs = jobResult.getAttrsOrThrow(modelKey).getAttrsList();
-            modelReq.addAllTagUpdates(modelAttrs);
+        for (var staticAttr : modelDef.getStaticAttributesMap().entrySet()) {
+
+            modelReq.addTagUpdates(TagUpdate.newBuilder()
+                    .setOperation(TagOperation.CREATE_OR_REPLACE_ATTR)
+                    .setAttrName(staticAttr.getKey())
+                    .setValue(staticAttr.getValue()));
         }
 
         // Add attrs defined in the job
@@ -162,38 +165,32 @@ public class ImportModelJob implements IJobLogic {
 
         modelReq.addTagUpdates(TagUpdate.newBuilder()
                 .setAttrName(TRAC_MODEL_REPOSITORY)
-                .setValue(encodeValue(modelDef.getRepository()))
-                .build());
+                .setValue(encodeValue(modelDef.getRepository())));
 
         if (modelDef.hasPackageGroup()) {
 
             modelReq.addTagUpdates(TagUpdate.newBuilder()
                     .setAttrName(TRAC_MODEL_PACKAGE_GROUP)
-                    .setValue(encodeValue(modelDef.getPackageGroup()))
-                    .build());
+                    .setValue(encodeValue(modelDef.getPackageGroup())));
         }
 
         modelReq.addTagUpdates(TagUpdate.newBuilder()
                 .setAttrName(TRAC_MODEL_PACKAGE)
-                .setValue(encodeValue(modelDef.getPackage()))
-                .build());
+                .setValue(encodeValue(modelDef.getPackage())));
 
         modelReq.addTagUpdates(TagUpdate.newBuilder()
                 .setAttrName(TRAC_MODEL_VERSION)
-                .setValue(encodeValue(modelDef.getVersion()))
-                .build());
+                .setValue(encodeValue(modelDef.getVersion())));
 
         modelReq.addTagUpdates(TagUpdate.newBuilder()
                 .setAttrName(TRAC_MODEL_ENTRY_POINT)
-                .setValue(encodeValue(modelDef.getEntryPoint()))
-                .build());
+                .setValue(encodeValue(modelDef.getEntryPoint())));
 
         if (modelDef.hasPath()) {
 
             modelReq.addTagUpdates(TagUpdate.newBuilder()
                     .setAttrName(TRAC_MODEL_PATH)
-                    .setValue(encodeValue(modelDef.getPath()))
-                    .build());
+                    .setValue(encodeValue(modelDef.getPath())));
         }
 
         return List.of(modelReq.build());
