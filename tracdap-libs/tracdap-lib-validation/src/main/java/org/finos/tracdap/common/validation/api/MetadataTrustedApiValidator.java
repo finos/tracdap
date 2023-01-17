@@ -16,27 +16,14 @@
 
 package org.finos.tracdap.common.validation.api;
 
-import com.google.protobuf.Descriptors;
 import org.finos.tracdap.api.*;
 import org.finos.tracdap.common.validation.core.ValidationContext;
 import org.finos.tracdap.common.validation.core.ValidationType;
 import org.finos.tracdap.common.validation.core.Validator;
-import org.finos.tracdap.common.validation.static_.CommonValidators;
-import org.finos.tracdap.common.validation.static_.ObjectIdValidator;
-import org.finos.tracdap.metadata.TagSelector;
-
-import static org.finos.tracdap.common.validation.core.ValidatorUtils.field;
 
 
 @Validator(type = ValidationType.STATIC, serviceFile = MetadataTrusted.class, serviceName = TrustedMetadataApiGrpc.SERVICE_NAME)
 public class MetadataTrustedApiValidator {
-    private static final Descriptors.Descriptor UNIVERSAL_METADATA_WRITE_BATCH_REQUEST;
-    private static final Descriptors.FieldDescriptor UMWBR_TENANT;
-
-    static {
-        UNIVERSAL_METADATA_WRITE_BATCH_REQUEST = UniversalMetadataWriteBatchRequest.getDescriptor();
-        UMWBR_TENANT = field(UNIVERSAL_METADATA_WRITE_BATCH_REQUEST, UniversalMetadataWriteBatchRequest.TENANT_FIELD_NUMBER);
-    }
 
     // Let's not introduce validation differences between the trusted and regular metadata API
     // Ideally, they should be made into the same API, with differences managed by permissions
@@ -97,30 +84,9 @@ public class MetadataTrustedApiValidator {
         return MetadataApiValidator.createPreallocatedObjectBatch(msg, ctx);  // always a trusted call
     }
 
-    @Validator(method = "universalWrite")
-    public static ValidationContext universalWrite(UniversalMetadataWriteBatchRequest msg, ValidationContext ctx) {
-        ctx = ctx.push(UMWBR_TENANT)
-                .apply(CommonValidators::required)
-                .apply(CommonValidators::identifier)
-                .pop();
-
-        ctx = ctx.pushRepeated(field(UNIVERSAL_METADATA_WRITE_BATCH_REQUEST, UniversalMetadataWriteBatchRequest.CREATEOBJECTS_FIELD_NUMBER))
-                .applyRepeated(MetadataTrustedApiValidator::createObject, MetadataWriteRequest.class)
-                .pop();
-
-        ctx = ctx.pushRepeated(field(UNIVERSAL_METADATA_WRITE_BATCH_REQUEST, UniversalMetadataWriteBatchRequest.CREATEPREALLOCATEDOBJECTS_FIELD_NUMBER))
-                .applyRepeated(MetadataTrustedApiValidator::createPreallocatedObject, MetadataWriteRequest.class)
-                .pop();
-
-        ctx = ctx.pushRepeated(field(UNIVERSAL_METADATA_WRITE_BATCH_REQUEST, UniversalMetadataWriteBatchRequest.UPDATEOBJECTS_FIELD_NUMBER))
-                .applyRepeated(MetadataTrustedApiValidator::updateObject, MetadataWriteRequest.class)
-                .pop();
-
-        ctx = ctx.pushRepeated(field(UNIVERSAL_METADATA_WRITE_BATCH_REQUEST, UniversalMetadataWriteBatchRequest.UPDATETAGS_FIELD_NUMBER))
-                .applyRepeated(MetadataTrustedApiValidator::updateTag, MetadataWriteRequest.class)
-                .pop();
-
-        return ctx;
+    @Validator(method = "writeBatch")
+    public static ValidationContext writeBatch(UniversalMetadataWriteBatchRequest msg, ValidationContext ctx) {
+        return MetadataApiValidator.writeBatch(msg, ctx, MetadataApiValidator.TRUSTED_API);
     }
 
     @Validator(method = "readObject")

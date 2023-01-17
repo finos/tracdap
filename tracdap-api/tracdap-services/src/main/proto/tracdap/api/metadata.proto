@@ -150,6 +150,17 @@ service TracMetadataApi {
     }
 
     /**
+     * Perform all operations in UniversalMetadataWriteBatchRequest
+     * in the TRAC metadata store.
+     */
+    rpc writeBatch (UniversalMetadataWriteBatchRequest) returns (UniversalMetadataWriteBatchResponse) {
+        option (google.api.http) = {
+            post: "/{tenant}/write-batch"
+            body: "*"
+        };
+    }
+
+    /**
      * Create new objects in batch in the TRAC metadata store.
      *
      * To create an object, supply a metadata write request with the tenant code,
@@ -614,6 +625,31 @@ message MetadataWriteBatchRequest {
 
 
 /**
+ * Request to create or update a batch of objects in the TRAC metadata store.
+ *
+ * Tenant in requests must be null.
+ */
+message UniversalMetadataWriteBatchRequest {
+
+    /**
+     * Tenant code for the requested operation, always required.
+     */
+    string tenant = 1;
+
+    /**
+     * Requests to be realized in batch.
+     *
+     * Tenant in requests must be null.
+     */
+
+    repeated MetadataWriteRequest preallocateObjects = 2;
+    repeated MetadataWriteRequest createObjects = 3;
+    repeated MetadataWriteRequest updateObjects = 4;
+    repeated MetadataWriteRequest updateTags = 5;
+};
+
+
+/**
  * Response to reading a batch of objects from the TRAC metadata store.
  *
  * @see TracMetadataApi
@@ -636,6 +672,19 @@ message MetadataWriteBatchResponse {
      * In the same order as in MetadataWriteBatchRequest.
      */
     repeated metadata.TagHeader headers = 1;
+};
+
+
+/**
+ * Response to batch write operation.
+ *
+ * @see UniversalMetadataWriteBatchRequest
+ */
+message UniversalMetadataWriteBatchResponse {
+     repeated metadata.TagHeader preallocatedObjectHeaders = 2;
+     repeated metadata.TagHeader createObjectHeaders = 3;
+     repeated metadata.TagHeader updateObjectHeaders = 4;
+     repeated metadata.TagHeader updateTagHeaders = 5;
 };
 
 

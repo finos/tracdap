@@ -18,6 +18,7 @@ package org.finos.tracdap.svc.meta.services;
 
 import org.finos.tracdap.api.MetadataWriteRequest;
 import org.finos.tracdap.api.UniversalMetadataWriteBatchRequest;
+import org.finos.tracdap.api.UniversalMetadataWriteBatchResponse;
 import org.finos.tracdap.common.auth.AuthConstants;
 import org.finos.tracdap.common.auth.internal.UserInfo;
 import org.finos.tracdap.metadata.*;
@@ -54,44 +55,50 @@ public class MetadataWriteService {
         List<TagHeader> tagHeaders;
     }
 
-    public List<TagHeader> universalWrite(
+    public UniversalMetadataWriteBatchResponse writeBatch(
             UniversalMetadataWriteBatchRequest request
     ) {
         var tenant = request.getTenant();
         var writeOperations = new ArrayList<WriteOperation>();
+        var resultBuilder = UniversalMetadataWriteBatchResponse.newBuilder();
 
-        if (request.getCreatePreallocatedObjectsCount() > 0) {
-            var requests = request.getCreatePreallocatedObjectsList();
-            writeOperations.add(createPreallocatedObjectsWriteOperation(
-                    requests,
-                    Collections.emptyList()
-            ));
+        if (request.getPreallocateObjectsCount() > 0) {
+            var requests = request.getPreallocateObjectsList();
+            var opers = createPreallocatedObjectsWriteOperation(requests, Collections.emptyList());
+            resultBuilder.addAllPreallocatedObjectHeaders(opers.tagHeaders);
+            writeOperations.add(opers);
         }
 
         if (request.getCreateObjectsCount() > 0) {
             var requests = request.getCreateObjectsList();
-            writeOperations.add(createObjectsWriteOperation(
+            var opers = createObjectsWriteOperation(
                     requests,
                     Collections.emptyList()
-            ));
+            );
+            resultBuilder.addAllCreateObjectHeaders(opers.tagHeaders);
+            writeOperations.add(opers);
         }
 
         if (request.getUpdateObjectsCount() > 0) {
             var requests = request.getUpdateObjectsList();
-            writeOperations.add(updateObjectsWriteOperation(
+            var opers = updateObjectsWriteOperation(
                     tenant,
                     requests,
                     Collections.emptyList()
-            ));
+            );
+            resultBuilder.addAllUpdateObjectHeaders(opers.tagHeaders);
+            writeOperations.add(opers);
         }
 
         if (request.getUpdateTagsCount() > 0) {
             var requests = request.getUpdateTagsList();
-            writeOperations.add(updateTagsWriteOperation(
+            var opers = updateTagsWriteOperation(
                     tenant,
                     requests,
                     Collections.emptyList()
-            ));
+            );
+            resultBuilder.addAllUpdateTagHeaders(opers.tagHeaders);
+            writeOperations.add(opers);
         }
 
         dal.runWriteOperations(
@@ -99,7 +106,7 @@ public class MetadataWriteService {
                 writeOperations.stream().map(w -> w.writeOperation).collect(Collectors.toList())
         );
 
-        return writeOperations.stream().flatMap(w -> w.tagHeaders.stream()).collect(Collectors.toList());
+        return resultBuilder.build();
     }
 
     private List<TagHeader> executeWriteOperation(String tenant, WriteOperation oper) {

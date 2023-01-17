@@ -58,9 +58,9 @@ public class TrustedMetadataApi extends TrustedMetadataApiGrpc.TrustedMetadataAp
     }
 
     @Override
-    public void universalWrite(UniversalMetadataWriteBatchRequest request, StreamObserver<MetadataWriteBatchResponse> response) {
+    public void writeBatch(UniversalMetadataWriteBatchRequest request, StreamObserver<UniversalMetadataWriteBatchResponse> response) {
 
-        grpcWrap.unaryCall(request, response, apiImpl::universalWrite);
+        grpcWrap.unaryCall(request, response, apiImpl::writeBatch);
     }
 
     @Override

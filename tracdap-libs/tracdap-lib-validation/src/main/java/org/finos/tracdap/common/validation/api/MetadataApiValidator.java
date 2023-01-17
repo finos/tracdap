@@ -18,12 +18,16 @@ package org.finos.tracdap.common.validation.api;
 
 import org.finos.tracdap.api.*;
 import org.finos.tracdap.common.validation.core.ValidationContext;
+import org.finos.tracdap.common.validation.core.ValidationFunction;
 import org.finos.tracdap.common.validation.core.ValidationType;
 import org.finos.tracdap.common.validation.core.Validator;
 import org.finos.tracdap.common.validation.static_.*;
 import org.finos.tracdap.metadata.*;
 
 import com.google.protobuf.Descriptors;
+
+import java.util.HashSet;
+import java.util.Set;
 
 import static org.finos.tracdap.common.validation.core.ValidatorUtils.field;
 
@@ -65,6 +69,9 @@ public class MetadataApiValidator {
     private static final Descriptors.FieldDescriptor MGR_OBJECT_VERSION;
     private static final Descriptors.FieldDescriptor MGR_TAG_VERSION;
 
+    private static final Descriptors.Descriptor UNIVERSAL_METADATA_WRITE_BATCH_REQUEST;
+    private static final Descriptors.FieldDescriptor UMWBR_TENANT;
+
     static {
 
         METADATA_WRITE_REQUEST = MetadataWriteRequest.getDescriptor();
@@ -97,6 +104,46 @@ public class MetadataApiValidator {
         MGR_OBJECT_ID = field(METADATA_GET_REQUEST, MetadataGetRequest.OBJECTID_FIELD_NUMBER);
         MGR_OBJECT_VERSION = field(METADATA_GET_REQUEST, MetadataGetRequest.OBJECTVERSION_FIELD_NUMBER);
         MGR_TAG_VERSION = field(METADATA_GET_REQUEST, MetadataGetRequest.TAGVERSION_FIELD_NUMBER);
+
+        UNIVERSAL_METADATA_WRITE_BATCH_REQUEST = UniversalMetadataWriteBatchRequest.getDescriptor();
+        UMWBR_TENANT = field(UNIVERSAL_METADATA_WRITE_BATCH_REQUEST, UniversalMetadataWriteBatchRequest.TENANT_FIELD_NUMBER);
+    }
+
+    @Validator(method = "writeBatch")
+    public static ValidationContext writeBatch(UniversalMetadataWriteBatchRequest msg, ValidationContext ctx) {
+        return writeBatch(msg, ctx, MetadataApiValidator.PUBLIC_API);
+    }
+
+    public static ValidationContext writeBatch(UniversalMetadataWriteBatchRequest msg, ValidationContext ctx, boolean apiTrust) {
+        ctx = ctx.push(UMWBR_TENANT)
+                .apply(CommonValidators::required)
+                .apply(CommonValidators::identifier)
+                .pop();
+
+        var knownObjectIds = new HashSet<String>();
+        var objectIdCheck = uniqueObjectIdCheck(knownObjectIds);
+
+        ctx = ctx.pushRepeated(field(UNIVERSAL_METADATA_WRITE_BATCH_REQUEST, UniversalMetadataWriteBatchRequest.CREATEOBJECTS_FIELD_NUMBER))
+                .applyRepeated((m, c) -> createObject(m, c, apiTrust, false), MetadataWriteRequest.class)
+                .applyRepeated(objectIdCheck, MetadataWriteRequest.class)
+                .pop();
+
+        ctx = ctx.pushRepeated(field(UNIVERSAL_METADATA_WRITE_BATCH_REQUEST, UniversalMetadataWriteBatchRequest.PREALLOCATEOBJECTS_FIELD_NUMBER))
+                .applyRepeated((m, c) -> createPreallocatedObject(m, c, false), MetadataWriteRequest.class)
+                .applyRepeated(objectIdCheck, MetadataWriteRequest.class)
+                .pop();
+
+        ctx = ctx.pushRepeated(field(UNIVERSAL_METADATA_WRITE_BATCH_REQUEST, UniversalMetadataWriteBatchRequest.UPDATEOBJECTS_FIELD_NUMBER))
+                .applyRepeated((m, c) -> updateObject(m, c, apiTrust, false), MetadataWriteRequest.class)
+                .applyRepeated(objectIdCheck, MetadataWriteRequest.class)
+                .pop();
+
+        ctx = ctx.pushRepeated(field(UNIVERSAL_METADATA_WRITE_BATCH_REQUEST, UniversalMetadataWriteBatchRequest.UPDATETAGS_FIELD_NUMBER))
+                .applyRepeated((m, c) -> updateTag(m, c, apiTrust, false), MetadataWriteRequest.class)
+                .applyRepeated(objectIdCheck, MetadataWriteRequest.class)
+                .pop();
+
+        return ctx;
     }
 
     @Validator(method = "createObject")
@@ -483,5 +530,27 @@ public class MetadataApiValidator {
                 .pop();
 
         return ctx;
+    }
+
+    private static ValidationFunction.Typed<MetadataWriteRequest> uniqueObjectIdCheck(Set<String> knownObjectIds) {
+        return (request, ctx) -> {
+            var objectId = request.getPriorVersion().getObjectId();
+            if (request.getPriorVersion().getObjectId().isEmpty()) {
+                return ctx;
+            }
+
+            if (knownObjectIds.contains(objectId)) {
+
+                var err = String.format(
+                        "object ID [%s] is already modified in the write batch",
+                        objectId
+                );
+
+                return ctx.error(err);
+            }
+
+            knownObjectIds.add(objectId);
+            return ctx;
+        };
     }
 }

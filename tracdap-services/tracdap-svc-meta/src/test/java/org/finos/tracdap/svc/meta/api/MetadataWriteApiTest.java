@@ -26,7 +26,6 @@ import org.finos.tracdap.test.meta.TestData;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.extension.RegisterExtension;
@@ -88,6 +87,49 @@ abstract class MetadataWriteApiTest {
             trustedApi = platform.metaClientTrustedBlocking();
         }
     }
+
+    // -----------------------------------------------------------------------------------------------------------------
+    // WRITE BATCH
+    // -----------------------------------------------------------------------------------------------------------------
+
+    @ParameterizedTest
+    @EnumSource(value = ObjectType.class, mode = EnumSource.Mode.EXCLUDE,
+            names = {"OBJECT_TYPE_NOT_SET", "UNRECOGNIZED"})
+    void writeBatch_trustedTypesOk(ObjectType objectType) {
+
+        createObjectBatch_ok(objectType, request ->
+                deuniversalizeCreateObjectBatchResponse(trustedApi.writeBatch(universalizeCreateObjectBatchRequest(request)))
+        );
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = ObjectType.class, mode = EnumSource.Mode.INCLUDE,
+            names = {"SCHEMA", "FLOW", "CUSTOM"})
+    void writeBatch_publicTypesOk(ObjectType objectType) {
+
+        // All object types should be either in this test, or publicTypesNotAllowed
+
+        createObjectBatch_ok(objectType, request ->
+                        deuniversalizeCreateObjectBatchResponse(publicApi.writeBatch(universalizeCreateObjectBatchRequest(request)))
+                );
+    }
+
+    private UniversalMetadataWriteBatchRequest universalizeCreateObjectBatchRequest(MetadataWriteBatchRequest request) {
+        var b = UniversalMetadataWriteBatchRequest.newBuilder();
+        b.setTenant(request.getTenant());
+        b.addAllCreateObjects(
+                request.getRequestsList().stream().map(MetadataWriteApiTest::scrapTenant).collect(Collectors.toList())
+        );
+
+        return b.build();
+    }
+
+    private MetadataWriteBatchResponse deuniversalizeCreateObjectBatchResponse(UniversalMetadataWriteBatchResponse response) {
+        return MetadataWriteBatchResponse.newBuilder()
+                .addAllHeaders(response.getCreateObjectHeadersList())
+                .build();
+    }
+
 
     // -----------------------------------------------------------------------------------------------------------------
     // CREATE OBJECT
@@ -2309,5 +2351,14 @@ abstract class MetadataWriteApiTest {
         // noinspection ResultOfMethodCallIgnored
         var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.createPreallocatedObjectBatch(writeBatchRequest));
         assertEquals(Status.Code.NOT_FOUND, error.getStatus().getCode());
+    }
+
+    /**
+     * Remove tenant from write request.
+     * Necessary when you want to add the request to a batch write request.
+     */
+    private static MetadataWriteRequest scrapTenant(MetadataWriteRequest request) {
+        return MetadataWriteRequest.newBuilder(request)
+                .clearTenant().build();
     }
 }
