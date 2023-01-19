@@ -28,6 +28,7 @@ import typing as _tp
 
 import tracdap.rt.config as _cfg
 import tracdap.rt.exceptions as _ex
+import tracdap.rt.ext._util as _ext_util
 
 
 class PluginManager:
@@ -43,6 +44,8 @@ class PluginManager:
             service_class: _tp.Type[T_SERVICE],
             protocols: _tp.List[str]):
 
+        _ext_util.run_model_guard()
+
         for protocol in protocols:
 
             plugin_key = (service_type, protocol)
@@ -54,6 +57,8 @@ class PluginManager:
             service_type: _tp.Type[T_SERVICE],
             config: _cfg.PluginConfig) \
             -> T_SERVICE:
+
+        _ext_util.run_model_guard()
 
         plugin_key = (service_type, config.protocol)
         plugin_class = cls.__plugins.get(plugin_key)
