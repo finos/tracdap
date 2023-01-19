@@ -38,11 +38,6 @@ from tracdap.rt.ext.repos import *
 
 class RepositoryManager:
 
-    @classmethod
-    def register_repo_type(cls, repo_type: str, loader_class: tp.Callable[[_cfg.PluginConfig], IModelRepository]):
-        """This method is deprecated, use PluginManager.register_plugin() from tracdap.rt.ext.plugins"""
-        plugins.PluginManager.register_plugin(IModelRepository, loader_class, [repo_type])
-
     def __init__(self, sys_config: _cfg.RuntimeConfig):
 
         self._log = _util.logger_for_object(self)
