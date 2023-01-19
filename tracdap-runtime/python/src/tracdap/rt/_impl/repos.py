@@ -32,7 +32,52 @@ import tracdap.rt.exceptions as _ex
 import tracdap.rt._impl.util as _util
 
 # Import repo interfaces
+import tracdap.rt.ext.plugins as plugins
 from tracdap.rt.ext.repos import *
+
+
+class RepositoryManager:
+
+    @classmethod
+    def register_repo_type(cls, repo_type: str, loader_class: tp.Callable[[_cfg.PluginConfig], IModelRepository]):
+        """This method is deprecated, use PluginManager.register_plugin() from tracdap.rt.ext.plugins"""
+        plugins.PluginManager.register_plugin(IModelRepository, loader_class, [repo_type])
+
+    def __init__(self, sys_config: _cfg.RuntimeConfig):
+
+        self._log = _util.logger_for_object(self)
+        self._repos: tp.Dict[str, IModelRepository] = dict()
+
+        # Initialize all repos in the system config
+        # Any errors for missing repo types (plugins) will be raised during startup
+
+        for repo_name, repo_config in sys_config.repositories.items():
+
+            try:
+
+                self._repos[repo_name] = plugins.PluginManager.load_plugin(IModelRepository, repo_config)
+
+            except _ex.EPluginNotAvailable as e:
+
+                msg = f"Model repository type [{repo_config.protocol}] is not recognised" \
+                      + " (this could indicate a missing model repository plugin)"
+
+                self._log.error(msg)
+                raise _ex.EStartup(msg) from e
+
+    def get_repository(self, repo_name: str) -> IModelRepository:
+
+        repo = self._repos.get(repo_name)
+
+        if repo is None:
+
+            msg = f"Model repository [{repo_name}] is unknown or not configured" \
+                  + " (this could indicate a missing repository entry in the system config)"
+
+            self._log.error(msg)
+            raise _ex.EModelRepoConfig(msg)
+
+        return repo
 
 
 # Helper functions for handling credentials supplied via HTTP(S) URLs
@@ -42,11 +87,11 @@ __REPO_USER_KEY = "username"
 __REPO_PASS_KEY = "password"
 
 
-def _get_credentials(url: urllib.parse.ParseResult, plugin_config: _cfg.PluginConfig):
+def _get_credentials(url: urllib.parse.ParseResult, properties: tp.Dict[str, str]):
 
-    token = _util.get_plugin_property(plugin_config, __REPO_TOKEN_KEY)
-    username = _util.get_plugin_property(plugin_config, __REPO_USER_KEY)
-    password = _util.get_plugin_property(plugin_config, __REPO_PASS_KEY)
+    token = _util.get_plugin_property(properties, __REPO_TOKEN_KEY)
+    username = _util.get_plugin_property(properties, __REPO_USER_KEY)
+    password = _util.get_plugin_property(properties, __REPO_PASS_KEY)
 
     if token is not None:
         return token
@@ -78,8 +123,8 @@ def _apply_credentials(url: urllib.parse.ParseResult, credentials: str):
 
 class IntegratedSource(IModelRepository):
 
-    def __init__(self, repo_config: _cfg.PluginConfig):
-        self._repo_config = repo_config
+    def __init__(self, properties: tp.Dict[str, str]):
+        self._repo_config = properties
 
     def checkout_key(self, model_def: _meta.ModelDefinition):
         return "trac_integrated"
@@ -104,8 +149,8 @@ class LocalRepository(IModelRepository):
 
     REPO_URL_KEY = "repoUrl"
 
-    def __init__(self, repo_config: _cfg.PluginConfig):
-        self._repo_config = repo_config
+    def __init__(self, properties: tp.Dict[str, str]):
+        self._repo_config = properties
         self._repo_url = _util.get_plugin_property(self._repo_config, self.REPO_URL_KEY)
 
         if not self._repo_url:
@@ -135,9 +180,9 @@ class GitRepository(IModelRepository):
     REPO_URL_KEY = "repoUrl"
     GIT_TIMEOUT_SECONDS = 30
 
-    def __init__(self, repo_config: _cfg.PluginConfig):
+    def __init__(self, properties: tp.Dict[str, str]):
 
-        self._repo_config = repo_config
+        self._repo_config = properties
         self._log = _util.logger_for_object(self)
 
         repo_url_prop = _util.get_plugin_property(self._repo_config, self.REPO_URL_KEY)
@@ -146,7 +191,7 @@ class GitRepository(IModelRepository):
             raise _ex.EConfigParse(f"Missing required property [{self.REPO_URL_KEY}] in Git repository config")
 
         repo_url = urllib.parse.urlparse(repo_url_prop)
-        credentials = _get_credentials(repo_url, repo_config)
+        credentials = _get_credentials(repo_url, self._repo_config)
 
         self._repo_url = _apply_credentials(repo_url, credentials)
 
@@ -249,11 +294,11 @@ class PyPiRepository(IModelRepository):
     PIP_SIMPLE_TYPE_JSON = "application/vnd.pypi.simple.v1+json"
     PIP_SIMPLE_TYPE_HTML = "text/html"
 
-    def __init__(self, repo_config: _cfg.PluginConfig):
+    def __init__(self, properties: tp.Dict[str, str]):
 
         self._log = _util.logger_for_object(self)
 
-        self._repo_config = repo_config
+        self._repo_config = properties
 
         self._pip_index = _util.get_plugin_property(self._repo_config, self.PIP_INDEX_KEY)
         self._pip_index_url = _util.get_plugin_property(self._repo_config, self.PIP_INDEX_URL_KEY)
@@ -551,51 +596,9 @@ class _PypiSimpleHtmlParser(html.parser.HTMLParser):
         self.response["files"].append(file_info)
 
 
-# TODO: Move Git and PyPI repos into _plugins
+# Register plugins for built-in repo types
 
-
-class RepositoryManager:
-
-    __repo_types: tp.Dict[str, tp.Callable[[_cfg.PluginConfig], IModelRepository]] = {
-        "integrated": IntegratedSource,
-        "local": LocalRepository,
-        "git": GitRepository,
-        "pypi": PyPiRepository
-    }
-
-    @classmethod
-    def register_repo_type(cls, repo_type: str, loader_class: tp.Callable[[_cfg.PluginConfig], IModelRepository]):
-        cls.__repo_types[repo_type] = loader_class
-
-    def __init__(self, sys_config: _cfg.RuntimeConfig):
-
-        self._log = _util.logger_for_object(self)
-        self._loaders: tp.Dict[str, IModelRepository] = dict()
-
-        for repo_name, repo_config in sys_config.repositories.items():
-
-            if repo_config.protocol not in self.__repo_types:
-
-                msg = f"Model repository type [{repo_config.protocol}] is not recognised" \
-                    + " (this could indicate a missing model repository plugin)"
-
-                self._log.error(msg)
-                raise _ex.EModelRepoConfig(msg)
-
-            loader_class = self.__repo_types[repo_config.protocol]
-            loader = loader_class(repo_config)
-            self._loaders[repo_name] = loader
-
-    def get_repository(self, repo_name: str) -> IModelRepository:
-
-        loader = self._loaders.get(repo_name)
-
-        if loader is None:
-
-            msg = f"Model repository [{repo_name}] is unknown or not configured" \
-                + " (this could indicate a missing repository entry in the system config)"
-
-            self._log.error(msg)
-            raise _ex.EModelRepoConfig(msg)
-
-        return loader
+plugins.PluginManager.register_plugin(IModelRepository, IntegratedSource, ["integrated"])
+plugins.PluginManager.register_plugin(IModelRepository, LocalRepository, ["local"])
+plugins.PluginManager.register_plugin(IModelRepository, GitRepository, ["git"])
+plugins.PluginManager.register_plugin(IModelRepository, PyPiRepository, ["pypi"])

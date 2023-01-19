@@ -332,17 +332,17 @@ def log_safe_url(url: tp.Union[str, urllib.parse.ParseResult, urllib.parse.Parse
         return url.geturl()
 
 
-def get_plugin_property(config: cfg.PluginConfig, property_name: str):
+def get_plugin_property(properties: tp.Dict[str, str], property_name: str):
 
-    if property_name in config.properties:
-        return config.properties[property_name]
+    if property_name in properties:
+        return properties[property_name]
 
     # Allow for properties set up via env variables on Windows
     # Python for Windows makes env var names uppercase when querying the environment
     # This will allow properties to be found, even if the case has been changed
     if is_windows():
 
-        for key, value in config.properties.items():
+        for key, value in properties.items():
             if key.lower() == property_name.lower():
                 return value
 

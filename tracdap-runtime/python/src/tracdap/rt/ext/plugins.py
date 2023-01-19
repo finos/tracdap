@@ -52,7 +52,7 @@ class PluginManager:
             cls.__plugins[plugin_key] = service_class
 
     @classmethod
-    def get_plugin(
+    def load_plugin(
             cls,
             service_type: _tp.Type[T_SERVICE],
             config: _cfg.PluginConfig) \
@@ -64,7 +64,8 @@ class PluginManager:
         plugin_class = cls.__plugins.get(plugin_key)
 
         if plugin_class is None:
-            raise _ex.EStartup(f"No plugin available for [{service_type}] with protocol [{config.protocol}]")
+            plugin_type = service_type.__name__
+            raise _ex.EPluginNotAvailable(f"No plugin available for [{plugin_type}] with protocol [{config.protocol}]")
 
         plugin = plugin_class(config.properties)
 
