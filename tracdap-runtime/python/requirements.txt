@@ -62,6 +62,7 @@ googleapis-common-protos >= 1.56, < 2.0
 
 # Tools for building and packaging the Python runtime
 
+setuptools >= 66.1.1
 wheel >= 0.38.4
 build >= 0.10.0
 packaging >= 23.0
