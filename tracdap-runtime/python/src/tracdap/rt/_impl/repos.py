@@ -116,58 +116,7 @@ def _apply_credentials(url: urllib.parse.ParseResult, credentials: str):
     return url._replace(netloc=location)
 
 
-class IntegratedSource(IModelRepository):
 
-    def __init__(self, properties: tp.Dict[str, str]):
-        self._repo_config = properties
-
-    def checkout_key(self, model_def: _meta.ModelDefinition):
-        return "trac_integrated"
-
-    def package_path(
-            self, model_def: _meta.ModelDefinition,
-            checkout_dir: pathlib.Path) -> tp.Optional[pathlib.Path]:
-
-        return None
-
-    def do_checkout(
-            self, model_def: _meta.ModelDefinition,
-            checkout_dir: tp.Union[str, pathlib.Path]) \
-            -> None:
-
-        # For the integrated repo there is nothing to check out
-
-        return self.package_path(model_def, checkout_dir)
-
-
-class LocalRepository(IModelRepository):
-
-    REPO_URL_KEY = "repoUrl"
-
-    def __init__(self, properties: tp.Dict[str, str]):
-        self._repo_config = properties
-        self._repo_url = _util.get_plugin_property(self._repo_config, self.REPO_URL_KEY)
-
-        if not self._repo_url:
-            raise _ex.EConfigParse(f"Missing required property [{self.REPO_URL_KEY}] in local repository config")
-
-    def checkout_key(self, model_def: _meta.ModelDefinition):
-        return "trac_local"
-
-    def package_path(
-            self, model_def: _meta.ModelDefinition,
-            checkout_dir: pathlib.Path) -> tp.Optional[pathlib.Path]:
-
-        checkout_path = pathlib.Path(self._repo_url).joinpath(model_def.path)
-
-        return checkout_path
-
-    def do_checkout(self, model_def: _meta.ModelDefinition, checkout_dir: pathlib.Path) -> pathlib.Path:
-
-        # For local repos, checkout is a no-op since the model is already local
-        # Just return the existing package path
-
-        return self.package_path(model_def, checkout_dir)
 
 
 class GitRepository(IModelRepository):
@@ -592,8 +541,5 @@ class _PypiSimpleHtmlParser(html.parser.HTMLParser):
 
 
 # Register plugins for built-in repo types
-
-plugins.PluginManager.register_plugin(IModelRepository, IntegratedSource, ["integrated"])
-plugins.PluginManager.register_plugin(IModelRepository, LocalRepository, ["local"])
 plugins.PluginManager.register_plugin(IModelRepository, GitRepository, ["git"])
 plugins.PluginManager.register_plugin(IModelRepository, PyPiRepository, ["pypi"])
