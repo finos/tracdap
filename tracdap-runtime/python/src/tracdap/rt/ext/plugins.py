@@ -25,6 +25,10 @@
 #  limitations under the License.
 
 import typing as _tp
+import logging as _log
+import pkgutil as _pkg
+import importlib as _il
+import platform as _platform
 
 import tracdap.rt.config as _cfg
 import tracdap.rt.exceptions as _ex
@@ -35,7 +39,31 @@ class PluginManager:
 
     T_SERVICE = _tp.TypeVar("T_SERVICE")
 
+    __log = _log.getLogger(f"{__name__}.PluginManager")
+
+    __core_registered = False
     __plugins = {}
+
+    @classmethod
+    def register_core_plugins(cls):
+
+        _ext_util.run_model_guard()
+
+        if cls.__core_registered:
+            return
+
+        cls.__log.info("Register core plugins...")
+
+        plugins_package = _il.import_module("tracdap.rt._plugins")
+
+        for module in _pkg.iter_modules(plugins_package.__path__):
+            try:
+                module_name = f"tracdap.rt._plugins.{module.name}"
+                _il.import_module(module_name)
+            except ImportError:
+                pass  # Ignore plugins that fail to load
+
+        cls.__core_registered = True
 
     @classmethod
     def register_plugin(
@@ -45,11 +73,20 @@ class PluginManager:
             protocols: _tp.List[str]):
 
         _ext_util.run_model_guard()
+        
+        cls.__log.info(f"Register {service_type.__name__}: [{service_class.__name__}] ({', '.join(protocols)})")
 
         for protocol in protocols:
-
             plugin_key = (service_type, protocol)
             cls.__plugins[plugin_key] = service_class
+
+    @classmethod
+    def is_plugin_available(cls, service_type: _tp.Type[T_SERVICE], protocol: str):
+
+        _ext_util.run_model_guard()
+
+        plugin_key = (service_type, protocol)
+        return plugin_key in cls.__plugins
 
     @classmethod
     def load_plugin(
@@ -70,3 +107,20 @@ class PluginManager:
         plugin = plugin_class(config.properties)
 
         return plugin
+
+
+def get_property(properties: _tp.Dict[str, str], property_name: str) -> _tp.Optional[str]:
+
+    if property_name in properties:
+        return properties[property_name]
+
+    # Allow for properties set up via env variables on Windows
+    # Python for Windows makes env var names uppercase when querying the environment
+    # This will allow properties to be found, even if the case has been changed
+    if _platform.system() == "Windows":
+
+        for key, value in properties.items():
+            if key.lower() == property_name.lower():
+                return value
+
+    return None
