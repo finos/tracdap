@@ -28,7 +28,6 @@ import typing as _tp
 import logging as _log
 import pkgutil as _pkg
 import importlib as _il
-import platform as _platform
 
 import tracdap.rt.config as _cfg
 import tracdap.rt.exceptions as _ex
@@ -107,20 +106,3 @@ class PluginManager:
         plugin = plugin_class(config.properties)
 
         return plugin
-
-
-def get_property(properties: _tp.Dict[str, str], property_name: str) -> _tp.Optional[str]:
-
-    if property_name in properties:
-        return properties[property_name]
-
-    # Allow for properties set up via env variables on Windows
-    # Python for Windows makes env var names uppercase when querying the environment
-    # This will allow properties to be found, even if the case has been changed
-    if _platform.system() == "Windows":
-
-        for key, value in properties.items():
-            if key.lower() == property_name.lower():
-                return value
-
-    return None
