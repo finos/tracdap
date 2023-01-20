@@ -25,16 +25,17 @@ import typing as tp
 
 import tracdap.rt.api as _api
 import tracdap.rt.config as _cfg
-import tracdap.rt._version as _version
 import tracdap.rt.exceptions as _ex
+import tracdap.rt.ext.plugins as _plugins
 import tracdap.rt._exec.actors as _actors
 import tracdap.rt._exec.engine as _engine
 import tracdap.rt._exec.dev_mode as _dev_mode
 import tracdap.rt._impl.config_parser as _cparse  # noqa
-import tracdap.rt._impl.util as util  # noqa
+import tracdap.rt._impl.util as _util  # noqa
 import tracdap.rt._impl.models as _models  # noqa
 import tracdap.rt._impl.storage as _storage  # noqa
 import tracdap.rt._impl.static_api as _static_api  # noqa
+import tracdap.rt._version as _version
 
 
 @dc.dataclass
@@ -70,8 +71,8 @@ class TracRuntime:
         if isinstance(scratch_dir, str):
             scratch_dir = pathlib.Path(scratch_dir)
 
-        util.configure_logging()
-        self._log = util.logger_for_object(self)
+        _util.configure_logging()
+        self._log = _util.logger_for_object(self)
         self._log.info(f"TRAC D.A.P. Python Runtime {trac_version}")
 
         self._sys_config = sys_config if isinstance(sys_config, _cfg.RuntimeConfig) else None
@@ -119,11 +120,14 @@ class TracRuntime:
 
             self._prepare_scratch_dir()
 
-            # Plugins will be loaded here, before config
+            # Plugin manager and static API impl are singletons
+            # If these methods are called multiple times, the second and subsequent calls are ignored
 
+            _plugins.PluginManager.register_core_plugins()
             _static_api.StaticApiImpl.register_impl()
 
-            # Load sys and job config (or use embedded)
+            # Load sys config (or use embedded), config errors are detected before start()
+            # Job config can also be checked before start() by using load_job_config()
 
             if self._sys_config is None:
                 sys_config_dev_mode = _dev_mode.DEV_MODE_SYS_CONFIG if self._dev_mode else None
@@ -218,7 +222,7 @@ class TracRuntime:
     def _clean_scratch_dir(self):
 
         if not self._scratch_dir_persist:
-            util.try_clean_dir(self._scratch_dir, remove=(not self._scratch_dir_provided))
+            _util.try_clean_dir(self._scratch_dir, remove=(not self._scratch_dir_provided))
 
     # ------------------------------------------------------------------------------------------------------------------
     # Job submission
@@ -250,7 +254,7 @@ class TracRuntime:
 
     def submit_job(self, job_config: _cfg.JobConfig):
 
-        job_key = util.object_key(job_config.jobId)
+        job_key = _util.object_key(job_config.jobId)
         self._jobs[job_key] = _RuntimeJobInfo()
 
         self._system.send(
@@ -260,7 +264,7 @@ class TracRuntime:
 
     def wait_for_job(self, job_id: _api.TagHeader):
 
-        job_key = util.object_key(job_id)
+        job_key = _util.object_key(job_id)
 
         if job_key not in self._jobs:
             raise _ex.ETracInternal(f"Attempt to wait for a job that was never started")
