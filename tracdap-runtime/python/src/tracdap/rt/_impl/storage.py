@@ -628,10 +628,3 @@ class LocalDataStorage(CommonDataStorage):
 
 
 StorageManager.register_storage_type("LOCAL", LocalFileStorage, LocalDataStorage)
-
-
-try:
-    import tracdap.rt._plugins.aws_storage as aws_storage
-    StorageManager.register_storage_type("S3", aws_storage.S3ObjectStorage, CommonDataStorage)
-except ImportError:
-    pass

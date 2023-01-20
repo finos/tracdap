@@ -20,7 +20,9 @@ from tracdap.rt.ext.storage import *
 
 import tracdap.rt.config as _cfg
 import tracdap.rt.exceptions as _ex
+import tracdap.rt.ext.plugins as plugins
 import tracdap.rt._impl.util as _util
+import tracdap.rt._impl.storage as _storage
 
 # AWS SDK
 import boto3
@@ -57,13 +59,12 @@ class S3ObjectStorage(IFileStorage):
 
         self._log = _util.logger_for_object(self)
 
-        self._config = config
-        self._options = options
+        self._properties = config.properties
 
-        self._bucket = _util.get_plugin_property(self._config, self.BUCKET_PROPERTY)
-        self._prefix = _util.get_plugin_property(self._config, self.PREFIX_PROPERTY) or ""
-        self._region = _util.get_plugin_property(self._config, self.REGION_PROPERTY)
-        self._endpoint = _util.get_plugin_property(self._config, self.ENDPOINT_PROPERTY)
+        self._bucket = plugins.get_property(self._properties, self.BUCKET_PROPERTY)
+        self._prefix = plugins.get_property(self._properties, self.PREFIX_PROPERTY) or ""
+        self._region = plugins.get_property(self._properties, self.REGION_PROPERTY)
+        self._endpoint = plugins.get_property(self._properties, self.ENDPOINT_PROPERTY)
 
         credentials_params = self.setup_credentials()
 
@@ -81,7 +82,7 @@ class S3ObjectStorage(IFileStorage):
 
     def setup_credentials(self):
 
-        mechanism = _util.get_plugin_property(self._config, self.CREDENTIALS_PROPERTY) or self.CREDENTIALS_DEFAULT
+        mechanism = plugins.get_property(self._properties, self.CREDENTIALS_PROPERTY) or self.CREDENTIALS_DEFAULT
 
         if mechanism.lower() == self.CREDENTIALS_DEFAULT:
             self._log.info(f"Using [{self.CREDENTIALS_DEFAULT}] credentials mechanism")
@@ -89,8 +90,8 @@ class S3ObjectStorage(IFileStorage):
 
         if mechanism.lower() == self.CREDENTIALS_STATIC:
 
-            access_key_id = _util.get_plugin_property(self._config, self.ACCESS_KEY_ID_PROPERTY)
-            secret_access_key = _util.get_plugin_property(self._config, self.SECRET_ACCESS_KEY_PROPERTY)
+            access_key_id = plugins.get_property(self._properties, self.ACCESS_KEY_ID_PROPERTY)
+            secret_access_key = plugins.get_property(self._properties, self.SECRET_ACCESS_KEY_PROPERTY)
 
             self._log.info(
                 f"Using [{self.CREDENTIALS_STATIC}] credentials mechanism, " +
@@ -287,3 +288,8 @@ class S3ObjectStorage(IFileStorage):
         full_path = self._prefix + separator + storage_path
 
         return full_path[1:] if full_path.startswith("/") else full_path
+
+
+# Register the S3 storage plugin
+
+_storage.StorageManager.register_storage_type("S3", S3ObjectStorage, _storage.CommonDataStorage)
