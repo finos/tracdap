@@ -12,13 +12,9 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from __future__ import annotations
-
 import datetime as dt
 import logging
 import pathlib
-import platform
-import urllib.parse
 
 import sys
 import typing as tp
@@ -28,12 +24,8 @@ import tracdap.rt.exceptions as ex
 import tracdap.rt.metadata as meta
 import tracdap.rt.config as cfg
 
-
-__IS_WINDOWS = platform.system() == "Windows"
-
-
-def is_windows():
-    return __IS_WINDOWS
+# Include utils from the .ext package
+from tracdap.rt.ext.util import *
 
 
 class ColorFormatter(logging.Formatter):
@@ -131,19 +123,6 @@ def configure_logging(enable_debug=False):
         trac_logger.propagate = False
 
 
-def logger_for_object(obj: object) -> logging.Logger:
-    return logger_for_class(obj.__class__)
-
-
-def logger_for_class(clazz: type) -> logging.Logger:
-    qualified_class_name = f"{clazz.__module__}.{clazz.__name__}"
-    return logging.getLogger(qualified_class_name)
-
-
-def logger_for_namespace(namespace: str) -> logging.Logger:
-    return logging.getLogger(namespace)
-
-
 def new_object_id(object_type: meta.ObjectType) -> meta.TagHeader:
 
     timestamp = dt.datetime.utcnow()
@@ -209,12 +188,12 @@ def get_job_resource(
         return job_config.resources[resource_key]
 
 
-__T = tp.TypeVar("__T")
+_T = tp.TypeVar("_T")
 
 
-class __LogClose(tp.Generic[__T]):
+class _LogClose(tp.Generic[_T]):
 
-    def __init__(self, ctx_mgr: __T, log, msg):
+    def __init__(self, ctx_mgr: _T, log, msg):
         self.__ctx_mgr = ctx_mgr
         self.__log = log
         self.__msg = msg
@@ -230,9 +209,9 @@ class __LogClose(tp.Generic[__T]):
         self.__log.info(self.__msg)
 
 
-def log_close(ctx_mgg: __T, log: logging.Logger, msg: str) -> __T:
+def log_close(ctx_mgg: _T, log: logging.Logger, msg: str) -> _T:
 
-    return __LogClose(ctx_mgg, log, msg)
+    return _LogClose(ctx_mgg, log, msg)
 
 
 def get_origin(metaclass: type):
@@ -289,102 +268,3 @@ def try_clean_dir(dir_path: pathlib.Path, remove: bool = False) -> bool:
             return clean_ok
         except Exception:  # noqa
             return False
-
-
-def log_safe(param: tp.Any):
-
-    if isinstance(param, urllib.parse.ParseResult) or isinstance(param, urllib.parse.ParseResultBytes):
-        return log_safe_url(param)
-
-    if isinstance(param, str):
-        try:
-            url = urllib.parse.urlparse(param)
-            return log_safe_url(url)
-        except ValueError:
-            return param
-
-    return param
-
-
-def log_safe_url(url: tp.Union[str, urllib.parse.ParseResult, urllib.parse.ParseResultBytes]):
-
-    if isinstance(url, str):
-        url = urllib.parse.urlparse(url)
-
-    if url.password:
-
-        user_sep = url.netloc.index(":")
-        pass_sep = url.netloc.index("@")
-
-        user = url.netloc[:user_sep]
-        safe_location = f"{user}:*****@{url.netloc[pass_sep + 1:]}"
-
-        return url._replace(netloc=safe_location).geturl()
-
-    elif url.username:
-
-        separator = url.netloc.index("@")
-        safe_location = f"*****@{url.netloc[separator + 1:]}"
-
-        return url._replace(netloc=safe_location).geturl()
-
-    else:
-        return url.geturl()
-
-
-def get_plugin_property(properties: tp.Dict[str, str], property_name: str):
-
-    if property_name in properties:
-        return properties[property_name]
-
-    # Allow for properties set up via env variables on Windows
-    # Python for Windows makes env var names uppercase when querying the environment
-    # This will allow properties to be found, even if the case has been changed
-    if is_windows():
-
-        for key, value in properties.items():
-            if key.lower() == property_name.lower():
-                return value
-
-    return None
-
-
-# Helper functions for handling credentials supplied via HTTP(S) URLs
-
-__HTTP_TOKEN_KEY = "token"
-__HTTP_USER_KEY = "username"
-__HTTP_PASS_KEY = "password"
-
-
-def get_http_credentials(url: urllib.parse.ParseResult, properties: tp.Dict[str, str]):
-
-    token = get_plugin_property(properties, __HTTP_TOKEN_KEY)
-    username = get_plugin_property(properties, __HTTP_USER_KEY)
-    password = get_plugin_property(properties, __HTTP_PASS_KEY)
-
-    if token is not None:
-        return token
-
-    if username is not None and password is not None:
-        return f"{username}:{password}"
-
-    if url.username:
-        credentials_sep = url.netloc.index("@")
-        return url.netloc[:credentials_sep]
-
-    return None
-
-
-def apply_http_credentials(url: urllib.parse.ParseResult, credentials: str):
-
-    if credentials is None:
-        return url
-
-    if url.username is None:
-        location = f"{credentials}@{url.netloc}"
-
-    else:
-        location_sep = url.netloc.index("@")
-        location = f"{credentials}@{url.netloc[location_sep + 1:]}"
-
-    return url._replace(netloc=location)
