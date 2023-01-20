@@ -56,11 +56,11 @@ class PyPiRepository(IModelRepository):
 
         self._log = util.logger_for_object(self)
 
-        self._repo_config = properties
+        self._properties = properties
 
-        self._pip_index = util.get_plugin_property(self._repo_config, self.PIP_INDEX_KEY)
-        self._pip_index_url = util.get_plugin_property(self._repo_config, self.PIP_INDEX_URL_KEY)
-        self._pip_simple_format = util.get_plugin_property(self._repo_config, self.PIP_SIMPLE_FORMAT_KEY)
+        self._pip_index = util.get_plugin_property(self._properties, self.PIP_INDEX_KEY)
+        self._pip_index_url = util.get_plugin_property(self._properties, self.PIP_INDEX_URL_KEY)
+        self._pip_simple_format = util.get_plugin_property(self._properties, self.PIP_SIMPLE_FORMAT_KEY)
 
         if self._pip_index is None and self._pip_index_url is None:
             message = f"Neither [{self.PIP_INDEX_KEY}] nor [{self.PIP_INDEX_URL_KEY} is set in PyPi repository config"
@@ -117,7 +117,7 @@ class PyPiRepository(IModelRepository):
             simple_content_type = self._pypi_simple_content_type()
             simple_headers = {"accept": simple_content_type}
 
-            credentials = util.get_http_credentials(simple_root_url, self._repo_config)
+            credentials = util.get_http_credentials(simple_root_url, self._properties)
 
             self._log.info(f"Query package: [{model_def.package}]")
 
@@ -213,7 +213,7 @@ class PyPiRepository(IModelRepository):
         json_root_url = urllib.parse.urlparse(self._pip_index)
         json_headers = {"accept": "application/json"}
 
-        credentials = util.get_http_credentials(json_root_url, self._repo_config)
+        credentials = util.get_http_credentials(json_root_url, self._properties)
 
         self._log.info(f"Query package: [{model_def.package}], version = [{model_def.version}]")
 

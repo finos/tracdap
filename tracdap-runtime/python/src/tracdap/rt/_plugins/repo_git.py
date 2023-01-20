@@ -34,16 +34,16 @@ class GitRepository(IModelRepository):
 
     def __init__(self, properties: tp.Dict[str, str]):
 
-        self._repo_config = properties
+        self._properties = properties
         self._log = util.logger_for_object(self)
 
-        repo_url_prop = util.get_plugin_property(self._repo_config, self.REPO_URL_KEY)
+        repo_url_prop = util.get_plugin_property(self._properties, self.REPO_URL_KEY)
 
         if not repo_url_prop:
             raise ex.EConfigParse(f"Missing required property [{self.REPO_URL_KEY}] in Git repository config")
 
         repo_url = urllib.parse.urlparse(repo_url_prop)
-        credentials = util.get_http_credentials(repo_url, self._repo_config)
+        credentials = util.get_http_credentials(repo_url, self._properties)
 
         self._repo_url = util.apply_http_credentials(repo_url, credentials)
 
