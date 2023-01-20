@@ -23,7 +23,7 @@ import tracdap.rt.ext.plugins as plugins
 from tracdap.rt.ext.storage import *
 
 # Set of common helpers across the core plugins (do not reference rt._impl)
-import tracdap.rt._plugins._helpers as helpers
+from . import _helpers
 
 # TODO: Remove dependencies on internal implementation details
 import tracdap.rt._impl.storage as _storage
@@ -62,14 +62,14 @@ class S3ObjectStorage(IFileStorage):
 
     def __init__(self, config: cfg.PluginConfig, options: dict = None):
 
-        self._log = helpers.logger_for_object(self)
+        self._log = _helpers.logger_for_object(self)
 
         self._properties = config.properties
 
-        self._bucket = helpers.get_plugin_property(self._properties, self.BUCKET_PROPERTY)
-        self._prefix = helpers.get_plugin_property(self._properties, self.PREFIX_PROPERTY) or ""
-        self._region = helpers.get_plugin_property(self._properties, self.REGION_PROPERTY)
-        self._endpoint = helpers.get_plugin_property(self._properties, self.ENDPOINT_PROPERTY)
+        self._bucket = _helpers.get_plugin_property(self._properties, self.BUCKET_PROPERTY)
+        self._prefix = _helpers.get_plugin_property(self._properties, self.PREFIX_PROPERTY) or ""
+        self._region = _helpers.get_plugin_property(self._properties, self.REGION_PROPERTY)
+        self._endpoint = _helpers.get_plugin_property(self._properties, self.ENDPOINT_PROPERTY)
 
         credentials_params = self.setup_credentials()
 
@@ -87,7 +87,7 @@ class S3ObjectStorage(IFileStorage):
 
     def setup_credentials(self):
 
-        mechanism = helpers.get_plugin_property(self._properties, self.CREDENTIALS_PROPERTY) or self.CREDENTIALS_DEFAULT
+        mechanism = _helpers.get_plugin_property(self._properties, self.CREDENTIALS_PROPERTY) or self.CREDENTIALS_DEFAULT
 
         if mechanism.lower() == self.CREDENTIALS_DEFAULT:
             self._log.info(f"Using [{self.CREDENTIALS_DEFAULT}] credentials mechanism")
@@ -95,8 +95,8 @@ class S3ObjectStorage(IFileStorage):
 
         if mechanism.lower() == self.CREDENTIALS_STATIC:
 
-            access_key_id = helpers.get_plugin_property(self._properties, self.ACCESS_KEY_ID_PROPERTY)
-            secret_access_key = helpers.get_plugin_property(self._properties, self.SECRET_ACCESS_KEY_PROPERTY)
+            access_key_id = _helpers.get_plugin_property(self._properties, self.ACCESS_KEY_ID_PROPERTY)
+            secret_access_key = _helpers.get_plugin_property(self._properties, self.SECRET_ACCESS_KEY_PROPERTY)
 
             self._log.info(
                 f"Using [{self.CREDENTIALS_STATIC}] credentials mechanism, " +
