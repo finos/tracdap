@@ -21,9 +21,11 @@ import tracdap.rt.exceptions as ex
 import tracdap.rt.ext.plugins as plugins
 from tracdap.rt.ext.storage import *
 
+# Set of common helpers across the core plugins (do not reference rt._impl)
+import tracdap.rt._plugins._helpers as helpers
+
 # TODO: Remove dependencies on internal implementation details
 import tracdap.rt._impl.storage as _storage
-import tracdap.rt._impl.util as _util
 
 
 class LocalFileStorage(IFileStorage):
@@ -32,10 +34,10 @@ class LocalFileStorage(IFileStorage):
 
     def __init__(self, config: cfg.PluginConfig, options: dict = None):
 
-        self._log = _util.logger_for_object(self)
+        self._log = helpers.logger_for_object(self)
         self._properties = config.properties
 
-        root_path_config = plugins.get_property(self._properties, self.ROOT_PATH_PROPERTY)
+        root_path_config = helpers.get_plugin_property(self._properties, self.ROOT_PATH_PROPERTY)
 
         if not root_path_config or root_path_config.isspace():
             err = f"Storage root path not set"
@@ -154,7 +156,7 @@ class LocalFileStorage(IFileStorage):
         item_path = self._root_path / storage_path
         stream = open(item_path, mode='rb')
 
-        return _util.log_close(stream, self._log, operation)
+        return helpers.log_close(stream, self._log, operation)
 
     def write_bytes(self, storage_path: str, data: bytes, overwrite: bool = False):
 
@@ -181,7 +183,7 @@ class LocalFileStorage(IFileStorage):
         else:
             stream = open(item_path, mode='xb')
 
-        return _util.log_close(stream, self._log, operation)
+        return helpers.log_close(stream, self._log, operation)
 
     def read_text(self, storage_path: str, encoding: str = 'utf-8') -> str:
 
@@ -204,7 +206,7 @@ class LocalFileStorage(IFileStorage):
         item_path = self._root_path / storage_path
         stream = open(item_path, mode='rt', encoding=encoding)
 
-        return _util.log_close(stream, self._log, operation)
+        return helpers.log_close(stream, self._log, operation)
 
     def write_text(self, storage_path: str, data: str, encoding: str = 'utf-8', overwrite: bool = False):
 
@@ -231,7 +233,7 @@ class LocalFileStorage(IFileStorage):
         else:
             stream = open(item_path, mode='xt', encoding=encoding)
 
-        return _util.log_close(stream, self._log, operation)
+        return helpers.log_close(stream, self._log, operation)
 
     __T = tp.TypeVar("__T")
 

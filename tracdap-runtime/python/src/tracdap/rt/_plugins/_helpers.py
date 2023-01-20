@@ -17,20 +17,46 @@
 # The _plugins package should not refer to internal code in rt._impl
 # And we don't want to put them .ext, those are public APIs that need to be maintained
 
-import logging as _log
-import platform as _platform
-import urllib.parse as _url_parse
-import typing as _tp
+import logging
+import platform
+import urllib.parse
+import typing as tp
 
 
-def log_safe(param: _tp.Any):
+_T = tp.TypeVar("_T")
 
-    if isinstance(param, _url_parse.ParseResult) or isinstance(param, _url_parse.ParseResultBytes):
+
+class _LogClose(tp.Generic[_T]):
+
+    def __init__(self, ctx_mgr: _T, log, msg):
+        self.__ctx_mgr = ctx_mgr
+        self.__log = log
+        self.__msg = msg
+
+    def __getitem__(self, item):
+        return self.__ctx_mgr.__getitem__(item)
+
+    def __enter__(self):
+        return self.__ctx_mgr.__enter__()
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.__ctx_mgr.__exit__(exc_type, exc_val, exc_tb)
+        self.__log.info(self.__msg)
+
+
+def log_close(ctx_mgg: _T, log: logging.Logger, msg: str) -> _T:
+
+    return _LogClose(ctx_mgg, log, msg)
+
+
+def log_safe(param: tp.Any):
+
+    if isinstance(param, urllib.parse.ParseResult) or isinstance(param, urllib.parse.ParseResultBytes):
         return log_safe_url(param)
 
     if isinstance(param, str):
         try:
-            url = _url_parse.urlparse(param)
+            url = urllib.parse.urlparse(param)
             return log_safe_url(url)
         except ValueError:
             return param
@@ -38,10 +64,10 @@ def log_safe(param: _tp.Any):
     return param
 
 
-def log_safe_url(url: _tp.Union[str, _url_parse.ParseResult, _url_parse.ParseResultBytes]):
+def log_safe_url(url: tp.Union[str, urllib.parse.ParseResult, urllib.parse.ParseResultBytes]):
 
     if isinstance(url, str):
-        url = _url_parse.urlparse(url)
+        url = urllib.parse.urlparse(url)
 
     if url.password:
 
@@ -64,7 +90,7 @@ def log_safe_url(url: _tp.Union[str, _url_parse.ParseResult, _url_parse.ParseRes
         return url.geturl()
 
 
-def get_plugin_property(properties: _tp.Dict[str, str], property_name: str):
+def get_plugin_property(properties: tp.Dict[str, str], property_name: str):
 
     if property_name in properties:
         return properties[property_name]
@@ -88,7 +114,7 @@ __HTTP_USER_KEY = "username"
 __HTTP_PASS_KEY = "password"
 
 
-def get_http_credentials(url: _url_parse.ParseResult, properties: _tp.Dict[str, str]) -> _tp.Optional[str]:
+def get_http_credentials(url: urllib.parse.ParseResult, properties: tp.Dict[str, str]) -> tp.Optional[str]:
 
     token = get_plugin_property(properties, __HTTP_TOKEN_KEY)
     username = get_plugin_property(properties, __HTTP_USER_KEY)
@@ -107,7 +133,7 @@ def get_http_credentials(url: _url_parse.ParseResult, properties: _tp.Dict[str, 
     return None
 
 
-def apply_http_credentials(url: _url_parse.ParseResult, credentials: str) -> _url_parse.ParseResult:
+def apply_http_credentials(url: urllib.parse.ParseResult, credentials: str) -> urllib.parse.ParseResult:
 
     if credentials is None:
         return url
@@ -129,21 +155,21 @@ def apply_http_credentials(url: _url_parse.ParseResult, credentials: str) -> _ur
 # If lots more code gets added here, it might be time to re-think
 
 
-__IS_WINDOWS = _platform.system() == "Windows"
+__IS_WINDOWS = platform.system() == "Windows"
 
 
 def is_windows():
     return __IS_WINDOWS
 
 
-def logger_for_object(obj: object) -> _log.Logger:
+def logger_for_object(obj: object) -> logging.Logger:
     return logger_for_class(obj.__class__)
 
 
-def logger_for_class(clazz: type) -> _log.Logger:
+def logger_for_class(clazz: type) -> logging.Logger:
     qualified_class_name = f"{clazz.__module__}.{clazz.__name__}"
-    return _log.getLogger(qualified_class_name)
+    return logging.getLogger(qualified_class_name)
 
 
-def logger_for_namespace(namespace: str) -> _log.Logger:
-    return _log.getLogger(namespace)
+def logger_for_namespace(namespace: str) -> logging.Logger:
+    return logging.getLogger(namespace)

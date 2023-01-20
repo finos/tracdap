@@ -19,6 +19,9 @@ import tracdap.rt.exceptions as ex
 import tracdap.rt.ext.plugins as plugins
 from tracdap.rt.ext.repos import *
 
+# Set of common helpers across the core plugins (do not reference rt._impl)
+import tracdap.rt._plugins._helpers as helpers
+
 
 class IntegratedSource(IModelRepository):
 
@@ -50,7 +53,7 @@ class LocalRepository(IModelRepository):
 
     def __init__(self, properties: tp.Dict[str, str]):
         self._properties = properties
-        self._repo_url = plugins.get_property(self._properties, self.REPO_URL_KEY)
+        self._repo_url = helpers.get_plugin_property(self._properties, self.REPO_URL_KEY)
 
         if not self._repo_url:
             raise ex.EConfigParse(f"Missing required property [{self.REPO_URL_KEY}] in local repository config")

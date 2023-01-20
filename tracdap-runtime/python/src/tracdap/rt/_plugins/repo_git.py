@@ -24,9 +24,7 @@ import tracdap.rt.exceptions as ex
 import tracdap.rt.ext.plugins as plugins
 from tracdap.rt.ext.repos import *
 
-
-# Set of common helpers across the core plugins
-# The should be no reference internal code in rt._impl
+# Set of common helpers across the core plugins (do not reference rt._impl)
 import tracdap.rt._plugins._helpers as helpers
 
 
