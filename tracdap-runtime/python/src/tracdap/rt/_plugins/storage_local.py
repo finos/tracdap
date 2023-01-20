@@ -14,11 +14,11 @@
 
 import pathlib
 
-import tracdap.rt.ext.plugins as plugins
 import tracdap.rt.config as cfg
 import tracdap.rt.exceptions as ex
 
 # Import storage interfaces
+import tracdap.rt.ext.plugins as plugins
 from tracdap.rt.ext.storage import *
 
 # TODO: Remove dependencies on internal implementation details

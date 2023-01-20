@@ -15,6 +15,7 @@
 import datetime as dt
 import logging
 import pathlib
+import platform
 
 import sys
 import typing as tp
@@ -24,8 +25,12 @@ import tracdap.rt.exceptions as ex
 import tracdap.rt.metadata as meta
 import tracdap.rt.config as cfg
 
-# Include utils from the .ext package
-from tracdap.rt.ext.util import *
+
+__IS_WINDOWS = platform.system() == "Windows"
+
+
+def is_windows():
+    return __IS_WINDOWS
 
 
 class ColorFormatter(logging.Formatter):
@@ -121,6 +126,19 @@ def configure_logging(enable_debug=False):
         console_handler.setLevel(log_level)
         trac_logger.addHandler(console_handler)
         trac_logger.propagate = False
+
+
+def logger_for_object(obj: object) -> logging.Logger:
+    return logger_for_class(obj.__class__)
+
+
+def logger_for_class(clazz: type) -> logging.Logger:
+    qualified_class_name = f"{clazz.__module__}.{clazz.__name__}"
+    return logging.getLogger(qualified_class_name)
+
+
+def logger_for_namespace(namespace: str) -> logging.Logger:
+    return logging.getLogger(namespace)
 
 
 def new_object_id(object_type: meta.ObjectType) -> meta.TagHeader:

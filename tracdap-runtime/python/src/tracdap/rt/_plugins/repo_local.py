@@ -15,9 +15,8 @@
 import tracdap.rt.metadata as meta
 import tracdap.rt.exceptions as ex
 
-import tracdap.rt.ext.plugins as plugins
-
 # Import repo interfaces
+import tracdap.rt.ext.plugins as plugins
 from tracdap.rt.ext.repos import *
 
 

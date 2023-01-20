@@ -20,11 +20,14 @@ import time
 import tracdap.rt.metadata as meta
 import tracdap.rt.exceptions as ex
 
-import tracdap.rt.ext.plugins as plugins
-import tracdap.rt.ext.util as util
-
 # Import repo interfaces
+import tracdap.rt.ext.plugins as plugins
 from tracdap.rt.ext.repos import *
+
+
+# Set of common helpers across the core plugins
+# The should be no reference internal code in rt._impl
+import tracdap.rt._plugins._helpers as helpers
 
 
 class GitRepository(IModelRepository):
@@ -35,17 +38,17 @@ class GitRepository(IModelRepository):
     def __init__(self, properties: tp.Dict[str, str]):
 
         self._properties = properties
-        self._log = util.logger_for_object(self)
+        self._log = helpers.logger_for_object(self)
 
-        repo_url_prop = util.get_plugin_property(self._properties, self.REPO_URL_KEY)
+        repo_url_prop = helpers.get_plugin_property(self._properties, self.REPO_URL_KEY)
 
         if not repo_url_prop:
             raise ex.EConfigParse(f"Missing required property [{self.REPO_URL_KEY}] in Git repository config")
 
         repo_url = urllib.parse.urlparse(repo_url_prop)
-        credentials = util.get_http_credentials(repo_url, self._properties)
+        credentials = helpers.get_http_credentials(repo_url, self._properties)
 
-        self._repo_url = util.apply_http_credentials(repo_url, credentials)
+        self._repo_url = helpers.apply_http_credentials(repo_url, credentials)
 
     def checkout_key(self, model_def: meta.ModelDefinition):
         return model_def.version
@@ -73,7 +76,7 @@ class GitRepository(IModelRepository):
             ["reset", "--hard", "FETCH_HEAD"]]
 
         # Work around Windows issues
-        if util.is_windows():
+        if helpers.is_windows():
 
             # Some machines may still be setup without long path support in Windows and/or the Git client
             # Workaround: Enable the core.longpaths flag for each individual Git command (do not rely on system config)
@@ -91,7 +94,7 @@ class GitRepository(IModelRepository):
 
         for git_cmd in git_cmds:
 
-            safe_cmd = map(util.log_safe, git_cmd)
+            safe_cmd = map(helpers.log_safe, git_cmd)
             self._log.info(f"git {' '.join(safe_cmd)}")
 
             cmd = [*git_cli, *git_cmd]

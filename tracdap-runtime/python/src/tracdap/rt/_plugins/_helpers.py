@@ -12,6 +12,11 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+
+# These private helper functions are common across 2 or more plugins
+# The _plugins package should not refer to internal code in rt._impl
+# And we don't want to put them .ext, those are public APIs that need to be maintained
+
 import logging as _log
 import platform as _platform
 import urllib.parse as _url_parse
@@ -41,19 +46,19 @@ def logger_for_namespace(namespace: str) -> _log.Logger:
 def log_safe(param: _tp.Any):
 
     if isinstance(param, _url_parse.ParseResult) or isinstance(param, _url_parse.ParseResultBytes):
-        return __log_safe_url(param)
+        return log_safe_url(param)
 
     if isinstance(param, str):
         try:
             url = _url_parse.urlparse(param)
-            return __log_safe_url(url)
+            return log_safe_url(url)
         except ValueError:
             return param
 
     return param
 
 
-def __log_safe_url(url: _tp.Union[str, _url_parse.ParseResult, _url_parse.ParseResultBytes]):
+def log_safe_url(url: _tp.Union[str, _url_parse.ParseResult, _url_parse.ParseResultBytes]):
 
     if isinstance(url, str):
         url = _url_parse.urlparse(url)
