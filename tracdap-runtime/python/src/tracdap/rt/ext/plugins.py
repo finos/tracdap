@@ -32,7 +32,7 @@ import platform as _platform
 
 import tracdap.rt.config as _cfg
 import tracdap.rt.exceptions as _ex
-import tracdap.rt.ext._util as _ext_util
+import tracdap.rt.ext._guard as _guard
 
 
 class PluginManager:
@@ -47,7 +47,7 @@ class PluginManager:
     @classmethod
     def register_core_plugins(cls):
 
-        _ext_util.run_model_guard()
+        _guard.run_model_guard()
 
         if cls.__core_registered:
             return
@@ -72,7 +72,7 @@ class PluginManager:
             service_class: _tp.Type[T_SERVICE],
             protocols: _tp.List[str]):
 
-        _ext_util.run_model_guard()
+        _guard.run_model_guard()
         
         cls.__log.info(f"Register {service_type.__name__}: [{service_class.__name__}] ({', '.join(protocols)})")
 
@@ -83,7 +83,7 @@ class PluginManager:
     @classmethod
     def is_plugin_available(cls, service_type: _tp.Type[T_SERVICE], protocol: str):
 
-        _ext_util.run_model_guard()
+        _guard.run_model_guard()
 
         plugin_key = (service_type, protocol)
         return plugin_key in cls.__plugins
@@ -95,7 +95,7 @@ class PluginManager:
             config: _cfg.PluginConfig) \
             -> T_SERVICE:
 
-        _ext_util.run_model_guard()
+        _guard.run_model_guard()
 
         plugin_key = (service_type, config.protocol)
         plugin_class = cls.__plugins.get(plugin_key)
