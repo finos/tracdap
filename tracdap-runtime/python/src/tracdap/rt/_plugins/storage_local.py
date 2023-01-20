@@ -53,7 +53,7 @@ class LocalFileStorage(IFileStorage):
             raise ex.EStorageConfig(err)
 
         try:
-            self.__root_path = absolute_root.resolve(strict=True)
+            self._root_path = absolute_root.resolve(strict=True)
 
         except FileNotFoundError as e:
             err = f"Storage root path does not exist: [{absolute_root}]"
@@ -61,7 +61,7 @@ class LocalFileStorage(IFileStorage):
             raise ex.EStorageRequest(err) from e
 
     def _get_root(self):
-        return self.__root_path
+        return self._root_path
 
     def exists(self, storage_path: str) -> bool:
 
@@ -70,7 +70,7 @@ class LocalFileStorage(IFileStorage):
 
     def _exists(self, storage_path: str) -> bool:
 
-        item_path = self.__root_path / storage_path
+        item_path = self._root_path / storage_path
         return item_path.exists()
 
     def size(self, storage_path: str) -> int:
@@ -85,7 +85,7 @@ class LocalFileStorage(IFileStorage):
 
     def _stat(self, storage_path: str) -> FileStat:
 
-        item_path = self.__root_path / storage_path
+        item_path = self._root_path / storage_path
         os_stat = item_path.stat()
 
         file_type = FileType.FILE if item_path.is_file() \
@@ -109,7 +109,7 @@ class LocalFileStorage(IFileStorage):
 
     def _ls(self, storage_path: str) -> tp.List[str]:
 
-        item_path = self.__root_path / storage_path
+        item_path = self._root_path / storage_path
         return [str(x.relative_to(item_path))
                 for x in item_path.iterdir()
                 if x.is_file() or x.is_dir()]
@@ -121,7 +121,7 @@ class LocalFileStorage(IFileStorage):
 
     def _mkdir(self, storage_path: str, recursive: bool = False, exists_ok: bool = False):
 
-        item_path = self.__root_path / storage_path
+        item_path = self._root_path / storage_path
         item_path.mkdir(parents=recursive, exist_ok=exists_ok)
 
     def rm(self, storage_path: str, recursive: bool = False):
@@ -151,7 +151,7 @@ class LocalFileStorage(IFileStorage):
     def _read_byte_stream(self, storage_path: str) -> tp.BinaryIO:
 
         operation = f"CLOSE BYTE STREAM (READ) [{storage_path}]"
-        item_path = self.__root_path / storage_path
+        item_path = self._root_path / storage_path
         stream = open(item_path, mode='rb')
 
         return _util.log_close(stream, self._log, operation)
@@ -174,7 +174,7 @@ class LocalFileStorage(IFileStorage):
     def _write_byte_stream(self, storage_path: str, overwrite: bool = False) -> tp.BinaryIO:
 
         operation = f"CLOSE BYTE STREAM (WRITE) [{storage_path}]"
-        item_path = self.__root_path / storage_path
+        item_path = self._root_path / storage_path
 
         if overwrite:
             stream = open(item_path, mode='wb')
@@ -201,7 +201,7 @@ class LocalFileStorage(IFileStorage):
     def _read_text_stream(self, storage_path: str, encoding: str = 'utf-8') -> tp.TextIO:
 
         operation = f"CLOSE TEXT STREAM (READ) [{storage_path}]"
-        item_path = self.__root_path / storage_path
+        item_path = self._root_path / storage_path
         stream = open(item_path, mode='rt', encoding=encoding)
 
         return _util.log_close(stream, self._log, operation)
@@ -224,7 +224,7 @@ class LocalFileStorage(IFileStorage):
     def _write_text_stream(self, storage_path: str, encoding: str = 'utf-8', overwrite: bool = False) -> tp.TextIO:
 
         operation = f"CLOSE TEXT STREAM (WRITE) [{storage_path}]"
-        item_path = self.__root_path / storage_path
+        item_path = self._root_path / storage_path
 
         if overwrite:
             stream = open(item_path, mode='wt', encoding=encoding)

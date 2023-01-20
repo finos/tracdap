@@ -11,22 +11,25 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+
 import http
 import io
 
-import botocore.response
+import tracdap.rt.ext.plugins as plugins
+import tracdap.rt.config as cfg
+import tracdap.rt.exceptions as ex
 
+# Import storage interfaces
 from tracdap.rt.ext.storage import *
 
-import tracdap.rt.config as _cfg
-import tracdap.rt.exceptions as _ex
-import tracdap.rt.ext.plugins as plugins
+# TODO: Remove dependencies on internal implementation details
 import tracdap.rt._impl.util as _util
 import tracdap.rt._impl.storage as _storage
 
 # AWS SDK
 import boto3
-import botocore.exceptions as _aws_ex  # noqa
+import botocore.response  # noqa
+import botocore.exceptions as aws_ex  # noqa
 
 
 class S3ObjectStorage(IFileStorage):
@@ -55,7 +58,7 @@ class S3ObjectStorage(IFileStorage):
     ACCESS_KEY_ID_PROPERTY = "accessKeyId"
     SECRET_ACCESS_KEY_PROPERTY = "secretAccessKey"
 
-    def __init__(self, config: _cfg.PluginConfig, options: dict = None):
+    def __init__(self, config: cfg.PluginConfig, options: dict = None):
 
         self._log = _util.logger_for_object(self)
 
@@ -78,7 +81,7 @@ class S3ObjectStorage(IFileStorage):
         if self._endpoint is not None:
             client_args["endpoint_url"] = self._endpoint
 
-        self.__client = boto3.client(**client_args)
+        self._client = boto3.client(**client_args)
 
     def setup_credentials(self):
 
@@ -101,7 +104,7 @@ class S3ObjectStorage(IFileStorage):
 
         message = f"Unrecognised credentials mechanism: [{mechanism}]"
         self._log.error(message)
-        raise _ex.EStartup(message)
+        raise ex.EStartup(message)
 
     def exists(self, storage_path: str) -> bool:
 
@@ -109,14 +112,14 @@ class S3ObjectStorage(IFileStorage):
             self._log.info(f"EXISTS [{storage_path}]")
 
             object_key = self._resolve_path(storage_path)
-            self.__client.head_object(Bucket=self._bucket, Key=object_key)
+            self._client.head_object(Bucket=self._bucket, Key=object_key)
             return True
 
-        except _aws_ex.ClientError as error:
-            _aws_code = error.response['Error']['Code']
-            if _aws_code == str(http.HTTPStatus.NOT_FOUND.value):  # noqa
+        except aws_ex.ClientError as error:
+            aws_code = error.response['Error']['Code']
+            if aws_code == str(http.HTTPStatus.NOT_FOUND.value):  # noqa
                 return False
-            raise _ex.EStorageRequest(f"Storage error: {str(error)}") from error
+            raise ex.EStorageRequest(f"Storage error: {str(error)}") from error
 
     def size(self, storage_path: str) -> int:
 
@@ -124,12 +127,11 @@ class S3ObjectStorage(IFileStorage):
             self._log.info(f"SIZE [{storage_path}]")
 
             object_key = self._resolve_path(storage_path)
-            response = self.__client.head_object(Bucket=self._bucket, Key=object_key)
+            response = self._client.head_object(Bucket=self._bucket, Key=object_key)
             return response['ContentLength']
 
-        except _aws_ex.ClientError as error:
-            _aws_code = error.response['Error']['Code']
-            raise _ex.EStorageRequest(f"Storage error: {str(error)}") from error
+        except aws_ex.ClientError as error:
+            raise ex.EStorageRequest(f"Storage error: {str(error)}") from error
 
     def stat(self, storage_path: str) -> FileStat:
 
@@ -153,7 +155,7 @@ class S3ObjectStorage(IFileStorage):
 
         prefix = self._resolve_path(storage_path) + "/"
 
-        response = self.__client.list_objects_v2(
+        response = self._client.list_objects_v2(
             Bucket=self._bucket,
             Prefix=prefix,
             Delimiter="/")
@@ -161,7 +163,7 @@ class S3ObjectStorage(IFileStorage):
         keys = []
 
         if "Contents" not in response and "CommonPrefixes" not in response:
-            raise _ex.EStorageRequest(f"Storage prefix not found: [{storage_path}]")
+            raise ex.EStorageRequest(f"Storage prefix not found: [{storage_path}]")
 
         if "Contents" in response:
             for entry in response["Contents"]:
@@ -194,11 +196,10 @@ class S3ObjectStorage(IFileStorage):
                 raise RuntimeError("RM (recursive) not available for S3 storage")
 
             object_key = self._resolve_path(storage_path)
-            self.__client.delete_object(Bucket=self._bucket, Key=object_key)
+            self._client.delete_object(Bucket=self._bucket, Key=object_key)
 
-        except _aws_ex.ClientError as error:
-            _aws_code = error.response['Error']['Code']
-            raise _ex.EStorageRequest(f"Storage error: {str(error)}") from error
+        except aws_ex.ClientError as error:
+            raise ex.EStorageRequest(f"Storage error: {str(error)}") from error
 
     def read_bytes(self, storage_path: str) -> bytes:
 
@@ -219,12 +220,11 @@ class S3ObjectStorage(IFileStorage):
         try:
 
             object_key = self._resolve_path(storage_path)
-            response = self.__client.get_object(Bucket=self._bucket, Key=object_key)
+            response = self._client.get_object(Bucket=self._bucket, Key=object_key)
             return response['Body']
 
-        except _aws_ex.ClientError as error:
-            _aws_code = error.response['Error']['Code']
-            raise _ex.EStorageRequest(f"Storage error: {str(error)}") from error
+        except aws_ex.ClientError as error:
+            raise ex.EStorageRequest(f"Storage error: {str(error)}") from error
 
     def write_bytes(self, storage_path: str, data: bytes, overwrite: bool = False):
 
@@ -233,14 +233,13 @@ class S3ObjectStorage(IFileStorage):
 
             object_key = self._resolve_path(storage_path)
 
-            self.__client.put_object(
+            self._client.put_object(
                 Bucket=self._bucket,
                 Key=object_key,
                 Body=data)
 
-        except _aws_ex.ClientError as error:
-            _aws_code = error.response['Error']['Code']
-            raise _ex.EStorageRequest(f"Storage error: {str(error)}") from error
+        except aws_ex.ClientError as error:
+            raise ex.EStorageRequest(f"Storage error: {str(error)}") from error
 
     def write_byte_stream(self, storage_path: str, overwrite: bool = False) -> tp.BinaryIO:
 
