@@ -23,6 +23,7 @@ option java_multiple_files = true;
 import "tracdap/metadata/type.proto";
 import "tracdap/metadata/model.proto";
 import "tracdap/metadata/search.proto";
+import "tracdap/metadata/tag_update.proto";
 
 
 enum FlowNodeType {
@@ -40,6 +41,7 @@ message FlowNode {
   repeated string outputs = 3;
 
   SearchExpression nodeSearch = 4;
+  repeated TagUpdate nodeAttrs = 5;
 
   reserved "parameters;";
 }

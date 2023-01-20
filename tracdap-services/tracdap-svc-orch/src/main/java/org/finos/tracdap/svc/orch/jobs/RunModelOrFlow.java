@@ -129,7 +129,8 @@ public abstract class RunModelOrFlow {
 
     public List<MetadataWriteRequest> buildResultMetadata(
             String tenant, Map<String, TagSelector> outputs, Map<String, TagSelector> priorOutputs,
-            List<TagUpdate> outputAttrs, JobConfig jobConfig, JobResult jobResult) {
+            List<TagUpdate> outputAttrs, Map<String, List<TagUpdate>> perNodeOutputAttrs,
+            JobConfig jobConfig, JobResult jobResult) {
 
         var updates = new ArrayList<MetadataWriteRequest>();
 
@@ -163,6 +164,11 @@ public abstract class RunModelOrFlow {
                     .setValue(MetadataCodec.encodeValue(outputName))
                     .build());
 
+            var nodeOutputAttrs = perNodeOutputAttrs.get(outputName);
+            if (nodeOutputAttrs == null) {
+                nodeOutputAttrs = List.of();
+            }
+
             var dataUpdate = MetadataWriteRequest.newBuilder()
                     .setTenant(tenant)
                     .setObjectType(ObjectType.DATA)
@@ -170,6 +176,7 @@ public abstract class RunModelOrFlow {
                     .setDefinition(dataObj)
                     .addAllTagUpdates(controlledAttrs)
                     .addAllTagUpdates(outputAttrs)
+                    .addAllTagUpdates(nodeOutputAttrs)
                     .build();
 
             updates.add(dataUpdate);

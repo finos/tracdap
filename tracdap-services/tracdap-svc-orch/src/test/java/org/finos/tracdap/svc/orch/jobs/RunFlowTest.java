@@ -79,6 +79,15 @@ public class RunFlowTest {
 
         var metaClient = platform.metaClientBlocking();
 
+        var pi_value = Value.newBuilder()
+                .setType(
+                        TypeDescriptor.newBuilder()
+                                .setBasicType(BasicType.FLOAT)
+                                .build()
+                )
+                .setFloatValue(3.14)
+                .build();
+
         var flowDef = FlowDefinition.newBuilder()
                 .putNodes("customer_loans", FlowNode.newBuilder().setNodeType(FlowNodeType.INPUT_NODE).build())
                 .putNodes("currency_data", FlowNode.newBuilder().setNodeType(FlowNodeType.INPUT_NODE).build())
@@ -93,7 +102,15 @@ public class RunFlowTest {
                         .addInputs("preprocessed_data")
                         .addOutputs("profit_by_region")
                         .build())
-                .putNodes("profit_by_region", FlowNode.newBuilder().setNodeType(FlowNodeType.OUTPUT_NODE).build())
+                .putNodes("profit_by_region", FlowNode.newBuilder()
+                        .setNodeType(FlowNodeType.OUTPUT_NODE)
+                        .addAllNodeAttrs(List.of(
+                                TagUpdate.newBuilder()
+                                        .setAttrName("analysis_type")
+                                        .setValue(pi_value)
+                                        .build()
+                        ))
+                        .build())
                 .addEdges(FlowEdge.newBuilder()
                         .setSource(FlowSocket.newBuilder().setNode("customer_loans"))
                         .setTarget(FlowSocket.newBuilder().setNode("model_1").setSocket("customer_loans")))
