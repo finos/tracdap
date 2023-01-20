@@ -347,3 +347,44 @@ def get_plugin_property(properties: tp.Dict[str, str], property_name: str):
                 return value
 
     return None
+
+
+# Helper functions for handling credentials supplied via HTTP(S) URLs
+
+__HTTP_TOKEN_KEY = "token"
+__HTTP_USER_KEY = "username"
+__HTTP_PASS_KEY = "password"
+
+
+def get_http_credentials(url: urllib.parse.ParseResult, properties: tp.Dict[str, str]):
+
+    token = get_plugin_property(properties, __HTTP_TOKEN_KEY)
+    username = get_plugin_property(properties, __HTTP_USER_KEY)
+    password = get_plugin_property(properties, __HTTP_PASS_KEY)
+
+    if token is not None:
+        return token
+
+    if username is not None and password is not None:
+        return f"{username}:{password}"
+
+    if url.username:
+        credentials_sep = url.netloc.index("@")
+        return url.netloc[:credentials_sep]
+
+    return None
+
+
+def apply_http_credentials(url: urllib.parse.ParseResult, credentials: str):
+
+    if credentials is None:
+        return url
+
+    if url.username is None:
+        location = f"{credentials}@{url.netloc}"
+
+    else:
+        location_sep = url.netloc.index("@")
+        location = f"{credentials}@{url.netloc[location_sep + 1:]}"
+
+    return url._replace(netloc=location)
