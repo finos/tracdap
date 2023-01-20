@@ -269,8 +269,13 @@ class LocalStorageTest(DataStorageTestSuite):
             protocol="LOCAL",
             properties={"rootPath": cls.storage_root.name})
 
-        file_storage = _storage.LocalFileStorage(bucket_config)
-        data_storage = _storage.CommonDataStorage(bucket_config, file_storage)
+        sys_config = _cfg.RuntimeConfig()
+        sys_config.storage = _cfg.StorageConfig()
+        sys_config.storage.buckets["test_bucket"] = bucket_config
+
+        manager = _storage.StorageManager(sys_config)
+        file_storage = manager.get_file_storage("test_bucket")
+        data_storage = manager.get_data_storage("test_bucket")
 
         cls.file_storage = file_storage
 
@@ -303,8 +308,12 @@ class LocalCsvStorageTest(unittest.TestCase, LocalStorageTest):
             protocol="LOCAL",
             properties={"rootPath": str(_TEST_DATA_DIR)})
 
-        test_lib_file_storage = _storage.LocalFileStorage(test_lib_storage_config)
-        test_lib_data_storage = _storage.CommonDataStorage(test_lib_storage_config, test_lib_file_storage)
+        sys_config = _cfg.RuntimeConfig()
+        sys_config.storage = _cfg.StorageConfig()
+        sys_config.storage.buckets["test_csv_bucket"] = test_lib_storage_config
+
+        manager = _storage.StorageManager(sys_config)
+        test_lib_data_storage = manager.get_data_storage("test_csv_bucket")
 
         cls.test_lib_storage_instance_cfg = test_lib_storage_config
         cls.test_lib_storage = test_lib_data_storage
@@ -420,8 +429,12 @@ class LocalCsvStorageTest(unittest.TestCase, LocalStorageTest):
         test_lib_storage_instance.properties["csv.date_format"] = "%d/%m/%Y"
         test_lib_storage_instance.properties["csv.datetime_format"] = "%d/%m/%Y %H:%M:%S"
 
-        test_lib_file_storage = _storage.LocalFileStorage(test_lib_storage_instance)
-        test_lib_data_storage = _storage.CommonDataStorage(test_lib_storage_instance, test_lib_file_storage)
+        sys_config = _cfg.RuntimeConfig()
+        sys_config.storage = _cfg.StorageConfig()
+        sys_config.storage.buckets["test_csv_bucket"] = test_lib_storage_instance
+
+        manager = _storage.StorageManager(sys_config)
+        test_lib_data_storage = manager.get_data_storage("test_csv_bucket")
 
         schema = self.sample_schema()
         table = test_lib_data_storage.read_table("csv_basic_uk_dates.csv", "CSV", schema)
