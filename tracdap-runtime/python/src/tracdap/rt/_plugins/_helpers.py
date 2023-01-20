@@ -23,26 +23,6 @@ import urllib.parse as _url_parse
 import typing as _tp
 
 
-__IS_WINDOWS = _platform.system() == "Windows"
-
-
-def is_windows():
-    return __IS_WINDOWS
-
-
-def logger_for_object(obj: object) -> _log.Logger:
-    return logger_for_class(obj.__class__)
-
-
-def logger_for_class(clazz: type) -> _log.Logger:
-    qualified_class_name = f"{clazz.__module__}.{clazz.__name__}"
-    return _log.getLogger(qualified_class_name)
-
-
-def logger_for_namespace(namespace: str) -> _log.Logger:
-    return _log.getLogger(namespace)
-
-
 def log_safe(param: _tp.Any):
 
     if isinstance(param, _url_parse.ParseResult) or isinstance(param, _url_parse.ParseResultBytes):
@@ -140,3 +120,30 @@ def apply_http_credentials(url: _url_parse.ParseResult, credentials: str) -> _ur
         location = f"{credentials}@{url.netloc[location_sep + 1:]}"
 
     return url._replace(netloc=location)
+
+
+# Duplicated code from rt._impl.util
+# To avoid both duplication and circular dependencies,
+# this code would need to be in .ext or a public module visible from .ext
+# For the sake of 10 lines we can avoid maintaining a public API of util functions
+# If lots more code gets added here, it might be time to re-think
+
+
+__IS_WINDOWS = _platform.system() == "Windows"
+
+
+def is_windows():
+    return __IS_WINDOWS
+
+
+def logger_for_object(obj: object) -> _log.Logger:
+    return logger_for_class(obj.__class__)
+
+
+def logger_for_class(clazz: type) -> _log.Logger:
+    qualified_class_name = f"{clazz.__module__}.{clazz.__name__}"
+    return _log.getLogger(qualified_class_name)
+
+
+def logger_for_namespace(namespace: str) -> _log.Logger:
+    return _log.getLogger(namespace)
