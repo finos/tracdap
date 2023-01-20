@@ -285,7 +285,7 @@ class _PypiSimpleHtmlParser(html.parser.HTMLParser):
             "files": []
         }
 
-    def handle_starttag(self, tag: str, attrs: list[tuple[str, tp.Union[str, None]]]):
+    def handle_starttag(self, tag: str, attrs: tp.List[tp.Tuple[str, tp.Union[str, None]]]):
 
         element = (tag, attrs)
         self._stack.append(element)
@@ -309,7 +309,7 @@ class _PypiSimpleHtmlParser(html.parser.HTMLParser):
         stripped_data = data.strip()
         self._data = stripped_data if len(stripped_data) > 0 else None
 
-    def _record_meta(self, attrs: list[tuple[str, tp.Union[str, None]]]):
+    def _record_meta(self, attrs: tp.List[tp.Tuple[str, tp.Union[str, None]]]):
 
         content_attr = list(filter(lambda a: a[0] == "content", attrs))
 
@@ -317,7 +317,7 @@ class _PypiSimpleHtmlParser(html.parser.HTMLParser):
             content, version = content_attr[0]
             self.response["meta"]["api-version"] = version
 
-    def _record_link(self, filename, attrs: list[tuple[str, tp.Union[str, None]]]):
+    def _record_link(self, filename, attrs: tp.List[tp.Tuple[str, tp.Union[str, None]]]):
 
         href_attr = list(filter(lambda a: a[0] == "href", attrs))
         yanked_attr = list(filter(lambda a: a[0] == "data-yanked", attrs))
