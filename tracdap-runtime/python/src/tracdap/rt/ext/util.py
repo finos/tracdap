@@ -103,7 +103,7 @@ __HTTP_USER_KEY = "username"
 __HTTP_PASS_KEY = "password"
 
 
-def get_http_credentials(url: _url_parse.ParseResult, properties: _tp.Dict[str, str]):
+def get_http_credentials(url: _url_parse.ParseResult, properties: _tp.Dict[str, str]) -> _tp.Optional[str]:
 
     token = get_plugin_property(properties, __HTTP_TOKEN_KEY)
     username = get_plugin_property(properties, __HTTP_USER_KEY)
@@ -122,7 +122,7 @@ def get_http_credentials(url: _url_parse.ParseResult, properties: _tp.Dict[str, 
     return None
 
 
-def apply_http_credentials(url: _url_parse.ParseResult, credentials: str):
+def apply_http_credentials(url: _url_parse.ParseResult, credentials: str) -> _url_parse.ParseResult:
 
     if credentials is None:
         return url

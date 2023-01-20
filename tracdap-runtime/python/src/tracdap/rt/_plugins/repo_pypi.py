@@ -21,15 +21,14 @@ import io
 
 import requests
 
-import tracdap.rt.ext.plugins as plugins
 import tracdap.rt.metadata as meta
 import tracdap.rt.exceptions as ex
 
+import tracdap.rt.ext.plugins as plugins
+import tracdap.rt.ext.util as util
+
 # Import repo interfaces
 from tracdap.rt.ext.repos import *
-
-# TODO: Remove internal dependencies
-import tracdap.rt._impl.util as _util
 
 
 class PyPiRepository(IModelRepository):
@@ -55,13 +54,13 @@ class PyPiRepository(IModelRepository):
 
     def __init__(self, properties: tp.Dict[str, str]):
 
-        self._log = _util.logger_for_object(self)
+        self._log = util.logger_for_object(self)
 
         self._repo_config = properties
 
-        self._pip_index = _util.get_plugin_property(self._repo_config, self.PIP_INDEX_KEY)
-        self._pip_index_url = _util.get_plugin_property(self._repo_config, self.PIP_INDEX_URL_KEY)
-        self._pip_simple_format = _util.get_plugin_property(self._repo_config, self.PIP_SIMPLE_FORMAT_KEY)
+        self._pip_index = util.get_plugin_property(self._repo_config, self.PIP_INDEX_KEY)
+        self._pip_index_url = util.get_plugin_property(self._repo_config, self.PIP_INDEX_URL_KEY)
+        self._pip_simple_format = util.get_plugin_property(self._repo_config, self.PIP_SIMPLE_FORMAT_KEY)
 
         if self._pip_index is None and self._pip_index_url is None:
             message = f"Neither [{self.PIP_INDEX_KEY}] nor [{self.PIP_INDEX_URL_KEY} is set in PyPi repository config"
@@ -91,7 +90,7 @@ class PyPiRepository(IModelRepository):
             package_filename, package_url = self._pypi_json_query(model_def)
 
         self._log.info(f"Downloading [{package_filename}]")
-        self._log.info(f"GET: {_util.log_safe_url(package_url)}")
+        self._log.info(f"GET: {util.log_safe(package_url)}")
 
         download_req = requests.get(package_url.geturl())
         content = download_req.content
@@ -118,7 +117,7 @@ class PyPiRepository(IModelRepository):
             simple_content_type = self._pypi_simple_content_type()
             simple_headers = {"accept": simple_content_type}
 
-            credentials = _util.get_http_credentials(simple_root_url, self._repo_config)
+            credentials = util.get_http_credentials(simple_root_url, self._repo_config)
 
             self._log.info(f"Query package: [{model_def.package}]")
 
@@ -146,7 +145,7 @@ class PyPiRepository(IModelRepository):
                 raise ex.EModelRepo(err)
 
             package_url = urllib.parse.urlparse(url)
-            package_url = _util.apply_http_credentials(package_url, credentials)
+            package_url = util.apply_http_credentials(package_url, credentials)
 
             return filename, package_url
 
@@ -214,7 +213,7 @@ class PyPiRepository(IModelRepository):
         json_root_url = urllib.parse.urlparse(self._pip_index)
         json_headers = {"accept": "application/json"}
 
-        credentials = _util.get_http_credentials(json_root_url, self._repo_config)
+        credentials = util.get_http_credentials(json_root_url, self._repo_config)
 
         self._log.info(f"Query package: [{model_def.package}], version = [{model_def.version}]")
 
@@ -244,17 +243,17 @@ class PyPiRepository(IModelRepository):
         package_url_info = bdist_urls[0]
         package_filename = package_url_info.get("filename")
         package_url = urllib.parse.urlparse(package_url_info.get("url"))
-        package_url = _util.apply_http_credentials(package_url, credentials)
+        package_url = util.apply_http_credentials(package_url, credentials)
 
         return package_filename, package_url
 
     def _pypi_package_query(self, package_path_template, root_url, headers, credentials, model_def):
 
-        root_url = _util.apply_http_credentials(root_url, credentials)
+        root_url = util.apply_http_credentials(root_url, credentials)
         package_path = package_path_template.format(root_url.path, model_def.package, model_def.version)
         package_url = root_url._replace(path=package_path)
 
-        self._log.info(f"GET: {_util.log_safe_url(package_url)}")
+        self._log.info(f"GET: {util.log_safe(package_url)}")
 
         package_req = requests.get(package_url.geturl(), headers=headers)
 

@@ -12,9 +12,10 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import tracdap.rt.ext.plugins as plugins
 import tracdap.rt.metadata as meta
 import tracdap.rt.exceptions as ex
+
+import tracdap.rt.ext.plugins as plugins
 
 # Import repo interfaces
 from tracdap.rt.ext.repos import *
