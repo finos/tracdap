@@ -378,7 +378,7 @@ class CsvStorageFormat(IDataFormat):
                         return False
 
             if python_type == int:
-                if isinstance(raw_value, float):
+                if isinstance(raw_value, float) and raw_value.is_integer():
                     return int(raw_value)
                 if isinstance(raw_value, str):
                     return int(raw_value)
