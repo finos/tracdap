@@ -75,7 +75,7 @@ public class JacksonValues {
 
         if (isSet == 0 && !isNullable) {
 
-            var msg = "Parsing failed: Got a null value for non-nullable field [" + vector.getField().getName() + "]";
+            var msg = "Parsing failed: Got a null value for not-null field [" + vector.getField().getName() + "]";
             throw new JsonParseException(parser, msg, parser.currentLocation());
         }
 
