@@ -296,8 +296,17 @@ class _StaticValidator:
         cls._unique_context_check(unique_ctx, model_def.inputs.keys(), "model input")
         cls._unique_context_check(unique_ctx, model_def.outputs.keys(), "model output")
 
+        cls._check_parameters(model_def.parameters)
         cls._check_table_fields(model_def.inputs)
         cls._check_table_fields(model_def.outputs)
+
+    @classmethod
+    def _check_parameters(cls, parameters):
+
+        for param_name, param in parameters.items():
+
+            if param.label is None or len(param.label.strip()) == 0:
+                cls._fail(f"Invalid model parameter: [{param_name}] label is missing or blank")
 
     @classmethod
     def _check_table_fields(cls, inputs_or_outputs):
