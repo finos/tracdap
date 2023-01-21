@@ -57,6 +57,7 @@ class SchemaLoader:
 
                 schema_of_schema = _data.DataMapping.trac_to_arrow_schema(cls.__SCHEMA_OF_SCHEMA)
                 schema_data = csv_format.read_table(schema_io, schema_of_schema)
+                schema_data = _data.DataConformance.conform_to_schema(schema_data, schema_of_schema)
 
             return cls._decode_schema_data(schema_data)
 
