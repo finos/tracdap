@@ -1,4 +1,16 @@
-#  Copyright 2022 Accenture Global Solutions Limited
+#  Copyright 2023 Accenture Global Solutions Limited
+#
+#  Licensed under the Apache License, Version 2.0 (the "License");
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
 #
 #  Licensed under the Apache License, Version 2.0 (the "License");
 #  you may not use this file except in compliance with the License.
@@ -23,12 +35,17 @@ import pyarrow as pa
 import pyarrow.compute as pac
 import pyarrow.csv as pa_csv
 
-import tracdap.rt.exceptions as _ex
-import tracdap.rt._impl.data as _data
-import tracdap.rt._impl.util as _util
+import tracdap.rt.ext.plugins as plugins
+import tracdap.rt.exceptions as ex
 
 # Import storage interfaces
 from tracdap.rt.ext.storage import IDataFormat
+
+# Set of common helpers across the core plugins (do not reference rt._impl)
+from . import _helpers
+
+# TODO: Remove dependency on internal code
+import tracdap.rt._impl.data as _data
 
 
 class CsvStorageFormat(IDataFormat):
@@ -45,7 +62,7 @@ class CsvStorageFormat(IDataFormat):
 
     def __init__(self, format_options: tp.Dict[str, tp.Any] = None):
 
-        self._log = _util.logger_for_object(self)
+        self._log = _helpers.logger_for_object(self)
 
         self._format_options = format_options
         self._use_lenient_parser = False
@@ -78,7 +95,7 @@ class CsvStorageFormat(IDataFormat):
             if lenient_flag.lower() == "true":
                 return True
 
-        raise _ex.EConfigParse(f"Invalid lenient flag for CSV storage: [{lenient_flag}]")
+        raise ex.EConfigParse(f"Invalid lenient flag for CSV storage: [{lenient_flag}]")
 
     @classmethod
     def _validate_date_format(cls, date_format: str):
@@ -88,7 +105,7 @@ class CsvStorageFormat(IDataFormat):
             current_date.strftime(date_format)
             return date_format
         except EncodingWarning:
-            raise _ex.EConfigParse(f"Invalid date format for CSV storage: [{date_format}]")
+            raise ex.EConfigParse(f"Invalid date format for CSV storage: [{date_format}]")
 
     @classmethod
     def _validate_datetime_format(cls, datetime_format: str):
@@ -98,7 +115,7 @@ class CsvStorageFormat(IDataFormat):
             current_datetime.strftime(datetime_format)
             return datetime_format
         except EncodingWarning:
-            raise _ex.EConfigParse(f"Invalid datetime format for CSV storage: [{datetime_format}]")
+            raise ex.EConfigParse(f"Invalid datetime format for CSV storage: [{datetime_format}]")
 
     def format_code(self) -> str:
         return self.FORMAT_CODE
@@ -111,7 +128,7 @@ class CsvStorageFormat(IDataFormat):
         # For CSV data, if there is no schema then type inference will do unpredictable things!
 
         if schema is None or len(schema.names) == 0 or len(schema.types) == 0:
-            raise _ex.EDataConformance("An explicit schema is required to load CSV data")
+            raise ex.EDataConformance("An explicit schema is required to load CSV data")
 
         if self._use_lenient_parser:
             return self._read_table_lenient(source, schema)
@@ -152,13 +169,13 @@ class CsvStorageFormat(IDataFormat):
         except pa.ArrowInvalid as e:
             err = f"CSV file decoding failed, content is garbled"
             self._log.exception(err)
-            raise _ex.EDataCorruption(err) from e
+            raise ex.EDataCorruption(err) from e
 
         except pa.ArrowKeyError as e:
             err = f"CSV file decoding failed, one or more columns is missing"
             self._log.error(err)
             self._log.exception(str(e))
-            raise _ex.EDataCorruption(err) from e
+            raise ex.EDataCorruption(err) from e
 
     @classmethod
     def _format_outputs(cls, table: pa.Table) -> pa.Table:
@@ -277,7 +294,7 @@ class CsvStorageFormat(IDataFormat):
             if any(missing_columns):
                 msg = f"CSV data is missing one or more columns: [{', '.join(missing_columns)}]"
                 self._log.error(msg)
-                raise _ex.EDataConformance(msg)
+                raise ex.EDataConformance(msg)
 
             schema_columns = {col.lower(): index for index, col in enumerate(schema.names)}
             col_mapping = [schema_columns.get(col) for col in header_lower]
@@ -320,12 +337,12 @@ class CsvStorageFormat(IDataFormat):
         except StopIteration as e:
             err = f"CSV decoding failed, no readable content"
             self._log.exception(err)
-            raise _ex.EDataCorruption(err) from e
+            raise ex.EDataCorruption(err) from e
 
         except UnicodeDecodeError as e:
             err = f"CSV decoding failed, content is garbled"
             self._log.exception(err)
-            raise _ex.EDataCorruption(err) from e
+            raise ex.EDataCorruption(err) from e
 
     def _convert_python_value(
             self, raw_value: tp.Any, python_type: type, nullable: bool,
@@ -343,7 +360,7 @@ class CsvStorageFormat(IDataFormat):
                 else:
                     msg = f"CSV data contains null value for a not-null field (col = {col}, row = {row})"
                     self._log.error(msg)
-                    raise _ex.EDataConformance(msg)
+                    raise ex.EDataConformance(msg)
 
             if isinstance(raw_value, python_type):
                 return raw_value
@@ -404,7 +421,7 @@ class CsvStorageFormat(IDataFormat):
                 + f": {str(e)}"
 
             self._log.exception(msg)
-            raise _ex.EDataConformance(msg) from e
+            raise ex.EDataConformance(msg) from e
 
         # Default case: unrecognized python_type
 
@@ -412,4 +429,9 @@ class CsvStorageFormat(IDataFormat):
               + f" (col = {col}, row = {row}, expected type = [{python_type.__name__}], value = [{str(raw_value)}])"
 
         self._log.error(msg)
-        raise _ex.EDataConformance(msg)
+        raise ex.EDataConformance(msg)
+
+
+plugins.PluginManager.register_plugin(
+    IDataFormat, CsvStorageFormat,
+    ["CSV", ".csv", "text/csv"])

@@ -24,7 +24,6 @@ import tracdap.rt.exceptions as _ex
 import tracdap.rt.ext.plugins as plugins
 import tracdap.rt._impl.data as _data
 import tracdap.rt._impl.util as _util
-import tracdap.rt._impl.csv_codec as csv_codec
 
 # Import storage interfaces
 from tracdap.rt.ext.storage import IDataFormat, IDataStorage, IFileStorage, FileType
@@ -253,13 +252,3 @@ class CommonDataStorage(IDataStorage):
 
     def query_table(self):
         pass
-
-
-# ----------------------------------------------------------------------------------------------------------------------
-# DATA FORMATS
-# ----------------------------------------------------------------------------------------------------------------------
-
-
-plugins.PluginManager.register_plugin(
-    IDataFormat, csv_codec.CsvStorageFormat,
-    ["CSV", ".csv", "text/csv"])
