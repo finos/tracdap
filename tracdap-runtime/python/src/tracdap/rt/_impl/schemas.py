@@ -136,7 +136,7 @@ class SchemaLoader:
             cls, schema_field_name: str, field_name: tp.Optional[str], field_index: int,
             arrow_value: pa.StringScalar, required: bool = False):
 
-        if arrow_value is not None:
+        if arrow_value is not None and arrow_value.is_valid:
             return arrow_value.as_py()
 
         if not required:
@@ -156,7 +156,7 @@ class SchemaLoader:
             cls, schema_field_name: str, field_name: str, field_index: int,
             arrow_value: pa.BooleanScalar, required: bool = False, default: tp.Optional[bool] = None):
 
-        if arrow_value is not None:
+        if arrow_value is not None and arrow_value.is_valid:
             return arrow_value.as_py()
 
         if not required:
