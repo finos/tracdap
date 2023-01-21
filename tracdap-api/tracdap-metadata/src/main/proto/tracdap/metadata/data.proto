@@ -48,6 +48,9 @@ message FieldSchema {
     bool businessKey = 5;
     bool categorical = 6;
 
+    // This could become mandatory with the next metadata update
+    optional bool notNull = 8;
+
     optional string formatCode = 7;
 }
 
