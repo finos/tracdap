@@ -239,7 +239,7 @@ def define_field(
         label: str,
         business_key: bool = False,
         categorical: bool = False,
-        not_null: _tp.Optional[bool] = False,
+        not_null: _tp.Optional[bool] = None,
         format_code: _tp.Optional[str] = None,
         field_order: _tp.Optional[int] = None) \
         -> FieldSchema:
@@ -297,7 +297,7 @@ def declare_field(
         label: str,
         business_key: bool = False,
         categorical: bool = False,
-        not_null: _tp.Optional[bool] = False,
+        not_null: _tp.Optional[bool] = None,
         format_code: _tp.Optional[str] = None,
         field_order: _tp.Optional[int] = None) \
         -> FieldSchema:
@@ -329,7 +329,7 @@ def F(  # noqa
         label: str,
         business_key: bool = False,
         categorical: bool = False,
-        not_null: _tp.Optional[bool] = False,
+        not_null: _tp.Optional[bool] = None,
         format_code: _tp.Optional[str] = None,
         field_order: _tp.Optional[int] = None) \
         -> FieldSchema:
