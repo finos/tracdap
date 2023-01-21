@@ -127,10 +127,6 @@ class IDataStorage:
             overwrite: bool = False):
         pass
 
-    @abc.abstractmethod
-    def query_table(self):
-        pass
-
 
 class IDataFormat:
 
