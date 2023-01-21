@@ -307,6 +307,18 @@ class CsvStorageFormat(IDataFormat):
 
             for row in csv_reader:
 
+                # Extra values in the row is an error, they don't belong to any column
+                if len(row) > len(header):
+                    err = f"CSV decoding failed, unexpected extra columns on row [{csv_row}]"
+                    self._log.exception(err)
+                    raise ex.EDataCorruption(err)
+
+                # Missing values at the end of the row are filled with blanks/nulls
+                # This is only valid if the missing fields are nullable or of string type
+                if len(row) < len(header):
+                    null_values = ["" for _ in range(len(header) - len(row))]
+                    row = row + null_values
+
                 for raw_value in row:
 
                     col_name = header[csv_col]
@@ -319,12 +331,6 @@ class CsvStorageFormat(IDataFormat):
                         data[output_col].append(python_value)
 
                     csv_col += 1
-
-                # Allow for trailing null columns
-                # TODO: What is the right behavior here? Use a flag to control?
-                for blank_col in range(csv_col, len(header)):
-                    output_col = col_mapping[blank_col]
-                    data[output_col].append(None)  # noqa
 
                 csv_col = 0
                 csv_row += 1
@@ -354,7 +360,7 @@ class CsvStorageFormat(IDataFormat):
 
             if raw_value is None or (isinstance(raw_value, str) and raw_value == ""):
                 if python_type == str:
-                    return raw_value
+                    return raw_value if nullable else ""
                 if nullable:
                     return None
                 else:
