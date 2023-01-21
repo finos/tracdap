@@ -19,6 +19,7 @@ import subprocess as sp
 
 import tracdap.rt.metadata as meta
 import tracdap.rt.config as config
+import tracdap.rt.ext.plugins as plugins
 import tracdap.rt._impl.static_api as api_hook  # noqa
 import tracdap.rt._impl.models as models  # noqa
 import tracdap.rt._impl.repos as repos  # noqa
@@ -29,6 +30,7 @@ class ModelRepositoriesTest(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls) -> None:
+        plugins.PluginManager.register_core_plugins()
         api_hook.StaticApiImpl.register_impl()
         util.configure_logging()
 
@@ -72,7 +74,7 @@ class ModelRepositoriesTest(unittest.TestCase):
         repo_mgr = repos.RepositoryManager(sys_config)
         repo = repo_mgr.get_repository("git_test")
 
-        checkout_key = repo.checkout_key(model_def)
+        checkout_key = "test_checkout_git"
         checkout_subdir = pathlib.Path(checkout_key)
 
         checkout_dir = self.scratch_dir.joinpath(model_def.repository, checkout_subdir)
@@ -103,7 +105,7 @@ class ModelRepositoriesTest(unittest.TestCase):
         repo_mgr = repos.RepositoryManager(sys_config)
         repo = repo_mgr.get_repository("pypi_test")
 
-        checkout_key = repo.checkout_key(model_def)
+        checkout_key = "test_checkout_pypi"
         checkout_subdir = pathlib.Path(checkout_key)
 
         checkout_dir = self.scratch_dir.joinpath(model_def.repository, checkout_subdir)
@@ -135,7 +137,7 @@ class ModelRepositoriesTest(unittest.TestCase):
         repo_mgr = repos.RepositoryManager(sys_config)
         repo = repo_mgr.get_repository("pypi_test")
 
-        checkout_key = repo.checkout_key(model_def)
+        checkout_key = "test_checkout_pypi_simple_json"
         checkout_subdir = pathlib.Path(checkout_key)
 
         checkout_dir = self.scratch_dir.joinpath(model_def.repository, checkout_subdir)
@@ -167,7 +169,7 @@ class ModelRepositoriesTest(unittest.TestCase):
         repo_mgr = repos.RepositoryManager(sys_config)
         repo = repo_mgr.get_repository("pypi_test")
 
-        checkout_key = repo.checkout_key(model_def)
+        checkout_key = "test_checkout_pypi_simple_html"
         checkout_subdir = pathlib.Path(checkout_key)
 
         checkout_dir = self.scratch_dir.joinpath(model_def.repository, checkout_subdir)
@@ -176,4 +178,3 @@ class ModelRepositoriesTest(unittest.TestCase):
         package_dir = repo.do_checkout(model_def, checkout_dir)
 
         self.assertTrue(package_dir.joinpath("tracdap").exists())
-

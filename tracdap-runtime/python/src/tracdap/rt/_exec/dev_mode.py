@@ -671,7 +671,10 @@ class DevModeTranslator:
     def infer_format(storage_path: str, storage_config: _cfg.StorageConfig):
 
         if re.match(r'.*\.\w+$', storage_path):
-            return _storage.FormatManager.format_for_extension(pathlib.Path(storage_path).suffix)
+            extension = pathlib.Path(storage_path).suffix
+            codec = _storage.FormatManager.get_data_format(extension, format_options={})
+            return codec.format_code()
+
         else:
             return storage_config.defaultFormat
 

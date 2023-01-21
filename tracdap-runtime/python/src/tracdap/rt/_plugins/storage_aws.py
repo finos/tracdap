@@ -11,20 +11,28 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+
+import typing as tp
 import http
 import io
 
-import botocore.response
+import tracdap.rt.config as cfg
+import tracdap.rt.exceptions as ex
 
+# Import storage interfaces
+import tracdap.rt.ext.plugins as plugins
 from tracdap.rt.ext.storage import *
 
-import tracdap.rt.config as _cfg
-import tracdap.rt.exceptions as _ex
-import tracdap.rt._impl.util as _util
+# Set of common helpers across the core plugins (do not reference rt._impl)
+from . import _helpers
+
+# TODO: Remove dependencies on internal implementation details
+import tracdap.rt._impl.storage as _storage
 
 # AWS SDK
 import boto3
-import botocore.exceptions as _aws_ex  # noqa
+import botocore.response  # noqa
+import botocore.exceptions as aws_ex  # noqa
 
 
 class S3ObjectStorage(IFileStorage):
@@ -53,17 +61,16 @@ class S3ObjectStorage(IFileStorage):
     ACCESS_KEY_ID_PROPERTY = "accessKeyId"
     SECRET_ACCESS_KEY_PROPERTY = "secretAccessKey"
 
-    def __init__(self, config: _cfg.PluginConfig, options: dict = None):
+    def __init__(self, config: cfg.PluginConfig, options: dict = None):
 
-        self._log = _util.logger_for_object(self)
+        self._log = _helpers.logger_for_object(self)
 
-        self._config = config
-        self._options = options
+        self._properties = config.properties
 
-        self._bucket = _util.get_plugin_property(self._config, self.BUCKET_PROPERTY)
-        self._prefix = _util.get_plugin_property(self._config, self.PREFIX_PROPERTY) or ""
-        self._region = _util.get_plugin_property(self._config, self.REGION_PROPERTY)
-        self._endpoint = _util.get_plugin_property(self._config, self.ENDPOINT_PROPERTY)
+        self._bucket = _helpers.get_plugin_property(self._properties, self.BUCKET_PROPERTY)
+        self._prefix = _helpers.get_plugin_property(self._properties, self.PREFIX_PROPERTY) or ""
+        self._region = _helpers.get_plugin_property(self._properties, self.REGION_PROPERTY)
+        self._endpoint = _helpers.get_plugin_property(self._properties, self.ENDPOINT_PROPERTY)
 
         credentials_params = self.setup_credentials()
 
@@ -77,11 +84,11 @@ class S3ObjectStorage(IFileStorage):
         if self._endpoint is not None:
             client_args["endpoint_url"] = self._endpoint
 
-        self.__client = boto3.client(**client_args)
+        self._client = boto3.client(**client_args)
 
     def setup_credentials(self):
 
-        mechanism = _util.get_plugin_property(self._config, self.CREDENTIALS_PROPERTY) or self.CREDENTIALS_DEFAULT
+        mechanism = _helpers.get_plugin_property(self._properties, self.CREDENTIALS_PROPERTY) or self.CREDENTIALS_DEFAULT
 
         if mechanism.lower() == self.CREDENTIALS_DEFAULT:
             self._log.info(f"Using [{self.CREDENTIALS_DEFAULT}] credentials mechanism")
@@ -89,8 +96,8 @@ class S3ObjectStorage(IFileStorage):
 
         if mechanism.lower() == self.CREDENTIALS_STATIC:
 
-            access_key_id = _util.get_plugin_property(self._config, self.ACCESS_KEY_ID_PROPERTY)
-            secret_access_key = _util.get_plugin_property(self._config, self.SECRET_ACCESS_KEY_PROPERTY)
+            access_key_id = _helpers.get_plugin_property(self._properties, self.ACCESS_KEY_ID_PROPERTY)
+            secret_access_key = _helpers.get_plugin_property(self._properties, self.SECRET_ACCESS_KEY_PROPERTY)
 
             self._log.info(
                 f"Using [{self.CREDENTIALS_STATIC}] credentials mechanism, " +
@@ -100,7 +107,7 @@ class S3ObjectStorage(IFileStorage):
 
         message = f"Unrecognised credentials mechanism: [{mechanism}]"
         self._log.error(message)
-        raise _ex.EStartup(message)
+        raise ex.EStartup(message)
 
     def exists(self, storage_path: str) -> bool:
 
@@ -108,14 +115,14 @@ class S3ObjectStorage(IFileStorage):
             self._log.info(f"EXISTS [{storage_path}]")
 
             object_key = self._resolve_path(storage_path)
-            self.__client.head_object(Bucket=self._bucket, Key=object_key)
+            self._client.head_object(Bucket=self._bucket, Key=object_key)
             return True
 
-        except _aws_ex.ClientError as error:
-            _aws_code = error.response['Error']['Code']
-            if _aws_code == str(http.HTTPStatus.NOT_FOUND.value):  # noqa
+        except aws_ex.ClientError as error:
+            aws_code = error.response['Error']['Code']
+            if aws_code == str(http.HTTPStatus.NOT_FOUND.value):  # noqa
                 return False
-            raise _ex.EStorageRequest(f"Storage error: {str(error)}") from error
+            raise ex.EStorageRequest(f"Storage error: {str(error)}") from error
 
     def size(self, storage_path: str) -> int:
 
@@ -123,12 +130,11 @@ class S3ObjectStorage(IFileStorage):
             self._log.info(f"SIZE [{storage_path}]")
 
             object_key = self._resolve_path(storage_path)
-            response = self.__client.head_object(Bucket=self._bucket, Key=object_key)
+            response = self._client.head_object(Bucket=self._bucket, Key=object_key)
             return response['ContentLength']
 
-        except _aws_ex.ClientError as error:
-            _aws_code = error.response['Error']['Code']
-            raise _ex.EStorageRequest(f"Storage error: {str(error)}") from error
+        except aws_ex.ClientError as error:
+            raise ex.EStorageRequest(f"Storage error: {str(error)}") from error
 
     def stat(self, storage_path: str) -> FileStat:
 
@@ -152,7 +158,7 @@ class S3ObjectStorage(IFileStorage):
 
         prefix = self._resolve_path(storage_path) + "/"
 
-        response = self.__client.list_objects_v2(
+        response = self._client.list_objects_v2(
             Bucket=self._bucket,
             Prefix=prefix,
             Delimiter="/")
@@ -160,7 +166,7 @@ class S3ObjectStorage(IFileStorage):
         keys = []
 
         if "Contents" not in response and "CommonPrefixes" not in response:
-            raise _ex.EStorageRequest(f"Storage prefix not found: [{storage_path}]")
+            raise ex.EStorageRequest(f"Storage prefix not found: [{storage_path}]")
 
         if "Contents" in response:
             for entry in response["Contents"]:
@@ -193,11 +199,10 @@ class S3ObjectStorage(IFileStorage):
                 raise RuntimeError("RM (recursive) not available for S3 storage")
 
             object_key = self._resolve_path(storage_path)
-            self.__client.delete_object(Bucket=self._bucket, Key=object_key)
+            self._client.delete_object(Bucket=self._bucket, Key=object_key)
 
-        except _aws_ex.ClientError as error:
-            _aws_code = error.response['Error']['Code']
-            raise _ex.EStorageRequest(f"Storage error: {str(error)}") from error
+        except aws_ex.ClientError as error:
+            raise ex.EStorageRequest(f"Storage error: {str(error)}") from error
 
     def read_bytes(self, storage_path: str) -> bytes:
 
@@ -218,12 +223,11 @@ class S3ObjectStorage(IFileStorage):
         try:
 
             object_key = self._resolve_path(storage_path)
-            response = self.__client.get_object(Bucket=self._bucket, Key=object_key)
+            response = self._client.get_object(Bucket=self._bucket, Key=object_key)
             return response['Body']
 
-        except _aws_ex.ClientError as error:
-            _aws_code = error.response['Error']['Code']
-            raise _ex.EStorageRequest(f"Storage error: {str(error)}") from error
+        except aws_ex.ClientError as error:
+            raise ex.EStorageRequest(f"Storage error: {str(error)}") from error
 
     def write_bytes(self, storage_path: str, data: bytes, overwrite: bool = False):
 
@@ -232,14 +236,13 @@ class S3ObjectStorage(IFileStorage):
 
             object_key = self._resolve_path(storage_path)
 
-            self.__client.put_object(
+            self._client.put_object(
                 Bucket=self._bucket,
                 Key=object_key,
                 Body=data)
 
-        except _aws_ex.ClientError as error:
-            _aws_code = error.response['Error']['Code']
-            raise _ex.EStorageRequest(f"Storage error: {str(error)}") from error
+        except aws_ex.ClientError as error:
+            raise ex.EStorageRequest(f"Storage error: {str(error)}") from error
 
     def write_byte_stream(self, storage_path: str, overwrite: bool = False) -> tp.BinaryIO:
 
@@ -287,3 +290,8 @@ class S3ObjectStorage(IFileStorage):
         full_path = self._prefix + separator + storage_path
 
         return full_path[1:] if full_path.startswith("/") else full_path
+
+
+# Register the S3 storage plugin
+
+_storage.StorageManager.register_storage_type("S3", S3ObjectStorage, _storage.CommonDataStorage)

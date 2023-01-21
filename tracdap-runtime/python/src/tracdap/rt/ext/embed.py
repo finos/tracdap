@@ -13,41 +13,47 @@
 #  limitations under the License.
 
 import tracdap.rt.config as _cfg
+import tracdap.rt.ext._guard as _guard
+
+# Dependency back into the main runtime implementation
 import tracdap.rt._exec.runtime as _rt  # noqa
-import tracdap.rt._impl.validation as _val  # noqa
 
 
 class __EmbeddedRuntime:
 
     def __init__(self, runtime: _rt.TracRuntime):
+        _guard.run_model_guard("Using __EmbeddedRuntime")
         self.__runtime = runtime
         self.__destroyed = False
 
     def __enter__(self):
+        _guard.run_model_guard("Using __EmbeddedRuntime")
         self.__runtime.__enter__()
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
+        _guard.run_model_guard("Using __EmbeddedRuntime")
         self.__runtime.__exit__(exc_type, exc_val, exc_tb)
         self.__destroyed = True
 
     def __del__(self):
+        _guard.run_model_guard("Using __EmbeddedRuntime")
         if not self.__destroyed:
             self.__runtime.stop()
             self.__destroyed = True
 
     def run_job_(self, job_config: _cfg.JobConfig):
 
-        _val.validate_signature(self.run_job_, job_config)
+        _guard.run_model_guard("Using __EmbeddedRuntime")
 
         self.__runtime.submit_job(job_config)
 
         return self.__runtime.wait_for_job(job_config.jobId)
 
 
-def create_runtime(sys_config: _cfg.RuntimeConfig, dev_mode: bool = False):
+def create_runtime(sys_config: _cfg.RuntimeConfig, dev_mode: bool = False) -> __EmbeddedRuntime:
 
-    _val.validate_signature(create_runtime, sys_config, dev_mode)
+    _guard.run_model_guard()
 
     runtime = _rt.TracRuntime(sys_config, dev_mode=dev_mode)
     runtime.pre_start()
@@ -57,6 +63,6 @@ def create_runtime(sys_config: _cfg.RuntimeConfig, dev_mode: bool = False):
 
 def run_job(runtime: __EmbeddedRuntime, job_config: _cfg.JobConfig) -> _cfg.JobResult:
 
-    _val.validate_signature(run_job, runtime, job_config)
+    _guard.run_model_guard()
 
     return runtime.run_job_(job_config)

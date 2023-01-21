@@ -12,13 +12,10 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from __future__ import annotations
-
 import datetime as dt
 import logging
 import pathlib
 import platform
-import urllib.parse
 
 import sys
 import typing as tp
@@ -209,32 +206,6 @@ def get_job_resource(
         return job_config.resources[resource_key]
 
 
-__T = tp.TypeVar("__T")
-
-
-class __LogClose(tp.Generic[__T]):
-
-    def __init__(self, ctx_mgr: __T, log, msg):
-        self.__ctx_mgr = ctx_mgr
-        self.__log = log
-        self.__msg = msg
-
-    def __getitem__(self, item):
-        return self.__ctx_mgr.__getitem__(item)
-
-    def __enter__(self):
-        return self.__ctx_mgr.__enter__()
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self.__ctx_mgr.__exit__(exc_type, exc_val, exc_tb)
-        self.__log.info(self.__msg)
-
-
-def log_close(ctx_mgg: __T, log: logging.Logger, msg: str) -> __T:
-
-    return __LogClose(ctx_mgg, log, msg)
-
-
 def get_origin(metaclass: type):
 
     # Minimum supported Python is 3.7, which does not provide get_origin and get_args
@@ -289,61 +260,3 @@ def try_clean_dir(dir_path: pathlib.Path, remove: bool = False) -> bool:
             return clean_ok
         except Exception:  # noqa
             return False
-
-
-def log_safe(param: tp.Any):
-
-    if isinstance(param, urllib.parse.ParseResult) or isinstance(param, urllib.parse.ParseResultBytes):
-        return log_safe_url(param)
-
-    if isinstance(param, str):
-        try:
-            url = urllib.parse.urlparse(param)
-            return log_safe_url(url)
-        except ValueError:
-            return param
-
-    return param
-
-
-def log_safe_url(url: tp.Union[str, urllib.parse.ParseResult, urllib.parse.ParseResultBytes]):
-
-    if isinstance(url, str):
-        url = urllib.parse.urlparse(url)
-
-    if url.password:
-
-        user_sep = url.netloc.index(":")
-        pass_sep = url.netloc.index("@")
-
-        user = url.netloc[:user_sep]
-        safe_location = f"{user}:*****@{url.netloc[pass_sep + 1:]}"
-
-        return url._replace(netloc=safe_location).geturl()
-
-    elif url.username:
-
-        separator = url.netloc.index("@")
-        safe_location = f"*****@{url.netloc[separator + 1:]}"
-
-        return url._replace(netloc=safe_location).geturl()
-
-    else:
-        return url.geturl()
-
-
-def get_plugin_property(config: cfg.PluginConfig, property_name: str):
-
-    if property_name in config.properties:
-        return config.properties[property_name]
-
-    # Allow for properties set up via env variables on Windows
-    # Python for Windows makes env var names uppercase when querying the environment
-    # This will allow properties to be found, even if the case has been changed
-    if is_windows():
-
-        for key, value in config.properties.items():
-            if key.lower() == property_name.lower():
-                return value
-
-    return None
