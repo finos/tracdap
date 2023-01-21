@@ -54,6 +54,7 @@ class CsvStorageFormat(IDataFormat):
     FILE_EXTENSION = "csv"
 
     __LENIENT_CSV_PARSER = "lenient_csv_parser"
+    __LENIENT_MISSING_COLUMNS = "lenient_missing_columns"
     __DATE_FORMAT = "date_format"
     __DATETIME_FORMAT = "datetime_format"
 
@@ -252,7 +253,7 @@ class CsvStorageFormat(IDataFormat):
     @classmethod
     def _format_timestamp(cls, column: pa.Array) -> pa.Array:
 
-        # PyArrow outputs timestamps with a space (' ') separator between date and time
+        # PyArrow outputs timestamps with a space ' ' separator between date and time
         # ISO format requires a 'T' between date and time
 
         column_type: pa.TimestampType = column.type
@@ -281,22 +282,38 @@ class CsvStorageFormat(IDataFormat):
             text_source = stream_reader(source)
 
             csv_params = {
-                "skipinitialspace": True,
-                "doublequote": True
+                "skipinitialspace": True,  # noqa
+                "doublequote": True  # noqa
             }
 
             csv_reader = csv.reader(text_source, **csv_params)
-            header = next(csv_reader)
 
+            header = next(csv_reader)
             header_lower = list(map(str.lower, header))
+
+            schema_columns = dict((col.lower(), index) for index, col in enumerate(schema.names))
+
+            lenient_columns = _helpers.get_plugin_property(self._format_options, self.__LENIENT_MISSING_COLUMNS)
             missing_columns = list(filter(lambda col_: col_.lower() not in header_lower, schema.names))
 
+            # The lenient_missing_columns flag allows missing columns so long as they are nullable
+            # Primarily intended for reading schema files if not all the columns are needed
             if any(missing_columns):
-                msg = f"CSV data is missing one or more columns: [{', '.join(missing_columns)}]"
-                self._log.error(msg)
-                raise ex.EDataConformance(msg)
 
-            schema_columns = {col.lower(): index for index, col in enumerate(schema.names)}
+                if not lenient_columns:
+                    msg = f"CSV data is missing one or more columns: [{', '.join(missing_columns)}]"
+                    self._log.error(msg)
+                    raise ex.EDataConformance(msg)
+
+                missing_not_null = list(filter(lambda col: not schema.field(col).nullable, missing_columns))
+
+                if any(missing_not_null):
+                    msg = f"CSV data is missing one or more not-null columns: [{', '.join(missing_not_null)}]"
+                    self._log.error(msg)
+                    raise ex.EDataConformance(msg)
+
+            # Set up column mappings using field indices (avoid string lookups in the loop)
+
             col_mapping = [schema_columns.get(col) for col in header_lower]
             python_types = list(map(_data.DataMapping.arrow_to_python_type, schema.types))
             nullable_flags = list(map(lambda c: schema.field(c).nullable, range(len(schema.names))))
@@ -336,6 +353,12 @@ class CsvStorageFormat(IDataFormat):
                 csv_row += 1
 
             data_dict = dict(zip(schema.names, data))
+
+            # In lenient column mode, fill in any missing nullable columns with nulls
+            if lenient_columns:
+                for output_col in missing_columns:
+                    data_dict[output_col] = list(None for _ in range(csv_row - 1))
+
             table = pa.Table.from_pydict(data_dict, schema)  # noqa
 
             return table
