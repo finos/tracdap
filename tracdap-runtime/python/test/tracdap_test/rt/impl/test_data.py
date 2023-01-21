@@ -18,6 +18,7 @@ import unittest
 import sys
 import math
 import pandas as pd
+import copy
 
 import pyarrow as pa
 
@@ -28,6 +29,19 @@ import tracdap.rt._impl.util as _util  # noqa
 
 
 class DataMappingTest(unittest.TestCase):
+
+    TRAC_SCHEMA = _meta.SchemaDefinition(
+        _meta.SchemaType.TABLE,
+        _meta.PartType.PART_ROOT,
+        _meta.TableSchema(fields=[
+            _meta.FieldSchema("boolean_field", fieldType=_meta.BasicType.BOOLEAN),
+            _meta.FieldSchema("integer_field", fieldType=_meta.BasicType.INTEGER),
+            _meta.FieldSchema("float_field", fieldType=_meta.BasicType.FLOAT),
+            _meta.FieldSchema("decimal_field", fieldType=_meta.BasicType.DECIMAL),
+            _meta.FieldSchema("string_field", fieldType=_meta.BasicType.STRING),
+            _meta.FieldSchema("date_field", fieldType=_meta.BasicType.DATE),
+            _meta.FieldSchema("datetime_field", fieldType=_meta.BasicType.DATETIME),
+        ]))
 
     @classmethod
     def setUpClass(cls):
@@ -48,23 +62,10 @@ class DataMappingTest(unittest.TestCase):
                 dt.datetime(2000, 1, 3, 2, 2, 2), dt.datetime(2000, 1, 4, 3, 3, 3)]
         }
 
-    @staticmethod
-    def sample_schema():
+    @classmethod
+    def sample_schema(cls):
 
-        trac_schema = _meta.SchemaDefinition(
-            _meta.SchemaType.TABLE,
-            _meta.PartType.PART_ROOT,
-            _meta.TableSchema(fields=[
-                _meta.FieldSchema("boolean_field", fieldType=_meta.BasicType.BOOLEAN),
-                _meta.FieldSchema("integer_field", fieldType=_meta.BasicType.INTEGER),
-                _meta.FieldSchema("float_field", fieldType=_meta.BasicType.FLOAT),
-                _meta.FieldSchema("decimal_field", fieldType=_meta.BasicType.DECIMAL),
-                _meta.FieldSchema("string_field", fieldType=_meta.BasicType.STRING),
-                _meta.FieldSchema("date_field", fieldType=_meta.BasicType.DATE),
-                _meta.FieldSchema("datetime_field", fieldType=_meta.BasicType.DATETIME),
-            ]))
-
-        return _data.DataMapping.trac_to_arrow_schema(trac_schema)
+        return _data.DataMapping.trac_to_arrow_schema(cls.TRAC_SCHEMA)
 
     @staticmethod
     def one_field_schema(field_type: _meta.BasicType):
@@ -105,6 +106,14 @@ class DataMappingTest(unittest.TestCase):
 
         self.assertEqual(sample_schema, rt.schema)
         self.assertEqual(table, rt)
+
+    def test_not_null_schema_mapping(self):
+
+        trac_schema = copy.deepcopy(self.TRAC_SCHEMA)
+        trac_schema.table.fields[1].notNull = True  # noqa
+
+        sample_schema = _data.DataMapping.trac_to_arrow_schema(trac_schema)
+        self.assertFalse(sample_schema.field("integer_field").nullable)
 
     def test_pandas_dtypes(self):
 
@@ -508,6 +517,27 @@ class DataConformanceTest(unittest.TestCase):
 
         self.assertNotEqual(schema, table.schema)
         self.assertEqual(schema, conformed.schema)
+
+    def test_not_null_constraint(self):
+
+        trac_schema = copy.deepcopy(DataMappingTest.TRAC_SCHEMA)
+        trac_schema.table.fields[1].notNull = True  # noqa
+
+        sample_schema = _data.DataMapping.trac_to_arrow_schema(trac_schema)
+
+        # Null value in the boolean field should be fine
+        sample_data = DataMappingTest.sample_data()
+        sample_data["boolean_field"][0] = None  # noqa
+
+        table = pa.Table.from_pydict(sample_data, sample_schema)  # noqa
+        _data.DataConformance.conform_to_schema(table, sample_schema)
+
+        # Null value in not-null field should raise an error
+        sample_data["integer_field"][0] = None  # noqa
+
+        table = pa.Table.from_pydict(sample_data, sample_schema)  # noqa
+
+        self.assertRaises(_ex.EDataConformance, lambda: _data.DataConformance.conform_to_schema(table, sample_schema))
 
     def test_boolean_same_type(self):
 

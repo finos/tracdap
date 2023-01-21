@@ -296,8 +296,17 @@ class _StaticValidator:
         cls._unique_context_check(unique_ctx, model_def.inputs.keys(), "model input")
         cls._unique_context_check(unique_ctx, model_def.outputs.keys(), "model output")
 
+        cls._check_parameters(model_def.parameters)
         cls._check_table_fields(model_def.inputs)
         cls._check_table_fields(model_def.outputs)
+
+    @classmethod
+    def _check_parameters(cls, parameters):
+
+        for param_name, param in parameters.items():
+
+            if param.label is None or len(param.label.strip()) == 0:
+                cls._fail(f"Invalid model parameter: [{param_name}] label is missing or blank")
 
     @classmethod
     def _check_table_fields(cls, inputs_or_outputs):
@@ -329,11 +338,17 @@ class _StaticValidator:
         if field.fieldType not in cls.__PRIMITIVE_TYPES:
             cls._fail(f"Invalid {property_type}: [{field.fieldName}] fieldType is not a primitive type")
 
+        if field.label is None or len(field.label.strip()) == 0:
+            cls._fail(f"Invalid {property_type}: [{field.fieldName}] label is missing or blank")
+
         if field.businessKey and field.fieldType not in cls.__BUSINESS_KEY_TYPES:
             cls._fail(f"Invalid {property_type}: [{field.fieldName}] fieldType {field.fieldType} used as business key")
 
         if field.categorical and field.fieldType != meta.BasicType.STRING:
             cls._fail(f"Invalid {property_type}: [{field.fieldName}] fieldType {field.fieldType} used as categorical")
+
+        if field.businessKey and not field.notNull:
+            cls._fail(f"Invalid {property_type}: [{field.fieldName}] is a business key but not_null = False")
 
     @classmethod
     def _valid_identifiers(cls, keys, property_type):

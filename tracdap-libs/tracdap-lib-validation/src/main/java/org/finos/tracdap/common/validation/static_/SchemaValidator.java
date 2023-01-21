@@ -190,6 +190,17 @@ public class SchemaValidator {
             ctx = ctx.error(err);
         }
 
+        // If the notNull field is set on a business key, it must be set to true
+
+        if (field.getBusinessKey() && field.hasNotNull() && !field.getNotNull()) {
+
+            var err = String.format(
+                    "Schema field [%s] cannot have notNull == false because it is a business key",
+                    ctx.fieldName());
+
+            ctx = ctx.error(err);
+        }
+
         // No validation applied to label or format code
 
         return ctx;
