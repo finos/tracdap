@@ -17,8 +17,6 @@ import re
 import typing as tp
 
 import pyarrow as pa
-import pyarrow.feather as pa_ft
-import pyarrow.parquet as pa_pq
 
 import tracdap.rt.metadata as _meta
 import tracdap.rt.config as _cfg
@@ -261,81 +259,6 @@ class CommonDataStorage(IDataStorage):
 # DATA FORMATS
 # ----------------------------------------------------------------------------------------------------------------------
 
-
-class ArrowFileFormat(IDataFormat):
-
-    FORMAT_CODE = "ARROW_FILE"
-    FILE_EXTENSION = "arrow"
-
-    def __init__(self, format_options: tp.Dict[str, tp.Any] = None):
-        self._format_options = format_options
-        self._log = _util.logger_for_object(self)
-
-    def format_code(self) -> str:
-        return self.FORMAT_CODE
-
-    def file_extension(self) -> str:
-        return self.FILE_EXTENSION
-
-    def read_table(self, source: tp.BinaryIO, schema: tp.Optional[pa.Schema]) -> pa.Table:
-
-        try:
-            columns = schema.names if schema else None
-            return pa_ft.read_table(source, columns)
-
-        except pa.ArrowInvalid as e:
-            err = f"Arrow file decoding failed, content is garbled"
-            self._log.exception(err)
-            raise _ex.EDataCorruption(err) from e
-
-    def write_table(self, target: tp.BinaryIO, table: pa.Table):
-
-        # Compression support in Java is limited
-        # For now, let's get Arrow format working without compression or dictionaries
-
-        pa_ft.write_feather(table, target, compression="uncompressed")  # noqa
-
-
-class ParquetStorageFormat(IDataFormat):
-
-    FORMAT_CODE = "PARQUET"
-    FILE_EXTENSION = "parquet"
-
-    def __init__(self, format_options: tp.Dict[str, tp.Any] = None):
-        self._format_options = format_options
-        self._log = _util.logger_for_object(self)
-
-    def format_code(self) -> str:
-        return self.FORMAT_CODE
-
-    def file_extension(self) -> str:
-        return self.FILE_EXTENSION
-
-    def read_table(self, source: tp.BinaryIO, schema: tp.Optional[pa.Schema]) -> pa.Table:
-
-        try:
-            columns = schema.names if schema else None
-            return pa_pq.read_table(source, columns=columns)
-
-        except pa.ArrowInvalid as e:
-            err = f"Parquet file decoding failed, content is garbled"
-            self._log.exception(err)
-            raise _ex.EDataCorruption(err) from e
-
-    def write_table(self, target: tp.BinaryIO, table: pa.Table):
-
-        pa_pq.write_table(table, target)
-
-
-plugins.PluginManager.register_plugin(
-    IDataFormat, ArrowFileFormat,
-    ["ARROW_FILE", ".arrow", "application/vnd.apache.arrow.file", "application/x-apache-arrow-file"])
-
-# Mime type for Parquet is not registered yet! But there is an issue open to register one:
-# https://issues.apache.org/jira/browse/PARQUET-1889
-plugins.PluginManager.register_plugin(
-    IDataFormat, ParquetStorageFormat,
-    ["PARQUET", ".parquet", "application/vnd.apache.parquet"])
 
 plugins.PluginManager.register_plugin(
     IDataFormat, csv_codec.CsvStorageFormat,
