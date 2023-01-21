@@ -82,9 +82,9 @@ public class ArrowSchema {
         for (var tracField : tracTableSchema.getFieldsList()) {
 
             var fieldName = tracField.getFieldName();
-            var nullable = !tracField.getBusinessKey();  // only business keys are not nullable
-
             var arrowType = TRAC_ARROW_TYPE_MAPPING.get(tracField.getFieldType());
+            var notNull = tracField.getBusinessKey() || tracField.getNotNull();
+            var nullable = !notNull;
 
             // Unexpected error - All TRAC primitive types are mapped
             if (arrowType == null)
@@ -110,6 +110,7 @@ public class ArrowSchema {
 
             var arrowTypeId = arrowField.getType().getTypeID();
             var tracType = ARROW_TRAC_TYPE_MAPPING.get(arrowTypeId);
+            var notNull = ! arrowField.isNullable();
 
             if (tracType == null) {
                 var arrowTypeName = arrowField.getType().getTypeID().name();
@@ -120,7 +121,8 @@ public class ArrowSchema {
             tracTableSchema.addFields(FieldSchema.newBuilder()
                     .setFieldName(fieldName)
                     .setFieldOrder(fieldIndex)
-                    .setFieldType(tracType));
+                    .setFieldType(tracType)
+                    .setNotNull(notNull));
 
             // Not attempting to set business key, categorical flag, format code or label
             // Categorical *could* be inferred for Arrow dictionary vectors
