@@ -204,11 +204,17 @@ class DataMapping:
         if trac_schema.schemaType != _meta.SchemaType.TABLE:
             raise _ex.ETracInternal(f"Schema type [{trac_schema.schemaType}] cannot be converted for Apache Arrow")
 
-        arrow_fields = [
-            (f.fieldName, cls.trac_to_arrow_basic_type(f.fieldType))
-            for f in trac_schema.table.fields]
+        arrow_fields = list(map(cls.trac_to_arrow_field, trac_schema.table.fields))
 
         return pa.schema(arrow_fields, metadata={})
+
+    @classmethod
+    def trac_to_arrow_field(cls, trac_field: _meta.FieldSchema):
+
+        arrow_type = cls.trac_to_arrow_basic_type(trac_field.fieldType)
+        nullable = not trac_field.notNull if trac_field.notNull is not None else not trac_field.businessKey
+
+        return pa.field(trac_field.fieldName, arrow_type, nullable)
 
     @classmethod
     def trac_arrow_decimal_type(cls) -> pa.Decimal128Type:
