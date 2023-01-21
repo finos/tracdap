@@ -86,16 +86,6 @@ class FormatManager:
         return spec.format_code.lower()
 
     @classmethod
-    def extension_for_format(cls, format_code: str) -> str:
-
-        spec = cls.__formats.get(format_code.lower())
-
-        if spec is None:
-            raise _ex.EStorageConfig(f"Unsupported storage format [{format_code}]")
-
-        return spec.format_ext
-
-    @classmethod
     def format_for_extension(cls, extension: str) -> str:
 
         if extension.startswith("."):
@@ -225,7 +215,7 @@ class CommonDataStorage(IDataStorage):
                     format_prop_key = prop_key[len(format_code) + 1:]
                     format_options[format_prop_key] = prop_value
 
-            format_impl = FormatManager.get_data_format(storage_format, format_options)
+            codec = FormatManager.get_data_format(storage_format, format_options)
 
             stat = self.__file_storage.stat(storage_path)
 
@@ -239,7 +229,7 @@ class CommonDataStorage(IDataStorage):
                     raise NotImplementedError("Directory storage format not available yet")
 
             with self.__file_storage.read_byte_stream(storage_path) as byte_stream:
-                table = format_impl.read_table(byte_stream, schema)
+                table = codec.read_table(byte_stream, schema)
 
             if schema is not None:
                 # Apply conformance, in case the format was not able to apply it fully on read
@@ -267,14 +257,14 @@ class CommonDataStorage(IDataStorage):
 
         try:
 
-            format_impl = FormatManager.get_data_format(storage_format, storage_options)
-            format_extension = FormatManager.extension_for_format(storage_format)
+            codec = FormatManager.get_data_format(storage_format, storage_options)
+            extension = codec.default_file_extension()
 
             # TODO: Full handling of directory storage formats
 
-            if not storage_path.endswith(format_extension):
+            if not storage_path.endswith(extension):
                 parent_dir_ = storage_path
-                storage_path_ = storage_path.rstrip("/\\") + f"/chunk-0.{format_extension}"
+                storage_path_ = storage_path.rstrip("/\\") + f"/chunk-0.{extension}"
                 self.__file_storage.mkdir(parent_dir_, True, exists_ok=overwrite)
             else:
                 parent_dir_ = str(pathlib.PurePath(storage_path).parent)
@@ -282,7 +272,7 @@ class CommonDataStorage(IDataStorage):
                 self.__file_storage.mkdir(parent_dir_, True, True)
 
             with self.__file_storage.write_byte_stream(storage_path_, overwrite=overwrite) as byte_stream:
-                format_impl.write_table(byte_stream, table)
+                codec.write_table(byte_stream, table)
 
         except (_ex.EStorage, _ex.EData) as e:
             err = f"Failed to write table [{storage_path}]: {str(e)}"
@@ -317,9 +307,14 @@ class CommonDataStorage(IDataStorage):
 
 class ArrowFileFormat(IDataFormat):
 
+    DEFAULT_FILE_EXTENSION = "arrow"
+
     def __init__(self, format_options: tp.Dict[str, tp.Any] = None):
         self._format_options = format_options
         self._log = _util.logger_for_object(self)
+
+    def default_file_extension(self) -> str:
+        return self.DEFAULT_FILE_EXTENSION
 
     def read_table(self, source: tp.BinaryIO, schema: tp.Optional[pa.Schema]) -> pa.Table:
 
@@ -342,9 +337,14 @@ class ArrowFileFormat(IDataFormat):
 
 class ParquetStorageFormat(IDataFormat):
 
+    DEFAULT_FILE_EXTENSION = "parquet"
+
     def __init__(self, format_options: tp.Dict[str, tp.Any] = None):
         self._format_options = format_options
         self._log = _util.logger_for_object(self)
+
+    def default_file_extension(self) -> str:
+        return self.DEFAULT_FILE_EXTENSION
 
     def read_table(self, source: tp.BinaryIO, schema: tp.Optional[pa.Schema]) -> pa.Table:
 

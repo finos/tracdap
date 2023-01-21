@@ -135,6 +135,10 @@ class IDataStorage:
 class IDataFormat:
 
     @abc.abstractmethod
+    def default_file_extension(self) -> str:
+        pass
+
+    @abc.abstractmethod
     def read_table(self, source: tp.BinaryIO, schema: tp.Optional[pa.Schema]) -> pa.Table:
         pass
 
