@@ -239,6 +239,7 @@ def define_field(
         label: str,
         business_key: bool = False,
         categorical: bool = False,
+        not_null: _tp.Optional[bool] = False,
         format_code: _tp.Optional[str] = None,
         field_order: _tp.Optional[int] = None) \
         -> FieldSchema:
@@ -249,12 +250,14 @@ def define_field(
     Individual fields in a dataset can be defined using this method or the shorthand alias :py:func:`F`.
     The name, type and label of a field are always required.
     The business_key and categorical flags are false by default.
+    The not_null flag is false by default unless the field is a business key, in which case it is true by default.
+    Explicitly specifying not_null=False for a business key will cause a validation error.
     Format code is optional.
 
     If no field ordering is supplied, fields will automatically be assigned a contiguous ordering starting at 0.
     In this case care must be taken when creating an updated version of a model, that the order of existing
     fields is not disturbed. Adding fields to the end of a list is always safe.
-    If field orders are specified explicitly, the must for a contiguous ordering starting at 0.
+    If field orders are specified explicitly, they must form a contiguous ordering starting at 0.
 
     Once defined field schemas can be passed to :py:func:`define_input_table` or :py:func:`define_output_table`,
     either as a list or as individual arguments, to create the full schema for an input or output.
@@ -264,6 +267,7 @@ def define_field(
     :param label: A descriptive label for the field (required)
     :param business_key: Flag indicating whether this field is a business key for its dataset (default: False)
     :param categorical: Flag indicating whether this is a categorical field (default: False)
+    :param not_null: Whether this field has a not null constraint (default: True for business keys, false otherwise)
     :param format_code: A code that can be interpreted by client applications to format the field (optional)
     :param field_order: Explicit field ordering (optional)
     :return: A field schema, suitable for use in a schema definition
@@ -273,6 +277,7 @@ def define_field(
     :type label: str
     :type business_key: bool
     :type categorical: bool
+    :type not_null: _tp.Optional[bool]
     :type format_code: _tp.Optional[str]
     :type field_order: _tp.Optional[int]
     :rtype: :py:class:`FieldSchema <tracdap.rt.metadata.FieldSchema>`
@@ -282,7 +287,7 @@ def define_field(
 
     return sa.define_field(
         field_name, field_type, label,
-        business_key, categorical,
+        business_key, categorical, not_null,
         format_code, field_order)
 
 
@@ -292,6 +297,7 @@ def declare_field(
         label: str,
         business_key: bool = False,
         categorical: bool = False,
+        not_null: _tp.Optional[bool] = False,
         format_code: _tp.Optional[str] = None,
         field_order: _tp.Optional[int] = None) \
         -> FieldSchema:
@@ -305,6 +311,7 @@ def declare_field(
     :type label: str
     :type business_key: bool
     :type categorical: bool
+    :type not_null: _tp.Optional[bool]
     :type format_code: _tp.Optional[str]
     :type field_order: _tp.Optional[int]
     :rtype: :py:class:`FieldSchema <tracdap.rt.metadata.FieldSchema>`
@@ -312,7 +319,7 @@ def declare_field(
 
     return define_field(
         field_name, field_type, label,
-        business_key, categorical,
+        business_key, categorical, not_null,
         format_code, field_order)
 
 
@@ -322,6 +329,7 @@ def F(  # noqa
         label: str,
         business_key: bool = False,
         categorical: bool = False,
+        not_null: _tp.Optional[bool] = False,
         format_code: _tp.Optional[str] = None,
         field_order: _tp.Optional[int] = None) \
         -> FieldSchema:
@@ -334,6 +342,7 @@ def F(  # noqa
     :type label: str
     :type business_key: bool
     :type categorical: bool
+    :type not_null: _tp.Optional[bool]
     :type format_code: _tp.Optional[str]
     :type field_order: _tp.Optional[int]
     :rtype: :py:class:`FieldSchema <tracdap.rt.metadata.FieldSchema>`
@@ -341,7 +350,7 @@ def F(  # noqa
 
     return define_field(
         field_name, field_type, label,
-        business_key, categorical,
+        business_key, categorical, not_null,
         format_code, field_order)
 
 

@@ -96,13 +96,18 @@ class StaticApiImpl(_StaticApiHook):
 
     def define_field(
             self, field_name: str, field_type: _meta.BasicType, label: str,
-            business_key: bool = False, categorical: bool = False,
+            business_key: bool = False, categorical: bool = False, not_null: _tp.Optional[bool] = None,
             format_code: _tp.Optional[str] = None, field_order: _tp.Optional[int] = None) \
             -> _meta.FieldSchema:
 
         _val.validate_signature(
             self.define_field, field_name, field_type, label,
-            business_key, categorical, format_code, field_order)
+            business_key, categorical, not_null,
+            format_code, field_order)
+
+        # Set the not_null flag for business keys if it is not specified
+        if not_null is None:
+            not_null = business_key
 
         return _meta.FieldSchema(
             field_name,
@@ -111,6 +116,7 @@ class StaticApiImpl(_StaticApiHook):
             label,
             businessKey=business_key,
             categorical=categorical,
+            notNull=not_null,
             formatCode=format_code)
 
     def define_schema(
