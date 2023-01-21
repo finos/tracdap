@@ -33,7 +33,8 @@ from tracdap.rt.ext.storage import IDataFormat
 
 class CsvStorageFormat(IDataFormat):
 
-    DEFAULT_FILE_EXTENSION = "csv"
+    FORMAT_CODE = "CSV"
+    FILE_EXTENSION = "csv"
 
     __LENIENT_CSV_PARSER = "lenient_csv_parser"
     __DATE_FORMAT = "date_format"
@@ -99,8 +100,11 @@ class CsvStorageFormat(IDataFormat):
         except EncodingWarning:
             raise _ex.EConfigParse(f"Invalid datetime format for CSV storage: [{datetime_format}]")
 
-    def default_file_extension(self) -> str:
-        return self.DEFAULT_FILE_EXTENSION
+    def format_code(self) -> str:
+        return self.FORMAT_CODE
+
+    def file_extension(self) -> str:
+        return self.FILE_EXTENSION
 
     def read_table(self, source: tp.BinaryIO, schema: tp.Optional[pa.Schema]) -> pa.Table:
 

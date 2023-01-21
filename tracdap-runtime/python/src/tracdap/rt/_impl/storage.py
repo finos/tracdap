@@ -13,7 +13,7 @@
 #  limitations under the License.
 
 import pathlib
-import dataclasses as dc
+import re
 import typing as tp
 
 import pyarrow as pa
@@ -23,6 +23,7 @@ import pyarrow.parquet as pa_pq
 import tracdap.rt.metadata as _meta
 import tracdap.rt.config as _cfg
 import tracdap.rt.exceptions as _ex
+import tracdap.rt.ext.plugins as plugins
 import tracdap.rt._impl.data as _data
 import tracdap.rt._impl.util as _util
 import tracdap.rt._impl.csv_codec as csv_codec
@@ -33,70 +34,21 @@ from tracdap.rt.ext.storage import IDataFormat, IDataStorage, IFileStorage, File
 
 class FormatManager:
 
-    @dc.dataclass
-    class _FormatSpec:
-        format_class: IDataFormat.__class__
-        format_code: str
-        format_ext: str
-
-    __formats: tp.Dict[str, _FormatSpec] = dict()
-    __extensions: tp.Dict[str, _FormatSpec] = dict()
-
-    @classmethod
-    def register_data_format(
-            cls, format_impl: IDataFormat.__class__,
-            format_code: str, format_ext: str,
-            extra_codes: tp.List[str] = None,
-            extra_ext: tp.List[str] = None):
-
-        if format_ext.startswith("."):
-            format_ext = format_ext[1:]
-
-        spec = cls._FormatSpec(format_impl, format_code, format_ext)
-
-        cls.__formats[format_code.lower()] = spec
-        cls.__extensions[format_ext.lower()] = spec
-
-        if extra_codes:
-            for code in extra_codes:
-                cls.__formats[code.lower()] = spec
-
-        if extra_ext:
-            for ext in extra_ext:
-                cls.__extensions[ext.lower()] = spec
-
     @classmethod
     def get_data_format(cls, format_code: str, format_options: tp.Dict[str, tp.Any]) -> IDataFormat:
 
-        spec = cls.__formats.get(format_code.lower())
+        try:
+            config = _cfg.PluginConfig(format_code, format_options)
+            return plugins.PluginManager.load_plugin(IDataFormat, config)
 
-        if spec is None:
-            raise _ex.EStorageConfig(f"Unsupported storage format [{format_code}]")
-
-        return spec.format_class.__call__(format_options)
+        except _ex.EPluginNotAvailable as e:
+            raise _ex.EStorageConfig(f"Unsupported storage format [{format_code}]") from e
 
     @classmethod
     def primary_format_code(cls, format_code: str) -> str:
 
-        spec = cls.__formats.get(format_code.lower())
-
-        if spec is None:
-            raise _ex.EStorageConfig(f"Unsupported storage format [{format_code}]")
-
-        return spec.format_code.lower()
-
-    @classmethod
-    def format_for_extension(cls, extension: str) -> str:
-
-        if extension.startswith("."):
-            extension = extension[1:]
-
-        spec = cls.__extensions.get(extension)
-
-        if spec is None:
-            raise _ex.EStorageConfig(f"No storage format is registered for file extension [{extension}]")
-
-        return spec.format_code
+        codec = cls.get_data_format(format_code, format_options={})
+        return codec.format_code()
 
 
 class StorageManager:
@@ -207,15 +159,20 @@ class CommonDataStorage(IDataStorage):
 
         try:
 
+            codec_properties = storage_options.copy() if storage_options else dict()
+
+            # Codec properties can be specified in the storage config
+            # Properties starting with the codec format code are considered codec properties
+
             format_code = FormatManager.primary_format_code(storage_format)
-            format_options = storage_options.copy() if storage_options else dict()
+            format_code_pattern = re.compile(f"^{format_code}.", re.IGNORECASE)
 
             for prop_key, prop_value in self.__config.properties.items():
-                if prop_key.startswith(f"{format_code}."):
+                if format_code_pattern.match(prop_key):
                     format_prop_key = prop_key[len(format_code) + 1:]
-                    format_options[format_prop_key] = prop_value
+                    codec_properties[format_prop_key] = prop_value
 
-            codec = FormatManager.get_data_format(storage_format, format_options)
+            codec = FormatManager.get_data_format(storage_format, codec_properties)
 
             stat = self.__file_storage.stat(storage_path)
 
@@ -258,7 +215,7 @@ class CommonDataStorage(IDataStorage):
         try:
 
             codec = FormatManager.get_data_format(storage_format, storage_options)
-            extension = codec.default_file_extension()
+            extension = codec.file_extension()
 
             # TODO: Full handling of directory storage formats
 
@@ -307,14 +264,18 @@ class CommonDataStorage(IDataStorage):
 
 class ArrowFileFormat(IDataFormat):
 
-    DEFAULT_FILE_EXTENSION = "arrow"
+    FORMAT_CODE = "ARROW_FILE"
+    FILE_EXTENSION = "arrow"
 
     def __init__(self, format_options: tp.Dict[str, tp.Any] = None):
         self._format_options = format_options
         self._log = _util.logger_for_object(self)
 
-    def default_file_extension(self) -> str:
-        return self.DEFAULT_FILE_EXTENSION
+    def format_code(self) -> str:
+        return self.FORMAT_CODE
+
+    def file_extension(self) -> str:
+        return self.FILE_EXTENSION
 
     def read_table(self, source: tp.BinaryIO, schema: tp.Optional[pa.Schema]) -> pa.Table:
 
@@ -337,14 +298,18 @@ class ArrowFileFormat(IDataFormat):
 
 class ParquetStorageFormat(IDataFormat):
 
-    DEFAULT_FILE_EXTENSION = "parquet"
+    FORMAT_CODE = "PARQUET"
+    FILE_EXTENSION = "parquet"
 
     def __init__(self, format_options: tp.Dict[str, tp.Any] = None):
         self._format_options = format_options
         self._log = _util.logger_for_object(self)
 
-    def default_file_extension(self) -> str:
-        return self.DEFAULT_FILE_EXTENSION
+    def format_code(self) -> str:
+        return self.FORMAT_CODE
+
+    def file_extension(self) -> str:
+        return self.FILE_EXTENSION
 
     def read_table(self, source: tp.BinaryIO, schema: tp.Optional[pa.Schema]) -> pa.Table:
 
@@ -362,18 +327,16 @@ class ParquetStorageFormat(IDataFormat):
         pa_pq.write_table(table, target)
 
 
-FormatManager.register_data_format(
-    ArrowFileFormat, "ARROW_FILE", ".arrow",
-    extra_codes=[
-        "application/vnd.apache.arrow.file",
-        "application/x-apache-arrow-file"])
+plugins.PluginManager.register_plugin(
+    IDataFormat, ArrowFileFormat,
+    ["ARROW_FILE", ".arrow", "application/vnd.apache.arrow.file", "application/x-apache-arrow-file"])
 
 # Mime type for Parquet is not registered yet! But there is an issue open to register one:
 # https://issues.apache.org/jira/browse/PARQUET-1889
-FormatManager.register_data_format(
-    ParquetStorageFormat, "PARQUET", ".parquet",
-    extra_codes=["application/vnd.apache.parquet"])
+plugins.PluginManager.register_plugin(
+    IDataFormat, ParquetStorageFormat,
+    ["PARQUET", ".parquet", "application/vnd.apache.parquet"])
 
-FormatManager.register_data_format(
-    csv_codec.CsvStorageFormat, "CSV", ".csv",
-    extra_codes=["text/csv"])
+plugins.PluginManager.register_plugin(
+    IDataFormat, csv_codec.CsvStorageFormat,
+    ["CSV", ".csv", "text/csv"])

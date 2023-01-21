@@ -135,7 +135,11 @@ class IDataStorage:
 class IDataFormat:
 
     @abc.abstractmethod
-    def default_file_extension(self) -> str:
+    def format_code(self) -> str:
+        pass
+
+    @abc.abstractmethod
+    def file_extension(self) -> str:
         pass
 
     @abc.abstractmethod
