@@ -335,6 +335,9 @@ class _StaticValidator:
         if field.categorical and field.fieldType != meta.BasicType.STRING:
             cls._fail(f"Invalid {property_type}: [{field.fieldName}] fieldType {field.fieldType} used as categorical")
 
+        if field.businessKey and not field.notNull:
+            cls._fail(f"Invalid {property_type}: [{field.fieldName}] is a business key but not_null = False")
+
     @classmethod
     def _valid_identifiers(cls, keys, property_type):
 
