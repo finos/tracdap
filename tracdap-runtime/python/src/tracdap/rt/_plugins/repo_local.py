@@ -28,9 +28,6 @@ class IntegratedSource(IModelRepository):
     def __init__(self, properties: tp.Dict[str, str]):
         self._properties = properties
 
-    def checkout_key(self, model_def: meta.ModelDefinition):
-        return "trac_integrated"
-
     def package_path(
             self, model_def: meta.ModelDefinition,
             checkout_dir: pathlib.Path) -> tp.Optional[pathlib.Path]:
@@ -57,9 +54,6 @@ class LocalRepository(IModelRepository):
 
         if not self._repo_url:
             raise ex.EConfigParse(f"Missing required property [{self.REPO_URL_KEY}] in local repository config")
-
-    def checkout_key(self, model_def: meta.ModelDefinition):
-        return "trac_local"
 
     def package_path(
             self, model_def: meta.ModelDefinition,

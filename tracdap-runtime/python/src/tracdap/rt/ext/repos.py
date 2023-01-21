@@ -22,25 +22,6 @@ import tracdap.rt.metadata as _meta
 class IModelRepository:
 
     @abc.abstractmethod
-    def checkout_key(self, model_def: _meta.ModelDefinition) -> str:
-
-        """
-        A unique key identifying the checkout required for the given model definition.
-
-        For example, in Git repositories the checkout key might be a commit hash or tag.
-        For binary packages in Nexus, the checkout key might involve both package and version.
-        Other repositories might need to use the path as well.
-
-        This key is used to avoid duplicate checkouts. So for example, if several models exist in
-        the same version of a package, returning the same key will mean the checkout is only performed once.
-
-        :param model_def: Model to request a checkout key for
-        :return: Checkout key for the given model
-        """
-
-        pass
-
-    @abc.abstractmethod
     def package_path(
             self, model_def: _meta.ModelDefinition,
             checkout_dir: pathlib.Path) \

@@ -67,9 +67,6 @@ class PyPiRepository(IModelRepository):
             message = f"Neither [{self.PIP_INDEX_KEY}] nor [{self.PIP_INDEX_URL_KEY} is set in PyPi repository config"
             raise ex.EConfigParse(message)
 
-    def checkout_key(self, model_def: meta.ModelDefinition):
-        return model_def.version
-
     def package_path(
             self, model_def: meta.ModelDefinition,
             checkout_dir: pathlib.Path) -> tp.Optional[pathlib.Path]:

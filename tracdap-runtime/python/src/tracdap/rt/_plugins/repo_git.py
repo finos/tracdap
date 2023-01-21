@@ -48,9 +48,6 @@ class GitRepository(IModelRepository):
 
         self._repo_url = _helpers.apply_http_credentials(repo_url, credentials)
 
-    def checkout_key(self, model_def: meta.ModelDefinition):
-        return model_def.version
-
     def package_path(
             self, model_def: meta.ModelDefinition,
             checkout_dir: pathlib.Path) -> tp.Optional[pathlib.Path]:

@@ -79,6 +79,18 @@ class ModelLoader:
         # If the flag is set, all scratch content should be left behind
         # This can be for debugging, or because the scratch data is written to an ephemeral volume
 
+    @staticmethod
+    def model_checkout_key(model_def: _meta.ModelDefinition):
+
+        # The "packageGroup" field is optional and may not be present for some repo types
+        # The "package" field remains optional until the 0.6 metadata upgrade
+
+        group = model_def.packageGroup or "-"
+        package = model_def.package or "-"
+        version = model_def.version
+
+        return f"{group}/{package}/{version}"
+
     def load_model_class(self, scope: str, model_def: _meta.ModelDefinition) -> _api.TracModel.__class__:
 
         scope_state = self.__scopes[scope]
@@ -92,7 +104,7 @@ class ModelLoader:
         self.__log.info(f"Loading model [{model_def.entryPoint}] (version=[{model_def.version}], scope=[{scope}])...")
 
         repo = self.__repos.get_repository(model_def.repository)
-        checkout_key = repo.checkout_key(model_def)
+        checkout_key = self.model_checkout_key(model_def)
         checkout_subdir = pathlib.Path(checkout_key)
 
         # Make sure the checkout key is safe to use as a directory name
