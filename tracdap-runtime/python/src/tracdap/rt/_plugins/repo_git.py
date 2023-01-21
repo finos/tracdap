@@ -12,8 +12,9 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import subprocess
+import pathlib
 import subprocess as sp
+import typing as tp
 import urllib.parse
 import time
 
@@ -50,7 +51,7 @@ class GitRepository(IModelRepository):
 
     def package_path(
             self, model_def: meta.ModelDefinition,
-            checkout_dir: pathlib.Path) -> tp.Optional[pathlib.Path]:
+            checkout_dir: pathlib.Path) -> pathlib.Path:
 
         return checkout_dir.joinpath(model_def.path)
 
@@ -83,7 +84,7 @@ class GitRepository(IModelRepository):
             # Workaround: Explicitly take ownership of the repo directory, always, before starting the checkout
             try:
                 self._log.info(f"Fixing filesystem permissions for [{checkout_dir}]")
-                subprocess.run(f"takeown /f \"{checkout_dir}\"")
+                sp.run(f"takeown /f \"{checkout_dir}\"")
             except Exception:  # noqa
                 self._log.info(f"Failed to fix filesystem permissions, this might prevent checkout from succeeding")
 

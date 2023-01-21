@@ -12,20 +12,19 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import abc
-import pathlib
-import typing as tp
+import abc as _abc
+import pathlib as _pathlib
 
 import tracdap.rt.metadata as _meta
 
 
 class IModelRepository:
 
-    @abc.abstractmethod
+    @_abc.abstractmethod
     def do_checkout(
             self, model_def: _meta.ModelDefinition,
-            checkout_dir: pathlib.Path) \
-            -> tp.Optional[pathlib.Path]:
+            checkout_dir: _pathlib.Path) \
+            -> _pathlib.Path:
 
         """
         Perform a checkout for the given model definition, into the supplied checkout dir.
@@ -50,11 +49,11 @@ class IModelRepository:
 
         pass
 
-    @abc.abstractmethod
+    @_abc.abstractmethod
     def package_path(
             self, model_def: _meta.ModelDefinition,
-            checkout_dir: pathlib.Path) \
-            -> tp.Optional[pathlib.Path]:
+            checkout_dir: _pathlib.Path) \
+            -> _pathlib.Path:
 
         """
         Get the package path that would be returned by :py:meth:`do_checkout()`,

@@ -14,7 +14,9 @@
 
 import html.parser
 import json.decoder
+import pathlib
 import re
+import typing as tp
 import urllib.parse
 import zipfile
 import io
@@ -69,11 +71,11 @@ class PyPiRepository(IModelRepository):
 
     def package_path(
             self, model_def: meta.ModelDefinition,
-            checkout_dir: pathlib.Path) -> tp.Optional[pathlib.Path]:
+            checkout_dir: pathlib.Path) -> pathlib.Path:
 
         return checkout_dir
 
-    def do_checkout(self, model_def: meta.ModelDefinition, checkout_dir: pathlib.Path) -> tp.Optional[pathlib.Path]:
+    def do_checkout(self, model_def: meta.ModelDefinition, checkout_dir: pathlib.Path) -> pathlib.Path:
 
         self._log.info(
             f"PyPI checkout: repo = [{model_def.repository}], " +

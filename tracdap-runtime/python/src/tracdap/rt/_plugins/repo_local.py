@@ -12,6 +12,9 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import pathlib
+import typing as tp
+
 import tracdap.rt.metadata as meta
 import tracdap.rt.exceptions as ex
 
@@ -32,12 +35,14 @@ class IntegratedSource(IModelRepository):
             self, model_def: meta.ModelDefinition,
             checkout_dir: pathlib.Path) -> tp.Optional[pathlib.Path]:
 
+        # Integrated repo does not have a package path, since it is loading from the Python path
+
         return None
 
     def do_checkout(
             self, model_def: meta.ModelDefinition,
             checkout_dir: tp.Union[str, pathlib.Path]) \
-            -> None:
+            -> tp.Optional[pathlib.Path]:
 
         # For the integrated repo there is nothing to check out
 
@@ -57,7 +62,7 @@ class LocalRepository(IModelRepository):
 
     def package_path(
             self, model_def: meta.ModelDefinition,
-            checkout_dir: pathlib.Path) -> tp.Optional[pathlib.Path]:
+            checkout_dir: pathlib.Path) -> pathlib.Path:
 
         checkout_path = pathlib.Path(self._repo_url).joinpath(model_def.path)
 
