@@ -22,26 +22,6 @@ import tracdap.rt.metadata as _meta
 class IModelRepository:
 
     @abc.abstractmethod
-    def package_path(
-            self, model_def: _meta.ModelDefinition,
-            checkout_dir: pathlib.Path) \
-            -> tp.Optional[pathlib.Path]:
-
-        """
-        Get the root directory for package loading, assuming the model is checked out in the supplied directory.
-        The package directory will contain the Python package for the model described by the model definition,
-        it can be used as a package root (Python source root) by the TRAC model loading mechanism.
-
-        For example, in Git repositories this will be the path from the model definition, relative to the checkout dir.
-
-        :param model_def: Model for which the package path is requested
-        :param checkout_dir: Directory where the model is checked out (checkout must have happened previously)
-        :return: A package root directory, containing the Python package of the requested model
-        """
-
-        pass
-
-    @abc.abstractmethod
     def do_checkout(
             self, model_def: _meta.ModelDefinition,
             checkout_dir: pathlib.Path) \
@@ -50,12 +30,46 @@ class IModelRepository:
         """
         Perform a checkout for the given model definition, into the supplied checkout dir.
 
-        The checkout dir must be empty before this method is called.
-        The return value is the package path for the model, as per :py:meth:`package_path()`.
+        The checkout dir will be empty before this method is called.
+
+        The return value is the path given to the module loader, to load the model.
+        I.e. it should contain the root packages / modules that the model will load.
+
+        Repo implementations are free to put packages directly into checkout_dir,
+        in which case the return value should be checkout_dir. It may be helpful to
+        create a folder structure inside checkout_dir, e.g. to separate temporary files,
+        in which case the return value will be a subfolder of checkout_dir containing
+        just the model packages to be loaded. Source repositories are likely to have a
+        folder structure in the model repo itself, for example in a source repository where
+        the root source folder is "src", the return value might be <checkout_dir>/src.
 
         :param model_def: The model to check out
         :param checkout_dir: Empty directory into which the checkout will be performed
-        :return: The package path for the model, as per :py:meth:`package_path()`.
+        :return: Path for the root packages / modules that the model will load
+        """
+
+        pass
+
+    @abc.abstractmethod
+    def package_path(
+            self, model_def: _meta.ModelDefinition,
+            checkout_dir: pathlib.Path) \
+            -> tp.Optional[pathlib.Path]:
+
+        """
+        Get the package path that would be returned by :py:meth:`do_checkout()`,
+        for the given checkout_dir and model_dir, without doing a checkout.
+
+        This is used by the loader mechanism to avoid repeating the same checkout multiple times.
+        E.g. if there are multiple models or resources being loaded from the same package,
+        or if a model is referenced multiple times.
+
+        This method is always required and may be called before :py:meth:`do_checkout()`.
+        The return value should be deterministic for a given model_def and checkout_dir.
+
+        :param model_def: Model for which the package path is requested
+        :param checkout_dir: Directory where the model is (or will be) checked out
+        :return: Path for the root packages / modules that the model will load
         """
 
         pass
