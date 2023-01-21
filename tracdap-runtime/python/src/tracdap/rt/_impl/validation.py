@@ -329,6 +329,9 @@ class _StaticValidator:
         if field.fieldType not in cls.__PRIMITIVE_TYPES:
             cls._fail(f"Invalid {property_type}: [{field.fieldName}] fieldType is not a primitive type")
 
+        if field.label is None or len(field.label.strip()) == 0:
+            cls._fail(f"Invalid {property_type}: [{field.fieldName}] label is missing or blank")
+
         if field.businessKey and field.fieldType not in cls.__BUSINESS_KEY_TYPES:
             cls._fail(f"Invalid {property_type}: [{field.fieldName}] fieldType {field.fieldType} used as business key")
 
