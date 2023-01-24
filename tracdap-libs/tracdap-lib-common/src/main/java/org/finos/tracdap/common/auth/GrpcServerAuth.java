@@ -16,14 +16,12 @@
 
 package org.finos.tracdap.common.auth;
 
-import io.grpc.*;
 import org.finos.tracdap.common.auth.internal.JwtValidator;
 import org.finos.tracdap.common.auth.internal.UserInfo;
-import org.finos.tracdap.common.config.ConfigKeys;
-import org.finos.tracdap.common.config.ConfigManager;
-import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.config.AuthenticationConfig;
-import org.finos.tracdap.config.PlatformInfo;
+
+import io.grpc.*;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -40,57 +38,7 @@ public class GrpcServerAuth implements ServerInterceptor {
     private final AuthenticationConfig authConfig;
     private final JwtValidator jwt;
 
-    public static GrpcServerAuth setupAuth(
-            AuthenticationConfig authConfig,
-            PlatformInfo platformInfo,
-            ConfigManager configManager) {
-
-        // Do not allow turning off the authentication mechanism in production!
-        if (platformInfo.getProduction()) {
-
-            if (authConfig.getDisableAuth() || authConfig.getDisableSigning()) {
-
-                var message = String.format(
-                        "Authentication and token signing must be enabled in production environment [%s]",
-                        platformInfo.getEnvironment());
-
-                log.error(message);
-                throw new EStartup(message);
-            }
-        }
-
-        if (authConfig.getDisableAuth()) {
-
-            log.warn("!!!!! AUTHENTICATION IS DISABLED (do not use this setting in production)");
-
-            return new GrpcServerAuth(authConfig, null);
-        }
-        else if (authConfig.getDisableSigning()) {
-
-            log.warn("!!!!! SIGNATURE VALIDATION IS DISABLED (do not use this setting in production)");
-
-            var jwt = JwtValidator.configure(authConfig, platformInfo, null);
-            return new GrpcServerAuth(authConfig, jwt);
-        }
-        else if (configManager.hasSecret(ConfigKeys.TRAC_AUTH_PUBLIC_KEY)) {
-
-            var publicKey = configManager.loadPublicKey(ConfigKeys.TRAC_AUTH_PUBLIC_KEY);
-            var jwt = JwtValidator.configure(authConfig, platformInfo, publicKey);
-            return new GrpcServerAuth(authConfig, jwt);
-        }
-        else {
-
-            // Allowing the service to run without validating authentication is hugely risky
-            // Especially because claims can still be added to JWT
-            // The auth-tool utility makes it really easy to set up auth keys on local JKS
-
-            var error = "Root authentication keys are not available, the service will not start";
-            log.error(error);
-            throw new EStartup(error);
-        }
-    }
-
-    GrpcServerAuth(AuthenticationConfig authConfig, JwtValidator jwt) {
+    public GrpcServerAuth(AuthenticationConfig authConfig, JwtValidator jwt) {
         this.authConfig = authConfig;
         this.jwt = jwt;
     }

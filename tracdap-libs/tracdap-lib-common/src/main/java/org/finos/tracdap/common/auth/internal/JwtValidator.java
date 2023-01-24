@@ -16,6 +16,7 @@
 
 package org.finos.tracdap.common.auth.internal;
 
+import org.finos.tracdap.config.AuthenticationConfig;
 import org.finos.tracdap.common.config.ConfigDefaults;
 import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.common.exception.EUnexpected;
@@ -25,8 +26,6 @@ import com.auth0.jwt.JWTVerifier;
 import com.auth0.jwt.RegisteredClaims;
 import com.auth0.jwt.algorithms.Algorithm;
 import com.auth0.jwt.exceptions.JWTVerificationException;
-import org.finos.tracdap.config.AuthenticationConfig;
-import org.finos.tracdap.config.PlatformInfo;
 
 import java.security.KeyPair;
 import java.security.PublicKey;
@@ -48,33 +47,7 @@ public class JwtValidator {
 
     private final JWTVerifier verifier;
 
-    public static JwtValidator configure(AuthenticationConfig authConfig, PlatformInfo platformInfo, PublicKey publicKey) {
-
-        // Allow disabling signing in non-prod environments only
-        if (authConfig.getDisableSigning()) {
-
-            if (platformInfo.getProduction()) {
-
-                var message = String.format(
-                        "Token signing must be enabled in production environment [%s]",
-                        platformInfo.getEnvironment());
-
-                throw new EStartup(message);
-            }
-
-            return new JwtProcessor(authConfig, Algorithm.none());
-        }
-
-        // If the key pair is missing but signing is not disabled, this is an error
-        if (publicKey == null) {
-            throw new EStartup("Root authentication key is not available (do you need to run auth-tool)?");
-        }
-
-        var algorithm = chooseAlgorithm(publicKey);
-        return new JwtValidator(authConfig, algorithm);
-    }
-
-    JwtValidator(AuthenticationConfig authConfig, Algorithm algorithm) {
+    public JwtValidator(AuthenticationConfig authConfig, Algorithm algorithm) {
 
         this.algorithm = algorithm;
 
@@ -138,7 +111,7 @@ public class JwtValidator {
         }
     }
 
-    private static Algorithm chooseAlgorithm(PublicKey publicKey) {
+    public static Algorithm chooseAlgorithm(PublicKey publicKey) {
 
         // Should already be checked
         if (publicKey == null)
@@ -146,10 +119,10 @@ public class JwtValidator {
 
         var keyPair = new KeyPair(publicKey, null);
 
-        return chooseAlgorithm(keyPair);
+        return JwtValidator.chooseAlgorithm(keyPair);
     }
 
-    protected static Algorithm chooseAlgorithm(KeyPair keyPair) {
+    public static Algorithm chooseAlgorithm(KeyPair keyPair) {
 
         // Should already be checked
         if (keyPair == null)
