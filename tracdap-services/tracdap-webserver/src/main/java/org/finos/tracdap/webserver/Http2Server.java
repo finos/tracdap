@@ -28,6 +28,12 @@ public class Http2Server extends ChannelInboundHandlerAdapter {
 
     private static final Logger log = LoggerFactory.getLogger(Http2Server.class);
 
+    private final ContentServer contentServer;
+
+    public Http2Server(ContentServer contentServer) {
+        this.contentServer = contentServer;
+    }
+
     @Override
     public void channelRead(@Nonnull ChannelHandlerContext ctx, Object msg) throws Exception {
 

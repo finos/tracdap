@@ -21,6 +21,7 @@ import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.common.plugin.PluginManager;
 import org.finos.tracdap.common.service.CommonServiceBase;
+import org.finos.tracdap.common.storage.IFileStorage;
 import org.finos.tracdap.config.PlatformConfig;
 
 import io.netty.bootstrap.ServerBootstrap;
@@ -65,16 +66,27 @@ public class TracWebServer extends CommonServiceBase {
 
         var serverPort = 8090;
 
-        log.info("Starting the web server on port {}...", serverPort);
-
         platformConfig = configManager.loadRootConfigObject(PlatformConfig.class);
+
+        if (!platformConfig.hasWebServer() || !platformConfig.getWebServer().getEnabled()) {
+
+            var msg = "Web server is not enabled in the TRAC platform configuration";
+            log.error(msg);
+            throw new EStartup(msg);
+        }
+
+        log.info("Starting web server on port [{}]", serverPort);
 
         // JWT processor is responsible for signing and validating auth tokens
         var jwtValidator = AuthSetup.createValidator(platformConfig, configManager);
 
+        var contentRootConfig = platformConfig.getWebServer().getContentRoot();
+        var contentStorage = pluginManager.createService(IFileStorage.class, configManager, contentRootConfig);
+        var contentServer = new ContentServer(contentStorage);
+
         // Handlers for all support protocols
-        var http1Handler = (Supplier<Http1Server>) Http1Server::new;
-        var http2Handler = (Supplier<Http2Server>) Http2Server::new;
+        var http1Handler = (Supplier<Http1Server>) () -> new Http1Server(contentServer);
+        var http2Handler = (Supplier<Http2Server>) () -> new Http2Server(contentServer);
 
         // The protocol negotiator is the top level initializer for new inbound connections
         var protocolNegotiator = new ProtocolNegotiator(jwtValidator, http1Handler, http2Handler);
