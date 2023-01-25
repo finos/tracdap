@@ -16,5 +16,18 @@
 
 package org.finos.tracdap.webserver;
 
+import io.netty.buffer.ByteBuf;
+import io.netty.handler.codec.http.DefaultHttpHeaders;
+import io.netty.handler.codec.http.HttpHeaders;
+import io.netty.handler.codec.http.HttpResponseStatus;
+
+import java.util.concurrent.Flow;
+
 public class ContentResponse {
+
+    HttpResponseStatus statusCode;
+
+    HttpHeaders headers = new DefaultHttpHeaders();
+
+    Flow.Publisher<ByteBuf> reader;
 }

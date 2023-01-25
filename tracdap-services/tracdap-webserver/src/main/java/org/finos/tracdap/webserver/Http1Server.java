@@ -16,39 +16,221 @@
 
 package org.finos.tracdap.webserver;
 
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufAllocator;
+import io.netty.buffer.ByteBufUtil;
+import io.netty.util.concurrent.OrderedEventExecutor;
+import org.finos.tracdap.common.data.DataContext;
+import org.finos.tracdap.common.exception.ENetworkHttp;
+import org.finos.tracdap.common.exception.EUnexpected;
+
+import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
+import io.netty.handler.codec.http.*;
+import io.netty.util.ReferenceCountUtil;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nonnull;
+import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import java.util.List;
+import java.util.concurrent.Flow;
 
 
 public class Http1Server extends ChannelInboundHandlerAdapter {
 
+    private static final List<HttpMethod> SUPPORTED_METHODS = List.of(HttpMethod.HEAD, HttpMethod.GET);
+
     private static final Logger log = LoggerFactory.getLogger(Http1Server.class);
 
     private final ContentServer contentServer;
+
+    private HttpRequest currentRequest;
 
     public Http1Server(ContentServer contentServer) {
         this.contentServer = contentServer;
     }
 
     @Override
-    public void channelRead(@Nonnull ChannelHandlerContext ctx, Object msg) throws Exception {
+    public void channelRead(@Nonnull ChannelHandlerContext ctx, @Nonnull Object msg) throws Exception {
 
-        log.info("Got a message: {}", msg.getClass().getName());
+        try {
 
-        super.channelRead(ctx, msg);
-    }
+            if (!(msg instanceof HttpObject))
+                throw new EUnexpected();
 
-    @Override
-    public void channelReadComplete(ChannelHandlerContext ctx) throws Exception {
-        super.channelReadComplete(ctx);
+            var processed = false;
+
+            if (msg instanceof HttpRequest) {
+
+                if (currentRequest != null) {
+                    throw new EUnexpected();  // TODO: Err pipelining
+                }
+
+                currentRequest = (HttpRequest) msg;
+                processed = true;
+            }
+
+            if (msg instanceof LastHttpContent) {
+                if (currentRequest != null) {
+                    serveRequest(ctx, currentRequest);
+                    currentRequest = null;
+                    processed = true;
+                }
+            }
+
+            if (!processed) {
+
+                if (currentRequest != null && !SUPPORTED_METHODS.contains(currentRequest.method())) {
+
+                    var responseMessage = String.format(
+                            "HTTP method not supported: %s [%s]",
+                            currentRequest.method().name(),
+                            currentRequest.uri());
+
+                    var responseContent = Unpooled.copiedBuffer(responseMessage,StandardCharsets.UTF_8);
+
+                    var response = new DefaultFullHttpResponse(
+                            currentRequest.protocolVersion(),
+                            HttpResponseStatus.METHOD_NOT_ALLOWED,
+                            responseContent);
+
+                    ctx.write(response);
+                    ctx.flush();
+                }
+                else {
+
+                    var responseMessage = "Request could not be understood";
+                    var responseContent = Unpooled.copiedBuffer(responseMessage,StandardCharsets.UTF_8);
+                    var response = new DefaultFullHttpResponse(
+                            currentRequest.protocolVersion(),
+                            HttpResponseStatus.INTERNAL_SERVER_ERROR,
+                            responseContent);
+
+                    ctx.write(response);
+                    ctx.flush();
+
+                }
+
+            }
+        }
+        finally {
+            ReferenceCountUtil.release(msg);
+        }
     }
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
         super.exceptionCaught(ctx, cause);
+    }
+
+    private void serveRequest(ChannelHandlerContext ctx, HttpRequest request) {
+
+        log.info("Request {} [{}]", request.method(), request.uri());
+
+        if (request.method().equals(HttpMethod.HEAD)) {
+            serveHeadRequest(ctx, request);
+        }
+
+        else if (request.method().equals(HttpMethod.GET)) {
+            serveGetRequest(ctx, request);
+        }
+
+        else {
+            var msg = String.format("Unsupported HTTP method in request: %s [%s] ", request.method(), request.uri());
+            log.error(msg);
+            throw new ENetworkHttp(HttpResponseStatus.METHOD_NOT_ALLOWED.code(), msg);
+        }
+    }
+
+    private void serveHeadRequest(ChannelHandlerContext ctx, HttpRequest request) {
+
+        var executor = (OrderedEventExecutor) ctx.executor();
+        var dataCtx = new DataContext(executor, null);
+
+        contentServer.headRequest(request.uri(), dataCtx)
+                .thenAccept(response -> serverHeadResponse(ctx, request, response));
+    }
+
+    private void serverHeadResponse(ChannelHandlerContext ctx, HttpRequest request, ContentResponse serverResponse) {
+
+        var httpResponse = new DefaultFullHttpResponse(
+                request.protocolVersion(),
+                serverResponse.statusCode);
+
+        httpResponse.headers().setAll(serverResponse.headers);
+
+        ctx.write(httpResponse);
+        ctx.flush();
+    }
+
+    private void serveGetRequest(ChannelHandlerContext ctx, HttpRequest request) {
+
+        var executor = (OrderedEventExecutor) ctx.executor();
+        var dataCtx = new DataContext(executor, null);
+
+        contentServer.getRequest(request.uri(), dataCtx)
+                .thenAccept(response -> serveGetResponse(ctx, request, response));
+    }
+
+    private void serveGetResponse(ChannelHandlerContext ctx, HttpRequest request, ContentResponse serverResponse) {
+
+        var httpResponse = new DefaultHttpResponse(
+                request.protocolVersion(),
+                serverResponse.statusCode);
+
+        httpResponse.headers().setAll(serverResponse.headers);
+
+        ctx.write(httpResponse);
+
+        serverResponse.reader.subscribe(new ResponseSender(ctx));
+    }
+
+    private static class ResponseSender implements Flow.Subscriber<ByteBuf> {
+
+        private final ChannelHandlerContext ctx;
+
+        private Flow.Subscription subscription;
+        private long nPending;
+
+        ResponseSender(ChannelHandlerContext ctx) {
+            this.ctx = ctx;
+        }
+
+        @Override
+        public void onSubscribe(Flow.Subscription subscription) {
+            this.subscription = subscription;
+
+            nPending += 32;
+            subscription.request(32);
+        }
+
+        @Override
+        public void onNext(ByteBuf chunk) {
+
+            ctx.write(new DefaultHttpContent(chunk));
+
+            if (nPending < 16) {
+                var nRequest = 32 - nPending;
+                nPending += nRequest;
+                subscription.request(nRequest);
+            }
+        }
+
+        @Override
+        public void onError(Throwable throwable) {
+
+            ctx.close();
+        }
+
+        @Override
+        public void onComplete() {
+
+            ctx.write(new DefaultLastHttpContent());
+            ctx.flush();
+        }
     }
 }
