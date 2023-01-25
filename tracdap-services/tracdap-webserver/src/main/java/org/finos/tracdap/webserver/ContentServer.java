@@ -27,20 +27,26 @@ import org.finos.tracdap.common.storage.IFileStorage;
 
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
 import java.util.function.Function;
+import java.util.regex.Pattern;
 
 
 public class ContentServer {
 
+    private static final Pattern EXTENSION_PATTERN = Pattern.compile(".*\\.([^/?#]+\\Z)");
+
     private final IFileStorage storage;
 
     private final String indexDoc = "index.html";
+    private final Map<String, String> mimeTypes;
 
     public ContentServer(IFileStorage storage) {
         this.storage = storage;
+        this.mimeTypes = MimeTypes.loadMimeTypeMap();
     }
 
     public CompletionStage<ContentResponse> headRequest(String requestUri, IExecutionContext execCtx) {
@@ -108,6 +114,19 @@ public class ContentServer {
         var response = new ContentResponse();
         response.statusCode = HttpResponseStatus.OK;
         response.headers.set(HttpHeaderNames.CONTENT_LENGTH, fileStat.size);
+
+        // Try to match the file extension and set the content-type header
+
+        var extensionMatch = EXTENSION_PATTERN.matcher(fileStat.storagePath);
+
+        if (extensionMatch.matches()) {
+
+            var extension = extensionMatch.group(1);
+            var mimeType = mimeTypes.get(extension);
+
+            if (mimeType != null)
+                response.headers.set(HttpHeaderNames.CONTENT_TYPE, mimeType);
+        }
 
         return response;
     }
