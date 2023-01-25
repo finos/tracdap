@@ -75,26 +75,27 @@ public class TracWebServer extends CommonServiceBase {
             throw new EStartup(msg);
         }
 
-        log.info("Starting web server on port [{}]", serverPort);
+        // TODO: Review configuration of thread pools and channel options
+
+        bossGroup = new NioEventLoopGroup(2, new DefaultThreadFactory("boss"));
+        workerGroup = new NioEventLoopGroup(6, new DefaultThreadFactory("worker"));
 
         // JWT processor is responsible for signing and validating auth tokens
         var jwtValidator = AuthSetup.createValidator(platformConfig, configManager);
 
+        log.info("Accessing storage for content root...");
+
         var contentRootConfig = platformConfig.getWebServer().getContentRoot();
         var contentStorage = pluginManager.createService(IFileStorage.class, configManager, contentRootConfig);
-        var contentServer = new ContentServer(contentStorage);
+        contentStorage.start(workerGroup);
 
         // Handlers for all support protocols
+        var contentServer = new ContentServer(contentStorage);
         var http1Handler = (Supplier<Http1Server>) () -> new Http1Server(contentServer);
         var http2Handler = (Supplier<Http2Server>) () -> new Http2Server(contentServer);
 
         // The protocol negotiator is the top level initializer for new inbound connections
         var protocolNegotiator = new ProtocolNegotiator(jwtValidator, http1Handler, http2Handler);
-
-        // TODO: Review configuration of thread pools and channel options
-
-        bossGroup = new NioEventLoopGroup(2, new DefaultThreadFactory("boss"));
-        workerGroup = new NioEventLoopGroup(6, new DefaultThreadFactory("worker"));
 
         var bootstrap = new ServerBootstrap()
                 .group(bossGroup, workerGroup)
@@ -104,6 +105,7 @@ public class TracWebServer extends CommonServiceBase {
                 .childOption(ChannelOption.SO_KEEPALIVE, true);
 
         // Bind and start to accept incoming connections.
+        log.info("Starting web server on port [{}]", serverPort);
         var startupFuture = bootstrap.bind(serverPort);
 
         // Block until the server channel is ready - it's just easier this way!
