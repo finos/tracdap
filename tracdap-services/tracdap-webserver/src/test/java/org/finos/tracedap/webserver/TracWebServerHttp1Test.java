@@ -16,13 +16,18 @@
 
 package org.finos.tracedap.webserver;
 
+import io.netty.handler.codec.http.HttpHeaderNames;
+import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.test.helpers.ServiceHelpers;
 import org.finos.tracdap.webserver.TracWebServer;
 
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -44,6 +49,8 @@ public class TracWebServerHttp1Test {
     private static Path tempDir;
 
     private static TracWebServer webServer = null;
+
+    private final Logger log = LoggerFactory.getLogger(getClass());
 
     @BeforeAll
     static void startServer() throws Exception {
@@ -78,6 +85,16 @@ public class TracWebServerHttp1Test {
 
         var get = request.GET().build();
         var getResponse = client.send(get, HttpResponse.BodyHandlers.ofString());
+
+        var sizeHeader = headResponse.headers().firstValueAsLong(HttpHeaderNames.CONTENT_LENGTH.toString());
+        var typeHeader = headResponse.headers().firstValue(HttpHeaderNames.CONTENT_TYPE.toString());
+
+        Assertions.assertTrue(sizeHeader.isPresent());
+        Assertions.assertTrue(typeHeader.isPresent());
+
+        var size = sizeHeader.getAsLong();
+
+        Assertions.assertEquals(size, getResponse.body().length());
     }
 
     @Test
@@ -96,6 +113,16 @@ public class TracWebServerHttp1Test {
 
         var get = request.GET().build();
         var getResponse = client.send(get, HttpResponse.BodyHandlers.ofString());
+
+        var sizeHeader = headResponse.headers().firstValueAsLong(HttpHeaderNames.CONTENT_LENGTH.toString());
+        var typeHeader = headResponse.headers().firstValue(HttpHeaderNames.CONTENT_TYPE.toString());
+
+        Assertions.assertTrue(sizeHeader.isPresent());
+        Assertions.assertTrue(typeHeader.isPresent());
+
+        var size = sizeHeader.getAsLong();
+
+        Assertions.assertEquals(size, getResponse.body().length());
     }
 
     @Test
@@ -114,6 +141,16 @@ public class TracWebServerHttp1Test {
 
         var get = request.GET().build();
         var getResponse = client.send(get, HttpResponse.BodyHandlers.ofString());
+
+        var sizeHeader = headResponse.headers().firstValueAsLong(HttpHeaderNames.CONTENT_LENGTH.toString());
+        var typeHeader = headResponse.headers().firstValue(HttpHeaderNames.CONTENT_TYPE.toString());
+
+        Assertions.assertTrue(sizeHeader.isPresent());
+        Assertions.assertTrue(typeHeader.isPresent());
+
+        var size = sizeHeader.getAsLong();
+
+        Assertions.assertEquals(size, getResponse.body().length());
     }
 
     @Test
