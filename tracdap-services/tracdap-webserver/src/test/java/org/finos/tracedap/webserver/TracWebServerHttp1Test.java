@@ -17,7 +17,7 @@
 package org.finos.tracedap.webserver;
 
 import io.netty.handler.codec.http.HttpHeaderNames;
-import org.finos.tracdap.common.exception.EUnexpected;
+import io.netty.handler.codec.http.HttpResponseStatus;
 import org.finos.tracdap.test.helpers.ServiceHelpers;
 import org.finos.tracdap.webserver.TracWebServer;
 
@@ -26,8 +26,6 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -49,8 +47,6 @@ public class TracWebServerHttp1Test {
     private static Path tempDir;
 
     private static TracWebServer webServer = null;
-
-    private final Logger log = LoggerFactory.getLogger(getClass());
 
     @BeforeAll
     static void startServer() throws Exception {
@@ -169,6 +165,9 @@ public class TracWebServerHttp1Test {
 
         var get = request.GET().build();
         var getResponse = client.send(get, HttpResponse.BodyHandlers.ofString());
+
+        Assertions.assertEquals(HttpResponseStatus.NOT_FOUND.code(), headResponse.statusCode());
+        Assertions.assertEquals(HttpResponseStatus.NOT_FOUND.code(), getResponse.statusCode());
     }
 
     @Test
@@ -187,6 +186,9 @@ public class TracWebServerHttp1Test {
 
         var get = request.GET().build();
         var getResponse = client.send(get, HttpResponse.BodyHandlers.ofString());
+
+        Assertions.assertEquals(HttpResponseStatus.NOT_FOUND.code(), headResponse.statusCode());
+        Assertions.assertEquals(HttpResponseStatus.NOT_FOUND.code(), getResponse.statusCode());
     }
 
 }

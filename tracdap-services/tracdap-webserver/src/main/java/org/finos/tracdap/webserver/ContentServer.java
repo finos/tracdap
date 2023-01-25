@@ -28,6 +28,7 @@ import org.finos.tracdap.common.storage.IFileStorage;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
 import java.util.function.Function;
 
@@ -122,6 +123,10 @@ public class ContentServer {
     private ContentResponse buildErrorResponse(Throwable e) {
 
         var response = new ContentResponse();
+
+        // Unwrap concurrent completion errors
+        if (e instanceof CompletionException)
+            e = e.getCause();
 
         if (e instanceof EStorageRequest) {
             response.statusCode = HttpResponseStatus.NOT_FOUND;

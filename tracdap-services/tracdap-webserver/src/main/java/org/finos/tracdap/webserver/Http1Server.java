@@ -17,8 +17,6 @@
 package org.finos.tracdap.webserver;
 
 import io.netty.buffer.ByteBuf;
-import io.netty.buffer.ByteBufAllocator;
-import io.netty.buffer.ByteBufUtil;
 import io.netty.util.concurrent.OrderedEventExecutor;
 import org.finos.tracdap.common.data.DataContext;
 import org.finos.tracdap.common.exception.ENetworkHttp;
@@ -34,7 +32,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nonnull;
-import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.concurrent.Flow;
@@ -55,7 +52,7 @@ public class Http1Server extends ChannelInboundHandlerAdapter {
     }
 
     @Override
-    public void channelRead(@Nonnull ChannelHandlerContext ctx, @Nonnull Object msg) throws Exception {
+    public void channelRead(@Nonnull ChannelHandlerContext ctx, @Nonnull Object msg) {
 
         try {
 
@@ -186,7 +183,15 @@ public class Http1Server extends ChannelInboundHandlerAdapter {
 
         ctx.write(httpResponse);
 
-        serverResponse.reader.subscribe(new ResponseSender(ctx));
+        if (serverResponse.statusCode == HttpResponseStatus.OK) {
+
+            serverResponse.reader.subscribe(new ResponseSender(ctx));
+        }
+        else {
+
+            ctx.write(new DefaultLastHttpContent());
+            ctx.flush();
+        }
     }
 
     private static class ResponseSender implements Flow.Subscriber<ByteBuf> {
