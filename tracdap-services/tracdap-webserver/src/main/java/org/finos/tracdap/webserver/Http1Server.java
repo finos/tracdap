@@ -149,7 +149,8 @@ public class Http1Server extends ChannelInboundHandlerAdapter {
         var dataCtx = new DataContext(executor, null);
 
         contentServer.headRequest(request.uri(), dataCtx)
-                .thenAccept(response -> serverHeadResponse(ctx, request, response));
+                .thenAccept(response -> serverHeadResponse(ctx, request, response))
+                .exceptionally(err -> unexpectedError(ctx, err));
     }
 
     private void serverHeadResponse(ChannelHandlerContext ctx, HttpRequest request, ContentResponse serverResponse) {
@@ -170,7 +171,8 @@ public class Http1Server extends ChannelInboundHandlerAdapter {
         var dataCtx = new DataContext(executor, null);
 
         contentServer.getRequest(request.uri(), dataCtx)
-                .thenAccept(response -> serveGetResponse(ctx, request, response));
+                .thenAccept(response -> serveGetResponse(ctx, request, response))
+                .exceptionally(err -> unexpectedError(ctx, err));
     }
 
     private void serveGetResponse(ChannelHandlerContext ctx, HttpRequest request, ContentResponse serverResponse) {
@@ -192,6 +194,12 @@ public class Http1Server extends ChannelInboundHandlerAdapter {
             ctx.write(new DefaultLastHttpContent());
             ctx.flush();
         }
+    }
+
+    private Void unexpectedError(ChannelHandlerContext ctx, Throwable error) {
+
+        ctx.fireExceptionCaught(error);
+        return null;
     }
 
     private static class ResponseSender implements Flow.Subscriber<ByteBuf> {
