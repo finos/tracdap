@@ -36,7 +36,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static org.finos.tracdap.common.metadata.MetadataCodec.encodeValue;
@@ -63,70 +62,16 @@ public class JobLifecycle {
     /**
      * Add a request without sending it.
      */
-    private static void addUpdateToBatchMetadataAPI(BatchMetadataWriteAPI batchMetadataWriteAPI, MetadataWriteRequest update) {
-        var targetList = batchMetadataWriteAPI.updateObject;
-
+    private static void addUpdateToWriteBatch(UniversalMetadataWriteBatchRequest.Builder builder, MetadataWriteRequest update) {
         if (!update.hasDefinition()) {
-            targetList = batchMetadataWriteAPI.updateTag;
+            builder.addUpdateTags(update);
         } else if (!update.hasPriorVersion()) {
-            targetList = batchMetadataWriteAPI.createObject;
+            builder.addCreateObjects(update);
         } else if (update.getPriorVersion().getObjectVersion() < OBJECT_FIRST_VERSION) {
-            targetList = batchMetadataWriteAPI.createPreallocatedObject;
+            builder.addPreallocateObjects(update);
+        } else {
+            builder.addUpdateObjects(update);
         }
-
-        targetList.add(scrapTenant(update));
-    }
-
-    /**
-     * Send all requests in a batch manner. Clear the requests after the operation.
-     */
-    private void sendBatchMetadataWriteAPI(
-            JobState jobState,
-            BatchMetadataWriteAPI batchMetadataWriteAPI
-    ) {
-        var tenant = jobState.tenant;
-        var metadataClient = GrpcClientAuth.applyIfAvailable(metaClient, jobState.ownerToken);
-        callApi(
-                tenant,
-                metadataClient::createPreallocatedObjectBatch,
-                batchMetadataWriteAPI.createPreallocatedObject
-        );
-
-        callApi(
-                tenant,
-                metadataClient::createObjectBatch,
-                batchMetadataWriteAPI.createObject
-        );
-
-        callApi(
-                tenant,
-                metadataClient::updateObjectBatch,
-                batchMetadataWriteAPI.updateObject
-        );
-
-        callApi(
-                tenant,
-                metadataClient::updateTagBatch,
-                batchMetadataWriteAPI.updateTag
-        );
-    }
-
-    private void callApi(
-            String tenant,
-            Function<MetadataWriteBatchRequest, MetadataWriteBatchResponse> methodImpl,
-            List<MetadataWriteRequest> requests
-    ) {
-        if (requests.isEmpty()) {
-            return;
-        }
-
-        var request = MetadataWriteBatchRequest.newBuilder()
-                .setTenant(tenant)
-                .addAllRequests(requests)
-                .build();
-        methodImpl.apply(request);
-
-        requests.clear();
     }
 
     /**
@@ -405,17 +350,34 @@ public class JobLifecycle {
                 ? buildJobSucceededUpdate(jobState)
                 : buildJobFailedUpdate(jobState);
 
-        var resultMetadata = new BatchMetadataWriteAPI();
+        var requestBuilder = UniversalMetadataWriteBatchRequest.newBuilder();
+        requestBuilder.setTenant(jobState.tenant);
 
         for (var update : metaUpdates) {
 
-            var update_ = applyJobAttrs(jobState, update);
-            addUpdateToBatchMetadataAPI(resultMetadata, update_);
+            var update_ = applyJobAttrs(jobState, scrapTenant(update));
+            addUpdateToWriteBatch(requestBuilder, update_);
         }
 
-        addUpdateToBatchMetadataAPI(resultMetadata, jobUpdate);
+        addUpdateToWriteBatch(requestBuilder, scrapTenant(jobUpdate));
 
-        sendBatchMetadataWriteAPI(jobState, resultMetadata);
+        UniversalMetadataWriteBatchRequest request = requestBuilder.build();
+
+        boolean anyToSend = isAnyToSend(request);
+
+        if (anyToSend) {
+            var metadataClient = GrpcClientAuth.applyIfAvailable(metaClient, jobState.ownerToken);
+            metadataClient.writeBatch(request);
+        }
+    }
+
+    private static boolean isAnyToSend(UniversalMetadataWriteBatchRequest request) {
+        var c = 0;
+        c += request.getCreateObjectsCount();
+        c += request.getUpdateObjectsCount();
+        c += request.getUpdateTagsCount();
+        c += request.getPreallocateObjectsCount();
+        return c != 0;
     }
 
     private MetadataWriteRequest buildJobSucceededUpdate(JobState jobState) {

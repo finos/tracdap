@@ -35,20 +35,11 @@ public class TrustedMetadataApi extends TrustedMetadataApiGrpc.TrustedMetadataAp
     private static final String SERVICE_NAME = TrustedMetadataApiGrpc.SERVICE_NAME.substring(TrustedMetadataApiGrpc.SERVICE_NAME.lastIndexOf(".") + 1);
     private static final Descriptors.ServiceDescriptor TRUSTED_METADATA_SERVICE = MetadataTrusted.getDescriptor().findServiceByName(SERVICE_NAME);
 
-    private static final MethodDescriptor<MetadataWriteRequest, TagHeader> CREATE_OBJECT_METHOD = TrustedMetadataApiGrpc.getCreateObjectMethod();
-    private static final MethodDescriptor<MetadataWriteBatchRequest, MetadataWriteBatchResponse> CREATE_OBJECT_BATCH_METHOD = TrustedMetadataApiGrpc.getCreateObjectBatchMethod();
-    private static final MethodDescriptor<MetadataWriteRequest, TagHeader> UPDATE_OBJECT_METHOD = TrustedMetadataApiGrpc.getUpdateObjectMethod();
-    private static final MethodDescriptor<MetadataWriteBatchRequest, MetadataWriteBatchResponse> UPDATE_OBJECT_BATCH_METHOD = TrustedMetadataApiGrpc.getUpdateObjectBatchMethod();
-    private static final MethodDescriptor<MetadataWriteRequest, TagHeader> UPDATE_TAG_METHOD = TrustedMetadataApiGrpc.getUpdateTagMethod();
-    private static final MethodDescriptor<MetadataWriteBatchRequest, MetadataWriteBatchResponse> UPDATE_TAG_BATCH_METHOD = TrustedMetadataApiGrpc.getUpdateTagBatchMethod();
     static final MethodDescriptor<MetadataWriteRequest, TagHeader> PREALLOCATE_ID_METHOD = TrustedMetadataApiGrpc.getPreallocateIdMethod();
     static final MethodDescriptor<MetadataWriteBatchRequest, MetadataWriteBatchResponse> PREALLOCATE_ID_BATCH_METHOD = TrustedMetadataApiGrpc.getPreallocateIdBatchMethod();
     static final MethodDescriptor<MetadataWriteRequest, TagHeader> CREATE_PREALLOCATED_OBJECT_METHOD = TrustedMetadataApiGrpc.getCreatePreallocatedObjectMethod();
     static final MethodDescriptor<MetadataWriteBatchRequest, MetadataWriteBatchResponse> CREATE_PREALLOCATED_OBJECT_BATCH_METHOD = TrustedMetadataApiGrpc.getCreatePreallocatedObjectBatchMethod();
 
-    private static final MethodDescriptor<MetadataReadRequest, Tag> READ_OBJECT_METHOD = TrustedMetadataApiGrpc.getReadObjectMethod();
-    private static final MethodDescriptor<MetadataBatchRequest, MetadataBatchResponse> READ_BATCH_METHOD = TrustedMetadataApiGrpc.getReadBatchMethod();
-    private static final MethodDescriptor<MetadataSearchRequest, MetadataSearchResponse> SEARCH_METHOD = TrustedMetadataApiGrpc.getSearchMethod();
 
 
     private final MetadataApiImpl apiImpl;
@@ -64,6 +55,12 @@ public class TrustedMetadataApi extends TrustedMetadataApiGrpc.TrustedMetadataAp
 
         apiImpl = new MetadataApiImpl(TRUSTED_METADATA_SERVICE, readService, writeService, searchService, MetadataConstants.TRUSTED_API);
         grpcWrap = new GrpcServerWrap();
+    }
+
+    @Override
+    public void writeBatch(UniversalMetadataWriteBatchRequest request, StreamObserver<UniversalMetadataWriteBatchResponse> response) {
+
+        grpcWrap.unaryCall(request, response, apiImpl::writeBatch);
     }
 
     @Override

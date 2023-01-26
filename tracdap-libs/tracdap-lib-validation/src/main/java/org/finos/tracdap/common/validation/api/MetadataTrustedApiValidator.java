@@ -84,6 +84,11 @@ public class MetadataTrustedApiValidator {
         return MetadataApiValidator.createPreallocatedObjectBatch(msg, ctx);  // always a trusted call
     }
 
+    @Validator(method = "writeBatch")
+    public static ValidationContext writeBatch(UniversalMetadataWriteBatchRequest msg, ValidationContext ctx) {
+        return MetadataApiValidator.writeBatch(msg, ctx, MetadataApiValidator.TRUSTED_API);
+    }
+
     @Validator(method = "readObject")
     public static ValidationContext readObject(MetadataReadRequest msg, ValidationContext ctx) {
         return MetadataApiValidator.readObject(msg, ctx);

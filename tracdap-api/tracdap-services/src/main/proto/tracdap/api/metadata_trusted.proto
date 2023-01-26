@@ -29,7 +29,6 @@ import "tracdap/api/metadata.proto";
 
 import "google/api/annotations.proto";
 
-
 /**
  * Trusted API reading, writing and searching for objects in the TRAC metadata store.
  *
@@ -45,6 +44,18 @@ import "google/api/annotations.proto";
  * @see TracMetadataApi
  */
 service TrustedMetadataApi {
+  /**
+   * Perform all operations in UniversalMetadataWriteBatchRequest
+   * in the TRAC metadata store.
+   *
+   * This call runs without restriction on which types of object can be saved.
+   */
+  rpc writeBatch (UniversalMetadataWriteBatchRequest) returns (UniversalMetadataWriteBatchResponse) {
+    option (google.api.http) = {
+      post: "/{tenant}/trusted/write-batch"
+      body: "*"
+    };
+  }
 
   /**
    * Create a new object in the TRAC metadata store.

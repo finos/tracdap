@@ -224,6 +224,13 @@ public class MetadataApiImpl {
                 .build();
     }
 
+    public UniversalMetadataWriteBatchResponse writeBatch(UniversalMetadataWriteBatchRequest request) {
+
+        validateRequest(TrustedMetadataApiGrpc.getWriteBatchMethod(), request);
+
+        return writeService.writeBatch(request);
+    }
+
     Tag readObject(MetadataReadRequest request) {
 
         validateRequest(READ_OBJECT_METHOD, request);
@@ -296,4 +303,5 @@ public class MetadataApiImpl {
 
         validator.validateFixedMethod(request, protoMethod);
     }
+
 }

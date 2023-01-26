@@ -105,6 +105,13 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
     // I.e. no special optimisation for saving a single item, even though this is the common case
 
 
+    /**
+     * Run operations in a batch fashion.
+     * Each operation in the list represents a batch write operation.
+     *
+     * @param tenant Tenant name.
+     * @param operations List of operations to do.
+     */
     @Override
     public void runWriteOperations(String tenant, List<DalWriteOperation> operations) {
         if (operations.isEmpty()) {
