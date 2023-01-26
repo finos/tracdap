@@ -240,7 +240,7 @@ public class Http1Server extends ChannelInboundHandlerAdapter {
         @Override
         public void onError(Throwable throwable) {
 
-            ctx.close();
+            ctx.fireExceptionCaught(throwable);
         }
 
         @Override
