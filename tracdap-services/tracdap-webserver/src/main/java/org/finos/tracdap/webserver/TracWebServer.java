@@ -65,8 +65,6 @@ public class TracWebServer extends CommonServiceBase {
     @Override
     protected void doStartup(Duration startupTimeout) throws InterruptedException {
 
-        var serverPort = 8090;
-
         var platformConfig = configManager.loadRootConfigObject(PlatformConfig.class);
 
         if (!platformConfig.hasWebServer() || !platformConfig.getWebServer().getEnabled()) {
@@ -86,10 +84,10 @@ public class TracWebServer extends CommonServiceBase {
 
         log.info("Accessing storage for content root...");
 
-        var contentRootConfig = platformConfig.getWebServer().getContentRoot();
+        var webServerConfig = platformConfig.getWebServer();
 
         // Set the storage key - in data service this is done by StorageManager
-        contentRootConfig = contentRootConfig.toBuilder()
+        var contentRootConfig = webServerConfig.getContentRoot().toBuilder()
                 .putProperties(IStorageManager.PROP_STORAGE_KEY, "CONTENT_ROOT")
                 .build();
 
@@ -112,8 +110,8 @@ public class TracWebServer extends CommonServiceBase {
                 .childOption(ChannelOption.SO_KEEPALIVE, true);
 
         // Bind and start to accept incoming connections.
-        log.info("Starting web server on port [{}]", serverPort);
-        var startupFuture = bootstrap.bind(serverPort);
+        log.info("Starting web server on port [{}]", webServerConfig.getPort());
+        var startupFuture = bootstrap.bind(webServerConfig.getPort());
 
         // Block until the server channel is ready - it's just easier this way!
         // The sync call will rethrow any errors, so they can be handled before leaving the start() method
