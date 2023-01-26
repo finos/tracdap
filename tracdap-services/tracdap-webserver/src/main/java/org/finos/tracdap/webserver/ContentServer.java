@@ -24,9 +24,12 @@ import org.finos.tracdap.common.exception.*;
 import org.finos.tracdap.common.storage.FileStat;
 import org.finos.tracdap.common.storage.FileType;
 import org.finos.tracdap.common.storage.IFileStorage;
+import org.finos.tracdap.config.WebServerConfig;
 
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -37,16 +40,27 @@ import java.util.regex.Pattern;
 
 public class ContentServer {
 
+    private static final String INDEX_DOC = "index.html";
     private static final Pattern EXTENSION_PATTERN = Pattern.compile(".*\\.([^/?#]+\\Z)");
 
     private final IFileStorage storage;
 
-    private final String indexDoc = "index.html";
     private final Map<String, String> mimeTypes;
+    private final List<Map.Entry<Pattern, String>> rewriteRules;
 
-    public ContentServer(IFileStorage storage) {
+    public ContentServer(WebServerConfig config, IFileStorage storage) {
+
         this.storage = storage;
+
         this.mimeTypes = MimeTypes.loadMimeTypeMap();
+
+        this.rewriteRules = new ArrayList<>();
+
+        for (var rule : config.getRewriteRulesList()) {
+            var source = Pattern.compile(rule.getSource());
+            var target = rule.getTarget();
+            rewriteRules.add(Map.entry(source, target));
+        }
     }
 
     public CompletionStage<ContentResponse> headRequest(String requestUri, IExecutionContext execCtx) {
@@ -82,11 +96,21 @@ public class ContentServer {
             var uri = new URI(requestUri);
             var path = uri.getPath();
 
+            for (var rule : rewriteRules) {
+
+                var pattern = rule.getKey();
+                var match = pattern.matcher(path);
+                var replacement = rule.getValue();
+
+                if (match.matches())
+                    path = match.replaceFirst(replacement);
+            }
+
             if (path.equals("/"))
-                return indexDoc;
+                return INDEX_DOC;
 
             if (path.endsWith("/"))
-                return path.substring(1) + indexDoc;
+                return path.substring(1) + INDEX_DOC;
 
             return path.substring(1);
         }
@@ -101,7 +125,7 @@ public class ContentServer {
             return CompletableFuture.completedFuture(fileStat);
 
         var dirPath = fileStat.storagePath;
-        var indexPath = dirPath.endsWith("/") ? dirPath + indexDoc : dirPath + "/" + indexDoc;
+        var indexPath = dirPath.endsWith("/") ? dirPath + INDEX_DOC : dirPath + "/" + INDEX_DOC;
 
         return storage.stat(indexPath, execCtx);
     }

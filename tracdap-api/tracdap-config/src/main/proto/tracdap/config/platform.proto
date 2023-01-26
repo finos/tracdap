@@ -77,6 +77,13 @@ message WebServerConfig {
 
   bool enabled = 1;
   PluginConfig contentRoot = 2;
+  repeated WebServerRewriteRule rewriteRules = 3;
+}
+
+message WebServerRewriteRule {
+
+  string source = 1;
+  string target = 2;
 }
 
 

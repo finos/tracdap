@@ -90,7 +90,7 @@ public class TracWebServer extends CommonServiceBase {
         contentStorage.start(workerGroup);
 
         // Handlers for all support protocols
-        var contentServer = new ContentServer(contentStorage);
+        var contentServer = new ContentServer(platformConfig.getWebServer(), contentStorage);
         var http1Handler = (Supplier<Http1Server>) () -> new Http1Server(contentServer);
         var http2Handler = (Supplier<Http2Server>) () -> new Http2Server(contentServer);
 
