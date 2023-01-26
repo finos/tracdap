@@ -35,6 +35,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
+import java.time.Instant;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 
 
@@ -44,8 +46,6 @@ public class TracWebServer extends CommonServiceBase {
 
     private final PluginManager pluginManager;
     private final ConfigManager configManager;
-
-    private PlatformConfig platformConfig;
 
     private EventLoopGroup bossGroup = null;
     private EventLoopGroup workerGroup = null;
@@ -66,7 +66,7 @@ public class TracWebServer extends CommonServiceBase {
 
         var serverPort = 8090;
 
-        platformConfig = configManager.loadRootConfigObject(PlatformConfig.class);
+        var platformConfig = configManager.loadRootConfigObject(PlatformConfig.class);
 
         if (!platformConfig.hasWebServer() || !platformConfig.getWebServer().getEnabled()) {
 
@@ -130,6 +130,35 @@ public class TracWebServer extends CommonServiceBase {
 
     @Override
     protected int doShutdown(Duration shutdownTimeout) throws InterruptedException {
+
+        var shutdownStartTime = Instant.now();
+
+        log.info("Closing the web server to new connections...");
+
+        var bossShutdown = bossGroup.shutdownGracefully();
+        bossShutdown.await(shutdownTimeout.getSeconds(), TimeUnit.SECONDS);
+
+        if (!bossShutdown.isSuccess()) {
+
+            log.error("Web server shutdown did not complete successfully in the allotted time");
+            return -1;
+        }
+
+        log.info("Waiting for existing connections to clear...");
+
+        var shutdownElapsedTime = Duration.between(shutdownStartTime, Instant.now());
+        var shutdownTimeRemaining = shutdownTimeout.minus(shutdownElapsedTime);
+
+        var workerShutdown = workerGroup.shutdownGracefully();
+        workerShutdown.await(shutdownTimeRemaining.getSeconds(), TimeUnit.SECONDS);
+
+        if (!workerShutdown.isSuccess()) {
+
+            log.error("Web server shutdown did not complete successfully in the allotted time");
+            return -1;
+        }
+
+        log.info("All web server connections are closed");
         return 0;
     }
 }
