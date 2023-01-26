@@ -41,7 +41,7 @@ public class TracWebServerHttp1Test {
     private static final String CONFIG_PATH = "src/test/resources/config/trac-platform.yaml";
     private static final String CONFIG_SECRET_KEY = "no_secrets";
 
-    private static final String SERVER_ADDRESS = "http://localhost:8090";
+    private static final String SERVER_ADDRESS = "http://localhost:9876";
 
     @TempDir
     private static Path tempDir;
