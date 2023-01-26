@@ -22,6 +22,7 @@ import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.common.plugin.PluginManager;
 import org.finos.tracdap.common.service.CommonServiceBase;
 import org.finos.tracdap.common.storage.IFileStorage;
+import org.finos.tracdap.common.storage.IStorageManager;
 import org.finos.tracdap.config.PlatformConfig;
 
 import io.netty.bootstrap.ServerBootstrap;
@@ -86,6 +87,12 @@ public class TracWebServer extends CommonServiceBase {
         log.info("Accessing storage for content root...");
 
         var contentRootConfig = platformConfig.getWebServer().getContentRoot();
+
+        // Set the storage key - in data service this is done by StorageManager
+        contentRootConfig = contentRootConfig.toBuilder()
+                .putProperties(IStorageManager.PROP_STORAGE_KEY, "CONTENT_ROOT")
+                .build();
+
         var contentStorage = pluginManager.createService(IFileStorage.class, configManager, contentRootConfig);
         contentStorage.start(workerGroup);
 
