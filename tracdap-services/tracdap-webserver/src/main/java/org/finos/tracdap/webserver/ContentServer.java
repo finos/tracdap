@@ -17,6 +17,7 @@
 package org.finos.tracdap.webserver;
 
 import io.netty.handler.codec.http.HttpHeaderNames;
+import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import org.finos.tracdap.common.concurrent.IExecutionContext;
 import org.finos.tracdap.common.data.IDataContext;
@@ -28,6 +29,8 @@ import org.finos.tracdap.config.WebServerConfig;
 
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -42,6 +45,8 @@ public class ContentServer {
 
     private static final String INDEX_DOC = "index.html";
     private static final Pattern EXTENSION_PATTERN = Pattern.compile(".*\\.([^/?#]+\\Z)");
+
+    private static final long CACHE_CONTROL_MAX_AGE = 3600;
 
     private final IFileStorage storage;
 
@@ -136,6 +141,7 @@ public class ContentServer {
             throw new EUnexpected();
 
         var response = new ContentResponse();
+
         response.statusCode = HttpResponseStatus.OK;
         response.headers.set(HttpHeaderNames.CONTENT_LENGTH, fileStat.size);
 
@@ -151,6 +157,10 @@ public class ContentServer {
             if (mimeType != null)
                 response.headers.set(HttpHeaderNames.CONTENT_TYPE, mimeType);
         }
+
+        // Common headers that need to be set on every response
+
+        addStandardHeaders(response.headers);
 
         return response;
     }
@@ -183,5 +193,14 @@ public class ContentServer {
 
         response.statusCode = HttpResponseStatus.INTERNAL_SERVER_ERROR;
         return response;
+    }
+
+    private void addStandardHeaders(HttpHeaders headers) {
+
+        var date = DateTimeFormatter.RFC_1123_DATE_TIME.format(ZonedDateTime.now());
+        headers.set(HttpHeaderNames.DATE, date);
+
+        var cacheControl = String.format("max-age=%d", CACHE_CONTROL_MAX_AGE);
+        headers.set(HttpHeaderNames.CACHE_CONTROL, cacheControl);
     }
 }
