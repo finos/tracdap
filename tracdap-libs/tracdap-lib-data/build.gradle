@@ -29,13 +29,22 @@ dependencies {
     api project(':tracdap-lib-common')
 
     // Data framework API is in terms of Apache Arrow
-    api group: 'org.apache.arrow', name: 'arrow-vector', version: "$arrow_version"
+    api (group: 'org.apache.arrow', name: 'arrow-vector', version: "$arrow_version") {
+
+        // For explicit versions of Jackson - needed to pass compliance scanning
+        exclude group: 'com.fasterxml.jackson.core', module: 'jackson-core'
+        exclude group: 'com.fasterxml.jackson.core', module: 'jackson-annotations'
+        exclude group: 'com.fasterxml.jackson.core', module: 'jackson-databind'
+    }
+
     api group: 'org.apache.arrow', name: 'arrow-memory-netty', version: "$arrow_version"
 
     // Jackson used for implementations of formats included as standard
     implementation group: 'com.fasterxml.jackson.core', name: 'jackson-core', version: "$jackson_version"
+    implementation group: 'com.fasterxml.jackson.core', name: 'jackson-annotations', version: "$jackson_databind_version"
     implementation group: 'com.fasterxml.jackson.core', name: 'jackson-databind', version: "$jackson_databind_version"
     implementation group: 'com.fasterxml.jackson.dataformat', name: 'jackson-dataformat-csv', version: "$jackson_version"
+    implementation group: 'com.fasterxml.jackson.datatype', name: 'jackson-datatype-jsr310', version: "$jackson_databind_version"
 
     testImplementation project(':tracdap-lib-test')
 }
