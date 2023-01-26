@@ -42,6 +42,8 @@ message PlatformConfig {
 
   map<string, TenantConfig> tenants = 10;
 
+  optional WebServerConfig webServer = 11;
+
   InstantMap instances = 3;
   ServiceMap services = 4;
 }
@@ -70,6 +72,21 @@ message TenantConfig {
   optional string defaultFormat = 2;
 }
 
+
+message WebServerConfig {
+
+  bool enabled = 1;
+  int32 port = 2;
+
+  PluginConfig contentRoot = 3;
+  repeated WebServerRewriteRule rewriteRules = 4;
+}
+
+message WebServerRewriteRule {
+
+  string source = 1;
+  string target = 2;
+}
 
 
 message InstantMap {

@@ -17,6 +17,7 @@
 package org.finos.tracdap.svc.orch;
 
 import org.finos.tracdap.api.TrustedMetadataApiGrpc;
+import org.finos.tracdap.common.auth.AuthSetup;
 import org.finos.tracdap.common.auth.GrpcServerAuth;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.exception.EStartup;
@@ -133,15 +134,12 @@ public class TracOrchestratorService extends CommonServiceBase {
             var orchestrator = new JobApiService(jobLifecycle, jobCache);
             var orchestratorApi = new TracOrchestratorApi(orchestrator);
 
-            var authentication = GrpcServerAuth.setupAuth(
-                    platformConfig.getAuthentication(),
-                    platformConfig.getPlatformInfo(),
-                    configManager);
+            var jwtValidator = AuthSetup.createValidator(platformConfig, configManager);
 
             this.server = NettyServerBuilder
                     .forPort(orchestratorConfig.getPort())
                     .intercept(new LoggingServerInterceptor(TracOrchestratorService.class))
-                    .intercept(authentication)
+                    .intercept(new GrpcServerAuth(platformConfig.getAuthentication(), jwtValidator))
                     .intercept(new ErrorMappingInterceptor())
                     .addService(orchestratorApi)
 

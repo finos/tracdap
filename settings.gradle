@@ -59,11 +59,14 @@ include 'tracdap-svc-meta'
 include 'tracdap-svc-data'
 include 'tracdap-svc-orch'
 include 'tracdap-gateway'
+include 'tracdap-webserver'
 
 project(":tracdap-svc-meta").projectDir = file("tracdap-services/tracdap-svc-meta")
 project(":tracdap-svc-data").projectDir = file("tracdap-services/tracdap-svc-data")
 project(":tracdap-svc-orch").projectDir = file("tracdap-services/tracdap-svc-orch")
 project(":tracdap-gateway").projectDir = file("tracdap-services/tracdap-gateway")
+project(":tracdap-webserver").projectDir = file("tracdap-services/tracdap-webserver")
+
 
 
 // Tools and utilities

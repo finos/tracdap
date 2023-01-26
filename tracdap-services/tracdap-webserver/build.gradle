@@ -1,0 +1,88 @@
+/*
+ * Copyright 2020 Accenture Global Solutions Limited
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+plugins {
+    id "application"
+}
+
+apply from: "${rootProject.projectDir.path}/gradle/base-java.gradle"
+apply from: "${rootProject.projectDir.path}/gradle/functions.gradle"
+apply from: "${rootProject.projectDir.path}/gradle/plugins.gradle"
+
+description = "TRAC D.A.P. web server, a basic web server for static content"
+
+application {
+
+    mainClass.set("org.finos.tracdap.webserver.TracWebServer")
+
+    // JVM flags needed for Arrow / Netty / gRPC to access native memory
+    applicationDefaultJvmArgs = [
+            "--add-opens", "java.base/jdk.internal.misc=ALL-UNNAMED",
+            "--add-opens", "java.base/java.nio=ALL-UNNAMED",
+            "-Dio.netty.tryReflectionSetAccessible=true"
+    ]
+
+    // Working dir when running in the IDE
+    tasks.run.workingDir = rootProject.projectDir
+}
+
+ext.addVersionInfo(sourceSets.getByName("main"), "TRAC Web Server")
+
+
+dependencies {
+
+    implementation project(':tracdap-api-config')
+    implementation project(':tracdap-lib-common')
+    implementation project(':tracdap-lib-data')
+
+    // Core framework - Netty + gRPC
+    implementation group: 'io.netty', name: 'netty-common', version: "$netty_version"
+    implementation group: 'io.netty', name: 'netty-codec-http', version: "$netty_version"
+    implementation group: 'io.netty', name: 'netty-codec-http2', version: "$netty_version"
+    implementation group: 'io.netty', name: 'netty-handler-proxy', version: "$netty_version"
+
+
+    // Test
+
+    testImplementation project(':tracdap-lib-test')
+
+    // Migration support for JUnit 4 Rules, provided by gRPC for managing test service instances
+    testImplementation group: 'org.junit.jupiter', name: 'junit-jupiter-migrationsupport', version: "$junit_version"
+}
+
+// Add any plugin dependencies enabled at build time
+ext.enableBuildTimePlugins(["config", "auth"])
+
+
+distributions {
+    main {
+        contents {
+            into("") { from("${rootDir}/dist/template") }
+        }
+    }
+}
+
+tasks.withType(CreateStartScripts) {
+
+    unixStartScriptGenerator.template = resources.text.fromFile("${rootDir}/dist/scripts/service-ctrl.sh")
+    windowsStartScriptGenerator.template = resources.text.fromFile("${rootDir}/dist/scripts/service-ctrl.bat")
+
+    // Default config file location
+    startScripts { doLast {
+        unixScript.text = unixScript.text.replace("<DEFAULT_CONFIG_FILE>", "trac-platform.yaml")
+        windowsScript.text = windowsScript.text.replace("<DEFAULT_CONFIG_FILE>", "trac-platform.yaml")
+    }}
+}

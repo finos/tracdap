@@ -16,6 +16,7 @@
 
 package org.finos.tracdap.svc.meta;
 
+import org.finos.tracdap.common.auth.AuthSetup;
 import org.finos.tracdap.common.auth.GrpcServerAuth;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.exception.EStartup;
@@ -113,10 +114,7 @@ public class TracMetadataService extends CommonServiceBase {
             var publicApi = new TracMetadataApi(readService, writeService, searchService);
             var trustedApi = new TrustedMetadataApi(readService, writeService, searchService);
 
-            var authentication = GrpcServerAuth.setupAuth(
-                    platformConfig.getAuthentication(),
-                    platformConfig.getPlatformInfo(),
-                    configManager);
+            var jwtValidator = AuthSetup.createValidator(platformConfig, configManager);
 
             // Create the main server
 
@@ -126,7 +124,7 @@ public class TracMetadataService extends CommonServiceBase {
             this.server = ServerBuilder
                     .forPort(servicePort)
                     .intercept(new LoggingServerInterceptor(TracMetadataApi.class))
-                    .intercept(authentication)
+                    .intercept(new GrpcServerAuth(platformConfig.getAuthentication(), jwtValidator))
                     .intercept(new ErrorMappingInterceptor())
                     .addService(publicApi)
                     .addService(trustedApi)

@@ -31,6 +31,8 @@ public class JwtProcessor extends JwtValidator {
 
     public static JwtProcessor configure(AuthenticationConfig authConfig, PlatformInfo platformInfo, KeyPair keyPair) {
 
+        // TODO: Move this method to AuthSetup
+
         // Allow disabling signing in non-prod environments only
         if (authConfig.getDisableSigning()) {
 
