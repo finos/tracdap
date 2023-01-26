@@ -50,6 +50,8 @@ public class ProtocolNegotiator extends ChannelInitializer<SocketChannel> {
     private static final int MAX_TIMEOUT = 3600;
     private static final int DEFAULT_TIMEOUT = 60;
 
+    private static boolean HTTP2_ENABLED = false;
+
     private static final Logger log = LoggerFactory.getLogger(ProtocolNegotiator.class);
 
     private final JwtValidator jwtValidator;
@@ -103,16 +105,19 @@ public class ProtocolNegotiator extends ChannelInitializer<SocketChannel> {
 
             log.info("Request for protocol upgrade: [{}]", protocol);
 
-            if (AsciiString.contentEquals(Http2CodecUtil.HTTP_UPGRADE_PROTOCOL_NAME, protocol)) {
+            if (HTTP2_ENABLED) {
 
-                var http2Codec = Http2FrameCodecBuilder.forServer().build();
-                return new Http2ServerUpgradeCodec(http2Codec, new Http2Initializer());
-            }
+                if (AsciiString.contentEquals(Http2CodecUtil.HTTP_UPGRADE_PROTOCOL_NAME, protocol)) {
 
-            if (AsciiString.contentEquals(Http2CodecUtil.TLS_UPGRADE_PROTOCOL_NAME, protocol)) {
+                    var http2Codec = Http2FrameCodecBuilder.forServer().build();
+                    return new Http2ServerUpgradeCodec(http2Codec, new Http2Initializer());
+                }
 
-                var http2Codec = Http2FrameCodecBuilder.forServer().build();
-                return new Http2ServerUpgradeCodec(http2Codec, new Http2Initializer());
+                if (AsciiString.contentEquals(Http2CodecUtil.TLS_UPGRADE_PROTOCOL_NAME, protocol)) {
+
+                    var http2Codec = Http2FrameCodecBuilder.forServer().build();
+                    return new Http2ServerUpgradeCodec(http2Codec, new Http2Initializer());
+                }
             }
 
             log.warn("Upgrade not available for protocol: " + protocol);
