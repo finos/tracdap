@@ -196,6 +196,8 @@ public class Http1Server extends ChannelInboundHandlerAdapter {
 
     private static class ResponseSender implements Flow.Subscriber<ByteBuf> {
 
+        private static final long REQUEST_BUFFER = 32;
+
         private final ChannelHandlerContext ctx;
 
         private Flow.Subscription subscription;
@@ -207,19 +209,21 @@ public class Http1Server extends ChannelInboundHandlerAdapter {
 
         @Override
         public void onSubscribe(Flow.Subscription subscription) {
+
             this.subscription = subscription;
 
-            nPending += 32;
-            subscription.request(32);
+            nPending += REQUEST_BUFFER;
+            subscription.request(REQUEST_BUFFER);
         }
 
         @Override
         public void onNext(ByteBuf chunk) {
 
             ctx.write(new DefaultHttpContent(chunk));
+            nPending -= 1;
 
-            if (nPending < 16) {
-                var nRequest = 32 - nPending;
+            if (nPending < REQUEST_BUFFER / 2) {
+                var nRequest = REQUEST_BUFFER - nPending;
                 nPending += nRequest;
                 subscription.request(nRequest);
             }
