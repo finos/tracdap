@@ -19,7 +19,6 @@ package org.finos.tracdap.webserver;
 import io.netty.buffer.ByteBuf;
 import io.netty.util.concurrent.OrderedEventExecutor;
 import org.finos.tracdap.common.data.DataContext;
-import org.finos.tracdap.common.exception.ENetworkHttp;
 import org.finos.tracdap.common.exception.EUnexpected;
 
 import io.netty.buffer.Unpooled;
@@ -137,9 +136,15 @@ public class Http1Server extends ChannelInboundHandlerAdapter {
         }
 
         else {
-            var msg = String.format("Unsupported HTTP method in request: %s [%s] ", request.method(), request.uri());
-            log.error(msg);
-            throw new ENetworkHttp(HttpResponseStatus.METHOD_NOT_ALLOWED.code(), msg);
+
+            // Send method not allowed for all other methods
+
+            var httpResponse = new DefaultFullHttpResponse(
+                    request.protocolVersion(),
+                    HttpResponseStatus.METHOD_NOT_ALLOWED);
+
+            ctx.write(httpResponse);
+            ctx.flush();
         }
     }
 
