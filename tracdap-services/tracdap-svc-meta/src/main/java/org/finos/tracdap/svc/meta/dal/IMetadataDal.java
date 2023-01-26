@@ -31,6 +31,13 @@ public interface IMetadataDal {
 
     List<TenantInfo> listTenants();
 
+    /**
+     * Run operations in a batch fashion.
+     * Each operation in the list represents a batch write operation.
+     *
+     * @param tenant Tenant name.
+     * @param operations List of operations to do.
+     */
     void runWriteOperations(String tenant, List<DalWriteOperation> operations);
 
     void saveNewObjects(String tenant, List<Tag> tags);
