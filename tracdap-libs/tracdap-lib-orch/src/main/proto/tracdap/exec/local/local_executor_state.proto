@@ -14,18 +14,22 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.exec;
+syntax = 'proto3';
+package tracdap.exec.local;
 
-import com.google.protobuf.Message;
-import org.finos.tracdap.metadata.JobStatusCode;
+option java_package = "org.finos.tracdap.common.exec.local";
+option java_multiple_files = true;
 
 
-public class ExecutorPollResult<TState extends Message> {
+message LocalBatchState {
 
-    public String jobKey;
-    public JobStatusCode statusCode;
-    public String statusMessage;
-    public String errorDetail;
+  string batchDir = 1;
+  repeated string volumes = 2;
+  int64 pid = 3;
+}
 
-    public TState batchState;
+
+message LocalExecutorState {
+
+
 }

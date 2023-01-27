@@ -58,42 +58,8 @@ public class JobState implements Serializable, Cloneable {
     public JobConfig jobConfig;
     public JobResult jobResult;
 
-    public byte[] executorState;
+    public byte[] batchState;
 
-
-
-    public static <T extends Serializable> byte[] serialize(T obj){
-
-        try (var bos = new ByteArrayOutputStream();
-             var oos = new ObjectOutputStream(bos)) {
-
-            oos.writeObject(obj);
-            oos.flush();
-
-            return bos.toByteArray();
-        }
-        catch (IOException e) {
-            throw new EUnexpected();  // TODO
-        }
-    }
-
-    @SuppressWarnings("unchecked")
-    public static <T extends Serializable> T deserialize(byte[] bytes, Class<T> clazz){
-
-        try (var bis = new ByteArrayInputStream(bytes);
-             var ois = new ObjectInputStream(bis)) {
-
-            var obj = ois.readObject();
-
-            if (!clazz.isInstance(obj))
-                throw new EUnexpected();  // TODO
-
-            return (T) obj;
-        }
-        catch (IOException | ClassNotFoundException e) {
-            throw new EUnexpected();  // TODO
-        }
-    }
 
     @Override
     public JobState clone() {
@@ -107,7 +73,7 @@ public class JobState implements Serializable, Cloneable {
             return clone;
         }
         catch (CloneNotSupportedException e) {
-            throw new AssertionError();
+            throw new EUnexpected(e);
         }
     }
 }

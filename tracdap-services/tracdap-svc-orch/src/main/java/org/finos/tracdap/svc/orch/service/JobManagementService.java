@@ -16,6 +16,8 @@
 
 package org.finos.tracdap.svc.orch.service;
 
+import com.google.protobuf.InvalidProtocolBufferException;
+import com.google.protobuf.Message;
 import org.finos.tracdap.common.config.ConfigFormat;
 import org.finos.tracdap.common.config.ConfigParser;
 import org.finos.tracdap.common.exception.*;
@@ -46,7 +48,7 @@ public class JobManagementService {
 
     private final JobLifecycle jobLifecycle;
     private final IJobCache jobCache;
-    private final IBatchExecutor jobExecutor;
+    private final IBatchExecutor<? extends Message> untypedExecutor;
     private final ScheduledExecutorService executorService;
 
     private ScheduledFuture<?> pollingTask;
@@ -56,13 +58,29 @@ public class JobManagementService {
     public JobManagementService(
             JobLifecycle jobLifecycle,
             IJobCache jobCache,
-            IBatchExecutor jobExecutor,
+            IBatchExecutor<? extends Message> batchExecutor,
             ScheduledExecutorService executorService) {
 
         this.jobLifecycle = jobLifecycle;
         this.jobCache = jobCache;
-        this.jobExecutor = jobExecutor;
+        this.untypedExecutor = batchExecutor;
         this.executorService = executorService;
+    }
+
+    @SuppressWarnings("unchecked")
+    private <TState extends Message>
+    IBatchExecutor<TState> stronglyTypedExecutor() {
+        return (IBatchExecutor<TState>) untypedExecutor;
+    }
+
+    private <TState extends Message>
+    TState stronglyTypedState(IBatchExecutor<TState> batchExecutor, byte[] stateBytes) {
+        try {
+            return batchExecutor.stateDecoder().parseFrom(stateBytes);
+        }
+        catch (InvalidProtocolBufferException e) {
+            throw new ETracInternal("Invalid job state: " + e.getMessage(), e);
+        }
     }
 
     public void start() {
@@ -129,17 +147,19 @@ public class JobManagementService {
 
         try  {
 
+            var batchExecutor = stronglyTypedExecutor();
+
             var activeStates = List.of(JobStatusCode.SUBMITTED, JobStatusCode.RUNNING);
             var activeJobs = jobCache.pollJobs(job -> activeStates.contains(job.statusCode));
 
-            var execStateMap = new HashMap<String, ExecutorState>();
+            var batchStateMap = new HashMap<String, Message>();
 
             for (var job : activeJobs) {
-                var executorState = JobState.deserialize(job.executorState, ExecutorState.class);
-                execStateMap.put(job.jobKey, executorState);
+                var batchState = stronglyTypedState(batchExecutor, job.batchState);
+                batchStateMap.put(job.jobKey, batchState);
             }
 
-            var pollResults = jobExecutor.pollAllBatches(execStateMap);
+            var pollResults = batchExecutor.pollAllBatches(batchStateMap);
 
             for (var result : pollResults) {
 
@@ -147,7 +167,7 @@ public class JobManagementService {
 
                 jobOperation(result.jobKey, (key, state, ticket) -> {
 
-                    state.executorState = JobState.serialize(result.executorState);
+                    state.batchState = result.batchState.toByteArray();
                     state.statusCode = JobStatusCode.FINISHING;
 
                     jobCache.updateJob(key, state, ticket);
@@ -162,19 +182,21 @@ public class JobManagementService {
 
     private void submitJob(String jobKey, JobState jobState, Ticket ticket) {
 
-        var execState = jobExecutor.createBatch(jobKey);
-        execState = jobExecutor.createVolume(execState, "config", ExecutorVolumeType.CONFIG_DIR);
-        execState = jobExecutor.createVolume(execState, "result", ExecutorVolumeType.RESULT_DIR);
-        execState = jobExecutor.createVolume(execState, "log", ExecutorVolumeType.RESULT_DIR);
-        execState = jobExecutor.createVolume(execState, "scratch", ExecutorVolumeType.SCRATCH_DIR);
+        var batchExecutor = stronglyTypedExecutor();
+
+        var batchState = batchExecutor.createBatch(jobKey);
+        batchState = batchExecutor.createVolume(jobKey, batchState, "config", ExecutorVolumeType.CONFIG_DIR);
+        batchState = batchExecutor.createVolume(jobKey, batchState, "result", ExecutorVolumeType.RESULT_DIR);
+        batchState = batchExecutor.createVolume(jobKey, batchState, "log", ExecutorVolumeType.RESULT_DIR);
+        batchState = batchExecutor.createVolume(jobKey, batchState, "scratch", ExecutorVolumeType.SCRATCH_DIR);
 
         // No specialisation is needed to build the job config
         // This may change in the future, in which case add IJobLogic.buildJobConfig()
 
         var jobConfigJson = ConfigParser.quoteConfig(jobState.jobConfig, ConfigFormat.JSON);
         var sysConfigJson = ConfigParser.quoteConfig(jobState.sysConfig, ConfigFormat.JSON);
-        execState = jobExecutor.writeFile(execState, "config", "job_config.json", jobConfigJson);
-        execState = jobExecutor.writeFile(execState, "config", "sys_config.json", sysConfigJson);
+        batchState = batchExecutor.writeFile(jobKey, batchState, "config", "job_config.json", jobConfigJson);
+        batchState = batchExecutor.writeFile(jobKey, batchState, "config", "sys_config.json", sysConfigJson);
 
         var launchCmd = LaunchCmd.trac();
 
@@ -185,10 +207,10 @@ public class JobManagementService {
                 LaunchArg.string("--job-result-format"), LaunchArg.string("json"),
                 LaunchArg.string("--scratch-dir"), LaunchArg.path("scratch", "."));
 
-        execState = jobExecutor.startBatch(execState, launchCmd, launchArgs);
+        batchState = batchExecutor.startBatch(jobKey, batchState, launchCmd, launchArgs);
 
         jobState.statusCode = JobStatusCode.SUBMITTED;
-        jobState.executorState = JobState.serialize(execState);
+        jobState.batchState = batchState.toByteArray();
         jobCache.updateJob(jobKey, jobState, ticket);
 
         log.info("Job submitted: [{}]", jobKey);
@@ -198,9 +220,10 @@ public class JobManagementService {
 
         log.info("Record job result: [{}]", jobKey);
 
-        var execState = JobState.deserialize(jobState.executorState, ExecutorState.class);
-        var execResult = jobExecutor.pollBatch(execState);
+        var batchExecutor = stronglyTypedExecutor();
+        var batchState = stronglyTypedState(batchExecutor, jobState.batchState);
 
+        var execResult = batchExecutor.pollBatch(jobKey, batchState);
         jobState.statusCode = execResult.statusCode;
         jobState.statusMessage = execResult.statusMessage;
 
@@ -209,7 +232,7 @@ public class JobManagementService {
             try {
 
                 var jobResultFile = String.format("job_result_%s.json", jobKey);
-                var jobResultBytes = jobExecutor.readFile(execState, "result", jobResultFile);
+                var jobResultBytes = batchExecutor.readFile(jobKey, batchState, "result", jobResultFile);
 
                 jobState.jobResult = ConfigParser.parseConfig(jobResultBytes, ConfigFormat.JSON, JobResult.class);
 
@@ -239,7 +262,7 @@ public class JobManagementService {
 
         // Only once the results are recorded, update the cache and remove the physical job
         jobCache.updateJob(jobKey, jobState, ticket);
-        jobExecutor.destroyBatch(jobKey, execState);
+        batchExecutor.destroyBatch(jobKey, batchState);
 
         // Schedule removal from the cache at some later time (allows check-job for some time after completion)
         executorService.schedule(

@@ -16,31 +16,36 @@
 
 package org.finos.tracdap.common.exec;
 
+import com.google.protobuf.Message;
+import com.google.protobuf.Parser;
+
 import java.util.List;
 import java.util.Map;
 
 
-public interface IBatchExecutor {
+public interface IBatchExecutor<TState extends Message> {
 
     // Interface for running batch jobs, i.e. a job that runs using one-shot using a one-shot process
 
     void executorStatus();
 
-    ExecutorState createBatch(String jobKey);
+    Parser<TState> stateDecoder();
 
-    void destroyBatch(String jobKey, ExecutorState jobState);
+    TState createBatch(String batchKey);
 
-    ExecutorState createVolume(ExecutorState state, String volumeName, ExecutorVolumeType volumeType);
+    void destroyBatch(String batchKey, TState batchState);
 
-    ExecutorState writeFile(ExecutorState state, String volumeName, String fileName, byte[] fileContent);
+    TState createVolume(String batchKey, TState batchState, String volumeName, ExecutorVolumeType volumeType);
 
-    byte[] readFile(ExecutorState state, String volumeName, String fileName);
+    TState writeFile(String batchKey, TState batchState, String volumeName, String fileName, byte[] fileContent);
 
-    ExecutorState startBatch(ExecutorState jobState, LaunchCmd launchCmd, List<LaunchArg> launchArgs);
+    byte[] readFile(String batchKey, TState batchState, String volumeName, String fileName);
 
-    ExecutorState cancelBatch(ExecutorState jobState);
+    TState startBatch(String batchKey, TState batchState, LaunchCmd launchCmd, List<LaunchArg> launchArgs);
 
-    ExecutorPollResult pollBatch(ExecutorState jobState);
+    TState cancelBatch(String batchKey, TState batchState);
 
-    List<ExecutorPollResult> pollAllBatches(Map<String, ExecutorState> priorStates);
+    ExecutorPollResult<TState> pollBatch(String batchKey, TState batchState);
+
+    List<ExecutorPollResult<TState>> pollAllBatches(Map<String, TState> priorStates);
 }

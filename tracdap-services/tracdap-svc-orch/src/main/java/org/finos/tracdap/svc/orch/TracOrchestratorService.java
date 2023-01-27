@@ -71,7 +71,7 @@ public class TracOrchestratorService extends CommonServiceBase {
     private ManagedChannel clientChannel;
 
     private IJobCache jobCache;
-    private IBatchExecutor jobExecCtrl;
+    private IBatchExecutor<?> jobExecCtrl;
     private JobManagementService jobMonitor;
 
     public TracOrchestratorService(PluginManager pluginManager, ConfigManager configManager) {

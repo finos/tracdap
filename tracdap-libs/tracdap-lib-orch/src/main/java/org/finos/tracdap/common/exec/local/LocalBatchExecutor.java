@@ -16,6 +16,7 @@
 
 package org.finos.tracdap.common.exec.local;
 
+import com.google.protobuf.Parser;
 import org.finos.tracdap.common.exception.*;
 import org.finos.tracdap.common.exec.*;
 import org.finos.tracdap.common.metadata.MetadataConstants;
@@ -30,12 +31,11 @@ import java.nio.file.*;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.CompletionException;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 
-public class LocalBatchExecutor implements IBatchExecutor {
+public class LocalBatchExecutor implements IBatchExecutor<LocalBatchState> {
 
     public static final String CONFIG_VENV_PATH = "venvPath";
     public static final String CONFIG_BATCH_DIR = "batchDir";
@@ -73,6 +73,368 @@ public class LocalBatchExecutor implements IBatchExecutor {
         this.batchPersist = prepareBatchPersist(properties);
         this.batchUser = lookupBatchUser();
     }
+
+    @Override
+    public Parser<LocalBatchState> stateDecoder() {
+        return LocalBatchState.parser();
+    }
+
+    @Override
+    public void executorStatus() {
+
+    }
+
+    @Override
+    public LocalBatchState createBatch(String jobKey) {
+
+        try {
+
+            var batchDirPrefix = String.format(JOB_DIR_TEMPLATE, jobKey.toLowerCase());
+            var batchDir = (batchRootDir != null)
+                    ? Files.createTempDirectory(batchRootDir, batchDirPrefix)
+                    : Files.createTempDirectory(batchDirPrefix);
+
+            var batchDirOwner = Files.getOwner(batchDir);
+
+            if (batchUser != null && batchDirOwner != null && !batchUser.equals(batchDirOwner.getName())) {
+
+                fixSandboxPermissions(batchDir);
+                batchDirOwner = Files.getOwner(batchDir);
+            }
+
+            var batchState = LocalBatchState.newBuilder()
+                    .setBatchDir(batchDir.toString())
+                    .build();
+
+            log.info("Job [{}] sandbox directory created: [{}], owner = [{}]", jobKey, batchDir, batchDirOwner);
+
+            return batchState;
+        }
+        catch (IOException e) {
+
+            var errorMessage = String.format(
+                    "Job [%s] failed to create sandbox directory: %s",
+                    jobKey, e.getMessage());
+
+            log.error(errorMessage, e);
+            throw new EExecutorFailure(errorMessage, e);
+        }
+    }
+
+    @Override
+    public void destroyBatch(String jobKey, LocalBatchState state) {
+
+        var batchState = validState(state);
+        var batchDir = Paths.get(batchState.getBatchDir());
+        var process = processMap.get(batchState.getPid());
+
+        if (process == null)
+            throw new EUnexpected();  // TODO
+
+        if (process.isAlive()) {
+            log.warn("Process for job [{}] is not complete, it will be forcibly terminated", jobKey);
+            process.destroyForcibly();
+        }
+
+        if (!batchPersist) {
+
+            log.info("Cleaning up sandbox directory [{}]...", batchDir);
+
+            try (var files = Files.walk(batchDir)) {
+
+                files.sorted(Comparator.reverseOrder()).forEach(f -> {
+                    try { Files.delete(f); }
+                    catch (IOException e) { throw new CompletionException(e); }
+                });
+            }
+            catch (IOException e) {
+                log.warn("Failed to clean up sandbox directory [{}]: {}", batchDir, e.getMessage(), e);
+            }
+            catch (CompletionException e) {
+                var cause = e.getCause();
+                log.warn("Failed to clean up sandbox directory [{}]: {}", batchDir, cause.getMessage(), cause);
+            }
+        }
+        else {
+
+            log.info("Sandbox directory [{}] will be retained", batchDir);
+        }
+
+        processMap.remove(batchState.getPid());
+    }
+
+    @Override
+    public LocalBatchState createVolume(String jobKey, LocalBatchState state, String volumeName, ExecutorVolumeType volumeType) {
+
+        try {
+
+            var batchState = validState(state);
+
+            var isValid = MetadataConstants.VALID_IDENTIFIER.matcher(volumeName);
+            var isReserved = MetadataConstants.TRAC_RESERVED_IDENTIFIER.matcher(volumeName);
+
+            if (!isValid.matches()) {
+
+                var errorMsg = String.format(
+                        "Job [%s] requested volume name is not a valid identifier: [%s]",
+                        jobKey, volumeName);
+
+                log.error(errorMsg);
+                throw new EExecutorValidation(errorMsg);
+            }
+
+            if (isReserved.matches()) {
+
+                var errorMsg = String.format(
+                        "Job [%s] requested volume name is a reserved identifier: [%s]",
+                        jobKey, volumeName);
+
+                log.error(errorMsg);
+                throw new EExecutorValidation(errorMsg);
+            }
+
+            // Since volumeName is an identifier, it cannot be an absolute path
+
+            var batchDir = Path.of(batchState.getBatchDir());
+            var volumeDir = batchDir.resolve(volumeName);
+
+            Files.createDirectory(volumeDir);
+
+            return batchState.toBuilder()
+                    .addVolumes(volumeName)
+                    .build();
+        }
+        catch (AccessDeniedException e) {
+
+            // Permissions errors reported as executor access error
+
+            var errorMessage = String.format(
+                    "Job [%s] failed to create batch volume [%s]: %s",
+                    jobKey, volumeName, e.getMessage());
+
+            log.error(errorMessage, e);
+            throw new EExecutorAccess(errorMessage, e);
+        }
+        catch (IOException e) {
+
+            var errorMessage = String.format(
+                    "Job [%s] failed to create batch volume [%s]: %s",
+                    jobKey, volumeName, e.getMessage());
+
+            log.error(errorMessage, e);
+            throw new EExecutorFailure(errorMessage, e);
+        }
+    }
+
+    @Override
+    public LocalBatchState writeFile(String jobKey, LocalBatchState state, String volumeName, String fileName, byte[] fileContent) {
+
+        try {
+
+            var batchState = validState(state);
+            var process = processMap.get(batchState.getPid());
+
+            if (!batchState.getVolumesList().contains(volumeName)) {
+                var errorMsg = String.format("Requested Volume does not exist: [%s]", volumeName);
+                log.error(errorMsg);
+                throw new ETracInternal(errorMsg);
+            }
+
+            if (process != null ){
+                log.error("writeFile() called after process was started");
+                throw new ETracInternal("writeFile() called after process was started");
+            }
+
+            var batchDir = Path.of(batchState.getBatchDir());
+            var volumeDir = batchDir.resolve(volumeName);
+            var filePath = volumeDir.resolve(fileName);
+
+            Files.write(filePath, fileContent, StandardOpenOption.CREATE_NEW);
+
+            return batchState;
+        }
+        catch (IOException e) {
+
+            // Includes FileAlreadyExistsException
+
+            // TODO
+            throw new RuntimeException("TODO", e);
+        }
+    }
+
+    @Override
+    public byte[] readFile(String jobKey, LocalBatchState state, String volumeName, String fileName) {
+
+        try {
+
+            var batchState = validState(state);
+            var process = processMap.get(batchState.getPid());
+
+            if (!batchState.getVolumesList().contains(volumeName)) {
+                var errorMsg = String.format("Volume for readFile() does not exist: [%s]", volumeName);
+                log.error(errorMsg);
+                throw new ETracInternal(errorMsg);
+            }
+
+            if (process == null || process.isAlive()){
+                log.error("readFile() called before process is complete");
+                throw new ETracInternal("readFile() called before process is complete");
+            }
+
+            var batchDir = Path.of(batchState.getBatchDir());
+            var volumeDir = batchDir.resolve(volumeName);
+            var filePath = volumeDir.resolve(fileName);
+
+            return Files.readAllBytes(filePath);
+        }
+        // TODO: These error messages will not be meaningful to users
+        catch (NoSuchFileException e) {
+            var message = String.format("Executor read failed for [%s]: File not found", fileName);
+            throw new EExecutorFailure(message, e);
+        }
+        catch (IOException e) {
+            var message = String.format("Executor read failed for [%s]: %s", fileName, e.getMessage());
+            throw new EExecutorFailure(message, e);
+        }
+    }
+
+    @Override
+    public LocalBatchState startBatch(String jobKey, LocalBatchState jobState, LaunchCmd launchCmd, List<LaunchArg> launchArgs) {
+
+        try {
+
+            var batchState = validState(jobState);
+            var batchDir = Paths.get(batchState.getBatchDir());
+
+            var pythonExe = tracRuntimeVenv.resolve(VENV_BIN_SUBDIR).resolve(PYTHON_EXE).toString();
+            var decodedArgs = launchArgs.stream()
+                    .map(arg -> decodeLaunchArg(arg, batchState))
+                    .collect(Collectors.toList());
+
+            var processArgs = new ArrayList<String>();
+            processArgs.add(pythonExe);
+            processArgs.addAll(TRAC_CMD_ARGS);
+            processArgs.addAll(decodedArgs);
+
+            if (batchPersist)
+                processArgs.add("--scratch-dir-persist");
+
+            var pb = new ProcessBuilder();
+            pb.command(processArgs);
+            pb.directory(batchDir.toFile());
+
+            var env = pb.environment();
+            env.put(VENV_ENV_VAR, tracRuntimeVenv.toString());
+
+            // Record logs under the batch dir
+            var logDir = batchDir.resolve(JOB_LOG_SUBDIR);
+            var stdoutPath = logDir.resolve("trac_rt_stdout.txt");
+            var stderrPath = logDir.resolve("trac_rt_stderr.txt");
+
+            // createDirectories() will not error if logic code has already created the log dir
+            Files.createDirectories(logDir);
+            pb.redirectOutput(stdoutPath.toFile());
+            pb.redirectError(stderrPath.toFile());
+
+            var process = pb.start();
+
+            processMap.put(process.pid(), process);
+
+            logBatchStart(jobKey, pb, process);
+
+            // If used, this should go on the main service executor
+//            process.onExit().whenComplete((proc, err) ->
+//                    logBatchComplete(jobState.getJobKey(), process, batchState));
+
+            return batchState.toBuilder()
+                    .setPid(process.pid())
+                    .build();
+        }
+        catch (IOException e) {
+            e.printStackTrace();
+            // TODO
+            throw new RuntimeException("TODO");
+        }
+    }
+
+    @Override public LocalBatchState
+    cancelBatch(String jobKey, LocalBatchState jobState) {
+
+        throw new ETracInternal("Cancellation not implemented yet");
+    }
+
+
+    @Override public ExecutorPollResult<LocalBatchState>
+    pollBatch(String jobKey, LocalBatchState jobState) {
+
+        try {
+
+            var batchState = validState(jobState);
+            var process = processMap.get(batchState.getPid());
+
+            if (process == null)
+                throw new EUnexpected();  // TODO
+
+            var pollResult = new ExecutorPollResult<LocalBatchState>();
+            pollResult.jobKey = jobKey;
+            pollResult.batchState = batchState;
+
+            pollResult.statusCode = process.isAlive()
+                    ? JobStatusCode.RUNNING :
+                    process.exitValue() == 0
+                            ? JobStatusCode.SUCCEEDED
+                            : JobStatusCode.FAILED;
+
+            if (pollResult.statusCode == JobStatusCode.FAILED) {
+
+                if (Files.exists(Path.of(batchState.getBatchDir(), JOB_LOG_SUBDIR, "trac_rt_stderr.txt"))) {
+
+                    var errorBytes = readFile(jobKey, batchState, JOB_LOG_SUBDIR, "trac_rt_stderr.txt");
+                    var errorDetail = new String(errorBytes, StandardCharsets.UTF_8);
+
+                    pollResult.statusMessage = extractErrorMessage(errorDetail, process.exitValue());
+                    pollResult.errorDetail = errorDetail;
+                }
+                else {
+
+                    pollResult.statusMessage = String.format(FALLBACK_ERROR_MESSAGE, process.exitValue());
+                    pollResult.errorDetail = FALLBACK_ERROR_DETAIL;
+                }
+            }
+
+            return pollResult;
+        }
+        catch (RuntimeException e) {
+            e.printStackTrace();
+            // TODO
+            throw new RuntimeException("TODO");
+        }
+    }
+
+    @Override public List<ExecutorPollResult<LocalBatchState>>
+    pollAllBatches(Map<String, LocalBatchState> priorStates) {
+
+        var updates = new ArrayList<ExecutorPollResult<LocalBatchState>>();
+
+        for (var job : priorStates.entrySet()) {
+
+            try {
+
+                var priorState = validState(job.getValue());
+                var pollResult = pollBatch(job.getKey(), priorState);
+
+                if (pollResult.statusCode == JobStatusCode.SUCCEEDED || pollResult.statusCode == JobStatusCode.FAILED)
+                    updates.add(pollResult);
+            }
+            catch (Exception e) {
+
+                log.warn("Failed to poll job: [{}] {}", job.getKey(), e.getMessage(), e);
+            }
+        }
+
+        return updates;
+    }
+
 
     private Path prepareVenvPath(Properties properties) {
 
@@ -140,54 +502,15 @@ public class LocalBatchExecutor implements IBatchExecutor {
         return processUser;
     }
 
-    private LocalBatchState validState(ExecutorState jobState) {
+    private LocalBatchState validState(LocalBatchState jobState) {
 
-        if (!(jobState instanceof LocalBatchState))
+        if (jobState == null)
             throw new EUnexpected();
 
-        return (LocalBatchState) jobState;
+        return jobState;
     }
 
-    @Override
-    public void executorStatus() {
 
-    }
-
-    @Override
-    public ExecutorState createBatch(String jobKey) {
-
-        try {
-
-            var batchDirPrefix = String.format(JOB_DIR_TEMPLATE, jobKey.toLowerCase());
-            var batchDir = (batchRootDir != null)
-                    ? Files.createTempDirectory(batchRootDir, batchDirPrefix)
-                    : Files.createTempDirectory(batchDirPrefix);
-
-            var batchDirOwner = Files.getOwner(batchDir);
-
-            if (batchUser != null && batchDirOwner != null && !batchUser.equals(batchDirOwner.getName())) {
-
-                fixSandboxPermissions(batchDir);
-                batchDirOwner = Files.getOwner(batchDir);
-            }
-
-            var batchState = new LocalBatchState(jobKey);
-            batchState.setBatchDir(batchDir.toString());
-
-            log.info("Job [{}] sandbox directory created: [{}], owner = [{}]", jobKey, batchDir, batchDirOwner);
-
-            return batchState;
-        }
-        catch (IOException e) {
-
-            var errorMessage = String.format(
-                    "Job [%s] failed to create sandbox directory: %s",
-                    jobKey, e.getMessage());
-
-            log.error(errorMessage, e);
-            throw new EExecutorFailure(errorMessage, e);
-        }
-    }
 
     private void fixSandboxPermissions(Path batchDir) {
 
@@ -210,241 +533,6 @@ public class LocalBatchExecutor implements IBatchExecutor {
         }
     }
 
-    @Override
-    public void destroyBatch(String jobKey, ExecutorState state) {
-
-        var batchState = validState(state);
-        var batchDir = Paths.get(batchState.getBatchDir());
-        var process = processMap.get(batchState.getPid());
-
-        if (process == null)
-            throw new EUnexpected();  // TODO
-
-        if (process.isAlive()) {
-            log.warn("Process for job [{}] is not complete, it will be forcibly terminated", jobKey);
-            process.destroyForcibly();
-        }
-
-        if (!batchPersist) {
-
-            log.info("Cleaning up sandbox directory [{}]...", batchDir);
-
-            try (var files = Files.walk(batchDir)) {
-
-                files.sorted(Comparator.reverseOrder()).forEach(f -> {
-                    try { Files.delete(f); }
-                    catch (IOException e) { throw new CompletionException(e); }
-                });
-            }
-            catch (IOException e) {
-                log.warn("Failed to clean up sandbox directory [{}]: {}", batchDir, e.getMessage(), e);
-            }
-            catch (CompletionException e) {
-                var cause = e.getCause();
-                log.warn("Failed to clean up sandbox directory [{}]: {}", batchDir, cause.getMessage(), cause);
-            }
-        }
-        else {
-
-            log.info("Sandbox directory [{}] will be retained", batchDir);
-        }
-
-        processMap.remove(batchState.getPid());
-    }
-
-    @Override
-    public ExecutorState createVolume(ExecutorState state, String volumeName, ExecutorVolumeType volumeType) {
-
-        try {
-
-            var batchState = validState(state);
-
-            var isValid = MetadataConstants.VALID_IDENTIFIER.matcher(volumeName);
-            var isReserved = MetadataConstants.TRAC_RESERVED_IDENTIFIER.matcher(volumeName);
-
-            if (!isValid.matches()) {
-
-                var errorMsg = String.format(
-                        "Job [%s] requested volume name is not a valid identifier: [%s]",
-                        state.getJobKey(), volumeName);
-
-                log.error(errorMsg);
-                throw new EExecutorValidation(errorMsg);
-            }
-
-            if (isReserved.matches()) {
-
-                var errorMsg = String.format(
-                        "Job [%s] requested volume name is a reserved identifier: [%s]",
-                        state.getJobKey(), volumeName);
-
-                log.error(errorMsg);
-                throw new EExecutorValidation(errorMsg);
-            }
-
-            // Since volumeName is an identifier, it cannot be an absolute path
-
-            var batchDir = Path.of(batchState.getBatchDir());
-            var volumeDir = batchDir.resolve(volumeName);
-
-            Files.createDirectory(volumeDir);
-
-            batchState.getVolumes().add(volumeName);
-
-            return batchState;
-        }
-        catch (AccessDeniedException e) {
-
-            // Permissions errors reported as executor access error
-
-            var errorMessage = String.format(
-                    "Job [%s] failed to create batch volume [%s]: %s",
-                    state.getJobKey(), volumeName, e.getMessage());
-
-            log.error(errorMessage, e);
-            throw new EExecutorAccess(errorMessage, e);
-        }
-        catch (IOException e) {
-
-            var errorMessage = String.format(
-                    "Job [%s] failed to create batch volume [%s]: %s",
-                    state.getJobKey(), volumeName, e.getMessage());
-
-            log.error(errorMessage, e);
-            throw new EExecutorFailure(errorMessage, e);
-        }
-    }
-
-    @Override
-    public ExecutorState writeFile(ExecutorState state, String volumeName, String fileName, byte[] fileContent) {
-
-        try {
-
-            var batchState = validState(state);
-            var process = processMap.get(batchState.getPid());
-
-            if (!batchState.getVolumes().contains(volumeName)) {
-                var errorMsg = String.format("Requested Volume does not exist: [%s]", volumeName);
-                log.error(errorMsg);
-                throw new ETracInternal(errorMsg);
-            }
-
-            if (process != null ){
-                log.error("writeFile() called after process was started");
-                throw new ETracInternal("writeFile() called after process was started");
-            }
-
-            var batchDir = Path.of(batchState.getBatchDir());
-            var volumeDir = batchDir.resolve(volumeName);
-            var filePath = volumeDir.resolve(fileName);
-
-            Files.write(filePath, fileContent, StandardOpenOption.CREATE_NEW);
-
-            return batchState;
-        }
-        catch (IOException e) {
-
-            // Includes FileAlreadyExistsException
-
-            // TODO
-            throw new RuntimeException("TODO", e);
-        }
-    }
-
-    @Override
-    public byte[] readFile(ExecutorState state, String volumeName, String fileName) {
-
-        try {
-
-            var batchState = validState(state);
-            var process = processMap.get(batchState.getPid());
-
-            if (!batchState.getVolumes().contains(volumeName)) {
-                var errorMsg = String.format("Volume for readFile() does not exist: [%s]", volumeName);
-                log.error(errorMsg);
-                throw new ETracInternal(errorMsg);
-            }
-
-            if (process == null || process.isAlive()){
-                log.error("readFile() called before process is complete");
-                throw new ETracInternal("readFile() called before process is complete");
-            }
-
-            var batchDir = Path.of(batchState.getBatchDir());
-            var volumeDir = batchDir.resolve(volumeName);
-            var filePath = volumeDir.resolve(fileName);
-
-            return Files.readAllBytes(filePath);
-        }
-        // TODO: These error messages will not be meaningful to users
-        catch (NoSuchFileException e) {
-            var message = String.format("Executor read failed for [%s]: File not found", fileName);
-            throw new EExecutorFailure(message, e);
-        }
-        catch (IOException e) {
-            var message = String.format("Executor read failed for [%s]: %s", fileName, e.getMessage());
-            throw new EExecutorFailure(message, e);
-        }
-    }
-
-    @Override
-    public ExecutorState startBatch(ExecutorState jobState, LaunchCmd launchCmd, List<LaunchArg> launchArgs) {
-
-        try {
-
-            var batchState = validState(jobState);
-            var batchDir = Paths.get(batchState.getBatchDir());
-
-            var pythonExe = tracRuntimeVenv.resolve(VENV_BIN_SUBDIR).resolve(PYTHON_EXE).toString();
-            var decodedArgs = launchArgs.stream()
-                    .map(arg -> decodeLaunchArg(arg, batchState))
-                    .collect(Collectors.toList());
-
-            var processArgs = new ArrayList<String>();
-            processArgs.add(pythonExe);
-            processArgs.addAll(TRAC_CMD_ARGS);
-            processArgs.addAll(decodedArgs);
-
-            if (batchPersist)
-                processArgs.add("--scratch-dir-persist");
-
-            var pb = new ProcessBuilder();
-            pb.command(processArgs);
-            pb.directory(batchDir.toFile());
-
-            var env = pb.environment();
-            env.put(VENV_ENV_VAR, tracRuntimeVenv.toString());
-
-            // Record logs under the batch dir
-            var logDir = batchDir.resolve(JOB_LOG_SUBDIR);
-            var stdoutPath = logDir.resolve("trac_rt_stdout.txt");
-            var stderrPath = logDir.resolve("trac_rt_stderr.txt");
-
-            // createDirectories() will not error if logic code has already created the log dir
-            Files.createDirectories(logDir);
-            pb.redirectOutput(stdoutPath.toFile());
-            pb.redirectError(stderrPath.toFile());
-
-            var process = pb.start();
-
-            batchState.setPid(process.pid());
-            processMap.put(process.pid(), process);
-
-            logBatchStart(jobState.getJobKey(), pb, process);
-
-            // If used, this should go on the main service executor
-//            process.onExit().whenComplete((proc, err) ->
-//                    logBatchComplete(jobState.getJobKey(), process, batchState));
-
-            return batchState;
-        }
-        catch (IOException e) {
-            e.printStackTrace();
-            // TODO
-            throw new RuntimeException("TODO");
-        }
-    }
-
     private String decodeLaunchArg(LaunchArg arg, LocalBatchState batchState) {
 
         switch (arg.getArgType()) {
@@ -457,7 +545,7 @@ public class LocalBatchExecutor implements IBatchExecutor {
                 var batchDir = Path.of(batchState.getBatchDir());
                 var volume = arg.getPathVolume();
 
-                if (!batchState.getVolumes().contains(volume)) {
+                if (!batchState.getVolumesList().contains(volume)) {
                     var errorMsg = String.format("Requested volume does not exist: [%s]", volume);
                     log.error(errorMsg);
                     throw new ETracInternal(errorMsg);
@@ -496,68 +584,13 @@ public class LocalBatchExecutor implements IBatchExecutor {
         }
         else {
 
-            var errorBytes = readFile(batchState, JOB_LOG_SUBDIR, "trac_rt_stderr.txt");
+            var errorBytes = readFile(jobKey, batchState, JOB_LOG_SUBDIR, "trac_rt_stderr.txt");
             var errorDetail = new String(errorBytes, StandardCharsets.UTF_8);
 
             log.error("Batch process failed: [{}]", jobKey);
             log.error("Exit code: [{}]", batchProcess.exitValue());
             log.error("CPU time: [{}]", procInfo.totalCpuDuration().orElse(Duration.ZERO));
             log.error(errorDetail);
-        }
-    }
-
-
-    @Override
-    public ExecutorState cancelBatch(ExecutorState jobState) {
-
-        throw new ETracInternal("Cancellation not implemented yet");
-    }
-
-
-    @Override
-    public ExecutorPollResult pollBatch(ExecutorState jobState) {
-
-        try {
-
-            var batchState = validState(jobState);
-            var process = processMap.get(batchState.getPid());
-
-            if (process == null)
-                throw new EUnexpected();  // TODO
-
-            var pollResult = new ExecutorPollResult();
-            pollResult.jobKey = jobState.getJobKey();
-            pollResult.executorState = batchState;
-
-            pollResult.statusCode = process.isAlive()
-                ? JobStatusCode.RUNNING :
-                process.exitValue() == 0
-                    ? JobStatusCode.SUCCEEDED
-                    : JobStatusCode.FAILED;
-
-            if (pollResult.statusCode == JobStatusCode.FAILED) {
-
-                if (Files.exists(Path.of(batchState.getBatchDir(), JOB_LOG_SUBDIR, "trac_rt_stderr.txt"))) {
-
-                    var errorBytes = readFile(batchState, JOB_LOG_SUBDIR, "trac_rt_stderr.txt");
-                    var errorDetail = new String(errorBytes, StandardCharsets.UTF_8);
-
-                    pollResult.statusMessage = extractErrorMessage(errorDetail, process.exitValue());
-                    pollResult.errorDetail = errorDetail;
-                }
-                else {
-
-                    pollResult.statusMessage = String.format(FALLBACK_ERROR_MESSAGE, process.exitValue());
-                    pollResult.errorDetail = FALLBACK_ERROR_DETAIL;
-                }
-            }
-
-            return pollResult;
-        }
-        catch (RuntimeException e) {
-            e.printStackTrace();
-            // TODO
-            throw new RuntimeException("TODO");
         }
     }
 
@@ -580,29 +613,5 @@ public class LocalBatchExecutor implements IBatchExecutor {
 
             return String.format(FALLBACK_ERROR_MESSAGE, exitCode);
         }
-    }
-
-    @Override
-    public List<ExecutorPollResult> pollAllBatches(Map<String, ExecutorState> priorStates) {
-
-        var updates = new ArrayList<ExecutorPollResult>();
-
-        for (var job : priorStates.entrySet()) {
-
-            try {
-
-                var priorState = validState(job.getValue());
-                var pollResult = pollBatch(priorState);
-
-                if (pollResult.statusCode == JobStatusCode.SUCCEEDED || pollResult.statusCode == JobStatusCode.FAILED)
-                    updates.add(pollResult);
-            }
-            catch (Exception e) {
-
-                log.warn("Failed to poll job: [{}] {}", job.getKey(), e.getMessage(), e);
-            }
-        }
-
-        return updates;
     }
 }
