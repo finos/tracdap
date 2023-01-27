@@ -16,6 +16,7 @@
 
 plugins {
     id "java-library"
+    id "com.google.protobuf"
 }
 
 apply from: "${rootProject.projectDir.path}/gradle/base-java.gradle"
@@ -32,6 +33,32 @@ dependencies {
 
     testImplementation project(':tracdap-lib-test')
 }
+
+protobuf {
+
+    protoc {
+        artifact = "com.google.protobuf:protoc:$proto_version"
+    }
+
+    generateProtoTasks.generatedFilesBaseDir = "${project.buildDir}/generated-sources"
+
+    generateProtoTasks {
+        //noinspection GroovyAssignabilityCheck
+        all().each { task -> task.builtins { java {} } }
+    }
+}
+
+sourceSets {
+    main {
+        java {
+            // Include generated code from protoc
+            // Including the proto src dir lets autocomplete work in the IDE
+            srcDirs "${project.buildDir}/generated-sources/main/java"
+            srcDirs "${projectDir}/src/main/proto"
+        }
+    }
+}
+
 
 
 // Compiling dependent targets does not require processResources to be executed by default
