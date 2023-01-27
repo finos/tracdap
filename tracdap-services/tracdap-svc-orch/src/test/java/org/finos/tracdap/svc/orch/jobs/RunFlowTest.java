@@ -365,7 +365,7 @@ public class RunFlowTest {
                     .getAttrsMap().containsKey(ANALYSIS_TYPE)
         );
 
-        var searchResult = dataSearchResult.getSearchResult(0);
+        var searchResult = indexedResult.get("profit_by_region");
         var dataReq = MetadataReadRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setSelector(MetadataUtil.selectorFor(searchResult.getHeader()))
