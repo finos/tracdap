@@ -16,13 +16,16 @@
 
 package org.finos.tracdap.common.exec;
 
+import com.google.protobuf.Message;
 import org.finos.tracdap.metadata.JobStatusCode;
 
-public class ExecutorPollResult {
+
+public class ExecutorPollResult<TState extends Message> {
 
     public String jobKey;
     public JobStatusCode statusCode;
     public String statusMessage;
     public String errorDetail;
-    public ExecutorState executorState;
+
+    public TState batchState;
 }
