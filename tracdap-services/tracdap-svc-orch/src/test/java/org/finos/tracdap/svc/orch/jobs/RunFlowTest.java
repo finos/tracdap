@@ -36,6 +36,7 @@ import java.nio.file.Files;
 import java.time.LocalDate;
 import java.util.Arrays;
 import java.util.List;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static org.finos.tracdap.svc.orch.jobs.Helpers.runJob;
@@ -51,6 +52,7 @@ public class RunFlowTest {
 
     private static final String LOANS_INPUT_PATH = "examples/models/python/data/inputs/loan_final313_100_shortform.csv";
     private static final String CURRENCY_INPUT_PATH = "examples/models/python/data/inputs/currency_data_sample.csv";
+    public static final String ANALYSIS_TYPE = "analysis_type";
 
     // Only test E2E run model using the local repo
     // E2E model loading with different repo types is tested in ImportModelTest
@@ -106,10 +108,13 @@ public class RunFlowTest {
                         .setNodeType(FlowNodeType.OUTPUT_NODE)
                         .addAllNodeAttrs(List.of(
                                 TagUpdate.newBuilder()
-                                        .setAttrName("analysis_type")
+                                        .setAttrName(ANALYSIS_TYPE)
                                         .setValue(pi_value)
                                         .build()
                         ))
+                        .build())
+                .putNodes("preprocessed_data", FlowNode.newBuilder()
+                        .setNodeType(FlowNodeType.OUTPUT_NODE)
                         .build())
                 .addEdges(FlowEdge.newBuilder()
                         .setSource(FlowSocket.newBuilder().setNode("customer_loans"))
@@ -123,6 +128,9 @@ public class RunFlowTest {
                 .addEdges(FlowEdge.newBuilder()
                         .setSource(FlowSocket.newBuilder().setNode("model_2").setSocket("profit_by_region"))
                         .setTarget(FlowSocket.newBuilder().setNode("profit_by_region")))
+                .addEdges(FlowEdge.newBuilder()
+                        .setSource(FlowSocket.newBuilder().setNode("model_1").setSocket("preprocessed_data"))
+                        .setTarget(FlowSocket.newBuilder().setNode("preprocessed_data")))
                 .build();
 
         var createReq = MetadataWriteRequest.newBuilder()
@@ -342,7 +350,20 @@ public class RunFlowTest {
 
         var dataSearchResult = metaClient.search(dataSearch);
 
-        Assertions.assertEquals(1, dataSearchResult.getSearchResultCount());
+        Assertions.assertEquals(2, dataSearchResult.getSearchResultCount());
+
+        var indexedResult = dataSearchResult.getSearchResultList().stream()
+                .collect(Collectors.toMap(RunFlowTest::getJobOutput, Function.identity()));
+
+        var profitByRegionAnalysisType = indexedResult.get("profit_by_region")
+                .getAttrsOrThrow(ANALYSIS_TYPE)
+                .getFloatValue();
+        Assertions.assertEquals(3.14, profitByRegionAnalysisType);
+
+        Assertions.assertFalse(
+            indexedResult.get("preprocessed_data")
+                    .getAttrsMap().containsKey(ANALYSIS_TYPE)
+        );
 
         var searchResult = dataSearchResult.getSearchResult(0);
         var dataReq = MetadataReadRequest.newBuilder()
@@ -358,6 +379,11 @@ public class RunFlowTest {
         Assertions.assertEquals(1, dataDef.getPartsCount());
 
         outputDataId = dataTag.getHeader();
+    }
+
+    private static String getJobOutput(org.finos.tracdap.metadata.Tag t) {
+        var attr = t.getAttrsOrThrow("trac_job_output");
+        return attr.getStringValue();
     }
 
     @Test @Order(5)
