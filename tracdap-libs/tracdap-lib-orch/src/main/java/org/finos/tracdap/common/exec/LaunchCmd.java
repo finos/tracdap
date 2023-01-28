@@ -17,19 +17,49 @@
 package org.finos.tracdap.common.exec;
 
 
+import java.util.List;
+
+
 public class LaunchCmd {
 
+    private final boolean isTrac;
+
+    private final String customCommand;
+    private final List<LaunchArg> customArgs;
+
     public static LaunchCmd trac() {
-        return new LaunchCmd(true);
+        return new LaunchCmd("cp");
     }
 
-    private LaunchCmd(boolean isTrac) {
-        this.isTrac = isTrac;
+    public static LaunchCmd custom(String command) {
+        return new LaunchCmd(command, List.of());
+    }
+
+    public static LaunchCmd custom(String command, List<LaunchArg> args) {
+        return new LaunchCmd(command, args);
+    }
+
+    private LaunchCmd(String cp) {
+        this.isTrac = true;
+        this.customCommand = null;
+        this.customArgs = null;
+    }
+
+    private LaunchCmd(String command, List<LaunchArg> args) {
+        this.isTrac = false;
+        this.customCommand = command;
+        this.customArgs = args;
     }
 
     public boolean isTrac() {
         return this.isTrac;
     }
 
-    private final boolean isTrac;
+    public String customCommand() {
+        return customCommand;
+    }
+
+    public List<LaunchArg> customArgs() {
+        return customArgs;
+    }
 }

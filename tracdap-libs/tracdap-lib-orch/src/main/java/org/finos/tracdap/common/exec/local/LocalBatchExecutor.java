@@ -312,8 +312,18 @@ public class LocalBatchExecutor implements IBatchExecutor<LocalBatchState> {
                     .collect(Collectors.toList());
 
             var processArgs = new ArrayList<String>();
-            processArgs.add(pythonExe);
-            processArgs.addAll(TRAC_CMD_ARGS);
+
+            if (launchCmd.isTrac()) {
+                processArgs.add(pythonExe);
+                processArgs.addAll(TRAC_CMD_ARGS);
+            }
+            else {
+                processArgs.add(launchCmd.customCommand());
+                launchCmd.customArgs().stream()
+                        .map(arg -> decodeLaunchArg(arg, batchState))
+                        .forEach(processArgs::add);
+            }
+
             processArgs.addAll(decodedArgs);
 
             if (batchPersist)
