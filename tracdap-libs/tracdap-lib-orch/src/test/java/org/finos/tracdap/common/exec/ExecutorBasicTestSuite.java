@@ -1,0 +1,131 @@
+/*
+ * Copyright 2023 Accenture Global Solutions Limited
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.finos.tracdap.common.exec;
+
+import org.finos.tracdap.metadata.JobStatusCode;
+import org.finos.tracdap.test.helpers.TestResourceHelpers;
+
+import com.google.protobuf.Message;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
+
+import java.util.List;
+import java.util.UUID;
+import java.util.concurrent.TimeUnit;
+
+
+public abstract class ExecutorBasicTestSuite {
+
+    public static final String LOREM_IPSUM_TEST_RESOURCE = "/lorem_ipsum.txt";
+
+    protected IBatchExecutor<?> executor;
+
+    @SuppressWarnings("unchecked")
+    private <T extends Message> IBatchExecutor<T> stronglyTypedExecutor() {
+        return (IBatchExecutor<T>) executor;
+    }
+
+    @Test
+    void runBasicJob_ok() throws Exception {
+
+        var jobKey = UUID.randomUUID().toString();
+
+        // Create a new batch
+
+        var batchExecutor = stronglyTypedExecutor();
+        var batchState = batchExecutor.createBatch(jobKey);
+
+        // Set up volumes
+
+        batchState = batchExecutor.createVolume(jobKey, batchState, "config", ExecutorVolumeType.CONFIG_DIR);
+        batchState = batchExecutor.createVolume(jobKey, batchState, "outputs", ExecutorVolumeType.RESULT_DIR);
+
+        // TODO: This should not be required (unless it is made part of the API)
+        batchState = batchExecutor.createVolume(jobKey, batchState, "log", ExecutorVolumeType.RESULT_DIR);
+
+        // Write a test file into the config volume
+
+        var inputBytes = TestResourceHelpers.loadResourceAsBytes(LOREM_IPSUM_TEST_RESOURCE, ExecutorBasicTestSuite.class);
+        batchState = batchExecutor.writeFile(jobKey, batchState, "config", "lorem_ipsum.txt", inputBytes);
+
+        // Set up a basic copy command
+
+        var launchCmd = LaunchCmd.custom("cp");
+        var launchArgs = List.of(
+                LaunchArg.string("-v"),
+                LaunchArg.path("config", "lorem_ipsum.txt"),
+                LaunchArg.path("outputs", "lorem_ipsum_copy.txt"));
+
+        // Start the batch
+
+        batchState = batchExecutor.startBatch(jobKey, batchState, launchCmd, launchArgs);
+
+        TimeUnit.MILLISECONDS.sleep(500);
+
+        // TODO: Executor API after this point will need to change
+
+        var result = batchExecutor.pollBatch(jobKey, batchState);
+        batchState = result.batchState;
+
+        Assertions.assertEquals(JobStatusCode.SUCCEEDED, result.statusCode);
+
+        var outputBytes = batchExecutor.readFile(jobKey, batchState, "outputs", "lorem_ipsum_copy.txt");
+
+        Assertions.assertArrayEquals(inputBytes, outputBytes);
+    }
+
+    @Test
+    void runBasicJob_processFailure() throws Exception {
+
+        var jobKey = UUID.randomUUID().toString();
+
+        // Create a new batch
+
+        var batchExecutor = stronglyTypedExecutor();
+        var batchState = batchExecutor.createBatch(jobKey);
+
+        // Set up volumes
+
+        batchState = batchExecutor.createVolume(jobKey, batchState, "config", ExecutorVolumeType.CONFIG_DIR);
+        batchState = batchExecutor.createVolume(jobKey, batchState, "outputs", ExecutorVolumeType.RESULT_DIR);
+
+        // TODO: This should not be required (unless it is made part of the API)
+        batchState = batchExecutor.createVolume(jobKey, batchState, "log", ExecutorVolumeType.RESULT_DIR);
+
+        // Do not prepare input file, let it be missing
+
+        // Set up a basic copy command
+
+        var launchCmd = LaunchCmd.custom("cp");
+        var launchArgs = List.of(
+                LaunchArg.string("-v"),
+                LaunchArg.path("config", "lorem_ipsum.txt"),
+                LaunchArg.path("outputs", "lorem_ipsum_copy.txt"));
+
+        // Start the batch
+
+        batchState = batchExecutor.startBatch(jobKey, batchState, launchCmd, launchArgs);
+
+        TimeUnit.MILLISECONDS.sleep(500);
+
+        // TODO: Executor API after this point will need to change
+
+        var result = batchExecutor.pollBatch(jobKey, batchState);
+
+        Assertions.assertEquals(JobStatusCode.FAILED, result.statusCode);
+    }
+}
