@@ -66,3 +66,21 @@ sourceSets {
 // This dependency ensures resources are always processed, even for partial builds
 
 compileJava.dependsOn(processResources)
+
+
+// Expose test classes as a test suite available to re-use in storage plugins
+
+configurations {
+    testSuite {
+        extendsFrom(testImplementation)
+    }
+}
+
+task testJar(type: Jar) {
+    archiveClassifier.set('test')
+    from sourceSets.test.output
+}
+
+artifacts {
+    testSuite testJar
+}
