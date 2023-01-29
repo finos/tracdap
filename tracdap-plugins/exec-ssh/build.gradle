@@ -32,6 +32,8 @@ dependencies {
 
     api project(':tracdap-lib-common')
     api project(':tracdap-lib-orch')
+
+    testImplementation project(path: ':tracdap-lib-orch', configuration: 'testSuite')
 }
 
 protobuf {
