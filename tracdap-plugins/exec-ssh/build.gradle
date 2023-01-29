@@ -33,6 +33,17 @@ dependencies {
     api project(':tracdap-lib-common')
     api project(':tracdap-lib-orch')
 
+    // Dependencies for Apache SSHD
+    implementation (group: "org.apache.sshd", name: "sshd-common", version: "${apache_sshd_version}")
+    implementation group: "org.apache.sshd", name: "sshd-core", version: "${apache_sshd_version}"
+    implementation group: "org.apache.sshd", name: "sshd-scp", version: "${apache_sshd_version}"
+    implementation group: "org.apache.sshd", name: "sshd-netty", version: "${apache_sshd_version}"
+
+    // Force version of SLF4J to match other components
+    implementation group: 'org.slf4j', name: 'slf4j-api', version: "${slf4j_version}"
+    implementation group: 'org.slf4j', name: 'jcl-over-slf4j', version: "${slf4j_version}"
+
+    // Pull in the executor test suite for testing
     testImplementation project(path: ':tracdap-lib-orch', configuration: 'testSuite')
 }
 
