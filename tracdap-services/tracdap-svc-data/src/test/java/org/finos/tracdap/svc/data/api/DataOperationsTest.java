@@ -46,7 +46,7 @@ import static org.finos.tracdap.common.metadata.MetadataUtil.selectorFor;
 import static org.finos.tracdap.common.metadata.MetadataUtil.selectorForLatest;
 import static org.finos.tracdap.test.concurrent.ConcurrentTestHelpers.resultOf;
 import static org.finos.tracdap.test.concurrent.ConcurrentTestHelpers.waitFor;
-import static org.finos.tracdap.test.helpers.TestResourceHelpers.loadResourceAsByteString;
+import static org.finos.tracdap.common.util.ResourceHelpers.loadResourceAsByteString;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 

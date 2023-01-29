@@ -20,7 +20,7 @@ import org.finos.tracdap.common.config.test.TestConfigPlugin;
 import org.finos.tracdap.common.exception.EConfigParse;
 import org.finos.tracdap.config.PlatformConfig;
 import org.finos.tracdap.config.PluginConfig;
-import org.finos.tracdap.test.helpers.TestResourceHelpers;
+import org.finos.tracdap.common.util.ResourceHelpers;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -47,7 +47,7 @@ public class ConfigParserTest {
     @Test
     public void testJson_basicLoadOk() {
 
-        var configBytes = TestResourceHelpers.loadResourceAsBytes(SAMPLE_JSON_CONFIG);
+        var configBytes = ResourceHelpers.loadResourceAsBytes(SAMPLE_JSON_CONFIG);
         var configObject = ConfigParser.parseConfig(configBytes, ConfigFormat.JSON, PlatformConfig.class);
 
         Assertions.assertNotNull(configObject);
@@ -72,7 +72,7 @@ public class ConfigParserTest {
     @Test
     public void testJson_unknownItem() {
 
-        var configBytes = TestResourceHelpers.loadResourceAsBytes(UNKNOWN_ITEM_JSON_CONFIG);
+        var configBytes = ResourceHelpers.loadResourceAsBytes(UNKNOWN_ITEM_JSON_CONFIG);
 
         Assertions.assertThrows(EConfigParse.class, () ->
                 ConfigParser.parseConfig(configBytes, ConfigFormat.JSON, PlatformConfig.class));
@@ -81,7 +81,7 @@ public class ConfigParserTest {
     @Test
     public void testJson_lenient() {
 
-        var configBytes = TestResourceHelpers.loadResourceAsBytes(UNKNOWN_ITEM_JSON_CONFIG);
+        var configBytes = ResourceHelpers.loadResourceAsBytes(UNKNOWN_ITEM_JSON_CONFIG);
 
         Assertions.assertDoesNotThrow(() ->
                 ConfigParser.parseConfig(configBytes, ConfigFormat.JSON, PlatformConfig.class, true));
@@ -90,7 +90,7 @@ public class ConfigParserTest {
     @Test
     public void testYaml_basicLoadOk() {
 
-        var configBytes = TestResourceHelpers.loadResourceAsBytes(SAMPLE_YAML_CONFIG);
+        var configBytes = ResourceHelpers.loadResourceAsBytes(SAMPLE_YAML_CONFIG);
         var configObject = ConfigParser.parseConfig(configBytes, ConfigFormat.YAML, PlatformConfig.class);
 
         Assertions.assertNotNull(configObject);
@@ -115,7 +115,7 @@ public class ConfigParserTest {
     @Test
     public void testYaml_unknownItem() {
 
-        var configBytes = TestResourceHelpers.loadResourceAsBytes(UNKNOWN_ITEM_YAML_CONFIG);
+        var configBytes = ResourceHelpers.loadResourceAsBytes(UNKNOWN_ITEM_YAML_CONFIG);
 
         Assertions.assertThrows(EConfigParse.class, () ->
                 ConfigParser.parseConfig(configBytes, ConfigFormat.YAML, PlatformConfig.class));
@@ -124,7 +124,7 @@ public class ConfigParserTest {
     @Test
     public void testYaml_lenient() {
 
-        var configBytes = TestResourceHelpers.loadResourceAsBytes(UNKNOWN_ITEM_YAML_CONFIG);
+        var configBytes = ResourceHelpers.loadResourceAsBytes(UNKNOWN_ITEM_YAML_CONFIG);
 
         Assertions.assertDoesNotThrow(() ->
                 ConfigParser.parseConfig(configBytes, ConfigFormat.YAML, PlatformConfig.class, true));

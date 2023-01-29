@@ -17,7 +17,7 @@
 package org.finos.tracdap.common.exec;
 
 import org.finos.tracdap.metadata.JobStatusCode;
-import org.finos.tracdap.test.helpers.TestResourceHelpers;
+import org.finos.tracdap.common.util.ResourceHelpers;
 
 import com.google.protobuf.Message;
 import org.junit.jupiter.api.Assertions;
@@ -59,7 +59,7 @@ public abstract class ExecutorBasicTestSuite {
 
         // Write a test file into the config volume
 
-        var inputBytes = TestResourceHelpers.loadResourceAsBytes(LOREM_IPSUM_TEST_RESOURCE, ExecutorBasicTestSuite.class);
+        var inputBytes = ResourceHelpers.loadResourceAsBytes(LOREM_IPSUM_TEST_RESOURCE, ExecutorBasicTestSuite.class);
         batchState = batchExecutor.writeFile(jobKey, batchState, "config", "lorem_ipsum.txt", inputBytes);
 
         // Set up a basic copy command
