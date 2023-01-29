@@ -63,6 +63,8 @@ ext {
 
     aws_sdk_version = '2.19.10'
 
+    apache_sshd_version = "2.9.2"
+
     // AWS SDK uses Reactive Streams
     // Only the latest version has a good license (MIT-0, prior versions were Creative Commons)
     reactive_streams_version = '1.0.4'
