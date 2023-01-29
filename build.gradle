@@ -45,6 +45,10 @@ subprojects {
 
     // Publishing setup is defined in gradle/publish.gradle
     project.afterEvaluate(publishModule)
+
+    // Workaround for a bug between Gradle and Jetbrains in the build system
+    // Jetbrains build with Gradle creates classpath.index, subsequent builds report duplicate output file
+    tasks.withType(Jar).tap { configureEach { duplicatesStrategy = DuplicatesStrategy.EXCLUDE } }
 }
 
 
