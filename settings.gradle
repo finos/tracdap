@@ -96,3 +96,6 @@ project(":aws-storage").projectDir = file("tracdap-plugins/aws-storage")
 
 include 'gcp-config'
 project(":gcp-config").projectDir = file("tracdap-plugins/gcp-config")
+
+include 'exec-ssh'
+project(":exec-ssh").projectDir = file("tracdap-plugins/exec-ssh")

@@ -16,22 +16,35 @@
 
 plugins {
     id "java-library"
+    id 'java-library-distribution'
     id "com.google.protobuf"
 }
 
 apply from: "${rootProject.projectDir.path}/gradle/base-java.gradle"
 
 
-description = "TRAC D.A.P. orchestration library, interfaces and core functionality for job orchestration"
+description = "Executor plugin for remote execution over SSH"
+
+// Put plugins into a separate package group
+group = "org.finos.tracdap.plugins"
 
 dependencies {
 
-    api project(':tracdap-api-metadata')
-    api project(':tracdap-api-config')
-    api project(':tracdap-api-services')
     api project(':tracdap-lib-common')
+    api project(':tracdap-lib-orch')
 
-    testImplementation project(':tracdap-lib-test')
+    // Dependencies for Apache SSHD
+    implementation (group: "org.apache.sshd", name: "sshd-common", version: "${apache_sshd_version}")
+    implementation group: "org.apache.sshd", name: "sshd-core", version: "${apache_sshd_version}"
+    implementation group: "org.apache.sshd", name: "sshd-scp", version: "${apache_sshd_version}"
+    implementation group: "org.apache.sshd", name: "sshd-netty", version: "${apache_sshd_version}"
+
+    // Force version of SLF4J to match other components
+    implementation group: 'org.slf4j', name: 'slf4j-api', version: "${slf4j_version}"
+    implementation group: 'org.slf4j', name: 'jcl-over-slf4j', version: "${slf4j_version}"
+
+    // Pull in the executor test suite for testing
+    testImplementation project(path: ':tracdap-lib-orch', configuration: 'testSuite')
 }
 
 protobuf {
@@ -59,28 +72,5 @@ sourceSets {
     }
 }
 
-
-
-// Compiling dependent targets does not require processResources to be executed by default
-// E.g. running tests from the IDE will not trigger processResources - this can cause confusion!
-// This dependency ensures resources are always processed, even for partial builds
-
-compileJava.dependsOn(processResources)
-
-
-// Expose test classes as a test suite available to re-use in storage plugins
-
-configurations {
-    testSuite {
-        extendsFrom(testImplementation)
-    }
-}
-
-task testJar(type: Jar) {
-    archiveClassifier.set('test')
-    from sourceSets.test.output
-}
-
-artifacts {
-    testSuite testJar
-}
+// Use a different build dir (don't include plugins in the main release package)
+project.buildDir = rootProject.buildDir.path + '/plugins/' + project.name
