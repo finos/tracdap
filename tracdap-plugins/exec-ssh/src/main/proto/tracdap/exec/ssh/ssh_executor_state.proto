@@ -23,9 +23,14 @@ option java_multiple_files = true;
 
 message SshBatchState {
 
-  string batchDir = 1;
-  repeated string volumes = 2;
-  int64 pid = 3;
+  string remoteHost = 1;
+  int32 remotePort = 2;
+  string batchUser = 3;
+
+  string batchDir = 4;
+  repeated string volumes = 5;
+
+  int64 pid = 6;
 }
 
 
