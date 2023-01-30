@@ -16,6 +16,7 @@
 
 package org.finos.tracdap.common.storage;
 
+import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.config.StorageConfig;
 import org.finos.tracdap.common.codec.ICodecManager;
 import org.finos.tracdap.common.exception.EStartup;
@@ -36,10 +37,12 @@ public class StorageManager implements IStorageManager, AutoCloseable {
     private final Logger log = LoggerFactory.getLogger(getClass());
 
     private final IPluginManager plugins;
+    private final ConfigManager configManager;
     private final Map<String, StorageBackend> storage;
 
-    public StorageManager(IPluginManager plugins) {
+    public StorageManager(IPluginManager plugins, ConfigManager configManager) {
         this.plugins = plugins;
+        this.configManager = configManager;
         this.storage = new HashMap<>();
     }
 
@@ -53,25 +56,23 @@ public class StorageManager implements IStorageManager, AutoCloseable {
             var bucketConfig = bucket.getValue();
             var backend = new StorageBackend();
 
-            var protocol = bucketConfig.getProtocol();
-            var rawProps = bucketConfig.getPropertiesMap();
-            var props = new Properties();
-            props.put(PROP_STORAGE_KEY, bucketKey);
-            props.putAll(rawProps);
+            bucketConfig = bucketConfig.toBuilder()
+                    .putProperties(PROP_STORAGE_KEY, bucketKey)
+                    .build();
 
-            log.info("Attach storage: [{}] (protocol: {})", bucketKey, protocol);
+            log.info("Attach storage: [{}] (protocol: {})", bucketKey, bucketConfig.getProtocol());
 
-            if (plugins.isServiceAvailable(IFileStorage.class, protocol)) {
+            if (plugins.isServiceAvailable(IFileStorage.class, bucketConfig.getProtocol())) {
 
-                var fileInstance = plugins.createService(IFileStorage.class, protocol, props);
+                var fileInstance = plugins.createService(IFileStorage.class, bucketConfig, configManager);
                 fileInstance.start(eventLoopGroup);
 
                 backend.fileInstances.add(fileInstance);
             }
 
-            if (plugins.isServiceAvailable(IDataStorage.class, protocol)) {
+            if (plugins.isServiceAvailable(IDataStorage.class, bucketConfig.getProtocol())) {
 
-                var dataInstance = plugins.createService(IDataStorage.class, protocol, props);
+                var dataInstance = plugins.createService(IDataStorage.class, bucketConfig, configManager);
                 dataInstance.start(eventLoopGroup);
 
                 backend.dataInstances.add(dataInstance);
@@ -91,7 +92,7 @@ public class StorageManager implements IStorageManager, AutoCloseable {
 
             if (backend.fileInstances.isEmpty() && backend.dataInstances.isEmpty()) {
 
-                var message = String.format("No plugin found to support storage protocol [%s]", protocol);
+                var message = String.format("No plugin found to support storage protocol [%s]", bucketConfig.getProtocol());
                 var error = new EStartup(message);
 
                 log.error(message, error);
