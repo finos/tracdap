@@ -147,7 +147,7 @@ public class PluginManager implements IPluginManager {
     }
 
     @Override
-    public <T> T createService(Class<T> serviceClass, ConfigManager configManager, PluginConfig pluginConfig) {
+    public <T> T createService(Class<T> serviceClass, PluginConfig pluginConfig, ConfigManager configManager) {
 
         var protocol = pluginConfig.getProtocol();
         var properties = new Properties();

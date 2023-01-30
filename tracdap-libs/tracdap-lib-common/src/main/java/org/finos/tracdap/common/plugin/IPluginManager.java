@@ -28,7 +28,7 @@ public interface IPluginManager {
 
     boolean isServiceAvailable(Class<?> serviceClass, String protocol);
 
-    <T> T createService(Class<T> serviceClass, ConfigManager configManager, PluginConfig pluginConfig);
+    <T> T createService(Class<T> serviceClass, PluginConfig pluginConfig, ConfigManager configManager);
 
     <T> T createService(Class<T> serviceClass, String protocol);
 

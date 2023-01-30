@@ -122,8 +122,9 @@ public class TracOrchestratorService extends CommonServiceBase {
             // jobCache = InterfaceLogging.wrap(jobCache, IJobCache.class);
 
             jobExecCtrl = pluginManager.createService(
-                    IBatchExecutor.class, configManager,
-                    platformConfig.getExecutor());
+                    IBatchExecutor.class,
+                    platformConfig.getExecutor(),
+                    configManager);
 
             jobMonitor = new JobManagementService(
                     jobLifecycle, jobCache,
