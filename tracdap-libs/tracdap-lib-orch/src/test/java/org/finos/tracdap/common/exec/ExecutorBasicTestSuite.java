@@ -49,43 +49,49 @@ public abstract class ExecutorBasicTestSuite {
         var batchExecutor = stronglyTypedExecutor();
         var batchState = batchExecutor.createBatch(jobKey);
 
-        // Set up volumes
+        try {
 
-        batchState = batchExecutor.createVolume(jobKey, batchState, "config", ExecutorVolumeType.CONFIG_DIR);
-        batchState = batchExecutor.createVolume(jobKey, batchState, "outputs", ExecutorVolumeType.RESULT_DIR);
+            // Set up volumes
 
-        // TODO: This should not be required (unless it is made part of the API)
-        batchState = batchExecutor.createVolume(jobKey, batchState, "log", ExecutorVolumeType.RESULT_DIR);
+            batchState = batchExecutor.createVolume(jobKey, batchState, "config", ExecutorVolumeType.CONFIG_DIR);
+            batchState = batchExecutor.createVolume(jobKey, batchState, "outputs", ExecutorVolumeType.RESULT_DIR);
 
-        // Write a test file into the config volume
+            // TODO: This should not be required (unless it is made part of the API)
+            batchState = batchExecutor.createVolume(jobKey, batchState, "log", ExecutorVolumeType.RESULT_DIR);
 
-        var inputBytes = ResourceHelpers.loadResourceAsBytes(LOREM_IPSUM_TEST_RESOURCE, ExecutorBasicTestSuite.class);
-        batchState = batchExecutor.writeFile(jobKey, batchState, "config", "lorem_ipsum.txt", inputBytes);
+            // Write a test file into the config volume
 
-        // Set up a basic copy command
+            var inputBytes = ResourceHelpers.loadResourceAsBytes(LOREM_IPSUM_TEST_RESOURCE, ExecutorBasicTestSuite.class);
+            batchState = batchExecutor.writeFile(jobKey, batchState, "config", "lorem_ipsum.txt", inputBytes);
 
-        var launchCmd = LaunchCmd.custom("cp");
-        var launchArgs = List.of(
-                LaunchArg.string("-v"),
-                LaunchArg.path("config", "lorem_ipsum.txt"),
-                LaunchArg.path("outputs", "lorem_ipsum_copy.txt"));
+            // Set up a basic copy command
 
-        // Start the batch
+            var launchCmd = LaunchCmd.custom("cp");
+            var launchArgs = List.of(
+                    LaunchArg.string("-v"),
+                    LaunchArg.path("config", "lorem_ipsum.txt"),
+                    LaunchArg.path("outputs", "lorem_ipsum_copy.txt"));
 
-        batchState = batchExecutor.startBatch(jobKey, batchState, launchCmd, launchArgs);
+            // Start the batch
 
-        TimeUnit.MILLISECONDS.sleep(500);
+            batchState = batchExecutor.startBatch(jobKey, batchState, launchCmd, launchArgs);
 
-        // TODO: Executor API after this point will need to change
+            TimeUnit.MILLISECONDS.sleep(500);
 
-        var result = batchExecutor.pollBatch(jobKey, batchState);
-        batchState = result.batchState;
+            // TODO: Executor API after this point will need to change
 
-        Assertions.assertEquals(JobStatusCode.SUCCEEDED, result.statusCode);
+            var result = batchExecutor.pollBatch(jobKey, batchState);
+            batchState = result.batchState;
 
-        var outputBytes = batchExecutor.readFile(jobKey, batchState, "outputs", "lorem_ipsum_copy.txt");
+            Assertions.assertEquals(JobStatusCode.SUCCEEDED, result.statusCode);
 
-        Assertions.assertArrayEquals(inputBytes, outputBytes);
+            var outputBytes = batchExecutor.readFile(jobKey, batchState, "outputs", "lorem_ipsum_copy.txt");
+
+            Assertions.assertArrayEquals(inputBytes, outputBytes);
+        }
+        finally {
+            batchExecutor.destroyBatch(jobKey, batchState);
+        }
     }
 
     @Test
@@ -98,34 +104,40 @@ public abstract class ExecutorBasicTestSuite {
         var batchExecutor = stronglyTypedExecutor();
         var batchState = batchExecutor.createBatch(jobKey);
 
-        // Set up volumes
+        try {
 
-        batchState = batchExecutor.createVolume(jobKey, batchState, "config", ExecutorVolumeType.CONFIG_DIR);
-        batchState = batchExecutor.createVolume(jobKey, batchState, "outputs", ExecutorVolumeType.RESULT_DIR);
+            // Set up volumes
 
-        // TODO: This should not be required (unless it is made part of the API)
-        batchState = batchExecutor.createVolume(jobKey, batchState, "log", ExecutorVolumeType.RESULT_DIR);
+            batchState = batchExecutor.createVolume(jobKey, batchState, "config", ExecutorVolumeType.CONFIG_DIR);
+            batchState = batchExecutor.createVolume(jobKey, batchState, "outputs", ExecutorVolumeType.RESULT_DIR);
 
-        // Do not prepare input file, let it be missing
+            // TODO: This should not be required (unless it is made part of the API)
+            batchState = batchExecutor.createVolume(jobKey, batchState, "log", ExecutorVolumeType.RESULT_DIR);
 
-        // Set up a basic copy command
+            // Do not prepare input file, let it be missing
 
-        var launchCmd = LaunchCmd.custom("cp");
-        var launchArgs = List.of(
-                LaunchArg.string("-v"),
-                LaunchArg.path("config", "lorem_ipsum.txt"),
-                LaunchArg.path("outputs", "lorem_ipsum_copy.txt"));
+            // Set up a basic copy command
 
-        // Start the batch
+            var launchCmd = LaunchCmd.custom("cp");
+            var launchArgs = List.of(
+                    LaunchArg.string("-v"),
+                    LaunchArg.path("config", "lorem_ipsum.txt"),
+                    LaunchArg.path("outputs", "lorem_ipsum_copy.txt"));
 
-        batchState = batchExecutor.startBatch(jobKey, batchState, launchCmd, launchArgs);
+            // Start the batch
 
-        TimeUnit.MILLISECONDS.sleep(500);
+            batchState = batchExecutor.startBatch(jobKey, batchState, launchCmd, launchArgs);
 
-        // TODO: Executor API after this point will need to change
+            TimeUnit.MILLISECONDS.sleep(500);
 
-        var result = batchExecutor.pollBatch(jobKey, batchState);
+            // TODO: Executor API after this point will need to change
 
-        Assertions.assertEquals(JobStatusCode.FAILED, result.statusCode);
+            var result = batchExecutor.pollBatch(jobKey, batchState);
+
+            Assertions.assertEquals(JobStatusCode.FAILED, result.statusCode);
+        }
+        finally {
+            batchExecutor.destroyBatch(jobKey, batchState);
+        }
     }
 }
