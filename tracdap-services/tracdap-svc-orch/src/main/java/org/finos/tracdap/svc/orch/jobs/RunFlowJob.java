@@ -24,10 +24,7 @@ import org.finos.tracdap.config.JobResult;
 import org.finos.tracdap.config.PlatformConfig;
 import org.finos.tracdap.metadata.*;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 
@@ -64,7 +61,8 @@ public class RunFlowJob extends RunModelOrFlow implements IJobLogic {
 
         var runFlow = job.getRunFlow();
 
-        var outputs = flowOutputs(runFlow.getFlow(), resources, resourceMapping);
+        var outputFlowNodes = getFlowOutputNodes(runFlow.getFlow(), resources, resourceMapping);
+        var outputs = getFlowOutputNames(outputFlowNodes);
 
         return newResultIds(tenant, outputs, runFlow.getPriorOutputsMap());
     }
@@ -77,24 +75,27 @@ public class RunFlowJob extends RunModelOrFlow implements IJobLogic {
 
         var runFlow = job.getRunFlow();
 
-        var outputs = flowOutputs(runFlow.getFlow(), resources, resourceMapping);
+        var outputFlowNodes = getFlowOutputNodes(runFlow.getFlow(), resources, resourceMapping);
+        var outputs = getFlowOutputNames(outputFlowNodes);
 
         return priorResultIds(outputs, runFlow.getPriorOutputsMap(), resources, resourceMapping);
     }
 
-    private Set<String> flowOutputs(
+    private static Set<String> getFlowOutputNames(Map<String, FlowNode> outputFlowNodes) {
+        return new HashSet<>(outputFlowNodes.keySet());
+    }
+
+    private static Map<String, FlowNode> getFlowOutputNodes(
             TagSelector flowSelector,
             Map<String, ObjectDefinition> resources,
             Map<String, TagHeader> resourceMapping) {
-
         var flowKey = MetadataUtil.objectKey(flowSelector);
         var flowId = resourceMapping.get(flowKey);
         var flowDef = resources.get(MetadataUtil.objectKey(flowId)).getFlow();
 
         return flowDef.getNodesMap().entrySet().stream()
                 .filter(nodeEntry -> nodeEntry.getValue().getNodeType() == FlowNodeType.OUTPUT_NODE)
-                .map(Map.Entry::getKey)
-                .collect(Collectors.toSet());
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
     }
 
     @Override
@@ -103,7 +104,8 @@ public class RunFlowJob extends RunModelOrFlow implements IJobLogic {
             Map<String, ObjectDefinition> resources,
             Map<String, TagHeader> resourceMapping) {
 
-        var flowOutputNames = flowOutputs(job.getRunFlow().getFlow(), resources, resourceMapping);
+        var outputFlowNodes = getFlowOutputNodes(job.getRunFlow().getFlow(), resources, resourceMapping);
+        var flowOutputNames = getFlowOutputNames(outputFlowNodes);
 
         var flowOutputSelectors = setResultIds(flowOutputNames, resultMapping);
 
@@ -120,9 +122,18 @@ public class RunFlowJob extends RunModelOrFlow implements IJobLogic {
     public List<MetadataWriteRequest> buildResultMetadata(String tenant, JobConfig jobConfig, JobResult jobResult) {
 
         var runFlow = jobConfig.getJob().getRunFlow();
+        var outputFlowNodes = getFlowOutputNodes(
+                jobConfig.getJob().getRunFlow().getFlow(),
+                jobConfig.getResourcesMap(),
+                jobConfig.getResourceMappingMap()
+        );
+
+        var perNodeOutputAttrs = outputFlowNodes.entrySet().stream()
+                .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().getNodeAttrsList()));
 
         return buildResultMetadata(
                 tenant, runFlow.getOutputsMap(), runFlow.getPriorOutputsMap(),
-                runFlow.getOutputAttrsList(), jobConfig, jobResult);
+                runFlow.getOutputAttrsList(), perNodeOutputAttrs,
+                jobConfig, jobResult);
     }
 }

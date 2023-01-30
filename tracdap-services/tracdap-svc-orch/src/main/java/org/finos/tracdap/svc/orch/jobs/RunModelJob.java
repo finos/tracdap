@@ -115,6 +115,7 @@ public class RunModelJob extends RunModelOrFlow implements IJobLogic {
 
         return buildResultMetadata(
                 tenant, runModel.getOutputsMap(), runModel.getPriorOutputsMap(),
-                runModel.getOutputAttrsList(), jobConfig, jobResult);
+                runModel.getOutputAttrsList(), Map.of(),
+                jobConfig, jobResult);
     }
 }
