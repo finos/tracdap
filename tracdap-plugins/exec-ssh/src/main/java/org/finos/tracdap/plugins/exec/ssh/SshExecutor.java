@@ -66,20 +66,16 @@ public class SshExecutor implements IBatchExecutor<SshBatchState> {
     public static final String CONFIG_BATCH_DIR = "batchDir";
     public static final String CONFIG_BATCH_PERSIST = "batchPersist";
 
+    private static final String LAUNCH_SCRIPT_NAME = "launch_batch.sh";
+    private static final String POLL_SCRIPT_NAME = "poll_batch.sh";
     private static final byte[] LAUNCH_SCRIPT = ResourceHelpers.loadResourceAsBytes("/scripts/launch_batch.sh", SshExecutor.class);
     private static final byte[] POLL_SCRIPT = ResourceHelpers.loadResourceAsBytes("/scripts/poll_batch.sh", SshExecutor.class);
+    // private static final String POLL_EXECUTOR_COMMAND = "ps -a | grep launch_batch.sh | grep -v \"grep launch_batch.sh\"";
 
     private static final String CREATE_BATCH_DIR_COMMAND = "mkdir -p -m %s \"%s\"";
     private static final String DESTROY_BATCH_PROCESS_COMMAND = "if ps -p %d; then kill -s KILL %d; fi";
     private static final String DESTROY_BATCH_DIR_COMMAND = "rm -r \"%s\"";
-
     private static final String CREATE_VOLUME_COMMAND = "mkdir -m %s \"%s\"";
-
-    private static final List<String> TRAC_CMD_ARGS = List.of("-m", "tracdap.rt.launch");
-    private static final String LAUNCH_SCRIPT_NAME = "launch_batch.sh";
-    private static final String POLL_SCRIPT_NAME = "poll_batch.sh";
-
-    // private static final String POLL_EXECUTOR_COMMAND = "ps -a | grep launch_batch.sh | grep -v \"grep launch_batch.sh\"";
 
     private static final List<PosixFilePermission> DEFAULT_FILE_PERMISSIONS = List.of(
             PosixFilePermission.OWNER_READ,
@@ -95,9 +91,11 @@ public class SshExecutor implements IBatchExecutor<SshBatchState> {
 
     private static final String DEFAULT_DIRECTORY_MODE = "750";
 
+    private static final List<String> TRAC_CMD_ARGS = List.of("-m", "tracdap.rt.launch");
+    private static final Pattern TRAC_ERROR_LINE = Pattern.compile("tracdap.rt.exceptions.(E\\w+): (.+)");
+
     private static final String FALLBACK_ERROR_MESSAGE = "Local batch terminated with non-zero exit code [%d]";
     private static final String FALLBACK_ERROR_DETAIL = "No details available";
-    private static final Pattern TRAC_ERROR_LINE = Pattern.compile("tracdap.rt.exceptions.(E\\w+): (.+)");
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
