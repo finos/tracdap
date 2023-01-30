@@ -40,6 +40,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.attribute.PosixFilePermission;
 import java.rmi.ServerException;
 import java.security.GeneralSecurityException;
@@ -51,6 +52,7 @@ import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 
@@ -73,10 +75,11 @@ public class SshExecutor implements IBatchExecutor<SshBatchState> {
 
     private static final String CREATE_VOLUME_COMMAND = "mkdir -m %s \"%s\"";
 
+    private static final List<String> TRAC_CMD_ARGS = List.of("-m", "tracdap.rt.launch");
     private static final String LAUNCH_SCRIPT_NAME = "launch_batch.sh";
     private static final String POLL_SCRIPT_NAME = "poll_batch.sh";
 
-    private static final String POLL_EXECUTOR_COMMAND = "ps -a | grep launch_batch.sh | grep -v \"grep launch_batch.sh\"";
+    // private static final String POLL_EXECUTOR_COMMAND = "ps -a | grep launch_batch.sh | grep -v \"grep launch_batch.sh\"";
 
     private static final List<PosixFilePermission> DEFAULT_FILE_PERMISSIONS = List.of(
             PosixFilePermission.OWNER_READ,
@@ -91,6 +94,10 @@ public class SshExecutor implements IBatchExecutor<SshBatchState> {
             PosixFilePermission.GROUP_EXECUTE);
 
     private static final String DEFAULT_DIRECTORY_MODE = "750";
+
+    private static final String FALLBACK_ERROR_MESSAGE = "Local batch terminated with non-zero exit code [%d]";
+    private static final String FALLBACK_ERROR_DETAIL = "No details available";
+    private static final Pattern TRAC_ERROR_LINE = Pattern.compile("tracdap.rt.exceptions.(E\\w+): (.+)");
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
@@ -111,7 +118,7 @@ public class SshExecutor implements IBatchExecutor<SshBatchState> {
 
         venvPath = requiredProperty(CONFIG_VENV_PATH);
         batchRootDir = requiredProperty(CONFIG_BATCH_DIR);
-        batchPersist = properties.contains(CONFIG_BATCH_PERSIST) &&
+        batchPersist = properties.containsKey(CONFIG_BATCH_PERSIST) &&
                 Boolean.parseBoolean(requiredProperty(CONFIG_BATCH_PERSIST));
     }
 
@@ -447,13 +454,25 @@ public class SshExecutor implements IBatchExecutor<SshBatchState> {
                 result.statusCode = JobStatusCode.RUNNING;
             }
             else {
-                var exitCode = tryParseLong(pollResponse.get("exit_code"), "Invalid poll response for [exit_code]");
+                var exitCode = (int)(long) tryParseLong(pollResponse.get("exit_code"), "Invalid poll response for [exit_code]");
                 result.statusCode = exitCode == 0 ? JobStatusCode.SUCCEEDED : JobStatusCode.FAILED;
-            }
 
-            if (result.statusCode == JobStatusCode.FAILED) {
+                if (result.statusCode == JobStatusCode.FAILED) {
 
-                // todo Try to get the error message
+                    try {
+
+                        var errorBytes = readFile(batchKey, batchState, "log", "trac_rt_stderr.txt");
+                        var errorDetail = new String(errorBytes, StandardCharsets.UTF_8);
+
+                        result.statusMessage = extractErrorMessage(errorDetail, exitCode);
+                        result.errorDetail = errorDetail;
+                    }
+                    catch (EExecutorFailure e) {
+
+                        result.statusMessage = String.format(FALLBACK_ERROR_MESSAGE, exitCode);
+                        result.errorDetail = FALLBACK_ERROR_DETAIL;
+                    }
+                }
             }
 
             return result;
@@ -652,11 +671,9 @@ public class SshExecutor implements IBatchExecutor<SshBatchState> {
         var processArgs = new ArrayList<String>();
 
         if (launchCmd.isTrac()) {
-            // todo
-            throw new ETracInternal("not implemented");
-//            var pythonExe = tracRuntimeVenv.resolve(VENV_BIN_SUBDIR).resolve(PYTHON_EXE).toString();
-//            processArgs.add(pythonExe);
-//            processArgs.addAll(TRAC_CMD_ARGS);
+            var pythonExe = venvPath + (venvPath.endsWith("/") ? "" : "/") + "bin/python";
+            processArgs.add(pythonExe);
+            processArgs.addAll(TRAC_CMD_ARGS);
         }
         else {
             processArgs.add(launchCmd.customCommand());
@@ -719,6 +736,29 @@ public class SshExecutor implements IBatchExecutor<SshBatchState> {
         catch (NumberFormatException e) {
             var message = String.format("%s (%s)", errorMessage, e.getMessage());
             throw new EExecutorFailure(message, e);
+        }
+    }
+
+    private String extractErrorMessage(String errorDetail, int exitCode) {
+
+        // TODO: Better way of reporting runtime errors
+
+        var lastLineIndex = errorDetail.stripTrailing().lastIndexOf("\n");
+        var lastLine = errorDetail.substring(lastLineIndex + 1).stripTrailing();
+
+        var tracError = TRAC_ERROR_LINE.matcher(lastLine);
+
+        if (tracError.matches()) {
+
+            var exception = tracError.group(1);
+            var message = tracError.group(2);
+
+            log.error("Runtime error [{}]: {}", exception, message);
+            return message;
+        }
+        else {
+
+            return String.format(FALLBACK_ERROR_MESSAGE, exitCode);
         }
     }
 
