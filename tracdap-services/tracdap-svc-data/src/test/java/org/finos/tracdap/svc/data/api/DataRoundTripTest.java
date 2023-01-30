@@ -25,7 +25,7 @@ import org.finos.tracdap.metadata.*;
 
 import org.finos.tracdap.test.data.SampleData;
 import org.finos.tracdap.test.helpers.PlatformTest;
-import org.finos.tracdap.test.helpers.TestResourceHelpers;
+import org.finos.tracdap.common.util.ResourceHelpers;
 import com.google.common.collect.Streams;
 import com.google.protobuf.ByteString;
 import org.apache.arrow.memory.RootAllocator;
@@ -105,7 +105,7 @@ abstract class DataRoundTripTest {
     private static final String BASIC_JSON_DATA = SampleData.BASIC_JSON_DATA_RESOURCE;
     private static final String LARGE_CSV_DATA = "/large_csv_data_100000.csv";
 
-    private static final byte[] BASIC_CSV_CONTENT = TestResourceHelpers.loadResourceAsBytes(BASIC_CSV_DATA);
+    private static final byte[] BASIC_CSV_CONTENT = ResourceHelpers.loadResourceAsBytes(BASIC_CSV_DATA);
 
     private static final List<Vector<Object>> BASIC_TEST_DATA = DataApiTestHelpers.decodeCsv(
             SampleData.BASIC_TABLE_SCHEMA,

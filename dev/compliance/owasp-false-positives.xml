@@ -151,4 +151,10 @@
         <cve>CVE-2022-41915</cve>
     </suppress>
 
+    <!-- pending upgrade to SLF4J 2 -->
+    <suppress>
+        <packageUrl regex="true">^pkg:maven/org\.slf4j/jcl\-over\-slf4j@.*$</packageUrl>
+        <cve>CVE-2021-37533</cve>
+    </suppress>
+
 </suppressions>

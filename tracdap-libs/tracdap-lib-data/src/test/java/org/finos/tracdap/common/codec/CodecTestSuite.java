@@ -33,7 +33,7 @@ import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.test.data.SampleData;
 import org.finos.tracdap.test.data.SingleBatchDataSink;
 import org.finos.tracdap.test.data.SingleBatchDataSource;
-import org.finos.tracdap.test.helpers.TestResourceHelpers;
+import org.finos.tracdap.common.util.ResourceHelpers;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.EmptyByteBuf;
@@ -358,7 +358,7 @@ public abstract class CodecTestSuite {
         var allocator = new RootAllocator();
         var root = generateBasicData(allocator);
 
-        var testData = TestResourceHelpers.loadResourceAsBytes(basicData);
+        var testData = ResourceHelpers.loadResourceAsBytes(basicData);
         var testDataBuf = Unpooled.wrappedBuffer(testData);
         var testDataStream = Flows.publish(List.of(testDataBuf));
 

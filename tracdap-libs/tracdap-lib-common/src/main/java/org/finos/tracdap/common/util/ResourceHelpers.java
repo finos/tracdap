@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Accenture Global Solutions Limited
+ * Copyright 2023 Accenture Global Solutions Limited
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,19 +14,18 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.test.helpers;
+package org.finos.tracdap.common.util;
 
 import com.google.protobuf.ByteString;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 
 
-public class TestResourceHelpers {
+public class ResourceHelpers {
 
     public static ByteString loadResourceAsByteString(String resourcePath) {
 
-        return loadResourceAsByteString(resourcePath, TestResourceHelpers.class);
+        return loadResourceAsByteString(resourcePath, ResourceHelpers.class);
     }
 
     public static ByteString loadResourceAsByteString(String resourcePath, Class<?> clazz) {
@@ -35,20 +34,9 @@ public class TestResourceHelpers {
         return ByteString.copyFrom(bytes);
     }
 
-    public static String loadResourceAsString(String resourcePath) {
-
-        return loadResourceAsString(resourcePath, TestResourceHelpers.class);
-    }
-
-    public static String loadResourceAsString(String resourcePath, Class<?> clazz) {
-
-        var bytes = loadResourceAsBytes(resourcePath, clazz);
-        return new String(bytes, StandardCharsets.UTF_8);
-    }
-
     public static byte[] loadResourceAsBytes(String resourcePath) {
 
-        return loadResourceAsBytes(resourcePath, TestResourceHelpers.class);
+        return loadResourceAsBytes(resourcePath, ResourceHelpers.class);
     }
 
     public static byte[] loadResourceAsBytes(String resourcePath, Class<?> clazz) {
@@ -56,7 +44,7 @@ public class TestResourceHelpers {
         try (var stream = clazz.getResourceAsStream(resourcePath)) {
 
             if (stream == null)
-                throw new IOException("Failed to read resource: " + resourcePath);
+                throw new IOException("Failed to load resource: [" + resourcePath + "]");
 
             return stream.readAllBytes();
         }
