@@ -71,7 +71,7 @@ public class TracOrchestratorService extends CommonServiceBase {
     private ManagedChannel clientChannel;
 
     private IJobCache jobCache;
-    private IBatchExecutor<?> jobExecCtrl;
+    private IBatchExecutor<?> jobExecutor;
     private JobManagementService jobMonitor;
 
     public TracOrchestratorService(PluginManager pluginManager, ConfigManager configManager) {
@@ -121,15 +121,16 @@ public class TracOrchestratorService extends CommonServiceBase {
             jobCache = new LocalJobCache();
             // jobCache = InterfaceLogging.wrap(jobCache, IJobCache.class);
 
-            jobExecCtrl = pluginManager.createService(
+            jobExecutor = pluginManager.createService(
                     IBatchExecutor.class,
                     platformConfig.getExecutor(),
                     configManager);
 
             jobMonitor = new JobManagementService(
                     jobLifecycle, jobCache,
-                    jobExecCtrl, serviceGroup);
+                    jobExecutor, serviceGroup);
 
+            jobExecutor.start(serviceGroup);
             jobMonitor.start();
 
             var orchestrator = new JobApiService(jobLifecycle, jobCache);
@@ -177,6 +178,12 @@ public class TracOrchestratorService extends CommonServiceBase {
             return clientChannel.awaitTermination(remaining.toMillis(), TimeUnit.MILLISECONDS);
         });
 
+        var executorDown = shutdownResource("Executor service", deadline, remainingTime -> {
+
+            jobExecutor.stop();
+            return true;
+        });
+
         var jobMonitorDown = shutdownResource("Job monitor service", deadline, remaining -> {
 
             jobMonitor.stop();
@@ -201,7 +208,7 @@ public class TracOrchestratorService extends CommonServiceBase {
             return bossGroup.awaitTermination(remaining.toMillis(), TimeUnit.MILLISECONDS);
         });
 
-        if (serverDown && clientDown && jobMonitorDown &&
+        if (serverDown && clientDown && executorDown && jobMonitorDown &&
             serviceThreadsDown && nettyDown && bossDown)
             return 0;
 
