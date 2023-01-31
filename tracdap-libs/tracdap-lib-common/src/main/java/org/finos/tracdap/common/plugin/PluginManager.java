@@ -149,7 +149,7 @@ public class PluginManager implements IPluginManager {
     @Override
     public <T> T createService(Class<T> serviceClass, PluginConfig pluginConfig, ConfigManager configManager) {
 
-        var plugin = getPlugin(serviceClass, pluginConfig.getProtocol());
+        var plugin = lookupPlugin(serviceClass, pluginConfig.getProtocol());
 
         return plugin.createService(serviceClass, pluginConfig, configManager);
     }
@@ -167,7 +167,7 @@ public class PluginManager implements IPluginManager {
     @Override
     public <T> T createConfigService(Class<T> serviceClass, PluginConfig pluginConfig) {
 
-        var plugin = getPlugin(serviceClass, pluginConfig.getProtocol());
+        var plugin = lookupPlugin(serviceClass, pluginConfig.getProtocol());
 
         return plugin.createConfigService(serviceClass, pluginConfig);
     }
@@ -184,12 +184,12 @@ public class PluginManager implements IPluginManager {
             pluginConfig.putProperties(key, value);
         }
 
-        var plugin = getPlugin(serviceClass, protocol);
+        var plugin = lookupPlugin(serviceClass, protocol);
 
         return plugin.createConfigService(serviceClass, pluginConfig.build());
     }
 
-    private <T> ITracPlugin getPlugin(Class<T> serviceClass, String protocol) {
+    private <T> ITracPlugin lookupPlugin(Class<T> serviceClass, String protocol) {
 
         var pluginKey = new PluginKey(serviceClass, protocol);
 
