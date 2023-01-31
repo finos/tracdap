@@ -149,27 +149,47 @@ public class PluginManager implements IPluginManager {
     @Override
     public <T> T createService(Class<T> serviceClass, PluginConfig pluginConfig, ConfigManager configManager) {
 
-        var protocol = pluginConfig.getProtocol();
-        var properties = new Properties();
-        properties.putAll(pluginConfig.getPropertiesMap());
+        var plugin = getPlugin(serviceClass, pluginConfig.getProtocol());
 
-        for (var secret : pluginConfig.getSecretsMap().entrySet()) {
-            var secretKey = secret.getKey();
-            var secretValue = configManager.loadPassword(secret.getValue());
-            properties.put(secretKey, secretValue);
+        return plugin.createService(serviceClass, pluginConfig, configManager);
+    }
+
+    @Override
+    public <T> T createService(Class<T> serviceClass, String protocol, ConfigManager configManager) {
+
+        var pluginConfig = PluginConfig.newBuilder()
+                .setProtocol(protocol)
+                .build();
+
+        return createService(serviceClass, pluginConfig, configManager);
+    }
+
+    @Override
+    public <T> T createConfigService(Class<T> serviceClass, PluginConfig pluginConfig) {
+
+        var plugin = getPlugin(serviceClass, pluginConfig.getProtocol());
+
+        return plugin.createConfigService(serviceClass, pluginConfig);
+    }
+
+    @Override
+    public <T> T createConfigService(Class<T> serviceClass, String protocol, Properties properties) {
+
+        var pluginConfig = PluginConfig.newBuilder()
+                .setProtocol(protocol);
+
+        for (var property: properties.entrySet()) {
+            var key = property.getKey().toString();
+            var value = property.getValue().toString();
+            pluginConfig.putProperties(key, value);
         }
 
-        return createService(serviceClass, protocol, properties);
+        var plugin = getPlugin(serviceClass, protocol);
+
+        return plugin.createConfigService(serviceClass, pluginConfig.build());
     }
 
-    @Override
-    public <T> T createService(Class<T> serviceClass, String protocol) {
-
-        return createService(serviceClass, protocol, new Properties());
-    }
-
-    @Override
-    public <T> T createService(Class<T> serviceClass, String protocol, Properties properties) {
+    private <T> ITracPlugin getPlugin(Class<T> serviceClass, String protocol) {
 
         var pluginKey = new PluginKey(serviceClass, protocol);
 
@@ -196,9 +216,7 @@ public class PluginManager implements IPluginManager {
             throw new EPluginNotAvailable(message);
         }
 
-        var plugin = plugins.get(pluginKey);
-
-        return plugin.createService(serviceClass, protocol, properties);
+        return plugins.get(pluginKey);
     }
 
     private String prettyTypeName(String rawTypeName, boolean caps) {

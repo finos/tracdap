@@ -30,7 +30,9 @@ public interface IPluginManager {
 
     <T> T createService(Class<T> serviceClass, PluginConfig pluginConfig, ConfigManager configManager);
 
-    <T> T createService(Class<T> serviceClass, String protocol);
+    <T> T createService(Class<T> serviceClass, String protocol, ConfigManager configManager);
 
-    <T> T createService(Class<T> serviceClass, String protocol, Properties properties);
+    <T> T createConfigService(Class<T> serviceClass, PluginConfig pluginConfig);
+
+    <T> T createConfigService(Class<T> serviceClass, String protocol, Properties properties);
 }
