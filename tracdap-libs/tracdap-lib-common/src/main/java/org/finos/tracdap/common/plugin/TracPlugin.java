@@ -29,13 +29,13 @@ public abstract class TracPlugin implements ITracPlugin {
 
     protected <T> T createService(String serviceName, Properties properties, ConfigManager configManager) {
 
-        var message = String.format("No plugin available with service name [%s]", serviceName);
+        var message = String.format("Plugin [%s] does not support the service [%s]", pluginName(), serviceName);
         throw new EPluginNotAvailable(message);
     }
 
     protected <T> T createConfigService(String serviceName, Properties properties) {
 
-        var message = String.format("No plugin available with service name [%s]", serviceName);
+        var message = String.format("Plugin [%s] does not support the service [%s]", pluginName(), serviceName);
         throw new EPluginNotAvailable(message);
     }
 
