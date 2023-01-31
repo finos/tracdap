@@ -16,6 +16,7 @@
 
 package org.finos.tracdap.common.codec;
 
+import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.exception.EPluginNotAvailable;
 import org.finos.tracdap.common.plugin.IPluginManager;
 import org.slf4j.Logger;
@@ -27,16 +28,18 @@ public class CodecManager implements ICodecManager {
     private final Logger log = LoggerFactory.getLogger(getClass());
 
     private final IPluginManager plugins;
+    private final ConfigManager configManager;
 
-    public CodecManager(IPluginManager plugins) {
+    public CodecManager(IPluginManager plugins, ConfigManager configManager) {
         this.plugins = plugins;
+        this.configManager = configManager;
     }
 
     @Override
     public ICodec getCodec(String format) {
 
         if (plugins.isServiceAvailable(ICodec.class, format))
-            return plugins.createService(ICodec.class, format);
+            return plugins.createService(ICodec.class, format, configManager);
 
         else {
 

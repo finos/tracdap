@@ -16,7 +16,8 @@
 
 package org.finos.tracdap.plugins.exec.ssh;
 
-import org.finos.tracdap.common.exception.EUnexpected;
+import org.finos.tracdap.common.config.ConfigManager;
+import org.finos.tracdap.common.exception.EPluginNotAvailable;
 import org.finos.tracdap.common.exec.IBatchExecutor;
 import org.finos.tracdap.common.plugin.PluginServiceInfo;
 import org.finos.tracdap.common.plugin.TracPlugin;
@@ -46,14 +47,12 @@ public class SshExecutorPlugin extends TracPlugin {
     }
 
     @Override @SuppressWarnings("unchecked")
-    public <T> T createService(String serviceName, Properties properties) {
+    public <T> T createService(String serviceName, Properties properties, ConfigManager configManager) {
 
-        switch (serviceName) {
+        if (serviceName.equals(SSH_EXECUTOR_NAME))
+            return (T) new SshExecutor(properties, configManager);
 
-            case SSH_EXECUTOR_NAME: return (T) new SshExecutor(properties);
-
-            default:
-                throw new EUnexpected();
-        }
+        var message = String.format("Plugin [%s] does not support the service [%s]", pluginName(), serviceName);
+        throw new EPluginNotAvailable(message);
     }
 }

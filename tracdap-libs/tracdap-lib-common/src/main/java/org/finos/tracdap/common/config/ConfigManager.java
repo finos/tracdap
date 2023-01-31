@@ -173,7 +173,7 @@ public class ConfigManager {
      * Allow client code to resolve config files explicitly
      *
      * <p>This is not normally needed by the TRAC services, which read config though this class.
-     * But some of the utility programs can use this method to find config files for updating.
+     * But the TRAC utility programs can use this method to find config files for updating.
      *
      * @param relativePath Relative URL of the config file to resolve
      * @return The resolved absolute URL of the config file
@@ -504,7 +504,7 @@ public class ConfigManager {
             throw new EConfigLoad(message);
         }
 
-        return plugins.createService(IConfigLoader.class, protocol);
+        return plugins.createConfigService(IConfigLoader.class, protocol, new Properties());
     }
 
     private ISecretLoader secretLoaderForProtocol(String protocol, Map<String, String> configMap) {
@@ -518,7 +518,7 @@ public class ConfigManager {
         }
 
         var secretProps = buildSecretProps(configMap);
-        var secretLoader = plugins.createService(ISecretLoader.class, protocol, secretProps);
+        var secretLoader = plugins.createConfigService(ISecretLoader.class, protocol, secretProps);
         secretLoader.init(this);
 
         return secretLoader;

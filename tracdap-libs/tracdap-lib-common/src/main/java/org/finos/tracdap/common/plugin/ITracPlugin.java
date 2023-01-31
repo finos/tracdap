@@ -16,8 +16,11 @@
 
 package org.finos.tracdap.common.plugin;
 
+import org.finos.tracdap.common.config.ConfigManager;
+import org.finos.tracdap.config.PluginConfig;
+
 import java.util.List;
-import java.util.Properties;
+
 
 public interface ITracPlugin {
 
@@ -27,5 +30,7 @@ public interface ITracPlugin {
 
     List<String> protocols(Class<?> service);
 
-    <T> T createService(Class<T> serviceClass, String protocol, Properties properties);
+    <T> T createService(Class<T> serviceClass, PluginConfig config, ConfigManager configManager);
+
+    <T> T createConfigService(Class<T> serviceClass, PluginConfig config);
 }

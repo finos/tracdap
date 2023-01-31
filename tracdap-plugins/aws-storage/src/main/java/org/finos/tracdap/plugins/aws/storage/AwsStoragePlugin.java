@@ -16,7 +16,8 @@
 
 package org.finos.tracdap.plugins.aws.storage;
 
-import org.finos.tracdap.common.exception.EUnexpected;
+import org.finos.tracdap.common.config.ConfigManager;
+import org.finos.tracdap.common.exception.EPluginNotAvailable;
 import org.finos.tracdap.common.plugin.PluginServiceInfo;
 import org.finos.tracdap.common.plugin.TracPlugin;
 import org.finos.tracdap.common.storage.IFileStorage;
@@ -44,11 +45,12 @@ public class AwsStoragePlugin extends TracPlugin {
     }
 
     @Override @SuppressWarnings("unchecked")
-    protected <T> T createService(String serviceName, Properties properties) {
+    protected <T> T createService(String serviceName, Properties properties, ConfigManager configManager) {
 
         if (serviceName.equals(S3_OBJECT_STORAGE))
             return (T) new S3ObjectStorage(properties);
 
-        throw new EUnexpected();
+        var message = String.format("Plugin [%s] does not support the service [%s]", pluginName(), serviceName);
+        throw new EPluginNotAvailable(message);
     }
 }

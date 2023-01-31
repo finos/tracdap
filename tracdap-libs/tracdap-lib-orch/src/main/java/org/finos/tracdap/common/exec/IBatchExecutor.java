@@ -27,6 +27,10 @@ public interface IBatchExecutor<TState extends Message> {
 
     // Interface for running batch jobs, i.e. a job that runs using one-shot using a one-shot process
 
+    void start();
+
+    void stop();
+
     void executorStatus();
 
     Parser<TState> stateDecoder();

@@ -75,6 +75,16 @@ public class LocalBatchExecutor implements IBatchExecutor<LocalBatchState> {
     }
 
     @Override
+    public void start() {
+
+    }
+
+    @Override
+    public void stop() {
+
+    }
+
+    @Override
     public Parser<LocalBatchState> stateDecoder() {
         return LocalBatchState.parser();
     }

@@ -16,8 +16,9 @@
 
 package org.finos.tracdap.svc.meta.dal;
 
+import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.db.JdbcSetup;
-import org.finos.tracdap.common.exception.EUnexpected;
+import org.finos.tracdap.common.exception.EPluginNotAvailable;
 import org.finos.tracdap.common.plugin.PluginServiceInfo;
 import org.finos.tracdap.common.plugin.TracPlugin;
 import org.finos.tracdap.svc.meta.dal.jdbc.JdbcMetadataDal;
@@ -47,7 +48,7 @@ public class MetadataDalPlugin extends TracPlugin {
 
     @Override
     @SuppressWarnings("unchecked")
-    protected <T> T createService(String serviceName, Properties properties) {
+    protected <T> T createService(String serviceName, Properties properties, ConfigManager configManager) {
 
         if (JDBC_METADATA_DAL.equals(serviceName)) {
 
@@ -58,6 +59,7 @@ public class MetadataDalPlugin extends TracPlugin {
         }
 
         // Should never happen, protected by PluginManager
-        throw new EUnexpected();
+        var message = String.format("Plugin [%s] does not support the service [%s]", pluginName(), serviceName);
+        throw new EPluginNotAvailable(message);
     }
 }

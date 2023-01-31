@@ -33,5 +33,6 @@ public class LocalExecutorBasicTest extends ExecutorBasicTestSuite {
         executorProps.setProperty("venvPath", tempDir.normalize().toString());
 
         executor = new LocalBatchExecutor(executorProps);
+        executor.start();
     }
 }

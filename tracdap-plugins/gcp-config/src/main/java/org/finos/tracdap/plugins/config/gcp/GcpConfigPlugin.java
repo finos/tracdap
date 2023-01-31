@@ -17,7 +17,7 @@
 package org.finos.tracdap.plugins.config.gcp;
 
 import org.finos.tracdap.common.config.IConfigLoader;
-import org.finos.tracdap.common.exception.EUnexpected;
+import org.finos.tracdap.common.exception.EPluginNotAvailable;
 import org.finos.tracdap.common.plugin.PluginServiceInfo;
 import org.finos.tracdap.common.plugin.TracPlugin;
 
@@ -47,11 +47,12 @@ public class GcpConfigPlugin extends TracPlugin {
     }
 
     @Override @SuppressWarnings("unchecked")
-    protected <T> T createService(String serviceName, Properties properties) {
+    protected <T> T createConfigService(String serviceName, Properties properties) {
 
         if (serviceName.equals(SERVICE_NAME))
             return (T) new GcpConfigLoader();
 
-        throw new EUnexpected();
+        var message = String.format("Plugin [%s] does not support the service [%s]", pluginName(), serviceName);
+        throw new EPluginNotAvailable(message);
     }
 }

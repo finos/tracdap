@@ -95,7 +95,7 @@ public class TracMetadataService extends CommonServiceBase {
 
             // Load the DAL service using the plugin loader mechanism
             var metaDbConfig = platformConfig.getMetadata().getDatabase();
-            dal = pluginManager.createService(IMetadataDal.class, configManager, metaDbConfig);
+            dal = pluginManager.createService(IMetadataDal.class, metaDbConfig, configManager);
             dal.start();
 
             // Metadata DB props contains config need for the executor pool size

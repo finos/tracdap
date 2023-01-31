@@ -143,8 +143,8 @@ public class TracDataService extends CommonServiceBase {
 
             var arrowAllocator = new RootAllocator(arrowAllocatorConfig);
 
-            var formats = new CodecManager(pluginManager);
-            storage = new StorageManager(pluginManager);
+            var formats = new CodecManager(pluginManager, configManager);
+            storage = new StorageManager(pluginManager, configManager);
             storage.initStorage(platformConfig.getStorage(), formats, serviceGroup);
 
             var tenantConfig = platformConfig.getTenantsMap();

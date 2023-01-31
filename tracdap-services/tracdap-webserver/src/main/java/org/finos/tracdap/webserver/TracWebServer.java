@@ -91,7 +91,7 @@ public class TracWebServer extends CommonServiceBase {
                 .putProperties(IStorageManager.PROP_STORAGE_KEY, "CONTENT_ROOT")
                 .build();
 
-        var contentStorage = pluginManager.createService(IFileStorage.class, configManager, contentRootConfig);
+        var contentStorage = pluginManager.createService(IFileStorage.class, contentRootConfig, configManager);
         contentStorage.start(workerGroup);
 
         // Handlers for all support protocols

@@ -16,6 +16,10 @@
 
 package org.finos.tracdap.common.plugin;
 
+import org.finos.tracdap.common.config.ConfigManager;
+import org.finos.tracdap.common.exception.EPluginNotAvailable;
+import org.finos.tracdap.config.PluginConfig;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
@@ -23,7 +27,17 @@ import java.util.stream.Collectors;
 
 public abstract class TracPlugin implements ITracPlugin {
 
-    protected abstract <T> T createService(String serviceName, Properties properties);
+    protected <T> T createService(String serviceName, Properties properties, ConfigManager configManager) {
+
+        var message = String.format("Plugin [%s] does not support the service [%s]", pluginName(), serviceName);
+        throw new EPluginNotAvailable(message);
+    }
+
+    protected <T> T createConfigService(String serviceName, Properties properties) {
+
+        var message = String.format("Plugin [%s] does not support the service [%s]", pluginName(), serviceName);
+        throw new EPluginNotAvailable(message);
+    }
 
     @Override
     public final List<String> protocols(Class<?> service) {
@@ -43,7 +57,34 @@ public abstract class TracPlugin implements ITracPlugin {
     }
 
     @Override
-    public final <T> T createService(Class<T> serviceClass, String protocol, Properties properties) {
+    public final <T> T createService(Class<T> serviceClass, PluginConfig config, ConfigManager configManager) {
+
+        var serviceInfo = lookupService(serviceClass, config.getProtocol());
+
+        var properties = new Properties();
+        properties.putAll(config.getPropertiesMap());
+
+        for (var secret : config.getSecretsMap().entrySet()) {
+            var secretKey = secret.getKey();
+            var secretValue = configManager.loadPassword(secret.getValue());
+            properties.put(secretKey, secretValue);
+        }
+
+        return createService(serviceInfo.serviceName(), properties, configManager);
+    }
+
+    @Override
+    public final <T> T createConfigService(Class<T> serviceClass, PluginConfig config) {
+
+        var serviceInfo = lookupService(serviceClass, config.getProtocol());
+
+        var properties = new Properties();
+        properties.putAll(config.getPropertiesMap());
+
+        return createConfigService(serviceInfo.serviceName(), properties);
+    }
+
+    private <T> PluginServiceInfo lookupService(Class<T> serviceClass, String protocol) {
 
         var psi = serviceInfo();
 
@@ -54,10 +95,10 @@ public abstract class TracPlugin implements ITracPlugin {
         if (matchingPsi.isEmpty())
             throw new IllegalArgumentException();
 
-        return createService(matchingPsi.get().serviceName(), properties);
+        return matchingPsi.get();
     }
 
-    protected static boolean psiMatch(PluginServiceInfo psi, Class<?> service, String protocol) {
+    private static boolean psiMatch(PluginServiceInfo psi, Class<?> service, String protocol) {
 
         if (psi.serviceClass() != service)
             return false;

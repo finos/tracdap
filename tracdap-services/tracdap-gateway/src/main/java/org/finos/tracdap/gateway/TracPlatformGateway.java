@@ -108,7 +108,7 @@ public class TracPlatformGateway extends CommonServiceBase {
             log.info("Starting the gateway server on port {}...", proxyPort);
 
             var authProviderConfig = gatewayConfig.getAuthentication().getProvider();
-            var authProvider = pluginManager.createService(IAuthProvider.class, configManager, authProviderConfig);
+            var authProvider = pluginManager.createService(IAuthProvider.class, authProviderConfig, configManager);
 
             if (authProvider.wantTracUsers())
                 authProvider.setTracUsers(configManager.getUserDb());
