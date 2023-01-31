@@ -22,6 +22,7 @@ import org.finos.tracdap.common.config.ConfigFormat;
 import org.finos.tracdap.common.config.ConfigParser;
 import org.finos.tracdap.common.exception.*;
 import org.finos.tracdap.common.exec.*;
+import org.finos.tracdap.common.exec.local.LocalBatchExecutor;
 import org.finos.tracdap.common.validation.Validator;
 import org.finos.tracdap.config.*;
 import org.finos.tracdap.metadata.JobStatusCode;
@@ -55,6 +56,8 @@ public class JobManagementService {
 
     private final Validator validator = new Validator();
 
+    private final Duration pollInterval;
+
     public JobManagementService(
             JobLifecycle jobLifecycle,
             IJobCache jobCache,
@@ -65,6 +68,9 @@ public class JobManagementService {
         this.jobCache = jobCache;
         this.untypedExecutor = batchExecutor;
         this.executorService = executorService;
+
+        // TODO: This needs to come from a property, probably in the executor plugin config
+        pollInterval = (batchExecutor instanceof LocalBatchExecutor) ? Duration.ofSeconds(5) : POLL_INTERVAL;
     }
 
     @SuppressWarnings("unchecked")
@@ -91,8 +97,8 @@ public class JobManagementService {
 
             pollingTask = executorService.scheduleAtFixedRate(
                     this::poll,
-                    POLL_INTERVAL.getSeconds(),
-                    POLL_INTERVAL.getSeconds(),
+                    pollInterval.getSeconds(),
+                    pollInterval.getSeconds(),
                     TimeUnit.SECONDS);
 
             log.info("Job monitor service started OK");
