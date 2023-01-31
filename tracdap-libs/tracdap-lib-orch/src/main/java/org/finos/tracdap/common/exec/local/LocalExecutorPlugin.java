@@ -16,7 +16,8 @@
 
 package org.finos.tracdap.common.exec.local;
 
-import org.finos.tracdap.common.exception.EUnexpected;
+import org.finos.tracdap.common.config.ConfigManager;
+import org.finos.tracdap.common.exception.EPluginNotAvailable;
 import org.finos.tracdap.common.plugin.PluginServiceInfo;
 import org.finos.tracdap.common.plugin.TracPlugin;
 import org.finos.tracdap.common.exec.IBatchExecutor;
@@ -45,14 +46,12 @@ public class LocalExecutorPlugin extends TracPlugin {
     }
 
     @Override @SuppressWarnings("unchecked")
-    public <T> T createService(String serviceName, Properties properties) {
+    protected <T> T createService(String serviceName, Properties properties, ConfigManager configManager) {
 
-        switch (serviceName) {
+        if (serviceName.equals(LOCAL_BATCH_EXECUTOR_NAME))
+            return (T) new LocalBatchExecutor(properties);
 
-            case LOCAL_BATCH_EXECUTOR_NAME: return (T) new LocalBatchExecutor(properties);
-
-            default:
-                throw new EUnexpected();
-        }
+        var message = String.format("Plugin [%s] does not support the service [%s]", pluginName(), serviceName);
+        throw new EPluginNotAvailable(message);
     }
 }

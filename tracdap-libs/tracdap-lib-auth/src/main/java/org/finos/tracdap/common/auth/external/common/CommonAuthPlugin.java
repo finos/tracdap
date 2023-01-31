@@ -17,7 +17,8 @@
 package org.finos.tracdap.common.auth.external.common;
 
 import org.finos.tracdap.common.auth.external.IAuthProvider;
-import org.finos.tracdap.common.exception.EUnexpected;
+import org.finos.tracdap.common.config.ConfigManager;
+import org.finos.tracdap.common.exception.EPluginNotAvailable;
 import org.finos.tracdap.common.plugin.PluginServiceInfo;
 import org.finos.tracdap.common.plugin.TracPlugin;
 
@@ -46,7 +47,7 @@ public class CommonAuthPlugin extends TracPlugin {
     }
 
     @Override @SuppressWarnings("unchecked")
-    protected <T> T createService(String serviceName, Properties properties) {
+    protected <T> T createService(String serviceName, Properties properties, ConfigManager configManager) {
 
         if (serviceName.equals(GUEST_PROVIDER))
             return (T) new GuestAuthProvider(properties);
@@ -54,6 +55,7 @@ public class CommonAuthPlugin extends TracPlugin {
         if (serviceName.equals(BASIC_PROVIDER))
             return (T) new BasicAuthProvider(properties);
 
-        throw new EUnexpected();
+        var message = String.format("Plugin [%s] does not support the service [%s]", pluginName(), serviceName);
+        throw new EPluginNotAvailable(message);
     }
 }

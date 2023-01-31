@@ -21,7 +21,8 @@ import org.finos.tracdap.common.codec.arrow.ArrowFileCodec;
 import org.finos.tracdap.common.codec.arrow.ArrowStreamCodec;
 import org.finos.tracdap.common.codec.csv.CsvCodec;
 import org.finos.tracdap.common.codec.json.JsonCodec;
-import org.finos.tracdap.common.exception.EUnexpected;
+import org.finos.tracdap.common.config.ConfigManager;
+import org.finos.tracdap.common.exception.EPluginNotAvailable;
 import org.finos.tracdap.common.plugin.PluginServiceInfo;
 import org.finos.tracdap.common.plugin.TracPlugin;
 import org.finos.tracdap.common.storage.IFileStorage;
@@ -60,7 +61,7 @@ public class CoreDataPlugin extends TracPlugin {
     }
 
     @Override @SuppressWarnings("unchecked")
-    public <T> T createService(String serviceName, Properties properties) {
+    protected  <T> T createService(String serviceName, Properties properties, ConfigManager configManager) {
 
         switch (serviceName) {
 
@@ -69,9 +70,9 @@ public class CoreDataPlugin extends TracPlugin {
             case ARROW_FILE_CODEC_NAME: return (T) new ArrowFileCodec();
             case CSV_CODEC_NAME: return (T) new CsvCodec();
             case JSON_CODEC_NAME: return (T) new JsonCodec();
-
-            default:
-                throw new EUnexpected();
         }
+
+        var message = String.format("Plugin [%s] does not support the service [%s]", pluginName(), serviceName);
+        throw new EPluginNotAvailable(message);
     }
 }
