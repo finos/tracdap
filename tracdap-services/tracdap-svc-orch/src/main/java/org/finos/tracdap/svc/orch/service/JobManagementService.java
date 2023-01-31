@@ -41,7 +41,7 @@ import java.util.concurrent.*;
 
 public class JobManagementService {
 
-    private static final Duration POLL_INTERVAL = Duration.ofSeconds(2);
+    private static final Duration POLL_INTERVAL = Duration.ofSeconds(60);
     private static final Duration RETAIN_COMPLETE_DELAY = Duration.ofSeconds(60);
 
     private final Logger log = LoggerFactory.getLogger(getClass());
