@@ -17,7 +17,6 @@
 package org.finos.tracdap.common.exec.local;
 
 import com.google.protobuf.Parser;
-import io.netty.channel.EventLoopGroup;
 import org.finos.tracdap.common.exception.*;
 import org.finos.tracdap.common.exec.*;
 import org.finos.tracdap.common.metadata.MetadataConstants;
@@ -76,7 +75,7 @@ public class LocalBatchExecutor implements IBatchExecutor<LocalBatchState> {
     }
 
     @Override
-    public void start(EventLoopGroup eventLoopGroup) {
+    public void start() {
 
     }
 

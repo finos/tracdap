@@ -130,7 +130,7 @@ public class TracOrchestratorService extends CommonServiceBase {
                     jobLifecycle, jobCache,
                     jobExecutor, serviceGroup);
 
-            jobExecutor.start(serviceGroup);
+            jobExecutor.start();
             jobMonitor.start();
 
             var orchestrator = new JobApiService(jobLifecycle, jobCache);

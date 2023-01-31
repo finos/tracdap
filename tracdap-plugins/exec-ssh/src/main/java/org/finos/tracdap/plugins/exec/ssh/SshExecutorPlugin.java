@@ -50,7 +50,7 @@ public class SshExecutorPlugin extends TracPlugin {
     public <T> T createService(String serviceName, Properties properties, ConfigManager configManager) {
 
         if (serviceName.equals(SSH_EXECUTOR_NAME))
-            return (T) new SshExecutor(properties);
+            return (T) new SshExecutor(properties, configManager);
 
         var message = String.format("Plugin [%s] does not support the service [%s]", pluginName(), serviceName);
         throw new EPluginNotAvailable(message);

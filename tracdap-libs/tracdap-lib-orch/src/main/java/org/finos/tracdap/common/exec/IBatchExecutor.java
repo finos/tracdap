@@ -18,7 +18,6 @@ package org.finos.tracdap.common.exec;
 
 import com.google.protobuf.Message;
 import com.google.protobuf.Parser;
-import io.netty.channel.EventLoopGroup;
 
 import java.util.List;
 import java.util.Map;
@@ -28,7 +27,7 @@ public interface IBatchExecutor<TState extends Message> {
 
     // Interface for running batch jobs, i.e. a job that runs using one-shot using a one-shot process
 
-    void start(EventLoopGroup eventLoopGroup);
+    void start();
 
     void stop();
 

@@ -44,6 +44,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.attribute.PosixFilePermission;
 import java.rmi.ServerException;
 import java.security.GeneralSecurityException;
+import java.security.KeyPair;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -107,8 +108,10 @@ public class SshExecutor implements IBatchExecutor<SshBatchState> {
     private final String batchRootDir;
     private final boolean batchPersist;
 
+    private final List<KeyPair> sshKeyPairs;
 
-    public SshExecutor(Properties properties) {
+
+    public SshExecutor(Properties properties, ConfigManager configManager) {
 
         this.properties = properties;
         this.client = SshClient.setUpDefaultClient();
@@ -118,27 +121,52 @@ public class SshExecutor implements IBatchExecutor<SshBatchState> {
         batchRootDir = requiredProperty(CONFIG_BATCH_DIR);
         batchPersist = properties.containsKey(CONFIG_BATCH_PERSIST) &&
                 Boolean.parseBoolean(requiredProperty(CONFIG_BATCH_PERSIST));
+
+        sshKeyPairs = loadSshKeys(configManager);
     }
 
-    public void start(ConfigManager configManager) {
+    private List<KeyPair> loadSshKeys(ConfigManager configManager) {
 
         try {
-
-            var ioService = new NettyIoServiceFactoryFactory();
-            client.setIoServiceFactoryFactory(ioService);
 
             var keyFile = requiredProperty(KEY_FILE_KEY);
             var keyData = configManager.loadTextConfig(keyFile);
 
             var keyLoader = SecurityUtils.getKeyPairResourceParser();
-            var keys = keyLoader.loadKeyPairs(null, NamedResource.ofName("executor ssh key"), null, keyData);
-            client.setKeyIdentityProvider(KeyIdentityProvider.wrapKeyPairs(keys));
+            var keyPairs = keyLoader.loadKeyPairs(null, NamedResource.ofName("executor ssh key"), null, keyData);
 
-            client.start();
+            return new ArrayList<>(keyPairs);
         }
         catch (GeneralSecurityException | IOException e) {
             throw new EStartup(e.getMessage(), e);
         }
+    }
+
+    @Override
+    public void start() {
+
+        try {
+
+            // It is not clear what Apache SSHD does with its event loop group
+            // Is it blocking operations, or non-block low-level IO? (or non-block operations)
+            // If the wrong loops are used for the wrong things this will cause problems!
+            // So, using the default for now
+
+            var ioService = new NettyIoServiceFactoryFactory();
+            client.setIoServiceFactoryFactory(ioService);
+            client.setKeyIdentityProvider(KeyIdentityProvider.wrapKeyPairs(sshKeyPairs));
+
+            client.start();
+        }
+        catch (Exception e) {
+            throw new EStartup(e.getMessage(), e);
+        }
+    }
+
+    @Override
+    public void stop() {
+
+        client.stop();
     }
 
     @Override
