@@ -52,14 +52,45 @@ class ModelRepositoriesTest(unittest.TestCase):
 
         util.try_clean_dir(self.scratch_dir, remove=True)
 
-    def test_checkout_git(self):
+    def test_checkout_git_native(self):
+
+        sys_config = config.RuntimeConfig()
+        sys_config.repositories["git_test"] = config.PluginConfig(
+            protocol="git",
+            properties={
+                "repoUrl": "https://github.com/finos/tracdap"})
+
+        model_def = meta.ModelDefinition(
+            language="python",
+            repository="git_test",
+            packageGroup="finos",
+            package="tracdap",
+            version="v0.5.0",
+            entryPoint="tutorial.hello_world.HelloWorldModel",
+            path="examples/models/python/src"
+        )
+
+        repo_mgr = repos.RepositoryManager(sys_config)
+        repo = repo_mgr.get_repository("git_test")
+
+        checkout_key = "test_checkout_git"
+        checkout_subdir = pathlib.Path(checkout_key)
+
+        checkout_dir = self.scratch_dir.joinpath(model_def.repository, checkout_subdir)
+        checkout_dir.mkdir(mode=0o750, parents=True, exist_ok=False)
+
+        package_dir = repo.do_checkout(model_def, checkout_dir)
+
+        self.assertTrue(package_dir.joinpath("tutorial/hello_world.py").exists())
+
+    def test_checkout_git_python(self):
 
         sys_config = config.RuntimeConfig()
         sys_config.repositories["git_test"] = config.PluginConfig(
             protocol="git",
             properties={
                 "repoUrl": "https://github.com/finos/tracdap",
-                "token": "ghe_UNUSED_TOKEN"})
+                "purePython": "true"})
 
         model_def = meta.ModelDefinition(
             language="python",
