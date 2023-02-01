@@ -101,6 +101,9 @@ class GitRepository(IModelRepository):
             ["fetch", "--depth=1", "origin", model_def.version],
             ["reset", "--hard", "FETCH_HEAD"]]
 
+        # Flag to track when git config is written to the repo
+        config_written = False
+
         # Work around Windows issues
         if _helpers.is_windows():
 
@@ -148,6 +151,13 @@ class GitRepository(IModelRepository):
                 error_msg = f"Git checkout failed for {model_def.package} {model_def.version}"
                 self._log.error(error_msg)
                 raise ex.EModelRepo(error_msg)
+
+            # After the init command, use dulwich to write config into the repo folder
+            # This is a regular .gitconfig file, so it will be understood by the native commands
+            if not config_written:
+                repo = git_repo.Repo(str(checkout_dir))
+                self._apply_config_from_properties(repo)
+                config_written = True
 
         return self.package_path(model_def, checkout_dir)
 
