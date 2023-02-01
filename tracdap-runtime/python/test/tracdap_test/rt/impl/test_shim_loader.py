@@ -69,6 +69,13 @@ class TestShimLoader(unittest.TestCase):
         self.assertEqual(class_.__name__, "ImportTest")
         self.assertIsInstance(instance_, class_)
 
+    def test_relative_import_4(self):
+
+        class_ = self._shim_loader.load_class("acme.rockets.rel4", "ImportTest", object)
+        instance_ = class_()
+        self.assertEqual(class_.__name__, "ImportTest")
+        self.assertIsInstance(instance_, class_)
+
     def test_package_import_1(self):
 
         class_ = self._shim_loader.load_class("acme.rockets.pkg1", "ImportTest", object)
