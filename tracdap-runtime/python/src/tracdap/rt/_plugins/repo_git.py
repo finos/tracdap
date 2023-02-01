@@ -21,6 +21,7 @@ import time
 
 import dulwich.porcelain as porcelain
 import dulwich.index as git_index
+import dulwich.client as git_client
 
 import tracdap.rt.metadata as meta
 import tracdap.rt.exceptions as ex
@@ -41,6 +42,7 @@ class GitRepository(IModelRepository):
     GIT_TIMEOUT_SECONDS = 30
 
     PURE_PYTHON_CONFIG_PATTERN = re.compile("^purePython\\.([^.]+)\\.(.+)")
+    SHA1_PATTERN = re.compile("^[0-9a-f]{40}$")
 
     def __init__(self, properties: tp.Dict[str, str]):
 
@@ -152,26 +154,56 @@ class GitRepository(IModelRepository):
 
         self._log.info(f"Checkout mechanism: [python]")
 
+        # Create a new repo
         repo = porcelain.init(checkout_dir)
 
+        # Set any config supplied in the plugin properties
         self._apply_dulwich_config(repo)
 
+        # Add a remote for the origin server
         porcelain.remote_add(repo, "origin", self._repo_url.geturl())
-        porcelain.fetch(repo, "origin")
 
-        commit_key = self._ref_key(model_def.version)
+        # Set up the ref keys to look for in the fetch response
+        commit_hash = self._ref_key(model_def.version) if self.SHA1_PATTERN.match(model_def.version) else None
         tag_key = self._ref_key(f"refs/tags/{model_def.version}")
-        branch_key = self._ref_key(f"refs/remotes/origin/{model_def.version}")
+        branch_key = self._ref_key(f"refs/heads/{model_def.version}")
 
-        if commit_key in repo:
-            repo[b"HEAD"] = commit_key
-        elif tag_key in repo:
-            repo[b"HEAD"] = repo[tag_key]
-        elif branch_key in repo:
-            repo[b"HEAD"] = repo[branch_key]
+        # This is how dulwich filters what comes back from a fetch
+        # Commit hash is first preference, then tag, then branch
+        # We are only ever going to request a single commit
+        def select_commit_hash(refs, depth):  # noqa
+            if commit_hash is not None:
+                return [commit_hash]
+            if tag_key in refs:
+                return [refs[tag_key]]
+            if branch_key in refs:
+                return [refs[branch_key]]
+            raise ex.EModelRepo(f"Model version not found: [{model_def.version}]")
+
+        # Run the Git fetch command
+
+        credentials = _helpers.get_http_credentials(self._repo_url, self._properties)
+        username, password = _helpers.split_http_credentials(credentials)
+
+        client = git_client.HttpGitClient(
+            self._repo_url.geturl(),
+            config=repo.get_config(),
+            username=username,
+            password=password)
+
+        fetch = client.fetch(self._repo_url.path, repo, select_commit_hash,  depth=1)
+
+        # Look for the ref that came back from the fetch command and set it as HEAD
+        if commit_hash is not None:
+            repo[b"HEAD"] = commit_hash
+        elif tag_key in fetch.refs:
+            repo[b"HEAD"] = fetch.refs[tag_key]
+        elif branch_key in fetch.refs:
+            repo[b"HEAD"] = fetch.refs[branch_key]
         else:
             raise ex.EModelRepo(f"Model version not found: [{model_def.version}]")
 
+        # This checks out HEAD into the repo folder
         index_file = repo.index_path()
         tree = repo[b"HEAD"].tree
         git_index.build_index_from_tree(repo.path, index_file, repo.object_store, tree)

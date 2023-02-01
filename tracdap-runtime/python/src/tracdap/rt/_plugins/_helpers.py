@@ -66,6 +66,21 @@ def get_http_credentials(url: urllib.parse.ParseResult, properties: tp.Dict[str,
     return None
 
 
+def split_http_credentials(credentials: str) -> tp.Tuple[tp.Optional[str], tp.Optional[str]]:
+
+    if credentials is None:
+        return None, None
+
+    elif ":" in credentials:
+        sep = credentials.index(":")
+        username = credentials[:sep]
+        password = credentials[sep + 1:]
+        return username, password
+
+    else:
+        return credentials, None
+
+
 def apply_http_credentials(url: urllib.parse.ParseResult, credentials: str) -> urllib.parse.ParseResult:
 
     if credentials is None:
