@@ -19,9 +19,9 @@ import typing as tp
 import urllib.parse
 import time
 
-import dulwich.porcelain as porcelain
-import dulwich.index as git_index
+import dulwich.repo as git_repo
 import dulwich.client as git_client
+import dulwich.index as git_index
 
 import tracdap.rt.metadata as meta
 import tracdap.rt.exceptions as ex
@@ -155,13 +155,10 @@ class GitRepository(IModelRepository):
         self._log.info(f"Checkout mechanism: [python]")
 
         # Create a new repo
-        repo = porcelain.init(checkout_dir)
+        repo = git_repo.Repo.init(str(checkout_dir))
 
-        # Set any config supplied in the plugin properties
-        self._apply_dulwich_config(repo)
-
-        # Add a remote for the origin server
-        porcelain.remote_add(repo, "origin", self._repo_url.geturl())
+        self._apply_config_from_properties(repo)
+        self._add_remote(repo, "origin", self._repo_url.geturl())
 
         # Set up the ref keys to look for in the fetch response
         commit_hash = self._ref_key(model_def.version) if self.SHA1_PATTERN.match(model_def.version) else None
@@ -210,7 +207,7 @@ class GitRepository(IModelRepository):
 
         return self.package_path(model_def, checkout_dir)
 
-    def _apply_dulwich_config(self, repo: porcelain.Repo):
+    def _apply_config_from_properties(self, repo: git_repo.Repo):
 
         config = repo.get_config()
 
@@ -222,6 +219,14 @@ class GitRepository(IModelRepository):
                 section = match.group(1)
                 name = match.group(2)
                 config.set(section, name, value)
+
+        config.write_to_path()
+
+    def _add_remote(self, repo: git_repo.Repo, remote_name: str, remote_location):
+
+        config = repo.get_config()
+
+        config.set(f"remote \"{remote_name}\"", "url", remote_location)
 
         config.write_to_path()
 
