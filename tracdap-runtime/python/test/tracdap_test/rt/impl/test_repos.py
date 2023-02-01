@@ -12,6 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import platform
 import tempfile
 import unittest
 import pathlib
@@ -92,12 +93,17 @@ class ModelRepositoriesTest(unittest.TestCase):
                 "repoUrl": "https://github.com/finos/tracdap",
                 "purePython": "true"})
 
+        # On macOS, SSL certificates are not set up correctly by default in urllib3
+        # We can reconfigure them by passing Git config properties into the pure python Git client
+        if platform.system() == "Darwin":
+            sys_config.repositories["git_test"].properties["purePython.http.sslCaInfo"] = "/etc/ssl/cert.pem"
+
         model_def = meta.ModelDefinition(
             language="python",
             repository="git_test",
             packageGroup="finos",
             package="tracdap",
-            version="v0.5.0",
+            version="e372d05775d98de027d0b02850f11eb6585ae75f",
             entryPoint="tutorial.hello_world.HelloWorldModel",
             path="examples/models/python/src"
         )
