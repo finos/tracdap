@@ -103,7 +103,7 @@ class ModelRepositoriesTest(unittest.TestCase):
             repository="git_test",
             packageGroup="finos",
             package="tracdap",
-            version="e372d05775d98de027d0b02850f11eb6585ae75f",
+            version="v0.5.0",
             entryPoint="tutorial.hello_world.HelloWorldModel",
             path="examples/models/python/src"
         )
