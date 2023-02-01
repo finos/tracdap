@@ -91,12 +91,12 @@ class ModelRepositoriesTest(unittest.TestCase):
             protocol="git",
             properties={
                 "repoUrl": "https://github.com/finos/tracdap",
-                "purePython": "true"})
+                "nativeGit": "false"})
 
         # On macOS, SSL certificates are not set up correctly by default in urllib3
         # We can reconfigure them by passing Git config properties into the pure python Git client
         if platform.system() == "Darwin":
-            sys_config.repositories["git_test"].properties["purePython.http.sslCaInfo"] = "/etc/ssl/cert.pem"
+            sys_config.repositories["git_test"].properties["git.http.sslCaInfo"] = "/etc/ssl/cert.pem"
 
         model_def = meta.ModelDefinition(
             language="python",

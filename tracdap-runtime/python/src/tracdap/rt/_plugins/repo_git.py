@@ -37,11 +37,12 @@ from . import _helpers
 class GitRepository(IModelRepository):
 
     REPO_URL_KEY = "repoUrl"
-    PURE_PYTHON_KEY = "purePython"
+    NATIVE_GIT_KEY = "nativeGit"
+    NATIVE_GIT_DEFAULT = True
 
     GIT_TIMEOUT_SECONDS = 30
 
-    PURE_PYTHON_CONFIG_PATTERN = re.compile("^purePython\\.([^.]+)\\.(.+)")
+    GIT_CONFIG_PATTERN = re.compile("^git\\.([^.]+)\\.(.+)")
     SHA1_PATTERN = re.compile("^[0-9a-f]{40}$")
 
     def __init__(self, properties: tp.Dict[str, str]):
@@ -50,7 +51,7 @@ class GitRepository(IModelRepository):
         self._log = _helpers.logger_for_object(self)
 
         repo_url_prop = _helpers.get_plugin_property(self._properties, self.REPO_URL_KEY)
-        pure_python_prop = _helpers.get_plugin_property(self._properties, self.PURE_PYTHON_KEY)
+        native_git_prop = _helpers.get_plugin_property(self._properties, self.NATIVE_GIT_KEY)
 
         if not repo_url_prop:
             raise ex.EConfigParse(f"Missing required property [{self.REPO_URL_KEY}] in Git repository config")
@@ -60,10 +61,10 @@ class GitRepository(IModelRepository):
 
         self._repo_url = _helpers.apply_http_credentials(repo_url, credentials)
 
-        if pure_python_prop:
-            self._pure_python = pure_python_prop.strip().lower() == "true"
+        if native_git_prop is not None:
+            self._native_git = native_git_prop.strip().lower() == "true"
         else:
-            self._pure_python = False
+            self._native_git = self.NATIVE_GIT_DEFAULT
 
     def package_path(
             self, model_def: meta.ModelDefinition,
@@ -79,10 +80,10 @@ class GitRepository(IModelRepository):
 
         self._log.info(f"Checkout location: [{checkout_dir}]")
 
-        if self._pure_python:
-            package_path = self._do_python_checkout(model_def, checkout_dir)
-        else:
+        if self._native_git:
             package_path = self._do_native_checkout(model_def, checkout_dir)
+        else:
+            package_path = self._do_python_checkout(model_def, checkout_dir)
 
         self._log.info(f"Git checkout succeeded for {model_def.package} {model_def.version}")
 
@@ -225,7 +226,7 @@ class GitRepository(IModelRepository):
 
         for key, value in self._properties.items():
 
-            match = self.PURE_PYTHON_CONFIG_PATTERN.match(key)
+            match = self.GIT_CONFIG_PATTERN.match(key)
 
             if match:
                 section = match.group(1)
