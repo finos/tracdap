@@ -15,6 +15,9 @@ pyarrow == 10.0.1
 # PyYAML is used to load config supplied in YAML format
 pyyaml == 6.0
 
+# Python implementation of Git, for model loading
+dulwich == 0.21.2
+
 # Requests, used for downloading model packages
 requests == 2.28.1
 
