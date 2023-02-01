@@ -155,9 +155,16 @@ class GitRepository(IModelRepository):
         self._log.info(f"Checkout mechanism: [python]")
 
         # Create a new repo
-        repo = git_repo.Repo.init(str(checkout_dir))
 
+        self._log.info("=> git init")
+
+        repo = git_repo.Repo.init(str(checkout_dir))
         self._apply_config_from_properties(repo)
+
+        # Set up origin
+
+        self._log.info(f"=> git remote add origin {_helpers.log_safe(self._repo_url)}")
+
         self._add_remote(repo, "origin", self._repo_url.geturl())
 
         # Set up the ref keys to look for in the fetch response
@@ -179,6 +186,8 @@ class GitRepository(IModelRepository):
 
         # Run the Git fetch command
 
+        self._log.info(f"=> git fetch --depth=1 origin {model_def.version}")
+
         credentials = _helpers.get_http_credentials(self._repo_url, self._properties)
         username, password = _helpers.split_http_credentials(credentials)
 
@@ -191,6 +200,9 @@ class GitRepository(IModelRepository):
         fetch = client.fetch(self._repo_url.path, repo, select_commit_hash,  depth=1)
 
         # Look for the ref that came back from the fetch command and set it as HEAD
+
+        self._log.info("=> git reset --hard FETCH_HEAD")
+
         if commit_hash is not None:
             repo[b"HEAD"] = commit_hash
         elif tag_key in fetch.refs:
@@ -222,7 +234,8 @@ class GitRepository(IModelRepository):
 
         config.write_to_path()
 
-    def _add_remote(self, repo: git_repo.Repo, remote_name: str, remote_location):
+    @staticmethod
+    def _add_remote(repo: git_repo.Repo, remote_name: str, remote_location):
 
         config = repo.get_config()
 
