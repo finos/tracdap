@@ -379,13 +379,17 @@ class ShimLoader:
     @contextlib.contextmanager
     def use_shim(cls, shim_namespace: str):
 
-        if shim_namespace:
-            cls.activate_shim(shim_namespace)
+        try:
 
-        yield
+            if shim_namespace:
+                cls.activate_shim(shim_namespace)
 
-        if shim_namespace:
-            cls.deactivate_shim()
+            yield
+
+        finally:
+
+            if shim_namespace:
+                cls.deactivate_shim()
 
     @classmethod
     def load_class(
