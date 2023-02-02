@@ -90,6 +90,13 @@ class TestShimLoader(unittest.TestCase):
         self.assertEqual(class_.__name__, "ImportTest")
         self.assertIsInstance(instance_, class_)
 
+    def test_package_relative(self):
+
+        class_ = self._shim_loader.load_class("acme.rockets", "ImportTest", object)
+        instance_ = class_()
+        self.assertEqual(class_.__name__, "ImportTest")
+        self.assertIsInstance(instance_, class_)
+
     def test_duplicate_import_1(self):
 
         # A module can exist as both a module and a package in the same source path
