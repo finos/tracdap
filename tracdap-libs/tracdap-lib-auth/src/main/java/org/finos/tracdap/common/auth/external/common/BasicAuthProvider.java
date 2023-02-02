@@ -21,6 +21,7 @@ import org.finos.tracdap.common.auth.internal.UserInfo;
 
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.*;
+import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.config.CryptoHelpers;
 import org.finos.tracdap.common.config.ISecretLoader;
 import org.slf4j.Logger;
@@ -28,7 +29,6 @@ import org.slf4j.LoggerFactory;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
-import java.util.Properties;
 
 
 public class BasicAuthProvider implements IAuthProvider {
@@ -39,21 +39,11 @@ public class BasicAuthProvider implements IAuthProvider {
 
     private static final String DISPLAY_NAME_ATTR = "displayName";
 
-    private ISecretLoader userDb;
+    private final ISecretLoader userDb;
 
-    public BasicAuthProvider(Properties properties) {
+    public BasicAuthProvider(ConfigManager configManager) {
 
-        // TODO: Pass info on the users DB source through the plugin properties
-    }
-
-    @Override
-    public boolean wantTracUsers() {
-        return true;
-    }
-
-    @Override
-    public void setTracUsers(ISecretLoader userDb) {
-        this.userDb = userDb;
+        this.userDb = configManager.getUserDb();
     }
 
     @Override

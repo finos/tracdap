@@ -53,7 +53,7 @@ public class CommonAuthPlugin extends TracPlugin {
             return (T) new GuestAuthProvider(properties);
 
         if (serviceName.equals(BASIC_PROVIDER))
-            return (T) new BasicAuthProvider(properties);
+            return (T) new BasicAuthProvider(configManager);
 
         var message = String.format("Plugin [%s] does not support the service [%s]", pluginName(), serviceName);
         throw new EPluginNotAvailable(message);
