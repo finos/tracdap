@@ -205,7 +205,7 @@ class _NamespaceShimFinder(_ila.MetaPathFinder):
                 shim_loader = _ilm.SourceFileLoader(fullname, str(package_path))
 
             spec = _ilm.ModuleSpec(fullname, origin=str(package_path), is_package=True, loader=shim_loader)
-            spec.submodule_search_locations = str(package_path.parent)
+            spec.submodule_search_locations = [str(package_path.parent)]
             return spec
 
         # If the module path is found, return a spec for a regular module
