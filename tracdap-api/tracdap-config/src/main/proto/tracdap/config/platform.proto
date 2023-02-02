@@ -80,12 +80,20 @@ message WebServerConfig {
 
   PluginConfig contentRoot = 3;
   repeated WebServerRewriteRule rewriteRules = 4;
+  repeated WebServerRedirect redirects = 5;
 }
 
 message WebServerRewriteRule {
 
   string source = 1;
   string target = 2;
+}
+
+message WebServerRedirect {
+
+  string source = 1;
+  string target = 2;
+  int32 status = 3;
 }
 
 
