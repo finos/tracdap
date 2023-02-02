@@ -26,6 +26,7 @@ import org.finos.tracdap.common.storage.FileStat;
 import org.finos.tracdap.common.storage.FileType;
 import org.finos.tracdap.common.storage.IFileStorage;
 import org.finos.tracdap.config.WebServerConfig;
+import org.finos.tracdap.config.WebServerRedirect;
 
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -51,6 +52,7 @@ public class ContentServer {
     private final IFileStorage storage;
 
     private final Map<String, String> mimeTypes;
+    private final List<Map.Entry<Pattern, WebServerRedirect>> redirects;
     private final List<Map.Entry<Pattern, String>> rewriteRules;
 
     public ContentServer(WebServerConfig config, IFileStorage storage) {
@@ -59,7 +61,13 @@ public class ContentServer {
 
         this.mimeTypes = MimeTypes.loadMimeTypeMap();
 
+        this.redirects = new ArrayList<>();
         this.rewriteRules = new ArrayList<>();
+
+        for (var redirect : config.getRedirectsList()) {
+            var source = Pattern.compile(redirect.getSource());
+            redirects.add(Map.entry(source, redirect));
+        }
 
         for (var rule : config.getRewriteRulesList()) {
             var source = Pattern.compile(rule.getSource());
@@ -69,6 +77,11 @@ public class ContentServer {
     }
 
     public CompletionStage<ContentResponse> headRequest(String requestUri, IExecutionContext execCtx) {
+
+        var redirect = processRedirects(requestUri);
+
+        if (redirect != null)
+            return CompletableFuture.completedFuture(redirect);
 
         var storagePath = translateStoragePath(requestUri);
 
@@ -86,6 +99,11 @@ public class ContentServer {
 
     public CompletionStage<ContentResponse> getRequest(String requestUri, IDataContext dataCtx) {
 
+        var redirect = processRedirects(requestUri);
+
+        if (redirect != null)
+            return CompletableFuture.completedFuture(redirect);
+
         var storagePath = translateStoragePath(requestUri);
 
         return storage.stat(storagePath, dataCtx)
@@ -93,6 +111,28 @@ public class ContentServer {
                 .thenApply(fileStat -> buildContentResponse(fileStat, dataCtx))
                 .exceptionally(this::buildErrorResponse)
                 .thenApplyAsync(Function.identity(), dataCtx.eventLoopExecutor());
+    }
+
+    private ContentResponse processRedirects(String requestUri) {
+
+        try {
+            var uri = new URI(requestUri);
+            var path = uri.getPath();
+
+            for (var redirect : redirects) {
+
+                var pattern = redirect.getKey();
+                var match = pattern.matcher(path);
+
+                if (match.matches())
+                    return buildRedirectResponse(redirect.getValue());
+            }
+
+            return null;
+        }
+        catch (URISyntaxException e) {
+            throw new ENetworkHttp(HttpResponseStatus.BAD_REQUEST.code(), "Invalid URL: " + e.getMessage(), e);
+        }
     }
 
     private String translateStoragePath(String requestUri) {
@@ -192,6 +232,15 @@ public class ContentServer {
         }
 
         response.statusCode = HttpResponseStatus.INTERNAL_SERVER_ERROR;
+        return response;
+    }
+
+    private ContentResponse buildRedirectResponse(WebServerRedirect redirect) {
+
+        var response = new ContentResponse();
+        response.statusCode = HttpResponseStatus.valueOf(redirect.getStatus());
+        response.headers.set(HttpHeaderNames.LOCATION, redirect.getTarget());
+
         return response;
     }
 
