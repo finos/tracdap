@@ -27,6 +27,7 @@ import org.finos.tracdap.common.storage.FileType;
 import org.finos.tracdap.common.storage.IFileStorage;
 import org.finos.tracdap.config.WebServerConfig;
 import org.finos.tracdap.config.WebServerRedirect;
+import org.finos.tracdap.config.WebServerRewriteRule;
 
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -53,7 +54,7 @@ public class ContentServer {
 
     private final Map<String, String> mimeTypes;
     private final List<Map.Entry<Pattern, WebServerRedirect>> redirects;
-    private final List<Map.Entry<Pattern, String>> rewriteRules;
+    private final List<Map.Entry<Pattern, WebServerRewriteRule>> rewriteRules;
 
     public ContentServer(WebServerConfig config, IFileStorage storage) {
 
@@ -71,8 +72,7 @@ public class ContentServer {
 
         for (var rule : config.getRewriteRulesList()) {
             var source = Pattern.compile(rule.getSource());
-            var target = rule.getTarget();
-            rewriteRules.add(Map.entry(source, target));
+            rewriteRules.add(Map.entry(source, rule));
         }
     }
 
@@ -145,10 +145,10 @@ public class ContentServer {
 
                 var pattern = rule.getKey();
                 var match = pattern.matcher(path);
-                var replacement = rule.getValue();
+                var rewrite = rule.getValue();
 
                 if (match.matches())
-                    path = match.replaceFirst(replacement);
+                    path = match.replaceFirst(rewrite.getTarget());
             }
 
             if (path.equals("/"))
