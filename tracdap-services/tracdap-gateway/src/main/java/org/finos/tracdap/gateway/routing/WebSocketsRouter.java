@@ -125,6 +125,10 @@ public class WebSocketsRouter extends CoreRouter {
                 processInboundTextFrame(ctx);
             }
 
+            else if (frame instanceof ContinuationWebSocketFrame) {
+                processInboundContinuationFrame(ctx, (ContinuationWebSocketFrame) frame);
+            }
+
             else if (frame instanceof PingWebSocketFrame) {
                 processInboundPingFrame();
             }
@@ -255,8 +259,6 @@ public class WebSocketsRouter extends CoreRouter {
 
     private void processInboundBinaryFrame(ChannelHandlerContext ctx, BinaryWebSocketFrame frame) {
 
-        var target = (CoreRouter.TargetChannelState) null;
-
         if (!firstMessageReceived) {
 
             var uri = URI.create(upgradeUri);
@@ -272,38 +274,20 @@ public class WebSocketsRouter extends CoreRouter {
 
             // If the target is not active, create a new connection (For WS it will always be a new connection)
             // This should always succeed inline, errors may be reported later
-            target = getOrCreateTarget(ctx, route);
-
-            firstMessageReceived = true;
+            getOrCreateTarget(ctx, route);
             routeId = route.getIndex();
+            firstMessageReceived = true;
 
             // The first frame in grpc-websockets holds encoded HTTP headers
             // We want to add the headers from the upgrade request, particularly path
-
-            frame.retain();
-            frame = addUpgradeHeaders(frame);
+            var firstFrame = addUpgradeHeaders(frame);
+            
+            relayFrame(ctx, firstFrame, true);
         }
         else {
 
-            target = getTarget(routeId);
-
-            // This could happen if the proxy route has closed while messages are still coming in
-            // There is no way to recover, so we have to close the client connection
-            if (target == null) {
-                var statusCode = WebSocketCloseStatus.ENDPOINT_UNAVAILABLE;
-                var message = String.format("Proxy connection has been closed for [%s]", upgradeUri);
-                reportErrorAndClose(ctx, message, statusCode, /* cause = */ null);
-                return;
-            }
-
-            frame.retain();
+            relayFrame(ctx, frame, false);
         }
-
-        // We don't know when the incoming stream finishes, without digging into the contents of the stream
-        // Simplify by flushing for each message, the proxy queues will buffer anyway
-
-        relayMessage(target, frame);
-        flushMessages(target);
     }
 
     private void processInboundTextFrame(ChannelHandlerContext ctx) {
@@ -315,6 +299,19 @@ public class WebSocketsRouter extends CoreRouter {
         var message = "Web socket text frames are not currently supported";
 
         reportErrorAndClose(ctx, message, statusCode, /* cause = */ null);
+    }
+
+    private void processInboundContinuationFrame(ChannelHandlerContext ctx, ContinuationWebSocketFrame frame) {
+
+        // No continuation frames before the first message!
+        if (!firstMessageReceived) {
+            var statusCode = WebSocketCloseStatus.INVALID_MESSAGE_TYPE;
+            var message = String.format("Invalid stream for [%s] (continuation before start)", upgradeUri);
+            reportErrorAndClose(ctx, message, statusCode, /* cause = */ null);
+            return;
+        }
+        
+        relayFrame(ctx, frame, false);
     }
 
     private void processInboundPingFrame() {
@@ -432,13 +429,41 @@ public class WebSocketsRouter extends CoreRouter {
 
         var combinedHeaders = Unpooled.compositeBuffer();
         combinedHeaders.addComponent(extraHeaderBytes);
-        combinedHeaders.addComponent(firstFrame.content());
+        combinedHeaders.addComponent(firstFrame.content().retain());
 
         combinedHeaders.writerIndex(
                 extraHeaderBytes.writerIndex() +
                 firstFrame.content().writerIndex());
 
         return new BinaryWebSocketFrame(combinedHeaders);
+    }
+    
+    private void relayFrame(ChannelHandlerContext ctx, WebSocketFrame frame, boolean needRelease) {
+
+        try {
+
+            var target = getTarget(routeId);
+
+            // This could happen if the proxy route has closed while messages are still coming in
+            // There is no way to recover, so we have to close the client connection
+            if (target == null) {
+                var statusCode = WebSocketCloseStatus.ENDPOINT_UNAVAILABLE;
+                var message = String.format("Proxy connection has been closed for [%s]", upgradeUri);
+                reportErrorAndClose(ctx, message, statusCode, /* cause = */ null);
+                return;
+            }
+
+            // We don't know when the incoming stream finishes, without digging into the contents of the stream
+            // Simplify by flushing for each message, the proxy queues will buffer anyway
+
+            relayMessage(target, frame.retain());
+            flushMessages(target);
+        }
+        catch (Throwable e) {
+            if (needRelease)
+                ReferenceCountUtil.release(frame);
+            throw e;
+        }
     }
 
     private void reportErrorAndClose(
