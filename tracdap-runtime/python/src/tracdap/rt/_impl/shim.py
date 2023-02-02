@@ -408,7 +408,13 @@ class ShimLoader:
             cls._log.debug(f"Loading class [{class_name}] from [{module_name}]")
 
             if isinstance(module, str):
-                module = _il.import_module(module_name)
+                try:
+                    # Set the root module for class loading
+                    # Relative imports will be resolved relative to this root
+                    cls.__active_shim.root_module = module_name
+                    module = _il.import_module(module_name)
+                finally:
+                    cls.__active_shim.root_module = None
 
             class_ = module.__dict__.get(class_name)
 
