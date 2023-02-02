@@ -369,13 +369,9 @@ class ShimLoader:
         except _ex.EModelLoad:
             raise
 
-        except ModuleNotFoundError as e:
-            err = f"Loading classes failed in module [{module_name}]: {str(e)}"
-            cls._log.error(err)
-            raise _ex.EModelLoad(err) from e
-
-        except NameError as e:
-            err = f"Loading classes failed in module [{module_name}]: {str(e)} ({cls._last_frame(e)}"
+        except (ModuleNotFoundError, NameError) as e:
+            details = cls._error_details(e)
+            err = f"Loading classes failed in module [{module_name}]: {str(e)}{details}"
             cls._log.error(err)
             raise _ex.EModelLoad(err) from e
 
@@ -423,23 +419,19 @@ class ShimLoader:
         except _ex.EModelLoad:
             raise
 
-        except ModuleNotFoundError as e:
-            err = f"Loading resources failed in module [{module_name}]: {str(e)}"
+        except (ModuleNotFoundError, NameError) as e:
+            details = cls._error_details(e)
+            err = f"Loading resources failed in module [{module_name}]: {str(e)}{details}"
             cls._log.error(err)
             raise _ex.EModelLoad(err) from e
 
         except FileNotFoundError as e:
-            err = f"Loading resources failed in module [{module_name}]: Resource not found for [{resource_name}]"
-            cls._log.error(err)
-            raise _ex.EModelLoad(err) from e
-
-        except NameError as e:
-            err = f"Loading classes failed in module [{module_name}]: {str(e)} ({cls._last_frame(e)}"
+            err = f"Loading resources failed in module [{module_name}]: File not found for [{resource_name}]"
             cls._log.error(err)
             raise _ex.EModelLoad(err) from e
 
         except Exception as e:
-            err = f"Loading classes failed in module [{module_name}]: Unexpected error"
+            err = f"Loading resources failed in module [{module_name}]: Unexpected error"
             cls._log.error(err)
             raise _ex.EModelLoad(err) from e
 
@@ -463,11 +455,18 @@ class ShimLoader:
                 raise _ex.ERuntimeValidation(err)
 
     @classmethod
-    def _last_frame(cls, error: Exception):
+    def _error_details(cls, error: Exception):
+
         trace = tb.extract_tb(error.__traceback__)
         last_frame = trace[len(trace) - 1]
         filename = pathlib.PurePath(last_frame.filename).name
-        return f"{filename} line {last_frame.lineno}, {last_frame.line}"
+
+        # Do not report errors from inside C modules,
+        # they will not be meaningful to users
+        if filename.startswith("<"):
+            return ""
+        else:
+            return f" ({filename} line {last_frame.lineno}, {last_frame.line})"
 
 
 ShimLoader._log = _util.logger_for_class(ShimLoader)
