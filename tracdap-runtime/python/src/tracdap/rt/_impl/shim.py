@@ -40,6 +40,7 @@ class _ActiveShim:
 
     def __init__(self):
         self.shim: tp.Optional[str] = None
+        self.root_module: tp.Optional[str] = None
 
 
 class _ActiveShimFinder(_ila.MetaPathFinder):
@@ -49,9 +50,13 @@ class _ActiveShimFinder(_ila.MetaPathFinder):
     # The module name is mapped: acme_global.module -> tracdap.shim._XXX.acme_global.module
     # The shimmed module name is passed back to importlib for resolution
 
-    # Absolute imports in model code will always come to this finder
-    # Consequently, absolute imports only work when the shim is active, i.e. when the model module is imported
-    # Absolute imports in model code will not work (imports in model code is very bad practice anyway)!
+    # This finder will handle loading the root model packages, after which
+    # absolute and qualified imports are handled by the normal mechanism
+
+    # Unqualified (i.e. relative) imports will always come to this loader
+    # This is because the names are qualified before adding to the module cache
+    # So, unqualified relative imports only work when the shim is active, i.e. during initial load
+    # Relative imports used dynamically will not work (this is very bad practice anyway)!
 
     def __init__(self, shim_map: tp.Dict[str, pathlib.Path], active_shim: _ActiveShim):
         self.__shim_map = shim_map
@@ -69,6 +74,11 @@ class _ActiveShimFinder(_ila.MetaPathFinder):
             target: tp.Optional[types.ModuleType] = None) \
             -> tp.Optional[_ilm.ModuleSpec]:
 
+        # The active shim finder works by translating the supplied module name
+        # E.g. acme.rockets -> import tracdap.shim._0.acme.rockets
+        # The loader issue a new call to find_module for the translated name
+        # Theis new call will hit the namespace shim finder
+
         # If the module name is already qualified with a shim, don't try to re-qualify it
         if fullname.startswith(ShimLoader.SHIM_NAMESPACE):
             return None
@@ -77,14 +87,64 @@ class _ActiveShimFinder(_ila.MetaPathFinder):
         if self.__active_shim.shim is None:
             return None
 
-        shim_module = f"{self.__active_shim.shim}.{fullname}"
         shim_path = self.__shim_map.get(self.__active_shim.shim)
+        module_spec = None
 
-        # Looking for the shimmed module will hit the namespace shim finder
-        return _ilu.find_spec(shim_module, str(shim_path))
+        # Python adds the directory containing __main__ to PYTHONPATH ahead of other source dirs
+        # This has the effect that relative imports are given priority in the loading order
+        # To replicate this behavior, we can attempt a relative import before looking for qualified names
+
+        # The root package has to be loaded before relative imports are attempted
+        # I.e. a.b is the root, do not look for a.b.a (relative import) before loading a.b
+
+        if self._root_exists_and_is_loaded():
+
+            # Relative imports are different for packages and modules
+            # If the root is a package, relative imports are at the same level as the package
+            # IF the root is a module, relative imports are at the parent level
+
+            root_module = self.__active_shim.root_module
+            root_module_file = shim_path.joinpath(root_module.replace(".", "/") + ".py")
+            root_package_file = shim_path.joinpath(root_module.replace(".", "/")).joinpath("__init__.py")
+
+            # Attempt relative import if the root module is a package
+
+            if root_package_file.exists():
+                relative_module = f"{self.__active_shim.shim}.{root_module}.{fullname}"
+                module_spec = _ilu.find_spec(relative_module, root_package_file.parent)
+
+            # Attempt relative import if the root module is a module
+            # Not needed if the root module is in the root of the shim,
+            # in which case the relative and absolute module paths will be the same
+
+            elif "." in root_module:
+                parent_package = root_module[:root_module.rfind(".")]
+                relative_module = f"{self.__active_shim.shim}.{parent_package}.{fullname}"
+                module_spec = _ilu.find_spec(relative_module, root_module_file.parent)
+
+        # The last option is to look for the module using an absolute import in the root of the shim
+        # This is in line with Python's own behavior, which gives priority to relative imports
+
+        if module_spec is None:
+
+            shim_module = f"{self.__active_shim.shim}.{fullname}"
+            module_spec = _ilu.find_spec(shim_module, str(shim_path))
+
+        return module_spec
 
     def invalidate_caches(self) -> None:
         pass
+
+    def _root_exists_and_is_loaded(self):
+
+        if self.__active_shim.root_module is None:
+            return False
+
+        root_module = self.__active_shim.root_module
+        root_package = root_module[:root_module.find('.')]
+        shim_root_package = f"{self.__active_shim.shim}.{root_package}"
+
+        return shim_root_package in sys.modules
 
 
 class _ActiveShimLoader(_ilm.SourceFileLoader):
