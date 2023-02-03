@@ -49,7 +49,6 @@ import java.net.http.HttpClient;
 import java.net.http.HttpResponse;
 import java.net.http.WebSocket;
 import java.nio.charset.StandardCharsets;
-import java.security.KeyPair;
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
@@ -88,7 +87,7 @@ public class ProtocolNegotiatorTest {
         var jwtProcessor = JwtProcessor.configure(
                 gatewayConfig.getAuthentication(),
                 gatewayConfig.getPlatformInfo(),
-                (KeyPair) null);
+                null);
 
         // The protocol negotiator is the top level initializer for new inbound connections
         var protocolNegotiator = new ProtocolNegotiator(
@@ -310,13 +309,23 @@ public class ProtocolNegotiatorTest {
     private static class DummyAuthProvider implements IAuthProvider {
 
         @Override
-        public AuthResult attemptAuth(ChannelHandlerContext ctx, IAuthHeaders headers) {
+        public AuthResult attemptAuth(AuthRequest authRequest) {
 
             var user = new UserInfo();
             user.setUserId("test_user");
             user.setDisplayName("Test User");
 
-            return new AuthResult(AuthResultCode.AUTHORIZED, user);
+            return AuthResult.AUTHORIZED(user);
+        }
+
+        @Override
+        public boolean postAuthMatch(String method, String uri) {
+            return false;
+        }
+
+        @Override
+        public AuthResponse postAuth(AuthRequest authRequest, UserInfo userInfo) {
+            return null;
         }
     }
 }
