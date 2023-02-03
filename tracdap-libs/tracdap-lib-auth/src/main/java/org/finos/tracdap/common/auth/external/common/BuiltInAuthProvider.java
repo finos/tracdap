@@ -75,8 +75,6 @@ public class BuiltInAuthProvider implements IAuthProvider {
     @Override
     public boolean postAuthMatch(String method, String uri) {
 
-        log.info("Testing {}, result = {}", uri, uri.startsWith(BUILT_IN_AUTH_ROOT));
-
         return uri.startsWith(BUILT_IN_AUTH_ROOT);
     }
 
@@ -134,7 +132,6 @@ public class BuiltInAuthProvider implements IAuthProvider {
             return redirectToLogin(request);
         }
         else {
-            log.error("AUTH OK");
             var userInfo = LocalUsers.getUserInfo(userDb, username);
             return AuthResult.AUTHORIZED(userInfo);
         }
