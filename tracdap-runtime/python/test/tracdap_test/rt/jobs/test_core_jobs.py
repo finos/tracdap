@@ -96,6 +96,7 @@ class CoreJobsTest(unittest.TestCase):
 
             scratch_dir = pathlib.Path(tmpdir)
 
+            # Let dev mode translator sort out the data / storage definitions
             job_config = dev_mode.DevModeTranslator.translate_job_config(
                 self.sys_config, job_config, scratch_dir, None, None)
 
@@ -118,6 +119,7 @@ class CoreJobsTest(unittest.TestCase):
 
             scratch_dir = pathlib.Path(tmpdir)
 
+            # Let dev mode translator sort out the data / storage definitions
             job_config = dev_mode.DevModeTranslator.translate_job_config(
                 self.sys_config, job_config, scratch_dir, None, None)
 
