@@ -309,6 +309,8 @@ class DynamicDataSpecFunc(NodeFunction[_data.DataSpec]):
 
     def _execute(self, ctx: NodeContext) -> _data.DataSpec:
 
+        # When data def for an output was not supplied in the job, this function creates a dynamic data spec
+
         if self.node.prior_data_spec is not None:
             raise _ex.ETracInternal("Data updates not supported yet")
 
@@ -369,6 +371,8 @@ class DynamicDataSpecFunc(NodeFunction[_data.DataSpec]):
 
         storage_def = meta.StorageDefinition()
         storage_def.dataItems[data_item] = storage_item
+
+        # Dynamic data def will always use an embedded schema (this is no ID for an external schema)
 
         return _data.DataSpec(
             data_item,
