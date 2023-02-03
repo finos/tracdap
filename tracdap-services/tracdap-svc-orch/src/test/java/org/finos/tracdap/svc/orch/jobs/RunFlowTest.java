@@ -211,6 +211,7 @@ public class RunFlowTest {
 
         var writeRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.SCHEMA)
                 .setDefinition(schema)
                 .addAllTagUpdates(attrs)
                 .build();
