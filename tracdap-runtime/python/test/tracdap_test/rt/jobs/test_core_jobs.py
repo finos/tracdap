@@ -90,6 +90,64 @@ class CoreJobsTest(unittest.TestCase):
 
     def test_run_model_job(self):
 
+        job_id, job_config = self._build_run_model_job_config()
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+
+            scratch_dir = pathlib.Path(tmpdir)
+
+            job_config = dev_mode.DevModeTranslator.translate_job_config(
+                self.sys_config, job_config, scratch_dir, None, None)
+
+            trac_runtime = runtime.TracRuntime(
+                self.sys_config,
+                job_result_dir=tmpdir,
+                job_result_format="json")
+
+            trac_runtime.pre_start()
+
+            with trac_runtime as rt:
+                rt.submit_job(job_config)
+                rt.wait_for_job(job_id)
+
+    def test_run_model_job_external_schemas(self):
+
+        job_id, job_config = self._build_run_model_job_config()
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+
+            scratch_dir = pathlib.Path(tmpdir)
+
+            job_config = dev_mode.DevModeTranslator.translate_job_config(
+                self.sys_config, job_config, scratch_dir, None, None)
+
+            # Make the input dataset use an external schema
+
+            input_id = job_config.job.runModel.inputs["customer_loans"]
+            input_data_def = util.get_job_resource(input_id, job_config)
+
+            input_schema_id = util.new_object_id(meta.ObjectType.SCHEMA)
+            input_schema = meta.ObjectDefinition(meta.ObjectType.SCHEMA, schema=input_data_def.data.schema)
+            job_config.resources[util.object_key(input_schema_id)] = input_schema
+
+            input_data_def.data.schemaId = util.selector_for(input_schema_id)
+            input_data_def.data.schema = None
+
+            # Now continue with the job as normal
+
+            trac_runtime = runtime.TracRuntime(
+                self.sys_config,
+                job_result_dir=tmpdir,
+                job_result_format="json")
+
+            trac_runtime.pre_start()
+
+            with trac_runtime as rt:
+                rt.submit_job(job_config)
+                rt.wait_for_job(job_id)
+
+    def _build_run_model_job_config(self):
+
         job_id = util.new_object_id(meta.ObjectType.JOB)
         model_id = util.new_object_id(meta.ObjectType.MODEL)
 
@@ -145,20 +203,5 @@ class CoreJobsTest(unittest.TestCase):
         job_config = cfg.JobConfig(job_id, job_def)
         job_config.resources[util.object_key(model_id)] = model_def
 
-        with tempfile.TemporaryDirectory() as tmpdir:
+        return job_id, job_config
 
-            scratch_dir = pathlib.Path(tmpdir)
-
-            job_config = dev_mode.DevModeTranslator.translate_job_config(
-                self.sys_config, job_config, scratch_dir, None, None)
-
-            trac_runtime = runtime.TracRuntime(
-                self.sys_config,
-                job_result_dir=tmpdir,
-                job_result_format="json")
-
-            trac_runtime.pre_start()
-
-            with trac_runtime as rt:
-                rt.submit_job(job_config)
-                rt.wait_for_job(job_id)
