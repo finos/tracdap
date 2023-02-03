@@ -222,7 +222,11 @@ class GraphBuilder:
             # For now we are always loading the root part, snap 0, delta 0
             data_def = _util.get_job_resource(data_selector, job_config).data
             storage_def = _util.get_job_resource(data_def.storageId, job_config).storage
-            schema_def = _util.get_job_resource(data_def.schemaId, job_config).schema if data_def.schemaId else None
+
+            if data_def.schemaId:
+                schema_def = _util.get_job_resource(data_def.schemaId, job_config).schema
+            else:
+                schema_def = data_def.schema
 
             root_part_opaque_key = 'part-root'  # TODO: Central part names / constants
             data_item = data_def.parts[root_part_opaque_key].snap.deltas[0].dataItem
@@ -239,7 +243,7 @@ class GraphBuilder:
 
             # Input views assembled by mapping one root part to each view
             data_view_id = NodeId.of(input_name, job_namespace, _data.DataView)
-            data_view_node = DataViewNode(data_view_id, data_def.schema, data_load_id)
+            data_view_node = DataViewNode(data_view_id, schema_def, data_load_id)
 
             nodes[data_spec_id] = data_spec_node
             nodes[data_load_id] = data_load_node
@@ -275,7 +279,11 @@ class GraphBuilder:
 
                 data_def = data_obj.data
                 storage_def = _util.get_job_resource(data_def.storageId, job_config).storage
-                schema_def = _util.get_job_resource(data_def.schemaId, job_config).schema if data_def.schemaId else None
+
+                if data_def.schemaId:
+                    schema_def = _util.get_job_resource(data_def.schemaId, job_config).schema
+                else:
+                    schema_def = data_def.schema
 
                 root_part_opaque_key = 'part-root'  # TODO: Central part names / constants
                 data_item = data_def.parts[root_part_opaque_key].snap.deltas[0].dataItem
