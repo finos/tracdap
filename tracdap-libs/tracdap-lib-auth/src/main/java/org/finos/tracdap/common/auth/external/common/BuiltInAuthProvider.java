@@ -21,6 +21,7 @@ import org.finos.tracdap.common.auth.internal.UserInfo;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.config.ISecretLoader;
 import org.finos.tracdap.common.exception.EResourceNotFound;
+import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.common.util.ResourceHelpers;
 
 import io.netty.buffer.Unpooled;
@@ -31,9 +32,12 @@ import org.slf4j.LoggerFactory;
 
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.util.Properties;
 
 
 public class BuiltInAuthProvider implements IAuthProvider {
+
+    public static final String MAIN_PAGE_KEY = "mainPage";
 
     public static final String BUILT_IN_AUTH_ROOT = "/trac-auth/";
     public static final String BUILT_IN_AUTH_PAGE = "/trac-auth/login";
@@ -45,9 +49,20 @@ public class BuiltInAuthProvider implements IAuthProvider {
 
     private static final Logger log = LoggerFactory.getLogger(BuiltInAuthProvider.class);
 
+    private final String mainPage;
     private final ISecretLoader userDb;
 
-    public BuiltInAuthProvider(ConfigManager configManager) {
+    public BuiltInAuthProvider(Properties properties, ConfigManager configManager) {
+
+        if (!properties.containsKey(MAIN_PAGE_KEY)) {
+
+            var messageTemplate = "The [BUILTIN] auth provider is missing required config property [%s]";
+            var message = String.format(messageTemplate, MAIN_PAGE_KEY);
+            log.error(message);
+            throw new EStartup(message);
+        }
+
+        mainPage = properties.getProperty(MAIN_PAGE_KEY);
 
         this.userDb = configManager.getUserDb();
     }
@@ -175,7 +190,7 @@ public class BuiltInAuthProvider implements IAuthProvider {
     private byte[] insertRedirect(byte[] pageBytes) {
 
         var pageText = new String(pageBytes, StandardCharsets.UTF_8);
-        pageText = pageText.replace("${REDIRECT}", "/trac-ui/app");
+        pageText = pageText.replace("${REDIRECT}", mainPage);
         return pageText.getBytes(StandardCharsets.UTF_8);
     }
 

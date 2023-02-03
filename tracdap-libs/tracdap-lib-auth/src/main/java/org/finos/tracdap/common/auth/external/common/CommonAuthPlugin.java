@@ -58,7 +58,7 @@ public class CommonAuthPlugin extends TracPlugin {
             return (T) new BasicAuthProvider(configManager);
 
         if (serviceName.equals(BUILT_IN_AUTH_PROVIDER))
-            return (T) new BuiltInAuthProvider(configManager);
+            return (T) new BuiltInAuthProvider(properties, configManager);
 
         var message = String.format("Plugin [%s] does not support the service [%s]", pluginName(), serviceName);
         throw new EPluginNotAvailable(message);
