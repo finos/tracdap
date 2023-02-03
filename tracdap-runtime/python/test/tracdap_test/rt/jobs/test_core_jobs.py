@@ -23,7 +23,7 @@ import tracdap.rt._exec.runtime as runtime  # noqa
 import tracdap.rt._impl.util as util  # noqa
 
 
-class ImportModelTest(unittest.TestCase):
+class CoreJobsTest(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls) -> None:

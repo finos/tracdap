@@ -28,7 +28,7 @@ _ROOT_DIR = pathlib.Path(__file__).parent \
     .resolve()
 
 
-class ModelApiTest(unittest.TestCase):
+class EmbeddedJobsTest(unittest.TestCase):
 
     def setUp(self):
         api_hook.StaticApiImpl.register_impl()
