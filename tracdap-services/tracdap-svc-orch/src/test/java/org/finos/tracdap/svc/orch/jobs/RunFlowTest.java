@@ -47,6 +47,9 @@ import static org.finos.tracdap.svc.orch.jobs.Helpers.runJob;
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class RunFlowTest {
 
+    // Run flow is a more realistic test of production processes
+    // This test uses external schema files for model inputs
+
     private static final String TEST_TENANT = "ACME_CORP";
     private static final String E2E_CONFIG = "config/trac-e2e.yaml";
 
@@ -70,7 +73,9 @@ public class RunFlowTest {
     private final Logger log = LoggerFactory.getLogger(getClass());
 
     static TagHeader flowId;
+    static TagHeader loansSchemaId;
     static TagHeader loansDataId;
+    static TagHeader currencySchemaId;
     static TagHeader currencyDataId;
     static TagHeader model1Id;
     static TagHeader model2Id;
@@ -143,11 +148,11 @@ public class RunFlowTest {
     }
 
     @Test @Order(2)
-    void loadInputData() throws Exception {
+    void createSchemas() {
 
-        log.info("Loading input data...");
-
-        var loansSchema = SchemaDefinition.newBuilder()
+        var loansSchema = ObjectDefinition.newBuilder()
+                .setObjectType(ObjectType.SCHEMA)
+                .setSchema(SchemaDefinition.newBuilder()
                 .setSchemaType(SchemaType.TABLE)
                 .setTable(TableSchema.newBuilder()
                         .addFields(FieldSchema.newBuilder()
@@ -166,10 +171,12 @@ public class RunFlowTest {
                         .addFields(FieldSchema.newBuilder()
                                 .setFieldName("region")
                                 .setFieldType(BasicType.STRING)
-                                .setCategorical(true)))
+                                .setCategorical(true))))
                 .build();
 
-        var currencySchema = SchemaDefinition.newBuilder()
+        var currencySchema = ObjectDefinition.newBuilder()
+                .setObjectType(ObjectType.SCHEMA)
+                .setSchema(SchemaDefinition.newBuilder()
                 .setSchemaType(SchemaType.TABLE)
                 .setTable(TableSchema.newBuilder()
                         .addFields(FieldSchema.newBuilder()
@@ -181,8 +188,41 @@ public class RunFlowTest {
                                 .setFieldType(BasicType.DATE))
                         .addFields(FieldSchema.newBuilder()
                                 .setFieldName("dollar_rate")
-                                .setFieldType(BasicType.DECIMAL)))
+                                .setFieldType(BasicType.DECIMAL))))
                 .build();
+
+        var loansSchemaAttrs = List.of(TagUpdate.newBuilder()
+                .setAttrName("e2e_test_schema")
+                .setValue(MetadataCodec.encodeValue("run_flow:customer_loans"))
+                .build());
+
+        var currencySchemaAttrs = List.of(TagUpdate.newBuilder()
+                .setAttrName("e2e_test_schema")
+                .setValue(MetadataCodec.encodeValue("run_flow:currency_data"))
+                .build());
+
+        loansSchemaId = createSchema(loansSchema, loansSchemaAttrs);
+        currencySchemaId = createSchema(currencySchema, currencySchemaAttrs);
+    }
+
+    TagHeader createSchema(ObjectDefinition schema, List<TagUpdate> attrs) {
+
+        var metaClient = platform.metaClientBlocking();
+
+        var writeRequest = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.SCHEMA)
+                .setDefinition(schema)
+                .addAllTagUpdates(attrs)
+                .build();
+
+        return metaClient.createObject(writeRequest);
+    }
+
+    @Test @Order(3)
+    void loadInputData() throws Exception {
+
+        log.info("Loading input data...");
 
         var loansAttrs = List.of(TagUpdate.newBuilder()
                 .setAttrName("e2e_test_dataset")
@@ -194,11 +234,11 @@ public class RunFlowTest {
                 .setValue(MetadataCodec.encodeValue("run_flow:currency_data"))
                 .build());
 
-        loansDataId = loadDataset(loansSchema, LOANS_INPUT_PATH, loansAttrs);
-        currencyDataId = loadDataset(currencySchema, CURRENCY_INPUT_PATH, currencyAttrs);
+        loansDataId = loadDataset(loansSchemaId, LOANS_INPUT_PATH, loansAttrs);
+        currencyDataId = loadDataset(currencySchemaId, CURRENCY_INPUT_PATH, currencyAttrs);
     }
 
-    TagHeader loadDataset(SchemaDefinition schema, String dataPath, List<TagUpdate> attrs) throws Exception {
+    TagHeader loadDataset(TagHeader schemaId, String dataPath, List<TagUpdate> attrs) throws Exception {
 
         var dataClient = platform.dataClientBlocking();
 
@@ -207,7 +247,7 @@ public class RunFlowTest {
 
         var writeRequest = DataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
-                .setSchema(schema)
+                .setSchemaId(MetadataUtil.selectorFor(schemaId))
                 .setFormat("text/csv")
                 .setContent(ByteString.copyFrom(inputBytes))
                 .addAllTagUpdates(attrs)
@@ -216,7 +256,7 @@ public class RunFlowTest {
         return dataClient.createSmallDataset(writeRequest);
     }
 
-    @Test @Order(3)
+    @Test @Order(4)
     void importModels() {
 
         log.info("Running IMPORT_MODEL job...");
@@ -301,7 +341,7 @@ public class RunFlowTest {
         return modelSearchResult.getSearchResult(0).getHeader();
     }
 
-    @Test @Order(4)
+    @Test @Order(5)
     void runFlow() {
 
         var metaClient = platform.metaClientBlocking();
@@ -386,7 +426,7 @@ public class RunFlowTest {
         return attr.getStringValue();
     }
 
-    @Test @Order(5)
+    @Test @Order(6)
     void checkOutputData() {
 
         log.info("Checking output data...");

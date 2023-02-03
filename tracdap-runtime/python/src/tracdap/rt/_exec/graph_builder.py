@@ -223,9 +223,14 @@ class GraphBuilder:
             data_def = _util.get_job_resource(data_selector, job_config).data
             storage_def = _util.get_job_resource(data_def.storageId, job_config).storage
 
+            if data_def.schemaId:
+                schema_def = _util.get_job_resource(data_def.schemaId, job_config).schema
+            else:
+                schema_def = data_def.schema
+
             root_part_opaque_key = 'part-root'  # TODO: Central part names / constants
             data_item = data_def.parts[root_part_opaque_key].snap.deltas[0].dataItem
-            data_spec = _data.DataSpec(data_item, data_def, storage_def, schema_def=None)
+            data_spec = _data.DataSpec(data_item, data_def, storage_def, schema_def)
 
             # Data spec node is static, using the assembled data spec
             data_spec_id = NodeId.of(f"{input_name}:SPEC", job_namespace, _data.DataSpec)
@@ -238,7 +243,7 @@ class GraphBuilder:
 
             # Input views assembled by mapping one root part to each view
             data_view_id = NodeId.of(input_name, job_namespace, _data.DataView)
-            data_view_node = DataViewNode(data_view_id, data_def.schema, data_load_id)
+            data_view_node = DataViewNode(data_view_id, schema_def, data_load_id)
 
             nodes[data_spec_id] = data_spec_node
             nodes[data_load_id] = data_load_node
@@ -270,13 +275,19 @@ class GraphBuilder:
 
             if data_obj is not None:
 
+                # If data def for the output has been built in advance, use a static data spec
+
                 data_def = data_obj.data
-                storage_obj = _util.get_job_resource(data_def.storageId, job_config)
-                storage_def = storage_obj.storage
+                storage_def = _util.get_job_resource(data_def.storageId, job_config).storage
+
+                if data_def.schemaId:
+                    schema_def = _util.get_job_resource(data_def.schemaId, job_config).schema
+                else:
+                    schema_def = data_def.schema
 
                 root_part_opaque_key = 'part-root'  # TODO: Central part names / constants
                 data_item = data_def.parts[root_part_opaque_key].snap.deltas[0].dataItem
-                data_spec = _data.DataSpec(data_item, data_def, storage_def, schema_def=None)
+                data_spec = _data.DataSpec(data_item, data_def, storage_def, schema_def)
 
                 data_spec_node = StaticValueNode(data_spec_id, data_spec, explicit_deps=explicit_deps)
 
@@ -284,6 +295,9 @@ class GraphBuilder:
                 output_storage_key = output_name + ":STORAGE"
 
             else:
+
+                # If output data def for an output was not supplied in the job, create a dynamic data spec
+                # Dynamic data def will always use an embedded schema (this is no ID for an external schema)
 
                 data_key = output_name + ":DATA"
                 data_id = job_config.resultMapping[data_key]

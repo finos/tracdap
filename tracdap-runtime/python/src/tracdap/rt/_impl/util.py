@@ -200,10 +200,16 @@ def get_job_resource(
     if resource_id is not None:
         resource_key = object_key(resource_id)
 
+    resource = job_config.resources.get(resource_key)
+
+    if resource is not None:
+        return resource
+
     if optional:
-        return job_config.resources.get(resource_key)
-    else:
-        return job_config.resources[resource_key]
+        return None
+
+    err = f"Missing required {selector.objectType} resource [{object_key(selector)}]"
+    raise ex.EJobValidation(err)
 
 
 def get_origin(metaclass: type):
