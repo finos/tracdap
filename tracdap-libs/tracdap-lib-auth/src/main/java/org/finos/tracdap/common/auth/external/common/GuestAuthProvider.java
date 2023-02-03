@@ -52,7 +52,7 @@ public class GuestAuthProvider implements IAuthProvider {
     }
 
     @Override
-    public AuthResult attemptAuth(ChannelHandlerContext ctx, IAuthHeaders headers) {
+    public AuthResult attemptAuth(ChannelHandlerContext ctx, AuthRequest authRequest) {
 
         log.info("AUTHENTICATION: Using guest authentication [{}]", guestId);
 

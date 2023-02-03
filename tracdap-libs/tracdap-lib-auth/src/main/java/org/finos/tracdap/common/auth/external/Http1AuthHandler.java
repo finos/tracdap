@@ -158,7 +158,8 @@ public class Http1AuthHandler extends ChannelDuplexHandler {
                 log.info("conn = {}, authentication required ({})", connId, session.getErrorMessage());
 
             // Only one auth provider available atm, for both browser and API routes
-            authResult = authProvider.attemptAuth(ctx, headers);
+            var authRequest = AuthRequest.forHttp1Request(request, headers);
+            authResult = authProvider.attemptAuth(ctx, authRequest);
 
             // If primary auth succeeded, set up the session token
             if (authResult.getCode() == AuthResultCode.AUTHORIZED) {

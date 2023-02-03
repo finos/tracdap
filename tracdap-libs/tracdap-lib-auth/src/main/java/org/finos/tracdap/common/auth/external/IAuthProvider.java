@@ -22,5 +22,5 @@ import io.netty.channel.ChannelHandlerContext;
 
 public interface IAuthProvider {
 
-    AuthResult attemptAuth(ChannelHandlerContext ctx, IAuthHeaders headers);
+    AuthResult attemptAuth(ChannelHandlerContext ctx, AuthRequest authRequest);
 }

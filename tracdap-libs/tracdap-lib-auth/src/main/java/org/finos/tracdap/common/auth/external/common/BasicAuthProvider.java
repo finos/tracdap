@@ -47,7 +47,9 @@ public class BasicAuthProvider implements IAuthProvider {
     }
 
     @Override
-    public AuthResult attemptAuth(ChannelHandlerContext ctx, IAuthHeaders headers) {
+    public AuthResult attemptAuth(ChannelHandlerContext ctx, AuthRequest authRequest) {
+
+        var headers = authRequest.getHeaders();
 
         if (!headers.contains(HttpHeaderNames.AUTHORIZATION)) {
             log.info("No authorization provided, new authorization required");
