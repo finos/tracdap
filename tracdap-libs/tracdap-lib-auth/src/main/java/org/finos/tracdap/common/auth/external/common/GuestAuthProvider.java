@@ -52,7 +52,7 @@ public class GuestAuthProvider implements IAuthProvider {
     }
 
     @Override
-    public AuthResult attemptAuth(ChannelHandlerContext ctx, IAuthHeaders headers) {
+    public AuthResult attemptAuth(AuthRequest authRequest) {
 
         log.info("AUTHENTICATION: Using guest authentication [{}]", guestId);
 
@@ -60,6 +60,16 @@ public class GuestAuthProvider implements IAuthProvider {
         user.setUserId(guestId);
         user.setDisplayName(guestName);
 
-        return new AuthResult(AuthResultCode.AUTHORIZED, user);
+        return AuthResult.AUTHORIZED(user);
+    }
+
+    @Override
+    public boolean postAuthMatch(String method, String uri) {
+        return false;
+    }
+
+    @Override
+    public AuthResponse postAuth(AuthRequest authRequest, UserInfo userInfo) {
+        return null;
     }
 }

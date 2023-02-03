@@ -17,6 +17,7 @@
 package org.finos.tracdap.common.util;
 
 import com.google.protobuf.ByteString;
+import org.finos.tracdap.common.exception.EResourceNotFound;
 
 import java.io.IOException;
 
@@ -49,7 +50,7 @@ public class ResourceHelpers {
             return stream.readAllBytes();
         }
         catch (IOException e) {
-            throw new RuntimeException(e);
+            throw new EResourceNotFound(e.getMessage(), e);
         }
     }
 }

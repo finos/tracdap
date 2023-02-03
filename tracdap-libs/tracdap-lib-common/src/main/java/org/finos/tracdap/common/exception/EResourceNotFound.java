@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Accenture Global Solutions Limited
+ * Copyright 2023 Accenture Global Solutions Limited
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,16 +14,16 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.auth.external;
+package org.finos.tracdap.common.exception;
 
+/** Resource not found when loading from config (e.g. default config files, db scripts etc.) */
+public class EResourceNotFound extends ETracInternal {
 
-import org.finos.tracdap.common.auth.internal.UserInfo;
+    public EResourceNotFound(String message, Throwable cause) {
+        super(message, cause);
+    }
 
-public interface IAuthProvider {
-
-    AuthResult attemptAuth(AuthRequest authRequest);
-
-    boolean postAuthMatch(String method, String uri);
-
-    AuthResponse postAuth(AuthRequest authRequest, UserInfo userInfo);
+    public EResourceNotFound(String message) {
+        super(message);
+    }
 }

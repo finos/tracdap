@@ -16,8 +16,12 @@
 
 package org.finos.tracdap.common.auth.external;
 
+import io.netty.buffer.ByteBufAllocator;
+import io.netty.buffer.CompositeByteBuf;
+import io.netty.buffer.Unpooled;
 import org.finos.tracdap.common.auth.internal.JwtProcessor;
 import org.finos.tracdap.common.auth.internal.SessionInfo;
+import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.config.AuthenticationConfig;
 
 import io.netty.channel.ChannelDuplexHandler;
@@ -34,6 +38,7 @@ import javax.annotation.Nonnull;
 
 public class Http1AuthHandler extends ChannelDuplexHandler {
 
+    private static final int PENDING_CONTENT_LIMIT = 64 * 1024;
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
@@ -48,6 +53,9 @@ public class Http1AuthHandler extends ChannelDuplexHandler {
     private SessionInfo session;
     private String token;
     private boolean wantCookies;
+
+    private HttpRequest pendingRequest;
+    private CompositeByteBuf pendingContent;
 
     public Http1AuthHandler(
             AuthenticationConfig authConfig, int connId,
@@ -65,6 +73,16 @@ public class Http1AuthHandler extends ChannelDuplexHandler {
     public void channelRead(@Nonnull ChannelHandlerContext ctx, @Nonnull Object msg) {
 
         try {
+
+            // Some auth mechanisms require content as well as headers
+            // These mechanisms set the result NEED_CONTENT, to trigger aggregation
+            // Aggregated messages are fed through the normal flow once they are ready
+
+            msg = handleAggregateContent(msg);
+
+            if (msg == null)
+                return;
+
             // HTTP/1 auth works purely on the request object
             // Each new request will re-run the auth processing
 
@@ -84,7 +102,10 @@ public class Http1AuthHandler extends ChannelDuplexHandler {
             // Special handling for request objects, apply translation to the headers
             if (msg instanceof HttpRequest) {
                 var request = (HttpRequest) msg;
-                processRequest(ctx, request);
+                if (authProvider.postAuthMatch(request.method().name(), request.uri()))
+                    processPostAuthMatch(ctx, request);
+                else
+                    processRequest(ctx, request);
             }
 
             // Everything else flows straight through
@@ -125,6 +146,35 @@ public class Http1AuthHandler extends ChannelDuplexHandler {
         }
     }
 
+    private Object handleAggregateContent(Object msg) {
+
+        if (authResult.getCode() != AuthResultCode.NEED_CONTENT)
+            return msg;
+
+        if (!(msg instanceof HttpContent) || pendingContent.readableBytes() > PENDING_CONTENT_LIMIT) {
+            pendingContent.release();
+            throw new EUnexpected();
+        }
+
+        var content = (HttpContent) msg;
+        pendingContent.addComponent(content.content());
+        pendingContent.writerIndex(pendingContent.writerIndex() + content.content().writerIndex());
+
+        if (content instanceof LastHttpContent)
+
+            return new DefaultFullHttpRequest(
+                    pendingRequest.protocolVersion(),
+                    pendingRequest.method(),
+                    pendingRequest.uri(),
+                    pendingContent,
+                    pendingRequest.headers(),
+                    ((LastHttpContent) content).trailingHeaders());
+
+        else
+
+            return null;
+    }
+
     private void processAuthentication(ChannelHandlerContext ctx, HttpRequest request) {
 
         // Start the auth process by looking for the TRAC auth token
@@ -132,10 +182,23 @@ public class Http1AuthHandler extends ChannelDuplexHandler {
 
         var headers = new Http1AuthHeaders(request.headers());
 
+        // Decide whether to send the auth response as headers or cookies
+        // Always send cookies for browser routes
+        // For API routes the client can set a header to prefer cookies in the response
+
+        var isApi =
+                headers.contains(HttpHeaderNames.CONTENT_TYPE) &&
+                headers.get(HttpHeaderNames.CONTENT_TYPE).startsWith("application/") &&
+                !headers.get(HttpHeaderNames.CONTENT_TYPE).equals("application/x-www-form-urlencoded");
+
+        wantCookies = !isApi || headers.contains(AuthLogic.TRAC_AUTH_COOKIES_HEADER);
+
+        // Look for an existing session token in the request
+        // If the token gives a valid session then authentication has succeeded
+
         token = AuthLogic.findTracAuthToken(headers, AuthLogic.SERVER_COOKIE);
         session = (token != null) ? jwtProcessor.decodeAndValidate(token) : null;
 
-        // If the token gives a valid session then authentication has succeeded
         if (session != null && session.isValid()) {
 
             // Check to see if the token needs refreshing
@@ -147,25 +210,25 @@ public class Http1AuthHandler extends ChannelDuplexHandler {
             }
 
             authResult = AuthResult.AUTHORIZED(session.getUserInfo());
+            return;
         }
 
         // If the TRAC token is not available or not valid, fall back to the primary auth mechanism
-        else {
 
-            if (session == null)
-                log.info("conn = {}, authentication required (no session available)", connId);
-            else
-                log.info("conn = {}, authentication required ({})", connId, session.getErrorMessage());
+        if (authResult == null || authResult.getCode() != AuthResultCode.NEED_CONTENT) {
+            var reason = (session == null) ? "no session available" : session.getErrorMessage();
+            log.info("conn = {}, authentication required ({})", connId, reason);
+        }
 
-            // Only one auth provider available atm, for both browser and API routes
-            authResult = authProvider.attemptAuth(ctx, headers);
+        // Only one auth provider available atm, for both browser and API routes
+        var authRequest = AuthRequest.forHttp1Request(request, headers);
+        authResult = authProvider.attemptAuth(authRequest);
 
-            // If primary auth succeeded, set up the session token
-            if (authResult.getCode() == AuthResultCode.AUTHORIZED) {
+        // If primary auth succeeded, set up the session token
+        if (authResult.getCode() == AuthResultCode.AUTHORIZED) {
 
-                session = AuthLogic.newSession(authResult.getUserInfo(), authConfig);
-                token = jwtProcessor.encodeToken(session);
-            }
+            session = AuthLogic.newSession(authResult.getUserInfo(), authConfig);
+            token = jwtProcessor.encodeToken(session);
         }
 
         // Send a basic error response for authentication failures for now
@@ -175,29 +238,42 @@ public class Http1AuthHandler extends ChannelDuplexHandler {
 
             log.error("conn = {}, authentication failed ({})", connId, authResult.getMessage());
 
-            // Basic unauthorized response
-            // Could try to put the auth result message here maybe?
-
-            var responseHeaders = new DefaultHttpHeaders();
-            var response = new DefaultHttpResponse(
-                    request.protocolVersion(),
-                    HttpResponseStatus.UNAUTHORIZED,
-                    responseHeaders);
+            var response = buildFailedResponse(request, authResult);
 
             ctx.write(response);
             ctx.flush();
             ctx.close();
         }
 
-        // Decide whether to send the auth response as headers or cookies
-        // Always send cookies for browser routes
-        // For API routes the client can set a header to prefer cookies in the response
+        if (authResult.getCode() == AuthResultCode.OTHER_RESPONSE) {
 
-        var isApi =
-                headers.contains(HttpHeaderNames.CONTENT_TYPE) &&
-                headers.get(HttpHeaderNames.CONTENT_TYPE).startsWith("application/");
+            var response = buildAuthResponse(request, authResult.getOtherResponse());
 
-        wantCookies = !isApi || headers.contains(AuthLogic.TRAC_AUTH_COOKIES_HEADER);
+            ctx.write(response);
+            ctx.flush();
+        }
+
+        if (authResult.getCode() == AuthResultCode.NEED_CONTENT) {
+
+            pendingRequest = request;
+            pendingContent = ByteBufAllocator.DEFAULT.compositeBuffer();
+        }
+    }
+
+    private void processPostAuthMatch(ChannelHandlerContext ctx, HttpRequest request) {
+
+        var postAuthHeaders = new Http1AuthHeaders(request.headers());
+        var postAuthRequest = AuthRequest.forHttp1Request(request, postAuthHeaders);
+        var postAuthResponse = authProvider.postAuth(postAuthRequest, session.getUserInfo());
+
+        if (postAuthResponse != null) {
+
+            authResult = AuthResult.OTHER_RESPONSE(postAuthResponse);
+            var response = buildAuthResponse(request, postAuthResponse);
+
+            processResponse(ctx, response, ctx.newPromise());
+            ctx.flush();
+        }
     }
 
     private void processRequest(ChannelHandlerContext ctx, HttpRequest request) {
@@ -262,5 +338,34 @@ public class Http1AuthHandler extends ChannelDuplexHandler {
 
             ctx.write(relayResponse, promise);
         }
+    }
+
+    private FullHttpResponse buildAuthResponse(HttpRequest request, AuthResponse responseDetails) {
+
+        var responseCode = HttpResponseStatus.valueOf(
+                responseDetails.getStatusCode(),
+                responseDetails.getStatusMessage());
+
+        var responseHeaders = new DefaultHttpHeaders();
+        for (var header : responseDetails.getHeaders())
+            responseHeaders.add(header.getKey(), header.getValue());
+
+        return new DefaultFullHttpResponse(
+                request.protocolVersion(), responseCode,
+                responseDetails.getContent(), responseHeaders,
+                new DefaultHttpHeaders());
+    }
+
+    private FullHttpResponse buildFailedResponse(HttpRequest request, AuthResult authResult) {
+
+        var responseCode = HttpResponseStatus.valueOf(
+                HttpResponseStatus.UNAUTHORIZED.code(),
+                authResult.getMessage());
+
+        return new DefaultFullHttpResponse(
+                request.protocolVersion(), responseCode,
+                Unpooled.EMPTY_BUFFER,
+                new DefaultHttpHeaders(),
+                new DefaultHttpHeaders());
     }
 }

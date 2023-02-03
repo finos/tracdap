@@ -22,8 +22,9 @@ import org.finos.tracdap.common.auth.internal.UserInfo;
 public class AuthResult {
 
     private final AuthResultCode code;
-    private final String message;
     private final UserInfo userInfo;
+    private final String message;
+    private final AuthResponse otherResponse;
 
     public static AuthResult AUTHORIZED(UserInfo userInfo) {
         return new AuthResult(AuthResultCode.AUTHORIZED, userInfo);
@@ -33,16 +34,37 @@ public class AuthResult {
         return new AuthResult(AuthResultCode.FAILED, (String) null);
     }
 
-    public AuthResult(AuthResultCode code, UserInfo userInfo) {
-        this.code = code;
-        this.message = null;
-        this.userInfo = userInfo;
+    public static AuthResult FAILED(String message) {
+        return new AuthResult(AuthResultCode.FAILED, message);
     }
 
-    public AuthResult(AuthResultCode code, String message) {
+    public static AuthResult OTHER_RESPONSE(AuthResponse response) {
+        return new AuthResult(AuthResultCode.OTHER_RESPONSE, response);
+    }
+
+    public static AuthResult NEED_CONTENT() {
+        return new AuthResult(AuthResultCode.NEED_CONTENT, (UserInfo) null);
+    }
+
+    private AuthResult(AuthResultCode code, UserInfo userInfo) {
         this.code = code;
-        this.message = message;
+        this.userInfo = userInfo;
+        this.message = null;
+        this.otherResponse = null;
+    }
+
+    private AuthResult(AuthResultCode code, String message) {
+        this.code = code;
         this.userInfo = null;
+        this.message = message;
+        this.otherResponse = null;
+    }
+
+    private AuthResult(AuthResultCode code, AuthResponse otherResponse) {
+        this.code = code;
+        this.userInfo = null;
+        this.message = null;
+        this.otherResponse = otherResponse;
     }
 
     public AuthResultCode getCode() {
@@ -55,5 +77,9 @@ public class AuthResult {
 
     public UserInfo getUserInfo() {
         return userInfo;
+    }
+
+    public AuthResponse getOtherResponse() {
+        return otherResponse;
     }
 }
