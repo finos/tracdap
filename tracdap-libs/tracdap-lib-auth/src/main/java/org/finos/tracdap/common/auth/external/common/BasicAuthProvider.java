@@ -18,12 +18,13 @@ package org.finos.tracdap.common.auth.external.common;
 
 import org.finos.tracdap.common.auth.external.*;
 import org.finos.tracdap.common.auth.internal.UserInfo;
+import org.finos.tracdap.common.config.ConfigManager;
+import org.finos.tracdap.common.config.ISecretLoader;
 
+import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.*;
-import org.finos.tracdap.common.config.ConfigManager;
-import org.finos.tracdap.common.config.CryptoHelpers;
-import org.finos.tracdap.common.config.ISecretLoader;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -37,8 +38,6 @@ public class BasicAuthProvider implements IAuthProvider {
 
     private static final String BASIC_AUTH_PREFIX = "basic ";
 
-    private static final String DISPLAY_NAME_ATTR = "displayName";
-
     private final ISecretLoader userDb;
 
     public BasicAuthProvider(ConfigManager configManager) {
@@ -47,13 +46,13 @@ public class BasicAuthProvider implements IAuthProvider {
     }
 
     @Override
-    public AuthResult attemptAuth(ChannelHandlerContext ctx, AuthRequest authRequest) {
+    public AuthResult attemptAuth(AuthRequest authRequest) {
 
         var headers = authRequest.getHeaders();
 
         if (!headers.contains(HttpHeaderNames.AUTHORIZATION)) {
             log.info("No authorization provided, new authorization required");
-            return requestAuth(ctx);
+            return requestAuth();
         }
 
         var authHeader = headers.get(HttpHeaderNames.AUTHORIZATION).toString();
@@ -63,7 +62,7 @@ public class BasicAuthProvider implements IAuthProvider {
         // If the authorization header is not understood, trigger a new auth workflow
         if (!prefix.equalsIgnoreCase(BASIC_AUTH_PREFIX)) {
             log.warn("Invalid authorization header, re-authorization required");
-            return requestAuth(ctx);
+            return requestAuth();
         }
 
         var basicAuthData = authHeader.substring(BASIC_AUTH_PREFIX.length());
@@ -74,68 +73,45 @@ public class BasicAuthProvider implements IAuthProvider {
         // Separator must be found and cannot be at position zero (i.e. no empty usernames)
         if (separator < 1) {
             log.warn("Invalid authorization header, re-authorization required");
-            return requestAuth(ctx);
+            return requestAuth();
         }
 
         var username = userAndPass.substring(0, separator);
         var password = userAndPass.substring(separator + 1);
 
-        if (!checkPassword(username, password)) {
-            return requestAuth(ctx);
+        if (!LocalUsers.checkPassword(userDb, username, password, log)) {
+            return requestAuth();
         }
 
-        var userInfo = getUserInfo(username);
+        var userInfo = LocalUsers.getUserInfo(userDb, username);
 
-        return new AuthResult(AuthResultCode.AUTHORIZED, userInfo);
+        return AuthResult.AUTHORIZED(userInfo);
     }
 
-    public AuthResult requestAuth(ChannelHandlerContext ctx) {
+    @Override
+    public boolean postAuthMatch(String method, String uri) {
+        return false;
+    }
+
+    @Override
+    public AuthResponse postAuth(AuthRequest authRequest, UserInfo userInfo) {
+        return null;
+    }
+
+    public AuthResult requestAuth() {
 
         log.info("AUTHENTICATION: Using basic authentication");
 
-        var headers = new DefaultHttpHeaders();
+        var headers = new Http1AuthHeaders();
         headers.add(HttpHeaderNames.WWW_AUTHENTICATE, "Basic realm=\"trac_auth_realm\", charset=\"UTF-8\"");
 
-        var response = new DefaultHttpResponse(
-                HttpVersion.HTTP_1_1,
-                HttpResponseStatus.UNAUTHORIZED,
-                headers);
+        var response = new AuthResponse(
+                HttpResponseStatus.UNAUTHORIZED.code(),
+                HttpResponseStatus.UNAUTHORIZED.reasonPhrase(),
+                headers, Unpooled.EMPTY_BUFFER);
 
-        ctx.writeAndFlush(response);
-        ctx.close();
-
-        return new AuthResult(AuthResultCode.REDIRECTED, ""); // TODO: message
+        return AuthResult.OTHER_RESPONSE(response);
     }
 
-    private boolean checkPassword(String user, String pass) {
 
-        if (!userDb.hasSecret(user)) {
-
-            log.warn("AUTHENTICATION: Failed [{}] user not found", user);
-            return false;
-        }
-
-        var passwordHash = userDb.loadPassword(user);
-        var passwordOk = CryptoHelpers.validateSSHA512(passwordHash, pass);
-
-        if (passwordOk)
-            log.info("AUTHENTICATION: Succeeded [{}]", user);
-        else
-            log.warn("AUTHENTICATION: Failed [{}] wrong password", user);
-
-        return passwordOk;
-    }
-
-    private UserInfo getUserInfo(String user) {
-
-        var displayName = userDb.hasAttr(user, DISPLAY_NAME_ATTR)
-                ? userDb.loadAttr(user, DISPLAY_NAME_ATTR)
-                : user;
-
-        var userInfo = new UserInfo();
-        userInfo.setUserId(user);
-        userInfo.setDisplayName(displayName);
-
-        return userInfo;
-    }
 }

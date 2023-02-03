@@ -17,6 +17,7 @@
 package org.finos.tracdap.common.auth.external;
 
 
+import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.HttpRequest;
 
 public class AuthRequest {
@@ -24,16 +25,26 @@ public class AuthRequest {
     private final String method;
     private final String url;
     private final IAuthHeaders headers;
+    private final byte[] content;
 
     public static AuthRequest forHttp1Request(HttpRequest request, IAuthHeaders headers) {
 
-        return new AuthRequest(request.method().toString(), request.uri(), headers);
+        byte[] content = null;
+
+        if (request instanceof FullHttpRequest) {
+            var fullRequest = (FullHttpRequest) request;
+            content = new byte[fullRequest.content().readableBytes()];
+            fullRequest.content().readBytes(content);
+        }
+
+        return new AuthRequest(request.method().toString(), request.uri(), headers, content);
     }
 
-    public AuthRequest(String method, String url, IAuthHeaders headers) {
+    public AuthRequest(String method, String url, IAuthHeaders headers, byte[] content) {
         this.method = method;
         this.url = url;
         this.headers = headers;
+        this.content = content;
     }
 
     public String getMethod() {
@@ -46,5 +57,9 @@ public class AuthRequest {
 
     public IAuthHeaders getHeaders() {
         return headers;
+    }
+
+    public byte[] getContent() {
+        return content;
     }
 }

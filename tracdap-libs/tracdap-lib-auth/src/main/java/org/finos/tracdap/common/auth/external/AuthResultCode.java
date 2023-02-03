@@ -19,6 +19,7 @@ package org.finos.tracdap.common.auth.external;
 
 public enum AuthResultCode {
     AUTHORIZED,
-    REDIRECTED,
-    FAILED
+    FAILED,
+    OTHER_RESPONSE,
+    NEED_CONTENT
 }
