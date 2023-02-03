@@ -142,8 +142,7 @@ jobs:
           GPG_KEY_PASSPHRASE: ${{ secrets.GPG_KEY_PASSPHRASE }}
 
       - name: Publish to Maven Central
-        # if: ${{ github.event_name == 'release' && github.event.action == 'published' }}
-        if: ${{ false }}
+        if: ${{ github.event_name == 'release' && github.event.action == 'published' }}
         run: |
           mkdir -p ~/.gnupg/
           printf "$GPG_KEY_BASE64" | base64 --decode > ~/.gnupg/keyring.gpg
