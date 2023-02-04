@@ -28,8 +28,8 @@ public interface IJobCache<TValue> {
     Ticket openTicket(String key, int revision, Duration duration);
     void closeTicket(Ticket ticket);
 
-    void addEntry(Ticket ticket, String status, TValue value);
-    void updateEntry(Ticket ticket, String status, TValue value);
+    int addEntry(Ticket ticket, String status, TValue value);
+    int updateEntry(Ticket ticket, String status, TValue value);
     void removeEntry(Ticket ticket);
 
     CacheQueryResult<TValue> getEntry(Ticket ticket);

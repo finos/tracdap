@@ -121,13 +121,13 @@ public class LocalJobCache<TValue> implements IJobCache<TValue> {
     }
 
     @Override
-    public void addEntry(Ticket ticket, String status, TValue value) {
+    public int addEntry(Ticket ticket, String status, TValue value) {
 
         var commitTime = Instant.now();
 
         checkValidTicket(ticket, "create", commitTime);
 
-        _cache.compute(ticket.key(), (_key, _entry) -> {
+        var added = _cache.compute(ticket.key(), (_key, _entry) -> {
 
             if (_entry != null) {
                 var message = String.format("Cannot create [%s], item is already in the cache", ticket.key());
@@ -144,16 +144,18 @@ public class LocalJobCache<TValue> implements IJobCache<TValue> {
 
             return newEntry;
         });
+
+        return added.revision;
     }
 
     @Override
-    public void updateEntry(Ticket ticket, String stateKey, TValue value) {
+    public int updateEntry(Ticket ticket, String stateKey, TValue value) {
 
         var commitTime = Instant.now();
 
         checkValidTicket(ticket, "update", commitTime);
 
-        _cache.compute(ticket.key(), (_key, _entry) -> {
+        var updated = _cache.compute(ticket.key(), (_key, _entry) -> {
 
             if (_entry == null) {
                 var message = String.format("Cannot update [%s], item is not in the cache", ticket.key());
@@ -171,6 +173,8 @@ public class LocalJobCache<TValue> implements IJobCache<TValue> {
 
             return newEntry;
         });
+
+        return updated.revision;
     }
 
     @Override
@@ -317,4 +321,5 @@ public class LocalJobCache<TValue> implements IJobCache<TValue> {
             throw new ECacheTicket(message);
         }
     }
+
 }
