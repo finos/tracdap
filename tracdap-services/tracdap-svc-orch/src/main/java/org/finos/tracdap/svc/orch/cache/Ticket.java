@@ -28,10 +28,16 @@ public class Ticket implements AutoCloseable {
     private final Instant grantTime;
     private final Instant expiry;
     private final boolean superseded;
+    private final boolean missing;
+
+    public static Ticket missingEntryTicket(String key, int revision, Instant grantTime) {
+
+        return new Ticket(null, key, revision, grantTime, grantTime, true, true);
+    }
 
     public static Ticket supersededTicket(String key, int revision, Instant grantTime) {
 
-        return new Ticket(null, key, revision, grantTime, grantTime, true);
+        return new Ticket(null, key, revision, grantTime, grantTime, true, false);
     }
 
     public static Ticket forDuration(
@@ -39,14 +45,14 @@ public class Ticket implements AutoCloseable {
             String key, int revision,
             Instant grantTime, Duration grantDuration) {
 
-        return new Ticket(cache, key, revision, grantTime, grantTime.plus(grantDuration), false);
+        return new Ticket(cache, key, revision, grantTime, grantTime.plus(grantDuration), false, false);
     }
 
     protected Ticket(
             IJobCache<?> cache,
             String key, int iteration,
             Instant grantTime, Instant expiry,
-            boolean superseded) {
+            boolean superseded, boolean missing) {
 
         this.cache = cache;
 
@@ -55,6 +61,7 @@ public class Ticket implements AutoCloseable {
         this.grantTime = grantTime;
         this.expiry = expiry;
         this.superseded = superseded;
+        this.missing = missing;
     }
 
     public String key() {
@@ -74,7 +81,11 @@ public class Ticket implements AutoCloseable {
     }
 
     public boolean superseded() {
-        return superseded;
+        return superseded || missing;
+    }
+
+    public boolean missing() {
+        return missing;
     }
 
     @Override
