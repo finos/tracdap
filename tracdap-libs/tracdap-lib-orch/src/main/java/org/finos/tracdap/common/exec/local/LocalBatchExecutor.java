@@ -78,11 +78,13 @@ public class LocalBatchExecutor implements IBatchExecutor<LocalBatchState> {
     @Override
     public void start() {
 
+        log.info("Local executor is starting up...");
     }
 
     @Override
     public void stop() {
 
+        log.info("Local executor is shutting down...");
     }
 
     @Override

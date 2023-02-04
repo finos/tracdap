@@ -146,6 +146,8 @@ public class SshExecutor implements IBatchExecutor<SshBatchState> {
 
         try {
 
+            log.info("SSH executor is starting up...");
+
             // It is not clear what Apache SSHD does with its event loop group
             // Is it blocking operations, or non-block low-level IO? (or non-block operations)
             // If the wrong loops are used for the wrong things this will cause problems!
@@ -164,6 +166,8 @@ public class SshExecutor implements IBatchExecutor<SshBatchState> {
 
     @Override
     public void stop() {
+
+        log.info("SSH executor is shutting down...");
 
         client.stop();
     }
