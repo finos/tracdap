@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Accenture Global Solutions Limited
+ * Copyright 2023 Accenture Global Solutions Limited
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,31 +19,50 @@ package org.finos.tracdap.svc.orch.cache;
 import java.time.Duration;
 import java.time.Instant;
 
-public class Ticket {
+public class Ticket implements AutoCloseable {
+
+    private final IJobCache<?> cache;
 
     private final String key;
+    private final int revision;
     private final Instant grantTime;
     private final Instant expiry;
     private final boolean superseded;
 
-    Ticket(String key, Instant grantTime, Instant expiry, boolean superseded) {
+    public static Ticket supersededTicket(String key, int revision, Instant grantTime) {
+
+        return new Ticket(null, key, revision, grantTime, grantTime, true);
+    }
+
+    public static Ticket forDuration(
+            IJobCache<?> cache,
+            String key, int revision,
+            Instant grantTime, Duration grantDuration) {
+
+        return new Ticket(cache, key, revision, grantTime, grantTime.plus(grantDuration), false);
+    }
+
+    protected Ticket(
+            IJobCache<?> cache,
+            String key, int iteration,
+            Instant grantTime, Instant expiry,
+            boolean superseded) {
+
+        this.cache = cache;
+
         this.key = key;
+        this.revision = iteration;
         this.grantTime = grantTime;
         this.expiry = expiry;
         this.superseded = superseded;
     }
 
-    public static Ticket forDuration(String key, Instant grantTime, Duration duration) {
-        var expiry = grantTime.plus(duration);
-        return new Ticket(key, grantTime, expiry, false);
-    }
-
-    public static Ticket superseded(String key, Instant operationTime) {
-        return new Ticket(key, operationTime, operationTime, true);
-    }
-
     public String key() {
         return key;
+    }
+
+    public int revision() {
+        return revision;
     }
 
     public Instant grantTime() {
@@ -56,5 +75,10 @@ public class Ticket {
 
     public boolean superseded() {
         return superseded;
+    }
+
+    @Override
+    public void close() {
+        cache.closeTicket(this);
     }
 }
