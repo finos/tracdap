@@ -18,12 +18,10 @@ package org.finos.tracdap.svc.orch.service;
 
 import org.finos.tracdap.api.*;
 import org.finos.tracdap.common.auth.AuthConstants;
-import org.finos.tracdap.metadata.JobStatusCode;
 import org.finos.tracdap.common.exception.EMetadataNotFound;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.metadata.MetadataUtil;
-import org.finos.tracdap.svc.orch.cache.IJobCache;
-import org.finos.tracdap.svc.orch.cache.JobState;
+import org.finos.tracdap.metadata.JobStatusCode;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,26 +31,20 @@ public class JobApiService {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
-    private final JobLifecycle jobLifecycle;
-    private final IJobCache jobCache;
+    private final JobManager jobManager;
+    private final JobProcessor jobProcessor;
 
-    public JobApiService(
-            JobLifecycle jobLifecycle,
-            IJobCache jobCache) {
+    public JobApiService(JobManager jobManager, JobProcessor jobProcessor) {
 
-        this.jobLifecycle = jobLifecycle;
-        this.jobCache = jobCache;
+        this.jobManager = jobManager;
+        this.jobProcessor = jobProcessor;
     }
 
     public JobStatus validateJob(JobRequest request) {
 
         var jobState = newJob(request);
 
-        jobStatus(jobState, JobStatusCode.PREPARING);
-
-        jobState = jobLifecycle.assembleAndValidate(jobState);
-
-        jobStatus(jobState, JobStatusCode.VALIDATED);
+        jobState = jobProcessor.assembleAndValidate(jobState);
 
         return reportStatus(jobState);
     }
@@ -61,17 +53,11 @@ public class JobApiService {
 
         var jobState = newJob(request);
 
-        jobStatus(jobState, JobStatusCode.PREPARING);
+        jobState = jobProcessor.assembleAndValidate(jobState);
+        jobState = jobManager.addNewJob(jobState);
 
-        jobState = jobLifecycle.assembleAndValidate(jobState);
-
-        jobStatus(jobState, JobStatusCode.VALIDATED);
-        jobStatus(jobState, JobStatusCode.PENDING);
-
-        jobState = jobLifecycle.saveInitialMetadata(jobState);
-        jobState = submitForExecution(jobState);
-
-        return reportStatus(jobState);    }
+        return reportStatus(jobState);
+    }
 
     public JobStatus checkJob(JobStatusRequest request) {
 
@@ -80,7 +66,7 @@ public class JobApiService {
             throw new EUnexpected();
 
         var jobKey = MetadataUtil.objectKey(request.getSelector());
-        var jobState = jobCache.readJob(jobKey);
+        var jobState = jobManager.queryJob(jobKey);
 
         // TODO: Should there be a different error for jobs not found in the cache? EJobNotLive?
         if (jobState == null) {
@@ -103,33 +89,9 @@ public class JobApiService {
         jobState.definition = request.getJob();
         jobState.jobRequest = request;
 
+        jobState.tracStatus = JobStatusCode.PREPARING;
+
         return jobState;
-    }
-
-    private JobState jobStatus(JobState jobState, JobStatusCode statusCode) {
-
-        jobState.statusCode = statusCode;
-        return jobState;
-    }
-
-    private JobState submitForExecution(JobState jobState) {
-
-        var jobKey = MetadataUtil.objectKey(jobState.jobId);
-
-        try (var ctx = jobCache.useTicket(jobKey)) {
-
-            // Should not happen for a new job ID
-            // However if it does, we definitely want to report an error!
-            if (ctx.superseded())
-                throw new EUnexpected();
-
-            jobState.jobKey = jobKey;
-            jobState.statusCode = JobStatusCode.QUEUED;
-
-            jobCache.createJob(jobKey, jobState, ctx.ticket());
-
-            return jobState;
-        }
     }
 
     private JobStatus reportStatus(JobState jobState) {
@@ -139,7 +101,7 @@ public class JobApiService {
         if (jobState.jobId != null)
             status.setJobId(jobState.jobId);
 
-        status.setStatusCode(jobState.statusCode);
+        status.setStatusCode(jobState.tracStatus);
 
         if (jobState.statusMessage != null)
             status.setStatusMessage(jobState.statusMessage);
