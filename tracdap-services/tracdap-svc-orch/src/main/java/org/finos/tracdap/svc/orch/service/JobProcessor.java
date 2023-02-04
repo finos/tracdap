@@ -183,7 +183,7 @@ public class JobProcessor {
             // Change to SUBMITTED / RUNNING state is significant, send update to metadata service
 
             case QUEUED:
-                newState.tracStatus = JobStatusCode.PENDING;  // QUEUED_IN_EXECUTOR todo
+                newState.tracStatus = JobStatusCode.SUBMITTED;
                 newState.cacheStatus = CacheStatus.QUEUED_IN_EXECUTOR;
                 return updateMetadata(newState);
 
