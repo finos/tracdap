@@ -58,6 +58,8 @@ ext {
     BUILD_aws_config = false
     BUILD_aws_storage = false
 
+    BUILD_exec_ssh = false
+
 
     // These DEPEND_ flags say what gets pulled in for each plugin
 
@@ -69,4 +71,6 @@ ext {
     // AWS config project needs updating to AWS SDK v2
     // DEPEND_aws_config = project(":aws-config")
     DEPEND_aws_storage = project(":aws-storage")
+
+    DEPEND_exec_ssh = project(":exec-ssh")
 }
