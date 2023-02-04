@@ -181,8 +181,7 @@ public class JobManager {
 
         try {
 
-            var runningStates = List.of("");
-            var runningJobs = cache.queryState(runningStates);
+            var runningJobs = cache.queryState(STATUS_FOR_RUNNING_JOBS);
 
             var pollRequests = runningJobs.stream()
                     .map(j -> Map.entry(j.key(), j.value()))
@@ -201,7 +200,7 @@ public class JobManager {
         }
         catch (Exception e) {
 
-            log.warn("There was an error polling the executor: " + e.getMessage());
+            log.warn("There was an error polling the executor: " + e.getMessage(), e);
             log.warn("Polling operation will be retried periodically");
 
             // TODO: Track successive polling errors, take action after a threshold
@@ -210,20 +209,30 @@ public class JobManager {
 
     public JobState addNewJob(JobState jobState) {
 
-        var jobKey = MetadataUtil.objectKey(jobState.jobId);
+        try {
 
-        try (var ticket = cache.openNewTicket(jobKey)) {
+            // Job key is not known until the initial metadata is saved
 
-            // Duplicate job key, should never happen
-            if (ticket.superseded())
-                throw new ECacheTicket("Job could not be created because it already exists");
+            var newState_ = jobState.clone();
+            newState_.tracStatus = JobStatusCode.QUEUED;
+            newState_.cacheStatus = CacheStatus.QUEUED_IN_TRAC;
 
-            var newState = processor.saveInitialMetadata(jobState);
+            var newState = processor.saveInitialMetadata(newState_);
+            newState.jobKey = MetadataUtil.objectKey(newState.jobId);
 
-            newState.tracStatus = JobStatusCode.QUEUED;
-            newState.cacheStatus = CacheStatus.QUEUED_IN_TRAC;
+            try (var ticket = cache.openNewTicket(newState.jobKey)) {
 
-            cache.addEntry(ticket, newState.cacheStatus, newState);
+                // Duplicate job key, should never happen
+                if (ticket.superseded())
+                    throw new ECacheTicket("Job could not be created because it already exists");
+
+                cache.addEntry(ticket, newState.cacheStatus, newState);
+            }
+
+            // Avoid polling delay if multiple updates are processed in succession
+            // This will also tend to make all the updates in a sequence run on one orchestrator node
+
+            javaExecutor.submit(this::pollForLaunch);
 
             return newState;
         }
@@ -232,7 +241,7 @@ public class JobManager {
             // This method is called from the public API
             // Let errors propagate back to the client
 
-            var message = String.format("Job was not accepted: [%s] %s", jobState.jobKey, e.getMessage());
+            var message = String.format("Job was not accepted: %s", e.getMessage());
             log.error(message);
 
             throw new EJobFailure(message, e);
@@ -261,12 +270,15 @@ public class JobManager {
         }
         catch (Exception e) {
 
-            log.warn("There was a problem launching the job: " + e.getMessage());
+            log.warn("There was a problem launching the job: " + e.getMessage(), e);
             log.warn("Launch operation will be retried");
         }
     }
 
     public void recordPollResult(String jobKey, int revision, ExecutorJobInfo executorJobInfo) {
+
+        int newRevision = revision;
+        String newCacheStatus = null;
 
         try (var ticket = cache.openTicket(jobKey, revision)) {
 
@@ -277,16 +289,28 @@ public class JobManager {
             var jobState = cacheEntry.value();
             var newState = processor.recordPollStatus(jobState, executorJobInfo);
 
-            cache.updateEntry(ticket, newState.cacheStatus, newState);
+            newRevision = cache.updateEntry(ticket, newState.cacheStatus, newState);
+            newCacheStatus = newState.cacheStatus;
         }
         catch (Exception e) {
 
-            log.warn("There was a problem polling the job: " + e.getMessage());
+            log.warn("There was a problem polling the job: " + e.getMessage(), e);
             log.warn("Poll operation will be retried");
+        }
+
+        // Avoid polling delay if multiple updates are processed in succession
+        // This will also tend to make all the updates in a sequence run on one orchestrator node
+
+        if (newRevision > revision && STATUS_FOR_UPDATE.contains(newCacheStatus)) {
+            var newRevision_ = newRevision;
+            javaExecutor.submit(() -> processJobUpdate(jobKey, newRevision_));
         }
     }
 
     public void processJobUpdate(String jobKey, int revision) {
+
+        int newRevision = revision;
+        String newCacheStatus = null;
 
         try (var ticket = cache.openTicket(jobKey, revision)) {
 
@@ -304,12 +328,21 @@ public class JobManager {
             var updateFunc = getUpdateFunc(jobState.cacheStatus);
             var newState = updateFunc.apply(jobState);
 
-            cache.updateEntry(ticket, newState.cacheStatus, newState);
+            newRevision = cache.updateEntry(ticket, newState.cacheStatus, newState);
+            newCacheStatus = newState.cacheStatus;
         }
         catch (Exception e) {
 
-            log.warn("There was a problem processing the job: " + e.getMessage());
+            log.warn("There was a problem processing the job: " + e.getMessage(), e);
             log.warn("The operation will be retried");
+        }
+
+        // Avoid polling delay if multiple updates are processed in succession
+        // This will also tend to make all the updates in a sequence run on one orchestrator node
+
+        if (newRevision > revision && STATUS_FOR_UPDATE.contains(newCacheStatus)) {
+            var newRevision_ = newRevision;
+            javaExecutor.submit(() -> processJobUpdate(jobKey, newRevision_));
         }
     }
 
