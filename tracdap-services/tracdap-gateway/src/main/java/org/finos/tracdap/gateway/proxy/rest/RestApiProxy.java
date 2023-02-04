@@ -286,6 +286,7 @@ public class RestApiProxy extends Http2ChannelDuplexHandler {
 
                 ctx.fireChannelRead(headersFrame);
                 ctx.fireChannelRead(dataFrame);
+                ctx.fireChannelReadComplete();
             }
             catch (InvalidProtocolBufferException e) {
 
@@ -323,12 +324,12 @@ public class RestApiProxy extends Http2ChannelDuplexHandler {
 
         var headers = new DefaultHttp2Headers();
         headers.status(errorStatus.toString());
-        headers.set(":version", "HTTP/2.0");
 
         if (errorMessage == null || errorMessage.isEmpty()) {
 
             var headersFrame = new DefaultHttp2HeadersFrame(headers, true).stream(stream);
             ctx.fireChannelRead(headersFrame);
+            ctx.fireChannelReadComplete();
         }
         else {
 
@@ -346,6 +347,7 @@ public class RestApiProxy extends Http2ChannelDuplexHandler {
 
             ctx.fireChannelRead(headersFrame);
             ctx.fireChannelRead(dataFrame);
+            ctx.fireChannelReadComplete();
         }
     }
 
