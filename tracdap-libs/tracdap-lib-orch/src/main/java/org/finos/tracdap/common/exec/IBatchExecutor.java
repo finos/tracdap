@@ -31,8 +31,6 @@ public interface IBatchExecutor<TState extends Message> {
 
     void stop();
 
-    void executorStatus();
-
     Parser<TState> stateDecoder();
 
     TState createBatch(String batchKey);
@@ -47,9 +45,8 @@ public interface IBatchExecutor<TState extends Message> {
 
     TState startBatch(String batchKey, TState batchState, LaunchCmd launchCmd, List<LaunchArg> launchArgs);
 
-    TState cancelBatch(String batchKey, TState batchState);
+    ExecutorJobInfo pollBatch(String batchKey, TState batchState);
 
-    ExecutorPollResult<TState> pollBatch(String batchKey, TState batchState);
+    List<ExecutorJobInfo> pollBatches(List<Map.Entry<String, TState>> batches);
 
-    List<ExecutorPollResult<TState>> pollAllBatches(Map<String, TState> priorStates);
 }

@@ -14,10 +14,15 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.svc.orch.process;
+package org.finos.tracdap.common.exec;
 
+public enum ExecutorJobStatus {
 
-public class JobManager {
-
-
+    STATUS_UNKNOWN,
+    QUEUED,
+    RUNNING,
+    COMPLETE,
+    SUCCEEDED,
+    FAILED,
+    CANCELLED
 }
