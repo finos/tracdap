@@ -16,15 +16,24 @@
 
 package org.finos.tracdap.svc.orch.service;
 
-import com.google.protobuf.InvalidProtocolBufferException;
-import com.google.protobuf.Message;
+import org.finos.tracdap.api.MetadataWriteRequest;
+import org.finos.tracdap.api.TrustedMetadataApiGrpc.TrustedMetadataApiBlockingStub;
+import org.finos.tracdap.common.auth.GrpcClientAuth;
 import org.finos.tracdap.common.config.ConfigFormat;
 import org.finos.tracdap.common.config.ConfigParser;
 import org.finos.tracdap.common.exception.*;
 import org.finos.tracdap.common.exec.*;
+import org.finos.tracdap.common.metadata.MetadataCodec;
+import org.finos.tracdap.common.metadata.MetadataUtil;
 import org.finos.tracdap.common.validation.Validator;
 import org.finos.tracdap.config.JobResult;
 import org.finos.tracdap.metadata.JobStatusCode;
+
+import com.google.protobuf.InvalidProtocolBufferException;
+import com.google.protobuf.Message;
+
+import org.finos.tracdap.metadata.ObjectType;
+import org.finos.tracdap.metadata.TagUpdate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -32,11 +41,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import static org.finos.tracdap.common.metadata.MetadataConstants.TRAC_JOB_STATUS_ATTR;
+
 
 public class JobProcessor {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
+    private final TrustedMetadataApiBlockingStub metaClient;
     private final IBatchExecutor<?> executor;
     private final Validator validator = new Validator();
 
@@ -44,8 +56,9 @@ public class JobProcessor {
     private final JobLifecycle lifecycle;
 
 
-    public JobProcessor(IBatchExecutor<?> executor, JobLifecycle lifecycle) {
+    public JobProcessor(TrustedMetadataApiBlockingStub metaClient, IBatchExecutor<?> executor, JobLifecycle lifecycle) {
 
+        this.metaClient = metaClient;
         this.executor = executor;
         this.lifecycle = lifecycle;
     }
@@ -78,9 +91,22 @@ public class JobProcessor {
 
     public JobState updateMetadata(JobState jobState) {
 
-        // TODO: Intermediary job updates not currently reported
+        var writeRequest = MetadataWriteRequest.newBuilder()
+                .setTenant(jobState.tenant)
+                .setObjectType(ObjectType.JOB)
+                .setPriorVersion(MetadataUtil.selectorFor(jobState.jobId))
+                .addTagUpdates(TagUpdate.newBuilder()
+                .setAttrName(TRAC_JOB_STATUS_ATTR)
+                .setValue(MetadataCodec.encodeValue(jobState.tracStatus.name())))
+                .build();
 
-        return jobState;
+        var userAuth = GrpcClientAuth.applyIfAvailable(metaClient, jobState.ownerToken);
+        var newId = userAuth.updateTag(writeRequest);
+
+        var newState = jobState.clone();
+        newState.jobId = newId;
+
+        return newState;
     }
 
     public JobState saveResultMetadata(JobState jobState) {
@@ -153,25 +179,31 @@ public class JobProcessor {
 
         switch (batchInfo.getStatus()) {
 
+
+            // Change to SUBMITTED / RUNNING state is significant, send update to metadata service
+
             case QUEUED:
                 newState.tracStatus = JobStatusCode.PENDING;  // QUEUED_IN_EXECUTOR todo
                 newState.cacheStatus = CacheStatus.QUEUED_IN_EXECUTOR;
-                break;
+                return updateMetadata(newState);
 
             case RUNNING:
                 newState.tracStatus = JobStatusCode.RUNNING;
                 newState.cacheStatus = CacheStatus.RUNNING_IN_EXECUTOR;
-                break;
+                return updateMetadata(newState);
+
+            // Completed states will be reported when the job results are fully assembled
+            // Do not send metadata updates here for finishing states
 
             case COMPLETE:
                 newState.tracStatus = JobStatusCode.FINISHING;
                 newState.cacheStatus = CacheStatus.EXECUTOR_COMPLETE;
-                break;
+                return newState;
 
             case SUCCEEDED:
                 newState.tracStatus = JobStatusCode.FINISHING;
                 newState.cacheStatus = CacheStatus.EXECUTOR_SUCCEEDED;
-                break;
+                return newState;
 
             case FAILED:
                 newState.tracStatus = JobStatusCode.FAILED;
@@ -182,7 +214,7 @@ public class JobProcessor {
                 log.error("Execution failed for [{}]: {}", newState.jobKey, batchInfo.getStatusMessage());
                 log.error("Error detail for [{}]\n{}", newState.jobKey, batchInfo.getErrorDetail());
 
-                break;
+                return newState;
 
             // TODO: Handling for CANCELLED
             // Cancellation is not supported yet, but will need to be handled here when it is
@@ -199,9 +231,9 @@ public class JobProcessor {
                 newState.tracStatus = JobStatusCode.FAILED;
                 newState.cacheStatus = CacheStatus.EXECUTOR_FAILED;
                 newState.statusMessage = "Job status could not be determined";
-        }
 
-        return newState;
+                return newState;
+        }
     }
 
     public JobState fetchJobResult(JobState jobState) {
