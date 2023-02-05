@@ -41,10 +41,11 @@ import java.util.stream.Collectors;
 public class JobManager {
 
     public static final Duration LAUNCH_DURATION = Duration.of(2, ChronoUnit.MINUTES);
+    public static final Duration SCHEDULED_REMOVAL_DURATION = Duration.of(2, ChronoUnit.MINUTES);
 
     public static final int DEFAULT_JOB_LIMIT = 6;
     public static final Duration DEFAULT_CACHE_POLL_INTERVAL = Duration.of(2, ChronoUnit.SECONDS);
-    public static final Duration DEFAULT_EXECUTOR_POLL_INTERVAL = Duration.of(30, ChronoUnit.SECONDS);
+    public static final Duration DEFAULT_EXECUTOR_POLL_INTERVAL = Duration.of(1, ChronoUnit.SECONDS);
     public static final Duration STARTUP_DELAY = Duration.of(10, ChronoUnit.SECONDS);
 
     private final Logger log = LoggerFactory.getLogger(getClass());
@@ -320,16 +321,18 @@ public class JobManager {
             var cacheEntry = cache.getEntry(ticket);
             var jobState = cacheEntry.value();
 
-            if (jobState.cacheStatus.equals(CacheStatus.READY_TO_REMOVE)) {
-                cache.removeEntry(ticket);
-                return;
-            }
-
             var updateFunc = getUpdateFunc(jobState.cacheStatus);
             var newState = updateFunc.apply(jobState);
 
             newRevision = cache.updateEntry(ticket, newState.cacheStatus, newState);
             newCacheStatus = newState.cacheStatus;
+
+            // If the job is scheduled for removal, create a remove task
+            if (newState.cacheStatus.equals(CacheStatus.SCHEDULED_TO_REMOVE)) {
+                javaExecutor.schedule(
+                        () -> removeFromCache(jobKey, revision + 1),
+                        SCHEDULED_REMOVAL_DURATION.getSeconds(), TimeUnit.SECONDS);
+            }
         }
         catch (Exception e) {
 
@@ -343,6 +346,24 @@ public class JobManager {
         if (newRevision > revision && STATUS_FOR_UPDATE.contains(newCacheStatus)) {
             var newRevision_ = newRevision;
             javaExecutor.submit(() -> processJobUpdate(jobKey, newRevision_));
+        }
+    }
+
+    public void removeFromCache(String jobKey, int revision) {
+
+        log.info("REMOVING JOB FROM CACHE: [{}]", jobKey);
+
+        try (var ticket = cache.openTicket(jobKey, revision)) {
+
+            if (ticket.missing())
+                return;
+
+            cache.removeEntry(ticket);
+        }
+        catch (Exception e) {
+
+            log.warn("There was a problem processing the job: " + e.getMessage(), e);
+            log.warn("The operation will be retried");
         }
     }
 
@@ -365,7 +386,7 @@ public class JobManager {
 
         // Should never be called, but not an error
         if (cacheStatus.equals(CacheStatus.READY_TO_REMOVE))
-            return Function.identity();
+            return processor::scheduleRemoval;
 
         throw new EUnexpected();
     }
@@ -386,4 +407,7 @@ public class JobManager {
             CacheStatus.RESULTS_INVALID,
             CacheStatus.RESULTS_SAVED,
             CacheStatus.READY_TO_REMOVE);
+
+    // States that are not acted on:
+    // CacheStatus.SCHEDULED_TO_REMOVE
 }

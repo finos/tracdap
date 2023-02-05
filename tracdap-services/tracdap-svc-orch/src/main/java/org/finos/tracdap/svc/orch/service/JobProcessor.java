@@ -309,6 +309,16 @@ public class JobProcessor {
         return newState;
     }
 
+    public JobState scheduleRemoval(JobState jobState) {
+
+        log.info("SCHEDULING REMOVAL: [{}]", jobState.jobKey);
+
+        var newState = jobState.clone();
+        newState.cacheStatus = CacheStatus.SCHEDULED_TO_REMOVE;
+
+        return newState;
+    }
+
     // Executor polling
 
     public List<ExecutorJobInfo> pollExecutorJobs(List<Map.Entry<String, JobState>> jobs) {
