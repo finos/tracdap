@@ -124,6 +124,15 @@ public class JobProcessor {
 
     // Executor actions
 
+    public JobState markAsPending(JobState jobState) {
+
+        var newState = jobState.clone();
+        newState.tracStatus = JobStatusCode.PENDING;
+        newState.cacheStatus = CacheStatus.LAUNCH_IN_PROGRESS;
+
+        return updateMetadata(newState);
+    }
+
     public JobState launchJob(JobState jobState) {
 
         // TODO: Use a submission ID to avoid clash on repeat

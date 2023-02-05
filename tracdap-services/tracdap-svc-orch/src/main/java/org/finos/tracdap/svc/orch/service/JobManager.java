@@ -284,13 +284,11 @@ public class JobManager {
 
             // Launching can take a long time for some executors
             // Setting a launch state lets the job count towards the running jobs total
-            var launchState = jobState.clone();
-            launchState.cacheStatus = CacheStatus.LAUNCH_IN_PROGRESS;
+            var launchState = processor.markAsPending(jobState);
             cache.updateEntry(ticket, launchState.cacheStatus, launchState);
 
             // Perform the launch
-            var newState = processor.launchJob(jobState);
-
+            var newState = processor.launchJob(launchState);
             cache.updateEntry(ticket, newState.cacheStatus, newState);
         }
         catch (Exception e) {
