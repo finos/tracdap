@@ -19,6 +19,8 @@ package org.finos.tracdap.tools.secrets;
 
 public interface IUserManager {
 
+    void initTracUsers();
+
     void addUser(String userId, String userName, String passwordHash);
 
     void deleteUser(String userId);

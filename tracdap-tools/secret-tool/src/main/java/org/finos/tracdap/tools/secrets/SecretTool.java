@@ -220,38 +220,30 @@ public class SecretTool {
             throw new EStartup(message);
         }
 
-        var userDbType = config.getConfigOrThrow(ConfigKeys.USER_DB_TYPE);
-        var userDbUrl = config.getConfigOrThrow(ConfigKeys.USER_DB_URL);
-        var userDbSecret = config.getConfigOrDefault(ConfigKeys.USER_DB_KEY, "");
-
-        String userDbKey;
+        if (!config.containsConfig(ConfigKeys.USER_DB_KEY)) {
+            var message = "Missing required config key [" + ConfigKeys.USER_DB_KEY + "]";
+            log.error(message);
+            throw new EStartup(message);
+        }
 
         var secrets = JksHelpers.loadKeystore(secretType, keystorePath, secretKey, false);
+        var userDbSecret = config.getConfigOrThrow(ConfigKeys.USER_DB_KEY);
 
-        if (userDbSecret.isEmpty()) {
-
-            userDbKey = secretKey;
-        }
-        else if (CryptoHelpers.containsEntry(secrets, userDbSecret)) {
-
-            userDbKey = CryptoHelpers.readTextEntry(secrets, secretKey, userDbSecret);
-        }
-        else {
+        if (!CryptoHelpers.containsEntry(secrets, userDbSecret)) {
 
             var random = new SecureRandom();
             var secretBytes = new byte[16];
             random.nextBytes(secretBytes);
 
             var b64 = Base64.getEncoder().withoutPadding();
-            userDbKey = b64.encodeToString(secretBytes);
+            var userDbKey = b64.encodeToString(secretBytes);
 
             CryptoHelpers.writeTextEntry(secrets, secretKey, userDbSecret, userDbKey);
             JksHelpers.saveKeystore(keystorePath, secretKey, secrets);
         }
 
-        var userDbPath = Paths.get(configManager.resolveConfigFile(URI.create(userDbUrl)));
-        var userDb = JksHelpers.loadKeystore(userDbType, userDbPath, userDbKey, /* createIfMissing = */ true);
-        JksHelpers.saveKeystore(userDbPath, userDbKey, userDb);
+        var userManager = new JksUserManager(configManager);
+        userManager.initTracUsers();
     }
 
     private void addTracUser() {

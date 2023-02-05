@@ -22,6 +22,9 @@ import org.finos.tracdap.common.config.CryptoHelpers;
 import org.finos.tracdap.common.exception.ETracPublic;
 import org.finos.tracdap.config.GatewayConfig;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.net.URI;
 import java.nio.file.Paths;
 import java.security.KeyStore;
@@ -31,11 +34,26 @@ public class JksUserManager implements IUserManager {
 
     private static final String DISPLAY_NAME_ATTR = "displayName";
 
+    private final Logger log = LoggerFactory.getLogger(getClass());
     private final ConfigManager configManager;
 
     public JksUserManager(ConfigManager configManager) {
         this.configManager = configManager;
         this.configManager.prepareSecrets();
+    }
+
+    @Override
+    public void initTracUsers() {
+
+        var config = configManager.loadRootConfigObject(GatewayConfig.class);
+        var userDbType = config.getConfigOrThrow(ConfigKeys.USER_DB_TYPE);
+        var userDbUrl = config.getConfigOrThrow(ConfigKeys.USER_DB_URL);
+        var userDbSecret = config.getConfigOrThrow(ConfigKeys.USER_DB_KEY);
+        var userDbKey = configManager.loadPassword(userDbSecret);
+
+        var userDbPath = Paths.get(configManager.resolveConfigFile(URI.create(userDbUrl)));
+        var userDb = JksHelpers.loadKeystore(userDbType, userDbPath, userDbKey, /* createIfMissing = */ true);
+        JksHelpers.saveKeystore(userDbPath, userDbKey, userDb);
     }
 
     @Override
