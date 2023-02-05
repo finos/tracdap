@@ -20,21 +20,29 @@ import org.finos.tracdap.common.auth.external.IUserDatabase;
 import org.finos.tracdap.common.auth.external.UserDbRecord;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.config.ISecretLoader;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class JksUserDb implements IUserDatabase {
 
     private static final String DISPLAY_NAME_ATTR = "displayName";
 
+    private final Logger log = LoggerFactory.getLogger(getClass());
     private final ISecretLoader secretLoader;
 
     public JksUserDb(ConfigManager configManager) {
+
+        log.info("Using JKS user database");
 
         this.secretLoader = configManager.getUserDb();
     }
 
     @Override
     public UserDbRecord getUserDbRecord(String userId) {
+
+        if (log.isDebugEnabled())
+            log.debug("Getting user DB record for {}", userId);
 
         if (!secretLoader.hasSecret(userId))
             return null;

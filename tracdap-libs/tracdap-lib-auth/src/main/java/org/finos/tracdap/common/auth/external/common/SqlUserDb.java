@@ -34,7 +34,7 @@ public class SqlUserDb implements IUserDatabase {
 
     public static SqlUserDb getUserDb(ConfigManager configManager, String dialect, String usersUrl) {
 
-        var jdbcUrl = configManager.configRoot().relativize(URI.create(usersUrl)).getPath();
+        var jdbcUrl = configManager.resolveConfigFile((URI.create(usersUrl))).getPath();
 
         var properties = new Properties();
         properties.setProperty("dialect", dialect);
@@ -57,6 +57,8 @@ public class SqlUserDb implements IUserDatabase {
 
     public SqlUserDb(DataSource dataSource) {
 
+        log.info("Using SQL user database");
+
         this.dataSource = dataSource;
     }
 
@@ -64,6 +66,9 @@ public class SqlUserDb implements IUserDatabase {
     public UserDbRecord getUserDbRecord(String userId) {
 
         try(var conn = dataSource.getConnection()) {
+
+            if (log.isDebugEnabled())
+                log.debug("Getting user DB record for {}", userId);
 
             var query = "select user_id, user_name, password_hash from users where user_id = ?";
             var stmt = conn.prepareStatement(query);
