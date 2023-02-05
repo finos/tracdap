@@ -16,12 +16,10 @@
 
 package org.finos.tracdap.plugins.exec.ssh;
 
-import org.apache.sshd.scp.client.ScpClient;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.exception.*;
 import org.finos.tracdap.common.exec.*;
 import org.finos.tracdap.common.util.ResourceHelpers;
-import org.finos.tracdap.metadata.JobStatusCode;
 
 import org.apache.sshd.client.SshClient;
 import org.apache.sshd.client.future.ConnectFuture;
@@ -30,6 +28,7 @@ import org.apache.sshd.common.NamedResource;
 import org.apache.sshd.common.keyprovider.KeyIdentityProvider;
 import org.apache.sshd.common.util.security.SecurityUtils;
 import org.apache.sshd.netty.NettyIoServiceFactoryFactory;
+import org.apache.sshd.scp.client.ScpClient;
 import org.apache.sshd.scp.client.ScpClientCreator;
 import org.apache.sshd.scp.common.helpers.ScpTimestampCommandDetails;
 
@@ -147,6 +146,8 @@ public class SshExecutor implements IBatchExecutor<SshBatchState> {
 
         try {
 
+            log.info("SSH executor is starting up...");
+
             // It is not clear what Apache SSHD does with its event loop group
             // Is it blocking operations, or non-block low-level IO? (or non-block operations)
             // If the wrong loops are used for the wrong things this will cause problems!
@@ -166,12 +167,9 @@ public class SshExecutor implements IBatchExecutor<SshBatchState> {
     @Override
     public void stop() {
 
-        client.stop();
-    }
+        log.info("SSH executor is shutting down...");
 
-    @Override
-    public void executorStatus() {
-        // not used
+        client.stop();
     }
 
     @Override
@@ -430,13 +428,7 @@ public class SshExecutor implements IBatchExecutor<SshBatchState> {
     }
 
     @Override
-    public SshBatchState cancelBatch(String batchKey, SshBatchState batchState) {
-
-        throw new ETracInternal("Batch cancellation not available yet for SSH executor");
-    }
-
-    @Override
-    public ExecutorPollResult<SshBatchState> pollBatch(String batchKey, SshBatchState batchState) {
+    public ExecutorJobInfo pollBatch(String batchKey, SshBatchState batchState) {
 
         try {
 
@@ -472,36 +464,28 @@ public class SshExecutor implements IBatchExecutor<SshBatchState> {
                 throw new EExecutorFailure("Invalid poll response");
             }
 
-            var result = new ExecutorPollResult<SshBatchState>();
-            result.jobKey = batchKey;
-            result.batchState = batchState;
+            if (running == 0)
+                return new ExecutorJobInfo(ExecutorJobStatus.RUNNING);
 
-            if (running == 0) {
-                result.statusCode = JobStatusCode.RUNNING;
+            var exitCode = (int)(long) tryParseLong(pollResponse.get("exit_code"), "Invalid poll response for [exit_code]");
+
+            if (exitCode == 0)
+                return new ExecutorJobInfo(ExecutorJobStatus.SUCCEEDED);
+
+            try {
+
+                var errorBytes = readFile(batchKey, batchState, "log", "trac_rt_stderr.txt");
+                var errorDetail = new String(errorBytes, StandardCharsets.UTF_8);
+                var statusMessage = extractErrorMessage(errorDetail, exitCode);
+
+                return new ExecutorJobInfo(ExecutorJobStatus.FAILED, statusMessage, errorDetail);
             }
-            else {
-                var exitCode = (int)(long) tryParseLong(pollResponse.get("exit_code"), "Invalid poll response for [exit_code]");
-                result.statusCode = exitCode == 0 ? JobStatusCode.SUCCEEDED : JobStatusCode.FAILED;
+            catch (EExecutorFailure e) {
 
-                if (result.statusCode == JobStatusCode.FAILED) {
+                var statusMessage = String.format(FALLBACK_ERROR_MESSAGE, exitCode);
 
-                    try {
-
-                        var errorBytes = readFile(batchKey, batchState, "log", "trac_rt_stderr.txt");
-                        var errorDetail = new String(errorBytes, StandardCharsets.UTF_8);
-
-                        result.statusMessage = extractErrorMessage(errorDetail, exitCode);
-                        result.errorDetail = errorDetail;
-                    }
-                    catch (EExecutorFailure e) {
-
-                        result.statusMessage = String.format(FALLBACK_ERROR_MESSAGE, exitCode);
-                        result.errorDetail = FALLBACK_ERROR_DETAIL;
-                    }
-                }
+                return new ExecutorJobInfo(ExecutorJobStatus.FAILED, statusMessage, FALLBACK_ERROR_DETAIL);
             }
-
-            return result;
         }
         catch (IOException e) {
 
@@ -514,27 +498,27 @@ public class SshExecutor implements IBatchExecutor<SshBatchState> {
     }
 
     @Override
-    public List<ExecutorPollResult<SshBatchState>> pollAllBatches(Map<String, SshBatchState> priorStates) {
+    public List<ExecutorJobInfo> pollBatches(List<Map.Entry<String, SshBatchState>> priorStates) {
 
-        var updates = new ArrayList<ExecutorPollResult<SshBatchState>>();
+        var results = new ArrayList<ExecutorJobInfo>();
 
-        for (var job : priorStates.entrySet()) {
+        for (var job : priorStates) {
 
             try {
 
                 var priorState = job.getValue();
                 var pollResult = pollBatch(job.getKey(), priorState);
 
-                if (pollResult.statusCode == JobStatusCode.SUCCEEDED || pollResult.statusCode == JobStatusCode.FAILED)
-                    updates.add(pollResult);
+                results.add(pollResult);
             }
             catch (Exception e) {
 
                 log.warn("Failed to poll job: [{}] {}", job.getKey(), e.getMessage(), e);
+                results.add(new ExecutorJobInfo(ExecutorJobStatus.STATUS_UNKNOWN));
             }
         }
 
-        return updates;
+        return results;
     }
 
 

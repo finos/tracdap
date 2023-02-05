@@ -29,13 +29,14 @@ import org.finos.tracdap.common.service.CommonServiceBase;
 import org.finos.tracdap.config.PlatformConfig;
 import org.finos.tracdap.config.ServiceConfig;
 import org.finos.tracdap.svc.orch.api.TracOrchestratorApi;
-import org.finos.tracdap.svc.orch.cache.IJobCache;
 import org.finos.tracdap.svc.orch.cache.local.LocalJobCache;
 import org.finos.tracdap.common.exec.IBatchExecutor;
+import org.finos.tracdap.svc.orch.service.JobManager;
+import org.finos.tracdap.svc.orch.service.JobProcessor;
+import org.finos.tracdap.svc.orch.service.JobState;
 import org.finos.tracdap.svc.orch.service.JobApiService;
 
 import org.finos.tracdap.svc.orch.service.JobLifecycle;
-import org.finos.tracdap.svc.orch.service.JobManagementService;
 import io.grpc.ManagedChannel;
 import io.grpc.Server;
 import io.grpc.netty.NettyChannelBuilder;
@@ -70,9 +71,8 @@ public class TracOrchestratorService extends CommonServiceBase {
     private Server server;
     private ManagedChannel clientChannel;
 
-    private IJobCache jobCache;
     private IBatchExecutor<?> jobExecutor;
-    private JobManagementService jobMonitor;
+    private JobManager jobManager;
 
     public TracOrchestratorService(PluginManager pluginManager, ConfigManager configManager) {
 
@@ -113,27 +113,26 @@ public class TracOrchestratorService extends CommonServiceBase {
             serviceGroup = new NioEventLoopGroup(CONCURRENT_REQUESTS, new DefaultThreadFactory("orch-svc"));
 
             prepareMetadataClientChannel(platformConfig, clientChannelType);
-            var metaClient = TrustedMetadataApiGrpc.newBlockingStub(clientChannel);
 
-            var jobLifecycleMetaClient = metaClient.withInterceptors(new LoggingClientInterceptor(JobLifecycle.class));
-            var jobLifecycle = new JobLifecycle(platformConfig, jobLifecycleMetaClient);
-
-            jobCache = new LocalJobCache();
-            // jobCache = InterfaceLogging.wrap(jobCache, IJobCache.class);
+            var metaClient = TrustedMetadataApiGrpc
+                    .newBlockingStub(clientChannel)
+                    .withInterceptors(new LoggingClientInterceptor(JobLifecycle.class));
 
             jobExecutor = pluginManager.createService(
                     IBatchExecutor.class,
                     platformConfig.getExecutor(),
                     configManager);
 
-            jobMonitor = new JobManagementService(
-                    jobLifecycle, jobCache,
-                    jobExecutor, serviceGroup);
+            var jobCache = new LocalJobCache<JobState>();
+
+            var jobLifecycle = new JobLifecycle(platformConfig, metaClient);
+            var jobProcessor = new JobProcessor(metaClient, jobExecutor, jobLifecycle);
+            jobManager = new JobManager(platformConfig, jobProcessor, jobCache, serviceGroup);
 
             jobExecutor.start();
-            jobMonitor.start();
+            jobManager.start();
 
-            var orchestrator = new JobApiService(jobLifecycle, jobCache);
+            var orchestrator = new JobApiService(jobManager, jobProcessor);
             var orchestratorApi = new TracOrchestratorApi(orchestrator);
 
             var jwtValidator = AuthSetup.createValidator(platformConfig, configManager);
@@ -186,7 +185,7 @@ public class TracOrchestratorService extends CommonServiceBase {
 
         var jobMonitorDown = shutdownResource("Job monitor service", deadline, remaining -> {
 
-            jobMonitor.stop();
+            jobManager.stop();
             return true;
         });
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Accenture Global Solutions Limited
+ * Copyright 2023 Accenture Global Solutions Limited
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,18 +14,16 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.exec;
-
-import com.google.protobuf.Message;
-import org.finos.tracdap.metadata.JobStatusCode;
+package org.finos.tracdap.common.exception;
 
 
-public class ExecutorPollResult<TState extends Message> {
+public class EJobFailure extends ETracPublic {
 
-    public String jobKey;
-    public JobStatusCode statusCode;
-    public String statusMessage;
-    public String errorDetail;
+    public EJobFailure(String message, Throwable cause) {
+        super(message, cause);
+    }
 
-    public TState batchState;
+    public EJobFailure(String message) {
+        super(message);
+    }
 }

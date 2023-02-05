@@ -16,7 +16,6 @@
 
 package org.finos.tracdap.common.exec;
 
-import org.finos.tracdap.metadata.JobStatusCode;
 import org.finos.tracdap.common.util.ResourceHelpers;
 
 import com.google.protobuf.Message;
@@ -78,15 +77,10 @@ public abstract class ExecutorBasicTestSuite {
 
             TimeUnit.MILLISECONDS.sleep(500);
 
-            // TODO: Executor API after this point will need to change
-
             var result = batchExecutor.pollBatch(jobKey, batchState);
-            batchState = result.batchState;
-
-            Assertions.assertEquals(JobStatusCode.SUCCEEDED, result.statusCode);
+            Assertions.assertEquals(ExecutorJobStatus.SUCCEEDED, result.getStatus());
 
             var outputBytes = batchExecutor.readFile(jobKey, batchState, "outputs", "lorem_ipsum_copy.txt");
-
             Assertions.assertArrayEquals(inputBytes, outputBytes);
         }
         finally {
@@ -130,11 +124,8 @@ public abstract class ExecutorBasicTestSuite {
 
             TimeUnit.MILLISECONDS.sleep(500);
 
-            // TODO: Executor API after this point will need to change
-
             var result = batchExecutor.pollBatch(jobKey, batchState);
-
-            Assertions.assertEquals(JobStatusCode.FAILED, result.statusCode);
+            Assertions.assertEquals(ExecutorJobStatus.FAILED, result.getStatus());
         }
         finally {
             batchExecutor.destroyBatch(jobKey, batchState);

@@ -25,7 +25,6 @@ import org.finos.tracdap.config.JobConfig;
 import org.finos.tracdap.config.PlatformConfig;
 import org.finos.tracdap.config.RuntimeConfig;
 import org.finos.tracdap.metadata.*;
-import org.finos.tracdap.svc.orch.cache.JobState;
 import org.finos.tracdap.svc.orch.jobs.JobLogic;
 
 import org.slf4j.Logger;
@@ -309,7 +308,7 @@ public class JobLifecycle {
                         .build(),
                 TagUpdate.newBuilder()
                         .setAttrName(TRAC_JOB_STATUS_ATTR)
-                        .setValue(MetadataCodec.encodeValue(jobState.statusCode.toString()))
+                        .setValue(MetadataCodec.encodeValue(jobState.tracStatus.toString()))
                         .build());
 
         var freeJobAttrs = jobState.jobRequest.getJobAttrsList();
@@ -338,15 +337,15 @@ public class JobLifecycle {
 
     void processJobResult(JobState jobState) {
 
-        log.info("Record job result [{}]: {}", jobState.jobKey, jobState.statusCode);
+        log.info("Record job result [{}]: {}", jobState.jobKey, jobState.tracStatus);
 
         var jobLogic = JobLogic.forJobType(jobState.jobType);
 
-        var metaUpdates = jobState.statusCode == JobStatusCode.SUCCEEDED
+        var metaUpdates = jobState.tracStatus == JobStatusCode.SUCCEEDED
                 ? jobLogic.buildResultMetadata(jobState.tenant, jobState.jobConfig, jobState.jobResult)
                 : List.<MetadataWriteRequest>of();
 
-        var jobUpdate = jobState.statusCode == JobStatusCode.SUCCEEDED
+        var jobUpdate = jobState.tracStatus == JobStatusCode.SUCCEEDED
                 ? buildJobSucceededUpdate(jobState)
                 : buildJobFailedUpdate(jobState);
 
@@ -385,7 +384,7 @@ public class JobLifecycle {
         var attrUpdates = List.of(
                 TagUpdate.newBuilder()
                         .setAttrName(TRAC_JOB_STATUS_ATTR)
-                        .setValue(encodeValue(jobState.statusCode.toString()))
+                        .setValue(encodeValue(jobState.tracStatus.toString()))
                         .build());
 
         return MetadataWriteRequest.newBuilder()
@@ -401,7 +400,7 @@ public class JobLifecycle {
         var attrUpdates = List.of(
                 TagUpdate.newBuilder()
                         .setAttrName(TRAC_JOB_STATUS_ATTR)
-                        .setValue(encodeValue(jobState.statusCode.toString()))
+                        .setValue(encodeValue(jobState.tracStatus.toString()))
                         .build(),
                 TagUpdate.newBuilder()
                         .setAttrName(TRAC_JOB_ERROR_MESSAGE_ATTR)

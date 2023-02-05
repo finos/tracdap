@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Accenture Global Solutions Limited
+ * Copyright 2023 Accenture Global Solutions Limited
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,18 +16,13 @@
 
 package org.finos.tracdap.common.exec;
 
-import java.io.Serializable;
+public enum ExecutorJobStatus {
 
-
-public class ExecutorState implements Serializable {
-
-    private final String jobKey;
-
-    protected ExecutorState(String jobKey) {
-        this.jobKey = jobKey;
-    }
-
-    public String getJobKey() {
-        return jobKey;
-    }
+    STATUS_UNKNOWN,
+    QUEUED,
+    RUNNING,
+    COMPLETE,
+    SUCCEEDED,
+    FAILED,
+    CANCELLED
 }

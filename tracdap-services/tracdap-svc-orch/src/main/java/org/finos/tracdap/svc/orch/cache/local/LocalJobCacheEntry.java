@@ -16,24 +16,26 @@
 
 package org.finos.tracdap.svc.orch.cache.local;
 
-import org.finos.tracdap.svc.orch.cache.JobState;
 import org.finos.tracdap.svc.orch.cache.Ticket;
 
 import java.time.Instant;
 
-class LocalJobCacheEntry implements Cloneable {
 
-    int revision;
+class LocalJobCacheEntry<TValue> implements Cloneable {
+
+    public int revision;
+    String stateKey;
+    TValue value;
+
     Instant lastActivity;
-    Instant lastPoll;
     Ticket ticket;
-    JobState jobState;
 
     @Override
-    public LocalJobCacheEntry clone() {
+    @SuppressWarnings("unchecked")
+    public LocalJobCacheEntry<TValue> clone() {
 
         try {
-            return (LocalJobCacheEntry) super.clone();
+            return (LocalJobCacheEntry<TValue>) super.clone();
         }
         catch (CloneNotSupportedException e) {
             throw new AssertionError();

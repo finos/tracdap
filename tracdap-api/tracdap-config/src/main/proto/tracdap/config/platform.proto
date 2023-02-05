@@ -40,6 +40,8 @@ message PlatformConfig {
 
   PluginConfig executor = 9;
 
+  PluginConfig jobCache = 12;
+
   map<string, TenantConfig> tenants = 10;
 
   optional WebServerConfig webServer = 11;

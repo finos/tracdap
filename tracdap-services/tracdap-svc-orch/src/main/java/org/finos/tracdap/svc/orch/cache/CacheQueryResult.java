@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Accenture Global Solutions Limited
+ * Copyright 2023 Accenture Global Solutions Limited
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,29 +17,33 @@
 package org.finos.tracdap.svc.orch.cache;
 
 
-public class TicketContext implements AutoCloseable {
+public class CacheQueryResult<TValue> {
 
-    private final IJobCache cache;
-    private final Ticket[] tickets;
+    private final String key;
+    private final int revision;
+    private final String status;
+    private final TValue value;
 
-    TicketContext(IJobCache cache, Ticket... tickets) {
-        this.cache = cache;
-        this.tickets = tickets;
+    public CacheQueryResult(String key, int revision, String status, TValue value) {
+        this.key = key;
+        this.revision = revision;
+        this.status = status;
+        this.value = value;
     }
 
-    public Ticket ticket() {
-        return this.tickets[0];
+    public String key() {
+        return key;
     }
 
-    public boolean superseded() {
-
-        return false;
+    public int revision() {
+        return revision;
     }
 
-    @Override
-    public void close() {
+    public String getStatus() {
+        return status;
+    }
 
-        for (var ticket : tickets)
-            cache.closeTicket(ticket);
+    public TValue value() {
+        return value;
     }
 }

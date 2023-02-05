@@ -16,11 +16,11 @@
 
 package org.finos.tracdap.common.exec.local;
 
-import com.google.protobuf.Parser;
 import org.finos.tracdap.common.exception.*;
 import org.finos.tracdap.common.exec.*;
 import org.finos.tracdap.common.metadata.MetadataConstants;
-import org.finos.tracdap.metadata.JobStatusCode;
+
+import com.google.protobuf.Parser;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -65,6 +65,7 @@ public class LocalBatchExecutor implements IBatchExecutor<LocalBatchState> {
     private final String batchUser;
 
     private final Map<Long, Process> processMap = new HashMap<>();
+    private final Set<Long> completionLog = new HashSet<>();
 
     public LocalBatchExecutor(Properties properties) {
 
@@ -77,21 +78,18 @@ public class LocalBatchExecutor implements IBatchExecutor<LocalBatchState> {
     @Override
     public void start() {
 
+        log.info("Local executor is starting up...");
     }
 
     @Override
     public void stop() {
 
+        log.info("Local executor is shutting down...");
     }
 
     @Override
     public Parser<LocalBatchState> stateDecoder() {
         return LocalBatchState.parser();
-    }
-
-    @Override
-    public void executorStatus() {
-
     }
 
     @Override
@@ -171,6 +169,7 @@ public class LocalBatchExecutor implements IBatchExecutor<LocalBatchState> {
         }
 
         processMap.remove(batchState.getPid());
+        completionLog.remove(batchState.getPid());
     }
 
     @Override
@@ -362,10 +361,6 @@ public class LocalBatchExecutor implements IBatchExecutor<LocalBatchState> {
 
             logBatchStart(jobKey, pb, process);
 
-            // If used, this should go on the main service executor
-//            process.onExit().whenComplete((proc, err) ->
-//                    logBatchComplete(jobState.getJobKey(), process, batchState));
-
             return batchState.toBuilder()
                     .setPid(process.pid())
                     .build();
@@ -377,14 +372,7 @@ public class LocalBatchExecutor implements IBatchExecutor<LocalBatchState> {
         }
     }
 
-    @Override public LocalBatchState
-    cancelBatch(String jobKey, LocalBatchState jobState) {
-
-        throw new ETracInternal("Cancellation not implemented yet");
-    }
-
-
-    @Override public ExecutorPollResult<LocalBatchState>
+    @Override public ExecutorJobInfo
     pollBatch(String jobKey, LocalBatchState jobState) {
 
         try {
@@ -395,34 +383,30 @@ public class LocalBatchExecutor implements IBatchExecutor<LocalBatchState> {
             if (process == null)
                 throw new EUnexpected();  // TODO
 
-            var pollResult = new ExecutorPollResult<LocalBatchState>();
-            pollResult.jobKey = jobKey;
-            pollResult.batchState = batchState;
+            if (process.isAlive())
+                return new ExecutorJobInfo(ExecutorJobStatus.RUNNING);
 
-            pollResult.statusCode = process.isAlive()
-                    ? JobStatusCode.RUNNING :
-                    process.exitValue() == 0
-                            ? JobStatusCode.SUCCEEDED
-                            : JobStatusCode.FAILED;
+            logBatchComplete(jobKey, process, jobState);
 
-            if (pollResult.statusCode == JobStatusCode.FAILED) {
+            if (process.exitValue() == 0)
+                return new ExecutorJobInfo(ExecutorJobStatus.SUCCEEDED);
 
-                if (Files.exists(Path.of(batchState.getBatchDir(), JOB_LOG_SUBDIR, "trac_rt_stderr.txt"))) {
+            // Job has failed, try to get some helpful info on the error
 
-                    var errorBytes = readFile(jobKey, batchState, JOB_LOG_SUBDIR, "trac_rt_stderr.txt");
-                    var errorDetail = new String(errorBytes, StandardCharsets.UTF_8);
+            if (Files.exists(Path.of(batchState.getBatchDir(), JOB_LOG_SUBDIR, "trac_rt_stderr.txt"))) {
 
-                    pollResult.statusMessage = extractErrorMessage(errorDetail, process.exitValue());
-                    pollResult.errorDetail = errorDetail;
-                }
-                else {
+                var errorBytes = readFile(jobKey, batchState, JOB_LOG_SUBDIR, "trac_rt_stderr.txt");
+                var errorDetail = new String(errorBytes, StandardCharsets.UTF_8);
+                var statusMessage = extractErrorMessage(errorDetail, process.exitValue());
 
-                    pollResult.statusMessage = String.format(FALLBACK_ERROR_MESSAGE, process.exitValue());
-                    pollResult.errorDetail = FALLBACK_ERROR_DETAIL;
-                }
+                return new ExecutorJobInfo(ExecutorJobStatus.FAILED, statusMessage, errorDetail);
             }
+            else {
 
-            return pollResult;
+                var statusMessage = String.format(FALLBACK_ERROR_MESSAGE, process.exitValue());
+
+                return new ExecutorJobInfo(ExecutorJobStatus.FAILED, statusMessage, FALLBACK_ERROR_DETAIL);
+            }
         }
         catch (RuntimeException e) {
             e.printStackTrace();
@@ -431,28 +415,27 @@ public class LocalBatchExecutor implements IBatchExecutor<LocalBatchState> {
         }
     }
 
-    @Override public List<ExecutorPollResult<LocalBatchState>>
-    pollAllBatches(Map<String, LocalBatchState> priorStates) {
+    @Override public List<ExecutorJobInfo>
+    pollBatches(List<Map.Entry<String, LocalBatchState>> priorStates) {
 
-        var updates = new ArrayList<ExecutorPollResult<LocalBatchState>>();
+        var results = new ArrayList<ExecutorJobInfo>();
 
-        for (var job : priorStates.entrySet()) {
+        for (var job : priorStates) {
 
             try {
 
-                var priorState = validState(job.getValue());
-                var pollResult = pollBatch(job.getKey(), priorState);
-
-                if (pollResult.statusCode == JobStatusCode.SUCCEEDED || pollResult.statusCode == JobStatusCode.FAILED)
-                    updates.add(pollResult);
+                var jobState = validState(job.getValue());
+                var pollResult = pollBatch(job.getKey(), jobState);
+                results.add(pollResult);
             }
             catch (Exception e) {
 
                 log.warn("Failed to poll job: [{}] {}", job.getKey(), e.getMessage(), e);
+                results.add(new ExecutorJobInfo(ExecutorJobStatus.STATUS_UNKNOWN));
             }
         }
 
-        return updates;
+        return results;
     }
 
 
@@ -594,6 +577,9 @@ public class LocalBatchExecutor implements IBatchExecutor<LocalBatchState> {
 
     private void logBatchComplete(String jobKey, Process batchProcess, LocalBatchState batchState) {
 
+        if (completionLog.contains(batchProcess.pid()))
+            return;
+
         var procInfo = batchProcess.info();
 
         if (batchProcess.exitValue() == 0) {
@@ -612,6 +598,8 @@ public class LocalBatchExecutor implements IBatchExecutor<LocalBatchState> {
             log.error("CPU time: [{}]", procInfo.totalCpuDuration().orElse(Duration.ZERO));
             log.error(errorDetail);
         }
+
+        completionLog.add(batchProcess.pid());
     }
 
     private String extractErrorMessage(String errorDetail, int exitCode) {

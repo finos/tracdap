@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Accenture Global Solutions Limited
+ * Copyright 2023 Accenture Global Solutions Limited
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,28 +16,26 @@
 
 package org.finos.tracdap.svc.orch.cache;
 
+import java.time.Duration;
 import java.util.List;
-import java.util.function.Function;
 
 
-public interface IJobCache {
+public interface IJobCache<TValue> {
 
-    default TicketContext useTicket(String jobKey) {
-        var ticket = openTicket(jobKey);
-        return new TicketContext(this, ticket);
-    }
-
-    Ticket openTicket(String jobKey);
-
+    Ticket openNewTicket(String key);
+    Ticket openNewTicket(String key, Duration duration);
+    Ticket openTicket(String key, int revision);
+    Ticket openTicket(String key, int revision, Duration duration);
     void closeTicket(Ticket ticket);
 
-    void createJob(String jobKey, JobState state, Ticket ticket);
+    int addEntry(Ticket ticket, String status, TValue value);
+    int updateEntry(Ticket ticket, String status, TValue value);
+    void removeEntry(Ticket ticket);
 
-    JobState readJob(String jobKey);
+    CacheQueryResult<TValue> getEntry(Ticket ticket);
+    CacheQueryResult<TValue> getEntry(String key, int revision);
+    CacheQueryResult<TValue> getLatestEntry(String key);
 
-    void updateJob(String jobKey, JobState state, Ticket ticket);
-
-    void deleteJob(String jobKey, Ticket ticket);
-
-    List<JobState> pollJobs(Function<JobState, Boolean> filter);
+    List<CacheQueryResult<TValue>> queryState(List<String> states);
+    List<CacheQueryResult<TValue>> queryState(List<String> states, boolean includeOpenTickets);
 }
