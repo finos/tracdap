@@ -68,8 +68,8 @@ public class SshExecutor implements IBatchExecutor<SshBatchState> {
 
     private static final String LAUNCH_SCRIPT_NAME = "launch_batch.sh";
     private static final String POLL_SCRIPT_NAME = "poll_batch.sh";
-    private static final byte[] LAUNCH_SCRIPT = ResourceHelpers.loadResourceAsBytes("/scripts/launch_batch.sh", SshExecutor.class);
-    private static final byte[] POLL_SCRIPT = ResourceHelpers.loadResourceAsBytes("/scripts/poll_batch.sh", SshExecutor.class);
+    private static final String LAUNCH_SCRIPT = ResourceHelpers.loadResourceAsString("/scripts/launch_batch.sh", SshExecutor.class);
+    private static final String POLL_SCRIPT = ResourceHelpers.loadResourceAsString("/scripts/poll_batch.sh", SshExecutor.class);
     // private static final String POLL_EXECUTOR_COMMAND = "ps -a | grep launch_batch.sh | grep -v \"grep launch_batch.sh\"";
 
     private static final String CREATE_BATCH_DIR_COMMAND = "mkdir -p -m %s \"%s\"";
@@ -380,31 +380,42 @@ public class SshExecutor implements IBatchExecutor<SshBatchState> {
             executePermissions.add(PosixFilePermission.OWNER_EXECUTE);
             executePermissions.add(PosixFilePermission.GROUP_EXECUTE);
 
-            batchState = createVolume(batchKey, batchState, "trac_admin", ExecutorVolumeType.SCRATCH_DIR);
-            writeFile(batchKey, batchState, "trac_admin", LAUNCH_SCRIPT_NAME, LAUNCH_SCRIPT, executePermissions);
-            writeFile(batchKey, batchState, "trac_admin", POLL_SCRIPT_NAME, POLL_SCRIPT, executePermissions);
+            // Setting environment variables as part of the command causes issues
+            // Running VAR=value ./script.sh & does not properly background the process
+            // As a work-around, substitute the variables directly into the script before sending
+
+            // It may be possible to use an SSH exec shell and set up env vars that way
+            // Didn't work on first try, but it seems like it should work the way you'd expect...
+
+            // TODO: Remove dependencies on particular outputs set in the job args
 
             var batchAdminDir = buildVolumePath(batchState, "trac_admin");
             var stdOutLog = buildRemotePath(batchState, "log", "trac_rt_stdout.txt");
             var stdErrLog = buildRemotePath(batchState, "log", "trac_rt_stderr.txt");
+            var resultFileName = String.format("job_result_%s.json", batchKey);
+            var resultFilePath = buildRemotePath(batchState, "result", resultFileName);
+
+            var launchScriptContent = LAUNCH_SCRIPT
+                    .replace("${TRAC_BATCH_ADMIN_DIR}", batchAdminDir)
+                    .replace("${TRAC_BATCH_STDOUT}", stdOutLog)
+                    .replace("${TRAC_BATCH_STDERR}", stdErrLog)
+                    .getBytes(StandardCharsets.UTF_8);
+
+            var pollScriptContent = POLL_SCRIPT
+                    .replace("${TRAC_BATCH_ADMIN_DIR}", batchAdminDir)
+                    .replace("${TRAC_RESULT_FILE}", resultFilePath)
+                    .getBytes(StandardCharsets.UTF_8);
+
+            batchState = createVolume(batchKey, batchState, "trac_admin", ExecutorVolumeType.SCRATCH_DIR);
+            writeFile(batchKey, batchState, "trac_admin", LAUNCH_SCRIPT_NAME, launchScriptContent, executePermissions);
+            writeFile(batchKey, batchState, "trac_admin", POLL_SCRIPT_NAME, pollScriptContent, executePermissions);
 
             var launchScript = buildRemotePath(batchState, "trac_admin", LAUNCH_SCRIPT_NAME);
-            var launchCommand = new StringBuilder();
-            launchCommand.append("TRAC_BATCH_ADMIN_DIR=");
-            launchCommand.append(batchAdminDir);
-            launchCommand.append(" TRAC_BATCH_STDOUT=");
-            launchCommand.append(stdOutLog);
-            launchCommand.append(" TRAC_BATCH_STDERR=");
-            launchCommand.append(stdErrLog);
-            launchCommand.append(" ");
-            launchCommand.append(launchScript);
-            launchCommand.append(" ");
-            launchCommand.append(command);
-            launchCommand.append(" &");
+            String launchCommand = launchScript + " " + command;
 
             log.info("Launch command: {}", command);
 
-            session.executeRemoteCommand(launchCommand.toString());
+            session.executeRemoteCommand(launchCommand);
 
             var pidFile = buildRemotePath(batchState, "trac_admin", "pid");
             var pidCommand = String.format("cat %s", pidFile);
@@ -437,16 +448,10 @@ public class SshExecutor implements IBatchExecutor<SshBatchState> {
 
             var session = getSession(batchState);
 
-            var batchAdminDir = buildVolumePath(batchState, "trac_admin");
+            // See startBatch(), env vars are already set in the poll script before it was sent
 
             var pollScript = buildRemotePath(batchState, "trac_admin", POLL_SCRIPT_NAME);
-            var pollCommand = new StringBuilder();
-            pollCommand.append("TRAC_BATCH_ADMIN_DIR=");
-            pollCommand.append(batchAdminDir);
-            pollCommand.append(" ");
-            pollCommand.append(pollScript);
-
-            var pollOutput = session.executeRemoteCommand(pollCommand.toString());
+            var pollOutput = session.executeRemoteCommand(pollScript);
             var pollResponse = new HashMap<String, String>();
 
             for (var line : pollOutput.split("\n")) {

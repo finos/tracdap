@@ -22,8 +22,3 @@ $@ >"${log_out}" 2>"${log_err}" </dev/null &
 
 pid=$!
 echo $pid > "${batch_admin_dir}/pid"
-
-wait $pid
-
-exit_code=$?
-echo $exit_code > "${batch_admin_dir}/exit_code"

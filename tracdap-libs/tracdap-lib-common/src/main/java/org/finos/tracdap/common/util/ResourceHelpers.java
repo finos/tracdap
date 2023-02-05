@@ -20,6 +20,7 @@ import com.google.protobuf.ByteString;
 import org.finos.tracdap.common.exception.EResourceNotFound;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 
 
 public class ResourceHelpers {
@@ -33,6 +34,12 @@ public class ResourceHelpers {
 
         var bytes = loadResourceAsBytes(resourcePath, clazz);
         return ByteString.copyFrom(bytes);
+    }
+
+    public static String loadResourceAsString(String resourcePath, Class<?> clazz) {
+
+        var bytes = loadResourceAsBytes(resourcePath, clazz);
+        return new String(bytes, StandardCharsets.UTF_8);
     }
 
     public static byte[] loadResourceAsBytes(String resourcePath) {

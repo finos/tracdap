@@ -254,6 +254,18 @@ public class JobProcessor {
         var batchExecutor = stronglyTypedExecutor();
         var batchState = stronglyTypedState(batchExecutor, jobState.batchState);
 
+        if (jobState.batchState == null) {
+
+            log.info("FETCH JOB RESULT FAILED: [{}] executor state is not available", jobState.jobKey);
+
+            var newState = jobState.clone();
+            newState.tracStatus = JobStatusCode.FAILED;
+            newState.cacheStatus = CacheStatus.RESULTS_INVALID;
+            newState.statusMessage = "executor state is not available";
+
+            return newState;
+        }
+
         try {
 
             var resultFile = String.format("job_result_%s.json", jobKey);
@@ -303,19 +315,33 @@ public class JobProcessor {
 
         log.info("CLEAN UP JOB: [{}]", jobState.jobKey);
 
-        var batchExecutor = stronglyTypedExecutor();
-        var batchState = stronglyTypedState(batchExecutor, jobState.batchState);
+        if (jobState.batchState != null) {
 
-        batchExecutor.destroyBatch(jobState.jobKey, batchState);
+            var batchExecutor = stronglyTypedExecutor();
+            var batchState = stronglyTypedState(batchExecutor, jobState.batchState);
 
-        var newState = jobState.clone();
-        newState.cacheStatus = CacheStatus.READY_TO_REMOVE;
-        newState.batchStatus = ExecutorJobStatus.STATUS_UNKNOWN;
-        newState.batchState = null;
+            batchExecutor.destroyBatch(jobState.jobKey, batchState);
 
-        log.info("CLEAN UP JOB SUCCEEDED: [{}]", jobState.jobKey);
+            var newState = jobState.clone();
+            newState.cacheStatus = CacheStatus.READY_TO_REMOVE;
+            newState.batchStatus = ExecutorJobStatus.STATUS_UNKNOWN;
+            newState.batchState = null;
 
-        return newState;
+            log.info("CLEAN UP JOB SUCCEEDED: [{}]", jobState.jobKey);
+
+            return newState;
+        }
+        else {
+
+            var newState = jobState.clone();
+            newState.cacheStatus = CacheStatus.READY_TO_REMOVE;
+            newState.batchStatus = ExecutorJobStatus.STATUS_UNKNOWN;
+
+            log.warn("CLEAN UP JOB FAILED: [{}] executor state is not available", jobState.jobKey);
+            log.warn("There may be an orphaned task in the executor");
+
+            return newState;
+        }
     }
 
     public JobState scheduleRemoval(JobState jobState) {
@@ -335,6 +361,8 @@ public class JobProcessor {
         var executor = stronglyTypedExecutor();
 
         var jobState = jobs.stream()
+                // Only poll jobs that have an executor state
+                .filter(j -> j.getValue().batchState != null)
                 .map(j -> Map.entry(j.getKey(), stronglyTypedState(executor, j.getValue().batchState)))
                 .collect(Collectors.toList());
 

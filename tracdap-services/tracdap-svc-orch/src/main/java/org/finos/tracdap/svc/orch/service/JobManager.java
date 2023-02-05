@@ -196,7 +196,10 @@ public class JobManager {
 
         try {
 
-            var runningJobs = cache.queryState(STATUS_FOR_RUNNING_JOBS);
+            var runningJobs = cache.queryState(STATUS_FOR_RUNNING_JOBS)
+                    // Only poll jobs that have an executor state
+                    .stream().filter(j -> j.value().batchState != null)
+                    .collect(Collectors.toList());
 
             var pollRequests = runningJobs.stream()
                     .map(j -> Map.entry(j.key(), j.value()))
@@ -204,7 +207,7 @@ public class JobManager {
 
             var pollResults = processor.pollExecutorJobs(pollRequests);
 
-            for (var i = 0; i < runningJobs.size(); i++) {
+            for (var i = 0; i < pollRequests.size(); i++) {
 
                 var job = runningJobs.get(i);
                 var pollResult = pollResults.get(i);
