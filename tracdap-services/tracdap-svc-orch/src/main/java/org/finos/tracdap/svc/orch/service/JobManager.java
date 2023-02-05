@@ -40,13 +40,14 @@ import java.util.stream.Collectors;
 
 public class JobManager {
 
-    public static final Duration LAUNCH_DURATION = Duration.of(2, ChronoUnit.MINUTES);
+    public static final Duration STARTUP_DELAY = Duration.of(10, ChronoUnit.SECONDS);
     public static final Duration SCHEDULED_REMOVAL_DURATION = Duration.of(2, ChronoUnit.MINUTES);
 
-    public static final int DEFAULT_JOB_LIMIT = 6;
     public static final Duration DEFAULT_CACHE_POLL_INTERVAL = Duration.of(2, ChronoUnit.SECONDS);
-    public static final Duration DEFAULT_EXECUTOR_POLL_INTERVAL = Duration.of(1, ChronoUnit.SECONDS);
-    public static final Duration STARTUP_DELAY = Duration.of(10, ChronoUnit.SECONDS);
+    public static final Duration DEFAULT_CACHE_TICKET_DURATION = Duration.of(10, ChronoUnit.SECONDS);
+    public static final Duration DEFAULT_EXECUTOR_POLL_INTERVAL = Duration.of(30, ChronoUnit.SECONDS);
+    public static final Duration DEFAULT_EXECUTOR_TICKET_DURATION = Duration.of(2, ChronoUnit.MINUTES);
+    public static final int DEFAULT_EXECUTOR_JOB_LIMIT = 6;
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
@@ -54,9 +55,11 @@ public class JobManager {
     private final IJobCache<JobState> cache;
     private final EventExecutorGroup javaExecutor;
 
-    private final int jobLimit;
     private final Duration cachePollInterval;
+    private final Duration cacheTicketDuration;
     private final Duration executorPollInterval;
+    private final Duration executorTicketDuration;
+    private final int executorJobLimit;
 
     private ScheduledFuture<?> cachePollingTask = null;
     private ScheduledFuture<?> executorPollingTask = null;
@@ -70,9 +73,11 @@ public class JobManager {
         this.cache = cache;
         this.javaExecutor = javaExecutor;
 
-        jobLimit = DEFAULT_JOB_LIMIT;
         cachePollInterval = DEFAULT_CACHE_POLL_INTERVAL;
+        cacheTicketDuration = DEFAULT_CACHE_TICKET_DURATION;
         executorPollInterval = DEFAULT_EXECUTOR_POLL_INTERVAL;
+        executorTicketDuration = DEFAULT_EXECUTOR_TICKET_DURATION;
+        executorJobLimit = DEFAULT_EXECUTOR_JOB_LIMIT;
     }
 
     public void start() {
@@ -129,49 +134,34 @@ public class JobManager {
             // Or filter down the query so not all nodes attempt all updates
             // But the ticket.superseded() mechanism should be sufficient unless the load is extreme
 
+            var launchableJobs = cache.queryState(STATUS_FOR_LAUNCH);
+            var runningJobs = cache.queryState(STATUS_FOR_RUNNING_JOBS);
+            var fetchResultJobs = cache.queryState(STATUS_FOR_FETCH_RESULTS);
             var updatedJobs = cache.queryState(STATUS_FOR_UPDATE);
 
-            for (var update : updatedJobs)
-                javaExecutor.submit(() -> processJobUpdate(update.key(), update.revision()));
+            // A simple capacity cap to prevent spamming the executor with too many jobs
+            // No queuing or prioritisation yet!!
 
-            // Jobs that are ready to launch get special handling
+            var launchCapacity = executorJobLimit - runningJobs.size();
+            if (launchCapacity <= 0)
+                return;
 
-            pollForLaunch();
+            var launchJobs = launchableJobs.size() > launchCapacity
+                    ? launchableJobs.subList(0, launchCapacity)
+                    : launchableJobs;
+
+            for (var job : launchJobs)
+                javaExecutor.submit(() -> launchJob(job.key(), job.revision()));
+
+            for (var job : fetchResultJobs)
+                javaExecutor.submit(() -> fetchJobResult(job.key(), job.revision()));
+
+            for (var job : updatedJobs)
+                javaExecutor.submit(() -> processJobUpdate(job.key(), job.revision()));
         }
         catch (Exception e) {
 
             log.warn("There was an error polling the job cache: " + e.getMessage(), e);
-            log.warn("Polling operation will be retried periodically");
-
-            // TODO: Track successive polling errors, take action after a threshold
-        }
-    }
-
-    public void pollForLaunch() {
-
-        try {
-
-            var runningJobs = cache.queryState(STATUS_FOR_RUNNING_JOBS);
-
-            var launchCapacity = jobLimit - runningJobs.size();
-            if (launchCapacity <= 0)
-                return;
-
-            var launchableJobs = cache.queryState(STATUS_FOR_LAUNCH);
-
-            // Select the first jobs in the queue up to the available capacity
-            // Launch selection could be a lot more intelligent!!!
-
-            var selectedJobs = launchableJobs.size() > launchCapacity
-                    ? launchableJobs.subList(0, launchCapacity)
-                    : launchableJobs;
-
-            for (var job : selectedJobs)
-                javaExecutor.submit(() -> launchJob(job.key(), job.revision()));
-        }
-        catch (Exception e) {
-
-            log.warn("There was an error polling the executor: " + e.getMessage(), e);
             log.warn("Polling operation will be retried periodically");
 
             // TODO: Track successive polling errors, take action after a threshold
@@ -221,7 +211,7 @@ public class JobManager {
             var newState = processor.saveInitialMetadata(newState_);
             newState.jobKey = MetadataUtil.objectKey(newState.jobId);
 
-            try (var ticket = cache.openNewTicket(newState.jobKey)) {
+            try (var ticket = cache.openNewTicket(newState.jobKey, cacheTicketDuration)) {
 
                 // Duplicate job key, should never happen
                 if (ticket.superseded())
@@ -233,7 +223,7 @@ public class JobManager {
             // Avoid polling delay if multiple updates are processed in succession
             // This will also tend to make all the updates in a sequence run on one orchestrator node
 
-            javaExecutor.submit(this::pollForLaunch);
+            javaExecutor.submit(this::pollCache);
 
             return newState;
         }
@@ -258,7 +248,9 @@ public class JobManager {
 
     public void launchJob(String jobKey, int revision) {
 
-        try (var ticket = cache.openTicket(jobKey, revision, LAUNCH_DURATION)) {
+        // Launching a job means talking to the executor, so use the executor ticket duration
+
+        try (var ticket = cache.openTicket(jobKey, revision, executorTicketDuration)) {
 
             if (ticket.superseded())
                 return;
@@ -276,12 +268,34 @@ public class JobManager {
         }
     }
 
+    public void fetchJobResult(String jobKey, int revision) {
+
+        // Fetching a result means talking to the executor, so use the executor ticket duration
+
+        try (var ticket = cache.openTicket(jobKey, revision, executorTicketDuration)) {
+
+            if (ticket.superseded())
+                return;
+
+            var cacheEntry = cache.getEntry(ticket);
+            var jobState = cacheEntry.value();
+            var newState = processor.fetchJobResult(jobState);
+
+            cache.updateEntry(ticket, newState.cacheStatus, newState);
+        }
+        catch (Exception e) {
+
+            log.warn("There was a problem launching the job: " + e.getMessage(), e);
+            log.warn("Launch operation will be retried");
+        }
+    }
+
     public void recordPollResult(String jobKey, int revision, ExecutorJobInfo executorJobInfo) {
 
         int newRevision = revision;
         String newCacheStatus = null;
 
-        try (var ticket = cache.openTicket(jobKey, revision)) {
+        try (var ticket = cache.openTicket(jobKey, revision, cacheTicketDuration)) {
 
             if (ticket.superseded())
                 return;
@@ -353,7 +367,7 @@ public class JobManager {
 
         log.info("REMOVING JOB FROM CACHE: [{}]", jobKey);
 
-        try (var ticket = cache.openTicket(jobKey, revision)) {
+        try (var ticket = cache.openTicket(jobKey, revision, cacheTicketDuration)) {
 
             if (ticket.missing())
                 return;
@@ -399,9 +413,11 @@ public class JobManager {
             CacheStatus.QUEUED_IN_EXECUTOR,
             CacheStatus.RUNNING_IN_EXECUTOR);
 
-    private static final List<String> STATUS_FOR_UPDATE = List.of(
+    private static final List<String> STATUS_FOR_FETCH_RESULTS = List.of(
             CacheStatus.EXECUTOR_COMPLETE,
-            CacheStatus.EXECUTOR_SUCCEEDED,
+            CacheStatus.EXECUTOR_SUCCEEDED);
+
+    private static final List<String> STATUS_FOR_UPDATE = List.of(
             CacheStatus.EXECUTOR_FAILED,
             CacheStatus.RESULTS_RECEIVED,
             CacheStatus.RESULTS_INVALID,
