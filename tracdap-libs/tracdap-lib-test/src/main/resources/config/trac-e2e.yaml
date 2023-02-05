@@ -74,6 +74,7 @@ executor:
   protocol: LOCAL
   properties:
     venvPath: ${TRAC_EXEC_DIR}/venv
+    pollInterval: 1
 
 
 instances:
