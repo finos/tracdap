@@ -19,10 +19,8 @@ package org.finos.tracdap.common.auth.external.common;
 import org.finos.tracdap.common.auth.external.*;
 import org.finos.tracdap.common.auth.internal.UserInfo;
 import org.finos.tracdap.common.config.ConfigManager;
-import org.finos.tracdap.common.config.ISecretLoader;
 
 import io.netty.buffer.Unpooled;
-import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.*;
 
 import org.slf4j.Logger;
@@ -38,11 +36,11 @@ public class BasicAuthProvider implements IAuthProvider {
 
     private static final String BASIC_AUTH_PREFIX = "basic ";
 
-    private final ISecretLoader userDb;
+    private final IUserDatabase userDb;
 
     public BasicAuthProvider(ConfigManager configManager) {
 
-        this.userDb = configManager.getUserDb();
+        this.userDb = CommonAuthPlugin.createUserDb(configManager);
     }
 
     @Override
@@ -79,13 +77,13 @@ public class BasicAuthProvider implements IAuthProvider {
         var username = userAndPass.substring(0, separator);
         var password = userAndPass.substring(separator + 1);
 
-        if (!LocalUsers.checkPassword(userDb, username, password, log)) {
+        if (LocalUsers.checkPassword(userDb, username, password, log)) {
+            var userInfo = LocalUsers.getUserInfo(userDb, username);
+            return AuthResult.AUTHORIZED(userInfo);
+        }
+        else {
             return requestAuth();
         }
-
-        var userInfo = LocalUsers.getUserInfo(userDb, username);
-
-        return AuthResult.AUTHORIZED(userInfo);
     }
 
     @Override

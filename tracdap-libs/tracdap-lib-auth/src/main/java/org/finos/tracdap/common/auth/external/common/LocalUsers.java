@@ -16,25 +16,25 @@
 
 package org.finos.tracdap.common.auth.external.common;
 
+import org.finos.tracdap.common.auth.external.IUserDatabase;
 import org.finos.tracdap.common.auth.internal.UserInfo;
 import org.finos.tracdap.common.config.CryptoHelpers;
-import org.finos.tracdap.common.config.ISecretLoader;
+import org.finos.tracdap.common.exception.EAuthorization;
 import org.slf4j.Logger;
 
 public class LocalUsers {
 
-    private static final String DISPLAY_NAME_ATTR = "displayName";
+    static boolean checkPassword(IUserDatabase userDb, String user, String pass, Logger log) {
 
-    static boolean checkPassword(ISecretLoader userDb, String user, String pass, Logger log) {
+        var userDbRecord = userDb.getUserDbRecord(user);
 
-        if (!userDb.hasSecret(user)) {
+        if (userDbRecord == null) {
 
             log.warn("AUTHENTICATION: Failed [{}] user not found", user);
             return false;
         }
 
-        var passwordHash = userDb.loadPassword(user);
-        var passwordOk = CryptoHelpers.validateSSHA512(passwordHash, pass);
+        var passwordOk = CryptoHelpers.validateSSHA512(userDbRecord.getPasswordHash(), pass);
 
         if (passwordOk)
             log.info("AUTHENTICATION: Succeeded [{}]", user);
@@ -44,15 +44,16 @@ public class LocalUsers {
         return passwordOk;
     }
 
-    static UserInfo getUserInfo(ISecretLoader userDb, String user) {
+    static UserInfo getUserInfo(IUserDatabase userDb, String user) {
 
-        var displayName = userDb.hasAttr(user, DISPLAY_NAME_ATTR)
-                ? userDb.loadAttr(user, DISPLAY_NAME_ATTR)
-                : user;
+        var userDbRecord = userDb.getUserDbRecord(user);
+
+        if (userDbRecord == null)
+            throw new EAuthorization(String.format("Unknown user [%s]", user));
 
         var userInfo = new UserInfo();
-        userInfo.setUserId(user);
-        userInfo.setDisplayName(displayName);
+        userInfo.setUserId(userDbRecord.getUserId());
+        userInfo.setDisplayName(userDbRecord.getUserName());
 
         return userInfo;
     }
