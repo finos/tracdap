@@ -90,6 +90,8 @@ public class Ticket implements AutoCloseable {
 
     @Override
     public void close() {
-        cache.closeTicket(this);
+
+        if (cache != null)
+            cache.closeTicket(this);
     }
 }
