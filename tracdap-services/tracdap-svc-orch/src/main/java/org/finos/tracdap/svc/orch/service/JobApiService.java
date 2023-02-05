@@ -26,8 +26,6 @@ import org.finos.tracdap.metadata.JobStatusCode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.List;
-
 
 public class JobApiService {
 
@@ -113,7 +111,7 @@ public class JobApiService {
         // Then tracStatus can be set on a new state object prior to saving and before updating the cache
 
         if (jobState.tracStatus == JobStatusCode.SUCCEEDED || jobState.tracStatus == JobStatusCode.FAILED) {
-            if (!List.of(CacheStatus.RESULTS_SAVED, CacheStatus.READY_TO_REMOVE).contains(jobState.cacheStatus)) {
+            if (jobState.cacheStatus.startsWith("EXECUTOR_") || jobState.cacheStatus.startsWith("RESULTS_")) {
                 status.setStatusCode(JobStatusCode.FINISHING);
                 status.clearStatusMessage();
             }
