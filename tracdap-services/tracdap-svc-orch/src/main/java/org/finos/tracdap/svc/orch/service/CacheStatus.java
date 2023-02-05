@@ -33,4 +33,5 @@ public class CacheStatus {
     public static final String RESULTS_SAVED = "RESULTS_SAVED";
 
     public static final String READY_TO_REMOVE = "READY_TO_REMOVE";
+    public static final String SCHEDULED_TO_REMOVE = "SCHEDULED_TO_REMOVE";
 }
