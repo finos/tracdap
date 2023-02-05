@@ -19,10 +19,10 @@ package org.finos.tracdap.svc.orch.service;
 import org.finos.tracdap.common.exception.*;
 import org.finos.tracdap.common.exec.ExecutorJobInfo;
 import org.finos.tracdap.common.metadata.MetadataUtil;
+import org.finos.tracdap.config.PlatformConfig;
+import org.finos.tracdap.config.PluginConfig;
 import org.finos.tracdap.metadata.JobStatusCode;
 import org.finos.tracdap.svc.orch.cache.IJobCache;
-
-import io.netty.util.concurrent.EventExecutorGroup;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,6 +32,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
@@ -43,17 +44,21 @@ public class JobManager {
     public static final Duration STARTUP_DELAY = Duration.of(10, ChronoUnit.SECONDS);
     public static final Duration SCHEDULED_REMOVAL_DURATION = Duration.of(2, ChronoUnit.MINUTES);
 
-    public static final Duration DEFAULT_CACHE_POLL_INTERVAL = Duration.of(2, ChronoUnit.SECONDS);
-    public static final Duration DEFAULT_CACHE_TICKET_DURATION = Duration.of(10, ChronoUnit.SECONDS);
-    public static final Duration DEFAULT_EXECUTOR_POLL_INTERVAL = Duration.of(30, ChronoUnit.SECONDS);
-    public static final Duration DEFAULT_EXECUTOR_TICKET_DURATION = Duration.of(2, ChronoUnit.MINUTES);
+    public static final String POLL_INTERVAL_CONFIG_KEY = "pollInterval";
+    public static final String TICKET_DURATION_CONFI_KEY = "ticketDuration";
+    public static final String MAX_JOBS_CONFIG_KEY = "maxJobs";
+
+    public static final int DEFAULT_CACHE_POLL_INTERVAL = 2;
+    public static final int DEFAULT_CACHE_TICKET_DURATION = 10;
+    public static final int DEFAULT_EXECUTOR_POLL_INTERVAL = 30;
+    public static final int DEFAULT_EXECUTOR_TICKET_DURATION = 120;
     public static final int DEFAULT_EXECUTOR_JOB_LIMIT = 6;
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
     private final JobProcessor processor;
     private final IJobCache<JobState> cache;
-    private final EventExecutorGroup javaExecutor;
+    private final ScheduledExecutorService javaExecutor;
 
     private final Duration cachePollInterval;
     private final Duration cacheTicketDuration;
@@ -65,19 +70,41 @@ public class JobManager {
     private ScheduledFuture<?> executorPollingTask = null;
 
     public JobManager(
+            PlatformConfig config,
             JobProcessor processor,
             IJobCache<JobState> cache,
-            EventExecutorGroup javaExecutor) {
+            ScheduledExecutorService javaExecutor) {
 
         this.processor = processor;
         this.cache = cache;
         this.javaExecutor = javaExecutor;
 
-        cachePollInterval = DEFAULT_CACHE_POLL_INTERVAL;
-        cacheTicketDuration = DEFAULT_CACHE_TICKET_DURATION;
-        executorPollInterval = DEFAULT_EXECUTOR_POLL_INTERVAL;
-        executorTicketDuration = DEFAULT_EXECUTOR_TICKET_DURATION;
-        executorJobLimit = DEFAULT_EXECUTOR_JOB_LIMIT;
+        cachePollInterval = Duration.ofSeconds(readIntegerProperty(config.getJobCache(), POLL_INTERVAL_CONFIG_KEY, DEFAULT_CACHE_POLL_INTERVAL));
+        cacheTicketDuration = Duration.ofSeconds(readIntegerProperty(config.getJobCache(), TICKET_DURATION_CONFI_KEY, DEFAULT_CACHE_TICKET_DURATION));
+        executorPollInterval = Duration.ofSeconds(readIntegerProperty(config.getExecutor(), POLL_INTERVAL_CONFIG_KEY, DEFAULT_EXECUTOR_POLL_INTERVAL));
+        executorTicketDuration = Duration.ofSeconds(readIntegerProperty(config.getExecutor(), TICKET_DURATION_CONFI_KEY, DEFAULT_EXECUTOR_TICKET_DURATION));
+        executorJobLimit = readIntegerProperty(config.getExecutor(), MAX_JOBS_CONFIG_KEY, DEFAULT_EXECUTOR_JOB_LIMIT);
+    }
+
+    private int readIntegerProperty(PluginConfig config, String propertyKey, int defaultValue) {
+
+        if (!config.containsProperties(propertyKey))
+            return defaultValue;
+
+        var configValue = config.getPropertiesOrDefault(propertyKey, Integer.toString(defaultValue));
+
+        try {
+            return Integer.parseInt(configValue.trim());
+        }
+        catch (NumberFormatException e) {
+
+            var message = String.format(
+                    "Invalid config property [%s]: Expected an integer, got [%s]",
+                    propertyKey, configValue);
+
+            log.error(message);
+            throw new EStartup(message);
+        }
     }
 
     public void start() {
@@ -135,17 +162,14 @@ public class JobManager {
             // But the ticket.superseded() mechanism should be sufficient unless the load is extreme
 
             var launchableJobs = cache.queryState(STATUS_FOR_LAUNCH);
-            var runningJobs = cache.queryState(STATUS_FOR_RUNNING_JOBS);
+            var runningJobs = cache.queryState(STATUS_FOR_RUNNING_JOBS, true);  // Include jobs with launch in progress
             var fetchResultJobs = cache.queryState(STATUS_FOR_FETCH_RESULTS);
             var updatedJobs = cache.queryState(STATUS_FOR_UPDATE);
 
             // A simple capacity cap to prevent spamming the executor with too many jobs
             // No queuing or prioritisation yet!!
 
-            var launchCapacity = executorJobLimit - runningJobs.size();
-            if (launchCapacity <= 0)
-                return;
-
+            var launchCapacity = Math.max(executorJobLimit - runningJobs.size(), 0);
             var launchJobs = launchableJobs.size() > launchCapacity
                     ? launchableJobs.subList(0, launchCapacity)
                     : launchableJobs;
@@ -257,29 +281,15 @@ public class JobManager {
 
             var cacheEntry = cache.getEntry(ticket);
             var jobState = cacheEntry.value();
+
+            // Launching can take a long time for some executors
+            // Setting a launch state lets the job count towards the running jobs total
+            var launchState = jobState.clone();
+            launchState.cacheStatus = CacheStatus.LAUNCH_IN_PROGRESS;
+            cache.updateEntry(ticket, launchState.cacheStatus, launchState);
+
+            // Perform the launch
             var newState = processor.launchJob(jobState);
-
-            cache.updateEntry(ticket, newState.cacheStatus, newState);
-        }
-        catch (Exception e) {
-
-            log.warn("There was a problem launching the job: " + e.getMessage(), e);
-            log.warn("Launch operation will be retried");
-        }
-    }
-
-    public void fetchJobResult(String jobKey, int revision) {
-
-        // Fetching a result means talking to the executor, so use the executor ticket duration
-
-        try (var ticket = cache.openTicket(jobKey, revision, executorTicketDuration)) {
-
-            if (ticket.superseded())
-                return;
-
-            var cacheEntry = cache.getEntry(ticket);
-            var jobState = cacheEntry.value();
-            var newState = processor.fetchJobResult(jobState);
 
             cache.updateEntry(ticket, newState.cacheStatus, newState);
         }
@@ -322,12 +332,46 @@ public class JobManager {
         }
     }
 
+    public void fetchJobResult(String jobKey, int revision) {
+
+        int newRevision = revision;
+        String newCacheStatus = null;
+
+        // Fetching a result means talking to the executor, so use the executor ticket duration
+
+        try (var ticket = cache.openTicket(jobKey, revision, executorTicketDuration)) {
+
+            if (ticket.superseded())
+                return;
+
+            var cacheEntry = cache.getEntry(ticket);
+            var jobState = cacheEntry.value();
+            var newState = processor.fetchJobResult(jobState);
+
+            newRevision = cache.updateEntry(ticket, newState.cacheStatus, newState);
+            newCacheStatus = newState.cacheStatus;
+        }
+        catch (Exception e) {
+
+            log.warn("There was a problem launching the job: " + e.getMessage(), e);
+            log.warn("Launch operation will be retried");
+        }
+
+        // Avoid polling delay if multiple updates are processed in succession
+        // This will also tend to make all the updates in a sequence run on one orchestrator node
+
+        if (newRevision > revision && STATUS_FOR_UPDATE.contains(newCacheStatus)) {
+            var newRevision_ = newRevision;
+            javaExecutor.submit(() -> processJobUpdate(jobKey, newRevision_));
+        }
+    }
+
     public void processJobUpdate(String jobKey, int revision) {
 
         int newRevision = revision;
         String newCacheStatus = null;
 
-        try (var ticket = cache.openTicket(jobKey, revision)) {
+        try (var ticket = cache.openTicket(jobKey, revision, cacheTicketDuration)) {
 
             if (ticket.superseded())
                 return;
@@ -409,6 +453,7 @@ public class JobManager {
             CacheStatus.QUEUED_IN_TRAC);
 
     private static final List<String> STATUS_FOR_RUNNING_JOBS = List.of(
+            CacheStatus.LAUNCH_IN_PROGRESS,
             CacheStatus.SENT_TO_EXECUTOR,
             CacheStatus.QUEUED_IN_EXECUTOR,
             CacheStatus.RUNNING_IN_EXECUTOR);

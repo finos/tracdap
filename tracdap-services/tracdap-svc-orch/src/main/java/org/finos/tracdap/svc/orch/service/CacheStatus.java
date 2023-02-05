@@ -21,6 +21,7 @@ public class CacheStatus {
 
     public static final String QUEUED_IN_TRAC = "QUEUED_IN_TRAC";
 
+    public static final String LAUNCH_IN_PROGRESS = "LAUNCH_IN_PROGRESS";
     public static final String SENT_TO_EXECUTOR = "SENT_TO_EXECUTOR";
     public static final String QUEUED_IN_EXECUTOR = "QUEUED_IN_EXECUTOR";
     public static final String RUNNING_IN_EXECUTOR = "RUNNING_IN_EXECUTOR";

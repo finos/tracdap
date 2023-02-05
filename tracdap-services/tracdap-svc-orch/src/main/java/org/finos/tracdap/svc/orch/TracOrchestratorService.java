@@ -127,7 +127,7 @@ public class TracOrchestratorService extends CommonServiceBase {
 
             var jobLifecycle = new JobLifecycle(platformConfig, metaClient);
             var jobProcessor = new JobProcessor(metaClient, jobExecutor, jobLifecycle);
-            jobManager = new JobManager(jobProcessor, jobCache, serviceGroup);
+            jobManager = new JobManager(platformConfig, jobProcessor, jobCache, serviceGroup);
 
             jobExecutor.start();
             jobManager.start();
