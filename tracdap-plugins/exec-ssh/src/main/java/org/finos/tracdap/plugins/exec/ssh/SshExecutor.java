@@ -387,9 +387,13 @@ public class SshExecutor implements IBatchExecutor<SshBatchState> {
             // It may be possible to use an SSH exec shell and set up env vars that way
             // Didn't work on first try, but it seems like it should work the way you'd expect...
 
+            // TODO: Remove dependencies on particular outputs set in the job args
+
             var batchAdminDir = buildVolumePath(batchState, "trac_admin");
             var stdOutLog = buildRemotePath(batchState, "log", "trac_rt_stdout.txt");
             var stdErrLog = buildRemotePath(batchState, "log", "trac_rt_stderr.txt");
+            var resultFileName = String.format("job_result_%s.json", batchKey);
+            var resultFilePath = buildRemotePath(batchState, "result", resultFileName);
 
             var launchScriptContent = LAUNCH_SCRIPT
                     .replace("${TRAC_BATCH_ADMIN_DIR}", batchAdminDir)
@@ -399,6 +403,7 @@ public class SshExecutor implements IBatchExecutor<SshBatchState> {
 
             var pollScriptContent = POLL_SCRIPT
                     .replace("${TRAC_BATCH_ADMIN_DIR}", batchAdminDir)
+                    .replace("${TRAC_RESULT_FILE}", resultFilePath)
                     .getBytes(StandardCharsets.UTF_8);
 
             batchState = createVolume(batchKey, batchState, "trac_admin", ExecutorVolumeType.SCRATCH_DIR);
@@ -406,15 +411,11 @@ public class SshExecutor implements IBatchExecutor<SshBatchState> {
             writeFile(batchKey, batchState, "trac_admin", POLL_SCRIPT_NAME, pollScriptContent, executePermissions);
 
             var launchScript = buildRemotePath(batchState, "trac_admin", LAUNCH_SCRIPT_NAME);
-            var launchCommand = new StringBuilder();
-            launchCommand.append(launchScript);
-            launchCommand.append(" ");
-            launchCommand.append(command);
-            launchCommand.append(" &");
+            String launchCommand = launchScript + " " + command;
 
             log.info("Launch command: {}", command);
 
-            session.executeRemoteCommand(launchCommand.toString());
+            session.executeRemoteCommand(launchCommand);
 
             var pidFile = buildRemotePath(batchState, "trac_admin", "pid");
             var pidCommand = String.format("cat %s", pidFile);
