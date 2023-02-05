@@ -199,6 +199,8 @@ public class JobManager {
             var runningJobs = cache.queryState(STATUS_FOR_RUNNING_JOBS);
 
             var pollRequests = runningJobs.stream()
+                    // Only poll jobs that have an executor state
+                    .filter(j -> j.value().batchState != null)
                     .map(j -> Map.entry(j.key(), j.value()))
                     .collect(Collectors.toList());
 
