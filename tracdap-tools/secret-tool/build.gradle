@@ -43,6 +43,7 @@ dependencies {
 
     implementation project(':tracdap-api-config')
     implementation project(':tracdap-lib-common')
+    implementation project(':tracdap-lib-db')
 }
 
 distributions {

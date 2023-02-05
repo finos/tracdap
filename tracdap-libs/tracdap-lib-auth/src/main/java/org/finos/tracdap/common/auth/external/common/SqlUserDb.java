@@ -34,7 +34,8 @@ public class SqlUserDb implements IUserDatabase {
 
     public static SqlUserDb getUserDb(ConfigManager configManager, String dialect, String usersUrl) {
 
-        var jdbcUrl = configManager.resolveConfigFile((URI.create(usersUrl))).getPath();
+        var jdbcPath = configManager.resolveConfigFile((URI.create(usersUrl))).getPath();
+        var jdbcUrl = jdbcPath + ";AUTO_SERVER=TRUE";
 
         var properties = new Properties();
         properties.setProperty("dialect", dialect);

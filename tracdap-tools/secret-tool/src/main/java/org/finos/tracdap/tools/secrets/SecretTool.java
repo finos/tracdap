@@ -242,7 +242,7 @@ public class SecretTool {
             JksHelpers.saveKeystore(keystorePath, secretKey, secrets);
         }
 
-        var userManager = new JksUserManager(configManager);
+        var userManager = getUserManager();
         userManager.initTracUsers();
     }
 
@@ -258,14 +258,36 @@ public class SecretTool {
 
         var hash = CryptoHelpers.encodeSSHA512(password, salt);
 
-        var userManager = new JksUserManager(configManager);
+        var userManager = getUserManager();
         userManager.addUser(userId, userName, hash);
     }
 
     private void deleteTracUser(String userId) {
 
-        var userManager = new JksUserManager(configManager);
+        var userManager = getUserManager();
         userManager.deleteUser(userId);
+    }
+
+    private IUserManager getUserManager() {
+
+        var config = configManager.loadRootConfigObject(GatewayConfig.class);
+
+        if (!config.containsConfig(ConfigKeys.USER_DB_TYPE)) {
+            var template = "TRAC user database is not enabled (set config key [%s] to turn it on)";
+            var message = String.format(template, ConfigKeys.USER_DB_TYPE);
+            log.error(message);
+            throw new EStartup(message);
+        }
+
+        var userDbType = config.getConfigOrThrow(ConfigKeys.USER_DB_TYPE);
+
+        if (userDbType.equals("JKS") || userDbType.equals("PKCS12"))
+            return new JksUserManager(configManager);
+
+        if (userDbType.equals("H2"))
+            return new SqlUserManager(configManager);
+
+        throw new EStartup(String.format("Unsupported user DB type: [%s]", userDbType));
     }
 
     private void writeKeysToFiles(KeyPair keyPair, Path configDir) {
