@@ -27,7 +27,6 @@ dependencies {
 
     api project(':tracdap-api-metadata')
     api project(':tracdap-api-config')
-
     api project(':tracdap-lib-common')
 
     // Google Guava - common lib includes helpers to translate to/from equivalent JDK types
@@ -49,6 +48,9 @@ dependencies {
 
     // JWT auth
     implementation group: 'com.auth0', name: 'java-jwt', version: "$jwt_version"
+
+    // For local users database
+    implementation project(':tracdap-lib-db')
 
     // Logging facade is an API dependency
     api group: 'org.slf4j', name: 'slf4j-api', version: "$slf4j_version"

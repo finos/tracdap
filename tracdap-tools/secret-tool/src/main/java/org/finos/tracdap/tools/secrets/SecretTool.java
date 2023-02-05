@@ -29,8 +29,6 @@ import org.finos.tracdap.config._ConfigFile;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
@@ -41,7 +39,6 @@ import java.nio.file.StandardOpenOption;
 import java.security.*;
 import java.util.Base64;
 import java.util.List;
-import java.util.Map;
 import java.util.Scanner;
 
 
@@ -66,9 +63,6 @@ public class SecretTool {
             StandardArgs.task(INIT_TRAC_USERS, "Create a new TRAC user database (only required if SSO is not deployed)"),
             StandardArgs.task(ADD_USER, "Add a new user to the TRAC user database"),
             StandardArgs.task(DELETE_USER, "USER_ID", "Delete a user from the TRAC user database"));
-
-    // Must match what is used by auth providers
-    private static final String DISPLAY_NAME_ATTR = "displayName";
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
@@ -155,30 +149,30 @@ public class SecretTool {
 
     }
 
-    private void initSecrets() throws IOException, GeneralSecurityException {
+    private void initSecrets() {
 
-        var keystore = loadKeystore(secretType, keystorePath, secretKey, true);
-        saveKeystore(keystorePath, secretKey, keystore);
+        var keystore = JksHelpers.loadKeystore(secretType, keystorePath, secretKey, true);
+        JksHelpers.saveKeystore(keystorePath, secretKey, keystore);
     }
 
-    private void addSecret(String alias) throws Exception {
+    private void addSecret(String alias) {
 
         var secret = consoleReadPassword("Enter secret for [%s]: ", alias);
 
-        var keystore = loadKeystore(secretType, keystorePath, secretKey, true);
+        var keystore = JksHelpers.loadKeystore(secretType, keystorePath, secretKey, true);
 
         CryptoHelpers.writeTextEntry(keystore, secretKey, alias, secret);
 
-        saveKeystore(keystorePath, secretKey, keystore);
+        JksHelpers.saveKeystore(keystorePath, secretKey, keystore);
     }
 
-    private void deleteSecret(String alias) throws Exception {
+    private void deleteSecret(String alias) {
 
-        var keystore = loadKeystore(secretType, keystorePath, secretKey, true);
+        var keystore = JksHelpers.loadKeystore(secretType, keystorePath, secretKey, true);
 
         CryptoHelpers.deleteEntry(keystore, alias);
 
-        saveKeystore(keystorePath, secretKey, keystore);
+        JksHelpers.saveKeystore(keystorePath, secretKey, keystore);
     }
 
     private void createRootAuthKey(String algorithm, String bits) {
@@ -193,7 +187,9 @@ public class SecretTool {
 
             var keyPair = keyGen.generateKeyPair();
 
-            writeKeysToKeystore(keyPair);
+            var keystore = JksHelpers.loadKeystore(secretType, keystorePath, secretKey, true);
+            JksHelpers.writeKeysToKeystore(keystore, secretKey, keyPair);
+            JksHelpers.saveKeystore(keystorePath, secretKey, keystore);
         }
         catch (NumberFormatException e) {
             var message = String.format("Key size is not an integer [%s]", bits);
@@ -207,7 +203,7 @@ public class SecretTool {
         }
     }
 
-    private void initTracUsers() throws Exception {
+    private void initTracUsers() {
 
         var config = configManager.loadRootConfigObject(GatewayConfig.class);
 
@@ -224,41 +220,33 @@ public class SecretTool {
             throw new EStartup(message);
         }
 
-        var userDbType = config.getConfigOrThrow(ConfigKeys.USER_DB_TYPE);
-        var userDbUrl = config.getConfigOrThrow(ConfigKeys.USER_DB_URL);
-        var userDbSecret = config.getConfigOrDefault(ConfigKeys.USER_DB_KEY, "");
-
-        String userDbKey;
-
-        var secrets = loadKeystore(secretType, keystorePath, secretKey, false);
-
-        if (userDbSecret.isEmpty()) {
-
-            userDbKey = secretKey;
+        if (!config.containsConfig(ConfigKeys.USER_DB_KEY)) {
+            var message = "Missing required config key [" + ConfigKeys.USER_DB_KEY + "]";
+            log.error(message);
+            throw new EStartup(message);
         }
-        else if (CryptoHelpers.containsEntry(secrets, userDbSecret)) {
 
-            userDbKey = CryptoHelpers.readTextEntry(secrets, secretKey, userDbSecret);
-        }
-        else {
+        var secrets = JksHelpers.loadKeystore(secretType, keystorePath, secretKey, false);
+        var userDbSecret = config.getConfigOrThrow(ConfigKeys.USER_DB_KEY);
+
+        if (!CryptoHelpers.containsEntry(secrets, userDbSecret)) {
 
             var random = new SecureRandom();
             var secretBytes = new byte[16];
             random.nextBytes(secretBytes);
 
             var b64 = Base64.getEncoder().withoutPadding();
-            userDbKey = b64.encodeToString(secretBytes);
+            var userDbKey = b64.encodeToString(secretBytes);
 
             CryptoHelpers.writeTextEntry(secrets, secretKey, userDbSecret, userDbKey);
-            saveKeystore(keystorePath, secretKey, secrets);
+            JksHelpers.saveKeystore(keystorePath, secretKey, secrets);
         }
 
-        var userDbPath = Paths.get(configManager.resolveConfigFile(URI.create(userDbUrl)));
-        var userDb = loadKeystore(userDbType, userDbPath, userDbKey, /* createIfMissing = */ true);
-        saveKeystore(userDbPath, userDbKey, userDb);
+        var userManager = getUserManager();
+        userManager.initTracUsers();
     }
 
-    private void addTracUser() throws Exception {
+    private void addTracUser() {
 
         var userId = consoleReadLine("Enter user ID: ").trim();
         var userName = consoleReadLine("Enter full name for [%s]: ", userId).trim();
@@ -269,120 +257,37 @@ public class SecretTool {
         random.nextBytes(salt);
 
         var hash = CryptoHelpers.encodeSSHA512(password, salt);
-        var attrs = Map.of(DISPLAY_NAME_ATTR, userName);
 
-        var userDb = loadUserDb();
+        var userManager = getUserManager();
+        userManager.addUser(userId, userName, hash);
+    }
+
+    private void deleteTracUser(String userId) {
+
+        var userManager = getUserManager();
+        userManager.deleteUser(userId);
+    }
+
+    private IUserManager getUserManager() {
 
         var config = configManager.loadRootConfigObject(GatewayConfig.class);
-        var secrets = loadKeystore(secretType, keystorePath, secretKey, false);
 
-        var userDbSecret = config.getConfigOrDefault(ConfigKeys.USER_DB_KEY, "");
-        var userDbKey = userDbSecret.isEmpty()
-                ? secretKey
-                : CryptoHelpers.readTextEntry(secrets, secretKey, userDbSecret);
-
-        CryptoHelpers.writeTextEntry(userDb, userDbKey, userId, hash, attrs);
-
-        saveUserDb(userDb);
-    }
-
-    private void deleteTracUser(String userId) throws Exception {
-
-        var userDb = loadUserDb();
-
-        CryptoHelpers.deleteEntry(userDb, userId);
-
-        saveUserDb(userDb);
-    }
-
-    private void writeKeysToKeystore(KeyPair keyPair) {
-
-        try {
-
-            var keystore = loadKeystore(secretType, keystorePath, secretKey, /* createIfMissing = */ true);
-
-            var publicEncoded = CryptoHelpers.encodePublicKey(keyPair.getPublic(), false);
-            var privateEncoded = CryptoHelpers.encodePrivateKey(keyPair.getPrivate(), false);
-
-            CryptoHelpers.writeTextEntry(keystore, secretKey, ConfigKeys.TRAC_AUTH_PUBLIC_KEY, publicEncoded);
-            CryptoHelpers.writeTextEntry(keystore, secretKey, ConfigKeys.TRAC_AUTH_PRIVATE_KEY, privateEncoded);
-
-            saveKeystore(keystorePath, secretKey, keystore);
-        }
-        catch (IOException | GeneralSecurityException e) {
-
-            var innerError = (e.getCause() instanceof UnrecoverableEntryException)
-                    ? e.getCause() : e;
-
-            var message = String.format("There was a problem saving the keys: %s", innerError.getMessage());
+        if (!config.containsConfig(ConfigKeys.USER_DB_TYPE)) {
+            var template = "TRAC user database is not enabled (set config key [%s] to turn it on)";
+            var message = String.format(template, ConfigKeys.USER_DB_TYPE);
             log.error(message);
-            throw new EStartup(message, innerError);
-        }
-    }
-
-    private static KeyStore loadKeystore(
-            String keystoreType, Path keystorePath, String keystoreKey,
-            boolean createIfMissing)
-            throws IOException, GeneralSecurityException {
-
-        var keystore = KeyStore.getInstance(keystoreType);
-
-        if (!Files.exists(keystorePath) && createIfMissing) {
-            keystore.load(null, keystoreKey.toCharArray());
-        }
-        else {
-            try (var in = new FileInputStream(keystorePath.toFile())) {
-                keystore.load(in, keystoreKey.toCharArray());
-            }
+            throw new EStartup(message);
         }
 
-        return keystore;
-    }
-
-    private static void saveKeystore(
-            Path keystorePath, String keystoreKey, KeyStore keystore)
-            throws IOException, GeneralSecurityException {
-
-        var keystoreBackup = keystorePath.getParent().resolve((keystorePath.getFileSystem() + ".upd~"));
-
-        if (Files.exists(keystorePath))
-            Files.move(keystorePath, keystoreBackup);
-
-        try (var out = new FileOutputStream(keystorePath.toFile())) {
-            keystore.store(out, keystoreKey.toCharArray());
-        }
-
-        if (Files.exists(keystoreBackup))
-            Files.delete(keystoreBackup);
-    }
-
-    private KeyStore loadUserDb() throws IOException, GeneralSecurityException {
-
-        var secrets = loadKeystore(secretType, keystorePath, secretKey, false);
-
-        var config = configManager.loadRootConfigObject(GatewayConfig.class);
         var userDbType = config.getConfigOrThrow(ConfigKeys.USER_DB_TYPE);
-        var userDbUrl = config.getConfigOrThrow(ConfigKeys.USER_DB_URL);
-        var userDbSecret = config.getConfigOrThrow(ConfigKeys.USER_DB_KEY);
 
-        var userDbPath = Paths.get(configManager.resolveConfigFile(URI.create(userDbUrl)));
-        var userDbKey = CryptoHelpers.readTextEntry(secrets, secretKey, userDbSecret);
+        if (userDbType.equals("JKS") || userDbType.equals("PKCS12"))
+            return new JksUserManager(configManager);
 
-        return loadKeystore(userDbType, userDbPath, userDbKey, false);
-    }
+        if (userDbType.equals("H2"))
+            return new SqlUserManager(configManager);
 
-    private void saveUserDb(KeyStore userDb) throws IOException, GeneralSecurityException {
-
-        var secrets = loadKeystore(secretType, keystorePath, secretKey, false);
-
-        var config = configManager.loadRootConfigObject(GatewayConfig.class);
-        var userDbUrl = config.getConfigOrThrow(ConfigKeys.USER_DB_URL);
-        var userDbSecret = config.getConfigOrThrow(ConfigKeys.USER_DB_KEY);
-
-        var userDbPath = Paths.get(configManager.resolveConfigFile(URI.create(userDbUrl)));
-        var userDbKey = CryptoHelpers.readTextEntry(secrets, secretKey, userDbSecret);
-
-        saveKeystore(userDbPath, userDbKey, userDb);
+        throw new EStartup(String.format("Unsupported user DB type: [%s]", userDbType));
     }
 
     private void writeKeysToFiles(KeyPair keyPair, Path configDir) {

@@ -19,7 +19,6 @@ package org.finos.tracdap.common.auth.external.common;
 import org.finos.tracdap.common.auth.external.*;
 import org.finos.tracdap.common.auth.internal.UserInfo;
 import org.finos.tracdap.common.config.ConfigManager;
-import org.finos.tracdap.common.config.ISecretLoader;
 import org.finos.tracdap.common.exception.EResourceNotFound;
 import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.common.util.ResourceHelpers;
@@ -50,7 +49,7 @@ public class BuiltInAuthProvider implements IAuthProvider {
     private static final Logger log = LoggerFactory.getLogger(BuiltInAuthProvider.class);
 
     private final String mainPage;
-    private final ISecretLoader userDb;
+    private final IUserDatabase userDb;
 
     public BuiltInAuthProvider(Properties properties, ConfigManager configManager) {
 
@@ -64,11 +63,25 @@ public class BuiltInAuthProvider implements IAuthProvider {
 
         mainPage = properties.getProperty(MAIN_PAGE_KEY);
 
-        this.userDb = configManager.getUserDb();
+        this.userDb = CommonAuthPlugin.createUserDb(configManager);
     }
 
     @Override
     public AuthResult attemptAuth(AuthRequest request) {
+
+        // API auth by redirect does not work nicely out of the box!
+        // For now send an auth failure on API routes
+        // Anyway for browser re-directs there should be some control in the client layer
+        // Perhaps this can be done in the web bindings package, with suitable config options available?
+
+        var headers = request.getHeaders();
+        var isApi =
+                headers.contains(HttpHeaderNames.CONTENT_TYPE) &&
+                headers.get(HttpHeaderNames.CONTENT_TYPE).toString().startsWith("application/") &&
+                !headers.get(HttpHeaderNames.CONTENT_TYPE).equals("application/x-www-form-urlencoded");
+
+        if (isApi)
+            return AuthResult.FAILED("Session expired or not available");
 
         if (!request.getUrl().startsWith(BUILT_IN_AUTH_ROOT))
             return redirectToLogin(request);
@@ -143,12 +156,12 @@ public class BuiltInAuthProvider implements IAuthProvider {
         var username = usernameParam.get(0);
         var password = passwordParam.get(0);
 
-        if (!LocalUsers.checkPassword(userDb, username, password, log)) {
-            return redirectToLogin(request);
-        }
-        else {
+        if (LocalUsers.checkPassword(userDb, username, password, log)) {
             var userInfo = LocalUsers.getUserInfo(userDb, username);
             return AuthResult.AUTHORIZED(userInfo);
+        }
+        else {
+            return redirectToLogin(request);
         }
     }
 
