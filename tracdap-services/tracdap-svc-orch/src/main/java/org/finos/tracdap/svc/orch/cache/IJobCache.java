@@ -37,4 +37,5 @@ public interface IJobCache<TValue> {
     CacheQueryResult<TValue> getLatestEntry(String key);
 
     List<CacheQueryResult<TValue>> queryState(List<String> states);
+    List<CacheQueryResult<TValue>> queryState(List<String> states, boolean includeOpenTickets);
 }

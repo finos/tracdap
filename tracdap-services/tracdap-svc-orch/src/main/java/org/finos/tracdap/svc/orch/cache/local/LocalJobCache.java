@@ -258,6 +258,7 @@ public class LocalJobCache<TValue> implements IJobCache<TValue> {
         return queryState(states, false);
     }
 
+    @Override
     public List<CacheQueryResult<TValue>> queryState(List<String> states, boolean includeOpenTickets) {
 
         var queryTime = Instant.now();
@@ -302,12 +303,6 @@ public class LocalJobCache<TValue> implements IJobCache<TValue> {
     }
 
     private void checkEntryMatchesTicket(LocalJobCacheEntry<TValue> entry, Ticket ticket, String operation) {
-
-        if (entry.revision != ticket.revision()) {
-            var message = String.format("Cannot %s [%s], it has already been updated", operation, ticket.key());
-            log.error(message);
-            throw new ECacheTicket(message);
-        }
 
         if (entry.ticket == null){
             var message = String.format("Cannot %s [%s], ticket is no longer valid", operation, ticket.key());
