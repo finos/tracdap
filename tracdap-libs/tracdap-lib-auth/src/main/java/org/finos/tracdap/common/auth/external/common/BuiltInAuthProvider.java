@@ -69,6 +69,20 @@ public class BuiltInAuthProvider implements IAuthProvider {
     @Override
     public AuthResult attemptAuth(AuthRequest request) {
 
+        // API auth by redirect does not work nicely out of the box!
+        // For now send an auth failure on API routes
+        // Anyway for browser re-directs there should be some control in the client layer
+        // Perhaps this can be done in the web bindings package, with suitable config options available?
+
+        var headers = request.getHeaders();
+        var isApi =
+                headers.contains(HttpHeaderNames.CONTENT_TYPE) &&
+                headers.get(HttpHeaderNames.CONTENT_TYPE).toString().startsWith("application/") &&
+                !headers.get(HttpHeaderNames.CONTENT_TYPE).equals("application/x-www-form-urlencoded");
+
+        if (isApi)
+            return AuthResult.FAILED("Session expired or not available");
+
         if (!request.getUrl().startsWith(BUILT_IN_AUTH_ROOT))
             return redirectToLogin(request);
 
