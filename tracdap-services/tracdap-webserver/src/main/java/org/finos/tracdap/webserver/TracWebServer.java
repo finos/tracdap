@@ -16,7 +16,7 @@
 
 package org.finos.tracdap.webserver;
 
-import org.finos.tracdap.common.auth.AuthSetup;
+import org.finos.tracdap.common.auth.internal.JwtSetup;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.common.plugin.PluginManager;
@@ -80,7 +80,7 @@ public class TracWebServer extends CommonServiceBase {
         workerGroup = new NioEventLoopGroup(6, new DefaultThreadFactory("worker"));
 
         // JWT processor is responsible for signing and validating auth tokens
-        var jwtValidator = AuthSetup.createValidator(platformConfig, configManager);
+        var jwtValidator = JwtSetup.createValidator(platformConfig, configManager);
 
         log.info("Accessing storage for content root...");
 
