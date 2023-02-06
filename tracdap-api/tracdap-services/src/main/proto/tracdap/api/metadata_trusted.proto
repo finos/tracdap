@@ -73,22 +73,6 @@ service TrustedMetadataApi {
   }
 
   /**
-   * Create new objects in the TRAC metadata store.
-   *
-   * This call behaves identically to the equivalent public API call, without the
-   * restriction on which types of object can be saved.
-   *
-   * @see TracMetadataApi.createObjectBatch()
-   * @see TracMetadataApi.createObject()
-   */
-  rpc createObjectBatch (MetadataWriteBatchRequest) returns (MetadataWriteBatchResponse) {
-    option (google.api.http) = {
-      post: "/{tenant}/trusted/create-object-batch"
-      body: "*"
-    };
-  }
-
-  /**
    * Update an existing object in the TRAC metadata store.
    *
    * This call behaves identically to the equivalent public API call, however it
@@ -105,23 +89,6 @@ service TrustedMetadataApi {
   }
 
   /**
-   * Update existing objects in the TRAC metadata store.
-   *
-   * This call behaves identically to the equivalent public API call, however it
-   * can be used with any type of object that supports versioning (currently DATA
-   * and CUSTOM).
-   *
-   * @see TracMetadataApi.updateObjectBatch()
-   * @see TracMetadataApi.updateObject()
-   */
-  rpc updateObjectBatch (MetadataWriteBatchRequest) returns (MetadataWriteBatchResponse) {
-    option (google.api.http) = {
-      post: "/{tenant}/trusted/update-object-batch"
-      body: "*"
-    };
-  }
-
-  /**
    * Update the tag for an existing object in the TRAC metadata store.
    *
    * This call behaves identically to the equivalent public API call.
@@ -131,23 +98,6 @@ service TrustedMetadataApi {
   rpc updateTag (MetadataWriteRequest) returns (metadata.TagHeader) {
     option (google.api.http) = {
       post: "/{tenant}/trusted/update-tag"
-      body: "*"
-    };
-  }
-
-  /**
-   * Update tags for existing objects in the TRAC metadata store.
-   *
-   * This call behaves identically to the equivalent public API call, however it
-   * can be used with any type of object that supports versioning (currently DATA
-   * and CUSTOM).
-   *
-   * @see TracMetadataApi.updateTagBatch()
-   * @see TracMetadataApi.updateTag()
-   */
-  rpc updateTagBatch (MetadataWriteBatchRequest) returns (MetadataWriteBatchResponse) {
-    option (google.api.http) = {
-      post: "/{tenant}/trusted/update-batch-tag"
       body: "*"
     };
   }
@@ -205,27 +155,6 @@ service TrustedMetadataApi {
   rpc createPreallocatedObject (MetadataWriteRequest) returns (metadata.TagHeader) {
     option (google.api.http) = {
       post: "/{tenant}/trusted/create-preallocated"
-      body: "*"
-    };
-  }
-
-  /**
-   * Create objects in batch using IDs that were previously preallocated.
-   *
-   * This call behaves essentially the same as saveNewObject(), with all the
-   * same validation. The only difference is that the new definition must be
-   * supplied with an object header, including the object ID returned from a
-   * prior call to preallocateId().
-   *
-   * Error conditions include all the error conditions for saveNewObject().
-   * Using a preallocated ID twice, attempting to save to an unknown ID or the
-   * ID of another object that already exists are also errors.
-   *
-   * @see TrustedMetadataApi.createPreallocatedObject()
-   */
-  rpc createPreallocatedObjectBatch (MetadataWriteBatchRequest) returns (MetadataWriteBatchResponse) {
-    option (google.api.http) = {
-      post: "/{tenant}/trusted/create-preallocated-batch"
       body: "*"
     };
   }

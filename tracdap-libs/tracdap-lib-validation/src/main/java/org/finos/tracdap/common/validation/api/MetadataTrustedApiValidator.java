@@ -39,29 +39,14 @@ public class MetadataTrustedApiValidator {
         return MetadataApiValidator.createObject(msg, ctx, MetadataApiValidator.TRUSTED_API, true);
     }
 
-    @Validator(method = "createObjectBatch")
-    public static ValidationContext createObjectBatch(MetadataWriteBatchRequest msg, ValidationContext ctx) {
-        return MetadataApiValidator.createObjectBatch(msg, ctx, MetadataApiValidator.TRUSTED_API);
-    }
-
     @Validator(method = "updateObject")
     public static ValidationContext updateObject(MetadataWriteRequest msg, ValidationContext ctx) {
         return MetadataApiValidator.updateObject(msg, ctx, MetadataApiValidator.TRUSTED_API, true);
     }
 
-    @Validator(method = "updateObjectBatch")
-    public static ValidationContext updateObjectBatch(MetadataWriteBatchRequest msg, ValidationContext ctx) {
-        return MetadataApiValidator.updateObjectBatch(msg, ctx, MetadataApiValidator.TRUSTED_API);
-    }
-
     @Validator(method = "updateTag")
     public static ValidationContext updateTag(MetadataWriteRequest msg, ValidationContext ctx) {
         return MetadataApiValidator.updateTag(msg, ctx, MetadataApiValidator.TRUSTED_API, true);
-    }
-
-    @Validator(method = "updateTagBatch")
-    public static ValidationContext updateTagBatch(MetadataWriteBatchRequest msg, ValidationContext ctx) {
-        return MetadataApiValidator.updateTagBatch(msg, ctx, MetadataApiValidator.TRUSTED_API);
     }
 
     @Validator(method = "preallocateId")
@@ -77,11 +62,6 @@ public class MetadataTrustedApiValidator {
     @Validator(method = "createPreallocatedObject")
     public static ValidationContext createPreallocatedObject(MetadataWriteRequest msg, ValidationContext ctx) {
         return MetadataApiValidator.createPreallocatedObject(msg, ctx);  // always a trusted call
-    }
-
-    @Validator(method = "createPreallocatedObjectBatch")
-    public static ValidationContext createPreallocatedObjectBatch(MetadataWriteBatchRequest msg, ValidationContext ctx) {
-        return MetadataApiValidator.createPreallocatedObjectBatch(msg, ctx);  // always a trusted call
     }
 
     @Validator(method = "writeBatch")

@@ -160,39 +160,6 @@ service TracMetadataApi {
         };
     }
 
-    /**
-     * Create new objects in batch in the TRAC metadata store.
-     *
-     * To create an object, supply a metadata write request with the tenant code,
-     * object type and a definition for the item you want to save. The tag should contain
-     * all the attributes you want to set and the object definition, without an
-     * object header. TRAC will create a header when it assigns and ID for the new
-     * object. Only FLOW and CUSTOM objects can be created by this API call.
-     *
-     * Validation is performed on new objects before they are saved. Objects can
-     * fail validation because they are semantically invalid (e.g. missing
-     * required fields or inconsistencies within the object definition) or due to
-     * consistency errors (referring to other metadata items that don't exist or
-     * don't meet certain requirements).
-     *
-     * NOTE: Validation is only partially implemented in the current release.
-     *
-     * The call returns an ID responses to indicate the IDs of the newly created
-     * objects, as well as the objects and tag versions (which will always be 1).
-     *
-     * Error conditions include: Invalid request, unknown tenant, object type does
-     * not match the supplied definition, validation failure.
-     *
-     * @see TracMetadataApi.createObject()
-     * @see tracdap.metadata.ObjectDefinition
-     * @see tracdap.metadata.TagUpdate
-     */
-    rpc createObjectBatch (MetadataWriteBatchRequest) returns (MetadataWriteBatchResponse) {
-        option (google.api.http) = {
-            post: "/{tenant}/create-object-batch"
-            body: "*"
-        };
-    }
 
     /**
      * Update an existing object in the TRAC metadata store.
@@ -232,43 +199,6 @@ service TracMetadataApi {
         };
     }
 
-    /**
-     * Update existing objects in batch in the TRAC metadata store.
-     *
-     * To save a new version, supply a metadata write request with the tenant code,
-     * object type and a tag for the item you want to save. The tag should contain
-     * all the attributes you want to set and the updated object definition, which
-     * must be supplied with the header from the *previous* version of the object.
-     * TRAC will apply the new version number when it creates the new version of
-     * the object. Only the latest version of an object can be updated and only
-     * CUSTOM objects can be updated by this API call.
-     *
-     * Validation is performed on new objects before they are saved. Objects can
-     * fail validation because they are semantically invalid (e.g. missing
-     * required fields or inconsistencies within the object definition) or due to
-     * consistency errors (referring to other metadata items that don't exist or
-     * don't meet certain requirements). For new versions, validation also covers
-     * checking for compatibility with the previous version of the object.
-     *
-     * NOTE: Validation is only partially implemented in the current release.
-     *
-     * The call returns an ID response with the ID object and the newly assigned
-     * version number, as well as the tag version (which will always be 1).
-     *
-     * Error conditions include: Invalid request, unknown tenant, unknown object
-     * ID or version, wrong object type (not the same as the prior version), object
-     * version is superseded.
-     *
-     * @see TracMetadataApi.updateObject()
-     * @see tracdap.metadata.ObjectDefinition
-     * @see tracdap.metadata.TagUpdate
-     */
-    rpc updateObjectBatch (MetadataWriteBatchRequest) returns (MetadataWriteBatchResponse) {
-        option (google.api.http) = {
-            post: "/{tenant}/update-object-batch"
-            body: "*"
-        };
-    }
 
     /**
      * Update the tag for an existing object in the TRAC metadata store.
@@ -298,34 +228,6 @@ service TracMetadataApi {
         };
     }
 
-    /**
-     * Update tags in batch for existing objects in the TRAC metadata store.
-     *
-     * To save a new tag, supply a metadata write request with the tenant code,
-     * object type and a tag for the item you want to save. The tag should contain
-     * all the attributes you want to include in the new tag, even if they have
-     * not been changed. The object definition must be supplied with a header only,
-     * supplying an object body is an invalid request. Tags for any type of object
-     * can be updated by this API call. Only the latest version of a tag can be
-     * updated.
-     *
-     * The call returns an ID response with the ID and version of the object and
-     * the newly assigned tag number.
-     *
-     * Error conditions include: Invalid request, unknown tenant, unknown object
-     * ID, object version or tag version, wrong object type (does not match what
-     * is stored in TRAC), tag version is superseded.
-     *
-     * @see TracMetadataApi.updateTag()
-     * @see tracdap.metadata.ObjectDefinition
-     * @see tracdap.metadata.TagUpdate
-     */
-    rpc updateTagBatch (MetadataWriteBatchRequest) returns (MetadataWriteBatchResponse) {
-        option (google.api.http) = {
-            post: "/{tenant}/update-batch-tag"
-            body: "*"
-        };
-    }
 
     /**
      * Read a single object from the TRAC metadata store using a tag selector.
@@ -646,6 +548,7 @@ message UniversalMetadataWriteBatchRequest {
     repeated MetadataWriteRequest createObjects = 3;
     repeated MetadataWriteRequest updateObjects = 4;
     repeated MetadataWriteRequest updateTags = 5;
+    repeated MetadataWriteRequest preallocateIds = 6;
 };
 
 
@@ -681,6 +584,7 @@ message MetadataWriteBatchResponse {
  * @see UniversalMetadataWriteBatchRequest
  */
 message UniversalMetadataWriteBatchResponse {
+     repeated metadata.TagHeader preallocatedIdHeaders = 1;
      repeated metadata.TagHeader preallocatedObjectHeaders = 2;
      repeated metadata.TagHeader createObjectHeaders = 3;
      repeated metadata.TagHeader updateObjectHeaders = 4;
