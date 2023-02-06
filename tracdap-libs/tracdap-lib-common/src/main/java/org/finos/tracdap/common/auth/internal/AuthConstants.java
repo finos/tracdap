@@ -26,12 +26,15 @@ public class AuthConstants {
     public static final String TRAC_AUTH_USER = "trac_auth_user";
     public static final String TRAC_DELEGATE = "trac_delegate";
 
-    public static final Metadata.Key<String> TRAC_AUTH_TOKEN_KEY =
+    // Restrict access to the gRPC context keys to the auth.internal package
+    // Access is through AuthHelpers.currentUser() and AuthHelpers.currentSystemUser()
+
+    static final Metadata.Key<String> TRAC_AUTH_TOKEN_KEY =
             Metadata.Key.of(TRAC_AUTH_TOKEN, Metadata.ASCII_STRING_MARSHALLER);
 
-    public static final Context.Key<UserInfo> TRAC_AUTH_USER_KEY =
+    static final Context.Key<UserInfo> TRAC_AUTH_USER_KEY =
             Context.key(TRAC_AUTH_USER);
 
-    public static final Context.Key<UserInfo> TRAC_DELEGATE_KEY =
+    static final Context.Key<UserInfo> TRAC_DELEGATE_KEY =
             Context.key(TRAC_DELEGATE);
 }

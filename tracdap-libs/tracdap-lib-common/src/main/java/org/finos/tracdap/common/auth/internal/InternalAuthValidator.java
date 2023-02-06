@@ -105,12 +105,12 @@ public class InternalAuthValidator implements ServerInterceptor {
         if (authConfig.getDisableSigning()) {
             log.warn("AUTHENTICATE: {}() [{}] SUCCEEDED WITHOUT VALIDATION",
                     call.getMethodDescriptor().getBareMethodName(),
-                    AuthHelpers.printUserInfoWithDelegate(userInfo, delegate));
+                    AuthHelpers.printCurrentUser(userInfo, delegate));
         }
         else {
             log.info("AUTHENTICATE: {}() [{}] SUCCEEDED",
                     call.getMethodDescriptor().getBareMethodName(),
-                    AuthHelpers.printUserInfoWithDelegate(userInfo, delegate));
+                    AuthHelpers.printCurrentUser(userInfo, delegate));
         }
 
         // Auth complete, put details into the current call context

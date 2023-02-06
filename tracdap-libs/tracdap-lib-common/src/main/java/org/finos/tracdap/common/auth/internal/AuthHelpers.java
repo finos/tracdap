@@ -46,19 +46,34 @@ public class AuthHelpers {
         throw new EAuthorization("User details are not available");
     }
 
-    public static String printUserInfo(UserInfo userInfo) {
+    public static String printCurrentUser() {
 
-        return String.format("%s <%s>", userInfo.getDisplayName(), userInfo.getUserId());
+        var authUser = AuthConstants.TRAC_AUTH_USER_KEY.get();
+        var delegate = AuthConstants.TRAC_DELEGATE_KEY.get();
+
+        return printCurrentUser(authUser, delegate);
     }
 
-    public static String printUserInfoWithDelegate(UserInfo userInfo, UserInfo delegate) {
+    public static String printCurrentAuthUser() {
+
+        var authUser = AuthConstants.TRAC_AUTH_USER_KEY.get();
+
+        return printCurrentAuthUser(authUser);
+    }
+
+    static String printCurrentAuthUser(UserInfo authUser) {
+
+        return String.format("%s <%s>", authUser.getDisplayName(), authUser.getUserId());
+    }
+
+    static String printCurrentUser(UserInfo authUser, UserInfo delegate) {
 
         if (delegate != null)
             return String.format("%s <%s> on behalf of %s <%s>",
-                    userInfo.getDisplayName(), userInfo.getUserId(),
+                    authUser.getDisplayName(), authUser.getUserId(),
                     delegate.getDisplayName(), delegate.getUserId());
 
         else
-            return String.format("%s <%s>", userInfo.getDisplayName(), userInfo.getUserId());
+            return String.format("%s <%s>", authUser.getDisplayName(), authUser.getUserId());
     }
 }
