@@ -21,9 +21,10 @@ import org.finos.tracdap.api.TracDataApiGrpc;
 import org.finos.tracdap.api.TracMetadataApiGrpc;
 import org.finos.tracdap.api.TracOrchestratorApiGrpc;
 import org.finos.tracdap.api.TrustedMetadataApiGrpc;
-import org.finos.tracdap.common.auth.GrpcClientAuth;
+import org.finos.tracdap.common.auth.internal.ClientAuthProvider;
 import org.finos.tracdap.common.auth.external.AuthLogic;
 import org.finos.tracdap.common.auth.internal.JwtProcessor;
+import org.finos.tracdap.common.auth.internal.JwtSetup;
 import org.finos.tracdap.common.auth.internal.UserInfo;
 import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.config.ConfigManager;
@@ -148,32 +149,32 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
 
     public TracMetadataApiGrpc.TracMetadataApiFutureStub metaClientFuture() {
         var client = TracMetadataApiGrpc.newFutureStub(metaChannel);
-        return GrpcClientAuth.applyIfAvailable(client, authToken);
+        return ClientAuthProvider.applyIfAvailable(client, authToken);
     }
 
     public TracMetadataApiGrpc.TracMetadataApiBlockingStub metaClientBlocking() {
         var client = TracMetadataApiGrpc.newBlockingStub(metaChannel);
-        return GrpcClientAuth.applyIfAvailable(client, authToken);
+        return ClientAuthProvider.applyIfAvailable(client, authToken);
     }
 
     public TrustedMetadataApiGrpc.TrustedMetadataApiBlockingStub metaClientTrustedBlocking() {
         var client = TrustedMetadataApiGrpc.newBlockingStub(metaChannel);
-        return GrpcClientAuth.applyIfAvailable(client, authToken);
+        return ClientAuthProvider.applyIfAvailable(client, authToken);
     }
 
     public TracDataApiGrpc.TracDataApiStub dataClient() {
         var client = TracDataApiGrpc.newStub(dataChannel);
-        return GrpcClientAuth.applyIfAvailable(client, authToken);
+        return ClientAuthProvider.applyIfAvailable(client, authToken);
     }
 
     public TracDataApiGrpc.TracDataApiBlockingStub dataClientBlocking() {
         var client = TracDataApiGrpc.newBlockingStub(dataChannel);
-        return GrpcClientAuth.applyIfAvailable(client, authToken);
+        return ClientAuthProvider.applyIfAvailable(client, authToken);
     }
 
     public TracOrchestratorApiGrpc.TracOrchestratorApiBlockingStub orchClientBlocking() {
         var client = TracOrchestratorApiGrpc.newBlockingStub(orchChannel);
-        return GrpcClientAuth.applyIfAvailable(client, authToken);
+        return ClientAuthProvider.applyIfAvailable(client, authToken);
     }
 
     public Path storageRootDir() {
@@ -337,13 +338,9 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         configMgr.prepareSecrets();
 
         var platformConfig = configMgr.loadRootConfigObject(PlatformConfig.class);
-        var platformInfo = platformConfig.getPlatformInfo();
         var authConfig = platformConfig.getAuthentication();
 
-        var publicKey = configMgr.loadPublicKey(ConfigKeys.TRAC_AUTH_PUBLIC_KEY);
-        var privateKey = configMgr.loadPrivateKey(ConfigKeys.TRAC_AUTH_PRIVATE_KEY);
-        var keyPair = new KeyPair(publicKey, privateKey);
-        var jwt = JwtProcessor.configure(authConfig, platformInfo, keyPair);
+        var jwt = JwtSetup.createProcessor(platformConfig, configMgr);
 
         var userInfo = new UserInfo();
         userInfo.setUserId("platform_testing");
