@@ -21,6 +21,7 @@ import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.config.AuthenticationConfig;
+import org.finos.tracdap.config.GatewayConfig;
 import org.finos.tracdap.config.PlatformConfig;
 import org.finos.tracdap.config.PlatformInfo;
 
@@ -41,7 +42,30 @@ public class JwtSetup {
 
     private static final Logger log = LoggerFactory.getLogger(JwtSetup.class);
 
-    public static JwtProcessor createProcessor(AuthenticationConfig authConfig, PlatformInfo platformInfo, ConfigManager configManager) {
+    public static JwtProcessor createProcessor(
+            PlatformConfig platformConfig,
+            ConfigManager configManager) {
+
+        return createProcessor(
+                platformConfig.getAuthentication(),
+                platformConfig.getPlatformInfo(),
+                configManager);
+    }
+
+    public static JwtProcessor createProcessor(
+            GatewayConfig gatewayConfig,
+            ConfigManager configManager) {
+
+        return createProcessor(
+                gatewayConfig.getAuthentication(),
+                gatewayConfig.getPlatformInfo(),
+                configManager);
+    }
+
+    private static JwtProcessor createProcessor(
+            AuthenticationConfig authConfig,
+            PlatformInfo platformInfo,
+            ConfigManager configManager) {
 
         // Allow disabling signing in non-prod environments only
         if (authConfig.getDisableSigning()) {
@@ -88,7 +112,7 @@ public class JwtSetup {
                 configManager);
     }
 
-    public static JwtValidator createValidator(
+    private static JwtValidator createValidator(
             AuthenticationConfig authConfig,
             PlatformInfo platformInfo,
             ConfigManager configManager) {
