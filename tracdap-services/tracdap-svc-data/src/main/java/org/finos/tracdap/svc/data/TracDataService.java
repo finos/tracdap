@@ -153,7 +153,7 @@ public class TracDataService extends CommonServiceBase {
             // Check default storage and format are available
             checkDefaultStorageAndFormat(storage, formats, storageConfig);
 
-            var tokenProcessor = JwtSetup.createProcessor(platformConfig.getAuthentication(), platformConfig.getPlatformInfo(), configManager);
+            var tokenProcessor = JwtSetup.createProcessor(platformConfig, configManager);
             var internalAuth = new InternalAuthProvider(tokenProcessor, platformConfig.getAuthentication());
             var metaClient = prepareMetadataClient(platformConfig, clientChannelType);
 
