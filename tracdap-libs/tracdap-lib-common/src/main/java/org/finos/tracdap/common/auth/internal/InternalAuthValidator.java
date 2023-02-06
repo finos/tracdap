@@ -16,9 +16,6 @@
 
 package org.finos.tracdap.common.auth.internal;
 
-import org.finos.tracdap.common.auth.AuthConstants;
-import org.finos.tracdap.common.auth.AuthHelpers;
-import org.finos.tracdap.common.auth.UserInfo;
 import org.finos.tracdap.config.AuthenticationConfig;
 
 import io.grpc.*;

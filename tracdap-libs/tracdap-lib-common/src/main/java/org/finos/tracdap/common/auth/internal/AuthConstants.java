@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Accenture Global Solutions Limited
+ * Copyright 2023 Accenture Global Solutions Limited
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,9 +14,7 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.auth;
-
-import org.finos.tracdap.common.auth.internal.UserInfo;
+package org.finos.tracdap.common.auth.internal;
 
 import io.grpc.Context;
 import io.grpc.Metadata;
@@ -25,15 +23,15 @@ import io.grpc.Metadata;
 public class AuthConstants {
 
     public static final String TRAC_AUTH_TOKEN = "trac_auth_token";
-    public static final String TRAC_USER_INFO = "user_info";
+    public static final String TRAC_AUTH_USER = "trac_auth_user";
+    public static final String TRAC_DELEGATE = "trac_delegate";
 
-    public static final Metadata.Key<String> AUTH_TOKEN_METADATA_KEY =
+    public static final Metadata.Key<String> TRAC_AUTH_TOKEN_KEY =
             Metadata.Key.of(TRAC_AUTH_TOKEN, Metadata.ASCII_STRING_MARSHALLER);
 
-    public static final Context.Key<String> AUTH_TOKEN_KEY =
-            Context.key(TRAC_AUTH_TOKEN);
+    public static final Context.Key<UserInfo> TRAC_AUTH_USER_KEY =
+            Context.key(TRAC_AUTH_USER);
 
-    public static final Context.Key<UserInfo> USER_INFO_KEY =
-            Context.key(TRAC_USER_INFO);
-
+    public static final Context.Key<UserInfo> TRAC_DELEGATE_KEY =
+            Context.key(TRAC_DELEGATE);
 }

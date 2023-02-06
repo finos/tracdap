@@ -19,7 +19,6 @@ package org.finos.tracdap.common.auth.internal;
 import com.auth0.jwt.HeaderParams;
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.algorithms.Algorithm;
-import org.finos.tracdap.common.auth.SessionInfo;
 import org.finos.tracdap.config.AuthenticationConfig;
 
 import java.util.Map;

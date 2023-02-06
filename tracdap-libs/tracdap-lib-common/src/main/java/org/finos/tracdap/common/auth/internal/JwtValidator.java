@@ -16,8 +16,6 @@
 
 package org.finos.tracdap.common.auth.internal;
 
-import org.finos.tracdap.common.auth.SessionInfo;
-import org.finos.tracdap.common.auth.UserInfo;
 import org.finos.tracdap.config.AuthenticationConfig;
 import org.finos.tracdap.common.config.ConfigDefaults;
 

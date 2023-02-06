@@ -19,9 +19,6 @@ package org.finos.tracdap.common.auth.internal;
 import io.grpc.CallCredentials;
 import io.grpc.Metadata;
 import io.grpc.Status;
-import org.finos.tracdap.common.auth.AuthConstants;
-import org.finos.tracdap.common.auth.SessionInfo;
-import org.finos.tracdap.common.auth.UserInfo;
 import org.finos.tracdap.config.AuthenticationConfig;
 
 import java.time.Duration;
