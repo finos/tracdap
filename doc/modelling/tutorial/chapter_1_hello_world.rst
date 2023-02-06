@@ -122,7 +122,7 @@ to be configured in the system config. We still need to supply a config file tho
     :caption: sys_config.yaml
     :name: hello_world_sys_config
 
-    # No system config needed!
+    # The file can be empty, but you need to supply it!
 
 
 Run the model
