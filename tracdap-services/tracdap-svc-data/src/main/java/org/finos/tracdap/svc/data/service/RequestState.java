@@ -16,6 +16,8 @@
 
 package org.finos.tracdap.svc.data.service;
 
+import io.grpc.CallCredentials;
+import org.finos.tracdap.common.auth.internal.UserInfo;
 import org.finos.tracdap.metadata.*;
 
 import java.time.Instant;
@@ -24,9 +26,9 @@ import java.util.List;
 
 class RequestState {
 
-    String authToken;
-
-    Instant objectTimestamp;
+    UserInfo requestOwner;
+    Instant requestTimestamp;
+    CallCredentials credentials;
 
     List<TagUpdate> dataTags;
     List<TagUpdate> fileTags;
