@@ -17,7 +17,8 @@
 package org.finos.tracdap.svc.data.service;
 
 import org.finos.tracdap.api.*;
-import org.finos.tracdap.common.auth.GrpcClientAuth;
+import org.finos.tracdap.common.auth.internal.UserInfo;
+import org.finos.tracdap.common.auth.internal.InternalAuthProvider;
 import org.finos.tracdap.common.concurrent.Futures;
 import org.finos.tracdap.common.data.ArrowSchema;
 import org.finos.tracdap.common.data.DataPipeline;
@@ -42,9 +43,11 @@ import org.apache.arrow.memory.BufferAllocator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -62,6 +65,8 @@ public class DataService {
     private static final String DATA_ITEM_TEMPLATE = "data/%s/%s/%s/snap-%d/delta-%d";
     private static final String STORAGE_PATH_TEMPLATE = "data/%s/%s/%s/snap-%d/delta-%d-x%06x";
 
+    private static final Duration DATA_OPERATION_TIMEOUT = Duration.of(1, ChronoUnit.HOURS);
+
     private final Logger log = LoggerFactory.getLogger(getClass());
 
     private final StorageConfig storageConfig;
@@ -70,6 +75,7 @@ public class DataService {
     private final IStorageManager storageManager;
     private final ICodecManager codecManager;
     private final TrustedMetadataApiGrpc.TrustedMetadataApiFutureStub metaClient;
+    private final InternalAuthProvider internalAuth;
 
     private final Validator validator = new Validator();
     private final Random random = new Random();
@@ -80,7 +86,8 @@ public class DataService {
             BufferAllocator arrowAllocator,
             IStorageManager storageManager,
             ICodecManager codecManager,
-            TrustedMetadataApiGrpc.TrustedMetadataApiFutureStub metaClient) {
+            TrustedMetadataApiGrpc.TrustedMetadataApiFutureStub metaClient,
+            InternalAuthProvider internalAuth) {
 
         this.storageConfig = storageConfig;
         this.tenantConfig = tenantConfig;
@@ -88,18 +95,23 @@ public class DataService {
         this.storageManager = storageManager;
         this.codecManager = codecManager;
         this.metaClient = metaClient;
+        this.internalAuth = internalAuth;
     }
 
     public CompletionStage<TagHeader> createDataset(
             DataWriteRequest request,
             Flow.Publisher<ByteBuf> contentStream,
             IExecutionContext execCtx,
-            String authToken) {
+            UserInfo userInfo) {
 
         var dataCtx = new DataContext(execCtx.eventLoopExecutor(), arrowAllocator);
+
         var state = new RequestState();
-        state.authToken = authToken;
-        var objectTimestamp = Instant.now().atOffset(ZoneOffset.UTC);
+        state.requestOwner = userInfo;
+        state.requestTimestamp = Instant.now();
+        state.credentials = internalAuth.createDelegateSession(state.requestOwner, DATA_OPERATION_TIMEOUT);
+
+        var objectTimestamp = state.requestTimestamp.atOffset(ZoneOffset.UTC);
 
         // Look up the requested data codec
         // If the codec is unknown the request will fail right away
@@ -144,14 +156,17 @@ public class DataService {
             DataWriteRequest request,
             Flow.Publisher<ByteBuf> contentStream,
             IExecutionContext execCtx,
-            String authToken) {
+            UserInfo userInfo) {
 
         var dataCtx = new DataContext(execCtx.eventLoopExecutor(), arrowAllocator);
+
         var state = new RequestState();
-        state.authToken = authToken;
+        state.requestOwner = userInfo;
+        state.requestTimestamp = Instant.now();
+        state.credentials = internalAuth.createDelegateSession(state.requestOwner, DATA_OPERATION_TIMEOUT);
+
         var prior = new RequestState();
-        prior.authToken = authToken;
-        var objectTimestamp = Instant.now().atOffset(ZoneOffset.UTC);
+        var objectTimestamp = state.requestTimestamp.atOffset(ZoneOffset.UTC);
 
         // Look up the requested data codec
         // If the codec is unknown the request will fail right away
@@ -202,11 +217,14 @@ public class DataService {
             CompletableFuture<SchemaDefinition> schema,
             Flow.Subscriber<ByteBuf> contentStream,
             IExecutionContext execCtx,
-            String authToken) {
+            UserInfo userInfo) {
 
         var dataCtx = new DataContext(execCtx.eventLoopExecutor(), arrowAllocator);
+
         var state = new RequestState();
-        state.authToken = authToken;
+        state.requestOwner = userInfo;
+        state.requestTimestamp = Instant.now();
+        state.credentials = internalAuth.createDelegateSession(state.requestOwner, DATA_OPERATION_TIMEOUT);
 
         var codec = codecManager.getCodec(request.getFormat());
         var codecOptions = Map.<String, String>of();
@@ -236,7 +254,7 @@ public class DataService {
 
     private CompletionStage<Void> loadMetadata(String tenant, TagSelector dataSelector, RequestState state) {
 
-        var client = GrpcClientAuth.applyIfAvailable(metaClient, state.authToken);
+        var client = metaClient.withCallCredentials(state.credentials);
         var request = MetadataBuilders.requestForSelector(tenant, dataSelector);
 
         return Futures.javaFuture(client.readObject(request))
@@ -251,7 +269,7 @@ public class DataService {
 
     private CompletionStage<Void> loadStorageAndExternalSchema(String tenant, RequestState state) {
 
-        var client = GrpcClientAuth.applyIfAvailable(metaClient, state.authToken);
+        var client = metaClient.withCallCredentials(state.credentials);
         var request = MetadataBuilders.requestForBatch(tenant, state.data.getStorageId(), state.data.getSchemaId());
 
         return Futures.javaFuture(client.readBatch(request))
@@ -270,7 +288,7 @@ public class DataService {
 
     private CompletionStage<Void> loadStorageAndEmbeddedSchema(String tenant, RequestState state) {
 
-        var client = GrpcClientAuth.applyIfAvailable(metaClient, state.authToken);
+        var client = metaClient.withCallCredentials(state.credentials);
         var request = MetadataBuilders.requestForSelector(tenant, state.data.getStorageId());
 
         return Futures.javaFuture(client.readObject(request))
@@ -286,7 +304,7 @@ public class DataService {
 
     private CompletionStage<SchemaDefinition> resolveSchema(DataWriteRequest request, RequestState state) {
 
-        var client = GrpcClientAuth.applyIfAvailable(metaClient, state.authToken);
+        var client = metaClient.withCallCredentials(state.credentials);
 
         if (request.hasSchema()) {
             state.schema = request.getSchema();
@@ -332,7 +350,7 @@ public class DataService {
 
     private CompletionStage<Void> preallocateIds(DataWriteRequest request, RequestState state) {
 
-        var client = GrpcClientAuth.applyIfAvailable(metaClient, state.authToken);
+        var client = metaClient.withCallCredentials(state.credentials);
 
         var preAllocDataReq = MetadataBuilders.preallocateRequest(request.getTenant(), ObjectType.DATA);
         var preAllocStorageReq = MetadataBuilders.preallocateRequest(request.getTenant(), ObjectType.STORAGE);
@@ -348,7 +366,7 @@ public class DataService {
 
     private CompletionStage<TagHeader> saveMetadata(DataWriteRequest request, RequestState state) {
 
-        var client = GrpcClientAuth.applyIfAvailable(metaClient, state.authToken);
+        var client = metaClient.withCallCredentials(state.credentials);
 
         var priorStorageId = selectorFor(state.preAllocStorageId);
         var storageReq = MetadataBuilders.buildCreateObjectReq(request.getTenant(), priorStorageId, state.storage, state.storageTags);
@@ -362,7 +380,7 @@ public class DataService {
 
     private CompletionStage<TagHeader> saveMetadata(DataWriteRequest request, RequestState state, RequestState prior) {
 
-        var client = GrpcClientAuth.applyIfAvailable(metaClient, state.authToken);
+        var client = metaClient.withCallCredentials(state.credentials);
 
         var priorStorageId = selectorFor(prior.storageId);
         var storageReq = MetadataBuilders.buildCreateObjectReq(request.getTenant(), priorStorageId, state.storage, state.storageTags);
