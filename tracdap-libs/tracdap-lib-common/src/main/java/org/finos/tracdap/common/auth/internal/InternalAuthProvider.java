@@ -16,7 +16,6 @@
 
 package org.finos.tracdap.common.auth.internal;
 
-import io.grpc.CallCredentials;
 import org.finos.tracdap.config.AuthenticationConfig;
 
 import java.time.Duration;
@@ -64,7 +63,7 @@ public class InternalAuthProvider {
         this.systemTicketRefresh = systemTicketRefresh;
     }
 
-    public CallCredentials createDelegateSession(UserInfo delegate, Duration sessionTimeout) {
+    public InternalCallCredentials createDelegateSession(UserInfo delegate, Duration sessionTimeout) {
 
         var issue = Instant.now();
         var expiry = issue.plus(systemTicketDuration);
@@ -81,5 +80,9 @@ public class InternalAuthProvider {
                 systemTicketDuration,
                 systemTicketRefresh,
                 session, tokenProcessor);
+    }
+
+    public void setTokenProcessor(InternalCallCredentials callCredentials) {
+        callCredentials.setTokenProcessor(tokenProcessor);
     }
 }

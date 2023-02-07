@@ -53,9 +53,8 @@ public class InternalCallCredentials extends CallCredentials implements Serializ
         this.tokenProcessor = tokenProcessor;
     }
 
-    public InternalCallCredentials useTokenProcessor(JwtProcessor tokenProcessor) {
+    void setTokenProcessor(JwtProcessor tokenProcessor) {
         this.tokenProcessor = tokenProcessor;
-        return this;
     }
 
     @Override
