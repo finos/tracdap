@@ -17,14 +17,11 @@
 package org.finos.tracdap.common.auth.internal;
 
 import io.grpc.CallCredentials;
-import io.grpc.Metadata;
-import io.grpc.Status;
 import org.finos.tracdap.config.AuthenticationConfig;
 
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.concurrent.Executor;
 
 
 public class InternalAuthProvider {
@@ -70,65 +67,19 @@ public class InternalAuthProvider {
     public CallCredentials createDelegateSession(UserInfo delegate, Duration sessionTimeout) {
 
         var issue = Instant.now();
+        var expiry = issue.plus(systemTicketDuration);
         var limit = issue.plus(sessionTimeout);
-        return new DelegateSession(delegate, issue, limit);
-    }
 
-    private class DelegateSession extends CallCredentials {
+        var session = new SessionInfo();
+        session.setUserInfo(systemUser);
+        session.setDelegate(delegate);
+        session.setIssueTime(issue);
+        session.setExpiryTime(expiry);
+        session.setExpiryLimit(limit);
 
-        private final UserInfo delegate;
-        private final Instant limit;
-
-        private String token;
-        private Instant refresh;
-
-        private DelegateSession(UserInfo delegate, Instant issue, Instant limit) {
-
-            this.delegate = delegate;
-            this.limit = limit;
-
-            this.token = regenerateToken(issue);
-            this.refresh = issue.plus(systemTicketRefresh);
-        }
-
-        @Override
-        public void applyRequestMetadata(RequestInfo requestInfo, Executor appExecutor, MetadataApplier applier) {
-
-            var now = Instant.now();
-
-            if (now.isAfter(limit)) {
-                applier.fail(Status.UNAUTHENTICATED.withDescription("Session timed out"));
-                return;
-            }
-
-            if (now.isAfter(refresh))  {
-                token = regenerateToken(now);
-                refresh = now.plus(systemTicketRefresh);
-            }
-
-            var authHeaders = new Metadata();
-            authHeaders.put(AuthConstants.TRAC_AUTH_TOKEN_KEY, token);
-            applier.apply(authHeaders);
-        }
-
-        @Override
-        public void thisUsesUnstableApi() {
-
-        }
-
-        private String regenerateToken(Instant refreshTime) {
-
-            var expiryUnlimited = refreshTime.plus(systemTicketDuration);
-            var expiryTime = expiryUnlimited.isBefore(limit) ? expiryUnlimited : limit;
-
-            var session = new SessionInfo();
-            session.setUserInfo(systemUser);
-            session.setDelegate(delegate);
-            session.setIssueTime(refreshTime);
-            session.setExpiryTime(expiryTime);
-            session.setExpiryLimit(limit);
-
-            return tokenProcessor.encodeToken(session);
-        }
+        return new InternalCallCredentials(
+                systemTicketDuration,
+                systemTicketRefresh,
+                session, tokenProcessor);
     }
 }
