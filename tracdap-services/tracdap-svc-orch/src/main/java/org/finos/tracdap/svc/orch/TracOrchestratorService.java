@@ -136,7 +136,7 @@ public class TracOrchestratorService extends CommonServiceBase {
             jobExecutor.start();
             jobManager.start();
 
-            var orchestrator = new JobApiService(jobManager, jobProcessor);
+            var orchestrator = new JobApiService(jobManager, jobProcessor, internalAuth);
             var orchestratorApi = new TracOrchestratorApi(orchestrator);
 
             this.server = NettyServerBuilder

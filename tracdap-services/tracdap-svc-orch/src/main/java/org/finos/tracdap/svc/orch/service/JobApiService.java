@@ -18,6 +18,7 @@ package org.finos.tracdap.svc.orch.service;
 
 import org.finos.tracdap.api.*;
 import org.finos.tracdap.common.auth.internal.AuthHelpers;
+import org.finos.tracdap.common.auth.internal.InternalAuthProvider;
 import org.finos.tracdap.common.exception.EMetadataNotFound;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.metadata.MetadataUtil;
@@ -26,23 +27,31 @@ import org.finos.tracdap.metadata.JobStatusCode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.time.Duration;
+import java.time.temporal.ChronoUnit;
+
 
 public class JobApiService {
+
+    private static final Duration JOB_VALIDATION_DURATION = Duration.of(1, ChronoUnit.MINUTES);
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
     private final JobManager jobManager;
     private final JobProcessor jobProcessor;
+    private final InternalAuthProvider internalAuth;
 
-    public JobApiService(JobManager jobManager, JobProcessor jobProcessor) {
+    public JobApiService(JobManager jobManager, JobProcessor jobProcessor, InternalAuthProvider internalAuth) {
 
         this.jobManager = jobManager;
         this.jobProcessor = jobProcessor;
+        this.internalAuth = internalAuth;
     }
 
     public JobStatus validateJob(JobRequest request) {
 
         var jobState = newJob(request);
+        jobState.credentials = internalAuth.createDelegateSession(jobState.owner, JOB_VALIDATION_DURATION);
 
         jobState = jobProcessor.assembleAndValidate(jobState);
 
@@ -52,6 +61,9 @@ public class JobApiService {
     public JobStatus submitJob(JobRequest request) {
 
         var jobState = newJob(request);
+
+        // These credentials are just for validation - job manager will allocate a longer session
+        jobState.credentials = internalAuth.createDelegateSession(jobState.owner, JOB_VALIDATION_DURATION);
 
         jobState = jobProcessor.assembleAndValidate(jobState);
         jobState = jobManager.addNewJob(jobState);
