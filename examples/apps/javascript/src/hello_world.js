@@ -33,7 +33,7 @@ export function createSchema() {
         table: {
             fields: [
                 {
-                    fieldName: "customer_id", fieldType: tracdap.STRING, businessKey: true,
+                    fieldName: "customer_id", fieldType: tracdap.STRING, businessKey: true, notNull: true,
                     label: "Unique customer account number"
                 },
                 {
