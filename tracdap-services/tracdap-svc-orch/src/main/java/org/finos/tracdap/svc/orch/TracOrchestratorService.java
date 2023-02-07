@@ -17,8 +17,9 @@
 package org.finos.tracdap.svc.orch;
 
 import org.finos.tracdap.api.TrustedMetadataApiGrpc;
-import org.finos.tracdap.common.auth.AuthSetup;
-import org.finos.tracdap.common.auth.GrpcServerAuth;
+import org.finos.tracdap.common.auth.internal.InternalAuthProvider;
+import org.finos.tracdap.common.auth.internal.JwtSetup;
+import org.finos.tracdap.common.auth.internal.InternalAuthValidator;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.common.grpc.ErrorMappingInterceptor;
@@ -118,6 +119,9 @@ public class TracOrchestratorService extends CommonServiceBase {
                     .newBlockingStub(clientChannel)
                     .withInterceptors(new LoggingClientInterceptor(JobLifecycle.class));
 
+            var jwtProcessor = JwtSetup.createProcessor(platformConfig, configManager);
+            var internalAuth = new InternalAuthProvider(jwtProcessor, platformConfig.getAuthentication());
+
             jobExecutor = pluginManager.createService(
                     IBatchExecutor.class,
                     platformConfig.getExecutor(),
@@ -127,7 +131,7 @@ public class TracOrchestratorService extends CommonServiceBase {
 
             var jobLifecycle = new JobLifecycle(platformConfig, metaClient);
             var jobProcessor = new JobProcessor(metaClient, jobExecutor, jobLifecycle);
-            jobManager = new JobManager(platformConfig, jobProcessor, jobCache, serviceGroup);
+            jobManager = new JobManager(platformConfig, jobProcessor, jobCache, serviceGroup, internalAuth);
 
             jobExecutor.start();
             jobManager.start();
@@ -135,12 +139,10 @@ public class TracOrchestratorService extends CommonServiceBase {
             var orchestrator = new JobApiService(jobManager, jobProcessor);
             var orchestratorApi = new TracOrchestratorApi(orchestrator);
 
-            var jwtValidator = AuthSetup.createValidator(platformConfig, configManager);
-
             this.server = NettyServerBuilder
                     .forPort(orchestratorConfig.getPort())
                     .intercept(new LoggingServerInterceptor(TracOrchestratorService.class))
-                    .intercept(new GrpcServerAuth(platformConfig.getAuthentication(), jwtValidator))
+                    .intercept(new InternalAuthValidator(platformConfig.getAuthentication(), jwtProcessor))
                     .intercept(new ErrorMappingInterceptor())
                     .addService(orchestratorApi)
 
