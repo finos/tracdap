@@ -21,7 +21,7 @@ import io.netty.channel.ChannelPromise;
 import io.netty.handler.codec.http.websocketx.TextWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.WebSocketServerProtocolConfig;
 import org.finos.tracdap.common.auth.external.*;
-import org.finos.tracdap.common.auth.internal.JwtProcessor;
+import org.finos.tracdap.common.auth.internal.JwtSetup;
 import org.finos.tracdap.common.auth.internal.UserInfo;
 import org.finos.tracdap.config.AuthenticationConfig;
 import org.finos.tracdap.config.GatewayConfig;
@@ -84,10 +84,7 @@ public class ProtocolNegotiatorTest {
                 .build();
 
         var authProvider = new DummyAuthProvider();
-        var jwtProcessor = JwtProcessor.configure(
-                gatewayConfig.getAuthentication(),
-                gatewayConfig.getPlatformInfo(),
-                null);
+        var jwtProcessor = JwtSetup.createProcessor(gatewayConfig, /* config manager */ null);
 
         // The protocol negotiator is the top level initializer for new inbound connections
         var protocolNegotiator = new ProtocolNegotiator(
