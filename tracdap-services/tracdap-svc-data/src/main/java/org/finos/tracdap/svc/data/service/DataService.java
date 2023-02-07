@@ -166,6 +166,8 @@ public class DataService {
         state.credentials = internalAuth.createDelegateSession(state.requestOwner, DATA_OPERATION_TIMEOUT);
 
         var prior = new RequestState();
+        prior.credentials = state.credentials;
+
         var objectTimestamp = state.requestTimestamp.atOffset(ZoneOffset.UTC);
 
         // Look up the requested data codec

@@ -194,6 +194,7 @@ public class FileService {
         state.storageTags = List.of();   // Storage tags is empty to start with
 
         var prior = new RequestState();
+        prior.credentials = state.credentials;
 
         // Currently tenant config is optional for single-tenant deployments, fall back to global defaults
         var bucket = tenantConfig.containsKey(tenant) && tenantConfig.get(tenant).hasDefaultBucket()
