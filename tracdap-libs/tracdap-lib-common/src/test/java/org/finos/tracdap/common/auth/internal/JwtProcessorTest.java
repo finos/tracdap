@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Accenture Global Solutions Limited
+ * Copyright 2023 Accenture Global Solutions Limited
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,11 +14,9 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.auth;
+package org.finos.tracdap.common.auth.internal;
 
 import org.finos.tracdap.common.auth.external.AuthLogic;
-import org.finos.tracdap.common.auth.internal.JwtProcessor;
-import org.finos.tracdap.common.auth.internal.UserInfo;
 import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.config.AuthenticationConfig;
 
@@ -72,7 +70,7 @@ public class JwtProcessorTest {
     @BeforeEach
     void setupJwt() {
 
-        jwt = JwtProcessor.configure(authConfig, platformInfo, keyPair);
+        jwt = JwtSetup.createProcessor(authConfig, platformInfo, keyPair);
     }
 
     @Test
@@ -132,7 +130,7 @@ public class JwtProcessorTest {
 
         var altKeyPair = keyGen.generateKeyPair();
 
-        var altJwt = JwtProcessor.configure(authConfig, platformInfo, altKeyPair);
+        var altJwt = JwtSetup.createProcessor(authConfig, platformInfo, altKeyPair);
 
         var userInfo = new UserInfo();
         userInfo.setUserId("fb2876");
@@ -159,7 +157,7 @@ public class JwtProcessorTest {
                 .setJwtExpiry(7200)
                 .build();
 
-        var altJwt = JwtProcessor.configure(altAuthConfig, platformInfo, keyPair);
+        var altJwt = JwtSetup.createProcessor(altAuthConfig, platformInfo, keyPair);
 
         var userInfo = new UserInfo();
         userInfo.setUserId("fb2876");
@@ -186,7 +184,7 @@ public class JwtProcessorTest {
                 .setJwtExpiry(1)
                 .build();
 
-        var altJwt = JwtProcessor.configure(altAuthConfig, platformInfo, keyPair);
+        var altJwt = JwtSetup.createProcessor(altAuthConfig, platformInfo, keyPair);
 
         var userInfo = new UserInfo();
         userInfo.setUserId("fb2876");
@@ -213,7 +211,7 @@ public class JwtProcessorTest {
                 .setProduction(false)
                 .build();
 
-        var altJwt = JwtProcessor.configure(altAuthConfig, altEnvironment, keyPair);
+        var altJwt = JwtSetup.createProcessor(altAuthConfig, altEnvironment, keyPair);
 
         var userInfo = new UserInfo();
         userInfo.setUserId("fb2876");
@@ -235,6 +233,6 @@ public class JwtProcessorTest {
                 .setDisableSigning(true)
                 .build();
 
-        Assertions.assertThrows(EStartup.class, () -> JwtProcessor.configure(altAuthConfig, platformInfo, keyPair));
+        Assertions.assertThrows(EStartup.class, () -> JwtSetup.createProcessor(altAuthConfig, platformInfo, keyPair));
     }
 }

@@ -67,39 +67,15 @@ public class JwtSetup {
             PlatformInfo platformInfo,
             ConfigManager configManager) {
 
-        // Allow disabling signing in non-prod environments only
-        if (authConfig.getDisableSigning()) {
-
-            if (platformInfo.getProduction()) {
-
-                var message = String.format(
-                        "Token signing must be enabled in production environment [%s]",
-                        platformInfo.getEnvironment());
-
-                throw new EStartup(message);
-            }
-
-            return new JwtProcessor(authConfig, Algorithm.none());
+        if (configManager.hasSecret(ConfigKeys.TRAC_AUTH_PUBLIC_KEY) && configManager.hasSecret(ConfigKeys.TRAC_AUTH_PRIVATE_KEY)) {
+            var publicKey = configManager.loadPublicKey(ConfigKeys.TRAC_AUTH_PUBLIC_KEY);
+            var privateKey = configManager.loadPrivateKey(ConfigKeys.TRAC_AUTH_PRIVATE_KEY);
+            var keyPair = new KeyPair(publicKey, privateKey);
+            return createProcessor(authConfig, platformInfo, keyPair);
         }
-
-        if (!configManager.hasSecret(ConfigKeys.TRAC_AUTH_PUBLIC_KEY) ||
-            !configManager.hasSecret(ConfigKeys.TRAC_AUTH_PRIVATE_KEY)) {
-
-            // Allowing the service to run without validating authentication is hugely risky
-            // Especially because claims can still be added to JWT
-            // The auth-tool utility makes it really easy to set up auth keys on local JKS
-
-            var error = "Root authentication keys are not available, the service will not start";
-            log.error(error);
-            throw new EStartup(error);
+        else {
+            return createProcessor(authConfig, platformInfo, (KeyPair) null);
         }
-
-        var publicKey = configManager.loadPublicKey(ConfigKeys.TRAC_AUTH_PUBLIC_KEY);
-        var privateKey = configManager.loadPrivateKey(ConfigKeys.TRAC_AUTH_PRIVATE_KEY);
-        var keyPair = new KeyPair(publicKey, privateKey);
-
-        var algorithm = chooseAlgorithm(keyPair);
-        return new JwtProcessor(authConfig, algorithm);
     }
 
     public static JwtValidator createValidator(
@@ -117,6 +93,75 @@ public class JwtSetup {
             PlatformInfo platformInfo,
             ConfigManager configManager) {
 
+        if (configManager.hasSecret(ConfigKeys.TRAC_AUTH_PUBLIC_KEY)) {
+            var publicKey = configManager.loadPublicKey(ConfigKeys.TRAC_AUTH_PUBLIC_KEY);
+            return createValidator(authConfig, platformInfo, publicKey);
+        }
+        else {
+            return createValidator(authConfig, platformInfo, (PublicKey) null);
+        }
+    }
+
+    public static JwtProcessor createProcessor(
+            AuthenticationConfig authConfig,
+            PlatformInfo platformInfo,
+            KeyPair keyPair) {
+
+        // Do not allow turning off the authentication mechanism in production!
+        checkProduction(authConfig, platformInfo);
+
+        if (authConfig.getDisableAuth()) {
+            log.warn("!!!!! AUTHENTICATION IS DISABLED (do not use this setting in production)");
+            return null;
+        }
+
+        if (authConfig.getDisableSigning()) {
+            log.warn("!!!!! SIGNATURE VALIDATION IS DISABLED (do not use this setting in production)");
+            return new JwtProcessor(authConfig, Algorithm.none());
+        }
+
+        // If the key pair is missing but signing is not disabled, this is an error
+        if (keyPair == null) {
+            var error = "Root authentication keys are not available, the service will not start";
+            log.error(error);
+            throw new EStartup(error);
+        }
+
+        var algorithm = chooseAlgorithm(keyPair);
+        return new JwtProcessor(authConfig, algorithm);
+    }
+
+    public static JwtValidator createValidator(
+            AuthenticationConfig authConfig,
+            PlatformInfo platformInfo,
+            PublicKey publicKey) {
+
+        // Do not allow turning off the authentication mechanism in production!
+        checkProduction(authConfig, platformInfo);
+
+        if (authConfig.getDisableAuth()) {
+            log.warn("!!!!! AUTHENTICATION IS DISABLED (do not use this setting in production)");
+            return null;
+        }
+
+        if (authConfig.getDisableSigning()) {
+            log.warn("!!!!! SIGNATURE VALIDATION IS DISABLED (do not use this setting in production)");
+            return new JwtValidator(authConfig, Algorithm.none());
+        }
+
+        // If the key pair is missing but signing is not disabled, this is an error
+        if (publicKey == null) {
+            var error = "Root authentication keys are not available, the service will not start";
+            log.error(error);
+            throw new EStartup(error);
+        }
+
+        var algorithm = chooseAlgorithm(publicKey);
+        return new JwtValidator(authConfig, algorithm);
+    }
+
+    private static void checkProduction(AuthenticationConfig authConfig, PlatformInfo platformInfo) {
+
         // Do not allow turning off the authentication mechanism in production!
         if (platformInfo.getProduction()) {
 
@@ -130,63 +175,6 @@ public class JwtSetup {
                 throw new EStartup(message);
             }
         }
-
-        if (authConfig.getDisableAuth()) {
-
-            log.warn("!!!!! AUTHENTICATION IS DISABLED (do not use this setting in production)");
-
-            return null;
-        }
-        else if (authConfig.getDisableSigning()) {
-
-            log.warn("!!!!! SIGNATURE VALIDATION IS DISABLED (do not use this setting in production)");
-
-            return createValidator(authConfig, platformInfo, (PublicKey) null);
-        }
-        else if (configManager.hasSecret(ConfigKeys.TRAC_AUTH_PUBLIC_KEY)) {
-
-            var publicKey = configManager.loadPublicKey(ConfigKeys.TRAC_AUTH_PUBLIC_KEY);
-            return createValidator(authConfig, platformInfo, publicKey);
-        }
-        else {
-
-            // Allowing the service to run without validating authentication is hugely risky
-            // Especially because claims can still be added to JWT
-            // The auth-tool utility makes it really easy to set up auth keys on local JKS
-
-            var error = "Root authentication keys are not available, the service will not start";
-            log.error(error);
-            throw new EStartup(error);
-        }
-    }
-
-    private static JwtValidator createValidator(
-            AuthenticationConfig authConfig,
-            PlatformInfo platformInfo,
-            PublicKey publicKey) {
-
-        // Allow disabling signing in non-prod environments only
-        if (authConfig.getDisableSigning()) {
-
-            if (platformInfo.getProduction()) {
-
-                var message = String.format(
-                        "Token signing must be enabled in production environment [%s]",
-                        platformInfo.getEnvironment());
-
-                throw new EStartup(message);
-            }
-
-            return new JwtValidator(authConfig, Algorithm.none());
-        }
-
-        // If the key pair is missing but signing is not disabled, this is an error
-        if (publicKey == null) {
-            throw new EStartup("Root authentication key is not available (do you need to run auth-tool)?");
-        }
-
-        var algorithm = chooseAlgorithm(publicKey);
-        return new JwtValidator(authConfig, algorithm);
     }
 
     private static Algorithm chooseAlgorithm(PublicKey publicKey) {
@@ -233,8 +221,8 @@ public class JwtSetup {
                 return Algorithm.RSA256((RSAPublicKey)  keyPair.getPublic(), (RSAPrivateKey) keyPair.getPrivate());
         }
 
-        var message = String.format("" +
-                        "Root authentication keys are not available, no JWT singing / validation algorithm for [algorithM: %s, key size: %s]",
+        var message = String.format(
+                "Root authentication key uses an unsupported algorith [algorithM: %s, key size: %s]",
                 keyAlgo, keySize);
 
         throw new EStartup(message);
