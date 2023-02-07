@@ -185,7 +185,7 @@ class CoreJobsTest(unittest.TestCase):
                     "customer_loans": meta.ModelInputSchema(meta.SchemaDefinition(
                         schemaType=meta.SchemaType.TABLE,
                         table=meta.TableSchema(fields=[
-                            meta.FieldSchema("id", fieldType=meta.BasicType.STRING, businessKey=True),
+                            meta.FieldSchema("id", fieldType=meta.BasicType.STRING, businessKey=True, notNull=True),
                             meta.FieldSchema("loan_amount", fieldType=meta.BasicType.DECIMAL),
                             meta.FieldSchema("total_pymnt", fieldType=meta.BasicType.DECIMAL),
                             meta.FieldSchema("region", fieldType=meta.BasicType.STRING, categorical=True),
