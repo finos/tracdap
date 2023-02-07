@@ -22,87 +22,9 @@ option java_multiple_files = true;
 
 import "tracdap/metadata/type.proto";
 import "tracdap/metadata/object_id.proto";
+import "tracdap/metadata/schema_proto.proto";
 
 
-/**
- * Enumeration of the available types of data schema
- *
- * Currently only table schemas are supported, other schema types may be added later.
- *
- * @see SchemaDefinition
- */
-enum SchemaType {
-
-    SCHEMA_TYPE_NOT_SET = 0;
-    TABLE = 1;
-}
-
-message FieldSchema {
-
-    string fieldName = 1;
-    sint32 fieldOrder = 2;
-    BasicType fieldType = 3;
-
-    string label = 4;
-
-    bool businessKey = 5;
-    bool categorical = 6;
-
-    // This could become mandatory with the next metadata update
-    optional bool notNull = 8;
-
-    optional string formatCode = 7;
-}
-
-
-message TableSchema {
-
-    repeated FieldSchema fields = 1;
-}
-
-
-/**
- * A schema definition describes the schema of a dataset
- *
- * Schema definitions can be top level objects (a type of object definition),
- * in which case they can be referred to by multiple data definitions. Alternatively
- * they can be embedded in a data definition to create datasets with one-off schemas.
- *
- * A table schema describes the schema of a tabular data set. Other schema types may
- * be added later, e.g. for matrices, tensors, curves, surfaces and structured datasets.
- *
- * @see DataDefinition
- */
-message SchemaDefinition {
-
-    SchemaType schemaType = 1;
-    PartType partType = 2;
-
-    oneof schemaTypeDefinition {
-
-        TableSchema table = 3;
-    }
-}
-
-
-
-
-enum PartType {
-    PART_ROOT = 0;
-    PART_BY_RANGE = 1;
-    PART_BY_VALUE = 2;
-}
-
-
-message PartKey {
-
-    string opaqueKey = 1;
-
-    PartType partType = 2;
-    repeated Value partValues = 3;
-    optional Value partRangeMin = 4;
-    optional Value partRangeMax = 5;
-}
 
 
 message DataDefinition {
