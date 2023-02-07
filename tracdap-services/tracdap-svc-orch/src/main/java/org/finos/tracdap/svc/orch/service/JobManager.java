@@ -16,6 +16,7 @@
 
 package org.finos.tracdap.svc.orch.service;
 
+import org.finos.tracdap.common.auth.internal.InternalAuthProvider;
 import org.finos.tracdap.common.exception.*;
 import org.finos.tracdap.common.exec.ExecutorJobInfo;
 import org.finos.tracdap.common.metadata.MetadataUtil;
@@ -43,6 +44,7 @@ public class JobManager {
 
     public static final Duration STARTUP_DELAY = Duration.of(10, ChronoUnit.SECONDS);
     public static final Duration SCHEDULED_REMOVAL_DURATION = Duration.of(2, ChronoUnit.MINUTES);
+    public static final Duration JOB_TIMEOUT = Duration.of(12, ChronoUnit.HOURS);
 
     public static final String POLL_INTERVAL_CONFIG_KEY = "pollInterval";
     public static final String TICKET_DURATION_CONFI_KEY = "ticketDuration";
@@ -59,6 +61,7 @@ public class JobManager {
     private final JobProcessor processor;
     private final IJobCache<JobState> cache;
     private final ScheduledExecutorService javaExecutor;
+    private final InternalAuthProvider internalAuth;
 
     private final Duration cachePollInterval;
     private final Duration cacheTicketDuration;
@@ -73,11 +76,13 @@ public class JobManager {
             PlatformConfig config,
             JobProcessor processor,
             IJobCache<JobState> cache,
-            ScheduledExecutorService javaExecutor) {
+            ScheduledExecutorService javaExecutor,
+            InternalAuthProvider internalAuth) {
 
         this.processor = processor;
         this.cache = cache;
         this.javaExecutor = javaExecutor;
+        this.internalAuth = internalAuth;
 
         cachePollInterval = Duration.ofSeconds(readIntegerProperty(config.getJobCache(), POLL_INTERVAL_CONFIG_KEY, DEFAULT_CACHE_POLL_INTERVAL));
         cacheTicketDuration = Duration.ofSeconds(readIntegerProperty(config.getJobCache(), TICKET_DURATION_CONFI_KEY, DEFAULT_CACHE_TICKET_DURATION));
@@ -235,6 +240,8 @@ public class JobManager {
             newState_.tracStatus = JobStatusCode.QUEUED;
             newState_.cacheStatus = CacheStatus.QUEUED_IN_TRAC;
 
+            newState_.credentials = internalAuth.createDelegateSession(newState_.owner, JOB_TIMEOUT);
+
             var newState = processor.saveInitialMetadata(newState_);
             newState.jobKey = MetadataUtil.objectKey(newState.jobId);
 
@@ -285,6 +292,9 @@ public class JobManager {
             var cacheEntry = cache.getEntry(ticket);
             var jobState = cacheEntry.value();
 
+            // Reset auth processor in job state after deserialization
+            internalAuth.setTokenProcessor(jobState.credentials);
+
             // Launching can take a long time for some executors
             // Setting a launch state lets the job count towards the running jobs total
             var launchState = processor.markAsPending(jobState);
@@ -313,6 +323,10 @@ public class JobManager {
 
             var cacheEntry = cache.getEntry(ticket);
             var jobState = cacheEntry.value();
+
+            // Reset auth processor in job state after deserialization
+            internalAuth.setTokenProcessor(jobState.credentials);
+
             var newState = processor.recordPollStatus(jobState, executorJobInfo);
 
             newRevision = cache.updateEntry(ticket, newState.cacheStatus, newState);
@@ -347,6 +361,10 @@ public class JobManager {
 
             var cacheEntry = cache.getEntry(ticket);
             var jobState = cacheEntry.value();
+
+            // Reset auth processor in job state after deserialization
+            internalAuth.setTokenProcessor(jobState.credentials);
+
             var newState = processor.fetchJobResult(jobState);
 
             newRevision = cache.updateEntry(ticket, newState.cacheStatus, newState);
@@ -379,6 +397,9 @@ public class JobManager {
 
             var cacheEntry = cache.getEntry(ticket);
             var jobState = cacheEntry.value();
+
+            // Reset auth processor in job state after deserialization
+            internalAuth.setTokenProcessor(jobState.credentials);
 
             var updateFunc = getUpdateFunc(jobState.cacheStatus);
             var newState = updateFunc.apply(jobState);
