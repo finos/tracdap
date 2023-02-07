@@ -17,7 +17,6 @@
 package org.finos.tracdap.svc.orch.service;
 
 import org.finos.tracdap.api.*;
-import org.finos.tracdap.common.auth.GrpcClientAuth;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.metadata.MetadataUtil;
@@ -134,7 +133,7 @@ public class JobLifecycle {
                 .addAllSelector(orderedSelectors)
                 .build();
 
-        var client = GrpcClientAuth.applyIfAvailable(metaClient, jobState.ownerToken);
+        var client = metaClient.withCallCredentials(jobState.credentials);
         var batchResponse = client.readBatch(batchRequest);
 
         return loadResourcesResponse(jobState, orderedKeys, batchResponse);
@@ -230,7 +229,7 @@ public class JobLifecycle {
                 .addAllRequests(requests)
                 .build();
 
-        var client = GrpcClientAuth.applyIfAvailable(metaClient, jobState.ownerToken);
+        var client = metaClient.withCallCredentials(jobState.credentials);
 
         var preallocatedIds = client.preallocateIdBatch(request)
                 .getHeadersList();
@@ -321,7 +320,7 @@ public class JobLifecycle {
                 .addAllTagUpdates(freeJobAttrs)
                 .build();
 
-        var client = GrpcClientAuth.applyIfAvailable(metaClient, jobState.ownerToken);
+        var client = metaClient.withCallCredentials(jobState.credentials);
 
         var jobId = client.createObject(jobWriteReq);
 
@@ -365,7 +364,7 @@ public class JobLifecycle {
         boolean anyToSend = isAnyToSend(request);
 
         if (anyToSend) {
-            var metadataClient = GrpcClientAuth.applyIfAvailable(metaClient, jobState.ownerToken);
+            var metadataClient = metaClient.withCallCredentials(jobState.credentials);
             metadataClient.writeBatch(request);
         }
     }
