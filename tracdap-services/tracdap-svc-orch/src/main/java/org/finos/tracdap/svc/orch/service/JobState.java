@@ -16,6 +16,7 @@
 
 package org.finos.tracdap.svc.orch.service;
 
+import io.grpc.CallCredentials;
 import org.finos.tracdap.api.JobRequest;
 import org.finos.tracdap.common.auth.internal.UserInfo;
 import org.finos.tracdap.common.exception.EUnexpected;
@@ -38,7 +39,7 @@ public class JobState implements Serializable, Cloneable {
 
     public String tenant;
     public UserInfo owner;
-    public String ownerToken;
+    public CallCredentials credentials;
 
     public JobRequest jobRequest;
     public String jobKey;
