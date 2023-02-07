@@ -17,7 +17,7 @@
 package org.finos.tracdap.svc.data.api;
 
 import org.finos.tracdap.api.*;
-import org.finos.tracdap.common.auth.AuthConstants;
+import org.finos.tracdap.common.auth.internal.AuthHelpers;
 import org.finos.tracdap.common.concurrent.ExecutionContext;
 import org.finos.tracdap.common.grpc.GrpcServerWrap;
 import org.finos.tracdap.common.util.Bytes;
@@ -158,8 +158,8 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
 
     private CompletionStage<TagHeader> createDataset(Flow.Publisher<DataWriteRequest> requestStream) {
 
-        var authToken = AuthConstants.AUTH_TOKEN_KEY.get();
         var execCtx = ExecutionContext.EXEC_CONTEXT_KEY.get();
+        var userInfo = AuthHelpers.currentUser();
 
         var requestHub = Flows.<DataWriteRequest>hub(execCtx);
         requestStream.subscribe(requestHub);
@@ -169,26 +169,26 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
 
         return firstMessage
                 .thenApply(request -> validateRequest(CREATE_DATASET_METHOD, request))
-                .thenCompose(request -> dataRwService.createDataset(request, dataStream, execCtx, authToken));
+                .thenCompose(request -> dataRwService.createDataset(request, dataStream, execCtx, userInfo));
     }
 
     private CompletionStage<TagHeader> createSmallDataset(DataWriteRequest request) {
 
         validateRequest(CREATE_SMALL_DATASET_METHOD, request);
 
-        var authToken = AuthConstants.AUTH_TOKEN_KEY.get();
         var execCtx = ExecutionContext.EXEC_CONTEXT_KEY.get();
+        var userInfo = AuthHelpers.currentUser();
 
         var dataBytes = Bytes.fromProtoBytes(request.getContent());
         var dataStream = Flows.publish(List.of(dataBytes));
 
-        return dataRwService.createDataset(request, dataStream, execCtx, authToken);
+        return dataRwService.createDataset(request, dataStream, execCtx, userInfo);
     }
 
     private CompletionStage<TagHeader> updateDataset(Flow.Publisher<DataWriteRequest> requestStream) {
 
-        var authToken = AuthConstants.AUTH_TOKEN_KEY.get();
         var execCtx = ExecutionContext.EXEC_CONTEXT_KEY.get();
+        var userInfo = AuthHelpers.currentUser();
 
         var requestHub = Flows.<DataWriteRequest>hub(execCtx);
         requestStream.subscribe(requestHub);
@@ -198,33 +198,33 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
 
         return firstMessage
                 .thenApply(request -> validateRequest(UPDATE_DATASET_METHOD, request))
-                .thenCompose(request -> dataRwService.updateDataset(request, dataStream, execCtx, authToken));
+                .thenCompose(request -> dataRwService.updateDataset(request, dataStream, execCtx, userInfo));
     }
 
     private CompletionStage<TagHeader> updateSmallDataset(DataWriteRequest request) {
 
         validateRequest(UPDATE_DATASET_METHOD, request);
 
-        var authToken = AuthConstants.AUTH_TOKEN_KEY.get();
         var execCtx = ExecutionContext.EXEC_CONTEXT_KEY.get();
+        var userInfo = AuthHelpers.currentUser();
 
         var dataBytes = Bytes.fromProtoBytes(request.getContent());
         var dataStream = Flows.publish(List.of(dataBytes));
 
-        return dataRwService.updateDataset(request, dataStream, execCtx, authToken);
+        return dataRwService.updateDataset(request, dataStream, execCtx, userInfo);
     }
 
     private Flow.Publisher<DataReadResponse> readDataset(DataReadRequest request) {
 
         validateRequest(READ_DATASET_METHOD, request);
 
-        var authToken = AuthConstants.AUTH_TOKEN_KEY.get();
         var execCtx = ExecutionContext.EXEC_CONTEXT_KEY.get();
+        var userInfo = AuthHelpers.currentUser();
 
         var schemaResult = new CompletableFuture<SchemaDefinition>();
         var dataStream = Flows.<ByteBuf>hub(execCtx);
 
-        dataRwService.readDataset(request, schemaResult, dataStream, execCtx, authToken);
+        dataRwService.readDataset(request, schemaResult, dataStream, execCtx, userInfo);
 
         var schemaMsg = schemaResult.thenApply(schema ->
                 DataReadResponse.newBuilder()
@@ -246,13 +246,13 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
 
         validateRequest(READ_SMALL_DATASET_METHOD, request);
 
-        var authToken = AuthConstants.AUTH_TOKEN_KEY.get();
         var execCtx = ExecutionContext.EXEC_CONTEXT_KEY.get();
+        var userInfo = AuthHelpers.currentUser();
 
         var schemaResult = new CompletableFuture<SchemaDefinition>();
         var dataStream = Flows.<ByteBuf>hub(execCtx);
 
-        dataRwService.readDataset(request, schemaResult, dataStream, execCtx, authToken);
+        dataRwService.readDataset(request, schemaResult, dataStream, execCtx, userInfo);
 
         return schemaResult.thenCompose(schema -> {
 
@@ -271,8 +271,8 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
 
     private CompletionStage<TagHeader> createFile(Flow.Publisher<FileWriteRequest> requestStream) {
 
-        var authToken = AuthConstants.AUTH_TOKEN_KEY.get();
         var execCtx = ExecutionContext.EXEC_CONTEXT_KEY.get();
+        var userInfo = AuthHelpers.currentUser();
 
         var requestHub = Flows.<FileWriteRequest>hub(execCtx);
         requestStream.subscribe(requestHub);
@@ -288,15 +288,15 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
                         request.getName(),
                         request.getMimeType(),
                         request.hasSize() ? request.getSize() : null,
-                        dataStream, execCtx, authToken));
+                        dataStream, execCtx, userInfo));
     }
 
     private CompletionStage<TagHeader> createSmallFile(FileWriteRequest request) {
 
         validateRequest(CREATE_SMALL_FILE_METHOD, request);
 
-        var authToken = AuthConstants.AUTH_TOKEN_KEY.get();
         var execCtx = ExecutionContext.EXEC_CONTEXT_KEY.get();
+        var userInfo = AuthHelpers.currentUser();
 
         var dataBytes = Bytes.fromProtoBytes(request.getContent());
         var dataStream = Flows.publish(List.of(dataBytes));
@@ -307,13 +307,13 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
                 request.getName(),
                 request.getMimeType(),
                 request.hasSize() ? request.getSize() : null,
-                dataStream, execCtx, authToken);
+                dataStream, execCtx, userInfo);
     }
 
     private CompletionStage<TagHeader> updateFile(Flow.Publisher<FileWriteRequest> requestStream) {
 
-        var authToken = AuthConstants.AUTH_TOKEN_KEY.get();
         var execCtx = ExecutionContext.EXEC_CONTEXT_KEY.get();
+        var userInfo = AuthHelpers.currentUser();
 
         var requestHub = Flows.<FileWriteRequest>hub(execCtx);
         requestStream.subscribe(requestHub);
@@ -330,15 +330,15 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
                         request.getName(),
                         request.getMimeType(),
                         request.hasSize() ? request.getSize() : null,
-                        dataStream, execCtx, authToken));
+                        dataStream, execCtx, userInfo));
     }
 
     private CompletionStage<TagHeader> updateSSmallFile(FileWriteRequest request) {
 
         validateRequest(UPDATE_SMALL_FILE_METHOD, request);
 
-        var authToken = AuthConstants.AUTH_TOKEN_KEY.get();
         var execCtx = ExecutionContext.EXEC_CONTEXT_KEY.get();
+        var userInfo = AuthHelpers.currentUser();
 
         var dataBytes = Bytes.fromProtoBytes(request.getContent());
         var dataStream = Flows.publish(List.of(dataBytes));
@@ -350,22 +350,22 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
                 request.getName(),
                 request.getMimeType(),
                 request.hasSize() ? request.getSize() : null,
-                dataStream, execCtx, authToken);
+                dataStream, execCtx, userInfo);
     }
 
     private Flow.Publisher<FileReadResponse> readFile(FileReadRequest request) {
 
         validateRequest(READ_FILE_METHOD, request);
 
-        var authToken = AuthConstants.AUTH_TOKEN_KEY.get();
         var execCtx = ExecutionContext.EXEC_CONTEXT_KEY.get();
+        var userInfo = AuthHelpers.currentUser();
 
         var fileResult = new CompletableFuture<FileDefinition>();
         var dataStream = Flows.<ByteBuf>hub(execCtx);
 
         fileService.readFile(
                 request.getTenant(), request.getSelector(),
-                fileResult, dataStream, execCtx, authToken);
+                fileResult, dataStream, execCtx, userInfo);
 
         var msg0 = fileResult.thenApply(file ->
                 FileReadResponse.newBuilder()
@@ -387,15 +387,15 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
 
         validateRequest(READ_SMALL_FILE_METHOD, request);
 
-        var authToken = AuthConstants.AUTH_TOKEN_KEY.get();
         var execCtx = ExecutionContext.EXEC_CONTEXT_KEY.get();
+        var userInfo = AuthHelpers.currentUser();
 
         var fileResult = new CompletableFuture<FileDefinition>();
         var dataStream = Flows.<ByteBuf>hub(execCtx);
 
         fileService.readFile(
                 request.getTenant(), request.getSelector(),
-                fileResult, dataStream, execCtx, authToken);
+                fileResult, dataStream, execCtx, userInfo);
 
         return fileResult.thenCompose(file -> {
 

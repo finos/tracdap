@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Accenture Global Solutions Limited
+ * Copyright 2023 Accenture Global Solutions Limited
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,10 +14,9 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.auth;
+package org.finos.tracdap.common.auth.internal;
 
-import org.finos.tracdap.common.auth.internal.JwtValidator;
-import org.finos.tracdap.common.auth.internal.UserInfo;
+import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.config.AuthenticationConfig;
 
 import io.grpc.*;
@@ -26,19 +25,22 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class GrpcServerAuth implements ServerInterceptor {
-
-    private static final String BEARER_AUTH_PREFIX = "bearer ";
+public class InternalAuthValidator implements ServerInterceptor {
 
     private static final String AUTH_DISABLED_USER_ID = "no_auth";
     private static final String AUTH_DISABLED_USER_NAME = "Authentication Disabled";
 
-    private static final Logger log = LoggerFactory.getLogger(GrpcServerAuth.class);
+    private static final Logger log = LoggerFactory.getLogger(InternalAuthValidator.class);
 
     private final AuthenticationConfig authConfig;
     private final JwtValidator jwt;
 
-    public GrpcServerAuth(AuthenticationConfig authConfig, JwtValidator jwt) {
+    public InternalAuthValidator(AuthenticationConfig authConfig, JwtValidator jwt) {
+
+        if (jwt == null && !authConfig.getDisableAuth()) {
+            throw new EStartup("Token validator is not available");
+        }
+
         this.authConfig = authConfig;
         this.jwt = jwt;
     }
@@ -53,27 +55,26 @@ public class GrpcServerAuth implements ServerInterceptor {
 
         if (authConfig.getDisableAuth()) {
 
-            log.warn("AUTHENTICATE: DISABLED {}", call.getMethodDescriptor().getFullMethodName());
+            log.warn("AUTHENTICATE: {}() AUTHENTICATION DISABLED", call.getMethodDescriptor().getBareMethodName());
 
             var userInfo = new UserInfo();
             userInfo.setUserId(AUTH_DISABLED_USER_ID);
             userInfo.setDisplayName(AUTH_DISABLED_USER_NAME);
 
             var ctx = Context.current()
-                    .withValue(AuthConstants.AUTH_TOKEN_KEY, "")
-                    .withValue(AuthConstants.USER_INFO_KEY, userInfo);
+                    .withValue(AuthConstants.TRAC_AUTH_USER_KEY, userInfo);
 
             return Contexts.interceptCall(ctx, call, headers, next);
         }
 
-        var token = headers.get(AuthConstants.AUTH_TOKEN_METADATA_KEY);
+        var token = headers.get(AuthConstants.TRAC_AUTH_TOKEN_KEY);
 
         if (token == null) {
 
             var message = "No authentication provided";
 
-            log.error("AUTHENTICATE: FAILED {} [{}]",
-                    call.getMethodDescriptor().getFullMethodName(),
+            log.error("AUTHENTICATE: {}() [{}] FAILED ",
+                    call.getMethodDescriptor().getBareMethodName(),
                     message);
 
             var status = Status.UNAUTHENTICATED.withDescription(message);
@@ -83,14 +84,6 @@ public class GrpcServerAuth implements ServerInterceptor {
             return new ServerCall.Listener<>() {};
         }
 
-        // Expect BEARER auth scheme, but also allow raw JSON tokens
-
-        if (token.length() >= BEARER_AUTH_PREFIX.length()) {
-            var prefix = token.substring(0, BEARER_AUTH_PREFIX.length());
-            if (prefix.equalsIgnoreCase(BEARER_AUTH_PREFIX))
-                token = token.substring(BEARER_AUTH_PREFIX.length());
-        }
-
         var sessionInfo = jwt.decodeAndValidate(token);
 
         // If the auth session is invalid, this is still an UNAUTHENTICATED condition
@@ -98,8 +91,8 @@ public class GrpcServerAuth implements ServerInterceptor {
 
         if (!sessionInfo.isValid()) {
 
-            log.error("AUTHENTICATE: FAILED {} [{}]",
-                    call.getMethodDescriptor().getFullMethodName(),
+            log.error("AUTHENTICATE: {}() [{}] FAILED",
+                    call.getMethodDescriptor().getBareMethodName(),
                     sessionInfo.getErrorMessage());
 
             var status = Status.UNAUTHENTICATED.withDescription(sessionInfo.getErrorMessage());
@@ -113,25 +106,24 @@ public class GrpcServerAuth implements ServerInterceptor {
         // Put the user info object into the context to make it available in the service implementation
 
         var userInfo = sessionInfo.getUserInfo();
+        var delegate = sessionInfo.getDelegate();
 
         if (authConfig.getDisableSigning()) {
-            log.warn("AUTHENTICATE: SUCCEEDED WITHOUT VALIDATION {} [{} <{}>]",
-                    call.getMethodDescriptor().getFullMethodName(),
-                    userInfo.getDisplayName(),
-                    userInfo.getUserId());
+            log.warn("AUTHENTICATE: {}() [{}] SUCCEEDED WITHOUT VALIDATION",
+                    call.getMethodDescriptor().getBareMethodName(),
+                    AuthHelpers.printCurrentUser(userInfo, delegate));
         }
         else {
-            log.info("AUTHENTICATE: SUCCEEDED {} [{} <{}>]",
-                    call.getMethodDescriptor().getFullMethodName(),
-                    userInfo.getDisplayName(),
-                    userInfo.getUserId());
+            log.info("AUTHENTICATE: {}() [{}] SUCCEEDED",
+                    call.getMethodDescriptor().getBareMethodName(),
+                    AuthHelpers.printCurrentUser(userInfo, delegate));
         }
 
         // Auth complete, put details into the current call context
 
         var ctx = Context.current()
-                .withValue(AuthConstants.AUTH_TOKEN_KEY, token)
-                .withValue(AuthConstants.USER_INFO_KEY, userInfo);
+                .withValue(AuthConstants.TRAC_AUTH_USER_KEY, userInfo)
+                .withValue(AuthConstants.TRAC_DELEGATE_KEY, delegate);
 
         return Contexts.interceptCall(ctx, call, headers, next);
     }

@@ -17,8 +17,9 @@
 package org.finos.tracdap.svc.data;
 
 import org.finos.tracdap.api.TrustedMetadataApiGrpc;
-import org.finos.tracdap.common.auth.AuthSetup;
-import org.finos.tracdap.common.auth.GrpcServerAuth;
+import org.finos.tracdap.common.auth.internal.InternalAuthProvider;
+import org.finos.tracdap.common.auth.internal.JwtSetup;
+import org.finos.tracdap.common.auth.internal.InternalAuthValidator;
 import org.finos.tracdap.common.grpc.ErrorMappingInterceptor;
 import org.finos.tracdap.common.grpc.LoggingServerInterceptor;
 import org.finos.tracdap.config.ServiceConfig;
@@ -152,13 +153,13 @@ public class TracDataService extends CommonServiceBase {
             // Check default storage and format are available
             checkDefaultStorageAndFormat(storage, formats, storageConfig);
 
+            var tokenProcessor = JwtSetup.createProcessor(platformConfig, configManager);
+            var internalAuth = new InternalAuthProvider(tokenProcessor, platformConfig.getAuthentication());
             var metaClient = prepareMetadataClient(platformConfig, clientChannelType);
 
-            var fileSvc = new FileService(storageConfig, tenantConfig, arrowAllocator, storage, metaClient);
-            var dataSvc = new DataService(storageConfig, tenantConfig, arrowAllocator, storage, formats, metaClient);
+            var fileSvc = new FileService(storageConfig, tenantConfig, arrowAllocator, storage, metaClient, internalAuth);
+            var dataSvc = new DataService(storageConfig, tenantConfig, arrowAllocator, storage, formats, metaClient, internalAuth);
             var dataApi = new TracDataApi(dataSvc, fileSvc);
-
-            var jwtValidator = AuthSetup.createValidator(platformConfig, configManager);
 
             // Create the main server
 
@@ -176,7 +177,7 @@ public class TracDataService extends CommonServiceBase {
 
                     // Interceptors
                     .intercept(new LoggingServerInterceptor(TracDataApi.class))
-                    .intercept(new GrpcServerAuth(platformConfig.getAuthentication(), jwtValidator))
+                    .intercept(new InternalAuthValidator(platformConfig.getAuthentication(), tokenProcessor))
                     .intercept(new ErrorMappingInterceptor())
                     .intercept(execRegister.registerExecContext())
 

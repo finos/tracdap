@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Accenture Global Solutions Limited
+ * Copyright 2023 Accenture Global Solutions Limited
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,6 +28,7 @@ public class SessionInfo {
     private Instant expiryLimit;
 
     private UserInfo userInfo;
+    private UserInfo delegate;
 
     public boolean isValid() {
         return valid;
@@ -75,5 +76,13 @@ public class SessionInfo {
 
     public void setUserInfo(UserInfo userInfo) {
         this.userInfo = userInfo;
+    }
+
+    public UserInfo getDelegate() {
+        return delegate;
+    }
+
+    public void setDelegate(UserInfo delegate) {
+        this.delegate = delegate;
     }
 }

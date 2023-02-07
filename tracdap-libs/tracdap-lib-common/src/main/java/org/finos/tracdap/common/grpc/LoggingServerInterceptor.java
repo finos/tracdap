@@ -17,7 +17,7 @@
 package org.finos.tracdap.common.grpc;
 
 import io.grpc.*;
-import org.finos.tracdap.common.auth.AuthConstants;
+import org.finos.tracdap.common.auth.internal.AuthHelpers;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,13 +36,20 @@ public class LoggingServerInterceptor implements ServerInterceptor {
             ServerCallHandler<ReqT, RespT> next) {
 
         var method = call.getMethodDescriptor();
-        var userInfo = AuthConstants.USER_INFO_KEY.get();
 
-        log.info("API CALL START: [{}] [{} <{}>] ({})",
-                method.getBareMethodName(),
-                userInfo.getDisplayName(),
-                userInfo.getUserId(),
-                method.getType());
+        if (method.getType() == MethodDescriptor.MethodType.UNARY) {
+
+            log.info("API CALL START: {}() [{}]",
+                    method.getBareMethodName(),
+                    AuthHelpers.printCurrentUser());
+        }
+        else {
+
+            log.info("API CALL START: {}() [{}] ({})",
+                    method.getBareMethodName(),
+                    AuthHelpers.printCurrentUser(),
+                    method.getType());
+        }
 
         var loggingCall = new LoggingServerCall<>(call);
 
@@ -61,7 +68,7 @@ public class LoggingServerInterceptor implements ServerInterceptor {
             var method = getMethodDescriptor();
 
             if (status.isOk()) {
-                log.info("API CALL SUCCEEDED: [{}]", method.getBareMethodName());
+                log.info("API CALL SUCCEEDED: {}()", method.getBareMethodName());
             }
             else {
                 var grpcError = status.asRuntimeException();
@@ -69,7 +76,7 @@ public class LoggingServerInterceptor implements ServerInterceptor {
                 // 1) grpcError is always StatusRuntimeException
                 // 2) GrpcErrorMapping.processError passes through StatusRuntimeException
 
-                log.error("API CALL FAILED: [{}] {}", method.getBareMethodName(), grpcError.getMessage(), grpcError);
+                log.error("API CALL FAILED: {}() {}", method.getBareMethodName(), grpcError.getMessage(), grpcError);
             }
 
             delegate().close(status, trailers);

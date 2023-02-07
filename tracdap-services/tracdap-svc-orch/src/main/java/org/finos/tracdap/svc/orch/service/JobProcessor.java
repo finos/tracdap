@@ -18,7 +18,6 @@ package org.finos.tracdap.svc.orch.service;
 
 import org.finos.tracdap.api.MetadataWriteRequest;
 import org.finos.tracdap.api.TrustedMetadataApiGrpc.TrustedMetadataApiBlockingStub;
-import org.finos.tracdap.common.auth.GrpcClientAuth;
 import org.finos.tracdap.common.config.ConfigFormat;
 import org.finos.tracdap.common.config.ConfigParser;
 import org.finos.tracdap.common.exception.*;
@@ -100,7 +99,7 @@ public class JobProcessor {
                 .setValue(MetadataCodec.encodeValue(jobState.tracStatus.name())))
                 .build();
 
-        var userAuth = GrpcClientAuth.applyIfAvailable(metaClient, jobState.ownerToken);
+        var userAuth = metaClient.withCallCredentials(jobState.credentials);
         var newId = userAuth.updateTag(writeRequest);
 
         var newState = jobState.clone();

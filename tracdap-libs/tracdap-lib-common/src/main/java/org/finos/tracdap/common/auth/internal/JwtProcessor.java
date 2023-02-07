@@ -19,43 +19,14 @@ package org.finos.tracdap.common.auth.internal;
 import com.auth0.jwt.HeaderParams;
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.algorithms.Algorithm;
-import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.config.AuthenticationConfig;
-import org.finos.tracdap.config.PlatformInfo;
 
-import java.security.KeyPair;
 import java.util.Map;
 
 
 public class JwtProcessor extends JwtValidator {
 
-    public static JwtProcessor configure(AuthenticationConfig authConfig, PlatformInfo platformInfo, KeyPair keyPair) {
-
-        // TODO: Move this method to AuthSetup
-
-        // Allow disabling signing in non-prod environments only
-        if (authConfig.getDisableSigning()) {
-
-            if (platformInfo.getProduction()) {
-
-                var message = String.format(
-                        "Token signing must be enabled in production environment [%s]",
-                        platformInfo.getEnvironment());
-
-                throw new EStartup(message);
-            }
-
-            return new JwtProcessor(authConfig, Algorithm.none());
-        }
-
-        // If the key pair is missing but signing is not disabled, this is an error
-        if (keyPair == null) {
-            throw new EStartup("Root authentication key is not available (do you need to run auth-tool)?");
-        }
-
-        var algorithm = chooseAlgorithm(keyPair);
-        return new JwtProcessor(authConfig, algorithm);
-    }
+    // Package-scope constructor, force setup using JwtSetup
 
     JwtProcessor(AuthenticationConfig authConfig, Algorithm algorithm) {
         super(authConfig, algorithm);
@@ -76,7 +47,11 @@ public class JwtProcessor extends JwtValidator {
                 .withClaim(JWT_LIMIT_CLAIM, session.getExpiryLimit())
                 .withClaim(JWT_NAME_CLAIM, session.getUserInfo().getDisplayName());
 
+        if (session.getDelegate() != null) {
+            jwt.withClaim(JWT_DELEGATE_ID_CLAIM, session.getDelegate().getUserId());
+            jwt.withClaim(JWT_DELEGATE_NAME_CLAIM, session.getDelegate().getDisplayName());
+        }
+
         return jwt.sign(algorithm).trim();
     }
-
 }
