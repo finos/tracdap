@@ -52,6 +52,7 @@ public class JobState implements Serializable, Cloneable {
     public String statusMessage;
     public String errorDetail;
     public Exception exception;
+    public int retries;
 
     public JobDefinition definition;
     public Map<String, ObjectDefinition> resources = new HashMap<>();

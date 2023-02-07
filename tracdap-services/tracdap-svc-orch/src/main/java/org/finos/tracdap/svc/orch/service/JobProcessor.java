@@ -123,11 +123,11 @@ public class JobProcessor {
 
     // Executor actions
 
-    public JobState markAsPending(JobState jobState) {
+    public JobState scheduleLaunch(JobState jobState) {
 
         var newState = jobState.clone();
         newState.tracStatus = JobStatusCode.PENDING;
-        newState.cacheStatus = CacheStatus.LAUNCH_IN_PROGRESS;
+        newState.cacheStatus = CacheStatus.LAUNCH_SCHEDULED;
 
         return updateMetadata(newState);
     }

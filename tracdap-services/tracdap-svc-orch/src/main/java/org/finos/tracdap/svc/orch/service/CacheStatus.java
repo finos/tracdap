@@ -21,7 +21,7 @@ public class CacheStatus {
 
     public static final String QUEUED_IN_TRAC = "QUEUED_IN_TRAC";
 
-    public static final String LAUNCH_IN_PROGRESS = "LAUNCH_IN_PROGRESS";
+    public static final String LAUNCH_SCHEDULED = "LAUNCH_SCHEDULED";
     public static final String SENT_TO_EXECUTOR = "SENT_TO_EXECUTOR";
     public static final String QUEUED_IN_EXECUTOR = "QUEUED_IN_EXECUTOR";
     public static final String RUNNING_IN_EXECUTOR = "RUNNING_IN_EXECUTOR";
@@ -32,6 +32,8 @@ public class CacheStatus {
     public static final String RESULTS_RECEIVED = "RESULTS_RECEIVED";
     public static final String RESULTS_INVALID = "RESULTS_INVALID";
     public static final String RESULTS_SAVED = "RESULTS_SAVED";
+
+    public static final String PROCESSING_FAILED = "PROCESSING_FAILED";
 
     public static final String READY_TO_REMOVE = "READY_TO_REMOVE";
     public static final String SCHEDULED_TO_REMOVE = "SCHEDULED_TO_REMOVE";
