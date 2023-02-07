@@ -84,7 +84,10 @@ public class ProtocolNegotiatorTest {
                 .build();
 
         var authProvider = new DummyAuthProvider();
-        var jwtProcessor = JwtSetup.createProcessor(gatewayConfig, /* config manager */ null);
+        var jwtProcessor = JwtSetup.createProcessor(
+                gatewayConfig.getAuthentication(),
+                gatewayConfig.getPlatformInfo(),
+                null);
 
         // The protocol negotiator is the top level initializer for new inbound connections
         var protocolNegotiator = new ProtocolNegotiator(

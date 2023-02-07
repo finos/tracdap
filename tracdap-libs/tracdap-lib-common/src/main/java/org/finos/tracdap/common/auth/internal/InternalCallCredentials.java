@@ -60,6 +60,14 @@ public class InternalCallCredentials extends CallCredentials implements Serializ
     @Override
     public void applyRequestMetadata(CallCredentials.RequestInfo requestInfo, Executor appExecutor, CallCredentials.MetadataApplier applier) {
 
+        // This will allow the internal calls to be made when disableAuth = true has been configured
+        // Calls will only be accepted if disableAuth = true is also set on the target server
+
+        if (tokenProcessor == null) {
+            applier.apply(new Metadata());
+            return;
+        }
+
         var now = Instant.now();
 
         if (now.isAfter(session.getExpiryLimit())) {

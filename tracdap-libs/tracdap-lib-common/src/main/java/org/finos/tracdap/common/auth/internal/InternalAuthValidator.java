@@ -16,6 +16,7 @@
 
 package org.finos.tracdap.common.auth.internal;
 
+import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.config.AuthenticationConfig;
 
 import io.grpc.*;
@@ -35,6 +36,11 @@ public class InternalAuthValidator implements ServerInterceptor {
     private final JwtValidator jwt;
 
     public InternalAuthValidator(AuthenticationConfig authConfig, JwtValidator jwt) {
+
+        if (jwt == null && !authConfig.getDisableAuth()) {
+            throw new EStartup("Token validator is not available");
+        }
+
         this.authConfig = authConfig;
         this.jwt = jwt;
     }
