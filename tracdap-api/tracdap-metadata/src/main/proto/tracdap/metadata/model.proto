@@ -22,6 +22,7 @@ option java_multiple_files = true;
 
 import "tracdap/metadata/type.proto";
 import "tracdap/metadata/data.proto";
+import "tracdap/metadata/schema_proto.proto";
 
 
 /**
