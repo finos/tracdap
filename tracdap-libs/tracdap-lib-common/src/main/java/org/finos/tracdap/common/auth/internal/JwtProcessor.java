@@ -26,7 +26,9 @@ import java.util.Map;
 
 public class JwtProcessor extends JwtValidator {
 
-    public JwtProcessor(AuthenticationConfig authConfig, Algorithm algorithm) {
+    // Package-scope constructor, force setup using JwtSetup
+
+    JwtProcessor(AuthenticationConfig authConfig, Algorithm algorithm) {
         super(authConfig, algorithm);
     }
 

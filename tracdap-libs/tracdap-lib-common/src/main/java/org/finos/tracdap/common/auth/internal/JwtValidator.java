@@ -42,7 +42,9 @@ public class JwtValidator {
 
     private final JWTVerifier verifier;
 
-    public JwtValidator(AuthenticationConfig authConfig, Algorithm algorithm) {
+    // Package-scope constructor, force setup using JwtSetup
+
+    JwtValidator(AuthenticationConfig authConfig, Algorithm algorithm) {
 
         this.algorithm = algorithm;
 
