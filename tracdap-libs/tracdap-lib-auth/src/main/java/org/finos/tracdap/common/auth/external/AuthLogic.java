@@ -17,7 +17,7 @@
 package org.finos.tracdap.common.auth.external;
 
 import io.netty.handler.codec.http.cookie.*;
-import org.finos.tracdap.common.auth.AuthConstants;
+import org.finos.tracdap.common.auth.internal.AuthConstants;
 import org.finos.tracdap.common.auth.internal.SessionInfo;
 import org.finos.tracdap.common.auth.internal.UserInfo;
 import org.finos.tracdap.common.config.ConfigDefaults;

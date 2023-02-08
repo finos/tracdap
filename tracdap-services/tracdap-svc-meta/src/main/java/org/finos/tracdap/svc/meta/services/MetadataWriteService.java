@@ -19,9 +19,9 @@ package org.finos.tracdap.svc.meta.services;
 import org.finos.tracdap.api.MetadataWriteRequest;
 import org.finos.tracdap.api.UniversalMetadataWriteBatchRequest;
 import org.finos.tracdap.api.UniversalMetadataWriteBatchResponse;
-import org.finos.tracdap.common.auth.AuthConstants;
-import org.finos.tracdap.common.auth.internal.UserInfo;
 import org.finos.tracdap.metadata.*;
+import org.finos.tracdap.common.auth.internal.AuthHelpers;
+import org.finos.tracdap.common.auth.internal.UserInfo;
 import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.metadata.MetadataConstants;
 import org.finos.tracdap.common.validation.Validator;
@@ -149,7 +149,7 @@ public class MetadataWriteService {
 
     private Tag prepareCreateObject(UUID objectId, ObjectDefinition definition, List<TagUpdate> tagUpdates) {
 
-        var userInfo = AuthConstants.USER_INFO_KEY.get();
+        var userInfo = AuthHelpers.currentUser();
         var userId = userInfo.getUserId();
         var userName = userInfo.getDisplayName();
         var timestamp = Instant.now().atOffset(ZoneOffset.UTC);
@@ -199,7 +199,7 @@ public class MetadataWriteService {
             List<MetadataWriteRequest> requests,
             List<TagUpdate> batchTagUpdates) {
 
-        var userInfo = AuthConstants.USER_INFO_KEY.get();
+        var userInfo = AuthHelpers.currentUser();
 
         var priorVersions = requests.stream()
                 .map(MetadataWriteRequest::getPriorVersion)

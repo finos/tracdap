@@ -55,4 +55,9 @@ message AuthenticationConfig {
 
   bool disableAuth = 4;
   bool disableSigning = 5;
+
+  string systemUserId = 8;
+  string systemUserName = 9;
+  sint32 systemTicketDuration = 10;
+  sint32 systemTicketRefresh = 11;
 }

@@ -18,8 +18,6 @@ package org.finos.tracdap.common.auth.internal;
 
 import org.finos.tracdap.config.AuthenticationConfig;
 import org.finos.tracdap.common.config.ConfigDefaults;
-import org.finos.tracdap.common.exception.EStartup;
-import org.finos.tracdap.common.exception.EUnexpected;
 
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.JWTVerifier;
@@ -27,12 +25,6 @@ import com.auth0.jwt.RegisteredClaims;
 import com.auth0.jwt.algorithms.Algorithm;
 import com.auth0.jwt.exceptions.JWTVerificationException;
 
-import java.security.KeyPair;
-import java.security.PublicKey;
-import java.security.interfaces.ECPrivateKey;
-import java.security.interfaces.ECPublicKey;
-import java.security.interfaces.RSAPrivateKey;
-import java.security.interfaces.RSAPublicKey;
 import java.time.Instant;
 
 
@@ -41,13 +33,18 @@ public class JwtValidator {
     protected static final String JWT_NAME_CLAIM = "name";
     protected static final String JWT_LIMIT_CLAIM = "limit";
 
+    protected static final String JWT_DELEGATE_ID_CLAIM = "delegate";
+    protected static final String JWT_DELEGATE_NAME_CLAIM = "delegateName";
+
     protected final Algorithm algorithm;
     protected final String issuer;
     protected final int expiry;
 
     private final JWTVerifier verifier;
 
-    public JwtValidator(AuthenticationConfig authConfig, Algorithm algorithm) {
+    // Package-scope constructor, force setup using JwtSetup
+
+    JwtValidator(AuthenticationConfig authConfig, Algorithm algorithm) {
 
         this.algorithm = algorithm;
 
@@ -72,7 +69,7 @@ public class JwtValidator {
             var expiryTimeStr = jwt.getClaim(RegisteredClaims.EXPIRES_AT);
             var expiryLimitStr = jwt.getClaim(JWT_LIMIT_CLAIM);
 
-            if (userId == null || issueTimeStr == null || expiryTimeStr == null || expiryLimitStr == null) {
+            if (userId.isMissing() || issueTimeStr.isMissing() || expiryTimeStr.isMissing() || expiryLimitStr.isMissing()) {
                 var sessionInfo = new SessionInfo();
                 sessionInfo.setValid(false);
                 sessionInfo.setErrorMessage("Authentication failed: Missing required details");
@@ -84,7 +81,7 @@ public class JwtValidator {
 
             var userInfo = new UserInfo();
             userInfo.setUserId(userId.asString());
-            userInfo.setDisplayName(displayName != null ? displayName.asString() : userId.asString());
+            userInfo.setDisplayName(displayName.isMissing() ? userId.asString() : displayName.asString());
 
             var issueTime = Instant.ofEpochSecond(issueTimeStr.asLong());
             var expiryTime = Instant.ofEpochSecond(expiryTimeStr.asLong());
@@ -96,6 +93,16 @@ public class JwtValidator {
             sessionInfo.setExpiryTime(expiryTime);
             sessionInfo.setExpiryLimit(expiryLimit);
             sessionInfo.setValid(true);
+
+            var delegateIdClaim = jwt.getClaim(JWT_DELEGATE_ID_CLAIM);
+            var delegateNameClaim = jwt.getClaim(JWT_DELEGATE_NAME_CLAIM);
+
+            if (!delegateIdClaim.isMissing()) {
+                var delegate = new UserInfo();
+                delegate.setUserId(delegateIdClaim.asString());
+                delegate.setDisplayName(delegateNameClaim.asString());
+                sessionInfo.setDelegate(delegate);
+            }
 
             return sessionInfo;
         }
@@ -109,56 +116,5 @@ public class JwtValidator {
 
             return sessionInfo;
         }
-    }
-
-    public static Algorithm chooseAlgorithm(PublicKey publicKey) {
-
-        // Should already be checked
-        if (publicKey == null)
-            throw new EUnexpected();
-
-        var keyPair = new KeyPair(publicKey, null);
-
-        return JwtValidator.chooseAlgorithm(keyPair);
-    }
-
-    public static Algorithm chooseAlgorithm(KeyPair keyPair) {
-
-        // Should already be checked
-        if (keyPair == null)
-            throw new EUnexpected();
-
-        var keyAlgo = keyPair.getPublic().getAlgorithm();
-        var keySize = keyPair.getPublic().getEncoded().length * 8;
-
-        if (keyAlgo.equals("EC")) {
-
-            if (keySize >= 512)
-                return Algorithm.ECDSA512((ECPublicKey) keyPair.getPublic(), (ECPrivateKey)  keyPair.getPrivate());
-
-            if (keySize >= 384)
-                return Algorithm.ECDSA384((ECPublicKey) keyPair.getPublic(), (ECPrivateKey)  keyPair.getPrivate());
-
-            if (keySize >= 256)
-                return Algorithm.ECDSA256((ECPublicKey) keyPair.getPublic(), (ECPrivateKey)  keyPair.getPrivate());
-        }
-
-        if (keyAlgo.equals("RSA")) {
-
-            if (keySize >= 3072)
-                return Algorithm.RSA512((RSAPublicKey)  keyPair.getPublic(), (RSAPrivateKey) keyPair.getPrivate());
-
-            if (keySize >= 2048)
-                return Algorithm.RSA384((RSAPublicKey)  keyPair.getPublic(), (RSAPrivateKey) keyPair.getPrivate());
-
-            if (keySize >= 1024)
-                return Algorithm.RSA256((RSAPublicKey)  keyPair.getPublic(), (RSAPrivateKey) keyPair.getPrivate());
-        }
-
-        var message = String.format("" +
-                        "Root authentication keys are not available, no JWT singing / validation algorithm for [algorithM: %s, key size: %s]",
-                keyAlgo, keySize);
-
-        throw new EStartup(message);
     }
 }

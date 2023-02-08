@@ -17,8 +17,7 @@
 package org.finos.tracdap.gateway;
 
 import org.finos.tracdap.common.auth.external.IAuthProvider;
-import org.finos.tracdap.common.auth.internal.JwtProcessor;
-import org.finos.tracdap.common.config.ConfigKeys;
+import org.finos.tracdap.common.auth.internal.JwtSetup;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.common.plugin.PluginManager;
@@ -42,7 +41,6 @@ import io.netty.util.concurrent.DefaultThreadFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.security.KeyPair;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -111,7 +109,7 @@ public class TracPlatformGateway extends CommonServiceBase {
             var authProvider = pluginManager.createService(IAuthProvider.class, authProviderConfig, configManager);
 
             // JWT processor is responsible for signing and validating auth tokens
-            var jwtProcessor = setupJwtAuth(configManager);
+            var jwtProcessor = JwtSetup.createProcessor(gatewayConfig, configManager);
 
             // Handlers for all support protocols
             var http1Handler = ProtocolSetup.setup(connId -> new Http1Router(routes, connId));
@@ -220,27 +218,6 @@ public class TracPlatformGateway extends CommonServiceBase {
 
         log.info("All gateway connections are closed");
         return 0;
-    }
-
-    private JwtProcessor setupJwtAuth(ConfigManager configManager) {
-
-        if (!configManager.hasSecret(ConfigKeys.TRAC_AUTH_PUBLIC_KEY) ||
-            !configManager.hasSecret(ConfigKeys.TRAC_AUTH_PRIVATE_KEY)) {
-
-            // Allowing the service to run without validating authentication is hugely risky
-            // Especially because claims can still be added to JWT
-            // The auth-tool utility makes it really easy to set up auth keys on local JKS
-
-            var error = "Root authentication keys are not available, the service will not start";
-            log.error(error);
-            throw new EStartup(error);
-        }
-
-        var publicKey = configManager.loadPublicKey(ConfigKeys.TRAC_AUTH_PUBLIC_KEY);
-        var privateKey = configManager.loadPrivateKey(ConfigKeys.TRAC_AUTH_PRIVATE_KEY);
-        var keyPair = new KeyPair(publicKey, privateKey);
-
-        return JwtProcessor.configure(gatewayConfig.getAuthentication(), gatewayConfig.getPlatformInfo(), keyPair);
     }
 
     public static void main(String[] args) {

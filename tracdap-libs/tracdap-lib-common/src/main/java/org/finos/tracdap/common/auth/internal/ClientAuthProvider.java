@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Accenture Global Solutions Limited
+ * Copyright 2023 Accenture Global Solutions Limited
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.auth;
+package org.finos.tracdap.common.auth.internal;
 
 import io.grpc.CallCredentials;
 import io.grpc.CallOptions;
@@ -25,14 +25,14 @@ import io.grpc.stub.AbstractStub;
 import java.util.concurrent.Executor;
 
 
-public class GrpcClientAuth extends CallCredentials {
+public class ClientAuthProvider extends CallCredentials {
 
     private final String token;
 
     public static <T extends AbstractStub<T>>  T applyIfAvailable(T client, String token) {
 
         if (token != null && !token.isBlank())
-            return client.withCallCredentials((new GrpcClientAuth(token)));
+            return client.withCallCredentials((new ClientAuthProvider(token)));
         else
             return client;
     }
@@ -40,12 +40,12 @@ public class GrpcClientAuth extends CallCredentials {
     public static CallOptions applyIfAvailable(CallOptions callOptions, String token) {
 
         if (token != null && !token.isBlank())
-            return callOptions.withCallCredentials((new GrpcClientAuth(token)));
+            return callOptions.withCallCredentials((new ClientAuthProvider(token)));
         else
             return callOptions;
     }
 
-    private GrpcClientAuth(String token) {
+    private ClientAuthProvider(String token) {
         this.token = token;
     }
 
@@ -59,7 +59,7 @@ public class GrpcClientAuth extends CallCredentials {
         else {
 
             var authHeaders = new Metadata();
-            authHeaders.put(AuthConstants.AUTH_TOKEN_METADATA_KEY, token);
+            authHeaders.put(AuthConstants.TRAC_AUTH_TOKEN_KEY, token);
 
             applier.apply(authHeaders);
         }
