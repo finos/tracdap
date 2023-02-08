@@ -310,7 +310,7 @@ class _StaticValidator:
                 cls._fail(f"Invalid model parameter: [{param_name}] label is missing or blank")
 
             if len(param.label) > cls.__label_length_limit:
-                cls._fail(f"Invalid model parameter: [{param.fieldName}] label exceeds maximum length limit")
+                cls._fail(f"Invalid model parameter: [{param.fieldName}] label exceeds maximum length limit ({cls.__label_length_limit} characters)")  # noqa
 
     @classmethod
     def _check_table_fields(cls, inputs_or_outputs):
@@ -346,7 +346,7 @@ class _StaticValidator:
             cls._fail(f"Invalid {property_type}: [{field.fieldName}] label is missing or blank")
 
         if len(field.label) > cls.__label_length_limit:
-            cls._fail(f"Invalid {property_type}: [{field.fieldName}] label exceeds maximum length limit")
+            cls._fail(f"Invalid {property_type}: [{field.fieldName}] label exceeds maximum length limit ({cls.__label_length_limit} characters)")  # noqa
 
         if field.businessKey and field.fieldType not in cls.__BUSINESS_KEY_TYPES:
             cls._fail(f"Invalid {property_type}: [{field.fieldName}] fieldType {field.fieldType} used as business key")
