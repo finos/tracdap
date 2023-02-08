@@ -237,6 +237,7 @@ class _StaticValidator:
 
     __identifier_pattern = re.compile("\\A[a-zA-Z_]\\w*\\Z", re.ASCII)
     __reserved_identifier_pattern = re.compile("\\A(_|trac_)", re.ASCII)
+    __label_length_limit = 4096
 
     __PRIMITIVE_TYPES = [
         meta.BasicType.BOOLEAN,
@@ -308,6 +309,9 @@ class _StaticValidator:
             if param.label is None or len(param.label.strip()) == 0:
                 cls._fail(f"Invalid model parameter: [{param_name}] label is missing or blank")
 
+            if len(param.label) > cls.__label_length_limit:
+                cls._fail(f"Invalid model parameter: [{param.fieldName}] label exceeds maximum length limit")
+
     @classmethod
     def _check_table_fields(cls, inputs_or_outputs):
 
@@ -340,6 +344,9 @@ class _StaticValidator:
 
         if field.label is None or len(field.label.strip()) == 0:
             cls._fail(f"Invalid {property_type}: [{field.fieldName}] label is missing or blank")
+
+        if len(field.label) > cls.__label_length_limit:
+            cls._fail(f"Invalid {property_type}: [{field.fieldName}] label exceeds maximum length limit")
 
         if field.businessKey and field.fieldType not in cls.__BUSINESS_KEY_TYPES:
             cls._fail(f"Invalid {property_type}: [{field.fieldName}] fieldType {field.fieldType} used as business key")
