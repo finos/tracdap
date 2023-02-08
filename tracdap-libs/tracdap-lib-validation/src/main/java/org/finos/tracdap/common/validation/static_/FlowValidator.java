@@ -49,6 +49,8 @@ public class FlowValidator {
     private static final Descriptors.FieldDescriptor FN_INPUTS;
     private static final Descriptors.FieldDescriptor FN_OUTPUTS;
     private static final Descriptors.FieldDescriptor FN_NODE_SEARCH;
+    private static final Descriptors.FieldDescriptor FN_NODE_ATTRS;
+    private static final Descriptors.FieldDescriptor FN_LABEL;
 
     private static final Descriptors.Descriptor FLOW_EDGE;
     private static final Descriptors.FieldDescriptor FE_SOURCE;
@@ -72,6 +74,8 @@ public class FlowValidator {
         FN_INPUTS = field(FLOW_NODE, FlowNode.INPUTS_FIELD_NUMBER);
         FN_OUTPUTS = field(FLOW_NODE, FlowNode.OUTPUTS_FIELD_NUMBER);
         FN_NODE_SEARCH = field(FLOW_NODE, FlowNode.NODESEARCH_FIELD_NUMBER);
+        FN_NODE_ATTRS = field(FLOW_NODE, FlowNode.NODEATTRS_FIELD_NUMBER);
+        FN_LABEL = field(FLOW_NODE, FlowNode.LABEL_FIELD_NUMBER);
 
         FLOW_EDGE = FlowEdge.getDescriptor();
         FE_SOURCE = field(FLOW_EDGE, FlowEdge.SOURCE_FIELD_NUMBER);
@@ -146,6 +150,16 @@ public class FlowValidator {
         ctx = ctx.push(FN_NODE_SEARCH)
                 .apply(CommonValidators::optional)
                 .apply(SearchValidator::searchExpression, SearchExpression.class)
+                .pop();
+
+        ctx = ctx.pushRepeated(FN_NODE_ATTRS)
+                .apply(CommonValidators::optional)
+                .applyRepeated(TagUpdateValidator::tagUpdate, TagUpdate.class)
+                .pop();
+
+        ctx = ctx.push(FN_LABEL)
+                .apply(CommonValidators::optional)
+                .apply(CommonValidators::labelLengthLimit)
                 .pop();
 
         return ctx;

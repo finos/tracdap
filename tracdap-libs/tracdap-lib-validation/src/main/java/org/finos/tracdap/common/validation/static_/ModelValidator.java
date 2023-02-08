@@ -171,6 +171,7 @@ public class ModelValidator {
 
         ctx = ctx.push(MP_LABEL)
                 .apply(CommonValidators::optional)
+                .apply(CommonValidators::labelLengthLimit)
                 .pop();
 
         ctx = ctx.push(MP_DEFAULT_VALUE)
