@@ -42,6 +42,7 @@ message FlowNode {
 
   SearchExpression nodeSearch = 4;
   repeated TagUpdate nodeAttrs = 5;
+  string label = 6;
 
   reserved "parameters;";
 }

@@ -75,4 +75,5 @@ public class ValidationConstants {
     // Commit hash might start with a number
     // If these criteria are too restrictive we made need to relax this later
     public static final Pattern MODEL_VERSION = Pattern.compile("\\A\\p{Alnum}[\\w-.]*\\Z");
+    public static final int LABEL_LENGTH_LIMIT = 4096;
 }

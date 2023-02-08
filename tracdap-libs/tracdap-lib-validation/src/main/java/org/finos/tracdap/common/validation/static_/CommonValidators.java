@@ -43,6 +43,7 @@ import java.util.UUID;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
+import static org.finos.tracdap.common.validation.ValidationConstants.LABEL_LENGTH_LIMIT;
 
 public class CommonValidators {
 
@@ -280,6 +281,21 @@ public class CommonValidators {
 
             return ctx.error(err);
         }
+    }
+
+    public static ValidationContext labelLengthLimit(String value, ValidationContext ctx) {
+
+        if (ctx.field().getType() != Descriptors.FieldDescriptor.Type.STRING)
+            throw new EUnexpected();
+
+        if(value.length()>LABEL_LENGTH_LIMIT) {
+            var err = String.format("Length limit of [%d] characters was exceeded by the label: %s",
+                    LABEL_LENGTH_LIMIT, value);
+            return ctx.error(err);
+        }
+
+        return ctx;
+
     }
 
     public static ValidationContext identifier(String value, ValidationContext ctx) {
