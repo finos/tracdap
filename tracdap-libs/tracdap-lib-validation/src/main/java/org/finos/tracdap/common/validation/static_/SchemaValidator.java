@@ -52,6 +52,7 @@ public class SchemaValidator {
     private static final Descriptors.FieldDescriptor FS_FIELD_NAME;
     private static final Descriptors.FieldDescriptor FS_FIELD_ORDER;
     private static final Descriptors.FieldDescriptor FS_FIELD_TYPE;
+    private static final Descriptors.FieldDescriptor FS_LABEL;
 
     static {
 
@@ -67,6 +68,7 @@ public class SchemaValidator {
         FS_FIELD_NAME = ValidatorUtils.field(FIELD_SCHEMA, FieldSchema.FIELDNAME_FIELD_NUMBER);
         FS_FIELD_ORDER = ValidatorUtils.field(FIELD_SCHEMA, FieldSchema.FIELDORDER_FIELD_NUMBER);
         FS_FIELD_TYPE = ValidatorUtils.field(FIELD_SCHEMA, FieldSchema.FIELDTYPE_FIELD_NUMBER);
+        FS_LABEL = ValidatorUtils.field(FIELD_SCHEMA, FieldSchema.LABEL_FIELD_NUMBER);
     }
 
 
@@ -173,6 +175,11 @@ public class SchemaValidator {
                 .apply(CommonValidators::required)
                 .apply(CommonValidators::recognizedEnum, BasicType.class)
                 .apply(CommonValidators::primitiveType, BasicType.class)
+                .pop();
+
+        ctx = ctx.push(FS_LABEL)
+                .apply(CommonValidators::optional)
+                .apply(CommonValidators::labelLengthLimit)
                 .pop();
 
         if (field.getBusinessKey() && !ALLOWED_BUSINESS_KEY_TYPES.contains(field.getFieldType())) {
