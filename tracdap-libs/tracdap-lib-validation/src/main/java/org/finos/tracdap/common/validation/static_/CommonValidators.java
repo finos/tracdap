@@ -289,8 +289,7 @@ public class CommonValidators {
             throw new EUnexpected();
 
         if(value.length()>LABEL_LENGTH_LIMIT) {
-            var err = String.format("Length limit of [%d] characters was exceeded by the label: %s",
-                    LABEL_LENGTH_LIMIT, value);
+            var err = String.format("Label exceeds maximum length limit (%d characters)", LABEL_LENGTH_LIMIT);
             return ctx.error(err);
         }
 
