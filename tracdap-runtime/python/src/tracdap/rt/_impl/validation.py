@@ -235,7 +235,7 @@ class _TypeValidator:
 
 class _StaticValidator:
 
-    __identifier_pattern = re.compile("\\A[a-zA-Z_]\\w+\\Z", re.ASCII)
+    __identifier_pattern = re.compile("\\A[a-zA-Z_]\\w*\\Z", re.ASCII)
     __reserved_identifier_pattern = re.compile("\\A(_|trac_)", re.ASCII)
 
     __PRIMITIVE_TYPES = [
