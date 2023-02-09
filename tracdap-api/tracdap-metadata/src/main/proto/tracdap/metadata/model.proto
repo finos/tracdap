@@ -51,6 +51,7 @@ message ModelParameter {
 message ModelInputSchema {
 
     SchemaDefinition schema = 1;
+    string label = 2;
 }
 
 /**
@@ -68,6 +69,7 @@ message ModelInputSchema {
 message ModelOutputSchema {
 
     SchemaDefinition schema = 1;
+    string label = 2;
 }
 
 

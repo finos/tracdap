@@ -52,9 +52,11 @@ public class ModelValidator {
 
     private static final Descriptors.Descriptor MODEL_INPUT_SCHEMA;
     private static final Descriptors.FieldDescriptor MIS_SCHEMA;
+    private static final Descriptors.FieldDescriptor MIS_LABEL;
 
     private static final Descriptors.Descriptor MODEL_OUTPUT_SCHEMA;
     private static final Descriptors.FieldDescriptor MOS_SCHEMA;
+    private static final Descriptors.FieldDescriptor MOS_LABEL;
 
     static {
 
@@ -75,9 +77,11 @@ public class ModelValidator {
 
         MODEL_INPUT_SCHEMA = ModelInputSchema.getDescriptor();
         MIS_SCHEMA = field(MODEL_INPUT_SCHEMA, ModelInputSchema.SCHEMA_FIELD_NUMBER);
+        MIS_LABEL = field(MODEL_INPUT_SCHEMA, ModelInputSchema.LABEL_FIELD_NUMBER);
 
         MODEL_OUTPUT_SCHEMA = ModelOutputSchema.getDescriptor();
         MOS_SCHEMA = field(MODEL_OUTPUT_SCHEMA, ModelOutputSchema.SCHEMA_FIELD_NUMBER);
+        MOS_LABEL = field(MODEL_OUTPUT_SCHEMA, ModelOutputSchema.LABEL_FIELD_NUMBER);
     }
 
     @Validator
@@ -185,19 +189,33 @@ public class ModelValidator {
     @Validator
     public static ValidationContext modelInputSchema(ModelInputSchema msg, ValidationContext ctx) {
 
-        return ctx.push(MIS_SCHEMA)
+        ctx = ctx.push(MIS_SCHEMA)
                 .apply(CommonValidators::required)
                 .applyRegistered()
                 .pop();
+
+        ctx = ctx.push(MIS_LABEL)
+                .apply(CommonValidators::optional)
+                .apply(CommonValidators::labelLengthLimit)
+                .pop();
+
+        return ctx;
     }
 
     @Validator
     public static ValidationContext modelOutputSchema(ModelOutputSchema msg, ValidationContext ctx) {
 
-        return ctx.push(MOS_SCHEMA)
+        ctx = ctx.push(MOS_SCHEMA)
                 .apply(CommonValidators::required)
                 .applyRegistered()
                 .pop();
+
+        ctx = ctx.push(MOS_LABEL)
+                .apply(CommonValidators::optional)
+                .apply(CommonValidators::labelLengthLimit)
+                .pop();
+
+        return ctx;
     }
 
     public static ValidationContext modelEntryPoint(String modelEntryPoint, ValidationContext ctx) {
