@@ -138,9 +138,14 @@ public class TracOrchestratorService extends CommonServiceBase {
 
             this.server = NettyServerBuilder
                     .forPort(orchestratorConfig.getPort())
+
+                    // Interceptor order: Last added is executed first
+                    // But note, on close it is the other way round, because the stack is unwinding
+                    // We want error mapping at the bottom of the stack, so it unwinds before logging
+
+                    .intercept(new ErrorMappingInterceptor())
                     .intercept(new LoggingServerInterceptor(TracOrchestratorService.class))
                     .intercept(new InternalAuthValidator(platformConfig.getAuthentication(), jwtProcessor))
-                    .intercept(new ErrorMappingInterceptor())
                     .addService(new TracOrchestratorApi(jobManager, jobProcessor))
 
                     .channelType(channelType)

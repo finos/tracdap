@@ -175,10 +175,14 @@ public class TracDataService extends CommonServiceBase {
                     // Services
                     .addService(dataApi)
 
+                    // Interceptor order: Last added is executed first
+                    // But note, on close it is the other way round, because the stack is unwinding
+                    // We want error mapping at the bottom of the stack, so it unwinds before logging
+
                     // Interceptors
+                    .intercept(new ErrorMappingInterceptor())
                     .intercept(new LoggingServerInterceptor(TracDataApi.class))
                     .intercept(new InternalAuthValidator(platformConfig.getAuthentication(), tokenProcessor))
-                    .intercept(new ErrorMappingInterceptor())
                     .intercept(execRegister.registerExecContext())
 
                     .build();
