@@ -116,7 +116,7 @@ public class TracOrchestratorService extends CommonServiceBase {
 
             var metaClient = TrustedMetadataApiGrpc
                     .newBlockingStub(clientChannel)
-                    .withInterceptors(new LoggingClientInterceptor(JobProcessorHelpers.class));
+                    .withInterceptors(new LoggingClientInterceptor(JobProcessor.class));
 
             var jwtProcessor = JwtSetup.createProcessor(platformConfig, configManager);
             var internalAuth = new InternalAuthProvider(jwtProcessor, platformConfig.getAuthentication());
