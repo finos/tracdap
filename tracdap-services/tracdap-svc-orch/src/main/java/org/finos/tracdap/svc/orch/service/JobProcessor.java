@@ -16,8 +16,11 @@
 
 package org.finos.tracdap.svc.orch.service;
 
+import org.finos.tracdap.api.JobRequest;
 import org.finos.tracdap.api.MetadataWriteRequest;
 import org.finos.tracdap.api.TrustedMetadataApiGrpc.TrustedMetadataApiBlockingStub;
+import org.finos.tracdap.common.auth.internal.AuthHelpers;
+import org.finos.tracdap.common.auth.internal.InternalAuthProvider;
 import org.finos.tracdap.common.config.ConfigFormat;
 import org.finos.tracdap.common.config.ConfigParser;
 import org.finos.tracdap.common.exception.*;
@@ -36,6 +39,8 @@ import org.finos.tracdap.metadata.TagUpdate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.time.Duration;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -45,9 +50,16 @@ import static org.finos.tracdap.common.metadata.MetadataConstants.TRAC_JOB_STATU
 
 public class JobProcessor {
 
+    // These timeouts are to avoid granting unbounded delegate sessions
+    // When job processing timeouts are added in JobManager, the session timeouts should reflect those
+
+    private static final Duration JOB_SETUP_SESSION_TIMEOUT = Duration.of(1, ChronoUnit.MINUTES);
+    private static final Duration JOB_EXECUTION_SESSION_TIMEOUT = Duration.of(24, ChronoUnit.HOURS);
+
     private final Logger log = LoggerFactory.getLogger(getClass());
 
     private final TrustedMetadataApiBlockingStub metaClient;
+    private final InternalAuthProvider internalAuth;
     private final IBatchExecutor<?> executor;
     private final Validator validator = new Validator();
 
@@ -55,21 +67,50 @@ public class JobProcessor {
     private final JobLifecycle lifecycle;
 
 
-    public JobProcessor(TrustedMetadataApiBlockingStub metaClient, IBatchExecutor<?> executor, JobLifecycle lifecycle) {
+    public JobProcessor(
+            TrustedMetadataApiBlockingStub metaClient,
+            InternalAuthProvider internalAuth,
+            IBatchExecutor<?> executor,
+            JobLifecycle lifecycle) {
 
         this.metaClient = metaClient;
+        this.internalAuth = internalAuth;
         this.executor = executor;
         this.lifecycle = lifecycle;
     }
 
+    public JobState newJob(JobRequest request) {
 
-    // Metadata actions
+        var jobState = new JobState();
+        jobState.tenant = request.getTenant();
+        jobState.owner = AuthHelpers.currentUser();
+
+        // Create a short-lived delegate auth session to set up the job
+        jobState.credentials = internalAuth.createDelegateSession(jobState.owner, JOB_SETUP_SESSION_TIMEOUT);
+
+        jobState.jobType = request.getJob().getJobType();
+        jobState.definition = request.getJob();
+        jobState.jobRequest = request;
+
+        jobState.tracStatus = JobStatusCode.PREPARING;
+
+        return jobState;
+    }
 
     public JobState assembleAndValidate(JobState jobState) {
 
         var newState = jobState.clone();
 
-        newState = lifecycle.assembleAndValidate(newState);
+        // Credentials token processor must be reset after deserializing jobState from the cache
+        internalAuth.setTokenProcessor(newState.credentials);
+
+        newState = lifecycle.applyTransform(newState);
+        newState = lifecycle.loadResources(newState);
+        newState = lifecycle.allocateResultIds(newState);
+        newState = lifecycle.buildJobConfig(newState);
+
+        // static validate
+        // semantic validate
 
         newState.tracStatus = JobStatusCode.VALIDATED;
 
@@ -80,6 +121,9 @@ public class JobProcessor {
 
         var newState = jobState.clone();
 
+        // Credentials token processor must be reset after deserializing jobState from the cache
+        internalAuth.setTokenProcessor(newState.credentials);
+
         newState = lifecycle.saveInitialMetadata(newState);
 
         newState.tracStatus = JobStatusCode.QUEUED;
@@ -88,15 +132,30 @@ public class JobProcessor {
         return newState;
     }
 
-    public JobState updateMetadata(JobState jobState) {
+    public JobState scheduleLaunch(JobState jobState) {
+
+        var newState = jobState.clone();
+        newState.tracStatus = JobStatusCode.PENDING;
+        newState.cacheStatus = CacheStatus.LAUNCH_SCHEDULED;
+
+        // Create a new, long-lived delegate auth session for job execution
+        jobState.credentials = internalAuth.createDelegateSession(jobState.owner, JOB_EXECUTION_SESSION_TIMEOUT);
+
+        return updateMetadata(newState);
+    }
+
+    private JobState updateMetadata(JobState jobState) {
+
+        // Credentials token processor must be reset after deserializing jobState from the cache
+        internalAuth.setTokenProcessor(jobState.credentials);
 
         var writeRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(jobState.tenant)
                 .setObjectType(ObjectType.JOB)
                 .setPriorVersion(MetadataUtil.selectorFor(jobState.jobId))
                 .addTagUpdates(TagUpdate.newBuilder()
-                .setAttrName(TRAC_JOB_STATUS_ATTR)
-                .setValue(MetadataCodec.encodeValue(jobState.tracStatus.name())))
+                        .setAttrName(TRAC_JOB_STATUS_ATTR)
+                        .setValue(MetadataCodec.encodeValue(jobState.tracStatus.name())))
                 .build();
 
         var userAuth = metaClient.withCallCredentials(jobState.credentials);
@@ -108,37 +167,11 @@ public class JobProcessor {
         return newState;
     }
 
-    public JobState saveResultMetadata(JobState jobState) {
-
-        // TRAC job status must already be set before calling lifecycle
-
-        lifecycle.processJobResult(jobState);
-
-        var newState = jobState.clone();
-        newState.cacheStatus = CacheStatus.RESULTS_SAVED;
-
-        return newState;
-    }
-
-
-    // Executor actions
-
-    public JobState scheduleLaunch(JobState jobState) {
-
-        var newState = jobState.clone();
-        newState.tracStatus = JobStatusCode.PENDING;
-        newState.cacheStatus = CacheStatus.LAUNCH_SCHEDULED;
-
-        return updateMetadata(newState);
-    }
-
     public JobState launchJob(JobState jobState) {
 
         // TODO: Use a submission ID to avoid clash on repeat
 
         var jobKey =  jobState.jobKey;
-
-        log.info("LAUNCH JOB: [{}]", jobKey);
 
         var batchExecutor = stronglyTypedExecutor();
         var batchState = batchExecutor.createBatch(jobKey);
@@ -173,20 +206,30 @@ public class JobProcessor {
         newState.batchStatus = ExecutorJobStatus.STATUS_UNKNOWN;
         newState.batchState = batchState.toByteArray();
 
-        log.info("LAUNCH JOB SUCCEEDED: [{}]", jobKey);
-
         return newState;
     }
 
-    public JobState recordPollStatus(JobState jobState, ExecutorJobInfo batchInfo) {
+    public List<ExecutorJobInfo> pollExecutorJobs(List<Map.Entry<String, JobState>> jobs) {
+
+        var executor = stronglyTypedExecutor();
+
+        var jobState = jobs.stream()
+                // Only poll jobs that have an executor state
+                .filter(j -> j.getValue().batchState != null)
+                .map(j -> Map.entry(j.getKey(), stronglyTypedState(executor, j.getValue().batchState)))
+                .collect(Collectors.toList());
+
+        return executor.pollBatches(jobState);
+    }
+
+    public JobState recordJobStatus(JobState jobState, ExecutorJobInfo batchInfo) {
 
         var newState = jobState.clone();
         newState.batchStatus = batchInfo.getStatus();
 
-        log.info("EXECUTOR STATE UPDATE: [{}] {}", newState.jobKey, batchInfo.getStatus());
+        log.info("Job status received from executor: [{}] {}", newState.jobKey, newState.batchStatus);
 
         switch (batchInfo.getStatus()) {
-
 
             // Change to SUBMITTED / RUNNING state is significant, send update to metadata service
 
@@ -246,16 +289,12 @@ public class JobProcessor {
 
     public JobState fetchJobResult(JobState jobState) {
 
-        var jobKey = jobState.jobKey;
-
-        log.info("FETCH JOB RESULT: [{}]", jobKey);
-
         var batchExecutor = stronglyTypedExecutor();
         var batchState = stronglyTypedState(batchExecutor, jobState.batchState);
 
         if (jobState.batchState == null) {
 
-            log.info("FETCH JOB RESULT FAILED: [{}] executor state is not available", jobState.jobKey);
+            log.info("Cannot fetch job result: [{}] Executor state is not available", jobState.jobKey);
 
             var newState = jobState.clone();
             newState.tracStatus = JobStatusCode.FAILED;
@@ -267,8 +306,8 @@ public class JobProcessor {
 
         try {
 
-            var resultFile = String.format("job_result_%s.json", jobKey);
-            var resultBytes = batchExecutor.readFile(jobKey, batchState, "result", resultFile);
+            var resultFile = String.format("job_result_%s.json", jobState.jobKey);
+            var resultBytes = batchExecutor.readFile(jobState.jobKey, batchState, "result", resultFile);
 
             var results = ConfigParser.parseConfig(resultBytes, ConfigFormat.JSON, JobResult.class);
 
@@ -277,7 +316,7 @@ public class JobProcessor {
 
             for (var result : results.getResultsMap().entrySet()) {
 
-                log.info("Validating job result [{}]", result.getKey());
+                log.info("Validating job result: [{}] item [{}]", jobState.jobKey, result.getKey());
                 validator.validateFixedObject(result.getValue());
             }
 
@@ -285,8 +324,6 @@ public class JobProcessor {
             newState.jobResult = results;
             newState.tracStatus = JobStatusCode.SUCCEEDED;
             newState.cacheStatus = CacheStatus.RESULTS_RECEIVED;
-
-            log.info("FETCH JOB RESULT SUCCEEDED: [{}]", jobKey);
 
             return newState;
         }
@@ -304,15 +341,28 @@ public class JobProcessor {
             newState.cacheStatus = CacheStatus.RESULTS_INVALID;
             newState.statusMessage = shortMessage;
 
-            log.error("FETCH JOB RESULT FAILED: [{}] {}", jobKey, shortMessage, e);
+            log.error("Failed to decode job result: [{}] {}", jobState.jobKey, shortMessage, e);
 
             return newState;
         }
     }
 
-    public JobState cleanUpJob(JobState jobState) {
+    public JobState saveResultMetadata(JobState jobState) {
 
-        log.info("CLEAN UP JOB: [{}]", jobState.jobKey);
+        // Credentials token processor must be reset after deserializing jobState from the cache
+        internalAuth.setTokenProcessor(jobState.credentials);
+
+        // TRAC job status must already be set before calling lifecycle
+
+        lifecycle.processJobResult(jobState);
+
+        var newState = jobState.clone();
+        newState.cacheStatus = CacheStatus.RESULTS_SAVED;
+
+        return newState;
+    }
+
+    public JobState cleanUpJob(JobState jobState) {
 
         if (jobState.batchState != null) {
 
@@ -326,8 +376,6 @@ public class JobProcessor {
             newState.batchStatus = ExecutorJobStatus.STATUS_UNKNOWN;
             newState.batchState = null;
 
-            log.info("CLEAN UP JOB SUCCEEDED: [{}]", jobState.jobKey);
-
             return newState;
         }
         else {
@@ -336,7 +384,7 @@ public class JobProcessor {
             newState.cacheStatus = CacheStatus.READY_TO_REMOVE;
             newState.batchStatus = ExecutorJobStatus.STATUS_UNKNOWN;
 
-            log.warn("CLEAN UP JOB FAILED: [{}] executor state is not available", jobState.jobKey);
+            log.warn("Job could not be cleaned up: [{}] Executor state is not available", jobState.jobKey);
             log.warn("There may be an orphaned task in the executor");
 
             return newState;
@@ -345,27 +393,25 @@ public class JobProcessor {
 
     public JobState scheduleRemoval(JobState jobState) {
 
-        log.info("SCHEDULING REMOVAL: [{}]", jobState.jobKey);
-
         var newState = jobState.clone();
         newState.cacheStatus = CacheStatus.SCHEDULED_TO_REMOVE;
 
         return newState;
     }
 
-    // Executor polling
+    public JobState handleProcessingFailed(JobState jobState, String errorMessage, Exception exception) {
 
-    public List<ExecutorJobInfo> pollExecutorJobs(List<Map.Entry<String, JobState>> jobs) {
+        var newState = jobState.clone();
+        newState.tracStatus = JobStatusCode.FAILED;
+        newState.statusMessage = errorMessage;
+        newState.exception = exception;
 
-        var executor = stronglyTypedExecutor();
+        internalAuth.setTokenProcessor(newState.credentials);
+        lifecycle.processJobResult(newState);
 
-        var jobState = jobs.stream()
-                // Only poll jobs that have an executor state
-                .filter(j -> j.getValue().batchState != null)
-                .map(j -> Map.entry(j.getKey(), stronglyTypedState(executor, j.getValue().batchState)))
-                .collect(Collectors.toList());
+        newState.cacheStatus = CacheStatus.READY_TO_REMOVE;
 
-        return executor.pollBatches(jobState);
+        return newState;
     }
 
     @SuppressWarnings("unchecked")
