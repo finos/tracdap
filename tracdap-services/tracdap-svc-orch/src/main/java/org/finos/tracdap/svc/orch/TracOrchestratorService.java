@@ -120,8 +120,6 @@ public class TracOrchestratorService extends CommonServiceBase {
 
             var jwtProcessor = JwtSetup.createProcessor(platformConfig, configManager);
             var internalAuth = new InternalAuthProvider(jwtProcessor, platformConfig.getAuthentication());
-            var jobProcessorHelpers = new JobProcessorHelpers(platformConfig, metaClient);
-            var jobProcessor = new JobProcessor(metaClient, internalAuth, jobExecutor, jobProcessorHelpers);
 
             jobExecutor = pluginManager.createService(
                     IBatchExecutor.class,
@@ -129,6 +127,9 @@ public class TracOrchestratorService extends CommonServiceBase {
                     configManager);
 
             var jobCache = new LocalJobCache<JobState>();
+
+            var jobProcessorHelpers = new JobProcessorHelpers(platformConfig, metaClient);
+            var jobProcessor = new JobProcessor(metaClient, internalAuth, jobExecutor, jobProcessorHelpers);
 
             jobManager = new JobManager(platformConfig, jobProcessor, jobCache, serviceGroup);
 
