@@ -41,15 +41,15 @@ import static org.finos.tracdap.common.metadata.MetadataConstants.*;
 import static org.finos.tracdap.common.metadata.MetadataUtil.selectorFor;
 
 
-public class JobLifecycle {
+public class JobProcessorHelpers {
 
-    private final Logger log = LoggerFactory.getLogger(JobLifecycle.class);
+    private final Logger log = LoggerFactory.getLogger(JobProcessorHelpers.class);
 
     private final PlatformConfig platformConfig;
     private final TrustedMetadataApiGrpc.TrustedMetadataApiBlockingStub metaClient;
 
 
-    public JobLifecycle(
+    public JobProcessorHelpers(
             PlatformConfig platformConfig,
             TrustedMetadataApiGrpc.TrustedMetadataApiBlockingStub metaClient) {
 
@@ -79,19 +79,6 @@ public class JobLifecycle {
     private static MetadataWriteRequest scrapTenant(MetadataWriteRequest request) {
         return MetadataWriteRequest.newBuilder(request)
                 .clearTenant().build();
-    }
-
-    JobState assembleAndValidate(JobState jobState) {
-
-        jobState = applyTransform(jobState);
-        jobState = loadResources(jobState);
-        jobState = allocateResultIds(jobState);
-        jobState = buildJobConfig(jobState);
-
-        return jobState;
-
-        // static validate
-        // semantic validate
     }
 
     JobState applyTransform(JobState jobState) {

@@ -37,32 +37,33 @@ import java.util.Map;
 
 public class JobState implements Serializable, Cloneable {
 
-    public String tenant;
-    public UserInfo owner;
-    public InternalCallCredentials credentials;
+    String tenant;
+    UserInfo owner;
+    InternalCallCredentials credentials;
 
-    public JobRequest jobRequest;
-    public String jobKey;
-    public TagHeader jobId;
-    public JobType jobType;
+    JobRequest jobRequest;
+    String jobKey;
+    TagHeader jobId;
+    JobType jobType;
 
-    public JobStatusCode tracStatus;
-    public ExecutorJobStatus batchStatus;
-    public String cacheStatus;
-    public String statusMessage;
-    public String errorDetail;
-    public Exception exception;
+    JobStatusCode tracStatus;
+    ExecutorJobStatus batchStatus;
+    String cacheStatus;
+    String statusMessage;
+    String errorDetail;
+    Exception exception;
+    int retries;
 
-    public JobDefinition definition;
-    public Map<String, ObjectDefinition> resources = new HashMap<>();
-    public Map<String, TagHeader> resourceMapping = new HashMap<>();
-    public Map<String, TagHeader> resultMapping = new HashMap<>();
+    JobDefinition definition;
+    Map<String, ObjectDefinition> resources = new HashMap<>();
+    Map<String, TagHeader> resourceMapping = new HashMap<>();
+    Map<String, TagHeader> resultMapping = new HashMap<>();
 
-    public RuntimeConfig sysConfig;
-    public JobConfig jobConfig;
-    public JobResult jobResult;
+    RuntimeConfig sysConfig;
+    JobConfig jobConfig;
+    JobResult jobResult;
 
-    public byte[] batchState;
+    byte[] batchState;
 
 
     @Override

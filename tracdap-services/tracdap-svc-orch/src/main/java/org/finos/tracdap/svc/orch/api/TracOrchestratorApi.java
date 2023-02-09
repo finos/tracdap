@@ -19,11 +19,17 @@ package org.finos.tracdap.svc.orch.api;
 import com.google.protobuf.Descriptors;
 import com.google.protobuf.Message;
 import org.finos.tracdap.api.*;
+import org.finos.tracdap.common.exception.EMetadataNotFound;
+import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.grpc.GrpcServerWrap;
+import org.finos.tracdap.common.metadata.MetadataUtil;
 import org.finos.tracdap.common.validation.Validator;
-import org.finos.tracdap.svc.orch.service.JobApiService;
 import io.grpc.MethodDescriptor;
 import io.grpc.stub.StreamObserver;
+import org.finos.tracdap.svc.orch.service.JobManager;
+import org.finos.tracdap.svc.orch.service.JobProcessor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.function.Function;
 
@@ -37,15 +43,20 @@ public class TracOrchestratorApi extends TracOrchestratorApiGrpc.TracOrchestrato
     private static final MethodDescriptor<JobRequest, JobStatus> SUBMIT_JOB_METHOD = TracOrchestratorApiGrpc.getSubmitJobMethod();
     private static final MethodDescriptor<JobStatusRequest, JobStatus> CHECK_JOB_METHOD = TracOrchestratorApiGrpc.getCheckJobMethod();
 
-    private final Validator validator;
-    private final JobApiService orchestrator;
-    private final GrpcServerWrap grpcWrap;
+    private final Logger log = LoggerFactory.getLogger(getClass());
 
-    public TracOrchestratorApi(JobApiService orchestrator) {
+    private final Validator validator;
+    private final GrpcServerWrap grpcWrap;
+    private final JobManager jobManager;
+    private final JobProcessor jobProcessor;
+
+
+    public TracOrchestratorApi(JobManager jobManager, JobProcessor jobProcessor) {
 
         this.validator = new Validator();
-        this.orchestrator = orchestrator;
         this.grpcWrap = new GrpcServerWrap();
+        this.jobManager = jobManager;
+        this.jobProcessor = jobProcessor;
     }
 
     @Override
@@ -53,7 +64,7 @@ public class TracOrchestratorApi extends TracOrchestratorApiGrpc.TracOrchestrato
 
         grpcWrap.unaryCall(
                 request, responseObserver,
-                apiFunc(VALIDATE_JOB_METHOD, orchestrator::validateJob));
+                apiFunc(VALIDATE_JOB_METHOD, this::validateJobImpl));
     }
 
     @Override
@@ -61,7 +72,7 @@ public class TracOrchestratorApi extends TracOrchestratorApiGrpc.TracOrchestrato
 
         grpcWrap.unaryCall(
                 request, responseObserver,
-                apiFunc(SUBMIT_JOB_METHOD, orchestrator::submitJob));
+                apiFunc(SUBMIT_JOB_METHOD, this::submitJobImpl));
     }
 
     @Override
@@ -69,7 +80,7 @@ public class TracOrchestratorApi extends TracOrchestratorApiGrpc.TracOrchestrato
 
         grpcWrap.unaryCall(
                 request, responseObserver,
-                apiFunc(CHECK_JOB_METHOD, orchestrator::checkJob));
+                apiFunc(CHECK_JOB_METHOD, this::checkJobImpl));
     }
 
     @Override
@@ -94,5 +105,41 @@ public class TracOrchestratorApi extends TracOrchestratorApiGrpc.TracOrchestrato
 
             return func.apply(req);
         };
+    }
+
+    private JobStatus validateJobImpl(JobRequest request) {
+
+        var jobState = jobProcessor.newJob(request);
+        var assembled = jobProcessor.assembleAndValidate(jobState);
+
+        return jobProcessor.getStatus(assembled);
+    }
+
+    private JobStatus submitJobImpl(JobRequest request) {
+
+        var jobState = jobProcessor.newJob(request);
+        var assembled = jobProcessor.assembleAndValidate(jobState);
+        var cached = jobManager.addNewJob(assembled);
+
+        return jobProcessor.getStatus(cached);
+    }
+
+    private JobStatus checkJobImpl(JobStatusRequest request) {
+
+        // TODO: Keys for other selector types
+        if (!request.getSelector().hasObjectVersion())
+            throw new EUnexpected();
+
+        var jobKey = MetadataUtil.objectKey(request.getSelector());
+        var jobState = jobManager.queryJob(jobKey);
+
+        // TODO: Should there be a different error for jobs not found in the cache? EJobNotLive?
+        if (jobState == null) {
+            var message = String.format("Job not found (it may have completed): [%s]", jobKey);
+            log.error(message);
+            throw new EMetadataNotFound(message);
+        }
+
+        return jobProcessor.getStatus(jobState);
     }
 }

@@ -20,10 +20,9 @@ import io.grpc.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.annotation.Nullable;
-
 
 public class LoggingClientInterceptor implements ClientInterceptor {
+
     private final Logger log;
 
     public LoggingClientInterceptor(Class<?> serviceClass) {
@@ -34,16 +33,16 @@ public class LoggingClientInterceptor implements ClientInterceptor {
     public <ReqT, RespT> ClientCall<ReqT, RespT> interceptCall(
             MethodDescriptor<ReqT, RespT> method,
             CallOptions callOptions,
-            Channel next
-    ) {
+            Channel next) {
 
         var nextCall = next.newCall(method, callOptions);
         var methodName = methodDisplayName(method);
 
-        return new LoggingClientCall<>(nextCall, log, methodName);
+        return new LoggingClientCall<>(nextCall, methodName, method.getType());
     }
 
     private String methodDisplayName(MethodDescriptor<?, ?> method) {
+
         var serviceName = method.getServiceName();
         var shortServiceName = serviceName == null ? null : serviceName.substring(serviceName.lastIndexOf(".") + 1);
         var methodName = method.getBareMethodName();
@@ -52,73 +51,65 @@ public class LoggingClientInterceptor implements ClientInterceptor {
     }
 
 
-    private static class LoggingClientCall<ReqT, RespT> extends ForwardingClientCall.SimpleForwardingClientCall<ReqT, RespT> {
-        private final Logger log;
-        private final String methodName;
+    private class LoggingClientCall<ReqT, RespT> extends ForwardingClientCall.SimpleForwardingClientCall<ReqT, RespT> {
 
-        LoggingClientCall(ClientCall<ReqT, RespT> delegate, Logger log, String methodName) {
+        private final String methodName;
+        private final MethodDescriptor.MethodType methodType;
+
+        LoggingClientCall(ClientCall<ReqT, RespT> delegate, String methodName, MethodDescriptor.MethodType methodType) {
             super(delegate);
-            this.log = log;
             this.methodName = methodName;
+            this.methodType = methodType;
         }
 
         @Override
         public void start(ClientCall.Listener<RespT> responseListener, Metadata headers) {
-            log.info("CLIENT CALL START: [{}]", methodName);
 
-            var loggingResponseListener = new LoggingClientCallListener<>(responseListener, log, methodName);
-
-            super.start(loggingResponseListener, headers);
-        }
-
-        @Override
-        public void cancel(@Nullable String message, @Nullable Throwable cause) {
-            if (cause != null) {
-                var grpcError = GrpcErrorMapping.processError(cause);
-                // There is GrpcErrorMapping.processError,
-                // because the exact type of the cause is not known.
-
-                log.error(
-                        "CLIENT CALL CANCELLED: [{}] {}",
-                        methodName,
-                        grpcError.getMessage(),
-                        grpcError
-                );
+            if (methodType == MethodDescriptor.MethodType.UNARY) {
+                log.info("CLIENT CALL START: {}", methodName);
+            }
+            else {
+                log.info("CLIENT CALL START: {} ({})", methodName, methodType);
             }
 
-            super.cancel(message, cause);
+            var loggingResponseListener = new LoggingClientCallListener<>(responseListener, methodName);
+
+            delegate().start(loggingResponseListener, headers);
         }
     }
 
-    private static class LoggingClientCallListener<RespT> extends ForwardingClientCallListener.SimpleForwardingClientCallListener<RespT> {
-        private final Logger log;
+    private class LoggingClientCallListener<RespT> extends ForwardingClientCallListener.SimpleForwardingClientCallListener<RespT> {
+
         private final String methodName;
 
-        LoggingClientCallListener(ClientCall.Listener<RespT> delegate, Logger log, String methodName) {
+        LoggingClientCallListener(ClientCall.Listener<RespT> delegate, String methodName) {
             super(delegate);
-            this.log = log;
             this.methodName = methodName;
         }
 
         @Override
         public void onClose(Status status, Metadata trailers) {
+
             if (status.isOk()) {
-                log.info("CLIENT CALL SUCCEEDED: [{}]", methodName);
-            } else {
-                var grpcError = status.asRuntimeException();
+                log.info("CLIENT CALL SUCCEEDED: {}", methodName);
+            }
+            else {
+
                 // There is no GrpcErrorMapping.processError, because:
                 // 1) grpcError is always StatusRuntimeException
                 // 2) GrpcErrorMapping.processError passes through StatusRuntimeException
 
+                var grpcError = status.asRuntimeException();
+
                 log.error(
-                        "CLIENT CALL FAILED: [{}] {}",
+                        "CLIENT CALL FAILED: {} {}",
                         methodName,
                         grpcError.getMessage(),
                         grpcError
                 );
             }
 
-            super.onClose(status, trailers);
+            delegate().onClose(status, trailers);
         }
 
     }
