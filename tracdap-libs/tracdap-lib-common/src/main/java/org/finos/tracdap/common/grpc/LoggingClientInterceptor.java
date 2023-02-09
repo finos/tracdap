@@ -66,10 +66,10 @@ public class LoggingClientInterceptor implements ClientInterceptor {
         public void start(ClientCall.Listener<RespT> responseListener, Metadata headers) {
 
             if (methodType == MethodDescriptor.MethodType.UNARY) {
-                log.info("CLIENT CALL START: {}()", methodName);
+                log.info("CLIENT CALL START: {}", methodName);
             }
             else {
-                log.info("CLIENT CALL START: {}() ({})", methodName, methodType);
+                log.info("CLIENT CALL START: {} ({})", methodName, methodType);
             }
 
             var loggingResponseListener = new LoggingClientCallListener<>(responseListener, methodName);
@@ -91,7 +91,7 @@ public class LoggingClientInterceptor implements ClientInterceptor {
         public void onClose(Status status, Metadata trailers) {
 
             if (status.isOk()) {
-                log.info("CLIENT CALL SUCCEEDED: {}()", methodName);
+                log.info("CLIENT CALL SUCCEEDED: {}", methodName);
             }
             else {
 
@@ -102,7 +102,7 @@ public class LoggingClientInterceptor implements ClientInterceptor {
                 var grpcError = status.asRuntimeException();
 
                 log.error(
-                        "CLIENT CALL FAILED: {}() {}",
+                        "CLIENT CALL FAILED: {} {}",
                         methodName,
                         grpcError.getMessage(),
                         grpcError
