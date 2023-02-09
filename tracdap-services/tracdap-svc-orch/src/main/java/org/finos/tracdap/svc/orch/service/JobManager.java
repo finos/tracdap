@@ -50,12 +50,13 @@ public class JobManager {
     public static final int PROCESSING_RETRY_LIMIT = 2;
     public static final int CACHE_POLL_ERROR_LIMIT = 100;
     public static final int EXECUTOR_POLL_ERROR_LIMIT = 20;
+    public static final int JOB_REVISION_LIMIT = 50;
 
     public static final String POLL_INTERVAL_CONFIG_KEY = "pollInterval";
     public static final String TICKET_DURATION_CONFI_KEY = "ticketDuration";
     public static final String MAX_JOBS_CONFIG_KEY = "maxJobs";
 
-    public static final int DEFAULT_CACHE_POLL_INTERVAL = 2;
+    public static final int DEFAULT_CACHE_POLL_INTERVAL = 10;
     public static final int DEFAULT_CACHE_TICKET_DURATION = 10;
     public static final int DEFAULT_EXECUTOR_POLL_INTERVAL = 30;
     public static final int DEFAULT_EXECUTOR_TICKET_DURATION = 120;
@@ -353,6 +354,24 @@ public class JobManager {
         operation.revision = revision;
         operation.cacheStatus = cacheStatus;
 
+        // Guard against infinite loops in job state processing with a hard revision limit
+        // This should never happen, errors are handled by moving the job into nextErrorState()
+        // If error processing fails, nextErrorState() will remove the job well before the revision limit
+
+        // See comments for nextErrorState() - we probably want a way to record failed error handling
+
+        if (revision > JOB_REVISION_LIMIT) {
+
+            log.error("Internal job state error, key = [{}], revision = [{}], cache state = [{}]", key, revision, cacheStatus);
+            log.error("Job revision limit has been hit, job will be removed without further processing");
+
+            operation.operationName = "remove_from_cache";
+            operation.operation = state -> null;
+            operation.timeout = cacheTicketDuration;
+
+            return operation;
+        }
+
         switch (cacheStatus) {
 
             case CacheStatus.QUEUED_IN_TRAC:
@@ -383,6 +402,7 @@ public class JobManager {
                 break;
 
             case CacheStatus.RESULTS_SAVED:
+            case CacheStatus.READY_FOR_CLEANUP:
                 operation.operationName = "clean_up_job";
                 operation.operation = processor::cleanUpJob;
                 operation.timeout = cacheTicketDuration;
@@ -394,7 +414,7 @@ public class JobManager {
                 operation.timeout = cacheTicketDuration;
                 break;
 
-            case CacheStatus.SCHEDULED_TO_REMOVE:
+            case CacheStatus.REMOVAL_SCHEDULED:
                 operation.operationName = "remove_from_cache";
                 operation.operation = state -> null;
                 operation.timeout = cacheTicketDuration;
@@ -407,6 +427,7 @@ public class JobManager {
                 operation.operationName = "handle_processing_failed";
                 operation.operation = state -> processor.handleProcessingFailed(state, state.statusMessage, state.exception);
                 operation.timeout = cacheTicketDuration;
+                break;
 
             default:
 
@@ -415,9 +436,7 @@ public class JobManager {
                 // This error only affects the current job, the job can be cleaned up, normal operations continue.
                 // Do not throw an exception here (this would crash the polling loop)
 
-                log.error(
-                        "Internal job state error, key = [{}], revision = [{}], cache state = [{}]",
-                        key, revision, cacheStatus);
+                log.error("Internal job state error, key = [{}], revision = [{}], cache state = [{}]", key, revision, cacheStatus);
 
                 var message = "Internal job state error";
                 var error = new ETracInternal(message);
@@ -461,10 +480,34 @@ public class JobManager {
         return operation;
     }
 
+    // If a job operation fails the job goes to nextErrorState()
+    // The default error state, PROCESSING_FAILED, will record the failure and clean up the job
+    // However this processing can also fail, in which case moving to nextErrorState() again skips some parts of the cleanup
+    // Eventually the job will be removed from the cache
+
+    // TODO: Dormant state for failed error handling
+    // We could record some state in the cache when error handling fails to indicate failed / partial cleanup
+    // These jobs could be returned to at a later date and failures reported back to the metadata store
+
+    // These error states only relate to failed operations, not failed cache updates
+    // Cache errors need to be handled separately, see comments in processJobOperation()
+
+    private String getNextErrorState(String cacheStatus) {
+
+        if (cacheStatus.equals(CacheStatus.PROCESSING_FAILED))
+            return CacheStatus.READY_FOR_CLEANUP;
+
+        if (cacheStatus.equals(CacheStatus.READY_FOR_CLEANUP))
+            return CacheStatus.READY_TO_REMOVE;
+
+        return CacheStatus.PROCESSING_FAILED;
+    }
+
     private void processJobOperation(JobOperation operation) {
 
         int newRevision = operation.revision;
         String newCacheStatus = null;
+        boolean isRetry = false;
 
         try (var ticket = cache.openTicket(operation.jobKey, operation.revision, operation.timeout)) {
 
@@ -479,6 +522,7 @@ public class JobManager {
             if (newState != null) {
                 newRevision = cache.updateEntry(ticket, newState.cacheStatus, newState);
                 newCacheStatus = newState.cacheStatus;
+                isRetry = newState.retries > 0;
             }
             else {
                 // Null new state indicates the job can be removed
@@ -505,16 +549,18 @@ public class JobManager {
         // This needs to happen after the ticket for the original operation has been closed
         // Errors here can be safely ignored, the job will be picked up in the next polling loop anyway
 
-        if (newRevision > operation.revision && newCacheStatus != null && STATUS_FOR_UPDATE.contains(newCacheStatus)) {
-            var nextOperation = getNextOperation(operation.jobKey, newRevision, newCacheStatus);
-            javaExecutor.submit(() -> processJobOperation(nextOperation));
+        if (newRevision > operation.revision && !isRetry) {
+            if (newCacheStatus != null && STATUS_FOR_UPDATE.contains(newCacheStatus)) {
+                var nextOperation = getNextOperation(operation.jobKey, newRevision, newCacheStatus);
+                javaExecutor.submit(() -> processJobOperation(nextOperation));
+            }
         }
 
         // Create a cleanup task if the job is scheduled for removal
         // If we add timeout processing we would need to add a last activity monitor to the cache
         // In that case, cleanup could be detected by the regular polling loop
 
-        if (newRevision > operation.revision && CacheStatus.SCHEDULED_TO_REMOVE.equals(newCacheStatus)) {
+        if (newRevision > operation.revision && CacheStatus.REMOVAL_SCHEDULED.equals(newCacheStatus)) {
             var removeOperation = getNextOperation(operation.jobKey, newRevision, newCacheStatus);
             javaExecutor.schedule(
                     () -> processJobOperation(removeOperation),
@@ -539,44 +585,63 @@ public class JobManager {
                         operation.jobKey);
             }
 
-            return operation.operation.apply(jobState);
+            var newState = operation.operation.apply(jobState);
+
+            // Reset the retry counter after a successful operation
+            if (newState != null)
+                newState.retries = 0;
+
+            return newState;
         }
         catch (Exception error) {
 
-            log.error("JOB OPERATION FAILED {}: [{}] {}",
-                    operation.operationName,
-                    jobState.jobKey,
-                    error.getMessage(),
-                    error);
+            var newState = jobState.clone();
+            var canRetry = errorCanRetry(error);
 
-            if (!errorCanRetry(error)) {
+            // First check if a retry is possible
+            // If it is, just bump the retry counter
 
-                log.error("This error is fatal and cannot be retried");
+            if (canRetry) {
 
-                var newState = jobState.clone();
-                newState.cacheStatus = CacheStatus.PROCESSING_FAILED;
-                newState.statusMessage = error.getMessage();
-                newState.exception = error;
-
-                return newState;
-            }
-            else {
-
-                var newState = jobState.clone();
                 newState.retries += 1;
 
                 if (newState.retries < PROCESSING_RETRY_LIMIT) {
-                    log.warn("The operation can be retried (this was attempt {} of {})", newState.retries, PROCESSING_RETRY_LIMIT);
-                }
-                else {
-                    log.error("The retry limit has been reached (this was attempt {} of {})", newState.retries, PROCESSING_RETRY_LIMIT);
-                    newState.cacheStatus = CacheStatus.PROCESSING_FAILED;
-                    newState.statusMessage = error.getMessage();
-                    newState.exception = error;
-                }
 
-                return newState;
+                    log.warn("JOB OPERATION FAILED {}: [{}] {}", operation.operationName, jobState.jobKey, error.getMessage(), error);
+                    log.warn("The operation can be retried (this was attempt {} of {})", newState.retries, PROCESSING_RETRY_LIMIT);
+
+                    return newState;
+                }
             }
+
+            // If retry is not possible we need to go to the next error state
+            // This is to prevent infinite loops for errors that can't be cleaned up
+            // The first error state handler is to report errors in TRAC with full metadata
+            // The last handler will just remove the job from the cache
+
+            // We could be more clever here for distributed caches
+            // E.g. if an operation fails once on a node and there are other nodes available,
+            // a different node should pick up the retry
+
+            var nextErrorState = getNextErrorState(jobState.cacheStatus);
+
+            log.error("JOB OPERATION FAILED {}: [{}] {}", operation.operationName, jobState.jobKey, error.getMessage(), error);
+
+            if (canRetry)
+                log.error("The retry limit has been reached (this was attempt {} of {})", newState.retries, PROCESSING_RETRY_LIMIT);
+            else
+                log.error("This error is fatal and cannot be retried");
+
+            log.error("Job will be updated to the next error state: [{}] {}", jobState.jobKey, nextErrorState);
+
+            newState.cacheStatus = nextErrorState;
+            newState.statusMessage = error.getMessage();
+            newState.exception = error;
+
+            // Reset retries for cleanup operation
+            newState.retries = 0;
+
+            return newState;
         }
     }
 
@@ -610,7 +675,9 @@ public class JobManager {
             CacheStatus.RESULTS_RECEIVED,
             CacheStatus.RESULTS_INVALID,
             CacheStatus.RESULTS_SAVED,
-            CacheStatus.READY_TO_REMOVE);
+            CacheStatus.READY_FOR_CLEANUP,
+            CacheStatus.READY_TO_REMOVE,
+            CacheStatus.PROCESSING_FAILED);
 
     private static final List<Status.Code> GRPC_CAN_RETRY = List.of(
             Status.Code.UNAVAILABLE,
