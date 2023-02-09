@@ -54,7 +54,7 @@ class _TypeValidator:
     _log: logging.Logger = util.logger_for_namespace(__name__)
 
     @classmethod
-    def validate_signature(cls, method: tp.Callable, *args, **kwargs):
+    def validate_signature(cls, method: tp.Callable, *args, **kwargs): #TODO: bugfixing
 
         if method.__name__ in cls.__method_cache:
             signature = cls.__method_cache[method.__name__]
