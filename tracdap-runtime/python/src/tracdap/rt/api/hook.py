@@ -119,14 +119,16 @@ class _StaticApiHook:
 
     @_abc.abstractmethod
     def define_input_table(
-            self, *fields: _tp.Union[_meta.FieldSchema, _tp.List[_meta.FieldSchema]]) \
+            self, *fields: _tp.Union[_meta.FieldSchema, _tp.List[_meta.FieldSchema]],
+            label: str = None) \
             -> _meta.ModelInputSchema:
 
         pass
 
     @_abc.abstractmethod
     def define_output_table(
-            self, *fields: _tp.Union[_meta.FieldSchema, _tp.List[_meta.FieldSchema]]) \
+            self, *fields: _tp.Union[_meta.FieldSchema, _tp.List[_meta.FieldSchema]],
+            label: str = None) \
             -> _meta.ModelOutputSchema:
 
         pass
