@@ -227,6 +227,8 @@ public class JobProcessor {
 
         batchState = batchExecutor.startBatch(jobKey, batchState, launchCmd, launchArgs);
 
+        log.info("Job has been sent to the executor: [{}]", jobKey);
+
         var newState = jobState.clone();
         newState.tracStatus = JobStatusCode.SUBMITTED;
         newState.cacheStatus = CacheStatus.SENT_TO_EXECUTOR;
@@ -421,7 +423,7 @@ public class JobProcessor {
     public JobState scheduleRemoval(JobState jobState) {
 
         var newState = jobState.clone();
-        newState.cacheStatus = CacheStatus.SCHEDULED_TO_REMOVE;
+        newState.cacheStatus = CacheStatus.REMOVAL_SCHEDULED;
 
         return newState;
     }
