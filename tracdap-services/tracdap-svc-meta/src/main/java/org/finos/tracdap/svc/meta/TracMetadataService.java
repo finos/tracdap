@@ -121,11 +121,15 @@ public class TracMetadataService extends CommonServiceBase {
             var metaSvcConfig = platformConfig.getServices().getMeta();
             var servicePort = metaSvcConfig.getPort();
 
+            // Interceptor order: Last added is executed first
+            // But note, on close it is the other way round, because the stack is unwinding
+            // We want error mapping at the bottom of the stack, so it unwinds before logging
+
             this.server = ServerBuilder
                     .forPort(servicePort)
+                    .intercept(new ErrorMappingInterceptor())
                     .intercept(new LoggingServerInterceptor(TracMetadataApi.class))
                     .intercept(new InternalAuthValidator(platformConfig.getAuthentication(), jwtValidator))
-                    .intercept(new ErrorMappingInterceptor())
                     .addService(publicApi)
                     .addService(trustedApi)
                     .executor(executor)
