@@ -35,6 +35,7 @@ public class CacheStatus {
 
     public static final String PROCESSING_FAILED = "PROCESSING_FAILED";
 
+    public static final String READY_FOR_CLEANUP = "READY_FOR_CLEANUP";
     public static final String READY_TO_REMOVE = "READY_TO_REMOVE";
-    public static final String SCHEDULED_TO_REMOVE = "SCHEDULED_TO_REMOVE";
+    public static final String REMOVAL_SCHEDULED = "SCHEDULED_TO_REMOVE";
 }
