@@ -64,14 +64,14 @@ public class JobProcessor {
     private final Validator validator = new Validator();
 
     // TODO: Refactor into this class
-    private final JobLifecycle lifecycle;
+    private final JobProcessorHelpers lifecycle;
 
 
     public JobProcessor(
             TrustedMetadataApiBlockingStub metaClient,
             InternalAuthProvider internalAuth,
             IBatchExecutor<?> executor,
-            JobLifecycle lifecycle) {
+            JobProcessorHelpers lifecycle) {
 
         this.metaClient = metaClient;
         this.internalAuth = internalAuth;
