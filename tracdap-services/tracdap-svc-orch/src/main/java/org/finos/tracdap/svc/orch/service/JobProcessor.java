@@ -51,11 +51,11 @@ import static org.finos.tracdap.common.metadata.MetadataConstants.TRAC_JOB_STATU
 
 public class JobProcessor {
 
-    // These timeouts are to avoid granting unbounded delegate sessions
-    // When job processing timeouts are added in JobManager, the session timeouts should reflect those
+    // Timeout for delegate sessions used to record metadata updates
+    // We regenerate these for each operation, e.g. reporting failures after a job hang we don't want the token to expire
+    // As a result the delegate token can be short-lived
 
-    private static final Duration JOB_SETUP_SESSION_TIMEOUT = Duration.of(1, ChronoUnit.MINUTES);
-    private static final Duration JOB_EXECUTION_SESSION_TIMEOUT = Duration.of(24, ChronoUnit.HOURS);
+    private static final Duration DELEGATE_SESSION_TIMEOUT = Duration.of(5, ChronoUnit.MINUTES);
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
@@ -85,9 +85,6 @@ public class JobProcessor {
         var jobState = new JobState();
         jobState.tenant = request.getTenant();
         jobState.owner = AuthHelpers.currentUser();
-
-        // Create a short-lived delegate auth session to set up the job
-        jobState.credentials = internalAuth.createDelegateSession(jobState.owner, JOB_SETUP_SESSION_TIMEOUT);
 
         jobState.jobType = request.getJob().getJobType();
         jobState.definition = request.getJob();
@@ -128,8 +125,8 @@ public class JobProcessor {
 
         var newState = jobState.clone();
 
-        // Credentials token processor must be reset after deserializing jobState from the cache
-        internalAuth.setTokenProcessor(newState.credentials);
+        // Credentials are not serialized in the cache
+        newState.credentials = internalAuth.createDelegateSession(jobState.owner, DELEGATE_SESSION_TIMEOUT);
 
         newState = lifecycle.applyTransform(newState);
         newState = lifecycle.loadResources(newState);
@@ -148,8 +145,8 @@ public class JobProcessor {
 
         var newState = jobState.clone();
 
-        // Credentials token processor must be reset after deserializing jobState from the cache
-        internalAuth.setTokenProcessor(newState.credentials);
+        // Credentials are not serialized in the cache
+        newState.credentials = internalAuth.createDelegateSession(jobState.owner, DELEGATE_SESSION_TIMEOUT);
 
         newState = lifecycle.saveInitialMetadata(newState);
 
@@ -165,31 +162,27 @@ public class JobProcessor {
         newState.tracStatus = JobStatusCode.PENDING;
         newState.cacheStatus = CacheStatus.LAUNCH_SCHEDULED;
 
-        // Create a new, long-lived delegate auth session for job execution
-        jobState.credentials = internalAuth.createDelegateSession(jobState.owner, JOB_EXECUTION_SESSION_TIMEOUT);
-
         return updateMetadata(newState);
     }
 
     private JobState updateMetadata(JobState jobState) {
 
-        // Credentials token processor must be reset after deserializing jobState from the cache
-        internalAuth.setTokenProcessor(jobState.credentials);
+        var newState = jobState.clone();
+
+        // Credentials are not serialized in the cache
+        newState.credentials = internalAuth.createDelegateSession(jobState.owner, DELEGATE_SESSION_TIMEOUT);
 
         var writeRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(jobState.tenant)
                 .setObjectType(ObjectType.JOB)
-                .setPriorVersion(MetadataUtil.selectorFor(jobState.jobId))
+                .setPriorVersion(MetadataUtil.selectorFor(jobState.jobId))  // prior version selector
                 .addTagUpdates(TagUpdate.newBuilder()
                         .setAttrName(TRAC_JOB_STATUS_ATTR)
                         .setValue(MetadataCodec.encodeValue(jobState.tracStatus.name())))
                 .build();
 
-        var userAuth = metaClient.withCallCredentials(jobState.credentials);
-        var newId = userAuth.updateTag(writeRequest);
-
-        var newState = jobState.clone();
-        newState.jobId = newId;
+        var userAuth = metaClient.withCallCredentials(newState.credentials);
+        newState.jobId = userAuth.updateTag(writeRequest);
 
         return newState;
     }
@@ -378,14 +371,15 @@ public class JobProcessor {
 
     public JobState saveResultMetadata(JobState jobState) {
 
-        // Credentials token processor must be reset after deserializing jobState from the cache
-        internalAuth.setTokenProcessor(jobState.credentials);
+        var newState = jobState.clone();
+
+        // Credentials are not serialized in the cache
+        newState.credentials = internalAuth.createDelegateSession(jobState.owner, DELEGATE_SESSION_TIMEOUT);
 
         // TRAC job status must already be set before calling lifecycle
 
-        lifecycle.processJobResult(jobState);
+        lifecycle.processJobResult(newState);
 
-        var newState = jobState.clone();
         newState.cacheStatus = CacheStatus.RESULTS_SAVED;
 
         return newState;
@@ -435,7 +429,9 @@ public class JobProcessor {
         newState.statusMessage = errorMessage;
         newState.exception = exception;
 
-        internalAuth.setTokenProcessor(newState.credentials);
+        // Credentials are not serialized in the cache
+        newState.credentials = internalAuth.createDelegateSession(jobState.owner, DELEGATE_SESSION_TIMEOUT);
+
         lifecycle.processJobResult(newState);
 
         newState.cacheStatus = CacheStatus.READY_TO_REMOVE;

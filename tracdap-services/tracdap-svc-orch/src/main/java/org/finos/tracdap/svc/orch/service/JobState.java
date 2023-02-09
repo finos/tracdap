@@ -39,7 +39,9 @@ public class JobState implements Serializable, Cloneable {
 
     String tenant;
     UserInfo owner;
-    InternalCallCredentials credentials;
+
+    // Do not serialize credentials to the cache
+    transient InternalCallCredentials credentials;
 
     JobRequest jobRequest;
     String jobKey;
