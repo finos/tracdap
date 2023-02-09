@@ -17,6 +17,7 @@
 package org.finos.tracdap.svc.orch.service;
 
 import org.finos.tracdap.api.JobRequest;
+import org.finos.tracdap.api.JobStatus;
 import org.finos.tracdap.api.MetadataWriteRequest;
 import org.finos.tracdap.api.TrustedMetadataApiGrpc.TrustedMetadataApiBlockingStub;
 import org.finos.tracdap.common.auth.internal.AuthHelpers;
@@ -95,6 +96,32 @@ public class JobProcessor {
         jobState.tracStatus = JobStatusCode.PREPARING;
 
         return jobState;
+    }
+
+    public JobStatus getStatus(JobState jobState) {
+
+        var status = JobStatus.newBuilder();
+
+        if (jobState.jobId != null)
+            status.setJobId(jobState.jobId);
+
+        status.setStatusCode(jobState.tracStatus);
+
+        if (jobState.statusMessage != null)
+            status.setStatusMessage(jobState.statusMessage);
+
+        // This is a work-around because the new orchestration logic sets tracStatus before the results are saved
+        // We need to merge the remaining logic in JobLifecycle into JobProcessor
+        // Then tracStatus can be set on a new state object prior to saving and before updating the cache
+
+        if (jobState.tracStatus == JobStatusCode.SUCCEEDED || jobState.tracStatus == JobStatusCode.FAILED) {
+            if (jobState.cacheStatus.startsWith("EXECUTOR_") || jobState.cacheStatus.startsWith("RESULTS_")) {
+                status.setStatusCode(JobStatusCode.FINISHING);
+                status.clearStatusMessage();
+            }
+        }
+
+        return status.build();
     }
 
     public JobState assembleAndValidate(JobState jobState) {
