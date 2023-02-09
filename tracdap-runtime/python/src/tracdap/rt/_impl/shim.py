@@ -525,7 +525,7 @@ class ShimLoader:
                 raise _ex.ERuntimeValidation(err)
 
     @classmethod
-    def _error_details(cls, error: Exception):
+    def _error_details(cls, error: Exception): #TODO!!!
 
         trace = tb.extract_tb(error.__traceback__)
         last_frame = trace[len(trace) - 1]

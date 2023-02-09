@@ -266,3 +266,9 @@ def try_clean_dir(dir_path: pathlib.Path, remove: bool = False) -> bool:
             return clean_ok
         except Exception:  # noqa
             return False
+
+#TODO: add error message formatting function (include _build_model_stack_trace from context.py)
+# usages:
+#  - shim.py
+#  - _report_error in context.py
+#  - _execute in RunModelFunc (see functions.py)
