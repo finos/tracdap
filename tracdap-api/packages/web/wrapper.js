@@ -585,7 +585,14 @@
                     console.log(`Connection did not close cleanly: ${event.reason} (websockets code ${event.code})`)
             }
 
-            else if (event.wasClean)
+            if (event.wasClean)
+                this._handleComplete();
+
+            // Sometimes there is a response from gRPC even when the connection did not close cleanly
+            // This happens if gRPC interrupts a stream to send an error response
+            // The response from gRPC is usually more helpful than a generic "connection closed early"
+
+            if (GRPC_STATUS_HEADER in this.responseMetadata)
                 this._handleComplete();
 
             else {
@@ -607,7 +614,8 @@
 
             this.options.debug && console.log("TracTransport _wsHandlerError")
 
-            this.ws.close(1006, "close on error");
+            if (this.ws.readyState !== WebSocket.CLOSED)
+                this.ws.close(1002, "close on error");
 
             const status = grpc.StatusCode.UNKNOWN;
             const message = event.reason;
@@ -795,14 +803,21 @@
                 return;
             }
 
+            // Sometimes there is a response from gRPC even when the connection did not close cleanly
+            // This happens if gRPC interrupts a stream to send an error response
+            // The response from gRPC is usually more helpful than a generic "connection closed early"
+
+            const grpcStatus = GRPC_STATUS_HEADER in this.responseMetadata ? this.responseMetadata[GRPC_STATUS_HEADER] : null;
+            const grpcMessage = GRPC_MESSAGE_HEADER in this.responseMetadata ? this.responseMetadata[GRPC_MESSAGE_HEADER] : null;
+
             if (!this.sendDone || !this.rcvDone) {
 
-                const code = grpc.StatusCode.UNKNOWN;
-                const message = "The connection was closed before communication finished";
+                const code = grpcStatus || grpc.StatusCode.UNKNOWN;
+                const message = grpcMessage || "The connection was closed before communication finished";
                 const error = {status: code, message: message, metadata: this.responseMetadata};
                 this.callback(error, null);
             }
-            else if (!(GRPC_STATUS_HEADER in this.responseMetadata)) {
+            else if (grpcStatus === null) {
 
                 const code = grpc.StatusCode.UNKNOWN;
                 const message = "The connection was closed before a response was received";
@@ -855,7 +870,8 @@
 
             // Send a WS close, in case it has not already been done
 
-            this.ws.close(1006, "close on error");
+            if (this.ws.readyState !== WebSocket.CLOSED)
+                this.ws.close(1002, "close on error");
 
             // In an error condition make sure not to keep a reference to any data
 
