@@ -525,7 +525,7 @@ class ShimLoader:
                 raise _ex.ERuntimeValidation(err)
 
     @classmethod
-    def _error_details(cls, error: Exception):
+    def _error_details(cls, error: Exception): #TODO: replace calls to this method with direct call to error_details_from_exception
         _util.error_details_from_exception(error)
 
 

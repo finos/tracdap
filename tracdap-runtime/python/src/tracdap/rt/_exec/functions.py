@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import datetime
 import abc
+import pathlib
 import random
 import dataclasses as dc  # noqa
 
@@ -511,11 +512,11 @@ class ImportModelFunc(NodeFunction[meta.ObjectDefinition]):
 
 class RunModelFunc(NodeFunction[Bundle[_data.DataView]]):
 
-    def __init__(self, node: RunModelNode, model_class: _api.TracModel.__class__):
+    def __init__(self, node: RunModelNode, model_class: _api.TracModel.__class__, checkout_directory: pathlib.Path):
         super().__init__()
         self.node = node
         self.model_class = model_class
-
+        self.checkout_directory = checkout_directory
     def _execute(self, ctx: NodeContext) -> Bundle[_data.DataView]:
 
         model_def = self.node.model_def
@@ -562,7 +563,9 @@ class RunModelFunc(NodeFunction[Bundle[_data.DataView]]):
         except _ex.ETrac:
             raise
         except Exception as e:
-            msg = f"There was an unhandled error in the model: {_util.error_details_from_exception(e)}"
+
+            details = _util.error_details_from_model_exception(e, self.checkout_directory)
+            msg = f"There was an unhandled error in the model: {str(e)}{details}"
             raise _ex.EModelExec(msg) from e
 
         # The node result is just the model outputs taken from the local context
@@ -628,10 +631,11 @@ class FunctionResolver:
     def resolve_run_model_node(self, node: RunModelNode) -> NodeFunction:
 
         model_class = self._models.load_model_class(node.model_scope, node.model_def)
+        checkout_directory = self._models.model_load_checkout_directory(node.model_scope, node.model_def)
 
         # TODO: Verify model_class against model_def
 
-        return RunModelFunc(node, model_class)
+        return RunModelFunc(node, model_class, checkout_directory)
 
     __basic_node_mapping: tp.Dict[Node.__class__, NodeFunction.__class__] = {
 
