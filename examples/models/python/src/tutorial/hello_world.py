@@ -35,8 +35,6 @@ class HelloWorldModel(trac.TracModel):
 
         ctx.log().info("Hello world model is running")
 
-        raise RuntimeError("test message")
-
         meaning_of_life = ctx.get_parameter("meaning_of_life")
         ctx.log().info(f"The meaning of life is {meaning_of_life}")
 

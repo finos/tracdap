@@ -525,18 +525,9 @@ class ShimLoader:
                 raise _ex.ERuntimeValidation(err)
 
     @classmethod
-    def _error_details(cls, error: Exception): #TODO!!!
+    def _error_details(cls, error: Exception):
+        _util.error_details_from_exception(error)
 
-        trace = tb.extract_tb(error.__traceback__)
-        last_frame = trace[len(trace) - 1]
-        filename = pathlib.PurePath(last_frame.filename).name
-
-        # Do not report errors from inside C modules,
-        # they will not be meaningful to users
-        if filename.startswith("<"):
-            return ""
-        else:
-            return f" ({filename} line {last_frame.lineno}, {last_frame.line})"
 
 
 ShimLoader._log = _util.logger_for_class(ShimLoader)

@@ -25,6 +25,8 @@ import tracdap.rt.exceptions as ex
 import tracdap.rt.metadata as meta
 import tracdap.rt.config as cfg
 
+import traceback as tb
+
 
 __IS_WINDOWS = platform.system() == "Windows"
 
@@ -267,8 +269,19 @@ def try_clean_dir(dir_path: pathlib.Path, remove: bool = False) -> bool:
         except Exception:  # noqa
             return False
 
-#TODO: add error message formatting function (include _build_model_stack_trace from context.py)
-# usages:
-#  - shim.py
-#  - _report_error in context.py
-#  - _execute in RunModelFunc (see functions.py)
+
+def error_details_from_trace(trace: tb.StackSummary):
+    last_frame = trace[len(trace) - 1]
+    filename = pathlib.PurePath(last_frame.filename).name
+    # Do not report errors from inside C modules,
+    # they will not be meaningful to users
+    if filename.startswith("<"):
+        return ""
+    else:
+        return f" ({filename} line {last_frame.lineno}, {last_frame.line})"
+
+
+def error_details_from_exception(error: Exception):
+    trace = tb.extract_tb(error.__traceback__)
+    return error_details_from_trace(trace)
+

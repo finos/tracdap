@@ -192,6 +192,7 @@ class TracContextValidator:
 
         model_stack = self._build_model_stack_trace()
         model_stack_str = ''.join(traceback.format_list(list(reversed(model_stack))))
+        message = f"{message} {_util.error_details_from_trace(model_stack)}"
 
         self.__log.error(message)
         self.__log.error(f"Model stack trace:\n{model_stack_str}")
