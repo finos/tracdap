@@ -114,7 +114,7 @@ class TracContextTest(unittest.TestCase):
     DATE_PARAM_VALUE = datetime.date(2021, 6, 21)
     DATETIME_PARAM_VALUE = datetime.datetime(2021, 6, 21, 13, 0, 0)
 
-    INVALID_IDENTIFIERS = ["", "test:var", "test-var", "$xyz", "{xyz}", "xyz abc"] #, "中文"]
+    INVALID_IDENTIFIERS = ["", "test:var", "test-var", "$xyz", "{xyz}", "xyz abc", "中文"]
 
     LOANS_DATA = pd.DataFrame({
         "id": ["acc001", "acc002"],
