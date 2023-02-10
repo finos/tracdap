@@ -509,7 +509,7 @@ class ImportModelFunc(NodeFunction[meta.ObjectDefinition]):
         return meta.ObjectDefinition(meta.ObjectType.MODEL, model=model_def)
 
 
-class RunModelFunc(NodeFunction[Bundle[_data.DataView]]): #TODO!!!
+class RunModelFunc(NodeFunction[Bundle[_data.DataView]]):
 
     def __init__(self, node: RunModelNode, model_class: _api.TracModel.__class__):
         super().__init__()
@@ -562,7 +562,7 @@ class RunModelFunc(NodeFunction[Bundle[_data.DataView]]): #TODO!!!
         except _ex.ETrac:
             raise
         except Exception as e:
-            msg = f"There was an unhandled error in the model: {str(e)}" #TODO!!!
+            msg = f"There was an unhandled error in the model: {_util.error_details_from_exception(e)}"
             raise _ex.EModelExec(msg) from e
 
         # The node result is just the model outputs taken from the local context
