@@ -563,7 +563,6 @@ class RunModelFunc(NodeFunction[Bundle[_data.DataView]]):
         except _ex.ETrac:
             raise
         except Exception as e:
-
             details = _util.error_details_from_model_exception(e, self.checkout_directory)
             msg = f"There was an unhandled error in the model: {str(e)}{details}"
             raise _ex.EModelExec(msg) from e
