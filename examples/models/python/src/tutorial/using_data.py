@@ -17,7 +17,8 @@ import typing as tp
 
 import pandas as pd
 import tracdap.rt.api as trac
-
+import numpy as np
+import pandas as pd
 
 def calculate_profit_by_region(
         customer_loans: pd.DataFrame,
@@ -30,6 +31,10 @@ def calculate_profit_by_region(
     Use a weighting factor for bad loans and report results in USD
     Optionally, bad loans can be filtered from the results
     """
+
+    x = pd.DataFrame([[1, 2], [1, 2]], columns=["a", "b"])
+    x.rename(columns= {"c": "d"}, errors="raise")
+
 
     if filter_defaults:
         customer_loans = customer_loans[customer_loans["loan_condition_cat"] == 0]

@@ -309,7 +309,9 @@ def filter_model_stack_trace(full_stack: tb.StackSummary, checkout_directory: pa
 
     for frame_index, frame in enumerate(full_stack[first_model_frame:]):
         module_path = pathlib.Path(frame.filename)
-        if "tracdap" in module_path.parts:
+        if ("tracdap" in module_path.parts) and ("rt" in module_path.parts):
+            break
+        if ("site-packages" in module_path.parts) or ("venv" in module_path.parts):
             break
         if (checkout_directory is not None) and (not module_path.is_relative_to(checkout_directory)):
             break
