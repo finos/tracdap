@@ -20,7 +20,7 @@ import org.finos.tracdap.api.*;
 import org.finos.tracdap.common.auth.internal.AuthHelpers;
 import org.finos.tracdap.common.concurrent.ExecutionContext;
 import org.finos.tracdap.common.grpc.GrpcServerWrap;
-import org.finos.tracdap.common.util.Bytes;
+import org.finos.tracdap.common.data.util.Bytes;
 import org.finos.tracdap.common.concurrent.Flows;
 import org.finos.tracdap.common.validation.Validator;
 import org.finos.tracdap.metadata.FileDefinition;

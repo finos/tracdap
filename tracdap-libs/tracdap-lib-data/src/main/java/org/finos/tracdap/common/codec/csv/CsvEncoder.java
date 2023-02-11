@@ -19,7 +19,7 @@ package org.finos.tracdap.common.codec.csv;
 import org.finos.tracdap.common.codec.StreamingEncoder;
 import org.finos.tracdap.common.codec.json.JacksonValues;
 import org.finos.tracdap.common.exception.EUnexpected;
-import org.finos.tracdap.common.util.ByteOutputStream;
+import org.finos.tracdap.common.data.util.ByteOutputStream;
 
 import org.apache.arrow.vector.VectorSchemaRoot;
 import org.apache.arrow.vector.types.pojo.Schema;
