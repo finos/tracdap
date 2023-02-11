@@ -159,7 +159,7 @@ public class JobProcessor {
     public JobState scheduleLaunch(JobState jobState) {
 
         var newState = jobState.clone();
-        newState.tracStatus = JobStatusCode.PENDING;
+        newState.tracStatus = JobStatusCode.PREPARING;
         newState.cacheStatus = CacheStatus.LAUNCH_SCHEDULED;
 
         return updateMetadata(newState);
