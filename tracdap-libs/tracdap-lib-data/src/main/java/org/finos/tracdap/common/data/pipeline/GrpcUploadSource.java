@@ -46,6 +46,7 @@ public class GrpcUploadSource<TRequest, TResponse> {
 
     private boolean requestedFirst;
     private boolean sentFirst;
+    private boolean grpcComplete;
 
     @SuppressWarnings("unused") // Request class is needed to infer types for the upload source
     public GrpcUploadSource(Class<TRequest> requestClass, StreamObserver<TResponse> response) {
@@ -94,13 +95,17 @@ public class GrpcUploadSource<TRequest, TResponse> {
 
     private void apiOnNext(TRequest value) {
 
-        // Special handling for the first message, the data stream may not be active yet
+        if (!firstMessage.isDone()) {
 
-        if (!firstMessage.isDone() && firstMessage.complete(value)) {
+            firstMessage.complete(value);
 
             if (requestedFirst) {
+
                 sentFirst = true;
                 subscriber.onNext(value);
+
+                if (grpcComplete)
+                    subscriber.onComplete();
             }
         }
         else {
@@ -110,11 +115,40 @@ public class GrpcUploadSource<TRequest, TResponse> {
     }
 
     private void apiOnComplete() {
-        subscriber.onComplete();
+
+        if (!firstMessage.isDone()) {
+
+            // Should never happen, gRPC will always send onNext before onComplete
+            firstMessage.completeExceptionally(new EUnexpected());
+        }
+        else {
+
+            // Sometimes the incoming stream has just one message
+            // Then onComplete might fire before the data stream is set up
+            // If this happens, record the complete signal to send with the first message
+
+            if (subscriber != null)
+                subscriber.onComplete();
+            else
+                grpcComplete = true;
+        }
     }
 
     private void apiOnError(Throwable error) {
-        subscriber.onError(error);
+
+        if (!firstMessage.isDone()) {
+
+            firstMessage.completeExceptionally(error);
+
+            if (requestedFirst) {
+                sentFirst = true;
+                subscriber.onError(error);
+            }
+        }
+        else {
+
+            subscriber.onError(error);
+        }
     }
 
     private void apiOnCancel() {
@@ -133,14 +167,28 @@ public class GrpcUploadSource<TRequest, TResponse> {
 
     private void pipelineRequest(long n) {
 
-        // Don't ignore the first message requested by start(), it may contain content for teh data stream
+        // The first message has already been received when the pipe starts and may contain data content
+        // It is also possible the stream completed already (if there was just a single message),
+        // or that an error occurred before the first message was received
 
         if (!sentFirst && firstMessage.isDone()) {
+
             sentFirst = true;
-            firstMessage.thenAccept(msg -> subscriber.onNext(msg));
+
+            try {
+
+                subscriber.onNext(firstMessage.getNow(null));
+
+                if (grpcComplete)
+                    subscriber.onComplete();
+            }
+            catch (Throwable e) {
+
+                subscriber.onError(e);
+            }
         }
 
-        // Allow that one message was requested by start(), don't pump more messages than requested
+        // One message was already requested by start(), don't pump more messages than requested
 
         if (!requestedFirst) {
             requestedFirst = true;
