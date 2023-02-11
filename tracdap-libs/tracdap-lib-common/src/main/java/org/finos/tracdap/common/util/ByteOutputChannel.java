@@ -28,7 +28,7 @@ import java.util.function.Consumer;
 
 public class ByteOutputChannel implements WritableByteChannel {
 
-    private static final int CHUNK_SIZE = 4096;
+    private static final int CHUNK_SIZE = 4 * 1024 * 1024;
 
     private final ByteBufAllocator allocator;
     private final Consumer<ByteBuf> sink;

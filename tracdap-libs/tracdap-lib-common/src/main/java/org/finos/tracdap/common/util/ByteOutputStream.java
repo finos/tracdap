@@ -26,7 +26,7 @@ import java.util.function.Consumer;
 
 public class ByteOutputStream extends OutputStream {
 
-    private static final int DEFAULT_CHUNK_SIZE = 4096;
+    private static final int DEFAULT_CHUNK_SIZE = 4 * 1024 * 1024;
 
     private final ByteBufAllocator allocator;
     private final Consumer<ByteBuf> sink;
