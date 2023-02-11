@@ -19,10 +19,9 @@ package org.finos.tracdap.svc.data.api;
 import org.finos.tracdap.api.*;
 import org.finos.tracdap.common.auth.internal.AuthHelpers;
 import org.finos.tracdap.common.concurrent.ExecutionContext;
+import org.finos.tracdap.common.data.pipeline.GrpcDownloadSink;
 import org.finos.tracdap.common.data.pipeline.GrpcUploadSource;
-import org.finos.tracdap.common.grpc.GrpcServerWrap;
 import org.finos.tracdap.common.data.util.Bytes;
-import org.finos.tracdap.common.concurrent.Flows;
 import org.finos.tracdap.common.validation.Validator;
 import org.finos.tracdap.metadata.FileDefinition;
 import org.finos.tracdap.metadata.SchemaDefinition;
@@ -30,15 +29,9 @@ import org.finos.tracdap.metadata.TagHeader;
 import org.finos.tracdap.svc.data.service.DataService;
 import org.finos.tracdap.svc.data.service.FileService;
 
-import com.google.protobuf.ByteString;
 import com.google.protobuf.Message;
 import io.grpc.MethodDescriptor;
 import io.grpc.stub.StreamObserver;
-import io.netty.buffer.ByteBuf;
-
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionStage;
-import java.util.concurrent.Flow;
 
 
 public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
@@ -61,18 +54,14 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
 
     private final DataService dataRwService;
     private final FileService fileService;
-
     private final Validator validator;
-    private final GrpcServerWrap grpcWrap;
 
 
     public TracDataApi(DataService dataRwService, FileService fileService) {
 
         this.dataRwService = dataRwService;
         this.fileService = fileService;
-
         this.validator = new Validator();
-        this.grpcWrap = new GrpcServerWrap();
     }
 
 
@@ -145,13 +134,31 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
     @Override
     public void readDataset(DataReadRequest request, StreamObserver<DataReadResponse> responseObserver) {
 
-        grpcWrap.serverStreaming(request, responseObserver, this::readDataset);
+        var download = new GrpcDownloadSink<>(responseObserver, DataReadResponse::newBuilder, GrpcDownloadSink.STREAMING);
+        readDataset(READ_DATASET_METHOD, request, download);
     }
 
     @Override
     public void readSmallDataset(DataReadRequest request, StreamObserver<DataReadResponse> responseObserver) {
 
-        grpcWrap.unaryAsync(request, responseObserver, this::readSmallDataset);
+        var download = new GrpcDownloadSink<>(responseObserver, DataReadResponse::newBuilder, GrpcDownloadSink.AGGREGATED);
+        readDataset(READ_SMALL_DATASET_METHOD, request, download);
+    }
+
+    private void readDataset(
+            MethodDescriptor<DataReadRequest, DataReadResponse> method, DataReadRequest request,
+            GrpcDownloadSink<DataReadResponse, DataReadResponse.Builder> download) {
+
+        var execCtx = ExecutionContext.EXEC_CONTEXT_KEY.get();
+        var userInfo = AuthHelpers.currentUser();
+
+        var firstMessage = download.<SchemaDefinition>firstMessage(DataReadResponse.Builder::setSchema);
+        var dataStream = download.dataStream((msg, chunk) -> msg.setContent(Bytes.toProtoBytes(chunk)));
+
+        download.start(request)
+                .thenApply(req -> validateRequest(method, request))
+                .thenAccept(req -> dataRwService.readDataset(request, firstMessage, dataStream, execCtx, userInfo))
+                .exceptionally(download::failed);
     }
 
     @Override
@@ -232,132 +239,35 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
     @Override
     public void readFile(FileReadRequest request, StreamObserver<FileReadResponse> responseObserver) {
 
-        grpcWrap.serverStreaming(request, responseObserver, this::readFile);
+        var download = new GrpcDownloadSink<>(responseObserver, FileReadResponse::newBuilder, GrpcDownloadSink.STREAMING);
+        readFile(READ_FILE_METHOD, request, download);
     }
 
     @Override
     public void readSmallFile(FileReadRequest request, StreamObserver<FileReadResponse> responseObserver) {
 
-        grpcWrap.unaryAsync(request, responseObserver, this::readSmallFile);
+        var download = new GrpcDownloadSink<>(responseObserver, FileReadResponse::newBuilder, GrpcDownloadSink.AGGREGATED);
+        readFile(READ_SMALL_FILE_METHOD, request, download);
     }
 
-
-    // -----------------------------------------------------------------------------------------------------------------
-    // API implementation
-    // -----------------------------------------------------------------------------------------------------------------
-
-    private Flow.Publisher<DataReadResponse> readDataset(DataReadRequest request) {
-
-        validateRequest(READ_DATASET_METHOD, request);
+    private void readFile(
+            MethodDescriptor<FileReadRequest, FileReadResponse> method, FileReadRequest request,
+            GrpcDownloadSink<FileReadResponse, FileReadResponse.Builder> download) {
 
         var execCtx = ExecutionContext.EXEC_CONTEXT_KEY.get();
         var userInfo = AuthHelpers.currentUser();
 
-        var schemaResult = new CompletableFuture<SchemaDefinition>();
-        var dataStream = Flows.<ByteBuf>hub(execCtx);
+        var firstMessage = download.<FileDefinition>firstMessage(FileReadResponse.Builder::setFileDefinition);
+        var dataStream = download.dataStream((msg, chunk) -> msg.setContent(Bytes.toProtoBytes(chunk)));
 
-        dataRwService.readDataset(request, schemaResult, dataStream, execCtx, userInfo);
-
-        var schemaMsg = schemaResult.thenApply(schema ->
-                DataReadResponse.newBuilder()
-                .setSchema(schema)
-                .build());
-
-        var protoDataStream = Flows.map(dataStream, Bytes::toProtoBytes);
-        var dataMsg = Flows.map(protoDataStream, chunk ->
-                DataReadResponse.newBuilder()
-                .setContent(chunk)
-                .build());
-
-        // Flows.concat will only request from the data pipeline if schemaMsg completes successfully
-
-        return Flows.concat(schemaMsg, dataMsg);
-    }
-
-    private CompletionStage<DataReadResponse> readSmallDataset(DataReadRequest request) {
-
-        validateRequest(READ_SMALL_DATASET_METHOD, request);
-
-        var execCtx = ExecutionContext.EXEC_CONTEXT_KEY.get();
-        var userInfo = AuthHelpers.currentUser();
-
-        var schemaResult = new CompletableFuture<SchemaDefinition>();
-        var dataStream = Flows.<ByteBuf>hub(execCtx);
-
-        dataRwService.readDataset(request, schemaResult, dataStream, execCtx, userInfo);
-
-        return schemaResult.thenCompose(schema -> {
-
-            // Flows.fold triggers a request from the data pipeline
-            // So, only do this if schemaResult completes successfully
-
-            var protoDataStream = Flows.map(dataStream, Bytes::toProtoBytes);
-            var protoAggregate = Flows.fold(protoDataStream, ByteString::concat, ByteString.EMPTY);
-
-            return protoAggregate.thenApply(data -> DataReadResponse.newBuilder()
-                    .setSchema(schema)
-                    .setContent(data)
-                    .build());
-        });
-    }
-
-    private Flow.Publisher<FileReadResponse> readFile(FileReadRequest request) {
-
-        validateRequest(READ_FILE_METHOD, request);
-
-        var execCtx = ExecutionContext.EXEC_CONTEXT_KEY.get();
-        var userInfo = AuthHelpers.currentUser();
-
-        var fileResult = new CompletableFuture<FileDefinition>();
-        var dataStream = Flows.<ByteBuf>hub(execCtx);
-
-        fileService.readFile(
-                request.getTenant(), request.getSelector(),
-                fileResult, dataStream, execCtx, userInfo);
-
-        var msg0 = fileResult.thenApply(file ->
-                FileReadResponse.newBuilder()
-                .setFileDefinition(file)
-                .build());
-
-        var protoDataStream = Flows.map(dataStream, Bytes::toProtoBytes);
-        var contentMsg = Flows.map(protoDataStream, chunk ->
-                FileReadResponse.newBuilder()
-                .setContent(chunk)
-                .build());
-
-        // Flows.concat will only request from the data pipeline if msg0 completes successfully
-
-        return Flows.concat(msg0, contentMsg);
-    }
-
-    private CompletionStage<FileReadResponse> readSmallFile(FileReadRequest request) {
-
-        validateRequest(READ_SMALL_FILE_METHOD, request);
-
-        var execCtx = ExecutionContext.EXEC_CONTEXT_KEY.get();
-        var userInfo = AuthHelpers.currentUser();
-
-        var fileResult = new CompletableFuture<FileDefinition>();
-        var dataStream = Flows.<ByteBuf>hub(execCtx);
-
-        fileService.readFile(
-                request.getTenant(), request.getSelector(),
-                fileResult, dataStream, execCtx, userInfo);
-
-        return fileResult.thenCompose(file -> {
-
-            // Flows.fold triggers a request from the data pipeline
-            // So, only do this if fileResult completes successfully
-
-            var protoDataStream = Flows.map(dataStream, Bytes::toProtoBytes);
-            var protoAggregate = Flows.fold(protoDataStream, ByteString::concat, ByteString.EMPTY);
-
-            return protoAggregate.thenApply(content -> FileReadResponse.newBuilder()
-                    .setFileDefinition(file)
-                    .setContent(content)
-                    .build());
-        });
+        download.start(request)
+                .thenApply(req -> validateRequest(method, req))
+                .thenAccept(req -> fileService.readFile(
+                        request.getTenant(),
+                        request.getSelector(),
+                        firstMessage, dataStream,
+                        execCtx, userInfo))
+                .exceptionally(download::failed);
     }
 
 
