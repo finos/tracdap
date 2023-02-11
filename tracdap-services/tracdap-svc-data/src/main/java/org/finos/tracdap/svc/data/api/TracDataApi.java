@@ -19,6 +19,7 @@ package org.finos.tracdap.svc.data.api;
 import org.finos.tracdap.api.*;
 import org.finos.tracdap.common.auth.internal.AuthHelpers;
 import org.finos.tracdap.common.concurrent.ExecutionContext;
+import org.finos.tracdap.common.data.pipeline.GrpcUploadSource;
 import org.finos.tracdap.common.grpc.GrpcServerWrap;
 import org.finos.tracdap.common.data.util.Bytes;
 import org.finos.tracdap.common.concurrent.Flows;
@@ -35,7 +36,6 @@ import io.grpc.MethodDescriptor;
 import io.grpc.stub.StreamObserver;
 import io.netty.buffer.ByteBuf;
 
-import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Flow;
@@ -48,6 +48,7 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
     private static final MethodDescriptor<DataReadRequest, DataReadResponse> READ_DATASET_METHOD = TracDataApiGrpc.getReadDatasetMethod();
 
     private static final MethodDescriptor<DataWriteRequest, TagHeader> CREATE_SMALL_DATASET_METHOD = TracDataApiGrpc.getCreateSmallDatasetMethod();
+    private static final MethodDescriptor<DataWriteRequest, TagHeader> UPDATE_SMALL_DATASET_METHOD = TracDataApiGrpc.getUpdateSmallDatasetMethod();
     private static final MethodDescriptor<DataReadRequest, DataReadResponse> READ_SMALL_DATASET_METHOD = TracDataApiGrpc.getReadSmallDatasetMethod();
 
     private static final MethodDescriptor<FileWriteRequest, TagHeader> CREATE_FILE_METHOD = TracDataApiGrpc.getCreateFileMethod();
@@ -82,25 +83,63 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
     @Override
     public StreamObserver<DataWriteRequest> createDataset(StreamObserver<TagHeader> responseObserver) {
 
-        return grpcWrap.clientStreaming(responseObserver, this::createDataset);
+        var upload = new GrpcUploadSource<>(DataWriteRequest.class, responseObserver);
+
+        var execCtx = ExecutionContext.EXEC_CONTEXT_KEY.get();
+        var userInfo = AuthHelpers.currentUser();
+
+        var firstMessage = upload.firstMessage();
+        var dataStream = upload.dataStream(msg -> Bytes.fromProtoBytes(msg.getContent()));
+
+        firstMessage
+                .thenApply(req -> validateRequest(CREATE_DATASET_METHOD, req))
+                .thenCompose(req -> dataRwService.createDataset(req, dataStream, execCtx, userInfo))
+                .thenAccept(upload::succeeded)
+                .exceptionally(upload::failed);
+
+        return upload.start();
     }
 
     @Override
     public void createSmallDataset(DataWriteRequest request, StreamObserver<TagHeader> responseObserver) {
 
-        grpcWrap.unaryAsync(request, responseObserver, this::createSmallDataset);
+        validateRequest(CREATE_SMALL_DATASET_METHOD, request);
+
+        var upload = createDataset(responseObserver);
+
+        upload.onNext(request);
+        upload.onCompleted();
     }
 
     @Override
     public StreamObserver<DataWriteRequest> updateDataset(StreamObserver<TagHeader> responseObserver) {
 
-        return grpcWrap.clientStreaming(responseObserver, this::updateDataset);
+        var upload = new GrpcUploadSource<>(DataWriteRequest.class, responseObserver);
+
+        var execCtx = ExecutionContext.EXEC_CONTEXT_KEY.get();
+        var userInfo = AuthHelpers.currentUser();
+
+        var firstMessage = upload.firstMessage();
+        var dataStream = upload.dataStream(msg -> Bytes.fromProtoBytes(msg.getContent()));
+
+        firstMessage
+                .thenApply(req -> validateRequest(UPDATE_DATASET_METHOD, req))
+                .thenCompose(req -> dataRwService.updateDataset(req, dataStream, execCtx, userInfo))
+                .thenAccept(upload::succeeded)
+                .exceptionally(upload::failed);
+
+        return upload.start();
     }
 
     @Override
     public void updateSmallDataset(DataWriteRequest request, StreamObserver<TagHeader> responseObserver) {
 
-        grpcWrap.unaryAsync(request, responseObserver, this::updateSmallDataset);
+        validateRequest(UPDATE_SMALL_DATASET_METHOD, request);
+
+        var upload = updateDataset(responseObserver);
+
+        upload.onNext(request);
+        upload.onCompleted();
     }
 
     @Override
@@ -118,25 +157,76 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
     @Override
     public StreamObserver<FileWriteRequest> createFile(StreamObserver<TagHeader> responseObserver) {
 
-        return grpcWrap.clientStreaming(responseObserver, this::createFile);
+        var upload = new GrpcUploadSource<>(FileWriteRequest.class, responseObserver);
+
+        var execCtx = ExecutionContext.EXEC_CONTEXT_KEY.get();
+        var userInfo = AuthHelpers.currentUser();
+
+        var firstMessage = upload.firstMessage();
+        var dataStream = upload.dataStream(msg -> Bytes.fromProtoBytes(msg.getContent()));
+
+        firstMessage
+                .thenApply(req -> validateRequest(CREATE_FILE_METHOD, req))
+                .thenCompose(req -> fileService.createFile(
+                        req.getTenant(),
+                        req.getTagUpdatesList(),
+                        req.getName(),
+                        req.getMimeType(),
+                        req.hasSize() ? req.getSize() : null,
+                        dataStream, execCtx, userInfo))
+                .thenAccept(upload::succeeded)
+                .exceptionally(upload::failed);
+
+        return upload.start();
     }
 
     @Override
     public void createSmallFile(FileWriteRequest request, StreamObserver<TagHeader> responseObserver) {
 
-        grpcWrap.unaryAsync(request, responseObserver, this::createSmallFile);
+        validateRequest(CREATE_SMALL_FILE_METHOD, request);
+
+        var upload = createFile(responseObserver);
+
+        upload.onNext(request);
+        upload.onCompleted();
     }
 
     @Override
     public StreamObserver<FileWriteRequest> updateFile(StreamObserver<TagHeader> responseObserver) {
 
-        return grpcWrap.clientStreaming(responseObserver, this::updateFile);
+        var upload = new GrpcUploadSource<>(FileWriteRequest.class, responseObserver);
+
+        var execCtx = ExecutionContext.EXEC_CONTEXT_KEY.get();
+        var userInfo = AuthHelpers.currentUser();
+
+        var firstMessage = upload.firstMessage();
+        var dataStream = upload.dataStream(msg -> Bytes.fromProtoBytes(msg.getContent()));
+
+        firstMessage
+                .thenApply(req -> validateRequest(UPDATE_FILE_METHOD, req))
+                .thenCompose(req -> fileService.updateFile(
+                        req.getTenant(),
+                        req.getTagUpdatesList(),
+                        req.getPriorVersion(),
+                        req.getName(),
+                        req.getMimeType(),
+                        req.hasSize() ? req.getSize() : null,
+                        dataStream, execCtx, userInfo))
+                .thenAccept(upload::succeeded)
+                .exceptionally(upload::failed);
+
+        return upload.start();
     }
 
     @Override
     public void updateSmallFile(FileWriteRequest request, StreamObserver<TagHeader> responseObserver) {
 
-        grpcWrap.unaryAsync(request, responseObserver, this::updateSSmallFile);
+        validateRequest(UPDATE_SMALL_FILE_METHOD, request);
+
+        var upload = updateFile(responseObserver);
+
+        upload.onNext(request);
+        upload.onCompleted();
     }
 
     @Override
@@ -155,64 +245,6 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
     // -----------------------------------------------------------------------------------------------------------------
     // API implementation
     // -----------------------------------------------------------------------------------------------------------------
-
-    private CompletionStage<TagHeader> createDataset(Flow.Publisher<DataWriteRequest> requestStream) {
-
-        var execCtx = ExecutionContext.EXEC_CONTEXT_KEY.get();
-        var userInfo = AuthHelpers.currentUser();
-
-        var requestHub = Flows.<DataWriteRequest>hub(execCtx);
-        requestStream.subscribe(requestHub);
-
-        var firstMessage = Flows.first(requestHub);
-        var dataStream = Flows.map(requestHub, msg -> Bytes.fromProtoBytes(msg.getContent()));
-
-        return firstMessage
-                .thenApply(request -> validateRequest(CREATE_DATASET_METHOD, request))
-                .thenCompose(request -> dataRwService.createDataset(request, dataStream, execCtx, userInfo));
-    }
-
-    private CompletionStage<TagHeader> createSmallDataset(DataWriteRequest request) {
-
-        validateRequest(CREATE_SMALL_DATASET_METHOD, request);
-
-        var execCtx = ExecutionContext.EXEC_CONTEXT_KEY.get();
-        var userInfo = AuthHelpers.currentUser();
-
-        var dataBytes = Bytes.fromProtoBytes(request.getContent());
-        var dataStream = Flows.publish(List.of(dataBytes));
-
-        return dataRwService.createDataset(request, dataStream, execCtx, userInfo);
-    }
-
-    private CompletionStage<TagHeader> updateDataset(Flow.Publisher<DataWriteRequest> requestStream) {
-
-        var execCtx = ExecutionContext.EXEC_CONTEXT_KEY.get();
-        var userInfo = AuthHelpers.currentUser();
-
-        var requestHub = Flows.<DataWriteRequest>hub(execCtx);
-        requestStream.subscribe(requestHub);
-
-        var firstMessage = Flows.first(requestHub);
-        var dataStream = Flows.map(requestHub, msg -> Bytes.fromProtoBytes(msg.getContent()));
-
-        return firstMessage
-                .thenApply(request -> validateRequest(UPDATE_DATASET_METHOD, request))
-                .thenCompose(request -> dataRwService.updateDataset(request, dataStream, execCtx, userInfo));
-    }
-
-    private CompletionStage<TagHeader> updateSmallDataset(DataWriteRequest request) {
-
-        validateRequest(UPDATE_DATASET_METHOD, request);
-
-        var execCtx = ExecutionContext.EXEC_CONTEXT_KEY.get();
-        var userInfo = AuthHelpers.currentUser();
-
-        var dataBytes = Bytes.fromProtoBytes(request.getContent());
-        var dataStream = Flows.publish(List.of(dataBytes));
-
-        return dataRwService.updateDataset(request, dataStream, execCtx, userInfo);
-    }
 
     private Flow.Publisher<DataReadResponse> readDataset(DataReadRequest request) {
 
@@ -267,90 +299,6 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
                     .setContent(data)
                     .build());
         });
-    }
-
-    private CompletionStage<TagHeader> createFile(Flow.Publisher<FileWriteRequest> requestStream) {
-
-        var execCtx = ExecutionContext.EXEC_CONTEXT_KEY.get();
-        var userInfo = AuthHelpers.currentUser();
-
-        var requestHub = Flows.<FileWriteRequest>hub(execCtx);
-        requestStream.subscribe(requestHub);
-
-        var firstMessage = Flows.first(requestHub);
-        var dataStream = Flows.map(requestHub, msg -> Bytes.fromProtoBytes(msg.getContent()));
-
-        return firstMessage
-                .thenApply(request -> validateRequest(CREATE_FILE_METHOD, request))
-                .thenCompose(request -> fileService.createFile(
-                        request.getTenant(),
-                        request.getTagUpdatesList(),
-                        request.getName(),
-                        request.getMimeType(),
-                        request.hasSize() ? request.getSize() : null,
-                        dataStream, execCtx, userInfo));
-    }
-
-    private CompletionStage<TagHeader> createSmallFile(FileWriteRequest request) {
-
-        validateRequest(CREATE_SMALL_FILE_METHOD, request);
-
-        var execCtx = ExecutionContext.EXEC_CONTEXT_KEY.get();
-        var userInfo = AuthHelpers.currentUser();
-
-        var dataBytes = Bytes.fromProtoBytes(request.getContent());
-        var dataStream = Flows.publish(List.of(dataBytes));
-
-        return fileService.createFile(
-                request.getTenant(),
-                request.getTagUpdatesList(),
-                request.getName(),
-                request.getMimeType(),
-                request.hasSize() ? request.getSize() : null,
-                dataStream, execCtx, userInfo);
-    }
-
-    private CompletionStage<TagHeader> updateFile(Flow.Publisher<FileWriteRequest> requestStream) {
-
-        var execCtx = ExecutionContext.EXEC_CONTEXT_KEY.get();
-        var userInfo = AuthHelpers.currentUser();
-
-        var requestHub = Flows.<FileWriteRequest>hub(execCtx);
-        requestStream.subscribe(requestHub);
-
-        var firstMessage = Flows.first(requestHub);
-        var dataStream = Flows.map(requestHub, msg -> Bytes.fromProtoBytes(msg.getContent()));
-
-        return firstMessage
-                .thenApply(request -> validateRequest(UPDATE_FILE_METHOD, request))
-                .thenCompose(request -> fileService.updateFile(
-                        request.getTenant(),
-                        request.getTagUpdatesList(),
-                        request.getPriorVersion(),
-                        request.getName(),
-                        request.getMimeType(),
-                        request.hasSize() ? request.getSize() : null,
-                        dataStream, execCtx, userInfo));
-    }
-
-    private CompletionStage<TagHeader> updateSSmallFile(FileWriteRequest request) {
-
-        validateRequest(UPDATE_SMALL_FILE_METHOD, request);
-
-        var execCtx = ExecutionContext.EXEC_CONTEXT_KEY.get();
-        var userInfo = AuthHelpers.currentUser();
-
-        var dataBytes = Bytes.fromProtoBytes(request.getContent());
-        var dataStream = Flows.publish(List.of(dataBytes));
-
-        return fileService.updateFile(
-                request.getTenant(),
-                request.getTagUpdatesList(),
-                request.getPriorVersion(),
-                request.getName(),
-                request.getMimeType(),
-                request.hasSize() ? request.getSize() : null,
-                dataStream, execCtx, userInfo);
     }
 
     private Flow.Publisher<FileReadResponse> readFile(FileReadRequest request) {
