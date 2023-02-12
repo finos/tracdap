@@ -65,8 +65,12 @@ public class ReactiveByteSource
     @Override
     public void pump() {
 
+        // data stream not active, do not pump
         if (subscription == null) {
-            log.warn("Data stream has not started yet or has already closed");
+
+            if (nRequested > 0 || cancelled)
+                log.warn("Data stream has already closed");
+
             return;
         }
 
