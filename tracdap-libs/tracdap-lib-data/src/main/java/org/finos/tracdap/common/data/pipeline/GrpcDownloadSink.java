@@ -35,8 +35,6 @@ import java.util.function.Supplier;
 
 public class GrpcDownloadSink<TResponse extends MessageLite, TBuilder extends MessageLite.Builder> {
 
-    public static final long COMPRESSION_THRESHOLD = 64 * 1024;
-
     public static final boolean STREAMING = true;
     public static final boolean AGGREGATED = false;
 
@@ -65,8 +63,6 @@ public class GrpcDownloadSink<TResponse extends MessageLite, TBuilder extends Me
             throw new EUnexpected();
 
         responseStream = (ServerCallStreamObserver<TResponse>) response;
-        responseStream.setCompression("gzip");
-        responseStream.setMessageCompression(true);
         responseStream.setOnCancelHandler(this::apiOnCancel);
         responseStream.setOnReadyHandler(this::apiOnReady);
 
@@ -135,7 +131,7 @@ public class GrpcDownloadSink<TResponse extends MessageLite, TBuilder extends Me
     private void firstMessageComplete(TBuilder response) {
 
         if (streaming)
-            sendMessage((TResponse) response.build());
+            responseStream.onNext((TResponse) response.build());
         else
             aggregateResponse.mergeFrom(response.buildPartial());
 
@@ -178,7 +174,7 @@ public class GrpcDownloadSink<TResponse extends MessageLite, TBuilder extends Me
 
         if (streaming) {
             var msg = dataFunc.apply(builder.get(), chunk).build();
-            sendMessage((TResponse) msg);
+            responseStream.onNext((TResponse) msg);
         }
         else
             addToAggregate(chunk);
@@ -192,7 +188,7 @@ public class GrpcDownloadSink<TResponse extends MessageLite, TBuilder extends Me
 
         if (!streaming) {
             var msg = dataFunc.apply(aggregateResponse, aggregateBuffer).build();
-            sendMessage((TResponse) msg);
+            responseStream.onNext((TResponse) msg);
         }
 
         responseStream.onCompleted();
@@ -226,12 +222,6 @@ public class GrpcDownloadSink<TResponse extends MessageLite, TBuilder extends Me
 
         if (aggregateBuffer.refCnt() > 0)
             aggregateBuffer.release();
-    }
-
-    private void sendMessage(TResponse msg) {
-
-        responseStream.setMessageCompression(msg.getSerializedSize() > COMPRESSION_THRESHOLD);
-        responseStream.onNext(msg);
     }
 
     private class DownloadSubscriber implements Flow.Subscriber<ByteBuf> {

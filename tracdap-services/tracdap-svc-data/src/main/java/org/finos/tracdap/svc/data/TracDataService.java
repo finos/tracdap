@@ -20,6 +20,7 @@ import org.finos.tracdap.api.TrustedMetadataApiGrpc;
 import org.finos.tracdap.common.auth.internal.InternalAuthProvider;
 import org.finos.tracdap.common.auth.internal.JwtSetup;
 import org.finos.tracdap.common.auth.internal.InternalAuthValidator;
+import org.finos.tracdap.common.grpc.CompressionServerInterceptor;
 import org.finos.tracdap.common.grpc.ErrorMappingInterceptor;
 import org.finos.tracdap.common.grpc.LoggingServerInterceptor;
 import org.finos.tracdap.config.ServiceConfig;
@@ -182,6 +183,7 @@ public class TracDataService extends CommonServiceBase {
                     // Interceptors
                     .intercept(new ErrorMappingInterceptor())
                     .intercept(new LoggingServerInterceptor(TracDataApi.class))
+                    .intercept(new CompressionServerInterceptor())
                     .intercept(new InternalAuthValidator(platformConfig.getAuthentication(), tokenProcessor))
                     .intercept(execRegister.registerExecContext())
 

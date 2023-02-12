@@ -56,8 +56,6 @@ public class GrpcUploadSource<TRequest, TResponse> {
 
         this.response = (ServerCallStreamObserver<TResponse>) response;
         this.response.disableAutoInboundFlowControl();
-        this.response.setCompression("gzip");
-        this.response.setMessageCompression(true);
         this.response.setOnCancelHandler(this::apiOnCancel);
 
         this.request = new UploadRequestObserver();
