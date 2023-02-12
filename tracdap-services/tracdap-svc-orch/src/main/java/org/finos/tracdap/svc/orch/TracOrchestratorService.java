@@ -254,7 +254,7 @@ public class TracOrchestratorService extends CommonServiceBase {
                 .newBlockingStub(clientChannel)
                 .withCompression(CompressionClientInterceptor.COMPRESSION_TYPE)
                 .withInterceptors(new CompressionClientInterceptor())
-                .withInterceptors(new LoggingClientInterceptor(JobProcessor.class));
+                .withInterceptors(new LoggingClientInterceptor(TracOrchestratorService.class));
     }
 
     public static void main(String[] args) {

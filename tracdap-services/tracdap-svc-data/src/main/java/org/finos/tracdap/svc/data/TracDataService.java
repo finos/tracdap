@@ -252,7 +252,7 @@ public class TracDataService extends CommonServiceBase {
         return TrustedMetadataApiGrpc.newFutureStub(clientChannel)
                 .withCompression(CompressionClientInterceptor.COMPRESSION_TYPE)
                 .withInterceptors(new CompressionClientInterceptor())
-                .withInterceptors(new LoggingClientInterceptor(DataService.class));
+                .withInterceptors(new LoggingClientInterceptor(TracDataService.class));
     }
 
     @Override
