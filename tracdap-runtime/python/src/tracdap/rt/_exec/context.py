@@ -13,6 +13,7 @@
 #  limitations under the License.
 
 import logging
+import pathlib
 import typing as tp
 import re
 import traceback
@@ -59,7 +60,8 @@ class TracContextImpl(_api.TracContext):
                  model_def: _meta.ModelDefinition,
                  model_class: _api.TracModel.__class__,
                  local_ctx: tp.Dict[str, _data.DataView],
-                 schemas: tp.Dict[str, _meta.SchemaDefinition]):
+                 schemas: tp.Dict[str, _meta.SchemaDefinition],
+                 checkout_directory: pathlib.Path = None):
 
         self.__ctx_log = _util.logger_for_object(self)
         self.__model_log = _util.logger_for_class(model_class)
@@ -74,7 +76,9 @@ class TracContextImpl(_api.TracContext):
         self.__val = TracContextValidator(
             self.__ctx_log,
             self.__parameters,
-            self.__data)
+            self.__data,
+            checkout_directory)
+
 
     def get_parameter(self, parameter_name: str) -> tp.Any:
 
@@ -175,43 +179,29 @@ class TracContextValidator:
     __VALID_IDENTIFIER = re.compile("^[a-zA-Z_]\\w*$",)
     __RESERVED_IDENTIFIER = re.compile("^(trac_|_)\\w*")
 
-    __LAST_MODEL_FRAME = -4
-    __FIRST_MODEL_FRAME_NAME = "run_model"
-    __FIRST_MODEL_FRAME_TEST_NAME = "_callTestMethod"
-
     def __init__(
             self, log: logging.Logger,
             parameters: tp.Dict[str, tp.Any],
-            data_ctx: tp.Dict[str, _data.DataView]):
+            data_ctx: tp.Dict[str, _data.DataView],
+            checkout_directory: pathlib.Path):
 
         self.__log = log
         self.__parameters = parameters
         self.__data_ctx = data_ctx
+        self.__checkout_directory = checkout_directory
 
     def _report_error(self, message):
 
-        model_stack = self._build_model_stack_trace()
+        full_stack = traceback.extract_stack()
+        model_stack = _util.filter_model_stack_trace(full_stack, self.__checkout_directory)
         model_stack_str = ''.join(traceback.format_list(list(reversed(model_stack))))
+        details = _util.error_details_from_trace(model_stack)
+        message = f"{message} {details}"
 
         self.__log.error(message)
         self.__log.error(f"Model stack trace:\n{model_stack_str}")
 
         raise _ex.ERuntimeValidation(message)
-
-    def _build_model_stack_trace(self):
-
-        full_stack = traceback.extract_stack()
-
-        frame_names = list(map(lambda frame: frame.name, full_stack))
-
-        if self.__FIRST_MODEL_FRAME_NAME in frame_names:
-            first_model_frame = frame_names.index(self.__FIRST_MODEL_FRAME_NAME)
-        elif self.__FIRST_MODEL_FRAME_TEST_NAME in frame_names:
-            first_model_frame = frame_names.index(self.__FIRST_MODEL_FRAME_TEST_NAME)
-        else:
-            first_model_frame = 0
-
-        return full_stack[first_model_frame:self.__LAST_MODEL_FRAME]
 
     def check_param_not_null(self, param_name):
 

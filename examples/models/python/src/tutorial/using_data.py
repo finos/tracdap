@@ -14,9 +14,8 @@
 
 import decimal
 import typing as tp
-
-import pandas as pd
 import tracdap.rt.api as trac
+import pandas as pd
 
 
 def calculate_profit_by_region(

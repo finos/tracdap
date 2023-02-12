@@ -91,10 +91,45 @@ class ModelLoader:
 
         return f"{group}/{package}/{version}"
 
+    def _get_checkout_dir(self, scope: str, model_def: _meta.ModelDefinition):
+        scope_state = self.__scopes[scope]
+        repo = self.__repos.get_repository(model_def.repository)
+        checkout_key = self.model_checkout_key(model_def)
+        checkout_subdir = pathlib.Path(checkout_key)
+
+        if checkout_subdir.is_absolute() or checkout_subdir.is_reserved():
+
+            msg = f"Checkout failed: Invalid checkout key [{checkout_key}] in repo [{model_def.repository}]" + \
+                  f" (type: {type(repo).__name__})"
+
+            self.__log.error(msg)
+            raise _ex.EUnexpected(msg)
+
+        code_cache_key = f"{model_def.repository}#{checkout_key}"
+
+        if code_cache_key in scope_state.code_cache:
+            checkout_dir = scope_state.code_cache[code_cache_key]
+
+        # Otherwise, we need to run the checkout, and store the checkout dir into the code cache
+        # What gets cached is the checkout, which may contain multiple packages depending on the repo type
+
+        else:
+            scope_dir = scope_state.scratch_dir
+            checkout_dir = scope_dir.joinpath(model_def.repository, checkout_subdir)
+
+        return checkout_dir
+
+    def model_load_checkout_directory(self, scope: str, model_def: _meta.ModelDefinition) -> pathlib.Path:
+
+        repo = self.__repos.get_repository(model_def.repository)
+        checkout_dir = self._get_checkout_dir(scope, model_def)
+
+        return repo.package_path(model_def, checkout_dir)
+
     def load_model_class(self, scope: str, model_def: _meta.ModelDefinition) -> _api.TracModel.__class__:
 
+        checkout_dir = self._get_checkout_dir(scope, model_def)
         scope_state = self.__scopes[scope]
-
         model_key = f"{model_def.repository}#{model_def.path}#{model_def.version}#{model_def.entryPoint}"
         model_class = scope_state.model_cache.get(model_key)
 
@@ -105,32 +140,18 @@ class ModelLoader:
 
         repo = self.__repos.get_repository(model_def.repository)
         checkout_key = self.model_checkout_key(model_def)
-        checkout_subdir = pathlib.Path(checkout_key)
-
-        # Make sure the checkout key is safe to use as a directory name
-
-        if checkout_subdir.is_absolute() or checkout_subdir.is_reserved():
-
-            msg = f"Checkout failed: Invalid checkout key [{checkout_key}] in repo [{model_def.repository}]" + \
-                  f" (type: {type(repo).__name__})"
-
-            self.__log.error(msg)
-            raise _ex.EUnexpected(msg)
 
         # If the repo/checkout already exists in the code cache, we can use the existing checkout and package dir
 
         code_cache_key = f"{model_def.repository}#{checkout_key}"
 
         if code_cache_key in scope_state.code_cache:
-            checkout_dir = scope_state.code_cache[code_cache_key]
             package_dir = repo.package_path(model_def, checkout_dir)
 
         # Otherwise, we need to run the checkout, and store the checkout dir into the code cache
         # What gets cached is the checkout, which may contain multiple packages depending on the repo type
 
         else:
-            scope_dir = scope_state.scratch_dir
-            checkout_dir = scope_dir.joinpath(model_def.repository, checkout_subdir)
             checkout_dir.mkdir(mode=0o750, parents=True, exist_ok=False)
             package_dir = repo.do_checkout(model_def, checkout_dir)
 
