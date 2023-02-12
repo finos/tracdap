@@ -20,8 +20,7 @@ import org.finos.tracdap.api.TrustedMetadataApiGrpc;
 import org.finos.tracdap.common.auth.internal.InternalAuthProvider;
 import org.finos.tracdap.common.auth.internal.JwtSetup;
 import org.finos.tracdap.common.auth.internal.InternalAuthValidator;
-import org.finos.tracdap.common.grpc.ErrorMappingInterceptor;
-import org.finos.tracdap.common.grpc.LoggingServerInterceptor;
+import org.finos.tracdap.common.grpc.*;
 import org.finos.tracdap.config.ServiceConfig;
 import org.finos.tracdap.config.PlatformConfig;
 
@@ -182,6 +181,7 @@ public class TracDataService extends CommonServiceBase {
                     // Interceptors
                     .intercept(new ErrorMappingInterceptor())
                     .intercept(new LoggingServerInterceptor(TracDataApi.class))
+                    .intercept(new CompressionServerInterceptor())
                     .intercept(new InternalAuthValidator(platformConfig.getAuthentication(), tokenProcessor))
                     .intercept(execRegister.registerExecContext())
 
@@ -242,13 +242,17 @@ public class TracDataService extends CommonServiceBase {
         var clientChannelBuilder = NettyChannelBuilder
                 .forAddress(metaInstance.getHost(), metaInstance.getPort())
                 .channelType(channelType)
+                .enableFullStreamDecompression()
                 .eventLoopGroup(serviceGroup)
                 .directExecutor()
                 .usePlaintext();
 
         clientChannel = EventLoopChannel.wrapChannel(clientChannelBuilder, serviceGroup);
 
-        return TrustedMetadataApiGrpc.newFutureStub(clientChannel);
+        return TrustedMetadataApiGrpc.newFutureStub(clientChannel)
+                .withCompression(CompressionClientInterceptor.COMPRESSION_TYPE)
+                .withInterceptors(new CompressionClientInterceptor())
+                .withInterceptors(new LoggingClientInterceptor(TracDataService.class));
     }
 
     @Override

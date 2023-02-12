@@ -17,13 +17,9 @@
 package org.finos.tracdap.common.concurrent;
 
 import org.finos.tracdap.common.concurrent.flow.*;
-import org.finos.tracdap.common.exception.EUnexpected;
-
-import io.netty.util.concurrent.OrderedEventExecutor;
 
 import java.util.*;
 import java.util.concurrent.*;
-import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.stream.Stream;
@@ -44,24 +40,9 @@ public class Flows {
     }
 
     public static <T>
-    Flow.Publisher<T> publish(CompletionStage<T> source) {
+    Flow.Publisher<T> waitForSignal(Flow.Publisher<T> target, CompletionStage<?> signal) {
 
-        return new FutureResultPublisher<>(source);
-    }
-
-    public static <T>
-    Flow.Processor<T, T> passThrough() {
-
-        return new InterceptProcessor<>(/* resultInterceptor = */ null);
-    }
-
-    public static <T>
-    Flow.Processor<T, T> interceptResult(Flow.Publisher<T> source, BiConsumer<T, Throwable> resultHandler) {
-
-        var interceptor = new InterceptProcessor<T>(resultHandler);
-        source.subscribe(interceptor);
-
-        return interceptor;
+        return new DelayedPublisher<>(target, signal);
     }
 
     public static <T>
@@ -117,34 +98,6 @@ public class Flows {
     }
 
     public static <T>
-    Flow.Publisher<T> concat(List<Flow.Publisher<T>> publishers) {
-
-        if (publishers.isEmpty())
-            throw new EUnexpected();
-
-        var concat = new ConcatProcessor<>(publishers);
-
-        publishers.get(0).subscribe(concat);
-
-        return concat;
-    }
-
-    public static <T>
-    Flow.Publisher<T> concat(CompletionStage<T> head, Flow.Publisher<T> tail) {
-
-        var headStream = publish(head);
-
-        var publishers = new ArrayList<Flow.Publisher<T>>(2);
-        publishers.add(headStream);
-        publishers.add(tail);
-
-        var concat = new ConcatProcessor<>(publishers);
-        headStream.subscribe(concat);
-
-        return concat;
-    }
-
-    public static <T>
     CompletionStage<List<T>> toList(Flow.Publisher<T> source) {
 
         return fold(source, (xs, x) -> {
@@ -153,12 +106,4 @@ public class Flows {
         }, new ArrayList<>());
     }
 
-    public static <T>
-    Flow.Publisher<T> onEventLoop(Flow.Publisher<T> publisher, OrderedEventExecutor executor) {
-
-        var relay = new EventLoopProcessor<T>(executor);
-        publisher.subscribe(relay);
-
-        return relay;
-    }
 }

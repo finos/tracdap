@@ -16,7 +16,7 @@
 
 package org.finos.tracdap.common.codec.arrow;
 
-import org.finos.tracdap.common.util.ByteOutputChannel;
+import org.finos.tracdap.common.data.util.ByteOutputChannel;
 
 import org.apache.arrow.vector.VectorSchemaRoot;
 import org.apache.arrow.vector.ipc.ArrowFileWriter;

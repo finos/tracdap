@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Accenture Global Solutions Limited
+ * Copyright 2023 Accenture Global Solutions Limited
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,11 +14,12 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.util;
+package org.finos.tracdap.common.data.util;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 
+import javax.annotation.Nonnull;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.function.Consumer;
@@ -26,7 +27,7 @@ import java.util.function.Consumer;
 
 public class ByteOutputStream extends OutputStream {
 
-    private static final int DEFAULT_CHUNK_SIZE = 4096;
+    private static final int DEFAULT_CHUNK_SIZE = 2 * 1024 * 1024;
 
     private final ByteBufAllocator allocator;
     private final Consumer<ByteBuf> sink;
@@ -45,7 +46,7 @@ public class ByteOutputStream extends OutputStream {
     }
 
     @Override
-    public void write(byte[] b, int off, int len) throws IOException {
+    public void write(@Nonnull byte[] b, int off, int len) throws IOException {
 
         var remaining = len - off;
 

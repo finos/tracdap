@@ -43,6 +43,7 @@ public class ReactiveByteSource
     private Flow.Subscription subscription;
     private long nRequested;
     private long nReceived;
+    private boolean cancelled = false;
 
     public ReactiveByteSource(DataPipelineImpl pipeline, Flow.Publisher<? extends ByteBuf> publisher) {
         super(DataPipeline.StreamApi.class);
@@ -64,8 +65,12 @@ public class ReactiveByteSource
     @Override
     public void pump() {
 
+        // data stream not active, do not pump
         if (subscription == null) {
-            log.warn("Data stream has not started yet or has already closed");
+
+            if (nRequested > 0 || cancelled)
+                log.warn("Data stream has already closed");
+
             return;
         }
 
@@ -86,6 +91,7 @@ public class ReactiveByteSource
     @Override
     public void cancel() {
 
+        cancelled = true;
         markAsDone();
 
         close();
@@ -126,6 +132,11 @@ public class ReactiveByteSource
     @Override
     public void onNext(ByteBuf chunk) {
 
+        if (cancelled) {
+            chunk.release();
+            return;
+        }
+
         reportUnhandledErrors(() -> {
 
             if (log.isTraceEnabled())
@@ -149,6 +160,10 @@ public class ReactiveByteSource
     @Override
     public void onComplete() {
 
+        if (cancelled) {
+            return;
+        }
+
         reportUnhandledErrors(() -> {
 
             if (log.isTraceEnabled())
@@ -163,6 +178,9 @@ public class ReactiveByteSource
 
     @Override
     public void onError(Throwable error) {
+
+        if (cancelled)
+            return;
 
         reportUnhandledErrors(() -> {
 

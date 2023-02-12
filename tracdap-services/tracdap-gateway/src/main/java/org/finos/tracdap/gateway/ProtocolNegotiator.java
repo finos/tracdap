@@ -24,7 +24,6 @@ import org.finos.tracdap.config.GatewayConfig;
 import io.netty.channel.*;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.handler.codec.http.*;
-import io.netty.handler.codec.http.websocketx.extensions.compression.WebSocketServerCompressionHandler;
 import io.netty.handler.codec.http.websocketx.WebSocketServerProtocolConfig;
 import io.netty.handler.codec.http.websocketx.WebSocketServerProtocolHandler;
 import io.netty.handler.codec.http2.*;
@@ -55,7 +54,6 @@ public class ProtocolNegotiator extends ChannelInitializer<SocketChannel> {
     private static final String HTTP_2_CODEC = "http_2_codec";
 
     private static final String WS_INITIALIZER = "ws_initializer";
-    private static final String WS_COMPRESSION = "ws_compression";
     private static final String WS_FRAME_CODEC = "ws_frame_codec";
 
     private static final int MAX_TIMEOUT = 3600;
@@ -372,7 +370,13 @@ public class ProtocolNegotiator extends ChannelInitializer<SocketChannel> {
 
             pipeline.addAfter(CLIENT_TIMEOUT, HTTP_1_AUTH, authHandler);
 
-            pipeline.addAfter(HTTP_1_AUTH, WS_COMPRESSION, new WebSocketServerCompressionHandler());
+
+            // Do not include compression codec at the WS level
+            // Compression happens at the gRPC level for individual message blocks
+            // Those message flow through different hops and protocols, including WS and HTTP/2
+            // Compressing / uncompressing on each hop is particularly inefficient since the payload is compressed
+            // Quick testing shows a roughly 10% performance gain in Chrome from removing WS-level compression
+
 
             // Configure the WS protocol handler - path must match the URI in the upgrade request
 
@@ -386,7 +390,7 @@ public class ProtocolNegotiator extends ChannelInitializer<SocketChannel> {
                     .handleCloseFrames(false)
                     .build();
 
-            pipeline.addAfter(WS_COMPRESSION, WS_FRAME_CODEC, new WebSocketServerProtocolHandler(wsConfig));
+            pipeline.addAfter(HTTP_1_AUTH, WS_FRAME_CODEC, new WebSocketServerProtocolHandler(wsConfig));
 
             // Ådd the main handler - this should be the WebTransportRouter when the full service is running
             pipeline.addLast(webSocketsHandler.create(connId.getAndIncrement()));
