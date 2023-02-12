@@ -83,7 +83,7 @@ public class StorageManager implements IStorageManager, AutoCloseable {
 
                 for (var fileInstance : backend.fileInstances) {
 
-                    var dataInstance = new FlatDataStorage(fileInstance, formats);
+                    var dataInstance = new FlatDataStorage(bucketConfig, fileInstance, formats);
                     dataInstance.start(eventLoopGroup);
 
                     backend.dataInstances.add(dataInstance);
