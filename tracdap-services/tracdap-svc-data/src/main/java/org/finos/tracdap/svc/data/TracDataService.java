@@ -161,8 +161,6 @@ public class TracDataService extends CommonServiceBase {
             var dataSvc = new DataService(storageConfig, tenantConfig, arrowAllocator, storage, formats, metaClient, internalAuth);
             var dataApi = new TracDataApi(dataSvc, fileSvc);
 
-            var decompress = DecompressorRegistry.emptyInstance().with(new Codec.Gzip(), true);
-
             // Create the main server
 
             this.server = NettyServerBuilder
@@ -186,9 +184,6 @@ public class TracDataService extends CommonServiceBase {
                     .intercept(new LoggingServerInterceptor(TracDataApi.class))
                     .intercept(new InternalAuthValidator(platformConfig.getAuthentication(), tokenProcessor))
                     .intercept(execRegister.registerExecContext())
-
-                    // Compression support
-                    .decompressorRegistry(decompress)
 
                     .build();
 
