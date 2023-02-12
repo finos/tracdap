@@ -22,10 +22,7 @@ import org.finos.tracdap.common.auth.internal.JwtSetup;
 import org.finos.tracdap.common.auth.internal.InternalAuthValidator;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.exception.EStartup;
-import org.finos.tracdap.common.grpc.CompressionServerInterceptor;
-import org.finos.tracdap.common.grpc.ErrorMappingInterceptor;
-import org.finos.tracdap.common.grpc.LoggingClientInterceptor;
-import org.finos.tracdap.common.grpc.LoggingServerInterceptor;
+import org.finos.tracdap.common.grpc.*;
 import org.finos.tracdap.common.plugin.PluginManager;
 import org.finos.tracdap.common.service.CommonServiceBase;
 import org.finos.tracdap.config.PlatformConfig;
@@ -113,11 +110,7 @@ public class TracOrchestratorService extends CommonServiceBase {
             nettyGroup = new NioEventLoopGroup(2, new DefaultThreadFactory("orch-netty"));
             serviceGroup = new NioEventLoopGroup(CONCURRENT_REQUESTS, new DefaultThreadFactory("orch-svc"));
 
-            prepareMetadataClientChannel(platformConfig, clientChannelType);
-
-            var metaClient = TrustedMetadataApiGrpc
-                    .newBlockingStub(clientChannel)
-                    .withInterceptors(new LoggingClientInterceptor(JobProcessor.class));
+            var metaClient = prepareMetadataClient(platformConfig, clientChannelType);
 
             var jwtProcessor = JwtSetup.createProcessor(platformConfig, configManager);
             var internalAuth = new InternalAuthProvider(jwtProcessor, platformConfig.getAuthentication());
@@ -229,7 +222,7 @@ public class TracOrchestratorService extends CommonServiceBase {
         return -1;
     }
 
-    private void prepareMetadataClientChannel(
+    private TrustedMetadataApiGrpc.TrustedMetadataApiBlockingStub prepareMetadataClient(
             PlatformConfig platformConfig,
             Class<? extends io.netty.channel.Channel> channelType) {
 
@@ -250,11 +243,18 @@ public class TracOrchestratorService extends CommonServiceBase {
         var clientChannelBuilder = NettyChannelBuilder
                 .forAddress(metaInstance.getHost(), metaInstance.getPort())
                 .channelType(channelType)
+                .enableFullStreamDecompression()
                 .eventLoopGroup(nettyGroup)
                 .executor(serviceGroup)
                 .usePlaintext();
 
         clientChannel = clientChannelBuilder.build();
+
+        return TrustedMetadataApiGrpc
+                .newBlockingStub(clientChannel)
+                .withCompression(CompressionClientInterceptor.COMPRESSION_TYPE)
+                .withInterceptors(new CompressionClientInterceptor())
+                .withInterceptors(new LoggingClientInterceptor(JobProcessor.class));
     }
 
     public static void main(String[] args) {
