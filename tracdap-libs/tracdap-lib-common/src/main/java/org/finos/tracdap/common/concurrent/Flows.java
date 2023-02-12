@@ -40,6 +40,12 @@ public class Flows {
     }
 
     public static <T>
+    Flow.Publisher<T> waitForSignal(Flow.Publisher<T> target, CompletionStage<?> signal) {
+
+        return new DelayedPublisher<>(target, signal);
+    }
+
+    public static <T>
     Flow.Subscriber<T> waitForSignal(Flow.Subscriber<T> target, CompletionStage<?> signal) {
 
         return new DelayedSubscriber<>(target, signal);
