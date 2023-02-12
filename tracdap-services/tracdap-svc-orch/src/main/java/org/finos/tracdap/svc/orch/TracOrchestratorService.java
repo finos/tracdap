@@ -22,6 +22,7 @@ import org.finos.tracdap.common.auth.internal.JwtSetup;
 import org.finos.tracdap.common.auth.internal.InternalAuthValidator;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.exception.EStartup;
+import org.finos.tracdap.common.grpc.CompressionServerInterceptor;
 import org.finos.tracdap.common.grpc.ErrorMappingInterceptor;
 import org.finos.tracdap.common.grpc.LoggingClientInterceptor;
 import org.finos.tracdap.common.grpc.LoggingServerInterceptor;
@@ -139,19 +140,23 @@ public class TracOrchestratorService extends CommonServiceBase {
             this.server = NettyServerBuilder
                     .forPort(orchestratorConfig.getPort())
 
+                    // Netty config
+                    .channelType(channelType)
+                    .bossEventLoopGroup(bossGroup)
+                    .workerEventLoopGroup(nettyGroup)
+                    .executor(serviceGroup)
+
                     // Interceptor order: Last added is executed first
                     // But note, on close it is the other way round, because the stack is unwinding
                     // We want error mapping at the bottom of the stack, so it unwinds before logging
 
                     .intercept(new ErrorMappingInterceptor())
                     .intercept(new LoggingServerInterceptor(TracOrchestratorService.class))
+                    .intercept(new CompressionServerInterceptor())
                     .intercept(new InternalAuthValidator(platformConfig.getAuthentication(), jwtProcessor))
-                    .addService(new TracOrchestratorApi(jobManager, jobProcessor))
 
-                    .channelType(channelType)
-                    .bossEventLoopGroup(bossGroup)
-                    .workerEventLoopGroup(nettyGroup)
-                    .executor(serviceGroup)
+                    // The main service
+                    .addService(new TracOrchestratorApi(jobManager, jobProcessor))
                     .build();
 
             this.server.start();
