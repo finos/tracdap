@@ -183,6 +183,7 @@ public class DataPipelineImpl implements DataPipeline {
 
         sourceStage.cancel();
         sinkStage.terminate(error);
+        sinkStage.terminate(error);
 
         closeAllStages();
     }
@@ -212,7 +213,7 @@ public class DataPipelineImpl implements DataPipeline {
                 stage.close();
             }
             catch (Throwable e) {
-                log.warn("There was an error while the data pipeline was shutting down: {}", e.getMessage());
+                log.warn("There was an error while the data pipeline was shutting down: {}", e.getMessage(), e);
             }
         }
     }

@@ -25,8 +25,12 @@ import tracdap.rt.exceptions as ex
 import tracdap.rt.metadata as meta
 import tracdap.rt.config as cfg
 
+import traceback as tb
+
 
 __IS_WINDOWS = platform.system() == "Windows"
+__FIRST_MODEL_FRAME_NAME = "run_model"
+__FIRST_MODEL_FRAME_TEST_NAME = "_callTestMethod"
 
 
 def is_windows():
@@ -266,3 +270,55 @@ def try_clean_dir(dir_path: pathlib.Path, remove: bool = False) -> bool:
             return clean_ok
         except Exception:  # noqa
             return False
+
+
+def error_details_from_trace(trace: tb.StackSummary):
+    last_frame = trace[len(trace) - 1]
+    filename = pathlib.PurePath(last_frame.filename).name
+    # Do not report errors from inside C modules,
+    # they will not be meaningful to users
+    if filename.startswith("<"):
+        return ""
+    else:
+        return f" ({filename} line {last_frame.lineno}, {last_frame.line})"
+
+
+def error_details_from_model_exception(error: Exception, checkout_directory: pathlib.Path):
+    trace = tb.extract_tb(error.__traceback__)
+    filtered_trace = filter_model_stack_trace(trace, checkout_directory)
+    return error_details_from_trace(filtered_trace)
+
+
+def error_details_from_exception(error: Exception):
+    trace = tb.extract_tb(error.__traceback__)
+    return error_details_from_trace(trace)
+
+
+def filter_model_stack_trace(full_stack: tb.StackSummary, checkout_directory: pathlib.Path):
+
+    frame_names = list(map(lambda frame: frame.name, full_stack))
+
+    if __FIRST_MODEL_FRAME_NAME in frame_names:
+        first_model_frame = frame_names.index(__FIRST_MODEL_FRAME_NAME)
+    elif __FIRST_MODEL_FRAME_TEST_NAME in frame_names:
+        first_model_frame = frame_names.index(__FIRST_MODEL_FRAME_TEST_NAME)
+    else:
+        first_model_frame = 0
+
+    last_model_frame = first_model_frame
+
+    for frame_index, frame in enumerate(full_stack[first_model_frame:]):
+        module_path = pathlib.Path(frame.filename)
+        if ("tracdap" in module_path.parts):
+            tracdap_index = len(module_path.parts) - 1 - list(reversed(module_path.parts)).index("tracdap")
+            if tracdap_index < len(module_path.parts)-1:
+                if module_path.parts[tracdap_index+1] == "rt":
+                    break
+        if ("site-packages" in module_path.parts) or ("venv" in module_path.parts):
+            break
+        if (checkout_directory is not None) and (not module_path.is_relative_to(checkout_directory)):
+            break
+        last_model_frame = first_model_frame + frame_index
+
+    return full_stack[first_model_frame:last_model_frame+1]
+

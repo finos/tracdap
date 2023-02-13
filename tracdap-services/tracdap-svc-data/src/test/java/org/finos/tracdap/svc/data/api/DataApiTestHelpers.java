@@ -22,7 +22,7 @@ import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.metadata.MetadataUtil;
 import org.finos.tracdap.common.concurrent.Flows;
-import org.finos.tracdap.common.util.ByteSeekableChannel;
+import org.finos.tracdap.common.data.util.ByteSeekableChannel;
 import org.finos.tracdap.test.grpc.GrpcTestStreams;
 import org.finos.tracdap.metadata.BasicType;
 import org.finos.tracdap.metadata.SchemaDefinition;

@@ -50,7 +50,7 @@ public class JobManager {
     public static final int PROCESSING_RETRY_LIMIT = 2;
     public static final int CACHE_POLL_ERROR_LIMIT = 100;
     public static final int EXECUTOR_POLL_ERROR_LIMIT = 20;
-    public static final int JOB_REVISION_LIMIT = 50;
+    public static final int JOB_REVISION_LIMIT = 100;
 
     public static final String POLL_INTERVAL_CONFIG_KEY = "pollInterval";
     public static final String TICKET_DURATION_CONFI_KEY = "ticketDuration";

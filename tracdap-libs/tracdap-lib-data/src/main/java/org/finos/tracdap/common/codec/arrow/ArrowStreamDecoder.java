@@ -18,7 +18,7 @@ package org.finos.tracdap.common.codec.arrow;
 
 import org.apache.arrow.vector.ipc.ArrowStreamReader;
 import org.finos.tracdap.common.exception.EDataCorruption;
-import org.finos.tracdap.common.util.ByteSeekableChannel;
+import org.finos.tracdap.common.data.util.ByteSeekableChannel;
 
 import org.apache.arrow.vector.ipc.ArrowReader;
 import org.apache.arrow.memory.BufferAllocator;
