@@ -33,7 +33,8 @@ class FirstModel(trac.TracModel):
             trac.F("loan_amount", trac.DECIMAL, label="Principal loan amount"),
             trac.F("total_pymnt", trac.DECIMAL, label="Total amount repaid"),
             trac.F("region", trac.STRING, label="Customer home region", categorical=True),
-            trac.F("loan_condition_cat", trac.INTEGER, label="Loan condition category"))
+            trac.F("loan_condition_cat", trac.INTEGER, label="Loan condition category"),
+            label="Basic loan parameters")
 
         currency_data = trac.define_input_table(
             trac.F("ccy_code", trac.STRING, label="Currency code", categorical=True),
@@ -44,9 +45,10 @@ class FirstModel(trac.TracModel):
 
     def define_outputs(self) -> tp.Dict[str, trac.ModelOutputSchema]:
 
-        preprocessed = trac.declare_output_table(
+        preprocessed = trac.define_output_table(
             trac.F("id", trac.STRING, label="Customer account ID", business_key=True),
-            trac.F("some_quantity_x", trac.DECIMAL, label="Some quantity X"))
+            trac.F("some_quantity_x", trac.DECIMAL, label="Some quantity X"),
+            label="Generic output")
 
         return {"preprocessed_data": preprocessed}
 

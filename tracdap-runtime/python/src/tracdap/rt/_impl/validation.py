@@ -54,7 +54,7 @@ class _TypeValidator:
     _log: logging.Logger = util.logger_for_namespace(__name__)
 
     @classmethod
-    def validate_signature(cls, method: tp.Callable, *args, **kwargs): #TODO: bugfixing
+    def validate_signature(cls, method: tp.Callable, *args, **kwargs):
 
         if method.__name__ in cls.__method_cache:
             signature = cls.__method_cache[method.__name__]
@@ -298,8 +298,13 @@ class _StaticValidator:
         cls._unique_context_check(unique_ctx, model_def.outputs.keys(), "model output")
 
         cls._check_parameters(model_def.parameters)
-        cls._check_table_fields(model_def.inputs)
-        cls._check_table_fields(model_def.outputs)
+        cls._check_inputs_or_outputs(model_def.inputs)
+        cls._check_inputs_or_outputs(model_def.outputs)
+
+    @classmethod
+    def _check_label(cls, label):
+        if label is not None and len(label) > cls.__label_length_limit:
+            cls._fail(f"Invalid model parameter: [{param.fieldName}] label exceeds maximum length limit ({cls.__label_length_limit} characters)")  # noqa
 
     @classmethod
     def _check_parameters(cls, parameters):
@@ -309,11 +314,10 @@ class _StaticValidator:
             if param.label is None or len(param.label.strip()) == 0:
                 cls._fail(f"Invalid model parameter: [{param_name}] label is missing or blank")
 
-            if len(param.label) > cls.__label_length_limit:
-                cls._fail(f"Invalid model parameter: [{param.fieldName}] label exceeds maximum length limit ({cls.__label_length_limit} characters)")  # noqa
+            cls._check_label(param.label)
 
     @classmethod
-    def _check_table_fields(cls, inputs_or_outputs):
+    def _check_inputs_or_outputs(cls, inputs_or_outputs):
 
         for input_name, input_schema in inputs_or_outputs.items():
 
@@ -322,12 +326,15 @@ class _StaticValidator:
             fields = input_schema.schema.table.fields
             field_names = list(map(lambda f: f.fieldName, fields))
             property_type = f"field in [{input_name}]"
+            label = input_schema.label
 
             cls._valid_identifiers(field_names, property_type)
             cls._case_insensitive_duplicates(field_names, property_type)
 
             for field in fields:
                 cls._check_single_field(field, property_type)
+
+            cls._check_label(label)
 
     @classmethod
     def _check_single_field(cls, field: meta.FieldSchema, property_type):

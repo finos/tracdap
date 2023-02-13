@@ -52,7 +52,7 @@ message ModelInputSchema {
 
     SchemaDefinition schema = 1;
 
-    string label = 2;
+    optional string label = 2;
 }
 
 /**
@@ -71,7 +71,7 @@ message ModelOutputSchema {
 
     SchemaDefinition schema = 1;
 
-    string label = 2;
+    optional string label = 2;
 }
 
 
