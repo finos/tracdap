@@ -54,8 +54,10 @@ class PythonGuardRails:
     ]
 
     REQUIRED_DEBUG_FUNCTIONS = ["exec", "eval", "compile"]
+    REQUIRED_IMPORT_FUNCTIONS = ["exec", "memoryview"]
 
-    MODEL_ENTRY_POINTS = _get_model_entry_points()
+    MODEL_IMPORT_ENTRY_POINT = "trac_model_code_import"
+    MODEL_ENTRY_POINTS = _get_model_entry_points() + [MODEL_IMPORT_ENTRY_POINT]
     TRAC_PACKAGE_PATH: pathlib.Path = _get_package_path("tracdap.rt")
     SITE_PACKAGE_PATH: pathlib.Path = _get_package_path("pyarrow")
 
@@ -89,7 +91,7 @@ class PythonGuardRails:
 
         def protected_function(*args, **kwargs):
 
-            model_code_details = cls.check_for_model_code()
+            model_code_details = cls.check_for_model_code(func_name)
 
             # Allow libraries and platform code to call the dangerous functions
             # Trying to restrict libraries or even Python itself causes too many errors to be practical
@@ -108,7 +110,7 @@ class PythonGuardRails:
         return protected_function
 
     @classmethod
-    def check_for_model_code(cls):
+    def check_for_model_code(cls, func_name):
 
         # Traceback is a lot faster than inspect.stack()
         # If there is no model entry point in the traceback,
@@ -142,20 +144,45 @@ class PythonGuardRails:
                     model_entry_depth = depth
                     break
 
+            # As well as the model API entry points, we need to look for model code imports
+            # Dangerous functions can execute in model scripts at global scope
+
+            if frame.function == cls.MODEL_IMPORT_ENTRY_POINT:
+                if frame.frame.f_globals["__name__"] == "tracdap.rt._impl.shim":
+                    model_entry_depth = depth
+                    break
+
         # If we didn't find a really model entry point, then there is no need to check further
 
         if model_entry_depth is None:
             return None
 
-        # Now look back up the stack from the model entry point, to see if there is a call to a library
-        # We need to ignore the protected func depth, which is the frames for this checking code
-
-        # For this check, anything in site-packages or the path where TRAC is installed is considered a library
-        # The python built-in modules are not considered an external call (this may need to change)
+        # Model entry point has been found
 
         model_stack = stack[cls.PROTECTED_FUNC_STACK_DEPTH:model_entry_depth + 1]
         first_model_frame = stack[model_entry_depth]
         last_model_frame = first_model_frame
+
+        # Check the entry point to see if it is a model code import
+        # If it is, we need to apply special handling
+
+        if first_model_frame.function == cls.MODEL_IMPORT_ENTRY_POINT:
+
+            # Allow some functions that are need to import modules
+            if func_name in cls.REQUIRED_IMPORT_FUNCTIONS:
+                return None
+
+            # It's difficult to get a file / line / statement from the import machinery
+            # We can at least say which module import triggered the dangerous function
+            else:
+                module_name = first_model_frame.frame.f_locals.get("module_name")
+                return f"{func_name}() called during import of [{module_name}]"
+
+        # Now we know the entry point was an API call on the TracModel class
+        # Look back up the stack from the entry point, to see if there is a call to a library
+        # We need to ignore the protected func depth, which is the frames for this checking code
+        # For this check, anything in site-packages or the path where TRAC is installed is considered a library
+        # The python built-in modules are not considered an external call (this may need to change)
 
         for frame in reversed(model_stack):
 

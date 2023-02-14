@@ -20,7 +20,6 @@ import pathlib
 import sys
 import contextlib
 import functools as fn
-import traceback as tb
 
 import inspect
 import importlib as _il
@@ -412,7 +411,7 @@ class ShimLoader:
                     # Set the root module for class loading
                     # Relative imports will be resolved relative to this root
                     cls.__active_shim.root_module = module_name
-                    module = _il.import_module(module_name)
+                    module = cls.trac_model_code_import(module_name)
                 finally:
                     cls.__active_shim.root_module = None
 
@@ -440,15 +439,23 @@ class ShimLoader:
             raise
 
         except (ModuleNotFoundError, NameError) as e:
-            details = cls._error_details(e)
+            details = _util.error_details_from_exception(e)
             err = f"Loading classes failed in module [{module_name}]: {str(e)}{details}"
             cls._log.error(err)
             raise _ex.EModelLoad(err) from e
 
         except Exception as e:
-            err = f"Loading classes failed in module [{module_name}]: Unexpected error"
+            err = f"Loading classes failed in module [{module_name}]: {str(e)}"
             cls._log.error(err)
             raise _ex.EModelLoad(err) from e
+
+    @classmethod
+    def trac_model_code_import(cls, module_name):
+
+        # This method name is used as a hook in PythonGuardRails
+        # It allows us to check for dangerous functions that execute on module import
+
+        return _il.import_module(module_name)
 
     @classmethod
     def load_resource(
@@ -490,7 +497,7 @@ class ShimLoader:
             raise
 
         except (ModuleNotFoundError, NameError) as e:
-            details = cls._error_details(e)
+            details = _util.error_details_from_exception(e)
             err = f"Loading resources failed in module [{module_name}]: {str(e)}{details}"
             cls._log.error(err)
             raise _ex.EModelLoad(err) from e
@@ -523,11 +530,6 @@ class ShimLoader:
                 err = f"Loading resources is not allowed inside run_model()"
                 cls._log.error(err)
                 raise _ex.ERuntimeValidation(err)
-
-    @classmethod
-    def _error_details(cls, error: Exception): #TODO: replace calls to this method with direct call to error_details_from_exception
-        _util.error_details_from_exception(error)
-
 
 
 ShimLoader._log = _util.logger_for_class(ShimLoader)
