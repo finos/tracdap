@@ -54,7 +54,7 @@ class PythonGuardRails:
     ]
 
     REQUIRED_DEBUG_FUNCTIONS = ["exec", "eval", "compile"]
-    REQUIRED_IMPORT_FUNCTIONS = ["exec", "memoryview"]
+    REQUIRED_IMPORT_FUNCTIONS = ["compile", "exec", "memoryview"]
 
     MODEL_IMPORT_ENTRY_POINT = "trac_model_code_import"
     MODEL_ENTRY_POINTS = _get_model_entry_points() + [MODEL_IMPORT_ENTRY_POINT]
