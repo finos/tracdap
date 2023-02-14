@@ -18,6 +18,7 @@ import tracdap.rt._impl.guard_rails as guard  # noqa
 
 import typing as tp
 import unittest
+import sys
 
 from tracdap.rt.api import TracContext
 from tracdap.rt_gen.domain.tracdap.metadata import ModelOutputSchema, ModelInputSchema, ModelParameter
@@ -59,3 +60,10 @@ class PythonGuardRailsTest(unittest.TestCase):
 
         exec("print('Hello world')")
         self.assertTrue(True)
+
+    def test_sys_exit_inside_model(self):
+
+        test_model_class = create_model(lambda: sys.exit(-1))
+        test_model = test_model_class()
+
+        self.assertRaises(ex.EModelValidation, lambda: test_model.run_model(None))  # noqa
