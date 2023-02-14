@@ -22,6 +22,17 @@ import tracdap.rt.api as api
 import tracdap.rt.exceptions as ex
 
 
+def _get_model_entry_points():
+
+    entry_points = []
+
+    for member_name, member in api.TracModel.__dict__.items():
+        if callable(member):
+            entry_points.append(member_name)
+
+    return entry_points
+
+
 def _get_package_path(module_name):
 
     importlib.import_module(module_name)
@@ -44,7 +55,7 @@ class PythonGuardRails:
 
     REQUIRED_DEBUG_FUNCTIONS = ["exec", "eval", "compile"]
 
-    MODEL_ENTRY_POINTS = ["run_model", "scan_model"]
+    MODEL_ENTRY_POINTS = _get_model_entry_points()
     TRAC_PACKAGE_PATH: pathlib.Path = _get_package_path("tracdap.rt")
     SITE_PACKAGE_PATH: pathlib.Path = _get_package_path("pyarrow")
 
