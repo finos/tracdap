@@ -103,6 +103,9 @@ class PythonGuardRails:
             if cls.is_debug() and func_name in cls.REQUIRED_DEBUG_FUNCTIONS:
                 return func(*args, **kwargs)
 
+            if cls.is_import() and func_name in cls.REQUIRED_IMPORT_FUNCTIONS:
+                return func(*args, **kwargs)
+
             raise ex.EModelValidation(f"Calling {func_name}() is not allowed in model code: {model_code_details}")
 
         setattr(protected_function,  "__trac_protection__", True)
@@ -164,19 +167,15 @@ class PythonGuardRails:
         last_model_frame = first_model_frame
 
         # Check the entry point to see if it is a model code import
-        # If it is, we need to apply special handling
+        # If it is the stack will be full of module import machinery
+        # There's no easy way to get the file / line / statement where the call occurred
+
+        # This may cause problems if model code imports libraries that use dangerous functions on init
 
         if first_model_frame.function == cls.MODEL_IMPORT_ENTRY_POINT:
 
-            # Allow some functions that are need to import modules
-            if func_name in cls.REQUIRED_IMPORT_FUNCTIONS:
-                return None
-
-            # It's difficult to get a file / line / statement from the import machinery
-            # We can at least say which module import triggered the dangerous function
-            else:
-                module_name = first_model_frame.frame.f_locals.get("module_name")
-                return f"{func_name}() called during import of [{module_name}]"
+            module_name = first_model_frame.frame.f_locals.get("module_name")
+            return f"{func_name}() called during import of module [{module_name}]"
 
         # Now we know the entry point was an API call on the TracModel class
         # Look back up the stack from the entry point, to see if there is a call to a library
@@ -223,3 +222,9 @@ class PythonGuardRails:
         else:
             trace = get_trace_func()
             return trace is not None
+
+    @classmethod
+    def is_import(cls):
+
+        trace = traceback.extract_stack()
+        return any(map(lambda f: f.name == cls.MODEL_IMPORT_ENTRY_POINT, trace))
