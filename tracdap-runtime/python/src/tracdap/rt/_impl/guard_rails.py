@@ -16,9 +16,22 @@ import inspect
 import pathlib
 import importlib
 import sys
+import traceback
 
 import tracdap.rt.api as api
 import tracdap.rt.exceptions as ex
+
+
+def _get_package_path(module_name):
+
+    importlib.import_module(module_name)
+
+    module = sys.modules[module_name]
+    module_path = pathlib.Path(module.__spec__.origin)
+
+    depth = module_name.count(".") + 1
+
+    return module_path.parents[depth]
 
 
 class PythonGuardRails:
@@ -30,6 +43,12 @@ class PythonGuardRails:
     ]
 
     REQUIRED_DEBUG_FUNCTIONS = ["exec", "eval", "compile"]
+
+    MODEL_ENTRY_POINTS = ["run_model", "scan_model"]
+    TRAC_PACKAGE_PATH: pathlib.Path = _get_package_path("tracdap.rt")
+    SITE_PACKAGE_PATH: pathlib.Path = _get_package_path("pyarrow")
+
+    PROTECTED_FUNC_STACK_DEPTH = 2
 
     @classmethod
     def protect_dangerous_functions(cls):
@@ -71,7 +90,7 @@ class PythonGuardRails:
             if cls.is_debug() and func_name in cls.REQUIRED_DEBUG_FUNCTIONS:
                 return func(*args, **kwargs)
 
-            raise ex.EModelValidation(f"Calling {func_name}() is not allowed in model code ({model_code_details})")
+            raise ex.EModelValidation(f"Calling {func_name}() is not allowed in model code: {model_code_details}")
 
         setattr(protected_function,  "__trac_protection__", True)
 
@@ -80,16 +99,72 @@ class PythonGuardRails:
     @classmethod
     def check_for_model_code(cls):
 
+        # Traceback is a lot faster than inspect.stack()
+        # If there is no model entry point in the traceback,
+        # then we are not in model code and no further checks are needed
+
+        trace = traceback.extract_stack()
+
+        if not any(map(lambda f: f.name in cls.MODEL_ENTRY_POINTS, trace)):
+            return None
+
+        # If model entry points exist in the traceback we need to inspect the full stack
+        # Calling inspect.stack() gives the stack with the top frame at index 0
+
         stack = inspect.stack()
+        model_entry_depth = None
 
-        for frame in stack:
-            if frame.function is not None and frame.function == "run_model":
-                for param_name, param in frame.frame.f_locals.items():
-                    if isinstance(param, api.TracModel):
-                        filename = pathlib.Path(frame.filename).name
-                        return f"{filename} line {frame.lineno}"
+        # Check down from the top of the stack to find the depth of the model entry point
 
-        return None
+        for depth, frame in enumerate(stack):
+
+            # We need to check the model entry point functions, to make sure they are really model entry points
+            # E.g. run_model is a very generic name that could be used in other places
+            # The test is whether one of the parameters is a TracModel instance
+            # We do not look for the special name "self", that would give a really easy way to defeat the check
+
+            if frame.function in cls.MODEL_ENTRY_POINTS:
+                frame_locals = frame.frame.f_locals
+                if any(map(lambda param: isinstance(param, api.TracModel), frame_locals.values())):
+                    # If we have hit a model entry point, record the frame depth
+                    # More checks are needed to see if control has left model code
+                    model_entry_depth = depth
+                    break
+
+        # If we didn't find a really model entry point, then there is no need to check further
+
+        if model_entry_depth is None:
+            return None
+
+        # Now look back up the stack from the model entry point, to see if there is a call to a library
+        # We need to ignore the protected func depth, which is the frames for this checking code
+
+        # For this check, anything in site-packages or the path where TRAC is installed is considered a library
+        # The python built-in modules are not considered an external call (this may need to change)
+
+        model_stack = stack[cls.PROTECTED_FUNC_STACK_DEPTH:model_entry_depth + 1]
+        first_model_frame = stack[model_entry_depth]
+        last_model_frame = first_model_frame
+
+        for frame in reversed(model_stack):
+
+            frame_path = pathlib.Path(frame.filename)
+
+            if frame_path.is_relative_to(cls.SITE_PACKAGE_PATH):
+                return None
+
+            if frame_path.is_relative_to(cls.TRAC_PACKAGE_PATH):
+                return None
+
+            last_model_frame = frame
+
+        # The call came from model code
+        # Report details of the last model code frame
+
+        filename = pathlib.Path(last_model_frame.filename).name
+        snippet = trace[-(cls.PROTECTED_FUNC_STACK_DEPTH + 1)].line
+
+        return f"{filename} line {last_model_frame.lineno}, {snippet}"
 
     @classmethod
     def is_debug(cls):
