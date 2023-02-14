@@ -150,10 +150,10 @@ class PythonGuardRails:
 
             frame_path = pathlib.Path(frame.filename)
 
-            if frame_path.is_relative_to(cls.SITE_PACKAGE_PATH):
+            if cls.path_is_in_dir(frame_path, cls.SITE_PACKAGE_PATH):
                 return None
 
-            if frame_path.is_relative_to(cls.TRAC_PACKAGE_PATH):
+            if cls.path_is_in_dir(frame_path, cls.TRAC_PACKAGE_PATH):
                 return None
 
             last_model_frame = frame
@@ -165,6 +165,14 @@ class PythonGuardRails:
         snippet = trace[-(cls.PROTECTED_FUNC_STACK_DEPTH + 1)].line
 
         return f"{filename} line {last_model_frame.lineno}, {snippet}"
+
+    @classmethod
+    def path_is_in_dir(cls, path: pathlib.Path, directory: pathlib.Path):
+
+        # path.is_relative_to() only appears in Python 3.9
+        # We are still supporting 3.7 +
+
+        return directory in path.parents
 
     @classmethod
     def is_debug(cls):
