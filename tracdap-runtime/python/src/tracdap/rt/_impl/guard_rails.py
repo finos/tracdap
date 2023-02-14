@@ -14,6 +14,7 @@
 
 import inspect
 import pathlib
+import importlib
 import sys
 
 import tracdap.rt.api as api
@@ -22,10 +23,11 @@ import tracdap.rt.exceptions as ex
 
 class PythonGuardRails:
 
-    # TODO: Do not block these calls running in the debugger
-
-    # breakpoint, globals
     DANGEROUS_BUILTIN_FUNCTIONS = ["exec", "eval", "compile", "open", "input", "memoryview"]
+
+    DANGEROUS_STDLIB_FUNCTIONS = [
+        ("sys", "exit")
+    ]
 
     REQUIRED_DEBUG_FUNCTIONS = ["exec", "eval", "compile"]
 
@@ -35,6 +37,17 @@ class PythonGuardRails:
         for func_name in cls.DANGEROUS_BUILTIN_FUNCTIONS:
             raw_func = __builtins__[func_name]  # noqa
             __builtins__[func_name] = cls.protect_function(func_name, raw_func)  # noqa
+
+        for module_name, func_name in cls.DANGEROUS_STDLIB_FUNCTIONS:
+
+            # Make sure the module is loaded
+            importlib.import_module(module_name)
+
+            qualified_name = f"{module_name}.{func_name}"
+            module = sys.modules[module_name]
+
+            raw_func = module.__dict__[func_name]
+            module.__dict__[func_name] = cls.protect_function(qualified_name, raw_func)
 
     @classmethod
     def protect_function(cls, func_name, func):
