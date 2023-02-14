@@ -14,6 +14,7 @@
 
 import inspect
 import pathlib
+import sys
 
 import tracdap.rt.api as api
 import tracdap.rt.exceptions as ex
@@ -26,6 +27,8 @@ class PythonGuardRails:
     # breakpoint, globals
     DANGEROUS_BUILTIN_FUNCTIONS = ["exec", "eval", "compile", "open", "input", "memoryview"]
 
+    REQUIRED_DEBUG_FUNCTIONS = ["exec", "eval", "compile"]
+
     @classmethod
     def protect_dangerous_functions(cls):
 
@@ -36,15 +39,26 @@ class PythonGuardRails:
     @classmethod
     def protect_function(cls, func_name, func):
 
+        # Do not re-wrap functions that are already wrapped if the runtime is started multiple times
+        # E.g. running in embedded mode or during testing
         if hasattr(func, "__trac_protection__") and func.__trac_protection__:
             return func
 
         def protected_function(*args, **kwargs):
+
             model_code_details = cls.check_for_model_code()
-            if model_code_details is not None:
-                raise ex.EModelValidation(f"Calling {func_name}() is not allowed in model code ({model_code_details})")
-            else:
+
+            # Allow libraries and platform code to call the dangerous functions
+            # Trying to restrict libraries or even Python itself causes too many errors to be practical
+            if model_code_details is None:
                 return func(*args, **kwargs)
+
+            # Some dangerous functions are required by the debugger, e.g. exec, eval, compile
+            # We definitely want the debugger to work for model code, so these have to be allowed
+            if cls.is_debug() and func_name in cls.REQUIRED_DEBUG_FUNCTIONS:
+                return func(*args, **kwargs)
+
+            raise ex.EModelValidation(f"Calling {func_name}() is not allowed in model code ({model_code_details})")
 
         setattr(protected_function,  "__trac_protection__", True)
 
@@ -63,3 +77,15 @@ class PythonGuardRails:
                         return f"{filename} line {frame.lineno}"
 
         return None
+
+    @classmethod
+    def is_debug(cls):
+
+        get_trace_func = getattr(sys, 'gettrace', None)
+
+        if get_trace_func is None:
+            return False
+
+        else:
+            trace = get_trace_func()
+            return trace is not None
