@@ -392,7 +392,7 @@ public class ProtocolNegotiator extends ChannelInitializer<SocketChannel> {
 
             pipeline.addAfter(HTTP_1_AUTH, WS_FRAME_CODEC, new WebSocketServerProtocolHandler(wsConfig));
 
-            // Ådd the main handler - this should be the WebTransportRouter when the full service is running
+            // Add the main handler - this should be the WebTransportRouter when the full service is running
             pipeline.addLast(webSocketsHandler.create(connId.getAndIncrement()));
 
             pipeline.remove(this);

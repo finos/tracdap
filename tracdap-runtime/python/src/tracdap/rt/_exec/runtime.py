@@ -35,6 +35,7 @@ import tracdap.rt._impl.util as _util  # noqa
 import tracdap.rt._impl.models as _models  # noqa
 import tracdap.rt._impl.storage as _storage  # noqa
 import tracdap.rt._impl.static_api as _static_api  # noqa
+import tracdap.rt._impl.guard_rails as _guard  # noqa
 import tracdap.rt._version as _version
 
 
@@ -125,6 +126,7 @@ class TracRuntime:
 
             _plugins.PluginManager.register_core_plugins()
             _static_api.StaticApiImpl.register_impl()
+            _guard.PythonGuardRails.protect_dangerous_functions()
 
             # Load sys config (or use embedded), config errors are detected before start()
             # Job config can also be checked before start() by using load_job_config()

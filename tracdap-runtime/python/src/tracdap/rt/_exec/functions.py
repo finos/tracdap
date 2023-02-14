@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import datetime
 import abc
-import pathlib
 import random
 import dataclasses as dc  # noqa
 
@@ -517,6 +516,7 @@ class RunModelFunc(NodeFunction[Bundle[_data.DataView]]):
         self.node = node
         self.model_class = model_class
         self.checkout_directory = checkout_directory
+
     def _execute(self, ctx: NodeContext) -> Bundle[_data.DataView]:
 
         model_def = self.node.model_def
