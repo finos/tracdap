@@ -114,17 +114,20 @@ class TracEngine(_actors.Actor):
                 if job_actor == signal.sender:
                     failed_job_key = job_key
 
-            # If the job key is not found, the job has already been stopped and no action is needed
             # If the job is still live, call job_failed explicitly
             if failed_job_key is not None:
-                if isinstance(signal, _actors.ErrorSignal) and signal.error:
-                    error = signal.error
-                else:
-                    error = _ex.ETracInternal("An unknown error occurred")
-                self.actors().send("job_failed", failed_job_key, error)
 
-            # Failed signal has been handled, do not propagate
-            return True
+                cause = signal.error if isinstance(signal, _actors.ErrorSignal) else None
+                cause_message = str(cause) if cause is not None else "(unknown)"
+                message = f"There was an error in the TRAC execution engine: " + \
+                          f"failed node = [{signal.sender}], cause = {cause_message}"
+                error = _ex .ETracInternal(message)
+                error.__cause__ = cause
+
+                self.actors().send(self.actors().id, "job_failed", failed_job_key, error)
+
+                # Failed signal has been handled, do not propagate
+                return True
 
         return super().on_signal(signal)
 
@@ -216,6 +219,26 @@ class JobProcessor(_actors.Actor):
     def on_stop(self):
         self._log.info(f"Cleaning up job [{self.job_key}]")
         self._models.destroy_scope(self.job_key)
+
+    def on_signal(self, signal: Signal) -> tp.Optional[bool]:
+
+        if signal.message == _actors.SignalNames.FAILED and isinstance(signal, _actors.ErrorSignal):
+
+            if isinstance(signal.error, _ex.ETrac):
+                error = signal.error
+
+            else:
+                cause = str(signal.error) if signal.error is not None else "(unknown)"
+                message = f"There was an error in the TRAC execution engine: " + \
+                          f"failed node = [{signal.sender}], cause = {cause}"
+                error = _ex .ETracInternal(message)
+                error.__cause__ = signal.error
+
+            self.actors().send(self.actors().id, "job_failed",  error)
+
+            return True
+
+        return super().on_signal(signal)
 
     @_actors.Message
     def job_graph(self, graph: _EngineContext, root_id: NodeId):

@@ -133,7 +133,7 @@ class Actor:
             else:
                 # Unhandled messages are dropped, with just a warning in the log
                 log = util.logger_for_class(Actor)
-                log.warning(f"Message ignored: [{msg.message}] -> {msg.target}" +
+                log.warning(f"Message ignored: [{msg.message}] {msg.sender} -> {msg.target}" +
                             f" (actor {self.__class__.__name__} does not support this message)")
 
         except Exception as error:
@@ -476,11 +476,11 @@ class ActorSystem:
 
         if target is None:
             # Unhandled messages are dropped, with just a warning in the log
-            self._log.warning(f"Message ignored: [{msg.message}] -> {msg.target}  (target actor not found)")
+            self._log.warning(f"Message ignored: [{msg.message}] {msg.sender} -> {msg.target}  (target actor not found)")
             return
 
         if target.actor.state() != ActorState.RUNNING:
-            self._log.warning(f"Message ignored: [{msg.message}] -> {msg.target}  (target actor not running)")
+            self._log.warning(f"Message ignored: [{msg.message}] {msg.sender} -> {msg.target}  (target actor not running)")
             return
 
         parent_id = target.parent_id

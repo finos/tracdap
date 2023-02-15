@@ -17,6 +17,7 @@ import unittest
 
 import tracdap.rt._impl.shim as shim
 import tracdap.rt._impl.util as util
+import tracdap.rt._impl.guard_rails as guard
 import tracdap.rt.exceptions as _ex
 
 _SHIM_TEST_DIR = pathlib.Path(__file__).parent \
@@ -34,6 +35,7 @@ class TestShimLoader(unittest.TestCase):
     def setUpClass(cls) -> None:
         util.configure_logging(enable_debug=True)
         cls._shim = cls._shim_loader.create_shim(_SHIM_TEST_DIR)
+        guard.PythonGuardRails.protect_dangerous_functions()
 
     def setUp(self):
         self._shim_loader.activate_shim(self._shim)
