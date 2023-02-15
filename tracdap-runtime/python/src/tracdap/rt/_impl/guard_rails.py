@@ -57,7 +57,7 @@ class PythonGuardRails:
     REQUIRED_IMPORT_FUNCTIONS = ["compile", "exec", "memoryview"]
 
     MODEL_IMPORT_ENTRY_POINT = "trac_model_code_import"
-    MODEL_ENTRY_POINTS = _get_model_entry_points() + [MODEL_IMPORT_ENTRY_POINT]
+    MODEL_ENTRY_POINTS = _get_model_entry_points()
     TRAC_PACKAGE_PATH: pathlib.Path = _get_package_path("tracdap.rt")
     SITE_PACKAGE_PATH: pathlib.Path = _get_package_path("pyarrow")
 
@@ -103,8 +103,13 @@ class PythonGuardRails:
             if cls.is_debug() and func_name in cls.REQUIRED_DEBUG_FUNCTIONS:
                 return func(*args, **kwargs)
 
-            if cls.is_import() and func_name in cls.REQUIRED_IMPORT_FUNCTIONS:
-                return func(*args, **kwargs)
+            # ----------------------------------------------------------------------------------------------------------
+            # Do not guard model code imports for now
+            # More work is required to guard imports without breaking third-party libraries
+            #
+            # if cls.is_import() and func_name in cls.REQUIRED_IMPORT_FUNCTIONS:
+            #    return func(*args, **kwargs)
+            # ----------------------------------------------------------------------------------------------------------
 
             raise ex.EModelValidation(f"Calling {func_name}() is not allowed in model code: {model_code_details}")
 
@@ -118,6 +123,9 @@ class PythonGuardRails:
         # Traceback is a lot faster than inspect.stack()
         # If there is no model entry point in the traceback,
         # then we are not in model code and no further checks are needed
+
+        # Do not guard model code imports for now
+        # More work is required to guard imports without breaking third-party libraries
 
         trace = traceback.extract_stack()
 
@@ -147,13 +155,17 @@ class PythonGuardRails:
                     model_entry_depth = depth
                     break
 
+            # ----------------------------------------------------------------------------------------------------------
+            # Do not guard model code imports for now
+            # More work is required to guard imports without breaking third-party libraries
+            #
             # As well as the model API entry points, we need to look for model code imports
             # Dangerous functions can execute in model scripts at global scope
-
-            if frame.function == cls.MODEL_IMPORT_ENTRY_POINT:
-                if frame.frame.f_globals["__name__"] == "tracdap.rt._impl.shim":
-                    model_entry_depth = depth
-                    break
+            # if frame.function == cls.MODEL_IMPORT_ENTRY_POINT:
+            #     if frame.frame.f_globals["__name__"] == "tracdap.rt._impl.shim":
+            #         model_entry_depth = depth
+            #         break
+            # ----------------------------------------------------------------------------------------------------------
 
         # If we didn't find a really model entry point, then there is no need to check further
 
@@ -166,16 +178,19 @@ class PythonGuardRails:
         first_model_frame = stack[model_entry_depth]
         last_model_frame = first_model_frame
 
+        # --------------------------------------------------------------------------------------------------------------
+        # Do not guard model code imports for now
+        # More work is required to guard imports without breaking third-party libraries
+        #
         # Check the entry point to see if it is a model code import
         # If it is the stack will be full of module import machinery
         # There's no easy way to get the file / line / statement where the call occurred
-
         # This may cause problems if model code imports libraries that use dangerous functions on init
-
-        if first_model_frame.function == cls.MODEL_IMPORT_ENTRY_POINT:
-
-            module_name = first_model_frame.frame.f_locals.get("module_name")
-            return f"{func_name}() called during import of module [{module_name}]"
+        # if first_model_frame.function == cls.MODEL_IMPORT_ENTRY_POINT:
+        #
+        #     module_name = first_model_frame.frame.f_locals.get("module_name")
+        #     return f"{func_name}() called during import of module [{module_name}]"
+        # --------------------------------------------------------------------------------------------------------------
 
         # Now we know the entry point was an API call on the TracModel class
         # Look back up the stack from the entry point, to see if there is a call to a library
