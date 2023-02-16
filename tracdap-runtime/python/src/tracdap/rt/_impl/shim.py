@@ -29,6 +29,7 @@ import importlib.machinery as _ilm
 import importlib.resources as _ilr
 
 import tracdap.rt.exceptions as _ex
+import tracdap.rt._impl.guard_rails as _guard
 import tracdap.rt._impl.util as _util
 
 
@@ -452,10 +453,12 @@ class ShimLoader:
     @classmethod
     def trac_model_code_import(cls, module_name):
 
-        # This method name is used as a hook in PythonGuardRails
-        # It allows us to check for dangerous functions that execute on module import
+        # Guard rails can interfere with import
+        # This method turns off some of the rails that interfere with importing
+        # This method name is used as a hook in PythonGuardRails, to detect model code imports
 
-        return _il.import_module(module_name)
+        with _guard.PythonGuardRails.enable_import_functions():
+            return _il.import_module(module_name)
 
     @classmethod
     def load_resource(
