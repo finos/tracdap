@@ -17,6 +17,7 @@ import pathlib
 import importlib
 import sys
 import traceback
+import contextlib
 
 import tracdap.rt.api as api
 import tracdap.rt.exceptions as ex
@@ -53,15 +54,43 @@ class PythonGuardRails:
         ("sys", "exit")
     ]
 
-    REQUIRED_DEBUG_FUNCTIONS = ["exec", "eval", "compile"]
-    REQUIRED_IMPORT_FUNCTIONS = ["compile", "exec", "memoryview"]
-
     MODEL_IMPORT_ENTRY_POINT = "trac_model_code_import"
     MODEL_ENTRY_POINTS = _get_model_entry_points()
     TRAC_PACKAGE_PATH: pathlib.Path = _get_package_path("tracdap.rt")
     SITE_PACKAGE_PATH: pathlib.Path = _get_package_path("pyarrow")
 
     PROTECTED_FUNC_STACK_DEPTH = 2
+
+    REQUIRED_DEBUG_FUNCTIONS = ["exec", "eval", "compile"]
+
+    REQUIRED_IMPORT_FUNCTIONS = {
+        "exec": exec,
+        "eval": eval,
+        "compile": compile,
+        "memoryview": memoryview
+    }
+
+    @classmethod
+    @contextlib.contextmanager
+    def enable_import_functions(cls):
+
+        # Guard rails can interfere with module importing
+        # This method turns off some of the rails that interfere with importing
+
+        protected_builtins = {}
+
+        try:
+
+            for func_name, real_func in cls.REQUIRED_IMPORT_FUNCTIONS.items():
+                protected_builtins[func_name] = __builtins__[func_name]  # noqa
+                __builtins__[func_name] = real_func  # noqa
+
+            yield
+
+        finally:
+
+            for func_name, real_func in cls.REQUIRED_IMPORT_FUNCTIONS.items():
+                __builtins__[func_name] = protected_builtins[func_name]  # noqa
 
     @classmethod
     def protect_dangerous_functions(cls):
