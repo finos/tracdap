@@ -337,7 +337,8 @@ class ActorNode:
 
     def __init__(
             self, actor_id: ActorId, actor: Actor,
-            parent: ActorNode, system: ActorSystem,
+            parent: tp.Optional[ActorNode],
+            system: ActorSystem,
             event_loop: EventLoop):
 
         self.actor_id = actor_id
