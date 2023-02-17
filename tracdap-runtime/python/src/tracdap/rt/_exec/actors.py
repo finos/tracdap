@@ -74,6 +74,44 @@ class ErrorSignal(Signal):
     origin: ActorId = None
 
 
+class SignalNames:
+
+    PREFIX = "actor:"
+
+    START = "actor:start"
+    STOP = "actor:stop"
+
+    STARTED = "actor:started"
+    STOPPED = "actor:stopped"
+    FAILED = "actor:failed"
+
+
+class EventLoop:
+
+    def __init__(self, thread: threading.Thread):
+        self.__thread = thread
+        self.__msg_lock = threading.Condition()
+        self.__msg_queue: tp.List[Msg] = []
+
+    def post_message(self, msg: Msg):
+        with self.__msg_lock:
+            self.__msg_queue.append(msg)
+
+    def _main(self):
+
+        while True:
+
+            with self.__msg_lock:
+                self.__msg_lock.wait_for(lambda: len(self.__msg_queue) > 0)
+                msg = self.__msg_queue.pop()
+
+            if msg is not None:
+                self._process_msg(msg)
+
+    def _process_msg(self, msg: Msg):
+        pass
+
+
 class Actor:
 
     __class_handlers: tp.Dict[type, tp.Dict[str, tp.Callable]] = dict()
@@ -260,18 +298,6 @@ class Message:
 
     def __call__(self, *args, **kwargs):
         self.__method(*args, **kwargs)
-
-
-class SignalNames:
-
-    PREFIX = "actor:"
-
-    START = "actor:start"
-    STOP = "actor:stop"
-
-    STARTED = "actor:started"
-    STOPPED = "actor:stopped"
-    FAILED = "actor:failed"
 
 
 @dc.dataclass(frozen=True)
