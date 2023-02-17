@@ -14,6 +14,7 @@
 
 from __future__ import annotations
 
+import logging
 import threading
 import functools as func
 import typing as tp
@@ -85,33 +86,75 @@ class SignalNames:
     STOPPED = "actor:stopped"
     FAILED = "actor:failed"
 
-    TERMINATE = "actor:terminate"
+    CONTROL_SIGNALS = [START, STOP]
 
 
 class EventLoop:
 
     def __init__(self):
         self.__msg_lock = threading.Condition()
-        self.__msg_queue: tp.List[tp.Tuple[Msg, tp.Callable[[Msg], None]] = []
+        self.__msg_queue: tp.List[tp.Tuple[Msg, tp.Callable[[Msg], None]]] = []
+        self.__shutdown = False
+        self.__shutdown_now = False
+        self.__log = util.logger_for_object(self)
 
     def post_message(self, msg: Msg, processor: tp.Callable[[Msg], None]):
         with self.__msg_lock:
-            self.__msg_queue.append((msg, processor))
+            if self.__shutdown:
+                raise EBadActor("System is already shutting down")
+            else:
+                self.__msg_queue.append((msg, processor))
+                self.__msg_lock.notify()
 
-    def _main(self):
+    def shutdown(self, immediate: bool = False):
+        with self.__msg_lock:
+            self.__shutdown = True
+            self.__shutdown_now = immediate
+            self.__msg_lock.notify()
+
+    def main(self):
+        self._event_loop()
+
+    def _event_loop(self):
 
         done = False
 
         while not done:
 
             with self.__msg_lock:
-                self.__msg_lock.wait_for(lambda: len(self.__msg_queue) > 0 or done)
-                msg, processor = self.__msg_queue.pop() if len(self.__msg_queue) > 0 else None
 
-            if msg.message == SignalNames.TERMINATE:
-                return
+                self.__msg_lock.wait_for(lambda: len(self.__msg_queue) > 0 or self.__shutdown)
+                event = self.__msg_queue.pop() if len(self.__msg_queue) > 0 else None
 
-            processor(msg)
+                if self.__shutdown_now:
+                    break
+
+                if self.__shutdown and event is None:
+                    done = True
+
+            if event is not None:
+                try:
+                    msg, processor = event
+                    processor(msg)
+                except Exception as e:
+                    self.__log.error(f"Unhandled error on the event loop: {str(e)}")
+                    self.__log.exception(e)
+
+        print("Event loop exit")
+
+
+class Message:
+
+    def __init__(self, method):
+        self.__method = method
+        func.update_wrapper(self, method)
+
+        params = inspect.signature(method).parameters
+        self.params = list(params.values())[1:]  # skip 'self' parameter
+        self.type_hints = tp.get_type_hints(method)
+
+    def __call__(self, *args, **kwargs):
+        self.__method(*args, **kwargs)
 
 
 class Actor:
@@ -159,7 +202,7 @@ class Actor:
         Actor.__class_handlers[self.__class__] = handlers
         return handlers
 
-    def _receive_message(self, system: ActorSystem, ctx: ActorContext, msg: Msg):
+    def _receive_message(self, node: ActorNode, ctx: ActorContext, msg: Msg):
 
         try:
             self.__ctx = ctx
@@ -180,12 +223,12 @@ class Actor:
 
             self.__state = ActorState.ERROR
             self.__error = error
-            system._report_error(ctx.id, msg.message, error)  # noqa
+            node.report_error(msg.message, error)  # noqa
 
         finally:
             self.__ctx = None
 
-    def _receive_signal(self, system: ActorSystem, ctx: ActorContext, signal: Signal) -> tp.Optional[bool]:
+    def _receive_signal(self, node: ActorNode, ctx: ActorContext, signal: Signal) -> tp.Optional[bool]:
 
         try:
             self.__ctx = ctx
@@ -213,7 +256,7 @@ class Actor:
 
             self.__state = ActorState.ERROR
             self.__error = error
-            system._report_error(ctx.id, signal.message, error)  # noqa
+            node.report_error(signal.message, error)  # noqa
             return None
 
         finally:
@@ -238,44 +281,44 @@ class Actor:
             raise _ex.EUnexpected(msg)
 
 
-# Static member __log can only be set after class Actor is declared
-Actor._Actor__log = util.logger_for_class(Actor)
-
-
 class ActorContext:
 
-    def __init__(self, system: ActorSystem, message: str,
-                 current_actor: ActorId, parent: ActorId, sender: tp.Optional[ActorId]):
+    def __init__(
+            self, node: ActorNode, message: str,
+            current_actor: ActorId, parent: ActorId, sender: tp.Optional[ActorId]):
 
-        self.id = current_actor
-        self.parent = parent
-        self.sender = sender
-
-        self.__system = system
+        self.__node = node
         self.__message = message
         self.__id = current_actor
         self.__parent = parent
         self.__sender = sender
         self.__error: tp.Optional[Exception] = None
 
+        self.id = current_actor
+        self.parent = parent
+        self.sender = sender
+
     def spawn(self, actor_class: Actor.__class__, *args, **kwargs) -> ActorId:
-        return self.__system._spawn_actor(self.__id, actor_class, args, kwargs)  # noqa
+        return self.spawn_instance(actor_class(*args, **kwargs))
+
+    def spawn_instance(self, actor: Actor) -> ActorId:
+        return self.__node.spawn(actor)
 
     def send(self, target_id: ActorId, message: str, *args, **kwargs):
-        self.__system._send_message(self.__id, target_id, message, args, kwargs)  # noqa
+        self.__node.send_message(self.__id, target_id, message, args, kwargs)
 
     def send_parent(self, message: str, *args, **kwargs):
-        self.__system._send_message(self.__id, self.__parent, message, args, kwargs)  # noqa
+        self.__node.send_message(self.__id, self.__parent, message, args, kwargs)
 
     def reply(self, message: str, *args, **kwargs):
-        self.__system._send_message(self.__id, self.__sender, message, args, kwargs)  # noqa
+        self.__node.send_message(self.__id, self.__sender, message, args, kwargs)
 
     def stop(self, target_id: tp.Optional[ActorId] = None):
 
         if target_id:
-            self.__system._stop_actor(self.__id, target_id)  # noqa
+            self.__node.send_signal(self.__id, target_id, SignalNames.STOP)
         else:
-            self.__system._stop_actor(self.__id, self.__id)  # noqa
+            self.__node.send_signal(self.__id, self.__id, SignalNames.STOP)
 
     def fail(self, error: Exception, cause: tp.Optional[Exception] = None):
 
@@ -285,108 +328,269 @@ class ActorContext:
         self.__error = error
 
         if self.__message not in [SignalNames.START, SignalNames.STOP]:
-            self.__system._stop_actor(self.__id, self.__id)  # noqa
+            self.__node.send_signal(self.__id, self.__id, SignalNames.STOP)
 
 
-class Message:
-
-    def __init__(self, method):
-        self.__method = method
-        func.update_wrapper(self, method)
-
-        params = inspect.signature(method).parameters
-        self.params = list(params.values())[1:]  # skip 'self' parameter
-        self.type_hints = tp.get_type_hints(method)
-
-    def __call__(self, *args, **kwargs):
-        self.__method(*args, **kwargs)
-
-
-@dc.dataclass(frozen=True)
 class ActorNode:
 
-    parent_id: ActorId
-    actor_id: ActorId
-    actor: Actor
+    _log: tp.Optional[logging.Logger]
 
-    children: tp.FrozenSet[ActorId] = dc.field(default_factory=frozenset)
-    next_child_number: int = 0
+    def __init__(
+            self, actor_id: ActorId, actor: Actor,
+            parent: ActorNode, system: ActorSystem,
+            event_loop: EventLoop):
 
-    def with_child(self, child_id: ActorId):
-        children = self.children.union([child_id])
-        return ActorNode(self.parent_id, self.actor_id, self.actor, children, self.next_child_number + 1)
+        self.actor_id = actor_id
+        self.actor = actor
+        self.parent = parent
+        self.system = system
+        self.event_loop = event_loop
 
-    def without_child(self, child_id: ActorId):
-        children = frozenset(filter(lambda c: c != child_id, self.children))
-        return ActorNode(self.parent_id, self.actor_id, self.actor, children, self.next_child_number)
+        self.children: tp.Dict[ActorId, ActorNode] = {}
+        self.next_child_number: int = 0
+
+    def spawn(self, child_actor: Actor):
+
+        actor_class = type(child_actor)
+        event_loop = self.system._allocate_event_loop(actor_class)  # noqa
+
+        child_id = self._new_child_id(actor_class)
+        child_node = ActorNode(child_id, child_actor, self, self.system, event_loop)
+        self.children[child_id] = child_node
+
+        child_node.send_signal(self.actor_id, child_id, SignalNames.START)
+
+        return child_id
+
+    def send_message(self, sender_id: ActorId, target_id: ActorId, message: str, args, kwargs):
+
+        self._log.info(f"send_signal [{self.actor_id}]: [{message}] {sender_id} -> {target_id}")
+
+        # Client code could try to send a signal string as a message, this counts as a bad actor
+
+        if message.startswith(SignalNames.PREFIX):
+
+            message = f"Invalid message: {sender_id} [{message}] -> {target_id}" \
+                      + f" ([{message} looks like a signal, signals cannot be sent with send_message)"
+
+            self._log.error(message)
+            raise EBadActor(message)
+
+        # TODO: Send-time type check
+
+        # target = self._lookup_actor_node(target_id)
+        # target_class = target.actor.__class__
+        # self._check_message_signature(target_id, target_class, message, args, kwargs)
+
+        msg = Msg(sender_id, target_id, message, args or [], kwargs or {})
+
+        self._post_message(msg)
+
+    def send_signal(self, sender_id: ActorId, target_id: ActorId, signal: str, error: tp.Optional[Exception] = None):
+
+        self._log.info(f"send_signal [{self.actor_id}]: [{signal}] {sender_id} -> {target_id}")
+
+        # Only the actor system can send signals, so a bad signal is an unexpected error
+
+        if not signal.startswith(SignalNames.PREFIX):
+            raise _ex.EUnexpected()
+
+        # Client code could submit an invalid control request, this counts as a bad actor
+
+        controllers = ["/system", target_id, ActorSystem._parent_id(target_id)]
+
+        if signal in SignalNames.CONTROL_SIGNALS and sender_id not in controllers:
+
+            message = f"Stop request rejected: [{SignalNames.STOP}] -> {target_id}" + \
+                      f" ({sender_id} is not allowed to stop this actor)"
+
+            self._log.error(message)
+            raise EBadActor(message)
+
+        if signal == SignalNames.FAILED:
+            msg = ErrorSignal(sender_id, target_id, signal, error=error)
+        else:
+            msg = Signal(sender_id, target_id, signal)
+
+        self._post_message(msg)
+
+    def report_error(self, message: str, error: Exception):
+
+        self._log.error(f"{self.actor_id} [{message}]: {str(error)}")
+        self._log.exception(error)
+        self._log.error(f"Actor failed: {self.actor_id} [{message}] (actor will be stopped)")
+
+        # Dp not send STOP signal for errors that occur while processing START or STOP
+        # In this case, directly set the state to FAILED and send a FAILED notification to the parent
+        if message in [SignalNames.START, SignalNames.STOP]:
+            self.actor._Actor__state = ActorState.FAILED
+            if self.parent is not None:
+                # TODO: Wrap for propagation?
+                self.send_signal(self.actor_id, self.parent.actor_id, SignalNames.FAILED, error)
+
+        # Otherwise stop the actor, a FAILED notification will be generated when the STOP signal is processed
+        else:
+            self.send_signal("/system", self.actor_id, SignalNames.STOP)
+
+    def _post_message(self, msg: Msg):
+
+        self._log.info(f"_post_message [{self.actor_id}]: [{msg.message}] {msg.sender} -> {msg.target}")
+
+        if msg.target == self.actor_id:
+            self._accept_message(msg)
+
+        elif self.parent and msg.target == self.parent.actor_id:
+            self.parent._accept_message(msg)
+
+        elif msg.target in self.children:
+            self.children[msg.target]._accept_message(msg)
+
+        elif msg.target.startswith(self.actor_id + "/"):
+            self._log.warning(f"Target actor not found: {msg.target}")  # todo
+
+        elif self.parent:
+            self.parent._post_message(msg)
+
+        else:
+            self._log.warning(f"Target actor not found: {msg.target}")  # todo
+
+    def _accept_message(self, msg: Msg):
+
+        if msg.message.startswith(SignalNames.PREFIX):
+            self.event_loop.post_message(msg, self._process_signal)
+        else:
+            self.event_loop.post_message(msg, self._process_message)
 
     def _process_message(self, msg: Msg):
 
-        target = self._lookup_actor_node(msg.target)
+        self._log.info(f"_process_message [{self.actor_id}]: [{msg.message}] {msg.sender} -> {msg.target}")
 
-        if target is None:
-            # Unhandled messages are dropped, with just a warning in the log
-            self.__log.warning(f"Message ignored: [{msg.message}] {msg.sender} -> {msg.target}  (target actor not found)")
+        if not self._check_message(msg):
             return
 
-        if target.actor.state() != ActorState.RUNNING:
-            self.__log.warning(f"Message ignored: [{msg.message}] {msg.sender} -> {msg.target}  (target actor not running)")
-            return
+        parent_id = self.parent.actor_id if self.parent else None
+        ctx = ActorContext(self, msg.message, self.actor_id, parent_id, msg.sender)
 
-        parent_id = target.parent_id
-        ctx = ActorContext(self, msg.message, msg.target, parent_id, msg.sender)
-
-        target.actor._receive_message(self, ctx, msg)  # noqa
+        self.actor._receive_message(self, ctx, msg)  # noqa
 
     def _process_signal(self, signal: Msg):
 
-        target = self._lookup_actor_node(signal.target)
+        self._log.info(f"_process_signal [{self.actor_id}]: [{signal.message}] {signal.sender} -> {signal.target}")
 
-        if target is None:
-
-            # stopped / failed messages can arrive from a child actor after the parent has stopped
-            # This is a normal condition and should be silently ignored (not be logged as a warning)
-            if self._parent_id(signal.sender) == signal.target and \
-                    signal.message in [SignalNames.STOPPED, SignalNames.FAILED]:
-                return
-
-            # Unhandled messages are dropped, with just a warning in the log
-            self.__log.warning(f"Signal ignored: [{signal.message}] -> {signal.target}  (target actor not found)")
+        if not self._check_message(signal):
             return
 
-        parent_id = target.parent_id
-        ctx = ActorContext(self, signal.message, signal.target, parent_id, signal.sender)
-        result = target.actor._receive_signal(self, ctx, signal)  # noqa
+        parent_id = self.parent.actor_id if self.parent else None
+        ctx = ActorContext(self, signal.message, self.actor_id, parent_id, signal.sender)
+
+        result = self.actor._receive_signal(self, ctx, signal)  # noqa
+
+        # todo shutdown ordering
+
+        # Propagate stop signals
+
+        if signal == SignalNames.STOP:
+            for child_id, child_node in self.children.items():
+                child_node.send_signal(self.actor_id, child_id, SignalNames.STOP)
 
         # Generate lifecycle notifications
 
-        if signal.message == SignalNames.STOP:
+        if signal.message == SignalNames.START and self.parent is not None:
+            if self.actor.state() == ActorState.RUNNING:
+                self.send_signal(self.actor_id, self.parent.actor_id, SignalNames.STARTED)
 
-            if target.actor.error():
-                self._send_signal(self.actor_id, self.parent_id, SignalNames.FAILED, target.actor.error())
+        if signal.message == SignalNames.STOP and self.parent is not None:
+            if self.actor.error():
+                self.send_signal(self.actor_id, self.parent.actor_id, SignalNames.FAILED, self.actor.error())
             else:
-                self._send_signal(self.actor_id, self.parent_id, SignalNames.STOPPED)
+                self.send_signal(self.actor_id, self.parent.actor_id, SignalNames.STOPPED)
 
         # Error propagation
         # When an actor dies due to an error, a FAILED signal is generated and sent to its direct parent
         # If the parent does not handle the error successfully, the parent also dies and the error propagates
 
-        if isinstance(signal, ErrorSignal):
-            if signal.target == self._parent_id(signal.sender) and result is not True:
-                target.actor._Actor__error = signal.error  # TODO: Error could be wrapped to indicate propagation?
-                self._stop_actor("/system", signal.target)
-                self._send_signal(signal.sender, target.parent_id, SignalNames.FAILED, signal.error)
+        if isinstance(signal, ErrorSignal) and ActorSystem._parent_id(signal.sender) == self.actor_id:
+            if result is not True:
+                self.actor._Actor__error = signal.error  # TODO: Error could be wrapped to indicate propagation?
+                self.send_signal("/system", self.actor_id, SignalNames.STOP)
+                if self.parent is not None:
+                    self.send_signal(self.actor_id, self.parent.actor_id, SignalNames.FAILED, signal.error)
 
         # Remove dead actors
         # If the actor is now stopped or failed, take it out of the registry
 
-        if target.actor.state() in [ActorState.STOPPED, ActorState.FAILED]:
-            with self.__system_lock:
-                self.__actors.pop(signal.target)
-                parent = self.__actors.get(target.parent_id)
-                if parent is not None:
-                    parent = parent.without_child(signal.target)
-                    self.__actors[target.parent_id] = parent
+        if signal.message in [ActorState.STOPPED, ActorState.FAILED] and signal.sender in self.children:
+            self.children.pop(signal.sender)
+
+    def _check_message(self, msg: Msg):
+
+        if msg.target != self.actor_id:
+
+            message = f"Message ignored: [{msg.message}] -> {msg.target}" + \
+                      f" ({self.actor_id} received this message by mistake)"
+
+            self._log.warning(message)
+            return False
+
+        controllers = ["/system", self.actor_id, ActorSystem._parent_id(self.actor_id)]
+
+        if msg.message in SignalNames.CONTROL_SIGNALS and msg.sender not in controllers:
+
+            message = f"Control signal ignored: [{msg.message}] -> {self.actor_id}" + \
+                      f" ({msg.sender} is not allowed to stop this actor)"
+
+            self._log.warning(message)
+            return False
+
+        return True
+
+    def _new_child_id(self, actor_class: Actor.__class__) -> ActorId:
+
+        classname = actor_class.__name__.lower()
+        child_name = f"{classname}-{self.next_child_number}"
+
+        self.next_child_number += 1
+
+        if self.actor_id == "/":  # TODO
+            return f"/{child_name}"
+        else:
+            return f"{self.actor_id}/{child_name}"
+
+
+class RootActor(Actor):
+
+    def __init__(self, main_actor: Actor, started: threading.Event, stopped: threading.Event):
+        super().__init__()
+        self.main_id: tp.Optional[ActorId] = None
+        self.main_actor = main_actor
+        self._started = started
+        self._stopped = stopped
+
+    def on_start(self):
+        self.main_id = self.actors().spawn_instance(self.main_actor)
+
+    def on_stop(self):
+        self._stopped.set()
+
+    def on_signal(self, signal: Signal) -> tp.Optional[bool]:
+
+        if signal.sender == self.main_id:
+
+            if signal.message == SignalNames.STARTED:
+                self._started.set()
+                return True
+
+            if signal.message == SignalNames.STOPPED:
+                self.actors().stop(self.actors().id)
+                return True
+
+            if signal.message == SignalNames.FAILED and isinstance(signal, ErrorSignal):
+                if not self._started.is_set():
+                    self._started.set()
+                self.actors().fail(signal.error)
+                return True
+
+        return False
 
 
 class ActorSystem:
@@ -395,225 +599,71 @@ class ActorSystem:
     __ROOT_ID = __DELIMITER
 
     def __init__(self, main_actor: Actor, system_thread: str = "actor_system"):
+
         super().__init__()
 
         self._log = util.logger_for_object(self)
 
-        self.__actors: tp.Dict[ActorId, ActorNode] = {self.__ROOT_ID: ActorNode("", self.__ROOT_ID, None)}
-        self.__message_queue: tp.List[Msg] = list()
+        # self.__actors: tp.Dict[ActorId, ActorNode] = {self.__ROOT_ID: ActorNode("", self.__ROOT_ID, None)}
+        # self.__message_queue: tp.List[Msg] = list()
 
+        self.__system_event_loop = EventLoop()
         self.__system_thread = threading.Thread(
             name=system_thread,
-            target=self._actor_system_main)
+            target=self.__system_event_loop.main)
 
-        self.__system_lock = threading.Lock()
-        self.__system_up = threading.Event()
-        self.__system_msg = threading.Event()
-        self.__system_error: tp.Optional[Exception] = None
-
-        self.__main_id = self._register_actor(self.__ROOT_ID, main_actor, do_start=False)
+        self.__root_started = threading.Event()
+        self.__root_stopped = threading.Event()
+        self.__root_actor = RootActor(main_actor, self.__root_started, self.__root_stopped)
+        self.__root_node = ActorNode(self.__ROOT_ID, self.__root_actor, None, self, self.__system_event_loop)
 
     # Public API
 
-    def start(self, wait=False):
+    def start(self, wait=True):
 
         self.__system_thread.start()
-        self._start_actor("/system", self.__main_id)
+        self.__root_node.send_signal("/system", self.__ROOT_ID, SignalNames.START)
 
         if wait:
-            self.__system_up.wait()  # TODO: Startup timeout
+            self.__root_started.wait()  # TODO: Startup timeout
 
     def stop(self):
 
-        self._stop_actor("/system", self.__main_id)
+        self.__root_node.send_signal("/system", self.__ROOT_ID, SignalNames.STOP)
 
     def wait_for_shutdown(self):
 
-        self.__system_thread.join()   # TODO: Timeout
+        self.__root_stopped.wait()   # TODO: Timeout
+        self.__system_event_loop.shutdown()
+        self.__system_thread.join()
 
     def shutdown_code(self) -> int:
 
-        return 0 if self.__system_error is None else -1
+        if self.__root_actor.state() == ActorState.STOPPED and not self.__root_actor.error():
+            return 0
+        else:
+            return -1
 
     def shutdown_error(self) -> tp.Optional[Exception]:
 
-        return self.__system_error
+        return self.__root_actor.error()
 
     def send(self, message: str, *args, **kwargs):
 
-        self._send_message("/external", self.__main_id, message, args, kwargs)
+        if self.__root_actor.main_id is None:
+            raise EBadActor("System has not started yet")
 
-    def _spawn_actor(self, parent_id: ActorId, actor_class: Actor.__class__, args, kwargs):
+        self.__root_node.send_message("/external", self.__root_actor.main_id, message, args, kwargs)
 
-        actor = actor_class(*args, **kwargs)
+    def _allocate_event_loop(self, actor_class: Actor.__class__) -> EventLoop:
 
-        return self._register_actor(parent_id, actor, do_start=True)
+        return self.__system_event_loop
 
-    def _register_actor(self, parent_id: ActorId, actor: Actor, do_start: bool = True):
+    @classmethod
+    def _parent_id(cls, actor_id: ActorId) -> ActorId:
 
-        actor_class = actor.__class__
-
-        with self.__system_lock:
-
-            # TODO: Parent already discarded, can that happen?
-            parent_node = self.__actors.get(parent_id)
-            actor_id = self._new_actor_id(parent_node, actor_class)
-
-            parent_node = parent_node.with_child(actor_id)
-            actor_node = ActorNode(parent_id, actor_id, actor)
-
-            self.__actors[parent_id] = parent_node
-            self.__actors[actor_id] = actor_node
-
-        if do_start:
-            self._start_actor(parent_id, actor_id)
-
-        return actor_id
-
-    def _start_actor(self, started_by_id: ActorId, actor_id: ActorId):
-
-        self._send_signal(started_by_id, actor_id, SignalNames.START)
-
-        return actor_id
-
-    def _stop_actor(self, sender_id: ActorId, target_id: ActorId):
-
-        if sender_id not in [target_id, self._parent_id(target_id), "/system"]:
-
-            # Client code could submit an invalid stop request, this counts as a bad actor
-
-            message = f"Stop request rejected: [{SignalNames.STOP}] -> {target_id}" + \
-                      f" ({sender_id} is not allowed to stop this actor)"
-
-            self._log.error(message)
-            raise EBadActor(message)
-
-        target = self._lookup_actor_node(target_id)
-
-        if target is None:
-            self._log.warning(
-                f"Signal ignored: [{SignalNames.STOP}] -> {target_id}" +
-                f" (target actor not found)")
-            return
-
-        for child_id in target.children:
-            self._stop_actor(target_id, child_id)
-
-        self._send_signal(sender_id, target_id, SignalNames.STOP)
-
-    def _send_signal(self, sender_id: ActorId, target_id: ActorId, signal: str, error: tp.Optional[Exception] = None):
-
-        # Only the actor system can send signals, so a bad signal is an unexpected error
-
-        if not signal.startswith(SignalNames.PREFIX):
-            raise _ex.EUnexpected()
-
-        if signal == SignalNames.FAILED:
-            msg = ErrorSignal(sender_id, target_id, signal, error=error)
-        else:
-            msg = Signal(sender_id, target_id, signal)
-
-        self.__message_queue.append(msg)
-
-    def _send_message(self, sender_id: ActorId, target_id: ActorId, message: str, args, kwargs):
-
-        # Client code could try to send a signal string as a message, this counts as a bad actor
-
-        if message.startswith(SignalNames.PREFIX):
-
-            message = f"Invalid message: {sender_id} [{message}] -> {target_id}" \
-                    + f" ([{message} looks like a signal, signals cannot be sent with send_message)"
-
-            self._log.error(message)
-            raise EBadActor(message)
-
-        _args = args or []
-        _kwargs = kwargs or {}
-
-        target = self._lookup_actor_node(target_id)
-
-        if target is not None:
-            target_class = target.actor.__class__
-            self._check_message_signature(target_id, target_class, message, args, kwargs)
-
-        msg = Msg(sender_id, target_id, message, _args, _kwargs)
-        self.__message_queue.append(msg)
-
-    def _actor_system_main(self):
-
-        self._message_loop()
-
-    def _message_loop(self):
-
-        self.__system_up.set()
-
-        main_actor = self._lookup_actor(self.__main_id)
-
-        while main_actor.state() not in [ActorState.STOPPED, ActorState.FAILED]:
-
-            if len(self.__message_queue):
-                next_msg = self.__message_queue.pop(0)
-            else:
-                next_msg = None
-
-            if next_msg:
-                if next_msg.message.startswith(SignalNames.PREFIX):
-                    self._process_signal(next_msg)
-                else:
-                    self._process_message(next_msg)
-            else:
-                self.__system_msg.wait(0.01)
-
-        self.__system_error = main_actor.error()
-
-
-    def _report_error(self, actor_id: ActorId, message: str, error: Exception):
-
-        actor_node = self._lookup_actor_node(actor_id)
-
-        if not actor_node:
-            message = f"Error ignored: [{SignalNames.STOP}] -> {actor_id} (failed actor not found)"
-            self._log.warning(message)
-            return
-
-        self._log.error(f"{actor_id} [{message}]: {str(error)}")
-        self._log.exception(error)
-        self._log.error(f"Actor failed: {actor_id} [{message}] (actor will be stopped)")
-
-        # Dp not send STOP signal for errors that occur while processing START or STOP
-        # In this case, directly set the state to FAILED and send a FAILED notification to the parent
-        if message in [SignalNames.START, SignalNames.STOP]:
-            actor_node.actor._Actor__state = ActorState.FAILED
-            self._send_signal(actor_id, actor_node.parent_id, SignalNames.FAILED, error)  # TODO: Wrap for propagation?
-
-        # Otherwise stop the actor, a FAILED notification will be generated when the STOP signal is processed
-        else:
-            self._stop_actor("/system", actor_id)
-
-    def _lookup_actor_node(self, actor_id: ActorId) -> tp.Optional[ActorNode]:
-
-        with self.__system_lock:
-            return self.__actors.get(actor_id)
-
-    def _lookup_actor(self, actor_id: ActorId) -> tp.Optional[Actor]:
-
-        with self.__system_lock:
-            actor_node = self.__actors.get(actor_id)
-            return actor_node.actor if actor_node is not None else None
-
-    def _new_actor_id(self, parent_node: ActorNode, actor_class: Actor.__class__) -> ActorId:
-
-        classname = actor_class.__name__.lower()
-
-        if parent_node.actor_id == self.__ROOT_ID:
-            return f"{self.__ROOT_ID}{classname}"
-        else:
-            return f"{parent_node.actor_id}{self.__DELIMITER}{classname}-{parent_node.next_child_number}"
-
-    def _parent_id(self, actor_id: ActorId) -> ActorId:
-
-        parent_delim = actor_id.rfind(self.__DELIMITER)
-        parent_id = self.__ROOT_ID if parent_delim == 0 else actor_id[:parent_delim]
+        parent_delim = actor_id.rfind(cls.__DELIMITER)
+        parent_id = cls.__ROOT_ID if parent_delim == 0 else actor_id[:parent_delim]
 
         return parent_id
 
@@ -680,3 +730,8 @@ class ActorSystem:
                 error = f"Invalid message: [{message}] -> {target_id} (wrong parameter type for '{kw_param.name}')"
                 self._log.error(error)
                 raise EBadActor(error)
+
+
+# Static loggers can only be set after class Actor is declared
+Actor._Actor__log = util.logger_for_class(Actor)
+ActorNode._log = util.logger_for_class(ActorNode)
