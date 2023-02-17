@@ -332,6 +332,14 @@ class GraphProcessor(_actors.Actor):
 
         def process_graph(graph: _EngineContext) -> _EngineContext:
 
+            processed_graph = cp.copy(graph)
+            processed_graph.nodes = cp.copy(graph.nodes)
+
+            # Start by removing any nodes that are no longer needed
+            for node_id, node in graph.nodes.items():
+                if node_id in graph.succeeded_nodes and not self._is_required_node(node, graph):
+                    processed_graph.nodes.pop(node_id)
+
             pending_nodes = cp.copy(graph.pending_nodes)
             active_nodes = cp.copy(graph.active_nodes)
             failed_nodes = cp.copy(graph.failed_nodes)
@@ -349,13 +357,14 @@ class GraphProcessor(_actors.Actor):
 
                 elif self._is_viable_node(node, graph):
 
-                    node_ref = self.actors().spawn(NodeProcessor, self.graph, node_id, node)
+                    # New nodes can be launched with the updated graph
+                    # Anything that was pruned is not needed by the new node
+                    node_ref = self.actors().spawn(NodeProcessor, processed_graph, node_id, node)
                     node_processors[node_id] = node_ref
 
                     pending_nodes.discard(node_id)
                     active_nodes.add(node_id)
 
-            processed_graph = cp.copy(self.graph)
             processed_graph.pending_nodes = pending_nodes
             processed_graph.active_nodes = active_nodes
             processed_graph.failed_nodes = failed_nodes
@@ -375,6 +384,22 @@ class GraphProcessor(_actors.Actor):
 
         # Job may have completed due to error propagation
         self.check_job_status(do_submit=False)
+
+    @classmethod
+    def _is_required_node(cls, node: _EngineNode, graph: _EngineContext):
+
+        if node.node.id not in graph.succeeded_nodes:
+            return False
+
+        def live_node(nid_n):
+            nid_, _ = nid_n
+            return nid_ in graph.active_nodes or nid_ in graph.pending_nodes
+
+        def use_target(nid_n):
+            _, n_ = nid_n
+            return node.node.id in n_.dependencies
+
+        return any(map(use_target, filter(live_node, graph.nodes.items())))
 
     @classmethod
     def _is_viable_node(cls, node: _EngineNode, graph: _EngineContext):
@@ -411,6 +436,10 @@ class GraphProcessor(_actors.Actor):
                 # Use the original node ID, to avoid overwriting the result type
                 results[item_node.node.id] = item_node
 
+        # Child node is no longer needed, it can be stopped to release resources
+        processor = self.processors.pop(node_id)
+        self.actors().stop(processor)
+
         self._update_results(results)
 
     @_actors.Message
@@ -420,6 +449,10 @@ class GraphProcessor(_actors.Actor):
         node = cp.copy(old_node)
         node.complete = True
         node.error = error
+
+        # Child node is no longer needed, it can be stopped to release resources
+        processor = self.processors.pop(node_id)
+        self.actors().stop(processor)
 
         self._update_results({node_id: node})
 
