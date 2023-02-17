@@ -85,31 +85,33 @@ class SignalNames:
     STOPPED = "actor:stopped"
     FAILED = "actor:failed"
 
+    TERMINATE = "actor:terminate"
+
 
 class EventLoop:
 
-    def __init__(self, thread: threading.Thread):
-        self.__thread = thread
+    def __init__(self):
         self.__msg_lock = threading.Condition()
-        self.__msg_queue: tp.List[Msg] = []
+        self.__msg_queue: tp.List[tp.Tuple[Msg, tp.Callable[[Msg], None]] = []
 
-    def post_message(self, msg: Msg):
+    def post_message(self, msg: Msg, processor: tp.Callable[[Msg], None]):
         with self.__msg_lock:
-            self.__msg_queue.append(msg)
+            self.__msg_queue.append((msg, processor))
 
     def _main(self):
 
-        while True:
+        done = False
+
+        while not done:
 
             with self.__msg_lock:
-                self.__msg_lock.wait_for(lambda: len(self.__msg_queue) > 0)
-                msg = self.__msg_queue.pop()
+                self.__msg_lock.wait_for(lambda: len(self.__msg_queue) > 0 or done)
+                msg, processor = self.__msg_queue.pop() if len(self.__msg_queue) > 0 else None
 
-            if msg is not None:
-                self._process_msg(msg)
+            if msg.message == SignalNames.TERMINATE:
+                return
 
-    def _process_msg(self, msg: Msg):
-        pass
+            processor(msg)
 
 
 class Actor:
@@ -318,6 +320,74 @@ class ActorNode:
         children = frozenset(filter(lambda c: c != child_id, self.children))
         return ActorNode(self.parent_id, self.actor_id, self.actor, children, self.next_child_number)
 
+    def _process_message(self, msg: Msg):
+
+        target = self._lookup_actor_node(msg.target)
+
+        if target is None:
+            # Unhandled messages are dropped, with just a warning in the log
+            self.__log.warning(f"Message ignored: [{msg.message}] {msg.sender} -> {msg.target}  (target actor not found)")
+            return
+
+        if target.actor.state() != ActorState.RUNNING:
+            self.__log.warning(f"Message ignored: [{msg.message}] {msg.sender} -> {msg.target}  (target actor not running)")
+            return
+
+        parent_id = target.parent_id
+        ctx = ActorContext(self, msg.message, msg.target, parent_id, msg.sender)
+
+        target.actor._receive_message(self, ctx, msg)  # noqa
+
+    def _process_signal(self, signal: Msg):
+
+        target = self._lookup_actor_node(signal.target)
+
+        if target is None:
+
+            # stopped / failed messages can arrive from a child actor after the parent has stopped
+            # This is a normal condition and should be silently ignored (not be logged as a warning)
+            if self._parent_id(signal.sender) == signal.target and \
+                    signal.message in [SignalNames.STOPPED, SignalNames.FAILED]:
+                return
+
+            # Unhandled messages are dropped, with just a warning in the log
+            self.__log.warning(f"Signal ignored: [{signal.message}] -> {signal.target}  (target actor not found)")
+            return
+
+        parent_id = target.parent_id
+        ctx = ActorContext(self, signal.message, signal.target, parent_id, signal.sender)
+        result = target.actor._receive_signal(self, ctx, signal)  # noqa
+
+        # Generate lifecycle notifications
+
+        if signal.message == SignalNames.STOP:
+
+            if target.actor.error():
+                self._send_signal(self.actor_id, self.parent_id, SignalNames.FAILED, target.actor.error())
+            else:
+                self._send_signal(self.actor_id, self.parent_id, SignalNames.STOPPED)
+
+        # Error propagation
+        # When an actor dies due to an error, a FAILED signal is generated and sent to its direct parent
+        # If the parent does not handle the error successfully, the parent also dies and the error propagates
+
+        if isinstance(signal, ErrorSignal):
+            if signal.target == self._parent_id(signal.sender) and result is not True:
+                target.actor._Actor__error = signal.error  # TODO: Error could be wrapped to indicate propagation?
+                self._stop_actor("/system", signal.target)
+                self._send_signal(signal.sender, target.parent_id, SignalNames.FAILED, signal.error)
+
+        # Remove dead actors
+        # If the actor is now stopped or failed, take it out of the registry
+
+        if target.actor.state() in [ActorState.STOPPED, ActorState.FAILED]:
+            with self.__system_lock:
+                self.__actors.pop(signal.target)
+                parent = self.__actors.get(target.parent_id)
+                if parent is not None:
+                    parent = parent.without_child(signal.target)
+                    self.__actors[target.parent_id] = parent
+
 
 class ActorSystem:
 
@@ -496,73 +566,6 @@ class ActorSystem:
 
         self.__system_error = main_actor.error()
 
-    def _process_message(self, msg: Msg):
-
-        target = self._lookup_actor_node(msg.target)
-
-        if target is None:
-            # Unhandled messages are dropped, with just a warning in the log
-            self._log.warning(f"Message ignored: [{msg.message}] {msg.sender} -> {msg.target}  (target actor not found)")
-            return
-
-        if target.actor.state() != ActorState.RUNNING:
-            self._log.warning(f"Message ignored: [{msg.message}] {msg.sender} -> {msg.target}  (target actor not running)")
-            return
-
-        parent_id = target.parent_id
-        ctx = ActorContext(self, msg.message, msg.target, parent_id, msg.sender)
-
-        target.actor._receive_message(self, ctx, msg)  # noqa
-
-    def _process_signal(self, signal: Msg):
-
-        target = self._lookup_actor_node(signal.target)
-
-        if target is None:
-
-            # stopped / failed messages can arrive from a child actor after the parent has stopped
-            # This is a normal condition and should be silently ignored (not be logged as a warning)
-            if self._parent_id(signal.sender) == signal.target and \
-                    signal.message in [SignalNames.STOPPED, SignalNames.FAILED]:
-                return
-
-            # Unhandled messages are dropped, with just a warning in the log
-            self._log.warning(f"Signal ignored: [{signal.message}] -> {signal.target}  (target actor not found)")
-            return
-
-        parent_id = target.parent_id
-        ctx = ActorContext(self, signal.message, signal.target, parent_id, signal.sender)
-        result = target.actor._receive_signal(self, ctx, signal)  # noqa
-
-        # Generate lifecycle notifications
-
-        if signal.message == SignalNames.STOP:
-
-            if target.actor.error():
-                self._send_signal(signal.target, target.parent_id, SignalNames.FAILED, target.actor.error())
-            else:
-                self._send_signal(signal.target, target.parent_id, SignalNames.STOPPED)
-
-        # Error propagation
-        # When an actor dies due to an error, a FAILED signal is generated and sent to its direct parent
-        # If the parent does not handle the error successfully, the parent also dies and the error propagates
-
-        if isinstance(signal, ErrorSignal):
-            if signal.target == self._parent_id(signal.sender) and result is not True:
-                target.actor._Actor__error = signal.error  # TODO: Error could be wrapped to indicate propagation?
-                self._stop_actor("/system", signal.target)
-                self._send_signal(signal.sender, target.parent_id, SignalNames.FAILED, signal.error)
-
-        # Remove dead actors
-        # If the actor is now stopped or failed, take it out of the registry
-
-        if target.actor.state() in [ActorState.STOPPED, ActorState.FAILED]:
-            with self.__system_lock:
-                self.__actors.pop(signal.target)
-                parent = self.__actors.get(target.parent_id)
-                if parent is not None:
-                    parent = parent.without_child(signal.target)
-                    self.__actors[target.parent_id] = parent
 
     def _report_error(self, actor_id: ActorId, message: str, error: Exception):
 
