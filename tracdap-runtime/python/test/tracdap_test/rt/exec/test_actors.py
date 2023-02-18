@@ -112,7 +112,7 @@ class ActorSystemTest(unittest.TestCase):
 
             def on_start(self):
 
-                target_id = self.actors().spawn(TargetActor)
+                target_id = self.actors().spawn(TargetActor())
 
                 # All these bad calls to send() should result in EBadActor being thrown
 
@@ -326,7 +326,7 @@ class ActorSystemTest(unittest.TestCase):
 
             def on_start(self):
                 results.append("parent_start")
-                self.child_id = self.actors().spawn(ChildActor)
+                self.child_id = self.actors().spawn(ChildActor())
 
             def on_stop(self):
                 results.append("parent_stop")
@@ -388,7 +388,7 @@ class ActorSystemTest(unittest.TestCase):
 
             def on_start(self):
                 results.append("parent_start")
-                self.actors().spawn(ChildActor)
+                self.actors().spawn(ChildActor())
 
             def on_stop(self):
                 results.append("parent_stop")
@@ -399,7 +399,7 @@ class ActorSystemTest(unittest.TestCase):
                 self.child_count += 1
 
                 if self.child_count < 3:
-                    self.actors().spawn(ChildActor)
+                    self.actors().spawn(ChildActor())
                 else:
                     self.actors().stop()
 
@@ -441,7 +441,7 @@ class ActorSystemTest(unittest.TestCase):
 
             def on_start(self):
                 results.append("child_start")
-                self.actors().spawn(Grandchild, self.actors().parent)
+                self.actors().spawn(Grandchild(self.actors().parent))
 
             def on_stop(self):
                 results.append("child_stop")
@@ -450,7 +450,7 @@ class ActorSystemTest(unittest.TestCase):
 
             def on_start(self):
                 results.append("parent_start")
-                self.actors().spawn(Child)
+                self.actors().spawn(Child())
 
             def on_stop(self):
                 results.append("parent_stop")
@@ -503,8 +503,8 @@ class ActorSystemTest(unittest.TestCase):
                 self.child_count = 0
 
             def on_start(self):
-                child1 = self.actors().spawn(ChildActor, None)
-                self.actors().spawn(ChildActor, child1)
+                child1 = self.actors().spawn(ChildActor(None))
+                self.actors().spawn(ChildActor(child1))
 
             @actors.Message
             def child_up(self):
@@ -546,7 +546,7 @@ class ActorSystemTest(unittest.TestCase):
 
                 results.append("parent_start")
 
-                child_id = self.actors().spawn(ChildActor)
+                child_id = self.actors().spawn(ChildActor())
                 self.actors().send(child_id, "sample_message", 1)
 
             def on_stop(self):
@@ -596,7 +596,7 @@ class ActorSystemTest(unittest.TestCase):
 
                 results.append("parent_start")
 
-                child_id = self.actors().spawn(ChildActor)
+                child_id = self.actors().spawn(ChildActor())
                 self.actors().send(child_id, "sample_message", 1)
 
             def on_stop(self):
@@ -651,7 +651,7 @@ class ActorSystemTest(unittest.TestCase):
 
                 results.append("parent_start")
 
-                self.child_id = self.actors().spawn(ChildActor)
+                self.child_id = self.actors().spawn(ChildActor())
                 self.actors().send(self.child_id, "sample_message", 1)
 
             def on_stop(self):
@@ -709,7 +709,7 @@ class ActorSystemTest(unittest.TestCase):
 
                 results.append("parent_start")
 
-                self.child_id = self.actors().spawn(ChildActor)
+                self.child_id = self.actors().spawn(ChildActor())
                 self.actors().send(self.child_id, "sample_message", 1)
 
             def on_stop(self):

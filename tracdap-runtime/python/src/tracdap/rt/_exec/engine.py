@@ -144,10 +144,8 @@ class TracEngine(_actors.Actor):
 
         self._log.info(f"Job submitted: [{job_key}]")
 
-        job_actor_id = self.actors().spawn(
-            JobProcessor, job_key,
-            job_config, result_spec,
-            self._models, self._storage)
+        job_processor = JobProcessor(job_key, job_config, result_spec,self._models, self._storage)
+        job_actor_id = self.actors().spawn(job_processor)
 
         job_actors = {**self._job_actors, job_key: job_actor_id}
         self._job_actors = job_actors
@@ -214,7 +212,7 @@ class JobProcessor(_actors.Actor):
     def on_start(self):
         self._log.info(f"Starting job [{self.job_key}]")
         self._models.create_scope(self.job_key)
-        self.actors().spawn(GraphBuilder, self.job_config, self.result_spec, self._models, self._storage)
+        self.actors().spawn(GraphBuilder(self.job_config, self.result_spec, self._models, self._storage))
 
     def on_stop(self):
         self._log.info(f"Cleaning up job [{self.job_key}]")
@@ -242,7 +240,7 @@ class JobProcessor(_actors.Actor):
 
     @_actors.Message
     def job_graph(self, graph: _EngineContext, root_id: NodeId):
-        self.actors().spawn(GraphProcessor, graph, root_id)
+        self.actors().spawn(GraphProcessor(graph, root_id))
         self.actors().stop(self.actors().sender)
 
     @_actors.Message
@@ -374,7 +372,7 @@ class GraphProcessor(_actors.Actor):
 
                     # New nodes can be launched with the updated graph
                     # Anything that was pruned is not needed by the new node
-                    node_ref = self.actors().spawn_instance(processor)
+                    node_ref = self.actors().spawn(processor)
                     node_processors[node_id] = node_ref
 
                     pending_nodes.discard(node_id)

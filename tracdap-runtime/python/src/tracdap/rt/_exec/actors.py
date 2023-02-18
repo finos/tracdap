@@ -147,10 +147,7 @@ class ActorContext:
         self.parent = parent
         self.sender = sender
 
-    def spawn(self, actor_class: Actor.__class__, *args, **kwargs) -> ActorId:
-        return self.spawn_instance(actor_class(*args, **kwargs))
-
-    def spawn_instance(self, actor: Actor) -> ActorId:
+    def spawn(self, actor: Actor) -> ActorId:
         return self.__node.spawn(actor)
 
     def send(self, target_id: ActorId, message: str, *args, **kwargs):
@@ -809,7 +806,7 @@ class RootActor(Actor):
         self._stopped = stopped
 
     def on_start(self):
-        self.main_id = self.actors().spawn_instance(self.main_actor)
+        self.main_id = self.actors().spawn(self.main_actor)
 
     def on_stop(self):
         self._stopped.set()
