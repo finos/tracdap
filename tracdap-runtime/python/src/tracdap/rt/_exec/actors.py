@@ -643,7 +643,8 @@ class ActorNode:
             self.actor._Actor__ctx = ctx
 
             if signal.message == SignalNames.START:
-                self._require_state([ActorState.NOT_STARTED, ActorState.STARTING], signal)
+                if not self._check_current_state([ActorState.NOT_STARTED, ActorState.STARTING], signal):
+                    return False
                 self.actor.on_start()
                 if self.error is None and ctx.get_error() is None:
                     self.state = ActorState.RUNNING
@@ -653,7 +654,11 @@ class ActorNode:
                 return True
 
             elif signal.message == SignalNames.STOP:
-                self._require_state([ActorState.RUNNING, ActorState.STOPPING, ActorState.ERROR], signal)
+                # Ignore duplicate stop signals
+                if self.state in [ActorState.STOPPED, ActorState.FAILED]:
+                    return True
+                if not self._check_current_state([ActorState.RUNNING, ActorState.STOPPING, ActorState.ERROR], signal):
+                    return False
                 self.actor.on_stop()
                 if self.error is None and ctx.get_error() is None:
                     self.state = ActorState.STOPPED
@@ -677,17 +682,17 @@ class ActorNode:
         finally:
             self.actor._Actor__ctx = None
 
-    def _require_state(self, allowed_states: tp.List[ActorState], signal: Signal):
+    def _check_current_state(self, allowed_states: tp.List[ActorState], signal: Signal) -> bool:
 
-        # The actor system should prevent, reject or discard out-of-sequence lifecycle events
-        # If one gets through this is an unexpected error
+        # Duplicate life-cycle events are possible, reject them with a warning
 
         if self.state not in allowed_states:
+            warning = f"Signal dropped: [{signal.message}] {signal.sender} -> {self.actor_id}" + \
+                      f" (signal out of sequence, current state is {self.state.name})"
+            self._log.warning(warning)
+            return False
 
-            msg = f"Actor lifecycle error [{self.actor_id}]: Signal [{signal.message}] received out of sequence" + \
-                  f" (current state is {self.state})"
-            self._log.error(msg)
-            raise _ex.EUnexpected(msg)
+        return True
 
     def _new_child_id(self, actor_class: Actor.__class__) -> ActorId:
 

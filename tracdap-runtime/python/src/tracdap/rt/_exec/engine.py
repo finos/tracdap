@@ -248,11 +248,13 @@ class JobProcessor(_actors.Actor):
     @_actors.Message
     def job_succeeded(self, job_result: _cfg.JobResult):
         self._log.info(f"Job succeeded {self.job_key}")
+        self.actors().stop(self.actors().sender)
         self.actors().send_parent("job_succeeded", self.job_key, job_result)
 
     @_actors.Message
     def job_failed(self, error: Exception):
         self._log.error(f"Job failed {self.job_key}")
+        self.actors().stop(self.actors().sender)
         self.actors().send_parent("job_failed", self.job_key, error)
 
 
