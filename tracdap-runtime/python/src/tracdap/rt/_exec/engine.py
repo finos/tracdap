@@ -144,10 +144,8 @@ class TracEngine(_actors.Actor):
 
         self._log.info(f"Job submitted: [{job_key}]")
 
-        job_actor_id = self.actors().spawn(
-            JobProcessor, job_key,
-            job_config, result_spec,
-            self._models, self._storage)
+        job_processor = JobProcessor(job_key, job_config, result_spec,self._models, self._storage)
+        job_actor_id = self.actors().spawn(job_processor)
 
         job_actors = {**self._job_actors, job_key: job_actor_id}
         self._job_actors = job_actors
@@ -162,10 +160,10 @@ class TracEngine(_actors.Actor):
 
         self._log.info(f"Recording job as successful: {job_key}")
 
+        self._finalize_job(job_key)
+
         if self._notify_callback is not None:
             self._notify_callback(job_key, job_result, None)
-
-        self._finalize_job(job_key)
 
     @_actors.Message
     def job_failed(self, job_key: str, error: Exception):
@@ -177,10 +175,10 @@ class TracEngine(_actors.Actor):
 
         self._log.error(f"Recording job as failed: {job_key}")
 
+        self._finalize_job(job_key)
+
         if self._notify_callback is not None:
             self._notify_callback(job_key, None, error)
-
-        self._finalize_job(job_key)
 
     def _finalize_job(self, job_key: str):
 
@@ -214,7 +212,7 @@ class JobProcessor(_actors.Actor):
     def on_start(self):
         self._log.info(f"Starting job [{self.job_key}]")
         self._models.create_scope(self.job_key)
-        self.actors().spawn(GraphBuilder, self.job_config, self.result_spec, self._models, self._storage)
+        self.actors().spawn(GraphBuilder(self.job_config, self.result_spec, self._models, self._storage))
 
     def on_stop(self):
         self._log.info(f"Cleaning up job [{self.job_key}]")
@@ -242,17 +240,19 @@ class JobProcessor(_actors.Actor):
 
     @_actors.Message
     def job_graph(self, graph: _EngineContext, root_id: NodeId):
-        self.actors().spawn(GraphProcessor, graph, root_id)
+        self.actors().spawn(GraphProcessor(graph, root_id))
         self.actors().stop(self.actors().sender)
 
     @_actors.Message
     def job_succeeded(self, job_result: _cfg.JobResult):
         self._log.info(f"Job succeeded {self.job_key}")
+        self.actors().stop(self.actors().sender)
         self.actors().send_parent("job_succeeded", self.job_key, job_result)
 
     @_actors.Message
     def job_failed(self, error: Exception):
         self._log.error(f"Job failed {self.job_key}")
+        self.actors().stop(self.actors().sender)
         self.actors().send_parent("job_failed", self.job_key, error)
 
 
@@ -332,6 +332,16 @@ class GraphProcessor(_actors.Actor):
 
         def process_graph(graph: _EngineContext) -> _EngineContext:
 
+            processed_graph = cp.copy(graph)
+            processed_graph.nodes = cp.copy(graph.nodes)
+
+            # Start by removing any nodes that are no longer needed
+            for node_id, node in graph.nodes.items():
+                if node_id in graph.succeeded_nodes and not self._is_required_node(node, graph):
+                    node = processed_graph.nodes.pop(node_id)
+                    NodeLogger.log_node_evict(node)
+                    del node
+
             pending_nodes = cp.copy(graph.pending_nodes)
             active_nodes = cp.copy(graph.active_nodes)
             failed_nodes = cp.copy(graph.failed_nodes)
@@ -349,13 +359,25 @@ class GraphProcessor(_actors.Actor):
 
                 elif self._is_viable_node(node, graph):
 
-                    node_ref = self.actors().spawn(NodeProcessor, self.graph, node_id, node)
+                    # This is very basic separation of different node types
+                    # Model and data nodes map to different thread pools in the actors engine
+                    # There is scope for a much more sophisticated approach, with prioritized scheduling
+
+                    if isinstance(node.node, _graph.RunModelNode) or isinstance(node.node, _graph.ImportModelNode):
+                        processor = ModelNodeProcessor(processed_graph, node_id, node)
+                    elif isinstance(node.node, _graph.LoadDataNode) or isinstance(node.node, _graph.SaveDataNode):
+                        processor = DataNodeProcessor(processed_graph, node_id, node)
+                    else:
+                        processor = NodeProcessor(processed_graph, node_id, node)
+
+                    # New nodes can be launched with the updated graph
+                    # Anything that was pruned is not needed by the new node
+                    node_ref = self.actors().spawn(processor)
                     node_processors[node_id] = node_ref
 
                     pending_nodes.discard(node_id)
                     active_nodes.add(node_id)
 
-            processed_graph = cp.copy(self.graph)
             processed_graph.pending_nodes = pending_nodes
             processed_graph.active_nodes = active_nodes
             processed_graph.failed_nodes = failed_nodes
@@ -375,6 +397,22 @@ class GraphProcessor(_actors.Actor):
 
         # Job may have completed due to error propagation
         self.check_job_status(do_submit=False)
+
+    @classmethod
+    def _is_required_node(cls, node: _EngineNode, graph: _EngineContext):
+
+        if node.node.id not in graph.succeeded_nodes:
+            return False
+
+        def live_node(nid_n):
+            nid_, _ = nid_n
+            return nid_ in graph.active_nodes or nid_ in graph.pending_nodes
+
+        def use_target(nid_n):
+            _, n_ = nid_n
+            return node.node.id in n_.dependencies
+
+        return any(map(use_target, filter(live_node, graph.nodes.items())))
 
     @classmethod
     def _is_viable_node(cls, node: _EngineNode, graph: _EngineContext):
@@ -411,6 +449,10 @@ class GraphProcessor(_actors.Actor):
                 # Use the original node ID, to avoid overwriting the result type
                 results[item_node.node.id] = item_node
 
+        # Child node is no longer needed, it can be stopped to release resources
+        processor = self.processors.pop(node_id)
+        self.actors().stop(processor)
+
         self._update_results(results)
 
     @_actors.Message
@@ -420,6 +462,10 @@ class GraphProcessor(_actors.Actor):
         node = cp.copy(old_node)
         node.complete = True
         node.error = error
+
+        # Child node is no longer needed, it can be stopped to release resources
+        processor = self.processors.pop(node_id)
+        self.actors().stop(processor)
 
         self._update_results({node_id: node})
 
@@ -496,7 +542,7 @@ class NodeProcessor(_actors.Actor):
 
     __NONE_TYPE = type(None)
 
-    def __init__(self, graph: _EngineContext, node_id: str, node: _EngineNode):
+    def __init__(self, graph: _EngineContext, node_id: NodeId, node: _EngineNode):
         super().__init__()
         self.graph = graph
         self.node_id = node_id
@@ -523,17 +569,17 @@ class NodeProcessor(_actors.Actor):
 
             ctx = NodeContextImpl(self.graph.nodes)
             result = self.node.function(ctx)
-
             self._check_result_type(result)
-            self.actors().send_parent("node_succeeded", self.node_id, result)
 
             NodeLogger.log_node_succeeded(self.node)
 
+            self.actors().send_parent("node_succeeded", self.node_id, result)
+
         except Exception as e:
 
-            self.actors().send_parent("node_failed", self.node_id, e)
-
             NodeLogger.log_node_failed(self.node, e)
+
+            self.actors().send_parent("node_failed", self.node_id, e)
 
     @classmethod
     def result_matches_type(cls, result, expected_type) -> bool:
@@ -583,6 +629,18 @@ class NodeProcessor(_actors.Actor):
         if not self.result_matches_type(result, expected_type):
             err = f"Node result is the wrong type, expected [{expected_type.__name__}], got [{result_type.__name__}]"
             raise _ex.ETracInternal(err)
+
+
+class ModelNodeProcessor(NodeProcessor):
+
+    def __init__(self, graph: _EngineContext, node_id: NodeId, node: _EngineNode):
+        super().__init__(graph, node_id, node)
+
+
+class DataNodeProcessor(NodeProcessor):
+
+    def __init__(self, graph: _EngineContext, node_id: NodeId, node: _EngineNode):
+        super().__init__(graph, node_id, node)
 
 
 class NodeLogger:
@@ -646,6 +704,18 @@ class NodeLogger:
         cls._log.exception(e)
 
     @classmethod
+    def log_node_evict(cls, node: _EngineNode):
+
+        logging_type = cls._logging_type(node)
+        node_name = node.node.id.name
+        namespace = node.node.id.namespace
+
+        if logging_type in [cls.LoggingType.STATIC_VALUE, cls.LoggingType.SIMPLE_MAPPING, cls.LoggingType.PUSH_POP]:
+            return
+
+        cls._log.info(f"EVICT {cls._func_type(node)} [{node_name}] / {namespace}")
+
+    @classmethod
     def _log_push_pop_node_details(cls, node: tp.Union[_graph.ContextPushNode, _graph.ContextPopNode]):
 
         push_or_pop = "PUSH" if isinstance(node, _graph.ContextPushNode) else "POP"
@@ -675,7 +745,7 @@ class NodeLogger:
         if isinstance(node.node, _graph.ContextPushNode) or isinstance(node.node, _graph.ContextPopNode):
             return cls.LoggingType.PUSH_POP
 
-        if isinstance(node.node, _graph.IdentityNode):
+        if isinstance(node.node, _graph.IdentityNode) or isinstance(node.node, _graph.BundleItemNode):
             return cls.LoggingType.SIMPLE_MAPPING
 
         if isinstance(node.node, _graph.RunModelNode):

@@ -112,7 +112,7 @@ class ActorSystemTest(unittest.TestCase):
 
             def on_start(self):
 
-                target_id = self.actors().spawn(TargetActor)
+                target_id = self.actors().spawn(TargetActor())
 
                 # All these bad calls to send() should result in EBadActor being thrown
 
@@ -326,7 +326,7 @@ class ActorSystemTest(unittest.TestCase):
 
             def on_start(self):
                 results.append("parent_start")
-                self.child_id = self.actors().spawn(ChildActor)
+                self.child_id = self.actors().spawn(ChildActor())
 
             def on_stop(self):
                 results.append("parent_stop")
@@ -334,11 +334,16 @@ class ActorSystemTest(unittest.TestCase):
             def on_signal(self, signal: actors.Signal) -> bool:
 
                 if signal.sender == self.child_id:
+
                     results.append("parent_signal")
                     results.append(signal.message)
 
-                self.actors().stop()
-                return True
+                    if signal.message == actors.SignalNames.STOPPED:
+                        self.actors().stop()
+
+                    return True
+
+                return False
 
             @actors.Message
             def child_started(self, child_id):
@@ -353,7 +358,9 @@ class ActorSystemTest(unittest.TestCase):
         self.assertEqual([
             "parent_start",
             "child_start", "child_started",
-            "child_stop", "parent_signal", "actor:stopped",
+            "parent_signal", "actor:started",
+            "child_stop",
+            "parent_signal", "actor:stopped",
             "parent_stop"],
             results)
 
@@ -381,7 +388,7 @@ class ActorSystemTest(unittest.TestCase):
 
             def on_start(self):
                 results.append("parent_start")
-                self.actors().spawn(ChildActor)
+                self.actors().spawn(ChildActor())
 
             def on_stop(self):
                 results.append("parent_stop")
@@ -392,7 +399,7 @@ class ActorSystemTest(unittest.TestCase):
                 self.child_count += 1
 
                 if self.child_count < 3:
-                    self.actors().spawn(ChildActor)
+                    self.actors().spawn(ChildActor())
                 else:
                     self.actors().stop()
 
@@ -406,8 +413,8 @@ class ActorSystemTest(unittest.TestCase):
             "child_start", "new_child",
             "child_start", "new_child",
             "child_start", "new_child",
-            "child_stop", "child_stop", "child_stop",
-            "parent_stop"],
+            "parent_stop",
+            "child_stop", "child_stop", "child_stop"],
             results)
 
         # Make sure the system went down cleanly
@@ -434,7 +441,7 @@ class ActorSystemTest(unittest.TestCase):
 
             def on_start(self):
                 results.append("child_start")
-                self.actors().spawn(Grandchild, self.actors().parent)
+                self.actors().spawn(Grandchild(self.actors().parent))
 
             def on_stop(self):
                 results.append("child_stop")
@@ -443,7 +450,7 @@ class ActorSystemTest(unittest.TestCase):
 
             def on_start(self):
                 results.append("parent_start")
-                self.actors().spawn(Child)
+                self.actors().spawn(Child())
 
             def on_stop(self):
                 results.append("parent_stop")
@@ -461,7 +468,7 @@ class ActorSystemTest(unittest.TestCase):
         self.assertEqual([
             "parent_start", "child_start", "grandchild_start",
             "grandchild_started",
-            "grandchild_stop", "child_stop", "parent_stop"],
+            "parent_stop", "child_stop", "grandchild_stop"],
             results)
 
         # Make sure the system went down cleanly
@@ -496,8 +503,8 @@ class ActorSystemTest(unittest.TestCase):
                 self.child_count = 0
 
             def on_start(self):
-                child1 = self.actors().spawn(ChildActor, None)
-                self.actors().spawn(ChildActor, child1)
+                child1 = self.actors().spawn(ChildActor(None))
+                self.actors().spawn(ChildActor(child1))
 
             @actors.Message
             def child_up(self):
@@ -539,7 +546,7 @@ class ActorSystemTest(unittest.TestCase):
 
                 results.append("parent_start")
 
-                child_id = self.actors().spawn(ChildActor)
+                child_id = self.actors().spawn(ChildActor())
                 self.actors().send(child_id, "sample_message", 1)
 
             def on_stop(self):
@@ -589,7 +596,7 @@ class ActorSystemTest(unittest.TestCase):
 
                 results.append("parent_start")
 
-                child_id = self.actors().spawn(ChildActor)
+                child_id = self.actors().spawn(ChildActor())
                 self.actors().send(child_id, "sample_message", 1)
 
             def on_stop(self):
@@ -644,7 +651,7 @@ class ActorSystemTest(unittest.TestCase):
 
                 results.append("parent_start")
 
-                self.child_id = self.actors().spawn(ChildActor)
+                self.child_id = self.actors().spawn(ChildActor())
                 self.actors().send(self.child_id, "sample_message", 1)
 
             def on_stop(self):
@@ -702,7 +709,7 @@ class ActorSystemTest(unittest.TestCase):
 
                 results.append("parent_start")
 
-                self.child_id = self.actors().spawn(ChildActor)
+                self.child_id = self.actors().spawn(ChildActor())
                 self.actors().send(self.child_id, "sample_message", 1)
 
             def on_stop(self):
@@ -714,21 +721,27 @@ class ActorSystemTest(unittest.TestCase):
                     results.append("child_signal")
                     results.append(signal.message)
 
-                self.actors().stop()
+                    if signal.message in [actors.SignalNames.STOPPED, actors.SignalNames.FAILED]:
+                        self.actors().stop()
 
-                # Intercept the signal - prevents propagation
-                return True
+                    # Intercept the signal - prevents propagation
+                    return True
 
         root = ParentActor()
         system = actors.ActorSystem(root)
         system.start()
         system.wait_for_shutdown()
 
-        self.assertEqual([
-            "parent_start", "child_start",
-            "sample_message", 1,
-            "child_stop", "child_signal", "actor:failed",
-            "parent_stop"], results)
+        # Child an parent might be running on separate threads
+        # The order of the middle events is not guaranteed
+
+        first_results = ["parent_start", "child_start", "sample_message", 1]
+        middle_results = ["child_signal", "actor:started", "child_stop"]
+        last_results = ["child_signal", "actor:failed", "parent_stop"]
+
+        self.assertEqual(first_results, results[:len(first_results)])
+        self.assertTrue(all(map(lambda x: x in results, middle_results)))
+        self.assertEqual(last_results, results[-len(last_results):])
 
         # Since the failure signal was handled, there should be a clean shutdown
         self.assertEqual(0, system.shutdown_code())
