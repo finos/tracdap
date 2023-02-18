@@ -357,9 +357,20 @@ class GraphProcessor(_actors.Actor):
 
                 elif self._is_viable_node(node, graph):
 
+                    # This is very basic separation of different node types
+                    # Model and data nodes map to different thread pools in the actors engine
+                    # There is scope for a much more sophisticated approach, with prioritized scheduling
+
+                    if isinstance(node.node, _graph.RunModelNode) or isinstance(node.node, _graph.ImportModelNode):
+                        processor = ModelNodeProcessor(processed_graph, node_id, node)
+                    elif isinstance(node.node, _graph.LoadDataNode) or isinstance(node.node, _graph.SaveDataNode):
+                        processor = DataNodeProcessor(processed_graph, node_id, node)
+                    else:
+                        processor = NodeProcessor(processed_graph, node_id, node)
+
                     # New nodes can be launched with the updated graph
                     # Anything that was pruned is not needed by the new node
-                    node_ref = self.actors().spawn(NodeProcessor, processed_graph, node_id, node)
+                    node_ref = self.actors().spawn_instance(processor)
                     node_processors[node_id] = node_ref
 
                     pending_nodes.discard(node_id)
@@ -529,7 +540,7 @@ class NodeProcessor(_actors.Actor):
 
     __NONE_TYPE = type(None)
 
-    def __init__(self, graph: _EngineContext, node_id: str, node: _EngineNode):
+    def __init__(self, graph: _EngineContext, node_id: NodeId, node: _EngineNode):
         super().__init__()
         self.graph = graph
         self.node_id = node_id
@@ -616,6 +627,18 @@ class NodeProcessor(_actors.Actor):
         if not self.result_matches_type(result, expected_type):
             err = f"Node result is the wrong type, expected [{expected_type.__name__}], got [{result_type.__name__}]"
             raise _ex.ETracInternal(err)
+
+
+class ModelNodeProcessor(NodeProcessor):
+
+    def __init__(self, graph: _EngineContext, node_id: NodeId, node: _EngineNode):
+        super().__init__(graph, node_id, node)
+
+
+class DataNodeProcessor(NodeProcessor):
+
+    def __init__(self, graph: _EngineContext, node_id: NodeId, node: _EngineNode):
+        super().__init__(graph, node_id, node)
 
 
 class NodeLogger:
