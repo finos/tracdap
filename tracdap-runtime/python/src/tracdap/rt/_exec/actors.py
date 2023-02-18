@@ -843,8 +843,6 @@ class ActorSystem:
 
         if thread_pools is not None:
             self._setup_event_loops(thread_pools)
-            for pool in self.__pools.values():
-                pool.start()
 
         self.__root_started = threading.Event()
         self.__root_stopped = threading.Event()
@@ -906,7 +904,7 @@ class ActorSystem:
 
     def _setup_event_loops(self, thread_pools: tp.Dict[str, int]):
 
-        for pool_name, pool_size in thread_pools:
+        for pool_name, pool_size in thread_pools.items():
             self.__pools[pool_name] = EventLoopPool(pool_name, pool_size)
 
     def _allocate_event_loop(self, actor_class: Actor.__class__) -> EventLoop:
