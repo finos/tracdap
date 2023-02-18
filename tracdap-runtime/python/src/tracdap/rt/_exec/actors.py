@@ -298,9 +298,9 @@ class FunctionCache:
 
         handlers = dict()
 
-        for member in actor_class.__dict__.values():
+        for member_name, member in inspect.getmembers(actor_class):
             if isinstance(member, Message):
-                handlers[member.__name__] = member
+                handlers[member_name] = member
 
         with cls.__lock:
             if actor_class in cls.__cache:
