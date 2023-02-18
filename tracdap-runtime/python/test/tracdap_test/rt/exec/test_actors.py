@@ -334,11 +334,16 @@ class ActorSystemTest(unittest.TestCase):
             def on_signal(self, signal: actors.Signal) -> bool:
 
                 if signal.sender == self.child_id:
+
                     results.append("parent_signal")
                     results.append(signal.message)
 
-                self.actors().stop()
-                return True
+                    if signal.message == actors.SignalNames.STOPPED:
+                        self.actors().stop()
+
+                    return True
+
+                return False
 
             @actors.Message
             def child_started(self, child_id):
@@ -353,7 +358,9 @@ class ActorSystemTest(unittest.TestCase):
         self.assertEqual([
             "parent_start",
             "child_start", "child_started",
-            "child_stop", "parent_signal", "actor:stopped",
+            "parent_signal", "actor:started",
+            "child_stop",
+            "parent_signal", "actor:stopped",
             "parent_stop"],
             results)
 
