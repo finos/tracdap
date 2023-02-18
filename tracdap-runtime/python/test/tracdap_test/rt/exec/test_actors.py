@@ -413,8 +413,8 @@ class ActorSystemTest(unittest.TestCase):
             "child_start", "new_child",
             "child_start", "new_child",
             "child_start", "new_child",
-            "child_stop", "child_stop", "child_stop",
-            "parent_stop"],
+            "parent_stop",
+            "child_stop", "child_stop", "child_stop"],
             results)
 
         # Make sure the system went down cleanly
@@ -468,7 +468,7 @@ class ActorSystemTest(unittest.TestCase):
         self.assertEqual([
             "parent_start", "child_start", "grandchild_start",
             "grandchild_started",
-            "grandchild_stop", "child_stop", "parent_stop"],
+            "parent_stop", "child_stop", "grandchild_stop"],
             results)
 
         # Make sure the system went down cleanly

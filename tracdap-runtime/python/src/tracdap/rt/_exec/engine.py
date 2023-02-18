@@ -162,10 +162,10 @@ class TracEngine(_actors.Actor):
 
         self._log.info(f"Recording job as successful: {job_key}")
 
+        self._finalize_job(job_key)
+
         if self._notify_callback is not None:
             self._notify_callback(job_key, job_result, None)
-
-        self._finalize_job(job_key)
 
     @_actors.Message
     def job_failed(self, job_key: str, error: Exception):
@@ -177,10 +177,10 @@ class TracEngine(_actors.Actor):
 
         self._log.error(f"Recording job as failed: {job_key}")
 
+        self._finalize_job(job_key)
+
         if self._notify_callback is not None:
             self._notify_callback(job_key, None, error)
-
-        self._finalize_job(job_key)
 
     def _finalize_job(self, job_key: str):
 
