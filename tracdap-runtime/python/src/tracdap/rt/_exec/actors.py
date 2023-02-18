@@ -838,8 +838,13 @@ class ActorSystem:
             name=system_thread,
             target=self.__system_event_loop.main)
 
-        # self.__pools = {name: EventLoopPool(name, size, daemon=False) for name, size in thread_pools.items()}
-        self.__pool1 = EventLoopPool("worker", 3, False)
+        self.__pools: tp.Dict[str, EventLoopPool] = {}
+        self.__pool_mapping = thread_pool_mapping or {}
+
+        if thread_pools is not None:
+            self._setup_event_loops(thread_pools)
+            for pool in self.__pools.values():
+                pool.start()
 
         self.__root_started = threading.Event()
         self.__root_stopped = threading.Event()
@@ -853,16 +858,18 @@ class ActorSystem:
         self.__system_thread.start()
         self.__root_node.send_signal("/system", self.ROOT_ID, SignalNames.START)
 
-        self.__pool1.start()
+        for pool in self.__pools.values():
+            pool.start()
 
         if wait:
-            self.__root_started.wait()  # TODO: Startup timeout
+            # TODO: Startup timeout
+            self.__root_started.wait()
 
     def stop(self):
 
         self.__root_node.send_signal("/system", self.ROOT_ID, SignalNames.STOP)
 
-    def wait_for_shutdown(self):
+    def wait_for_shutdown(self, timeout: tp.Optional[float] = None):
 
         self.__root_stopped.wait()
 
@@ -872,10 +879,12 @@ class ActorSystem:
 
         time.sleep(self.__SHUTDOWN_TIME)
 
-        self.__pool1.shutdown()
+        for pool in self.__pools.values():
+            pool.shutdown()
+            pool.join(timeout)
+
         self.__system_event_loop.shutdown()
-        self.__pool1.join()
-        self.__system_thread.join()
+        self.__system_thread.join(timeout)
 
     def shutdown_code(self) -> int:
 
@@ -895,9 +904,22 @@ class ActorSystem:
 
         self.__root_node.send_message("/external", self.__root_actor.main_id, message, args, kwargs)
 
+    def _setup_event_loops(self, thread_pools: tp.Dict[str, int]):
+
+        for pool_name, pool_size in thread_pools:
+            self.__pools[pool_name] = EventLoopPool(pool_name, pool_size)
+
     def _allocate_event_loop(self, actor_class: Actor.__class__) -> EventLoop:
 
         if actor_class == RootActor.__class__ or actor_class == self.__root_actor.main_actor.__class__:
             return self.__system_event_loop
 
-        return self.__pool1.get_loop()
+        preferred_pool = self.__pool_mapping.get(actor_class)
+
+        if preferred_pool is not None and preferred_pool in self.__pools:
+            return self.__pools[preferred_pool].get_loop()
+
+        # Fall back to the system loop for now
+        # We could allow setting an alternative default pool
+
+        return self.__system_event_loop
