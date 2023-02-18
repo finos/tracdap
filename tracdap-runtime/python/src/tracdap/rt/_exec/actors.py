@@ -22,6 +22,7 @@ import enum
 import dataclasses as dc
 import inspect
 import queue
+import time
 
 import tracdap.rt._impl.util as util  # noqa
 import tracdap.rt.exceptions as _ex
@@ -191,12 +192,16 @@ class EventLoop:
         self.__msg_queue: queue.Queue[tp.Tuple[Msg, tp.Callable[[Msg], None]]] = queue.Queue()
         self.__shutdown = False
         self.__shutdown_now = False
+        self.__done = False
         self.__log = util.logger_for_object(self)
 
-    def post_message(self, msg: _T_MSG, processor: tp.Callable[[_T_MSG], None]):
+    def post_message(self, msg: _T_MSG, processor: tp.Callable[[_T_MSG], None]) -> bool:
         with self.__msg_lock:
+            if self.__done:
+                return False
             self.__msg_queue.put((msg, processor))
             self.__msg_lock.notify()
+            return True
 
     def shutdown(self, immediate: bool = False):
         with self.__msg_lock:
@@ -209,9 +214,7 @@ class EventLoop:
 
     def _event_loop(self):
 
-        done = False
-
-        while not done:
+        while not self.__done:
 
             with self.__msg_lock:
 
@@ -219,10 +222,11 @@ class EventLoop:
                 event = self.__msg_queue.get() if not self.__msg_queue.empty() else None
 
                 if self.__shutdown_now:
+                    self.__done = True
                     break
 
                 if self.__shutdown and event is None:
-                    done = True
+                    self.__done = True
 
             if event is not None:
                 try:
@@ -231,6 +235,57 @@ class EventLoop:
                 except Exception as e:
                     self.__log.error(f"Unhandled error on the event loop: {str(e)}")
                     self.__log.exception(e)
+
+
+class EventLoopPool:
+
+    def __init__(self, name: str, size: int, daemon: bool = False):
+
+        self.__loops: tp.List[EventLoop] = []
+        self.__threads: tp.List[threading.Thread] = []
+        self.__lock = threading.Lock()
+        self.__size = size
+        self.__next = 0
+
+        for i in range(size):
+            loop = EventLoop()
+            thread = threading.Thread(name=f"{name}-{i}", target=loop.main, daemon=daemon)
+            self.__loops.append(loop)
+            self.__threads.append(thread)
+
+    def start(self):
+        for i in range(self.__size):
+            self.__threads[i].start()
+
+    def shutdown(self, immediate: bool = False):
+        for loop in self.__loops:
+            loop.shutdown(immediate)
+
+    def get_loop(self) -> EventLoop:
+        # simple round-robin for now (we could look at which loops are idle)
+        with self.__lock:
+            loop_index = self.__next
+            self.__next = (self.__next + 1) % self.__size
+        return self.__loops[loop_index]
+
+    def join(self, timeout=None):
+
+        start = time.clock_gettime(time.CLOCK_MONOTONIC)
+        remaining = timeout
+
+        for i in range(self.__size):
+
+            loop = self.__loops[i]
+            thread = self.__threads[i]
+
+            if remaining is None or remaining > 0:
+                thread.join(remaining)
+            if thread.is_alive():
+                loop.shutdown(True)
+
+            if timeout is not None:
+                elapsed = time.clock_gettime(time.CLOCK_MONOTONIC) - start
+                remaining = timeout - elapsed
 
 
 class FunctionCache:
@@ -423,17 +478,20 @@ class ActorNode:
         self._log.info(f"_accept [{self.actor_id}]: [{msg.message}] {msg.sender} -> {msg.target}")
 
         if msg.target != self.actor_id:
-
             err = f"Message delivery failed [{self.actor_id}]: [{msg.message}] {msg.sender} -> {msg.target}" + \
                   f" (delivered to the wrong address)"
-
             self._log.error(err)
             raise EBadActor(err)
 
         if isinstance(msg, Signal):
-            self.event_loop.post_message(msg, self._process_signal)
+            posted = self.event_loop.post_message(msg, self._process_signal)
         else:
-            self.event_loop.post_message(msg, self._process_message)
+            posted = self.event_loop.post_message(msg, self._process_message)
+
+        if not posted:
+            warning = f"Message dropped [{self.actor_id}]: [{msg.message}] {msg.sender} -> {msg.target}" + \
+                      f" (actor thread has already stopped)"
+            self._log.warning(warning)
 
     def _process_message(self, msg: Msg):
 
@@ -761,7 +819,12 @@ class ActorSystem:
     DELIMITER = "/"
     ROOT_ID = DELIMITER
 
-    def __init__(self, main_actor: Actor, system_thread: str = "actor_system"):
+    __SHUTDOWN_TIME = 0.01
+
+    def __init__(
+            self, main_actor: Actor, system_thread: str = "actor_system",
+            thread_pools: tp.Dict[str, int] = None,
+            thread_pool_mapping: tp.Dict[type, str] = None):
 
         super().__init__()
 
@@ -775,6 +838,9 @@ class ActorSystem:
             name=system_thread,
             target=self.__system_event_loop.main)
 
+        # self.__pools = {name: EventLoopPool(name, size, daemon=False) for name, size in thread_pools.items()}
+        self.__pool1 = EventLoopPool("worker", 3, False)
+
         self.__root_started = threading.Event()
         self.__root_stopped = threading.Event()
         self.__root_actor = RootActor(main_actor, self.__root_started, self.__root_stopped)
@@ -787,6 +853,8 @@ class ActorSystem:
         self.__system_thread.start()
         self.__root_node.send_signal("/system", self.ROOT_ID, SignalNames.START)
 
+        self.__pool1.start()
+
         if wait:
             self.__root_started.wait()  # TODO: Startup timeout
 
@@ -796,8 +864,17 @@ class ActorSystem:
 
     def wait_for_shutdown(self):
 
-        self.__root_stopped.wait()   # TODO: Timeout
+        self.__root_stopped.wait()
+
+        # This short delay lets message processing finish before stopping the event loops
+        # The real solution for this is to wait for all children to stop, before considering an actor STOPPED
+        # There would need to be a timeout, including a root timeout
+
+        time.sleep(self.__SHUTDOWN_TIME)
+
+        self.__pool1.shutdown()
         self.__system_event_loop.shutdown()
+        self.__pool1.join()
         self.__system_thread.join()
 
     def shutdown_code(self) -> int:
@@ -820,4 +897,7 @@ class ActorSystem:
 
     def _allocate_event_loop(self, actor_class: Actor.__class__) -> EventLoop:
 
-        return self.__system_event_loop
+        if actor_class == RootActor.__class__ or actor_class == self.__root_actor.main_actor.__class__:
+            return self.__system_event_loop
+
+        return self.__pool1.get_loop()

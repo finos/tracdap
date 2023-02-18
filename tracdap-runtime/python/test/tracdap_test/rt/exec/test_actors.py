@@ -732,13 +732,16 @@ class ActorSystemTest(unittest.TestCase):
         system.start()
         system.wait_for_shutdown()
 
-        self.assertEqual([
-            "parent_start", "child_start",
-            "sample_message", 1,
-            "child_signal", "actor:started",
-            "child_stop",
-            "child_signal", "actor:failed",
-            "parent_stop"], results)
+        # Child an parent might be running on separate threads
+        # The order of the middle events is not guaranteed
+
+        first_results = ["parent_start", "child_start", "sample_message", 1]
+        middle_results = ["child_signal", "actor:started", "child_stop"]
+        last_results = ["child_signal", "actor:failed", "parent_stop"]
+
+        self.assertEqual(first_results, results[:len(first_results)])
+        self.assertTrue(all(map(lambda x: x in results, middle_results)))
+        self.assertEqual(last_results, results[-len(last_results):])
 
         # Since the failure signal was handled, there should be a clean shutdown
         self.assertEqual(0, system.shutdown_code())
