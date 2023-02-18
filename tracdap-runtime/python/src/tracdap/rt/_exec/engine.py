@@ -569,17 +569,17 @@ class NodeProcessor(_actors.Actor):
 
             ctx = NodeContextImpl(self.graph.nodes)
             result = self.node.function(ctx)
-
             self._check_result_type(result)
-            self.actors().send_parent("node_succeeded", self.node_id, result)
 
             NodeLogger.log_node_succeeded(self.node)
 
+            self.actors().send_parent("node_succeeded", self.node_id, result)
+
         except Exception as e:
 
-            self.actors().send_parent("node_failed", self.node_id, e)
-
             NodeLogger.log_node_failed(self.node, e)
+
+            self.actors().send_parent("node_failed", self.node_id, e)
 
     @classmethod
     def result_matches_type(cls, result, expected_type) -> bool:
@@ -745,7 +745,7 @@ class NodeLogger:
         if isinstance(node.node, _graph.ContextPushNode) or isinstance(node.node, _graph.ContextPopNode):
             return cls.LoggingType.PUSH_POP
 
-        if isinstance(node.node, _graph.IdentityNode) or isinstance(node.node, _graph.NoopNode):
+        if isinstance(node.node, _graph.IdentityNode) or isinstance(node.node, _graph.BundleItemNode):
             return cls.LoggingType.SIMPLE_MAPPING
 
         if isinstance(node.node, _graph.RunModelNode):
