@@ -345,10 +345,16 @@ class ActorNode:
 
     def spawn(self, child_actor: Actor):
 
-        actor_class = type(child_actor)
-        event_loop = self.system._allocate_event_loop(actor_class)  # noqa
+        if self._log.isEnabledFor(logging.DEBUG):
+            self._log.debug(f"spawn [{self.actor_id}]: [{type(child_actor)}]")
 
+        actor_class = type(child_actor)
         child_id = self._new_child_id(actor_class)
+
+        if self._log.isEnabledFor(logging.DEBUG):
+            self._log.debug(f"spawn [{self.actor_id}]: [{type(child_actor)}] {child_id}")
+
+        event_loop = self.system._allocate_event_loop(actor_class)  # noqa
         child_node = ActorNode(child_id, child_actor, self, self.system, event_loop)
         self.children[child_id] = child_node
 
@@ -358,7 +364,8 @@ class ActorNode:
 
     def send_message(self, sender_id: ActorId, target_id: ActorId, message: str, args, kwargs):
 
-        self._log.info(f"send_signal [{self.actor_id}]: [{message}] {sender_id} -> {target_id}")
+        if self._log.isEnabledFor(logging.DEBUG):
+            self._log.debug(f"send_signal [{self.actor_id}]: [{message}] {sender_id} -> {target_id}")
 
         # Client code could try to send a signal string as a message, this counts as a bad actor
 
@@ -391,7 +398,8 @@ class ActorNode:
 
     def send_signal(self, sender_id: ActorId, target_id: ActorId, signal: str, error: tp.Optional[Exception] = None):
 
-        self._log.info(f"send_signal [{self.actor_id}]: [{signal}] {sender_id} -> {target_id}")
+        if self._log.isEnabledFor(logging.DEBUG):
+            self._log.debug(f"send_signal [{self.actor_id}]: [{signal}] {sender_id} -> {target_id}")
 
         # Only the actor system can send signals, so a bad signal is an unexpected error
 
@@ -475,7 +483,8 @@ class ActorNode:
 
     def _accept(self, msg: Msg):
 
-        self._log.info(f"_accept [{self.actor_id}]: [{msg.message}] {msg.sender} -> {msg.target}")
+        if self._log.isEnabledFor(logging.DEBUG):
+            self._log.debug(f"_accept [{self.actor_id}]: [{msg.message}] {msg.sender} -> {msg.target}")
 
         if msg.target != self.actor_id:
             err = f"Message delivery failed [{self.actor_id}]: [{msg.message}] {msg.sender} -> {msg.target}" + \
@@ -495,7 +504,8 @@ class ActorNode:
 
     def _process_message(self, msg: Msg):
 
-        self._log.info(f"_process_message [{self.actor_id}]: [{msg.message}] {msg.sender} -> {msg.target}")
+        if self._log.isEnabledFor(logging.DEBUG):
+            self._log.debug(f"_process_message [{self.actor_id}]: [{msg.message}] {msg.sender} -> {msg.target}")
 
         # Only accept legal signals where the target is this actor
 
@@ -527,7 +537,8 @@ class ActorNode:
 
     def _process_signal(self, signal: Signal):
 
-        self._log.info(f"_process_signal [{self.actor_id}]: [{signal.message}] {signal.sender} -> {signal.target}")
+        if self._log.isEnabledFor(logging.DEBUG):
+            self._log.debug(f"_process_signal [{self.actor_id}]: [{signal.message}] {signal.sender} -> {signal.target}")
 
         # Only accept legal signals where the target is this actor
 
@@ -595,6 +606,9 @@ class ActorNode:
 
     def _receive_message(self, ctx: ActorContext, msg: Msg):
 
+        if self._log.isEnabledFor(logging.DEBUG):
+            self._log.debug(f"_receive_message [{self.actor_id}]: [{msg.message}] {msg.sender} -> {msg.target}")
+
         try:
             self.actor._Actor__ctx = ctx
 
@@ -621,6 +635,9 @@ class ActorNode:
             self.actor._Actor__ctx = None
 
     def _receive_signal(self, ctx: ActorContext, signal: Signal) -> tp.Optional[bool]:
+
+        if self._log.isEnabledFor(logging.DEBUG):
+            self._log.debug(f"_receive_signal [{self.actor_id}]: [{signal.message}] {signal.sender} -> {signal.target}")
 
         try:
             self.actor._Actor__ctx = ctx
