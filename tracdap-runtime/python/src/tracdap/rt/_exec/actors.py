@@ -267,7 +267,7 @@ class EventLoopPool:
 
     def join(self, timeout=None):
 
-        start = time.clock_gettime(time.CLOCK_MONOTONIC)
+        start = time.monotonic()
         remaining = timeout
 
         for i in range(self.__size):
@@ -281,7 +281,7 @@ class EventLoopPool:
                 loop.shutdown(True)
 
             if timeout is not None:
-                elapsed = time.clock_gettime(time.CLOCK_MONOTONIC) - start
+                elapsed = time.monotonic() - start
                 remaining = timeout - elapsed
 
 
