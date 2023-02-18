@@ -721,10 +721,11 @@ class ActorSystemTest(unittest.TestCase):
                     results.append("child_signal")
                     results.append(signal.message)
 
-                self.actors().stop()
+                    if signal.message in [actors.SignalNames.STOPPED, actors.SignalNames.FAILED]:
+                        self.actors().stop()
 
-                # Intercept the signal - prevents propagation
-                return True
+                    # Intercept the signal - prevents propagation
+                    return True
 
         root = ParentActor()
         system = actors.ActorSystem(root)
@@ -734,7 +735,9 @@ class ActorSystemTest(unittest.TestCase):
         self.assertEqual([
             "parent_start", "child_start",
             "sample_message", 1,
-            "child_stop", "child_signal", "actor:failed",
+            "child_signal", "actor:started",
+            "child_stop",
+            "child_signal", "actor:failed",
             "parent_stop"], results)
 
         # Since the failure signal was handled, there should be a clean shutdown
