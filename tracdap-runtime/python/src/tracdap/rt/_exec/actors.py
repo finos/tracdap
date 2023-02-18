@@ -257,6 +257,39 @@ class EventLoop:
         print("Event loop exit")
 
 
+class SignatureCache:
+
+    __cache: tp.Dict[type, tp.Dict[str, tp.Callable]] = dict()
+    __lock = threading.Lock()
+
+    @classmethod
+    def inspect_handlers(cls, actor_class: Actor.__class__):
+
+        handlers = dict()
+
+        for member in actor_class.__dict__.values():
+            if isinstance(member, Message):
+                handlers[member.__name__] = member
+
+        with cls.__lock:
+            if actor_class in cls.__cache:
+                return cls.__cache[actor_class]
+            else:
+                cls.__cache[actor_class] = handlers
+                return handlers
+
+    @classmethod
+    def lookup_message(cls, actor_class: Actor.__class__, message: str):
+
+        with cls.__lock:
+            handlers = cls.__cache.get(actor_class)
+
+        if handlers is None:
+            handlers = cls.inspect_handlers(actor_class)
+
+        return handlers.get(message)
+
+
 class ActorNode:
 
     _log = util.logger_for_class(Actor)
@@ -299,22 +332,32 @@ class ActorNode:
         # Client code could try to send a signal string as a message, this counts as a bad actor
 
         if message.startswith(SignalNames.PREFIX):
-
             message = f"Invalid message: {sender_id} [{message}] -> {target_id}" \
                       + f" ([{message} looks like a signal, signals cannot be sent with send_message)"
-
             self._log.error(message)
             raise EBadActor(message)
 
-        # TODO: Send-time type check
+        # Look up the target node, signals to unknown targets are silently dropped
 
-        # target = self._lookup_actor_node(target_id)
-        # target_class = target.actor.__class__
-        # self._check_message_signature(target_id, target_class, message, args, kwargs)
+        target_node = self._lookup_node(target_id)
+
+        if target_node is None:
+            warning = f"Message dropped (target actor not found): [{message}] {sender_id} -> {target_id}"
+            target_node = self._lookup_node(target_id)
+            self._log.warning(warning)
+            return
+
+        # Check the target message signature - errors will be raised in the sender
+
+        target_class = target_node.actor.__class__
+        target_handler = SignatureCache.lookup_message(target_class, message)
+        self._check_message_signature(target_id, target_handler, message, args, kwargs)
+
+        # Send the message
 
         msg = Msg(sender_id, target_id, message, args or [], kwargs or {})
 
-        self._deliver(msg)
+        target_node._accept(msg)
 
     def send_signal(self, sender_id: ActorId, target_id: ActorId, signal: str, error: tp.Optional[Exception] = None):
 
@@ -327,44 +370,78 @@ class ActorNode:
 
         # Client code could submit an invalid control request, this counts as a bad actor
 
-        controllers = ["/system", target_id, ActorSystem._parent_id(target_id)]
+        controllers = ["/system", target_id, self._parent_id(target_id)]
 
         if signal in SignalNames.CONTROL_SIGNALS and sender_id not in controllers:
 
-            message = f"Stop request rejected: [{SignalNames.STOP}] -> {target_id}" + \
+            message = f"Stop signal rejected: [{SignalNames.STOP}] -> {target_id}" + \
                       f" ({sender_id} is not allowed to stop this actor)"
 
             self._log.error(message)
             raise EBadActor(message)
+
+        # Look up the target node, signals to unknown targets are silently dropped
+
+        target_node = self._lookup_node(target_id)
+
+        if target_node is None:
+            warning = f"Signal dropped (target actor not found): [{signal}] {sender_id} -> {target_id}"
+            self._log.warning(warning)
+            return
+
+        # Send the signal
 
         if signal == SignalNames.FAILED:
             msg = ErrorSignal(sender_id, target_id, signal, error=error)
         else:
             msg = Signal(sender_id, target_id, signal)
 
-        self._deliver(msg)
+        target_node._accept(msg)
 
-    def _deliver(self, msg: Msg):
+    def _lookup_node(self, target_id: ActorId) -> tp.Optional[ActorNode]:
 
-        self._log.info(f"_deliver [{self.actor_id}]: [{msg.message}] {msg.sender} -> {msg.target}")
+        # Check self first
 
-        if msg.target == self.actor_id:
-            self._accept(msg)
+        if target_id == self.actor_id:
+            return self
 
-        elif self.parent and msg.target == self.parent.actor_id:
-            self.parent._accept(msg)
+        # Check direct parent and children
 
-        elif msg.target in self.children:
-            self.children[msg.target]._accept(msg)
+        elif self.parent is not None and target_id == self.parent.actor_id:
+            return self.parent
 
-        elif msg.target.startswith(self.actor_id + "/"):
-            self._log.warning(f"Target actor not found: {msg.target}")  # todo
+        elif target_id in self.children:
+            # Child may be removed, use .get() not []
+            return self.children.get(target_id)
 
-        elif self.parent:
-            self.parent._deliver(msg)
+        # Otherwise we need to start searching the tree
+
+        if self.actor_id == ActorSystem.ROOT_ID:
+            child_namespace = ActorSystem.ROOT_ID
+        else:
+            child_namespace = self.actor_id + ActorSystem.DELIMITER
+
+        # If the target is in a child namespace for this node, try to go down a level
+
+        if target_id.startswith(child_namespace):
+
+            child_id_sep = target_id.find(ActorSystem.DELIMITER, len(child_namespace))
+            if child_id_sep < 0:
+                return None
+            child_id = target_id[:child_id_sep]
+            child_node = self.children.get(child_id)
+            if child_node is not None:
+                return child_node._lookup_node(target_id)
+            else:
+                return None
+
+        # Otherwise try to go up a level
 
         else:
-            self._log.warning(f"Target actor not found: {msg.target}")  # todo
+            if self.parent is not None:
+                return self.parent._lookup_node(target_id)
+            else:
+                return None
 
     def _accept(self, msg: Msg):
 
@@ -389,7 +466,7 @@ class ActorNode:
 
         # Only accept legal signals where the target is this actor
 
-        if not self._check_message(msg):
+        if not self._check_message_target(msg):
             return
 
         # Only process messages while the actor is running (this also implies no errors)
@@ -421,7 +498,7 @@ class ActorNode:
 
         # Only accept legal signals where the target is this actor
 
-        if not self._check_message(signal):
+        if not self._check_message_target(signal):
             return
 
         # Call the signal receiver function
@@ -550,28 +627,6 @@ class ActorNode:
         finally:
             self.actor._Actor__ctx = None
 
-    def _check_message(self, msg: Msg):
-
-        if msg.target != self.actor_id:
-
-            message = f"Message ignored: [{msg.message}] -> {msg.target}" + \
-                      f" ({self.actor_id} received this message by mistake)"
-
-            self._log.warning(message)
-            return False
-
-        controllers = ["/system", self.actor_id, ActorSystem._parent_id(self.actor_id)]
-
-        if msg.message in SignalNames.CONTROL_SIGNALS and msg.sender not in controllers:
-
-            message = f"Control signal ignored: [{msg.message}] -> {self.actor_id}" + \
-                      f" ({msg.sender} is not allowed to stop this actor)"
-
-            self._log.warning(message)
-            return False
-
-        return True
-
     def _require_state(self, allowed_states: tp.List[ActorState], signal: Signal):
 
         # The actor system should prevent, reject or discard out-of-sequence lifecycle events
@@ -596,121 +651,37 @@ class ActorNode:
         else:
             return f"{self.actor_id}/{child_name}"
 
-
-class RootActor(Actor):
-
-    def __init__(self, main_actor: Actor, started: threading.Event, stopped: threading.Event):
-        super().__init__()
-        self.main_id: tp.Optional[ActorId] = None
-        self.main_actor = main_actor
-        self._started = started
-        self._stopped = stopped
-
-    def on_start(self):
-        self.main_id = self.actors().spawn_instance(self.main_actor)
-
-    def on_stop(self):
-        self._stopped.set()
-
-    def on_signal(self, signal: Signal) -> tp.Optional[bool]:
-
-        if signal.sender == self.main_id:
-
-            if signal.message == SignalNames.STARTED:
-                self._started.set()
-                return True
-
-            if signal.message == SignalNames.STOPPED:
-                if self.state() in [ActorState.RUNNING, ActorState.STARTING]:
-                    self.actors().stop(self.actors().id)
-                return True
-
-            if signal.message == SignalNames.FAILED and isinstance(signal, ErrorSignal):
-                if not self._started.is_set():
-                    self._started.set()
-                self.actors().fail(signal.error)
-                return True
-
-        return False
-
-
-class ActorSystem:
-
-    __DELIMITER = "/"
-    __ROOT_ID = __DELIMITER
-
-    def __init__(self, main_actor: Actor, system_thread: str = "actor_system"):
-
-        super().__init__()
-
-        self._log = util.logger_for_object(self)
-
-        # self.__actors: tp.Dict[ActorId, ActorNode] = {self.__ROOT_ID: ActorNode("", self.__ROOT_ID, None)}
-        # self.__message_queue: tp.List[Msg] = list()
-
-        self.__system_event_loop = EventLoop()
-        self.__system_thread = threading.Thread(
-            name=system_thread,
-            target=self.__system_event_loop.main)
-
-        self.__root_started = threading.Event()
-        self.__root_stopped = threading.Event()
-        self.__root_actor = RootActor(main_actor, self.__root_started, self.__root_stopped)
-        self.__root_node = ActorNode(self.__ROOT_ID, self.__root_actor, None, self, self.__system_event_loop)
-
-    # Public API
-
-    def start(self, wait=True):
-
-        self.__system_thread.start()
-        self.__root_node.send_signal("/system", self.__ROOT_ID, SignalNames.START)
-
-        if wait:
-            self.__root_started.wait()  # TODO: Startup timeout
-
-    def stop(self):
-
-        self.__root_node.send_signal("/system", self.__ROOT_ID, SignalNames.STOP)
-
-    def wait_for_shutdown(self):
-
-        self.__root_stopped.wait()   # TODO: Timeout
-        self.__system_event_loop.shutdown()
-        self.__system_thread.join()
-
-    def shutdown_code(self) -> int:
-
-        if self.__root_node._state == ActorState.STOPPED and not self.__root_node._error:
-            return 0
-        else:
-            return -1
-
-    def shutdown_error(self) -> tp.Optional[Exception]:
-
-        return self.__root_node._error
-
-    def send(self, message: str, *args, **kwargs):
-
-        if self.__root_actor.main_id is None:
-            raise EBadActor("System has not started yet")
-
-        self.__root_node.send_message("/external", self.__root_actor.main_id, message, args, kwargs)
-
-    def _allocate_event_loop(self, actor_class: Actor.__class__) -> EventLoop:
-
-        return self.__system_event_loop
-
     @classmethod
     def _parent_id(cls, actor_id: ActorId) -> ActorId:
 
-        parent_delim = actor_id.rfind(cls.__DELIMITER)
-        parent_id = cls.__ROOT_ID if parent_delim == 0 else actor_id[:parent_delim]
+        parent_delim = actor_id.rfind(ActorSystem.DELIMITER)
+        parent_id = ActorSystem.ROOT_ID if parent_delim == 0 else actor_id[:parent_delim]
 
         return parent_id
 
-    def _check_message_signature(self, target_id: ActorId, target_class: Actor.__class__, message: str, args, kwargs):
+    def _check_message_target(self, msg: Msg):
 
-        target_handler = Actor._Actor__class_handlers.get(target_class).get(message)  # noqa
+        if msg.target != self.actor_id:
+
+            message = f"Message ignored: [{msg.message}] -> {msg.target}" + \
+                      f" ({self.actor_id} received this message by mistake)"
+
+            self._log.warning(message)
+            return False
+
+        controllers = ["/system", self.actor_id, self._parent_id(self.actor_id)]
+
+        if msg.message in SignalNames.CONTROL_SIGNALS and msg.sender not in controllers:
+
+            message = f"Control signal ignored: [{msg.message}] -> {self.actor_id}" + \
+                      f" ({msg.sender} is not allowed to stop this actor)"
+
+            self._log.warning(message)
+            return False
+
+        return True
+
+    def _check_message_signature(self, target_id: ActorId, target_handler: tp.Callable, message: str, args, kwargs):
 
         if target_handler is None:
             error = f"Invalid message: [{message}] -> {target_id} (unknown message '{message}')"
@@ -771,3 +742,107 @@ class ActorSystem:
                 error = f"Invalid message: [{message}] -> {target_id} (wrong parameter type for '{kw_param.name}')"
                 self._log.error(error)
                 raise EBadActor(error)
+
+
+class RootActor(Actor):
+
+    def __init__(self, main_actor: Actor, started: threading.Event, stopped: threading.Event):
+        super().__init__()
+        self.main_id: tp.Optional[ActorId] = None
+        self.main_actor = main_actor
+        self._started = started
+        self._stopped = stopped
+
+    def on_start(self):
+        self.main_id = self.actors().spawn_instance(self.main_actor)
+
+    def on_stop(self):
+        self._stopped.set()
+
+    def on_signal(self, signal: Signal) -> tp.Optional[bool]:
+
+        if signal.sender == self.main_id:
+
+            if signal.message == SignalNames.STARTED:
+                self._started.set()
+                return True
+
+            if signal.message == SignalNames.STOPPED:
+                if self.state() in [ActorState.RUNNING, ActorState.STARTING]:
+                    self.actors().stop(self.actors().id)
+                return True
+
+            if signal.message == SignalNames.FAILED and isinstance(signal, ErrorSignal):
+                if not self._started.is_set():
+                    self._started.set()
+                self.actors().fail(signal.error)
+                return True
+
+        return False
+
+
+class ActorSystem:
+
+    DELIMITER = "/"
+    ROOT_ID = DELIMITER
+
+    def __init__(self, main_actor: Actor, system_thread: str = "actor_system"):
+
+        super().__init__()
+
+        self._log = util.logger_for_object(self)
+
+        # self.__actors: tp.Dict[ActorId, ActorNode] = {self.__ROOT_ID: ActorNode("", self.__ROOT_ID, None)}
+        # self.__message_queue: tp.List[Msg] = list()
+
+        self.__system_event_loop = EventLoop()
+        self.__system_thread = threading.Thread(
+            name=system_thread,
+            target=self.__system_event_loop.main)
+
+        self.__root_started = threading.Event()
+        self.__root_stopped = threading.Event()
+        self.__root_actor = RootActor(main_actor, self.__root_started, self.__root_stopped)
+        self.__root_node = ActorNode(self.ROOT_ID, self.__root_actor, None, self, self.__system_event_loop)
+
+    # Public API
+
+    def start(self, wait=True):
+
+        self.__system_thread.start()
+        self.__root_node.send_signal("/system", self.ROOT_ID, SignalNames.START)
+
+        if wait:
+            self.__root_started.wait()  # TODO: Startup timeout
+
+    def stop(self):
+
+        self.__root_node.send_signal("/system", self.ROOT_ID, SignalNames.STOP)
+
+    def wait_for_shutdown(self):
+
+        self.__root_stopped.wait()   # TODO: Timeout
+        self.__system_event_loop.shutdown()
+        self.__system_thread.join()
+
+    def shutdown_code(self) -> int:
+
+        if self.__root_node._state == ActorState.STOPPED and not self.__root_node._error:
+            return 0
+        else:
+            return -1
+
+    def shutdown_error(self) -> tp.Optional[Exception]:
+
+        return self.__root_node._error
+
+    def send(self, message: str, *args, **kwargs):
+
+        if self.__root_actor.main_id is None:
+            raise EBadActor("System has not started yet")
+
+        self.__root_node.send_message("/external", self.__root_actor.main_id, message, args, kwargs)
+
+    def _allocate_event_loop(self, actor_class: Actor.__class__) -> EventLoop:
+
+        return self.__system_event_loop
