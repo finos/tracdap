@@ -338,7 +338,9 @@ class GraphProcessor(_actors.Actor):
             # Start by removing any nodes that are no longer needed
             for node_id, node in graph.nodes.items():
                 if node_id in graph.succeeded_nodes and not self._is_required_node(node, graph):
-                    processed_graph.nodes.pop(node_id)
+                    node = processed_graph.nodes.pop(node_id)
+                    NodeLogger.log_node_evict(node)
+                    del node
 
             pending_nodes = cp.copy(graph.pending_nodes)
             active_nodes = cp.copy(graph.active_nodes)
@@ -702,6 +704,18 @@ class NodeLogger:
         cls._log.exception(e)
 
     @classmethod
+    def log_node_evict(cls, node: _EngineNode):
+
+        logging_type = cls._logging_type(node)
+        node_name = node.node.id.name
+        namespace = node.node.id.namespace
+
+        if logging_type in [cls.LoggingType.STATIC_VALUE, cls.LoggingType.SIMPLE_MAPPING, cls.LoggingType.PUSH_POP]:
+            return
+
+        cls._log.info(f"EVICT {cls._func_type(node)} [{node_name}] / {namespace}")
+
+    @classmethod
     def _log_push_pop_node_details(cls, node: tp.Union[_graph.ContextPushNode, _graph.ContextPopNode]):
 
         push_or_pop = "PUSH" if isinstance(node, _graph.ContextPushNode) else "POP"
@@ -731,7 +745,7 @@ class NodeLogger:
         if isinstance(node.node, _graph.ContextPushNode) or isinstance(node.node, _graph.ContextPopNode):
             return cls.LoggingType.PUSH_POP
 
-        if isinstance(node.node, _graph.IdentityNode):
+        if isinstance(node.node, _graph.IdentityNode) or isinstance(node.node, _graph.NoopNode):
             return cls.LoggingType.SIMPLE_MAPPING
 
         if isinstance(node.node, _graph.RunModelNode):
