@@ -21,6 +21,7 @@ import typing as tp
 import enum
 import dataclasses as dc
 import inspect
+import queue
 
 import tracdap.rt._impl.util as util  # noqa
 import tracdap.rt.exceptions as _ex
@@ -93,7 +94,7 @@ class EventLoop:
 
     def __init__(self):
         self.__msg_lock = threading.Condition()
-        self.__msg_queue: tp.List[tp.Tuple[Msg, tp.Callable[[Msg], None]]] = []
+        self.__msg_queue: queue.Queue[tp.Tuple[Msg, tp.Callable[[Msg], None]]] = queue.Queue()
         self.__shutdown = False
         self.__shutdown_now = False
         self.__log = util.logger_for_object(self)
@@ -103,7 +104,7 @@ class EventLoop:
             if self.__shutdown:
                 raise EBadActor("System is already shutting down")
             else:
-                self.__msg_queue.append((msg, processor))
+                self.__msg_queue.put((msg, processor))
                 self.__msg_lock.notify()
 
     def shutdown(self, immediate: bool = False):
@@ -123,8 +124,8 @@ class EventLoop:
 
             with self.__msg_lock:
 
-                self.__msg_lock.wait_for(lambda: len(self.__msg_queue) > 0 or self.__shutdown)
-                event = self.__msg_queue.pop() if len(self.__msg_queue) > 0 else None
+                self.__msg_lock.wait_for(lambda: not self.__msg_queue.empty() or self.__shutdown)
+                event = self.__msg_queue.get() if not self.__msg_queue.empty() else None
 
                 if self.__shutdown_now:
                     break
@@ -467,6 +468,12 @@ class ActorNode:
         self._log.info(f"_process_message [{self.actor_id}]: [{msg.message}] {msg.sender} -> {msg.target}")
 
         if not self._check_message(msg):
+            return
+
+        if self.actor.state() != ActorState.RUNNING:
+            err = f"Message ignored: [{msg.message}] {msg.sender} -> {self.actor_id}" + \
+                  f" (actor is in {self.actor.state().name} state)"
+            self._log.warning(err)
             return
 
         parent_id = self.parent.actor_id if self.parent else None
