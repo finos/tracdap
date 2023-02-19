@@ -649,7 +649,8 @@ class FunctionResolver:
         DataResultNode: DataResultFunc,
         StaticValueNode: StaticValueFunc,
         BundleItemNode: NoopFunc,
-        NoopNode: NoopFunc
+        NoopNode: NoopFunc,
+        RunModelResultNode: NoopFunc
     }
 
     __node_mapping: tp.Dict[Node.__class__, __ResolveFunc] = {

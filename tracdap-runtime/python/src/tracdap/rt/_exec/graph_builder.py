@@ -457,7 +457,10 @@ class GraphBuilder:
             frozenset(parameter_ids), frozenset(input_ids),
             explicit_deps=explicit_deps, bundle=model_id.namespace)
 
-        nodes = {model_id: model_node}
+        module_result_id = NodeId(f"{model_name}:RESULT", namespace)
+        model_result_node = RunModelResultNode(module_result_id, model_id)
+
+        nodes = {model_id: model_node, module_result_id: model_result_node}
 
         # Create nodes for each model output
         # The model node itself outputs a bundle (dictionary of named outputs)
@@ -470,7 +473,7 @@ class GraphBuilder:
             nodes[output_id] = BundleItemNode(output_id, model_id, output_id.name)
 
         # Assemble a graph to include the model and its outputs
-        return GraphSection(nodes, inputs={*parameter_ids, *input_ids}, outputs=output_ids, must_run=[model_id])
+        return GraphSection(nodes, inputs={*parameter_ids, *input_ids}, outputs=output_ids, must_run=[module_result_id])
 
     @classmethod
     def build_flow(
@@ -662,7 +665,7 @@ class GraphBuilder:
 
         nodes = {**first_section.nodes}
         inputs = set(first_section.inputs)
-        must_run = first_section.must_run or []
+        must_run = list(first_section.must_run) if first_section.must_run else []
 
         for i in range(1, n_sections):
 
@@ -680,6 +683,8 @@ class GraphBuilder:
                     raise _ex.ETracInternal(err)  # todo inconsistent graph
 
             nodes.update(current_section.nodes)
+
+            must_run = list(filter(lambda n: n not in current_section.inputs, must_run))
             must_run.extend(current_section.must_run)
 
         return GraphSection(nodes, inputs, last_section.outputs, must_run)
