@@ -160,17 +160,17 @@ class GraphBuilder:
 
         input_section = cls.build_job_inputs(
             job_config, job_namespace, inputs,
-            explicit_deps=[job_push_id, *params_section.must_run])
+            explicit_deps=[job_push_id])
 
         exec_obj = _util.get_job_resource(target, job_config)
 
         exec_section = cls.build_model_or_flow(
             job_config, job_namespace, exec_obj,
-            explicit_deps=[job_push_id, *params_section.must_run, *input_section.must_run])
+            explicit_deps=[job_push_id])
 
         output_section = cls.build_job_outputs(
             job_config, job_namespace, outputs,
-            explicit_deps=[job_push_id, *exec_section.must_run])
+            explicit_deps=[job_push_id])
 
         main_section = cls._join_sections(params_section, input_section, exec_section, output_section)
 
