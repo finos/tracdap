@@ -547,8 +547,6 @@ class NodeProcessor(_actors.Actor):
     Processor responsible for running individual nodes in an execution graph
     """
 
-    # TODO: How to decide when to allocate an actors.Worker (long running, separate thread)
-
     __NONE_TYPE = type(None)
 
     def __init__(self, graph: _EngineContext, node_id: NodeId, node: _EngineNode):
@@ -560,6 +558,21 @@ class NodeProcessor(_actors.Actor):
     def on_start(self):
 
         self.actors().send(self.actors().id, "evaluate_node")
+
+    def on_stop(self):
+
+        # Something in the engine occasionally holds onto node processors
+        # These hold a copy of the graph with the pre-execution version of their own engine node
+        # I.e. the engine node that gets retained does not hold any data
+
+        # This is not a serious issue in most cases, but it is still better to release the resources
+        # We can do this by unsetting the references to self.node and self.graph
+
+        # It would be good to find out where the reference to the processor is being held and fix at source
+        # We could also add some accounting to the _EngineNode class
+
+        self.node = None
+        self.graph = None
 
     @_actors.Message
     def graph_event(self):
