@@ -597,9 +597,8 @@ class ActorNode:
         # Remove dead actors
         # If the actor is now stopped or failed, take it out of the registry
 
-        if signal.message in [ActorState.STOPPED, ActorState.FAILED] and signal.sender in self.children:
-            child = self.children.pop(signal.sender)
-            child.parent = None
+        if signal.message in [SignalNames.STOPPED, SignalNames.FAILED] and signal.sender in self.children:
+            self.children.pop(signal.sender)
 
     def _receive_message(self, ctx: ActorContext, msg: Msg):
 
