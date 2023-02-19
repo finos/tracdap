@@ -391,6 +391,7 @@ class GraphBuilder:
         sub_namespace = NodeNamespace(sub_namespace_name, namespace)
 
         # Execute in the sub-context by doing PUSH, EXEC, POP
+        # Note that POP node must be in the sub namespace too
 
         push_section = cls.build_context_push(
             sub_namespace, input_mapping,

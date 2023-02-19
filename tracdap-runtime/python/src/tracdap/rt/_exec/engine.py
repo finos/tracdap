@@ -428,6 +428,10 @@ class GraphProcessor(_actors.Actor):
     @_actors.Message
     def node_succeeded(self, node_id: NodeId, result):
 
+        # Child node is no longer needed, it can be stopped to release resources
+        processor = self.processors.pop(node_id)
+        self.actors().stop(processor)
+
         old_node = self.graph.nodes[node_id]
         node = cp.copy(old_node)
         node.complete = True
@@ -449,27 +453,26 @@ class GraphProcessor(_actors.Actor):
                 # Use the original node ID, to avoid overwriting the result type
                 results[item_node.node.id] = item_node
 
-        # Child node is no longer needed, it can be stopped to release resources
-        processor = self.processors.pop(node_id)
-        self.actors().stop(processor)
-
-        self._update_results(results)
+        if isinstance(node.node, _graph.ContextPopNode):
+            self._update_results(results, context_pop=node.node.id.namespace)
+        else:
+            self._update_results(results)
 
     @_actors.Message
     def node_failed(self, node_id: NodeId, error):
+
+        # Child node is no longer needed, it can be stopped to release resources
+        processor = self.processors.pop(node_id)
+        self.actors().stop(processor)
 
         old_node = self.graph.nodes[node_id]
         node = cp.copy(old_node)
         node.complete = True
         node.error = error
 
-        # Child node is no longer needed, it can be stopped to release resources
-        processor = self.processors.pop(node_id)
-        self.actors().stop(processor)
-
         self._update_results({node_id: node})
 
-    def _update_results(self, updates: tp.Dict[NodeId, _EngineNode]):
+    def _update_results(self, updates: tp.Dict[NodeId, _EngineNode], context_pop: _graph.NodeNamespace = None):
 
         nodes = {**self.graph.nodes, **updates}
 
@@ -495,6 +498,12 @@ class GraphProcessor(_actors.Actor):
             if node_id in self.processors:
                 node_ref = self.processors.pop(node_id)
                 self.actors().stop(node_ref)
+
+        # For context pop, remove all the nodes inside the pop context
+        # The graph builder is responsible for consistency, i.e. no dependencies across contexts
+        if context_pop:
+            for node_id in list(filter(lambda n: n.namespace == context_pop, nodes)):
+                nodes.pop(node_id)
 
         graph = _EngineContext(nodes, pending_nodes, active_nodes, succeeded_nodes, failed_nodes)
 
