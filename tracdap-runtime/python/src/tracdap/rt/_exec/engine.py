@@ -719,7 +719,7 @@ class NodeLogger:
         node_name = node.node.id.name
         namespace = node.node.id.namespace
 
-        if logging_type in [cls.LoggingType.STATIC_VALUE, cls.LoggingType.SIMPLE_MAPPING, cls.LoggingType.PUSH_POP]:
+        if logging_type in [cls.LoggingType.STATIC_VALUE, cls.LoggingType.SIMPLE_MAPPING]:
             return
 
         cls._log.info(f"EVICT {cls._func_type(node)} [{node_name}] / {namespace}")
@@ -778,9 +778,9 @@ class NodeLogger:
     @classmethod
     def _func_type(cls, node: _EngineNode) -> str:
 
-        # Remove "Func" from "xxxFunc"
+        # Remove "Node" from "xxxNode"
 
-        func_type = type(node.function)
+        func_type = type(node.node)
         return func_type.__name__[:-4]
 
     @classmethod
