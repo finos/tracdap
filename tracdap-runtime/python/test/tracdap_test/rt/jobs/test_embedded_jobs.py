@@ -24,7 +24,7 @@ import tracdap.rt.ext.embed as embed
 import tracdap.rt._impl.static_api as api_hook  # noqa
 
 _ROOT_DIR = pathlib.Path(__file__).parent \
-    .joinpath("../../../../..") \
+    .joinpath("../../../../../..") \
     .resolve()
 
 
