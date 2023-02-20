@@ -24,6 +24,7 @@ import tracdap.rt._impl.validation as _val
 # Import hook interfaces into this module namespace
 from tracdap.rt.api.hook import _StaticApiHook  # noqa
 from tracdap.rt.api.hook import _Named  # noqa
+from tracdap.rt.api.hook import _unprobable_label_value # noqa
 
 
 class StaticApiImpl(_StaticApiHook):
@@ -143,7 +144,7 @@ class StaticApiImpl(_StaticApiHook):
         return _schemas.SchemaLoader.load_schema(package, schema_file)
 
     def define_input_table(
-            self, *fields: _tp.Union[_meta.FieldSchema, _tp.List[_meta.FieldSchema]], label: _tp.Optional[str] = None) \
+            self, *fields: _tp.Union[_meta.FieldSchema, _tp.List[_meta.FieldSchema]], label: _tp.Optional[str] = _unprobable_label_value) \
             -> _meta.ModelInputSchema:
 
         _val.validate_signature(self.define_input_table, *fields, label=label)
@@ -152,7 +153,7 @@ class StaticApiImpl(_StaticApiHook):
         return _meta.ModelInputSchema(schema=schema_def, label=label)
 
     def define_output_table(
-            self, *fields: _tp.Union[_meta.FieldSchema, _tp.List[_meta.FieldSchema]], label: _tp.Optional[str] = None) \
+            self, *fields: _tp.Union[_meta.FieldSchema, _tp.List[_meta.FieldSchema]], label: _tp.Optional[str] = _unprobable_label_value) \
             -> _meta.ModelOutputSchema:
 
         _val.validate_signature(self.define_output_table, *fields, label=label)

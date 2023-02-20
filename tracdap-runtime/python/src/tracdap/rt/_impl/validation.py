@@ -23,6 +23,7 @@ import tracdap.rt._impl.util as util
 
 # _Named placeholder type from API hook is needed for API type checking
 from tracdap.rt.api.hook import _Named  # noqa
+from tracdap.rt.api.hook import _unprobable_label_value # noqa
 
 
 def validate_signature(method: tp.Callable, *args, **kwargs):
@@ -302,19 +303,18 @@ class _StaticValidator:
         cls._check_inputs_or_outputs(model_def.outputs)
 
     @classmethod
-    def _check_label(cls, label):
-        if label is not None and len(label) > cls.__label_length_limit:
-            cls._fail(f"Invalid model parameter: [{param.fieldName}] label exceeds maximum length limit ({cls.__label_length_limit} characters)")  # noqa
+    def _check_label(cls, label, field_name):
+
+        if label is None or len(label.strip()) == 0:
+            cls._fail(f"Invalid model parameter: [{field_name}] label is None or blank")
+        elif len(label) > cls.__label_length_limit:
+            cls._fail(f"Invalid model parameter: [{field_name}] label exceeds maximum length limit ({cls.__label_length_limit} characters)")  # noqa
 
     @classmethod
     def _check_parameters(cls, parameters):
 
         for param_name, param in parameters.items():
-
-            if param.label is None or len(param.label.strip()) == 0:
-                cls._fail(f"Invalid model parameter: [{param_name}] label is missing or blank")
-
-            cls._check_label(param.label)
+            cls._check_label(param.label, param.fieldName)
 
     @classmethod
     def _check_inputs_or_outputs(cls, inputs_or_outputs):
@@ -334,7 +334,7 @@ class _StaticValidator:
             for field in fields:
                 cls._check_single_field(field, property_type)
 
-            cls._check_label(label)
+            cls._check_label(label, input_name)
 
     @classmethod
     def _check_single_field(cls, field: meta.FieldSchema, property_type):
