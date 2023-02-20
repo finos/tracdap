@@ -26,75 +26,89 @@ _SHIM_TEST_DIR = pathlib.Path(__file__).parent \
     .resolve()
 
 
+_SHIM_TEST_DIR_2 = pathlib.Path(__file__).parent \
+    .joinpath("../../../..") \
+    .joinpath("test_data/shim_test_2") \
+    .resolve()
+
+
 class TestShimLoader(unittest.TestCase):
 
-    _shim_loader = shim.ShimLoader()
-    _shim = ""
+    _shim = shim.ShimLoader.create_shim(_SHIM_TEST_DIR)
 
     @classmethod
     def setUpClass(cls) -> None:
         util.configure_logging(enable_debug=True)
-        cls._shim = cls._shim_loader.create_shim(_SHIM_TEST_DIR)
         guard.PythonGuardRails.protect_dangerous_functions()
-
-    def setUp(self):
-        self._shim_loader.activate_shim(self._shim)
-
-    def tearDown(self):
-        self._shim_loader.deactivate_shim()
 
     def test_absolute_import(self):
 
-        class_ = self._shim_loader.load_class("acme.rockets.abs1", "ImportTest", object)
+        with shim.ShimLoader.use_shim(self._shim):
+            class_ = shim.ShimLoader.load_class("acme.rockets.abs1", "ImportTest", object)
+
         instance_ = class_()
         self.assertEqual(class_.__name__, "ImportTest")
         self.assertIsInstance(instance_, class_)
 
     def test_relative_import_1(self):
 
-        class_ = self._shim_loader.load_class("acme.rockets.rel1", "ImportTest", object)
+        with shim.ShimLoader.use_shim(self._shim):
+            class_ = shim.ShimLoader.load_class("acme.rockets.rel1", "ImportTest", object)
+
         instance_ = class_()
         self.assertEqual(class_.__name__, "ImportTest")
         self.assertIsInstance(instance_, class_)
 
     def test_relative_import_2(self):
 
-        class_ = self._shim_loader.load_class("acme.rockets.rel2", "ImportTest", object)
+        with shim.ShimLoader.use_shim(self._shim):
+            class_ = shim.ShimLoader.load_class("acme.rockets.rel2", "ImportTest", object)
+
         instance_ = class_()
         self.assertEqual(class_.__name__, "ImportTest")
         self.assertIsInstance(instance_, class_)
 
     def test_relative_import_3(self):
 
-        class_ = self._shim_loader.load_class("acme.rockets.rel3", "ImportTest", object)
+        with shim.ShimLoader.use_shim(self._shim):
+            class_ = shim.ShimLoader.load_class("acme.rockets.rel3", "ImportTest", object)
+
         instance_ = class_()
         self.assertEqual(class_.__name__, "ImportTest")
         self.assertIsInstance(instance_, class_)
 
     def test_relative_import_4(self):
 
-        class_ = self._shim_loader.load_class("acme.rockets.rel4", "ImportTest", object)
+        with shim.ShimLoader.use_shim(self._shim):
+            class_ = shim.ShimLoader.load_class("acme.rockets.rel4", "ImportTest", object)
+
         instance_ = class_()
         self.assertEqual(class_.__name__, "ImportTest")
         self.assertIsInstance(instance_, class_)
 
     def test_package_import_1(self):
 
-        class_ = self._shim_loader.load_class("acme.rockets.pkg1", "ImportTest", object)
+        with shim.ShimLoader.use_shim(self._shim):
+            class_ = shim.ShimLoader.load_class("acme.rockets.pkg1", "ImportTest", object)
+
         instance_ = class_()
         self.assertEqual(class_.__name__, "ImportTest")
         self.assertIsInstance(instance_, class_)
 
     def test_package_import_2(self):
 
-        class_ = self._shim_loader.load_class("acme.rockets.pkg2", "ImportTest", object)
+        with shim.ShimLoader.use_shim(self._shim):
+            class_ = shim.ShimLoader.load_class("acme.rockets.pkg2", "ImportTest", object)
+
         instance_ = class_()
         self.assertEqual(class_.__name__, "ImportTest")
         self.assertIsInstance(instance_, class_)
 
     def test_package_relative(self):
 
-        class_ = self._shim_loader.load_class("acme.rockets.pkg_rel", "ImportTest", object)
+        with shim.ShimLoader.use_shim(self._shim):
+            class_ = shim.ShimLoader.load_class("acme.rockets.pkg_rel", "ImportTest", object)
+
         instance_ = class_()
         self.assertEqual(class_.__name__, "ImportTest")
         self.assertIsInstance(instance_, class_)
@@ -107,7 +121,8 @@ class TestShimLoader(unittest.TestCase):
         # We want to replicate the same behaviour, to avoid unexpected breaks when loading to the platform
         # The Python behaviour is to give precedence to packages, so the shim loader should do the same
 
-        class_ = self._shim_loader.load_class("acme.rockets.dup1", "DupClass", object)
+        with shim.ShimLoader.use_shim(self._shim):
+            class_ = shim.ShimLoader.load_class("acme.rockets.dup1", "DupClass", object)
         instance_ = class_()
         self.assertEqual(class_.__name__, "DupClass")
         self.assertIsInstance(instance_, class_)
@@ -115,18 +130,44 @@ class TestShimLoader(unittest.TestCase):
 
     def test_unknown_module(self):
 
-        self.assertRaises(
-            _ex.EModelLoad, lambda:
-            self._shim_loader.load_class("nonexistent.module", "ImportTest", object))
+        with shim.ShimLoader.use_shim(self._shim):
+
+            self.assertRaises(
+                _ex.EModelLoad, lambda:
+                shim.ShimLoader.load_class("nonexistent.module", "ImportTest", object))
 
     def test_unknown_class(self):
 
-        self.assertRaises(
-            _ex.EModelLoad, lambda:
-            self._shim_loader.load_class("acme.rockets.abs1", "NonexistentClass", object))
+        with shim.ShimLoader.use_shim(self._shim):
+
+            self.assertRaises(
+                _ex.EModelLoad, lambda:
+                shim.ShimLoader.load_class("acme.rockets.abs1", "NonexistentClass", object))
 
     def test_load_wrong_type(self):
 
-        self.assertRaises(
-            _ex.EModelLoad, lambda:
-            self._shim_loader.load_class("acme.rockets.abs1", "ImportTest", dict))
+        with shim.ShimLoader.use_shim(self._shim):
+
+            self.assertRaises(
+                _ex.EModelLoad, lambda:
+                shim.ShimLoader.load_class("acme.rockets.abs1", "ImportTest", dict))
+
+    def test_multiple_scopes(self):
+
+        scope_1 = shim.ShimLoader.create_shim(_SHIM_TEST_DIR_2.joinpath("scope_1"))
+        scope_2 = shim.ShimLoader.create_shim(_SHIM_TEST_DIR_2.joinpath("scope_2"))
+
+        with shim.ShimLoader.use_shim(scope_1):
+            model_1_class = shim.ShimLoader.load_class("pkg_1.sub_1.model", "SampleModel", object)
+
+        with shim.ShimLoader.use_shim(scope_2):
+            model_2_class = shim.ShimLoader.load_class("pkg_1.sub_1.model", "SampleModel", object)
+
+        model_1 = model_1_class()
+        model_2 = model_2_class()
+
+        result_1 = model_1.use_utils()
+        result_2 = model_2.use_utils()
+
+        self.assertEqual("scope_1", result_1)
+        self.assertEqual("scope_2", result_2)
