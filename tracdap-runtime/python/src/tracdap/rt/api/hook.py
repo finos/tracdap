@@ -25,7 +25,7 @@ import tracdap.rt.exceptions as _ex
 # This module contains hooks for connecting the static API to the runtime implementation
 # To avoid noise in the API package, everything in this package is named with an underscore
 
-_unprobable_label_value = "wFwdyOzzNy5I3ZQcwFwdyOzzNy5I3ZQcwFwdyOzzNy5I3ZQc"
+_default_label_value = "wFwdyOzzNy5I3ZQcwFwdyOzzNy5I3ZQcwFwdyOzzNy5I3ZQc" # noqa
 
 _T = _tp.TypeVar("_T")
 
@@ -120,14 +120,16 @@ class _StaticApiHook:
 
     @_abc.abstractmethod
     def define_input_table(
-            self, *fields: _tp.Union[_meta.FieldSchema, _tp.List[_meta.FieldSchema]], label: _tp.Optional[str] = _unprobable_label_value) \
+            self, *fields: _tp.Union[_meta.FieldSchema, _tp.List[_meta.FieldSchema]],
+            label: str = _default_label_value) \
             -> _meta.ModelInputSchema:
 
         pass
 
     @_abc.abstractmethod
     def define_output_table(
-            self, *fields: _tp.Union[_meta.FieldSchema, _tp.List[_meta.FieldSchema]], label: _tp.Optional[str] = _unprobable_label_value) \
+            self, *fields: _tp.Union[_meta.FieldSchema, _tp.List[_meta.FieldSchema]],
+            label: str = _default_label_value) \
             -> _meta.ModelOutputSchema:
 
         pass

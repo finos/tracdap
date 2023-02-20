@@ -19,7 +19,7 @@ import types as _ts
 
 from .hook import _StaticApiHook
 from .hook import _Named
-from .hook import _unprobable_label_value
+from .hook import _default_label_value
 
 # Import metadata domain objects into the API namespace
 # This significantly improves type hinting, inline documentation and auto-complete in JetBrains IDEs
@@ -427,7 +427,7 @@ def load_schema(
 
 
 def define_input_table(
-        *fields: _tp.Union[FieldSchema, _tp.List[FieldSchema]], label: _tp.Optional[str] = _unprobable_label_value) \
+        *fields: _tp.Union[FieldSchema, _tp.List[FieldSchema]], label: str = _default_label_value) \
         -> ModelInputSchema:
 
     """
@@ -466,7 +466,7 @@ def declare_input_table(
 
 
 def define_output_table(
-        *fields: _tp.Union[FieldSchema, _tp.List[FieldSchema]], label: _tp.Optional[str] = _unprobable_label_value) \
+        *fields: _tp.Union[FieldSchema, _tp.List[FieldSchema]], label: str = _default_label_value) \
         -> ModelOutputSchema:
 
     """

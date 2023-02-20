@@ -23,7 +23,7 @@ import tracdap.rt._impl.util as util
 
 # _Named placeholder type from API hook is needed for API type checking
 from tracdap.rt.api.hook import _Named  # noqa
-from tracdap.rt.api.hook import _unprobable_label_value # noqa
+from tracdap.rt.api.hook import _default_label_value # noqa
 
 
 def validate_signature(method: tp.Callable, *args, **kwargs):
@@ -305,15 +305,17 @@ class _StaticValidator:
     @classmethod
     def _check_label(cls, label, field_name):
 
-        if label is None or len(label.strip()) == 0:
-            cls._fail(f"Invalid model parameter: [{field_name}] label is None or blank")
-        elif len(label) > cls.__label_length_limit:
+        if label is not None and len(label) > cls.__label_length_limit:
             cls._fail(f"Invalid model parameter: [{field_name}] label exceeds maximum length limit ({cls.__label_length_limit} characters)")  # noqa
 
     @classmethod
     def _check_parameters(cls, parameters):
 
         for param_name, param in parameters.items():
+
+            if param.label is None or len(param.label.strip()) == 0:
+                cls._fail(f"Invalid model parameter: [{param_name}] label is missing or blank")
+
             cls._check_label(param.label, param_name)
 
     @classmethod
