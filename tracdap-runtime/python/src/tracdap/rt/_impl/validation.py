@@ -314,7 +314,7 @@ class _StaticValidator:
     def _check_parameters(cls, parameters):
 
         for param_name, param in parameters.items():
-            cls._check_label(param.label, param.fieldName)
+            cls._check_label(param.label, param_name)
 
     @classmethod
     def _check_inputs_or_outputs(cls, inputs_or_outputs):
