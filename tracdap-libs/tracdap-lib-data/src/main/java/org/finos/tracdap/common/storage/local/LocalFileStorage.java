@@ -20,6 +20,7 @@ import io.netty.channel.EventLoopGroup;
 import org.finos.tracdap.common.concurrent.IExecutionContext;
 import org.finos.tracdap.common.data.IDataContext;
 import org.finos.tracdap.common.exception.EStartup;
+import org.finos.tracdap.common.exception.ETrac;
 import org.finos.tracdap.common.storage.*;
 
 import io.netty.buffer.ByteBuf;
@@ -30,6 +31,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.util.Objects;
 import java.util.Properties;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
@@ -49,7 +51,9 @@ public class LocalFileStorage implements IFileStorage {
     private final String storageKey;
     private final Path rootPath;
 
-    public LocalFileStorage(Properties config) {
+    private final boolean writeFlag;
+
+    public LocalFileStorage(Properties config, Boolean writeFlag) {
 
         this.storageKey = config.getProperty(IStorageManager.PROP_STORAGE_KEY);
 
@@ -61,6 +65,24 @@ public class LocalFileStorage implements IFileStorage {
         this.rootPath = Paths.get(rootDirProp)
                 .toAbsolutePath()
                 .normalize();
+
+        if(Objects.isNull(writeFlag)) {
+            this.writeFlag = Files.isWritable(this.rootPath);
+        } else {
+            this.writeFlag = writeFlag;
+        }
+    }
+
+    public LocalFileStorage(Properties config) {
+        this(config, null);
+    }
+
+    private void checkWriteFlag(String storagePath, String operation) throws ETrac {
+
+        if(!writeFlag) {
+            throw errors.explicitError(ACCESS_DENIED_EXCEPTION, storagePath, operation);
+        }
+
     }
 
     @Override
@@ -80,14 +102,23 @@ public class LocalFileStorage implements IFileStorage {
             throw new EStartup(err);
         }
 
-        if (!Files.isReadable(this.rootPath) || !Files.isWritable(this.rootPath)) {
+        if (!Files.isReadable(this.rootPath)) {
 
             var err = String.format(
-                    "Storage root path has insufficient access (read/write required): %s [%s]",
+                    "Storage root path has insufficient access (read required): %s [%s]",
                     storageKey, rootPath);
 
             log.error(err);
             throw new EStartup(err);
+        }
+
+        if (!Files.isWritable(this.rootPath)) {
+
+            var msg = String.format(
+                    "Storage root path has no write access. Write operations will not be performed in: %s [%s]",
+                    storageKey, rootPath);
+
+            log.info(msg);
         }
 
         logFsInfo();
@@ -281,6 +312,8 @@ public class LocalFileStorage implements IFileStorage {
         try {
             log.info("STORAGE OPERATION: {} {} [{}]", storageKey, MKDIR_OPERATION, storagePath);
 
+            checkWriteFlag(storagePath, MKDIR_OPERATION);
+
             var absolutePath = resolvePath(storagePath, false, MKDIR_OPERATION);
 
             if (recursive)
@@ -302,6 +335,8 @@ public class LocalFileStorage implements IFileStorage {
 
         try {
             log.info("STORAGE OPERATION: {} {} [{}]", storageKey, RM_OPERATION, storagePath);
+
+            checkWriteFlag(storagePath, RM_OPERATION);
 
             var absolutePath = resolvePath(storagePath, false, RM_OPERATION);
 
@@ -373,7 +408,8 @@ public class LocalFileStorage implements IFileStorage {
         return new LocalFileWriter(
                 storageKey, storagePath,
                 absolutePath, signal,
-                dataContext.eventLoopExecutor());
+                dataContext.eventLoopExecutor(),
+                writeFlag);
     }
 
     private Path resolvePath(String storagePath, boolean allowRootDir, String operationName) {
