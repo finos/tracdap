@@ -160,17 +160,17 @@ class GraphBuilder:
 
         input_section = cls.build_job_inputs(
             job_config, job_namespace, inputs,
-            explicit_deps=[job_push_id, *params_section.must_run])
+            explicit_deps=[job_push_id])
 
         exec_obj = _util.get_job_resource(target, job_config)
 
         exec_section = cls.build_model_or_flow(
             job_config, job_namespace, exec_obj,
-            explicit_deps=[job_push_id, *params_section.must_run, *input_section.must_run])
+            explicit_deps=[job_push_id])
 
         output_section = cls.build_job_outputs(
             job_config, job_namespace, outputs,
-            explicit_deps=[job_push_id, *exec_section.must_run])
+            explicit_deps=[job_push_id])
 
         main_section = cls._join_sections(params_section, input_section, exec_section, output_section)
 
@@ -391,6 +391,7 @@ class GraphBuilder:
         sub_namespace = NodeNamespace(sub_namespace_name, namespace)
 
         # Execute in the sub-context by doing PUSH, EXEC, POP
+        # Note that POP node must be in the sub namespace too
 
         push_section = cls.build_context_push(
             sub_namespace, input_mapping,
@@ -457,7 +458,10 @@ class GraphBuilder:
             frozenset(parameter_ids), frozenset(input_ids),
             explicit_deps=explicit_deps, bundle=model_id.namespace)
 
-        nodes = {model_id: model_node}
+        module_result_id = NodeId(f"{model_name}:RESULT", namespace)
+        model_result_node = RunModelResultNode(module_result_id, model_id)
+
+        nodes = {model_id: model_node, module_result_id: model_result_node}
 
         # Create nodes for each model output
         # The model node itself outputs a bundle (dictionary of named outputs)
@@ -470,7 +474,7 @@ class GraphBuilder:
             nodes[output_id] = BundleItemNode(output_id, model_id, output_id.name)
 
         # Assemble a graph to include the model and its outputs
-        return GraphSection(nodes, inputs={*parameter_ids, *input_ids}, outputs=output_ids, must_run=[model_id])
+        return GraphSection(nodes, inputs={*parameter_ids, *input_ids}, outputs=output_ids, must_run=[module_result_id])
 
     @classmethod
     def build_flow(
@@ -662,7 +666,7 @@ class GraphBuilder:
 
         nodes = {**first_section.nodes}
         inputs = set(first_section.inputs)
-        must_run = first_section.must_run or []
+        must_run = list(first_section.must_run) if first_section.must_run else []
 
         for i in range(1, n_sections):
 
@@ -680,6 +684,8 @@ class GraphBuilder:
                     raise _ex.ETracInternal(err)  # todo inconsistent graph
 
             nodes.update(current_section.nodes)
+
+            must_run = list(filter(lambda n: n not in current_section.inputs, must_run))
             must_run.extend(current_section.must_run)
 
         return GraphSection(nodes, inputs, last_section.outputs, must_run)

@@ -358,6 +358,15 @@ class RunModelNode(Node[Bundle[_data.DataView]]):
 
 
 @_node_type
+class RunModelResultNode(Node[None]):
+
+    model_id: NodeId
+
+    def _node_dependencies(self) -> tp.Dict[NodeId, DependencyType]:
+        return {self.model_id: DependencyType.HARD}
+
+
+@_node_type
 class BuildJobResultNode(Node[cfg.JobResult]):
 
     job_id: meta.TagHeader

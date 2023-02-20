@@ -48,6 +48,12 @@ class _RuntimeJobInfo:
 
 class TracRuntime:
 
+    # Basic configuration of engine threads
+    __THREAD_POOL_CONFIG = {"model": 1, "data": 3}
+    __THREAD_POOL_MAPPING = {
+        _engine.ModelNodeProcessor: "model",
+        _engine.DataNodeProcessor: "data"}
+
     def __init__(
             self,
             sys_config: tp.Union[str, pathlib.Path, _cfg.RuntimeConfig],
@@ -162,7 +168,11 @@ class TracRuntime:
                 self._sys_config, self._models, self._storage,
                 notify_callback=self._engine_callback)
 
-            self._system = _actors.ActorSystem(self._engine, system_thread="engine")
+            self._system = _actors.ActorSystem(
+                self._engine, system_thread="engine",
+                thread_pools=self.__THREAD_POOL_CONFIG,
+                thread_pool_mapping=self.__THREAD_POOL_MAPPING)
+
             self._system.start(wait=wait)
 
         except Exception as e:
