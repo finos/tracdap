@@ -16,6 +16,7 @@
 
 package org.finos.tracdap.common.storage.local;
 
+import org.finos.tracdap.common.exception.ETrac;
 import org.finos.tracdap.common.exception.ETracInternal;
 import org.finos.tracdap.common.exception.EUnexpected;
 import io.netty.buffer.ByteBuf;
@@ -32,6 +33,7 @@ import java.util.Set;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import static org.finos.tracdap.common.storage.StorageErrors.ExplicitError.ACCESS_DENIED_EXCEPTION;
 import static org.finos.tracdap.common.storage.StorageErrors.ExplicitError.DUPLICATE_SUBSCRIPTION;
 import static org.finos.tracdap.common.storage.local.LocalFileStorage.WRITE_OPERATION;
 import static java.nio.file.StandardOpenOption.*;
@@ -63,11 +65,14 @@ public class LocalFileWriter implements Flow.Subscriber<ByteBuf> {
     private boolean gotComplete;
     private boolean gotError;
     private final boolean gotCancel;
+    private final boolean writeFlag;
 
     LocalFileWriter(
             String storageKey, String storagePath,
-            Path absolutePath, CompletableFuture<Long> signal, OrderedEventExecutor executor) {
+            Path absolutePath, CompletableFuture<Long> signal, OrderedEventExecutor executor,
+            boolean writeFlag) {
 
+        this.writeFlag = writeFlag;
         this.errors = new LocalStorageErrors(storageKey, log);
         this.storagePath = storagePath;
 
@@ -157,6 +162,8 @@ public class LocalFileWriter implements Flow.Subscriber<ByteBuf> {
     private void doStart() {
 
         try {
+
+            checkWriteFlag("writer start");
 
             this.channel = AsynchronousFileChannel.open(absolutePath, Set.of(WRITE, CREATE_NEW), executor);
             this.writeHandler = new ChunkWriteHandler();
@@ -256,6 +263,11 @@ public class LocalFileWriter implements Flow.Subscriber<ByteBuf> {
 
             if (chunkInProgress || chunkBuffer.isEmpty())
                 throw new EUnexpected();
+
+            // This should never happen also - the condition is checked already in subscription operation
+            // and execution should never get this far.
+
+            checkWriteFlag("writing next chunk");
 
             chunkInProgress = true;
             chunksRequested -= 1;
@@ -447,5 +459,13 @@ public class LocalFileWriter implements Flow.Subscriber<ByteBuf> {
 
             writeChunkFailed(error, chunk);
         }
+    }
+
+    private void checkWriteFlag(String operation) throws ETrac {
+
+        if(!writeFlag) {
+            throw errors.explicitError(ACCESS_DENIED_EXCEPTION, absolutePath.toString(), operation);
+        }
+
     }
 }
