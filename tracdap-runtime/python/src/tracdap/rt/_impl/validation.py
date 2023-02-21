@@ -302,19 +302,23 @@ class _StaticValidator:
         cls._check_inputs_or_outputs(model_def.outputs)
 
     @classmethod
-    def _check_label(cls, label):
-        if label is not None and len(label) > cls.__label_length_limit:
-            cls._fail(f"Invalid model parameter: [{param.fieldName}] label exceeds maximum length limit ({cls.__label_length_limit} characters)")  # noqa
+    def _check_label(cls, label, param_name):
+        if label is not None:
+            if len(label) > cls.__label_length_limit:
+                cls._fail(f"Invalid model parameter: [{param_name}] label exceeds maximum length limit "
+                          f"({cls.__label_length_limit} characters)")
+            if len(label.strip()) == 0:
+                cls._fail(f"Invalid model parameter: [{param_name}] label is blank")
 
     @classmethod
     def _check_parameters(cls, parameters):
 
         for param_name, param in parameters.items():
 
-            if param.label is None or len(param.label.strip()) == 0:
-                cls._fail(f"Invalid model parameter: [{param_name}] label is missing or blank")
-
-            cls._check_label(param.label)
+            if param.label is None:
+                cls._fail(f"Invalid model parameter: [{param_name}] label is missing")
+            else:
+                cls._check_label(param.label, param_name)
 
     @classmethod
     def _check_inputs_or_outputs(cls, inputs_or_outputs):
@@ -326,7 +330,6 @@ class _StaticValidator:
             fields = input_schema.schema.table.fields
             field_names = list(map(lambda f: f.fieldName, fields))
             property_type = f"field in [{input_name}]"
-            label = input_schema.label
 
             cls._valid_identifiers(field_names, property_type)
             cls._case_insensitive_duplicates(field_names, property_type)
@@ -334,7 +337,8 @@ class _StaticValidator:
             for field in fields:
                 cls._check_single_field(field, property_type)
 
-            cls._check_label(label)
+            label = input_schema.label
+            cls._check_label(label, input_name)
 
     @classmethod
     def _check_single_field(cls, field: meta.FieldSchema, property_type):
