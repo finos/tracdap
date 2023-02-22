@@ -580,10 +580,27 @@ message DataReadRequest {
    */
   string format = 3;
 
+  /**
+   * Limit the number of rows returned by the request (optional).
+   *
+   * If specified the server will limit the number of rows returned.
+   * There is a hard limit configured in the back end, TRAC will never return
+   * more rows than the hard limit regardless of the limit value supplied by
+   * the client. If no limit value is supplied, the back end hard limit will
+   * still be applied.
+   *
+   * The returned rows are not ordered however ordering is guaranteed
+   * to stay the same for any particular dataset, i.e. two requests for the
+   * same dataset will return rows in the same order. If the dataset is
+   * expunged and recreated on the platform, e.g. by a re-run after an
+   * expired retention period, the ordering of the dataset may change.
+   */
+  optional uint64 limit = 4;
+
+  reserved "offset";
+
 //  map<string, metadata.Value> formatOptions = 4;
 //  optional metadata.PartKey part = 5;
-//  optional uint64 offset = 6;
-//  optional uint32 limit = 7;
 }
 
 /**
