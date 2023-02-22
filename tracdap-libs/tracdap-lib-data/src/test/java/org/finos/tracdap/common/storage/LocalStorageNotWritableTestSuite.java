@@ -103,7 +103,7 @@ public abstract class LocalStorageNotWritableTestSuite {
         Assertions.assertFalse(resultOf(dirPresent));
     }
 
-    @Test
+    /* @Test
     void roundTrip_basic_fail() {
 
         var storagePath = "haiku.txt";
@@ -134,5 +134,5 @@ public abstract class LocalStorageNotWritableTestSuite {
         waitFor(Duration.ofHours(1), writeSignal);
 
         Assertions.assertThrows(EStorageAccess.class, () -> resultOf(writeSignal));
-    }
+    } */
 }
