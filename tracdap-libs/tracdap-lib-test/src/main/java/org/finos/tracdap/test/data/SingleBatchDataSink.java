@@ -76,7 +76,7 @@ public class SingleBatchDataSink
     }
 
     @Override
-    public void onNext() {
+    public void onBatch() {
         this.rowCount += root.getRowCount();
     }
 

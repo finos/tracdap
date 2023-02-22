@@ -70,7 +70,7 @@ public abstract class ArrowEncoder extends StreamingEncoder implements DataPipel
     }
 
     @Override
-    public void onNext() {
+    public void onBatch() {
 
         try {  // This will release the batch
 

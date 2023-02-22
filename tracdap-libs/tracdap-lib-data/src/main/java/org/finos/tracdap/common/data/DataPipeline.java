@@ -96,7 +96,7 @@ public interface DataPipeline {
     interface ArrowApi extends DataInterface<ArrowApi> {
 
         void onStart(VectorSchemaRoot root);
-        void onNext();
+        void onBatch();
         void onComplete();
         void onError(Throwable error);
     }
