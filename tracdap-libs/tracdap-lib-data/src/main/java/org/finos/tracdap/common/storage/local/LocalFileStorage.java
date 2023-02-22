@@ -51,9 +51,9 @@ public class LocalFileStorage implements IFileStorage {
     private final String storageKey;
     private final Path rootPath;
 
-    private final boolean writeFlag;
+    private final boolean readOnlyFlag;
 
-    public LocalFileStorage(Properties config, Boolean writeFlag) {
+    public LocalFileStorage(Properties config, Boolean readOnlyFlag) {
 
         this.storageKey = config.getProperty(IStorageManager.PROP_STORAGE_KEY);
 
@@ -66,10 +66,10 @@ public class LocalFileStorage implements IFileStorage {
                 .toAbsolutePath()
                 .normalize();
 
-        if(Objects.isNull(writeFlag)) {
-            this.writeFlag = Files.isWritable(this.rootPath);
+        if(Objects.isNull(readOnlyFlag)) {
+            this.readOnlyFlag = Files.isWritable(this.rootPath);
         } else {
-            this.writeFlag = writeFlag;
+            this.readOnlyFlag = readOnlyFlag;
         }
     }
 
@@ -79,7 +79,7 @@ public class LocalFileStorage implements IFileStorage {
 
     private void checkWriteFlag(String storagePath, String operation) throws ETrac {
 
-        if(!writeFlag) {
+        if(!readOnlyFlag) {
             throw errors.explicitError(ACCESS_DENIED_EXCEPTION, storagePath, operation);
         }
 
@@ -408,8 +408,7 @@ public class LocalFileStorage implements IFileStorage {
         return new LocalFileWriter(
                 storageKey, storagePath,
                 absolutePath, signal,
-                dataContext.eventLoopExecutor(),
-                writeFlag);
+                dataContext.eventLoopExecutor());
     }
 
     private Path resolvePath(String storagePath, boolean allowRootDir, String operationName) {
