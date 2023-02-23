@@ -231,6 +231,9 @@ public class DataService {
         var codec = codecManager.getCodec(request.getFormat());
         var codecOptions = Map.<String, String>of();
 
+        state.offset = request.getOffset();
+        state.limit = request.getLimit();
+
         CompletableFuture.completedFuture(null)
 
                 // Load metadata for the dataset (DATA, STORAGE, SCHEMA if external)
@@ -247,9 +250,8 @@ public class DataService {
                 // This is where the main data processing streams are executed
                 // When this future completes, the data processing stream has completed (or failed)
                 .thenAccept(x -> loadAndEncode(
-                        state.schema, contentStream,
-                        codec, codecOptions,
-                        state.copy, dataCtx))
+                        state, contentStream,
+                        codec, codecOptions, dataCtx))
 
                 .exceptionally(error -> Helpers.reportError(error, schema, contentStream));
     }
@@ -664,18 +666,17 @@ public class DataService {
     }
 
     private void loadAndEncode(
-            SchemaDefinition schema, Flow.Subscriber<ByteBuf> contentStream,
+            RequestState request, Flow.Subscriber<ByteBuf> contentStream,
             ICodec codec, Map<String, String> codecOptions,
-            StorageCopy copy,
             IDataContext dataCtx) {
 
-        var requiredSchema = ArrowSchema.tracToArrow(schema);
+        var requiredSchema = ArrowSchema.tracToArrow(request.schema);
 
-        var storageKey = copy.getStorageKey();
+        var storageKey = request.copy.getStorageKey();
         var storage = storageManager.getDataStorage(storageKey);
         var encoder = codec.getEncoder(arrowAllocator, requiredSchema, codecOptions);
 
-        var pipeline = storage.pipelineReader(copy, requiredSchema, dataCtx);
+        var pipeline = storage.pipelineReader(request.copy, requiredSchema, dataCtx, request.offset, request.limit);
         pipeline.addStage(encoder);
         pipeline.addSink(contentStream);
 
