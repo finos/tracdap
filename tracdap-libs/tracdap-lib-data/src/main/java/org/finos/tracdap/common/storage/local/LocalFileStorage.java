@@ -31,7 +31,6 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
-import java.util.Objects;
 import java.util.Properties;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
@@ -44,6 +43,7 @@ import static org.finos.tracdap.common.storage.StorageErrors.ExplicitError.*;
 public class LocalFileStorage implements IFileStorage {
 
     public static final String CONFIG_ROOT_PATH = "rootPath";
+    public static final String CONFIG_READ_ONLY = "readOnly";
 
     private final Logger log = LoggerFactory.getLogger(getClass());
     private final StorageErrors errors;
@@ -53,7 +53,7 @@ public class LocalFileStorage implements IFileStorage {
 
     private final boolean readOnlyFlag;
 
-    public LocalFileStorage(Properties config, Boolean readOnlyFlag) {
+    public LocalFileStorage(Properties config) {
 
         this.storageKey = config.getProperty(IStorageManager.PROP_STORAGE_KEY);
 
@@ -66,20 +66,20 @@ public class LocalFileStorage implements IFileStorage {
                 .toAbsolutePath()
                 .normalize();
 
-        if(Objects.isNull(readOnlyFlag)) {
-            this.readOnlyFlag = Files.isWritable(this.rootPath);
-        } else {
-            this.readOnlyFlag = readOnlyFlag;
+        String readOnlyFlagString = config.getProperty(CONFIG_READ_ONLY);
+        if(readOnlyFlagString == null) {
+            var err = String.format(
+                    "Storage readOnly flag not provided for: %s [%s]", storageKey, rootPath);
+            log.error(err);
+            throw new EStartup(err);
         }
-    }
+        this.readOnlyFlag = Boolean.parseBoolean(readOnlyFlagString);
 
-    public LocalFileStorage(Properties config) {
-        this(config, null);
     }
 
     private void checkWriteFlag(String storagePath, String operation) throws ETrac {
 
-        if(!readOnlyFlag) {
+        if(readOnlyFlag) {
             throw errors.explicitError(ACCESS_DENIED_EXCEPTION, storagePath, operation);
         }
 
@@ -102,23 +102,26 @@ public class LocalFileStorage implements IFileStorage {
             throw new EStartup(err);
         }
 
-        if (!Files.isReadable(this.rootPath)) {
+        if(!readOnlyFlag) {
+            if (!Files.isReadable(this.rootPath) || !Files.isWritable(this.rootPath)) {
 
-            var err = String.format(
-                    "Storage root path has insufficient access (read required): %s [%s]",
-                    storageKey, rootPath);
+                var err = String.format(
+                        "Storage root path has insufficient access (read/write required): %s [%s]",
+                        storageKey, rootPath);
 
-            log.error(err);
-            throw new EStartup(err);
-        }
+                log.error(err);
+                throw new EStartup(err);
+            }
+        } else {
+            if (!Files.isReadable(this.rootPath)) {
 
-        if (!Files.isWritable(this.rootPath)) {
+                var err = String.format(
+                        "Storage root path has insufficient access (read required): %s [%s]",
+                        storageKey, rootPath);
 
-            var msg = String.format(
-                    "Storage root path has no write access. Write operations will not be performed in: %s [%s]",
-                    storageKey, rootPath);
-
-            log.info(msg);
+                log.error(err);
+                throw new EStartup(err);
+            }
         }
 
         logFsInfo();
