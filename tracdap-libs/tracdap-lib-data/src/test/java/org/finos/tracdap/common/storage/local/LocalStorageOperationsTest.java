@@ -41,6 +41,7 @@ public class LocalStorageOperationsTest extends StorageOperationsTestSuite {
         var storageProps = new Properties();
         storageProps.put(IStorageManager.PROP_STORAGE_KEY, "TEST_STORAGE");
         storageProps.put(LocalFileStorage.CONFIG_ROOT_PATH, storageDir.toString());
+        storageProps.put(LocalFileStorage.CONFIG_READ_ONLY, "false");
         storage = new LocalFileStorage(storageProps);
 
         execContext = new ExecutionContext(new DefaultEventExecutor(new DefaultThreadFactory("t-events")));

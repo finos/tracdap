@@ -53,6 +53,7 @@ storage:
       protocol: LOCAL
       properties:
         rootPath: ./build/run
+        readOnly: false
 
 
 repositories:

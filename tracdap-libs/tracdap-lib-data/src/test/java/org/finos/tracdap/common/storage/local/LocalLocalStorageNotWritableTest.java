@@ -37,8 +37,9 @@ public class LocalLocalStorageNotWritableTest extends LocalStorageNotWritableTes
 
         storageProps.put(IStorageManager.PROP_STORAGE_KEY, "TEST_STORAGE_NOT_WRITABLE");
         storageProps.put(LocalFileStorage.CONFIG_ROOT_PATH, storageDir.toString());
+        storageProps.put(LocalFileStorage.CONFIG_READ_ONLY, "true");
 
-        storage = new LocalFileStorage(storageProps, false);
+        storage = new LocalFileStorage(storageProps);
 
         execContext = new ExecutionContext(new DefaultEventExecutor(new DefaultThreadFactory("t-events")));
         dataContext = new DataContext(execContext.eventLoopExecutor(), new RootAllocator());

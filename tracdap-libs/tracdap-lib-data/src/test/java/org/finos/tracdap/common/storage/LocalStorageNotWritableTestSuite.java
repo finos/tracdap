@@ -16,8 +16,6 @@
 
 package org.finos.tracdap.common.storage;
 
-import io.netty.buffer.ByteBufAllocator;
-import org.finos.tracdap.common.concurrent.Flows;
 import org.finos.tracdap.common.concurrent.IExecutionContext;
 import org.finos.tracdap.common.data.IDataContext;
 import org.finos.tracdap.common.exception.EStorageAccess;
@@ -26,11 +24,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.time.Duration;
-import java.util.List;
-import java.util.concurrent.CompletableFuture;
 
 import static org.finos.tracdap.test.concurrent.ConcurrentTestHelpers.resultOf;
 import static org.finos.tracdap.test.concurrent.ConcurrentTestHelpers.waitFor;
@@ -57,20 +52,21 @@ public abstract class LocalStorageNotWritableTestSuite {
         File smallFile = new File(storageDir.resolve("test_file.txt").toString());
 
         boolean fileCreated;
+        String message = null;
 
         try {
             fileCreated = smallFile.createNewFile();
         } catch(Exception e) {
             fileCreated = false;
+            message = e.getMessage();
         }
 
-        Assertions.assertTrue(fileCreated);
+        Assertions.assertTrue(fileCreated, message==null?"The test file could not be created.":message);
 
         var rm = storage.rm("test_file.txt", false, execContext);
         waitFor(TEST_TIMEOUT, rm);
 
         Assertions.assertThrows(EStorageAccess.class, () -> resultOf(rm));
-        //Assertions.assertDoesNotThrow(() -> resultOf(rm));
 
         // File should not be gone
 
@@ -79,14 +75,16 @@ public abstract class LocalStorageNotWritableTestSuite {
         Assertions.assertTrue(resultOf(exists));
 
         boolean fileDeleted;
+        message = null;
 
         try {
             fileDeleted = smallFile.delete();
         } catch (Exception e) {
             fileDeleted = false;
+            message = e.getMessage();
         }
 
-        Assertions.assertTrue(fileDeleted, "The test file could not be deleted.");
+        Assertions.assertTrue(fileDeleted, message==null?"The test file could not be deleted.":message);
     }
 
     @Test

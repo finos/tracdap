@@ -55,6 +55,7 @@ storage:
       protocol: LOCAL
       properties:
         rootPath: ${TRAC_STORAGE_DIR}
+        readOnly: false
 
 
 repositories:
