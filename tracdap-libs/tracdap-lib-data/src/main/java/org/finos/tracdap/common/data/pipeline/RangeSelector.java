@@ -16,11 +16,13 @@
 
 package org.finos.tracdap.common.data.pipeline;
 
+import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.VectorSchemaRoot;
+import org.apache.arrow.vector.util.TransferPair;
 import org.finos.tracdap.common.data.DataPipeline;
+import org.finos.tracdap.common.exception.EUnexpected;
 
 import java.util.ArrayList;
-import java.util.List;
 
 
 public class RangeSelector
@@ -35,16 +37,17 @@ public class RangeSelector
     private final long limit;
     private long currentRow;
 
-    private VectorSchemaRoot root;
+    private VectorSchemaRoot incomingRoot;
+    private VectorSchemaRoot sliceRoot;
+    private ArrayList<TransferPair> sliceTransfers;
 
     public RangeSelector(long offset, long limit) {
+
         super(DataPipeline.ArrowApi.class);
 
         this.offset = offset;
         this.limit = limit;
         this.currentRow = 0;
-
-        this.root = new VectorSchemaRoot(List.of());
     }
 
     @Override
@@ -55,6 +58,7 @@ public class RangeSelector
     @Override
     public void pump() {
 
+        // No-op, data is mapped in each call to onBatch()
     }
 
     @Override
@@ -65,40 +69,59 @@ public class RangeSelector
     @Override
     public void close() {
 
+        releaseResources();
     }
 
     @Override
     public void onStart(VectorSchemaRoot root) {
 
-        var vectors = new ArrayList<>();
+        if (incomingRoot != null)
+            throw new EUnexpected();
+
+        var sliceTransfers = new ArrayList<TransferPair>();
+        var sliceVectors = new ArrayList<FieldVector>();
 
         for (var vector : root.getFieldVectors()) {
 
-            vector.
+            var transfer = vector.getTransferPair(vector.getAllocator());
+            var sliceVector = (FieldVector) transfer.getTo();
+
+            sliceTransfers.add(transfer);
+            sliceVectors.add(sliceVector);
         }
 
-        this.root = new VectorSchemaRoot()
+        this.incomingRoot = root;
+        this.sliceRoot = new VectorSchemaRoot(root.getSchema(), sliceVectors, 0);
+        this.sliceTransfers = sliceTransfers;
 
-        consumer().onStart(root);
+        consumer().onStart(sliceRoot);
     }
 
     @Override
     public void onBatch() {
 
-        var batchSize = root.getRowCount();
+        if (incomingRoot == null)
+            throw new EUnexpected();
+
+        var batchSize = incomingRoot.getRowCount();
         var batchStartRow = currentRow;
         var batchEndRow = currentRow + batchSize;
 
         if (batchStartRow >= offset && (batchEndRow < offset + limit || limit == 0)) {
+
+            sliceTransfers.forEach(TransferPair::transfer);
+            sliceRoot.setRowCount(incomingRoot.getRowCount());
+
             consumer().onBatch();
         }
         else if (batchEndRow >= offset && (batchStartRow < offset + limit || limit == 0)) {
 
             var sliceStart = (int) (offset - batchStartRow);
-            var sliceEnd = (int) Math.min(offset + limit - batchStartRow, root.getRowCount());
-            var slice = root.slice(sliceStart, sliceEnd);
+            var sliceEnd = (int) Math.min(offset + limit - batchStartRow, incomingRoot.getRowCount());
+            var sliceLength = sliceEnd - sliceStart;
 
-            root.getVector(0).
+            sliceTransfers.forEach(slice -> slice.splitAndTransfer(sliceStart, sliceLength));
+            sliceRoot.setRowCount(sliceLength);
 
             consumer().onBatch();
         }
@@ -112,11 +135,45 @@ public class RangeSelector
 
     @Override
     public void onComplete() {
-        consumer().onComplete();
+
+        if (incomingRoot == null)
+            throw new EUnexpected();
+
+        try {
+            consumer().onComplete();
+        }
+        finally {
+            releaseResources();
+        }
     }
 
     @Override
     public void onError(Throwable error) {
-        consumer().onError(error);
+
+        if (incomingRoot == null)
+            throw new EUnexpected();
+
+        try {
+            consumer().onError(error);
+        }
+        finally {
+            releaseResources();
+        }
+    }
+
+    private void releaseResources() {
+
+        // Incoming root is owned by the source, do not close
+        incomingRoot = null;
+
+        if (sliceRoot != null) {
+            sliceRoot.close();
+            sliceRoot = null;
+        }
+
+        if (sliceTransfers != null) {
+            sliceTransfers.clear();
+            sliceTransfers = null;
+        }
     }
 }
