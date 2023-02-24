@@ -29,3 +29,4 @@ webServer:
     protocol: LOCAL
     properties:
       rootPath: src/test/resources/content
+      readOnly: false
