@@ -21,9 +21,10 @@ import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonToken;
-import com.fasterxml.jackson.core.async.ByteArrayFeeder;
+import com.fasterxml.jackson.core.async.ByteBufferFeeder;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 
 
 class JsonStreamParser {
@@ -57,7 +58,7 @@ class JsonStreamParser {
     private static final int MAX_PARSE_DEPTH = 4;
 
     private final JsonParser lexer;
-    private final ByteArrayFeeder feeder;
+    private final ByteBufferFeeder feeder;
     private final Handler handler;
 
     private final ParseState[] parseStack;
@@ -66,8 +67,8 @@ class JsonStreamParser {
 
     JsonStreamParser(JsonFactory factory, Handler handler) throws IOException {
 
-        this.lexer = factory.createNonBlockingByteArrayParser();
-        this.feeder = (ByteArrayFeeder) lexer.getNonBlockingInputFeeder();
+        this.lexer = factory.createNonBlockingByteBufferParser();
+        this.feeder = (ByteBufferFeeder) lexer.getNonBlockingInputFeeder();
         this.handler = handler;
 
         this.parseStack = new ParseState[MAX_PARSE_DEPTH];
@@ -85,9 +86,9 @@ class JsonStreamParser {
         handler.close();
     }
 
-    public void feedInput(byte[] data, int offset, int end) throws IOException {
+    public void feedInput(ByteBuffer chunk) throws IOException {
 
-        feeder.feedInput(data, offset, end);
+        feeder.feedInput(chunk);
     }
 
     public JsonToken nextToken() throws IOException {
