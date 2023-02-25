@@ -16,6 +16,8 @@
 
 package org.finos.tracdap.common.storage;
 
+import io.netty.buffer.ByteBufAllocator;
+import org.finos.tracdap.common.concurrent.Flows;
 import org.finos.tracdap.common.concurrent.IExecutionContext;
 import org.finos.tracdap.common.data.IDataContext;
 import org.finos.tracdap.common.exception.EStorageAccess;
@@ -24,8 +26,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
 import static org.finos.tracdap.test.concurrent.ConcurrentTestHelpers.resultOf;
 import static org.finos.tracdap.test.concurrent.ConcurrentTestHelpers.waitFor;
@@ -75,16 +80,16 @@ public abstract class LocalStorageNotWritableTestSuite {
         Assertions.assertTrue(resultOf(exists));
 
         boolean fileDeleted;
-        message = null;
+        String message2 = null;
 
         try {
             fileDeleted = smallFile.delete();
         } catch (Exception e) {
             fileDeleted = false;
-            message = e.getMessage();
+            message2 = e.getMessage();
         }
 
-        Assertions.assertTrue(fileDeleted, message==null?"The test file could not be deleted.":message);
+        Assertions.assertTrue(fileDeleted, message2==null?"The test file could not be deleted.":message2);
     }
 
     @Test
@@ -101,15 +106,15 @@ public abstract class LocalStorageNotWritableTestSuite {
         Assertions.assertFalse(resultOf(dirPresent));
     }
 
-    /* @Test
+    @Test
     void roundTrip_basic_fail() {
 
         var storagePath = "haiku.txt";
 
         var haiku =
                 "The data goes in;\n" +
-                        "For a short while it persists,\n" +
-                        "then returns unscathed!";
+                        "but it cannot be saved,\n" +
+                        "so error is returned!";
 
         var haikuBytes = haiku.getBytes(StandardCharsets.UTF_8);
 
@@ -132,5 +137,5 @@ public abstract class LocalStorageNotWritableTestSuite {
         waitFor(Duration.ofHours(1), writeSignal);
 
         Assertions.assertThrows(EStorageAccess.class, () -> resultOf(writeSignal));
-    } */
+    }
 }

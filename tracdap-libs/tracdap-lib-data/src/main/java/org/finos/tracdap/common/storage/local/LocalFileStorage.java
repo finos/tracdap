@@ -86,14 +86,16 @@ public class LocalFileStorage implements IFileStorage {
 
     }
 
-    public CompletionStage<Boolean> writeEnabledVerification(String storagePath) {
+    public CompletionStage<?> writeEnabledVerification(String storagePath, String operationName) {
 
         log.info("READ ONLY FLAG VERIFICATION: {} [{}]", storageKey, storagePath);
 
         if(readOnlyFlag) {
-            return CompletableFuture.failedFuture(errors.explicitError(ACCESS_DENIED_EXCEPTION, storagePath, "READ ONLY FLAG VERIFICATION")); //TODO: constants clean-up
+            return CompletableFuture.failedFuture(
+                    errors.explicitError(ACCESS_DENIED_EXCEPTION, storagePath, operationName)
+            );
         } else {
-            return CompletableFuture.completedFuture(true);
+            return CompletableFuture.completedFuture(null);
         }
     }
 
@@ -425,7 +427,7 @@ public class LocalFileStorage implements IFileStorage {
                 absolutePath, signal,
                 dataContext.eventLoopExecutor());
 
-        var writeEnabledCheck = writeEnabledVerification(storagePath);
+        var writeEnabledCheck = writeEnabledVerification(storagePath, WRITE_OPERATION);
 
         return Flows.waitForSignal(localFileWriter, writeEnabledCheck);
     }
