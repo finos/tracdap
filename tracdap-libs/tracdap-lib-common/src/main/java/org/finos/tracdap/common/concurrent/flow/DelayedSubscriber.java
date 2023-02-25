@@ -24,6 +24,7 @@ public class DelayedSubscriber<T> implements Flow.Subscriber<T> {
 
     private final Flow.Subscriber<T> subscriber;
     private final CompletionStage<?> signal;
+    private CompletionStage<?> subscriptionSignal;
 
     public DelayedSubscriber(Flow.Subscriber<T> subscriber, CompletionStage<?> signal) {
         this.subscriber = subscriber;
@@ -33,7 +34,7 @@ public class DelayedSubscriber<T> implements Flow.Subscriber<T> {
     @Override
     public void onSubscribe(Flow.Subscription subscription) {
 
-        signal.whenComplete((result, error) -> {
+        subscriptionSignal = signal.whenComplete((result, error) -> {
 
             if (error == null)
                 subscriber.onSubscribe(subscription);

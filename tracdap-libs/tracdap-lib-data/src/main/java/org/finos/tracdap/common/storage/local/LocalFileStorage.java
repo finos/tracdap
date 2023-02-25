@@ -91,7 +91,7 @@ public class LocalFileStorage implements IFileStorage {
         log.info("READ ONLY FLAG VERIFICATION: {} [{}]", storageKey, storagePath);
 
         if(readOnlyFlag) {
-            return CompletableFuture.failedFuture(errors.explicitError(ACCESS_DENIED_EXCEPTION, storagePath, "READ ONLY FLAG VERIFICATION"));
+            return CompletableFuture.failedFuture(errors.explicitError(ACCESS_DENIED_EXCEPTION, storagePath, "READ ONLY FLAG VERIFICATION")); //TODO: constants clean-up
         } else {
             return CompletableFuture.completedFuture(true);
         }
