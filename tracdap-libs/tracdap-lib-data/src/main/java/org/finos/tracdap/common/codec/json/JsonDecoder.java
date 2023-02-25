@@ -89,11 +89,8 @@ public class JsonDecoder extends StreamingDecoder {
             if (log.isTraceEnabled())
                 log.trace("JSON DECODER: onNext()");
 
-            var bytes = new byte[chunk.readableBytes()];
-            chunk.readBytes(bytes);
-
-            parser.feedInput(bytes, 0, bytes.length);
-            bytesConsumed += bytes.length;
+            parser.feedInput(chunk.nioBuffer());
+            bytesConsumed += chunk.readableBytes();
 
             JsonToken token;
 
