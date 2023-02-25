@@ -29,6 +29,7 @@ public class DelayedSubscriber<T> implements Flow.Subscriber<T> {
     public DelayedSubscriber(Flow.Subscriber<T> subscriber, CompletionStage<?> signal) {
         this.subscriber = subscriber;
         this.signal = signal;
+        this.subscriptionSignal = null;
     }
 
     @Override
@@ -60,4 +61,6 @@ public class DelayedSubscriber<T> implements Flow.Subscriber<T> {
     public void onComplete() {
         subscriber.onComplete();
     }
+
+    public CompletionStage<?> getSubscriptionSignal() { return subscriptionSignal; }
 }
