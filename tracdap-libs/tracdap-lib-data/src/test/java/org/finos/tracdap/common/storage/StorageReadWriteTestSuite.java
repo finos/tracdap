@@ -34,6 +34,7 @@ import static org.finos.tracdap.test.storage.StorageTestHelpers.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
+import java.lang.reflect.Field;
 import java.nio.CharBuffer;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
@@ -41,6 +42,7 @@ import java.util.List;
 import java.util.Random;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Flow;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
@@ -453,6 +455,11 @@ public abstract class StorageReadWriteTestSuite {
         var writerSignal = new CompletableFuture<Long>();
         var writer = storage.writer(storagePath, writerSignal, dataContext);
 
+        Class writerClass = writer.getClass();
+        Field signalField = writerClass.getDeclaredField("subscriptionSignal");
+        signalField.setAccessible(true);
+
+
         // First subscription to the writer, everything should proceed normally
 
         var subscription1 = mock(Flow.Subscription.class);
@@ -462,7 +469,15 @@ public abstract class StorageReadWriteTestSuite {
         // Second subscription to the writer, should throw illegal state
 
         var subscription2 = mock(Flow.Subscription.class);
-        Assertions.assertThrows(IllegalStateException.class, () -> writer.onSubscribe(subscription2));
+        Assertions.assertThrows(IllegalStateException.class, () -> {
+            writer.onSubscribe(subscription2);
+            CompletableFuture<?> subscriptionSignal = (CompletableFuture<?>) signalField.get(writer);
+            try{
+                subscriptionSignal.join();
+            } catch(Exception e){
+                throw e.getCause();
+            }
+        });
 
         // First subscription should be unaffected, write operation should complete normally on subscription 1
 
