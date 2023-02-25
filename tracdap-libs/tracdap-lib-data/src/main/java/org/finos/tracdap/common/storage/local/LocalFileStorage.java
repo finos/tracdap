@@ -17,6 +17,7 @@
 package org.finos.tracdap.common.storage.local;
 
 import io.netty.channel.EventLoopGroup;
+import org.finos.tracdap.common.concurrent.Flows;
 import org.finos.tracdap.common.concurrent.IExecutionContext;
 import org.finos.tracdap.common.data.IDataContext;
 import org.finos.tracdap.common.exception.EStartup;
@@ -83,6 +84,17 @@ public class LocalFileStorage implements IFileStorage {
             throw errors.explicitError(ACCESS_DENIED_EXCEPTION, storagePath, operation);
         }
 
+    }
+
+    public CompletionStage<Boolean> writeEnabledVerification(String storagePath) {
+
+        log.info("READ ONLY FLAG VERIFICATION: {} [{}]", storageKey, storagePath);
+
+        if(readOnlyFlag) {
+            return CompletableFuture.failedFuture(errors.explicitError(ACCESS_DENIED_EXCEPTION, storagePath, "READ ONLY FLAG VERIFICATION"));
+        } else {
+            return CompletableFuture.completedFuture(true);
+        }
     }
 
     @Override
@@ -408,10 +420,14 @@ public class LocalFileStorage implements IFileStorage {
 
         var absolutePath = resolvePath(storagePath, false, WRITE_OPERATION);
 
-        return new LocalFileWriter(
+        var localFileWriter = new LocalFileWriter(
                 storageKey, storagePath,
                 absolutePath, signal,
                 dataContext.eventLoopExecutor());
+
+        var writeEnabledCheck = writeEnabledVerification(storagePath);
+
+        return Flows.waitForSignal(localFileWriter, writeEnabledCheck);
     }
 
     private Path resolvePath(String storagePath, boolean allowRootDir, String operationName) {
