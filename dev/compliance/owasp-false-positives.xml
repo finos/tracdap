@@ -68,7 +68,7 @@
     </suppress>
 
     <!-- Flat buffers detected as flat_project, a JavaScript library: https://github.com/hughsk/flat -->
-   <suppress>
+    <suppress>
         <packageUrl regex="true">^pkg:maven/com\.google\.flatbuffers/flatbuffers\-java@.*$</packageUrl>
         <cpe>cpe:/a:flat_project:flat</cpe>
     </suppress>
