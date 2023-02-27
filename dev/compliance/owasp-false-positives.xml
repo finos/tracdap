@@ -68,15 +68,15 @@
     </suppress>
 
     <!-- Flat buffers detected as flat_project, a JavaScript library: https://github.com/hughsk/flat -->
- <!--   <suppress>
+   <suppress>
         <packageUrl regex="true">^pkg:maven/com\.google\.flatbuffers/flatbuffers\-java@.*$</packageUrl>
         <cpe>cpe:/a:flat_project:flat</cpe>
     </suppress>
--->
+
     <!-- Two utils libs in the AWS SDK mis-identified as part of an old abandoned utils project -->
     <!-- https://www.cve.org/CVERecord?id=CVE-2021-4277 -->
     <!-- https://github.com/fredsmith/utils/commit/dbab1b66955eeb3d76b34612b358307f5c4e3944 -->
-<!--
+
     <suppress>
         <packageUrl regex="true">^pkg:maven/software\.amazon\.awssdk/json\-utils@.*$</packageUrl>
         <cpe>cpe:/a:utils_project:utils</cpe>
@@ -86,7 +86,7 @@
         <packageUrl regex="true">^pkg:maven/software\.amazon\.awssdk/utils@.*$</packageUrl>
         <cpe>cpe:/a:utils_project:utils</cpe>
     </suppress>
--->
+
     <!-- Several packages that are mis-identified as being part of this personal JSON project -->
     <!-- https://github.com/stleary/JSON-java -->
     <!-- https://nvd.nist.gov/vuln/detail/CVE-2022-45688#vulnConfigurationsArea -->
