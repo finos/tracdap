@@ -86,7 +86,7 @@ abstract class DataOperationsTest {
     }
 
     // Include this test case for integration against different database backends
-    @org.junit.jupiter.api.Tag("integration")
+    @Tag("integration")
     @Tag("int-storage")
     static class IntegrationTest extends DataOperationsTest {
 
@@ -1726,11 +1726,22 @@ abstract class DataOperationsTest {
 
         Assertions.assertEquals(originalData.size(), responseData.size());
 
-        for (var col = 0; col < originalData.size(); col++) {
-            Assertions.assertEquals(originalData.get(col).size(), responseData.get(col).size());
-            for (var row = 0; row < originalData.get(col).size(); row++) {
+        // By default, offset = 0 and limit = length of first response column
 
-                var originalVal = originalData.get(col).get(row);
+        assertDataEqualForRange(originalData, responseData, 0, originalData.get(0).size());
+    }
+
+    private void assertDataEqualForRange(
+            List<Vector<Object>> originalData, List<Vector<Object>> responseData,
+            long offset, long limit) {
+
+        Assertions.assertEquals(originalData.size(), responseData.size());
+
+        for (var col = 0; col < originalData.size(); col++) {
+            Assertions.assertEquals(limit, responseData.get(col).size());
+            for (var row = 0; row < limit; row++) {
+
+                var originalVal = originalData.get(col).get(row + (int) offset);
                 var responseVal = responseData.get(col).get(row);
 
                 // Decimals must be checked using compareTo, equals() does not handle equal values with different scale
@@ -2003,6 +2014,60 @@ abstract class DataOperationsTest {
 
         Assertions.assertEquals(BASIC_SCHEMA, response0.getSchema());
         assertDataEqual(originalData, responseData);
+    }
+
+    @Test
+    void readDataset_ok_limitAndOffset() throws Exception {
+
+        // Create an object to read
+        var createDataset = DataApiTestHelpers.clientStreaming(dataClient::createDataset, BASIC_CREATE_DATASET_REQUEST);
+        waitFor(TEST_TIMEOUT, createDataset);
+        var dataId = resultOf(createDataset);
+
+        var readRequest0 = readRequest(dataId)
+                .toBuilder()
+                .setLimit(2)
+                .build();
+
+        var readDataset = DataApiTestHelpers.serverStreaming(dataClient::readDataset, readRequest0, execContext);
+        waitFor(TEST_TIMEOUT, readDataset);
+        var responseList = resultOf(readDataset);
+
+        // First response message should contain metadata only, with an empty buffer
+        var response0 = responseList.get(0);
+        Assertions.assertEquals(ByteString.EMPTY, response0.getContent());
+
+        // The remainder of the list should contain the file content
+        var content = responseList.stream().skip(1)
+                .map(DataReadResponse::getContent)
+                .reduce(ByteString.EMPTY, ByteString::concat);
+
+        var originalData = DataApiTestHelpers.decodeCsv(BASIC_SCHEMA, List.of(BASIC_CSV_CONTENT));
+        var responseData = DataApiTestHelpers.decodeCsv(response0.getSchema(), List.of(content));
+
+        assertDataEqualForRange(originalData, responseData, 0, 2);
+
+        var readRequest1 = readRequest0
+                .toBuilder()
+                .setOffset(2)
+                .build();
+
+        var readDataset1 = DataApiTestHelpers.serverStreaming(dataClient::readDataset, readRequest1, execContext);
+        waitFor(TEST_TIMEOUT, readDataset1);
+        var responseList1 = resultOf(readDataset1);
+
+        // First response message should contain metadata only, with an empty buffer
+        var response1 = responseList1.get(0);
+        Assertions.assertEquals(ByteString.EMPTY, response1.getContent());
+
+        // The remainder of the list should contain the file content
+        var content1 = responseList1.stream().skip(1)
+                .map(DataReadResponse::getContent)
+                .reduce(ByteString.EMPTY, ByteString::concat);
+
+        var responseData1 = DataApiTestHelpers.decodeCsv(response1.getSchema(), List.of(content1));
+
+        assertDataEqualForRange(originalData, responseData1, 2, 2);
     }
 
     @Test
