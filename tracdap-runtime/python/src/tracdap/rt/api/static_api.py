@@ -426,7 +426,7 @@ def load_schema(
 
 
 def define_input_table(
-        *fields: _tp.Union[FieldSchema, _tp.List[FieldSchema]]) \
+        *fields: _tp.Union[FieldSchema, _tp.List[FieldSchema]], label: _tp.Optional[str] = None) \
         -> ModelInputSchema:
 
     """
@@ -436,6 +436,7 @@ def define_input_table(
     Individual fields should be defined using :py:func:`define_field` or the shorthand alias :py:func:`F`.
 
     :param fields: A set of fields to make up a :py:class:`TableSchema <tracdap.rt.metadata.TableSchema>`
+    :param label: An optional label (of type str) for a model input schema. Default value: None.
     :return: A model input schema, suitable for returning from :py:meth:`TracModel.define_inputs`
 
     :type fields: :py:class:`FieldSchema <tracdap.rt.metadata.FieldSchema>` |
@@ -444,7 +445,7 @@ def define_input_table(
     """
 
     sa = _StaticApiHook.get_instance()
-    return sa.define_input_table(*fields)
+    return sa.define_input_table(*fields, label=label)
 
 
 def declare_input_table(
@@ -464,7 +465,7 @@ def declare_input_table(
 
 
 def define_output_table(
-        *fields: _tp.Union[FieldSchema, _tp.List[FieldSchema]]) \
+        *fields: _tp.Union[FieldSchema, _tp.List[FieldSchema]], label: _tp.Optional[str] = None) \
         -> ModelOutputSchema:
 
     """
@@ -474,6 +475,7 @@ def define_output_table(
     Individual fields should be defined using :py:func:`define_field` or the shorthand alias :py:func:`F`.
 
     :param fields: A set of fields to make up a :py:class:`TableSchema <tracdap.rt.metadata.TableSchema>`
+    :param label: An optional label (of type str) for a model output schema. Default value: None.
     :return: A model output schema, suitable for returning from :py:meth:`TracModel.define_outputs`
 
     :type fields: :py:class:`FieldSchema <tracdap.rt.metadata.FieldSchema>` |
@@ -482,7 +484,7 @@ def define_output_table(
     """
 
     sa = _StaticApiHook.get_instance()
-    return sa.define_output_table(*fields)
+    return sa.define_output_table(*fields, label=label)
 
 
 def declare_output_table(
