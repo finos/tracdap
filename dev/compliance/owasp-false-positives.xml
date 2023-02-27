@@ -87,6 +87,30 @@
         <cpe>cpe:/a:utils_project:utils</cpe>
     </suppress>
 
+    <!-- Several packages that are mis-identified as being part of this personal JSON project -->
+    <!-- https://github.com/stleary/JSON-java -->
+    <!-- https://nvd.nist.gov/vuln/detail/CVE-2022-45688#vulnConfigurationsArea -->
+
+    <suppress>
+        <packageUrl regex="true">^pkg:maven/com\.google\.http\-client/google\-http\-client\-gson@.*$</packageUrl>
+        <cpe>cpe:/a:json-java_project:json-java</cpe>
+    </suppress>
+
+    <suppress>
+        <packageUrl regex="true">^pkg:maven/com\.google\.http\-client/google\-http\-client\-jackson2@.*$</packageUrl>
+        <cpe>cpe:/a:json-java_project:json-java</cpe>
+    </suppress>
+
+    <suppress>
+        <packageUrl regex="true">^pkg:maven/com\.fasterxml\.jackson\.core/jackson\-core@.*$</packageUrl>
+        <cpe>cpe:/a:json-java_project:json-java</cpe>
+    </suppress>
+
+    <suppress>
+        <packageUrl regex="true">^pkg:maven/software\.amazon\.awssdk/json\-utils@.*$</packageUrl>
+        <cpe>cpe:/a:json-java_project:json-java</cpe>
+    </suppress>
+
 
     <!-- ================== -->
     <!-- Special exceptions -->
