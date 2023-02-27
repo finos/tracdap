@@ -90,7 +90,7 @@ public class CsvEncoder extends StreamingEncoder implements AutoCloseable {
     }
 
     @Override
-    public void onNext() {
+    public void onBatch() {
 
         try {
 

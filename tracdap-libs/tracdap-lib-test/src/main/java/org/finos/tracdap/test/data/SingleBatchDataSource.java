@@ -41,7 +41,7 @@ public class SingleBatchDataSource
     public void pump() {
 
         consumer().onStart(root);
-        consumer().onNext();
+        consumer().onBatch();
         consumer().onComplete();
     }
 

@@ -35,10 +35,19 @@ public interface IDataStorage extends AutoCloseable {
     @Override
     default void close() { stop(); }
 
+    default DataPipeline pipelineReader(
+            StorageCopy storageCopy,
+            Schema requiredSchema,
+            IDataContext dataContext) {
+
+        return pipelineReader(storageCopy, requiredSchema, dataContext, 0, 0);
+    }
+
     DataPipeline pipelineReader(
             StorageCopy storageCopy,
             Schema requiredSchema,
-            IDataContext execContext);
+            IDataContext dataContext,
+            long offset, long limit);
 
     DataPipeline pipelineWriter(
             StorageCopy storageCopy,

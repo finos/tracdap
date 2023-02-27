@@ -127,7 +127,7 @@ public abstract class ArrowDecoder extends BufferDecoder implements DataPipeline
             var batchAvailable = reader.loadNextBatch();
 
             if (batchAvailable) {
-                consumer().onNext();
+                consumer().onBatch();
             }
             else {
                 return true;

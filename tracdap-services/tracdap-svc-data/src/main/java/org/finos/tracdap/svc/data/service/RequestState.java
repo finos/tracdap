@@ -47,5 +47,8 @@ class RequestState {
     int snap;
     int delta;
 
+    long offset;
+    long limit;
+
     StorageCopy copy;
 }
