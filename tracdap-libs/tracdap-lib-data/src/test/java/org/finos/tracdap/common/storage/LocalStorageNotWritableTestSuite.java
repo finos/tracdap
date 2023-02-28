@@ -107,35 +107,17 @@ public abstract class LocalStorageNotWritableTestSuite {
     }
 
     @Test
-    void roundTrip_basic_fail() {
+    void writer_basic_fail() {
 
-        var storagePath = "haiku.txt";
+        var storagePath = "any_file.txt";
 
-        var haiku =
-                "The data goes in;\n" +
-                        "but it cannot be saved,\n" +
-                        "so error is returned!";
-
-        var haikuBytes = haiku.getBytes(StandardCharsets.UTF_8);
-
-        writeTest(storagePath, List.of(haikuBytes), storage, dataContext);
+        Assertions.assertThrows(EStorageAccess.class, () -> writerTest(storagePath, storage, dataContext));
     }
 
-    static void writeTest(
-            String storagePath, List<byte[]> originalBytes,
-            IFileStorage storage, IDataContext dataContext) {
-
-        var originalBuffers = originalBytes.stream().map(bytes ->
-                ByteBufAllocator.DEFAULT
-                        .directBuffer(bytes.length)
-                        .writeBytes(bytes));
+    static void writerTest(String storagePath, IFileStorage storage, IDataContext dataContext) {
 
         var writeSignal = new CompletableFuture<Long>();
-        var writer = storage.writer(storagePath, writeSignal, dataContext);
 
-        Flows.publish(originalBuffers).subscribe(writer);
-        waitFor(Duration.ofHours(1), writeSignal);
-
-        Assertions.assertThrows(EStorageAccess.class, () -> resultOf(writeSignal));
+        storage.writer(storagePath, writeSignal, dataContext);
     }
 }
