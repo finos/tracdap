@@ -220,6 +220,12 @@ class _NamespaceShimFinder(_ila.MetaPathFinder):
         package_path = parent_path.joinpath(relative_parts[-1], "__init__.py")
         module_path = parent_path.joinpath(relative_parts[-1] + ".py")
 
+        # Windows still has a path length limit of 260 characters! Above that you have to use UNC-style paths
+        # Model checkout paths can easily exceed the limit, to be safe always use UNC paths on Windows
+        if _util.is_windows():
+            package_path = pathlib.Path(f"\\\\?\\{str(package_path)}")
+            module_path = pathlib.Path(f"\\\\?\\{str(module_path)}")
+
         # A module can exist as both a module and a package in the same source path
         # This is a very bad thing to do and should always be avoided
         # However, it is allowed when using the regular Python loader mechanisms
