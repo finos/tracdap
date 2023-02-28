@@ -17,7 +17,6 @@
 package org.finos.tracdap.common.storage;
 
 import org.finos.tracdap.common.concurrent.IExecutionContext;
-import org.finos.tracdap.common.concurrent.flow.DelayedSubscriber;
 import org.finos.tracdap.common.data.IDataContext;
 import org.finos.tracdap.common.exception.EStorageRequest;
 import org.finos.tracdap.common.exception.EValidationGap;
@@ -442,9 +441,6 @@ public abstract class StorageReadWriteTestSuite {
         Assertions.assertFalse(resultOf(fileExists));
     }
 
-
-
-
     @Test
     void testWrite_subscribeTwice() throws Exception {
 
@@ -460,13 +456,13 @@ public abstract class StorageReadWriteTestSuite {
         // First subscription to the writer, everything should proceed normally
 
         var subscription1 = mock(Flow.Subscription.class);
-        Assertions.assertDoesNotThrow(() -> writerOnSubscribeVerification(writer, subscription1));
+        writer.onSubscribe(subscription1);
         verify(subscription1, timeout(ASYNC_DELAY.toMillis())).request(anyLong());
 
         // Second subscription to the writer, should throw illegal state
 
         var subscription2 = mock(Flow.Subscription.class);
-        Assertions.assertThrows(IllegalStateException.class, () -> writerOnSubscribeVerification(writer, subscription2));
+        Assertions.assertThrows(IllegalStateException.class, () -> writer.onSubscribe(subscription2));
 
         // First subscription should be unaffected, write operation should complete normally on subscription 1
 
@@ -493,7 +489,7 @@ public abstract class StorageReadWriteTestSuite {
         // Request call may be immediate or async
 
         var subscription = mock(Flow.Subscription.class);
-        Assertions.assertDoesNotThrow(() -> writerOnSubscribeVerification(writer, subscription));
+        writer.onSubscribe(subscription);
 
         verify(subscription, timeout(ASYNC_DELAY.toMillis())).request(anyLong());
 
@@ -543,7 +539,7 @@ public abstract class StorageReadWriteTestSuite {
         // Request call may be immediate or async
 
         var subscription = mock(Flow.Subscription.class);
-        Assertions.assertDoesNotThrow(() -> writerOnSubscribeVerification(writer, subscription));
+        writer.onSubscribe(subscription);
 
         verify(subscription, timeout(ASYNC_DELAY.toMillis())).request(anyLong());
 
@@ -597,7 +593,7 @@ public abstract class StorageReadWriteTestSuite {
         var subscription1 = mock(Flow.Subscription.class);
         var chunk1 = Unpooled.wrappedBuffer(bytes);
 
-        Assertions.assertDoesNotThrow(() -> writerOnSubscribeVerification(writer1, subscription1));
+        writer1.onSubscribe(subscription1);
         verify(subscription1, timeout(ASYNC_DELAY.toMillis())).request(anyLong());
         writer1.onNext(chunk1);
 
@@ -621,7 +617,7 @@ public abstract class StorageReadWriteTestSuite {
         var subscription2 = mock(Flow.Subscription.class);
         var chunk2 = Unpooled.wrappedBuffer(bytes);
 
-        Assertions.assertDoesNotThrow(() -> writerOnSubscribeVerification(writer2, subscription2));
+        writer2.onSubscribe(subscription2);
         verify(subscription2, timeout(ASYNC_DELAY.toMillis())).request(anyLong());
         writer2.onNext(chunk2);
         writer2.onComplete();
@@ -957,21 +953,6 @@ public abstract class StorageReadWriteTestSuite {
     private static class TestException extends RuntimeException {
 
         TestException() { super("Test error handling"); }
-    }
-
-
-    private void writerOnSubscribeVerification(Flow.Subscriber<?> writer, Flow.Subscription subscription) throws Throwable {
-        writer.onSubscribe(subscription);
-        delayedSubscriberSignalVerification((DelayedSubscriber<?>) writer);
-    }
-
-    private void delayedSubscriberSignalVerification(DelayedSubscriber<?> writer) throws Throwable {
-        try {
-            CompletableFuture<?> subscriptionSignal = (CompletableFuture<?>) writer.getSubscriptionSignal();
-            subscriptionSignal.join();
-        } catch(Exception e){
-            throw e.getCause();
-        }
     }
 
 }

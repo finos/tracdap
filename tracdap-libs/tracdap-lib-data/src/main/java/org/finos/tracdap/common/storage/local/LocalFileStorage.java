@@ -17,7 +17,6 @@
 package org.finos.tracdap.common.storage.local;
 
 import io.netty.channel.EventLoopGroup;
-import org.finos.tracdap.common.concurrent.Flows;
 import org.finos.tracdap.common.concurrent.IExecutionContext;
 import org.finos.tracdap.common.data.IDataContext;
 import org.finos.tracdap.common.exception.EStartup;
@@ -67,13 +66,7 @@ public class LocalFileStorage implements IFileStorage {
                 .toAbsolutePath()
                 .normalize();
 
-        String readOnlyFlagString = config.getProperty(CONFIG_READ_ONLY);
-        if(readOnlyFlagString == null) {
-            var err = String.format(
-                    "Storage readOnly flag not provided for: %s [%s]", storageKey, rootPath);
-            log.error(err);
-            throw new EStartup(err);
-        }
+        String readOnlyFlagString = config.getProperty(CONFIG_READ_ONLY, "false");
         this.readOnlyFlag = Boolean.parseBoolean(readOnlyFlagString);
 
     }
@@ -82,20 +75,6 @@ public class LocalFileStorage implements IFileStorage {
 
         if(readOnlyFlag) {
             throw errors.explicitError(ACCESS_DENIED_EXCEPTION, storagePath, operation);
-        }
-
-    }
-
-    public CompletionStage<?> writeEnabledVerification(String storagePath, String operationName) {
-
-        log.info("READ ONLY FLAG VERIFICATION: {} [{}]", storageKey, storagePath);
-
-        if(readOnlyFlag) {
-            return CompletableFuture.failedFuture(
-                    errors.explicitError(ACCESS_DENIED_EXCEPTION, storagePath, operationName)
-            );
-        } else {
-            return CompletableFuture.completedFuture(null);
         }
     }
 
@@ -420,16 +399,14 @@ public class LocalFileStorage implements IFileStorage {
 
         log.info("STORAGE OPERATION: {} {} [{}]", storageKey, WRITE_OPERATION, storagePath);
 
+        checkWriteFlag(storagePath, WRITE_OPERATION);
+
         var absolutePath = resolvePath(storagePath, false, WRITE_OPERATION);
 
-        var localFileWriter = new LocalFileWriter(
+        return new LocalFileWriter(
                 storageKey, storagePath,
                 absolutePath, signal,
                 dataContext.eventLoopExecutor());
-
-        var writeEnabledCheck = writeEnabledVerification(storagePath, WRITE_OPERATION);
-
-        return Flows.waitForSignal(localFileWriter, writeEnabledCheck);
     }
 
     private Path resolvePath(String storagePath, boolean allowRootDir, String operationName) {
