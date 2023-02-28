@@ -298,22 +298,30 @@ class _StaticValidator:
         cls._unique_context_check(unique_ctx, model_def.outputs.keys(), "model output")
 
         cls._check_parameters(model_def.parameters)
-        cls._check_table_fields(model_def.inputs)
-        cls._check_table_fields(model_def.outputs)
+        cls._check_inputs_or_outputs(model_def.inputs)
+        cls._check_inputs_or_outputs(model_def.outputs)
+
+    @classmethod
+    def _check_label(cls, label, param_name):
+        if label is not None:
+            if len(label) > cls.__label_length_limit:
+                cls._fail(f"Invalid model parameter: [{param_name}] label exceeds maximum length limit "
+                          f"({cls.__label_length_limit} characters)")
+            if len(label.strip()) == 0:
+                cls._fail(f"Invalid model parameter: [{param_name}] label is blank")
 
     @classmethod
     def _check_parameters(cls, parameters):
 
         for param_name, param in parameters.items():
 
-            if param.label is None or len(param.label.strip()) == 0:
-                cls._fail(f"Invalid model parameter: [{param_name}] label is missing or blank")
-
-            if len(param.label) > cls.__label_length_limit:
-                cls._fail(f"Invalid model parameter: [{param.fieldName}] label exceeds maximum length limit ({cls.__label_length_limit} characters)")  # noqa
+            if param.label is None:
+                cls._fail(f"Invalid model parameter: [{param_name}] label is missing")
+            else:
+                cls._check_label(param.label, param_name)
 
     @classmethod
-    def _check_table_fields(cls, inputs_or_outputs):
+    def _check_inputs_or_outputs(cls, inputs_or_outputs):
 
         for input_name, input_schema in inputs_or_outputs.items():
 
@@ -328,6 +336,9 @@ class _StaticValidator:
 
             for field in fields:
                 cls._check_single_field(field, property_type)
+
+            label = input_schema.label
+            cls._check_label(label, input_name)
 
     @classmethod
     def _check_single_field(cls, field: meta.FieldSchema, property_type):

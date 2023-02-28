@@ -22,6 +22,7 @@ import org.finos.tracdap.common.codec.ICodecManager;
 import org.finos.tracdap.common.concurrent.Flows;
 import org.finos.tracdap.common.data.DataPipeline;
 import org.finos.tracdap.common.data.IDataContext;
+import org.finos.tracdap.common.data.pipeline.RangeSelector;
 import org.finos.tracdap.common.exception.EStorageValidation;
 import org.finos.tracdap.common.storage.IDataStorage;
 import org.finos.tracdap.common.storage.IFileStorage;
@@ -75,7 +76,9 @@ public class FlatDataStorage implements IDataStorage {
     }
 
     @Override
-    public DataPipeline pipelineReader(StorageCopy storageCopy, Schema requiredSchema, IDataContext dataContext) {
+    public DataPipeline pipelineReader(
+            StorageCopy storageCopy, Schema requiredSchema, IDataContext dataContext,
+            long offset, long limit) {
 
         var codec = formats.getCodec(storageCopy.getStorageFormat());
 
@@ -89,7 +92,12 @@ public class FlatDataStorage implements IDataStorage {
         var options = Map.<String, String>of();
         var decoder = codec.getDecoder(dataContext.arrowAllocator(), requiredSchema, options);
 
-        return pipeline.addStage(decoder);
+        pipeline.addStage(decoder);
+
+        if (offset != 0 || limit != 0)
+            pipeline.addStage(new RangeSelector(offset, limit));
+
+        return pipeline;
     }
 
     @Override

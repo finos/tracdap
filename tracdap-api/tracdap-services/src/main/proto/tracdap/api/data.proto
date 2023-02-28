@@ -580,10 +580,41 @@ message DataReadRequest {
    */
   string format = 3;
 
+  /**
+   * Limit the number of rows returned by the request (optional).
+   *
+   * If specified the server will limit the number of rows returned.
+   * There is a hard limit configured in the back end, TRAC will never return
+   * more rows than the hard limit regardless of the limit value supplied by
+   * the client. If no limit value is supplied, the back end hard limit will
+   * still be applied.
+   *
+   * The returned rows are not ordered however ordering is guaranteed
+   * to stay the same for any particular dataset, i.e. two requests for the
+   * same dataset will return rows in the same order. If the dataset is
+   * expunged and recreated on the platform, e.g. by a re-run after an
+   * expired retention period, the ordering of the dataset may change.
+   */
+  optional uint64 limit = 4;
+
+
+  /**
+   * Read dataset starting at the row with the given offset (optional).
+   *
+   * If specified the server will start the read operation at the given row offset.
+   * Can be combined with the limit parameter to achieve pagination.
+   * If the offset is greater than the size of the dataset, no rows will be returned.
+   *
+   * The returned rows are not ordered however ordering is guaranteed
+   * to stay the same for any particular dataset, i.e. two requests for the
+   * same dataset will return rows in the same order. If the dataset is
+   * expunged and recreated on the platform, e.g. by a re-run after an
+   * expired retention period, the ordering of the dataset may change.
+   */
+  optional uint64 offset = 5;
+
 //  map<string, metadata.Value> formatOptions = 4;
 //  optional metadata.PartKey part = 5;
-//  optional uint64 offset = 6;
-//  optional uint32 limit = 7;
 }
 
 /**

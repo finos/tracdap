@@ -256,7 +256,7 @@ public class CsvDecoder extends BufferDecoder {
                     if (row == BATCH_SIZE) {
 
                         root.setRowCount(row);
-                        consumer().onNext();
+                        consumer().onBatch();
 
                         if (!consumerReady())
                             return false;
@@ -278,7 +278,7 @@ public class CsvDecoder extends BufferDecoder {
         if (row > 0 || col > 0) {
 
             root.setRowCount(row);
-            consumer().onNext();
+            consumer().onBatch();
         }
 
         return true;

@@ -67,7 +67,7 @@ public class JsonDecoder extends StreamingDecoder {
                 log.trace("JSON DECODER: onStart()");
 
             var factory = new JsonFactory();
-            var tableHandler = new JsonTableHandler(root, batch -> consumer().onNext(), BATCH_SIZE, CASE_INSENSITIVE);
+            var tableHandler = new JsonTableHandler(root, batch -> consumer().onBatch(), BATCH_SIZE, CASE_INSENSITIVE);
 
             this.parser = new JsonStreamParser(factory, tableHandler);
 

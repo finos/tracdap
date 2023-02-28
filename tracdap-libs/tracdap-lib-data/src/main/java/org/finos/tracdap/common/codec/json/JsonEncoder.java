@@ -80,7 +80,7 @@ public class JsonEncoder extends StreamingEncoder implements AutoCloseable {
     }
 
     @Override
-    public void onNext() {
+    public void onBatch() {
 
         try {
 
