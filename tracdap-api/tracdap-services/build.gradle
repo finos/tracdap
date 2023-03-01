@@ -17,6 +17,7 @@
 plugins {
     id "com.google.protobuf"
     id "java-library"
+    id "idea"  // IDEA plugin is required to make IDEA work properly with protobuf
 }
 
 apply from: "${rootProject.projectDir.path}/gradle/base-java.gradle"
@@ -38,17 +39,16 @@ protobuf {
 
     generateProtoTasks.generatedFilesBaseDir = "${project.buildDir}/generated-sources"
 
-    generateProtoTasks {
-        all().each { task ->
+    generateProtoTasks.all().configureEach {
 
-            task.builtins {
-                java { }
-            }
+        builtins {
+            java { }
+        }
 
-            task.plugins {
-                grpc { }
-            }
-        }}
+        plugins {
+            grpc { }
+        }
+    }
 }
 
 sourceSets {
@@ -57,34 +57,31 @@ sourceSets {
             // Include generated code from protoc / gRPC
             srcDirs "${project.buildDir}/generated-sources/main/java"
             srcDirs "${project.buildDir}/generated-sources/main/grpc"
-
-            // Including the proto src dir lets autocomplete work in the IDE
-            // Not strictly necessary for protobuf itself
-            srcDirs "${projectDir}/src/main/proto"
         }
     }
 }
 
 dependencies {
 
-    api project(':tracdap-api-metadata')
-
-    // JavaX "Generated" annotation is still required by gRPC generated code
-    implementation project(':tracdap-lib-annotations')
-
     // Core services API uses gRPC / Protobuf stubs
+    api group: 'com.google.protobuf', name: 'protobuf-java', version: "$proto_version"
     api group: 'io.grpc', name: 'grpc-stub', version: "$grpc_version"
     api group: 'io.grpc', name: 'grpc-protobuf', version: "$grpc_version"
 
-    // gRPC has a dependency on Guava - make sure we get the right version
-    api group: 'com.google.guava', name: 'guava', version: "$guava_version"
+    api project(':tracdap-api-metadata')
 
     // Google APIs framework for REST APIs
-    implementation group: 'com.google.api.grpc', name: 'proto-google-common-protos', version: "$gapi_version"
+    api group: 'com.google.api.grpc', name: 'proto-google-common-protos', version: "$gapi_version"
+
+    // gRPC has a dependency on Guava - make sure we get the right version
+    implementation group: 'com.google.guava', name: 'guava', version: "$guava_version"
+
+    // JavaX "Generated" annotation is still required by gRPC generated code
+    implementation project(':tracdap-lib-annotations')
 }
 
 // Javadoc gives a lot of warnings on the protobuf generated code
 // Turn these warnings off, they're noisy and obscure real Javadoc warnings from TRAC's own code
-tasks.withType(Javadoc) {
+tasks.withType(Javadoc).configureEach {
     options.addStringOption('Xdoclint:none', '-quiet')
 }

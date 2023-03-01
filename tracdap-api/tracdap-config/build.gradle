@@ -17,6 +17,7 @@
 plugins {
     id "com.google.protobuf"
     id "java-library"
+    id "idea"  // IDEA plugin is required to make IDEA work properly with protobuf
 }
 
 apply from: "${rootProject.projectDir.path}/gradle/base-java.gradle"
@@ -32,38 +33,24 @@ protobuf {
 
     generateProtoTasks.generatedFilesBaseDir = "${project.buildDir}/generated-sources"
 
-    generateProtoTasks {
-        all().each { task ->
+    generateProtoTasks.all().each { task ->
 
-            task.builtins {
-                java { }
-            }
-        }}
-}
-
-sourceSets {
-    main {
-        java {
-            // Include generated code from protoc
-            srcDirs "${project.buildDir}/generated-sources/main/java"
-
-            // Including the proto src dir lets autocomplete work in the IDE
-            // Not strictly necessary for protobuf itself
-            srcDirs "${projectDir}/src/main/proto"
+        task.builtins {
+            java { }
         }
     }
 }
 
 dependencies {
 
-    api project(":tracdap-api-metadata")
-
     // Core protobuf for Java
     api group: 'com.google.protobuf', name: 'protobuf-java', version: "$proto_version"
+
+    api project(":tracdap-api-metadata")
 }
 
 // Javadoc gives a lot of warnings on the protobuf generated code
 // Turn these warnings off, they're noisy and obscure real Javadoc warnings from TRAC's own code
-tasks.withType(Javadoc) {
+tasks.withType(Javadoc).configureEach {
     options.addStringOption('Xdoclint:none', '-quiet')
 }
