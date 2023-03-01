@@ -127,6 +127,13 @@
     Either way, it relies on core devs keeping an eye on outstanding security issues.
     -->
 
+    <!-- Medium level warning in legacy (deprecated) API, Google are not issuing a fix -->
+    <!-- https://github.com/google/guava/issues/4011 -->
+    <suppress>
+        <packageUrl regex="true">^pkg:maven/com\.google\.guava/guava@.*$</packageUrl>
+        <vulnerabilityName>CVE-2020-8908</vulnerabilityName>
+    </suppress>
+
 
     <!-- The H2 developers maintain this CVE is not a security vulnerability and have not issued a fix -->
     <!-- The vulnerability only applies when an H2 web console service is running -->

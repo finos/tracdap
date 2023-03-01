@@ -73,11 +73,11 @@ dependencies {
     // Google APIs framework for REST APIs
     api group: 'com.google.api.grpc', name: 'proto-google-common-protos', version: "$gapi_version"
 
-    // JavaX "Generated" annotation is still required by gRPC generated code
-    implementation project(':tracdap-lib-annotations')
-
     // gRPC has a dependency on Guava - make sure we get the right version
     implementation group: 'com.google.guava', name: 'guava', version: "$guava_version"
+
+    // JavaX "Generated" annotation is still required by gRPC generated code
+    implementation project(':tracdap-lib-annotations')
 }
 
 // Javadoc gives a lot of warnings on the protobuf generated code
