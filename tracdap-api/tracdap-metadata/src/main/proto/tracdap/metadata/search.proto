@@ -129,6 +129,13 @@ enum SearchOperator {
    * for this reason it is not recommended to use the IN operator with FLOAT values.
    */
   IN = 7;
+
+  /**
+  EXISTS
+
+  TODO: add description
+   */
+  EXISTS = 8;
 }
 
 

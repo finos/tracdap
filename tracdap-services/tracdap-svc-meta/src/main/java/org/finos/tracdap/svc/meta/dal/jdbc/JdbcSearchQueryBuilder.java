@@ -215,6 +215,9 @@ class JdbcSearchQueryBuilder {
             case IN:
                 return buildInTerm(baseQuery, searchTerm);
 
+            case EXISTS:
+                return buildExistsTerm(baseQuery, searchTerm);
+
             default:
 
                 // Internal error - invalid searches should be picked up in the validation layer
@@ -427,6 +430,25 @@ class JdbcSearchQueryBuilder {
 
         return buildSearchTermFromTemplates(baseQuery, searchTerm, joinTemplate, whereTemplate,
                 Stream.concat(Stream.of(paramNameSetter), paramValueSetters));
+    }
+
+    JdbcSearchQuery buildExistsTerm(JdbcSearchQuery baseQuery, SearchTerm searchTerm) {
+
+        var joinTemplate = ""; /*""join tag_attr ta%1$d\n" +
+                "  on ta%1$d.tenant_id = t%2$d.tenant_id\n" +
+                "  and ta%1$d.tag_fk = t%2$d.tag_pk";*/
+
+        var whereTemplate = ""; /*""ta%1$d.attr_name = ? " +
+                "and ta%1$d.attr_index = ? " +
+                "and ta%1$d.attr_value_%2$s %3$s ?";*/
+
+        // Match attr name
+        var paramNameSetter = wrapErrors((stmt, pIndex) ->
+                stmt.setString(pIndex, searchTerm.getAttrName()));
+
+
+        return null; //buildSearchTermFromTemplates(baseQuery, searchTerm, joinTemplate, whereTemplate,
+                //Stream.of(paramNameSetter, paramIndexSetter, paramValueSetter));
     }
 
     JdbcSearchQuery buildSearchTermFromTemplates(
@@ -646,7 +668,8 @@ class JdbcSearchQueryBuilder {
             Map.entry(SearchOperator.GE, ">="),
             Map.entry(SearchOperator.LT, "<"),
             Map.entry(SearchOperator.LE, "<="),
-            Map.entry(SearchOperator.IN, "IN"));
+            Map.entry(SearchOperator.IN, "IN"),
+            Map.entry(SearchOperator.EXISTS, "EXISTS"));
 
     private static final int SINGLE_VALUED_ATTR_INDEX = -1;
 }
