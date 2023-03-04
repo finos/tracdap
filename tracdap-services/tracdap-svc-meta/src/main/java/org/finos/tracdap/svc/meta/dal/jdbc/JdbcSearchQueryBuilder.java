@@ -339,6 +339,28 @@ class JdbcSearchQueryBuilder {
     // SEARCH TERMS
     // -----------------------------------------------------------------------------------------------------------------
 
+    JdbcSearchQuery buildExistsTerm(JdbcSearchQuery baseQuery, SearchTerm searchTerm) {
+
+        var joinTemplate = "join tag_attr ta%1$d\n" +
+                "  on ta%1$d.tenant_id = t%2$d.tenant_id\n" +
+                "  and ta%1$d.tag_fk = t%2$d.tag_pk";
+
+        var whereTemplate = "ta%1$d.attr_name = ?";
+
+        // Match attr name
+        var paramNameSetter = wrapErrors((stmt, pIndex) ->
+                stmt.setString(pIndex, searchTerm.getAttrName()));
+
+        // Condition for attr value
+        /*var paramValueSetter = wrapErrors((stmt, pIndex) ->
+                JdbcAttrHelpers.setAttrValue(
+                        stmt, pIndex, searchTerm.getAttrType(), searchTerm.getSearchValue()));*/
+
+        return buildSearchTermFromTemplates(baseQuery, searchTerm, joinTemplate, whereTemplate,
+                Stream.of(paramNameSetter)); //, paramValueSetter));
+
+    }
+
     JdbcSearchQuery buildEqualsTerm(JdbcSearchQuery baseQuery, SearchTerm searchTerm) {
 
         var joinTemplate = "join tag_attr ta%1$d\n" +
@@ -430,25 +452,6 @@ class JdbcSearchQueryBuilder {
 
         return buildSearchTermFromTemplates(baseQuery, searchTerm, joinTemplate, whereTemplate,
                 Stream.concat(Stream.of(paramNameSetter), paramValueSetters));
-    }
-
-    JdbcSearchQuery buildExistsTerm(JdbcSearchQuery baseQuery, SearchTerm searchTerm) {
-
-        var joinTemplate = ""; /*""join tag_attr ta%1$d\n" +
-                "  on ta%1$d.tenant_id = t%2$d.tenant_id\n" +
-                "  and ta%1$d.tag_fk = t%2$d.tag_pk";*/
-
-        var whereTemplate = ""; /*""ta%1$d.attr_name = ? " +
-                "and ta%1$d.attr_index = ? " +
-                "and ta%1$d.attr_value_%2$s %3$s ?";*/
-
-        // Match attr name
-        var paramNameSetter = wrapErrors((stmt, pIndex) ->
-                stmt.setString(pIndex, searchTerm.getAttrName()));
-
-
-        return null; //buildSearchTermFromTemplates(baseQuery, searchTerm, joinTemplate, whereTemplate,
-                //Stream.of(paramNameSetter, paramIndexSetter, paramValueSetter));
     }
 
     JdbcSearchQuery buildSearchTermFromTemplates(
@@ -669,7 +672,7 @@ class JdbcSearchQueryBuilder {
             Map.entry(SearchOperator.LT, "<"),
             Map.entry(SearchOperator.LE, "<="),
             Map.entry(SearchOperator.IN, "IN"),
-            Map.entry(SearchOperator.EXISTS, "EXISTS"));
+            Map.entry(SearchOperator.EXISTS, "")); //TODO: verify it
 
     private static final int SINGLE_VALUED_ATTR_INDEX = -1;
 }
