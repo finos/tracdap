@@ -307,12 +307,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
 
         var searchResult = dal.search(TestData.TEST_TENANT, searchParams);
 
-        Tag tag3 = null;
-
-        for(int i = 0; i < testTags.size(); i++) {
-            tag3 = clearDefinitionBody(testTags.get(i));
-            if(tag3.containsAttrs(attrToLookFor + "_NOT")) break;
-        }
+        Tag tag3 = clearDefinitionBody(testTags.get(2));
 
         assertEquals(2, searchResult.size());
         assertNotEquals(tag3, searchResult.get(0));

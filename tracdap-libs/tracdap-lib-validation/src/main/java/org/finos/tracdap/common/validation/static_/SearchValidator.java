@@ -179,7 +179,7 @@ public class SearchValidator {
 
         if (!ctx.failed()) {
             ctx = ctx.apply(SearchValidator::operatorMatchesType, SearchTerm.class);
-            ctx = ctx.apply(SearchValidator::valueMatchesType, SearchTerm.class);
+            ctx = ctx.applyIf(!msg.getOperator().equals(SearchOperator.EXISTS), SearchValidator::valueMatchesType, SearchTerm.class);
         }
 
         return ctx;

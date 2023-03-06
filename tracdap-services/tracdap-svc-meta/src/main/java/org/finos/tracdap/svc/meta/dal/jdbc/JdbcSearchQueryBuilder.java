@@ -341,9 +341,18 @@ class JdbcSearchQueryBuilder {
 
     JdbcSearchQuery buildExistsTerm(JdbcSearchQuery baseQuery, SearchTerm searchTerm) {
 
+        // The meaning of character strings used in joinTemplate as placeholders for later substitution:
+        // %1$d = nextAttrNumber
+        // %2$d = subQueryNumber
+
         var joinTemplate = "join tag_attr ta%1$d\n" +
                 "  on ta%1$d.tenant_id = t%2$d.tenant_id\n" +
                 "  and ta%1$d.tag_fk = t%2$d.tag_pk";
+
+        // The meaning of character strings used in whereTemplate as placeholders for later substitution:
+        // %1$d = nextAttrNumber
+        // %2$s = attrType
+        // %3$s = searchOperator
 
         var whereTemplate = searchTerm.getAttrType().equals(BasicType.BASIC_TYPE_NOT_SET) ? "ta%1$d.attr_name = ?" :
                 "ta%1$d.attr_name = ? and ta%1$d.attr_type = '%2$s'";
@@ -358,9 +367,18 @@ class JdbcSearchQueryBuilder {
 
     JdbcSearchQuery buildEqualsTerm(JdbcSearchQuery baseQuery, SearchTerm searchTerm) {
 
+        // The meaning of character strings used in joinTemplate as placeholders for later substitution:
+        // %1$d = nextAttrNumber
+        // %2$d = subQueryNumber
+
         var joinTemplate = "join tag_attr ta%1$d\n" +
                 "  on ta%1$d.tenant_id = t%2$d.tenant_id\n" +
                 "  and ta%1$d.tag_fk = t%2$d.tag_pk";
+
+        // The meaning of character strings used in whereTemplate as placeholders for later substitution:
+        // %1$d = nextAttrNumber
+        // %2$s = attrType
+        // %3$s = searchOperator
 
         var whereTemplate = "ta%1$d.attr_name = ? " +
                 "and ta%1$d.attr_value_%2$s = ?";
@@ -399,9 +417,18 @@ class JdbcSearchQueryBuilder {
 
     JdbcSearchQuery buildInequalityTerm(JdbcSearchQuery baseQuery, SearchTerm searchTerm) {
 
+        // The meaning of character strings used in joinTemplate as placeholders for later substitution:
+        // %1$d = nextAttrNumber
+        // %2$d = subQueryNumber
+
         var joinTemplate = "join tag_attr ta%1$d\n" +
                 "  on ta%1$d.tenant_id = t%2$d.tenant_id\n" +
                 "  and ta%1$d.tag_fk = t%2$d.tag_pk";
+
+        // The meaning of character strings used in whereTemplate as placeholders for later substitution:
+        // %1$d = nextAttrNumber
+        // %2$s = attrType
+        // %3$s = searchOperator
 
         var whereTemplate = "ta%1$d.attr_name = ? " +
                 "and ta%1$d.attr_index = ? " +
@@ -429,9 +456,18 @@ class JdbcSearchQueryBuilder {
         var nItems = searchTerm.getSearchValue().getArrayValue().getItemsCount();
         var itemPlaceholders = String.join(", ", Collections.nCopies(nItems, "?"));
 
+        // The meaning of character strings used in joinTemplate as placeholders for later substitution:
+        // %1$d = nextAttrNumber
+        // %2$d = subQueryNumber
+
         var joinTemplate = "join tag_attr ta%1$d\n" +
                 "  on ta%1$d.tenant_id = t%2$d.tenant_id\n" +
                 "  and ta%1$d.tag_fk = t%2$d.tag_pk";
+
+        // The meaning of character strings used in whereTemplate as placeholders for later substitution:
+        // %1$d = nextAttrNumber
+        // %2$s = attrType
+        // %3$s = searchOperator
 
         var whereTemplate = "ta%1$d.attr_name = ? " +
                 "and ta%1$d.attr_value_%2$s in (" + itemPlaceholders + ")";
@@ -461,7 +497,7 @@ class JdbcSearchQueryBuilder {
         var attrTypeSuffix = searchTerm.getAttrType().toString();
 
         // Internal error - invalid searches should be picked up in the validation layer
-        if (searchTerm.getOperator() == null) { //TODO: rework
+        if (searchTerm.getOperator() == null) {
 
             var message = "Invalid search term (search operator not recognised)";
             log.error(message);
@@ -707,8 +743,7 @@ class JdbcSearchQueryBuilder {
             Map.entry(SearchOperator.GE, ">="),
             Map.entry(SearchOperator.LT, "<"),
             Map.entry(SearchOperator.LE, "<="),
-            Map.entry(SearchOperator.IN, "IN"),
-            Map.entry(SearchOperator.EXISTS, ""));
+            Map.entry(SearchOperator.IN, "IN"));
 
     private static final int SINGLE_VALUED_ATTR_INDEX = -1;
 }
