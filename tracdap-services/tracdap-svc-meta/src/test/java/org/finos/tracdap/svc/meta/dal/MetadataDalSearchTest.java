@@ -307,10 +307,16 @@ abstract class MetadataDalSearchTest implements IDalTestable {
 
         var searchResult = dal.search(TestData.TEST_TENANT, searchParams);
 
-        // Search results should come back with no definition body
-        var tag1 = clearDefinitionBody(testTags.get(0));
+        Tag tag3 = null;
+
+        for(int i = 0; i < testTags.size(); i++) {
+            tag3 = clearDefinitionBody(testTags.get(i));
+            if(tag3.containsAttrs(attrToLookFor + "_NOT")) break;
+        }
 
         assertEquals(2, searchResult.size());
+        assertNotEquals(tag3, searchResult.get(0));
+        assertNotEquals(tag3, searchResult.get(1));
     }
 
     // EQUALITY
@@ -500,7 +506,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
 
         var tag1 = tagForDef(def1, attrToLookFor, MetadataCodec.encodeNativeObject(objectOfType(basicType)));
 
-        // Wrong attr type - should not match
+        // Different attr type
         var tag2 = tagForDef(def2, attrToLookFor, MetadataCodec.encodeNativeObject(attr_value_2));
 
         // Wrong attr name - should not match
