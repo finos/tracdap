@@ -19,6 +19,7 @@ import enum as _enum
 import typing as _tp
 
 import pyarrow as _pa
+import pyarrow.fs as _afs
 
 
 class FileType(_enum.Enum):
@@ -144,4 +145,11 @@ class IDataFormat:
 
     @_abc.abstractmethod
     def write_table(self, target: _tp.BinaryIO, table: _pa.Table):
+        pass
+
+
+class IFileSystemProvider:
+
+    @_abc.abstractmethod
+    def prepare_file_system(self) -> _afs.FileSystem:
         pass
