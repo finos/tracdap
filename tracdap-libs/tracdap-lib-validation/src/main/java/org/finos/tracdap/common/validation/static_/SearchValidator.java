@@ -157,7 +157,8 @@ public class SearchValidator {
                 .pop();
 
         ctx = ctx.push(ST_ATTR_TYPE)
-                .apply(CommonValidators::required)
+                .applyIf(!msg.getOperator().equals(SearchOperator.EXISTS), CommonValidators::required)
+                .applyIf(msg.getOperator().equals(SearchOperator.EXISTS), CommonValidators::optional)
                 .apply(CommonValidators::nonZeroEnum, BasicType.class)
                 .apply(CommonValidators::primitiveType, BasicType.class)
                 .pop();
@@ -168,7 +169,8 @@ public class SearchValidator {
                 .pop();
 
         ctx = ctx.push(ST_SEARCH_VALUE)
-                .apply(CommonValidators::required)
+                .applyIf(!msg.getOperator().equals(SearchOperator.EXISTS), CommonValidators::required)
+                .applyIf(msg.getOperator().equals(SearchOperator.EXISTS), CommonValidators::omitted)
                 .apply(TypeSystemValidator::value, Value.class)
                 .pop();
 

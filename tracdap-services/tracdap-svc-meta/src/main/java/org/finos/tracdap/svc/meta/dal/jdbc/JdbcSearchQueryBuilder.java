@@ -345,20 +345,15 @@ class JdbcSearchQueryBuilder {
                 "  on ta%1$d.tenant_id = t%2$d.tenant_id\n" +
                 "  and ta%1$d.tag_fk = t%2$d.tag_pk";
 
-        var whereTemplate = "ta%1$d.attr_name = ?";
+        var whereTemplate = searchTerm.getAttrType().equals(BasicType.BASIC_TYPE_NOT_SET) ? "ta%1$d.attr_name = ?" :
+                "ta%1$d.attr_name = ? and ta%1$d.attr_type = '%2$s'";
 
         // Match attr name
         var paramNameSetter = wrapErrors((stmt, pIndex) ->
                 stmt.setString(pIndex, searchTerm.getAttrName()));
 
-        // Condition for attr value
-        /*var paramValueSetter = wrapErrors((stmt, pIndex) ->
-                JdbcAttrHelpers.setAttrValue(
-                        stmt, pIndex, searchTerm.getAttrType(), searchTerm.getSearchValue()));*/
-
-        return buildSearchTermFromTemplates(baseQuery, searchTerm, joinTemplate, whereTemplate,
-                Stream.of(paramNameSetter)); //, paramValueSetter));
-
+        return buildSearchTermFromTemplatesForExistsOperator(baseQuery, searchTerm, joinTemplate, whereTemplate,
+                Stream.of(paramNameSetter));
     }
 
     JdbcSearchQuery buildEqualsTerm(JdbcSearchQuery baseQuery, SearchTerm searchTerm) {
@@ -452,6 +447,47 @@ class JdbcSearchQueryBuilder {
 
         return buildSearchTermFromTemplates(baseQuery, searchTerm, joinTemplate, whereTemplate,
                 Stream.concat(Stream.of(paramNameSetter), paramValueSetters));
+    }
+
+    JdbcSearchQuery buildSearchTermFromTemplatesForExistsOperator(
+            JdbcSearchQuery baseQuery, SearchTerm searchTerm,
+            String joinTemplate, String whereTemplate,
+            Stream<JdbcSearchQuery.ParamSetter> params) {
+
+        // Fill out the join and where clause templates
+
+        var queryNumber = baseQuery.getSubQueryNumber();
+        var attrNumber = baseQuery.getNextAttrNumber();
+        var attrTypeSuffix = searchTerm.getAttrType().toString();
+
+        // Internal error - invalid searches should be picked up in the validation layer
+        if (searchTerm.getOperator() == null) { //TODO: rework
+
+            var message = "Invalid search term (search operator not recognised)";
+            log.error(message);
+
+            throw new EValidationGap(message);
+        }
+
+        var joinClause = String.format(joinTemplate, attrNumber, queryNumber);
+        var whereClause = "(" + String.format(whereTemplate, attrNumber, attrTypeSuffix) + ")";
+
+        // Create a new fragment for this search term
+        var fragment = new JdbcSearchQuery.Fragment(joinClause, whereClause, params.collect(Collectors.toList()));
+
+        // Add this new fragment to the list of fragments
+        var fragments = Stream.concat(
+                        baseQuery.getFragments().stream(),
+                        Stream.of(fragment))
+                .collect(Collectors.toList());
+
+        // Each search term queries a single attr, so increment nextAttrNumber by 1
+        // Adding a search term does not require a new sub-query, so subQueryNumber does not change
+
+        return new JdbcSearchQuery(
+                baseQuery.getSubQueryNumber(),
+                baseQuery.getNextAttrNumber() + 1,
+                fragments);
     }
 
     JdbcSearchQuery buildSearchTermFromTemplates(
@@ -672,7 +708,7 @@ class JdbcSearchQueryBuilder {
             Map.entry(SearchOperator.LT, "<"),
             Map.entry(SearchOperator.LE, "<="),
             Map.entry(SearchOperator.IN, "IN"),
-            Map.entry(SearchOperator.EXISTS, "")); //TODO: verify it
+            Map.entry(SearchOperator.EXISTS, ""));
 
     private static final int SINGLE_VALUED_ATTR_INDEX = -1;
 }
