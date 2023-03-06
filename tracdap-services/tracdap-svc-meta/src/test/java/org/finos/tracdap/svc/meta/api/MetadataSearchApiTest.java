@@ -202,6 +202,56 @@ abstract class MetadataSearchApiTest {
     }
 
     @Test
+    void basicSearchExistsNoType() {
+
+        var searchAttr = "basicSearch_DROIDS_EXIST_without_type_";
+
+        var obj1 = TestData.dummyDataDef();
+        var obj2 = TestData.dummyDataDef();
+
+        var tag1 = Tag.newBuilder()
+                .setDefinition(obj1)
+                .putAttrs(searchAttr, encodeValue("the_droids_you_are_looking_for"))
+                .build();
+
+        var tag2 = Tag.newBuilder()
+                .setDefinition(obj2)
+                .putAttrs(searchAttr, encodeValue(2.71828182845904523536))
+                .build();
+
+        var save1 = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.DATA)
+                .setDefinition(obj1)
+                .addAllTagUpdates(tagUpdatesForAttrs(tag1.getAttrsMap()))
+                .build();
+
+        var save2 = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.DATA)
+                .setDefinition(obj2)
+                .addAllTagUpdates(tagUpdatesForAttrs(tag2.getAttrsMap()))
+                .build();
+
+        var id1 = writeApi.createObject(save1);
+        writeApi.createObject(save2);
+
+        var searchRequest = MetadataSearchRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSearchParams(SearchParameters.newBuilder()
+                        .setObjectType(ObjectType.DATA)
+                        .setSearch(SearchExpression.newBuilder()
+                                .setTerm(SearchTerm.newBuilder()
+                                        .setAttrName(searchAttr)
+                                        .setOperator(SearchOperator.EXISTS))))
+                .build();
+
+        var searchResult = searchApi.search(searchRequest);
+
+        assertEquals(2, searchResult.getSearchResultCount());
+    }
+
+    @Test
     void basicSearch() {
 
         var searchAttr = "basicSearch_WHICH_DROIDS";
