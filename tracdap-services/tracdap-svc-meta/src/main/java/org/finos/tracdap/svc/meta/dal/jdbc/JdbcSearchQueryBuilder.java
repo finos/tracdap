@@ -352,7 +352,6 @@ class JdbcSearchQueryBuilder {
         // The meaning of character strings used in whereTemplate as placeholders for later substitution:
         // %1$d = nextAttrNumber
         // %2$s = attrType
-        // %3$s = searchOperator
 
         var whereTemplate = searchTerm.getAttrType().equals(BasicType.BASIC_TYPE_NOT_SET) ? "ta%1$d.attr_name = ?" :
                 "ta%1$d.attr_name = ? and ta%1$d.attr_type = '%2$s'";
@@ -378,7 +377,6 @@ class JdbcSearchQueryBuilder {
         // The meaning of character strings used in whereTemplate as placeholders for later substitution:
         // %1$d = nextAttrNumber
         // %2$s = attrType
-        // %3$s = searchOperator
 
         var whereTemplate = "ta%1$d.attr_name = ? " +
                 "and ta%1$d.attr_value_%2$s = ?";
@@ -467,7 +465,6 @@ class JdbcSearchQueryBuilder {
         // The meaning of character strings used in whereTemplate as placeholders for later substitution:
         // %1$d = nextAttrNumber
         // %2$s = attrType
-        // %3$s = searchOperator
 
         var whereTemplate = "ta%1$d.attr_name = ? " +
                 "and ta%1$d.attr_value_%2$s in (" + itemPlaceholders + ")";
@@ -491,7 +488,6 @@ class JdbcSearchQueryBuilder {
             Stream<JdbcSearchQuery.ParamSetter> params) {
 
         // Fill out the join and where clause templates
-
         var queryNumber = baseQuery.getSubQueryNumber();
         var attrNumber = baseQuery.getNextAttrNumber();
         var attrTypeSuffix = searchTerm.getAttrType().toString();

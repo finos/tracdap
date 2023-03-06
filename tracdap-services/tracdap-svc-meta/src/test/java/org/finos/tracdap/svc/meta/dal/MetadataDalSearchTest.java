@@ -273,8 +273,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
                         .setTerm(SearchTerm.newBuilder()
                                 .setAttrName(attrToLookFor)
                                 .setOperator(SearchOperator.EXISTS)
-                                .setAttrType(basicType)
-                ))
+                                .setAttrType(basicType)))
                 .build();
 
         var searchResult = dal.search(TestData.TEST_TENANT, searchParams);
@@ -301,8 +300,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
                 .setSearch(SearchExpression.newBuilder()
                         .setTerm(SearchTerm.newBuilder()
                                 .setAttrName(attrToLookFor)
-                                .setOperator(SearchOperator.EXISTS)
-                        ))
+                                .setOperator(SearchOperator.EXISTS)))
                 .build();
 
         var searchResult = dal.search(TestData.TEST_TENANT, searchParams);
