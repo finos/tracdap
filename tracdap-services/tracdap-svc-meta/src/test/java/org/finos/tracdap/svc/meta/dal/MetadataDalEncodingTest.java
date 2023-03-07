@@ -97,6 +97,9 @@ abstract class MetadataDalEncodingTest implements IDalTestable {
         var attrValue = objectOfType(attrType);
 
         var testTag = origTag.toBuilder()
+                .setHeader(origTag.getHeader().toBuilder()
+                        .setIsLatestTag(true) // TODO: replicate this in other tests
+                )
                 .putAttrs(attrName, MetadataCodec.encodeNativeObject(attrValue))
                 .build();
 

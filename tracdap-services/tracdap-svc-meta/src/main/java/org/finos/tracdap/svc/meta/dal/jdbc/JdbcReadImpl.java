@@ -91,7 +91,7 @@ class JdbcReadImpl {
             throws SQLException {
 
         var query =
-                "select definition_pk, object_version, object_timestamp, definition\n" +
+                "select definition_pk, object_version, object_timestamp, definition, object_is_latest\n" +
                 "from object_definition\n" +
                 "where tenant_id = ?\n" +
                 "and object_fk = ?\n" +
@@ -114,7 +114,7 @@ class JdbcReadImpl {
             throws SQLException {
 
         var query =
-                "select definition_pk, object_version, object_timestamp, definition\n" +
+                "select definition_pk, object_version, object_timestamp, definition, object_is_latest\n" +
                 "from object_definition\n" +
                 "where tenant_id = ?\n" +
                 "and object_fk = ?\n" +
@@ -140,7 +140,7 @@ class JdbcReadImpl {
             throws SQLException {
 
         var query =
-                "select definition_pk, object_version, object_timestamp, definition\n" +
+                "select definition_pk, object_version, object_timestamp, definition, object_is_latest\n" +
                 "from object_definition\n" +
                 "where tenant_id = ?\n" +
                 "  and object_fk = ?\n" +
@@ -170,13 +170,14 @@ class JdbcReadImpl {
             var objectTimestamp = sqlTimestamp.toInstant();
             var defEncoded = rs.getBytes(4);
             var defDecoded = ObjectDefinition.parseFrom(defEncoded);
+            var objectIsLatest = rs.getBoolean(5);
 
             // TODO: Encode / decode helper, type = protobuf | json ?
 
             if (rs.next())
                 throw new JdbcException(JdbcErrorCode.TOO_MANY_ROWS);
 
-            return new KeyedItem<>(defPk, objectVersion, objectTimestamp, defDecoded);
+            return new KeyedItem<>(defPk, objectVersion, objectTimestamp, defDecoded, objectIsLatest);
         }
         catch (InvalidProtocolBufferException e) {
             throw new JdbcException(JdbcErrorCode.INVALID_OBJECT_DEFINITION);
@@ -207,7 +208,7 @@ class JdbcReadImpl {
     readTagRecordByVersion(Connection conn, short tenantId, long definitionPk, int tagVersion) throws SQLException {
 
         var query =
-                "select tag_pk, tag_version, tag_timestamp\n" +
+                "select tag_pk, tag_version, tag_timestamp, tag_is_latest\n" +
                 "from tag\n" +
                 "where tenant_id = ?\n" +
                 "and definition_fk = ?\n" +
@@ -230,7 +231,7 @@ class JdbcReadImpl {
             throws SQLException {
 
         var query =
-                "select tag_pk, tag_version, tag_timestamp\n" +
+                "select tag_pk, tag_version, tag_timestamp, tag_is_latest\n" +
                 "from tag\n" +
                 "where tenant_id = ?\n" +
                 "and definition_fk = ?\n" +
@@ -254,7 +255,7 @@ class JdbcReadImpl {
     readTagRecordByLatest(Connection conn, short tenantId, long definitionPk) throws SQLException {
 
         var query =
-                "select tag_pk, tag_version, tag_timestamp\n" +
+                "select tag_pk, tag_version, tag_timestamp, tag_is_latest\n" +
                 "from tag\n" +
                 "where tenant_id = ?\n" +
                 "and definition_fk = ?\n" +
@@ -282,12 +283,13 @@ class JdbcReadImpl {
             var tagVersion = rs.getInt(2);
             var sqlTimestamp = rs.getTimestamp(3);
             var tagTimestamp = sqlTimestamp.toInstant();
+            var tagIsLatest = rs.getBoolean(4);
 
             if (rs.next())
                 throw new JdbcException(JdbcErrorCode.TOO_MANY_ROWS);
 
             // Tag record requires only PK and version info
-            return new KeyedItem<>(tagPk, tagVersion, tagTimestamp, null);
+            return new KeyedItem<>(tagPk, tagVersion, tagTimestamp, null, tagIsLatest);
         }
     }
 

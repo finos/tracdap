@@ -82,6 +82,11 @@ message TagHeader {
    * Timestamp for when this version of the tag was created.
    */
   DatetimeValue tagTimestamp = 6;
+
+  bool isLatestObject = 7;
+
+  bool isLatestTag = 8;
+
 }
 
 
