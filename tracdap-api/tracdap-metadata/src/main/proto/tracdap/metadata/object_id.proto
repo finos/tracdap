@@ -83,10 +83,15 @@ message TagHeader {
    */
   DatetimeValue tagTimestamp = 6;
 
+  /**
+   * isLatest flag for the object the tag is associated with.
+   */
   bool isLatestObject = 7;
 
+  /**
+   * isLatest flag for the tag.
+   */
   bool isLatestTag = 8;
-
 }
 
 
