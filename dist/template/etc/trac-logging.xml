@@ -29,7 +29,8 @@
                 name="LOCAL_FILES"
                 type="RollingFile"
                 fileName="${sys:LOG_DIR}/${sys:LOG_NAME}.log"
-                filePattern="${sys:LOG_DIR}/${sys:LOG_NAME}-%d{yyyy-MM-dd}.log.gz">
+                filePattern="${sys:LOG_DIR}/${sys:LOG_NAME}-%d{yyyy-MM-dd}.log.gz"
+                append="true">
 
             <Layout type="PatternLayout" disableAnsi="true">
                 <Pattern>
@@ -37,8 +38,14 @@
                 </Pattern>
             </Layout>
 
-            <Policies>
-            </Policies>
+            <TimeBasedTriggeringPolicy />
+
+            <DefaultRolloverStrategy>
+                <Delete basePath="${sys:LOG_DIR}" maxDepth="1">
+                    <IfFileName glob="*.log*" />
+                    <IfLastModified age="30d" />
+                </Delete>
+            </DefaultRolloverStrategy>
 
         </Appender>
 
