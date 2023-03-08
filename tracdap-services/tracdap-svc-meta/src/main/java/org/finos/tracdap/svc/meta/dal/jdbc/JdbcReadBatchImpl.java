@@ -261,7 +261,8 @@ class JdbcReadBatchImpl {
                 "  obj.object_id_hi,\n" +
                 "  obj.object_id_lo,\n" +
                 "  def.object_version,\n" +
-                "  def.object_timestamp\n" +
+                "  def.object_timestamp,\n" +
+                "  def.object_is_latest\n"+
                 "from key_mapping km\n" +
                 "join object_definition def\n" +
                 "  on def.definition_pk = km.fk\n" +
@@ -296,6 +297,7 @@ class JdbcReadBatchImpl {
                     var objectVersion = rs.getInt(5);
                     var sqlTimestamp = rs.getTimestamp(6);
                     var objectTimestamp = sqlTimestamp.toInstant();
+                    var isLatestObject = rs.getBoolean(7);
 
                     var objectId = new UUID(objectIdHi, objectIdLo);
                     var objectType = ObjectType.valueOf(objectTypeCode);
@@ -304,6 +306,7 @@ class JdbcReadBatchImpl {
                             .setObjectType(objectType)
                             .setObjectId(objectId.toString())
                             .setObjectVersion(objectVersion)
+                            .setIsLatestObject(isLatestObject)
                             .setObjectTimestamp(MetadataCodec.encodeDatetime(objectTimestamp.atOffset(ZoneOffset.UTC)))
                             .build();
 
@@ -451,6 +454,7 @@ class JdbcReadBatchImpl {
             var header = headers.items[i].toBuilder()
                     .setTagVersion(tagRecords.versions[i])
                     .setTagTimestamp(tagTimestamp)
+                    .setIsLatestTag(tagRecords.isLatest[i])
                     .build();
 
             tags[i] = Tag.newBuilder()

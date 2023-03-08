@@ -571,7 +571,8 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
                 .setObjectId(objectId.toString())
                 .setObjectVersion(definition.version)
                 .setTagVersion(tagRecord.version)
-                .setIsLatestTag(tagRecord.isLatest) //TODO: verify - issue345
+                .setIsLatestTag(tagRecord.isLatest)
+                .setIsLatestObject(definition.isLatest)
                 .setObjectTimestamp(MetadataCodec.encodeDatetime(objectTimestamp))
                 .setTagTimestamp(MetadataCodec.encodeDatetime(tagTimestamp));
 
@@ -599,7 +600,8 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
                     .setObjectId(objectId[i].toString())
                     .setObjectVersion(definitions.versions[i])
                     .setTagVersion(tags.versions[i])
-                    .setIsLatestTag(tags.isLatest[i]) //TODO: verify - issue345
+                    .setIsLatestTag(tags.isLatest[i])
+                    .setIsLatestObject(definitions.isLatest[i])
                     .setObjectTimestamp(MetadataCodec.encodeDatetime(objectTimestamp))
                     .setTagTimestamp(MetadataCodec.encodeDatetime(tagTimestamp));
 
