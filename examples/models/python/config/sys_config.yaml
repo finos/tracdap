@@ -10,7 +10,6 @@ storage:
       protocol: LOCAL
       properties:
         rootPath: ../data
-        readOnly: false
 
 
 sparkSettings:
