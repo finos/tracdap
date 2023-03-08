@@ -255,6 +255,63 @@ abstract class MetadataDalSearchTest implements IDalTestable {
     // SEARCH TERMS
     // -----------------------------------------------------------------------------------------------------------------
 
+
+    // EXISTENCE
+
+    @ParameterizedTest
+    @EnumSource(value = BasicType.class, mode = EnumSource.Mode.EXCLUDE,
+            names = {"BASIC_TYPE_NOT_SET", "UNRECOGNIZED", "ARRAY", "MAP"})
+    void searchTerm_exists_typed(BasicType basicType) {
+
+        var attrToLookFor = "existence_search_test_" + basicType.name();
+        var testTags = existenceTestTags(basicType, attrToLookFor);
+        dal.saveNewObjects(TestData.TEST_TENANT, testTags);
+
+        var searchParams = SearchParameters.newBuilder()
+                .setObjectType(ObjectType.DATA)
+                .setSearch(SearchExpression.newBuilder()
+                        .setTerm(SearchTerm.newBuilder()
+                                .setAttrName(attrToLookFor)
+                                .setOperator(SearchOperator.EXISTS)
+                                .setAttrType(basicType)))
+                .build();
+
+        var searchResult = dal.search(TestData.TEST_TENANT, searchParams);
+
+        // Search results should come back with no definition body
+        var tag1 = clearDefinitionBody(testTags.get(0));
+
+        assertEquals(1, searchResult.size());
+        assertEquals(tag1, searchResult.get(0));
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = BasicType.class, mode = EnumSource.Mode.EXCLUDE,
+            names = {"BASIC_TYPE_NOT_SET", "UNRECOGNIZED", "ARRAY", "MAP"})
+    void searchTerm_exists_not_typed(BasicType basicType) {
+
+        var attrToLookFor = "existence_search_test_no_type_" + basicType.name();
+        var testTags = existenceTestTags(basicType, attrToLookFor);
+
+        dal.saveNewObjects(TestData.TEST_TENANT, testTags);
+
+        var searchParams = SearchParameters.newBuilder()
+                .setObjectType(ObjectType.DATA)
+                .setSearch(SearchExpression.newBuilder()
+                        .setTerm(SearchTerm.newBuilder()
+                                .setAttrName(attrToLookFor)
+                                .setOperator(SearchOperator.EXISTS)))
+                .build();
+
+        var searchResult = dal.search(TestData.TEST_TENANT, searchParams);
+
+        Tag tag3 = clearDefinitionBody(testTags.get(2));
+
+        assertEquals(2, searchResult.size());
+        assertNotEquals(tag3, searchResult.get(0));
+        assertNotEquals(tag3, searchResult.get(1));
+    }
+
     // EQUALITY
 
     @ParameterizedTest
@@ -430,6 +487,25 @@ abstract class MetadataDalSearchTest implements IDalTestable {
 
         assertEquals(3, searchResult.size());
         assertEquals(expectedResult, searchResultSet);
+    }
+
+    private List<Tag> existenceTestTags(BasicType basicType, String attrToLookFor) {
+
+        var def1 = TestData.dummyDataDef();
+        var def2 = TestData.nextDataDef(def1);
+        var def3 = TestData.nextDataDef(def2);
+
+        var attr_value_2 = objectOfDifferentType(basicType);
+
+        var tag1 = tagForDef(def1, attrToLookFor, MetadataCodec.encodeNativeObject(objectOfType(basicType)));
+
+        // Different attr type
+        var tag2 = tagForDef(def2, attrToLookFor, MetadataCodec.encodeNativeObject(attr_value_2));
+
+        // Wrong attr name - should not match
+        var tag3 = tagForDef(def3, attrToLookFor + "_NOT", MetadataCodec.encodeNativeObject(objectOfType(basicType)));
+
+        return List.of(tag1, tag2, tag3);
     }
 
     private List<Tag> equalityTestTags(BasicType basicType, String attrToLookFor, Object valueToLookFor) {

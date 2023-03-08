@@ -129,6 +129,16 @@ enum SearchOperator {
    * for this reason it is not recommended to use the IN operator with FLOAT values.
    */
   IN = 7;
+
+  /**
+   * EXISTS
+   *
+   * If an attribute type is provided the EXISTS operator matches a tag of specified
+   * name when the tag has an attribute whose type is matched with type provided attribute
+   * type. If no attribute type is provided, then it is enough for the tag to be of
+   * specified name to be matched.
+   */
+  EXISTS = 8;
 }
 
 
