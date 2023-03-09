@@ -97,6 +97,14 @@ class LocalStorageProvider(IStorageProvider):
 plugins.PluginManager.register_plugin(IStorageProvider, LocalStorageProvider, ["LOCAL", "file"])
 
 
+# ----------------------------------------------------------------------------------------------------------------------
+# CUSTOM IMPLEMENTATION FOR LOCAL STORAGE
+# ----------------------------------------------------------------------------------------------------------------------
+
+# This is the old implementation that was used before Arrow native was made available
+# It is likely to be removed in a future release
+
+
 class LocalFileStorage(IFileStorage):
 
     def __init__(self, config: cfg.PluginConfig, options: dict = None):
