@@ -91,22 +91,6 @@ class IFileStorage:
     def write_byte_stream(self, storage_path: str, overwrite: bool = False) -> _tp.BinaryIO:
         pass
 
-    @_abc.abstractmethod
-    def read_text(self, storage_path: str, encoding: str = 'utf-8') -> str:
-        pass
-
-    @_abc.abstractmethod
-    def read_text_stream(self, storage_path: str, encoding: str = 'utf-8') -> _tp.TextIO:
-        pass
-
-    @_abc.abstractmethod
-    def write_text(self, storage_path: str, data: str, encoding: str = 'utf-8', overwrite: bool = False):
-        pass
-
-    @_abc.abstractmethod
-    def write_text_stream(self, storage_path: str, encoding: str = 'utf-8', overwrite: bool = False) -> _tp.TextIO:
-        pass
-
 
 class IDataStorage:
 
