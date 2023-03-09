@@ -26,7 +26,7 @@ from pyarrow import fs as afs
 from . import _helpers
 
 
-class GcsStorageProvider(IStorageProvider):
+class GcpStorageProvider(IStorageProvider):
 
     ARROW_NATIVE_FS_PROPERTY = "arrowNativeFs"
     ARROW_NATIVE_FS_DEFAULT = False
@@ -97,4 +97,4 @@ class GcsStorageProvider(IStorageProvider):
         raise ex.EStartup(message)
 
 
-plugins.PluginManager.register_plugin(IStorageProvider, GcsStorageProvider, ["GCS"])
+plugins.PluginManager.register_plugin(IStorageProvider, GcpStorageProvider, ["GCS"])

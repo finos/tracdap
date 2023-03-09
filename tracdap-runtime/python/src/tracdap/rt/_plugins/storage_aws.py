@@ -39,7 +39,7 @@ except ImportError:
     boto_available = False
 
 
-class S3StorageProvider(IStorageProvider):
+class AwsStorageProvider(IStorageProvider):
 
     ARROW_NATIVE_FS_PROPERTY = "arrowNativeFs"
     ARROW_NATIVE_FS_DEFAULT = False
@@ -89,8 +89,8 @@ class S3StorageProvider(IStorageProvider):
         s3fs_args = self.setup_client_args(self.ARROW_CLIENT_ARGS)
         s3fs = afs.S3FileSystem(**s3fs_args)
 
-        bucket = _helpers.get_plugin_property(self._properties, S3StorageProvider.BUCKET_PROPERTY)
-        prefix = _helpers.get_plugin_property(self._properties, S3StorageProvider.PREFIX_PROPERTY) or ""
+        bucket = _helpers.get_plugin_property(self._properties, self.BUCKET_PROPERTY)
+        prefix = _helpers.get_plugin_property(self._properties, self.PREFIX_PROPERTY) or ""
         root_path = f"{bucket}/{prefix}"
 
         return afs.SubTreeFileSystem(root_path, s3fs)
@@ -155,7 +155,7 @@ class S3StorageProvider(IStorageProvider):
         raise ex.EStartup(message)
 
 
-plugins.PluginManager.register_plugin(IStorageProvider, S3StorageProvider, ["S3"])
+plugins.PluginManager.register_plugin(IStorageProvider, AwsStorageProvider, ["S3"])
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -177,8 +177,8 @@ if boto_available:
             self._log = _helpers.logger_for_object(self)
 
             self._properties = config.properties
-            self._bucket = _helpers.get_plugin_property(self._properties, S3StorageProvider.BUCKET_PROPERTY)
-            self._prefix = _helpers.get_plugin_property(self._properties, S3StorageProvider.PREFIX_PROPERTY) or ""
+            self._bucket = _helpers.get_plugin_property(self._properties, AwsStorageProvider.BUCKET_PROPERTY)
+            self._prefix = _helpers.get_plugin_property(self._properties, AwsStorageProvider.PREFIX_PROPERTY) or ""
 
             self._client = boto3.client(**client_args)
 
