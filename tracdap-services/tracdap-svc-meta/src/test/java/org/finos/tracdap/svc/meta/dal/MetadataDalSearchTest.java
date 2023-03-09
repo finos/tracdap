@@ -1460,7 +1460,6 @@ abstract class MetadataDalSearchTest implements IDalTestable {
                 .build();
 
         var resultPriorTags = dal.search(TEST_TENANT, searchPriorTags);
-        var resultPriorTagsFirstTag = resultPriorTags.get(0);
 
         var expectedTagHeader = t2Tag.getHeader().toBuilder()
                         .setIsLatestObject(true)
