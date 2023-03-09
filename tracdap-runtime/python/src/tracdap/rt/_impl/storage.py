@@ -92,8 +92,8 @@ class StorageManager:
 
         if provider.has_file_storage():
             file_storage = provider.get_file_storage()
-        elif provider.has_file_system():
-            fs = provider.get_file_system()
+        elif provider.has_arrow_native():
+            fs = provider.get_arrow_native()
             file_storage = CommonFileStorage(storage_key, storage_config, fs)
         else:
             file_storage = None

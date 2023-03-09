@@ -118,7 +118,7 @@ class IDataStorage:
 
 class IStorageProvider(_abc.ABC):
 
-    def has_file_system(self) -> bool:
+    def has_arrow_native(self) -> bool:
         pass
 
     def has_file_storage(self) -> bool:
@@ -127,7 +127,7 @@ class IStorageProvider(_abc.ABC):
     def has_data_storage(self) -> bool:
         pass
 
-    def get_file_system(self) -> _afs.SubTreeFileSystem:
+    def get_arrow_native(self) -> _afs.SubTreeFileSystem:
         pass
 
     def get_file_storage(self) -> IFileStorage:
