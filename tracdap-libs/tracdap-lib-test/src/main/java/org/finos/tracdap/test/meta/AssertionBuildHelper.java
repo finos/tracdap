@@ -17,14 +17,20 @@
 package org.finos.tracdap.test.meta;
 
 import org.finos.tracdap.metadata.Tag;
+import org.finos.tracdap.metadata.TagHeader;
 
 public class AssertionBuildHelper {
 
+    public static TagHeader rebuildTagHeaderForceIsLatestFlagsTrue(TagHeader tagHeader) {
+        return tagHeader.toBuilder()
+                        .setIsLatestTag(true)
+                        .setIsLatestObject(true)
+                .build();
+    }
+
     public static Tag rebuildTagForceIsLatestFlagsTrue(Tag tag) {
         return tag.toBuilder()
-            .setHeader(tag.getHeader().toBuilder()
-                    .setIsLatestTag(true)
-                    .setIsLatestObject(true))
+            .setHeader(rebuildTagHeaderForceIsLatestFlagsTrue(tag.getHeader()))
             .build();
     }
 
