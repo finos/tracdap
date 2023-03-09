@@ -124,31 +124,6 @@ def apply_http_credentials(url: urllib.parse.ParseResult, credentials: str) -> u
 
 # Logging helpers
 
-_T = tp.TypeVar("_T")
-
-
-class _LogClose(tp.Generic[_T]):
-
-    def __init__(self, ctx_mgr: _T, log, msg):
-        self.__ctx_mgr = ctx_mgr
-        self.__log = log
-        self.__msg = msg
-
-    def __getitem__(self, item):
-        return self.__ctx_mgr.__getitem__(item)
-
-    def __enter__(self):
-        return self.__ctx_mgr.__enter__()
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self.__ctx_mgr.__exit__(exc_type, exc_val, exc_tb)
-        self.__log.info(self.__msg)
-
-
-def log_close(ctx_mgg: _T, log: logging.Logger, msg: str) -> _T:
-
-    return _LogClose(ctx_mgg, log, msg)
-
 
 def log_safe(param: tp.Any):
 

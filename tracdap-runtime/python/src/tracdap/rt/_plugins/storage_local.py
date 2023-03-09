@@ -187,7 +187,7 @@ class LocalFileStorage(IFileStorage):
 
     def _read_bytes(self, storage_path: str) -> bytes:
 
-        with self.read_byte_stream(storage_path) as stream:
+        with self._read_byte_stream(storage_path) as stream:
             return stream.read()
 
     def read_byte_stream(self, storage_path: str) -> tp.BinaryIO:
@@ -197,11 +197,8 @@ class LocalFileStorage(IFileStorage):
 
     def _read_byte_stream(self, storage_path: str) -> tp.BinaryIO:
 
-        operation = f"CLOSE BYTE STREAM (READ) [{storage_path}]"
         item_path = self._root_path / storage_path
-        stream = open(item_path, mode='rb')
-
-        return _helpers.log_close(stream, self._log, operation)
+        return open(item_path, mode='rb')
 
     def write_bytes(self, storage_path: str, data: bytes, overwrite: bool = False):
 
@@ -210,7 +207,7 @@ class LocalFileStorage(IFileStorage):
 
     def _write_bytes(self, storage_path: str, data: bytes, overwrite: bool = False):
 
-        with self.write_byte_stream(storage_path, overwrite) as stream:
+        with self._write_byte_stream(storage_path, overwrite) as stream:
             stream.write(data)
 
     def write_byte_stream(self, storage_path: str, overwrite: bool = False) -> tp.BinaryIO:
@@ -220,15 +217,19 @@ class LocalFileStorage(IFileStorage):
 
     def _write_byte_stream(self, storage_path: str, overwrite: bool = False) -> tp.BinaryIO:
 
-        operation = f"CLOSE BYTE STREAM (WRITE) [{storage_path}]"
         item_path = self._root_path / storage_path
 
         if overwrite:
-            stream = open(item_path, mode='wb')
+            return open(item_path, mode='wb')
         else:
-            stream = open(item_path, mode='xb')
+            return open(item_path, mode='xb')
 
-        return _helpers.log_close(stream, self._log, operation)
+    def close_byte_stream(self, storage_path: str, stream: tp.BinaryIO):
+
+        read_write = "WRITE" if stream.writable() else "READ"
+        self._log.info(f"CLOSE BYTE STREAM ({read_write}) [{storage_path}]")
+
+        stream.close()
 
     __T = tp.TypeVar("__T")
 
