@@ -91,6 +91,9 @@ class IFileStorage:
     def write_byte_stream(self, storage_path: str, overwrite: bool = False) -> _tp.BinaryIO:
         pass
 
+    def close_byte_stream(self, storage_path: str, stream: _tp.BinaryIO):
+        pass
+
 
 class IDataStorage:
 
