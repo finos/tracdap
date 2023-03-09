@@ -1380,6 +1380,75 @@ abstract class MetadataWriteApiTest {
     }
 
     @Test
+    void updateTag_isLatestObject_ok() {  //TODO: issue345
+
+        var v1SavedTag = updateObject_prepareV1(ObjectType.DATA);
+        var v1Selector = selectorForTag(v1SavedTag);
+        var v1Header = v1SavedTag.getHeader();
+
+        var v2Obj = TestData.dummyVersionForType(v1SavedTag.getDefinition());
+
+        var v2WriteRequest = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.DATA)
+                .setPriorVersion(v1Selector)
+                .setDefinition(v2Obj)
+                .build();
+
+        var v2Header = trustedApi.updateObject(v2WriteRequest);
+
+        var v1MetadataReadRequest = MetadataReadRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSelector(TagSelector.newBuilder()
+                        .setObjectType(ObjectType.DATA)
+                        .setObjectId(v1Header.getObjectId())
+                        .setObjectVersion(1)
+                        .setLatestTag(true))
+                .build();
+
+        var v1NotLatestObject = readApi.readObject(v1MetadataReadRequest);
+
+        assertTrue(v2Header.getIsLatestObject());
+        assertFalse(v1NotLatestObject.getHeader().getIsLatestObject());
+    }
+
+    @Test
+    void updateTag_isLatestTag_ok() {  //TODO: issue345
+
+        var v1SavedTag = updateObject_prepareV1(ObjectType.DATA);
+        var v1Selector = selectorForTag(v1SavedTag);
+        var v1Header = v1SavedTag.getHeader();
+
+        var t2Update = TagUpdate.newBuilder()
+                .setAttrName("extra_attr_v2")
+                .setValue(MetadataCodec.encodeValue("First extra attr"))
+                .build();
+
+        var v1t2WriteRequest = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.DATA)
+                .setPriorVersion(v1Selector)
+                .addTagUpdates(t2Update)
+                .build();
+
+        var v1t2Header = trustedApi.updateTag(v1t2WriteRequest);
+
+        var v1t1MetadataReadRequest = MetadataReadRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSelector(TagSelector.newBuilder()
+                        .setObjectType(ObjectType.DATA)
+                        .setObjectId(v1Header.getObjectId())
+                        .setObjectVersion(1)
+                        .setTagVersion(1))
+                .build();
+
+        var v1t1Header = readApi.readObject(v1t1MetadataReadRequest).getHeader();
+
+        assertTrue(v1t2Header.getIsLatestTag());
+        assertFalse(v1t1Header.getIsLatestTag());
+    }
+
+    @Test
     void updateTag_latestUpdated() {
 
         var v1SavedTag = updateObject_prepareV1(ObjectType.DATA);
