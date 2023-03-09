@@ -26,7 +26,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
-import org.finos.tracdap.test.meta.AssertionBuildHelper;
 import org.finos.tracdap.test.meta.IDalTestable;
 import org.finos.tracdap.test.meta.JdbcUnit;
 import org.finos.tracdap.test.meta.JdbcIntegration;
@@ -82,16 +81,19 @@ abstract class MetadataDalReadTest implements IDalTestable {
         var v2t1 = dal.loadObject(TEST_TENANT, selector2t1);
         var v2t2 = dal.loadObject(TEST_TENANT, selector2t2);
 
-        assertEquals(AssertionBuildHelper.rebuildTagForceIsLatestFlagsTrue(origTag),
-                AssertionBuildHelper.rebuildTagForceIsLatestFlagsTrue(v1t1));
-        assertFalse(v1t1.getHeader().getIsLatestObject());
-        assertTrue(v1t1.getHeader().getIsLatestTag());
+        var expectedTag1 = origTag.toBuilder()
+                        .setHeader(origTag.getHeader().toBuilder()
+                                .setIsLatestObject(false)
+                                .setIsLatestTag(true))
+                        .build();
+        var expectedTag2 = nextDefTag1.toBuilder()
+                .setHeader(nextDefTag1.getHeader().toBuilder()
+                        .setIsLatestObject(true)
+                        .setIsLatestTag(false))
+                .build();
 
-        assertEquals(AssertionBuildHelper.rebuildTagForceIsLatestFlagsTrue(nextDefTag1),
-                AssertionBuildHelper.rebuildTagForceIsLatestFlagsTrue(v2t1));
-        assertTrue(v2t1.getHeader().getIsLatestObject());
-        assertFalse(v2t1.getHeader().getIsLatestTag());
-
+        assertEquals(expectedTag1, v1t1);
+        assertEquals(expectedTag2, v2t1);
         assertEquals(nextDefTag2, v2t2);
     }
 
@@ -123,16 +125,19 @@ abstract class MetadataDalReadTest implements IDalTestable {
         var v2t1 = batch.get(1);
         var v2t2 = batch.get(2);
 
-        assertEquals(AssertionBuildHelper.rebuildTagForceIsLatestFlagsTrue(origTag),
-                AssertionBuildHelper.rebuildTagForceIsLatestFlagsTrue(v1t1));
-        assertFalse(v1t1.getHeader().getIsLatestObject());
-        assertTrue(v1t1.getHeader().getIsLatestTag());
+        var expectedTag1 = origTag.toBuilder()
+                        .setHeader(origTag.getHeader().toBuilder()
+                                .setIsLatestTag(true)
+                                .setIsLatestObject(false))
+                        .build();
+        var expectedTag2 = nextDefTag1.toBuilder()
+                .setHeader(nextDefTag1.getHeader().toBuilder()
+                        .setIsLatestTag(false)
+                        .setIsLatestObject(true))
+                .build();
 
-        assertEquals(AssertionBuildHelper.rebuildTagForceIsLatestFlagsTrue(nextDefTag1),
-                AssertionBuildHelper.rebuildTagForceIsLatestFlagsTrue(v2t1));
-        assertTrue(v2t1.getHeader().getIsLatestObject());
-        assertFalse(v2t1.getHeader().getIsLatestTag());
-
+        assertEquals(expectedTag1, v1t1);
+        assertEquals(expectedTag2, v2t1);
         assertEquals(nextDefTag2, v2t2);
     }
 
@@ -181,16 +186,19 @@ abstract class MetadataDalReadTest implements IDalTestable {
         var v2t1 = dal.loadObject(TEST_TENANT, selector2t1);
         var v2t2 = dal.loadObject(TEST_TENANT, selector2t2);
 
-        assertEquals(AssertionBuildHelper.rebuildTagForceIsLatestFlagsTrue(origTag),
-                AssertionBuildHelper.rebuildTagForceIsLatestFlagsTrue(v1t1));
-        assertFalse(v1t1.getHeader().getIsLatestObject());
-        assertTrue(v1t1.getHeader().getIsLatestTag());
+        var expectedTag1 = origTag.toBuilder()
+                .setHeader(origTag.getHeader().toBuilder()
+                        .setIsLatestTag(true)
+                        .setIsLatestObject(false))
+                .build();
+        var expectedTag2 = nextDefTag1.toBuilder()
+                .setHeader(nextDefTag1.getHeader().toBuilder()
+                        .setIsLatestTag(false)
+                        .setIsLatestObject(true))
+                .build();
 
-        assertEquals(AssertionBuildHelper.rebuildTagForceIsLatestFlagsTrue(nextDefTag1),
-                AssertionBuildHelper.rebuildTagForceIsLatestFlagsTrue(v2t1));
-        assertTrue(v2t1.getHeader().getIsLatestObject());
-        assertFalse(v2t1.getHeader().getIsLatestTag());
-
+        assertEquals(expectedTag1, v1t1);
+        assertEquals(expectedTag2, v2t1);
         assertEquals(nextDefTag2, v2t2);
     }
 
@@ -241,16 +249,19 @@ abstract class MetadataDalReadTest implements IDalTestable {
         var v2t1 = batch.get(1);
         var v2t2 = batch.get(2);
 
-        assertEquals(AssertionBuildHelper.rebuildTagForceIsLatestFlagsTrue(origTag),
-                AssertionBuildHelper.rebuildTagForceIsLatestFlagsTrue(v1t1));
-        assertFalse(v1t1.getHeader().getIsLatestObject());
-        assertTrue(v1t1.getHeader().getIsLatestTag());
+        var expectedTag1 = origTag.toBuilder()
+                        .setHeader(origTag.getHeader().toBuilder()
+                                .setIsLatestObject(false)
+                                .setIsLatestTag(true))
+                        .build();
+        var expectedTag2 = nextDefTag1.toBuilder()
+                .setHeader(nextDefTag1.getHeader().toBuilder()
+                        .setIsLatestObject(true)
+                        .setIsLatestTag(false))
+                .build();
 
-        assertEquals(AssertionBuildHelper.rebuildTagForceIsLatestFlagsTrue(nextDefTag1),
-                AssertionBuildHelper.rebuildTagForceIsLatestFlagsTrue(v2t1));
-        assertTrue(v2t1.getHeader().getIsLatestObject());
-        assertFalse(v2t1.getHeader().getIsLatestTag());
-
+        assertEquals(expectedTag1, v1t1);
+        assertEquals(expectedTag2, v2t1);
         assertEquals(nextDefTag2, v2t2);
     }
 
@@ -382,16 +393,19 @@ abstract class MetadataDalReadTest implements IDalTestable {
         var combo2 = dal.loadObject(TEST_TENANT, selectCombo2);
         var combo3 = dal.loadObject(TEST_TENANT, selectCombo3);
 
-        assertEquals(AssertionBuildHelper.rebuildTagForceIsLatestFlagsTrue(v2t2Tag),
-                AssertionBuildHelper.rebuildTagForceIsLatestFlagsTrue(combo1));
-        assertFalse(combo1.getHeader().getIsLatestObject());
-        assertTrue(combo1.getHeader().getIsLatestTag());
+        var expectedTag1 = v2t2Tag.toBuilder()
+                .setHeader(v2t2Tag.getHeader().toBuilder()
+                        .setIsLatestTag(true)
+                        .setIsLatestObject(false))
+                .build();
+        var expectedTag2 = v2t2Tag.toBuilder()
+                .setHeader(v2t2Tag.getHeader().toBuilder()
+                        .setIsLatestTag(true)
+                        .setIsLatestObject(false))
+                .build();
 
-        assertEquals(AssertionBuildHelper.rebuildTagForceIsLatestFlagsTrue(v2t2Tag),
-                AssertionBuildHelper.rebuildTagForceIsLatestFlagsTrue(combo2));
-        assertFalse(combo2.getHeader().getIsLatestObject());
-        assertTrue(combo2.getHeader().getIsLatestTag());
-
+        assertEquals(expectedTag1, combo1);
+        assertEquals(expectedTag2, combo2);
         assertEquals(v3t1Tag, combo3);
     }
 
@@ -450,16 +464,14 @@ abstract class MetadataDalReadTest implements IDalTestable {
         var combo2 = batch.get(1);
         var combo3 = batch.get(2);
 
-        assertEquals(AssertionBuildHelper.rebuildTagForceIsLatestFlagsTrue(v2t2Tag),
-                AssertionBuildHelper.rebuildTagForceIsLatestFlagsTrue(combo1));
-        assertFalse(combo1.getHeader().getIsLatestObject());
-        assertTrue(combo1.getHeader().getIsLatestTag());
+        var expectedTag = v2t2Tag.toBuilder()
+                .setHeader(v2t2Tag.getHeader().toBuilder()
+                        .setIsLatestTag(true)
+                        .setIsLatestObject(false))
+                .build();
 
-        assertEquals(AssertionBuildHelper.rebuildTagForceIsLatestFlagsTrue(v2t2Tag),
-                AssertionBuildHelper.rebuildTagForceIsLatestFlagsTrue(combo2));
-        assertFalse(combo2.getHeader().getIsLatestObject());
-        assertTrue(combo2.getHeader().getIsLatestTag());
-
+        assertEquals(expectedTag, combo1);
+        assertEquals(expectedTag, combo2);
         assertEquals(v3t1Tag, combo3);
     }
     
@@ -557,20 +569,21 @@ abstract class MetadataDalReadTest implements IDalTestable {
         var t2BoundaryTag = dal.loadObject(TEST_TENANT, t2BoundarySelector);
         var t2PriorTag = dal.loadObject(TEST_TENANT, t2PriorSelector);
 
-        assertEquals(AssertionBuildHelper.rebuildTagForceIsLatestFlagsTrue(v2Tag),
-                AssertionBuildHelper.rebuildTagForceIsLatestFlagsTrue(v2BoundaryTag));
-        assertTrue(v2BoundaryTag.getHeader().getIsLatestObject());
-        assertFalse(v2BoundaryTag.getHeader().getIsLatestTag());
+        var expectedTag1 = v2Tag.toBuilder()
+                .setHeader(v2Tag.getHeader().toBuilder()
+                        .setIsLatestTag(false)
+                        .setIsLatestObject(true))
+                .build();
+        var expectedTag2 = v1Tag.toBuilder()
+                .setHeader(v1Tag.getHeader().toBuilder()
+                        .setIsLatestTag(true)
+                        .setIsLatestObject(false))
+                .build();
 
-        assertEquals(AssertionBuildHelper.rebuildTagForceIsLatestFlagsTrue(v1Tag),
-                AssertionBuildHelper.rebuildTagForceIsLatestFlagsTrue(v2PriorTag));
-        assertFalse(v2PriorTag.getHeader().getIsLatestObject());
-        assertTrue(v2PriorTag.getHeader().getIsLatestTag());
-
+        assertEquals(expectedTag1, v2BoundaryTag);
+        assertEquals(expectedTag2, v2PriorTag);
         assertEquals(t2Tag, t2BoundaryTag);
-
-        assertEquals(AssertionBuildHelper.rebuildTagForceIsLatestFlagsTrue(v2Tag),
-                AssertionBuildHelper.rebuildTagForceIsLatestFlagsTrue(t2PriorTag));
+        assertEquals(expectedTag1, t2PriorTag);
     }
 
     @Test
@@ -613,22 +626,26 @@ abstract class MetadataDalReadTest implements IDalTestable {
         var batch2 = dal.loadObjects(TEST_TENANT, List.of(t2BoundarySelector, t2PriorSelector));
         var t2BoundaryTag = batch2.get(0);
         var t2PriorTag = batch2.get(1);
+        var expextedv2Tag = v2Tag.toBuilder()
+                .setHeader(v2Tag.getHeader().toBuilder()
+                        .setIsLatestTag(false)
+                        .setIsLatestObject(true))
+                .build();
+        var expextedv1Tag = v1Tag.toBuilder()
+                .setHeader(v1Tag.getHeader().toBuilder()
+                        .setIsLatestTag(true)
+                        .setIsLatestObject(false))
+                .build();
+        var expextedt2Tag = t2Tag.toBuilder()
+                .setHeader(t2Tag.getHeader().toBuilder()
+                        .setIsLatestTag(true)
+                        .setIsLatestObject(true))
+                .build();
 
-        assertEquals(AssertionBuildHelper.rebuildTagForceIsLatestFlagsTrue(v2Tag),
-                AssertionBuildHelper.rebuildTagForceIsLatestFlagsTrue(v2BoundaryTag));
-        assertTrue(v2BoundaryTag.getHeader().getIsLatestObject());
-        assertFalse(v2BoundaryTag.getHeader().getIsLatestTag());
-
-        assertEquals(AssertionBuildHelper.rebuildTagForceIsLatestFlagsTrue(v1Tag),
-                AssertionBuildHelper.rebuildTagForceIsLatestFlagsTrue(v2PriorTag));
-        assertFalse(v2PriorTag.getHeader().getIsLatestObject());
-        assertTrue(v2PriorTag.getHeader().getIsLatestTag());
-
-        assertEquals(AssertionBuildHelper.rebuildTagForceIsLatestFlagsTrue(t2Tag),
-                AssertionBuildHelper.rebuildTagForceIsLatestFlagsTrue(t2BoundaryTag));
-
-        assertEquals(AssertionBuildHelper.rebuildTagForceIsLatestFlagsTrue(v2Tag),
-                AssertionBuildHelper.rebuildTagForceIsLatestFlagsTrue(t2PriorTag));
+        assertEquals(expextedv2Tag, v2BoundaryTag);
+        assertEquals(expextedv1Tag, v2PriorTag);
+        assertEquals(expextedt2Tag, t2BoundaryTag);
+        assertEquals(expextedv2Tag, t2PriorTag);
     }
 
     @Test

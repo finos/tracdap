@@ -1404,13 +1404,14 @@ abstract class MetadataDalSearchTest implements IDalTestable {
                 .build();
 
         var resultPriorVersions = dal.search(TEST_TENANT, searchPriorVersions);
-        var resultPriorVersionsFirstTag = resultPriorVersions.get(0);
+
+        var expectedTagHeader = v2Tag.getHeader().toBuilder()
+                        .setIsLatestTag(true)
+                        .setIsLatestObject(false)
+                .build();
 
         assertEquals(1, resultPriorVersions.size());
-        assertEquals(AssertionBuildHelper.rebuildTagForceIsLatestFlagsTrue(v2Tag).getHeader(),
-                AssertionBuildHelper.rebuildTagForceIsLatestFlagsTrue(resultPriorVersionsFirstTag).getHeader());
-        assertTrue(resultPriorVersionsFirstTag.getHeader().getIsLatestTag());
-        assertFalse(resultPriorVersionsFirstTag.getHeader().getIsLatestObject());
+        assertEquals(expectedTagHeader, resultPriorVersions.get(0).getHeader());
     }
 
     @Test
@@ -1461,12 +1462,13 @@ abstract class MetadataDalSearchTest implements IDalTestable {
         var resultPriorTags = dal.search(TEST_TENANT, searchPriorTags);
         var resultPriorTagsFirstTag = resultPriorTags.get(0);
 
-        assertEquals(1, resultPriorTags.size());
+        var expectedTagHeader = t2Tag.getHeader().toBuilder()
+                        .setIsLatestObject(true)
+                        .setIsLatestTag(false)
+                .build();
 
-        assertEquals(AssertionBuildHelper.rebuildTagForceIsLatestFlagsTrue(t2Tag).getHeader(),
-                AssertionBuildHelper.rebuildTagForceIsLatestFlagsTrue(resultPriorTagsFirstTag).getHeader());
-        assertFalse(resultPriorTagsFirstTag.getHeader().getIsLatestTag());
-        assertTrue(resultPriorTagsFirstTag.getHeader().getIsLatestObject());
+        assertEquals(1, resultPriorTags.size());
+        assertEquals(expectedTagHeader, resultPriorTags.get(0).getHeader());
     }
 
     @Test
@@ -1541,17 +1543,16 @@ abstract class MetadataDalSearchTest implements IDalTestable {
         var asOfResult = dal.search(TEST_TENANT, asOfSearch);
         var resultHeader1 = asOfResult.get(0).getHeader();
         var resultHeader2 = asOfResult.get(1).getHeader();
+        var expectedv1TagHeader = v1Tag.getHeader().toBuilder()
+                    .setIsLatestTag(true)
+                    .setIsLatestObject(false)
+                .build();
 
         // The versioned tag should be returned first in the list
         // This is because results are returned with the most recently updated first
 
         assertEquals(2, asOfResult.size());
-
-        assertEquals(AssertionBuildHelper.rebuildTagForceIsLatestFlagsTrue(v1Tag).getHeader(),
-                AssertionBuildHelper.rebuildTagHeaderForceIsLatestFlagsTrue(resultHeader1));
-        assertFalse(resultHeader1.getIsLatestObject());
-        assertTrue(resultHeader1.getIsLatestTag());
-
+        assertEquals(expectedv1TagHeader, resultHeader1);
         assertEquals(unchangedTag.getHeader(), resultHeader2);
     }
 
@@ -1616,13 +1617,14 @@ abstract class MetadataDalSearchTest implements IDalTestable {
                 .build();
 
         var result2 = dal.search(TEST_TENANT, search2);
-        var result2FirstTag = result2.get(0);
+
+        var expectedTagHeader1 = v2t1Tag.getHeader().toBuilder()
+                        .setIsLatestTag(false)
+                        .setIsLatestObject(true)
+                .build();
 
         assertEquals(1, result2.size());
-        assertEquals(AssertionBuildHelper.rebuildTagForceIsLatestFlagsTrue(v2t1Tag).getHeader(),
-                AssertionBuildHelper.rebuildTagForceIsLatestFlagsTrue(result2FirstTag).getHeader());
-        assertFalse(result2FirstTag.getHeader().getIsLatestTag());
-        assertTrue(result2FirstTag.getHeader().getIsLatestObject());
+        assertEquals(expectedTagHeader1, result2.get(0).getHeader());
 
         var search3 = SearchParameters.newBuilder()
                 .setObjectType(ObjectType.DATA)
@@ -1631,13 +1633,14 @@ abstract class MetadataDalSearchTest implements IDalTestable {
                 .build();
 
         var result3 = dal.search(TEST_TENANT, search3);
-        var result3FirstTag = result3.get(0);
+
+        var expectedTagHeader2 = v1t2Tag.getHeader().toBuilder()
+                    .setIsLatestTag(true)
+                    .setIsLatestObject(false)
+                .build();
 
         assertEquals(1, result3.size());
-        assertEquals(AssertionBuildHelper.rebuildTagForceIsLatestFlagsTrue(v1t2Tag).getHeader(),
-                AssertionBuildHelper.rebuildTagForceIsLatestFlagsTrue(result3FirstTag).getHeader());
-        assertTrue(result3FirstTag.getHeader().getIsLatestTag());
-        assertFalse(result3FirstTag.getHeader().getIsLatestObject());
+        assertEquals(expectedTagHeader2, result3.get(0).getHeader());
 
         var search4 = SearchParameters.newBuilder()
                 .setObjectType(ObjectType.DATA)
@@ -1646,13 +1649,14 @@ abstract class MetadataDalSearchTest implements IDalTestable {
                 .build();
 
         var result4 = dal.search(TEST_TENANT, search4);
-        var result4FirstTag = result4.get(0);
+
+        var expectedTagHeader3 = v1t1Tag.getHeader().toBuilder()
+                    .setIsLatestTag(false)
+                    .setIsLatestObject(false)
+                .build();
 
         assertEquals(1, result4.size());
-        assertEquals(AssertionBuildHelper.rebuildTagForceIsLatestFlagsTrue(v1t1Tag).getHeader(),
-                AssertionBuildHelper.rebuildTagForceIsLatestFlagsTrue(result4FirstTag).getHeader());
-        assertFalse(result4FirstTag.getHeader().getIsLatestTag());
-        assertFalse(result4FirstTag.getHeader().getIsLatestObject());
+        assertEquals(expectedTagHeader3, result4.get(0).getHeader());
 
         // Stepping back before the object was created should give an empty search result
 
@@ -1747,13 +1751,14 @@ abstract class MetadataDalSearchTest implements IDalTestable {
                 .build();
 
         var result2 = dal.search(TEST_TENANT, search2);
-        var result2FirstTag = result2.get(0);
+
+        var expectedTagHeader = obj2t1Tag.getHeader().toBuilder()
+                    .setIsLatestTag(false)
+                    .setIsLatestObject(true)
+                .build();
 
         assertEquals(1, result2.size());
-        assertEquals(AssertionBuildHelper.rebuildTagForceIsLatestFlagsTrue(obj2t1Tag).getHeader(),
-                AssertionBuildHelper.rebuildTagForceIsLatestFlagsTrue(result2FirstTag).getHeader());
-        assertFalse(result2FirstTag.getHeader().getIsLatestTag());
-        assertTrue(result2FirstTag.getHeader().getIsLatestObject());
+        assertEquals(expectedTagHeader, result2.get(0).getHeader());
     }
 
     @Test
@@ -1851,12 +1856,13 @@ abstract class MetadataDalSearchTest implements IDalTestable {
 
         var result = dal.search(TEST_TENANT, searchParams);
         var resultFirstTag = result.get(0);
+        var expectedHeader = v1t3.getHeader().toBuilder()
+                    .setIsLatestTag(false)
+                    .setIsLatestObject(false)
+                .build();
 
         assertEquals(1, result.size());
-        assertEquals(AssertionBuildHelper.rebuildTagForceIsLatestFlagsTrue(v1t3).getHeader(),
-                AssertionBuildHelper.rebuildTagForceIsLatestFlagsTrue(resultFirstTag).getHeader());
-        assertFalse(resultFirstTag.getHeader().getIsLatestTag());
-        assertFalse(resultFirstTag.getHeader().getIsLatestObject());
+        assertEquals(expectedHeader, resultFirstTag.getHeader());
     }
 
     @Test

@@ -20,7 +20,6 @@ import org.finos.tracdap.api.*;
 import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.test.helpers.PlatformTest;
-import org.finos.tracdap.test.meta.AssertionBuildHelper;
 import org.finos.tracdap.test.meta.TestData;
 
 import io.grpc.Status;
@@ -632,9 +631,13 @@ abstract class MetadataSearchApiTest {
         // The object for header2 was created last
         // So, that should be the first result
 
+        header2 = header2.toBuilder()
+                    .setIsLatestTag(false)
+                    .setIsLatestObject(true)
+                .build();
+
         assertEquals(2, asOfResult.getSearchResultCount());
-        assertEquals(AssertionBuildHelper.rebuildTagHeaderForceIsLatestFlagsTrue(resultHeader1),
-                AssertionBuildHelper.rebuildTagHeaderForceIsLatestFlagsTrue(header2));
+        assertEquals(resultHeader1, header2);
         assertEquals(resultHeader2, header1);
     }
 
@@ -695,13 +698,13 @@ abstract class MetadataSearchApiTest {
 
         var result = searchApi.search(searchRequest);
         var resultFirstHeader = result.getSearchResult(0).getHeader();
+        v1t1Header = v1t1Header.toBuilder()
+                    .setIsLatestTag(false)
+                    .setIsLatestObject(false)
+                .build();
 
         assertEquals(1, result.getSearchResultCount());
-        assertEquals(AssertionBuildHelper.rebuildTagHeaderForceIsLatestFlagsTrue(v1t1Header),
-                AssertionBuildHelper.rebuildTagHeaderForceIsLatestFlagsTrue(resultFirstHeader));
-        assertFalse(resultFirstHeader.getIsLatestTag());
-        assertFalse(resultFirstHeader.getIsLatestObject());
-
+        assertEquals(v1t1Header, resultFirstHeader);
     }
 
     @Test

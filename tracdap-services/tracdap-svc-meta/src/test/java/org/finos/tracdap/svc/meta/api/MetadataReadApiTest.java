@@ -24,7 +24,6 @@ import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.svc.meta.TracMetadataService;
 import org.finos.tracdap.test.helpers.PlatformTest;
 import org.finos.tracdap.test.meta.TestData;
-import org.finos.tracdap.test.meta.AssertionBuildHelper;
 
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
@@ -280,7 +279,9 @@ abstract class MetadataReadApiTest {
         var t2TagSaved = readApi.readObject(t2MetadataReadRequest);
 
         var v1TagExpected = v1TagSaved.newBuilderForType()
-                .setHeader(v1Header)
+                .setHeader(v1Header.toBuilder()
+                        .setIsLatestTag(false)
+                        .setIsLatestObject(false))
                 .setDefinition(v1Obj)
                 .putAllAttrs(v1Attrs)
                 .build();
@@ -297,10 +298,7 @@ abstract class MetadataReadApiTest {
                 .putAllAttrs(t2Attrs)
                 .build();
 
-        assertTagEquals(AssertionBuildHelper.rebuildTagForceIsLatestFlagsTrue(v1TagExpected),
-                AssertionBuildHelper.rebuildTagForceIsLatestFlagsTrue(v1TagSaved));
-        assertFalse(v1TagSaved.getHeader().getIsLatestObject());
-        assertFalse(v1TagSaved.getHeader().getIsLatestTag());
+        assertTagEquals(v1TagExpected, v1TagSaved);
         assertTagEquals(v2TagExpected, v2TagSaved);
         assertTagEquals(t2TagExpected, t2TagSaved);
     }
@@ -364,13 +362,17 @@ abstract class MetadataReadApiTest {
         var t2TagSaved = savedTags.getTag(2);
 
         var v1TagExpected = v1TagSaved.newBuilderForType()
-                .setHeader(v1Header)
+                .setHeader(v1Header.toBuilder()
+                        .setIsLatestTag(false)
+                        .setIsLatestObject(false))
                 .setDefinition(v1Obj)
                 .putAllAttrs(v1Attrs)
                 .build();
 
         var v2TagExpected = v2TagSaved.newBuilderForType()
-                .setHeader(v2Header)
+                .setHeader(v2Header.toBuilder()
+                        .setIsLatestTag(true)
+                        .setIsLatestObject(true))
                 .setDefinition(v2Obj)
                 .putAllAttrs(v1Attrs)
                 .build();
@@ -381,16 +383,8 @@ abstract class MetadataReadApiTest {
                 .putAllAttrs(t2Attrs)
                 .build();
 
-        assertTagEquals(AssertionBuildHelper.rebuildTagForceIsLatestFlagsTrue(v1TagExpected),
-                AssertionBuildHelper.rebuildTagForceIsLatestFlagsTrue(v1TagSaved));
-        assertFalse(v1TagSaved.getHeader().getIsLatestObject());
-        assertFalse(v1TagSaved.getHeader().getIsLatestTag());
-
-        assertTagEquals(AssertionBuildHelper.rebuildTagForceIsLatestFlagsTrue(v2TagExpected),
-                AssertionBuildHelper.rebuildTagForceIsLatestFlagsTrue(v2TagSaved));
-        assertTrue(v2TagSaved.getHeader().getIsLatestObject());
-        assertTrue(v2TagSaved.getHeader().getIsLatestTag());
-
+        assertTagEquals(v1TagExpected, v1TagSaved);
+        assertTagEquals(v2TagExpected, v2TagSaved);
         assertTagEquals(t2TagExpected, t2TagSaved);
     }
 
@@ -482,13 +476,17 @@ abstract class MetadataReadApiTest {
         var t2TagSaved = readApi.readObject(t2MetadataReadRequest);
 
         var v1TagExpected = v1TagSaved.newBuilderForType()
-                .setHeader(v1Header)
+                .setHeader(v1Header.toBuilder()
+                        .setIsLatestTag(false)
+                        .setIsLatestObject(false))
                 .setDefinition(v1Obj)
                 .putAllAttrs(v1Attrs)
                 .build();
 
         var v2TagExpected = v2TagSaved.newBuilderForType()
-                .setHeader(v2Header)
+                .setHeader(v2Header.toBuilder()
+                        .setIsLatestTag(true)
+                        .setIsLatestObject(true))
                 .setDefinition(v2Obj)
                 .putAllAttrs(v1Attrs)
                 .build();
@@ -499,16 +497,8 @@ abstract class MetadataReadApiTest {
                 .putAllAttrs(t2Attrs)
                 .build();
 
-        assertTagEquals(AssertionBuildHelper.rebuildTagForceIsLatestFlagsTrue(v1TagExpected),
-                AssertionBuildHelper.rebuildTagForceIsLatestFlagsTrue(v1TagSaved));
-        assertFalse(v1TagSaved.getHeader().getIsLatestObject());
-        assertFalse(v1TagSaved.getHeader().getIsLatestTag());
-
-        assertTagEquals(AssertionBuildHelper.rebuildTagForceIsLatestFlagsTrue(v2TagExpected),
-                AssertionBuildHelper.rebuildTagForceIsLatestFlagsTrue(v2TagSaved));
-        assertTrue(v2TagSaved.getHeader().getIsLatestObject());
-        assertTrue(v2TagSaved.getHeader().getIsLatestTag());
-
+        assertTagEquals(v1TagExpected, v1TagSaved);
+        assertTagEquals(v2TagExpected, v2TagSaved);
         assertTagEquals(t2TagExpected, t2TagSaved);
     }
 
@@ -599,13 +589,17 @@ abstract class MetadataReadApiTest {
         var t2TagSaved = savedTags.getTag(2);
 
         var v1TagExpected = v1TagSaved.newBuilderForType()
-                .setHeader(v1Header)
+                .setHeader(v1Header.toBuilder()
+                        .setIsLatestTag(false)
+                        .setIsLatestObject(false))
                 .setDefinition(v1Obj)
                 .putAllAttrs(v1Attrs)
                 .build();
 
         var v2TagExpected = v2TagSaved.newBuilderForType()
-                .setHeader(v2Header)
+                .setHeader(v2Header.toBuilder()
+                        .setIsLatestTag(true)
+                        .setIsLatestObject(true))
                 .setDefinition(v2Obj)
                 .putAllAttrs(v1Attrs)
                 .build();
@@ -616,16 +610,8 @@ abstract class MetadataReadApiTest {
                 .putAllAttrs(t2Attrs)
                 .build();
 
-        assertTagEquals(AssertionBuildHelper.rebuildTagForceIsLatestFlagsTrue(v1TagExpected),
-                AssertionBuildHelper.rebuildTagForceIsLatestFlagsTrue(v1TagSaved));
-        assertFalse(v1TagSaved.getHeader().getIsLatestObject());
-        assertFalse(v1TagSaved.getHeader().getIsLatestTag());
-
-        assertTagEquals(AssertionBuildHelper.rebuildTagForceIsLatestFlagsTrue(v2TagExpected),
-                AssertionBuildHelper.rebuildTagForceIsLatestFlagsTrue(v2TagSaved));
-        assertTrue(v2TagSaved.getHeader().getIsLatestObject());
-        assertTrue(v2TagSaved.getHeader().getIsLatestTag());
-
+        assertTagEquals(v1TagExpected, v1TagSaved);
+        assertTagEquals(v2TagExpected, v2TagSaved);
         assertTagEquals(t2TagExpected, t2TagSaved);
     }
 
