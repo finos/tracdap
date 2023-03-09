@@ -145,6 +145,28 @@ def logger_for_namespace(namespace: str) -> logging.Logger:
     return logging.getLogger(namespace)
 
 
+def format_file_size(size: int) -> str:
+
+    if size < 1024:
+        if size == 0:
+            return "0 bytes"
+        elif size == 1:
+            return "1 byte"
+        else:
+            return f"{size} bytes"
+
+    if size < 1024 ** 2:
+        kb = size / 1024
+        return f"{kb:.1f} KB"
+
+    if size < 1024 ** 3:
+        mb = size / (1024 ** 2)
+        return f"{mb:.1f} MB"
+
+    gb = size / (1024 ** 3)
+    return f"{gb:.1f} GB"
+
+
 def new_object_id(object_type: meta.ObjectType) -> meta.TagHeader:
 
     timestamp = dt.datetime.utcnow()
