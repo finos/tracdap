@@ -129,6 +129,27 @@ class IDataStorage:
         pass
 
 
+class IStorageProvider(_abc.ABC):
+
+    def has_file_system(self) -> bool:
+        pass
+
+    def has_file_storage(self) -> bool:
+        pass
+
+    def has_data_storage(self) -> bool:
+        pass
+
+    def get_file_system(self) -> _afs.SubTreeFileSystem:
+        pass
+
+    def get_file_storage(self) -> IFileStorage:
+        pass
+
+    def get_data_storage(self) -> IDataStorage:
+        pass
+
+
 class IDataFormat:
 
     @_abc.abstractmethod
@@ -145,11 +166,4 @@ class IDataFormat:
 
     @_abc.abstractmethod
     def write_table(self, target: _tp.BinaryIO, table: _pa.Table):
-        pass
-
-
-class IFileSystemProvider:
-
-    @_abc.abstractmethod
-    def prepare_file_system(self) -> _afs.FileSystem:
         pass
