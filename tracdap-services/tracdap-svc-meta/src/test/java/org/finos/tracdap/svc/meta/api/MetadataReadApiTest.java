@@ -297,7 +297,8 @@ abstract class MetadataReadApiTest {
                 .putAllAttrs(t2Attrs)
                 .build();
 
-        assertTagEqualsIgnoreIsLatest(v1TagExpected, v1TagSaved);
+        assertTagEquals(AssertionBuildHelper.rebuildTagForceIsLatestFlagsTrue(v1TagExpected),
+                AssertionBuildHelper.rebuildTagForceIsLatestFlagsTrue(v1TagSaved));
         assertFalse(v1TagSaved.getHeader().getIsLatestObject());
         assertFalse(v1TagSaved.getHeader().getIsLatestTag());
         assertTagEquals(v2TagExpected, v2TagSaved);
@@ -380,8 +381,16 @@ abstract class MetadataReadApiTest {
                 .putAllAttrs(t2Attrs)
                 .build();
 
-        //assertTagEquals(v1TagExpected, v1TagSaved); // TODO: issue345 - correct
-        //assertTagEquals(v2TagExpected, v2TagSaved); // TODO: issue345 - correct
+        assertTagEquals(AssertionBuildHelper.rebuildTagForceIsLatestFlagsTrue(v1TagExpected),
+                AssertionBuildHelper.rebuildTagForceIsLatestFlagsTrue(v1TagSaved));
+        assertFalse(v1TagSaved.getHeader().getIsLatestObject());
+        assertFalse(v1TagSaved.getHeader().getIsLatestTag());
+
+        assertTagEquals(AssertionBuildHelper.rebuildTagForceIsLatestFlagsTrue(v2TagExpected),
+                AssertionBuildHelper.rebuildTagForceIsLatestFlagsTrue(v2TagSaved));
+        assertTrue(v2TagSaved.getHeader().getIsLatestObject());
+        assertTrue(v2TagSaved.getHeader().getIsLatestTag());
+
         assertTagEquals(t2TagExpected, t2TagSaved);
     }
 
@@ -490,8 +499,16 @@ abstract class MetadataReadApiTest {
                 .putAllAttrs(t2Attrs)
                 .build();
 
-        // assertTagEquals(v1TagExpected, v1TagSaved); // TODO: issue345 - correct
-        // assertTagEquals(v2TagExpected, v2TagSaved); // TODO: issue345 - correct
+        assertTagEquals(AssertionBuildHelper.rebuildTagForceIsLatestFlagsTrue(v1TagExpected),
+                AssertionBuildHelper.rebuildTagForceIsLatestFlagsTrue(v1TagSaved));
+        assertFalse(v1TagSaved.getHeader().getIsLatestObject());
+        assertFalse(v1TagSaved.getHeader().getIsLatestTag());
+
+        assertTagEquals(AssertionBuildHelper.rebuildTagForceIsLatestFlagsTrue(v2TagExpected),
+                AssertionBuildHelper.rebuildTagForceIsLatestFlagsTrue(v2TagSaved));
+        assertTrue(v2TagSaved.getHeader().getIsLatestObject());
+        assertTrue(v2TagSaved.getHeader().getIsLatestTag());
+
         assertTagEquals(t2TagExpected, t2TagSaved);
     }
 
@@ -599,8 +616,16 @@ abstract class MetadataReadApiTest {
                 .putAllAttrs(t2Attrs)
                 .build();
 
-//        assertTagEquals(v1TagExpected, v1TagSaved); // TODO: issue345 - correct
-//        assertTagEquals(v2TagExpected, v2TagSaved); // TODO: issue345 - correct
+        assertTagEquals(AssertionBuildHelper.rebuildTagForceIsLatestFlagsTrue(v1TagExpected),
+                AssertionBuildHelper.rebuildTagForceIsLatestFlagsTrue(v1TagSaved));
+        assertFalse(v1TagSaved.getHeader().getIsLatestObject());
+        assertFalse(v1TagSaved.getHeader().getIsLatestTag());
+
+        assertTagEquals(AssertionBuildHelper.rebuildTagForceIsLatestFlagsTrue(v2TagExpected),
+                AssertionBuildHelper.rebuildTagForceIsLatestFlagsTrue(v2TagSaved));
+        assertTrue(v2TagSaved.getHeader().getIsLatestObject());
+        assertTrue(v2TagSaved.getHeader().getIsLatestTag());
+
         assertTagEquals(t2TagExpected, t2TagSaved);
     }
 
@@ -1053,31 +1078,6 @@ abstract class MetadataReadApiTest {
     private void assertTagEquals(org.finos.tracdap.metadata.Tag expected, org.finos.tracdap.metadata.Tag actual) {
 
         assertEquals(expected.getHeader(), actual.getHeader());
-        assertEquals(expected.getDefinition(), actual.getDefinition());
-
-        for (var attr : expected.getAttrsMap().keySet()) {
-
-            // trac_update_ attrs may be present in an original tag and changed in an update operation
-            if (attr.startsWith("trac_update_"))
-                continue;
-
-            assertEquals(expected.getAttrsOrThrow(attr), actual.getAttrsOrThrow(attr));
-        }
-
-        assertTrue(actual.containsAttrs(MetadataConstants.TRAC_CREATE_TIME));
-        assertTrue(actual.containsAttrs(MetadataConstants.TRAC_CREATE_USER_ID));
-        assertTrue(actual.containsAttrs(MetadataConstants.TRAC_CREATE_USER_NAME));
-        assertTrue(actual.containsAttrs(MetadataConstants.TRAC_UPDATE_TIME));
-        assertTrue(actual.containsAttrs(MetadataConstants.TRAC_UPDATE_USER_ID));
-        assertTrue(actual.containsAttrs(MetadataConstants.TRAC_UPDATE_USER_NAME));
-    }
-
-    private void assertTagEqualsIgnoreIsLatest(org.finos.tracdap.metadata.Tag expected, org.finos.tracdap.metadata.Tag actual) {
-
-        var expectedIsLatestForcedTrue = AssertionBuildHelper.rebuildTagForceIsLatestFlagsTrue(expected);
-        var actualIsLatestForcedTrue = AssertionBuildHelper.rebuildTagForceIsLatestFlagsTrue(actual);
-
-        assertEquals(expectedIsLatestForcedTrue.getHeader(), actualIsLatestForcedTrue.getHeader());
         assertEquals(expected.getDefinition(), actual.getDefinition());
 
         for (var attr : expected.getAttrsMap().keySet()) {
