@@ -215,6 +215,9 @@ class JdbcSearchQueryBuilder {
             case IN:
                 return buildInTerm(baseQuery, searchTerm);
 
+            case EXISTS:
+                return buildExistsTerm(baseQuery, searchTerm);
+
             default:
 
                 // Internal error - invalid searches should be picked up in the validation layer
@@ -336,11 +339,44 @@ class JdbcSearchQueryBuilder {
     // SEARCH TERMS
     // -----------------------------------------------------------------------------------------------------------------
 
-    JdbcSearchQuery buildEqualsTerm(JdbcSearchQuery baseQuery, SearchTerm searchTerm) {
+    JdbcSearchQuery buildExistsTerm(JdbcSearchQuery baseQuery, SearchTerm searchTerm) {
+
+        // The meaning of character strings used in joinTemplate as placeholders for later substitution:
+        // %1$d = nextAttrNumber
+        // %2$d = subQueryNumber
 
         var joinTemplate = "join tag_attr ta%1$d\n" +
                 "  on ta%1$d.tenant_id = t%2$d.tenant_id\n" +
                 "  and ta%1$d.tag_fk = t%2$d.tag_pk";
+
+        // The meaning of character strings used in whereTemplate as placeholders for later substitution:
+        // %1$d = nextAttrNumber
+        // %2$s = attrType
+
+        var whereTemplate = searchTerm.getAttrType().equals(BasicType.BASIC_TYPE_NOT_SET) ? "ta%1$d.attr_name = ?" :
+                "ta%1$d.attr_name = ? and ta%1$d.attr_type = '%2$s'";
+
+        // Match attr name
+        var paramNameSetter = wrapErrors((stmt, pIndex) ->
+                stmt.setString(pIndex, searchTerm.getAttrName()));
+
+        return buildSearchTermFromTemplatesForExistsOperator(baseQuery, searchTerm, joinTemplate, whereTemplate,
+                Stream.of(paramNameSetter));
+    }
+
+    JdbcSearchQuery buildEqualsTerm(JdbcSearchQuery baseQuery, SearchTerm searchTerm) {
+
+        // The meaning of character strings used in joinTemplate as placeholders for later substitution:
+        // %1$d = nextAttrNumber
+        // %2$d = subQueryNumber
+
+        var joinTemplate = "join tag_attr ta%1$d\n" +
+                "  on ta%1$d.tenant_id = t%2$d.tenant_id\n" +
+                "  and ta%1$d.tag_fk = t%2$d.tag_pk";
+
+        // The meaning of character strings used in whereTemplate as placeholders for later substitution:
+        // %1$d = nextAttrNumber
+        // %2$s = attrType
 
         var whereTemplate = "ta%1$d.attr_name = ? " +
                 "and ta%1$d.attr_value_%2$s = ?";
@@ -379,9 +415,18 @@ class JdbcSearchQueryBuilder {
 
     JdbcSearchQuery buildInequalityTerm(JdbcSearchQuery baseQuery, SearchTerm searchTerm) {
 
+        // The meaning of character strings used in joinTemplate as placeholders for later substitution:
+        // %1$d = nextAttrNumber
+        // %2$d = subQueryNumber
+
         var joinTemplate = "join tag_attr ta%1$d\n" +
                 "  on ta%1$d.tenant_id = t%2$d.tenant_id\n" +
                 "  and ta%1$d.tag_fk = t%2$d.tag_pk";
+
+        // The meaning of character strings used in whereTemplate as placeholders for later substitution:
+        // %1$d = nextAttrNumber
+        // %2$s = attrType
+        // %3$s = searchOperator
 
         var whereTemplate = "ta%1$d.attr_name = ? " +
                 "and ta%1$d.attr_index = ? " +
@@ -409,9 +454,17 @@ class JdbcSearchQueryBuilder {
         var nItems = searchTerm.getSearchValue().getArrayValue().getItemsCount();
         var itemPlaceholders = String.join(", ", Collections.nCopies(nItems, "?"));
 
+        // The meaning of character strings used in joinTemplate as placeholders for later substitution:
+        // %1$d = nextAttrNumber
+        // %2$d = subQueryNumber
+
         var joinTemplate = "join tag_attr ta%1$d\n" +
                 "  on ta%1$d.tenant_id = t%2$d.tenant_id\n" +
                 "  and ta%1$d.tag_fk = t%2$d.tag_pk";
+
+        // The meaning of character strings used in whereTemplate as placeholders for later substitution:
+        // %1$d = nextAttrNumber
+        // %2$s = attrType
 
         var whereTemplate = "ta%1$d.attr_name = ? " +
                 "and ta%1$d.attr_value_%2$s in (" + itemPlaceholders + ")";
@@ -427,6 +480,46 @@ class JdbcSearchQueryBuilder {
 
         return buildSearchTermFromTemplates(baseQuery, searchTerm, joinTemplate, whereTemplate,
                 Stream.concat(Stream.of(paramNameSetter), paramValueSetters));
+    }
+
+    JdbcSearchQuery buildSearchTermFromTemplatesForExistsOperator(
+            JdbcSearchQuery baseQuery, SearchTerm searchTerm,
+            String joinTemplate, String whereTemplate,
+            Stream<JdbcSearchQuery.ParamSetter> params) {
+
+        // Fill out the join and where clause templates
+        var queryNumber = baseQuery.getSubQueryNumber();
+        var attrNumber = baseQuery.getNextAttrNumber();
+        var attrTypeSuffix = searchTerm.getAttrType().toString();
+
+        // Internal error - invalid searches should be picked up in the validation layer
+        if (searchTerm.getOperator() == null) {
+
+            var message = "Invalid search term (search operator not recognised)";
+            log.error(message);
+
+            throw new EValidationGap(message);
+        }
+
+        var joinClause = String.format(joinTemplate, attrNumber, queryNumber);
+        var whereClause = "(" + String.format(whereTemplate, attrNumber, attrTypeSuffix) + ")";
+
+        // Create a new fragment for this search term
+        var fragment = new JdbcSearchQuery.Fragment(joinClause, whereClause, params.collect(Collectors.toList()));
+
+        // Add this new fragment to the list of fragments
+        var fragments = Stream.concat(
+                        baseQuery.getFragments().stream(),
+                        Stream.of(fragment))
+                .collect(Collectors.toList());
+
+        // Each search term queries a single attr, so increment nextAttrNumber by 1
+        // Adding a search term does not require a new sub-query, so subQueryNumber does not change
+
+        return new JdbcSearchQuery(
+                baseQuery.getSubQueryNumber(),
+                baseQuery.getNextAttrNumber() + 1,
+                fragments);
     }
 
     JdbcSearchQuery buildSearchTermFromTemplates(

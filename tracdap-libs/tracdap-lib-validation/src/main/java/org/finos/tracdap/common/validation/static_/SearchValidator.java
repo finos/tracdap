@@ -157,7 +157,8 @@ public class SearchValidator {
                 .pop();
 
         ctx = ctx.push(ST_ATTR_TYPE)
-                .apply(CommonValidators::required)
+                .applyIf(!msg.getOperator().equals(SearchOperator.EXISTS), CommonValidators::required)
+                .applyIf(msg.getOperator().equals(SearchOperator.EXISTS), CommonValidators::optional)
                 .apply(CommonValidators::nonZeroEnum, BasicType.class)
                 .apply(CommonValidators::primitiveType, BasicType.class)
                 .pop();
@@ -168,7 +169,8 @@ public class SearchValidator {
                 .pop();
 
         ctx = ctx.push(ST_SEARCH_VALUE)
-                .apply(CommonValidators::required)
+                .applyIf(!msg.getOperator().equals(SearchOperator.EXISTS), CommonValidators::required)
+                .applyIf(msg.getOperator().equals(SearchOperator.EXISTS), CommonValidators::omitted)
                 .apply(TypeSystemValidator::value, Value.class)
                 .pop();
 
@@ -177,7 +179,7 @@ public class SearchValidator {
 
         if (!ctx.failed()) {
             ctx = ctx.apply(SearchValidator::operatorMatchesType, SearchTerm.class);
-            ctx = ctx.apply(SearchValidator::valueMatchesType, SearchTerm.class);
+            ctx = ctx.applyIf(!msg.getOperator().equals(SearchOperator.EXISTS), SearchValidator::valueMatchesType, SearchTerm.class);
         }
 
         return ctx;
