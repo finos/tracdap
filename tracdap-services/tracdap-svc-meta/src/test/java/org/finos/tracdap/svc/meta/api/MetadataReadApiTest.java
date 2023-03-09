@@ -24,6 +24,7 @@ import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.svc.meta.TracMetadataService;
 import org.finos.tracdap.test.helpers.PlatformTest;
 import org.finos.tracdap.test.meta.TestData;
+import org.finos.tracdap.test.meta.AssertionBuildHelper;
 
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
@@ -296,8 +297,10 @@ abstract class MetadataReadApiTest {
                 .putAllAttrs(t2Attrs)
                 .build();
 
-        //assertTagEquals(v1TagExpected, v1TagSaved); // TODO: issue345 - correct
-        //assertTagEquals(v2TagExpected, v2TagSaved); // TODO: issue345 - correct
+        assertTagEqualsIgnoreIsLatest(v1TagExpected, v1TagSaved);
+        assertFalse(v1TagSaved.getHeader().getIsLatestObject());
+        assertFalse(v1TagSaved.getHeader().getIsLatestTag());
+        assertTagEquals(v2TagExpected, v2TagSaved);
         assertTagEquals(t2TagExpected, t2TagSaved);
     }
 
@@ -1050,6 +1053,31 @@ abstract class MetadataReadApiTest {
     private void assertTagEquals(org.finos.tracdap.metadata.Tag expected, org.finos.tracdap.metadata.Tag actual) {
 
         assertEquals(expected.getHeader(), actual.getHeader());
+        assertEquals(expected.getDefinition(), actual.getDefinition());
+
+        for (var attr : expected.getAttrsMap().keySet()) {
+
+            // trac_update_ attrs may be present in an original tag and changed in an update operation
+            if (attr.startsWith("trac_update_"))
+                continue;
+
+            assertEquals(expected.getAttrsOrThrow(attr), actual.getAttrsOrThrow(attr));
+        }
+
+        assertTrue(actual.containsAttrs(MetadataConstants.TRAC_CREATE_TIME));
+        assertTrue(actual.containsAttrs(MetadataConstants.TRAC_CREATE_USER_ID));
+        assertTrue(actual.containsAttrs(MetadataConstants.TRAC_CREATE_USER_NAME));
+        assertTrue(actual.containsAttrs(MetadataConstants.TRAC_UPDATE_TIME));
+        assertTrue(actual.containsAttrs(MetadataConstants.TRAC_UPDATE_USER_ID));
+        assertTrue(actual.containsAttrs(MetadataConstants.TRAC_UPDATE_USER_NAME));
+    }
+
+    private void assertTagEqualsIgnoreIsLatest(org.finos.tracdap.metadata.Tag expected, org.finos.tracdap.metadata.Tag actual) {
+
+        var expectedIsLatestForcedTrue = AssertionBuildHelper.rebuildTagForceIsLatestFlagsTrue(expected);
+        var actualIsLatestForcedTrue = AssertionBuildHelper.rebuildTagForceIsLatestFlagsTrue(actual);
+
+        assertEquals(expectedIsLatestForcedTrue.getHeader(), actualIsLatestForcedTrue.getHeader());
         assertEquals(expected.getDefinition(), actual.getDefinition());
 
         for (var attr : expected.getAttrsMap().keySet()) {

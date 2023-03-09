@@ -1380,7 +1380,7 @@ abstract class MetadataWriteApiTest {
     }
 
     @Test
-    void updateTag_isLatestObject_ok() {  //TODO: issue345
+    void updateTag_isLatestObject_ok() {
 
         var v1SavedTag = updateObject_prepareV1(ObjectType.DATA);
         var v1Selector = selectorForTag(v1SavedTag);
@@ -1413,7 +1413,7 @@ abstract class MetadataWriteApiTest {
     }
 
     @Test
-    void updateTag_isLatestTag_ok() {  //TODO: issue345
+    void updateTag_isLatestTag_ok() {
 
         var v1SavedTag = updateObject_prepareV1(ObjectType.DATA);
         var v1Selector = selectorForTag(v1SavedTag);
