@@ -70,10 +70,8 @@ class StorageManager:
         self.__data_storage: tp.Dict[str, IDataStorage] = dict()
         self.__settings = sys_config.storage
 
-        storage_options = dict()
-
         for storage_key, storage_config in sys_config.storage.buckets.items():
-            self.create_storage(storage_key, storage_config, storage_options)
+            self.create_storage(storage_key, storage_config)
 
     def default_storage_key(self):
         return self.__settings.defaultBucket
@@ -81,7 +79,44 @@ class StorageManager:
     def default_storage_format(self):
         return self.__settings.defaultFormat
 
-    def create_storage(self, storage_key: str, storage_config: _cfg.PluginConfig, storage_options: dict = None):
+    def create_storage(self, storage_key: str, storage_config: _cfg.PluginConfig):
+
+        if plugins.PluginManager.is_plugin_available(IStorageProvider, storage_config.protocol):
+            self._create_storage_from_provider(storage_key, storage_config)
+        else:
+            self._create_storage_from_impl(storage_key, storage_config)
+
+    def _create_storage_from_provider(self, storage_key: str, storage_config: _cfg.PluginConfig):
+
+        provider = plugins.PluginManager.load_plugin(IStorageProvider, storage_config)
+
+        if provider.has_file_storage():
+            file_storage = provider.get_file_storage()
+        elif provider.has_file_system():
+            fs = provider.get_file_system()
+            file_storage = CommonFileStorage(storage_key, storage_config, fs)
+        else:
+            file_storage = None
+
+        if provider.has_data_storage():
+            data_storage = provider.get_data_storage()
+        elif file_storage is not None:
+            data_storage = CommonDataStorage(storage_config, file_storage)
+        else:
+            data_storage = None
+
+        if file_storage is None and data_storage is None:
+            err = f"Storage type [{storage_config.protocol}] is not available"
+            self.__log.error(err)
+            raise _ex.EStorageConfig(err)
+
+        if file_storage is not None:
+            self.__file_storage[storage_key] = file_storage
+
+        if data_storage is not None:
+            self.__data_storage[storage_key] = data_storage
+
+    def _create_storage_from_impl(self, storage_key: str, storage_config: _cfg.PluginConfig):
 
         if storage_config is None:
             err = f"Missing config for storage key [{storage_key}]"
@@ -97,6 +132,9 @@ class StorageManager:
             err = f"Storage type [{storage_type}] is not available"
             self.__log.error(err)
             raise _ex.EStorageConfig(err)
+
+        # Unused
+        storage_options = dict()
 
         file_storage = file_impl(storage_config, storage_options)
         data_storage = data_impl(storage_config, file_storage)
@@ -344,6 +382,7 @@ class CommonDataStorage(IDataStorage):
 
             with self.__file_storage.read_byte_stream(storage_path) as byte_stream:
                 table = codec.read_table(byte_stream, schema)
+                self.__file_storage.close_byte_stream(storage_path, byte_stream)
 
             if schema is not None:
                 # Apply conformance, in case the format was not able to apply it fully on read
@@ -387,6 +426,7 @@ class CommonDataStorage(IDataStorage):
 
             with self.__file_storage.write_byte_stream(storage_path_, overwrite=overwrite) as byte_stream:
                 codec.write_table(byte_stream, table)
+                self.__file_storage.close_byte_stream(storage_path, byte_stream)
 
         except (_ex.EStorage, _ex.EData) as e:
             err = f"Failed to write table [{storage_path}]: {str(e)}"
