@@ -17,6 +17,7 @@ import re
 import typing as tp
 
 import pyarrow as pa
+import pyarrow.fs as afs
 
 import tracdap.rt.metadata as _meta
 import tracdap.rt.config as _cfg
@@ -26,7 +27,7 @@ import tracdap.rt._impl.data as _data
 import tracdap.rt._impl.util as _util
 
 # Import storage interfaces
-from tracdap.rt.ext.storage import IDataFormat, IDataStorage, IFileStorage, FileType
+from tracdap.rt.ext.storage import *
 
 
 class FormatManager:
@@ -131,7 +132,166 @@ class StorageManager:
 
 
 # ----------------------------------------------------------------------------------------------------------------------
-# COMMON STORAGE IMPLEMENTATION
+# COMMON FILE STORAGE IMPLEMENTATION
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+class CommonFileStorage(IFileStorage):
+
+    def __init__(self, storage_key: str, storage_config: _cfg.PluginConfig, fs_impl: afs.SubTreeFileSystem):
+
+        self._log = _util.logger_for_object(self)
+        self._key = storage_key
+        self._config = storage_config
+        self._fs = fs_impl
+
+        fs_type = fs_impl.base_fs.type_name
+        fs_root = fs_impl.base_path
+
+        self._log.info(f"INIT [{self._key}]: Common file storage, fs = [{fs_type}], root = [{fs_root}]")
+
+    def exists(self, storage_path: str) -> bool:
+
+        operation = f"EXISTS [{self._key}]: [{storage_path}]"
+        return self._wrap_operation(operation, self._exists, storage_path)
+
+    def _exists(self, storage_path: str) -> bool:
+
+        file_info: afs.FileInfo = self._fs.get_file_info(storage_path)
+        return file_info.type != afs.FileType.NotFound
+
+    def size(self, storage_path: str) -> int:
+
+        operation = f"SIZE [{self._key}]: [{storage_path}]"
+        return self._wrap_operation(operation, self._size, storage_path)
+
+    def _size(self, storage_path: str) -> int:
+
+        file_info: afs.FileInfo = self._fs.get_file_info(storage_path)
+        return file_info.size
+
+    def stat(self, storage_path: str) -> FileStat:
+
+        operation = f"STAT [{self._key}]: [{storage_path}]"
+        return self._wrap_operation(operation, self._stat, storage_path)
+
+    def _stat(self, storage_path: str) -> FileStat:
+
+        file_info: afs.FileInfo = self._fs.get_file_info(storage_path)
+        file_type = FileType.FILE if file_info.is_file else FileType.DIRECTORY
+
+        return FileStat(
+            file_type, file_info.size,
+            ctime=file_info.mtime,
+            mtime=file_info.mtime,
+            atime=None)
+
+    def ls(self, storage_path: str) -> tp.List[str]:
+
+        operation = f"LS [{self._key}]: [{storage_path}]"
+        return self._wrap_operation(operation, self._ls, storage_path)
+
+    def _ls(self, storage_path: str) -> tp.List[str]:
+
+        selector = afs.FileSelector(storage_path, recursive=False)  # noqa
+        file_infos: tp.List[afs.FileInfo] = self._fs.get_file_info(selector)
+
+        return list(map(lambda fi: fi.base_name, file_infos))
+
+    def mkdir(self, storage_path: str, recursive: bool = False, exists_ok: bool = False):
+
+        operation = f"MKDIR [{self._key}]: [{storage_path}]"
+        return self._wrap_operation(operation, self._mkdir, storage_path, recursive)
+
+    def _mkdir(self, storage_path: str, recursive: bool):
+
+        self._fs.create_dir(storage_path, recursive=recursive)
+
+    def rm(self, storage_path: str, recursive: bool = False):
+
+        operation = f"RM [{self._key}]: [{storage_path}]"
+        return self._wrap_operation(operation, self._rm, storage_path, recursive)
+
+    def _rm(self, storage_path: str, recursive: bool = False):
+
+        if recursive:
+            self._fs.delete_dir(storage_path)
+        else:
+            self._fs.delete_file(storage_path)
+
+    def read_bytes(self, storage_path: str) -> bytes:
+
+        stream = self.read_byte_stream(storage_path)
+
+        try:
+            return stream.read()
+        finally:
+            self.close_byte_stream(storage_path, stream)
+
+    def read_byte_stream(self, storage_path: str) -> tp.BinaryIO:
+
+        operation = f"OPEN BYTE STREAM (READ) [{self._key}]: [{storage_path}]"
+        return self._wrap_operation(operation, self._read_byte_stream, storage_path)
+
+    def _read_byte_stream(self, storage_path: str) -> tp.BinaryIO:
+
+        stream: tp.BinaryIO = self._fs.open_input_file(storage_path)
+
+        stream.seek(0, 2)
+        file_size = _util.format_file_size(stream.tell())
+        stream.seek(0, 0)
+
+        self._log.info(f"File size [{self._key}]: {file_size} [{storage_path}]")
+
+        return stream
+
+    def write_bytes(self, storage_path: str, data: bytes, overwrite: bool = False):
+
+        stream = self.write_byte_stream(storage_path, overwrite)
+
+        try:
+            stream.write(data)
+        finally:
+            self.close_byte_stream(storage_path, stream)
+
+    def write_byte_stream(self, storage_path: str, overwrite: bool = False) -> tp.BinaryIO:
+
+        operation = f"OPEN BYTE STREAM (WRITE) [{self._key}]: [{storage_path}]"
+        return self._wrap_operation(operation, self._write_byte_stream, storage_path)
+
+    def _write_byte_stream(self, storage_path: str) -> tp.BinaryIO:
+
+        return self._fs.open_output_stream(storage_path)
+
+    def close_byte_stream(self, storage_path: str, stream: tp.BinaryIO):
+
+        if stream.writable():
+            file_size = _util.format_file_size(stream.tell())
+            self._log.info(f"File size [{self._key}]: {file_size} [{storage_path}]")
+            self._log.info(f"CLOSE BYTE STREAM (WRITE) [{self._key}]: [{storage_path}]")
+
+        else:
+            self._log.info(f"CLOSE BYTE STREAM (READ) [{self._key}]: [{storage_path}]")
+
+        stream.close()
+
+    def _wrap_operation(self, operation: str, func: tp.Callable, *args, **kwargs) -> tp.Any:
+
+        try:
+            self._log.info(operation)
+            return func(*args, **kwargs)
+
+        # TODO: We don't know what exception types Arrow FS will throw
+        # More specialized handling would be good, if that information can be found out
+
+        except Exception as e:
+            msg = f"There was a problem in the storage layer: {str(e)}"
+            self._log.exception(f"{operation}: {msg}")
+            raise _ex.EStorageRequest(msg) from e
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+# COMMON DATA STORAGE IMPLEMENTATION
 # ----------------------------------------------------------------------------------------------------------------------
 
 
