@@ -32,7 +32,7 @@ jobs:
 
   java-integration:
 
-    name: int-${{ inputs.service }}-${{ inputs.protocol }}-java
+    name: int-java-${{ inputs.service }}-${{ inputs.protocol }}
 
     env: ${{ fromJson( inputs.matrix ) }}
     if: ${{ inputs.enabled && inputs.has_java }}
@@ -111,7 +111,7 @@ jobs:
 
   python-integration:
 
-    name: int-${{ inputs.service }}-${{ inputs.protocol }}-python
+    name: int-python-${{ inputs.service }}-${{ inputs.protocol }}
 
     if: ${{ inputs.enabled && inputs.has_python }}
     env: ${{ fromJson( inputs.matrix ) }}
