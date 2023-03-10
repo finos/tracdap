@@ -12,6 +12,8 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import datetime as dt
+import enum
 import pathlib
 import re
 import typing as tp
@@ -195,7 +197,9 @@ class CommonFileStorage(IFileStorage):
 
     def _exists(self, storage_path: str) -> bool:
 
-        file_info: afs.FileInfo = self._fs.get_file_info(storage_path)
+        resolved_path = self._resolve_path(storage_path, "EXISTS", True)
+
+        file_info: afs.FileInfo = self._fs.get_file_info(resolved_path)
         return file_info.type != afs.FileType.NotFound
 
     def size(self, storage_path: str) -> int:
@@ -205,7 +209,9 @@ class CommonFileStorage(IFileStorage):
 
     def _size(self, storage_path: str) -> int:
 
-        file_info: afs.FileInfo = self._fs.get_file_info(storage_path)
+        resolved_path = self._resolve_path(storage_path, "SIZE", True)
+
+        file_info: afs.FileInfo = self._fs.get_file_info(resolved_path)
         return file_info.size
 
     def stat(self, storage_path: str) -> FileStat:
@@ -215,13 +221,15 @@ class CommonFileStorage(IFileStorage):
 
     def _stat(self, storage_path: str) -> FileStat:
 
-        file_info: afs.FileInfo = self._fs.get_file_info(storage_path)
+        resolved_path = self._resolve_path(storage_path, "STAT", True)
+
+        file_info: afs.FileInfo = self._fs.get_file_info(resolved_path)
         file_type = FileType.FILE if file_info.is_file else FileType.DIRECTORY
 
         return FileStat(
             file_type, file_info.size,
-            ctime=file_info.mtime,
-            mtime=file_info.mtime,
+            ctime=file_info.mtime.astimezone(dt.timezone.utc),
+            mtime=file_info.mtime.astimezone(dt.timezone.utc),
             atime=None)
 
     def ls(self, storage_path: str) -> tp.List[str]:
@@ -231,7 +239,9 @@ class CommonFileStorage(IFileStorage):
 
     def _ls(self, storage_path: str) -> tp.List[str]:
 
-        selector = afs.FileSelector(storage_path, recursive=False)  # noqa
+        resolved_path = self._resolve_path(storage_path, "LS", True)
+
+        selector = afs.FileSelector(resolved_path, recursive=False)  # noqa
         file_infos: tp.List[afs.FileInfo] = self._fs.get_file_info(selector)
 
         return list(map(lambda fi: fi.base_name, file_infos))
@@ -243,7 +253,9 @@ class CommonFileStorage(IFileStorage):
 
     def _mkdir(self, storage_path: str, recursive: bool):
 
-        self._fs.create_dir(storage_path, recursive=recursive)
+        resolved_path = self._resolve_path(storage_path, "MKDIR", False)
+
+        self._fs.create_dir(resolved_path, recursive=recursive)
 
     def rm(self, storage_path: str, recursive: bool = False):
 
@@ -252,10 +264,12 @@ class CommonFileStorage(IFileStorage):
 
     def _rm(self, storage_path: str, recursive: bool = False):
 
+        resolved_path = self._resolve_path(storage_path, "RM", False)
+
         if recursive:
-            self._fs.delete_dir(storage_path)
+            self._fs.delete_dir(resolved_path)
         else:
-            self._fs.delete_file(storage_path)
+            self._fs.delete_file(resolved_path)
 
     def read_bytes(self, storage_path: str) -> bytes:
 
@@ -273,7 +287,8 @@ class CommonFileStorage(IFileStorage):
 
     def _read_byte_stream(self, storage_path: str) -> tp.BinaryIO:
 
-        stream: tp.BinaryIO = self._fs.open_input_file(storage_path)
+        resolved_path = self._resolve_path(storage_path, "OPEN BYTE STREAM (READ)", False)
+        stream: tp.BinaryIO = self._fs.open_input_file(resolved_path)
 
         stream.seek(0, 2)
         file_size = _util.format_file_size(stream.tell())
@@ -299,7 +314,9 @@ class CommonFileStorage(IFileStorage):
 
     def _write_byte_stream(self, storage_path: str) -> tp.BinaryIO:
 
-        return self._fs.open_output_stream(storage_path)
+        resolved_path = self._resolve_path(storage_path, "OPEN BYTE STREAM (WRITE)", False)
+
+        return self._fs.open_output_stream(resolved_path)
 
     def close_byte_stream(self, storage_path: str, stream: tp.BinaryIO):
 
@@ -319,14 +336,140 @@ class CommonFileStorage(IFileStorage):
             self._log.info(operation)
             return func(*args, **kwargs)
 
+        # ETrac means the error is already handled, log the message as-is
+        except _ex.ETrac as e:
+            self._log.exception(f"{operation} {str(e)}")
+            raise
+
         # TODO: We don't know what exception types Arrow FS will throw
         # More specialized handling would be good, if that information can be found out
 
         except Exception as e:
             msg = f"There was a problem in the storage layer: {str(e)}"
-            self._log.exception(f"{operation}: {msg}")
+            self._log.exception(f"{operation} {msg}")
             raise _ex.EStorageRequest(msg) from e
+        
+    def _resolve_path(self, storage_path: str, operation_name: str, allow_root_dir: bool) -> str:
 
+        try:
+
+            if storage_path is None or len(storage_path.strip()) == 0:
+                raise self._explicit_error(self.ExplicitError.STORAGE_PATH_NULL_OR_BLANK, storage_path, operation_name)
+    
+            relative_path = pathlib.Path(storage_path)
+    
+            if relative_path.is_absolute():
+                raise self._explicit_error(self.ExplicitError.STORAGE_PATH_NOT_RELATIVE, storage_path, operation_name)
+
+            root_path = pathlib.Path("/root")
+            absolute_path = root_path.joinpath(storage_path).resolve(False)
+    
+            if len(absolute_path.parts) < len(root_path.parts) or not absolute_path.is_relative_to(root_path):
+                raise self._explicit_error(self.ExplicitError.STORAGE_PATH_OUTSIDE_ROOT, storage_path, operation_name)
+
+            if absolute_path == root_path and not allow_root_dir:
+                raise self._explicit_error(self.ExplicitError.STORAGE_PATH_IS_ROOT, storage_path, operation_name)
+    
+            return str(absolute_path.relative_to(root_path).as_posix())
+
+        except ValueError:
+
+            raise self._explicit_error(self.ExplicitError.STORAGE_PATH_INVALID, storage_path, operation_name)
+
+    def _explicit_error(self, error, storage_path, operation_name):
+
+        message_template = self._ERROR_MESSAGE_MAP.get(error)
+        message = message_template.format(operation_name, self._key, storage_path)
+
+        err_type = self._ERROR_TYPE_MAP.get(error)
+        err = err_type(message)
+
+        return err
+
+    class ExplicitError(enum.Enum):
+    
+        # Validation failures
+        STORAGE_PATH_NULL_OR_BLANK = 1
+        STORAGE_PATH_NOT_RELATIVE = 2
+        STORAGE_PATH_OUTSIDE_ROOT = 3
+        STORAGE_PATH_IS_ROOT = 4
+        STORAGE_PATH_INVALID = 5
+
+        # Explicit errors file in operations
+        SIZE_OF_DIR = 10
+        STAT_NOT_FILE_OR_DIR = 11
+        RM_DIR_NOT_RECURSIVE = 12
+
+        # Exceptions
+        NO_SUCH_FILE_EXCEPTION = 20
+        FILE_ALREADY_EXISTS_EXCEPTION = 21
+        DIRECTORY_NOT_FOUND_EXCEPTION = 22
+        NOT_DIRECTORY_EXCEPTION = 23
+        ACCESS_DENIED_EXCEPTION = 24
+        SECURITY_EXCEPTION = 25
+        IO_EXCEPTION = 26
+
+        # Errors in stream (Flow pub/sub) implementation
+        DUPLICATE_SUBSCRIPTION = 30
+
+        # These errors have special parameterization for their error messages
+        CHUNK_NOT_FULLY_WRITTEN = 31
+
+        # Unhandled / unexpected error
+        UNKNOWN_ERROR = 40
+
+    _ERROR_MESSAGE_MAP = {
+
+        ExplicitError.STORAGE_PATH_NULL_OR_BLANK: "Requested storage path is null or blank: {} {} [{}]",
+        ExplicitError.STORAGE_PATH_NOT_RELATIVE: "Requested storage path is not a relative path: {} {} [{}]",
+        ExplicitError.STORAGE_PATH_OUTSIDE_ROOT: "Requested storage path is outside the storage root directory: {} {} [{}]",  # noqa
+        ExplicitError.STORAGE_PATH_IS_ROOT: "Requested operation not allowed on the storage root directory: {} {} [{}]",
+        ExplicitError.STORAGE_PATH_INVALID: "Requested storage path is invalid: {} {} [{}]",
+
+        ExplicitError.SIZE_OF_DIR: "Size operation is not available for directories: {} {} [{}]",
+        ExplicitError.STAT_NOT_FILE_OR_DIR: "Object is not a file or directory: {} {} [{}]",
+        ExplicitError.RM_DIR_NOT_RECURSIVE: "Regular delete operation not available for directories (use recursive delete): {} {} [{}]",  # noqa
+
+        ExplicitError.NO_SUCH_FILE_EXCEPTION: "File not found in storage layer: {} {} [{}]",
+        ExplicitError.FILE_ALREADY_EXISTS_EXCEPTION: "File already exists in storage layer: {} {} [{}]",
+        ExplicitError.DIRECTORY_NOT_FOUND_EXCEPTION: "Directory not found in storage layer: {} {} [{}]",
+        ExplicitError.NOT_DIRECTORY_EXCEPTION: "Path is not a directory in storage layer: {} {} [{}]",
+        ExplicitError.ACCESS_DENIED_EXCEPTION: "Access denied in storage layer: {} {} [{}]",
+        ExplicitError.SECURITY_EXCEPTION: "Access denied in storage layer: {} {} [{}]",
+        ExplicitError.IO_EXCEPTION: "An IO error occurred in the storage layer: {} {} [{}]",
+
+        ExplicitError.DUPLICATE_SUBSCRIPTION: "Duplicate subscription detected in the storage layer: {} {} [{}]",
+        ExplicitError.CHUNK_NOT_FULLY_WRITTEN: "Chunk was not fully written, chunk size = {} B, written = {} B",
+
+        ExplicitError.UNKNOWN_ERROR: "An unexpected error occurred in the storage layer: {} {} [{}]",
+    }
+
+    _ERROR_TYPE_MAP = {
+
+        ExplicitError.STORAGE_PATH_NULL_OR_BLANK: _ex.EStorageRequest,
+        ExplicitError.STORAGE_PATH_NOT_RELATIVE: _ex.EStorageRequest,
+        ExplicitError.STORAGE_PATH_OUTSIDE_ROOT: _ex.EStorageRequest,
+        ExplicitError.STORAGE_PATH_IS_ROOT: _ex.EStorageRequest,
+        ExplicitError.STORAGE_PATH_INVALID: _ex.EStorageRequest,
+    
+        ExplicitError.SIZE_OF_DIR: _ex.EStorageRequest,
+        ExplicitError.RM_DIR_NOT_RECURSIVE: _ex.EStorageRequest,
+        ExplicitError.STAT_NOT_FILE_OR_DIR: _ex.EStorageRequest,
+    
+        ExplicitError.NO_SUCH_FILE_EXCEPTION: _ex.EStorageRequest,
+        ExplicitError.FILE_ALREADY_EXISTS_EXCEPTION: _ex.EStorageRequest,
+        ExplicitError.DIRECTORY_NOT_FOUND_EXCEPTION: _ex.EStorageRequest,
+        ExplicitError.NOT_DIRECTORY_EXCEPTION: _ex.EStorageRequest,
+        ExplicitError.ACCESS_DENIED_EXCEPTION: _ex.EStorageAccess,
+        ExplicitError.SECURITY_EXCEPTION: _ex.EStorageAccess,
+        ExplicitError.IO_EXCEPTION: _ex.EStorage,
+    
+        ExplicitError.DUPLICATE_SUBSCRIPTION: _ex.ETracInternal,
+        ExplicitError.CHUNK_NOT_FULLY_WRITTEN: _ex.EStorageCommunication,
+
+        ExplicitError.UNKNOWN_ERROR: _ex.ETracInternal
+    }
+        
 
 # ----------------------------------------------------------------------------------------------------------------------
 # COMMON DATA STORAGE IMPLEMENTATION
