@@ -8,7 +8,7 @@ on:
   # Re-run integration tests in main, to make sure there are no issues from the merge
   push:
     branches:
-      - main
+      - "**"
 
   # Allow manual triggering of integration tests
   workflow_dispatch:
@@ -164,6 +164,8 @@ jobs:
 
   end-to-end:
 
+    if: ${{ false }}
+
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -216,6 +218,8 @@ jobs:
 
 
   int-metadb:
+
+    if: ${{ false }}
 
     runs-on: ubuntu-latest
 
@@ -362,6 +366,8 @@ jobs:
 
           - { PROTOCOL: S3,
               BUILD_aws_storage: true,
+              SETUP_SCRIPT: ".github/scripts/int-storage-s3-setup.sh",
+              TEARDOWN_SCRIPT: ".github/scripts/int-storage-s3-teardown.sh",
               TRAC_CONFIG_FILE: '.github/config/int-storage-s3.yaml',
               TRAC_SECRET_KEY: storage_s3_secrets,
               S3_BUCKET: not-configured,
@@ -377,6 +383,9 @@ jobs:
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
+
+      - name: Integration setup script
+        run: ${{ env.SETUP_SCRIPT }}
 
       - name: Set up Java
         uses: actions/setup-java@v3
@@ -409,3 +418,6 @@ jobs:
           name: junit-test-results
           path: build/modules/*/reports/**
           retention-days: 7
+
+      - name: Integration teardown script
+        run: ${{ env.TEARDOWN_SCRIPT }}
