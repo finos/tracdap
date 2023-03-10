@@ -2,12 +2,24 @@
 on:
   workflow_call:
     inputs:
+      service:
+        required: true
+        type: string
+      protocol:
+        required: true
+        type: string
       enabled:
         required: true
         type: boolean
       matrix:
         required: true
         type: string
+      has_java:
+        required: true
+        type: boolean
+      has_python:
+        required: true
+        type: boolean
 
 
 env:
@@ -20,10 +32,10 @@ jobs:
 
   java-integration:
 
-    name: int-${{ env.SERVICE }}-java-${{ env.PROTOCOL }}
+    name: int-${{ inputs.service }}-${{ inputs.protocol }}-java
 
     env: ${{ fromJson( inputs.matrix ) }}
-    if: ${{ inputs.enabled && env.JAVA_TESTS }}
+    if: ${{ inputs.enabled && inputs.has_java }}
 
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -97,9 +109,9 @@ jobs:
 
   python-integration:
 
-    name: int-${{ env.SERVICE }}-python-${{ env.PROTOCOL }}
+    name: int-${{ inputs.service }}-${{ inputs.protocol }}-python
 
-    if: ${{ inputs.enabled && env.PYTHON_TESTS }}
+    if: ${{ inputs.enabled && inputs.has_python }}
     env: ${{ fromJson( inputs.matrix ) }}
 
     runs-on: ubuntu-latest

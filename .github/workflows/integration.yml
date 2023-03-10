@@ -375,6 +375,10 @@ jobs:
 
     uses: ./.github/workflows/int-storage.yaml
     with:
+      service: ${{ matrix.storage.SERVICE }}
+      protocol: ${{ matrix.storage.PROTOCOL }}
       enabled: ${{ vars[ matrix.storage.ENABLE_IF ] != '' }}
       matrix: ${{ toJson( matrix.storage ) }}
+      has_java: ${{ matrix.storage.JAVA_TESTS != '' }}
+      has_python: ${{ matrix.storage.PYTHON_TESTS != '' }}
     secrets: inherit
