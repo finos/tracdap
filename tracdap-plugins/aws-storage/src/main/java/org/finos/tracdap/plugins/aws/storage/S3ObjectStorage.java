@@ -181,14 +181,20 @@ public class S3ObjectStorage implements IFileStorage {
     @Override
     public CompletionStage<Boolean> exists(String storagePath, IExecutionContext execContext) {
 
-        log.info("STORAGE OPERATION: {} {} [{}]", storageKey, EXISTS_OPERATION, storagePath);
+        try {
 
-        var fileObjectKey = resolvePath(storagePath, true, EXISTS_OPERATION);
-        var dirObjectKey = fileObjectKey + "/";
+            log.info("STORAGE OPERATION: {} {} [{}]", storageKey, EXISTS_OPERATION, storagePath);
 
-        return existsImpl(fileObjectKey, execContext).thenCompose(found -> found
-                ? CompletableFuture.completedFuture(true)
-                : existsImpl(dirObjectKey, execContext));
+            var fileObjectKey = resolvePath(storagePath, true, EXISTS_OPERATION);
+            var dirObjectKey = fileObjectKey + "/";
+
+            return existsImpl(fileObjectKey, execContext).thenCompose(found -> found
+                    ? CompletableFuture.completedFuture(true)
+                    : existsImpl(dirObjectKey, execContext));
+        }
+        catch (Exception e) {
+            return CompletableFuture.failedFuture(e);
+        }
     }
 
     private CompletableFuture<Boolean> existsImpl(String objectKey, IExecutionContext execContext) {
@@ -225,32 +231,42 @@ public class S3ObjectStorage implements IFileStorage {
     @Override
     public CompletionStage<Long> size(String storagePath, IExecutionContext execContext) {
 
-        log.info("STORAGE OPERATION: {} {} [{}]", storageKey, SIZE_OPERATION, storagePath);
+        try {
 
-        var objectKey = resolvePath(storagePath, true, SIZE_OPERATION);
+            log.info("STORAGE OPERATION: {} {} [{}]", storageKey, SIZE_OPERATION, storagePath);
 
-        var request = HeadObjectRequest.builder()
-            .bucket(this.bucket)
-            .key(objectKey)
-            .build();
+            var objectKey = resolvePath(storagePath, true, SIZE_OPERATION);
 
-        return client.headObject(request)
-                .thenApplyAsync(Function.identity(), execContext.eventLoopExecutor())
+            var request = HeadObjectRequest.builder()
+                    .bucket(this.bucket)
+                    .key(objectKey)
+                    .build();
 
-                // Take size from the content-length header
-                .thenApply(HeadObjectResponse::contentLength)
+            return client.headObject(request)
+                    .thenApplyAsync(Function.identity(), execContext.eventLoopExecutor())
 
-                .exceptionally(error -> { throw errors.handleException(error, objectKey, SIZE_OPERATION); });
+                    // Take size from the content-length header
+                    .thenApply(HeadObjectResponse::contentLength)
+
+                    .exceptionally(error -> {
+                        throw errors.handleException(error, objectKey, SIZE_OPERATION);
+                    });
+        }
+        catch (Exception e) {
+            return CompletableFuture.failedFuture(e);
+        }
     }
 
     @Override
     public CompletionStage<FileStat> stat(String storagePath, IExecutionContext execContext) {
 
-        log.info("STORAGE OPERATION: {} {} [{}]", storageKey, STAT_OPERATION, storagePath);
+        try {
 
-        var objectKey = resolvePath(storagePath, true, STAT_OPERATION);
+            log.info("STORAGE OPERATION: {} {} [{}]", storageKey, STAT_OPERATION, storagePath);
 
-        return dirProcessing(objectKey, STAT_OPERATION, k_ -> statImpl(k_, execContext), execContext);
+            var objectKey = resolvePath(storagePath, true, STAT_OPERATION);
+
+            return dirProcessing(objectKey, STAT_OPERATION, k_ -> statImpl(k_, execContext), execContext);
 
 //        var request = GetObjectAttributesRequest.builder()
 //            .bucket(bucket)
@@ -276,6 +292,11 @@ public class S3ObjectStorage implements IFileStorage {
 //            return new FileStat(path, name, fileType, size, ctime, mtime, atime);
 //
 //        }, execContext.eventLoopExecutor());
+
+        }
+        catch (Exception e) {
+            return CompletableFuture.failedFuture(e);
+        }
     }
 
     private CompletionStage<FileStat> statImpl(String objectKey, IExecutionContext execContext) {
@@ -309,28 +330,33 @@ public class S3ObjectStorage implements IFileStorage {
     @Override
     public CompletionStage<DirStat> ls(String storagePath, IExecutionContext execContext) {
 
-        var dirPath = storagePath.endsWith(BACKSLASH) ? storagePath : storagePath + BACKSLASH;
+        try {
 
-        log.info("STORAGE OPERATION: {} {} [{}]", storageKey, LS_OPERATION, dirPath);
+            var dirPath = storagePath.endsWith(BACKSLASH) ? storagePath : storagePath + BACKSLASH;
 
-        var objectKey = resolvePath(dirPath, true, SIZE_OPERATION);
+            log.info("STORAGE OPERATION: {} {} [{}]", storageKey, LS_OPERATION, dirPath);
 
-        var request = ListObjectsRequest.builder()
-            .bucket(bucket)
-            .prefix(objectKey)
-            .delimiter(BACKSLASH)
-            .build();
+            var objectKey = resolvePath(dirPath, true, SIZE_OPERATION);
 
-        return client.listObjects(request).handleAsync((response, error) -> {
+            var request = ListObjectsRequest.builder()
+                    .bucket(bucket)
+                    .prefix(objectKey)
+                    .delimiter(BACKSLASH)
+                    .build();
 
-            if (error != null) {
-                throw errors.handleException(error, storagePath, LS_OPERATION);
-            }
-            else {
-                return lsResult(objectKey, response);
-            }
+            return client.listObjects(request).handleAsync((response, error) -> {
 
-        }, execContext.eventLoopExecutor());
+                if (error != null) {
+                    throw errors.handleException(error, storagePath, LS_OPERATION);
+                } else {
+                    return lsResult(objectKey, response);
+                }
+
+            }, execContext.eventLoopExecutor());
+        }
+        catch (Exception e) {
+            return CompletableFuture.failedFuture(e);
+        }
     }
 
     private DirStat lsResult(String dirObjectKey, ListObjectsResponse response) {
@@ -380,42 +406,53 @@ public class S3ObjectStorage implements IFileStorage {
     @Override
     public CompletionStage<Void> mkdir(String storagePath, boolean recursive, IExecutionContext execContext) {
 
-        log.info("STORAGE OPERATION: {} {} [{}]", storageKey, MKDIR_OPERATION, storagePath);
+        try {
 
-        var bucketKey = resolvePath(storagePath, false, MKDIR_OPERATION) + "/";
+            log.info("STORAGE OPERATION: {} {} [{}]", storageKey, MKDIR_OPERATION, storagePath);
 
-        var request = PutObjectRequest.builder()
-                .bucket(bucket)
-                .key(bucketKey)
-                .contentLength(0L)
-                .build();
+            var bucketKey = resolvePath(storagePath, false, MKDIR_OPERATION) + "/";
 
-        var content = AsyncRequestBody.empty();
+            var request = PutObjectRequest.builder()
+                    .bucket(bucket)
+                    .key(bucketKey)
+                    .contentLength(0L)
+                    .build();
 
-        return client.putObject(request, content).handleAsync((response, error) -> {
+            var content = AsyncRequestBody.empty();
 
-            if (error != null) {
-                throw errors.handleException(error, storagePath, LS_OPERATION);
-            }
-            else {
-                return null;
-            }
+            return client.putObject(request, content).handleAsync((response, error) -> {
 
-        }, execContext.eventLoopExecutor());
+                if (error != null) {
+                    throw errors.handleException(error, storagePath, LS_OPERATION);
+                } else {
+                    return null;
+                }
+
+            }, execContext.eventLoopExecutor());
+        }
+        catch (Exception e) {
+            return CompletableFuture.failedFuture(e);
+        }
     }
 
     @Override
     public CompletionStage<Void> rm(String storagePath, boolean recursive, IExecutionContext execContext) {
 
-        log.info("STORAGE OPERATION: {} {} [{}]", storageKey, RM_OPERATION, storagePath);
+        try {
 
-        var fileKey = resolvePath(storagePath, false, RM_OPERATION);
-        var dirKey = fileKey + "/";
+            log.info("STORAGE OPERATION: {} {} [{}]", storageKey, RM_OPERATION, storagePath);
 
-        return existsImpl(fileKey, execContext).thenComposeAsync(exists -> exists
-                ? rmSingle(fileKey, execContext)
-                : rmDir(dirKey, recursive, execContext),
-                execContext.eventLoopExecutor());
+            var fileKey = resolvePath(storagePath, false, RM_OPERATION);
+            var dirKey = fileKey + "/";
+
+            return existsImpl(fileKey, execContext).thenComposeAsync(exists -> exists
+                            ? rmSingle(fileKey, execContext)
+                            : rmDir(dirKey, recursive, execContext),
+                    execContext.eventLoopExecutor());
+        }
+        catch (Exception e) {
+            return CompletableFuture.failedFuture(e);
+        }
     }
 
     private CompletionStage<Void> rmDir(String dirKey, boolean recursive, IExecutionContext execContext) {
