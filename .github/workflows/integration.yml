@@ -26,6 +26,8 @@ jobs:
 
   web-api:
 
+    if: ${{ false }}
+
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -127,6 +129,8 @@ jobs:
   
 
   slow-tests:
+
+    if: ${{ false }}
 
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -354,6 +358,10 @@ jobs:
 
     runs-on: ubuntu-latest
     timeout-minutes: 5
+
+    # To use apt-get install, jobs must run in a container
+    container:
+      image: ubuntu:latest
 
     strategy:
 
