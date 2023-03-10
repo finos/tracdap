@@ -181,7 +181,7 @@ class LocalFileStorage(IFileStorage):
 
     def rm(self, storage_path: str, recursive: bool = False):
 
-        operation = f"MKDIR [{storage_path}]"
+        operation = f"RM [{storage_path}]"
         self._error_handling(operation, lambda: self._rm(storage_path, recursive))
 
     def _rm(self, storage_path: str, recursive: bool = False):
