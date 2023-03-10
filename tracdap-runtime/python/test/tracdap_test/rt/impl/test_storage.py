@@ -181,7 +181,7 @@ class FileStorageTestSuite:
         # In this case, storage implementations may return a null ctime
         # If ctime is returned, then it must be valid
         
-        test_start = dt.datetime.utcnow()
+        test_start = dt.datetime.now(dt.timezone.utc)
         
         # On macOS (APFS), the stat ctime is rounded down to 1 second resolution,
         # even though the filesystem supports nanosecond precision (which is used for mtime and atime)
@@ -195,7 +195,7 @@ class FileStorageTestSuite:
         stat_result = self.storage.stat("test_file.txt")
         
         time.sleep(0.01)  # Let time elapse before/after the test calls
-        test_finish = dt.datetime.utcnow()
+        test_finish = dt.datetime.now(dt.timezone.utc)
         
         self.assertTrue(stat_result.ctime is None or stat_result.ctime > test_start)
         self.assertTrue(stat_result.ctime is None or stat_result.ctime < test_finish)
@@ -204,7 +204,7 @@ class FileStorageTestSuite:
     
         # All storage implementations must implement mtime for files
 
-        test_start = dt.datetime.utcnow()
+        test_start = dt.datetime.now(dt.timezone.utc)
         time.sleep(0.01)  # Let time elapse before/after the test calls
 
         self.make_small_file("test_file.txt")
@@ -212,7 +212,7 @@ class FileStorageTestSuite:
         stat_result = self.storage.stat("test_file.txt")
 
         time.sleep(0.01)  # Let time elapse before/after the test calls
-        test_finish = dt.datetime.utcnow()
+        test_finish = dt.datetime.now(dt.timezone.utc)
 
         self.assertTrue(stat_result.mtime > test_start)
         self.assertTrue(stat_result.mtime < test_finish)
@@ -236,7 +236,7 @@ class FileStorageTestSuite:
 
         self.make_small_file("test_file.txt")
 
-        test_start = dt.datetime.utcnow()
+        test_start = dt.datetime.now(dt.timezone.utc)
         time.sleep(0.01)  # Let time elapse before/after the test calls
 
         self.storage.read_bytes("test_file.txt")
@@ -244,7 +244,7 @@ class FileStorageTestSuite:
         stat_result = self.storage.stat("test_file.txt")
 
         time.sleep(0.01)  # Let time elapse before/after the test calls
-        test_finish = dt.datetime.utcnow()
+        test_finish = dt.datetime.now(dt.timezone.utc)
 
         self.assertTrue(stat_result.atime is None or stat_result.atime > test_start)
         self.assertTrue(stat_result.atime is None or stat_result.atime < test_finish)
@@ -267,7 +267,7 @@ class FileStorageTestSuite:
         # ctime, mtime and atime for dirs is unlikely to be supported in cloud storage buckets
         # So, all of these fields are optional in stat responses for directories
 
-        test_start = dt.datetime.utcnow()
+        test_start = dt.datetime.now(dt.timezone.utc)
 
         # On macOS (APFS), the stat ctime is rounded down to 1 second resolution,
         # even though the filesystem supports nanosecond precision (which is used for mtime and atime)
@@ -281,7 +281,7 @@ class FileStorageTestSuite:
         stat_result = self.storage.stat("some_dir/test_dir")
 
         time.sleep(0.01)  # Let time elapse before/after the test calls
-        test_finish = dt.datetime.utcnow()
+        test_finish = dt.datetime.now(dt.timezone.utc)
         
         self.assertTrue(stat_result.ctime is None or stat_result.ctime > test_start)
         self.assertTrue(stat_result.ctime is None or stat_result.ctime < test_finish)
@@ -295,7 +295,7 @@ class FileStorageTestSuite:
 
         # "Modify" the directory by adding a file to it
 
-        test_start = dt.datetime.utcnow()
+        test_start = dt.datetime.now(dt.timezone.utc)
         time.sleep(0.01)  # Let time elapse before/after the test calls
 
         self.make_small_file("some_dir/test_dir/a_file.txt")
@@ -303,7 +303,7 @@ class FileStorageTestSuite:
         stat_result = self.storage.stat("some_dir/test_dir")
 
         time.sleep(0.01)  # Let time elapse before/after the test calls
-        test_finish = dt.datetime.utcnow()
+        test_finish = dt.datetime.now(dt.timezone.utc)
         
         self.assertTrue(stat_result.mtime is None or stat_result.mtime > test_start)
         self.assertTrue(stat_result.mtime is None or stat_result.mtime < test_finish)
@@ -318,7 +318,7 @@ class FileStorageTestSuite:
 
         # Access the directory by running "ls" on it
 
-        test_start = dt.datetime.utcnow()
+        test_start = dt.datetime.now(dt.timezone.utc)
         time.sleep(0.01)  # Let time elapse before/after the test calls
 
         self.storage.ls("some_dir/test_dir")
@@ -326,7 +326,7 @@ class FileStorageTestSuite:
         stat_result = self.storage.stat("some_dir/test_dir")
 
         time.sleep(0.01)  # Let time elapse before/after the test calls
-        test_finish = dt.datetime.utcnow()
+        test_finish = dt.datetime.now(dt.timezone.utc)
         
         self.assertTrue(stat_result.atime is None or stat_result.atime > test_start)
         self.assertTrue(stat_result.atime is None or stat_result.atime < test_finish)
