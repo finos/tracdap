@@ -352,17 +352,6 @@ jobs:
 
   int-storage:
 
-    # Storage integration tests not available in CI yet
-    # (test cases must be run manually until CI resources are available)
-    if: ${{ true }}
-
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-
-    # To use apt-get install, jobs must run in a container
-    container:
-      image: ubuntu:latest
-
     strategy:
 
       # Try to finish all jobs - it can be helpful to see if some succeed and others fail
@@ -373,59 +362,17 @@ jobs:
         storage:
 
           - { PROTOCOL: S3,
+              ENABLE_IF: TRAC_AWS_BUCKET,
               BUILD_aws_storage: true,
               SETUP_SCRIPT: ".github/scripts/int-storage-s3-setup.sh",
               TEARDOWN_SCRIPT: ".github/scripts/int-storage-s3-teardown.sh",
               TRAC_CONFIG_FILE: '.github/config/int-storage-s3.yaml',
-              TRAC_SECRET_KEY: storage_s3_secrets,
-              S3_BUCKET: not-configured,
-              STORGE_SECRET: "not_configured" }
+              TRAC_SECRET_KEY: very-secret-key,
+              STORAGE_SECRET: TRAC_AWS_SECRET_ACCESS_KEY
+          }
 
-
-    env: ${{ matrix.storage }}
-
-    steps:
-
-      # fetch-depth = 0 is needed to get tags for version info
-      - name: Checkout
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-
-      - name: Integration setup script
-        run: ${{ env.SETUP_SCRIPT }}
-
-      - name: Set up Java
-        uses: actions/setup-java@v3
-        with:
-          distribution: ${{ env.JAVA_DISTRIBUTION }}
-          java-version: ${{ env.JAVA_VERSION }}
-          cache: gradle
-
-      - name: Build
-        run: ./gradlew testClasses
-
-      # Auth tool will also create the secrets file if it doesn't exist
-      - name: Prepare secrets
-        run: |
-          ./gradlew secret-tool:run --args="--config ${{ env.TRAC_CONFIG_FILE }} --task init_secrets"
-          ./gradlew secret-tool:run --args="--config ${{ env.TRAC_CONFIG_FILE }} --task create_root_auth_key EC 256"
-          
-          echo "${STORAGE_SECRET}" | ./gradlew secret-tool:run --args="--config ${{ env.TRAC_CONFIG_FILE }} --task add_secret storage_secret"
-
-      # No need to prepare DB, it is done by the platform test setup
-
-      - name: Integration tests
-        run: ./gradlew integration -DintegrationTags="int-storage"
-
-      # If the tests fail, make the output available for download
-      - name: Store failed test results
-        uses: actions/upload-artifact@v3
-        if: failure()
-        with:
-          name: junit-test-results
-          path: build/modules/*/reports/**
-          retention-days: 7
-
-      - name: Integration teardown script
-        run: ${{ env.TEARDOWN_SCRIPT }}
+    uses: ./.github/workflows/int-storage.yaml
+    with:
+      enabled: ${{ vars[ matrix.storage.ENABLE_IF ] != '' }}
+      matrix: ${{ toJson( matrix.storage ) }}
+    secrets: inherit
