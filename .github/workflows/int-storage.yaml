@@ -8,12 +8,12 @@ on:
       protocol:
         required: true
         type: string
-      enabled:
-        required: true
-        type: boolean
       matrix:
         required: true
         type: string
+      enabled:
+        required: true
+        type: boolean
       has_java:
         required: true
         type: boolean

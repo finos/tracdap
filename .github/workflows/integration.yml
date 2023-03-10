@@ -369,16 +369,15 @@ jobs:
               TEARDOWN_SCRIPT: ".github/scripts/int-storage-s3-teardown.sh",
               TRAC_CONFIG_FILE: '.github/config/int-storage-s3.yaml',
               TRAC_SECRET_KEY: very-secret-key,
-              STORAGE_SECRET: TRAC_AWS_SECRET_ACCESS_KEY,
-              JAVA_TESTS: int-storage
+              STORAGE_SECRET: TRAC_AWS_SECRET_ACCESS_KEY
           }
 
     uses: ./.github/workflows/int-storage.yaml
     with:
       service: ${{ matrix.storage.SERVICE }}
       protocol: ${{ matrix.storage.PROTOCOL }}
-      enabled: ${{ vars[ matrix.storage.ENABLE_IF ] != '' }}
       matrix: ${{ toJson( matrix.storage ) }}
+      enabled: ${{ vars[ matrix.storage.ENABLE_IF ] != '' }}
       has_java: ${{ matrix.storage.JAVA_TESTS != '' }}
       has_python: ${{ matrix.storage.PYTHON_TESTS != '' }}
     secrets: inherit
