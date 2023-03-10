@@ -17,10 +17,13 @@ env:
 
 
 jobs:
-  int-storage:
 
-    if: ${{ inputs.enabled }}
+  java-integration:
+
+    name: int-${{ env.SERVICE }}-java-${{ env.PROTOCOL }}
+
     env: ${{ fromJson( inputs.matrix ) }}
+    if: ${{ inputs.enabled && env.JAVA_TESTS }}
 
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -51,7 +54,6 @@ jobs:
           ${{ env.SETUP_SCRIPT }}
 
       - name: Set up Java
-        if: ${{ env.JAVA_TESTS != '' }}
         uses: actions/setup-java@v3
         with:
           distribution: ${{ env.JAVA_DISTRIBUTION }}
@@ -59,12 +61,10 @@ jobs:
           cache: gradle
 
       - name: Build Java
-        if: ${{ env.JAVA_TESTS != '' }}
         run: ./gradlew testClasses
 
       # Auth tool will also create the secrets file if it doesn't exist
       - name: Prepare secrets
-        if: ${{ env.JAVA_TESTS != '' }}
         env:
           ${{ env.STORAGE_SECRET }}: ${{ secrets[ env.STORAGE_SECRET ] }}
         run: |
@@ -76,7 +76,6 @@ jobs:
       # No need to prepare DB, it is done by the platform test setup
 
       - name: Integration tests
-        if: ${{ env.JAVA_TESTS != '' }}
         env:
           ${{ env.STORAGE_SECRET }}: ${{ secrets[ env.STORAGE_SECRET ] }}
         run: |
@@ -91,6 +90,50 @@ jobs:
           name: junit-test-results
           path: build/plugins/*/reports/**
           retention-days: 7
+
+      - name: Integration teardown script
+        run: ${{ env.TEARDOWN_SCRIPT }}
+
+
+  python-integration:
+
+    name: int-${{ env.SERVICE }}-python-${{ env.PROTOCOL }}
+
+    if: ${{ inputs.enabled && env.PYTHON_TESTS }}
+    env: ${{ fromJson( inputs.matrix ) }}
+
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    # To use apt-get install, jobs must run in a container
+    container:
+      image: ubuntu:latest
+
+    steps:
+
+      # fetch-depth = 0 is needed to get tags for version info
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Install JQ
+        run: |
+          apt-get update
+          apt-get upgrade -y
+          apt-get install -y jq
+
+      - name: Integration setup script
+        env:
+          ${{ env.STORAGE_SECRET }}: ${{ secrets[ env.STORAGE_SECRET ] }}
+        run: |
+          $( echo '${{ toJson(vars) }}' | jq -r 'to_entries[] | "export " + .key + "=\"" + .value + "\""' )
+          ${{ env.SETUP_SCRIPT }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Integration teardown script
         run: ${{ env.TEARDOWN_SCRIPT }}
