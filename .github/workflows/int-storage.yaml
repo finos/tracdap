@@ -59,6 +59,7 @@ jobs:
           apt-get install -y jq
 
       - name: Integration setup script
+        if: ${{ env.SETUP_SCRIPT != '' }}
         env:
           ${{ env.STORAGE_SECRET }}: ${{ secrets[ env.STORAGE_SECRET ] }}
         run: |
@@ -104,6 +105,7 @@ jobs:
           retention-days: 7
 
       - name: Integration teardown script
+        if: ${{ env.TEARDOWN_SCRIPT != '' }}
         run: ${{ env.TEARDOWN_SCRIPT }}
 
 
@@ -136,6 +138,7 @@ jobs:
           apt-get install -y jq
 
       - name: Integration setup script
+        if: ${{ env.SETUP_SCRIPT != '' }}
         env:
           ${{ env.STORAGE_SECRET }}: ${{ secrets[ env.STORAGE_SECRET ] }}
         run: |
@@ -148,4 +151,5 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Integration teardown script
+        if: ${{ env.TEARDOWN_SCRIPT != '' }}
         run: ${{ env.TEARDOWN_SCRIPT }}
