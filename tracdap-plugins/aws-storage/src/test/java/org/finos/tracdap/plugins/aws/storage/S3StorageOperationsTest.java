@@ -26,10 +26,14 @@ import org.finos.tracdap.common.data.DataContext;
 import org.finos.tracdap.common.storage.StorageOperationsTestSuite;
 import org.junit.jupiter.api.*;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 import java.util.Properties;
 import java.util.Random;
+
+import static org.finos.tracdap.test.concurrent.ConcurrentTestHelpers.resultOf;
+import static org.finos.tracdap.test.concurrent.ConcurrentTestHelpers.waitFor;
 
 
 @Tag("integration")
@@ -44,7 +48,7 @@ public class S3StorageOperationsTest extends StorageOperationsTestSuite {
     static ExecutionContext setupExecCtx;
 
     @BeforeAll
-    static void setupStorage() {
+    static void setupStorage() throws Exception {
 
         var random = new Random();
 
@@ -61,7 +65,10 @@ public class S3StorageOperationsTest extends StorageOperationsTestSuite {
 
         setup = new S3ObjectStorage(storageProps);
         setup.start(elg);
-        setup.mkdir(testDir.substring(1), true, setupExecCtx);
+
+        var mkdir =setup.mkdir(testDir.substring(1), true, setupExecCtx);
+        waitFor(Duration.ofSeconds(10), mkdir);
+        resultOf(mkdir);
     }
 
     @BeforeEach
@@ -82,11 +89,11 @@ public class S3StorageOperationsTest extends StorageOperationsTestSuite {
     }
 
     @AfterAll
-    static void tearDownStorage() {
+    static void tearDownStorage() throws Exception {
 
-        setup.rm(testDir.substring(1), true, setupExecCtx)
-                .toCompletableFuture()
-                .join();
+        var rm = setup.rm(testDir.substring(1), true, setupExecCtx);
+        waitFor(Duration.ofSeconds(10), rm);
+        resultOf(rm);
 
         setup.stop();
         setup = null;

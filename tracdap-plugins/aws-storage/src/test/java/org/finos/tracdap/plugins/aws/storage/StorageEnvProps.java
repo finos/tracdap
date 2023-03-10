@@ -38,6 +38,7 @@ public class StorageEnvProps {
         storageProps.put(IStorageManager.PROP_STORAGE_KEY, "TEST_STORAGE");
         storageProps.put(S3ObjectStorage.REGION_PROPERTY, region);
         storageProps.put(S3ObjectStorage.BUCKET_PROPERTY, bucket);
+        storageProps.put(S3ObjectStorage.CREDENTIALS_PROPERTY, S3ObjectStorage.CREDENTIALS_STATIC);
         storageProps.put(S3ObjectStorage.ACCESS_KEY_ID_PROPERTY, accessKeyId);
         storageProps.put(S3ObjectStorage.SECRET_ACCESS_KEY_PROPERTY, secretAccessKey);
 
