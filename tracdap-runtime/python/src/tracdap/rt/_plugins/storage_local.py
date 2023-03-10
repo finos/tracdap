@@ -148,7 +148,9 @@ class LocalFileStorage(IFileStorage):
             else None
 
         return FileStat(
+            file_name=item_path.name,
             file_type=file_type,
+            storage_path=str(item_path.relative_to(self._root_path)),
             size=os_stat.st_size,
             ctime=dt.datetime.fromtimestamp(os_stat.st_ctime, dt.timezone.utc),
             mtime=dt.datetime.fromtimestamp(os_stat.st_mtime, dt.timezone.utc),

@@ -37,7 +37,9 @@ class FileStat:
     Timestamps are held in UTC
     """
 
+    file_name: str
     file_type: FileType
+    storage_path: str
     size: int
 
     ctime: _tp.Optional[_dt.datetime] = None

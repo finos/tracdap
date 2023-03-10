@@ -210,8 +210,17 @@ class CommonFileStorage(IFileStorage):
     def _size(self, storage_path: str) -> int:
 
         resolved_path = self._resolve_path(storage_path, "SIZE", True)
-
         file_info: afs.FileInfo = self._fs.get_file_info(resolved_path)
+
+        if file_info.type == afs.FileType.NotFound:
+            raise self._explicit_error(self.ExplicitError.NO_SUCH_FILE_EXCEPTION, storage_path, "SIZE")
+
+        if file_info.type == afs.FileType.Directory:
+            raise self._explicit_error(self.ExplicitError.SIZE_OF_DIR, storage_path, "SIZE")
+
+        if not file_info.is_file:
+            raise self._explicit_error(self.ExplicitError.UNKNOWN_ERROR, storage_path, "SIZE")
+
         return file_info.size
 
     def stat(self, storage_path: str) -> FileStat:
@@ -224,10 +233,18 @@ class CommonFileStorage(IFileStorage):
         resolved_path = self._resolve_path(storage_path, "STAT", True)
 
         file_info: afs.FileInfo = self._fs.get_file_info(resolved_path)
+
+        if file_info.type != afs.FileType.File and file_info.type != afs.FileType.Directory:
+            raise self._explicit_error(self.ExplicitError.STAT_NOT_FILE_OR_DIR, storage_path, "STAT")
+
         file_type = FileType.FILE if file_info.is_file else FileType.DIRECTORY
+        file_size = file_info.size if file_info.is_file else 0
 
         return FileStat(
-            file_type, file_info.size,
+            file_info.base_name,
+            file_type,
+            file_info.path,
+            file_size,
             ctime=file_info.mtime.astimezone(dt.timezone.utc),
             mtime=file_info.mtime.astimezone(dt.timezone.utc),
             atime=None)

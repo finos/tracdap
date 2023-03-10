@@ -170,8 +170,8 @@ class FileStorageTestSuite:
 
         stat_result = self.storage.stat("some_dir/test_file.txt")
 
-        self.assertEqual("some_dir/test_file.txt", stat_result.storagePath)
-        self.assertEqual("test_file.txt", stat_result.fileName)
+        self.assertEqual("some_dir/test_file.txt", stat_result.storage_path)
+        self.assertEqual("test_file.txt", stat_result.file_name)
         self.assertEqual(_storage.FileType.FILE, stat_result.file_type)
         self.assertEqual(expected_size, stat_result.size)
 
@@ -255,8 +255,8 @@ class FileStorageTestSuite:
 
         stat_result = self.storage.stat("some_dir/test_dir")
 
-        self.assertEqual("some_dir/test_dir", stat_result.storagePath)
-        self.assertEqual("test_dir", stat_result.fileName)
+        self.assertEqual("some_dir/test_dir", stat_result.storage_path)
+        self.assertEqual("test_dir", stat_result.file_name)
         self.assertEqual(_storage.FileType.DIRECTORY, stat_result.file_type)
 
         # Size field for directories should always be set to 0
@@ -335,8 +335,8 @@ class FileStorageTestSuite:
     
         root_stat = self.storage.stat(".")
 
-        self.assertEqual(".", root_stat.storagePath)
-        self.assertEqual(".", root_stat.fileName)
+        self.assertEqual(".", root_stat.storage_path)
+        self.assertEqual(".", root_stat.file_name)
         self.assertEqual(_storage.FileType.DIRECTORY, root_stat.file_type)
 
         # Size field for directories should always be set to 0
