@@ -245,7 +245,6 @@ class CommonFileStorage(IFileStorage):
             file_type,
             file_info.path,
             file_size,
-            ctime=file_info.mtime.astimezone(dt.timezone.utc),
             mtime=file_info.mtime.astimezone(dt.timezone.utc),
             atime=None)
 

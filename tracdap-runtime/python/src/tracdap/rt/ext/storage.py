@@ -42,13 +42,8 @@ class FileStat:
     storage_path: str
     size: int
 
-    ctime: _tp.Optional[_dt.datetime] = None
     mtime: _tp.Optional[_dt.datetime] = None
     atime: _tp.Optional[_dt.datetime] = None
-
-    uid: _tp.Optional[int] = None
-    gid: _tp.Optional[int] = None
-    mode: _tp.Optional[int] = None
 
 
 class IFileStorage:

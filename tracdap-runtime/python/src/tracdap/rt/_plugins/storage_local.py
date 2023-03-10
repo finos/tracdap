@@ -152,12 +152,8 @@ class LocalFileStorage(IFileStorage):
             file_type=file_type,
             storage_path=str(item_path.relative_to(self._root_path)),
             size=os_stat.st_size,
-            ctime=dt.datetime.fromtimestamp(os_stat.st_ctime, dt.timezone.utc),
             mtime=dt.datetime.fromtimestamp(os_stat.st_mtime, dt.timezone.utc),
-            atime=dt.datetime.fromtimestamp(os_stat.st_atime, dt.timezone.utc),
-            uid=os_stat.st_uid,
-            gid=os_stat.st_gid,
-            mode=os_stat.st_mode)
+            atime=dt.datetime.fromtimestamp(os_stat.st_atime, dt.timezone.utc))
 
     def ls(self, storage_path: str) -> tp.List[str]:
 

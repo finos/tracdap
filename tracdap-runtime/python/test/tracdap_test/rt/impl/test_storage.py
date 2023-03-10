@@ -175,34 +175,10 @@ class FileStorageTestSuite:
         self.assertEqual(_storage.FileType.FILE, stat_result.file_type)
         self.assertEqual(expected_size, stat_result.size)
 
-    def test_stat_file_ctime(self):
-
-        # For cloud storage buckets, it is likely that mtime is tracked but ctime is overwritten on updates
-        # In this case, storage implementations may return a null ctime
-        # If ctime is returned, then it must be valid
-        
-        test_start = dt.datetime.now(dt.timezone.utc)
-        
-        # On macOS (APFS), the stat ctime is rounded down to 1 second resolution,
-        # even though the filesystem supports nanosecond precision (which is used for mtime and atime)
-        # I am not sure if this is a bug in the JDK or a limitation in the underlying system calls
-        # Either way, allowing a whole second of sleep should always mean the ctime is after test_start
-        
-        time.sleep(1.0)  # Let time elapse before/after the test calls
-
-        self.make_small_file("test_file.txt")
-        
-        stat_result = self.storage.stat("test_file.txt")
-        
-        time.sleep(0.01)  # Let time elapse before/after the test calls
-        test_finish = dt.datetime.now(dt.timezone.utc)
-        
-        self.assertTrue(stat_result.ctime is None or stat_result.ctime > test_start)
-        self.assertTrue(stat_result.ctime is None or stat_result.ctime < test_finish)
-
     def test_stat_file_mtime(self):
     
         # All storage implementations must implement mtime for files
+        # Do not allow null mtime
 
         test_start = dt.datetime.now(dt.timezone.utc)
         time.sleep(0.01)  # Let time elapse before/after the test calls
@@ -262,33 +238,9 @@ class FileStorageTestSuite:
         # Size field for directories should always be set to 0
         self.assertEqual(0, stat_result.size)
     
-    def test_stat_dir_ctime(self):
-    
-        # ctime, mtime and atime for dirs is unlikely to be supported in cloud storage buckets
-        # So, all of these fields are optional in stat responses for directories
-
-        test_start = dt.datetime.now(dt.timezone.utc)
-
-        # On macOS (APFS), the stat ctime is rounded down to 1 second resolution,
-        # even though the filesystem supports nanosecond precision (which is used for mtime and atime)
-        # I am not sure if this is a bug in the JDK or a limitation in the underlying system calls
-        # Either way, allowing a whole second of sleep should always mean the ctime is after test_start
-
-        time.sleep(1.0)  # Let time elapse before/after the test calls
-
-        self.storage.mkdir("some_dir/test_dir", True)
-
-        stat_result = self.storage.stat("some_dir/test_dir")
-
-        time.sleep(0.01)  # Let time elapse before/after the test calls
-        test_finish = dt.datetime.now(dt.timezone.utc)
-        
-        self.assertTrue(stat_result.ctime is None or stat_result.ctime > test_start)
-        self.assertTrue(stat_result.ctime is None or stat_result.ctime < test_finish)
-    
     def test_stat_dir_mtime(self):
     
-        # ctime, mtime and atime for dirs is unlikely to be supported in cloud storage buckets
+        # mtime and atime for dirs is unlikely to be supported in cloud storage buckets
         # So, all of these fields are optional in stat responses for directories
 
         self.storage.mkdir("some_dir/test_dir", True)
@@ -310,7 +262,7 @@ class FileStorageTestSuite:
     
     def test_stat_dir_atime(self):
     
-        # ctime, mtime and atime for dirs is unlikely to be supported in cloud storage buckets
+        # mtime and atime for dirs is unlikely to be supported in cloud storage buckets
         # So, all of these fields are optional in stat responses for directories
 
         self.storage.mkdir("some_dir/test_dir", True)
