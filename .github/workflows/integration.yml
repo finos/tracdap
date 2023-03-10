@@ -368,7 +368,8 @@ jobs:
               TEARDOWN_SCRIPT: ".github/scripts/int-storage-s3-teardown.sh",
               TRAC_CONFIG_FILE: '.github/config/int-storage-s3.yaml',
               TRAC_SECRET_KEY: very-secret-key,
-              STORAGE_SECRET: TRAC_AWS_SECRET_ACCESS_KEY
+              STORAGE_SECRET: TRAC_AWS_SECRET_ACCESS_KEY,
+              JAVA_TESTS: int-storage
           }
 
     uses: ./.github/workflows/int-storage.yaml
