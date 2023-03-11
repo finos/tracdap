@@ -105,6 +105,25 @@ plugins.PluginManager.register_plugin(IStorageProvider, LocalStorageProvider, ["
 # It is likely to be removed in a future release
 
 
+class _StreamResource(tp.BinaryIO):  # noqa
+
+    def __init__(self, ctx_mgr, close_func):
+        self.__ctx_mgr = ctx_mgr
+        self.__close_func = close_func
+
+    def __getitem__(self, item):
+        return self.__ctx_mgr.__getitem__(item)
+
+    def __enter__(self):
+        return self.__ctx_mgr.__enter__()
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        try:
+            self.__close_func()
+        finally:
+            self.__ctx_mgr.__exit__(exc_type, exc_val, exc_tb)
+
+
 class LocalFileStorage(IFileStorage):
 
     def __init__(self, config: cfg.PluginConfig, options: dict = None):
@@ -204,7 +223,9 @@ class LocalFileStorage(IFileStorage):
     def _read_byte_stream(self, storage_path: str) -> tp.BinaryIO:
 
         item_path = self._root_path / storage_path
-        return open(item_path, mode='rb')
+        stream = open(item_path, mode='rb')
+
+        return _StreamResource(stream, lambda: self._close_byte_stream(storage_path, stream))
 
     def write_bytes(self, storage_path: str, data: bytes, overwrite: bool = False):
 
@@ -226,16 +247,23 @@ class LocalFileStorage(IFileStorage):
         item_path = self._root_path / storage_path
 
         if overwrite:
-            return open(item_path, mode='wb')
+            stream = open(item_path, mode='wb')
         else:
-            return open(item_path, mode='xb')
+            stream = open(item_path, mode='xb')
 
-    def close_byte_stream(self, storage_path: str, stream: tp.BinaryIO):
+        return _StreamResource(stream, lambda: self._close_byte_stream(storage_path, stream))
 
-        read_write = "WRITE" if stream.writable() else "READ"
-        self._log.info(f"CLOSE BYTE STREAM ({read_write}) [{storage_path}]")
+    def _close_byte_stream(self, storage_path: str, stream: tp.BinaryIO):
 
-        stream.close()
+        if stream.closed:
+            return
+
+        try:
+            read_write = "WRITE" if stream.writable() else "READ"
+            self._log.info(f"CLOSE BYTE STREAM ({read_write}) [{storage_path}]")
+
+        finally:
+            stream.close()
 
     __T = tp.TypeVar("__T")
 
