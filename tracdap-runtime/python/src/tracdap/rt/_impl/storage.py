@@ -177,9 +177,9 @@ class StorageManager:
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class _NativeFileResource(pa_lib.NativeFile, tp.BinaryIO):
+class _NativeFileResource(pa_lib.NativeFile):
 
-    def __init__(self, nf: tp.Union[pa_lib.NativeFile, tp.BinaryIO], close_func: tp.Callable):
+    def __init__(self, nf: pa_lib.NativeFile, close_func: tp.Callable):
         super().__init__()
         self.__nf = nf
         self.__close_func = close_func
@@ -324,7 +324,9 @@ class CommonFileStorage(IFileStorage):
 
         self._log.info(f"File size [{self._key}]: {file_size} [{storage_path}]")
 
-        return _NativeFileResource(stream, lambda: self.close_byte_stream(storage_path, stream))
+        # Return impl of PyArrow NativeFile instead of BinaryIO - this is the same thing PyArrow does
+
+        return _NativeFileResource(stream, lambda: self._close_byte_stream(storage_path, stream))  # noqa
 
     def write_byte_stream(self, storage_path: str, overwrite: bool = False) -> tp.BinaryIO:
 
@@ -336,9 +338,11 @@ class CommonFileStorage(IFileStorage):
         resolved_path = self._resolve_path(storage_path, "OPEN BYTE STREAM (WRITE)", False)
         stream = self._fs.open_output_stream(resolved_path)
 
-        return _NativeFileResource(stream, lambda: self.close_byte_stream(storage_path, stream))
+        # Return impl of  PyArrow NativeFile instead of BinaryIO - this is the same thing PyArrow does
 
-    def close_byte_stream(self, storage_path: str, stream: tp.BinaryIO):
+        return _NativeFileResource(stream, lambda: self._close_byte_stream(storage_path, stream))  # noqa
+
+    def _close_byte_stream(self, storage_path: str, stream: tp.BinaryIO):
 
         if stream.closed:
             return
@@ -550,7 +554,6 @@ class CommonDataStorage(IDataStorage):
 
             with self.__file_storage.read_byte_stream(storage_path) as byte_stream:
                 table = codec.read_table(byte_stream, schema)
-                self.__file_storage.close_byte_stream(storage_path, byte_stream)
 
             if schema is not None:
                 # Apply conformance, in case the format was not able to apply it fully on read
@@ -594,7 +597,6 @@ class CommonDataStorage(IDataStorage):
 
             with self.__file_storage.write_byte_stream(storage_path_, overwrite=overwrite) as byte_stream:
                 codec.write_table(byte_stream, table)
-                self.__file_storage.close_byte_stream(storage_path, byte_stream)
 
         except (_ex.EStorage, _ex.EData) as e:
             err = f"Failed to write table [{storage_path}]: {str(e)}"

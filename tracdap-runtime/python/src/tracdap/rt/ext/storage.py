@@ -80,10 +80,6 @@ class IFileStorage:
     def write_byte_stream(self, storage_path: str, overwrite: bool = False) -> _tp.BinaryIO:
         pass
 
-    @_abc.abstractmethod
-    def close_byte_stream(self, storage_path: str, stream: _tp.BinaryIO):
-        pass
-
     def read_bytes(self, storage_path: str) -> bytes:
         with self.read_byte_stream(storage_path) as stream:
             return stream.read()
