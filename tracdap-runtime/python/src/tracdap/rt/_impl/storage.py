@@ -318,15 +318,17 @@ class CommonFileStorage(IFileStorage):
 
     def close_byte_stream(self, storage_path: str, stream: tp.BinaryIO):
 
-        if stream.writable():
-            file_size = _util.format_file_size(stream.tell())
-            self._log.info(f"File size [{self._key}]: {file_size} [{storage_path}]")
-            self._log.info(f"CLOSE BYTE STREAM (WRITE) [{self._key}]: [{storage_path}]")
+        try:
+            if stream.writable():
+                file_size = _util.format_file_size(stream.tell())
+                self._log.info(f"File size [{self._key}]: {file_size} [{storage_path}]")
+                self._log.info(f"CLOSE BYTE STREAM (WRITE) [{self._key}]: [{storage_path}]")
 
-        else:
-            self._log.info(f"CLOSE BYTE STREAM (READ) [{self._key}]: [{storage_path}]")
+            else:
+                self._log.info(f"CLOSE BYTE STREAM (READ) [{self._key}]: [{storage_path}]")
 
-        stream.close()
+        finally:
+            stream.close()
 
     def _wrap_operation(self, operation: str, func: tp.Callable, *args, **kwargs) -> tp.Any:
 
