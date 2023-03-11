@@ -19,7 +19,8 @@ import re
 import typing as tp
 
 import pyarrow as pa
-import pyarrow.fs as afs
+import pyarrow.fs as pa_fs
+import pyarrow.lib as pa_lib
 
 import tracdap.rt.metadata as _meta
 import tracdap.rt.config as _cfg
@@ -176,9 +177,29 @@ class StorageManager:
 # ----------------------------------------------------------------------------------------------------------------------
 
 
+class _NativeFileResource(pa_lib.NativeFile, tp.BinaryIO):
+
+    def __init__(self, nf: tp.Union[pa_lib.NativeFile, tp.BinaryIO], close_func: tp.Callable):
+        super().__init__()
+        self.__nf = nf
+        self.__close_func = close_func
+
+    def __getattribute__(self, item):
+        if item == "close" or item == "_NativeFileResource__nf" or item == "_NativeFileResource__close_func":
+            return object.__getattribute__(self, item)
+        else:
+            return object.__getattribute__(self.__nf, item)
+
+    def close(self):
+        try:
+            self.__close_func()
+        finally:
+            self.__nf.close()
+
+
 class CommonFileStorage(IFileStorage):
 
-    def __init__(self, storage_key: str, storage_config: _cfg.PluginConfig, fs_impl: afs.SubTreeFileSystem):
+    def __init__(self, storage_key: str, storage_config: _cfg.PluginConfig, fs_impl: pa_fs.SubTreeFileSystem):
 
         self._log = _util.logger_for_object(self)
         self._key = storage_key
@@ -199,8 +220,8 @@ class CommonFileStorage(IFileStorage):
 
         resolved_path = self._resolve_path(storage_path, "EXISTS", True)
 
-        file_info: afs.FileInfo = self._fs.get_file_info(resolved_path)
-        return file_info.type != afs.FileType.NotFound
+        file_info: pa_fs.FileInfo = self._fs.get_file_info(resolved_path)
+        return file_info.type != pa_fs.FileType.NotFound
 
     def size(self, storage_path: str) -> int:
 
@@ -210,12 +231,12 @@ class CommonFileStorage(IFileStorage):
     def _size(self, storage_path: str) -> int:
 
         resolved_path = self._resolve_path(storage_path, "SIZE", True)
-        file_info: afs.FileInfo = self._fs.get_file_info(resolved_path)
+        file_info: pa_fs.FileInfo = self._fs.get_file_info(resolved_path)
 
-        if file_info.type == afs.FileType.NotFound:
+        if file_info.type == pa_fs.FileType.NotFound:
             raise self._explicit_error(self.ExplicitError.NO_SUCH_FILE_EXCEPTION, storage_path, "SIZE")
 
-        if file_info.type == afs.FileType.Directory:
+        if file_info.type == pa_fs.FileType.Directory:
             raise self._explicit_error(self.ExplicitError.SIZE_OF_DIR, storage_path, "SIZE")
 
         if not file_info.is_file:
@@ -232,9 +253,9 @@ class CommonFileStorage(IFileStorage):
 
         resolved_path = self._resolve_path(storage_path, "STAT", True)
 
-        file_info: afs.FileInfo = self._fs.get_file_info(resolved_path)
+        file_info: pa_fs.FileInfo = self._fs.get_file_info(resolved_path)
 
-        if file_info.type != afs.FileType.File and file_info.type != afs.FileType.Directory:
+        if file_info.type != pa_fs.FileType.File and file_info.type != pa_fs.FileType.Directory:
             raise self._explicit_error(self.ExplicitError.STAT_NOT_FILE_OR_DIR, storage_path, "STAT")
 
         file_type = FileType.FILE if file_info.is_file else FileType.DIRECTORY
@@ -257,8 +278,8 @@ class CommonFileStorage(IFileStorage):
 
         resolved_path = self._resolve_path(storage_path, "LS", True)
 
-        selector = afs.FileSelector(resolved_path, recursive=False)  # noqa
-        file_infos: tp.List[afs.FileInfo] = self._fs.get_file_info(selector)
+        selector = pa_fs.FileSelector(resolved_path, recursive=False)  # noqa
+        file_infos: tp.List[pa_fs.FileInfo] = self._fs.get_file_info(selector)
 
         return list(map(lambda fi: fi.base_name, file_infos))
 
@@ -295,7 +316,7 @@ class CommonFileStorage(IFileStorage):
     def _read_byte_stream(self, storage_path: str) -> tp.BinaryIO:
 
         resolved_path = self._resolve_path(storage_path, "OPEN BYTE STREAM (READ)", False)
-        stream: tp.BinaryIO = self._fs.open_input_file(resolved_path)
+        stream = self._fs.open_input_file(resolved_path)
 
         stream.seek(0, 2)
         file_size = _util.format_file_size(stream.tell())
@@ -303,7 +324,7 @@ class CommonFileStorage(IFileStorage):
 
         self._log.info(f"File size [{self._key}]: {file_size} [{storage_path}]")
 
-        return stream
+        return _NativeFileResource(stream, lambda: self.close_byte_stream(storage_path, stream))
 
     def write_byte_stream(self, storage_path: str, overwrite: bool = False) -> tp.BinaryIO:
 
@@ -313,10 +334,14 @@ class CommonFileStorage(IFileStorage):
     def _write_byte_stream(self, storage_path: str) -> tp.BinaryIO:
 
         resolved_path = self._resolve_path(storage_path, "OPEN BYTE STREAM (WRITE)", False)
+        stream = self._fs.open_output_stream(resolved_path)
 
-        return self._fs.open_output_stream(resolved_path)
+        return _NativeFileResource(stream, lambda: self.close_byte_stream(storage_path, stream))
 
     def close_byte_stream(self, storage_path: str, stream: tp.BinaryIO):
+
+        if stream.closed:
+            return
 
         try:
             if stream.writable():
@@ -372,9 +397,9 @@ class CommonFileStorage(IFileStorage):
     
             return str(absolute_path.relative_to(root_path).as_posix())
 
-        except ValueError:
+        except ValueError as e:
 
-            raise self._explicit_error(self.ExplicitError.STORAGE_PATH_INVALID, storage_path, operation_name)
+            raise self._explicit_error(self.ExplicitError.STORAGE_PATH_INVALID, storage_path, operation_name) from e
 
     def _explicit_error(self, error, storage_path, operation_name):
 

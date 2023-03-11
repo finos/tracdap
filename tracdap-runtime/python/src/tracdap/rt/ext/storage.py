@@ -85,18 +85,12 @@ class IFileStorage:
         pass
 
     def read_bytes(self, storage_path: str) -> bytes:
-        stream = self.read_byte_stream(storage_path)
-        try:
+        with self.read_byte_stream(storage_path) as stream:
             return stream.read()
-        finally:
-            self.close_byte_stream(storage_path, stream)
 
     def write_bytes(self, storage_path: str, data: bytes, overwrite: bool = False):
-        stream = self.write_byte_stream(storage_path, overwrite)
-        try:
+        with self.write_byte_stream(storage_path, overwrite) as stream:
             stream.write(data)
-        finally:
-            self.close_byte_stream(storage_path, stream)
 
 
 class IDataStorage:
