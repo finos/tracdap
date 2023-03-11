@@ -287,15 +287,6 @@ class CommonFileStorage(IFileStorage):
         else:
             self._fs.delete_file(resolved_path)
 
-    def read_bytes(self, storage_path: str) -> bytes:
-
-        stream = self.read_byte_stream(storage_path)
-
-        try:
-            return stream.read()
-        finally:
-            self.close_byte_stream(storage_path, stream)
-
     def read_byte_stream(self, storage_path: str) -> tp.BinaryIO:
 
         operation = f"OPEN BYTE STREAM (READ) [{self._key}]: [{storage_path}]"
@@ -313,15 +304,6 @@ class CommonFileStorage(IFileStorage):
         self._log.info(f"File size [{self._key}]: {file_size} [{storage_path}]")
 
         return stream
-
-    def write_bytes(self, storage_path: str, data: bytes, overwrite: bool = False):
-
-        stream = self.write_byte_stream(storage_path, overwrite)
-
-        try:
-            stream.write(data)
-        finally:
-            self.close_byte_stream(storage_path, stream)
 
     def write_byte_stream(self, storage_path: str, overwrite: bool = False) -> tp.BinaryIO:
 
