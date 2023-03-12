@@ -1,6 +1,6 @@
 #  Copyright 2023 Accenture Global Solutions Limited
 #
-#  Licensed under the Apache License, Version 2.0 (the "License");
+#  Licensed under the Apache License, Version 2.0 (the "License")
 #  you may not use this file except in compliance with the License.
 #  You may obtain a copy of the License at
 #
@@ -13,9 +13,11 @@
 #  limitations under the License.
 
 import datetime as dt
+import functools
 import pathlib
 import tempfile
 import time
+import typing as tp
 import unittest
 import random
 
@@ -28,7 +30,7 @@ import tracdap.rt._impl.util as _util  # noqa
 _util.configure_logging()
 
 
-class FileStorageTestSuite:
+class FileOperationsTestSuite:
 
     # >>> Test suite for IFileStorage - file system operations, functional tests
     #
@@ -307,11 +309,11 @@ class FileStorageTestSuite:
         child2 = next(filter(lambda x: x == "child_2.txt", ls), None)
 
         self.assertIsNotNone(child1)
-        self.assertEqual("test_dir/child_1", child1.storagePath)
+        self.assertEqual("test_dir/child_1", child1.storage_path)
         self.assertEqual(_storage.FileType.DIRECTORY, child1.fileType)
 
         self.assertIsNotNone(child2)
-        self.assertEqual("test_dir/child_2.txt", child2.storagePath)
+        self.assertEqual("test_dir/child_2.txt", child2.storage_path)
         self.assertEqual(_storage.FileType.FILE, child2.fileType)
 
     def test_ls_extensions(self):
@@ -330,11 +332,11 @@ class FileStorageTestSuite:
         child2 = next(filter(lambda x: x == "child_2_file", ls), None)
 
         self.assertIsNotNone(child1)
-        self.assertEqual("ls_extensions/child_1.dat", child1.storagePath)
+        self.assertEqual("ls_extensions/child_1.dat", child1.storage_path)
         self.assertEqual(_storage.FileType.DIRECTORY, child1.fileType)
 
         self.assertIsNotNone(child2)
-        self.assertEqual("ls_extensions/child_2_file", child2.storagePath)
+        self.assertEqual("ls_extensions/child_2_file", child2.storage_path)
         self.assertEqual(_storage.FileType.FILE, child2.fileType)
 
     def test_ls_trailing_slash(self):
@@ -365,11 +367,11 @@ class FileStorageTestSuite:
         child2 = next(filter(lambda x: x == "test_file.txt", ls), None)
 
         self.assertIsNotNone(child1)
-        self.assertEqual("test_dir", child1.storagePath)
+        self.assertEqual("test_dir", child1.storage_path)
         self.assertEqual(_storage.FileType.DIRECTORY, child1.fileType)
 
         self.assertIsNotNone(child2)
-        self.assertEqual("test_file.txt", child2.storagePath)
+        self.assertEqual("test_file.txt", child2.storage_path)
         self.assertEqual(_storage.FileType.FILE, child2.fileType)
 
     def test_ls_file(self):
@@ -613,6 +615,374 @@ class FileStorageTestSuite:
         self.storage.write_bytes(storage_path, content)
 
 
+class FileReadWriteTestSuite:
+
+    # >>> Test suite for IFileStorage - read/write operations, functional and stability tests
+    #
+    # These tests are implemented purely in terms of the IFileStorage interface. The test suite can be run for
+    #     any storage implementation and a valid storage implementations must pass this test suite.
+    #
+    # NOTE: To test a new storage implementation, setupStorage() must be replaced
+    # with a method to provide a storage implementation based on a supplied test config.
+    #
+    # Storage implementations may also wish to supply their own tests that use native APIs to set up and control
+    # tests. This can allow for finer grained control, particularly when testing corner cases and error conditions.
+
+    # Unit test implementation for local storage is in LocalStorageReadWriteTest
+
+    assertEqual = unittest.TestCase.assertEqual
+    assertTrue = unittest.TestCase.assertTrue
+    assertFalse = unittest.TestCase.assertFalse
+    assertIsNotNone = unittest.TestCase.assertIsNotNone
+    assertRaises = unittest.TestCase.assertRaises
+    fail = unittest.TestCase.fail
+
+    def __init__(self):
+        self.storage: _storage.IFileStorage = None  # noqa
+    
+    # -----------------------------------------------------------------------------------------------------------------
+    # Basic round trip
+    # -----------------------------------------------------------------------------------------------------------------
+
+    def test_round_trip_basic(self):
+
+        storage_path = "haiku.txt"
+
+        haiku = \
+            "The data goes in;\n" + \
+            "For a short while it persists,\n" + \
+            "then returns unscathed!"
+
+        haiku_bytes = haiku.encode('utf-8')
+
+        self.do_round_trip(storage_path, [haiku_bytes], self.storage)
+
+    def test_round_trip_large(self):
+
+        storage_path = "test_file.dat"
+
+        # One 10 M chunk
+        bytes_ = random.randbytes(10 * 1024 * 1024)
+
+        self.do_round_trip(storage_path, [bytes_], self.storage)
+
+    def test_round_trip_heterogeneous(self):
+
+        storage_path = "test_file.dat"
+
+        # Selection of different size chunks
+        bytes_ = [
+            random.randbytes(3),
+            random.randbytes(10000),
+            random.randbytes(42),
+            random.randbytes(4097),
+            random.randbytes(1),
+            random.randbytes(2000),
+        ]
+
+        self.do_round_trip(storage_path, bytes_, self.storage)
+
+    def test_round_trip_empty(self):
+
+        storage_path = "test_file.dat"
+        empty_bytes = bytes()
+
+        self.do_round_trip(storage_path, [empty_bytes], self.storage)
+
+    def do_round_trip(self, storage_path: str, original_bytes: tp.List[bytes], storage: _storage.IFileStorage):
+
+        with storage.write_byte_stream(storage_path) as write_stream:
+            for chunk in original_bytes:
+                write_stream.write(chunk)
+
+        with storage.read_byte_stream(storage_path) as read_stream:
+            read_result = []
+            while read_stream.readable():
+                chunk = read_stream.read(64 * 1024)
+                if chunk is None or len(chunk) == 0:
+                    break
+                read_result.append(chunk)
+
+        original_content = functools.reduce(lambda bs, b: bs + b, original_bytes, b"")
+        read_content = functools.reduce(lambda bs, b: bs + b, read_result, b"")
+
+        self.assertEqual(original_content, read_content)
+
+    # -----------------------------------------------------------------------------------------------------------------
+    # Functional error cases
+    # -----------------------------------------------------------------------------------------------------------------
+
+    # Functional error tests can be set up and verified entirely using the storage API
+    # All back ends should behave consistently for these tests
+
+    def test_write_missing_dir(self):
+
+        storage_path = "missing_dir/some_file.txt"
+        content = "Some content".encode('utf-8')
+
+        self.assertRaises(_ex.EStorageRequest, lambda: self.storage.write_bytes(storage_path, content))
+
+    def test_write_already_exists(self):
+
+        storage_path = "some_file.txt"
+        content = "Some content".encode('utf-8')
+
+        def write_to_path(path_, content_):
+            with self.storage.write_byte_stream(path_) as stream:
+                stream.write(content_)
+
+        write_to_path(storage_path, content)
+
+        exists = self.storage.exists(storage_path)
+        self.assertTrue(exists)
+
+        self.assertRaises(_ex.EStorageRequest, lambda: write_to_path(storage_path, content))
+
+    def test_write_bad_paths(self):
+
+        # \0 and / are the two characters that are always illegal in posix filenames
+        # But / will be interpreted as a separator
+        # There are several illegal characters for filenames on Windows!
+
+        absolute_path = "C:\\Temp\\blah.txt" if _util.is_windows() else "/tmp/blah.txt"
+        invalid_path = "£$ N'`¬$£>.)_£\"+\n%" if _util.is_windows() else "nul\0char"
+
+        self.assertRaises(_ex.EStorageRequest, lambda: self.storage.write_byte_stream(absolute_path))
+        self.assertRaises(_ex.EStorageRequest, lambda: self.storage.write_byte_stream(invalid_path))
+
+    def test_write_storage_root(self):
+
+        storage_path = "."
+
+        self.assertRaises(_ex.EStorageRequest, lambda: self.storage.write_byte_stream(storage_path))
+
+    def test_write_outside_root(self):
+
+        storage_path = "../any_file.txt"
+
+        self.assertRaises(_ex.EStorageRequest, lambda: self.storage.write_byte_stream(storage_path))
+
+    def test_read_missing(self):
+
+        storage_path = "missing_file.txt"
+
+        self.assertRaises(_ex.EStorageRequest, lambda: self.storage.read_byte_stream(storage_path))
+
+    def test_read_bad_paths(self):
+
+        # \0 and / are the two characters that are always illegal in posix filenames
+        # But / will be interpreted as a separator
+        # There are several illegal characters for filenames on Windows!
+
+        absolute_path = "C:\\Temp\\blah.txt" if _util.is_windows() else "/tmp/blah.txt"
+        invalid_path = "£$ N'`¬$£>.)_£\"+\n%" if _util.is_windows() else "nul\0char"
+
+        self.assertRaises(_ex.EStorageRequest, lambda: self.storage.read_byte_stream(absolute_path))
+        self.assertRaises(_ex.EStorageRequest, lambda: self.storage.read_byte_stream(invalid_path))
+
+    def test_read_storage_root(self):
+
+        storage_path = "."
+
+        self.assertRaises(_ex.EStorageRequest, lambda: self.storage.read_byte_stream(storage_path))
+
+    def test_read_outside_root(self):
+
+        storage_path = "../some_file.txt"
+
+        self.assertRaises(_ex.EStorageRequest, lambda: self.storage.read_byte_stream(storage_path))
+
+    # -----------------------------------------------------------------------------------------------------------------
+    # Interrupted operations
+    # -----------------------------------------------------------------------------------------------------------------
+
+    # Simulate error conditions in client code that interrupt read/write operations
+    # Try to check that errors are reported correctly and resources are cleaned up
+    # That means all handles/streams/locks are closed and for write operation partially written files are removed
+    # It is difficult to verify this using the abstracted storage API!
+    # These tests look for common symptoms of resource leaks that may catch some common errors
+    #
+    # Error states in the streams are checked directly by mocking/spying on the Java Flow API
+    # E.g. Illegal state and cancellation exceptions are checked explicitly
+    # This is different from the functional tests, which unwrap stream state errors to look for EStorage errors
+    #
+    # Using the storage API it is not possible to simulate errors that occur in the storage back end
+    # E.g. loss of connection to a storage service or disk full during a write operation
+    #
+    # Individual storage backends should implement tests using native calls to set up and verify tests
+    # This will allow testing error conditions in the storage back end,
+    # and more thorough validation of error handling behavior for error conditions in client code
+
+    class TestException(Exception):
+        pass
+
+    def test_write_error_immediately(self):
+
+        storage_path = "test_file.dat"
+
+        def attempt_write():
+            with self.storage.write_byte_stream(storage_path):
+                raise self.TestException("Error before content")
+
+        self.assertRaises(self.TestException, attempt_write)
+
+        # If there is a partially written file,
+        # the writer should remove it as part of the error cleanup
+
+        exists = self.storage.exists(storage_path)
+        self.assertFalse(exists)
+
+    def test_write_error_after_chunk(self):
+
+        storage_path = "test_file.dat"
+        first_chunk = "Some content\n".encode('utf-8')
+
+        def attempt_write():
+            with self.storage.write_byte_stream(storage_path) as stream:
+                stream.write(first_chunk)
+                raise self.TestException("Error after first chunk")
+
+        self.assertRaises(self.TestException, attempt_write)
+
+        # If there is a partially written file,
+        # the writer should remove it as part of the error cleanup
+
+        exists = self.storage.exists(storage_path)
+        self.assertFalse(exists)
+
+    def test_write_error_then_retry(self):
+
+        storage_path = "test_file.dat"
+        chunk_size = 10000
+        chunk = random.randbytes(chunk_size)
+
+        # Attempt a write operation, fail after sending content
+        # Exception should propagate back to client code
+
+        def failed_write():
+            with self.storage.write_byte_stream(storage_path) as stream1:
+                stream1.write(chunk)
+                raise self.TestException("Error after first chunk")
+
+        self.assertRaises(_ex.EStorageRequest, failed_write)
+
+        # File should not exist in storage after an aborted write
+        exists1 = self.storage.exists(storage_path)
+        self.assertFalse(exists1)
+
+        # Set up a second write to retry the same operation, this time successfully
+
+        with self.storage.write_byte_stream(storage_path) as stream2:
+            stream2.write(chunk)
+
+        # File should now be visible in storage
+        file_size = self.storage.size(storage_path)
+        self.assertEqual(chunk_size, file_size)
+
+    def test_read_concurrent_streams(self):
+
+        # Allow two read streams to be opened concurrently to the same file
+
+        storage_path = "some_file.txt"
+        content = "Some content".encode('utf-8')
+
+        self.storage.write_bytes(storage_path, content)
+
+        with self.storage.read_byte_stream(storage_path) as stream_1:
+            with self.storage.read_byte_stream(storage_path) as stream_2:
+                read_result_1 = stream_1.read(1024)
+                read_result_2 = stream_2.read(1024)
+
+        self.assertEqual(content, read_result_1)
+        self.assertEqual(content, read_result_2)
+
+    def test_read_delete_while_open(self):
+
+        storage_path = "some_file.txt"
+        content = "Some content".encode('utf-8')
+
+        self.storage.write_bytes(storage_path, content)
+
+        # Some implementations might allow rm, since there is not a locked open stream
+        # However reading after rm should always fail
+
+        def delete_and_read():
+            with self.storage.read_byte_stream(storage_path) as stream:
+                self.storage.rm(storage_path)
+                stream.read(1024)
+
+        self.assertRaises(_ex.EStorageRequest, delete_and_read)
+
+    def test_read_cancel_immediately(self):
+
+        storage_path = "some_file.txt"
+        content = "Some content".encode('utf-8')
+
+        self.storage.write_bytes(storage_path, content)
+
+        # Close read stream without reading - should not cause an error
+
+        with self.storage.read_byte_stream(storage_path):
+            pass
+
+        exists = self.storage.exists(storage_path)
+        self.assertTrue(exists)
+
+    def test_read_cancel_and_retry(self):
+
+        # Create a file big enough that it can't be read in a single chunk
+
+        storage_path = "some_file.txt"
+        content = random.randbytes(10000)
+
+        self.storage.write_bytes(storage_path, content)
+
+        # Close read stream without reading - should not cause an error
+
+        with self.storage.read_byte_stream(storage_path):
+            pass
+
+        exists = self.storage.exists(storage_path)
+        self.assertTrue(exists)
+
+        # Now re-open the read stream and read in the file
+
+        with self.storage.read_byte_stream(storage_path) as stream:
+            chunks = []
+            while stream.readable():
+                chunk = stream.read(64 * 1024)
+                if chunk is None or len(chunk) == 0:
+                    break
+                chunks.append(chunk)
+            read_result = functools.reduce(lambda bs, b: bs + b, chunks, b"")
+
+        self.assertEqual(content, read_result)
+
+    def test_read_cancel_and_delete(self):
+
+        storage_path = "some_file.txt"
+        content = "Some content".encode('utf-8')
+
+        self.storage.write_bytes(storage_path, content)
+
+        # Close read stream without reading - should not cause an error
+
+        with self.storage.read_byte_stream(storage_path):
+            pass
+
+        exists = self.storage.exists(storage_path)
+        self.assertTrue(exists)
+
+        # Now delete the file and try to re-open the read stream, this should fail
+
+        self.storage.rm(storage_path)
+        self.assertRaises(_ex.EStorageRequest, lambda: self.storage.read_byte_stream(storage_path))
+
+        # Check the file is really gone
+
+        exists2 = self.storage.exists(storage_path)
+        self.assertTrue(exists2)
+
 # ----------------------------------------------------------------------------------------------------------------------
 # UNIT TESTS
 # ----------------------------------------------------------------------------------------------------------------------
@@ -620,7 +990,7 @@ class FileStorageTestSuite:
 # Unit tests call the test suite using the local storage implementation
 
 
-class LocalFileStorageTest(unittest.TestCase, FileStorageTestSuite):
+class LocalFileStorageTest(unittest.TestCase, FileOperationsTestSuite, FileReadWriteTestSuite):
 
     storage_root: tempfile.TemporaryDirectory
     test_number: int
@@ -655,7 +1025,7 @@ class LocalFileStorageTest(unittest.TestCase, FileStorageTestSuite):
         cls.storage_root.cleanup()
 
 
-class LocalArrowNativeStorageTest(unittest.TestCase, FileStorageTestSuite):
+class LocalArrowNativeStorageTest(unittest.TestCase, FileOperationsTestSuite, FileReadWriteTestSuite):
 
     storage_root: tempfile.TemporaryDirectory
     test_number: int
