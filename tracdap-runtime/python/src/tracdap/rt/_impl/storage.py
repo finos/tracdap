@@ -317,6 +317,11 @@ class CommonFileStorage(IFileStorage):
     def _rmdir(self, operation_name: str, storage_path: str):
 
         resolved_path = self._resolve_path(operation_name, storage_path, False)
+
+        file_info: pa_fs.FileInfo = self._fs.get_file_info(resolved_path)
+        if file_info.type == pa_fs.FileType.File:
+            raise self._explicit_error(self.ExplicitError.NOT_A_DIRECTORY, operation_name, storage_path)
+
         self._fs.delete_dir(resolved_path)
 
     def read_byte_stream(self, storage_path: str) -> tp.BinaryIO:
@@ -420,9 +425,9 @@ class CommonFileStorage(IFileStorage):
             raise error from e
 
         except FileExistsError as e:
-            msg = "File already exists"
-            self._log.exception(f"{operation}: {msg}")
-            raise _ex.EStorageRequest(msg) from e
+            error = self._explicit_error(self.ExplicitError.OBJECT_ALREADY_EXISTS, operation_name, storage_path)
+            self._log.exception(f"{operation}: {str(error)}")
+            raise error from e
 
         except IsADirectoryError as e:
             error = self._explicit_error(self.ExplicitError.NOT_A_FILE, operation_name, storage_path)
@@ -440,10 +445,10 @@ class CommonFileStorage(IFileStorage):
             raise error from e
 
         # OSError is the top-level error for IO exceptions
-        # This might be raised if e.g. there is an unrecognised errno returned by a low-level operation
+        # This is raised on some platforms if there is not a recognized errno from the low-level operation
 
         except OSError as e:
-            error = self._explicit_error(self.ExplicitError.IO_EXCEPTION, operation_name, storage_path)
+            error = self._explicit_error(self.ExplicitError.IO_ERROR, operation_name, storage_path)
             self._log.exception(f"{operation}: {str(error)}")
             raise error from e
 
@@ -509,14 +514,17 @@ class CommonFileStorage(IFileStorage):
 
         # Exceptions
         OBJECT_NOT_FOUND = 10
-        NOT_A_FILE = 11
-        NOT_A_DIRECTORY = 12
-        NOT_A_FILE_OR_DIRECTORY = 13
-        ACCESS_DENIED = 15
+        OBJECT_ALREADY_EXISTS = 11
+        NOT_A_FILE = 12
+        NOT_A_DIRECTORY = 13
+        NOT_A_FILE_OR_DIRECTORY = 14
+        IO_ERROR = 15
+
+        # Permissions
+        ACCESS_DENIED = 20
 
         # Unhandled / unexpected error
-        IO_EXCEPTION = 20
-        UNKNOWN_ERROR = 21
+        UNKNOWN_ERROR = 30
 
     _ERROR_MESSAGE_MAP = {
 
@@ -526,13 +534,14 @@ class CommonFileStorage(IFileStorage):
         ExplicitError.STORAGE_PATH_IS_ROOT: "Requested operation not allowed on the storage root directory: {} {} [{}]",
         ExplicitError.STORAGE_PATH_INVALID: "Requested storage path is invalid: {} {} [{}]",
 
-
         ExplicitError.OBJECT_NOT_FOUND: "Object not found in storage layer: {} {} [{}]",
+        ExplicitError.OBJECT_ALREADY_EXISTS: "Object already exists in storage layer: {} {} [{}]",
         ExplicitError.NOT_A_FILE: "Object is not a file: {} {} [{}]",
         ExplicitError.NOT_A_DIRECTORY: "Object is not a directory: {} {} [{}]",
         ExplicitError.NOT_A_FILE_OR_DIRECTORY: "Object is not a file or directory: {} {} [{}]",
+        ExplicitError.IO_ERROR: "An IO error occurred in the storage layer: {} {} [{}]",
+
         ExplicitError.ACCESS_DENIED: "Access denied in storage layer: {} {} [{}]",
-        ExplicitError.IO_EXCEPTION: "An IO error occurred in the storage layer: {} {} [{}]",
 
         ExplicitError.UNKNOWN_ERROR: "An unexpected error occurred in the storage layer: {} {} [{}]",
     }
@@ -546,11 +555,13 @@ class CommonFileStorage(IFileStorage):
         ExplicitError.STORAGE_PATH_INVALID: _ex.EStorageValidation,
 
         ExplicitError.OBJECT_NOT_FOUND: _ex.EStorageRequest,
+        ExplicitError.OBJECT_ALREADY_EXISTS: _ex.EStorageRequest,
         ExplicitError.NOT_A_FILE: _ex.EStorageRequest,
         ExplicitError.NOT_A_DIRECTORY: _ex.EStorageRequest,
         ExplicitError.NOT_A_FILE_OR_DIRECTORY: _ex.EStorageRequest,
+        ExplicitError.IO_ERROR: _ex.EStorageRequest,
+
         ExplicitError.ACCESS_DENIED: _ex.EStorageAccess,
-        ExplicitError.IO_EXCEPTION: _ex.EStorage,
 
         ExplicitError.UNKNOWN_ERROR: _ex.ETracInternal
     }
