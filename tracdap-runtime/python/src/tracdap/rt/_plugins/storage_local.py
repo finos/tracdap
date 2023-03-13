@@ -15,6 +15,7 @@
 import datetime as dt
 import os
 import re
+import sys
 import typing as tp
 import pathlib
 
@@ -232,7 +233,12 @@ class LocalFileStorage(IFileStorage):
 
     def _rm(self, storage_path: str):
 
-        raise NotImplementedError()
+        item_path = self._resolve_path(storage_path, "RM", False)
+
+        if not item_path.is_file():
+            raise ex.EStorageRequest(f"Storage path is not a file: RM [{storage_path}]")
+
+        item_path.unlink()
 
     def rmdir(self, storage_path: str):
 
@@ -241,7 +247,22 @@ class LocalFileStorage(IFileStorage):
 
     def _rmdir(self, storage_path: str):
 
-        raise NotImplementedError()
+        item_path = self._resolve_path(storage_path, "RMDIR", False)
+
+        if not item_path.is_dir():
+            raise ex.EStorageRequest(f"Storage path is not a directory: RMDIR [{storage_path}]")
+
+        self._rmdir_inner(item_path)
+
+    def _rmdir_inner(self, item_path):
+
+        for item in item_path.iterdir():
+            if item.is_dir():
+                self._rmdir_inner(item)
+            else:
+                item.unlink()
+
+        item_path.rmdir()
 
     def read_byte_stream(self, storage_path: str) -> tp.BinaryIO:
 
@@ -264,11 +285,13 @@ class LocalFileStorage(IFileStorage):
 
         item_path = self._resolve_path(storage_path, "OPEN BYTE STREAM (WRITE)", False)
 
+        delete_on_error = not item_path.exists()
+
         stream = open(item_path, mode='wb')
 
-        return _StreamResource(stream, lambda: self._close_byte_stream(storage_path, stream))
+        return _StreamResource(stream, lambda: self._close_byte_stream(storage_path, stream, delete_on_error))
 
-    def _close_byte_stream(self, storage_path: str, stream: tp.BinaryIO):
+    def _close_byte_stream(self, storage_path: str, stream: tp.BinaryIO, delete_on_error: bool = False):
 
         if stream.closed:
             return
@@ -279,6 +302,17 @@ class LocalFileStorage(IFileStorage):
 
         finally:
             stream.close()
+
+        exc_info = sys.exc_info()
+        error = exc_info[1] if exc_info is not None else None
+
+        if error is not None and delete_on_error:
+            try:
+                item_path = self._resolve_path(storage_path, "CLOSE BYTE STREAM (WRITE)", False)
+                if item_path.exists():
+                    item_path.unlink()
+            except OSError:
+                pass
 
     __T = tp.TypeVar("__T")
 
