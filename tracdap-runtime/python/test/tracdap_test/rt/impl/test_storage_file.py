@@ -32,6 +32,13 @@ _util.configure_logging()
 _plugins.PluginManager.register_core_plugins()
 
 
+# randbytes was only added to the random module in 3.9
+# For testing, alias to secrets.token_bytes if it is not available (available since 3.6)
+if "randbytes" not in random.__dict__:
+    import secrets
+    random.__dict__["randbytes"] = secrets.token_bytes
+
+
 class FileOperationsTestSuite:
 
     # >>> Test suite for IFileStorage - file system operations, functional tests
