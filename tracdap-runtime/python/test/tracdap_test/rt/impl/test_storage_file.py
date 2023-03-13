@@ -307,16 +307,16 @@ class FileOperationsTestSuite:
 
         self.assertEqual(2, len(ls))
 
-        child1 = next(filter(lambda x: x == "child_1", ls), None)
-        child2 = next(filter(lambda x: x == "child_2.txt", ls), None)
+        child1 = next(filter(lambda x: x.file_name == "child_1", ls), None)
+        child2 = next(filter(lambda x: x.file_name == "child_2.txt", ls), None)
 
         self.assertIsNotNone(child1)
         self.assertEqual("test_dir/child_1", child1.storage_path)
-        self.assertEqual(_storage.FileType.DIRECTORY, child1.fileType)
+        self.assertEqual(_storage.FileType.DIRECTORY, child1.file_type)
 
         self.assertIsNotNone(child2)
         self.assertEqual("test_dir/child_2.txt", child2.storage_path)
-        self.assertEqual(_storage.FileType.FILE, child2.fileType)
+        self.assertEqual(_storage.FileType.FILE, child2.file_type)
 
     def test_ls_extensions(self):
 
@@ -330,16 +330,16 @@ class FileOperationsTestSuite:
 
         self.assertEqual(2, len(ls))
 
-        child1 = next(filter(lambda x: x == "child_1.dat", ls), None)
-        child2 = next(filter(lambda x: x == "child_2_file", ls), None)
+        child1 = next(filter(lambda x: x.file_name == "child_1.dat", ls), None)
+        child2 = next(filter(lambda x: x.file_name == "child_2_file", ls), None)
 
         self.assertIsNotNone(child1)
         self.assertEqual("ls_extensions/child_1.dat", child1.storage_path)
-        self.assertEqual(_storage.FileType.DIRECTORY, child1.fileType)
+        self.assertEqual(_storage.FileType.DIRECTORY, child1.file_type)
 
         self.assertIsNotNone(child2)
         self.assertEqual("ls_extensions/child_2_file", child2.storage_path)
-        self.assertEqual(_storage.FileType.FILE, child2.fileType)
+        self.assertEqual(_storage.FileType.FILE, child2.file_type)
 
     def test_ls_trailing_slash(self):
 
@@ -365,16 +365,16 @@ class FileOperationsTestSuite:
 
         self.assertTrue(len(ls) >= 2)
 
-        child1 = next(filter(lambda x: x == "test_dir", ls), None)
-        child2 = next(filter(lambda x: x == "test_file.txt", ls), None)
+        child1 = next(filter(lambda x: x.file_name == "test_dir", ls), None)
+        child2 = next(filter(lambda x: x.file_name == "test_file.txt", ls), None)
 
         self.assertIsNotNone(child1)
         self.assertEqual("test_dir", child1.storage_path)
-        self.assertEqual(_storage.FileType.DIRECTORY, child1.fileType)
+        self.assertEqual(_storage.FileType.DIRECTORY, child1.file_type)
 
         self.assertIsNotNone(child2)
         self.assertEqual("test_file.txt", child2.storage_path)
-        self.assertEqual(_storage.FileType.FILE, child2.fileType)
+        self.assertEqual(_storage.FileType.FILE, child2.file_type)
 
     def test_ls_file(self):
 
@@ -416,11 +416,17 @@ class FileOperationsTestSuite:
 
     def test_mkdir_dir_exists(self):
 
-        # mkdir with recursive = false should throw EStorageRequest if dir already exists
+        # It is not an error to call mkdir on an existing directory
 
         self.storage.mkdir("test_dir", False)
 
-        self.assertRaises(_ex.EStorageRequest, lambda: self.storage.mkdir("test_dir", False))
+        dir_exists_1 = self.storage.exists("test_dir")
+        self.assertTrue(dir_exists_1)
+
+        self.storage.mkdir("test_dir", False)
+
+        dir_exists_2 = self.storage.exists("test_dir")
+        self.assertTrue(dir_exists_2)
 
     def test_mkdir_file_exists(self):
 
@@ -455,7 +461,7 @@ class FileOperationsTestSuite:
         self.assertTrue(dir_exists)
         self.assertTrue(child_exists)
 
-    def test_mkdir_recursive_dir_eists(self):
+    def test_mkdir_recursive_dir_exists(self):
 
         # mkdir, when recursive = true it is not an error if the target dir already exists
 
@@ -498,20 +504,20 @@ class FileOperationsTestSuite:
 
         self.make_small_file("test_file.txt")
 
-        self.storage.rm("test_file.txt", False)
+        self.storage.rm("test_file.txt")
 
         # File should be gone
 
         exists = self.storage.exists("test_file.txt")
         self.assertFalse(exists)
 
-    def test_rm_dir(self):
+    def test_rm_on_dir(self):
 
-        # Calling rm on a directory with recursive = false is a bad request, even if the dir is empty
+        # Calling rm on a directory is a bad request, even if the dir is empty
 
-        self.storage.mkdir("test_dir", False)
+        self.storage.mkdir("test_dir")
 
-        self.assertRaises(_ex.EStorageRequest, lambda: self.storage.rm("test_dir", False))
+        self.assertRaises(_ex.EStorageRequest, lambda: self.storage.rm("test_dir"))
 
         # Dir should still exist because rm has failed
 
@@ -522,20 +528,64 @@ class FileOperationsTestSuite:
 
         # Try to delete a path that does not exist
 
-        self.assertRaises(_ex.EStorageRequest, lambda: self.storage.rm("missing_path", False))
+        self.assertRaises(_ex.EStorageRequest, lambda: self.storage.rm("missing_path.dat"))
 
-    def test_rm_recursive(self):
+    def test_rm_bad_paths(self):
+
+        self.bad_paths( self.storage.rm)
+
+    def test_rm_storage_root(self):
+
+        self.fail_for_storage_root(self.storage.rm)
+
+    # -----------------------------------------------------------------------------------------------------------------
+    # RMDIR
+    # -----------------------------------------------------------------------------------------------------------------
+
+    def test_rmdir_ok(self):
+
+        self.storage.mkdir("test_dir", False)
+
+        exists = self.storage.exists("test_dir")
+        self.assertTrue(exists)
+
+        self.storage.rmdir("test_dir")
+
+        exists = self.storage.exists("test_dir")
+        self.assertFalse(exists)
+
+    def test_rmdir_on_file(self):
+
+        # Calling rmdir on a file is a bad request
+
+        self.make_small_file("test_file.txt")
+
+        self.assertRaises(_ex.EStorageRequest, lambda: self.storage.rmdir("test_file.txt"))
+
+        # File should still exist because rm has failed
+
+        exists = self.storage.exists("test_file.txt")
+        self.assertTrue(exists)
+
+    def test_rmdir_missing(self):
+
+        # Try to delete a path that does not exist
+
+        self.assertRaises(_ex.EStorageRequest, lambda: self.storage.rmdir("missing_path"))
+
+    def test_rmdir_with_content(self):
 
         # Delete one whole dir tree
         # Sibling dir tree should be unaffected
 
         self.storage.mkdir("test_dir/child_1", True)
+        self.storage.mkdir("test_dir/child_1/sub")
         self.make_small_file("test_dir/child_1/file_a.txt")
         self.make_small_file("test_dir/child_1/file_b.txt")
         self.storage.mkdir("test_dir/child_2", True)
         self.make_small_file("test_dir/child_2/file_a.txt")
 
-        self.storage.rm("test_dir/child_1", True)
+        self.storage.rmdir("test_dir/child_1")
 
         exists1 = self.storage.exists("test_dir/child_1")
         exists2 = self.storage.exists("test_dir/child_2")
@@ -545,40 +595,13 @@ class FileOperationsTestSuite:
         self.assertTrue(exists2)
         self.assertTrue(size2a > 0)
 
-    def test_rm_recursive_file(self):
+    def test_rmdir_bad_paths(self):
 
-        # Calling rm for a single file with recursive = true is not an error
-        # The recursive delete should just remove that individual file
+        self.bad_paths(self.storage.rmdir)
 
-        self.storage.mkdir("test_dir", False)
-        self.make_small_file("test_dir/file_a.txt")
-        self.make_small_file("test_dir/file_b.txt")
+    def test_rmdir_storage_root(self):
 
-        self.storage.rm("test_dir/file_a.txt", True)
-
-        exists_a = self.storage.exists("test_dir/file_a.txt")
-        exists_b = self.storage.exists("test_dir/file_b.txt")
-
-        self.assertFalse(exists_a)
-        self.assertTrue(exists_b)
-
-    def test_rm_recursive_missing(self):
-
-        # Try to delete a path that does not exist, should fail regardless of recursive = true
-
-        self.storage.mkdir("test_dir", False)
-
-        self.assertRaises(_ex.EStorageRequest, lambda: self.storage.rm("test_dir/child", True))
-
-    def test_rm_bad_paths(self):
-
-        self.bad_paths(lambda path_: self.storage.rm(path_, False))
-        self.bad_paths(lambda path_: self.storage.rm(path_, True))
-
-    def test_rm_storage_root(self):
-
-        self.fail_for_storage_root(lambda path_: self.storage.rm(path_, False))
-        self.fail_for_storage_root(lambda path_: self.storage.rm(path_, True))
+        self.fail_for_storage_root(self.storage.rmdir)
 
     # -----------------------------------------------------------------------------------------------------------------
     # COMMON HELPERS (used for several storage calls)
@@ -711,7 +734,7 @@ class FileReadWriteTestSuite:
         self.assertEqual(original_content, read_content)
 
     # -----------------------------------------------------------------------------------------------------------------
-    # Functional error cases
+    # Functional error and corner cases
     # -----------------------------------------------------------------------------------------------------------------
 
     # Functional error tests can be set up and verified entirely using the storage API
@@ -726,6 +749,8 @@ class FileReadWriteTestSuite:
 
     def test_write_already_exists(self):
 
+        # Writing a file always overwrites any existing content
+
         storage_path = "some_file.txt"
         content = "Some content".encode('utf-8')
 
@@ -738,7 +763,12 @@ class FileReadWriteTestSuite:
         exists = self.storage.exists(storage_path)
         self.assertTrue(exists)
 
-        self.assertRaises(_ex.EStorageRequest, lambda: write_to_path(storage_path, content))
+        new_content = "Some different content".encode('utf-8')
+
+        write_to_path(storage_path, new_content)
+
+        read_content = self.storage.read_bytes(storage_path)
+        self.assertEqual(new_content, read_content)
 
     def test_write_bad_paths(self):
 
