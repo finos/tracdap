@@ -258,6 +258,9 @@ class FileOperationsTestSuite:
 
     def test_stat_dir_atime(self):
 
+        # NOTE: This test might fail for local storage on Windows, for the same reason as test_stat_file_atime
+        # If intermittent failures do occur on the Windows build, we will need to skip this test on Windows
+
         # mtime and atime for dirs is unlikely to be supported in cloud storage buckets
         # So, all of these fields are optional in stat responses for directories
 
