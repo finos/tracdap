@@ -23,11 +23,13 @@ import random
 
 import tracdap.rt.config as _cfg
 import tracdap.rt.exceptions as _ex
+import tracdap.rt.ext.plugins as _plugins
 import tracdap.rt._impl.data as _data  # noqa
 import tracdap.rt._impl.storage as _storage  # noqa
 import tracdap.rt._impl.util as _util  # noqa
 
 _util.configure_logging()
+_plugins.PluginManager.register_core_plugins()
 
 
 class FileOperationsTestSuite:
@@ -587,7 +589,7 @@ class FileOperationsTestSuite:
         # TRAC should not allow write-operations with path "." to reach the storage layer
         # Storage implementations should report this as a validation gap
 
-        self.assertRaises(_ex.EStorageRequest, lambda: test_method.__call__("."))
+        self.assertRaises(_ex.EStorageValidation, lambda: test_method.__call__("."))
 
     def bad_paths(self, test_method):
 
@@ -599,9 +601,9 @@ class FileOperationsTestSuite:
         absolute_path = "C:\\Windows" if _util.is_windows() else "/bin"
         invalid_path = "@$ N'`$>.)_\"+\n%" if _util.is_windows() else "nul\0char"
 
-        self.assertRaises(_ex.EStorageRequest, lambda: test_method.__call__(escaping_path))
-        self.assertRaises(_ex.EStorageRequest, lambda: test_method.__call__(absolute_path))
-        self.assertRaises(_ex.EStorageRequest, lambda: test_method.__call__(invalid_path))
+        self.assertRaises(_ex.EStorageValidation, lambda: test_method.__call__(escaping_path))
+        self.assertRaises(_ex.EStorageValidation, lambda: test_method.__call__(absolute_path))
+        self.assertRaises(_ex.EStorageValidation, lambda: test_method.__call__(invalid_path))
 
     def make_small_file(self, storage_path: str):
 
@@ -747,20 +749,20 @@ class FileReadWriteTestSuite:
         absolute_path = "C:\\Temp\\blah.txt" if _util.is_windows() else "/tmp/blah.txt"
         invalid_path = "£$ N'`¬$£>.)_£\"+\n%" if _util.is_windows() else "nul\0char"
 
-        self.assertRaises(_ex.EStorageRequest, lambda: self.storage.write_byte_stream(absolute_path))
-        self.assertRaises(_ex.EStorageRequest, lambda: self.storage.write_byte_stream(invalid_path))
+        self.assertRaises(_ex.EStorageValidation, lambda: self.storage.write_byte_stream(absolute_path))
+        self.assertRaises(_ex.EStorageValidation, lambda: self.storage.write_byte_stream(invalid_path))
 
     def test_write_storage_root(self):
 
         storage_path = "."
 
-        self.assertRaises(_ex.EStorageRequest, lambda: self.storage.write_byte_stream(storage_path))
+        self.assertRaises(_ex.EStorageValidation, lambda: self.storage.write_byte_stream(storage_path))
 
     def test_write_outside_root(self):
 
         storage_path = "../any_file.txt"
 
-        self.assertRaises(_ex.EStorageRequest, lambda: self.storage.write_byte_stream(storage_path))
+        self.assertRaises(_ex.EStorageValidation, lambda: self.storage.write_byte_stream(storage_path))
 
     def test_read_missing(self):
 
@@ -777,20 +779,20 @@ class FileReadWriteTestSuite:
         absolute_path = "C:\\Temp\\blah.txt" if _util.is_windows() else "/tmp/blah.txt"
         invalid_path = "£$ N'`¬$£>.)_£\"+\n%" if _util.is_windows() else "nul\0char"
 
-        self.assertRaises(_ex.EStorageRequest, lambda: self.storage.read_byte_stream(absolute_path))
-        self.assertRaises(_ex.EStorageRequest, lambda: self.storage.read_byte_stream(invalid_path))
+        self.assertRaises(_ex.EStorageValidation, lambda: self.storage.read_byte_stream(absolute_path))
+        self.assertRaises(_ex.EStorageValidation, lambda: self.storage.read_byte_stream(invalid_path))
 
     def test_read_storage_root(self):
 
         storage_path = "."
 
-        self.assertRaises(_ex.EStorageRequest, lambda: self.storage.read_byte_stream(storage_path))
+        self.assertRaises(_ex.EStorageValidation, lambda: self.storage.read_byte_stream(storage_path))
 
     def test_read_outside_root(self):
 
         storage_path = "../some_file.txt"
 
-        self.assertRaises(_ex.EStorageRequest, lambda: self.storage.read_byte_stream(storage_path))
+        self.assertRaises(_ex.EStorageValidation, lambda: self.storage.read_byte_stream(storage_path))
 
     # -----------------------------------------------------------------------------------------------------------------
     # Interrupted operations
@@ -911,7 +913,7 @@ class FileReadWriteTestSuite:
                 self.storage.rm(storage_path)
                 stream.read(1024)
 
-        self.assertRaises(_ex.EStorageRequest, delete_and_read)
+        self.assertRaises(_ex.EStorage, delete_and_read)
 
     def test_read_cancel_immediately(self):
 
@@ -981,7 +983,7 @@ class FileReadWriteTestSuite:
         # Check the file is really gone
 
         exists2 = self.storage.exists(storage_path)
-        self.assertTrue(exists2)
+        self.assertFalse(exists2)
 
 # ----------------------------------------------------------------------------------------------------------------------
 # UNIT TESTS
