@@ -50,42 +50,57 @@ class IFileStorage:
 
     @_abc.abstractmethod
     def exists(self, storage_path: str) -> bool:
+        """The exists method can be used for both files and directories"""
         pass
 
     @_abc.abstractmethod
     def size(self, storage_path: str) -> int:
+        """The rm method only works on regular files, it cannot be used for directories"""
         pass
 
     @_abc.abstractmethod
     def stat(self, storage_path: str) -> FileStat:
+        """The stat method can be used for both files and directories, so long as they exist"""
         pass
 
     @_abc.abstractmethod
-    def ls(self, storage_path: str) -> _tp.List[str]:
+    def ls(self, storage_path: str, recursive: bool = False) -> _tp.List[FileStat]:
+        """The ls method only works on directories, it cannot be used for regular files"""
         pass
 
     @_abc.abstractmethod
-    def mkdir(self, storage_path: str, recursive: bool = False, exists_ok: bool = False):
+    def mkdir(self, storage_path: str, recursive: bool = False):
+        """The mkdir method will succeed silently if the directory already exists"""
         pass
 
     @_abc.abstractmethod
-    def rm(self, storage_path: str, recursive: bool = False):
+    def rm(self, storage_path: str):
+        """The rm method only works on regular files, it cannot be used for directories and is not recursive"""
+        pass
+
+    @_abc.abstractmethod
+    def rmdir(self, storage_path: str):
+        """The rmdir method only works on directories and is always recursive"""
         pass
 
     @_abc.abstractmethod
     def read_byte_stream(self, storage_path: str) -> _tp.BinaryIO:
+        """The read_byte_stream method only works for existing files"""
         pass
 
     @_abc.abstractmethod
-    def write_byte_stream(self, storage_path: str, overwrite: bool = False) -> _tp.BinaryIO:
+    def write_byte_stream(self, storage_path: str) -> _tp.BinaryIO:
+        """The write_byte_stream method will always overwrite an existing file if it exists"""
         pass
 
     def read_bytes(self, storage_path: str) -> bytes:
+        """The read_bytes method only works for existing files"""
         with self.read_byte_stream(storage_path) as stream:
             return stream.read()
 
-    def write_bytes(self, storage_path: str, data: bytes, overwrite: bool = False):
-        with self.write_byte_stream(storage_path, overwrite) as stream:
+    def write_bytes(self, storage_path: str, data: bytes):
+        """The write_bytes method will always overwrite an existing file if it exists"""
+        with self.write_byte_stream(storage_path) as stream:
             stream.write(data)
 
 
