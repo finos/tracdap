@@ -494,7 +494,9 @@ class CommonFileStorage(IFileStorage):
 
         return err
 
-    _ILLEGAL_PATH_CHARS = re.compile(r".*[\x00<>:\"\'\\|?*].*")
+    _ILLEGAL_PATH_CHARS_WINDOWS = re.compile(r".*[\x00<>:\"\'|?*].*")
+    _ILLEGAL_PATH_CHARS_POSIX = re.compile(r".*[\x00<>:\"\'|?*\\].*")
+    _ILLEGAL_PATH_CHARS = _ILLEGAL_PATH_CHARS_WINDOWS if _util.is_windows() else _ILLEGAL_PATH_CHARS_POSIX
 
     class ExplicitError(enum.Enum):
     

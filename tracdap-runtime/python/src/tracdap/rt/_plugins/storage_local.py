@@ -382,4 +382,6 @@ class LocalFileStorage(IFileStorage):
             self._log.exception(f"{operation}: {msg}")
             raise ex.EStorageAccess(msg) from e
 
-    _ILLEGAL_PATH_CHARS = re.compile(r".*[\x00<>:\"\'\\|?*].*")
+    _ILLEGAL_PATH_CHARS_WINDOWS = re.compile(r".*[\x00<>:\"\'|?*].*")
+    _ILLEGAL_PATH_CHARS_POSIX = re.compile(r".*[\x00<>:\"\'|?*\\].*")
+    _ILLEGAL_PATH_CHARS = _ILLEGAL_PATH_CHARS_WINDOWS if _helpers.is_windows() else _ILLEGAL_PATH_CHARS_POSIX
