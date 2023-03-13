@@ -318,7 +318,7 @@ def error_details_from_exception(error: Exception):
 
 def filter_model_stack_trace(full_stack: tb.StackSummary, checkout_directory: pathlib.Path):
 
-    frame_names = list(map(lambda frame: frame.name, full_stack))
+    frame_names = list(map(lambda frame_: frame_.name, full_stack))
 
     if __FIRST_MODEL_FRAME_NAME in frame_names:
         first_model_frame = frame_names.index(__FIRST_MODEL_FRAME_NAME)
@@ -331,7 +331,7 @@ def filter_model_stack_trace(full_stack: tb.StackSummary, checkout_directory: pa
 
     for frame_index, frame in enumerate(full_stack[first_model_frame:]):
         module_path = pathlib.Path(frame.filename)
-        if ("tracdap" in module_path.parts):
+        if "tracdap" in module_path.parts:
             tracdap_index = len(module_path.parts) - 1 - list(reversed(module_path.parts)).index("tracdap")
             if tracdap_index < len(module_path.parts)-1:
                 if module_path.parts[tracdap_index+1] == "rt":
@@ -344,4 +344,3 @@ def filter_model_stack_trace(full_stack: tb.StackSummary, checkout_directory: pa
         last_model_frame = first_model_frame + frame_index
 
     return full_stack[first_model_frame:last_model_frame+1]
-
