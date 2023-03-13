@@ -256,10 +256,11 @@ class FileOperationsTestSuite:
         self.assertTrue(stat_result.mtime is None or stat_result.mtime > test_start)
         self.assertTrue(stat_result.mtime is None or stat_result.mtime < test_finish)
 
+    @unittest.skipIf(_util.is_windows(), "ATime testing disabled for Windows / NTFS")
     def test_stat_dir_atime(self):
 
-        # NOTE: This test might fail for local storage on Windows, for the same reason as test_stat_file_atime
-        # If intermittent failures do occur on the Windows build, we will need to skip this test on Windows
+        # This test fails intermittently for local storage on Windows, for the same reason as test_stat_file_atime
+        # https://docs.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-getfiletime?redirectedfrom=MSDN
 
         # mtime and atime for dirs is unlikely to be supported in cloud storage buckets
         # So, all of these fields are optional in stat responses for directories
