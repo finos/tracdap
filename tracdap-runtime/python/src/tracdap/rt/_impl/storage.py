@@ -16,6 +16,7 @@ import datetime as dt
 import enum
 import pathlib
 import re
+import sys
 import typing as tp
 
 import pyarrow as pa
@@ -325,8 +326,11 @@ class CommonFileStorage(IFileStorage):
     def _read_byte_stream(self, operation_name: str, storage_path: str) -> tp.BinaryIO:
 
         resolved_path = self._resolve_path(operation_name, storage_path, False)
+
+        # Open the stream
         stream = self._fs.open_input_file(resolved_path)
 
+        # Log file size now that the stream is successfully open
         stream.seek(0, 2)
         file_size = _util.format_file_size(stream.tell())
         stream.seek(0, 0)
@@ -334,7 +338,6 @@ class CommonFileStorage(IFileStorage):
         self._log.info(f"File size [{self._key}]: {file_size} [{storage_path}]")
 
         # Return impl of PyArrow NativeFile instead of BinaryIO - this is the same thing PyArrow does
-
         return _NativeFileResource(stream, lambda: self._close_byte_stream(storage_path, stream))  # noqa
 
     def write_byte_stream(self, storage_path: str) -> tp.BinaryIO:
@@ -344,28 +347,56 @@ class CommonFileStorage(IFileStorage):
     def _write_byte_stream(self, operation_name: str, storage_path: str) -> tp.BinaryIO:
 
         resolved_path = self._resolve_path(operation_name, storage_path, False)
+
+        # If the file does not already exist and the write operation fails, try to clean it up
+        file_info: pa_fs.FileInfo = self._fs.get_file_info(resolved_path)
+        delete_on_error = file_info.type == pa_fs.FileType.NotFound
+
+        # Open the stream
         stream = self._fs.open_output_stream(resolved_path)
 
         # Return impl of  PyArrow NativeFile instead of BinaryIO - this is the same thing PyArrow does
+        return _NativeFileResource(stream, lambda: self._close_byte_stream(storage_path, stream, delete_on_error))  # noqa
 
-        return _NativeFileResource(stream, lambda: self._close_byte_stream(storage_path, stream))  # noqa
+    def _close_byte_stream(self, storage_path: str, stream: tp.BinaryIO, delete_on_error: bool = False):
 
-    def _close_byte_stream(self, storage_path: str, stream: tp.BinaryIO):
-
+        # Do not try to close the stream twice
         if stream.closed:
             return
 
+        # If there has been an error, log it
+        exc_info = sys.exc_info()
+        error = exc_info[1] if exc_info is not None else None
+
+        if error is not None:
+            self._log.exception(str(error))
+
+        # Log closing of the stream
         try:
-            if stream.writable():
+            if stream.writable() and not error:
                 file_size = _util.format_file_size(stream.tell())
                 self._log.info(f"File size [{self._key}]: {file_size} [{storage_path}]")
+                self._log.info(f"CLOSE BYTE STREAM (WRITE) [{self._key}]: [{storage_path}]")
+
+            elif stream.writable():
                 self._log.info(f"CLOSE BYTE STREAM (WRITE) [{self._key}]: [{storage_path}]")
 
             else:
                 self._log.info(f"CLOSE BYTE STREAM (READ) [{self._key}]: [{storage_path}]")
 
+        # Always make sure the stream is closed
         finally:
             stream.close()
+
+        # If there is an error and cleanup is requested, try to remove the partially written file
+        # This is best-efforts, don't blow up if the cleanup fails
+        if error is not None and delete_on_error:
+            try:
+                file_info = self._fs.get_file_info(storage_path)
+                if file_info.type != pa_fs.FileType.NotFound:
+                    self._fs.delete_file(storage_path)
+            except OSError:
+                pass
 
     def _wrap_operation(self, func: tp.Callable, operation_name: str, storage_path: str, *args, **kwargs) -> tp.Any:
 
