@@ -390,7 +390,7 @@ class CommonFileStorage(IFileStorage):
             if relative_path.is_absolute():
                 raise self._explicit_error(self.ExplicitError.STORAGE_PATH_NOT_RELATIVE, storage_path, operation_name)
 
-            root_path = pathlib.Path("/root")
+            root_path = pathlib.Path("C:\\root") if _util.is_windows() else pathlib.Path("/root")
             absolute_path = root_path.joinpath(storage_path).resolve(False)
     
             if len(absolute_path.parts) < len(root_path.parts) or not absolute_path.is_relative_to(root_path):
