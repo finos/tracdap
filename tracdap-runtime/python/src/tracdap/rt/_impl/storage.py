@@ -366,17 +366,52 @@ class CommonFileStorage(IFileStorage):
             return func(*args, **kwargs)
 
         # ETrac means the error is already handled, log the message as-is
+
         except _ex.ETrac as e:
             self._log.exception(f"{operation} {str(e)}")
             raise
 
-        # TODO: We don't know what exception types Arrow FS will throw
-        # More specialized handling would be good, if that information can be found out
+        # Arrow maps filesystem errors into native Python OS errors
+
+        except FileNotFoundError as e:
+            msg = "File not found"
+            self._log.exception(f"{operation}: {msg}")
+            raise _ex.EStorageRequest(msg) from e
+
+        except FileExistsError as e:
+            msg = "File already exists"
+            self._log.exception(f"{operation}: {msg}")
+            raise _ex.EStorageRequest(msg) from e
+
+        except IsADirectoryError as e:
+            msg = "Path is a directory, not a file"
+            self._log.exception(f"{operation}: {msg}")
+            raise _ex.EStorageRequest(msg) from e
+
+        except NotADirectoryError as e:
+            msg = "Path is not a directory"
+            self._log.exception(f"{operation}: {msg}")
+            raise _ex.EStorageRequest(msg) from e
+
+        except PermissionError as e:
+            msg = "Access denied"
+            self._log.exception(f"{operation}: {msg}")
+            raise _ex.EStorageAccess(msg) from e
+
+        # OSError is the top-level error for IO exceptions
+        # This might be raised if e.g. there is an unrecognised errno returned by a low-level operation
+
+        except OSError as e:
+            msg = "Filesystem error"
+            self._log.exception(f"{operation}: {msg}")
+            raise _ex.EStorageAccess(msg) from e
+
+        # Other types of exception are not expected - report these as internal errors
 
         except Exception as e:
-            msg = f"There was a problem in the storage layer: {str(e)}"
+            msg = f"Unexpected error in storage layer: {str(e)}"
             self._log.exception(f"{operation} {msg}")
-            raise _ex.EStorageRequest(msg) from e
+            raise _ex.ETracInternal(msg) from e
         
     def _resolve_path(self, storage_path: str, operation_name: str, allow_root_dir: bool) -> str:
 
@@ -384,6 +419,9 @@ class CommonFileStorage(IFileStorage):
 
             if storage_path is None or len(storage_path.strip()) == 0:
                 raise self._explicit_error(self.ExplicitError.STORAGE_PATH_NULL_OR_BLANK, storage_path, operation_name)
+
+            if self._ILLEGAL_PATH_CHARS.match(storage_path):
+                raise self._explicit_error(self.ExplicitError.STORAGE_PATH_INVALID, storage_path, operation_name)
     
             relative_path = pathlib.Path(storage_path)
     
@@ -391,7 +429,7 @@ class CommonFileStorage(IFileStorage):
                 raise self._explicit_error(self.ExplicitError.STORAGE_PATH_NOT_RELATIVE, storage_path, operation_name)
 
             root_path = pathlib.Path("C:\\root") if _util.is_windows() else pathlib.Path("/root")
-            absolute_path = root_path.joinpath(storage_path).resolve(False)
+            absolute_path = root_path.joinpath(relative_path).resolve(False)
     
             if len(absolute_path.parts) < len(root_path.parts) or not absolute_path.is_relative_to(root_path):
                 raise self._explicit_error(self.ExplicitError.STORAGE_PATH_OUTSIDE_ROOT, storage_path, operation_name)
@@ -414,6 +452,8 @@ class CommonFileStorage(IFileStorage):
         err = err_type(message)
 
         return err
+
+    _ILLEGAL_PATH_CHARS = re.compile(r".*[\x00<>:\"\'\\|?*].*")
 
     class ExplicitError(enum.Enum):
     
@@ -475,11 +515,11 @@ class CommonFileStorage(IFileStorage):
 
     _ERROR_TYPE_MAP = {
 
-        ExplicitError.STORAGE_PATH_NULL_OR_BLANK: _ex.EStorageRequest,
-        ExplicitError.STORAGE_PATH_NOT_RELATIVE: _ex.EStorageRequest,
-        ExplicitError.STORAGE_PATH_OUTSIDE_ROOT: _ex.EStorageRequest,
-        ExplicitError.STORAGE_PATH_IS_ROOT: _ex.EStorageRequest,
-        ExplicitError.STORAGE_PATH_INVALID: _ex.EStorageRequest,
+        ExplicitError.STORAGE_PATH_NULL_OR_BLANK: _ex.EStorageValidation,
+        ExplicitError.STORAGE_PATH_NOT_RELATIVE: _ex.EStorageValidation,
+        ExplicitError.STORAGE_PATH_OUTSIDE_ROOT: _ex.EStorageValidation,
+        ExplicitError.STORAGE_PATH_IS_ROOT: _ex.EStorageValidation,
+        ExplicitError.STORAGE_PATH_INVALID: _ex.EStorageValidation,
     
         ExplicitError.SIZE_OF_DIR: _ex.EStorageRequest,
         ExplicitError.RM_DIR_NOT_RECURSIVE: _ex.EStorageRequest,
