@@ -188,11 +188,13 @@ class LocalFileStorage(IFileStorage):
             else FileType.DIRECTORY if item_path.is_dir() \
             else None
 
+        file_size = 0 if file_type is FileType.DIRECTORY else os_stat.st_size
+
         return FileStat(
             file_name=file_name,
             file_type=file_type,
             storage_path=str(item_path.relative_to(self._root_path).as_posix()),
-            size=os_stat.st_size,
+            size=file_size,
             mtime=dt.datetime.fromtimestamp(os_stat.st_mtime, dt.timezone.utc),
             atime=dt.datetime.fromtimestamp(os_stat.st_atime, dt.timezone.utc))
 
