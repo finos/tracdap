@@ -13,6 +13,7 @@
 #  limitations under the License.
 
 import datetime as dt
+import os
 import re
 import typing as tp
 import pathlib
@@ -176,6 +177,10 @@ class LocalFileStorage(IFileStorage):
         item_path = self._resolve_path(storage_path, "STAT", True)
         os_stat = item_path.stat()
 
+        return self._os_to_trac_stat(item_path, os_stat)
+
+    def _os_to_trac_stat(self, item_path: pathlib.Path, os_stat: os.stat_result):
+
         file_name = "." if item_path == self._root_path else item_path.name
 
         file_type = FileType.FILE if item_path.is_file() \
@@ -190,34 +195,51 @@ class LocalFileStorage(IFileStorage):
             mtime=dt.datetime.fromtimestamp(os_stat.st_mtime, dt.timezone.utc),
             atime=dt.datetime.fromtimestamp(os_stat.st_atime, dt.timezone.utc))
 
-    def ls(self, storage_path: str) -> tp.List[str]:
+    def ls(self, storage_path: str, recursive: bool = False) -> tp.List[FileStat]:
 
         operation = f"LS [{storage_path}]"
-        return self._error_handling(operation, lambda: self._ls(storage_path))
+        return self._error_handling(operation, lambda: self._ls(storage_path, recursive))
 
-    def _ls(self, storage_path: str) -> tp.List[str]:
+    def _ls(self, storage_path: str, recursive: bool = False) -> tp.List[FileStat]:
 
         item_path = self._resolve_path(storage_path, "LS", True)
-        return [str(x.relative_to(item_path))
-                for x in item_path.iterdir()
-                if x.is_file() or x.is_dir()]
 
-    def mkdir(self, storage_path: str, recursive: bool = False, exists_ok: bool = False):
+        if not item_path.exists():
+            raise ex.EStorageRequest(f"Storage path does not exist: STAT [{storage_path}]")
+
+        if not item_path.is_dir():
+            raise ex.EStorageRequest(f"Storage path is not a directory: STAT [{storage_path}]")
+
+        pattern = "**/*" if recursive else "*"
+        paths = list(item_path.glob(pattern))
+
+        return list(map(lambda p: self._os_to_trac_stat(p, p.stat()), paths))
+
+    def mkdir(self, storage_path: str, recursive: bool = False):
 
         operation = f"MKDIR [{storage_path}]"
-        self._error_handling(operation, lambda: self._mkdir(storage_path, recursive, exists_ok))
+        self._error_handling(operation, lambda: self._mkdir(storage_path, recursive))
 
-    def _mkdir(self, storage_path: str, recursive: bool = False, exists_ok: bool = False):
+    def _mkdir(self, storage_path: str, recursive: bool = False):
 
         item_path = self._resolve_path(storage_path, "MKDIR", False)
-        item_path.mkdir(parents=recursive, exist_ok=exists_ok)
+        item_path.mkdir(parents=recursive, exist_ok=True)
 
-    def rm(self, storage_path: str, recursive: bool = False):
+    def rm(self, storage_path: str):
 
         operation = f"RM [{storage_path}]"
-        self._error_handling(operation, lambda: self._rm(storage_path, recursive))
+        self._error_handling(operation, lambda: self._rm(storage_path))
 
-    def _rm(self, storage_path: str, recursive: bool = False):
+    def _rm(self, storage_path: str):
+
+        raise NotImplementedError()
+
+    def rmdir(self, storage_path: str):
+
+        operation = f"RMDIR [{storage_path}]"
+        self._error_handling(operation, lambda: self._rmdir(storage_path))
+
+    def _rmdir(self, storage_path: str):
 
         raise NotImplementedError()
 
@@ -233,19 +255,16 @@ class LocalFileStorage(IFileStorage):
 
         return _StreamResource(stream, lambda: self._close_byte_stream(storage_path, stream))
 
-    def write_byte_stream(self, storage_path: str, overwrite: bool = False) -> tp.BinaryIO:
+    def write_byte_stream(self, storage_path: str) -> tp.BinaryIO:
 
         operation = f"OPEN BYTE STREAM (WRITE) [{storage_path}]"
-        return self._error_handling(operation, lambda: self._write_byte_stream(storage_path, overwrite))
+        return self._error_handling(operation, lambda: self._write_byte_stream(storage_path))
 
-    def _write_byte_stream(self, storage_path: str, overwrite: bool = False) -> tp.BinaryIO:
+    def _write_byte_stream(self, storage_path: str) -> tp.BinaryIO:
 
         item_path = self._resolve_path(storage_path, "OPEN BYTE STREAM (WRITE)", False)
 
-        if overwrite:
-            stream = open(item_path, mode='wb')
-        else:
-            stream = open(item_path, mode='xb')
+        stream = open(item_path, mode='wb')
 
         return _StreamResource(stream, lambda: self._close_byte_stream(storage_path, stream))
 
