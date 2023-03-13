@@ -213,19 +213,21 @@ if boto_available:
 
             self._log.info(f"STAT [{storage_path}]")
 
+            name = storage_path.split("/")[-1]
+
             if self.exists(storage_path):
 
                 # Only OBJECTS can support stat atm
                 # Handling for directories needs to be changed, as part of refactor onto object storage
                 size = self.size(storage_path)
-                return FileStat(FileType.FILE, size)
+                return FileStat(name, FileType.FILE, storage_path, size)
 
             else:
 
                 self.ls(storage_path)
-                return FileStat(FileType.DIRECTORY, 0)
+                return FileStat(name, FileType.DIRECTORY, storage_path, 0)
 
-        def ls(self, storage_path: str) -> tp.List[str]:
+        def ls(self, storage_path: str, recursive: bool = False) -> tp.List[FileStat]:
 
             self._log.info(f"LS [{storage_path}]")
 
@@ -247,35 +249,40 @@ if boto_available:
                     if raw_key == prefix:
                         continue
                     key = raw_key.replace(prefix, "")
-                    keys.append(key)
+                    size = entry["Size"]
+                    mtime = entry["LastModified "]
+                    stat = FileStat(key, FileType.FILE, raw_key, size, mtime=mtime)
+                    keys.append(stat)
 
             if "CommonPrefixes" in response:
                 for raw_prefix in response["CommonPrefixes"]:
                     common_prefix = raw_prefix.replace(prefix, "")
-                    keys.append(common_prefix)
+                    stat = FileStat(common_prefix, FileType.DIRECTORY, raw_prefix, 0)
+                    keys.append(stat)
 
             return keys
 
-        def mkdir(self, storage_path: str, recursive: bool = False, exists_ok: bool = False):
+        def mkdir(self, storage_path: str, recursive: bool = False):
 
             self._log.info(f"MKDIR [{storage_path}]")
 
             # No-op in object storage
             pass
 
-        def rm(self, storage_path: str, recursive: bool = False):
+        def rm(self, storage_path: str):
 
             try:
                 self._log.info(f"RM [{storage_path}]")
-
-                if recursive:
-                    raise RuntimeError("RM (recursive) not available for S3 storage")
 
                 object_key = self._resolve_path(storage_path)
                 self._client.delete_object(Bucket=self._bucket, Key=object_key)
 
             except aws_ex.ClientError as error:
                 raise ex.EStorageRequest(f"Storage error: {str(error)}") from error
+
+        def rmdir(self, storage_path: str):
+
+            raise RuntimeError("RMDIR (recursive) not available for S3 storage")
 
         def read_bytes(self, storage_path: str) -> bytes:
 
@@ -302,7 +309,7 @@ if boto_available:
             except aws_ex.ClientError as error:
                 raise ex.EStorageRequest(f"Storage error: {str(error)}") from error
 
-        def write_bytes(self, storage_path: str, data: bytes, overwrite: bool = False):
+        def write_bytes(self, storage_path: str, data: bytes):
 
             try:
                 self._log.info(f"WRITE BYTES [{storage_path}]")
@@ -317,26 +324,25 @@ if boto_available:
             except aws_ex.ClientError as error:
                 raise ex.EStorageRequest(f"Storage error: {str(error)}") from error
 
-        def write_byte_stream(self, storage_path: str, overwrite: bool = False) -> tp.BinaryIO:
+        def write_byte_stream(self, storage_path: str) -> tp.BinaryIO:
 
             self._log.info(f"WRITE BYTE STREAM [{storage_path}]")
 
-            return self._AwsWriteBuf(self, storage_path, overwrite)
+            return self._AwsWriteBuf(self, storage_path)
 
         class _AwsWriteBuf(io.BytesIO):
 
-            def __init__(self, storage, storage_path, overwrite: bool):
+            def __init__(self, storage, storage_path):
                 super().__init__()
                 self._storage = storage
                 self._storage_path = storage_path
-                self._overwrite = overwrite
                 self._written = False
 
             def close(self):
                 if not self._written:
                     self.seek(0)
                     data = self.read()
-                    self._storage.write_bytes(self._storage_path, data, self._overwrite)
+                    self._storage.write_bytes(self._storage_path, data)
                     self._written = True
 
         def _resolve_path(self, storage_path: str) -> str:
