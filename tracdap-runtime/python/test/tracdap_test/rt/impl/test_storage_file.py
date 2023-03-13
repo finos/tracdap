@@ -896,7 +896,7 @@ class FileReadWriteTestSuite:
                 stream1.write(chunk)
                 raise self.TestException("Error after first chunk")
 
-        self.assertRaises(_ex.EStorageRequest, failed_write)
+        self.assertRaises(self.TestException, failed_write)
 
         # File should not exist in storage after an aborted write
         exists1 = self.storage.exists(storage_path)
