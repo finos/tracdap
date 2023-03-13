@@ -336,7 +336,8 @@ class LocalFileStorage(IFileStorage):
             root_path = self._root_path
             absolute_path = self._root_path.joinpath(relative_path).resolve(False)
 
-            if len(absolute_path.parts) < len(root_path.parts) or not absolute_path.is_relative_to(root_path):
+            # is_relative_to only supported in Python 3.9+, we need to support 3.7
+            if absolute_path != root_path and root_path not in absolute_path.parents:
                 raise ex.EStorageValidation(f"Path is outside storage root: {operation_name} [{storage_path}]")
 
             if absolute_path == root_path and not allow_root_dir:
