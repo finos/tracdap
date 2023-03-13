@@ -648,7 +648,8 @@ class DevModeTranslator:
             x_name = x_orig_path.name
 
             if x_storage.exists(str(x_orig_path.parent)):
-                existing_files = x_storage.ls(str(x_orig_path.parent))
+                listing = x_storage.ls(str(x_orig_path.parent))
+                existing_files = list(map(lambda stat: stat.file_name, listing))
             else:
                 existing_files = []
 
