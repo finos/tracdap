@@ -931,19 +931,35 @@ class FileReadWriteTestSuite:
     def test_read_delete_while_open(self):
 
         storage_path = "some_file.txt"
-        content = "Some content".encode('utf-8')
+        content = random.randbytes(64 * 1024)
 
         self.storage.write_bytes(storage_path, content)
 
-        # Some implementations might allow rm, since there is not a locked open stream
-        # However reading after rm should always fail
+        # Platforms vary in how this is handled
+        # There is no easy way to force the behavior, but we can check for consistency
 
-        def delete_and_read():
-            with self.storage.read_byte_stream(storage_path) as stream:
+        with self.storage.read_byte_stream(storage_path) as stream:
+
+            try:
                 self.storage.rm(storage_path)
-                stream.read(1024)
 
-        self.assertRaises(_ex.EStorage, delete_and_read)
+            # If rm fails, stream should still be open and readable
+            except _ex.EStorage:
+                read_content = stream.read(64 * 1024)
+                self.assertEqual(content, read_content)
+
+            # If rm succeeds, file should no longer exist in storage
+            else:
+                exists = self.storage.exists(storage_path)
+                self.assertFalse(exists)
+
+                # If the stream is still readable, data should not be corrupted
+                # If the stream throws an error on read, that is fine
+                try:
+                    read_content = stream.read(64 * 1024)
+                    self.assertEqual(content, read_content)
+                except OSError:
+                    pass
 
     def test_read_cancel_immediately(self):
 
