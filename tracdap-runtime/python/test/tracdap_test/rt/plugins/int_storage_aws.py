@@ -15,7 +15,7 @@
 import os
 import uuid
 
-from tracdap_test.rt.impl.test_storage_file import *
+from tracdap_test.rt.suites.file_storage_suite import *
 
 import tracdap.rt.config as cfg
 import tracdap.rt.ext.plugins as plugins
