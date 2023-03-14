@@ -163,7 +163,9 @@ jobs:
           pip install -r requirements.txt
 
       - name: Protoc code generation
-        run: python tracdap-runtime/python/build_runtime.py --target codegen
+        run: |
+          . ./venv/bin/activate
+          python tracdap-runtime/python/build_runtime.py --target codegen
 
       - name: Integration tests
         env:
