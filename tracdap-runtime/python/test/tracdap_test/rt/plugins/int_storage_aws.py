@@ -36,7 +36,7 @@ class AwsArrowNativeStorageTest(unittest.TestCase, FileOperationsTestSuite, File
     def setUpClass(cls) -> None:
 
         region = os.getenv("TRAC_AWS_REGION")
-        bucket = os.getenv("TRAC_AWS_REGION")
+        bucket = os.getenv("TRAC_AWS_BUCKET")
         access_key_id = os.getenv("TRAC_AWS_ACCESS_KEY_ID")
         secret_access_key = os.getenv("TRAC_AWS_SECRET_ACCESS_KEY")
 
@@ -65,7 +65,7 @@ class AwsArrowNativeStorageTest(unittest.TestCase, FileOperationsTestSuite, File
         AwsArrowNativeStorageTest.test_number += 1
 
         region = os.getenv("TRAC_AWS_REGION")
-        bucket = os.getenv("TRAC_AWS_REGION")
+        bucket = os.getenv("TRAC_AWS_BUCKET")
         access_key_id = os.getenv("TRAC_AWS_ACCESS_KEY_ID")
         secret_access_key = os.getenv("TRAC_AWS_SECRET_ACCESS_KEY")
 
