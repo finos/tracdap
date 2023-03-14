@@ -11,7 +11,7 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-
+import os
 import uuid
 
 from tracdap_test.rt.impl.test_storage_file import *
@@ -35,15 +35,19 @@ class AwsArrowNativeStorageTest(unittest.TestCase, FileOperationsTestSuite, File
     @classmethod
     def setUpClass(cls) -> None:
 
+        region = os.getenv("TRAC_AWS_REGION")
+        bucket = os.getenv("TRAC_AWS_REGION")
+        access_key_id = os.getenv("TRAC_AWS_ACCESS_KEY_ID")
+        secret_access_key = os.getenv("TRAC_AWS_SECRET_ACCESS_KEY")
+
         suite_storage_config = cfg.PluginConfig(
             protocol="S3",
             properties={
-                "region": "",
-                "bucket": "",
-                "prefix": "",
+                "region": region,
+                "bucket": bucket,
                 "credentials": "static",
-                "accessKeyId": "",
-                "secretAccessKey": "",
+                "accessKeyId": access_key_id,
+                "secretAccessKey": secret_access_key,
                 "arrowNativeFs": "true"
             })
 
@@ -53,22 +57,27 @@ class AwsArrowNativeStorageTest(unittest.TestCase, FileOperationsTestSuite, File
 
     def setUp(self):
 
-        test_name = f"test_{self.test_number}"
+        test_name = f"test_aws_{self.test_number}"
         test_dir = f"{self.suite_storage_prefix}/{test_name}"
 
         self.suite_storage.mkdir(test_dir)
 
         AwsArrowNativeStorageTest.test_number += 1
 
+        region = os.getenv("TRAC_AWS_REGION")
+        bucket = os.getenv("TRAC_AWS_REGION")
+        access_key_id = os.getenv("TRAC_AWS_ACCESS_KEY_ID")
+        secret_access_key = os.getenv("TRAC_AWS_SECRET_ACCESS_KEY")
+
         test_storage_config = cfg.PluginConfig(
             protocol="S3",
             properties={
-                "region": "",
-                "bucket": "",
+                "region": region,
+                "bucket": bucket,
                 "prefix": test_dir,
                 "credentials": "static",
-                "accessKeyId": "",
-                "secretAccessKey": "",
+                "accessKeyId": access_key_id,
+                "secretAccessKey": secret_access_key,
                 "arrowNativeFs": "true"
             })
 
