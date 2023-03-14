@@ -353,7 +353,7 @@ class CommonFileStorage(IFileStorage):
         self._log.info(f"File size [{self._key}]: {file_size} [{storage_path}]")
 
         # Return impl of PyArrow NativeFile instead of BinaryIO - this is the same thing PyArrow does
-        return _NativeFileResource(stream, lambda: self._close_byte_stream(storage_path, stream))  # noqa
+        return _NativeFileResource(stream, lambda: self._close_byte_stream(storage_path, stream, False))  # noqa
 
     def write_byte_stream(self, storage_path: str) -> tp.BinaryIO:
 
@@ -371,9 +371,9 @@ class CommonFileStorage(IFileStorage):
         stream = self._fs.open_output_stream(resolved_path)
 
         # Return impl of  PyArrow NativeFile instead of BinaryIO - this is the same thing PyArrow does
-        return _NativeFileResource(stream, lambda: self._close_byte_stream(storage_path, stream, delete_on_error))  # noqa
+        return _NativeFileResource(stream, lambda: self._close_byte_stream(storage_path, stream, True, delete_on_error))  # noqa
 
-    def _close_byte_stream(self, storage_path: str, stream: tp.BinaryIO, delete_on_error: bool = False):
+    def _close_byte_stream(self, storage_path: str, stream: tp.BinaryIO, is_write: bool, delete_on_error: bool = False):
 
         # Do not try to close the stream twice
         if stream.closed:
@@ -386,22 +386,22 @@ class CommonFileStorage(IFileStorage):
         if error is not None:
             self._log.exception(str(error))
 
+        # For successful write streams, log the total size written
+        if is_write and not error:
+            file_size = _util.format_file_size(stream.tell())
+            self._log.info(f"File size [{self._key}]: {file_size} [{storage_path}]")
+
+        # Close the stream - this may take time for write streams that are not flushed
+        # Closing here gives better logs, because any pause is before the close message
+        # As a fail-safe, _NativeFileResource always calls close() in a "finally" block
+        stream.close()
+
         # Log closing of the stream
-        try:
-            if stream.writable() and not error:
-                file_size = _util.format_file_size(stream.tell())
-                self._log.info(f"File size [{self._key}]: {file_size} [{storage_path}]")
-                self._log.info(f"CLOSE BYTE STREAM (WRITE) [{self._key}]: [{storage_path}]")
+        if is_write:
+            self._log.info(f"CLOSE BYTE STREAM (WRITE) [{self._key}]: [{storage_path}]")
 
-            elif stream.writable():
-                self._log.info(f"CLOSE BYTE STREAM (WRITE) [{self._key}]: [{storage_path}]")
-
-            else:
-                self._log.info(f"CLOSE BYTE STREAM (READ) [{self._key}]: [{storage_path}]")
-
-        # Always make sure the stream is closed
-        finally:
-            stream.close()
+        else:
+            self._log.info(f"CLOSE BYTE STREAM (READ) [{self._key}]: [{storage_path}]")
 
         # If there is an error and cleanup is requested, try to remove the partially written file
         # This is best-efforts, don't blow up if the cleanup fails
