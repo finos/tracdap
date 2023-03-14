@@ -355,6 +355,11 @@ class LocalFileStorage(IFileStorage):
             self._log.info(operation)
             return func()
 
+        # ETrac means the error is already handled, log the message as-is
+        except ex.ETrac as e:
+            self._log.exception(f"{operation} {str(e)}")
+            raise
+
         except FileNotFoundError as e:
             msg = "File not found"
             self._log.exception(f"{operation}: {msg}")
