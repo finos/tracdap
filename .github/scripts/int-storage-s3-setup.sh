@@ -18,3 +18,8 @@
 
 export DEBIAN_FRONTEND=noninteractive
 apt-get install -y awscli
+
+export AWS_ACCESS_KEY_ID=${TRAC_AWS_ACCESS_KEY_ID}
+export AWS_SECRET_ACCESS_KEY=${TRAC_AWS_SECRET_ACCESS_KEY}
+
+aws s3api list-objects-v2 --bucket ${TRAC_AWS_BUCKET} --region ${TRAC_AWS_REGION}

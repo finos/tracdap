@@ -366,6 +366,7 @@ jobs:
               PROTOCOL: S3,
               ENABLE_IF: TRAC_AWS_BUCKET,
               BUILD_aws_storage: true,
+              SETUP_SCRIPT: ".github/scripts/int-storage-s3-setup.sh",
               TRAC_CONFIG_FILE: '.github/config/int-storage-s3.yaml',
               TRAC_SECRET_KEY: very-secret-key,
               STORAGE_SECRET: TRAC_AWS_SECRET_ACCESS_KEY,
