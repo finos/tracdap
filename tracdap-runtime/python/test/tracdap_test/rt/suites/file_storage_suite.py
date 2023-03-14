@@ -692,7 +692,7 @@ class FileReadWriteTestSuite:
         storage_path = "test_file.dat"
 
         # One 10 M chunk
-        bytes_ = random.randbytes(10 * 1024 * 1024)
+        bytes_ = random.randbytes(100 * 1024 * 1024)
 
         self.do_round_trip(storage_path, [bytes_], self.storage)
 
@@ -726,15 +726,9 @@ class FileReadWriteTestSuite:
                 write_stream.write(chunk)
 
         with storage.read_byte_stream(storage_path) as read_stream:
-            read_result = []
-            while read_stream.readable():
-                chunk = read_stream.read(64 * 1024)
-                if chunk is None or len(chunk) == 0:
-                    break
-                read_result.append(chunk)
+            read_content = read_stream.read()
 
-        original_content = functools.reduce(lambda bs, b: bs + b, original_bytes, b"")
-        read_content = functools.reduce(lambda bs, b: bs + b, read_result, b"")
+        original_content = functools.reduce(lambda bs, b: bs + b, original_bytes[1:], original_bytes[0])
 
         self.assertEqual(original_content, read_content)
 
