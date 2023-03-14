@@ -90,8 +90,8 @@ class AwsStorageProvider(IStorageProvider):
         s3fs = afs.S3FileSystem(**s3fs_args)
 
         bucket = _helpers.get_plugin_property(self._properties, self.BUCKET_PROPERTY)
-        prefix = _helpers.get_plugin_property(self._properties, self.PREFIX_PROPERTY) or ""
-        root_path = f"{bucket}/{prefix}"
+        prefix = _helpers.get_plugin_property(self._properties, self.PREFIX_PROPERTY)
+        root_path = f"{bucket}/{prefix}" if prefix else bucket
 
         return afs.SubTreeFileSystem(root_path, s3fs)
 
