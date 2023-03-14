@@ -133,6 +133,7 @@ jobs:
 
       - name: Install JQ
         run: |
+          env
           apt-get update
           apt-get upgrade -y
           apt-get install -y jq
