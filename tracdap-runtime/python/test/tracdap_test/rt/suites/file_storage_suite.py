@@ -14,23 +14,17 @@
 
 import datetime as dt
 import functools
-import pathlib
-import tempfile
 import time
 import typing as tp
 import unittest
 import random
 
-import tracdap.rt.config as _cfg
 import tracdap.rt.exceptions as _ex
-import tracdap.rt.ext.plugins as _plugins
 import tracdap.rt._impl.data as _data  # noqa
 import tracdap.rt._impl.storage as _storage  # noqa
 import tracdap.rt._impl.util as _util  # noqa
 
 _util.configure_logging()
-_plugins.PluginManager.register_core_plugins()
-
 
 # randbytes was only added to the random module in 3.9
 # For testing, alias to secrets.token_bytes if it is not available (available since 3.6)
@@ -1041,81 +1035,3 @@ class FileReadWriteTestSuite:
 
         exists2 = self.storage.exists(storage_path)
         self.assertFalse(exists2)
-
-# ----------------------------------------------------------------------------------------------------------------------
-# UNIT TESTS
-# ----------------------------------------------------------------------------------------------------------------------
-
-# Unit tests call the test suite using the local storage implementation
-
-
-class LocalFileStorageTest(unittest.TestCase, FileOperationsTestSuite, FileReadWriteTestSuite):
-
-    storage_root: tempfile.TemporaryDirectory
-    test_number: int
-
-    @classmethod
-    def setUpClass(cls) -> None:
-
-        cls.storage_root = tempfile.TemporaryDirectory()
-        cls.test_number = 0
-
-    def setUp(self):
-
-        test_dir = pathlib.Path(self.storage_root.name).joinpath(f"test_{self.test_number}")
-        test_dir.mkdir()
-
-        LocalFileStorageTest.test_number += 1
-
-        test_storage_config = _cfg.PluginConfig(
-            protocol="LOCAL",
-            properties={"rootPath": str(test_dir)})
-
-        sys_config = _cfg.RuntimeConfig()
-        sys_config.storage = _cfg.StorageConfig()
-        sys_config.storage.buckets["test_bucket"] = test_storage_config
-
-        manager = _storage.StorageManager(sys_config)
-        self.storage = manager.get_file_storage("test_bucket")
-
-    @classmethod
-    def tearDownClass(cls) -> None:
-
-        cls.storage_root.cleanup()
-
-
-class LocalArrowNativeStorageTest(unittest.TestCase, FileOperationsTestSuite, FileReadWriteTestSuite):
-
-    storage_root: tempfile.TemporaryDirectory
-    test_number: int
-
-    @classmethod
-    def setUpClass(cls) -> None:
-
-        cls.storage_root = tempfile.TemporaryDirectory()
-        cls.test_number = 0
-
-    def setUp(self):
-
-        test_dir = pathlib.Path(self.storage_root.name).joinpath(f"test_{self.test_number}")
-        test_dir.mkdir()
-
-        LocalArrowNativeStorageTest.test_number += 1
-
-        test_storage_config = _cfg.PluginConfig(
-            protocol="LOCAL",
-            properties={
-                "rootPath": str(test_dir),
-                "arrowNativeFs": "true"})
-
-        sys_config = _cfg.RuntimeConfig()
-        sys_config.storage = _cfg.StorageConfig()
-        sys_config.storage.buckets["test_bucket"] = test_storage_config
-
-        manager = _storage.StorageManager(sys_config)
-        self.storage = manager.get_file_storage("test_bucket")
-
-    @classmethod
-    def tearDownClass(cls) -> None:
-
-        cls.storage_root.cleanup()
