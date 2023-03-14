@@ -151,7 +151,8 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Upgrade PIP
-        run: python -m venv ./venv
+        run: |
+          python -m venv ./venv
           . ./venv/bin/activate
           python -m pip install --upgrade pip
 
