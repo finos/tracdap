@@ -81,8 +81,19 @@ abstract class MetadataDalReadTest implements IDalTestable {
         var v2t1 = dal.loadObject(TEST_TENANT, selector2t1);
         var v2t2 = dal.loadObject(TEST_TENANT, selector2t2);
 
-        assertEquals(origTag, v1t1);
-        assertEquals(nextDefTag1, v2t1);
+        var expectedTag1 = origTag.toBuilder()
+                        .setHeader(origTag.getHeader().toBuilder()
+                                .setIsLatestObject(false)
+                                .setIsLatestTag(true))
+                        .build();
+        var expectedTag2 = nextDefTag1.toBuilder()
+                .setHeader(nextDefTag1.getHeader().toBuilder()
+                        .setIsLatestObject(true)
+                        .setIsLatestTag(false))
+                .build();
+
+        assertEquals(expectedTag1, v1t1);
+        assertEquals(expectedTag2, v2t1);
         assertEquals(nextDefTag2, v2t2);
     }
 
@@ -114,8 +125,19 @@ abstract class MetadataDalReadTest implements IDalTestable {
         var v2t1 = batch.get(1);
         var v2t2 = batch.get(2);
 
-        assertEquals(origTag, v1t1);
-        assertEquals(nextDefTag1, v2t1);
+        var expectedTag1 = origTag.toBuilder()
+                        .setHeader(origTag.getHeader().toBuilder()
+                                .setIsLatestTag(true)
+                                .setIsLatestObject(false))
+                        .build();
+        var expectedTag2 = nextDefTag1.toBuilder()
+                .setHeader(nextDefTag1.getHeader().toBuilder()
+                        .setIsLatestTag(false)
+                        .setIsLatestObject(true))
+                .build();
+
+        assertEquals(expectedTag1, v1t1);
+        assertEquals(expectedTag2, v2t1);
         assertEquals(nextDefTag2, v2t2);
     }
 
@@ -164,8 +186,19 @@ abstract class MetadataDalReadTest implements IDalTestable {
         var v2t1 = dal.loadObject(TEST_TENANT, selector2t1);
         var v2t2 = dal.loadObject(TEST_TENANT, selector2t2);
 
-        assertEquals(origTag, v1t1);
-        assertEquals(nextDefTag1, v2t1);
+        var expectedTag1 = origTag.toBuilder()
+                .setHeader(origTag.getHeader().toBuilder()
+                        .setIsLatestTag(true)
+                        .setIsLatestObject(false))
+                .build();
+        var expectedTag2 = nextDefTag1.toBuilder()
+                .setHeader(nextDefTag1.getHeader().toBuilder()
+                        .setIsLatestTag(false)
+                        .setIsLatestObject(true))
+                .build();
+
+        assertEquals(expectedTag1, v1t1);
+        assertEquals(expectedTag2, v2t1);
         assertEquals(nextDefTag2, v2t2);
     }
 
@@ -216,8 +249,19 @@ abstract class MetadataDalReadTest implements IDalTestable {
         var v2t1 = batch.get(1);
         var v2t2 = batch.get(2);
 
-        assertEquals(origTag, v1t1);
-        assertEquals(nextDefTag1, v2t1);
+        var expectedTag1 = origTag.toBuilder()
+                        .setHeader(origTag.getHeader().toBuilder()
+                                .setIsLatestObject(false)
+                                .setIsLatestTag(true))
+                        .build();
+        var expectedTag2 = nextDefTag1.toBuilder()
+                .setHeader(nextDefTag1.getHeader().toBuilder()
+                        .setIsLatestObject(true)
+                        .setIsLatestTag(false))
+                .build();
+
+        assertEquals(expectedTag1, v1t1);
+        assertEquals(expectedTag2, v2t1);
         assertEquals(nextDefTag2, v2t2);
     }
 
@@ -349,8 +393,19 @@ abstract class MetadataDalReadTest implements IDalTestable {
         var combo2 = dal.loadObject(TEST_TENANT, selectCombo2);
         var combo3 = dal.loadObject(TEST_TENANT, selectCombo3);
 
-        assertEquals(v2t2Tag, combo1);
-        assertEquals(v2t2Tag, combo2);
+        var expectedTag1 = v2t2Tag.toBuilder()
+                .setHeader(v2t2Tag.getHeader().toBuilder()
+                        .setIsLatestTag(true)
+                        .setIsLatestObject(false))
+                .build();
+        var expectedTag2 = v2t2Tag.toBuilder()
+                .setHeader(v2t2Tag.getHeader().toBuilder()
+                        .setIsLatestTag(true)
+                        .setIsLatestObject(false))
+                .build();
+
+        assertEquals(expectedTag1, combo1);
+        assertEquals(expectedTag2, combo2);
         assertEquals(v3t1Tag, combo3);
     }
 
@@ -409,8 +464,14 @@ abstract class MetadataDalReadTest implements IDalTestable {
         var combo2 = batch.get(1);
         var combo3 = batch.get(2);
 
-        assertEquals(v2t2Tag, combo1);
-        assertEquals(v2t2Tag, combo2);
+        var expectedTag = v2t2Tag.toBuilder()
+                .setHeader(v2t2Tag.getHeader().toBuilder()
+                        .setIsLatestTag(true)
+                        .setIsLatestObject(false))
+                .build();
+
+        assertEquals(expectedTag, combo1);
+        assertEquals(expectedTag, combo2);
         assertEquals(v3t1Tag, combo3);
     }
     
@@ -508,10 +569,21 @@ abstract class MetadataDalReadTest implements IDalTestable {
         var t2BoundaryTag = dal.loadObject(TEST_TENANT, t2BoundarySelector);
         var t2PriorTag = dal.loadObject(TEST_TENANT, t2PriorSelector);
 
-        assertEquals(v2Tag, v2BoundaryTag);
-        assertEquals(v1Tag, v2PriorTag);
+        var expectedTag1 = v2Tag.toBuilder()
+                .setHeader(v2Tag.getHeader().toBuilder()
+                        .setIsLatestTag(false)
+                        .setIsLatestObject(true))
+                .build();
+        var expectedTag2 = v1Tag.toBuilder()
+                .setHeader(v1Tag.getHeader().toBuilder()
+                        .setIsLatestTag(true)
+                        .setIsLatestObject(false))
+                .build();
+
+        assertEquals(expectedTag1, v2BoundaryTag);
+        assertEquals(expectedTag2, v2PriorTag);
         assertEquals(t2Tag, t2BoundaryTag);
-        assertEquals(v2Tag, t2PriorTag);
+        assertEquals(expectedTag1, t2PriorTag);
     }
 
     @Test
@@ -554,11 +626,26 @@ abstract class MetadataDalReadTest implements IDalTestable {
         var batch2 = dal.loadObjects(TEST_TENANT, List.of(t2BoundarySelector, t2PriorSelector));
         var t2BoundaryTag = batch2.get(0);
         var t2PriorTag = batch2.get(1);
+        var expextedv2Tag = v2Tag.toBuilder()
+                .setHeader(v2Tag.getHeader().toBuilder()
+                        .setIsLatestTag(false)
+                        .setIsLatestObject(true))
+                .build();
+        var expextedv1Tag = v1Tag.toBuilder()
+                .setHeader(v1Tag.getHeader().toBuilder()
+                        .setIsLatestTag(true)
+                        .setIsLatestObject(false))
+                .build();
+        var expextedt2Tag = t2Tag.toBuilder()
+                .setHeader(t2Tag.getHeader().toBuilder()
+                        .setIsLatestTag(true)
+                        .setIsLatestObject(true))
+                .build();
 
-        assertEquals(v2Tag, v2BoundaryTag);
-        assertEquals(v1Tag, v2PriorTag);
-        assertEquals(t2Tag, t2BoundaryTag);
-        assertEquals(v2Tag, t2PriorTag);
+        assertEquals(expextedv2Tag, v2BoundaryTag);
+        assertEquals(expextedv1Tag, v2PriorTag);
+        assertEquals(expextedt2Tag, t2BoundaryTag);
+        assertEquals(expextedv2Tag, t2PriorTag);
     }
 
     @Test

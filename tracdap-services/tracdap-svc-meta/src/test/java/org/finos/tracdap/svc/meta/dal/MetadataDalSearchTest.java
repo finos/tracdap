@@ -19,11 +19,8 @@ package org.finos.tracdap.svc.meta.dal;
 import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.common.metadata.TypeSystem;
 import org.finos.tracdap.common.metadata.MetadataCodec;
-import org.finos.tracdap.test.meta.IDalTestable;
-import org.finos.tracdap.test.meta.JdbcUnit;
-import org.finos.tracdap.test.meta.JdbcIntegration;
+import org.finos.tracdap.test.meta.*;
 
-import org.finos.tracdap.test.meta.TestData;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -1408,8 +1405,13 @@ abstract class MetadataDalSearchTest implements IDalTestable {
 
         var resultPriorVersions = dal.search(TEST_TENANT, searchPriorVersions);
 
-        Assertions.assertEquals(1, resultPriorVersions.size());
-        Assertions.assertEquals(v2Tag.getHeader(), resultPriorVersions.get(0).getHeader());
+        var expectedTagHeader = v2Tag.getHeader().toBuilder()
+                        .setIsLatestTag(true)
+                        .setIsLatestObject(false)
+                .build();
+
+        assertEquals(1, resultPriorVersions.size());
+        assertEquals(expectedTagHeader, resultPriorVersions.get(0).getHeader());
     }
 
     @Test
@@ -1459,8 +1461,13 @@ abstract class MetadataDalSearchTest implements IDalTestable {
 
         var resultPriorTags = dal.search(TEST_TENANT, searchPriorTags);
 
-        Assertions.assertEquals(1, resultPriorTags.size());
-        Assertions.assertEquals(t2Tag.getHeader(), resultPriorTags.get(0).getHeader());
+        var expectedTagHeader = t2Tag.getHeader().toBuilder()
+                        .setIsLatestObject(true)
+                        .setIsLatestTag(false)
+                .build();
+
+        assertEquals(1, resultPriorTags.size());
+        assertEquals(expectedTagHeader, resultPriorTags.get(0).getHeader());
     }
 
     @Test
@@ -1535,13 +1542,17 @@ abstract class MetadataDalSearchTest implements IDalTestable {
         var asOfResult = dal.search(TEST_TENANT, asOfSearch);
         var resultHeader1 = asOfResult.get(0).getHeader();
         var resultHeader2 = asOfResult.get(1).getHeader();
+        var expectedv1TagHeader = v1Tag.getHeader().toBuilder()
+                    .setIsLatestTag(true)
+                    .setIsLatestObject(false)
+                .build();
 
         // The versioned tag should be returned first in the list
         // This is because results are returned with the most recently updated first
 
-        Assertions.assertEquals(2, asOfResult.size());
-        Assertions.assertEquals(v1Tag.getHeader(), resultHeader1);
-        Assertions.assertEquals(unchangedTag.getHeader(), resultHeader2);
+        assertEquals(2, asOfResult.size());
+        assertEquals(expectedv1TagHeader, resultHeader1);
+        assertEquals(unchangedTag.getHeader(), resultHeader2);
     }
 
     @Test
@@ -1606,8 +1617,13 @@ abstract class MetadataDalSearchTest implements IDalTestable {
 
         var result2 = dal.search(TEST_TENANT, search2);
 
-        Assertions.assertEquals(1, result2.size());
-        Assertions.assertEquals(v2t1Tag.getHeader(), result2.get(0).getHeader());
+        var expectedTagHeader1 = v2t1Tag.getHeader().toBuilder()
+                        .setIsLatestTag(false)
+                        .setIsLatestObject(true)
+                .build();
+
+        assertEquals(1, result2.size());
+        assertEquals(expectedTagHeader1, result2.get(0).getHeader());
 
         var search3 = SearchParameters.newBuilder()
                 .setObjectType(ObjectType.DATA)
@@ -1617,8 +1633,13 @@ abstract class MetadataDalSearchTest implements IDalTestable {
 
         var result3 = dal.search(TEST_TENANT, search3);
 
-        Assertions.assertEquals(1, result3.size());
-        Assertions.assertEquals(v1t2Tag.getHeader(), result3.get(0).getHeader());
+        var expectedTagHeader2 = v1t2Tag.getHeader().toBuilder()
+                    .setIsLatestTag(true)
+                    .setIsLatestObject(false)
+                .build();
+
+        assertEquals(1, result3.size());
+        assertEquals(expectedTagHeader2, result3.get(0).getHeader());
 
         var search4 = SearchParameters.newBuilder()
                 .setObjectType(ObjectType.DATA)
@@ -1628,8 +1649,13 @@ abstract class MetadataDalSearchTest implements IDalTestable {
 
         var result4 = dal.search(TEST_TENANT, search4);
 
-        Assertions.assertEquals(1, result4.size());
-        Assertions.assertEquals(v1t1Tag.getHeader(), result4.get(0).getHeader());
+        var expectedTagHeader3 = v1t1Tag.getHeader().toBuilder()
+                    .setIsLatestTag(false)
+                    .setIsLatestObject(false)
+                .build();
+
+        assertEquals(1, result4.size());
+        assertEquals(expectedTagHeader3, result4.get(0).getHeader());
 
         // Stepping back before the object was created should give an empty search result
 
@@ -1725,8 +1751,13 @@ abstract class MetadataDalSearchTest implements IDalTestable {
 
         var result2 = dal.search(TEST_TENANT, search2);
 
-        Assertions.assertEquals(1, result2.size());
-        Assertions.assertEquals(obj2t1Tag.getHeader(), result2.get(0).getHeader());
+        var expectedTagHeader = obj2t1Tag.getHeader().toBuilder()
+                    .setIsLatestTag(false)
+                    .setIsLatestObject(true)
+                .build();
+
+        assertEquals(1, result2.size());
+        assertEquals(expectedTagHeader, result2.get(0).getHeader());
     }
 
     @Test
@@ -1823,9 +1854,14 @@ abstract class MetadataDalSearchTest implements IDalTestable {
                 .build();
 
         var result = dal.search(TEST_TENANT, searchParams);
+        var resultFirstTag = result.get(0);
+        var expectedHeader = v1t3.getHeader().toBuilder()
+                    .setIsLatestTag(false)
+                    .setIsLatestObject(false)
+                .build();
 
         assertEquals(1, result.size());
-        assertEquals(v1t3.getHeader(), result.get(0).getHeader());
+        assertEquals(expectedHeader, resultFirstTag.getHeader());
     }
 
     @Test
