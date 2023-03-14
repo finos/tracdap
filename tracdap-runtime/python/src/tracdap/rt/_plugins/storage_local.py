@@ -13,6 +13,9 @@
 #  limitations under the License.
 
 import datetime as dt
+import os
+import re
+import sys
 import typing as tp
 import pathlib
 
@@ -23,27 +26,56 @@ import tracdap.rt.exceptions as ex
 import tracdap.rt.ext.plugins as plugins
 from tracdap.rt.ext.storage import *
 
+import pyarrow.fs as afs
+
 # Set of common helpers across the core plugins (do not reference rt._impl)
 from . import _helpers
 
-# TODO: Remove dependencies on internal implementation details
-import tracdap.rt._impl.storage as _storage
 
-
-class LocalFileStorage(IFileStorage):
+class LocalStorageProvider(IStorageProvider):
 
     ROOT_PATH_PROPERTY = "rootPath"
+    ARROW_NATIVE_FS_PROPERTY = "arrowNativeFs"
+    ARROW_NATIVE_FS_DEFAULT = False
 
-    def __init__(self, config: cfg.PluginConfig, options: dict = None):
+    def __init__(self, properties: tp.Dict[str, str]):
 
         self._log = _helpers.logger_for_object(self)
-        self._properties = config.properties
+        self._properties = properties
 
-        root_path_config = _helpers.get_plugin_property(self._properties, self.ROOT_PATH_PROPERTY)
+        self._root_path = self.check_root_path(self._properties, self._log)
+
+        self._arrow_native = _helpers.get_plugin_property_boolean(
+            properties, self.ARROW_NATIVE_FS_PROPERTY, self.ARROW_NATIVE_FS_DEFAULT)
+
+    def has_arrow_native(self) -> bool:
+        return True if self._arrow_native else False
+
+    def has_file_storage(self) -> bool:
+        return False if self._arrow_native else True
+
+    def get_arrow_native(self) -> afs.SubTreeFileSystem:
+        root_fs = afs.LocalFileSystem()
+        return afs.SubTreeFileSystem(str(self._root_path), root_fs)
+
+    def get_file_storage(self) -> IFileStorage:
+
+        config = cfg.PluginConfig()
+        config.protocol = "LOCAL"
+        config.properties = self._properties
+
+        options = dict()
+
+        return LocalFileStorage(config, options)
+
+    @classmethod
+    def check_root_path(cls, properties, log):
+
+        root_path_config = _helpers.get_plugin_property(properties, cls.ROOT_PATH_PROPERTY)
 
         if not root_path_config or root_path_config.isspace():
             err = f"Storage root path not set"
-            self._log.error(err)
+            log.error(err)
             raise ex.EStorageRequest(err)
 
         supplied_root = pathlib.Path(root_path_config)
@@ -53,16 +85,57 @@ class LocalFileStorage(IFileStorage):
 
         else:
             err = f"Relative path not allowed for storage root [{supplied_root}]"
-            self._log.error(err)
+            log.error(err)
             raise ex.EStorageConfig(err)
 
         try:
-            self._root_path = absolute_root.resolve(strict=True)
+            return absolute_root.resolve(strict=True)
 
         except FileNotFoundError as e:
             err = f"Storage root path does not exist: [{absolute_root}]"
-            self._log.error(err)
+            log.error(err)
             raise ex.EStorageRequest(err) from e
+
+
+plugins.PluginManager.register_plugin(IStorageProvider, LocalStorageProvider, ["LOCAL", "file"])
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+# CUSTOM IMPLEMENTATION FOR LOCAL STORAGE
+# ----------------------------------------------------------------------------------------------------------------------
+
+# This is the old implementation that was used before Arrow native was made available
+# It is likely to be removed in a future release
+
+
+class _StreamResource(tp.BinaryIO):  # noqa
+
+    def __init__(self, ctx_mgr, close_func):
+        self.__ctx_mgr = ctx_mgr
+        self.__close_func = close_func
+
+    def __getitem__(self, item):
+        return self.__ctx_mgr.__getitem__(item)
+
+    def __enter__(self):
+        return self.__ctx_mgr.__enter__()
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        try:
+            self.__close_func()
+        finally:
+            self.__ctx_mgr.__exit__(exc_type, exc_val, exc_tb)
+
+
+class LocalFileStorage(IFileStorage):
+
+    def __init__(self, config: cfg.PluginConfig, options: dict = None):
+
+        self._log = _helpers.logger_for_object(self)
+        self._properties = config.properties
+        self._options = options  # Not used
+
+        self._root_path = LocalStorageProvider.check_root_path(self._properties, self._log)
 
     def _get_root(self):
         return self._root_path
@@ -74,13 +147,26 @@ class LocalFileStorage(IFileStorage):
 
     def _exists(self, storage_path: str) -> bool:
 
-        item_path = self._root_path / storage_path
+        item_path = self._resolve_path(storage_path, "EXISTS", True)
         return item_path.exists()
 
     def size(self, storage_path: str) -> int:
 
         operation = f"SIZE [{storage_path}]"
-        return self._error_handling(operation, lambda: self._stat(storage_path).size)
+        return self._error_handling(operation, lambda: self._size(storage_path))
+
+    def _size(self, storage_path: str) -> int:
+
+        item_path = self._resolve_path(storage_path, "SIZE", True)
+
+        if not item_path.exists():
+            raise ex.EStorageRequest(f"Storage path does not exist: SIZE [{storage_path}]")
+
+        if not item_path.is_file():
+            raise ex.EStorageRequest(f"Storage path is not a file: SIZE [{storage_path}]")
+
+        os_stat = item_path.stat()
+        return os_stat.st_size
 
     def stat(self, storage_path: str) -> FileStat:
 
@@ -89,63 +175,96 @@ class LocalFileStorage(IFileStorage):
 
     def _stat(self, storage_path: str) -> FileStat:
 
-        item_path = self._root_path / storage_path
+        item_path = self._resolve_path(storage_path, "STAT", True)
         os_stat = item_path.stat()
+
+        return self._os_to_trac_stat(item_path, os_stat)
+
+    def _os_to_trac_stat(self, item_path: pathlib.Path, os_stat: os.stat_result):
+
+        file_name = "." if item_path == self._root_path else item_path.name
 
         file_type = FileType.FILE if item_path.is_file() \
             else FileType.DIRECTORY if item_path.is_dir() \
             else None
 
-        return FileStat(
-            file_type=file_type,
-            size=os_stat.st_size,
-            ctime=dt.datetime.fromtimestamp(os_stat.st_ctime, dt.timezone.utc),
-            mtime=dt.datetime.fromtimestamp(os_stat.st_mtime, dt.timezone.utc),
-            atime=dt.datetime.fromtimestamp(os_stat.st_atime, dt.timezone.utc),
-            uid=os_stat.st_uid,
-            gid=os_stat.st_gid,
-            mode=os_stat.st_mode)
+        file_size = 0 if file_type is FileType.DIRECTORY else os_stat.st_size
 
-    def ls(self, storage_path: str) -> tp.List[str]:
+        return FileStat(
+            file_name=file_name,
+            file_type=file_type,
+            storage_path=str(item_path.relative_to(self._root_path).as_posix()),
+            size=file_size,
+            mtime=dt.datetime.fromtimestamp(os_stat.st_mtime, dt.timezone.utc),
+            atime=dt.datetime.fromtimestamp(os_stat.st_atime, dt.timezone.utc))
+
+    def ls(self, storage_path: str, recursive: bool = False) -> tp.List[FileStat]:
 
         operation = f"LS [{storage_path}]"
-        return self._error_handling(operation, lambda: self._ls(storage_path))
+        return self._error_handling(operation, lambda: self._ls(storage_path, recursive))
 
-    def _ls(self, storage_path: str) -> tp.List[str]:
+    def _ls(self, storage_path: str, recursive: bool = False) -> tp.List[FileStat]:
 
-        item_path = self._root_path / storage_path
-        return [str(x.relative_to(item_path))
-                for x in item_path.iterdir()
-                if x.is_file() or x.is_dir()]
+        item_path = self._resolve_path(storage_path, "LS", True)
 
-    def mkdir(self, storage_path: str, recursive: bool = False, exists_ok: bool = False):
+        if not item_path.exists():
+            raise ex.EStorageRequest(f"Storage path does not exist: STAT [{storage_path}]")
 
-        operation = f"MKDIR [{storage_path}]"
-        self._error_handling(operation, lambda: self._mkdir(storage_path, recursive, exists_ok))
+        if not item_path.is_dir():
+            raise ex.EStorageRequest(f"Storage path is not a directory: STAT [{storage_path}]")
 
-    def _mkdir(self, storage_path: str, recursive: bool = False, exists_ok: bool = False):
+        pattern = "**/*" if recursive else "*"
+        paths = list(item_path.glob(pattern))
 
-        item_path = self._root_path / storage_path
-        item_path.mkdir(parents=recursive, exist_ok=exists_ok)
+        return list(map(lambda p: self._os_to_trac_stat(p, p.stat()), paths))
 
-    def rm(self, storage_path: str, recursive: bool = False):
+    def mkdir(self, storage_path: str, recursive: bool = False):
 
         operation = f"MKDIR [{storage_path}]"
-        self._error_handling(operation, lambda: self._rm(storage_path, recursive))
+        self._error_handling(operation, lambda: self._mkdir(storage_path, recursive))
 
-    def _rm(self, storage_path: str, recursive: bool = False):
+    def _mkdir(self, storage_path: str, recursive: bool = False):
 
-        raise NotImplementedError()
+        item_path = self._resolve_path(storage_path, "MKDIR", False)
+        item_path.mkdir(parents=recursive, exist_ok=True)
 
-    def read_bytes(self, storage_path: str) -> bytes:
+    def rm(self, storage_path: str):
 
-        operation = f"READ BYTES [{storage_path}]"
-        return self._error_handling(operation, lambda: self._read_bytes(storage_path))
+        operation = f"RM [{storage_path}]"
+        self._error_handling(operation, lambda: self._rm(storage_path))
 
-    def _read_bytes(self, storage_path: str) -> bytes:
+    def _rm(self, storage_path: str):
 
-        with self.read_byte_stream(storage_path) as stream:
-            return stream.read()
+        item_path = self._resolve_path(storage_path, "RM", False)
+
+        if not item_path.is_file():
+            raise ex.EStorageRequest(f"Storage path is not a file: RM [{storage_path}]")
+
+        item_path.unlink()
+
+    def rmdir(self, storage_path: str):
+
+        operation = f"RMDIR [{storage_path}]"
+        self._error_handling(operation, lambda: self._rmdir(storage_path))
+
+    def _rmdir(self, storage_path: str):
+
+        item_path = self._resolve_path(storage_path, "RMDIR", False)
+
+        if not item_path.is_dir():
+            raise ex.EStorageRequest(f"Storage path is not a directory: RMDIR [{storage_path}]")
+
+        self._rmdir_inner(item_path)
+
+    def _rmdir_inner(self, item_path):
+
+        for item in item_path.iterdir():
+            if item.is_dir():
+                self._rmdir_inner(item)
+            else:
+                item.unlink()
+
+        item_path.rmdir()
 
     def read_byte_stream(self, storage_path: str) -> tp.BinaryIO:
 
@@ -154,90 +273,81 @@ class LocalFileStorage(IFileStorage):
 
     def _read_byte_stream(self, storage_path: str) -> tp.BinaryIO:
 
-        operation = f"CLOSE BYTE STREAM (READ) [{storage_path}]"
-        item_path = self._root_path / storage_path
+        item_path = self._resolve_path(storage_path, "OPEN BYTE STREAM (READ)", False)
         stream = open(item_path, mode='rb')
 
-        return _helpers.log_close(stream, self._log, operation)
+        return _StreamResource(stream, lambda: self._close_byte_stream(storage_path, stream))
 
-    def write_bytes(self, storage_path: str, data: bytes, overwrite: bool = False):
-
-        operation = f"WRITE BYTES [{storage_path}]"
-        self._error_handling(operation, lambda: self._write_bytes(storage_path, data, overwrite))
-
-    def _write_bytes(self, storage_path: str, data: bytes, overwrite: bool = False):
-
-        with self.write_byte_stream(storage_path, overwrite) as stream:
-            stream.write(data)
-
-    def write_byte_stream(self, storage_path: str, overwrite: bool = False) -> tp.BinaryIO:
+    def write_byte_stream(self, storage_path: str) -> tp.BinaryIO:
 
         operation = f"OPEN BYTE STREAM (WRITE) [{storage_path}]"
-        return self._error_handling(operation, lambda: self._write_byte_stream(storage_path, overwrite))
+        return self._error_handling(operation, lambda: self._write_byte_stream(storage_path))
 
-    def _write_byte_stream(self, storage_path: str, overwrite: bool = False) -> tp.BinaryIO:
+    def _write_byte_stream(self, storage_path: str) -> tp.BinaryIO:
 
-        operation = f"CLOSE BYTE STREAM (WRITE) [{storage_path}]"
-        item_path = self._root_path / storage_path
+        item_path = self._resolve_path(storage_path, "OPEN BYTE STREAM (WRITE)", False)
 
-        if overwrite:
-            stream = open(item_path, mode='wb')
-        else:
-            stream = open(item_path, mode='xb')
+        delete_on_error = not item_path.exists()
 
-        return _helpers.log_close(stream, self._log, operation)
+        stream = open(item_path, mode='wb')
 
-    def read_text(self, storage_path: str, encoding: str = 'utf-8') -> str:
+        return _StreamResource(stream, lambda: self._close_byte_stream(storage_path, stream, delete_on_error))
 
-        operation = f"READ TEXT [{storage_path}]"
-        return self._error_handling(operation, lambda: self._read_text(storage_path, encoding))
+    def _close_byte_stream(self, storage_path: str, stream: tp.BinaryIO, delete_on_error: bool = False):
 
-    def _read_text(self, storage_path: str, encoding: str = 'utf-8') -> str:
+        if stream.closed:
+            return
 
-        with self.read_text_stream(storage_path, encoding) as stream:
-            return stream.read()
+        try:
+            read_write = "WRITE" if stream.writable() else "READ"
+            self._log.info(f"CLOSE BYTE STREAM ({read_write}) [{storage_path}]")
 
-    def read_text_stream(self, storage_path: str, encoding: str = 'utf-8') -> tp.TextIO:
+        finally:
+            stream.close()
 
-        operation = f"OPEN TEXT STREAM (READ) [{storage_path}]"
-        return self._error_handling(operation, lambda: self._read_text_stream(storage_path, encoding))
+        exc_info = sys.exc_info()
+        error = exc_info[1] if exc_info is not None else None
 
-    def _read_text_stream(self, storage_path: str, encoding: str = 'utf-8') -> tp.TextIO:
-
-        operation = f"CLOSE TEXT STREAM (READ) [{storage_path}]"
-        item_path = self._root_path / storage_path
-        stream = open(item_path, mode='rt', encoding=encoding)
-
-        return _helpers.log_close(stream, self._log, operation)
-
-    def write_text(self, storage_path: str, data: str, encoding: str = 'utf-8', overwrite: bool = False):
-
-        operation = f"WRITE TEXT [{storage_path}]"
-        self._error_handling(operation, lambda: self._write_text(storage_path, data, encoding, overwrite))
-
-    def _write_text(self, storage_path: str, data: str, encoding: str = 'utf-8', overwrite: bool = False):
-
-        with self.write_text_stream(storage_path, encoding, overwrite) as stream:
-            stream.write(data)
-
-    def write_text_stream(self, storage_path: str, encoding: str = 'utf-8', overwrite: bool = False) -> tp.TextIO:
-
-        operation = f"OPEN TEXT STREAM (WRITE) [{storage_path}]"
-        return self._error_handling(operation, lambda: self._write_text_stream(storage_path, encoding, overwrite))
-
-    def _write_text_stream(self, storage_path: str, encoding: str = 'utf-8', overwrite: bool = False) -> tp.TextIO:
-
-        operation = f"CLOSE TEXT STREAM (WRITE) [{storage_path}]"
-        item_path = self._root_path / storage_path
-
-        if overwrite:
-            stream = open(item_path, mode='wt', encoding=encoding)
-        else:
-            stream = open(item_path, mode='xt', encoding=encoding)
-
-        return _helpers.log_close(stream, self._log, operation)
+        if error is not None and delete_on_error:
+            try:
+                item_path = self._resolve_path(storage_path, "CLOSE BYTE STREAM (WRITE)", False)
+                if item_path.exists():
+                    item_path.unlink()
+            except OSError:
+                pass
 
     __T = tp.TypeVar("__T")
+
+    def _resolve_path(self, storage_path: str, operation_name: str, allow_root_dir: bool) -> pathlib.Path:
+
+        try:
+
+            if storage_path is None or len(storage_path.strip()) == 0:
+                raise ex.EStorageValidation(f"Storage path is null or blank: {operation_name} [{storage_path}]")
+
+            if self._ILLEGAL_PATH_CHARS.match(storage_path):
+                raise ex.EStorageValidation(f"Storage path is invalid: {operation_name} [{storage_path}]")
+
+            relative_path = pathlib.Path(storage_path)
+
+            if relative_path.is_absolute():
+                raise ex.EStorageValidation(f"Storage path is not relative: {operation_name} [{storage_path}]")
+
+            root_path = self._root_path
+            absolute_path = self._root_path.joinpath(relative_path).resolve(False)
+
+            # is_relative_to only supported in Python 3.9+, we need to support 3.7
+            if absolute_path != root_path and root_path not in absolute_path.parents:
+                raise ex.EStorageValidation(f"Path is outside storage root: {operation_name} [{storage_path}]")
+
+            if absolute_path == root_path and not allow_root_dir:
+                raise ex.EStorageValidation(f"Illegal operation for storage root: {operation_name} [{storage_path}]")
+
+            return absolute_path
+
+        except ValueError as e:
+
+            raise ex.EStorageValidation(f"Storage path is invalid: {operation_name} [{storage_path}]") from e
 
     def _error_handling(self, operation: str, func: tp.Callable[[], __T]) -> __T:
 
@@ -255,6 +365,16 @@ class LocalFileStorage(IFileStorage):
             self._log.exception(f"{operation}: {msg}")
             raise ex.EStorageRequest(msg) from e
 
+        except IsADirectoryError as e:
+            msg = "Path is a directory, not a file"
+            self._log.exception(f"{operation}: {msg}")
+            raise ex.EStorageRequest(msg) from e
+
+        except NotADirectoryError as e:
+            msg = "Path is not a directory"
+            self._log.exception(f"{operation}: {msg}")
+            raise ex.EStorageRequest(msg) from e
+
         except PermissionError as e:
             msg = "Access denied"
             self._log.exception(f"{operation}: {msg}")
@@ -265,5 +385,6 @@ class LocalFileStorage(IFileStorage):
             self._log.exception(f"{operation}: {msg}")
             raise ex.EStorageAccess(msg) from e
 
-
-_storage.StorageManager.register_storage_type("LOCAL", LocalFileStorage, _storage.CommonDataStorage)
+    _ILLEGAL_PATH_CHARS_WINDOWS = re.compile(r".*[\x00<>:\"\'|?*].*")
+    _ILLEGAL_PATH_CHARS_POSIX = re.compile(r".*[\x00<>:\"\'|?*\\].*")
+    _ILLEGAL_PATH_CHARS = _ILLEGAL_PATH_CHARS_WINDOWS if _helpers.is_windows() else _ILLEGAL_PATH_CHARS_POSIX

@@ -12,11 +12,16 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import datetime as dt
+import enum
 import pathlib
 import re
+import sys
 import typing as tp
 
 import pyarrow as pa
+import pyarrow.fs as pa_fs
+import pyarrow.lib as pa_lib
 
 import tracdap.rt.metadata as _meta
 import tracdap.rt.config as _cfg
@@ -26,7 +31,7 @@ import tracdap.rt._impl.data as _data
 import tracdap.rt._impl.util as _util
 
 # Import storage interfaces
-from tracdap.rt.ext.storage import IDataFormat, IDataStorage, IFileStorage, FileType
+from tracdap.rt.ext.storage import *
 
 
 class FormatManager:
@@ -69,10 +74,8 @@ class StorageManager:
         self.__data_storage: tp.Dict[str, IDataStorage] = dict()
         self.__settings = sys_config.storage
 
-        storage_options = dict()
-
         for storage_key, storage_config in sys_config.storage.buckets.items():
-            self.create_storage(storage_key, storage_config, storage_options)
+            self.create_storage(storage_key, storage_config)
 
     def default_storage_key(self):
         return self.__settings.defaultBucket
@@ -80,7 +83,44 @@ class StorageManager:
     def default_storage_format(self):
         return self.__settings.defaultFormat
 
-    def create_storage(self, storage_key: str, storage_config: _cfg.PluginConfig, storage_options: dict = None):
+    def create_storage(self, storage_key: str, storage_config: _cfg.PluginConfig):
+
+        if plugins.PluginManager.is_plugin_available(IStorageProvider, storage_config.protocol):
+            self._create_storage_from_provider(storage_key, storage_config)
+        else:
+            self._create_storage_from_impl(storage_key, storage_config)
+
+    def _create_storage_from_provider(self, storage_key: str, storage_config: _cfg.PluginConfig):
+
+        provider = plugins.PluginManager.load_plugin(IStorageProvider, storage_config)
+
+        if provider.has_file_storage():
+            file_storage = provider.get_file_storage()
+        elif provider.has_arrow_native():
+            fs = provider.get_arrow_native()
+            file_storage = CommonFileStorage(storage_key, storage_config, fs)
+        else:
+            file_storage = None
+
+        if provider.has_data_storage():
+            data_storage = provider.get_data_storage()
+        elif file_storage is not None:
+            data_storage = CommonDataStorage(storage_config, file_storage)
+        else:
+            data_storage = None
+
+        if file_storage is None and data_storage is None:
+            err = f"Storage type [{storage_config.protocol}] is not available"
+            self.__log.error(err)
+            raise _ex.EStorageConfig(err)
+
+        if file_storage is not None:
+            self.__file_storage[storage_key] = file_storage
+
+        if data_storage is not None:
+            self.__data_storage[storage_key] = data_storage
+
+    def _create_storage_from_impl(self, storage_key: str, storage_config: _cfg.PluginConfig):
 
         if storage_config is None:
             err = f"Missing config for storage key [{storage_key}]"
@@ -96,6 +136,9 @@ class StorageManager:
             err = f"Storage type [{storage_type}] is not available"
             self.__log.error(err)
             raise _ex.EStorageConfig(err)
+
+        # Unused
+        storage_options = dict()
 
         file_storage = file_impl(storage_config, storage_options)
         data_storage = data_impl(storage_config, file_storage)
@@ -131,7 +174,402 @@ class StorageManager:
 
 
 # ----------------------------------------------------------------------------------------------------------------------
-# COMMON STORAGE IMPLEMENTATION
+# COMMON FILE STORAGE IMPLEMENTATION
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+class _NativeFileResource(pa_lib.NativeFile):
+
+    def __init__(self, nf: pa_lib.NativeFile, close_func: tp.Callable):
+        super().__init__()
+        self.__nf = nf
+        self.__close_func = close_func
+
+    def __getattribute__(self, item):
+        if item == "close" or item == "_NativeFileResource__nf" or item == "_NativeFileResource__close_func":
+            return object.__getattribute__(self, item)
+        else:
+            return object.__getattribute__(self.__nf, item)
+
+    def close(self):
+        try:
+            self.__close_func()
+        finally:
+            self.__nf.close()
+
+
+class CommonFileStorage(IFileStorage):
+
+    def __init__(self, storage_key: str, storage_config: _cfg.PluginConfig, fs_impl: pa_fs.SubTreeFileSystem):
+
+        self._log = _util.logger_for_object(self)
+        self._key = storage_key
+        self._config = storage_config
+        self._fs = fs_impl
+
+        fs_type = fs_impl.base_fs.type_name
+        fs_root = fs_impl.base_path
+
+        self._log.info(f"INIT [{self._key}]: Common file storage, fs = [{fs_type}], root = [{fs_root}]")
+
+    def exists(self, storage_path: str) -> bool:
+
+        return self._wrap_operation(self._exists, "EXISTS", storage_path)
+
+    def _exists(self, operation_name: str, storage_path: str) -> bool:
+
+        resolved_path = self._resolve_path(operation_name, storage_path, True)
+
+        file_info: pa_fs.FileInfo = self._fs.get_file_info(resolved_path)
+        return file_info.type != pa_fs.FileType.NotFound
+
+    def size(self, storage_path: str) -> int:
+
+        return self._wrap_operation(self._size, "SIZE", storage_path)
+
+    def _size(self, operation_name: str, storage_path: str) -> int:
+
+        resolved_path = self._resolve_path(operation_name, storage_path, True)
+        file_info: pa_fs.FileInfo = self._fs.get_file_info(resolved_path)
+
+        if file_info.type == pa_fs.FileType.NotFound:
+            raise self._explicit_error(self.ExplicitError.OBJECT_NOT_FOUND, operation_name, storage_path)
+
+        if not file_info.is_file:
+            raise self._explicit_error(self.ExplicitError.NOT_A_FILE, operation_name, storage_path)
+
+        return file_info.size
+
+    def stat(self, storage_path: str) -> FileStat:
+
+        return self._wrap_operation(self._stat, "STAT", storage_path)
+
+    def _stat(self, operation_name: str, storage_path: str) -> FileStat:
+
+        resolved_path = self._resolve_path(operation_name, storage_path, True)
+
+        file_info: pa_fs.FileInfo = self._fs.get_file_info(resolved_path)
+
+        if file_info.type == pa_fs.FileType.NotFound:
+            raise self._explicit_error(self.ExplicitError.OBJECT_NOT_FOUND, operation_name, storage_path)
+
+        if file_info.type != pa_fs.FileType.File and file_info.type != pa_fs.FileType.Directory:
+            raise self._explicit_error(self.ExplicitError.NOT_A_FILE_OR_DIRECTORY, operation_name, storage_path)
+
+        return self._info_to_stat(file_info)
+
+    @staticmethod
+    def _info_to_stat(file_info: pa_fs.FileInfo):
+
+        file_type = FileType.FILE if file_info.is_file else FileType.DIRECTORY
+        file_size = file_info.size if file_info.is_file else 0
+        storage_path = file_info.path[2:] if file_info.path.startswith("./") else file_info.path
+
+        return FileStat(
+            file_info.base_name,
+            file_type,
+            storage_path,
+            file_size,
+            mtime=file_info.mtime.astimezone(dt.timezone.utc),
+            atime=None)
+
+    def ls(self, storage_path: str, recursive: bool = False) -> tp.List[FileStat]:
+
+        return self._wrap_operation(self._ls, "LS", storage_path, recursive)
+
+    def _ls(self, operation_name: str, storage_path: str, recursive: bool) -> tp.List[FileStat]:
+
+        resolved_path = self._resolve_path(operation_name, storage_path, True)
+
+        selector = pa_fs.FileSelector(resolved_path, recursive=recursive)  # noqa
+        file_infos: tp.List[pa_fs.FileInfo] = self._fs.get_file_info(selector)
+
+        return list(map(self._info_to_stat, file_infos))
+
+    def mkdir(self, storage_path: str, recursive: bool = False):
+
+        return self._wrap_operation(self._mkdir, "MKDIR", storage_path, recursive)
+
+    def _mkdir(self, operation_name: str, storage_path: str, recursive: bool):
+
+        resolved_path = self._resolve_path(operation_name, storage_path, False)
+
+        self._fs.create_dir(resolved_path, recursive=recursive)
+
+    def rm(self, storage_path: str):
+
+        return self._wrap_operation(self._rm, "RM", storage_path)
+
+    def _rm(self, operation_name: str, storage_path: str):
+
+        resolved_path = self._resolve_path(operation_name, storage_path, False)
+
+        file_info: pa_fs.FileInfo = self._fs.get_file_info(resolved_path)
+        if file_info.type == pa_fs.FileType.Directory:
+            raise self._explicit_error(self.ExplicitError.NOT_A_FILE, operation_name, storage_path)
+
+        self._fs.delete_file(resolved_path)
+
+    def rmdir(self, storage_path: str):
+
+        return self._wrap_operation(self._rmdir, "RMDIR", storage_path)
+
+    def _rmdir(self, operation_name: str, storage_path: str):
+
+        resolved_path = self._resolve_path(operation_name, storage_path, False)
+
+        file_info: pa_fs.FileInfo = self._fs.get_file_info(resolved_path)
+        if file_info.type == pa_fs.FileType.File:
+            raise self._explicit_error(self.ExplicitError.NOT_A_DIRECTORY, operation_name, storage_path)
+
+        self._fs.delete_dir(resolved_path)
+
+    def read_byte_stream(self, storage_path: str) -> tp.BinaryIO:
+
+        return self._wrap_operation(self._read_byte_stream, "OPEN BYTE STREAM (READ)", storage_path)
+
+    def _read_byte_stream(self, operation_name: str, storage_path: str) -> tp.BinaryIO:
+
+        resolved_path = self._resolve_path(operation_name, storage_path, False)
+
+        # Open the stream
+        stream = self._fs.open_input_file(resolved_path)
+
+        # Log file size now that the stream is successfully open
+        stream.seek(0, 2)
+        file_size = _util.format_file_size(stream.tell())
+        stream.seek(0, 0)
+
+        self._log.info(f"File size [{self._key}]: {file_size} [{storage_path}]")
+
+        # Return impl of PyArrow NativeFile instead of BinaryIO - this is the same thing PyArrow does
+        return _NativeFileResource(stream, lambda: self._close_byte_stream(storage_path, stream))  # noqa
+
+    def write_byte_stream(self, storage_path: str) -> tp.BinaryIO:
+
+        return self._wrap_operation(self._write_byte_stream, "OPEN BYTE STREAM (WRITE)", storage_path)
+
+    def _write_byte_stream(self, operation_name: str, storage_path: str) -> tp.BinaryIO:
+
+        resolved_path = self._resolve_path(operation_name, storage_path, False)
+
+        # If the file does not already exist and the write operation fails, try to clean it up
+        file_info: pa_fs.FileInfo = self._fs.get_file_info(resolved_path)
+        delete_on_error = file_info.type == pa_fs.FileType.NotFound
+
+        # Open the stream
+        stream = self._fs.open_output_stream(resolved_path)
+
+        # Return impl of  PyArrow NativeFile instead of BinaryIO - this is the same thing PyArrow does
+        return _NativeFileResource(stream, lambda: self._close_byte_stream(storage_path, stream, delete_on_error))  # noqa
+
+    def _close_byte_stream(self, storage_path: str, stream: tp.BinaryIO, delete_on_error: bool = False):
+
+        # Do not try to close the stream twice
+        if stream.closed:
+            return
+
+        # If there has been an error, log it
+        exc_info = sys.exc_info()
+        error = exc_info[1] if exc_info is not None else None
+
+        if error is not None:
+            self._log.exception(str(error))
+
+        # Log closing of the stream
+        try:
+            if stream.writable() and not error:
+                file_size = _util.format_file_size(stream.tell())
+                self._log.info(f"File size [{self._key}]: {file_size} [{storage_path}]")
+                self._log.info(f"CLOSE BYTE STREAM (WRITE) [{self._key}]: [{storage_path}]")
+
+            elif stream.writable():
+                self._log.info(f"CLOSE BYTE STREAM (WRITE) [{self._key}]: [{storage_path}]")
+
+            else:
+                self._log.info(f"CLOSE BYTE STREAM (READ) [{self._key}]: [{storage_path}]")
+
+        # Always make sure the stream is closed
+        finally:
+            stream.close()
+
+        # If there is an error and cleanup is requested, try to remove the partially written file
+        # This is best-efforts, don't blow up if the cleanup fails
+        if error is not None and delete_on_error:
+            try:
+                file_info = self._fs.get_file_info(storage_path)
+                if file_info.type != pa_fs.FileType.NotFound:
+                    self._fs.delete_file(storage_path)
+            except OSError:
+                pass
+
+    def _wrap_operation(self, func: tp.Callable, operation_name: str, storage_path: str, *args, **kwargs) -> tp.Any:
+
+        operation = f"{operation_name} [{self._key}]: [{storage_path}]"
+
+        try:
+            self._log.info(operation)
+            return func(operation_name, storage_path, *args, **kwargs)
+
+        # ETrac means the error is already handled, log the message as-is
+
+        except _ex.ETrac as e:
+            self._log.exception(f"{operation} {str(e)}")
+            raise
+
+        # Arrow maps filesystem errors into native Python OS errors
+
+        except FileNotFoundError as e:
+            error = self._explicit_error(self.ExplicitError.OBJECT_NOT_FOUND, operation_name, storage_path)
+            self._log.exception(f"{operation}: {str(error)}")
+            raise error from e
+
+        except FileExistsError as e:
+            error = self._explicit_error(self.ExplicitError.OBJECT_ALREADY_EXISTS, operation_name, storage_path)
+            self._log.exception(f"{operation}: {str(error)}")
+            raise error from e
+
+        except IsADirectoryError as e:
+            error = self._explicit_error(self.ExplicitError.NOT_A_FILE, operation_name, storage_path)
+            self._log.exception(f"{operation}: {str(error)}")
+            raise error from e
+
+        except NotADirectoryError as e:
+            error = self._explicit_error(self.ExplicitError.NOT_A_DIRECTORY, operation_name, storage_path)
+            self._log.exception(f"{operation}: {str(error)}")
+            raise error from e
+
+        except PermissionError as e:
+            error = self._explicit_error(self.ExplicitError.ACCESS_DENIED, operation_name, storage_path)
+            self._log.exception(f"{operation}: {str(error)}")
+            raise error from e
+
+        # OSError is the top-level error for IO exceptions
+        # This is raised on some platforms if there is not a recognized errno from the low-level operation
+
+        except OSError as e:
+            error = self._explicit_error(self.ExplicitError.IO_ERROR, operation_name, storage_path)
+            self._log.exception(f"{operation}: {str(error)}")
+            raise error from e
+
+        # Other types of exception are not expected - report these as internal errors
+
+        except Exception as e:
+            error = self._explicit_error(self.ExplicitError.UNKNOWN_ERROR, operation_name, storage_path)
+            self._log.exception(f"{operation}: {str(error)}")
+            raise error from e
+        
+    def _resolve_path(self, operation_name: str, storage_path: str, allow_root_dir: bool) -> str:
+
+        try:
+
+            if storage_path is None or len(storage_path.strip()) == 0:
+                raise self._explicit_error(self.ExplicitError.STORAGE_PATH_NULL_OR_BLANK, operation_name, storage_path)
+
+            if self._ILLEGAL_PATH_CHARS.match(storage_path):
+                raise self._explicit_error(self.ExplicitError.STORAGE_PATH_INVALID, operation_name, storage_path)
+    
+            relative_path = pathlib.Path(storage_path)
+    
+            if relative_path.is_absolute():
+                raise self._explicit_error(self.ExplicitError.STORAGE_PATH_NOT_RELATIVE, operation_name, storage_path)
+
+            root_path = pathlib.Path("C:\\root") if _util.is_windows() else pathlib.Path("/root")
+            absolute_path = root_path.joinpath(relative_path).resolve(False)
+
+            # is_relative_to only supported in Python 3.9+, we need to support 3.7
+            if absolute_path != root_path and root_path not in absolute_path.parents:
+                raise self._explicit_error(self.ExplicitError.STORAGE_PATH_OUTSIDE_ROOT, operation_name, storage_path)
+
+            if absolute_path == root_path and not allow_root_dir:
+                raise self._explicit_error(self.ExplicitError.STORAGE_PATH_IS_ROOT, operation_name, storage_path)
+    
+            return absolute_path.relative_to(root_path).as_posix()
+
+        except ValueError as e:
+
+            raise self._explicit_error(self.ExplicitError.STORAGE_PATH_INVALID, operation_name, storage_path) from e
+
+    def _explicit_error(self, error, operation_name, storage_path):
+
+        message_template = self._ERROR_MESSAGE_MAP.get(error)
+        message = message_template.format(operation_name, self._key, storage_path)
+
+        err_type = self._ERROR_TYPE_MAP.get(error)
+        err = err_type(message)
+
+        return err
+
+    _ILLEGAL_PATH_CHARS_WINDOWS = re.compile(r".*[\x00<>:\"\'|?*].*")
+    _ILLEGAL_PATH_CHARS_POSIX = re.compile(r".*[\x00<>:\"\'|?*\\].*")
+    _ILLEGAL_PATH_CHARS = _ILLEGAL_PATH_CHARS_WINDOWS if _util.is_windows() else _ILLEGAL_PATH_CHARS_POSIX
+
+    class ExplicitError(enum.Enum):
+    
+        # Validation failures
+        STORAGE_PATH_NULL_OR_BLANK = 1
+        STORAGE_PATH_NOT_RELATIVE = 2
+        STORAGE_PATH_OUTSIDE_ROOT = 3
+        STORAGE_PATH_IS_ROOT = 4
+        STORAGE_PATH_INVALID = 5
+
+        # Exceptions
+        OBJECT_NOT_FOUND = 10
+        OBJECT_ALREADY_EXISTS = 11
+        NOT_A_FILE = 12
+        NOT_A_DIRECTORY = 13
+        NOT_A_FILE_OR_DIRECTORY = 14
+        IO_ERROR = 15
+
+        # Permissions
+        ACCESS_DENIED = 20
+
+        # Unhandled / unexpected error
+        UNKNOWN_ERROR = 30
+
+    _ERROR_MESSAGE_MAP = {
+
+        ExplicitError.STORAGE_PATH_NULL_OR_BLANK: "Requested storage path is null or blank: {} {} [{}]",
+        ExplicitError.STORAGE_PATH_NOT_RELATIVE: "Requested storage path is not a relative path: {} {} [{}]",
+        ExplicitError.STORAGE_PATH_OUTSIDE_ROOT: "Requested storage path is outside the storage root directory: {} {} [{}]",  # noqa
+        ExplicitError.STORAGE_PATH_IS_ROOT: "Requested operation not allowed on the storage root directory: {} {} [{}]",
+        ExplicitError.STORAGE_PATH_INVALID: "Requested storage path is invalid: {} {} [{}]",
+
+        ExplicitError.OBJECT_NOT_FOUND: "Object not found in storage layer: {} {} [{}]",
+        ExplicitError.OBJECT_ALREADY_EXISTS: "Object already exists in storage layer: {} {} [{}]",
+        ExplicitError.NOT_A_FILE: "Object is not a file: {} {} [{}]",
+        ExplicitError.NOT_A_DIRECTORY: "Object is not a directory: {} {} [{}]",
+        ExplicitError.NOT_A_FILE_OR_DIRECTORY: "Object is not a file or directory: {} {} [{}]",
+        ExplicitError.IO_ERROR: "An IO error occurred in the storage layer: {} {} [{}]",
+
+        ExplicitError.ACCESS_DENIED: "Access denied in storage layer: {} {} [{}]",
+
+        ExplicitError.UNKNOWN_ERROR: "An unexpected error occurred in the storage layer: {} {} [{}]",
+    }
+
+    _ERROR_TYPE_MAP = {
+
+        ExplicitError.STORAGE_PATH_NULL_OR_BLANK: _ex.EStorageValidation,
+        ExplicitError.STORAGE_PATH_NOT_RELATIVE: _ex.EStorageValidation,
+        ExplicitError.STORAGE_PATH_OUTSIDE_ROOT: _ex.EStorageValidation,
+        ExplicitError.STORAGE_PATH_IS_ROOT: _ex.EStorageValidation,
+        ExplicitError.STORAGE_PATH_INVALID: _ex.EStorageValidation,
+
+        ExplicitError.OBJECT_NOT_FOUND: _ex.EStorageRequest,
+        ExplicitError.OBJECT_ALREADY_EXISTS: _ex.EStorageRequest,
+        ExplicitError.NOT_A_FILE: _ex.EStorageRequest,
+        ExplicitError.NOT_A_DIRECTORY: _ex.EStorageRequest,
+        ExplicitError.NOT_A_FILE_OR_DIRECTORY: _ex.EStorageRequest,
+        ExplicitError.IO_ERROR: _ex.EStorageRequest,
+
+        ExplicitError.ACCESS_DENIED: _ex.EStorageAccess,
+
+        ExplicitError.UNKNOWN_ERROR: _ex.ETracInternal
+    }
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+# COMMON DATA STORAGE IMPLEMENTATION
 # ----------------------------------------------------------------------------------------------------------------------
 
 
@@ -178,7 +616,7 @@ class CommonDataStorage(IDataStorage):
                 dir_content = self.__file_storage.ls(storage_path)
 
                 if len(dir_content) == 1:
-                    storage_path = storage_path.rstrip("/\\") + "/" + dir_content[0]
+                    storage_path = dir_content[0].storage_path
                 else:
                     raise NotImplementedError("Directory storage format not available yet")
 
@@ -219,13 +657,16 @@ class CommonDataStorage(IDataStorage):
             if not storage_path.endswith(extension):
                 parent_dir_ = storage_path
                 storage_path_ = storage_path.rstrip("/\\") + f"/chunk-0.{extension}"
-                self.__file_storage.mkdir(parent_dir_, True, exists_ok=overwrite)
+                self.__file_storage.mkdir(parent_dir_, True)
             else:
                 parent_dir_ = str(pathlib.PurePath(storage_path).parent)
                 storage_path_ = storage_path
-                self.__file_storage.mkdir(parent_dir_, True, True)
+                self.__file_storage.mkdir(parent_dir_, True)
 
-            with self.__file_storage.write_byte_stream(storage_path_, overwrite=overwrite) as byte_stream:
+            if not overwrite and self.__file_storage.exists(storage_path_):
+                raise _ex.EStorageRequest(f"File already exists: [{storage_path_}]")
+
+            with self.__file_storage.write_byte_stream(storage_path_) as byte_stream:
                 codec.write_table(byte_stream, table)
 
         except (_ex.EStorage, _ex.EData) as e:

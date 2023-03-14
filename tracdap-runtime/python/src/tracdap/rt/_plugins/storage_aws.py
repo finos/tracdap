@@ -23,31 +23,26 @@ import tracdap.rt.exceptions as ex
 import tracdap.rt.ext.plugins as plugins
 from tracdap.rt.ext.storage import *
 
+from pyarrow import fs as afs
+
 # Set of common helpers across the core plugins (do not reference rt._impl)
 from . import _helpers
 
-# TODO: Remove dependencies on internal implementation details
-import tracdap.rt._impl.storage as _storage
 
-# AWS SDK
-import boto3
-import botocore.response  # noqa
-import botocore.exceptions as aws_ex  # noqa
+try:
+    # AWS SDK
+    import boto3  # noqa
+    import botocore.response  # noqa
+    import botocore.exceptions as aws_ex  # noqa
+    boto_available = True
+except ImportError:
+    boto_available = False
 
 
-class S3ObjectStorage(IFileStorage):
+class AwsStorageProvider(IStorageProvider):
 
-    # This is a quick implementation of IFileStorage on S3 using the boto3 AWS SDK
-
-    # TODO: Migrate IFileStorage interface to use object storage as the primary concept
-    # It is much easier to express objects on a file system than vice versa
-    # This change must also be made in the Java code
-
-    # TODO: Switch to using Apache Arrow file system interface
-    # Arrow already has implementations for AWS, GCP, HDFS and local files
-    # The arrow interface also allows extension with fsspec, to support Azure blob storage or custom implementations
-
-    # https://arrow.apache.org/docs/python/filesystems.html
+    ARROW_NATIVE_FS_PROPERTY = "arrowNativeFs"
+    ARROW_NATIVE_FS_DEFAULT = False
 
     BUCKET_PROPERTY = "bucket"
     PREFIX_PROPERTY = "prefix"
@@ -61,38 +56,83 @@ class S3ObjectStorage(IFileStorage):
     ACCESS_KEY_ID_PROPERTY = "accessKeyId"
     SECRET_ACCESS_KEY_PROPERTY = "secretAccessKey"
 
-    def __init__(self, config: cfg.PluginConfig, options: dict = None):
+    ARROW_CLIENT_ARGS = {
+        REGION_PROPERTY: "region",
+        ENDPOINT_PROPERTY: "endpoint_override",
+        ACCESS_KEY_ID_PROPERTY: "access_key",
+        SECRET_ACCESS_KEY_PROPERTY: "secret_key"
+    }
+
+    BOTO_CLIENT_ARGS = {
+        REGION_PROPERTY: "region_name",
+        ENDPOINT_PROPERTY: "endpoint_url",
+        ACCESS_KEY_ID_PROPERTY: "aws_access_key_id",
+        SECRET_ACCESS_KEY_PROPERTY: "aws_secret_access_key"
+    }
+
+    def __init__(self, properties: tp.Dict[str, str]):
 
         self._log = _helpers.logger_for_object(self)
+        self._properties = properties
 
-        self._properties = config.properties
+        self._arrow_native = _helpers.get_plugin_property_boolean(
+            properties, self.ARROW_NATIVE_FS_PROPERTY, self.ARROW_NATIVE_FS_DEFAULT)
 
-        self._bucket = _helpers.get_plugin_property(self._properties, self.BUCKET_PROPERTY)
-        self._prefix = _helpers.get_plugin_property(self._properties, self.PREFIX_PROPERTY) or ""
-        self._region = _helpers.get_plugin_property(self._properties, self.REGION_PROPERTY)
-        self._endpoint = _helpers.get_plugin_property(self._properties, self.ENDPOINT_PROPERTY)
+    def has_arrow_native(self) -> bool:
+        return True if self._arrow_native else False
 
-        credentials_params = self.setup_credentials()
+    def has_file_storage(self) -> bool:
+        return True if not self._arrow_native and boto_available else False
 
-        client_args = {
-            "service_name": "s3",
-            **credentials_params}
+    def get_arrow_native(self) -> afs.SubTreeFileSystem:
 
-        if self._region is not None:
-            client_args["region_name"] = self._region
+        s3fs_args = self.setup_client_args(self.ARROW_CLIENT_ARGS)
+        s3fs = afs.S3FileSystem(**s3fs_args)
 
-        if self._endpoint is not None:
-            client_args["endpoint_url"] = self._endpoint
+        bucket = _helpers.get_plugin_property(self._properties, self.BUCKET_PROPERTY)
+        prefix = _helpers.get_plugin_property(self._properties, self.PREFIX_PROPERTY) or ""
+        root_path = f"{bucket}/{prefix}"
 
-        self._client = boto3.client(**client_args)
+        return afs.SubTreeFileSystem(root_path, s3fs)
 
-    def setup_credentials(self):
+    def get_file_storage(self) -> IFileStorage:
 
-        mechanism = _helpers.get_plugin_property(self._properties, self.CREDENTIALS_PROPERTY) or self.CREDENTIALS_DEFAULT
+        client_args = self.setup_client_args(self.BOTO_CLIENT_ARGS)
+        client_args["service_name"] = "s3"
 
-        if mechanism.lower() == self.CREDENTIALS_DEFAULT:
+        config = cfg.PluginConfig()
+        config.protocol = "S3"
+        config.properties = self._properties
+
+        return S3ObjectStorage(config, client_args)
+
+    def setup_client_args(self, key_mapping: tp.Dict[str, str]) -> tp.Dict[str, tp.Any]:
+
+        client_args = dict()
+
+        region = _helpers.get_plugin_property(self._properties, self.REGION_PROPERTY)
+        endpoint = _helpers.get_plugin_property(self._properties, self.ENDPOINT_PROPERTY)
+
+        if region is not None:
+            region_key = key_mapping[self.REGION_PROPERTY]
+            client_args[region_key] = region
+
+        if endpoint is not None:
+            endpoint_key = key_mapping[self.ENDPOINT_PROPERTY]
+            client_args[endpoint_key] = endpoint
+
+        credentials = self.setup_credentials(key_mapping)
+        client_args.update(credentials)
+
+        return client_args
+
+    def setup_credentials(self, key_mapping: tp.Dict[str, str]):
+
+        mechanism = _helpers.get_plugin_property(self._properties, self.CREDENTIALS_PROPERTY)
+
+        if mechanism is None or len(mechanism) == 0 or mechanism.lower() == self.CREDENTIALS_DEFAULT:
             self._log.info(f"Using [{self.CREDENTIALS_DEFAULT}] credentials mechanism")
-            return {}
+            return dict()
 
         if mechanism.lower() == self.CREDENTIALS_STATIC:
 
@@ -103,195 +143,214 @@ class S3ObjectStorage(IFileStorage):
                 f"Using [{self.CREDENTIALS_STATIC}] credentials mechanism, " +
                 f"access key id = [{access_key_id}]")
 
-            return {"aws_access_key_id": access_key_id, "aws_secret_access_key": secret_access_key}
+            access_key_id_arg = key_mapping[self.ACCESS_KEY_ID_PROPERTY]
+            secret_access_key_arg = key_mapping[self.SECRET_ACCESS_KEY_PROPERTY]
+
+            return {
+                access_key_id_arg: access_key_id,
+                secret_access_key_arg: secret_access_key}
 
         message = f"Unrecognised credentials mechanism: [{mechanism}]"
         self._log.error(message)
         raise ex.EStartup(message)
 
-    def exists(self, storage_path: str) -> bool:
 
-        try:
-            self._log.info(f"EXISTS [{storage_path}]")
+plugins.PluginManager.register_plugin(IStorageProvider, AwsStorageProvider, ["S3"])
 
-            object_key = self._resolve_path(storage_path)
-            self._client.head_object(Bucket=self._bucket, Key=object_key)
-            return True
 
-        except aws_ex.ClientError as error:
-            aws_code = error.response['Error']['Code']
-            if aws_code == str(http.HTTPStatus.NOT_FOUND.value):  # noqa
-                return False
-            raise ex.EStorageRequest(f"Storage error: {str(error)}") from error
+# ----------------------------------------------------------------------------------------------------------------------
+# CUSTOM IMPLEMENTATION FOR S3 STORAGE
+# ----------------------------------------------------------------------------------------------------------------------
 
-    def size(self, storage_path: str) -> int:
+# This is the old implementation that was used before Arrow native was made available
+# It is likely to be removed in a future release
 
-        try:
-            self._log.info(f"SIZE [{storage_path}]")
 
-            object_key = self._resolve_path(storage_path)
-            response = self._client.head_object(Bucket=self._bucket, Key=object_key)
-            return response['ContentLength']
+if boto_available:
 
-        except aws_ex.ClientError as error:
-            raise ex.EStorageRequest(f"Storage error: {str(error)}") from error
+    class S3ObjectStorage(IFileStorage):
 
-    def stat(self, storage_path: str) -> FileStat:
+        # This is a quick implementation of IFileStorage on S3 using the boto3 AWS SDK
 
-        self._log.info(f"STAT [{storage_path}]")
+        def __init__(self, config: cfg.PluginConfig, client_args: dict):
 
-        if self.exists(storage_path):
+            self._log = _helpers.logger_for_object(self)
 
-            # Only OBJECTS can support stat atm
-            # Handling for directories needs to be changed, as part of refactor onto object storage
-            size = self.size(storage_path)
-            return FileStat(FileType.FILE, size)
+            self._properties = config.properties
+            self._bucket = _helpers.get_plugin_property(self._properties, AwsStorageProvider.BUCKET_PROPERTY)
+            self._prefix = _helpers.get_plugin_property(self._properties, AwsStorageProvider.PREFIX_PROPERTY) or ""
 
-        else:
+            self._client = boto3.client(**client_args)
 
-            self.ls(storage_path)
-            return FileStat(FileType.DIRECTORY, 0)
+        def exists(self, storage_path: str) -> bool:
 
-    def ls(self, storage_path: str) -> tp.List[str]:
+            try:
+                self._log.info(f"EXISTS [{storage_path}]")
 
-        self._log.info(f"LS [{storage_path}]")
+                object_key = self._resolve_path(storage_path)
+                self._client.head_object(Bucket=self._bucket, Key=object_key)
+                return True
 
-        prefix = self._resolve_path(storage_path) + "/"
+            except aws_ex.ClientError as error:
+                aws_code = error.response['Error']['Code']
+                if aws_code == str(http.HTTPStatus.NOT_FOUND.value):  # noqa
+                    return False
+                raise ex.EStorageRequest(f"Storage error: {str(error)}") from error
 
-        response = self._client.list_objects_v2(
-            Bucket=self._bucket,
-            Prefix=prefix,
-            Delimiter="/")
+        def size(self, storage_path: str) -> int:
 
-        keys = []
+            try:
+                self._log.info(f"SIZE [{storage_path}]")
 
-        if "Contents" not in response and "CommonPrefixes" not in response:
-            raise ex.EStorageRequest(f"Storage prefix not found: [{storage_path}]")
+                object_key = self._resolve_path(storage_path)
+                response = self._client.head_object(Bucket=self._bucket, Key=object_key)
+                return response['ContentLength']
 
-        if "Contents" in response:
-            for entry in response["Contents"]:
-                raw_key = entry["Key"]
-                if raw_key == prefix:
-                    continue
-                key = raw_key.replace(prefix, "")
-                keys.append(key)
+            except aws_ex.ClientError as error:
+                raise ex.EStorageRequest(f"Storage error: {str(error)}") from error
 
-        if "CommonPrefixes" in response:
-            for raw_prefix in response["CommonPrefixes"]:
-                common_prefix = raw_prefix.replace(prefix, "")
-                keys.append(common_prefix)
+        def stat(self, storage_path: str) -> FileStat:
 
-        return keys
+            self._log.info(f"STAT [{storage_path}]")
 
-    def mkdir(self, storage_path: str, recursive: bool = False, exists_ok: bool = False):
+            name = storage_path.split("/")[-1]
 
-        self._log.info(f"MKDIR [{storage_path}]")
+            if self.exists(storage_path):
 
-        # No-op in object storage
-        pass
+                # Only OBJECTS can support stat atm
+                # Handling for directories needs to be changed, as part of refactor onto object storage
+                size = self.size(storage_path)
+                return FileStat(name, FileType.FILE, storage_path, size)
 
-    def rm(self, storage_path: str, recursive: bool = False):
+            else:
 
-        try:
-            self._log.info(f"RM [{storage_path}]")
+                self.ls(storage_path)
+                return FileStat(name, FileType.DIRECTORY, storage_path, 0)
 
-            if recursive:
-                raise RuntimeError("RM (recursive) not available for S3 storage")
+        def ls(self, storage_path: str, recursive: bool = False) -> tp.List[FileStat]:
 
-            object_key = self._resolve_path(storage_path)
-            self._client.delete_object(Bucket=self._bucket, Key=object_key)
+            self._log.info(f"LS [{storage_path}]")
 
-        except aws_ex.ClientError as error:
-            raise ex.EStorageRequest(f"Storage error: {str(error)}") from error
+            prefix = self._resolve_path(storage_path) + "/"
 
-    def read_bytes(self, storage_path: str) -> bytes:
-
-        self._log.info(f"READ BYTES [{storage_path}]")
-
-        body = self._read_impl(storage_path)
-        return body.read()
-
-    def read_byte_stream(self, storage_path: str) -> tp.BinaryIO:
-
-        self._log.info(f"READ BYTE STREAM [{storage_path}]")
-
-        data = self.read_bytes(storage_path)
-        return io.BytesIO(data)
-
-    def _read_impl(self, storage_path: str) -> botocore.response.StreamingBody:
-
-        try:
-
-            object_key = self._resolve_path(storage_path)
-            response = self._client.get_object(Bucket=self._bucket, Key=object_key)
-            return response['Body']
-
-        except aws_ex.ClientError as error:
-            raise ex.EStorageRequest(f"Storage error: {str(error)}") from error
-
-    def write_bytes(self, storage_path: str, data: bytes, overwrite: bool = False):
-
-        try:
-            self._log.info(f"WRITE BYTES [{storage_path}]")
-
-            object_key = self._resolve_path(storage_path)
-
-            self._client.put_object(
+            response = self._client.list_objects_v2(
                 Bucket=self._bucket,
-                Key=object_key,
-                Body=data)
+                Prefix=prefix,
+                Delimiter="/")
 
-        except aws_ex.ClientError as error:
-            raise ex.EStorageRequest(f"Storage error: {str(error)}") from error
+            keys = []
 
-    def write_byte_stream(self, storage_path: str, overwrite: bool = False) -> tp.BinaryIO:
+            if "Contents" not in response and "CommonPrefixes" not in response:
+                raise ex.EStorageRequest(f"Storage prefix not found: [{storage_path}]")
 
-        self._log.info(f"WRITE BYTE STREAM [{storage_path}]")
+            if "Contents" in response:
+                for entry in response["Contents"]:
+                    raw_key = entry["Key"]
+                    if raw_key == prefix:
+                        continue
+                    key = raw_key.replace(prefix, "")
+                    size = entry["Size"]
+                    mtime = entry["LastModified "]
+                    stat = FileStat(key, FileType.FILE, raw_key, size, mtime=mtime)
+                    keys.append(stat)
 
-        return self._AwsWriteBuf(self, storage_path, overwrite)
+            if "CommonPrefixes" in response:
+                for raw_prefix in response["CommonPrefixes"]:
+                    common_prefix = raw_prefix.replace(prefix, "")
+                    stat = FileStat(common_prefix, FileType.DIRECTORY, raw_prefix, 0)
+                    keys.append(stat)
 
-    class _AwsWriteBuf(io.BytesIO):
+            return keys
 
-        def __init__(self, storage, storage_path, overwrite: bool):
-            super().__init__()
-            self._storage = storage
-            self._storage_path = storage_path
-            self._overwrite = overwrite
-            self._written = False
+        def mkdir(self, storage_path: str, recursive: bool = False):
 
-        def close(self):
-            if not self._written:
-                self.seek(0)
-                data = self.read()
-                self._storage.write_bytes(self._storage_path, data, self._overwrite)
-                self._written = True
+            self._log.info(f"MKDIR [{storage_path}]")
 
-    # TODO: These methods can be removed from the interface, they are not needed
-    # (storage layer only needs to work in binary mode)
+            # No-op in object storage
+            pass
 
-    def read_text(self, storage_path: str, encoding: str = 'utf-8') -> str:
-        raise RuntimeError("READ (text mode) not available for S3 storage")
+        def rm(self, storage_path: str):
 
-    def read_text_stream(self, storage_path: str, encoding: str = 'utf-8') -> tp.TextIO:
-        raise RuntimeError("READ (text mode) not available for S3 storage")
+            try:
+                self._log.info(f"RM [{storage_path}]")
 
-    def write_text(self, storage_path: str, data: str, encoding: str = 'utf-8', overwrite: bool = False):
-        raise RuntimeError("WRITE (text mode) not available for S3 storage")
+                object_key = self._resolve_path(storage_path)
+                self._client.delete_object(Bucket=self._bucket, Key=object_key)
 
-    def write_text_stream(self, storage_path: str, encoding: str = 'utf-8', overwrite: bool = False) -> tp.TextIO:
-        raise RuntimeError("WRITE (text mode) not available for S3 storage")
+            except aws_ex.ClientError as error:
+                raise ex.EStorageRequest(f"Storage error: {str(error)}") from error
 
-    def _resolve_path(self, storage_path: str) -> str:
+        def rmdir(self, storage_path: str):
 
-        if self._prefix is None or self._prefix.strip() == "":
-            return storage_path
+            raise RuntimeError("RMDIR (recursive) not available for S3 storage")
 
-        separator = "" if self._prefix.endswith("/") else "/"
-        full_path = self._prefix + separator + storage_path
+        def read_bytes(self, storage_path: str) -> bytes:
 
-        return full_path[1:] if full_path.startswith("/") else full_path
+            self._log.info(f"READ BYTES [{storage_path}]")
 
+            body = self._read_impl(storage_path)
+            return body.read()
 
-# Register the S3 storage plugin
+        def read_byte_stream(self, storage_path: str) -> tp.BinaryIO:
 
-_storage.StorageManager.register_storage_type("S3", S3ObjectStorage, _storage.CommonDataStorage)
+            self._log.info(f"READ BYTE STREAM [{storage_path}]")
+
+            data = self.read_bytes(storage_path)
+            return io.BytesIO(data)
+
+        def _read_impl(self, storage_path: str) -> botocore.response.StreamingBody:
+
+            try:
+
+                object_key = self._resolve_path(storage_path)
+                response = self._client.get_object(Bucket=self._bucket, Key=object_key)
+                return response['Body']
+
+            except aws_ex.ClientError as error:
+                raise ex.EStorageRequest(f"Storage error: {str(error)}") from error
+
+        def write_bytes(self, storage_path: str, data: bytes):
+
+            try:
+                self._log.info(f"WRITE BYTES [{storage_path}]")
+
+                object_key = self._resolve_path(storage_path)
+
+                self._client.put_object(
+                    Bucket=self._bucket,
+                    Key=object_key,
+                    Body=data)
+
+            except aws_ex.ClientError as error:
+                raise ex.EStorageRequest(f"Storage error: {str(error)}") from error
+
+        def write_byte_stream(self, storage_path: str) -> tp.BinaryIO:
+
+            self._log.info(f"WRITE BYTE STREAM [{storage_path}]")
+
+            return self._AwsWriteBuf(self, storage_path)
+
+        class _AwsWriteBuf(io.BytesIO):
+
+            def __init__(self, storage, storage_path):
+                super().__init__()
+                self._storage = storage
+                self._storage_path = storage_path
+                self._written = False
+
+            def close(self):
+                if not self._written:
+                    self.seek(0)
+                    data = self.read()
+                    self._storage.write_bytes(self._storage_path, data)
+                    self._written = True
+
+        def _resolve_path(self, storage_path: str) -> str:
+
+            if self._prefix is None or self._prefix.strip() == "":
+                return storage_path
+
+            separator = "" if self._prefix.endswith("/") else "/"
+            full_path = self._prefix + separator + storage_path
+
+            return full_path[1:] if full_path.startswith("/") else full_path

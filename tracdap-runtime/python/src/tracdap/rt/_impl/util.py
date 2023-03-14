@@ -145,6 +145,28 @@ def logger_for_namespace(namespace: str) -> logging.Logger:
     return logging.getLogger(namespace)
 
 
+def format_file_size(size: int) -> str:
+
+    if size < 1024:
+        if size == 0:
+            return "0 bytes"
+        elif size == 1:
+            return "1 byte"
+        else:
+            return f"{size} bytes"
+
+    if size < 1024 ** 2:
+        kb = size / 1024
+        return f"{kb:.1f} KB"
+
+    if size < 1024 ** 3:
+        mb = size / (1024 ** 2)
+        return f"{mb:.1f} MB"
+
+    gb = size / (1024 ** 3)
+    return f"{gb:.1f} GB"
+
+
 def new_object_id(object_type: meta.ObjectType) -> meta.TagHeader:
 
     timestamp = dt.datetime.utcnow()
@@ -296,7 +318,7 @@ def error_details_from_exception(error: Exception):
 
 def filter_model_stack_trace(full_stack: tb.StackSummary, checkout_directory: pathlib.Path):
 
-    frame_names = list(map(lambda frame: frame.name, full_stack))
+    frame_names = list(map(lambda frame_: frame_.name, full_stack))
 
     if __FIRST_MODEL_FRAME_NAME in frame_names:
         first_model_frame = frame_names.index(__FIRST_MODEL_FRAME_NAME)
@@ -309,16 +331,16 @@ def filter_model_stack_trace(full_stack: tb.StackSummary, checkout_directory: pa
 
     for frame_index, frame in enumerate(full_stack[first_model_frame:]):
         module_path = pathlib.Path(frame.filename)
-        if ("tracdap" in module_path.parts):
+        if "tracdap" in module_path.parts:
             tracdap_index = len(module_path.parts) - 1 - list(reversed(module_path.parts)).index("tracdap")
             if tracdap_index < len(module_path.parts)-1:
                 if module_path.parts[tracdap_index+1] == "rt":
                     break
         if ("site-packages" in module_path.parts) or ("venv" in module_path.parts):
             break
-        if (checkout_directory is not None) and (not module_path.is_relative_to(checkout_directory)):
+        # is_relative_to only supported in Python 3.9+, we need to support 3.7
+        if (checkout_directory is not None) and (checkout_directory not in module_path.parents):
             break
         last_model_frame = first_model_frame + frame_index
 
     return full_stack[first_model_frame:last_model_frame+1]
-

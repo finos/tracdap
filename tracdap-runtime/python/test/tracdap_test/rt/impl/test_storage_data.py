@@ -1,6 +1,6 @@
 #  Copyright 2022 Accenture Global Solutions Limited
 #
-#  Licensed under the Apache License, Version 2.0 (the "License");
+#  Licensed under the Apache License, Version 2.0 (the "License")
 #  you may not use this file except in compliance with the License.
 #  You may obtain a copy of the License at
 #
@@ -253,6 +253,13 @@ class DataStorageTestSuite:
         rt_table = self.storage.read_table("edge_cases_datetime", self.storage_format, table.schema)
 
         self.assertEqual(table, rt_table)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+# UNIT TESTS
+# ----------------------------------------------------------------------------------------------------------------------
+
+# Unit tests call the test suite using the local storage implementation
 
 
 class LocalStorageTest(DataStorageTestSuite):

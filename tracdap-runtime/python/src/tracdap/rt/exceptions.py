@@ -200,6 +200,15 @@ class EStorageConfig(EStorage):
     pass
 
 
+class EStorageValidation(EStorage):
+
+    """
+    Storage request is invalid or not allowed (e.g. illegal chars in storage path or path escapes storage root)
+    """
+
+    pass
+
+
 class EStorageCommunication(EStorage):
 
     """
