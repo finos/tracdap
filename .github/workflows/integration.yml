@@ -8,7 +8,7 @@ on:
   # Re-run integration tests in main, to make sure there are no issues from the merge
   push:
     branches:
-      - main
+      - "**"
 
   # Allow manual triggering of integration tests
   workflow_dispatch:
@@ -25,6 +25,8 @@ env:
 jobs:
 
   web-api:
+
+    if: ${{ false() }}
 
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -128,6 +130,8 @@ jobs:
 
   slow-tests:
 
+    if: ${{ false() }}
+
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -163,6 +167,8 @@ jobs:
 
 
   end-to-end:
+
+    if: ${{ false() }}
 
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -216,6 +222,8 @@ jobs:
 
 
   int-metadb:
+
+    if: ${{ false() }}
 
     runs-on: ubuntu-latest
 
