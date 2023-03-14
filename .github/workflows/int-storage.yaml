@@ -172,8 +172,9 @@ jobs:
           ${{ env.STORAGE_SECRET }}: ${{ secrets[ env.STORAGE_SECRET ] }}
         run: | 
           . ./venv/bin/activate
+          $( echo '${{ toJson(vars) }}' | jq -r 'to_entries[] | "export " + .key + "=\"" + .value + "\""' )
           export INT_PATTERN="int_${{ env.SERVICE }}_${{ env.TARGET }}*.py"
-          python tracdap-runtime/python/build_runtime.py --target integration --pattern int_
+          python tracdap-runtime/python/build_runtime.py --target integration --pattern ${INT_PATTERN}
 
       - name: Integration teardown script
         if: ${{ env.TEARDOWN_SCRIPT != '' }}
