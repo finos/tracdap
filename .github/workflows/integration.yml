@@ -26,7 +26,7 @@ jobs:
 
   web-api:
 
-    if: ${{ false() }}
+    if: ${{ false }}
 
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -130,7 +130,7 @@ jobs:
 
   slow-tests:
 
-    if: ${{ false() }}
+    if: ${{ false }}
 
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -168,7 +168,7 @@ jobs:
 
   end-to-end:
 
-    if: ${{ false() }}
+    if: ${{ false }}
 
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -223,7 +223,7 @@ jobs:
 
   int-metadb:
 
-    if: ${{ false() }}
+    if: ${{ false }}
 
     runs-on: ubuntu-latest
 
