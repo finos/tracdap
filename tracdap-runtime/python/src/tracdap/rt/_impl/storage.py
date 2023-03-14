@@ -261,16 +261,26 @@ class CommonFileStorage(IFileStorage):
     @staticmethod
     def _info_to_stat(file_info: pa_fs.FileInfo):
 
+        if file_info.path == "":
+            file_name = "."
+            storage_path = "."
+        elif file_info.path.startswith("./"):
+            file_name = file_info.base_name
+            storage_path = file_info.path[2:]
+        else:
+            file_name = file_info.base_name
+            storage_path = file_info.path
+
         file_type = FileType.FILE if file_info.is_file else FileType.DIRECTORY
         file_size = file_info.size if file_info.is_file else 0
-        storage_path = file_info.path[2:] if file_info.path.startswith("./") else file_info.path
+        mtime = file_info.mtime.astimezone(dt.timezone.utc) if file_info.mtime is not None else None
 
         return FileStat(
-            file_info.base_name,
+            file_name,
             file_type,
             storage_path,
             file_size,
-            mtime=file_info.mtime.astimezone(dt.timezone.utc),
+            mtime=mtime,
             atime=None)
 
     def ls(self, storage_path: str, recursive: bool = False) -> tp.List[FileStat]:
@@ -477,14 +487,17 @@ class CommonFileStorage(IFileStorage):
             root_path = pathlib.Path("C:\\root") if _util.is_windows() else pathlib.Path("/root")
             absolute_path = root_path.joinpath(relative_path).resolve(False)
 
-            # is_relative_to only supported in Python 3.9+, we need to support 3.7
-            if absolute_path != root_path and root_path not in absolute_path.parents:
-                raise self._explicit_error(self.ExplicitError.STORAGE_PATH_OUTSIDE_ROOT, operation_name, storage_path)
+            if absolute_path == root_path:
+                if not allow_root_dir:
+                    raise self._explicit_error(self.ExplicitError.STORAGE_PATH_IS_ROOT, operation_name, storage_path)
+                else:
+                    return ""
 
-            if absolute_path == root_path and not allow_root_dir:
-                raise self._explicit_error(self.ExplicitError.STORAGE_PATH_IS_ROOT, operation_name, storage_path)
-    
-            return absolute_path.relative_to(root_path).as_posix()
+            # is_relative_to only supported in Python 3.9+, we need to support 3.7
+            if root_path not in absolute_path.parents:
+                raise self._explicit_error(self.ExplicitError.STORAGE_PATH_OUTSIDE_ROOT, operation_name, storage_path)
+            else:
+                return absolute_path.relative_to(root_path).as_posix()
 
         except ValueError as e:
 
