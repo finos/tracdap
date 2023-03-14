@@ -27,4 +27,4 @@ export AWS_SECRET_ACCESS_KEY=${TRAC_AWS_SECRET_ACCESS_KEY}
 # List bucket contents to check the connection
 # (bucket may be empty, otherwise limit to first 10 objects)
 
-aws s3api list-objects-v2 --bucket ${TRAC_AWS_BUCKET} --region ${TRAC_AWS_REGION} --page-size 10
+aws s3api list-objects-v2 --bucket ${TRAC_AWS_BUCKET} --region ${TRAC_AWS_REGION} --max-items 10
