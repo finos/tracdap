@@ -151,10 +151,13 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Upgrade PIP
-        run: python -m pip install --upgrade pip
+        run: python -m venv ./venv
+          . ./venv/bin/activate
+          python -m pip install --upgrade pip
 
       - name: Install dependencies
         run: |
+          . ./venv/bin/activate
           cd tracdap-runtime/python
           pip install -r requirements.txt
 
@@ -165,6 +168,7 @@ jobs:
         env:
           ${{ env.STORAGE_SECRET }}: ${{ secrets[ env.STORAGE_SECRET ] }}
         run: | 
+          . ./venv/bin/activate
           export INT_PATTERN="int_${{ env.SERVICE }}_${{ env.TARGET }}*.py"
           python tracdap-runtime/python/build_runtime.py --target integration --pattern int_
 
