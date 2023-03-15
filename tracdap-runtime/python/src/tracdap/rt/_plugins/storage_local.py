@@ -278,6 +278,11 @@ class LocalFileStorage(IFileStorage):
     def _read_byte_stream(self, storage_path: str) -> tp.BinaryIO:
 
         item_path = self._resolve_path(storage_path, "OPEN BYTE STREAM (READ)", False)
+
+        # Do not try to open directories or other non-file objects for reading
+        if item_path.exists() and not item_path.is_file():
+            raise ex.EStorageRequest(f"Storage path is not a file: OPEN BYTE STREAM (READ) [{storage_path}]")
+
         stream = open(item_path, mode='rb')
 
         return _StreamResource(stream, lambda: self._close_byte_stream(storage_path, stream))
@@ -295,6 +300,10 @@ class LocalFileStorage(IFileStorage):
         # This brings local storage in line with cloud bucket semantics for writing objects
         if not item_path.parent.exists():
             item_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # Do not try to open directories or other non-file objects for write
+        if item_path.exists() and not item_path.is_file():
+            raise ex.EStorageRequest(f"Storage path is not a file: OPEN BYTE STREAM (WRITE) [{storage_path}]")
 
         # If the file does not already exist and there is an error, try to clean it up
         delete_on_error = not item_path.exists()
