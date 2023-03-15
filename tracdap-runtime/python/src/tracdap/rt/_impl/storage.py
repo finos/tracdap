@@ -291,15 +291,18 @@ class CommonFileStorage(IFileStorage):
 
         resolved_path = self._resolve_path(operation_name, storage_path, True)
 
-        # Make sure LS can only be called for directories
+        # _stat() will fail for file not found, or if the path is not a file/directory
         stat = self._stat(operation_name, storage_path)
-        if stat.file_type != FileType.DIRECTORY:
-            raise self._explicit_error(self.ExplicitError.NOT_A_DIRECTORY, operation_name, storage_path)
 
-        selector = pa_fs.FileSelector(resolved_path, recursive=recursive)  # noqa
-        file_infos: tp.List[pa_fs.FileInfo] = self._fs.get_file_info(selector)
+        # Calling LS on a file should return a list with one entry for just that file
+        if stat.file_type == FileType.FILE:
+            return [stat]
 
-        return list(map(self._info_to_stat, file_infos))
+        # Otherwise do a normal directory listing
+        else:
+            selector = pa_fs.FileSelector(resolved_path, recursive=recursive)  # noqa
+            file_infos = self._fs.get_file_info(selector)
+            return list(map(self._info_to_stat, file_infos))
 
     def mkdir(self, storage_path: str, recursive: bool = False):
 
@@ -367,6 +370,12 @@ class CommonFileStorage(IFileStorage):
     def _write_byte_stream(self, operation_name: str, storage_path: str) -> tp.BinaryIO:
 
         resolved_path = self._resolve_path(operation_name, storage_path, False)
+
+        # Make sure the parent directory exists
+        # This ensures storage with FS semantics still behaves like a cloud bucket
+        parent_path = self._resolve_parent(resolved_path)
+        if parent_path is not None:
+            self._mkdir(operation_name, parent_path, recursive=True)
 
         # If the file does not already exist and the write operation fails, try to clean it up
         file_info: pa_fs.FileInfo = self._fs.get_file_info(resolved_path)
@@ -508,6 +517,17 @@ class CommonFileStorage(IFileStorage):
         except ValueError as e:
 
             raise self._explicit_error(self.ExplicitError.STORAGE_PATH_INVALID, operation_name, storage_path) from e
+
+    def _resolve_parent(self, storage_path: str) -> tp.Optional[str]:
+
+        root_path = pathlib.Path("C:\\root") if _util.is_windows() else pathlib.Path("/root")
+        absolute_path = root_path.joinpath(storage_path).resolve(False)
+
+        if absolute_path == root_path or absolute_path.parent == root_path:
+            return None
+
+        else:
+            return pathlib.Path(storage_path).parent.as_posix()
 
     def _explicit_error(self, error, operation_name, storage_path):
 
