@@ -208,15 +208,19 @@ class LocalFileStorage(IFileStorage):
         item_path = self._resolve_path(storage_path, "LS", True)
 
         if not item_path.exists():
-            raise ex.EStorageRequest(f"Storage path does not exist: STAT [{storage_path}]")
+            raise ex.EStorageRequest(f"Storage path does not exist: LS [{storage_path}]")
 
+        # If LS is called on anything other than a directory, return a listing of that one item
         if not item_path.is_dir():
-            raise ex.EStorageRequest(f"Storage path is not a directory: STAT [{storage_path}]")
+            os_stat = item_path.stat()
+            stat = self._os_to_trac_stat(item_path, os_stat)
+            return [stat]
 
-        pattern = "**/*" if recursive else "*"
-        paths = list(item_path.glob(pattern))
-
-        return list(map(lambda p: self._os_to_trac_stat(p, p.stat()), paths))
+        # Otherwise do a regular directory listing
+        else:
+            pattern = "**/*" if recursive else "*"
+            paths = list(item_path.glob(pattern))
+            return list(map(lambda p: self._os_to_trac_stat(p, p.stat()), paths))
 
     def mkdir(self, storage_path: str, recursive: bool = False):
 
@@ -287,8 +291,15 @@ class LocalFileStorage(IFileStorage):
 
         item_path = self._resolve_path(storage_path, "OPEN BYTE STREAM (WRITE)", False)
 
+        # Make sure the parent dir always exists
+        # This brings local storage in line with cloud bucket semantics for writing objects
+        if not item_path.parent.exists():
+            item_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # If the file does not already exist and there is an error, try to clean it up
         delete_on_error = not item_path.exists()
 
+        # Always overwrite existing files, this is in line with cloud bucket semantics
         stream = open(item_path, mode='wb')
 
         return _StreamResource(stream, lambda: self._close_byte_stream(storage_path, stream, delete_on_error))
