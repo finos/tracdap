@@ -741,14 +741,30 @@ class FileReadWriteTestSuite:
 
     def test_write_missing_dir(self):
 
+        # Writing a file will always create the parent dir if it doesn't already exist
+        # This is in line with cloud bucket semantics
+
         storage_path = "missing_dir/some_file.txt"
         content = "Some content".encode('utf-8')
 
-        self.assertRaises(_ex.EStorageRequest, lambda: self.storage.write_bytes(storage_path, content))
+        self.storage.write_bytes(storage_path, content)
+
+        dir_exists = self.storage.exists("missing_dir")
+        file_exists = self.storage.exists(storage_path)
+
+        self.assertTrue(dir_exists)
+        self.assertTrue(file_exists)
+
+        dir_stat = self.storage.stat("missing_dir")
+        file_stat = self.storage.stat(storage_path)
+
+        self.assertEqual(_storage.FileType.DIRECTORY, dir_stat.file_type)
+        self.assertEqual(len(content), file_stat.size)
 
     def test_write_already_exists(self):
 
         # Writing a file always overwrites any existing content
+        # This is in line with cloud bucket semantics
 
         storage_path = "some_file.txt"
         content = "Some content".encode('utf-8')
@@ -790,8 +806,10 @@ class FileReadWriteTestSuite:
     def test_write_outside_root(self):
 
         storage_path = "../any_file.txt"
+        storage_path_2 = "dir/../../any_file.txt"
 
         self.assertRaises(_ex.EStorageValidation, lambda: self.storage.write_byte_stream(storage_path))
+        self.assertRaises(_ex.EStorageValidation, lambda: self.storage.write_byte_stream(storage_path_2))
 
     def test_read_missing(self):
 
