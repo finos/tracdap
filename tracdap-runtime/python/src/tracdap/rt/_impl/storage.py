@@ -312,6 +312,14 @@ class CommonFileStorage(IFileStorage):
 
         resolved_path = self._resolve_path(operation_name, storage_path, False)
 
+        # Try to prevent MKDIR if a file or file-like object already exists
+        # In cloud bucket semantics a file and dir can both exist with the same name - very confusing!
+        # There is a race condition here because a file could be created by another process
+        # But, given the very structured way TRAC uses file storage, this is extremely unlikely
+        prior_stat: pa_fs.FileInfo = self._fs.get_file_info(resolved_path)
+        if prior_stat.type == pa_fs.FileType.File or prior_stat.type == pa_fs.FileType.Unknown:
+            raise self._explicit_error(self.ExplicitError.OBJECT_ALREADY_EXISTS, operation_name, storage_path)
+
         self._fs.create_dir(resolved_path, recursive=recursive)
 
     def rm(self, storage_path: str):
@@ -377,9 +385,16 @@ class CommonFileStorage(IFileStorage):
         if parent_path is not None:
             self._mkdir(operation_name, parent_path, recursive=True)
 
+        # Try to prevent WRITE if the object is already defined as a directory
+        # In cloud bucket semantics a file and dir can both exist with the same name - very confusing!
+        # There is a race condition here because a directory could be created by another process
+        # But, given the very structured way TRAC uses file storage, this is extremely unlikely
+        prior_stat: pa_fs.FileInfo = self._fs.get_file_info(resolved_path)
+        if prior_stat.type == pa_fs.FileType.Directory:
+            raise self._explicit_error(self.ExplicitError.OBJECT_ALREADY_EXISTS, operation_name, storage_path)
+
         # If the file does not already exist and the write operation fails, try to clean it up
-        file_info: pa_fs.FileInfo = self._fs.get_file_info(resolved_path)
-        delete_on_error = file_info.type == pa_fs.FileType.NotFound
+        delete_on_error = prior_stat.type == pa_fs.FileType.NotFound
 
         # Open the stream
         stream = self._fs.open_output_stream(resolved_path)
@@ -518,7 +533,8 @@ class CommonFileStorage(IFileStorage):
 
             raise self._explicit_error(self.ExplicitError.STORAGE_PATH_INVALID, operation_name, storage_path) from e
 
-    def _resolve_parent(self, storage_path: str) -> tp.Optional[str]:
+    @staticmethod
+    def _resolve_parent(storage_path: str) -> tp.Optional[str]:
 
         root_path = pathlib.Path("C:\\root") if _util.is_windows() else pathlib.Path("/root")
         absolute_path = root_path.joinpath(storage_path).resolve(False)
