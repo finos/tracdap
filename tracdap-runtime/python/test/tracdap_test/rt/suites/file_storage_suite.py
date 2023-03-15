@@ -700,7 +700,7 @@ class FileReadWriteTestSuite:
         storage_path = "test_file.dat"
 
         # One 10 M chunk
-        bytes_ = random.randbytes(100 * 1024 * 1024)
+        bytes_ = random.randbytes(10 * 1024 * 1024)
 
         self.do_round_trip(storage_path, [bytes_], self.storage)
 
