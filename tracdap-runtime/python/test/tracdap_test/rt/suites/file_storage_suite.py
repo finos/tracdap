@@ -383,11 +383,19 @@ class FileOperationsTestSuite:
 
     def test_ls_file(self):
 
-        # Attempt to call ls on a file is an error
+        # Calling LS on a file returns a list of just that one file
 
         self.make_small_file("test_file")
 
-        self.assertRaises(_ex.EStorageRequest, lambda: self.storage.ls("test_file"))
+        ls = self.storage.ls("test_file")
+
+        self.assertEqual(1, len(ls))
+
+        stat = ls[0]
+
+        self.assertEqual(_storage.FileType.FILE, stat.file_type)
+        self.assertEqual("test_file", stat.file_name)
+        self.assertEqual("test_file", stat.storage_path)
 
     def test_ls_missing(self):
 
