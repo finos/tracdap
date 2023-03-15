@@ -167,17 +167,17 @@ class FileOperationsTestSuite:
 
     def test_stat_file_mtime(self):
 
-        # All storage implementations must implement mtime for files
-        # Do not allow null mtime
+        # All storage implementations must implement mtime for files, do not allow null mtime
+        # Using 1 second as the required resolution (at least one FS, AWS S3, has 1 second resolution)
 
         test_start = dt.datetime.now(dt.timezone.utc)
-        time.sleep(0.01)  # Let time elapse before/after the test calls
+        time.sleep(1.0)  # Let time elapse before/after the test calls
 
         self.make_small_file("test_file.txt")
 
         stat_result = self.storage.stat("test_file.txt")
 
-        time.sleep(0.01)  # Let time elapse before/after the test calls
+        time.sleep(1.0)  # Let time elapse before/after the test calls
         test_finish = dt.datetime.now(dt.timezone.utc)
 
         self.assertTrue(stat_result.mtime > test_start)
