@@ -825,6 +825,14 @@ class FileReadWriteTestSuite:
 
         self.assertRaises(_ex.EStorageRequest, lambda: self.storage.read_byte_stream(storage_path))
 
+    def test_read_dir(self):
+
+        storage_path = "not_a_file/"
+
+        self.storage.mkdir(storage_path)
+
+        self.assertRaises(_ex.EStorageRequest, lambda: self.storage.read_byte_stream(storage_path))
+
     def test_read_bad_paths(self):
 
         # \0 and / are the two characters that are always illegal in posix filenames
