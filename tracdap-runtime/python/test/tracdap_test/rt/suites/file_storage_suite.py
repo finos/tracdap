@@ -769,7 +769,7 @@ class FileReadWriteTestSuite:
         self.assertEqual(_storage.FileType.DIRECTORY, dir_stat.file_type)
         self.assertEqual(len(content), file_stat.size)
 
-    def test_write_already_exists(self):
+    def test_write_file_already_exists(self):
 
         # Writing a file always overwrites any existing content
         # This is in line with cloud bucket semantics
@@ -792,6 +792,22 @@ class FileReadWriteTestSuite:
 
         read_content = self.storage.read_bytes(storage_path)
         self.assertEqual(new_content, read_content)
+
+    def test_write_dir_already_exists(self):
+
+        # File storage should not allow a file to be written if a dir exists with the same name
+        # TRAC prohibits this even though it is allowed in pure bucket semantics
+
+        storage_path = "some_file.txt"
+
+        self.storage.mkdir(storage_path)
+
+        exists = self.storage.exists(storage_path)
+        self.assertTrue(exists)
+
+        new_content = "Some different content".encode('utf-8')
+
+        self.assertRaises(_ex.EStorageRequest, lambda: self.storage.write_bytes(storage_path, new_content))
 
     def test_write_bad_paths(self):
 
