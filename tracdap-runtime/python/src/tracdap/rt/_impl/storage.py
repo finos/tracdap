@@ -358,15 +358,21 @@ class CommonFileStorage(IFileStorage):
 
         resolved_path = self._resolve_path(operation_name, storage_path, False)
 
+        # Check some information about the file before attempting the read
+        # There is a race condition here so open_input_file() can still fail
+        # Even so, prior_stat gives more meaningful error information in the common case
+        # If the file is changed before open_input_file, errors will be raised but might be less meaningful
+        prior_stat: pa_fs.FileInfo = self._fs.get_file_info(resolved_path)
+        if prior_stat.type == pa_fs.FileType.NotFound:
+            raise self._explicit_error(self.ExplicitError.OBJECT_NOT_FOUND, operation_name, storage_path)
+        if prior_stat.type != pa_fs.FileType.File:
+            raise self._explicit_error(self.ExplicitError.NOT_A_FILE, operation_name, storage_path)
+
+        # Since the size is known, log it now rather than calling stream.seek() and stream.tell()
+        self._log.info(f"File size [{self._key}]: {prior_stat.size} [{storage_path}]")
+
         # Open the stream
         stream = self._fs.open_input_file(resolved_path)
-
-        # Log file size now that the stream is successfully open
-        stream.seek(0, 2)
-        file_size = _util.format_file_size(stream.tell())
-        stream.seek(0, 0)
-
-        self._log.info(f"File size [{self._key}]: {file_size} [{storage_path}]")
 
         # Return impl of PyArrow NativeFile instead of BinaryIO - this is the same thing PyArrow does
         return _NativeFileResource(stream, lambda: self._close_byte_stream(storage_path, stream, False))  # noqa
@@ -385,12 +391,12 @@ class CommonFileStorage(IFileStorage):
         if parent_path is not None:
             self._mkdir(operation_name, parent_path, recursive=True)
 
-        # Try to prevent WRITE if the object is already defined as a directory
+        # Try to prevent WRITE if the object is already defined as a directory or other non-file object
         # In cloud bucket semantics a file and dir can both exist with the same name - very confusing!
         # There is a race condition here because a directory could be created by another process
         # But, given the very structured way TRAC uses file storage, this is extremely unlikely
         prior_stat: pa_fs.FileInfo = self._fs.get_file_info(resolved_path)
-        if prior_stat.type == pa_fs.FileType.Directory:
+        if prior_stat.type != pa_fs.FileType.NotFound and prior_stat.type != pa_fs.FileType.File:
             raise self._explicit_error(self.ExplicitError.OBJECT_ALREADY_EXISTS, operation_name, storage_path)
 
         # If the file does not already exist and the write operation fails, try to clean it up
