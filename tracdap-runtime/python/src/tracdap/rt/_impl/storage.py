@@ -291,6 +291,11 @@ class CommonFileStorage(IFileStorage):
 
         resolved_path = self._resolve_path(operation_name, storage_path, True)
 
+        # Make sure LS can only be called for directories
+        stat = self._stat(operation_name, storage_path)
+        if stat.file_type != FileType.DIRECTORY:
+            raise self._explicit_error(self.ExplicitError.NOT_A_DIRECTORY, operation_name, storage_path)
+
         selector = pa_fs.FileSelector(resolved_path, recursive=recursive)  # noqa
         file_infos: tp.List[pa_fs.FileInfo] = self._fs.get_file_info(selector)
 
@@ -415,7 +420,7 @@ class CommonFileStorage(IFileStorage):
 
     def _wrap_operation(self, func: tp.Callable, operation_name: str, storage_path: str, *args, **kwargs) -> tp.Any:
 
-        operation = f"{operation_name} [{self._key}]: [{storage_path}]"
+        operation = f"{operation_name} {self._key} [{storage_path}]"
 
         try:
             self._log.info(operation)
@@ -424,7 +429,7 @@ class CommonFileStorage(IFileStorage):
         # ETrac means the error is already handled, log the message as-is
 
         except _ex.ETrac as e:
-            self._log.exception(f"{operation} {str(e)}")
+            self._log.exception(f"{operation}: {str(e)}")
             raise
 
         # Arrow maps filesystem errors into native Python OS errors
@@ -459,6 +464,7 @@ class CommonFileStorage(IFileStorage):
 
         except OSError as e:
             error = self._explicit_error(self.ExplicitError.IO_ERROR, operation_name, storage_path)
+            self._log.error(f"{operation}: {str(e)}")
             self._log.exception(f"{operation}: {str(error)}")
             raise error from e
 
