@@ -143,6 +143,10 @@ jobs:
         with:
           fetch-depth: 0
 
+      # Using IdP for AWS, set the repo secret AWS_CI_ROLE to use
+      # https://docs.github.com/en/actions/deployment/security-hardening-your-deployments/configuring-openid-connect-in-amazon-web-services
+      # https://github.com/aws-actions/configure-aws-credentials
+
       - name: Authenticate to AWS
         if: ${{ inputs.target == 'aws' }}
         uses: aws-actions/configure-aws-credentials@v2
@@ -150,6 +154,17 @@ jobs:
           role-to-assume: ${{ secrets.AWS_CI_ROLE }}
           role-session-name: tracdap-ci-session
           aws-region: ${{ vars.TRAC_AWS_REGION }}
+
+      # Using IdP for GCP
+      # https://docs.github.com/en/actions/deployment/security-hardening-your-deployments/configuring-openid-connect-in-google-cloud-platform
+      # https://github.com/google-github-actions/auth
+
+      - name: Authenticate to GCP
+        if: ${{ inputs.target == 'gcp' }}
+        uses: google-github-actions/auth@v1
+        with:
+          workload_identity_provider: projects/158849182108/locations/global/workloadIdentityPools/github/providers/github
+          service_account: ${{ secrets.GCP_CI_USER }}
 
       - name: Integration setup script
         if: ${{ env.SETUP_SCRIPT != '' }}
