@@ -363,6 +363,16 @@ jobs:
               TRAC_SECRET_KEY: short-lived-secret,
               PYTHON_TESTS: int_storage_aws*.py }
 
+          - { SERVICE: storage,
+              TARGET: gcp,
+              PROTOCOL: GCS,
+              ENABLE_IF: TRAC_GCP_BUCKET,
+              BUILD_gcp_storage: true,
+              SETUP_SCRIPT: ".github/scripts/int-storage-gcs-setup.sh",
+              TRAC_CONFIG_FILE: '.github/config/int-storage-gcs.yaml',
+              TRAC_SECRET_KEY: short-lived-secret,
+              PYTHON_TESTS: true }
+
     uses: ./.github/workflows/integration-cloud.yaml
 
     with:
