@@ -368,12 +368,10 @@ jobs:
               BUILD_aws_storage: true,
               SETUP_SCRIPT: ".github/scripts/int-storage-s3-setup.sh",
               TRAC_CONFIG_FILE: '.github/config/int-storage-s3.yaml',
-              TRAC_SECRET_KEY: very-secret-key,
-              STORAGE_SECRET: TRAC_AWS_SECRET_ACCESS_KEY,
-              PYTHON_TESTS: int_storage_aws*.py
-          }
+              TRAC_SECRET_KEY: short-lived-secret,
+              PYTHON_TESTS: int_storage_aws*.py }
 
-    uses: ./.github/workflows/int-storage.yaml
+    uses: ./.github/workflows/integration-cloud.yaml
 
     with:
       service: ${{ matrix.storage.SERVICE }}

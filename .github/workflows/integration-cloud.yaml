@@ -5,7 +5,7 @@ on:
       service:
         required: true
         type: string
-      protocol:
+      target:
         required: true
         type: string
       matrix:
@@ -28,16 +28,11 @@ env:
   PYTHON_VERSION: "3.11"
 
 
-permissions:
-  id-token: write
-  contents: read
-
-
 jobs:
 
   java-integration:
 
-    name: int-java-${{ inputs.service }}-${{ inputs.protocol }}
+    name: int-java-${{ inputs.service }}-${{ inputs.target }}
 
     env: ${{ fromJson( inputs.matrix ) }}
     if: ${{ inputs.enabled && inputs.has_java }}
@@ -57,18 +52,19 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Configure AWS credentials
-        if: ${{ env.TARGET == 'aws' }}
+      - name: Authenticate to AWS
+        if: ${{ inputs.target == 'aws' }}
         uses: aws-actions/configure-aws-credentials@v2
         with:
-          role-to-assume: ${{ secrets.AWS_ROLE }}
+          role-to-assume: ${{ secrets.AWS_CI_ROLE }}
           role-session-name: tracdap-ci-session
           aws-region: ${{ vars.TRAC_AWS_REGION }}
 
       - name: Integration setup script
         if: ${{ env.SETUP_SCRIPT != '' }}
         env: ${{ vars }}
-        run: ${{ env.SETUP_SCRIPT }}
+        run: |
+          ${{ env.SETUP_SCRIPT }}
 
       - name: Set up Java
         uses: actions/setup-java@v3
@@ -103,12 +99,13 @@ jobs:
 
       - name: Integration teardown script
         if: ${{ env.TEARDOWN_SCRIPT != '' }}
-        run: ${{ env.TEARDOWN_SCRIPT }}
+        run: |
+          ${{ env.TEARDOWN_SCRIPT }}
 
 
   python-integration:
 
-    name: int-python-${{ inputs.service }}-${{ inputs.protocol }}
+    name: int-python-${{ inputs.service }}-${{ inputs.target }}
 
     if: ${{ inputs.enabled && inputs.has_python }}
     env: ${{ fromJson( inputs.matrix ) }}
@@ -128,8 +125,8 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Configure AWS credentials
-        if: ${{ env.TARGET == 'aws' }}
+      - name: Authenticate to AWS
+        if: ${{ inputs.target == 'aws' }}
         uses: aws-actions/configure-aws-credentials@v2
         with:
           role-to-assume: ${{ secrets.AWS_CI_ROLE }}
