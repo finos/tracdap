@@ -17,12 +17,9 @@
 # Install CLI tools
 
 export DEBIAN_FRONTEND=noninteractive
+apt-get update
+apt-get upgrade -y
 apt-get install -y awscli
-
-# Put the access key where the AWS CLI will find it
-
-export AWS_ACCESS_KEY_ID=${TRAC_AWS_ACCESS_KEY_ID}
-export AWS_SECRET_ACCESS_KEY=${TRAC_AWS_SECRET_ACCESS_KEY}
 
 # List bucket contents to check the connection
 # (bucket may be empty, otherwise limit to first 10 objects)

@@ -344,6 +344,11 @@ jobs:
 
   int-storage:
 
+    # Permissions required to use IdP to connect to cloud platforms
+    permissions:
+      id-token: write   # This is required for requesting the JWT
+      contents: read    # This is required for actions/checkout
+
     strategy:
 
       # Try to finish all jobs - it can be helpful to see if some succeed and others fail
@@ -362,7 +367,7 @@ jobs:
               TRAC_CONFIG_FILE: '.github/config/int-storage-s3.yaml',
               TRAC_SECRET_KEY: very-secret-key,
               STORAGE_SECRET: TRAC_AWS_SECRET_ACCESS_KEY,
-              PYTHON_TESTS: true
+              PYTHON_TESTS: int_storage_aws*.py
           }
 
     uses: ./.github/workflows/int-storage.yaml
