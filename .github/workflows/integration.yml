@@ -354,20 +354,29 @@ jobs:
         storage:
 
           - { SERVICE: storage,
+              TARGET: aws,
               PROTOCOL: S3,
               ENABLE_IF: TRAC_AWS_BUCKET,
               BUILD_aws_storage: true,
+              SETUP_SCRIPT: ".github/scripts/int-storage-s3-setup.sh",
               TRAC_CONFIG_FILE: '.github/config/int-storage-s3.yaml',
-              TRAC_SECRET_KEY: very-secret-key,
-              STORAGE_SECRET: TRAC_AWS_SECRET_ACCESS_KEY
-          }
+              TRAC_SECRET_KEY: short-lived-secret,
+              PYTHON_TESTS: int_storage_aws*.py }
 
-    uses: ./.github/workflows/int-storage.yaml
+    uses: ./.github/workflows/integration-cloud.yaml
+
     with:
       service: ${{ matrix.storage.SERVICE }}
+      target: ${{ matrix.storage.TARGET }}
       protocol: ${{ matrix.storage.PROTOCOL }}
       matrix: ${{ toJson( matrix.storage ) }}
       enabled: ${{ vars[ matrix.storage.ENABLE_IF ] != '' }}
       has_java: ${{ matrix.storage.JAVA_TESTS != '' }}
       has_python: ${{ matrix.storage.PYTHON_TESTS != '' }}
+
     secrets: inherit
+
+    # Permissions required to use IdP to connect to cloud platforms
+    permissions:
+      id-token: write   # This is required for requesting the JWT
+      contents: read    # This is required for actions/checkout

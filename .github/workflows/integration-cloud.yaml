@@ -5,6 +5,9 @@ on:
       service:
         required: true
         type: string
+      target:
+        required: true
+        type: string
       protocol:
         required: true
         type: string
@@ -52,18 +55,18 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Install JQ
-        run: |
-          apt-get update
-          apt-get upgrade -y
-          apt-get install -y jq
+      - name: Authenticate to AWS
+        if: ${{ inputs.target == 'aws' }}
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: ${{ secrets.AWS_CI_ROLE }}
+          role-session-name: tracdap-ci-session
+          aws-region: ${{ vars.TRAC_AWS_REGION }}
 
       - name: Integration setup script
         if: ${{ env.SETUP_SCRIPT != '' }}
-        env:
-          ${{ env.STORAGE_SECRET }}: ${{ secrets[ env.STORAGE_SECRET ] }}
+        env: ${{ vars }}
         run: |
-          $( echo '${{ toJson(vars) }}' | jq -r 'to_entries[] | "export " + .key + "=\"" + .value + "\""' )
           ${{ env.SETUP_SCRIPT }}
 
       - name: Set up Java
@@ -78,22 +81,15 @@ jobs:
 
       # Auth tool will also create the secrets file if it doesn't exist
       - name: Prepare secrets
-        env:
-          ${{ env.STORAGE_SECRET }}: ${{ secrets[ env.STORAGE_SECRET ] }}
         run: |
           ./gradlew secret-tool:run --args="--config ${{ env.TRAC_CONFIG_FILE }} --task init_secrets"
           ./gradlew secret-tool:run --args="--config ${{ env.TRAC_CONFIG_FILE }} --task create_root_auth_key EC 256"
 
-          echo "${{ env[ env.STORAGE_SECRET ] }}" | ./gradlew secret-tool:run --args="--config ${{ env.TRAC_CONFIG_FILE }} --task add_secret storage_secret"
-
       # No need to prepare DB, it is done by the platform test setup
 
       - name: Integration tests
-        env:
-          ${{ env.STORAGE_SECRET }}: ${{ secrets[ env.STORAGE_SECRET ] }}
-        run: |
-          $( echo '${{ toJson(vars) }}' | jq -r 'to_entries[] | "export " + .key + "=" + .value' )
-          ./gradlew integration -DintegrationTags="${{ env.JAVA_TESTS }}"
+        env: ${{ vars }}
+        run: ./gradlew integration -DintegrationTags="${{ env.JAVA_TESTS }}"
 
       # If the tests fail, make the output available for download
       - name: Store failed test results
@@ -106,7 +102,8 @@ jobs:
 
       - name: Integration teardown script
         if: ${{ env.TEARDOWN_SCRIPT != '' }}
-        run: ${{ env.TEARDOWN_SCRIPT }}
+        run: |
+          ${{ env.TEARDOWN_SCRIPT }}
 
 
   python-integration:
@@ -131,18 +128,18 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Install JQ
-        run: |
-          apt-get update
-          apt-get upgrade -y
-          apt-get install -y jq
+      - name: Authenticate to AWS
+        if: ${{ inputs.target == 'aws' }}
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: ${{ secrets.AWS_CI_ROLE }}
+          role-session-name: tracdap-ci-session
+          aws-region: ${{ vars.TRAC_AWS_REGION }}
 
       - name: Integration setup script
         if: ${{ env.SETUP_SCRIPT != '' }}
-        env:
-          ${{ env.STORAGE_SECRET }}: ${{ secrets[ env.STORAGE_SECRET ] }}
+        env: ${{ vars }}
         run: |
-          $( echo '${{ toJson(vars) }}' | jq -r 'to_entries[] | "export " + .key + "=\"" + .value + "\""' )
           ${{ env.SETUP_SCRIPT }}
 
       - name: Set up Python
@@ -150,6 +147,30 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
+      - name: Upgrade PIP
+        run: |
+          python -m venv ./venv
+          . ./venv/bin/activate
+          python -m pip install --upgrade pip
+
+      - name: Install dependencies
+        run: |
+          . ./venv/bin/activate
+          cd tracdap-runtime/python
+          pip install -r requirements.txt
+
+      - name: Protoc code generation
+        run: |
+          . ./venv/bin/activate
+          python tracdap-runtime/python/build_runtime.py --target codegen
+
+      - name: Integration tests
+        env: ${{ vars }}
+        run: | 
+          . ./venv/bin/activate
+          python tracdap-runtime/python/build_runtime.py --target integration --pattern ${{ env.PYTHON_TESTS }}
+
       - name: Integration teardown script
         if: ${{ env.TEARDOWN_SCRIPT != '' }}
-        run: ${{ env.TEARDOWN_SCRIPT }}
+        run: |
+          ${{ env.TEARDOWN_SCRIPT }}

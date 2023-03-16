@@ -14,23 +14,17 @@
 
 import datetime as dt
 import functools
-import pathlib
-import tempfile
 import time
 import typing as tp
 import unittest
 import random
 
-import tracdap.rt.config as _cfg
 import tracdap.rt.exceptions as _ex
-import tracdap.rt.ext.plugins as _plugins
 import tracdap.rt._impl.data as _data  # noqa
 import tracdap.rt._impl.storage as _storage  # noqa
 import tracdap.rt._impl.util as _util  # noqa
 
 _util.configure_logging()
-_plugins.PluginManager.register_core_plugins()
-
 
 # randbytes was only added to the random module in 3.9
 # For testing, alias to secrets.token_bytes if it is not available (available since 3.6)
@@ -173,17 +167,17 @@ class FileOperationsTestSuite:
 
     def test_stat_file_mtime(self):
 
-        # All storage implementations must implement mtime for files
-        # Do not allow null mtime
+        # All storage implementations must implement mtime for files, do not allow null mtime
+        # Using 1 second as the required resolution (at least one FS, AWS S3, has 1 second resolution)
 
         test_start = dt.datetime.now(dt.timezone.utc)
-        time.sleep(0.01)  # Let time elapse before/after the test calls
+        time.sleep(1.0)  # Let time elapse before/after the test calls
 
         self.make_small_file("test_file.txt")
 
         stat_result = self.storage.stat("test_file.txt")
 
-        time.sleep(0.01)  # Let time elapse before/after the test calls
+        time.sleep(1.0)  # Let time elapse before/after the test calls
         test_finish = dt.datetime.now(dt.timezone.utc)
 
         self.assertTrue(stat_result.mtime > test_start)
@@ -389,11 +383,19 @@ class FileOperationsTestSuite:
 
     def test_ls_file(self):
 
-        # Attempt to call ls on a file is an error
+        # Calling LS on a file returns a list of just that one file
 
         self.make_small_file("test_file")
 
-        self.assertRaises(_ex.EStorageRequest, lambda: self.storage.ls("test_file"))
+        ls = self.storage.ls("test_file")
+
+        self.assertEqual(1, len(ls))
+
+        stat = ls[0]
+
+        self.assertEqual(_storage.FileType.FILE, stat.file_type)
+        self.assertEqual("test_file", stat.file_name)
+        self.assertEqual("test_file", stat.storage_path)
 
     def test_ls_missing(self):
 
@@ -732,15 +734,9 @@ class FileReadWriteTestSuite:
                 write_stream.write(chunk)
 
         with storage.read_byte_stream(storage_path) as read_stream:
-            read_result = []
-            while read_stream.readable():
-                chunk = read_stream.read(64 * 1024)
-                if chunk is None or len(chunk) == 0:
-                    break
-                read_result.append(chunk)
+            read_content = read_stream.read()
 
-        original_content = functools.reduce(lambda bs, b: bs + b, original_bytes, b"")
-        read_content = functools.reduce(lambda bs, b: bs + b, read_result, b"")
+        original_content = functools.reduce(lambda bs, b: bs + b, original_bytes[1:], original_bytes[0])
 
         self.assertEqual(original_content, read_content)
 
@@ -753,14 +749,30 @@ class FileReadWriteTestSuite:
 
     def test_write_missing_dir(self):
 
+        # Writing a file will always create the parent dir if it doesn't already exist
+        # This is in line with cloud bucket semantics
+
         storage_path = "missing_dir/some_file.txt"
         content = "Some content".encode('utf-8')
 
-        self.assertRaises(_ex.EStorageRequest, lambda: self.storage.write_bytes(storage_path, content))
+        self.storage.write_bytes(storage_path, content)
 
-    def test_write_already_exists(self):
+        dir_exists = self.storage.exists("missing_dir")
+        file_exists = self.storage.exists(storage_path)
+
+        self.assertTrue(dir_exists)
+        self.assertTrue(file_exists)
+
+        dir_stat = self.storage.stat("missing_dir")
+        file_stat = self.storage.stat(storage_path)
+
+        self.assertEqual(_storage.FileType.DIRECTORY, dir_stat.file_type)
+        self.assertEqual(len(content), file_stat.size)
+
+    def test_write_file_already_exists(self):
 
         # Writing a file always overwrites any existing content
+        # This is in line with cloud bucket semantics
 
         storage_path = "some_file.txt"
         content = "Some content".encode('utf-8')
@@ -780,6 +792,22 @@ class FileReadWriteTestSuite:
 
         read_content = self.storage.read_bytes(storage_path)
         self.assertEqual(new_content, read_content)
+
+    def test_write_dir_already_exists(self):
+
+        # File storage should not allow a file to be written if a dir exists with the same name
+        # TRAC prohibits this even though it is allowed in pure bucket semantics
+
+        storage_path = "some_file.txt"
+
+        self.storage.mkdir(storage_path)
+
+        exists = self.storage.exists(storage_path)
+        self.assertTrue(exists)
+
+        new_content = "Some different content".encode('utf-8')
+
+        self.assertRaises(_ex.EStorageRequest, lambda: self.storage.write_bytes(storage_path, new_content))
 
     def test_write_bad_paths(self):
 
@@ -802,12 +830,22 @@ class FileReadWriteTestSuite:
     def test_write_outside_root(self):
 
         storage_path = "../any_file.txt"
+        storage_path_2 = "dir/../../any_file.txt"
 
         self.assertRaises(_ex.EStorageValidation, lambda: self.storage.write_byte_stream(storage_path))
+        self.assertRaises(_ex.EStorageValidation, lambda: self.storage.write_byte_stream(storage_path_2))
 
     def test_read_missing(self):
 
         storage_path = "missing_file.txt"
+
+        self.assertRaises(_ex.EStorageRequest, lambda: self.storage.read_byte_stream(storage_path))
+
+    def test_read_dir(self):
+
+        storage_path = "not_a_file/"
+
+        self.storage.mkdir(storage_path)
 
         self.assertRaises(_ex.EStorageRequest, lambda: self.storage.read_byte_stream(storage_path))
 
@@ -1041,81 +1079,3 @@ class FileReadWriteTestSuite:
 
         exists2 = self.storage.exists(storage_path)
         self.assertFalse(exists2)
-
-# ----------------------------------------------------------------------------------------------------------------------
-# UNIT TESTS
-# ----------------------------------------------------------------------------------------------------------------------
-
-# Unit tests call the test suite using the local storage implementation
-
-
-class LocalFileStorageTest(unittest.TestCase, FileOperationsTestSuite, FileReadWriteTestSuite):
-
-    storage_root: tempfile.TemporaryDirectory
-    test_number: int
-
-    @classmethod
-    def setUpClass(cls) -> None:
-
-        cls.storage_root = tempfile.TemporaryDirectory()
-        cls.test_number = 0
-
-    def setUp(self):
-
-        test_dir = pathlib.Path(self.storage_root.name).joinpath(f"test_{self.test_number}")
-        test_dir.mkdir()
-
-        LocalFileStorageTest.test_number += 1
-
-        test_storage_config = _cfg.PluginConfig(
-            protocol="LOCAL",
-            properties={"rootPath": str(test_dir)})
-
-        sys_config = _cfg.RuntimeConfig()
-        sys_config.storage = _cfg.StorageConfig()
-        sys_config.storage.buckets["test_bucket"] = test_storage_config
-
-        manager = _storage.StorageManager(sys_config)
-        self.storage = manager.get_file_storage("test_bucket")
-
-    @classmethod
-    def tearDownClass(cls) -> None:
-
-        cls.storage_root.cleanup()
-
-
-class LocalArrowNativeStorageTest(unittest.TestCase, FileOperationsTestSuite, FileReadWriteTestSuite):
-
-    storage_root: tempfile.TemporaryDirectory
-    test_number: int
-
-    @classmethod
-    def setUpClass(cls) -> None:
-
-        cls.storage_root = tempfile.TemporaryDirectory()
-        cls.test_number = 0
-
-    def setUp(self):
-
-        test_dir = pathlib.Path(self.storage_root.name).joinpath(f"test_{self.test_number}")
-        test_dir.mkdir()
-
-        LocalArrowNativeStorageTest.test_number += 1
-
-        test_storage_config = _cfg.PluginConfig(
-            protocol="LOCAL",
-            properties={
-                "rootPath": str(test_dir),
-                "arrowNativeFs": "true"})
-
-        sys_config = _cfg.RuntimeConfig()
-        sys_config.storage = _cfg.StorageConfig()
-        sys_config.storage.buckets["test_bucket"] = test_storage_config
-
-        manager = _storage.StorageManager(sys_config)
-        self.storage = manager.get_file_storage("test_bucket")
-
-    @classmethod
-    def tearDownClass(cls) -> None:
-
-        cls.storage_root.cleanup()

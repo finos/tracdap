@@ -17,4 +17,11 @@
 # Install CLI tools
 
 export DEBIAN_FRONTEND=noninteractive
+apt-get update
+apt-get upgrade -y
 apt-get install -y awscli
+
+# List bucket contents to check the connection
+# (bucket may be empty, otherwise limit to first 10 objects)
+
+aws s3api list-objects-v2 --bucket ${TRAC_AWS_BUCKET} --region ${TRAC_AWS_REGION} --max-items 10

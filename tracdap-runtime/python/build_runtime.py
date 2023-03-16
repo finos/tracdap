@@ -205,13 +205,22 @@ def cli_args():
 
     parser.add_argument(
         "--target", type=str, metavar="target",
-        choices=["codegen", "test", "examples", "dist"], nargs="*", required=True,
+        choices=["codegen", "test", "examples", "integration", "dist"], nargs="*", required=True,
         help="The target to build")
+
+    parser.add_argument(
+        "--pattern", type=str, metavar="pattern",
+        nargs="*", required=False,
+        help="Patterns for matching integration tests")
 
     return parser.parse_args()
 
 
-def run_tests(test_path):
+def run_tests(test_path, pattern=None):
+
+    # Default test pattern for unit tests
+    if pattern is None:
+        pattern = "test*.py"
 
     cwd = os.getcwd()
     python_path = [*sys.path]
@@ -227,7 +236,8 @@ def run_tests(test_path):
         loader = unittest.TestLoader()
         suite = loader.discover(
             start_dir=str(SCRIPT_DIR.joinpath(test_path)),
-            top_level_dir=str(SCRIPT_DIR.joinpath("test")))
+            top_level_dir=str(SCRIPT_DIR.joinpath("test")),
+            pattern=pattern)
 
         result = runner.run(suite)
 
@@ -252,6 +262,10 @@ def main():
 
     if "examples" in args.target:
         run_tests("test/tracdap_examples")
+
+    if "integration" in args.target:
+        for pattern in args.pattern:
+            run_tests("test/tracdap_test", pattern)
 
     if "dist" in args.target:
 

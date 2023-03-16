@@ -90,8 +90,14 @@ class AwsStorageProvider(IStorageProvider):
         s3fs = afs.S3FileSystem(**s3fs_args)
 
         bucket = _helpers.get_plugin_property(self._properties, self.BUCKET_PROPERTY)
-        prefix = _helpers.get_plugin_property(self._properties, self.PREFIX_PROPERTY) or ""
-        root_path = f"{bucket}/{prefix}"
+        prefix = _helpers.get_plugin_property(self._properties, self.PREFIX_PROPERTY)
+
+        if bucket is None or len(bucket.strip()) == 0:
+            message = f"Missing required config property [{self.BUCKET_PROPERTY}] for S3 storage"
+            self._log.error(message)
+            raise ex.EConfigParse(message)
+
+        root_path = f"{bucket}/{prefix}" if prefix else bucket
 
         return afs.SubTreeFileSystem(root_path, s3fs)
 
@@ -179,6 +185,11 @@ if boto_available:
             self._properties = config.properties
             self._bucket = _helpers.get_plugin_property(self._properties, AwsStorageProvider.BUCKET_PROPERTY)
             self._prefix = _helpers.get_plugin_property(self._properties, AwsStorageProvider.PREFIX_PROPERTY) or ""
+
+            if self._bucket is None or len(self._bucket.strip()) == 0:
+                message = f"Missing required config property [{AwsStorageProvider.BUCKET_PROPERTY}] for S3 storage"
+                self._log.error(message)
+                raise ex.EConfigParse(message)
 
             self._client = boto3.client(**client_args)
 

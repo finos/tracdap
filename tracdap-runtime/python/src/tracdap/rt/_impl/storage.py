@@ -261,16 +261,26 @@ class CommonFileStorage(IFileStorage):
     @staticmethod
     def _info_to_stat(file_info: pa_fs.FileInfo):
 
+        if file_info.path == "":
+            file_name = "."
+            storage_path = "."
+        elif file_info.path.startswith("./"):
+            file_name = file_info.base_name
+            storage_path = file_info.path[2:]
+        else:
+            file_name = file_info.base_name
+            storage_path = file_info.path
+
         file_type = FileType.FILE if file_info.is_file else FileType.DIRECTORY
         file_size = file_info.size if file_info.is_file else 0
-        storage_path = file_info.path[2:] if file_info.path.startswith("./") else file_info.path
+        mtime = file_info.mtime.astimezone(dt.timezone.utc) if file_info.mtime is not None else None
 
         return FileStat(
-            file_info.base_name,
+            file_name,
             file_type,
             storage_path,
             file_size,
-            mtime=file_info.mtime.astimezone(dt.timezone.utc),
+            mtime=mtime,
             atime=None)
 
     def ls(self, storage_path: str, recursive: bool = False) -> tp.List[FileStat]:
@@ -281,10 +291,18 @@ class CommonFileStorage(IFileStorage):
 
         resolved_path = self._resolve_path(operation_name, storage_path, True)
 
-        selector = pa_fs.FileSelector(resolved_path, recursive=recursive)  # noqa
-        file_infos: tp.List[pa_fs.FileInfo] = self._fs.get_file_info(selector)
+        # _stat() will fail for file not found, or if the path is not a file/directory
+        stat = self._stat(operation_name, storage_path)
 
-        return list(map(self._info_to_stat, file_infos))
+        # Calling LS on a file should return a list with one entry for just that file
+        if stat.file_type == FileType.FILE:
+            return [stat]
+
+        # Otherwise do a normal directory listing
+        else:
+            selector = pa_fs.FileSelector(resolved_path, recursive=recursive)  # noqa
+            file_infos = self._fs.get_file_info(selector)
+            return list(map(self._info_to_stat, file_infos))
 
     def mkdir(self, storage_path: str, recursive: bool = False):
 
@@ -293,6 +311,14 @@ class CommonFileStorage(IFileStorage):
     def _mkdir(self, operation_name: str, storage_path: str, recursive: bool):
 
         resolved_path = self._resolve_path(operation_name, storage_path, False)
+
+        # Try to prevent MKDIR if a file or file-like object already exists
+        # In cloud bucket semantics a file and dir can both exist with the same name - very confusing!
+        # There is a race condition here because a file could be created by another process
+        # But, given the very structured way TRAC uses file storage, this is extremely unlikely
+        prior_stat: pa_fs.FileInfo = self._fs.get_file_info(resolved_path)
+        if prior_stat.type == pa_fs.FileType.File or prior_stat.type == pa_fs.FileType.Unknown:
+            raise self._explicit_error(self.ExplicitError.OBJECT_ALREADY_EXISTS, operation_name, storage_path)
 
         self._fs.create_dir(resolved_path, recursive=recursive)
 
@@ -332,18 +358,24 @@ class CommonFileStorage(IFileStorage):
 
         resolved_path = self._resolve_path(operation_name, storage_path, False)
 
+        # Check some information about the file before attempting the read
+        # There is a race condition here so open_input_file() can still fail
+        # Even so, prior_stat gives more meaningful error information in the common case
+        # If the file is changed before open_input_file, errors will be raised but might be less meaningful
+        prior_stat: pa_fs.FileInfo = self._fs.get_file_info(resolved_path)
+        if prior_stat.type == pa_fs.FileType.NotFound:
+            raise self._explicit_error(self.ExplicitError.OBJECT_NOT_FOUND, operation_name, storage_path)
+        if prior_stat.type != pa_fs.FileType.File:
+            raise self._explicit_error(self.ExplicitError.NOT_A_FILE, operation_name, storage_path)
+
+        # Since the size is known, log it now rather than calling stream.seek() and stream.tell()
+        self._log.info(f"File size [{self._key}]: {prior_stat.size} [{storage_path}]")
+
         # Open the stream
         stream = self._fs.open_input_file(resolved_path)
 
-        # Log file size now that the stream is successfully open
-        stream.seek(0, 2)
-        file_size = _util.format_file_size(stream.tell())
-        stream.seek(0, 0)
-
-        self._log.info(f"File size [{self._key}]: {file_size} [{storage_path}]")
-
         # Return impl of PyArrow NativeFile instead of BinaryIO - this is the same thing PyArrow does
-        return _NativeFileResource(stream, lambda: self._close_byte_stream(storage_path, stream))  # noqa
+        return _NativeFileResource(stream, lambda: self._close_byte_stream(storage_path, stream, False))  # noqa
 
     def write_byte_stream(self, storage_path: str) -> tp.BinaryIO:
 
@@ -353,17 +385,30 @@ class CommonFileStorage(IFileStorage):
 
         resolved_path = self._resolve_path(operation_name, storage_path, False)
 
+        # Make sure the parent directory exists
+        # This ensures storage with FS semantics still behaves like a cloud bucket
+        parent_path = self._resolve_parent(resolved_path)
+        if parent_path is not None:
+            self._mkdir(operation_name, parent_path, recursive=True)
+
+        # Try to prevent WRITE if the object is already defined as a directory or other non-file object
+        # In cloud bucket semantics a file and dir can both exist with the same name - very confusing!
+        # There is a race condition here because a directory could be created by another process
+        # But, given the very structured way TRAC uses file storage, this is extremely unlikely
+        prior_stat: pa_fs.FileInfo = self._fs.get_file_info(resolved_path)
+        if prior_stat.type != pa_fs.FileType.NotFound and prior_stat.type != pa_fs.FileType.File:
+            raise self._explicit_error(self.ExplicitError.OBJECT_ALREADY_EXISTS, operation_name, storage_path)
+
         # If the file does not already exist and the write operation fails, try to clean it up
-        file_info: pa_fs.FileInfo = self._fs.get_file_info(resolved_path)
-        delete_on_error = file_info.type == pa_fs.FileType.NotFound
+        delete_on_error = prior_stat.type == pa_fs.FileType.NotFound
 
         # Open the stream
         stream = self._fs.open_output_stream(resolved_path)
 
         # Return impl of  PyArrow NativeFile instead of BinaryIO - this is the same thing PyArrow does
-        return _NativeFileResource(stream, lambda: self._close_byte_stream(storage_path, stream, delete_on_error))  # noqa
+        return _NativeFileResource(stream, lambda: self._close_byte_stream(storage_path, stream, True, delete_on_error))  # noqa
 
-    def _close_byte_stream(self, storage_path: str, stream: tp.BinaryIO, delete_on_error: bool = False):
+    def _close_byte_stream(self, storage_path: str, stream: tp.BinaryIO, is_write: bool, delete_on_error: bool = False):
 
         # Do not try to close the stream twice
         if stream.closed:
@@ -376,22 +421,22 @@ class CommonFileStorage(IFileStorage):
         if error is not None:
             self._log.exception(str(error))
 
+        # For successful write streams, log the total size written
+        if is_write and not error:
+            file_size = _util.format_file_size(stream.tell())
+            self._log.info(f"File size [{self._key}]: {file_size} [{storage_path}]")
+
+        # Close the stream - this may take time for write streams that are not flushed
+        # Closing here gives better logs, because any pause is before the close message
+        # As a fail-safe, _NativeFileResource always calls close() in a "finally" block
+        stream.close()
+
         # Log closing of the stream
-        try:
-            if stream.writable() and not error:
-                file_size = _util.format_file_size(stream.tell())
-                self._log.info(f"File size [{self._key}]: {file_size} [{storage_path}]")
-                self._log.info(f"CLOSE BYTE STREAM (WRITE) [{self._key}]: [{storage_path}]")
+        if is_write:
+            self._log.info(f"CLOSE BYTE STREAM (WRITE) [{self._key}]: [{storage_path}]")
 
-            elif stream.writable():
-                self._log.info(f"CLOSE BYTE STREAM (WRITE) [{self._key}]: [{storage_path}]")
-
-            else:
-                self._log.info(f"CLOSE BYTE STREAM (READ) [{self._key}]: [{storage_path}]")
-
-        # Always make sure the stream is closed
-        finally:
-            stream.close()
+        else:
+            self._log.info(f"CLOSE BYTE STREAM (READ) [{self._key}]: [{storage_path}]")
 
         # If there is an error and cleanup is requested, try to remove the partially written file
         # This is best-efforts, don't blow up if the cleanup fails
@@ -405,7 +450,7 @@ class CommonFileStorage(IFileStorage):
 
     def _wrap_operation(self, func: tp.Callable, operation_name: str, storage_path: str, *args, **kwargs) -> tp.Any:
 
-        operation = f"{operation_name} [{self._key}]: [{storage_path}]"
+        operation = f"{operation_name} {self._key} [{storage_path}]"
 
         try:
             self._log.info(operation)
@@ -414,7 +459,7 @@ class CommonFileStorage(IFileStorage):
         # ETrac means the error is already handled, log the message as-is
 
         except _ex.ETrac as e:
-            self._log.exception(f"{operation} {str(e)}")
+            self._log.exception(f"{operation}: {str(e)}")
             raise
 
         # Arrow maps filesystem errors into native Python OS errors
@@ -449,6 +494,7 @@ class CommonFileStorage(IFileStorage):
 
         except OSError as e:
             error = self._explicit_error(self.ExplicitError.IO_ERROR, operation_name, storage_path)
+            self._log.error(f"{operation}: {str(e)}")
             self._log.exception(f"{operation}: {str(error)}")
             raise error from e
 
@@ -477,18 +523,33 @@ class CommonFileStorage(IFileStorage):
             root_path = pathlib.Path("C:\\root") if _util.is_windows() else pathlib.Path("/root")
             absolute_path = root_path.joinpath(relative_path).resolve(False)
 
-            # is_relative_to only supported in Python 3.9+, we need to support 3.7
-            if absolute_path != root_path and root_path not in absolute_path.parents:
-                raise self._explicit_error(self.ExplicitError.STORAGE_PATH_OUTSIDE_ROOT, operation_name, storage_path)
+            if absolute_path == root_path:
+                if not allow_root_dir:
+                    raise self._explicit_error(self.ExplicitError.STORAGE_PATH_IS_ROOT, operation_name, storage_path)
+                else:
+                    return ""
 
-            if absolute_path == root_path and not allow_root_dir:
-                raise self._explicit_error(self.ExplicitError.STORAGE_PATH_IS_ROOT, operation_name, storage_path)
-    
-            return absolute_path.relative_to(root_path).as_posix()
+            # is_relative_to only supported in Python 3.9+, we need to support 3.7
+            if root_path not in absolute_path.parents:
+                raise self._explicit_error(self.ExplicitError.STORAGE_PATH_OUTSIDE_ROOT, operation_name, storage_path)
+            else:
+                return absolute_path.relative_to(root_path).as_posix()
 
         except ValueError as e:
 
             raise self._explicit_error(self.ExplicitError.STORAGE_PATH_INVALID, operation_name, storage_path) from e
+
+    @staticmethod
+    def _resolve_parent(storage_path: str) -> tp.Optional[str]:
+
+        root_path = pathlib.Path("C:\\root") if _util.is_windows() else pathlib.Path("/root")
+        absolute_path = root_path.joinpath(storage_path).resolve(False)
+
+        if absolute_path == root_path or absolute_path.parent == root_path:
+            return None
+
+        else:
+            return pathlib.Path(storage_path).parent.as_posix()
 
     def _explicit_error(self, error, operation_name, storage_path):
 
