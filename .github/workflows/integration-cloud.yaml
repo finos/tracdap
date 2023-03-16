@@ -8,6 +8,9 @@ on:
       target:
         required: true
         type: string
+      protocol:
+        required: true
+        type: string
       matrix:
         required: true
         type: string
@@ -32,7 +35,7 @@ jobs:
 
   java-integration:
 
-    name: int-java-${{ inputs.service }}-${{ inputs.target }}
+    name: int-java-${{ inputs.service }}-${{ inputs.protocol }}
 
     env: ${{ fromJson( inputs.matrix ) }}
     if: ${{ inputs.enabled && inputs.has_java }}
@@ -105,7 +108,7 @@ jobs:
 
   python-integration:
 
-    name: int-python-${{ inputs.service }}-${{ inputs.target }}
+    name: int-python-${{ inputs.service }}-${{ inputs.protocol }}
 
     if: ${{ inputs.enabled && inputs.has_python }}
     env: ${{ fromJson( inputs.matrix ) }}

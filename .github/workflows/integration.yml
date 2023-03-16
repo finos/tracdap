@@ -376,6 +376,7 @@ jobs:
     with:
       service: ${{ matrix.storage.SERVICE }}
       target: ${{ matrix.storage.TARGET }}
+      protocol: ${{ matrix.storage.PROTOCOL }}
       matrix: ${{ toJson( matrix.storage ) }}
       enabled: ${{ vars[ matrix.storage.ENABLE_IF ] != '' }}
       has_java: ${{ matrix.storage.JAVA_TESTS != '' }}
