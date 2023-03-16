@@ -53,7 +53,7 @@ jobs:
           fetch-depth: 0
 
       - name: Configure AWS credentials
-        if: ${{ secrets.AWS_ROLE != '' }}
+        if: ${{ env.TARGET == 'aws' }}
         uses: aws-actions/configure-aws-credentials@v1
         with:
           role-to-assume: ${{ secrets.AWS_ROLE }}
@@ -124,7 +124,7 @@ jobs:
           fetch-depth: 0
 
       - name: Configure AWS credentials
-        if: ${{ secrets.AWS_ROLE != '' }}
+        if: ${{ env.TARGET == 'aws' }}
         uses: aws-actions/configure-aws-credentials@v1
         with:
           role-to-assume: ${{ secrets.AWS_ROLE }}
