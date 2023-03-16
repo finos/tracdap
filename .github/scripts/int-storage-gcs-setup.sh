@@ -17,6 +17,9 @@
 # Install CLI tools
 
 export DEBIAN_FRONTEND=noninteractive
+
+apt-get update
+apt-get upgrade -y
 apt-get install -y curl gnupg apt-transport-https ca-certificates
 
 echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | tee -a /etc/apt/sources.list.d/google-cloud-sdk.list
