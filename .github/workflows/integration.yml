@@ -352,11 +352,6 @@ jobs:
 
   int-storage:
 
-    # Permissions required to use IdP to connect to cloud platforms
-    permissions:
-      id-token: write   # This is required for requesting the JWT
-      contents: read    # This is required for actions/checkout
-
     strategy:
 
       # Try to finish all jobs - it can be helpful to see if some succeed and others fail
@@ -379,6 +374,7 @@ jobs:
           }
 
     uses: ./.github/workflows/int-storage.yaml
+
     with:
       service: ${{ matrix.storage.SERVICE }}
       protocol: ${{ matrix.storage.PROTOCOL }}
@@ -386,4 +382,10 @@ jobs:
       enabled: ${{ vars[ matrix.storage.ENABLE_IF ] != '' }}
       has_java: ${{ matrix.storage.JAVA_TESTS != '' }}
       has_python: ${{ matrix.storage.PYTHON_TESTS != '' }}
+
     secrets: inherit
+
+    # Permissions required to use IdP to connect to cloud platforms
+    permissions:
+      id-token: write   # This is required for requesting the JWT
+      contents: read    # This is required for actions/checkout
