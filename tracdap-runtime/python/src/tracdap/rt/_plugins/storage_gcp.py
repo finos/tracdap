@@ -13,6 +13,7 @@
 #  limitations under the License.
 
 import typing as tp
+import datetime as dt
 
 import tracdap.rt.exceptions as ex
 
@@ -38,6 +39,11 @@ class GcpStorageProvider(IStorageProvider):
 
     CREDENTIALS_PROPERTY = "credentials"
     CREDENTIALS_ADC = "adc"
+    CREDENTIALS_ACCESS_TOKEN = "access_token"
+
+    ACCESS_TOKEN = "accessToken"
+    ACCESS_TOKEN_EXPIRY = "accessTokenExpiry"
+    ACCESS_TOKEN_EXPIRY_DEFAULT = 3600
 
     def __init__(self, properties: tp.Dict[str, str]):
 
@@ -95,6 +101,22 @@ class GcpStorageProvider(IStorageProvider):
         if mechanism is None or len(mechanism) == 0 or mechanism.lower() == self.CREDENTIALS_ADC:
             self._log.info(f"Using [{self.CREDENTIALS_ADC}] credentials mechanism")
             return dict()
+
+        if mechanism == self.CREDENTIALS_ACCESS_TOKEN:
+
+            access_token = _helpers.get_plugin_property(self._properties, self.ACCESS_TOKEN)
+            access_token_expiry = _helpers.get_plugin_property(self._properties, self.ACCESS_TOKEN_EXPIRY)
+
+            if access_token is None or len(access_token.strip()) == 0:
+                message = f"Missing required config property [{self.ACCESS_TOKEN}] for GCP storage"
+                raise ex.EConfigParse(message)
+
+            if access_token_expiry is None:
+                access_token_expiry = self.ACCESS_TOKEN_EXPIRY_DEFAULT
+
+            expiry_timestamp = dt.datetime.now(dt.timezone.utc) + dt.timedelta(seconds=float(access_token_expiry))
+
+            return {"access_token": access_token, "credential_token_expiration": expiry_timestamp}
 
         message = f"Unrecognised credentials mechanism: [{mechanism}]"
         self._log.error(message)

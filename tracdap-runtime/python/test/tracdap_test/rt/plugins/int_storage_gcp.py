@@ -35,13 +35,9 @@ class AwsArrowNativeStorageTest(unittest.TestCase, FileOperationsTestSuite, File
     @classmethod
     def setUpClass(cls) -> None:
 
-        bucket = os.getenv("TRAC_GCP_BUCKET")
+        properties = cls._properties_from_env()
 
-        suite_storage_config = cfg.PluginConfig(
-            protocol="GCS",
-            properties={
-                "bucket": bucket
-            })
+        suite_storage_config = cfg.PluginConfig(protocol="GCS", properties=properties)
 
         cls.suite_storage = cls._storage_from_config(suite_storage_config, "tracdap_ci_storage")
         cls.suite_storage.mkdir(cls.suite_storage_prefix)
@@ -56,14 +52,10 @@ class AwsArrowNativeStorageTest(unittest.TestCase, FileOperationsTestSuite, File
 
         AwsArrowNativeStorageTest.test_number += 1
 
-        bucket = os.getenv("TRAC_GCP_BUCKET")
+        properties = self._properties_from_env()
+        properties["prefix"] = test_dir
 
-        test_storage_config = cfg.PluginConfig(
-            protocol="GCS",
-            properties={
-                "bucket": bucket,
-                "prefix": test_dir
-            })
+        test_storage_config = cfg.PluginConfig(protocol="GCS", properties=properties)
 
         self.storage = self._storage_from_config(test_storage_config, test_name)
 
@@ -71,6 +63,23 @@ class AwsArrowNativeStorageTest(unittest.TestCase, FileOperationsTestSuite, File
     def tearDownClass(cls) -> None:
 
         cls.suite_storage.rmdir(cls.suite_storage_prefix)
+
+    @staticmethod
+    def _properties_from_env():
+
+        properties = dict()
+        properties["bucket"] = os.getenv("TRAC_GCP_BUCKET")
+
+        credentials = os.getenv("TRAC_GCP_CREDENTIALS")
+
+        if credentials is not None:
+            properties["credentials"] = credentials
+
+        if credentials == "access_token":
+            properties["accessToken"] = os.getenv("TRAC_GCP_ACCESS_TOKEN")
+            properties["accessTokenExpiry"] = os.getenv("TRAC_GCP_ACCESS_TOKEN_EXPIRY")
+
+        return properties
 
     @staticmethod
     def _storage_from_config(storage_config: cfg.PluginConfig, storage_key: str):
