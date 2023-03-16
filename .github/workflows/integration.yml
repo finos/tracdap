@@ -379,7 +379,7 @@ jobs:
               SETUP_SCRIPT: ".github/scripts/int-storage-gcs-setup.sh",
               TRAC_CONFIG_FILE: '.github/config/int-storage-gcs.yaml',
               TRAC_SECRET_KEY: short-lived-secret,
-              PYTHON_TESTS: true }
+              PYTHON_TESTS: int_storage_gcp*.py }
 
     uses: ./.github/workflows/integration-cloud.yaml
 
