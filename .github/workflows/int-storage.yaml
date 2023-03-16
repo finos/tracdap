@@ -134,7 +134,8 @@ jobs:
       - name: Integration setup script
         if: ${{ env.SETUP_SCRIPT != '' }}
         env: ${{ vars }}
-        run: ${{ env.SETUP_SCRIPT }}
+        run: |
+          ${{ env.SETUP_SCRIPT }}
 
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -166,4 +167,5 @@ jobs:
 
       - name: Integration teardown script
         if: ${{ env.TEARDOWN_SCRIPT != '' }}
-        run: ${{ env.TEARDOWN_SCRIPT }}
+        run: |
+          ${{ env.TEARDOWN_SCRIPT }}
