@@ -28,6 +28,11 @@ env:
   PYTHON_VERSION: "3.11"
 
 
+permissions:
+  id-token: write
+  contents: read
+
+
 jobs:
 
   java-integration:
