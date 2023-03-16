@@ -36,21 +36,10 @@ class AwsArrowNativeStorageTest(unittest.TestCase, FileOperationsTestSuite, File
     @classmethod
     def setUpClass(cls) -> None:
 
-        region = os.getenv("TRAC_AWS_REGION")
-        bucket = os.getenv("TRAC_AWS_BUCKET")
-        access_key_id = os.getenv("TRAC_AWS_ACCESS_KEY_ID")
-        secret_access_key = os.getenv("TRAC_AWS_SECRET_ACCESS_KEY")
+        properties = cls._properties_from_env()
+        properties["arrowNativeFs"] = "true"
 
-        suite_storage_config = cfg.PluginConfig(
-            protocol="S3",
-            properties={
-                "region": region,
-                "bucket": bucket,
-                "credentials": "static",
-                "accessKeyId": access_key_id,
-                "secretAccessKey": secret_access_key,
-                "arrowNativeFs": "true"
-            })
+        suite_storage_config = cfg.PluginConfig(protocol="S3", properties=properties)
 
         cls.suite_storage = cls._storage_from_config(suite_storage_config, "tracdap_ci_storage")
         cls.suite_storage.mkdir(cls.suite_storage_prefix)
@@ -65,22 +54,11 @@ class AwsArrowNativeStorageTest(unittest.TestCase, FileOperationsTestSuite, File
 
         AwsArrowNativeStorageTest.test_number += 1
 
-        region = os.getenv("TRAC_AWS_REGION")
-        bucket = os.getenv("TRAC_AWS_BUCKET")
-        access_key_id = os.getenv("TRAC_AWS_ACCESS_KEY_ID")
-        secret_access_key = os.getenv("TRAC_AWS_SECRET_ACCESS_KEY")
+        properties = self._properties_from_env()
+        properties["arrowNativeFs"] = "true"
+        properties["prefix"] = test_dir
 
-        test_storage_config = cfg.PluginConfig(
-            protocol="S3",
-            properties={
-                "region": region,
-                "bucket": bucket,
-                "prefix": test_dir,
-                "credentials": "static",
-                "accessKeyId": access_key_id,
-                "secretAccessKey": secret_access_key,
-                "arrowNativeFs": "true"
-            })
+        test_storage_config = cfg.PluginConfig(protocol="S3", properties=properties)
 
         self.storage = self._storage_from_config(test_storage_config, test_name)
 
@@ -88,6 +66,24 @@ class AwsArrowNativeStorageTest(unittest.TestCase, FileOperationsTestSuite, File
     def tearDownClass(cls) -> None:
 
         cls.suite_storage.rmdir(cls.suite_storage_prefix)
+
+    @staticmethod
+    def _properties_from_env():
+
+        properties = dict()
+        properties["region"] = os.getenv("TRAC_AWS_REGION")
+        properties["bucket"] = os.getenv("TRAC_AWS_BUCKET")
+
+        credentials = os.getenv("TRAC_AWS_CREDENTIALS")
+
+        if credentials:
+            properties["credentials"] = credentials
+
+        if credentials == "static":
+            properties["accessKeyId"] = os.getenv("TRAC_AWS_ACCESS_KEY_ID")
+            properties["secretAccessKey"] = os.getenv("TRAC_AWS_SECRET_ACCESS_KEY")
+
+        return properties
 
     @staticmethod
     def _storage_from_config(storage_config: cfg.PluginConfig, storage_key: str):
