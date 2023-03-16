@@ -75,9 +75,8 @@ jobs:
         if: ${{ inputs.target == 'gcp' }}
         uses: google-github-actions/auth@v1
         with:
-          create_credentials_file: true
-          workload_identity_provider: <example-workload-identity-provider>
-          service_account: <example-service-account>
+          workload_identity_provider: projects/158849182108/locations/global/workloadIdentityPools/github/providers/github
+          service_account: ${{ secrets.GCP_CI_USER }}
 
       - name: Integration setup script
         if: ${{ env.SETUP_SCRIPT != '' }}
