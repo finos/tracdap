@@ -127,7 +127,7 @@ jobs:
         if: ${{ env.TARGET == 'aws' }}
         uses: aws-actions/configure-aws-credentials@v1
         with:
-          role-to-assume: ${{ secrets.AWS_ROLE }}
+          role-to-assume: ${{ secrets.AWS_CI_ROLE }}
           role-session-name: tracdap-ci-session
           aws-region: ${{ vars.TRAC_AWS_REGION }}
 
