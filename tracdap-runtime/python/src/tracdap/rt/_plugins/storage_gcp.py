@@ -37,8 +37,7 @@ class GcpStorageProvider(IStorageProvider):
     ENDPOINT_PROPERTY = "endpoint"
 
     CREDENTIALS_PROPERTY = "credentials"
-    CREDENTIALS_DEFAULT = "default"
-    CREDENTIALS_STATIC = "static"
+    CREDENTIALS_ADC = "adc"
 
     def __init__(self, properties: tp.Dict[str, str]):
 
@@ -57,8 +56,14 @@ class GcpStorageProvider(IStorageProvider):
         gcs_fs = afs.GcsFileSystem(**gcs_args)
 
         bucket = _helpers.get_plugin_property(self._properties, self.BUCKET_PROPERTY)
-        prefix = _helpers.get_plugin_property(self._properties, self.PREFIX_PROPERTY) or ""
-        root_path = f"{bucket}/{prefix}"
+
+        if bucket is None or len(bucket.strip()) == 0:
+            message = f"Missing required config property [{self.BUCKET_PROPERTY}] for GCP storage"
+            self._log.error(message)
+            raise ex.EConfigParse(message)
+
+        prefix = _helpers.get_plugin_property(self._properties, self.PREFIX_PROPERTY)
+        root_path = f"{bucket}/{prefix}" if prefix else bucket
 
         return afs.SubTreeFileSystem(root_path, gcs_fs)
 
@@ -82,15 +87,14 @@ class GcpStorageProvider(IStorageProvider):
 
     def setup_credentials(self):
 
+        # Only default (Google ADC) mechanism is supported
+        # Arrow GCP FS does also support access tokens, but ADC is probably all we ever need
+
         mechanism = _helpers.get_plugin_property(self._properties, self.CREDENTIALS_PROPERTY)
 
-        if mechanism is None or len(mechanism) == 0 or mechanism.lower() == self.CREDENTIALS_DEFAULT:
-            self._log.info(f"Using [{self.CREDENTIALS_DEFAULT}] credentials mechanism")
+        if mechanism is None or len(mechanism) == 0 or mechanism.lower() == self.CREDENTIALS_ADC:
+            self._log.info(f"Using [{self.CREDENTIALS_ADC}] credentials mechanism")
             return dict()
-
-        if mechanism.lower() == self.CREDENTIALS_STATIC:
-
-            raise NotImplementedError("GCP static credentials not implemented yet")
 
         message = f"Unrecognised credentials mechanism: [{mechanism}]"
         self._log.error(message)
