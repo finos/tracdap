@@ -279,7 +279,9 @@ abstract class MetadataReadApiTest {
         var t2TagSaved = readApi.readObject(t2MetadataReadRequest);
 
         var v1TagExpected = v1TagSaved.newBuilderForType()
-                .setHeader(v1Header)
+                .setHeader(v1Header.toBuilder()
+                        .setIsLatestTag(false)
+                        .setIsLatestObject(false))
                 .setDefinition(v1Obj)
                 .putAllAttrs(v1Attrs)
                 .build();
@@ -360,13 +362,17 @@ abstract class MetadataReadApiTest {
         var t2TagSaved = savedTags.getTag(2);
 
         var v1TagExpected = v1TagSaved.newBuilderForType()
-                .setHeader(v1Header)
+                .setHeader(v1Header.toBuilder()
+                        .setIsLatestTag(false)
+                        .setIsLatestObject(false))
                 .setDefinition(v1Obj)
                 .putAllAttrs(v1Attrs)
                 .build();
 
         var v2TagExpected = v2TagSaved.newBuilderForType()
-                .setHeader(v2Header)
+                .setHeader(v2Header.toBuilder()
+                        .setIsLatestTag(true)
+                        .setIsLatestObject(true))
                 .setDefinition(v2Obj)
                 .putAllAttrs(v1Attrs)
                 .build();
@@ -470,13 +476,17 @@ abstract class MetadataReadApiTest {
         var t2TagSaved = readApi.readObject(t2MetadataReadRequest);
 
         var v1TagExpected = v1TagSaved.newBuilderForType()
-                .setHeader(v1Header)
+                .setHeader(v1Header.toBuilder()
+                        .setIsLatestTag(false)
+                        .setIsLatestObject(false))
                 .setDefinition(v1Obj)
                 .putAllAttrs(v1Attrs)
                 .build();
 
         var v2TagExpected = v2TagSaved.newBuilderForType()
-                .setHeader(v2Header)
+                .setHeader(v2Header.toBuilder()
+                        .setIsLatestTag(true)
+                        .setIsLatestObject(true))
                 .setDefinition(v2Obj)
                 .putAllAttrs(v1Attrs)
                 .build();
@@ -579,13 +589,17 @@ abstract class MetadataReadApiTest {
         var t2TagSaved = savedTags.getTag(2);
 
         var v1TagExpected = v1TagSaved.newBuilderForType()
-                .setHeader(v1Header)
+                .setHeader(v1Header.toBuilder()
+                        .setIsLatestTag(false)
+                        .setIsLatestObject(false))
                 .setDefinition(v1Obj)
                 .putAllAttrs(v1Attrs)
                 .build();
 
         var v2TagExpected = v2TagSaved.newBuilderForType()
-                .setHeader(v2Header)
+                .setHeader(v2Header.toBuilder()
+                        .setIsLatestTag(true)
+                        .setIsLatestObject(true))
                 .setDefinition(v2Obj)
                 .putAllAttrs(v1Attrs)
                 .build();

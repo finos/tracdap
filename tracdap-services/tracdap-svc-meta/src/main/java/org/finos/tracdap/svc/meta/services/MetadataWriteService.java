@@ -161,6 +161,8 @@ public class MetadataWriteService {
                 .setObjectTimestamp(MetadataCodec.encodeDatetime(timestamp))
                 .setTagVersion(TAG_FIRST_VERSION)
                 .setTagTimestamp(MetadataCodec.encodeDatetime(timestamp))
+                .setIsLatestTag(true)
+                .setIsLatestObject(true)
                 .build();
 
         var newTag = Tag.newBuilder()
@@ -240,6 +242,8 @@ public class MetadataWriteService {
                 .setObjectTimestamp(MetadataCodec.encodeDatetime(timestamp))
                 .setTagVersion(TAG_FIRST_VERSION)
                 .setTagTimestamp(MetadataCodec.encodeDatetime(timestamp))
+                .setIsLatestTag(true)
+                .setIsLatestObject(true)
                 .build();
 
         var newTag = priorTag.toBuilder()
@@ -307,6 +311,7 @@ public class MetadataWriteService {
         var newHeader = oldHeader.toBuilder()
                 .setTagVersion(oldHeader.getTagVersion() + 1)
                 .setTagTimestamp(MetadataCodec.encodeDatetime(timestamp))
+                .setIsLatestTag(true)
                 .build();
 
         var newTag = priorTag.toBuilder()

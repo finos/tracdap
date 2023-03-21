@@ -107,7 +107,7 @@ class JdbcReadBatchImpl {
             throws SQLException {
 
         var query =
-                "select definition_pk, object_version, object_timestamp, definition\n" +
+                "select definition_pk, object_version, object_timestamp, definition, object_is_latest\n" +
                 "from object_definition def\n" +
                 "join key_mapping km\n" +
                 "  on def.definition_pk = km.pk\n" +
@@ -128,6 +128,7 @@ class JdbcReadBatchImpl {
                 int[] versions = new int[length];
                 Instant[] timestamps = new Instant[length];
                 ObjectDefinition[] defs = new ObjectDefinition[length];
+                boolean[] objectsIsLatest = new boolean[length];
 
                 for (var i = 0; i < length; i++) {
 
@@ -140,6 +141,7 @@ class JdbcReadBatchImpl {
                     var defTimestamp = sqlTimestamp.toInstant();
                     var defEncoded = rs.getBytes(4);
                     var defDecoded = ObjectDefinition.parseFrom(defEncoded);
+                    var objectIsLatest = rs.getBoolean(5);
 
                     // TODO: Encode / decode helper, type = protobuf | json ?
 
@@ -147,12 +149,13 @@ class JdbcReadBatchImpl {
                     versions[i] = defVersion;
                     timestamps[i] = defTimestamp;
                     defs[i] = defDecoded;
+                    objectsIsLatest[i] = objectIsLatest;
                 }
 
                 if (rs.next())
                     throw new JdbcException(JdbcErrorCode.TOO_MANY_ROWS);
 
-                return new JdbcBaseDal.KeyedItems<>(pks, versions, timestamps, defs);
+                return new JdbcBaseDal.KeyedItems<>(pks, versions, timestamps, defs, objectsIsLatest);
             }
             catch (InvalidProtocolBufferException e) {
                 throw new JdbcException(JdbcErrorCode.INVALID_OBJECT_DEFINITION);
@@ -193,7 +196,7 @@ class JdbcReadBatchImpl {
         // Note: Common attributes may be added to the tag table as search optimisations, but do not need to be read
 
         var query =
-                "select tag.tag_pk, tag.tag_version, tag.tag_timestamp\n" +
+                "select tag.tag_pk, tag.tag_version, tag.tag_timestamp, tag.tag_is_latest\n" +
                 "from tag\n" +
                 "join key_mapping km\n" +
                 "  on tag.tag_pk = km.pk\n" +
@@ -213,6 +216,7 @@ class JdbcReadBatchImpl {
                 long[] pks = new long[length];
                 int[] versions = new int[length];
                 Instant[] timestamps = new Instant[length];
+                boolean[] tagsIsLatest = new boolean[length];
 
                 for (var i = 0; i < length; i++) {
 
@@ -223,17 +227,19 @@ class JdbcReadBatchImpl {
                     var tagVersion = rs.getInt(2);
                     var sqlTimestamp = rs.getTimestamp(3);
                     var tagTimestamp = sqlTimestamp.toInstant();
+                    var tagIsLatest = rs.getBoolean(4);
 
                     pks[i] = tagPk;
                     versions[i] = tagVersion;
                     timestamps[i] = tagTimestamp;
+                    tagsIsLatest[i] = tagIsLatest;
                 }
 
                 if (rs.next())
                     throw new JdbcException(JdbcErrorCode.TOO_MANY_ROWS);
 
                 // Tag record requires only PK and version info
-                return new JdbcBaseDal.KeyedItems<>(pks, versions, timestamps, null);
+                return new JdbcBaseDal.KeyedItems<>(pks, versions, timestamps, null, tagsIsLatest);
             }
         }
     }
@@ -255,7 +261,8 @@ class JdbcReadBatchImpl {
                 "  obj.object_id_hi,\n" +
                 "  obj.object_id_lo,\n" +
                 "  def.object_version,\n" +
-                "  def.object_timestamp\n" +
+                "  def.object_timestamp,\n" +
+                "  def.object_is_latest\n"+
                 "from key_mapping km\n" +
                 "join object_definition def\n" +
                 "  on def.definition_pk = km.fk\n" +
@@ -290,6 +297,7 @@ class JdbcReadBatchImpl {
                     var objectVersion = rs.getInt(5);
                     var sqlTimestamp = rs.getTimestamp(6);
                     var objectTimestamp = sqlTimestamp.toInstant();
+                    var isLatestObject = rs.getBoolean(7);
 
                     var objectId = new UUID(objectIdHi, objectIdLo);
                     var objectType = ObjectType.valueOf(objectTypeCode);
@@ -298,6 +306,7 @@ class JdbcReadBatchImpl {
                             .setObjectType(objectType)
                             .setObjectId(objectId.toString())
                             .setObjectVersion(objectVersion)
+                            .setIsLatestObject(isLatestObject)
                             .setObjectTimestamp(MetadataCodec.encodeDatetime(objectTimestamp.atOffset(ZoneOffset.UTC)))
                             .build();
 
@@ -428,7 +437,7 @@ class JdbcReadBatchImpl {
                     .putAllAttrs(attrs[i]);
         }
 
-        return new JdbcBaseDal.KeyedItems<>(tagRecords.keys, tagRecords.versions, tagRecords.timestamps, tags);
+        return new JdbcBaseDal.KeyedItems<>(tagRecords.keys, tagRecords.versions, tagRecords.timestamps, tags, tagRecords.isLatest);
     }
 
     private JdbcBaseDal.KeyedItems<Tag.Builder>
@@ -445,6 +454,7 @@ class JdbcReadBatchImpl {
             var header = headers.items[i].toBuilder()
                     .setTagVersion(tagRecords.versions[i])
                     .setTagTimestamp(tagTimestamp)
+                    .setIsLatestTag(tagRecords.isLatest[i])
                     .build();
 
             tags[i] = Tag.newBuilder()
@@ -452,7 +462,7 @@ class JdbcReadBatchImpl {
                     .putAllAttrs(attrs[i]);
         }
 
-        return new JdbcBaseDal.KeyedItems<>(headers.keys, tagRecords.versions, tagRecords.timestamps, tags);
+        return new JdbcBaseDal.KeyedItems<>(headers.keys, tagRecords.versions, tagRecords.timestamps, tags, tagRecords.isLatest);
     }
 
 
