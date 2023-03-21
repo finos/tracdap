@@ -235,7 +235,7 @@ def get_job_resource(
         return None
 
     err = f"Missing required {selector.objectType} resource [{object_key(selector)}]"
-    raise ex.EJobValidation(err)
+    raise ex.ERuntimeValidation(err)
 
 
 def get_origin(metaclass: type):
