@@ -534,7 +534,10 @@ class GraphBuilder:
                         reachable_nodes[target_node_name] = target_node
 
         if any(remaining_nodes):
-            raise _ex.ETracInternal()  # todo: cyclic / unmet dependencies
+            missing_targets = [edge.target for node in remaining_edges_by_target.values() for edge in node]
+            missing_target_names = [f"{t.node}.{t.socket}" if t.socket else t.node for t in missing_targets]
+            missing_nodes = list(map(lambda n: NodeId(n, namespace), missing_target_names))
+            cls._invalid_graph_error(missing_nodes)
 
         return graph_section
 
@@ -680,8 +683,7 @@ class GraphBuilder:
                 if allow_partial_inputs:
                     inputs.update(requirements_not_met)
                 else:
-                    err = ', '.join(map(str, requirements_not_met))
-                    raise _ex.ETracInternal(err)  # todo inconsistent graph
+                    cls._invalid_graph_error(requirements_not_met)
 
             nodes.update(current_section.nodes)
 
@@ -689,3 +691,21 @@ class GraphBuilder:
             must_run.extend(current_section.must_run)
 
         return GraphSection(nodes, inputs, last_section.outputs, must_run)
+
+    @classmethod
+    def _invalid_graph_error(cls, missing_dependencies: tp.Iterable[NodeId]):
+
+        missing_ids = ", ".join(map(cls._display_name, missing_dependencies))
+        message = f"Invalid job config: The execution graph has unsatisfied dependencies: [{missing_ids}]"
+
+        raise _ex.EJobValidation(message)
+
+    @classmethod
+    def _display_name(cls, node_id: NodeId):
+
+        components = node_id.namespace.components()
+
+        if len(components) <= 1:
+            return node_id.name
+        else:
+            return f"{node_id.name} / {', '.join(components[:-1])}"
