@@ -316,7 +316,8 @@ def filter_model_stack_trace(full_stack: tb.StackSummary, checkout_directory: pa
                     break
         if ("site-packages" in module_path.parts) or ("venv" in module_path.parts):
             break
-        if (checkout_directory is not None) and (not module_path.is_relative_to(checkout_directory)):
+        # is_relative_to only supported in Python 3.9+, we need to support 3.7
+        if (checkout_directory is not None) and (checkout_directory not in module_path.parents):
             break
         last_model_frame = first_model_frame + frame_index
 
