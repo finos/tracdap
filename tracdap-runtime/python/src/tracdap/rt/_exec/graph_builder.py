@@ -695,15 +695,19 @@ class GraphBuilder:
     @classmethod
     def _invalid_graph_error(cls, missing_dependencies: tp.Iterable[NodeId]):
 
-        missing_ids = ", ".join(map(cls._display_name, missing_dependencies))
+        missing_ids = ", ".join(map(cls._missing_item_display_name, missing_dependencies))
         message = f"Invalid job config: The execution graph has unsatisfied dependencies: [{missing_ids}]"
 
         raise _ex.EJobValidation(message)
 
     @classmethod
-    def _display_name(cls, node_id: NodeId):
+    def _missing_item_display_name(cls, node_id: NodeId):
 
         components = node_id.namespace.components()
+
+        # The execution graph is built for an individual job, so the top-level namespace is always the job key
+        # Do not list the job key component with every missing node, that would be overly verbose
+        # If we ever start using global resources (to share between jobs), this logic may need to change
 
         if len(components) <= 1:
             return node_id.name
