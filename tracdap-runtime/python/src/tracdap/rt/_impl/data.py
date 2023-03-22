@@ -538,7 +538,7 @@ class DataConformance:
         if pa.types.is_null(vector.type):
 
             if field.nullable:
-                return pa.array([], type=field.type, size=len(vector))
+                return pa.nulls(size=len(vector), type=field.type)
             else:
                 raise _ex.EDataConformance(f"All null values in non-null field [{field.name}]")
 
