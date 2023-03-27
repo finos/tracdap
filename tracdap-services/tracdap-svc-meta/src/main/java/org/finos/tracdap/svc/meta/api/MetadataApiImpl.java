@@ -82,7 +82,7 @@ public class MetadataApiImpl {
     TagHeader createObject(MetadataWriteRequest request) {
 
         validateRequest(CREATE_OBJECT_METHOD, request);
-        validateObjectType(request.getObjectType());
+        validateObjectType(request.getObjectType()); //TODO: issue292 - we need to use this approach for all types of objects except for tags, which may be modified through public API
 
         return writeService.createObjects(
                 request.getTenant(),
@@ -97,7 +97,7 @@ public class MetadataApiImpl {
         var requestsList = request.getRequestsList();
 
         for (var rq : requestsList) {
-            validateObjectType(rq.getObjectType());
+            validateObjectType(rq.getObjectType()); //TODO: issue292 - clarify (*000*)
         }
 
         var tagHeaders = writeService.createObjects(
@@ -141,7 +141,7 @@ public class MetadataApiImpl {
                 .build();
     }
 
-    private void validateObjectType(ObjectType objectType) {
+    private void validateObjectType(ObjectType objectType) { //TODO: issue292 - this is needed to be called in the test
         if (apiTrustLevel == PUBLIC_API && !PUBLIC_WRITABLE_OBJECT_TYPES.contains(objectType)) {
             var message = String.format("Object type %s cannot be created via the TRAC public API", objectType);
             var status = Status.PERMISSION_DENIED.withDescription(message);
@@ -226,7 +226,7 @@ public class MetadataApiImpl {
 
     public UniversalMetadataWriteBatchResponse writeBatch(UniversalMetadataWriteBatchRequest request) {
 
-        validateRequest(TrustedMetadataApiGrpc.getWriteBatchMethod(), request);
+        validateRequest(TrustedMetadataApiGrpc.getWriteBatchMethod(), request); //TODO: issue292 - clarify type validation - see *000*...
 
         return writeService.writeBatch(request);
     }

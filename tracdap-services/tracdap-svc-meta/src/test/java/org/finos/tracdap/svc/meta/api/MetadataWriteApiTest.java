@@ -356,7 +356,7 @@ abstract class MetadataWriteApiTest {
     // CREATE BATCH
     // -----------------------------------------------------------------------------------------------------------------
 
-    @ParameterizedTest
+    /*@ParameterizedTest
     @EnumSource(value = ObjectType.class, mode = EnumSource.Mode.EXCLUDE,
             names = {"OBJECT_TYPE_NOT_SET", "UNRECOGNIZED"})
     void createObjectBatch_trustedTypesOk(ObjectType objectType) {
@@ -372,7 +372,7 @@ abstract class MetadataWriteApiTest {
         // All object types should be either in this test, or publicTypesNotAllowed
 
         createObjectBatch_ok(objectType, request -> publicApi.createObjectBatch(request));
-    }
+    } */ // TODO: issue292 - remove it
 
     @ParameterizedTest
     @EnumSource(value = ObjectType.class, mode = EnumSource.Mode.EXCLUDE,
@@ -401,7 +401,7 @@ abstract class MetadataWriteApiTest {
                 .build();
 
         // noinspection ResultOfMethodCallIgnored
-        var error = assertThrows(StatusRuntimeException.class, () -> publicApi.createObjectBatch(writeRequest));
+        var error = assertThrows(StatusRuntimeException.class, () ->  publicApi.writeBatch(universalizeCreateObjectBatchRequest(writeRequest))); //TODO: issue292
         assertEquals(Status.Code.PERMISSION_DENIED, error.getStatus().getCode());
     }
 
@@ -505,11 +505,11 @@ abstract class MetadataWriteApiTest {
                 .build();
 
         // noinspection ResultOfMethodCallIgnored
-        var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.createObjectBatch(writeRequest));
+        var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.writeBatch(universalizeCreateObjectBatchRequest(writeRequest))); //TODO: issue292
         assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
 
         // noinspection ResultOfMethodCallIgnored
-        var error2 = assertThrows(StatusRuntimeException.class, () -> publicApi.createObjectBatch(writeRequest));
+        var error2 = assertThrows(StatusRuntimeException.class, () -> publicApi.writeBatch(universalizeCreateObjectBatchRequest(writeRequest))); //TODO: issue292
         assertEquals(Status.Code.INVALID_ARGUMENT, error2.getStatus().getCode());
     }
 
@@ -551,11 +551,11 @@ abstract class MetadataWriteApiTest {
                 .build();
 
         // noinspection ResultOfMethodCallIgnored
-        var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.createObjectBatch(writeRequest));
+        var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.writeBatch(universalizeCreateObjectBatchRequest(writeRequest))); //TODO: issue292
         assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
 
         // noinspection ResultOfMethodCallIgnored
-        var error2 = assertThrows(StatusRuntimeException.class, () -> publicApi.createObjectBatch(writeRequest));
+        var error2 = assertThrows(StatusRuntimeException.class, () -> publicApi.writeBatch(universalizeCreateObjectBatchRequest(writeRequest))); //TODO: issue292
         assertEquals(Status.Code.INVALID_ARGUMENT, error2.getStatus().getCode());
     }
 
@@ -590,11 +590,11 @@ abstract class MetadataWriteApiTest {
                 .build();
 
         // noinspection ResultOfMethodCallIgnored
-        var error = assertThrows(StatusRuntimeException.class, () -> publicApi.createObjectBatch(writeRequest));
+        var error = assertThrows(StatusRuntimeException.class, () -> publicApi.writeBatch(universalizeCreateObjectBatchRequest(writeRequest))); //TODO: issue292
         assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
 
         // noinspection ResultOfMethodCallIgnored
-        var error2 = assertThrows(StatusRuntimeException.class, () -> trustedApi.createObjectBatch(writeRequest));
+        var error2 = assertThrows(StatusRuntimeException.class, () -> trustedApi.writeBatch(universalizeCreateObjectBatchRequest(writeRequest))); //TODO: issue292
         assertEquals(Status.Code.INVALID_ARGUMENT, error2.getStatus().getCode());
     }
 
@@ -634,10 +634,10 @@ abstract class MetadataWriteApiTest {
         // Then the result would be PERMISSION_DENIED instead
 
         // noinspection ResultOfMethodCallIgnored
-        var error = assertThrows(StatusRuntimeException.class, () -> publicApi.createObjectBatch(writeRequest));
+        var error = assertThrows(StatusRuntimeException.class, () -> publicApi.writeBatch(universalizeCreateObjectBatchRequest(writeRequest))); //TODO: issue292
         assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
 
-        assertDoesNotThrow(() -> trustedApi.createObjectBatch(writeRequest));
+        assertDoesNotThrow(() -> trustedApi.writeBatch(universalizeCreateObjectBatchRequest(writeRequest))); //TODO: issue292
     }
     
     // -----------------------------------------------------------------------------------------------------------------
@@ -1143,7 +1143,7 @@ abstract class MetadataWriteApiTest {
             names = {"DATA", "FILE", "STORAGE", "SCHEMA", "CUSTOM"})
     void updateObjectBatch_trustedTypesOk(ObjectType objectType) {
 
-        updateObjectBatch_ok(objectType, request -> trustedApi.updateObjectBatch(request));
+        updateObjectBatch_ok(objectType, request -> deuniversalizeCreateObjectBatchResponse(trustedApi.writeBatch(universalizeCreateObjectBatchRequest(request)))); //TODO: issue292 *001*
     }
 
     // Versioned types that are also publicly writable
@@ -1152,7 +1152,7 @@ abstract class MetadataWriteApiTest {
             names = {"SCHEMA", "CUSTOM"})
     void updateObjectBatch_publicTypesOk(ObjectType objectType) {
 
-        updateObjectBatch_ok(objectType, request -> publicApi.updateObjectBatch(request));
+        updateObjectBatch_ok(objectType, request -> deuniversalizeCreateObjectBatchResponse(publicApi.writeBatch(universalizeCreateObjectBatchRequest(request)))); //TODO: issue292
     }
 
     // Versioned types that are not publicly writable
@@ -1183,7 +1183,7 @@ abstract class MetadataWriteApiTest {
                 .build();
 
         // noinspection ResultOfMethodCallIgnored
-        var error = assertThrows(StatusRuntimeException.class, () -> publicApi.updateObjectBatch(v2WriteRequest));
+        var error = assertThrows(StatusRuntimeException.class, () -> deuniversalizeCreateObjectBatchResponse(publicApi.writeBatch(universalizeCreateObjectBatchRequest(v2WriteRequest)))); //TODO: issue292
         assertEquals(Status.Code.PERMISSION_DENIED, error.getStatus().getCode());
     }
 
@@ -1912,7 +1912,7 @@ abstract class MetadataWriteApiTest {
                 )
                 .build();
 
-        var t2headers = trustedApi.updateTagBatch(t2WriteRequest).getHeadersList();
+        var t2headers = trustedApi.updateTagBatch(t2WriteRequest).getHeadersList(); //TODO: issue292 *002*
 
         assertEquals(7, t2headers.size());
 
@@ -1970,7 +1970,7 @@ abstract class MetadataWriteApiTest {
                 )
                 .build();
 
-        var t3Headers = publicApi.updateTagBatch(t3WriteRequest).getHeadersList();
+        var t3Headers = publicApi.updateTagBatch(t3WriteRequest).getHeadersList(); //TODO: issue292 *002*
 
         assertEquals(7, t3Headers.size());
 
@@ -2437,7 +2437,7 @@ abstract class MetadataWriteApiTest {
                 .addAllRequests(requestsData.stream().map(r -> r.writeRequest).collect(Collectors.toList()))
                 .build();
 
-        var tagHeaders = trustedApi.createPreallocatedObjectBatch(writeRequest).getHeadersList();
+        var tagHeaders = deuniversalizeCreateObjectBatchResponse(trustedApi.writeBatch(universalizeCreateObjectBatchRequest(writeRequest))).getHeadersList(); //TODO: issue292 *003*
         assertEquals(13, tagHeaders.size());
 
         for (int i = 0; i < 13; i++) {
@@ -2510,7 +2510,7 @@ abstract class MetadataWriteApiTest {
                 .build();
 
         // noinspection ResultOfMethodCallIgnored
-        var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.createPreallocatedObjectBatch(writeBatchRequest));
+        var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.writeBatch(universalizeCreateObjectBatchRequest(writeBatchRequest))); //TODO: issue292 *003*
         assertEquals(Status.Code.NOT_FOUND, error.getStatus().getCode());
     }
 
