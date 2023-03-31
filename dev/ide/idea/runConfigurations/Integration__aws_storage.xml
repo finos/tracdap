@@ -1,0 +1,19 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Integration: aws-storage" type="JUnit" factoryName="JUnit">
+    <module name="tracdap.aws-storage.test" />
+    <option name="MAIN_CLASS_NAME" value="" />
+    <option name="METHOD_NAME" value="" />
+    <option name="TEST_OBJECT" value="tags" />
+    <option name="VM_PARAMETERS" value="-ea --add-opens java.base/jdk.internal.misc=ALL-UNNAMED --add-opens java.base/java.nio=ALL-UNNAMED -Dio.netty.tryReflectionSetAccessible=true" />
+    <envs>
+      <env name="TRAC_AWS_ACCESS_KEY_ID" value="&lt; set me &gt;" />
+      <env name="TRAC_AWS_BUCKET" value="&lt; set me &gt;" />
+      <env name="TRAC_AWS_REGION" value="&lt; set me &gt;" />
+      <env name="TRAC_AWS_SECRET_ACCESS_KEY" value="&lt; set me &gt;" />
+    </envs>
+    <tag value="int-storage" />
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>
