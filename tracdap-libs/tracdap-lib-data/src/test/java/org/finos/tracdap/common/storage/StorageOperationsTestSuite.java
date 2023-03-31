@@ -245,9 +245,10 @@ public abstract class StorageOperationsTestSuite {
     void testStat_fileMTime() throws Exception {
 
         // All storage implementations must implement mtime for files
+        // Using 1 second as the required resolution (at least one FS, AWS S3, has 1 second resolution)
 
         var testStart = Instant.now();
-        Thread.sleep(10);  // Let time elapse before/after the test calls
+        Thread.sleep(1000);  // Let time elapse before/after the test calls
 
         var prepare = makeSmallFile("test_file.txt", storage, execContext);
         waitFor(TEST_TIMEOUT, prepare);
@@ -255,7 +256,7 @@ public abstract class StorageOperationsTestSuite {
         var stat = storage.stat("test_file.txt", execContext);
         waitFor(TEST_TIMEOUT, stat);
 
-        Thread.sleep(10);  // Let time elapse before/after the test calls
+        Thread.sleep(1000);  // Let time elapse before/after the test calls
         var testFinish = Instant.now();
 
         var statResult = resultOf(stat);
@@ -264,7 +265,8 @@ public abstract class StorageOperationsTestSuite {
         Assertions.assertTrue(statResult.mtime.isBefore(testFinish));
     }
 
-    @Test  @DisabledOnOs(OS.WINDOWS)
+    @Test
+    @DisabledOnOs(value = OS.WINDOWS, disabledReason = "ATime testing disabled for Windows / NTFS")
     void testStat_fileATime() throws Exception {
 
         // For cloud storage implementations, file atime may not be available
@@ -329,7 +331,7 @@ public abstract class StorageOperationsTestSuite {
     @Test
     void testStat_dirMTime() throws Exception {
 
-        // ctime, mtime and atime for dirs is unlikely to be supported in cloud storage buckets
+        // mtime and atime for dirs is unlikely to be supported in cloud storage buckets
         // So, all of these fields are optional in stat responses for directories
 
         var prepare1 = storage.mkdir("some_dir/test_dir", true, execContext);
@@ -355,9 +357,13 @@ public abstract class StorageOperationsTestSuite {
     }
 
     @Test
+    @DisabledOnOs(value = OS.WINDOWS, disabledReason = "ATime testing disabled for Windows / NTFS")
     void testStat_dirATime() throws Exception {
 
-        // ctime, mtime and atime for dirs is unlikely to be supported in cloud storage buckets
+        // This test fails intermittently for local storage on Windows, for the same reason as test_stat_file_atime
+        // https://docs.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-getfiletime?redirectedfrom=MSDN
+
+        // mtime and atime for dirs is unlikely to be supported in cloud storage buckets
         // So, all of these fields are optional in stat responses for directories
 
         var prepare1 = storage
@@ -529,7 +535,7 @@ public abstract class StorageOperationsTestSuite {
     }
 
     @Test
-    void testLs_file() {
+    void testLs_file() throws Exception {
 
         // Attempt to call ls on a file is an error
 
@@ -539,7 +545,15 @@ public abstract class StorageOperationsTestSuite {
         var ls = storage.ls("test_file", execContext);
         waitFor(TEST_TIMEOUT, ls);
 
-        Assertions.assertThrows(EStorageRequest.class, () -> resultOf(ls));
+        var fileLs = resultOf(ls);
+
+        Assertions.assertEquals(1, fileLs.entries.size());
+
+        var stat = fileLs.entries.get(0);
+
+        Assertions.assertEquals(FileType.FILE, stat.fileType);
+        Assertions.assertEquals("test_file", stat.fileName);
+        Assertions.assertEquals("test_file", stat.storagePath);
     }
 
     @Test
@@ -590,17 +604,27 @@ public abstract class StorageOperationsTestSuite {
     }
 
     @Test
-    void testMkdir_dirExists() {
+    void testMkdir_dirExists() throws Exception {
 
-        // mkdir with recursive = false should throw EStorageRequest if dir already exists
+        // It is not an error to call mkdir on an existing directory
 
         var prepare = storage.mkdir("test_dir", false, execContext);
         waitFor(TEST_TIMEOUT, prepare);
 
+        var exists1 = storage.exists("test_dir", execContext);
+        waitFor(TEST_TIMEOUT, exists1);
+        var exists1Result = resultOf(exists1);
+
+        Assertions.assertTrue(exists1Result);
+
         var mkdir = storage.mkdir("test_dir", false, execContext);
         waitFor(TEST_TIMEOUT, mkdir);
 
-        Assertions.assertThrows(EStorageRequest.class, () -> resultOf(mkdir));
+        var exists2 = storage.exists("test_dir", execContext);
+        waitFor(TEST_TIMEOUT, exists2);
+        var exists2Result = resultOf(exists2);
+
+        Assertions.assertTrue(exists2Result);
     }
 
     @Test
