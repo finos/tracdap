@@ -31,6 +31,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
@@ -224,6 +225,13 @@ public class LocalFileStorage implements IFileStorage {
             log.info("STORAGE OPERATION: {} {} [{}]", storageKey, LS_OPERATION, storagePath);
 
             var absolutePath = resolvePath(storagePath, true, LS_OPERATION);
+            var stat = buildFileStat(absolutePath, storagePath, LS_OPERATION);
+
+            if (stat.fileType != FileType.DIRECTORY) {
+                var listing = List.of(stat);
+                var dirStat = new DirStat(listing);
+                return CompletableFuture.completedFuture(dirStat);
+            }
 
             try (var paths = Files.list(absolutePath)) {
 
