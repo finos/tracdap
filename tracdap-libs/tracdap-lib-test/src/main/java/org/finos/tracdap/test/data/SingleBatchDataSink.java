@@ -22,19 +22,30 @@ import org.finos.tracdap.common.data.pipeline.BaseDataSink;
 import org.apache.arrow.vector.VectorSchemaRoot;
 import org.apache.arrow.vector.types.pojo.Schema;
 
+import java.util.function.Consumer;
+
 
 public class SingleBatchDataSink
         extends BaseDataSink <DataPipeline.ArrowApi>
         implements DataPipeline.ArrowApi {
 
-    private VectorSchemaRoot root;
+    private final Consumer<VectorSchemaRoot> callback;
 
+    private VectorSchemaRoot root;
     private Schema schema;
     private long rowCount;
+    private int batchCount;
 
     public SingleBatchDataSink(DataPipeline pipeline) {
+        this(pipeline, batch -> {});
+    }
+
+    public SingleBatchDataSink(DataPipeline pipeline, Consumer<VectorSchemaRoot> callback) {
 
         super(pipeline);
+
+        this.callback = callback;
+        this.batchCount = 0;
     }
 
     @Override
@@ -47,6 +58,10 @@ public class SingleBatchDataSink
     }
 
     public long getRowCount() { return rowCount; }
+
+    public int getBatchCount() {
+        return batchCount;
+    }
 
     @Override
     public void connect() {
@@ -77,7 +92,11 @@ public class SingleBatchDataSink
 
     @Override
     public void onBatch() {
-        this.rowCount += root.getRowCount();
+
+        batchCount += 1;
+        rowCount += root.getRowCount();
+
+        callback.accept(root);
     }
 
     @Override
