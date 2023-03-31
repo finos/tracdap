@@ -53,7 +53,7 @@ public class S3StorageOperationsTest extends StorageOperationsTestSuite {
         var random = new Random();
 
         testDir = String.format(
-                "platform_storage_test_suite_%s_0x%h",
+                "platform_storage_test_suite_%s_0x%h/",
                 DateTimeFormatter.ISO_INSTANT.format(Instant.now()),
                 random.nextLong());
 
@@ -66,7 +66,7 @@ public class S3StorageOperationsTest extends StorageOperationsTestSuite {
         setup = new S3ObjectStorage(storageProps);
         setup.start(elg);
 
-        var mkdir =setup.mkdir(testDir.substring(1), true, setupExecCtx);
+        var mkdir = setup.mkdir(testDir, true, setupExecCtx);
         waitFor(Duration.ofSeconds(10), mkdir);
         resultOf(mkdir);
     }
@@ -91,7 +91,7 @@ public class S3StorageOperationsTest extends StorageOperationsTestSuite {
     @AfterAll
     static void tearDownStorage() throws Exception {
 
-        var rm = setup.rm(testDir.substring(1), true, setupExecCtx);
+        var rm = setup.rm(testDir, true, setupExecCtx);
         waitFor(Duration.ofSeconds(10), rm);
         resultOf(rm);
 
