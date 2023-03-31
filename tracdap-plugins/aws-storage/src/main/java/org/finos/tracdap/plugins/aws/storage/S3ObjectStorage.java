@@ -42,6 +42,7 @@ import org.slf4j.LoggerFactory;
 import java.net.URI;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -327,7 +328,7 @@ public class S3ObjectStorage implements IFileStorage {
     }
 
     @Override
-    public CompletionStage<DirStat> ls(String storagePath, IExecutionContext execContext) {
+    public CompletionStage<List<FileStat>> ls(String storagePath, IExecutionContext execContext) {
 
         try {
 
@@ -358,7 +359,7 @@ public class S3ObjectStorage implements IFileStorage {
         }
     }
 
-    private DirStat lsResult(String dirObjectKey, ListObjectsResponse response) {
+    private List<FileStat> lsResult(String dirObjectKey, ListObjectsResponse response) {
 
         log.info(response.commonPrefixes().toString());
 
@@ -399,7 +400,7 @@ public class S3ObjectStorage implements IFileStorage {
             stats.add(stat);
         }
 
-        return new DirStat(stats);
+        return stats;
     }
 
     @Override
@@ -458,7 +459,7 @@ public class S3ObjectStorage implements IFileStorage {
 
         return ls(dirKey, execContext).thenComposeAsync(stat -> {
 
-            if (stat.entries.isEmpty())
+            if (stat.isEmpty())
                 return rmSingle(dirKey, execContext);
 
             throw new ETracInternal("RM recursive not implemented yet");

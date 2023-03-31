@@ -22,6 +22,7 @@ import org.finos.tracdap.common.data.IDataContext;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.EventLoopGroup;
 
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Flow;
@@ -54,7 +55,7 @@ public interface IFileStorage extends AutoCloseable {
 
     CompletionStage<FileStat> stat(String storagePath, IExecutionContext execContext);
 
-    CompletionStage<DirStat> ls(String storagePath, IExecutionContext execContext);
+    CompletionStage<List<FileStat>> ls(String storagePath, IExecutionContext execContext);
 
     CompletionStage<Void> mkdir(String storagePath, boolean recursive, IExecutionContext execContext);
 

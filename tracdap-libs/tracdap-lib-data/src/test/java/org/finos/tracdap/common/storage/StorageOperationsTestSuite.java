@@ -440,12 +440,12 @@ public abstract class StorageOperationsTestSuite {
         var ls = storage.ls("test_dir", execContext);
         waitFor(TEST_TIMEOUT, ls);
 
-        var dirStat = resultOf(ls);
+        var listing = resultOf(ls);
 
-        Assertions.assertEquals(2, dirStat.entries.size());
+        Assertions.assertEquals(2, listing.size());
 
-        var child1 = dirStat.entries.stream().filter(e -> e.fileName.equals("child_1")).findFirst();
-        var child2 = dirStat.entries.stream().filter(e -> e.fileName.equals("child_2.txt")).findFirst();
+        var child1 = listing.stream().filter(e -> e.fileName.equals("child_1")).findFirst();
+        var child2 = listing.stream().filter(e -> e.fileName.equals("child_2.txt")).findFirst();
 
         Assertions.assertTrue(child1.isPresent());
         Assertions.assertEquals("test_dir/child_1", child1.get().storagePath);
@@ -470,12 +470,12 @@ public abstract class StorageOperationsTestSuite {
         var ls = storage.ls("ls_extensions", execContext);
         waitFor(TEST_TIMEOUT, ls);
 
-        var dirStat = resultOf(ls);
+        var listing = resultOf(ls);
 
-        Assertions.assertEquals(2, dirStat.entries.size());
+        Assertions.assertEquals(2, listing.size());
 
-        var child1 = dirStat.entries.stream().filter(e -> e.fileName.equals("child_1.dat")).findFirst();
-        var child2 = dirStat.entries.stream().filter(e -> e.fileName.equals("child_2_file")).findFirst();
+        var child1 = listing.stream().filter(e -> e.fileName.equals("child_1.dat")).findFirst();
+        var child2 = listing.stream().filter(e -> e.fileName.equals("child_2_file")).findFirst();
 
         Assertions.assertTrue(child1.isPresent());
         Assertions.assertEquals("ls_extensions/child_1.dat", child1.get().storagePath);
@@ -499,11 +499,11 @@ public abstract class StorageOperationsTestSuite {
         var ls2 = storage.ls("ls_trailing_slash/", execContext);
         waitFor(TEST_TIMEOUT, ls1, ls2);
 
-        var dirStat1 = resultOf(ls1);
-        var dirStat2 = resultOf(ls2);
+        var listing1 = resultOf(ls1);
+        var listing2 = resultOf(ls2);
 
-        Assertions.assertEquals(1, dirStat1.entries.size());
-        Assertions.assertEquals(1, dirStat2.entries.size());
+        Assertions.assertEquals(1, listing1.size());
+        Assertions.assertEquals(1, listing2.size());
     }
 
     @Test
@@ -518,12 +518,12 @@ public abstract class StorageOperationsTestSuite {
         var ls = storage.ls(".", execContext);
         waitFor(TEST_TIMEOUT, ls);
 
-        var dirStat = resultOf(ls);
+        var listing = resultOf(ls);
 
-        Assertions.assertTrue(dirStat.entries.size() >= 2);
+        Assertions.assertTrue(listing.size() >= 2);
 
-        var child1 = dirStat.entries.stream().filter(e -> e.fileName.equals("test_dir")).findFirst();
-        var child2 = dirStat.entries.stream().filter(e -> e.fileName.equals("test_file.txt")).findFirst();
+        var child1 = listing.stream().filter(e -> e.fileName.equals("test_dir")).findFirst();
+        var child2 = listing.stream().filter(e -> e.fileName.equals("test_file.txt")).findFirst();
 
         Assertions.assertTrue(child1.isPresent());
         Assertions.assertEquals("test_dir", child1.get().storagePath);
@@ -547,9 +547,9 @@ public abstract class StorageOperationsTestSuite {
 
         var fileLs = resultOf(ls);
 
-        Assertions.assertEquals(1, fileLs.entries.size());
+        Assertions.assertEquals(1, fileLs.size());
 
-        var stat = fileLs.entries.get(0);
+        var stat = fileLs.get(0);
 
         Assertions.assertEquals(FileType.FILE, stat.fileType);
         Assertions.assertEquals("test_file", stat.fileName);

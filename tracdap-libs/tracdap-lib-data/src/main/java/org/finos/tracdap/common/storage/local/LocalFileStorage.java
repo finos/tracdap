@@ -219,7 +219,7 @@ public class LocalFileStorage implements IFileStorage {
     }
 
     @Override
-    public CompletionStage<DirStat> ls(String storagePath, IExecutionContext execContext) {
+    public CompletionStage<List<FileStat>> ls(String storagePath, IExecutionContext execContext) {
 
         try {
             log.info("STORAGE OPERATION: {} {} [{}]", storageKey, LS_OPERATION, storagePath);
@@ -229,8 +229,7 @@ public class LocalFileStorage implements IFileStorage {
 
             if (stat.fileType != FileType.DIRECTORY) {
                 var listing = List.of(stat);
-                var dirStat = new DirStat(listing);
-                return CompletableFuture.completedFuture(dirStat);
+                return CompletableFuture.completedFuture(listing);
             }
 
             try (var paths = Files.list(absolutePath)) {
@@ -239,9 +238,7 @@ public class LocalFileStorage implements IFileStorage {
                         .map(p -> buildFileStat(p, rootPath.relativize(p).toString(), LS_OPERATION))
                         .collect(Collectors.toList());
 
-                var dirStat = new DirStat(entries);
-
-                return CompletableFuture.completedFuture(dirStat);
+                return CompletableFuture.completedFuture(entries);
             }
         }
         catch (Exception e) {
