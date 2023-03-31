@@ -53,7 +53,7 @@ public class S3StorageOperationsTest extends StorageOperationsTestSuite {
         var random = new Random();
 
         testDir = String.format(
-                "/tracdap_test/test_%s_0x%h",
+                "platform_storage_test_suite_%s_0x%h",
                 DateTimeFormatter.ISO_INSTANT.format(Instant.now()),
                 random.nextLong());
 
