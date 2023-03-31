@@ -40,7 +40,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.net.URI;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
@@ -314,15 +313,12 @@ public class S3ObjectStorage implements IFileStorage {
                 throw errors.handleException(error, objectKey, STAT_OPERATION);
             }
 
-            var path = objectKey;
             var name = objectKey.substring(objectKey.lastIndexOf("/", objectKey.length() - 2) + 1);
             var fileType = FileType.FILE;
             var size = response.objectSize();
-
             var mtime = response.lastModified();
-            var atime = (Instant) null;
 
-            return new FileStat(path, name, fileType, size, mtime, atime);
+            return new FileStat(objectKey, name, fileType, size, mtime, /* atime = */ null);
 
         }, execContext.eventLoopExecutor());
     }
