@@ -27,7 +27,6 @@ import org.finos.tracdap.common.codec.json.JsonCodec;
 import org.finos.tracdap.common.concurrent.Flows;
 import org.finos.tracdap.common.data.DataContext;
 import org.finos.tracdap.common.data.DataPipeline;
-import org.finos.tracdap.common.data.pipeline.DataPipelineImpl;
 import org.finos.tracdap.common.exception.EDataCorruption;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.test.data.SampleData;
@@ -140,9 +139,9 @@ public abstract class CodecTestSuite {
         var allocator = new RootAllocator();
 
         var fieldType = new FieldType(true, ArrowSchema.ARROW_BASIC_INTEGER, null);
-        var field = new Field("string_field", fieldType, null);
+        var field = new Field("integer_field", fieldType, null);
 
-        var intVec = new BigIntVector("integer_field", allocator);
+        var intVec = new BigIntVector(field, allocator);
         intVec.allocateNew(4);
 
         intVec.set(0, 0);
@@ -162,9 +161,9 @@ public abstract class CodecTestSuite {
         var allocator = new RootAllocator();
 
         var fieldType = new FieldType(true, ArrowSchema.ARROW_BASIC_FLOAT, null);
-        var field = new Field("string_field", fieldType, null);
+        var field = new Field("float_field", fieldType, null);
 
-        var floatVec = new Float8Vector("float_field", allocator);
+        var floatVec = new Float8Vector(field, allocator);
         floatVec.allocateNew(8);
 
         floatVec.set(0, 0.0);
@@ -336,7 +335,10 @@ public abstract class CodecTestSuite {
         var dataSrc = new SingleBatchDataSource(root);
         var pipeline = DataPipeline.forSource(dataSrc, ctx);
 
-        var dataSink = new SingleBatchDataSink((DataPipelineImpl) pipeline);
+        pipeline.addStage(codec.getEncoder(allocator, root.getSchema(), Map.of()));
+        pipeline.addStage(codec.getDecoder(allocator, root.getSchema(), Map.of()));
+
+        var dataSink = new SingleBatchDataSink(pipeline, batch -> compareBatches(root, batch));
         pipeline.addSink(dataSink);
 
         var exec = pipeline.execute();
@@ -345,6 +347,7 @@ public abstract class CodecTestSuite {
         var rtSchema = dataSink.getSchema();
         var rtRowCount = dataSink.getRowCount();
 
+        Assertions.assertEquals(1, dataSink.getBatchCount());
         Assertions.assertEquals(root.getSchema(), rtSchema);
         Assertions.assertEquals(root.getRowCount(), rtRowCount);
 
@@ -353,7 +356,7 @@ public abstract class CodecTestSuite {
 
     @Test
     @EnabledIf(value = "basicDataAvailable", disabledReason = "Pre-saved test data not available for this format")
-    void decode_basic() throws Exception {
+    void decode_basic() {
 
         var allocator = new RootAllocator();
         var root = generateBasicData(allocator);
@@ -368,7 +371,7 @@ public abstract class CodecTestSuite {
         var decoder = codec.getDecoder(allocator, root.getSchema(), Map.of());
         pipeline.addStage(decoder);
 
-        var dataSink = new SingleBatchDataSink(pipeline);
+        var dataSink = new SingleBatchDataSink(pipeline, batch -> compareBatches(root, batch));
         pipeline.addSink(dataSink);
 
         var exec = pipeline.execute();
@@ -377,6 +380,7 @@ public abstract class CodecTestSuite {
         var rtSchema = dataSink.getSchema();
         var rtRowCount = dataSink.getRowCount();
 
+        Assertions.assertEquals(1, dataSink.getBatchCount());
         Assertions.assertEquals(root.getSchema(), rtSchema);
         Assertions.assertEquals(root.getRowCount(), rtRowCount);
 
