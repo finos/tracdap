@@ -318,11 +318,10 @@ public class S3ObjectStorage implements IFileStorage {
             var fileType = FileType.FILE;
             var size = response.objectSize();
 
-            var ctime = response.lastModified();
             var mtime = response.lastModified();
             var atime = (Instant) null;
 
-            return new FileStat(path, name, fileType, size, ctime, mtime, atime);
+            return new FileStat(path, name, fileType, size, mtime, atime);
 
         }, execContext.eventLoopExecutor());
     }
@@ -379,11 +378,11 @@ public class S3ObjectStorage implements IFileStorage {
             var name = obj.key().substring(obj.key().lastIndexOf("/") + 1);
             var fileType = FileType.FILE;
             var size = obj.size();
-            var ctime = obj.lastModified();  // todo
+
             var mtime = obj.lastModified();
             var atime = obj.lastModified();  // todo
 
-            var stat = new FileStat(path, name, fileType, size, ctime, mtime, atime);
+            var stat = new FileStat(path, name, fileType, size, mtime, atime);
 
             stats.add(stat);
         }
@@ -395,7 +394,7 @@ public class S3ObjectStorage implements IFileStorage {
             var fileType = FileType.DIRECTORY;
             var size = 0;
 
-            var stat = new FileStat(path, name, fileType, size, null, null, null);
+            var stat = new FileStat(path, name, fileType, size, null, null);
 
             stats.add(stat);
         }

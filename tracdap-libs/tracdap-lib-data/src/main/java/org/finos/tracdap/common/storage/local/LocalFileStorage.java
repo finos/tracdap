@@ -287,14 +287,13 @@ public class LocalFileStorage implements IFileStorage {
                 ? attrs.size()
                 : 0;
 
-            var ctime = attrs.creationTime().toInstant();
             var mtime = attrs.lastModifiedTime().toInstant();
             var atime = attrs.lastAccessTime().toInstant();
 
             return new FileStat(
                     storagePathWithBackslash,
                     fileName, fileType, size,
-                    ctime, mtime, atime);
+                    mtime, atime);
         }
         catch (IOException e) {
 

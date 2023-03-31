@@ -242,36 +242,6 @@ public abstract class StorageOperationsTestSuite {
     }
 
     @Test
-    void testStat_fileCTime() throws Exception {
-
-        // For cloud storage buckets, it is likely that mtime is tracked but ctime is overwritten on updates
-        // In this case, storage implementations may return a null ctime
-        // If ctime is returned, then it must be valid
-
-        var testStart = Instant.now();
-
-        // On macOS (APFS), the stat ctime is rounded down to 1 second resolution,
-        // even though the filesystem supports nanosecond precision (which is used for mtime and atime)
-        // I am not sure if this is a bug in the JDK or a limitation in the underlying system calls
-        // Either way, allowing a whole second of sleep should always mean the ctime is after testStart
-
-        Thread.sleep(1000);  // Let time elapse before/after the test calls
-
-        var prepare = makeSmallFile("test_file.txt", storage, execContext);
-        waitFor(TEST_TIMEOUT, prepare);
-
-        var stat = storage.stat("test_file.txt", execContext);
-        waitFor(TEST_TIMEOUT, stat);
-
-        Thread.sleep(10);  // Let time elapse before/after the test calls
-        var testFinish = Instant.now();
-
-        var statResult = resultOf(stat);
-        Assertions.assertTrue(statResult.ctime == null || statResult.ctime.isAfter(testStart));
-        Assertions.assertTrue(statResult.ctime == null || statResult.ctime.isBefore(testFinish));
-    }
-
-    @Test
     void testStat_fileMTime() throws Exception {
 
         // All storage implementations must implement mtime for files
@@ -354,35 +324,6 @@ public abstract class StorageOperationsTestSuite {
 
         // Size field for directories should always be set to 0
         Assertions.assertEquals(0, statResult.size);
-    }
-
-    @Test
-    void testStat_dirCTime() throws Exception {
-
-        // ctime, mtime and atime for dirs is unlikely to be supported in cloud storage buckets
-        // So, all of these fields are optional in stat responses for directories
-
-        var testStart = Instant.now();
-
-        // On macOS (APFS), the stat ctime is rounded down to 1 second resolution,
-        // even though the filesystem supports nanosecond precision (which is used for mtime and atime)
-        // I am not sure if this is a bug in the JDK or a limitation in the underlying system calls
-        // Either way, allowing a whole second of sleep should always mean the ctime is after testStart
-
-        Thread.sleep(1000);  // Let time elapse before/after the test calls
-
-        var prepare = storage.mkdir("some_dir/test_dir", true, execContext);
-        waitFor(TEST_TIMEOUT, prepare);
-
-        var stat = storage.stat("some_dir/test_dir", execContext);
-        waitFor(TEST_TIMEOUT, stat);
-
-        Thread.sleep(10);  // Let time elapse before/after the test calls
-        var testFinish = Instant.now();
-
-        var statResult = resultOf(stat);
-        Assertions.assertTrue(statResult.ctime == null || statResult.ctime.isAfter(testStart));
-        Assertions.assertTrue(statResult.ctime == null || statResult.ctime.isBefore(testFinish));
     }
 
     @Test
