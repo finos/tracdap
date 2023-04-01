@@ -18,11 +18,12 @@ package org.finos.tracdap.plugins.aws.storage;
 
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
-import io.netty.util.concurrent.DefaultEventExecutor;
 import io.netty.util.concurrent.DefaultThreadFactory;
+import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.memory.RootAllocator;
 import org.finos.tracdap.common.concurrent.ExecutionContext;
 import org.finos.tracdap.common.data.DataContext;
+import org.finos.tracdap.common.storage.IStorageManager;
 import org.finos.tracdap.common.storage.StorageOperationsTestSuite;
 import org.junit.jupiter.api.*;
 
@@ -41,32 +42,36 @@ import static org.finos.tracdap.test.concurrent.ConcurrentTestHelpers.waitFor;
 public class S3StorageOperationsTest extends StorageOperationsTestSuite {
 
     static Properties storageProps;
-    static String testDir;
-    static S3ObjectStorage setup;
+    static String testSuiteDir;
 
     static EventLoopGroup elg;
-    static ExecutionContext setupExecCtx;
+    static BufferAllocator allocator;
+
+    static ExecutionContext setupCtx;
+    static S3ObjectStorage setupStorage;
+
+    static int testNumber;
 
     @BeforeAll
     static void setupStorage() throws Exception {
 
         var random = new Random();
 
-        testDir = String.format(
-                "platform_storage_test_suite_%s_0x%h/",
+        storageProps = StorageEnvProps.readStorageEnvProps();
+        testSuiteDir = String.format(
+                "platform_storage_ops_test_suite_%s_0x%h/",
                 DateTimeFormatter.ISO_INSTANT.format(Instant.now()),
                 random.nextLong());
 
-        setupExecCtx = new ExecutionContext(new DefaultEventExecutor(new DefaultThreadFactory("t-setup")));
+        elg = new NioEventLoopGroup(2, new DefaultThreadFactory("ops-test"));
+        allocator = new RootAllocator();
 
-        storageProps = StorageEnvProps.readStorageEnvProps();
+        storageProps.put(IStorageManager.PROP_STORAGE_KEY, "STORAGE_SETUP");
+        setupCtx = new ExecutionContext(elg.next());
+        setupStorage = new S3ObjectStorage(storageProps);
+        setupStorage.start(elg);
 
-        elg = new NioEventLoopGroup(2);
-
-        setup = new S3ObjectStorage(storageProps);
-        setup.start(elg);
-
-        var mkdir = setup.mkdir(testDir, true, setupExecCtx);
+        var mkdir = setupStorage.mkdir(testSuiteDir, true, setupCtx);
         waitFor(Duration.ofSeconds(10), mkdir);
         resultOf(mkdir);
     }
@@ -74,16 +79,21 @@ public class S3StorageOperationsTest extends StorageOperationsTestSuite {
     @BeforeEach
     void setup() {
 
-        execContext = new ExecutionContext(new DefaultEventExecutor(new DefaultThreadFactory("t-events")));
-        dataContext = new DataContext(execContext.eventLoopExecutor(), new RootAllocator());
+        execContext = new ExecutionContext(elg.next());
+        dataContext = new DataContext(execContext.eventLoopExecutor(), allocator);
 
+        var testDir = String.format("%stest_%d", testSuiteDir, ++testNumber);
+        setupStorage.mkdir(testDir, false, setupCtx);
         storageProps.put(S3ObjectStorage.PREFIX_PROPERTY, testDir);
+        storageProps.put(IStorageManager.PROP_STORAGE_KEY, "TEST_" + testNumber);
+
         storage = new S3ObjectStorage(storageProps);
         storage.start(elg);
     }
 
     @AfterEach
     void tearDown() {
+
         storage.stop();
         storage = null;
     }
@@ -91,12 +101,12 @@ public class S3StorageOperationsTest extends StorageOperationsTestSuite {
     @AfterAll
     static void tearDownStorage() throws Exception {
 
-        var rm = setup.rm(testDir, true, setupExecCtx);
+        var rm = setupStorage.rm(testSuiteDir, true, setupCtx);
         waitFor(Duration.ofSeconds(10), rm);
         resultOf(rm);
 
-        setup.stop();
-        setup = null;
+        setupStorage.stop();
+        setupStorage = null;
 
         elg.shutdownGracefully();
         elg = null;
