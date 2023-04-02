@@ -83,7 +83,7 @@ public class MetadataApiImpl {
     TagHeader createObject(MetadataWriteRequest request) {
 
         validateRequest(CREATE_OBJECT_METHOD, request);
-        validateObjectType(request.getObjectType()); //TODO: issue292 - we need to use this approach for all types of objects except for tags, which may be modified through public API
+        validateObjectType(request.getObjectType());
 
         return writeService.createObjects(
                 request.getTenant(),
@@ -98,7 +98,7 @@ public class MetadataApiImpl {
         var requestsList = request.getRequestsList();
 
         for (var rq : requestsList) {
-            validateObjectType(rq.getObjectType()); //TODO: issue292 - clarify (*000*)
+            validateObjectType(rq.getObjectType());
         }
 
         var tagHeaders = writeService.createObjects(
@@ -142,7 +142,7 @@ public class MetadataApiImpl {
                 .build();
     }
 
-    private void validateObjectType(ObjectType objectType) { //TODO: issue292 - this is needed to be called in the test
+    private void validateObjectType(ObjectType objectType) {
         if (apiTrustLevel == PUBLIC_API && !PUBLIC_WRITABLE_OBJECT_TYPES.contains(objectType)) {
             var message = String.format("Object type %s cannot be created via the TRAC public API", objectType);
             var status = Status.PERMISSION_DENIED.withDescription(message);
@@ -234,9 +234,9 @@ public class MetadataApiImpl {
 
     public UniversalMetadataWriteBatchResponse writeBatch(UniversalMetadataWriteBatchRequest request) {
 
-        validateRequest(TrustedMetadataApiGrpc.getWriteBatchMethod(), request); //TODO: issue292 - clarify type validation - see *000*...
+        validateRequest(TrustedMetadataApiGrpc.getWriteBatchMethod(), request);
 
-        validateListForObjectType(request.getPreallocateObjectsList()); //TODO: issue292 - run validation of allowed object types for all elements except for updateTags
+        validateListForObjectType(request.getPreallocateObjectsList());
         validateListForObjectType(request.getCreateObjectsList());
         validateListForObjectType(request.getUpdateObjectsList());
         validateListForObjectType(request.getPreallocateObjectsList());
