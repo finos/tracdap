@@ -1890,14 +1890,14 @@ abstract class MetadataWriteApiTest {
             requests.add(r);
         }
 
-        var t2WriteRequest = MetadataWriteBatchRequest.newBuilder()
+        var t2WriteRequest = UniversalMetadataWriteBatchRequest.newBuilder()
                 .setTenant(TEST_TENANT)
-                .addAllRequests(
+                .addAllUpdateTags(
                         requests.stream().map(r -> r.writeRequest).collect(Collectors.toList())
                 )
                 .build();
 
-        var t2headers = trustedApi.updateTagBatch(t2WriteRequest).getHeadersList();
+        var t2headers = trustedApi.writeBatch(t2WriteRequest).getUpdateTagHeadersList();
 
         assertEquals(7, t2headers.size());
 
@@ -1947,14 +1947,14 @@ abstract class MetadataWriteApiTest {
                     .build();
         }
 
-        var t3WriteRequest = MetadataWriteBatchRequest.newBuilder()
+        var t3WriteRequest = UniversalMetadataWriteBatchRequest.newBuilder()
                 .setTenant(TEST_TENANT)
-                .addAllRequests(
+                .addAllUpdateTags(
                         requests.stream().map(r -> r.t3WriteRequest).collect(Collectors.toList())
                 )
                 .build();
 
-        var t3Headers = publicApi.updateTagBatch(t3WriteRequest).getHeadersList();
+        var t3Headers = publicApi.writeBatch(t3WriteRequest).getUpdateTagHeadersList();
 
         assertEquals(7, t3Headers.size());
 
