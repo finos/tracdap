@@ -36,7 +36,6 @@ import java.util.stream.Collectors;
 import static org.finos.tracdap.common.metadata.MetadataConstants.PUBLIC_WRITABLE_OBJECT_TYPES;
 import static org.finos.tracdap.svc.meta.api.TracMetadataApi.*;
 import static org.finos.tracdap.svc.meta.api.TrustedMetadataApi.CREATE_PREALLOCATED_OBJECT_METHOD;
-import static org.finos.tracdap.svc.meta.api.TrustedMetadataApi.CREATE_PREALLOCATED_OBJECT_BATCH_METHOD;
 import static org.finos.tracdap.svc.meta.api.TrustedMetadataApi.PREALLOCATE_ID_METHOD;
 import static org.finos.tracdap.svc.meta.api.TrustedMetadataApi.PREALLOCATE_ID_BATCH_METHOD;
 import static org.finos.tracdap.svc.meta.services.MetadataConstants.PUBLIC_API;
@@ -91,26 +90,6 @@ public class MetadataApiImpl {
                 Collections.emptyList()).get(0);
     }
 
-    MetadataWriteBatchResponse createObjectBatch(MetadataWriteBatchRequest request) {
-
-        validateRequest(CREATE_OBJECT_BATCH_METHOD, request);
-
-        var requestsList = request.getRequestsList();
-
-        for (var rq : requestsList) {
-            validateObjectType(rq.getObjectType());
-        }
-
-        var tagHeaders = writeService.createObjects(
-                request.getTenant(),
-                requestsList,
-                request.getBatchAttrsList()
-        );
-        return MetadataWriteBatchResponse.newBuilder()
-                .addAllHeaders(tagHeaders)
-                .build();
-    }
-
     TagHeader updateObject(MetadataWriteRequest request) {
 
         validateRequest(UPDATE_OBJECT_METHOD, request);
@@ -120,26 +99,6 @@ public class MetadataApiImpl {
                 request.getTenant(),
                 Collections.singletonList(request),
                 Collections.emptyList()).get(0);
-    }
-
-    MetadataWriteBatchResponse updateObjectBatch(MetadataWriteBatchRequest request) {
-
-        validateRequest(UPDATE_OBJECT_BATCH_METHOD, request);
-
-        var requestsList = request.getRequestsList();
-
-        for (var rq : requestsList) {
-            validateObjectType(rq.getObjectType());
-        }
-
-        var tagHeaders = writeService.updateObjects(
-                request.getTenant(),
-                requestsList,
-                request.getBatchAttrsList()
-        );
-        return MetadataWriteBatchResponse.newBuilder()
-                .addAllHeaders(tagHeaders)
-                .build();
     }
 
     private void validateObjectType(ObjectType objectType) {
@@ -158,22 +117,6 @@ public class MetadataApiImpl {
                 request.getTenant(),
                 Collections.singletonList(request),
                 Collections.emptyList()).get(0);
-    }
-
-    MetadataWriteBatchResponse updateTagBatch(MetadataWriteBatchRequest request) {
-
-        validateRequest(UPDATE_TAG_BATCH_METHOD, request);
-
-        var requestsList = request.getRequestsList();
-
-        var tagHeaders = writeService.updateTagBatch(
-                request.getTenant(),
-                requestsList,
-                request.getBatchAttrsList()
-        );
-        return MetadataWriteBatchResponse.newBuilder()
-                .addAllHeaders(tagHeaders)
-                .build();
     }
 
     TagHeader preallocateId(MetadataWriteRequest request) {
@@ -209,20 +152,6 @@ public class MetadataApiImpl {
                 request.getTenant(),
                 Collections.singletonList(request),
                 Collections.emptyList()).get(0);
-    }
-
-    MetadataWriteBatchResponse createPreallocatedObjectBatch(MetadataWriteBatchRequest request) {
-
-        validateRequest(CREATE_PREALLOCATED_OBJECT_BATCH_METHOD, request);
-
-        var tagHeaders = writeService.createPreallocatedObjectBatch(
-                request.getTenant(),
-                request.getRequestsList(),
-                request.getBatchAttrsList()
-        );
-        return MetadataWriteBatchResponse.newBuilder()
-                .addAllHeaders(tagHeaders)
-                .build();
     }
 
     private void validateListForObjectType(List<MetadataWriteRequest> requestsList) {
