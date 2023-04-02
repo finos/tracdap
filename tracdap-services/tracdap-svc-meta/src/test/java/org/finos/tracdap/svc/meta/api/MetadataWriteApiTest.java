@@ -1188,6 +1188,7 @@ abstract class MetadataWriteApiTest {
     }
 
     void updateObjectBatch_ok(ObjectType objectType, Function<MetadataWriteBatchRequest, MetadataWriteBatchResponse> saveApiCall) {
+        //TODO: issue292 - start here...
         class RequestData {
             MetadataWriteRequest writeRequest;
             UUID v1ObjectId;

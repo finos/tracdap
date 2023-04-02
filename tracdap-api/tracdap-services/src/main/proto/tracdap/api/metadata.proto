@@ -642,7 +642,7 @@ message UniversalMetadataWriteBatchRequest {
      * Tenant in requests must be null.
      */
 
-    repeated MetadataWriteRequest preallocateObjects = 2; //TODO: issue292 - run validation of allowed object types for all elements exepto for updateTags
+    repeated MetadataWriteRequest preallocateObjects = 2; //TODO: issue292 - run validation of allowed object types for all elements except for updateTags
     repeated MetadataWriteRequest createObjects = 3;
     repeated MetadataWriteRequest updateObjects = 4;
     repeated MetadataWriteRequest updateTags = 5;

@@ -29,6 +29,7 @@ import io.grpc.MethodDescriptor;
 import io.grpc.Status;
 
 import java.util.Collections;
+import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -224,9 +225,22 @@ public class MetadataApiImpl {
                 .build();
     }
 
+    private void validateListForObjectType(List<MetadataWriteRequest> requestsList) {
+        for (var rq : requestsList) {
+            validateObjectType(rq.getObjectType());
+        }
+
+    }
+
     public UniversalMetadataWriteBatchResponse writeBatch(UniversalMetadataWriteBatchRequest request) {
 
         validateRequest(TrustedMetadataApiGrpc.getWriteBatchMethod(), request); //TODO: issue292 - clarify type validation - see *000*...
+
+        validateListForObjectType(request.getPreallocateObjectsList()); //TODO: issue292 - run validation of allowed object types for all elements except for updateTags
+        validateListForObjectType(request.getCreateObjectsList());
+        validateListForObjectType(request.getUpdateObjectsList());
+        validateListForObjectType(request.getPreallocateObjectsList());
+        validateListForObjectType(request.getPreallocateIdsList());
 
         return writeService.writeBatch(request);
     }
