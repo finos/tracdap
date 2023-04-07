@@ -85,8 +85,9 @@ public class CommonFileStorage implements IFileStorage {
     _exists(String operationName, String storagePath, IExecutionContext ctx) {
 
         var resolvedPath = resolvePath(operationName, storagePath, true);
+        var exists = fs.exists(resolvedPath, ctx);
 
-        return fs.exists(resolvedPath, ctx);
+        return useContext(ctx, exists);
     }
 
     @Override
@@ -102,7 +103,7 @@ public class CommonFileStorage implements IFileStorage {
         var resolvedPath = resolvePath(operationName, storagePath, true);
         var stat = fs.stat(resolvedPath, ctx);
 
-        return stat.thenApply(stat_ -> {
+        return useContext(ctx, stat).thenApply(stat_ -> {
 
             if (stat_.fileType != FileType.FILE)
                 throw errors.explicitError(SIZE_OF_DIR, storagePath, operationName);  // Todo
@@ -122,8 +123,9 @@ public class CommonFileStorage implements IFileStorage {
     _stat(String operationName, String storagePath, IExecutionContext ctx) {
 
         var resolvedPath = resolvePath(operationName, storagePath, true);
+        var stat = fs.stat(resolvedPath, ctx);
 
-        return fs.stat(resolvedPath, ctx);
+        return useContext(ctx, stat);
     }
 
 
@@ -140,12 +142,14 @@ public class CommonFileStorage implements IFileStorage {
         var resolvedPath = resolvePath(operationName, storagePath, true);
         var stat = fs.stat(resolvedPath, ctx);
 
-        return stat.thenCompose(fi -> {
+        return useContext(ctx, stat).thenCompose(fi -> {
 
             if (fi.fileType == FileType.FILE)
                 return CompletableFuture.completedFuture(List.of(fi));
 
-            return fs.ls(resolvedPath, ctx);  // todo recursive
+            var ls = fs.ls(resolvedPath, ctx);  // todo recursive
+
+            return useContext(ctx, ls);
         });
     }
 
@@ -161,12 +165,14 @@ public class CommonFileStorage implements IFileStorage {
         var resolvedPath = resolvePath(operationName, storagePath, false);
         var exists = fs.exists(resolvedPath, ctx);
 
-        return exists.thenCompose(exists_ -> {
+        return useContext(ctx, exists).thenCompose(exists_ -> {
 
             if (exists_)
                 throw errors.explicitError(FILE_ALREADY_EXISTS_EXCEPTION, storagePath, operationName);
 
-            return fs.mkdir(resolvedPath, recursive, ctx);
+            var mkdir = fs.mkdir(resolvedPath, recursive, ctx);
+
+            return useContext(ctx, mkdir);
         });
     }
 
@@ -263,6 +269,31 @@ public class CommonFileStorage implements IFileStorage {
 
             throw errors.exception(STORAGE_PATH_INVALID, e, storagePath, operationName);
         }
+    }
+
+    public static <TResult> CompletionStage<TResult> useContext(IExecutionContext execCtx, CompletionStage<TResult> promise) {
+
+        var ctxPromise = new CompletableFuture<TResult>();
+
+        promise.whenComplete((result, error) -> {
+
+            if (execCtx.eventLoopExecutor().inEventLoop()) {
+
+                if (error != null)
+                    ctxPromise.completeExceptionally(error);
+                else
+                    ctxPromise.complete(result);
+            }
+            else {
+
+                if (error != null)
+                    execCtx.eventLoopExecutor().execute(() -> ctxPromise.completeExceptionally(error));
+                else
+                    ctxPromise.completeAsync(() -> result, execCtx.eventLoopExecutor());
+            }
+        });
+
+        return ctxPromise;
     }
 
     @FunctionalInterface
