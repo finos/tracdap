@@ -364,7 +364,7 @@ public class S3ObjectStorage implements IFileStorage {
 
         // First entry should always be the directory being listed
         if (response.contents().isEmpty()) {
-            throw errors.explicitError(DIRECTORY_NOT_FOUND_EXCEPTION, dirObjectKey, LS_OPERATION);
+            throw errors.explicitError(OBJECT_NOT_FOUND, dirObjectKey, LS_OPERATION);
         }
 
         var folderContents = response.contents().subList(1, response.contents().size());

@@ -19,11 +19,8 @@ package org.finos.tracdap.plugins.aws.storage;
 import org.finos.tracdap.common.storage.StorageErrors;
 import org.slf4j.Logger;
 import software.amazon.awssdk.http.HttpStatusCode;
-import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 import software.amazon.awssdk.services.s3.model.S3Exception;
 
-import java.io.IOException;
-import java.nio.file.*;
 import java.util.List;
 import java.util.Map;
 
@@ -33,8 +30,8 @@ import static org.finos.tracdap.common.storage.StorageErrors.ExplicitError.*;
 public class S3StorageErrors extends StorageErrors {
 
     private static final List<Map.Entry<Integer, ExplicitError>> HTTP_ERROR_CODE_MAP = List.of(
-            Map.entry(HttpStatusCode.NOT_FOUND, NO_SUCH_FILE_EXCEPTION),
-            Map.entry(HttpStatusCode.FORBIDDEN, ACCESS_DENIED_EXCEPTION));
+            Map.entry(HttpStatusCode.NOT_FOUND, OBJECT_NOT_FOUND),
+            Map.entry(HttpStatusCode.FORBIDDEN, ACCESS_DENIED));
 
 //            Map.entry(DirectoryNotEmptyException.class, DIRECTORY_NOT_FOUND_EXCEPTION),
 //            Map.entry(NotDirectoryException.class, NOT_DIRECTORY_EXCEPTION),

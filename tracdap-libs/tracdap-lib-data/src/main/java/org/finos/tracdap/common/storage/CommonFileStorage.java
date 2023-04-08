@@ -106,7 +106,7 @@ public class CommonFileStorage implements IFileStorage {
         return useContext(ctx, stat).thenApply(stat_ -> {
 
             if (stat_.fileType != FileType.FILE)
-                throw errors.explicitError(SIZE_OF_DIR, storagePath, operationName);  // Todo
+                throw errors.explicitError(NOT_A_FILE, storagePath, operationName);  // Todo
 
             return stat_.size;
         });
@@ -168,7 +168,7 @@ public class CommonFileStorage implements IFileStorage {
         return useContext(ctx, exists).thenCompose(exists_ -> {
 
             if (exists_)
-                throw errors.explicitError(FILE_ALREADY_EXISTS_EXCEPTION, storagePath, operationName);
+                throw errors.explicitError(OBJECT_ALREADY_EXISTS, storagePath, operationName);
 
             var mkdir = fs.mkdir(resolvedPath, recursive, ctx);
 

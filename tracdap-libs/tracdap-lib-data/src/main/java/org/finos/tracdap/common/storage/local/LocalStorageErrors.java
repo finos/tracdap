@@ -30,14 +30,13 @@ import static org.finos.tracdap.common.storage.StorageErrors.ExplicitError.*;
 public class LocalStorageErrors extends StorageErrors {
 
     private static final List<Map.Entry<Class<? extends Exception>, StorageErrors.ExplicitError>> EXCEPTION_CLASS_MAP = List.of(
-            Map.entry(NoSuchFileException.class, NO_SUCH_FILE_EXCEPTION),
-            Map.entry(FileAlreadyExistsException.class, FILE_ALREADY_EXISTS_EXCEPTION),
-            Map.entry(DirectoryNotEmptyException.class, DIRECTORY_NOT_FOUND_EXCEPTION),
-            Map.entry(NotDirectoryException.class, NOT_DIRECTORY_EXCEPTION),
-            Map.entry(AccessDeniedException.class, ACCESS_DENIED_EXCEPTION),
-            Map.entry(SecurityException.class, SECURITY_EXCEPTION),
+            Map.entry(NoSuchFileException.class, OBJECT_NOT_FOUND),
+            Map.entry(FileAlreadyExistsException.class, OBJECT_ALREADY_EXISTS),
+            Map.entry(NotDirectoryException.class, NOT_A_DIRECTORY),
+            Map.entry(AccessDeniedException.class, ACCESS_DENIED),
+            Map.entry(SecurityException.class, ACCESS_DENIED),
             // IOException must be last in the list, not to obscure most specific exceptions
-            Map.entry(IOException.class, IO_EXCEPTION));
+            Map.entry(IOException.class, IO_ERROR));
 
     public LocalStorageErrors(String storageKey, Logger log) {
 

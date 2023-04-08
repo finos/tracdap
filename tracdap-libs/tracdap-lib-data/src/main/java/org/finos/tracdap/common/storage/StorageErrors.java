@@ -41,27 +41,23 @@ public abstract class StorageErrors {
         STORAGE_PATH_IS_ROOT,
         STORAGE_PATH_INVALID,
 
-        // Explicit errors file in operations
-        SIZE_OF_DIR,
-        STAT_NOT_FILE_OR_DIR,
-        RM_DIR_NOT_RECURSIVE,
-
         // Exceptions
-        NO_SUCH_FILE_EXCEPTION,
-        FILE_ALREADY_EXISTS_EXCEPTION,
-        DIRECTORY_NOT_FOUND_EXCEPTION,
-        NOT_DIRECTORY_EXCEPTION,
-        ACCESS_DENIED_EXCEPTION,
-        SECURITY_EXCEPTION,
-        IO_EXCEPTION,
+        OBJECT_NOT_FOUND,
+        OBJECT_ALREADY_EXISTS,
+        NOT_A_FILE,
+        NOT_A_DIRECTORY,
+        NOT_A_FILE_OR_DIRECTORY,
+        RM_DIR_NOT_RECURSIVE,
+        IO_ERROR,
 
-        // Errors in stream (Flow pub/sub) implementation
-        DUPLICATE_SUBSCRIPTION,
+        // Permissions
+        ACCESS_DENIED,
 
         // Unhandled / unexpected error
         UNKNOWN_ERROR,
 
-        // These errors have special parameterization for their error messages
+        // Errors in stream (Flow pub/sub) implementation
+        DUPLICATE_SUBSCRIPTION,
         CHUNK_NOT_FULLY_WRITTEN,
     }
 
@@ -72,22 +68,19 @@ public abstract class StorageErrors {
             Map.entry(STORAGE_PATH_IS_ROOT, "Requested operation not allowed on the storage root directory: %s %s [%s]"),
             Map.entry(STORAGE_PATH_INVALID, "Requested storage path is invalid: %s %s [%s]"),
 
-            Map.entry(SIZE_OF_DIR, "Size operation is not available for directories: %s %s [%s]"),
-            Map.entry(STAT_NOT_FILE_OR_DIR, "Object is not a file or directory: %s %s [%s]"),
+            Map.entry(OBJECT_NOT_FOUND, "Object not found in storage layer: %s %s [%s]"),
+            Map.entry(OBJECT_ALREADY_EXISTS, "Object already exists in storage layer: %s %s [%s]"),
+            Map.entry(NOT_A_FILE, "Object is not a file: %s %s [%s]"),
+            Map.entry(NOT_A_DIRECTORY, "Object is not a directory: %s %s [%s]"),
+            Map.entry(NOT_A_FILE_OR_DIRECTORY, "Object is not a file or directory: %s %s [%s]"),
             Map.entry(RM_DIR_NOT_RECURSIVE, "Regular delete operation not available for directories (use recursive delete): %s %s [%s]"),
+            Map.entry(IO_ERROR, "An IO error occurred in the storage layer: %s %s [%s]"),
 
-            Map.entry(NO_SUCH_FILE_EXCEPTION, "File not found in storage layer: %s %s [%s]"),
-            Map.entry(FILE_ALREADY_EXISTS_EXCEPTION, "File already exists in storage layer: %s %s [%s]"),
-            Map.entry(DIRECTORY_NOT_FOUND_EXCEPTION, "Directory not found in storage layer: %s %s [%s]"),
-            Map.entry(NOT_DIRECTORY_EXCEPTION, "Path is not a directory in storage layer: %s %s [%s]"),
-            Map.entry(ACCESS_DENIED_EXCEPTION, "Access denied in storage layer: %s %s [%s]"),
-            Map.entry(SECURITY_EXCEPTION, "Access denied in storage layer: %s %s [%s]"),
-            Map.entry(IO_EXCEPTION, "An IO error occurred in the storage layer: %s %s [%s]"),
-
-            Map.entry(DUPLICATE_SUBSCRIPTION, "Duplicate subscription detected in the storage layer: %s %s [%s]"),
+            Map.entry(ACCESS_DENIED, "Access denied in storage layer: %s %s [%s]"),
 
             Map.entry(UNKNOWN_ERROR, "An unexpected error occurred in the storage layer: %s %s [%s]"),
 
+            Map.entry(DUPLICATE_SUBSCRIPTION, "Duplicate subscription detected in the storage layer: %s %s [%s]"),
             Map.entry(CHUNK_NOT_FULLY_WRITTEN, "Chunk was not fully written, chunk size = %d B, written = %d B"));
 
     private static final Map<ExplicitError, Class<? extends ETrac>> ERROR_TYPE_MAP = Map.ofEntries(
@@ -97,22 +90,19 @@ public abstract class StorageErrors {
             Map.entry(STORAGE_PATH_IS_ROOT, EValidationGap.class),
             Map.entry(STORAGE_PATH_INVALID, EValidationGap.class),
 
-            Map.entry(SIZE_OF_DIR, EStorageRequest.class),
+            Map.entry(OBJECT_NOT_FOUND, EStorageRequest.class),
+            Map.entry(OBJECT_ALREADY_EXISTS, EStorageRequest.class),
+            Map.entry(NOT_A_FILE, EStorageRequest.class),
+            Map.entry(NOT_A_DIRECTORY, EStorageRequest.class),
+            Map.entry(NOT_A_FILE_OR_DIRECTORY, EStorageRequest.class),
             Map.entry(RM_DIR_NOT_RECURSIVE, EStorageRequest.class),
-            Map.entry(STAT_NOT_FILE_OR_DIR, EStorageRequest.class),
+            Map.entry(IO_ERROR, EStorage.class),
 
-            Map.entry(NO_SUCH_FILE_EXCEPTION, EStorageRequest.class),
-            Map.entry(FILE_ALREADY_EXISTS_EXCEPTION, EStorageRequest.class),
-            Map.entry(DIRECTORY_NOT_FOUND_EXCEPTION, EStorageRequest.class),
-            Map.entry(NOT_DIRECTORY_EXCEPTION, EStorageRequest.class),
-            Map.entry(ACCESS_DENIED_EXCEPTION, EStorageAccess.class),
-            Map.entry(SECURITY_EXCEPTION, EStorageAccess.class),
-            Map.entry(IO_EXCEPTION, EStorage.class),
-
-            Map.entry(DUPLICATE_SUBSCRIPTION, ETracInternal.class),
+            Map.entry(ACCESS_DENIED, EStorageAccess.class),
 
             Map.entry(UNKNOWN_ERROR, ETracInternal.class),
 
+            Map.entry(DUPLICATE_SUBSCRIPTION, ETracInternal.class),
             Map.entry(CHUNK_NOT_FULLY_WRITTEN, EStorageCommunication.class));
 
     private final String storageKey;

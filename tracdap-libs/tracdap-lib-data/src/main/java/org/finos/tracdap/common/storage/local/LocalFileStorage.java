@@ -75,7 +75,7 @@ public class LocalFileStorage implements IFileStorage {
     private void checkWriteFlag(String storagePath, String operation) throws ETrac {
 
         if(readOnlyFlag) {
-            throw errors.explicitError(ACCESS_DENIED_EXCEPTION, storagePath, operation);
+            throw errors.explicitError(ACCESS_DENIED, storagePath, operation);
         }
     }
 
@@ -189,7 +189,7 @@ public class LocalFileStorage implements IFileStorage {
             // Size operation for non-regular files can still succeed
             // So, add an explicit check for directories (and other non-regular files)
             if (!Files.isRegularFile(absolutePath))
-                throw errors.explicitError(SIZE_OF_DIR, storagePath, SIZE_OPERATION);
+                throw errors.explicitError(NOT_A_FILE, storagePath, SIZE_OPERATION);
 
             return CompletableFuture.completedFuture(size);
         }
@@ -279,7 +279,7 @@ public class LocalFileStorage implements IFileStorage {
             var attrs = Files.readAttributes(absolutePath, attrType);
 
             if (!attrs.isRegularFile() && !attrs.isDirectory())
-                throw errors.explicitError(STAT_NOT_FILE_OR_DIR, storagePath, STAT_OPERATION);
+                throw errors.explicitError(NOT_A_FILE_OR_DIRECTORY, storagePath, STAT_OPERATION);
 
             // Special handling for the root directory - do not return the name of the storage root folder!
             var fileName = absolutePath.equals(rootPath)
