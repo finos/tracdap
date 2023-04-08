@@ -61,16 +61,6 @@ class FileOperationsTestSuite:
     # EXISTS
     # ------------------------------------------------------------------------------------------------------------------
 
-    def test_exists_dir(self):
-
-        self.storage.mkdir("test_dir", False)
-
-        dir_present = self.storage.exists("test_dir")
-        dir_not_present = self.storage.exists("other_dir")
-
-        self.assertTrue(dir_present)
-        self.assertFalse(dir_not_present)
-
     def test_exists_file(self):
 
         self.make_small_file("test_file.txt")
@@ -88,6 +78,26 @@ class FileOperationsTestSuite:
         empty_file_exist = self.storage.exists("test_file.txt")
 
         self.assertTrue(empty_file_exist)
+
+    def test_exists_dir(self):
+
+        self.storage.mkdir("test_dir", False)
+
+        dir_present = self.storage.exists("test_dir")
+        dir_not_present = self.storage.exists("other_dir")
+
+        self.assertTrue(dir_present)
+        self.assertFalse(dir_not_present)
+
+    def test_exists_parent_dir(self):
+
+        self.storage.mkdir("parent_dir/child_dir", True)
+
+        dir_present = self.storage.exists("parent_dir")
+        dir_not_present = self.storage.exists("other_dir")
+
+        self.assertTrue(dir_present)
+        self.assertFalse(dir_not_present)
 
     def test_exists_storage_root(self):
 

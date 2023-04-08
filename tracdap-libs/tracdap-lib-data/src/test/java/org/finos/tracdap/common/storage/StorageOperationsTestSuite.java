@@ -70,21 +70,6 @@ public abstract class StorageOperationsTestSuite {
     // -----------------------------------------------------------------------------------------------------------------
 
     @Test
-    void testExists_dir() throws Exception {
-
-        var prepare = storage.mkdir("test_dir", false, execContext);
-        waitFor(TEST_TIMEOUT, prepare);
-
-        var dirPresent = storage.exists("test_dir", execContext);
-        var dirNotPresent = storage.exists("other_dir", execContext);
-
-        waitFor(TEST_TIMEOUT, dirPresent, dirNotPresent);
-
-        Assertions.assertTrue(resultOf(dirPresent));
-        Assertions.assertFalse(resultOf(dirNotPresent));
-    }
-
-    @Test
     void testExists_file() throws Exception {
 
         var prepare = makeSmallFile("test_file.txt", storage, execContext);
@@ -110,6 +95,37 @@ public abstract class StorageOperationsTestSuite {
         waitFor(TEST_TIMEOUT, emptyFileExist);
 
         Assertions.assertTrue(resultOf(emptyFileExist));
+    }
+
+
+    @Test
+    void testExists_dir() throws Exception {
+
+        var prepare = storage.mkdir("test_dir", false, execContext);
+        waitFor(TEST_TIMEOUT, prepare);
+
+        var dirPresent = storage.exists("test_dir", execContext);
+        var dirNotPresent = storage.exists("other_dir", execContext);
+
+        waitFor(TEST_TIMEOUT, dirPresent, dirNotPresent);
+
+        Assertions.assertTrue(resultOf(dirPresent));
+        Assertions.assertFalse(resultOf(dirNotPresent));
+    }
+
+    @Test
+    void testExists_parentDir() throws Exception {
+
+        var prepare = storage.mkdir("parent_dir/child_dir", true, execContext);
+        waitFor(TEST_TIMEOUT, prepare);
+
+        var dirPresent = storage.exists("parent_dir", execContext);
+        var dirNotPresent = storage.exists("other_dir", execContext);
+
+        waitFor(TEST_TIMEOUT, dirPresent, dirNotPresent);
+
+        Assertions.assertTrue(resultOf(dirPresent));
+        Assertions.assertFalse(resultOf(dirNotPresent));
     }
 
     @Test
