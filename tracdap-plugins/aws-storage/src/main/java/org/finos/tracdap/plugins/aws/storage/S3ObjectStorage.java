@@ -186,28 +186,29 @@ public class S3ObjectStorage implements IFileStorage {
 
             log.info("STORAGE OPERATION: {} {} [{}]", storageKey, EXISTS_OPERATION, storagePath);
 
-            var fileObjectKey = resolvePath(storagePath, true, EXISTS_OPERATION);
-            var dirObjectKey = fileObjectKey + "/";
+            var objectKey = resolvePath(storagePath, true, EXISTS_OPERATION);
+            var prefix = objectKey + BACKSLASH;
 
-            return existsImpl(fileObjectKey, execContext).thenCompose(found -> found
-                    ? CompletableFuture.completedFuture(true)
-                    : existsImpl(dirObjectKey, execContext));
+            var objectExists = objectExists(objectKey, execContext);
+            var prefixExists = prefixExists(prefix, execContext);
+
+            return objectExists.thenCombine(prefixExists, (obj, pfx) -> obj || pfx);
         }
         catch (Exception e) {
             return CompletableFuture.failedFuture(e);
         }
     }
 
-    private CompletionStage<Boolean> existsImpl(String objectKey, IExecutionContext execContext) {
+    private CompletionStage<Boolean> objectExists(String objectKey, IExecutionContext ctx) {
 
         var request = HeadObjectRequest.builder()
                 .bucket(this.bucket)
                 .key(objectKey)
                 .build();
 
-        var head = CommonFileStorage.useContext(execContext, client.headObject(request));
+        var response = CommonFileStorage.useContext(ctx, client.headObject(request));
 
-        return head
+        return response
                 .thenApply(x -> true)
                 .exceptionally(e -> {
 
@@ -221,6 +222,20 @@ public class S3ObjectStorage implements IFileStorage {
 
                     throw errors.handleException(e, objectKey, "EXISTS");
                 });
+    }
+
+    private CompletionStage<Boolean> prefixExists(String prefix, IExecutionContext ctx) {
+
+        var request = ListObjectsV2Request.builder()
+                .bucket(bucket)
+                .prefix(prefix)
+                .delimiter(BACKSLASH)
+                .maxKeys(1)
+                .build();
+
+        var response = CommonFileStorage.useContext(ctx, client.listObjectsV2(request));
+
+        return response.thenApply(result -> result.hasContents() || result.hasCommonPrefixes());
     }
 
     @Override
@@ -429,7 +444,7 @@ public class S3ObjectStorage implements IFileStorage {
             var fileKey = resolvePath(storagePath, false, RM_OPERATION);
             var dirKey = fileKey + "/";
 
-            return existsImpl(fileKey, execContext).thenComposeAsync(exists -> exists
+            return objectExists(fileKey, execContext).thenComposeAsync(exists -> exists
                             ? rmSingle(fileKey, execContext)
                             : rmDir(dirKey, recursive, execContext),
                     execContext.eventLoopExecutor());
@@ -531,7 +546,7 @@ public class S3ObjectStorage implements IFileStorage {
 
         var dirKey = objectKey + BACKSLASH;
 
-        return existsImpl(dirKey, execCtx).thenApplyAsync(
+        return objectExists(dirKey, execCtx).thenApplyAsync(
                 exists -> exists ? FileType.DIRECTORY : FileType.FILE);
     }
 
