@@ -69,6 +69,7 @@ public class S3ObjectStorage implements IFileStorage {
 
     private final String storageKey;
     private final AwsCredentialsProvider credentials;
+
     private final String bucket;
     private final StoragePath prefix;
     private final Region region;
@@ -197,34 +198,28 @@ public class S3ObjectStorage implements IFileStorage {
         }
     }
 
-    private CompletableFuture<Boolean> existsImpl(String objectKey, IExecutionContext execContext) {
+    private CompletionStage<Boolean> existsImpl(String objectKey, IExecutionContext execContext) {
 
         var request = HeadObjectRequest.builder()
                 .bucket(this.bucket)
                 .key(objectKey)
                 .build();
 
-        return client.headObject(request)
-                .thenApplyAsync(Function.identity(), execContext.eventLoopExecutor())
+        var head = CommonFileStorage.useContext(execContext, client.headObject(request));
 
-                // Object exists if the call completes
+        return head
                 .thenApply(x -> true)
+                .exceptionally(e -> {
 
-                .exceptionally(error -> {
-
-                    S3Exception s3Error;
-
-                    if (error instanceof S3Exception)
-                        s3Error = (S3Exception) error;
-                    else if (error.getCause() instanceof S3Exception)
-                        s3Error = (S3Exception) error.getCause();
-                    else
-                        s3Error = null;
+                    var s3Error =
+                            (e instanceof S3Exception) ? (S3Exception) e :
+                            (e.getCause() instanceof S3Exception) ? (S3Exception) e.getCause() :
+                            null;
 
                     if (s3Error != null && s3Error.statusCode() == HttpStatusCode.NOT_FOUND)
                         return false;
 
-                    throw errors.handleException(error, objectKey, SIZE_OPERATION);
+                    throw errors.handleException(e, objectKey, "EXISTS");
                 });
     }
 
@@ -334,28 +329,25 @@ public class S3ObjectStorage implements IFileStorage {
 
             var objectKey = resolvePath(dirPath, true, SIZE_OPERATION);
 
-            var request = ListObjectsRequest.builder()
+            var request = ListObjectsV2Request.builder()
                     .bucket(bucket)
                     .prefix(objectKey)
                     .delimiter(BACKSLASH)
                     .build();
 
-            return client.listObjects(request).handleAsync((response, error) -> {
+            // Send request and get response onto the EL for execContext
+            var response = useContext(execContext, client.listObjectsV2(request));
 
-                if (error != null) {
-                    throw errors.handleException(error, storagePath, LS_OPERATION);
-                } else {
-                    return lsResult(objectKey, response);
-                }
-
-            }, execContext.eventLoopExecutor());
+            return response
+                    .thenApply(result -> lsResult(objectKey, result))
+                    .exceptionally(error -> { throw errors.handleException(error, storagePath, LS_OPERATION); });
         }
         catch (Exception e) {
             return CompletableFuture.failedFuture(e);
         }
     }
 
-    private List<FileStat> lsResult(String dirObjectKey, ListObjectsResponse response) {
+    private List<FileStat> lsResult(String dirObjectKey, ListObjectsV2Response response) {
 
         log.info(response.commonPrefixes().toString());
 
@@ -371,27 +363,26 @@ public class S3ObjectStorage implements IFileStorage {
 
         for (var obj : folderContents) {
 
-            var path = obj.key().substring(rootPrefix.length());
-            var name = obj.key().substring(obj.key().lastIndexOf("/") + 1);
+            var path = obj.key().substring(rootPrefix.length() + 1);
+            var name = path.contains(BACKSLASH) ? path.substring(path.lastIndexOf(BACKSLASH) + 1) : path;
             var fileType = FileType.FILE;
             var size = obj.size();
-
             var mtime = obj.lastModified();
-            var atime = obj.lastModified();  // todo
 
-            var stat = new FileStat(path, name, fileType, size, mtime, atime);
+            var stat = new FileStat(path, name, fileType, size, mtime, /* atime = */ null);
 
             stats.add(stat);
         }
 
         for (var prefix : response.commonPrefixes()) {
 
-            var path = prefix.prefix().substring(rootPrefix.length(), prefix.prefix().length() - 1);
-            var name = path.substring(path.lastIndexOf("/") + 1);
+            // Remove the last character from directory names, which is the trailing backslash
+            var path = prefix.prefix().substring(rootPrefix.length() + 1, prefix.prefix().length() - 1);
+            var name = path.contains(BACKSLASH) ? path.substring(path.lastIndexOf(BACKSLASH) + 1) : path;
             var fileType = FileType.DIRECTORY;
             var size = 0;
 
-            var stat = new FileStat(path, name, fileType, size, null, null);
+            var stat = new FileStat(path, name, fileType, size, /* mtime = */ null, /* atime = */ null);
 
             stats.add(stat);
         }
@@ -416,15 +407,12 @@ public class S3ObjectStorage implements IFileStorage {
 
             var content = AsyncRequestBody.empty();
 
-            return client.putObject(request, content).handleAsync((response, error) -> {
+            // Send request and get response onto the EL for execContext
+            var response = useContext(execContext, client.putObject(request, content));
 
-                if (error != null) {
-                    throw errors.handleException(error, storagePath, LS_OPERATION);
-                } else {
-                    return null;
-                }
-
-            }, execContext.eventLoopExecutor());
+            return response
+                    .thenAccept(result -> {})
+                    .exceptionally(error -> { throw errors.handleException(error, storagePath, MKDIR_OPERATION); });
         }
         catch (Exception e) {
             return CompletableFuture.failedFuture(e);
@@ -590,5 +578,10 @@ public class S3ObjectStorage implements IFileStorage {
         }
 
         throw errors.handleException(error, fileKey, operation);
+    }
+
+    private <TResult> CompletionStage<TResult> useContext(IExecutionContext execCtx, CompletionStage<TResult> promise) {
+
+        return promise.thenApplyAsync(Function.identity(), execCtx.eventLoopExecutor());
     }
 }

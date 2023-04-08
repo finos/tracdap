@@ -23,6 +23,7 @@ import software.amazon.awssdk.services.s3.model.S3Exception;
 
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletionException;
 
 import static org.finos.tracdap.common.storage.StorageErrors.ExplicitError.*;
 
@@ -33,13 +34,6 @@ public class S3StorageErrors extends StorageErrors {
             Map.entry(HttpStatusCode.NOT_FOUND, OBJECT_NOT_FOUND),
             Map.entry(HttpStatusCode.FORBIDDEN, ACCESS_DENIED));
 
-//            Map.entry(DirectoryNotEmptyException.class, DIRECTORY_NOT_FOUND_EXCEPTION),
-//            Map.entry(NotDirectoryException.class, NOT_DIRECTORY_EXCEPTION),
-//            Map.entry(AccessDeniedException.class, ACCESS_DENIED_EXCEPTION),
-//            Map.entry(SecurityException.class, SECURITY_EXCEPTION),
-//            // IOException must be last in the list, not to obscure most specific exceptions
-//            Map.entry(IOException.class, IO_EXCEPTION));
-
     public S3StorageErrors(String storageKey, Logger log) {
 
         super(storageKey, log);
@@ -48,10 +42,12 @@ public class S3StorageErrors extends StorageErrors {
     @Override
     protected ExplicitError checkKnownExceptions(Throwable e) {
 
-        if (!(e instanceof S3Exception))
+        var cause = (e instanceof CompletionException) ? e.getCause() : e;
+
+        if (!(cause instanceof S3Exception))
             return null;
 
-        var s3Error = (S3Exception) e;
+        var s3Error = (S3Exception) cause;
 
         for (var entry : HTTP_ERROR_CODE_MAP) {
 
