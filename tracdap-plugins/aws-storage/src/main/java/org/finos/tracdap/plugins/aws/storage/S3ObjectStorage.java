@@ -40,19 +40,19 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.net.URI;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Flow;
-import java.util.function.Function;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static org.finos.tracdap.common.storage.StorageErrors.ExplicitError.*;
 
 
-public class S3ObjectStorage implements IFileStorage {
+public class S3ObjectStorage extends CommonFileStorage {
 
     public static final String BUCKET_PROPERTY = "bucket";
     public static final String PREFIX_PROPERTY = "prefix";
@@ -180,136 +180,56 @@ public class S3ObjectStorage implements IFileStorage {
     }
 
     @Override
-    public CompletionStage<Boolean> exists(String storagePath, IExecutionContext execContext) {
-
-        try {
-
-            log.info("STORAGE OPERATION: {} {} [{}]", storageKey, EXISTS_OPERATION, storagePath);
-
-            var objectKey = resolvePath(storagePath, true, EXISTS_OPERATION);
-            var prefix = objectKey + BACKSLASH;
-
-            var objectExists = objectExists(objectKey, execContext);
-            var prefixExists = prefixExists(prefix, execContext);
-
-            return objectExists.thenCombine(prefixExists, (obj, pfx) -> obj || pfx);
-        }
-        catch (Exception e) {
-            return CompletableFuture.failedFuture(e);
-        }
-    }
-
-    private CompletionStage<Boolean> objectExists(String objectKey, IExecutionContext ctx) {
+    protected CompletionStage<Boolean>
+    objectExists(String objectKey, IExecutionContext ctx) {
 
         var request = HeadObjectRequest.builder()
                 .bucket(this.bucket)
                 .key(objectKey)
                 .build();
 
-        var response = CommonFileStorage.useContext(ctx, client.headObject(request));
+        var response = useContext(ctx, client.headObject(request));
 
         return response
                 .thenApply(x -> true)
-                .exceptionally(e -> {
-
-                    var s3Error =
-                            (e instanceof S3Exception) ? (S3Exception) e :
-                            (e.getCause() instanceof S3Exception) ? (S3Exception) e.getCause() :
-                            null;
-
-                    if (s3Error != null && s3Error.statusCode() == HttpStatusCode.NOT_FOUND)
-                        return false;
-
-                    throw errors.handleException(e, objectKey, "EXISTS");
-                });
+                .exceptionally(this::objectExistsError);
     }
 
-    private CompletionStage<Boolean> prefixExists(String prefix, IExecutionContext ctx) {
+    private boolean
+    objectExistsError(Throwable e) {
+
+        var s3Error =
+                (e instanceof S3Exception) ? (S3Exception) e :
+                (e.getCause() instanceof S3Exception) ? (S3Exception) e.getCause() :
+                null;
+
+        if (s3Error != null && s3Error.statusCode() == HttpStatusCode.NOT_FOUND)
+            return false;
+
+        if (e instanceof CompletionException)
+            throw (CompletionException) e;
+        else
+            throw new CompletionException(e);
+    }
+
+    @Override
+    protected CompletionStage<Boolean>
+    prefixExists(String prefix, IExecutionContext ctx) {
 
         var request = ListObjectsV2Request.builder()
                 .bucket(bucket)
                 .prefix(prefix)
-                .delimiter(BACKSLASH)
                 .maxKeys(1)
                 .build();
 
         var response = CommonFileStorage.useContext(ctx, client.listObjectsV2(request));
 
-        return response.thenApply(result -> result.hasContents() || result.hasCommonPrefixes());
+        return response.thenApply(ListObjectsV2Response::hasContents);
     }
 
     @Override
-    public CompletionStage<Long> size(String storagePath, IExecutionContext execContext) {
-
-        try {
-
-            log.info("STORAGE OPERATION: {} {} [{}]", storageKey, SIZE_OPERATION, storagePath);
-
-            var objectKey = resolvePath(storagePath, true, SIZE_OPERATION);
-
-            var request = HeadObjectRequest.builder()
-                    .bucket(this.bucket)
-                    .key(objectKey)
-                    .build();
-
-            return client.headObject(request)
-                    .thenApplyAsync(Function.identity(), execContext.eventLoopExecutor())
-
-                    // Take size from the content-length header
-                    .thenApply(HeadObjectResponse::contentLength)
-
-                    .exceptionally(error -> {
-                        throw errors.handleException(error, objectKey, SIZE_OPERATION);
-                    });
-        }
-        catch (Exception e) {
-            return CompletableFuture.failedFuture(e);
-        }
-    }
-
-    @Override
-    public CompletionStage<FileStat> stat(String storagePath, IExecutionContext execContext) {
-
-        try {
-
-            log.info("STORAGE OPERATION: {} {} [{}]", storageKey, STAT_OPERATION, storagePath);
-
-            var objectKey = resolvePath(storagePath, true, STAT_OPERATION);
-
-            return dirProcessing(objectKey, STAT_OPERATION, k_ -> statImpl(k_, execContext), execContext);
-
-//        var request = GetObjectAttributesRequest.builder()
-//            .bucket(bucket)
-//            .key(objectKey)
-//            .objectAttributes(ObjectAttributes.OBJECT_SIZE)
-//            .build();
-//
-//        return client.getObjectAttributes(request).handleAsync((response, error) -> {
-//
-//            if (error != null) {
-//                throw errors.handleException(error, storagePath, STAT_OPERATION);
-//            }
-//
-//            var path = storagePath;
-//            var name = storagePath.substring(storagePath.lastIndexOf("/") + 1);
-//            var fileType = FileType.FILE;
-//            var size = response.objectSize();
-//
-//            var ctime = response.lastModified();
-//            var mtime = response.lastModified();
-//            var atime = (Instant) null;
-//
-//            return new FileStat(path, name, fileType, size, ctime, mtime, atime);
-//
-//        }, execContext.eventLoopExecutor());
-
-        }
-        catch (Exception e) {
-            return CompletableFuture.failedFuture(e);
-        }
-    }
-
-    private CompletionStage<FileStat> statImpl(String objectKey, IExecutionContext execContext) {
+    protected CompletionStage<FileStat>
+    objectStat(String objectKey, IExecutionContext ctx) {
 
         var request = GetObjectAttributesRequest.builder()
                 .bucket(bucket)
@@ -317,121 +237,93 @@ public class S3ObjectStorage implements IFileStorage {
                 .objectAttributes(ObjectAttributes.OBJECT_SIZE)
                 .build();
 
-        return client.getObjectAttributes(request).handleAsync((response, error) -> {
+        var response = CommonFileStorage.useContext(ctx, client.getObjectAttributes(request));
 
-            if (error != null) {
-                throw errors.handleException(error, objectKey, STAT_OPERATION);
-            }
-
-            var name = objectKey.substring(objectKey.lastIndexOf("/", objectKey.length() - 2) + 1);
-            var fileType = FileType.FILE;
-            var size = response.objectSize();
-            var mtime = response.lastModified();
-
-            return new FileStat(objectKey, name, fileType, size, mtime, /* atime = */ null);
-
-        }, execContext.eventLoopExecutor());
+        return response.thenApply(attrs -> attrsToFileStat(objectKey, attrs));
     }
 
     @Override
-    public CompletionStage<List<FileStat>> ls(String storagePath, IExecutionContext execContext) {
+    protected CompletionStage<FileStat>
+    prefixStat(String prefix, IExecutionContext ctx) {
 
-        try {
+        var name = prefix.contains(BACKSLASH) ? prefix.substring(prefix.lastIndexOf(BACKSLASH) + 1) : prefix;
+        var fileType = FileType.DIRECTORY;
+        var size = 0;
 
-            var dirPath = storagePath.endsWith(BACKSLASH) ? storagePath : storagePath + BACKSLASH;
+        var stat = new FileStat(prefix, name, fileType, size, /* mtime = */ null, /* atime = */ null);
 
-            log.info("STORAGE OPERATION: {} {} [{}]", storageKey, LS_OPERATION, dirPath);
-
-            var objectKey = resolvePath(dirPath, true, SIZE_OPERATION);
-
-            var request = ListObjectsV2Request.builder()
-                    .bucket(bucket)
-                    .prefix(objectKey)
-                    .delimiter(BACKSLASH)
-                    .build();
-
-            // Send request and get response onto the EL for execContext
-            var response = useContext(execContext, client.listObjectsV2(request));
-
-            return response
-                    .thenApply(result -> lsResult(objectKey, result))
-                    .exceptionally(error -> { throw errors.handleException(error, storagePath, LS_OPERATION); });
-        }
-        catch (Exception e) {
-            return CompletableFuture.failedFuture(e);
-        }
+        return CompletableFuture.completedFuture(stat);
     }
 
-    private List<FileStat> lsResult(String dirObjectKey, ListObjectsV2Response response) {
+    @Override
+    protected CompletionStage<List<FileStat>>
+    prefixLs(String prefix, String startAfter, int maxKeys, boolean recursive, IExecutionContext ctx) {
+
+        var request = ListObjectsV2Request.builder()
+                .bucket(bucket)
+                .prefix(prefix)
+                .maxKeys(maxKeys);
+
+        if (startAfter != null)
+            request.startAfter(startAfter);
+
+        if (!recursive)
+            request.delimiter(BACKSLASH);
+
+        // Send request and get response onto the EL for execContext
+        var response = useContext(ctx, client.listObjectsV2(request.build()));
+
+        return response.thenApply(result -> prefixLsResult(prefix, result));
+    }
+
+    private List<FileStat>
+    prefixLsResult(String prefix, ListObjectsV2Response response) {
 
         log.info(response.commonPrefixes().toString());
 
-        var stats = new ArrayList<FileStat>();
-        var rootPrefix = prefix.toString();
-
-        // First entry should always be the directory being listed
-        if (response.contents().isEmpty()) {
-            throw errors.explicitError(OBJECT_NOT_FOUND, dirObjectKey, LS_OPERATION);
+        // If no objects / prefixes are matched, the "directory" doesn't exist
+        if (response.contents().isEmpty() && response.commonPrefixes().isEmpty()) {
+            throw errors.explicitError(OBJECT_NOT_FOUND, prefix, LS_OPERATION);
         }
 
-        var folderContents = response.contents().subList(1, response.contents().size());
+        var objects = response.contents();
+        var prefixes = response.commonPrefixes();
 
-        for (var obj : folderContents) {
+        // Do not include the directory being listed, if it shows up as the first entry in the list
 
-            var path = obj.key().substring(rootPrefix.length() + 1);
-            var name = path.contains(BACKSLASH) ? path.substring(path.lastIndexOf(BACKSLASH) + 1) : path;
-            var fileType = FileType.FILE;
-            var size = obj.size();
-            var mtime = obj.lastModified();
+        if (!objects.isEmpty() && objects.get(0).key().equals(prefix))
+            objects = objects.subList(1, objects.size());
 
-            var stat = new FileStat(path, name, fileType, size, mtime, /* atime = */ null);
+        if (!prefixes.isEmpty() && prefixes.get(0).prefix().equals(prefix))
+            prefixes = prefixes.subList(1, prefixes.size());
 
-            stats.add(stat);
-        }
+        // Create FileStat for both objects and prefixes
 
-        for (var prefix : response.commonPrefixes()) {
+        var objectStats = objects.stream().map(this::objectToFileStat);
+        var prefixStats = prefixes.stream().map(this::prefixToFileStat);
 
-            // Remove the last character from directory names, which is the trailing backslash
-            var path = prefix.prefix().substring(rootPrefix.length() + 1, prefix.prefix().length() - 1);
-            var name = path.contains(BACKSLASH) ? path.substring(path.lastIndexOf(BACKSLASH) + 1) : path;
-            var fileType = FileType.DIRECTORY;
-            var size = 0;
-
-            var stat = new FileStat(path, name, fileType, size, /* mtime = */ null, /* atime = */ null);
-
-            stats.add(stat);
-        }
-
-        return stats;
+        return Stream
+                .concat(objectStats, prefixStats)
+                .collect(Collectors.toList());
     }
 
     @Override
-    public CompletionStage<Void> mkdir(String storagePath, boolean recursive, IExecutionContext execContext) {
+    protected CompletionStage<Void>
+    prefixMkdir(String prefix, IExecutionContext execContext) {
 
-        try {
 
-            log.info("STORAGE OPERATION: {} {} [{}]", storageKey, MKDIR_OPERATION, storagePath);
+        var request = PutObjectRequest.builder()
+                .bucket(bucket)
+                .key(prefix)
+                .contentLength(0L)
+                .build();
 
-            var bucketKey = resolvePath(storagePath, false, MKDIR_OPERATION) + "/";
+        var content = AsyncRequestBody.empty();
 
-            var request = PutObjectRequest.builder()
-                    .bucket(bucket)
-                    .key(bucketKey)
-                    .contentLength(0L)
-                    .build();
+        // Send request and get response onto the EL for execContext
+        var response = useContext(execContext, client.putObject(request, content));
 
-            var content = AsyncRequestBody.empty();
-
-            // Send request and get response onto the EL for execContext
-            var response = useContext(execContext, client.putObject(request, content));
-
-            return response
-                    .thenAccept(result -> {})
-                    .exceptionally(error -> { throw errors.handleException(error, storagePath, MKDIR_OPERATION); });
-        }
-        catch (Exception e) {
-            return CompletableFuture.failedFuture(e);
-        }
+        return response.thenAccept(result -> {});
     }
 
     @Override
@@ -441,7 +333,7 @@ public class S3ObjectStorage implements IFileStorage {
 
             log.info("STORAGE OPERATION: {} {} [{}]", storageKey, RM_OPERATION, storagePath);
 
-            var fileKey = resolvePath(storagePath, false, RM_OPERATION);
+            var fileKey = resolvePath(RM_OPERATION, storagePath, false);
             var dirKey = fileKey + "/";
 
             return objectExists(fileKey, execContext).thenComposeAsync(exists -> exists
@@ -475,12 +367,50 @@ public class S3ObjectStorage implements IFileStorage {
         return client.deleteObject(request).thenApplyAsync(x -> null, execContext.eventLoopExecutor());
     }
 
+    private FileStat
+    attrsToFileStat(String objectKey, GetObjectAttributesResponse objectAttrs) {
+
+        var path = objectKey.substring(prefix.toString().length() + 1);
+        var name = path.contains(BACKSLASH) ? path.substring(path.lastIndexOf(BACKSLASH) + 1) : path;
+        var fileType = objectKey.endsWith(BACKSLASH) ? FileType.DIRECTORY : FileType.FILE;
+        var size = objectAttrs.objectSize();
+        var mtime = objectAttrs.lastModified();
+
+        return new FileStat(objectKey, name, fileType, size, mtime, /* atime = */ null);
+    }
+
+    private FileStat
+    objectToFileStat(S3Object obj) {
+
+        var path = obj.key().substring(prefix.toString().length() + 1);
+        var name = path.contains(BACKSLASH) ? path.substring(path.lastIndexOf(BACKSLASH) + 1) : path;
+        var fileType = obj.key().endsWith(BACKSLASH) ? FileType.DIRECTORY : FileType.FILE;
+        var size = obj.size();
+        var mtime = obj.lastModified();
+
+        return new FileStat(path, name, fileType, size, mtime, /* atime = */ null);
+    }
+
+    private FileStat
+    prefixToFileStat(CommonPrefix prefix) {
+
+        // Remove the last character from directory names, which is the trailing backslash
+        var path = prefix.prefix().substring(this.prefix.toString().length() + 1, prefix.prefix().length() - 1);
+        var name = path.contains(BACKSLASH) ? path.substring(path.lastIndexOf(BACKSLASH) + 1) : path;
+        var fileType = FileType.DIRECTORY;
+        var size = 0;
+
+        return new FileStat(path, name, fileType, size, /* mtime = */ null, /* atime = */ null);
+    }
+
+
+
     @Override
     public Flow.Publisher<ByteBuf> reader(String storagePath, IDataContext dataContext) {
 
         log.info("STORAGE OPERATION: {} {} [{}]", storageKey, READ_OPERATION, storagePath);
 
-        var objectKey = resolvePath(storagePath, false, READ_OPERATION);
+        var objectKey = resolvePath(READ_OPERATION, storagePath, false);
 
         return new S3ObjectReader(
                 storageKey, storagePath, bucket, objectKey,
@@ -492,14 +422,14 @@ public class S3ObjectStorage implements IFileStorage {
 
         log.info("STORAGE OPERATION: {} {} [{}]", storageKey, WRITE_OPERATION, storagePath);
 
-        var objectKey = resolvePath(storagePath, false, WRITE_OPERATION);
+        var objectKey = resolvePath(WRITE_OPERATION, storagePath, false);
 
         return new S3ObjectWriter(
                 storageKey, storagePath, bucket, objectKey,
                 client, signal, dataContext.eventLoopExecutor(), errors);
     }
 
-    private String resolvePath(String requestedPath, boolean allowRootDir, String operationName) {
+    protected String resolvePath(String operationName, String requestedPath, boolean allowRootDir) {
 
         try {
 
@@ -537,66 +467,5 @@ public class S3ObjectStorage implements IFileStorage {
 
             throw errors.explicitError(STORAGE_PATH_INVALID, requestedPath, operationName);
         }
-    }
-
-    private CompletionStage<FileType> fileType(String objectKey, IExecutionContext execCtx) {
-
-        if (objectKey.endsWith(BACKSLASH))
-            return CompletableFuture.completedFuture(FileType.DIRECTORY);
-
-        var dirKey = objectKey + BACKSLASH;
-
-        return objectExists(dirKey, execCtx).thenApplyAsync(
-                exists -> exists ? FileType.DIRECTORY : FileType.FILE);
-    }
-
-
-    private <TResult> CompletionStage<TResult>
-    dirProcessing(
-            String requestedKey, String operation,
-            Function<String, CompletionStage<TResult>> func,
-            IExecutionContext execCtx) {
-
-        var storageKey = StoragePath.forPath(requestedKey);
-
-        if (storageKey.isDirectory()) {
-            return func.apply(requestedKey);
-        }
-        else {
-
-            var fileKey = requestedKey;
-            var dirKey = requestedKey + BACKSLASH;
-
-            var dirReq = ListObjectsV2Request.builder()
-                    .bucket(bucket)
-                    .prefix(dirKey)
-                    .maxKeys(1)
-                    .build();
-
-            return client.listObjectsV2(dirReq)
-                    .thenComposeAsync(response -> func.apply(dirKey), execCtx.eventLoopExecutor())
-                    .exceptionally(error -> dirProcessingHandler(error, requestedKey, operation))
-                    .thenComposeAsync(response -> func.apply(fileKey), execCtx.eventLoopExecutor());
-        }
-    }
-
-    private <TResult> TResult
-    dirProcessingHandler(Throwable error, String fileKey, String operation) {
-
-        if (error instanceof CompletionException)
-            error = error.getCause();
-
-        if (error instanceof S3Exception) {
-            var s3Error = (S3Exception) error;
-            if (s3Error.statusCode() == HttpStatusCode.NOT_FOUND)
-                return null;
-        }
-
-        throw errors.handleException(error, fileKey, operation);
-    }
-
-    private <TResult> CompletionStage<TResult> useContext(IExecutionContext execCtx, CompletionStage<TResult> promise) {
-
-        return promise.thenApplyAsync(Function.identity(), execCtx.eventLoopExecutor());
     }
 }

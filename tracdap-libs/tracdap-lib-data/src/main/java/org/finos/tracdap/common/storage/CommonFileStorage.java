@@ -19,7 +19,6 @@ package org.finos.tracdap.common.storage;
 import io.netty.channel.EventLoopGroup;
 import org.finos.tracdap.common.concurrent.IExecutionContext;
 import org.finos.tracdap.common.data.IDataContext;
-import org.finos.tracdap.common.exception.ETrac;
 
 import io.netty.buffer.ByteBuf;
 
@@ -37,7 +36,23 @@ import java.util.concurrent.Flow;
 import static org.finos.tracdap.common.storage.StorageErrors.ExplicitError.*;
 
 
-public class CommonFileStorage implements IFileStorage {
+public abstract class CommonFileStorage implements IFileStorage {
+
+    protected abstract CompletionStage<Boolean> objectExists(String objectKey, IExecutionContext ctx);
+    protected abstract CompletionStage<Boolean> prefixExists(String prefix, IExecutionContext ctx);
+
+    protected abstract CompletionStage<FileStat> objectStat(String objectKey, IExecutionContext ctx);
+    protected abstract CompletionStage<FileStat> prefixStat(String prefix, IExecutionContext ctx);
+
+    protected abstract CompletionStage<List<FileStat>> prefixLs(
+            String prefix, String startAfter, int maxKeys, boolean recursive,
+            IExecutionContext ctx);
+
+    protected abstract CompletionStage<Void> prefixMkdir(String prefix, IExecutionContext ctx);
+
+
+
+
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
@@ -84,10 +99,23 @@ public class CommonFileStorage implements IFileStorage {
     private CompletionStage<Boolean>
     _exists(String operationName, String storagePath, IExecutionContext ctx) {
 
-        var resolvedPath = resolvePath(operationName, storagePath, true);
-        var exists = fs.exists(resolvedPath, ctx);
+        var objectKey = resolvePath(operationName, storagePath, true);
+        var prefix = objectKey + BACKSLASH;
 
-        return useContext(ctx, exists);
+        if (storagePath.endsWith(BACKSLASH)) {
+
+            return prefixExists(prefix, ctx).thenCompose(
+                exists -> exists
+                    ? CompletableFuture.completedFuture(true)
+                    : objectExists(objectKey, ctx));
+        }
+        else {
+
+            return objectExists(objectKey, ctx).thenCompose(
+                exists -> exists
+                    ? CompletableFuture.completedFuture(true)
+                    : prefixExists(prefix, ctx));
+        }
     }
 
     @Override
@@ -100,15 +128,14 @@ public class CommonFileStorage implements IFileStorage {
     private CompletionStage<Long>
     _size(String operationName, String storagePath, IExecutionContext ctx) {
 
-        var resolvedPath = resolvePath(operationName, storagePath, true);
-        var stat = fs.stat(resolvedPath, ctx);
+        var _stat = _stat(operationName, storagePath, ctx);
 
-        return useContext(ctx, stat).thenApply(stat_ -> {
+        return _stat.thenApply(stat -> {
 
-            if (stat_.fileType != FileType.FILE)
+            if (stat.fileType != FileType.FILE)
                 throw errors.explicitError(NOT_A_FILE, storagePath, operationName);  // Todo
 
-            return stat_.size;
+            return stat.size;
         });
     }
 
@@ -122,12 +149,13 @@ public class CommonFileStorage implements IFileStorage {
     private CompletionStage<FileStat>
     _stat(String operationName, String storagePath, IExecutionContext ctx) {
 
-        var resolvedPath = resolvePath(operationName, storagePath, true);
-        var stat = fs.stat(resolvedPath, ctx);
+        var objectKey = resolvePath(operationName, storagePath, true);
+        var prefix = objectKey + BACKSLASH;
 
-        return useContext(ctx, stat);
+        return prefixExists(prefix, ctx).thenCompose(isDir -> isDir
+                ? prefixStat(prefix, ctx)
+                : objectStat(objectKey, ctx));
     }
-
 
     @Override
     public CompletionStage<List<FileStat>>
@@ -139,22 +167,23 @@ public class CommonFileStorage implements IFileStorage {
     private CompletionStage<List<FileStat>>
     _ls(String operationName, String storagePath, boolean recursive, IExecutionContext ctx) {
 
-        var resolvedPath = resolvePath(operationName, storagePath, true);
-        var stat = fs.stat(resolvedPath, ctx);
+        var _stat = _stat(operationName, storagePath, ctx);
 
-        return useContext(ctx, stat).thenCompose(fi -> {
+        return _stat.thenCompose(stat -> {
 
-            if (fi.fileType == FileType.FILE)
-                return CompletableFuture.completedFuture(List.of(fi));
+            if (stat.fileType == FileType.FILE)
+                return CompletableFuture.completedFuture(List.of(stat));
 
-            var ls = fs.ls(resolvedPath, ctx);  // todo recursive
+            var objectKey = resolvePath(operationName, storagePath, true);
+            var prefix = objectKey + BACKSLASH;
 
-            return useContext(ctx, ls);
+            return prefixLs(prefix, null, 1000, false, ctx);
         });
     }
 
     @Override
-    public CompletionStage<Void> mkdir(String storagePath, boolean recursive, IExecutionContext ctx) {
+    public CompletionStage<Void>
+    mkdir(String storagePath, boolean recursive, IExecutionContext ctx) {
 
         return wrapOperation("MKDIR", storagePath, (op, path) -> _mkdir(op, path, recursive, ctx));
     }
@@ -162,17 +191,22 @@ public class CommonFileStorage implements IFileStorage {
     private CompletionStage<Void>
     _mkdir(String operationName, String storagePath, Boolean recursive, IExecutionContext ctx) {
 
-        var resolvedPath = resolvePath(operationName, storagePath, false);
-        var exists = fs.exists(resolvedPath, ctx);
+        // TODO: check parent if not recursive
 
-        return useContext(ctx, exists).thenCompose(exists_ -> {
+        var objectKey = resolvePath(operationName, storagePath, false);
+        var prefix = objectKey + BACKSLASH;
 
-            if (exists_)
+        var objectExists = objectExists(objectKey, ctx);
+        var dirExists =  prefixExists(prefix, ctx);
+
+        var fileExists = objectExists.thenCombine(dirExists, (obj, dir) -> obj && !dir);
+
+        return fileExists.thenCompose(exists -> {
+
+            if (exists)
                 throw errors.explicitError(OBJECT_ALREADY_EXISTS, storagePath, operationName);
 
-            var mkdir = fs.mkdir(resolvedPath, recursive, ctx);
-
-            return useContext(ctx, mkdir);
+            return prefixMkdir(prefix, ctx);
         });
     }
 
@@ -209,22 +243,28 @@ public class CommonFileStorage implements IFileStorage {
 
         try {
 
-            log.info(operation);
+            log.info("STORAGE OPERATION: {}", operation);
 
-            return func.call(operationName, storagePath);
-        }
-        catch (ETrac e) {
-            log.error("{}: {}", operation, e.getMessage());
-            throw e;
+            var result = func.call(operationName, storagePath);
+
+            return result.exceptionally(e -> {
+
+                var error = errors.handleException(e, storagePath, operationName);
+                log.error("{}: {}", operation, error.getMessage());
+
+                throw error;
+            });
         }
         catch (Exception e) {
+
             var error = errors.handleException(e, storagePath, operationName);
             log.error("{}: {}", operation, error.getMessage());
-            throw error;
+
+            return CompletableFuture.failedFuture(error);
         }
     }
 
-    private String resolvePath(String operationName, String storagePath, boolean allowRootDir) {
+    protected String resolvePath(String operationName, String storagePath, boolean allowRootDir) {
 
 
         try {
