@@ -68,8 +68,6 @@ public class S3ObjectStorage extends CommonFileStorage {
     private final Logger log = LoggerFactory.getLogger(getClass());
 
     private final String storageKey;
-    private final AwsCredentialsProvider credentials;
-
     private final String bucket;
     private final StoragePath prefix;
     private final Region region;
@@ -77,18 +75,20 @@ public class S3ObjectStorage extends CommonFileStorage {
 
     private final StorageErrors errors;
 
+    private final AwsCredentialsProvider credentials;
     private S3AsyncClient client;
 
 
-    public S3ObjectStorage(Properties properties) {
+    public S3ObjectStorage(String storageKey, Properties properties) {
 
-        this.storageKey = properties.getProperty(IStorageManager.PROP_STORAGE_KEY);
+        super("s3", storageKey, new S3StorageErrors(storageKey, LoggerFactory.getLogger(S3ObjectStorage.class)));
 
         var bucket = properties.getProperty(BUCKET_PROPERTY);
         var prefix = properties.getProperty(PREFIX_PROPERTY);
         var region = properties.getProperty(REGION_PROPERTY);
         var endpoint = properties.getProperty(ENDPOINT_PROPERTY);
 
+        this.storageKey = storageKey;
         this.bucket = bucket;
         this.prefix = prefix != null && !prefix.isBlank() ? StoragePath.forPath(prefix) : StoragePath.root();
         this.region = region != null && !region.isBlank() ? Region.of(region) : null;

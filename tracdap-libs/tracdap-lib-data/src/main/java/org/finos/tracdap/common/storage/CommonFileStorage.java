@@ -50,44 +50,20 @@ public abstract class CommonFileStorage implements IFileStorage {
 
     protected abstract CompletionStage<Void> prefixMkdir(String prefix, IExecutionContext ctx);
 
-
-
-
-
     private final Logger log = LoggerFactory.getLogger(getClass());
 
     private final String storageType;
     private final String storageKey;
-    private final String rootPath;
-
-    private final IFileStorage fs;
     private final StorageErrors errors;
 
-    protected CommonFileStorage(
-            String storageType, String storageKey, String rootPath,
-            IFileStorage fs, StorageErrors errors) {
+    protected CommonFileStorage(String storageType, String storageKey, StorageErrors errors) {
 
         this.storageType = storageType;
         this.storageKey = storageKey;
-        this.rootPath = rootPath;
 
-        this.fs = fs;
         this.errors = errors;
     }
 
-    @Override
-    public void start(EventLoopGroup eventLoopGroup) {
-
-        log.info("INIT [{}]: Common file storage, fs = [{}], root = [{}]", storageKey, storageType, rootPath);
-
-        fs.start(eventLoopGroup);
-    }
-
-    @Override
-    public void stop() {
-
-        fs.stop();
-    }
 
     @Override
     public CompletionStage<Boolean>

@@ -66,7 +66,7 @@ public class S3StorageReadWriteTest extends StorageReadWriteTestSuite {
 
         elg = new NioEventLoopGroup(2);
 
-        setup = new S3ObjectStorage(storageProps);
+        setup = new S3ObjectStorage("STORAGE_SETUP", storageProps);
         setup.start(elg);
 
         var mkdir =setup.mkdir(testDir.substring(1), true, setupExecCtx);
@@ -81,7 +81,7 @@ public class S3StorageReadWriteTest extends StorageReadWriteTestSuite {
         dataContext = new DataContext(execContext.eventLoopExecutor(), new RootAllocator());
 
         storageProps.put(S3ObjectStorage.PREFIX_PROPERTY, testDir);
-        storage = new S3ObjectStorage(storageProps);
+        storage = new S3ObjectStorage("TEST_STORAGE", storageProps);
         storage.start(elg);
     }
 

@@ -66,9 +66,8 @@ public class S3StorageOperationsTest extends StorageOperationsTestSuite {
         elg = new NioEventLoopGroup(2, new DefaultThreadFactory("ops-test"));
         allocator = new RootAllocator();
 
-        storageProps.put(IStorageManager.PROP_STORAGE_KEY, "STORAGE_SETUP");
         setupCtx = new ExecutionContext(elg.next());
-        setupStorage = new S3ObjectStorage(storageProps);
+        setupStorage = new S3ObjectStorage("STORAGE_SETUP", storageProps);
         setupStorage.start(elg);
 
         var mkdir = setupStorage.mkdir(testSuiteDir, true, setupCtx);
@@ -85,9 +84,8 @@ public class S3StorageOperationsTest extends StorageOperationsTestSuite {
         var testDir = String.format("%stest_%d", testSuiteDir, ++testNumber);
         setupStorage.mkdir(testDir, false, setupCtx);
         storageProps.put(S3ObjectStorage.PREFIX_PROPERTY, testDir);
-        storageProps.put(IStorageManager.PROP_STORAGE_KEY, "TEST_" + testNumber);
 
-        storage = new S3ObjectStorage(storageProps);
+        storage = new S3ObjectStorage("TEST_" + testNumber, storageProps);
         storage.start(elg);
     }
 
