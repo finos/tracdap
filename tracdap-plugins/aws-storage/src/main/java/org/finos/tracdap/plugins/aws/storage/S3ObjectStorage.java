@@ -69,7 +69,7 @@ public class S3ObjectStorage extends CommonFileStorage {
 
     private final String storageKey;
     private final String bucket;
-    private final StoragePath prefix;
+    private final String prefix;
     private final Region region;
     private final URI endpoint;
 
@@ -90,13 +90,30 @@ public class S3ObjectStorage extends CommonFileStorage {
 
         this.storageKey = storageKey;
         this.bucket = bucket;
-        this.prefix = prefix != null && !prefix.isBlank() ? StoragePath.forPath(prefix) : StoragePath.root();
+        this.prefix = normalizePrefix(prefix);
         this.region = region != null && !region.isBlank() ? Region.of(region) : null;
         this.endpoint = endpoint != null && !endpoint.isBlank() ? URI.create(endpoint) : null;
 
         this.credentials = setupCredentials(properties);
 
         this.errors = new S3StorageErrors(storageKey, log);
+    }
+
+    private String normalizePrefix(String prefix) {
+
+        if (prefix == null)
+            return "";
+
+        while (prefix.startsWith(BACKSLASH))
+            prefix = prefix.substring(1);
+
+        if (prefix.isBlank())
+            return "";
+
+        if (!prefix.endsWith(BACKSLASH))
+            prefix = prefix + BACKSLASH;
+
+        return prefix;
     }
 
     private AwsCredentialsProvider setupCredentials(Properties properties) {
@@ -183,9 +200,11 @@ public class S3ObjectStorage extends CommonFileStorage {
     protected CompletionStage<Boolean>
     objectExists(String objectKey, IExecutionContext ctx) {
 
+        var absoluteKey = usePrefix(objectKey);
+
         var request = HeadObjectRequest.builder()
                 .bucket(this.bucket)
-                .key(objectKey)
+                .key(absoluteKey)
                 .build();
 
         var response = useContext(ctx, client.headObject(request));
@@ -214,11 +233,13 @@ public class S3ObjectStorage extends CommonFileStorage {
 
     @Override
     protected CompletionStage<Boolean>
-    prefixExists(String prefix, IExecutionContext ctx) {
+    prefixExists(String directoryKey, IExecutionContext ctx) {
+
+        var absoluteDir = usePrefix(directoryKey);
 
         var request = ListObjectsV2Request.builder()
                 .bucket(bucket)
-                .prefix(prefix)
+                .prefix(absoluteDir)
                 .maxKeys(1)
                 .build();
 
@@ -231,9 +252,11 @@ public class S3ObjectStorage extends CommonFileStorage {
     protected CompletionStage<FileStat>
     objectStat(String objectKey, IExecutionContext ctx) {
 
+        var absoluteKey = usePrefix(objectKey);
+
         var request = GetObjectAttributesRequest.builder()
                 .bucket(bucket)
-                .key(objectKey)
+                .key(absoluteKey)
                 .objectAttributes(ObjectAttributes.OBJECT_SIZE)
                 .build();
 
@@ -244,24 +267,31 @@ public class S3ObjectStorage extends CommonFileStorage {
 
     @Override
     protected CompletionStage<FileStat>
-    prefixStat(String prefix, IExecutionContext ctx) {
+    prefixStat(String directoryKey, IExecutionContext ctx) {
 
-        var name = prefix.contains(BACKSLASH) ? prefix.substring(prefix.lastIndexOf(BACKSLASH) + 1) : prefix;
+        var storagePath = directoryKey.isEmpty() ? "." : directoryKey.substring(0, directoryKey.length() - 1);
+
+        var name = storagePath.contains(BACKSLASH)
+                ? storagePath.substring(storagePath.lastIndexOf(BACKSLASH) + 1)
+                : storagePath;
+
         var fileType = FileType.DIRECTORY;
         var size = 0;
 
-        var stat = new FileStat(prefix, name, fileType, size, /* mtime = */ null, /* atime = */ null);
+        var stat = new FileStat(storagePath, name, fileType, size, /* mtime = */ null, /* atime = */ null);
 
         return CompletableFuture.completedFuture(stat);
     }
 
     @Override
     protected CompletionStage<List<FileStat>>
-    prefixLs(String prefix, String startAfter, int maxKeys, boolean recursive, IExecutionContext ctx) {
+    prefixLs(String directoryKey, String startAfter, int maxKeys, boolean recursive, IExecutionContext ctx) {
+
+        var absoluteDir = usePrefix(directoryKey);
 
         var request = ListObjectsV2Request.builder()
                 .bucket(bucket)
-                .prefix(prefix)
+                .prefix(absoluteDir)
                 .maxKeys(maxKeys);
 
         if (startAfter != null)
@@ -273,17 +303,15 @@ public class S3ObjectStorage extends CommonFileStorage {
         // Send request and get response onto the EL for execContext
         var response = useContext(ctx, client.listObjectsV2(request.build()));
 
-        return response.thenApply(result -> prefixLsResult(prefix, result));
+        return response.thenApply(result -> prefixLsResult(directoryKey, absoluteDir, result));
     }
 
     private List<FileStat>
-    prefixLsResult(String prefix, ListObjectsV2Response response) {
-
-        log.info(response.commonPrefixes().toString());
+    prefixLsResult(String directoryKey, String absoluteDir, ListObjectsV2Response response) {
 
         // If no objects / prefixes are matched, the "directory" doesn't exist
         if (response.contents().isEmpty() && response.commonPrefixes().isEmpty()) {
-            throw errors.explicitError(OBJECT_NOT_FOUND, prefix, LS_OPERATION);
+            throw errors.explicitError(OBJECT_NOT_FOUND, directoryKey, LS_OPERATION);
         }
 
         var objects = response.contents();
@@ -291,10 +319,10 @@ public class S3ObjectStorage extends CommonFileStorage {
 
         // Do not include the directory being listed, if it shows up as the first entry in the list
 
-        if (!objects.isEmpty() && objects.get(0).key().equals(prefix))
+        if (!objects.isEmpty() && objects.get(0).key().equals(absoluteDir))
             objects = objects.subList(1, objects.size());
 
-        if (!prefixes.isEmpty() && prefixes.get(0).prefix().equals(prefix))
+        if (!prefixes.isEmpty() && prefixes.get(0).prefix().equals(absoluteDir))
             prefixes = prefixes.subList(1, prefixes.size());
 
         // Create FileStat for both objects and prefixes
@@ -309,12 +337,13 @@ public class S3ObjectStorage extends CommonFileStorage {
 
     @Override
     protected CompletionStage<Void>
-    prefixMkdir(String prefix, IExecutionContext execContext) {
+    prefixMkdir(String directoryKey, IExecutionContext execContext) {
 
+        var absoluteDir = usePrefix(directoryKey);
 
         var request = PutObjectRequest.builder()
                 .bucket(bucket)
-                .key(prefix)
+                .key(absoluteDir)
                 .contentLength(0L)
                 .build();
 
@@ -327,13 +356,13 @@ public class S3ObjectStorage extends CommonFileStorage {
     }
 
     @Override
-    public CompletionStage<Void> rm(String storagePath, boolean recursive, IExecutionContext execContext) {
+    public CompletionStage<Void> rm(String objectKey, boolean recursive, IExecutionContext execContext) {
 
         try {
 
-            log.info("STORAGE OPERATION: {} {} [{}]", storageKey, RM_OPERATION, storagePath);
+            log.info("STORAGE OPERATION: {} {} [{}]", storageKey, RM_OPERATION, objectKey);
 
-            var fileKey = resolvePath(RM_OPERATION, storagePath, false);
+            var fileKey = usePrefix(objectKey);
             var dirKey = fileKey + "/";
 
             return objectExists(fileKey, execContext).thenComposeAsync(exists -> exists
@@ -346,17 +375,6 @@ public class S3ObjectStorage extends CommonFileStorage {
         }
     }
 
-    private CompletionStage<Void> rmDir(String dirKey, boolean recursive, IExecutionContext execContext) {
-
-        return ls(dirKey, execContext).thenComposeAsync(stat -> {
-
-            if (stat.isEmpty())
-                return rmSingle(dirKey, execContext);
-
-            throw new ETracInternal("RM recursive not implemented yet");
-        }, execContext.eventLoopExecutor());
-    }
-
     private CompletionStage<Void> rmSingle(String objectKey, IExecutionContext execContext) {
 
         var request = DeleteObjectRequest.builder()
@@ -367,35 +385,53 @@ public class S3ObjectStorage extends CommonFileStorage {
         return client.deleteObject(request).thenApplyAsync(x -> null, execContext.eventLoopExecutor());
     }
 
+    private CompletionStage<Void> rmDir(String directoryKey, boolean recursive, IExecutionContext execContext) {
+
+        return ls(directoryKey, execContext).thenComposeAsync(stat -> {
+
+            if (stat.isEmpty())
+                return rmSingle(directoryKey, execContext);
+
+            throw new ETracInternal("RM recursive not implemented yet");
+        }, execContext.eventLoopExecutor());
+    }
+
     private FileStat
     attrsToFileStat(String objectKey, GetObjectAttributesResponse objectAttrs) {
 
-        var path = objectKey.substring(prefix.toString().length() + 1);
-        var name = path.contains(BACKSLASH) ? path.substring(path.lastIndexOf(BACKSLASH) + 1) : path;
+        var storagePath =
+                objectKey.isEmpty() ? "." :
+                objectKey.endsWith(BACKSLASH) ? objectKey.substring(0, objectKey.length() - 1) :
+                objectKey;
+
+        var name = storagePath.contains(BACKSLASH)
+                ? storagePath.substring(storagePath.lastIndexOf(BACKSLASH) + 1)
+                : storagePath;
+
         var fileType = objectKey.endsWith(BACKSLASH) ? FileType.DIRECTORY : FileType.FILE;
         var size = objectAttrs.objectSize();
         var mtime = objectAttrs.lastModified();
 
-        return new FileStat(objectKey, name, fileType, size, mtime, /* atime = */ null);
+        return new FileStat(storagePath, name, fileType, size, mtime, /* atime = */ null);
     }
 
     private FileStat
-    objectToFileStat(S3Object obj) {
+    objectToFileStat(S3Object s3Object) {
 
-        var path = obj.key().substring(prefix.toString().length() + 1);
+        var path = s3Object.key().substring(prefix.length());
         var name = path.contains(BACKSLASH) ? path.substring(path.lastIndexOf(BACKSLASH) + 1) : path;
-        var fileType = obj.key().endsWith(BACKSLASH) ? FileType.DIRECTORY : FileType.FILE;
-        var size = obj.size();
-        var mtime = obj.lastModified();
+        var fileType = s3Object.key().endsWith(BACKSLASH) ? FileType.DIRECTORY : FileType.FILE;
+        var size = fileType == FileType.FILE ? s3Object.size() : 0;
+        var mtime = fileType == FileType.FILE ? s3Object.lastModified() : null;
 
         return new FileStat(path, name, fileType, size, mtime, /* atime = */ null);
     }
 
     private FileStat
-    prefixToFileStat(CommonPrefix prefix) {
+    prefixToFileStat(CommonPrefix s3Directory) {
 
         // Remove the last character from directory names, which is the trailing backslash
-        var path = prefix.prefix().substring(this.prefix.toString().length() + 1, prefix.prefix().length() - 1);
+        var path = s3Directory.prefix().substring(prefix.length(), s3Directory.prefix().length() - 1);
         var name = path.contains(BACKSLASH) ? path.substring(path.lastIndexOf(BACKSLASH) + 1) : path;
         var fileType = FileType.DIRECTORY;
         var size = 0;
@@ -403,14 +439,12 @@ public class S3ObjectStorage extends CommonFileStorage {
         return new FileStat(path, name, fileType, size, /* mtime = */ null, /* atime = */ null);
     }
 
-
-
     @Override
     public Flow.Publisher<ByteBuf> reader(String storagePath, IDataContext dataContext) {
 
-        log.info("STORAGE OPERATION: {} {} [{}]", storageKey, READ_OPERATION, storagePath);
+        log.info("{} {} [{}]", READ_OPERATION, storageKey, storagePath);
 
-        var objectKey = resolvePath(READ_OPERATION, storagePath, false);
+        var objectKey = usePrefix(storagePath);
 
         return new S3ObjectReader(
                 storageKey, storagePath, bucket, objectKey,
@@ -420,52 +454,23 @@ public class S3ObjectStorage extends CommonFileStorage {
     @Override
     public Flow.Subscriber<ByteBuf> writer(String storagePath, CompletableFuture<Long> signal, IDataContext dataContext) {
 
-        log.info("STORAGE OPERATION: {} {} [{}]", storageKey, WRITE_OPERATION, storagePath);
+        log.info("{} {} [{}]", WRITE_OPERATION, storageKey, storagePath);
 
-        var objectKey = resolvePath(WRITE_OPERATION, storagePath, false);
+        var objectKey = usePrefix(storagePath);
 
         return new S3ObjectWriter(
                 storageKey, storagePath, bucket, objectKey,
                 client, signal, dataContext.eventLoopExecutor(), errors);
     }
 
-    protected String resolvePath(String operationName, String requestedPath, boolean allowRootDir) {
+    private String usePrefix(String relativeKey) {
 
-        try {
+        if (prefix.isEmpty())
+            return relativeKey;
 
-            if (requestedPath == null || requestedPath.isBlank())
-                throw errors.explicitError(STORAGE_PATH_NULL_OR_BLANK, requestedPath, operationName);
+        if (relativeKey.isEmpty())
+            return prefix;
 
-            var storagePath = StoragePath.forPath(requestedPath).normalize();
-
-            if (storagePath.isAbsolute())
-                throw errors.explicitError(STORAGE_PATH_NOT_RELATIVE, requestedPath, operationName);
-
-            if (storagePath.startsWith(".."))
-                throw errors.explicitError(STORAGE_PATH_OUTSIDE_ROOT, requestedPath, operationName);
-
-            var absolutePath = prefix.resolve(storagePath).normalize();
-
-            if (!prefix.contains(absolutePath))
-                throw errors.explicitError(STORAGE_PATH_OUTSIDE_ROOT, requestedPath, operationName);
-
-            if (absolutePath.equals(prefix) && !allowRootDir)
-                throw errors.explicitError(STORAGE_PATH_IS_ROOT, requestedPath, operationName);
-
-            log.info("root: {}, requested: {}, absolute: {}", prefix, requestedPath, absolutePath);
-
-            // For bucket storage, do not use "/" for the root path
-            // Otherwise everything gets put in a folder called "/"
-
-            var objectKey = absolutePath.toString();
-
-            return objectKey.startsWith("/")
-                    ? objectKey.substring(1)
-                    : objectKey;
-        }
-        catch (StoragePathException e) {
-
-            throw errors.explicitError(STORAGE_PATH_INVALID, requestedPath, operationName);
-        }
+        return prefix + relativeKey;
     }
 }

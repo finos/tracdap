@@ -16,7 +16,6 @@
 
 package org.finos.tracdap.common.storage;
 
-import io.netty.channel.EventLoopGroup;
 import org.finos.tracdap.common.concurrent.IExecutionContext;
 import org.finos.tracdap.common.data.IDataContext;
 
@@ -75,8 +74,8 @@ public abstract class CommonFileStorage implements IFileStorage {
     private CompletionStage<Boolean>
     _exists(String operationName, String storagePath, IExecutionContext ctx) {
 
-        var objectKey = resolvePath(operationName, storagePath, true);
-        var prefix = objectKey + BACKSLASH;
+        var objectKey = resolveObjectKey(operationName, storagePath, true);
+        var prefix = resolveDirPrefix(objectKey);
 
         if (storagePath.endsWith(BACKSLASH)) {
 
@@ -125,8 +124,8 @@ public abstract class CommonFileStorage implements IFileStorage {
     private CompletionStage<FileStat>
     _stat(String operationName, String storagePath, IExecutionContext ctx) {
 
-        var objectKey = resolvePath(operationName, storagePath, true);
-        var prefix = objectKey + BACKSLASH;
+        var objectKey = resolveObjectKey(operationName, storagePath, true);
+        var prefix = resolveDirPrefix(objectKey);
 
         return prefixExists(prefix, ctx).thenCompose(isDir -> isDir
                 ? prefixStat(prefix, ctx)
@@ -150,8 +149,8 @@ public abstract class CommonFileStorage implements IFileStorage {
             if (stat.fileType == FileType.FILE)
                 return CompletableFuture.completedFuture(List.of(stat));
 
-            var objectKey = resolvePath(operationName, storagePath, true);
-            var prefix = objectKey + BACKSLASH;
+            var objectKey = resolveObjectKey(operationName, storagePath, true);
+            var prefix = resolveDirPrefix(objectKey);
 
             return prefixLs(prefix, null, 1000, false, ctx);
         });
@@ -169,8 +168,8 @@ public abstract class CommonFileStorage implements IFileStorage {
 
         // TODO: check parent if not recursive
 
-        var objectKey = resolvePath(operationName, storagePath, false);
-        var prefix = objectKey + BACKSLASH;
+        var objectKey = resolveObjectKey(operationName, storagePath, false);
+        var prefix = resolveDirPrefix(objectKey);
 
         var objectExists = objectExists(objectKey, ctx);
         var dirExists =  prefixExists(prefix, ctx);
@@ -196,7 +195,7 @@ public abstract class CommonFileStorage implements IFileStorage {
     private CompletionStage<Void>
     _rm(String operationName, String storagePath, boolean recursive, IExecutionContext ctx) {
 
-        var resolvedPath = resolvePath(operationName, storagePath, false);
+        var resolvedPath = resolveObjectKey(operationName, storagePath, false);
 
         return null;
     }
@@ -214,12 +213,11 @@ public abstract class CommonFileStorage implements IFileStorage {
     private <TResult> CompletionStage<TResult>
     wrapOperation(String operationName, String storagePath, FsOperation<TResult> func) {
 
-        var storageKey = "";
         var operation = String.format("%s %s [%s]", operationName, storageKey, storagePath);
 
         try {
 
-            log.info("STORAGE OPERATION: {}", operation);
+            log.info(operation);
 
             var result = func.call(operationName, storagePath);
 
@@ -240,7 +238,7 @@ public abstract class CommonFileStorage implements IFileStorage {
         }
     }
 
-    protected String resolvePath(String operationName, String storagePath, boolean allowRootDir) {
+    protected String resolveObjectKey(String operationName, String storagePath, boolean allowRootDir) {
 
 
         try {
@@ -285,6 +283,14 @@ public abstract class CommonFileStorage implements IFileStorage {
 
             throw errors.exception(STORAGE_PATH_INVALID, e, storagePath, operationName);
         }
+    }
+
+    protected String resolveDirPrefix(String objectKey) {
+
+        if (objectKey.isEmpty() || objectKey.endsWith(BACKSLASH))
+            return objectKey;
+        else
+            return objectKey + BACKSLASH;
     }
 
     public static <TResult> CompletionStage<TResult> useContext(IExecutionContext execCtx, CompletionStage<TResult> promise) {
