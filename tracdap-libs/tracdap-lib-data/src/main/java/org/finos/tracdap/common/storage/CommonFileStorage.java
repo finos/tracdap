@@ -195,6 +195,17 @@ public abstract class CommonFileStorage implements IFileStorage {
     private CompletionStage<Void>
     _rm(String operationName, String storagePath, boolean recursive, IExecutionContext ctx) {
 
+        if (recursive)
+            return _rmdir(operationName, storagePath, ctx);
+
+        var resolvedPath = resolveObjectKey(operationName, storagePath, false);
+
+        return null;
+    }
+
+    private CompletionStage<Void>
+    _rmdir(String operationName, String storagePath, IExecutionContext ctx) {
+
         var resolvedPath = resolveObjectKey(operationName, storagePath, false);
 
         return null;
@@ -293,7 +304,7 @@ public abstract class CommonFileStorage implements IFileStorage {
             return objectKey + BACKSLASH;
     }
 
-    public static <TResult> CompletionStage<TResult> useContext(IExecutionContext execCtx, CompletionStage<TResult> promise) {
+    protected <TResult> CompletionStage<TResult> useContext(IExecutionContext execCtx, CompletionStage<TResult> promise) {
 
         var ctxPromise = new CompletableFuture<TResult>();
 

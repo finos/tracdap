@@ -68,6 +68,8 @@ public class S3ObjectStorage extends CommonFileStorage {
     private final Logger log = LoggerFactory.getLogger(getClass());
 
     private final String storageKey;
+    private final Properties properties;
+
     private final String bucket;
     private final String prefix;
     private final Region region;
@@ -75,7 +77,7 @@ public class S3ObjectStorage extends CommonFileStorage {
 
     private final StorageErrors errors;
 
-    private final AwsCredentialsProvider credentials;
+    // private final AwsCredentialsProvider credentials;
     private S3AsyncClient client;
 
 
@@ -83,18 +85,18 @@ public class S3ObjectStorage extends CommonFileStorage {
 
         super("s3", storageKey, new S3StorageErrors(storageKey, LoggerFactory.getLogger(S3ObjectStorage.class)));
 
+        this.storageKey = storageKey;
+        this.properties = properties;
+
         var bucket = properties.getProperty(BUCKET_PROPERTY);
         var prefix = properties.getProperty(PREFIX_PROPERTY);
         var region = properties.getProperty(REGION_PROPERTY);
         var endpoint = properties.getProperty(ENDPOINT_PROPERTY);
 
-        this.storageKey = storageKey;
         this.bucket = bucket;
         this.prefix = normalizePrefix(prefix);
         this.region = region != null && !region.isBlank() ? Region.of(region) : null;
         this.endpoint = endpoint != null && !endpoint.isBlank() ? URI.create(endpoint) : null;
-
-        this.credentials = setupCredentials(properties);
 
         this.errors = new S3StorageErrors(storageKey, log);
     }
@@ -160,6 +162,10 @@ public class S3ObjectStorage extends CommonFileStorage {
         // The AWS client is entirely async so there is no need to worry about worker pools for blocking tasks
         // If other clients do this, it may be desirable to bring down the thread count in the main ELG
 
+        log.info("INIT [{}], fs = [S3], bucket = [{}], prefix = [{}]", storageKey, bucket, prefix);
+
+        var credentials = setupCredentials(properties);
+
         var httpElg = SdkEventLoopGroup.create(eventLoopGroup);
         var httpClient = NettyNioAsyncHttpClient.builder().eventLoopGroup(httpElg);
 
@@ -186,14 +192,14 @@ public class S3ObjectStorage extends CommonFileStorage {
             clientBuilder.endpointOverride(endpoint);
 
         this.client = clientBuilder.build();
-
-        log.info("Created S3 storage, bucket = [{}], prefix = [{}]", bucket, prefix);
     }
 
     @Override
     public void stop() {
 
-        this.client.close();
+        log.info("STOP [{}], fs = [S3], bucket = [{}], prefix = [{}]", storageKey, bucket, prefix);
+
+        client.close();
     }
 
     @Override
@@ -243,7 +249,7 @@ public class S3ObjectStorage extends CommonFileStorage {
                 .maxKeys(1)
                 .build();
 
-        var response = CommonFileStorage.useContext(ctx, client.listObjectsV2(request));
+        var response = useContext(ctx, client.listObjectsV2(request));
 
         return response.thenApply(ListObjectsV2Response::hasContents);
     }
@@ -260,7 +266,7 @@ public class S3ObjectStorage extends CommonFileStorage {
                 .objectAttributes(ObjectAttributes.OBJECT_SIZE)
                 .build();
 
-        var response = CommonFileStorage.useContext(ctx, client.getObjectAttributes(request));
+        var response = useContext(ctx, client.getObjectAttributes(request));
 
         return response.thenApply(attrs -> attrsToFileStat(objectKey, attrs));
     }
