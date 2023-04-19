@@ -592,7 +592,7 @@ class FileOperationsTestSuite:
 
     def test_rmdir_by_prefix(self):
 
-        self.storage.mkdir("test_dir/sub_dir", False)
+        self.storage.mkdir("test_dir/sub_dir", True)
 
         exists = self.storage.exists("test_dir")
         self.assertTrue(exists)

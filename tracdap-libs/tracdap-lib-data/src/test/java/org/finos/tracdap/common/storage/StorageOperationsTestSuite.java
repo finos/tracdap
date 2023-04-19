@@ -851,6 +851,7 @@ public abstract class StorageOperationsTestSuite {
 
         var rmdir = storage.rmdir("test_dir", execContext);
         waitFor(TEST_TIMEOUT, rmdir);
+        Assertions.assertDoesNotThrow(() -> resultOf(rmdir));
 
         var exists2 = storage.exists("test_dir", execContext);
         waitFor(TEST_TIMEOUT, exists2);
@@ -860,7 +861,7 @@ public abstract class StorageOperationsTestSuite {
     @Test
     void testRmdir_byPrefix() throws Exception {
 
-        var prepare = storage.mkdir("test_dir/sub_dir", false, execContext);
+        var prepare = storage.mkdir("test_dir/sub_dir", true, execContext);
         waitFor(TEST_TIMEOUT, prepare);
 
         var exists1 = storage.exists("test_dir", execContext);
@@ -869,6 +870,7 @@ public abstract class StorageOperationsTestSuite {
 
         var rmdir = storage.rmdir("test_dir", execContext);
         waitFor(TEST_TIMEOUT, rmdir);
+        Assertions.assertDoesNotThrow(() -> resultOf(rmdir));
 
         var exists2 = storage.exists("test_dir", execContext);
         waitFor(TEST_TIMEOUT, exists2);
