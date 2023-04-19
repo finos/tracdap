@@ -534,6 +534,19 @@ class FileOperationsTestSuite:
         exists = self.storage.exists("test_file.txt")
         self.assertFalse(exists)
 
+    def test_rm_in_subdir_ok(self):
+
+        # Simplest case - create one file and delete it
+
+        self.make_small_file("sub_dir/test_file.txt")
+
+        self.storage.rm("sub_dir/test_file.txt")
+
+        # File should be gone
+
+        exists = self.storage.exists("sub_dir/test_file.txt")
+        self.assertFalse(exists)
+
     def test_rm_on_dir(self):
 
         # Calling rm on a directory is a bad request, even if the dir is empty
@@ -577,24 +590,17 @@ class FileOperationsTestSuite:
         exists = self.storage.exists("test_dir")
         self.assertFalse(exists)
 
-    def test_rmdir_on_file(self):
+    def test_rmdir_by_prefix(self):
 
-        # Calling rmdir on a file is a bad request
+        self.storage.mkdir("test_dir/sub_dir", False)
 
-        self.make_small_file("test_file.txt")
-
-        self.assertRaises(_ex.EStorageRequest, lambda: self.storage.rmdir("test_file.txt"))
-
-        # File should still exist because rm has failed
-
-        exists = self.storage.exists("test_file.txt")
+        exists = self.storage.exists("test_dir")
         self.assertTrue(exists)
 
-    def test_rmdir_missing(self):
+        self.storage.rmdir("test_dir")
 
-        # Try to delete a path that does not exist
-
-        self.assertRaises(_ex.EStorageRequest, lambda: self.storage.rmdir("missing_path"))
+        exists = self.storage.exists("test_dir")
+        self.assertFalse(exists)
 
     def test_rmdir_with_content(self):
 
@@ -617,6 +623,25 @@ class FileOperationsTestSuite:
         self.assertFalse(exists1)
         self.assertTrue(exists2)
         self.assertTrue(size2a > 0)
+
+    def test_rmdir_on_file(self):
+
+        # Calling rmdir on a file is a bad request
+
+        self.make_small_file("test_file.txt")
+
+        self.assertRaises(_ex.EStorageRequest, lambda: self.storage.rmdir("test_file.txt"))
+
+        # File should still exist because rm has failed
+
+        exists = self.storage.exists("test_file.txt")
+        self.assertTrue(exists)
+
+    def test_rmdir_missing(self):
+
+        # Try to delete a path that does not exist
+
+        self.assertRaises(_ex.EStorageRequest, lambda: self.storage.rmdir("missing_path"))
 
     def test_rmdir_bad_paths(self):
 

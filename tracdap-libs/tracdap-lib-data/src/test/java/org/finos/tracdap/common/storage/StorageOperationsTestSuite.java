@@ -759,7 +759,7 @@ public abstract class StorageOperationsTestSuite {
         var prepare = makeSmallFile("test_file.txt", storage, execContext);
         waitFor(TEST_TIMEOUT, prepare);
 
-        var rm = storage.rm("test_file.txt", false, execContext);
+        var rm = storage.rm("test_file.txt", execContext);
         waitFor(TEST_TIMEOUT, rm);
 
         Assertions.assertDoesNotThrow(() -> resultOf(rm));
@@ -772,14 +772,34 @@ public abstract class StorageOperationsTestSuite {
     }
 
     @Test
-    void testRm_dir() throws Exception {
+    void testRm_inSubdirOk() throws Exception {
 
-        // Calling rm on a directory with recursive = false is a bad request, even if the dir is empty
+        // Simplest case - create one file and delete it
+
+        var prepare = makeSmallFile("sub_dir/test_file.txt", storage, execContext);
+        waitFor(TEST_TIMEOUT, prepare);
+
+        var rm = storage.rm("sub_dir/test_file.txt", execContext);
+        waitFor(TEST_TIMEOUT, rm);
+
+        Assertions.assertDoesNotThrow(() -> resultOf(rm));
+
+        // File should be gone
+
+        var exists = storage.exists("sub_dir/test_file.txt", execContext);
+        waitFor(TEST_TIMEOUT, exists);
+        Assertions.assertFalse(resultOf(exists));
+    }
+
+    @Test
+    void testRm_onDir() throws Exception {
+
+        // Calling rm on a directory is a bad request, even if the dir is empty
 
         var prepare = storage.mkdir("test_dir", false, execContext);
         waitFor(TEST_TIMEOUT, prepare);
 
-        var rm = storage.rm("test_dir", false, execContext);
+        var rm = storage.rm("test_dir", execContext);
         waitFor(TEST_TIMEOUT, rm);
 
         Assertions.assertThrows(EStorageRequest.class, () -> resultOf(rm));
@@ -796,20 +816,74 @@ public abstract class StorageOperationsTestSuite {
 
         // Try to delete a path that does not exist
 
-        var rm = storage.rm("missing_path", false, execContext);
+        var rm = storage.rm("missing_path.dat", execContext);
         waitFor(TEST_TIMEOUT, rm);
 
         Assertions.assertThrows(EStorageRequest.class, () -> resultOf(rm));
     }
 
     @Test
-    void testRm_recursive() throws Exception {
+    void testRm_badPaths() {
+
+        testBadPaths(storage::rm);
+    }
+
+    @Test
+    void testRm_storageRoot() {
+
+        failForStorageRoot(storage::rm);
+    }
+
+
+    // -----------------------------------------------------------------------------------------------------------------
+    // RMDIR
+    // -----------------------------------------------------------------------------------------------------------------
+
+    @Test
+    void testRmdir_ok() throws Exception {
+
+        var prepare = storage.mkdir("test_dir", false, execContext);
+        waitFor(TEST_TIMEOUT, prepare);
+
+        var exists1 = storage.exists("test_dir", execContext);
+        waitFor(TEST_TIMEOUT, exists1);
+        Assertions.assertTrue(resultOf(exists1));
+
+        var rmdir = storage.rmdir("test_dir", execContext);
+        waitFor(TEST_TIMEOUT, rmdir);
+
+        var exists2 = storage.exists("test_dir", execContext);
+        waitFor(TEST_TIMEOUT, exists2);
+        Assertions.assertFalse(resultOf(exists2));
+    }
+
+    @Test
+    void testRmdir_byPrefix() throws Exception {
+
+        var prepare = storage.mkdir("test_dir/sub_dir", false, execContext);
+        waitFor(TEST_TIMEOUT, prepare);
+
+        var exists1 = storage.exists("test_dir", execContext);
+        waitFor(TEST_TIMEOUT, exists1);
+        Assertions.assertTrue(resultOf(exists1));
+
+        var rmdir = storage.rmdir("test_dir", execContext);
+        waitFor(TEST_TIMEOUT, rmdir);
+
+        var exists2 = storage.exists("test_dir", execContext);
+        waitFor(TEST_TIMEOUT, exists2);
+        Assertions.assertFalse(resultOf(exists2));
+    }
+
+    @Test
+    void testRmdir_withContent() throws Exception {
 
         // Delete one whole dir tree
         // Sibling dir tree should be unaffected
 
         var prepare = storage
                 .mkdir("test_dir/child_1", true, execContext)
+                .thenCompose(x -> storage.mkdir("test_dir/child_1/sub", false, execContext))
                 .thenCompose(x -> makeSmallFile("test_dir/child_1/file_a.txt", storage, execContext))
                 .thenCompose(x -> makeSmallFile("test_dir/child_1/file_b.txt", storage, execContext))
                 .thenCompose(x -> storage.mkdir("test_dir/child_2", true, execContext))
@@ -817,10 +891,9 @@ public abstract class StorageOperationsTestSuite {
 
         waitFor(TEST_TIMEOUT.multipliedBy(2), prepare);  // Allow extra time for multiple operations
 
-        var rm = storage.rm("test_dir/child_1", true, execContext);
-        waitFor(TEST_TIMEOUT, rm);
-
-        Assertions.assertDoesNotThrow(() -> resultOf(rm));
+        var rmdir = storage.rmdir("test_dir/child_1", execContext);
+        waitFor(TEST_TIMEOUT, rmdir);
+        Assertions.assertDoesNotThrow(() -> resultOf(rmdir));
 
         var exists1 = storage.exists("test_dir/child_1", execContext);
         var exists2 = storage.exists("test_dir/child_2", execContext);
@@ -833,57 +906,44 @@ public abstract class StorageOperationsTestSuite {
     }
 
     @Test
-    void testRm_recursiveFile() throws Exception {
+    void testRmdir_onFile() throws Exception {
 
-        // Calling rm for a single file with recursive = true is not an error
-        // The recursive delete should just remove that individual file
+        // Calling rmdir on a file is a bad request
 
-        var prepare = storage
-                .mkdir("test_dir", false, execContext)
-                .thenCompose(x -> makeSmallFile("test_dir/file_a.txt", storage, execContext))
-                .thenCompose(x -> makeSmallFile("test_dir/file_b.txt", storage, execContext));
-
+        var prepare = makeSmallFile("test_file.txt", storage, execContext);
         waitFor(TEST_TIMEOUT, prepare);
 
-        var rm = storage.rm("test_dir/file_a.txt", true, execContext);
-        waitFor(TEST_TIMEOUT, rm);
+        var rmdir = storage.rmdir("test_file.txt", execContext);
+        waitFor(TEST_TIMEOUT, rmdir);
+        Assertions.assertThrows(EStorageRequest.class, () -> resultOf(rmdir));
 
-        Assertions.assertDoesNotThrow(() -> resultOf(rm));
+        // File should still exist because rm has failed
 
-        var existsA = storage.exists("test_dir/file_a.txt", execContext);
-        var existsB = storage.exists("test_dir/file_b.txt", execContext);
-        waitFor(TEST_TIMEOUT, existsA, existsB);
-
-        Assertions.assertFalse(resultOf(existsA));
-        Assertions.assertTrue(resultOf(existsB));
+        var exists = storage.exists("test_file.txt", execContext);
+        waitFor(TEST_TIMEOUT, exists);
+        Assertions.assertTrue(resultOf(exists));
     }
 
     @Test
-    void testRm_recursiveMissing() {
+    void testRmdir_Missing() {
 
-        // Try to delete a path that does not exist, should fail regardless of recursive = true
+        // Try to delete a path that does not exist
 
-        var prepare = storage.mkdir("test_dir", false, execContext);
-        waitFor(TEST_TIMEOUT, prepare);
-
-        var rm = storage.rm("test_dir/child", true, execContext);
-        waitFor(TEST_TIMEOUT, rm);
-
-        Assertions.assertThrows(EStorageRequest.class, () -> resultOf(rm));
+        var rmdir = storage.rmdir("missing_path", execContext);
+        waitFor(TEST_TIMEOUT, rmdir);
+        Assertions.assertThrows(EStorageRequest.class, () -> resultOf(rmdir));
     }
 
     @Test
-    void testRm_badPaths() {
+    void testRmdir_badPaths() {
 
-        testBadPaths((storagePath, execCtx) -> storage.rm(storagePath, false, execCtx));
-        testBadPaths((storagePath, execCtx) -> storage.rm(storagePath, true, execCtx));
+        testBadPaths(storage::rmdir);
     }
 
     @Test
-    void testRm_storageRoot() {
+    void testRmdir_storageRoot() {
 
-        failForStorageRoot((storagePath, execCtx) -> storage.rm(storagePath, false, execCtx));
-        failForStorageRoot((storagePath, execCtx) -> storage.rm(storagePath, true, execCtx));
+        failForStorageRoot(storage::rmdir);
     }
 
 
