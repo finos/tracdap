@@ -394,6 +394,8 @@ public class S3ObjectStorage extends CommonFileStorage {
         // Send request and get response onto the EL for execContext
         var listResponse = useContext(ctx, client.listObjectsV2(listRequest));
 
+        // TODO: Handle contents more than one page, use list objects iterator, or post back to event loop
+
         return listResponse.thenCompose(list -> {
 
             if (!list.hasContents()) {
