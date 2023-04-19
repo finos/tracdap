@@ -49,6 +49,9 @@ public abstract class CommonFileStorage implements IFileStorage {
 
     protected abstract CompletionStage<Void> prefixMkdir(String prefix, IExecutionContext ctx);
 
+    protected abstract CompletionStage<Void> fsDeleteFile(String objectKey, IExecutionContext ctx);
+    protected abstract CompletionStage<Void> fsDeleteDir(String directoryKey, IExecutionContext ctx);
+
     private final Logger log = LoggerFactory.getLogger(getClass());
 
     private final String storageType;
@@ -189,26 +192,42 @@ public abstract class CommonFileStorage implements IFileStorage {
     public CompletionStage<Void>
     rm(String storagePath, boolean recursive, IExecutionContext ctx) {
 
-        return wrapOperation("RM", storagePath, (op, path) -> _rm(op, path, recursive, ctx));
+        if (recursive)
+            return wrapOperation("RMDIR", storagePath, (op, path) -> _rmdir(op, path, ctx));
+        else
+            return wrapOperation("RM", storagePath, (op, path) -> _rm(op, path, ctx));
     }
 
     private CompletionStage<Void>
-    _rm(String operationName, String storagePath, boolean recursive, IExecutionContext ctx) {
+    _rm(String operationName, String storagePath, IExecutionContext ctx) {
 
-        if (recursive)
-            return _rmdir(operationName, storagePath, ctx);
+        var objectKey = resolveObjectKey(operationName, storagePath, false);
+        var fileInfo = _stat(operationName, storagePath, ctx);
 
-        var resolvedPath = resolveObjectKey(operationName, storagePath, false);
+        return fileInfo.thenCompose(fi -> {
 
-        return null;
+            if (fi.fileType != FileType.FILE)
+                throw errors.explicitError(NOT_A_FILE, storagePath, operationName);
+
+            return fsDeleteFile(objectKey, ctx);
+        });
     }
 
     private CompletionStage<Void>
     _rmdir(String operationName, String storagePath, IExecutionContext ctx) {
 
-        var resolvedPath = resolveObjectKey(operationName, storagePath, false);
+        var objectKey = resolveObjectKey(operationName, storagePath, false);
+        var dirPrefix = resolveDirPrefix(objectKey);
 
-        return null;
+        var fileInfo = _stat(operationName, storagePath, ctx);
+
+        return fileInfo.thenCompose(fi -> {
+
+            if (fi.fileType != FileType.DIRECTORY)
+                throw errors.explicitError(NOT_A_DIRECTORY, storagePath, operationName);
+
+            return fsDeleteDir(dirPrefix, ctx);
+        });
     }
 
     @Override
@@ -322,7 +341,7 @@ public abstract class CommonFileStorage implements IFileStorage {
                 if (error != null)
                     execCtx.eventLoopExecutor().execute(() -> ctxPromise.completeExceptionally(error));
                 else
-                    ctxPromise.completeAsync(() -> result, execCtx.eventLoopExecutor());
+                    execCtx.eventLoopExecutor().execute(() -> ctxPromise.complete(result));
             }
         });
 

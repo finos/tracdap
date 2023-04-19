@@ -20,7 +20,6 @@ import io.netty.channel.EventLoopGroup;
 import org.finos.tracdap.common.concurrent.IExecutionContext;
 import org.finos.tracdap.common.data.IDataContext;
 import org.finos.tracdap.common.exception.EStartup;
-import org.finos.tracdap.common.exception.ETracInternal;
 import org.finos.tracdap.common.storage.*;
 
 import software.amazon.awssdk.auth.credentials.*;
@@ -361,45 +360,73 @@ public class S3ObjectStorage extends CommonFileStorage {
         return response.thenAccept(result -> {});
     }
 
+
     @Override
-    public CompletionStage<Void> rm(String objectKey, boolean recursive, IExecutionContext execContext) {
+    protected CompletionStage<Void> fsDeleteFile(String objectKey, IExecutionContext ctx) {
 
-        try {
-
-            log.info("STORAGE OPERATION: {} {} [{}]", storageKey, RM_OPERATION, objectKey);
-
-            var fileKey = usePrefix(objectKey);
-            var dirKey = fileKey + "/";
-
-            return objectExists(fileKey, execContext).thenComposeAsync(exists -> exists
-                            ? rmSingle(fileKey, execContext)
-                            : rmDir(dirKey, recursive, execContext),
-                    execContext.eventLoopExecutor());
-        }
-        catch (Exception e) {
-            return CompletableFuture.failedFuture(e);
-        }
-    }
-
-    private CompletionStage<Void> rmSingle(String objectKey, IExecutionContext execContext) {
+        var absoluteKey = usePrefix(objectKey);
 
         var request = DeleteObjectRequest.builder()
                 .bucket(bucket)
-                .key(objectKey)
+                .key(absoluteKey)
                 .build();
 
-        return client.deleteObject(request).thenApplyAsync(x -> null, execContext.eventLoopExecutor());
+        var response = useContext(ctx, client.deleteObject(request));
+
+        return response.thenApply(x -> null);
     }
 
-    private CompletionStage<Void> rmDir(String directoryKey, boolean recursive, IExecutionContext execContext) {
+    @Override
+    protected CompletionStage<Void> fsDeleteDir(String directoryKey, IExecutionContext ctx) {
 
-        return ls(directoryKey, execContext).thenComposeAsync(stat -> {
+        return fsDeleteDir(directoryKey, true, ctx);
+    }
 
-            if (stat.isEmpty())
-                return rmSingle(directoryKey, execContext);
+    protected CompletionStage<Void> fsDeleteDir(String directoryKey, boolean firstPass, IExecutionContext ctx) {
 
-            throw new ETracInternal("RM recursive not implemented yet");
-        }, execContext.eventLoopExecutor());
+        var absoluteDir = usePrefix(directoryKey);
+
+        var listRequest = ListObjectsV2Request.builder()
+                .bucket(bucket)
+                .prefix(absoluteDir)
+                .build();
+
+        // Send request and get response onto the EL for execContext
+        var listResponse = useContext(ctx, client.listObjectsV2(listRequest));
+
+        return listResponse.thenCompose(list -> {
+
+            if (!list.hasContents()) {
+                if (firstPass)
+                    throw errors.explicitError(OBJECT_NOT_FOUND, directoryKey, "RMDIR");
+                else
+                    return CompletableFuture.completedFuture(0).thenApply(x -> null);
+            }
+
+            return fsDeleteDirContents(list, ctx);
+        });
+    }
+
+    private CompletionStage<Void>
+    fsDeleteDirContents(ListObjectsV2Response contents, IExecutionContext ctx) {
+
+        var objIds = contents.contents()
+                .stream()
+                .map(obj -> ObjectIdentifier.builder().key(obj.key()).build())
+                .collect(Collectors.toList());
+
+        var request = DeleteObjectsRequest.builder()
+                .bucket(bucket)
+                .delete(del -> del.objects(objIds))
+                .build();
+
+        var response = useContext(ctx, client.deleteObjects(request));
+
+        return response.thenApply(x -> {
+
+            var y = 1;
+            return null;
+        });
     }
 
     private FileStat
