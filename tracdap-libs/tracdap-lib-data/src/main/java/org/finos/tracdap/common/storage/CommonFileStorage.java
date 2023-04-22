@@ -96,27 +96,6 @@ public abstract class CommonFileStorage implements IFileStorage {
     }
 
     @Override
-    public CompletionStage<Long>
-    size(String storagePath, IExecutionContext ctx) {
-
-        return wrapOperation("SIZE", storagePath, (op, path) -> _size(op, path, ctx));
-    }
-
-    private CompletionStage<Long>
-    _size(String operationName, String storagePath, IExecutionContext ctx) {
-
-        var _stat = _stat(operationName, storagePath, ctx);
-
-        return _stat.thenApply(stat -> {
-
-            if (stat.fileType != FileType.FILE)
-                throw errors.explicitError(NOT_A_FILE, storagePath, operationName);  // Todo
-
-            return stat.size;
-        });
-    }
-
-    @Override
     public CompletionStage<FileStat>
     stat(String storagePath, IExecutionContext ctx) {
 
@@ -132,6 +111,27 @@ public abstract class CommonFileStorage implements IFileStorage {
         return prefixExists(prefix, ctx).thenCompose(isDir -> isDir
                 ? prefixStat(prefix, ctx)
                 : objectStat(objectKey, ctx));
+    }
+
+    @Override
+    public CompletionStage<Long>
+    size(String storagePath, IExecutionContext ctx) {
+
+        return wrapOperation("SIZE", storagePath, (op, path) -> _size(op, path, ctx));
+    }
+
+    private CompletionStage<Long>
+    _size(String operationName, String storagePath, IExecutionContext ctx) {
+
+        var _stat = _stat(operationName, storagePath, ctx);
+
+        return _stat.thenApply(stat -> {
+
+            if (stat.fileType != FileType.FILE)
+                throw errors.explicitError(NOT_A_FILE, storagePath, operationName);
+
+            return stat.size;
+        });
     }
 
     @Override

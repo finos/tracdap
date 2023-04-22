@@ -443,7 +443,7 @@ public class S3ObjectStorage extends CommonFileStorage {
                 ? storagePath.substring(storagePath.lastIndexOf(BACKSLASH) + 1)
                 : storagePath;
 
-        var fileType = objectKey.endsWith(BACKSLASH) ? FileType.DIRECTORY : FileType.FILE;
+        var fileType = objectKey.isEmpty() || objectKey.endsWith(BACKSLASH) ? FileType.DIRECTORY : FileType.FILE;
         var size = objectAttrs.objectSize();
         var mtime = objectAttrs.lastModified();
 
