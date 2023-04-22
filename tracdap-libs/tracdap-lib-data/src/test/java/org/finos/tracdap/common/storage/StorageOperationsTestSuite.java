@@ -345,6 +345,25 @@ public abstract class StorageOperationsTestSuite {
     }
 
     @Test
+    void testStat_dirImplicitOk() throws Exception {
+
+        var prepare = storage.mkdir("some_dir/test_dir", true, execContext);
+        waitFor(TEST_TIMEOUT, prepare);
+
+        var stat = storage.stat("some_dir", execContext);
+        waitFor(TEST_TIMEOUT, stat);
+
+        var statResult = resultOf(stat);
+
+        Assertions.assertEquals("some_dir", statResult.storagePath);
+        Assertions.assertEquals("some_dir", statResult.fileName);
+        Assertions.assertEquals(FileType.DIRECTORY, statResult.fileType);
+
+        // Size field for directories should always be set to 0
+        Assertions.assertEquals(0, statResult.size);
+    }
+
+    @Test
     void testStat_dirMTime() throws Exception {
 
         // mtime and atime for dirs is unlikely to be supported in cloud storage buckets

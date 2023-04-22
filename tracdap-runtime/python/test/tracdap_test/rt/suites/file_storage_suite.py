@@ -238,6 +238,19 @@ class FileOperationsTestSuite:
         # Size field for directories should always be set to 0
         self.assertEqual(0, stat_result.size)
 
+    def test_stat_dir_implicit_ok(self):
+
+        self.storage.mkdir("some_dir/test_dir", True)
+
+        stat_result = self.storage.stat("some_dir")
+
+        self.assertEqual("some_dir", stat_result.storage_path)
+        self.assertEqual("some_dir", stat_result.file_name)
+        self.assertEqual(_storage.FileType.DIRECTORY, stat_result.file_type)
+
+        # Size field for directories should always be set to 0
+        self.assertEqual(0, stat_result.size)
+
     def test_stat_dir_mtime(self):
 
         # mtime and atime for dirs is unlikely to be supported in cloud storage buckets
