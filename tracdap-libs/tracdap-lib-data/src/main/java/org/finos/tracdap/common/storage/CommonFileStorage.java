@@ -47,8 +47,7 @@ public abstract class CommonFileStorage implements IFileStorage {
             String prefix, String startAfter, int maxKeys, boolean recursive,
             IExecutionContext ctx);
 
-    protected abstract CompletionStage<Void> prefixMkdir(String prefix, IExecutionContext ctx);
-
+    protected abstract CompletionStage<Void> fsCreateDir(String prefix, IExecutionContext ctx);
     protected abstract CompletionStage<Void> fsDeleteFile(String objectKey, IExecutionContext ctx);
     protected abstract CompletionStage<Void> fsDeleteDir(String directoryKey, IExecutionContext ctx);
 
@@ -184,7 +183,7 @@ public abstract class CommonFileStorage implements IFileStorage {
             if (exists)
                 throw errors.explicitError(OBJECT_ALREADY_EXISTS, storagePath, operationName);
 
-            return prefixMkdir(prefix, ctx);
+            return fsCreateDir(prefix, ctx);
         });
     }
 

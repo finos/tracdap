@@ -342,7 +342,7 @@ public class S3ObjectStorage extends CommonFileStorage {
 
     @Override
     protected CompletionStage<Void>
-    prefixMkdir(String directoryKey, IExecutionContext execContext) {
+    fsCreateDir(String directoryKey, IExecutionContext execContext) {
 
         var absoluteDir = usePrefix(directoryKey);
 
