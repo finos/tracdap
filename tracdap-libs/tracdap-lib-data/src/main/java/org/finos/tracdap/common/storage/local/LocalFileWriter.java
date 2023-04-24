@@ -158,7 +158,10 @@ public class LocalFileWriter implements Flow.Subscriber<ByteBuf> {
 
         try {
 
-            this.channel = AsynchronousFileChannel.open(absolutePath, Set.of(WRITE, CREATE_NEW), executor);
+            // Open options will overwrite and truncate content if the file already exists
+            // This is in line with bucket semantics
+
+            this.channel = AsynchronousFileChannel.open(absolutePath, Set.of(WRITE, CREATE, TRUNCATE_EXISTING), executor);
             this.writeHandler = new ChunkWriteHandler();
 
             log.info("File channel open for writing: [{}]", absolutePath);
