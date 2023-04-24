@@ -213,12 +213,9 @@ public abstract class CommonFileStorage implements IFileStorage {
 
     @Override
     public CompletionStage<Void>
-    rm(String storagePath, boolean recursive, IExecutionContext ctx) {
+    rm(String storagePath, IExecutionContext ctx) {
 
-        if (recursive)
-            return wrapOperation("RMDIR", storagePath, (op, path) -> rmdir(op, path, ctx));
-        else
-            return wrapOperation("RM", storagePath, (op, path) -> rm(op, path, ctx));
+        return wrapOperation("RM", storagePath, (op, path) -> rm(op, path, ctx));
     }
 
     private CompletionStage<Void>
@@ -234,6 +231,13 @@ public abstract class CommonFileStorage implements IFileStorage {
 
             return fsDeleteFile(objectKey, ctx);
         });
+    }
+
+    @Override
+    public CompletionStage<Void>
+    rmdir(String storagePath, IExecutionContext ctx) {
+
+        return wrapOperation("RMDIR", storagePath, (op, path) -> rmdir(op, path, ctx));
     }
 
     private CompletionStage<Void>

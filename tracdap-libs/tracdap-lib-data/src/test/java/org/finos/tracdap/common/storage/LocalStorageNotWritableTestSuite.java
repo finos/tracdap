@@ -64,7 +64,7 @@ public abstract class LocalStorageNotWritableTestSuite {
 
         Assertions.assertTrue(fileCreated, message==null?"The test file could not be created.":message);
 
-        var rm = storage.rm("test_file.txt", false, execContext);
+        var rm = storage.rm("test_file.txt", execContext);
         waitFor(TEST_TIMEOUT, rm);
 
         Assertions.assertThrows(EStorageAccess.class, () -> resultOf(rm));

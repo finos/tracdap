@@ -709,7 +709,7 @@ public abstract class StorageReadWriteTestSuite {
         resultOf(content).release();
 
         // Delete the file
-        var rm = storage.rm(storagePath, false, dataContext);
+        var rm = storage.rm(storagePath, dataContext);
         waitFor(TEST_TIMEOUT, rm);
 
         // Now try subscribing to the reader - should result in a storage request error
@@ -930,7 +930,7 @@ public abstract class StorageReadWriteTestSuite {
 
         // Now delete the file
 
-        var rm = storage.rm(storagePath, false, dataContext);
+        var rm = storage.rm(storagePath, dataContext);
 
         waitFor(TEST_TIMEOUT, rm);
 

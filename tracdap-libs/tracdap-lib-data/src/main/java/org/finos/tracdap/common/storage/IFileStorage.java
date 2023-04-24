@@ -59,17 +59,9 @@ public interface IFileStorage extends AutoCloseable {
 
     CompletionStage<Void> mkdir(String storagePath, boolean recursive, IExecutionContext execContext);
 
-    // TODO: Make rm / rmdir the primary interface for rm, to match semantics of the runtime FS
+    CompletionStage<Void> rm(String storagePath, IExecutionContext execContext);
 
-    default CompletionStage<Void> rm(String storagePath, IExecutionContext execContext) {
-        return rm(storagePath, false, execContext);
-    }
-
-    default CompletionStage<Void> rmdir(String storagePath, IExecutionContext execContext) {
-        return rm(storagePath, true, execContext);
-    }
-
-    CompletionStage<Void> rm(String storagePath, boolean recursive, IExecutionContext execContext);
+    CompletionStage<Void> rmdir(String storagePath, IExecutionContext execContext);
 
     Flow.Publisher<ByteBuf> reader(
             String storagePath,
