@@ -424,11 +424,7 @@ public class S3ObjectStorage extends CommonFileStorage {
 
         var response = useContext(ctx, client.deleteObjects(request));
 
-        return response.thenApply(x -> {
-
-            var y = 1;
-            return null;
-        });
+        return response.thenApply(x -> null);
     }
 
     private FileStat
