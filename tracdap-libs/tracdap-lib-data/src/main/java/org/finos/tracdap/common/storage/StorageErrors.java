@@ -18,8 +18,6 @@ package org.finos.tracdap.common.storage;
 
 import org.finos.tracdap.common.exception.*;
 
-import org.slf4j.Logger;
-
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.util.Arrays;
@@ -106,33 +104,31 @@ public abstract class StorageErrors {
             Map.entry(CHUNK_NOT_FULLY_WRITTEN, EStorageCommunication.class));
 
     private final String storageKey;
-    private final Logger log;
 
-    protected StorageErrors(String storageKey, Logger log) {
+    protected StorageErrors(String storageKey) {
 
         this.storageKey = storageKey;
-        this.log = log;
     }
 
     protected abstract ExplicitError checkKnownExceptions(Throwable e);
 
-    public ETrac handleException(Throwable e, String storagePath, String operationName) {
+    public ETrac handleException(String operation, String path, Throwable error) {
 
-        if (e instanceof CompletionException && e.getCause() != null)
-            e = e.getCause();
+        if (error instanceof CompletionException && error.getCause() != null)
+            error = error.getCause();
 
         // Error of type ETrac means the error is already handled
-        if (e instanceof ETrac)
-            return (ETrac) e;
+        if (error instanceof ETrac)
+            return (ETrac) error;
 
-        var knownException = checkKnownExceptions(e);
+        var knownException = checkKnownExceptions(error);
 
         return knownException != null
-                ? exception(knownException, e, storagePath, operationName)
-                : exception(UNKNOWN_ERROR, e, storagePath, operationName);
+                ? explicitError(operation, path, knownException, error)
+                : explicitError(operation, path, UNKNOWN_ERROR, error);
     }
 
-    public ETrac explicitError(ExplicitError error, String path, String operation) {
+    public ETrac explicitError(String operation, String path, ExplicitError error) {
 
         try {
 
@@ -140,11 +136,7 @@ public abstract class StorageErrors {
             var message = String.format(messageTemplate, storageKey, operation, path);
 
             var errType = EXPLICIT_CONSTRUCTOR_MAP.get(error);
-            var err = errType.newInstance(message);
-
-            log.error(message, err);
-
-            return err;
+            return errType.newInstance(message);
         }
         catch (
                 InstantiationException |
@@ -155,7 +147,7 @@ public abstract class StorageErrors {
         }
     }
 
-    public ETrac exception(ExplicitError error, Throwable cause, String path, String operation) {
+    public ETrac explicitError(String operation, String path, ExplicitError error, Throwable cause) {
 
         try {
 
@@ -163,11 +155,7 @@ public abstract class StorageErrors {
             var message = String.format(messageTemplate, storageKey, operation, path);
 
             var errType = EXCEPTION_CONSTRUCTOR_MAP.get(error);
-            var err = errType.newInstance(message, cause);
-
-            log.error(message, err);
-
-            return err;
+            return errType.newInstance(message, cause);
         }
         catch (
                 InstantiationException |
@@ -183,14 +171,10 @@ public abstract class StorageErrors {
         try {
 
             var messageTemplate = ERROR_MESSAGE_MAP.get(CHUNK_NOT_FULLY_WRITTEN);
-            var message = String.format(messageTemplate, chunkBytes, writtenBytes);log.error(message);
+            var message = String.format(messageTemplate, chunkBytes, writtenBytes);
 
             var errType = EXPLICIT_CONSTRUCTOR_MAP.get(CHUNK_NOT_FULLY_WRITTEN);
-            var err = errType.newInstance(message);
-
-            log.error(message, err);
-
-            return err;
+            return errType.newInstance(message);
         }
         catch (
                 InstantiationException |

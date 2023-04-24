@@ -17,7 +17,6 @@
 package org.finos.tracdap.common.storage.local;
 
 import org.finos.tracdap.common.storage.StorageErrors;
-import org.slf4j.Logger;
 
 import java.io.IOException;
 import java.nio.file.*;
@@ -38,9 +37,9 @@ public class LocalStorageErrors extends StorageErrors {
             // IOException must be last in the list, not to obscure most specific exceptions
             Map.entry(IOException.class, IO_ERROR));
 
-    public LocalStorageErrors(String storageKey, Logger log) {
+    public LocalStorageErrors(String storageKey) {
 
-        super(storageKey, log);
+        super(storageKey);
     }
 
     @Override

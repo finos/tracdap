@@ -17,7 +17,7 @@
 package org.finos.tracdap.plugins.aws.storage;
 
 import org.finos.tracdap.common.storage.StorageErrors;
-import org.slf4j.Logger;
+
 import software.amazon.awssdk.http.HttpStatusCode;
 import software.amazon.awssdk.services.s3.model.S3Exception;
 
@@ -34,9 +34,9 @@ public class S3StorageErrors extends StorageErrors {
             Map.entry(HttpStatusCode.NOT_FOUND, OBJECT_NOT_FOUND),
             Map.entry(HttpStatusCode.FORBIDDEN, ACCESS_DENIED));
 
-    public S3StorageErrors(String storageKey, Logger log) {
+    public S3StorageErrors(String storageKey) {
 
-        super(storageKey, log);
+        super(storageKey);
     }
 
     @Override
