@@ -21,6 +21,7 @@ import io.netty.util.concurrent.DefaultThreadFactory;
 import org.apache.arrow.memory.RootAllocator;
 import org.finos.tracdap.common.concurrent.ExecutionContext;
 import org.finos.tracdap.common.data.DataContext;
+import org.finos.tracdap.common.storage.CommonFileStorage;
 import org.finos.tracdap.common.storage.IStorageManager;
 import org.finos.tracdap.common.storage.StorageReadOnlyTestSuite;
 
@@ -42,7 +43,7 @@ public class LocalStorageReadOnlyTest extends StorageReadOnlyTestSuite {
         rwStorage = new LocalFileStorage("TEST_LOCAL_RW_STORAGE", rwProps);
 
         var roProps = new Properties(rwProps);
-        roProps.put(LocalFileStorage.CONFIG_READ_ONLY, "true");
+        roProps.put(CommonFileStorage.READ_ONLY_CONFIG_KEY, "true");
         roStorage = new LocalFileStorage("TEST_LOCAL_RO_STORAGE", roProps);
 
         execContext = new ExecutionContext(new DefaultEventExecutor(new DefaultThreadFactory("t-events")));
