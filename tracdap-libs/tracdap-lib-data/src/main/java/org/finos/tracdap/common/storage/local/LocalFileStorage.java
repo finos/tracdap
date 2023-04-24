@@ -152,7 +152,7 @@ public class LocalFileStorage extends CommonFileStorage {
     @Override
     protected CompletionStage<Boolean> fsExists(String storagePath, IExecutionContext execContext) {
 
-        var absolutePath = resolvePath(storagePath, true, EXISTS_OPERATION);
+        var absolutePath = resolvePath(storagePath);
         var exists = Files.exists(absolutePath);
 
         return CompletableFuture.completedFuture(exists);
@@ -161,7 +161,7 @@ public class LocalFileStorage extends CommonFileStorage {
     @Override
     protected CompletionStage<Boolean> fsDirExists(String storagePath, IExecutionContext execContext) {
 
-        var absolutePath = resolvePath(storagePath, true, EXISTS_OPERATION);
+        var absolutePath = resolvePath(storagePath);
         var exists = Files.isDirectory(absolutePath);
 
         return CompletableFuture.completedFuture(exists);
@@ -171,7 +171,7 @@ public class LocalFileStorage extends CommonFileStorage {
     protected CompletionStage<FileStat> fsGetFileInfo(String storagePath, IExecutionContext execContext) {
 
         try {
-            var absolutePath = resolvePath(storagePath, true, STAT_OPERATION);
+            var absolutePath = resolvePath(storagePath);
             var fileStat = buildFileStat(absolutePath, storagePath);
 
             return CompletableFuture.completedFuture(fileStat);
@@ -193,7 +193,7 @@ public class LocalFileStorage extends CommonFileStorage {
             IExecutionContext execContext) {
 
         try {
-            var absolutePath = resolvePath(storagePath, true, LS_OPERATION);
+            var absolutePath = resolvePath(storagePath);
             var stat = buildFileStat(absolutePath, storagePath);
 
             if (stat.fileType != FileType.DIRECTORY) {
@@ -238,10 +238,19 @@ public class LocalFileStorage extends CommonFileStorage {
         // If/when they are added, there are attribute view classes that do include them
         // We'd need to check for Windows / Posix and choose an attribute view type accordingly
 
+        // Fix separator on Windows FS
+
         var separator = FileSystems.getDefault().getSeparator();
-        var storagePathWithBackslash = separator.equals(BACKSLASH)
-                ? storagePath
-                : storagePath.replace(separator, BACKSLASH);
+
+        if (!separator.equals(BACKSLASH))
+            storagePath = storagePath.replace(separator, BACKSLASH);
+
+        // Fix storage path for the storage root and directory entries
+
+        storagePath =
+                storagePath.isEmpty() ? "." :
+                storagePath.endsWith(BACKSLASH) ? storagePath.substring(0, storagePath.length() - 1) :
+                storagePath;
 
         var attrType = BasicFileAttributes.class;
         var attrs = Files.readAttributes(absolutePath, attrType);
@@ -264,7 +273,7 @@ public class LocalFileStorage extends CommonFileStorage {
         var atime = attrs.lastAccessTime().toInstant();
 
         return new FileStat(
-                storagePathWithBackslash,
+                storagePath,
                 fileName, fileType, size,
                 mtime, atime);
     }
@@ -285,7 +294,7 @@ public class LocalFileStorage extends CommonFileStorage {
         try {
             checkWriteFlag(storagePath, MKDIR_OPERATION);  // todo
 
-            var absolutePath = resolvePath(storagePath, false, MKDIR_OPERATION);
+            var absolutePath = resolvePath(storagePath);
 
             Files.createDirectories(absolutePath);
 
@@ -303,7 +312,7 @@ public class LocalFileStorage extends CommonFileStorage {
         try {
             checkWriteFlag(storagePath, RM_OPERATION);  // todo
 
-            var absolutePath = resolvePath(storagePath, false, RM_OPERATION);
+            var absolutePath = resolvePath(storagePath);
 
             Files.delete(absolutePath);
 
@@ -321,7 +330,7 @@ public class LocalFileStorage extends CommonFileStorage {
 
             checkWriteFlag(storagePath, RM_OPERATION);  // todo
 
-            var absolutePath = resolvePath(storagePath, false, RM_OPERATION);
+            var absolutePath = resolvePath(storagePath);
 
             Files.walkFileTree(absolutePath, new SimpleFileVisitor<>() {
 
@@ -376,10 +385,27 @@ public class LocalFileStorage extends CommonFileStorage {
 
         var absolutePath = resolvePath(storagePath, false, WRITE_OPERATION);
 
+        // TODO: This should be handled by common storage
+        try {
+            if (!Files.exists(absolutePath.getParent()))
+                Files.createDirectories(absolutePath.getParent());
+        }
+        catch (IOException e) {
+            throw errors.handleException(e, storagePath, WRITE_OPERATION);
+        }
+
         return new LocalFileWriter(
                 storageKey, storagePath,
                 absolutePath, signal,
                 dataContext.eventLoopExecutor());
+    }
+
+    private Path resolvePath(String storagePath) {
+
+        if (storagePath.isEmpty())
+            return rootPath;
+        else
+            return rootPath.resolve(storagePath);
     }
 
     private Path resolvePath(String storagePath, boolean allowRootDir, String operationName) {

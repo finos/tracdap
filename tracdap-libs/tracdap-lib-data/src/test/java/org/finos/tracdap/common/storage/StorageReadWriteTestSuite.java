@@ -195,25 +195,21 @@ public abstract class StorageReadWriteTestSuite {
     // This exposes the functional cause of errors in the stream, which will be EStorage (or ETrac) errors
 
     @Test
-    void testWrite_missingDir() {
+    void testWrite_missingDir() throws Exception {
 
-        var storagePath = "missing_dir/some_file.txt";
-        var content = ByteBufUtil.encodeString(
-                ByteBufAllocator.DEFAULT,
-                CharBuffer.wrap("Some content"),
-                StandardCharsets.UTF_8);
+        // Basic test without creating the parent dir first
+        // Should be automatically created by the writer
 
-        var contentStream = Flows.publish(Stream.of(content));
+        var storagePath = "parent_dir/haiku.txt";
 
-        var writeSignal = new CompletableFuture<Long>();
-        var writer = storage.writer(storagePath, writeSignal, dataContext);
+        var haiku =
+                "The data goes in;\n" +
+                "For a short while it persists,\n" +
+                "then returns unscathed!";
 
-        Assertions.assertThrows(EStorageRequest.class, () -> {
+        var haikuBytes = haiku.getBytes(StandardCharsets.UTF_8);
 
-            contentStream.subscribe(writer);
-            waitFor(TEST_TIMEOUT, writeSignal);
-            resultOf(writeSignal);
-        });
+        roundTripTest(storagePath, List.of(haikuBytes), storage, dataContext);
     }
 
     @Test
