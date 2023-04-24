@@ -84,38 +84,28 @@ public class LocalFileStorage implements IFileStorage {
 
         // These are just checks, no need to initialize anything
 
-        if (!Files.exists(this.rootPath)) {
+        if (!Files.exists(rootPath)) {
             var err = String.format("Storage root path does not exist: %s [%s]", storageKey, rootPath);
             log.error(err);
             throw new EStartup(err);
         }
 
-        if (!Files.isDirectory(this.rootPath)) {
+        if (!Files.isDirectory(rootPath)) {
             var err = String.format("Storage root path is not a directory: %s [%s]", storageKey, rootPath);
             log.error(err);
             throw new EStartup(err);
         }
 
-        if(!readOnlyFlag) {
-            if (!Files.isReadable(this.rootPath) || !Files.isWritable(this.rootPath)) {
+        if (!Files.isReadable(rootPath)) {
+            var err = String.format("Storage root path is not readable: %s [%s]", storageKey, rootPath);
+            log.error(err);
+            throw new EStartup(err);
+        }
 
-                var err = String.format(
-                        "Storage root path has insufficient access (read/write required): %s [%s]",
-                        storageKey, rootPath);
-
+        if(!readOnlyFlag && !Files.isWritable(rootPath)) {
+            var err = String.format("Storage root path is not writable: %s [%s]", storageKey, rootPath);
                 log.error(err);
                 throw new EStartup(err);
-            }
-        } else {
-            if (!Files.isReadable(this.rootPath)) {
-
-                var err = String.format(
-                        "Storage root path has insufficient access (read required): %s [%s]",
-                        storageKey, rootPath);
-
-                log.error(err);
-                throw new EStartup(err);
-            }
         }
 
         logFsInfo();
