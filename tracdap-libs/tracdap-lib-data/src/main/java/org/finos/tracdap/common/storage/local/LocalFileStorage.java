@@ -57,7 +57,7 @@ public class LocalFileStorage extends CommonFileStorage {
 
     public LocalFileStorage(String storageKey, Properties config) {
 
-        super("local", storageKey, new LocalStorageErrors(storageKey, LoggerFactory.getLogger(LocalFileStorage.class)));
+        super("local", storageKey, config, new LocalStorageErrors(storageKey, LoggerFactory.getLogger(LocalFileStorage.class)));
 
         this.storageKey = storageKey;
         this.errors = new LocalStorageErrors(storageKey, log);
@@ -292,16 +292,12 @@ public class LocalFileStorage extends CommonFileStorage {
     protected CompletionStage<Void> fsCreateDir(String storagePath, IExecutionContext execContext) {
 
         try {
-            checkWriteFlag(storagePath, MKDIR_OPERATION);  // todo
-
             var absolutePath = resolvePath(storagePath);
-
             Files.createDirectories(absolutePath);
 
             return CompletableFuture.completedFuture(null);
         }
         catch (IOException e) {
-
             return CompletableFuture.failedFuture(new CompletionException(e));
         }
     }
@@ -310,10 +306,7 @@ public class LocalFileStorage extends CommonFileStorage {
     protected CompletionStage<Void> fsDeleteFile(String storagePath, IExecutionContext execContext) {
 
         try {
-            checkWriteFlag(storagePath, RM_OPERATION);  // todo
-
             var absolutePath = resolvePath(storagePath);
-
             Files.delete(absolutePath);
 
             return CompletableFuture.completedFuture(null);
@@ -327,9 +320,6 @@ public class LocalFileStorage extends CommonFileStorage {
     protected CompletionStage<Void> fsDeleteDir(String storagePath, IExecutionContext execContext) {
 
         try {
-
-            checkWriteFlag(storagePath, RM_OPERATION);  // todo
-
             var absolutePath = resolvePath(storagePath);
 
             Files.walkFileTree(absolutePath, new SimpleFileVisitor<>() {

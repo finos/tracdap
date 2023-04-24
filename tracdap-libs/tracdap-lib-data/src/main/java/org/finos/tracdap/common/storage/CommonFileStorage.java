@@ -17,6 +17,7 @@
 package org.finos.tracdap.common.storage;
 
 import org.finos.tracdap.common.concurrent.IExecutionContext;
+import org.finos.tracdap.common.config.ConfigHelpers;
 import org.finos.tracdap.common.data.IDataContext;
 
 import io.netty.buffer.ByteBuf;
@@ -28,6 +29,7 @@ import java.nio.file.InvalidPathException;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Properties;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Flow;
@@ -47,6 +49,9 @@ import static org.finos.tracdap.common.storage.StorageErrors.ExplicitError.*;
  */
 public abstract class CommonFileStorage implements IFileStorage {
 
+    public static final String READ_ONLY_CONFIG_KEY = "readOnly";
+    public static final boolean READ_ONLY_CONFIG_DEFAULT = false;
+
     // Abstract interface for low-level FS operations
 
     protected abstract CompletionStage<Void> fsCreateDir(String prefix, IExecutionContext ctx);
@@ -64,12 +69,22 @@ public abstract class CommonFileStorage implements IFileStorage {
 
     private final String storageType;
     private final String storageKey;
+
+    private final boolean readOnly;
+
     private final StorageErrors errors;
 
-    protected CommonFileStorage(String storageType, String storageKey, StorageErrors errors) {
+    protected CommonFileStorage(
+            String storageType, String storageKey,
+            Properties properties, StorageErrors errors) {
 
         this.storageType = storageType;
         this.storageKey = storageKey;
+
+        this.readOnly = ConfigHelpers.optionalBoolean(
+                storageKey, properties,
+                READ_ONLY_CONFIG_KEY,
+                READ_ONLY_CONFIG_DEFAULT);
 
         this.errors = errors;
     }
@@ -178,8 +193,11 @@ public abstract class CommonFileStorage implements IFileStorage {
     mkdir(String operationName, String storagePath, Boolean recursive, IExecutionContext ctx) {
 
         var path = resolveObjectKey(operationName, storagePath, false);
-        var parent = path.contains(BACKSLASH) ? path.substring(0, path.lastIndexOf(BACKSLASH)) : null;
 
+        if (readOnly)
+            throw errors.explicitError(ACCESS_DENIED, storagePath, operationName);
+
+        var parent = path.contains(BACKSLASH) ? path.substring(0, path.lastIndexOf(BACKSLASH)) : null;
         var checkParent = path.contains(BACKSLASH) && !recursive
                 ? fsDirExists(parent, ctx)
                 : CompletableFuture.completedFuture(true);
@@ -222,6 +240,10 @@ public abstract class CommonFileStorage implements IFileStorage {
     rm(String operationName, String storagePath, IExecutionContext ctx) {
 
         var objectKey = resolveObjectKey(operationName, storagePath, false);
+
+        if (readOnly)
+            throw errors.explicitError(ACCESS_DENIED, storagePath, operationName);
+
         var fileInfo = stat(operationName, storagePath, ctx);
 
         return fileInfo.thenCompose(fi -> {
@@ -245,6 +267,9 @@ public abstract class CommonFileStorage implements IFileStorage {
 
         var objectKey = resolveObjectKey(operationName, storagePath, false);
         var dirPrefix = resolveDirPrefix(objectKey);
+
+        if (readOnly)
+            throw errors.explicitError(ACCESS_DENIED, storagePath, operationName);
 
         var fileInfo = stat(operationName, storagePath, ctx);
 

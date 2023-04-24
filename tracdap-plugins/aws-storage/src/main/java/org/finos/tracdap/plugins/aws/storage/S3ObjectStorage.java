@@ -82,7 +82,7 @@ public class S3ObjectStorage extends CommonFileStorage {
 
     public S3ObjectStorage(String storageKey, Properties properties) {
 
-        super("s3", storageKey, new S3StorageErrors(storageKey, LoggerFactory.getLogger(S3ObjectStorage.class)));
+        super("s3", storageKey, properties, new S3StorageErrors(storageKey, LoggerFactory.getLogger(S3ObjectStorage.class)));
 
         this.storageKey = storageKey;
         this.properties = properties;
