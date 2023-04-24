@@ -213,7 +213,44 @@ public abstract class StorageReadWriteTestSuite {
     }
 
     @Test
-    void testWrite_alreadyExists() throws Exception {
+    void testWrite_fileAlreadyExists() throws Exception {
+
+        //  Writing a file always overwrites any existing content
+        // This is in line with cloud bucket semantics
+
+        var prepare = makeSmallFile("some_file.txt", storage, execContext);
+        waitFor(TEST_TIMEOUT, prepare);
+
+        var exists1 = storage.exists("some_file.txt", execContext);
+        waitFor(TEST_TIMEOUT, exists1);
+        var exists1Result = resultOf(exists1);
+        Assertions.assertTrue(exists1Result);
+
+        var storagePath = "some_file.txt";
+
+        var haiku =
+                "The data goes in;\n" +
+                "For a short while it persists,\n" +
+                "then returns unscathed!";
+
+        var haikuBytes = haiku.getBytes(StandardCharsets.UTF_8);
+
+        roundTripTest(storagePath, List.of(haikuBytes), storage, dataContext);
+    }
+
+    @Test
+    void testWrite_dirAlreadyExists() throws Exception {
+
+        // File storage should not allow a file to be written if a dir exists with the same name
+        // TRAC prohibits this even though it is allowed in pure bucket semantics
+
+        var prepare = storage.mkdir("some_file.txt", false, execContext);
+        waitFor(TEST_TIMEOUT, prepare);
+
+        var exists1 = storage.exists("some_file.txt", execContext);
+        waitFor(TEST_TIMEOUT, exists1);
+        var exists1Result = resultOf(exists1);
+        Assertions.assertTrue(exists1Result);
 
         var storagePath = "some_file.txt";
         var content = ByteBufUtil.encodeString(
