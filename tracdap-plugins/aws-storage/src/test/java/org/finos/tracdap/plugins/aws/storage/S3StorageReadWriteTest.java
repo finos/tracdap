@@ -41,7 +41,6 @@ import static org.finos.tracdap.test.concurrent.ConcurrentTestHelpers.waitFor;
 
 @Tag("integration")
 @Tag("int-storage")
-@Disabled("Not ready yet")  // TODO: Enable and complete after adding range API for data read/write
 public class S3StorageReadWriteTest extends StorageReadWriteTestSuite {
 
     static Properties storageProps;
@@ -92,10 +91,6 @@ public class S3StorageReadWriteTest extends StorageReadWriteTestSuite {
 
         storage = new S3ObjectStorage("TEST_" + testNumber, storageProps);
         storage.start(elg);
-
-        storageProps.put(S3ObjectStorage.PREFIX_PROPERTY, testDir);
-        storage = new S3ObjectStorage("TEST_STORAGE", storageProps);
-        storage.start(elg);
     }
 
     @AfterEach
@@ -108,7 +103,7 @@ public class S3StorageReadWriteTest extends StorageReadWriteTestSuite {
     @AfterAll
     static void tearDownStorage() throws Exception {
 
-        var rm = setupStorage.rmdir(testSuiteDir.substring(1), setupCtx);
+        var rm = setupStorage.rmdir(testSuiteDir, setupCtx);
         waitFor(Duration.ofSeconds(10), rm);
         resultOf(rm);
 
