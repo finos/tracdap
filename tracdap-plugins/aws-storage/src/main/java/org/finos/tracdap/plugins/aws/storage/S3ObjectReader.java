@@ -237,7 +237,6 @@ public class S3ObjectReader implements Flow.Publisher<ByteBuf> {
 
         @Override
         public void onNext(ByteBuffer byteBuffer) {
-            var x = 1;
             executor.submit(() -> _onNext(byteBuffer));
         }
 
