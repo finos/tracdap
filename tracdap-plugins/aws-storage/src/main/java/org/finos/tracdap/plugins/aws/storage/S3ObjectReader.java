@@ -39,6 +39,7 @@ import java.util.concurrent.Flow;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.finos.tracdap.common.storage.CommonFileStorage.READ_OPERATION;
+import static org.finos.tracdap.common.storage.CommonFileStorage.WRITE_OPERATION;
 import static org.finos.tracdap.common.storage.StorageErrors.ExplicitError.DUPLICATE_SUBSCRIPTION;
 
 
@@ -59,6 +60,8 @@ public class S3ObjectReader implements Flow.Publisher<ByteBuf> {
     private Subscription awsSubscription;
 
     private int requestBuffer;
+    private boolean gotError;
+    private boolean gotCancel;
 
     public S3ObjectReader(
             String storagePath, String bucket, String objectKey,
@@ -153,6 +156,7 @@ public class S3ObjectReader implements Flow.Publisher<ByteBuf> {
         log.info("Got exception: " + error.getMessage(), error);
         var tracError = errors.handleException(READ_OPERATION, storagePath, error);
         subscriber.onError(tracError);
+        gotError = true;
     }
 
     private void _onSubscribe(Subscription s) {
@@ -166,18 +170,29 @@ public class S3ObjectReader implements Flow.Publisher<ByteBuf> {
     }
 
     private void _onNext(ByteBuffer byteBuffer) {
-        subscriber.onNext(Unpooled.wrappedBuffer(byteBuffer));
+
+        if (!gotError && !gotCancel)
+            subscriber.onNext(Unpooled.wrappedBuffer(byteBuffer));
     }
 
     private void _onComplete() {
-        log.info("Stream completed");
-        subscriber.onComplete();
+
+        if (!gotError && !gotCancel)
+            subscriber.onComplete();
     }
 
     private void _onError(Throwable error) {
-        subscriber.onError(error);
-    }
 
+        var mappedError = errors.handleException(WRITE_OPERATION, storagePath, error);
+
+        if (!gotError) {
+            subscriber.onError(mappedError);
+            gotError = true;
+        }
+        else {
+            log.warn("Another error occurred after the operation already failed", mappedError);
+        }
+    }
 
     private class ClientSubscription implements Flow.Subscription {
 
@@ -200,6 +215,8 @@ public class S3ObjectReader implements Flow.Publisher<ByteBuf> {
                 // todo
                 log.warn("Cancel before subscribe");
             }
+
+            gotCancel = true;
         }
     }
 
