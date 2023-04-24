@@ -70,11 +70,11 @@ public abstract class CommonFileStorage implements IFileStorage {
     public CompletionStage<Boolean>
     exists(String storagePath, IExecutionContext ctx) {
 
-        return wrapOperation("EXISTS", storagePath, (op, path) -> _exists(op, path, ctx));
+        return wrapOperation("EXISTS", storagePath, (op, path) -> exists(op, path, ctx));
     }
 
     private CompletionStage<Boolean>
-    _exists(String operationName, String storagePath, IExecutionContext ctx) {
+    exists(String operationName, String storagePath, IExecutionContext ctx) {
 
         var objectKey = resolveObjectKey(operationName, storagePath, true);
         var prefix = resolveDirPrefix(objectKey);
@@ -99,11 +99,11 @@ public abstract class CommonFileStorage implements IFileStorage {
     public CompletionStage<FileStat>
     stat(String storagePath, IExecutionContext ctx) {
 
-        return wrapOperation("STAT", storagePath, (op, path) -> _stat(op, path, ctx));
+        return wrapOperation("STAT", storagePath, (op, path) -> stat(op, path, ctx));
     }
 
     private CompletionStage<FileStat>
-    _stat(String operationName, String storagePath, IExecutionContext ctx) {
+    stat(String operationName, String storagePath, IExecutionContext ctx) {
 
         var objectKey = resolveObjectKey(operationName, storagePath, true);
         var prefix = resolveDirPrefix(objectKey);
@@ -117,13 +117,13 @@ public abstract class CommonFileStorage implements IFileStorage {
     public CompletionStage<Long>
     size(String storagePath, IExecutionContext ctx) {
 
-        return wrapOperation("SIZE", storagePath, (op, path) -> _size(op, path, ctx));
+        return wrapOperation("SIZE", storagePath, (op, path) -> size(op, path, ctx));
     }
 
     private CompletionStage<Long>
-    _size(String operationName, String storagePath, IExecutionContext ctx) {
+    size(String operationName, String storagePath, IExecutionContext ctx) {
 
-        var _stat = _stat(operationName, storagePath, ctx);
+        var _stat = stat(operationName, storagePath, ctx);
 
         return _stat.thenApply(stat -> {
 
@@ -138,13 +138,13 @@ public abstract class CommonFileStorage implements IFileStorage {
     public CompletionStage<List<FileStat>>
     ls(String storagePath, IExecutionContext ctx) {
 
-        return wrapOperation("LS", storagePath, (op, path) -> _ls(op, path, false, ctx));
+        return wrapOperation("LS", storagePath, (op, path) -> ls(op, path, false, ctx));
     }
 
     private CompletionStage<List<FileStat>>
-    _ls(String operationName, String storagePath, boolean recursive, IExecutionContext ctx) {
+    ls(String operationName, String storagePath, boolean recursive, IExecutionContext ctx) {
 
-        var _stat = _stat(operationName, storagePath, ctx);
+        var _stat = stat(operationName, storagePath, ctx);
 
         return _stat.thenCompose(stat -> {
 
@@ -207,16 +207,16 @@ public abstract class CommonFileStorage implements IFileStorage {
     rm(String storagePath, boolean recursive, IExecutionContext ctx) {
 
         if (recursive)
-            return wrapOperation("RMDIR", storagePath, (op, path) -> _rmdir(op, path, ctx));
+            return wrapOperation("RMDIR", storagePath, (op, path) -> rmdir(op, path, ctx));
         else
-            return wrapOperation("RM", storagePath, (op, path) -> _rm(op, path, ctx));
+            return wrapOperation("RM", storagePath, (op, path) -> rm(op, path, ctx));
     }
 
     private CompletionStage<Void>
-    _rm(String operationName, String storagePath, IExecutionContext ctx) {
+    rm(String operationName, String storagePath, IExecutionContext ctx) {
 
         var objectKey = resolveObjectKey(operationName, storagePath, false);
-        var fileInfo = _stat(operationName, storagePath, ctx);
+        var fileInfo = stat(operationName, storagePath, ctx);
 
         return fileInfo.thenCompose(fi -> {
 
@@ -228,12 +228,12 @@ public abstract class CommonFileStorage implements IFileStorage {
     }
 
     private CompletionStage<Void>
-    _rmdir(String operationName, String storagePath, IExecutionContext ctx) {
+    rmdir(String operationName, String storagePath, IExecutionContext ctx) {
 
         var objectKey = resolveObjectKey(operationName, storagePath, false);
         var dirPrefix = resolveDirPrefix(objectKey);
 
-        var fileInfo = _stat(operationName, storagePath, ctx);
+        var fileInfo = stat(operationName, storagePath, ctx);
 
         return fileInfo.thenCompose(fi -> {
 
