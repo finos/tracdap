@@ -218,24 +218,20 @@ public abstract class StorageReadWriteTestSuite {
         //  Writing a file always overwrites any existing content
         // This is in line with cloud bucket semantics
 
-        var prepare = makeSmallFile("some_file.txt", storage, execContext);
+        var storagePath = "some_file.txt";
+
+        var prepare = makeSmallFile(storagePath, storage, execContext);
         waitFor(TEST_TIMEOUT, prepare);
 
-        var exists1 = storage.exists("some_file.txt", execContext);
+        var exists1 = storage.exists(storagePath, execContext);
         waitFor(TEST_TIMEOUT, exists1);
         var exists1Result = resultOf(exists1);
         Assertions.assertTrue(exists1Result);
 
-        var storagePath = "some_file.txt";
+        var newContent = "small";
+        var newContentBytes = newContent.getBytes(StandardCharsets.UTF_8);
 
-        var haiku =
-                "The data goes in;\n" +
-                "For a short while it persists,\n" +
-                "then returns unscathed!";
-
-        var haikuBytes = haiku.getBytes(StandardCharsets.UTF_8);
-
-        roundTripTest(storagePath, List.of(haikuBytes), storage, dataContext);
+        roundTripTest(storagePath, List.of(newContentBytes), storage, dataContext);
     }
 
     @Test
@@ -244,15 +240,16 @@ public abstract class StorageReadWriteTestSuite {
         // File storage should not allow a file to be written if a dir exists with the same name
         // TRAC prohibits this even though it is allowed in pure bucket semantics
 
-        var prepare = storage.mkdir("some_file.txt", false, execContext);
+        var storagePath = "some_file.txt";
+
+        var prepare = storage.mkdir(storagePath, false, execContext);
         waitFor(TEST_TIMEOUT, prepare);
 
-        var exists1 = storage.exists("some_file.txt", execContext);
+        var exists1 = storage.exists(storagePath, execContext);
         waitFor(TEST_TIMEOUT, exists1);
         var exists1Result = resultOf(exists1);
         Assertions.assertTrue(exists1Result);
 
-        var storagePath = "some_file.txt";
         var content = ByteBufUtil.encodeString(
                 ByteBufAllocator.DEFAULT,
                 CharBuffer.wrap("Some content"),
