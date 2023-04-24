@@ -316,7 +316,7 @@ public class S3ObjectStorage extends CommonFileStorage {
 
         // If no objects / prefixes are matched, the "directory" doesn't exist
         if (response.contents().isEmpty() && response.commonPrefixes().isEmpty()) {
-            throw errors.explicitError(OBJECT_NOT_FOUND, directoryKey, LS_OPERATION);
+            throw errors.explicitError(OBJECT_NOT_FOUND, directoryKey, LS_OPERATION);  // todo
         }
 
         var objects = response.contents();
@@ -427,6 +427,26 @@ public class S3ObjectStorage extends CommonFileStorage {
         return response.thenApply(x -> null);
     }
 
+    @Override
+    protected Flow.Publisher<ByteBuf> fsOpenInputStream(String storagePath, IDataContext dataContext) {
+
+        var objectKey = usePrefix(storagePath);
+
+        return new S3ObjectReader(
+                storageKey, storagePath, bucket, objectKey,
+                client, dataContext.eventLoopExecutor(), errors);
+    }
+
+    @Override
+    public Flow.Subscriber<ByteBuf> fsOpenOutputStream(String storagePath, CompletableFuture<Long> signal, IDataContext dataContext) {
+
+        var objectKey = usePrefix(storagePath);
+
+        return new S3ObjectWriter(
+                storageKey, storagePath, bucket, objectKey,
+                client, signal, dataContext.eventLoopExecutor(), errors);
+    }
+
     private FileStat
     attrsToFileStat(String objectKey, GetObjectAttributesResponse objectAttrs) {
 
@@ -468,30 +488,6 @@ public class S3ObjectStorage extends CommonFileStorage {
         var size = 0;
 
         return new FileStat(path, name, fileType, size, /* mtime = */ null, /* atime = */ null);
-    }
-
-    @Override
-    public Flow.Publisher<ByteBuf> reader(String storagePath, IDataContext dataContext) {
-
-        log.info("{} {} [{}]", READ_OPERATION, storageKey, storagePath);
-
-        var objectKey = usePrefix(storagePath);
-
-        return new S3ObjectReader(
-                storageKey, storagePath, bucket, objectKey,
-                client, dataContext.eventLoopExecutor(), errors);
-    }
-
-    @Override
-    public Flow.Subscriber<ByteBuf> writer(String storagePath, CompletableFuture<Long> signal, IDataContext dataContext) {
-
-        log.info("{} {} [{}]", WRITE_OPERATION, storageKey, storagePath);
-
-        var objectKey = usePrefix(storagePath);
-
-        return new S3ObjectWriter(
-                storageKey, storagePath, bucket, objectKey,
-                client, signal, dataContext.eventLoopExecutor(), errors);
     }
 
     private String usePrefix(String relativeKey) {

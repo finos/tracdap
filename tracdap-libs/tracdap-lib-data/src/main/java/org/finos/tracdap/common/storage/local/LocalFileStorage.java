@@ -20,7 +20,6 @@ import io.netty.channel.EventLoopGroup;
 import org.finos.tracdap.common.concurrent.IExecutionContext;
 import org.finos.tracdap.common.data.IDataContext;
 import org.finos.tracdap.common.exception.EStartup;
-import org.finos.tracdap.common.exception.ETrac;
 import org.finos.tracdap.common.storage.*;
 
 import io.netty.buffer.ByteBuf;
@@ -72,13 +71,6 @@ public class LocalFileStorage extends CommonFileStorage {
         String readOnlyFlagString = config.getProperty(CONFIG_READ_ONLY, "false");
         this.readOnlyFlag = Boolean.parseBoolean(readOnlyFlagString);
 
-    }
-
-    private void checkWriteFlag(String storagePath, String operation) throws ETrac {
-
-        if(readOnlyFlag) {
-            throw errors.explicitError(ACCESS_DENIED, storagePath, operation);
-        }
     }
 
     @Override
@@ -256,7 +248,7 @@ public class LocalFileStorage extends CommonFileStorage {
         var attrs = Files.readAttributes(absolutePath, attrType);
 
         if (!attrs.isRegularFile() && !attrs.isDirectory())
-            throw errors.explicitError(NOT_A_FILE_OR_DIRECTORY, storagePath, STAT_OPERATION);
+            throw errors.explicitError(NOT_A_FILE_OR_DIRECTORY, storagePath, STAT_OPERATION);  // todo
 
         // Special handling for the root directory - do not return the name of the storage root folder!
         var fileName = absolutePath.equals(rootPath)
@@ -351,11 +343,10 @@ public class LocalFileStorage extends CommonFileStorage {
     }
 
     @Override
-    public Flow.Publisher<ByteBuf> reader(String storagePath, IDataContext dataContext) {
+    protected Flow.Publisher<ByteBuf>
+    fsOpenInputStream(String storagePath, IDataContext dataContext) {
 
-        log.info("STORAGE OPERATION: {} {} [{}]", storageKey, READ_OPERATION, storagePath);
-
-        var absolutePath = resolvePath(storagePath, false, READ_OPERATION);
+        var absolutePath = resolvePath(storagePath);
 
         return new LocalFileReader(
                 storageKey, storagePath,
@@ -364,25 +355,10 @@ public class LocalFileStorage extends CommonFileStorage {
     }
 
     @Override
-    public Flow.Subscriber<ByteBuf> writer(
-            String storagePath,
-            CompletableFuture<Long> signal,
-            IDataContext dataContext) {
+    protected Flow.Subscriber<ByteBuf>
+    fsOpenOutputStream(String storagePath, CompletableFuture<Long> signal, IDataContext dataContext) {
 
-        log.info("STORAGE OPERATION: {} {} [{}]", storageKey, WRITE_OPERATION, storagePath);
-
-        checkWriteFlag(storagePath, WRITE_OPERATION);
-
-        var absolutePath = resolvePath(storagePath, false, WRITE_OPERATION);
-
-        // TODO: This should be handled by common storage
-        try {
-            if (!Files.exists(absolutePath.getParent()))
-                Files.createDirectories(absolutePath.getParent());
-        }
-        catch (IOException e) {
-            throw errors.handleException(e, storagePath, WRITE_OPERATION);
-        }
+        var absolutePath = resolvePath(storagePath);
 
         return new LocalFileWriter(
                 storageKey, storagePath,
@@ -396,34 +372,5 @@ public class LocalFileStorage extends CommonFileStorage {
             return rootPath;
         else
             return rootPath.resolve(storagePath);
-    }
-
-    private Path resolvePath(String storagePath, boolean allowRootDir, String operationName) {
-
-        try {
-
-            if (storagePath == null || storagePath.isBlank())
-                throw errors.explicitError(STORAGE_PATH_NULL_OR_BLANK, storagePath, operationName);
-
-            var relativePath = Path.of(storagePath);
-
-            if (relativePath.isAbsolute())
-                throw errors.explicitError(STORAGE_PATH_NOT_RELATIVE, storagePath, operationName);
-
-            var absolutePath = rootPath.resolve(storagePath).normalize();
-
-            if (absolutePath.getNameCount() < rootPath.getNameCount() || !absolutePath.startsWith(rootPath))
-                throw errors.explicitError(STORAGE_PATH_OUTSIDE_ROOT, storagePath, operationName);
-
-
-            if (absolutePath.equals(rootPath) && !allowRootDir)
-                throw errors.explicitError(STORAGE_PATH_IS_ROOT, storagePath, operationName);
-
-            return absolutePath;
-        }
-        catch (InvalidPathException e) {
-
-            throw errors.explicitError(STORAGE_PATH_INVALID, storagePath, operationName);
-        }
     }
 }

@@ -16,12 +16,14 @@
 
 package org.finos.tracdap.common.storage;
 
+import org.finos.tracdap.common.concurrent.Flows;
 import org.finos.tracdap.common.concurrent.IExecutionContext;
 import org.finos.tracdap.common.config.ConfigHelpers;
 import org.finos.tracdap.common.data.IDataContext;
 
 import io.netty.buffer.ByteBuf;
 
+import org.finos.tracdap.common.exception.ETrac;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -33,6 +35,7 @@ import java.util.Properties;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Flow;
+import java.util.function.Function;
 
 import static org.finos.tracdap.common.storage.StorageErrors.ExplicitError.*;
 
@@ -66,22 +69,27 @@ public abstract class CommonFileStorage implements IFileStorage {
 
     // Abstract interface for low-level FS operations
 
-    protected abstract CompletionStage<Void> fsCreateDir(String prefix, IExecutionContext ctx);
-    protected abstract CompletionStage<Void> fsDeleteFile(String objectKey, IExecutionContext ctx);
-    protected abstract CompletionStage<Void> fsDeleteDir(String directoryKey, IExecutionContext ctx);
-    protected abstract CompletionStage<FileStat> fsGetFileInfo(String objectKey, IExecutionContext ctx);
-    protected abstract CompletionStage<FileStat> fsGetDirInfo(String prefix, IExecutionContext ctx);
     protected abstract CompletionStage<Boolean> fsExists(String objectKey, IExecutionContext ctx);
     protected abstract CompletionStage<Boolean> fsDirExists(String prefix, IExecutionContext ctx);
+    protected abstract CompletionStage<FileStat> fsGetFileInfo(String objectKey, IExecutionContext ctx);
+    protected abstract CompletionStage<FileStat> fsGetDirInfo(String prefix, IExecutionContext ctx);
     protected abstract CompletionStage<List<FileStat>> fsListContents(
             String prefix, String startAfter, int maxKeys, boolean recursive,
             IExecutionContext ctx);
+
+    protected abstract CompletionStage<Void> fsCreateDir(String prefix, IExecutionContext ctx);
+    protected abstract CompletionStage<Void> fsDeleteFile(String objectKey, IExecutionContext ctx);
+    protected abstract CompletionStage<Void> fsDeleteDir(String directoryKey, IExecutionContext ctx);
+
+    protected abstract Flow.Publisher<ByteBuf> fsOpenInputStream(String objectKey, IDataContext ctx);
+    protected abstract Flow.Subscriber<ByteBuf> fsOpenOutputStream(String objectKey, CompletableFuture<Long> signal, IDataContext ctx);
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
     private final String storageType;
     private final String storageKey;
     private final boolean readOnly;
+    private final boolean bucketSemantics = false;
     private final StorageErrors errors;
 
     protected CommonFileStorage(
@@ -293,13 +301,54 @@ public abstract class CommonFileStorage implements IFileStorage {
     }
 
     @Override
-    public Flow.Publisher<ByteBuf> reader(String storagePath, IDataContext dataContext) {
-        return null;
+    public Flow.Publisher<ByteBuf>
+    reader(String storagePath, IDataContext ctx) {
+
+        return wrapStreamOperation(
+                READ_OPERATION, storagePath,
+                (op, path) -> reader(op, path, ctx),
+                err -> { throw err; });
+    }
+
+    private Flow.Publisher<ByteBuf>
+    reader(String operationName, String storagePath, IDataContext dataContext) {
+
+        var objectKey = resolveObjectKey(operationName, storagePath, false);
+
+        return fsOpenInputStream(objectKey, dataContext);
     }
 
     @Override
-    public Flow.Subscriber<ByteBuf> writer(String storagePath, CompletableFuture<Long> signal, IDataContext dataContext) {
-        return null;
+    public Flow.Subscriber<ByteBuf>
+    writer(String storagePath, CompletableFuture<Long> signal, IDataContext ctx) {
+
+        return wrapStreamOperation(
+                WRITE_OPERATION, storagePath,
+                (op, path) -> writer(op, path, signal, ctx),
+                err -> { throw err; });
+    }
+
+    protected Flow.Subscriber<ByteBuf>
+    writer(String operationName, String storagePath, CompletableFuture<Long> signal, IDataContext ctx) {
+
+        var objectKey = resolveObjectKey(operationName, storagePath, false);
+
+        if (readOnly)
+            throw errors.explicitError(ACCESS_DENIED, storagePath, operationName);
+
+        var parent = objectKey.contains(BACKSLASH) ? objectKey.substring(0, objectKey.lastIndexOf(BACKSLASH)) : null;
+
+        var checkParent = objectKey.contains(BACKSLASH) && !bucketSemantics
+                ? fsDirExists(parent, ctx)
+                : CompletableFuture.completedFuture(true);
+
+        var createParent = checkParent.thenCompose(exists -> exists
+                ? CompletableFuture.completedFuture(null)
+                : fsCreateDir(parent, ctx));
+
+        var outputStream = fsOpenOutputStream(objectKey, signal, ctx);  // todo useContext
+
+        return Flows.waitForSignal(outputStream, createParent);
     }
 
     private <TResult> CompletionStage<TResult>
@@ -327,6 +376,29 @@ public abstract class CommonFileStorage implements IFileStorage {
             log.error("{}: {}", operation, error.getMessage());
 
             return CompletableFuture.failedFuture(error);
+        }
+    }
+
+    private <TResult> TResult
+    wrapStreamOperation(
+            String operationName, String storagePath,
+            FsStreamOperation<TResult> func,
+            Function<ETrac, TResult> errFunc) {
+
+        var operation = String.format("%s %s [%s]", operationName, storageKey, storagePath);
+
+        try {
+
+            log.info(operation);
+
+            return func.call(operationName, storagePath);
+        }
+        catch (Exception e) {
+
+            var error = errors.handleException(e, storagePath, operationName);
+            log.error("{}: {}", operation, error.getMessage());
+
+            return errFunc.apply(error);
         }
     }
 
@@ -385,7 +457,7 @@ public abstract class CommonFileStorage implements IFileStorage {
             return objectKey + BACKSLASH;
     }
 
-    protected <TResult> CompletionStage<TResult> useContext(IExecutionContext execCtx, CompletionStage<TResult> promise) {
+    protected <TResult> CompletableFuture<TResult> useContext(IExecutionContext execCtx, CompletionStage<TResult> promise) {
 
         var ctxPromise = new CompletableFuture<TResult>();
 
@@ -414,5 +486,11 @@ public abstract class CommonFileStorage implements IFileStorage {
     private interface FsOperation<TResult> {
 
         CompletionStage<TResult> call(String operationName, String storagePath);
+    }
+
+    @FunctionalInterface
+    private interface FsStreamOperation<TResult> {
+
+        TResult call(String operationName, String storagePath);
     }
 }
