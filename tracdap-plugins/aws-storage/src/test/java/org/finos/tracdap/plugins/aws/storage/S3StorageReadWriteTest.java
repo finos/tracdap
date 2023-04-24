@@ -108,7 +108,7 @@ public class S3StorageReadWriteTest extends StorageReadWriteTestSuite {
     @AfterAll
     static void tearDownStorage() throws Exception {
 
-        var rm = setupStorage.rm(testSuiteDir.substring(1), true, setupCtx);
+        var rm = setupStorage.rmdir(testSuiteDir.substring(1), setupCtx);
         waitFor(Duration.ofSeconds(10), rm);
         resultOf(rm);
 

@@ -98,7 +98,7 @@ public class S3StorageOperationsTest extends StorageOperationsTestSuite {
     @AfterAll
     static void tearDownStorage() throws Exception {
 
-        var rm = setupStorage.rm(testSuiteDir, true, setupCtx);
+        var rm = setupStorage.rmdir(testSuiteDir, setupCtx);
         waitFor(Duration.ofSeconds(10), rm);
         resultOf(rm);
 
