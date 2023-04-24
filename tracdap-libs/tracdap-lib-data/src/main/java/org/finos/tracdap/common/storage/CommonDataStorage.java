@@ -24,8 +24,6 @@ import org.finos.tracdap.common.data.DataPipeline;
 import org.finos.tracdap.common.data.IDataContext;
 import org.finos.tracdap.common.data.pipeline.RangeSelector;
 import org.finos.tracdap.common.exception.EStorageValidation;
-import org.finos.tracdap.common.storage.IDataStorage;
-import org.finos.tracdap.common.storage.IFileStorage;
 import org.finos.tracdap.config.PluginConfig;
 import org.finos.tracdap.metadata.StorageCopy;
 

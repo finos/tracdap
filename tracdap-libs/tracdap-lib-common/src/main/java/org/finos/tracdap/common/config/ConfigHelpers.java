@@ -26,13 +26,6 @@ public class ConfigHelpers {
     private static final String BOOLEAN_TRUE = Boolean.TRUE.toString();
     private static final String BOOLEAN_FALSE = Boolean.FALSE.toString();
 
-    public static boolean requiredBoolean(String context, Properties properties, String key) {
-
-        var rawValue = properties.getProperty(key);
-
-        return  checkBoolean(context, key, rawValue);
-    }
-
     public static boolean optionalBoolean(String context, Properties properties, String key, boolean defaultValue) {
 
         var rawValue = properties.getProperty(key);
