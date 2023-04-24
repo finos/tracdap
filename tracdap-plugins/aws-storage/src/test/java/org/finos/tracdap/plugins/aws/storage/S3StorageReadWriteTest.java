@@ -18,6 +18,7 @@ package org.finos.tracdap.plugins.aws.storage;
 
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
+import org.apache.arrow.memory.BufferAllocator;
 import org.finos.tracdap.common.concurrent.ExecutionContext;
 import org.finos.tracdap.common.data.DataContext;
 import org.finos.tracdap.common.storage.StorageReadWriteTestSuite;
@@ -44,32 +45,37 @@ import static org.finos.tracdap.test.concurrent.ConcurrentTestHelpers.waitFor;
 public class S3StorageReadWriteTest extends StorageReadWriteTestSuite {
 
     static Properties storageProps;
-    static String testDir;
-    static S3ObjectStorage setup;
+    static String testSuiteDir;
 
     static EventLoopGroup elg;
-    static ExecutionContext setupExecCtx;
+    static BufferAllocator allocator;
+
+    static S3ObjectStorage setupStorage;
+    static ExecutionContext setupCtx;
+
+    static int testNumber;
 
     @BeforeAll
     static void setupStorage() throws Exception {
 
-        var random = new Random();
+        var timestamp = DateTimeFormatter.ISO_INSTANT.format(Instant.now()).replace(':', '.');
+        var random = new Random().nextLong();
 
-        testDir = String.format(
-                "/tracdap_test/test_%s_0x%h",
-                DateTimeFormatter.ISO_INSTANT.format(Instant.now()),
-                random.nextLong());
+        testSuiteDir = String.format(
+                "platform_storage_rw_test_suite_%s_0x%h/",
+                timestamp, random);
 
-        setupExecCtx = new ExecutionContext(new DefaultEventExecutor(new DefaultThreadFactory("t-setup")));
+        setupCtx = new ExecutionContext(new DefaultEventExecutor(new DefaultThreadFactory("t-setup")));
 
         storageProps = StorageEnvProps.readStorageEnvProps();
 
         elg = new NioEventLoopGroup(2);
+        allocator = new RootAllocator();
 
-        setup = new S3ObjectStorage("STORAGE_SETUP", storageProps);
-        setup.start(elg);
+        setupStorage = new S3ObjectStorage("STORAGE_SETUP", storageProps);
+        setupStorage.start(elg);
 
-        var mkdir =setup.mkdir(testDir.substring(1), true, setupExecCtx);
+        var mkdir = setupStorage.mkdir(testSuiteDir, true, setupCtx);
         waitFor(Duration.ofSeconds(10), mkdir);
         resultOf(mkdir);
     }
@@ -78,7 +84,14 @@ public class S3StorageReadWriteTest extends StorageReadWriteTestSuite {
     void setup() {
 
         execContext = new ExecutionContext(new DefaultEventExecutor(new DefaultThreadFactory("t-events")));
-        dataContext = new DataContext(execContext.eventLoopExecutor(), new RootAllocator());
+        dataContext = new DataContext(execContext.eventLoopExecutor(), allocator);
+
+        var testDir = String.format("%stest_%d", testSuiteDir, ++testNumber);
+        setupStorage.mkdir(testDir, false, setupCtx);
+        storageProps.put(S3ObjectStorage.PREFIX_PROPERTY, testDir);
+
+        storage = new S3ObjectStorage("TEST_" + testNumber, storageProps);
+        storage.start(elg);
 
         storageProps.put(S3ObjectStorage.PREFIX_PROPERTY, testDir);
         storage = new S3ObjectStorage("TEST_STORAGE", storageProps);
@@ -95,12 +108,12 @@ public class S3StorageReadWriteTest extends StorageReadWriteTestSuite {
     @AfterAll
     static void tearDownStorage() throws Exception {
 
-        var rm = setup.rm(testDir.substring(1), true, setupExecCtx);
+        var rm = setupStorage.rm(testSuiteDir.substring(1), true, setupCtx);
         waitFor(Duration.ofSeconds(10), rm);
         resultOf(rm);
 
-        setup.stop();
-        setup = null;
+        setupStorage.stop();
+        setupStorage = null;
 
         elg.shutdownGracefully();
         elg = null;
