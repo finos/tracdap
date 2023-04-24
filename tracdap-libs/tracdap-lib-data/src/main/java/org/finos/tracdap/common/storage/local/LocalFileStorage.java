@@ -104,8 +104,8 @@ public class LocalFileStorage implements IFileStorage {
 
         if(!readOnlyFlag && !Files.isWritable(rootPath)) {
             var err = String.format("Storage root path is not writable: %s [%s]", storageKey, rootPath);
-                log.error(err);
-                throw new EStartup(err);
+            log.error(err);
+            throw new EStartup(err);
         }
 
         logFsInfo();
