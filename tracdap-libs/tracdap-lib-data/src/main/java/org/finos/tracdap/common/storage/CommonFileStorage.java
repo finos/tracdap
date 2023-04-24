@@ -36,6 +36,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Flow;
 import java.util.function.Function;
+import java.util.regex.Pattern;
 
 import static org.finos.tracdap.common.storage.StorageErrors.ExplicitError.*;
 
@@ -51,6 +52,8 @@ import static org.finos.tracdap.common.storage.StorageErrors.ExplicitError.*;
  * low-level operations is based on Arrow's NativeFile interface</p>
  */
 public abstract class CommonFileStorage implements IFileStorage {
+
+    public static final Pattern ILLEGAL_PATH_CHARS = Pattern.compile(".*[\u0000<>:'\"|?*\\\\].*");
 
     public static final String EXISTS_OPERATION = "exists";
     public static final String SIZE_OPERATION = "size";
@@ -438,7 +441,6 @@ public abstract class CommonFileStorage implements IFileStorage {
 
     protected String resolveObjectKey(String operationName, String storagePath, boolean allowRootDir) {
 
-
         try {
 
             var isWindows = System.getProperty("os.name").toLowerCase().contains("win");
@@ -446,8 +448,8 @@ public abstract class CommonFileStorage implements IFileStorage {
             if (storagePath == null || storagePath.isBlank())
                 throw errors.explicitError(operationName, storagePath, STORAGE_PATH_NULL_OR_BLANK);
 
-//            if self._ILLEGAL_PATH_CHARS.match(storage_path):
-//            raise self._explicit_error(self.ExplicitError.STORAGE_PATH_INVALID, operation_name, storage_path)
+            if (ILLEGAL_PATH_CHARS.matcher(storagePath).matches())
+                throw errors.explicitError(operationName, storagePath, STORAGE_PATH_INVALID);
 
             var relativePath = Paths.get(storagePath);
 
