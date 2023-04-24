@@ -31,7 +31,7 @@ import java.util.concurrent.CompletableFuture;
 import static org.finos.tracdap.test.concurrent.ConcurrentTestHelpers.resultOf;
 import static org.finos.tracdap.test.concurrent.ConcurrentTestHelpers.waitFor;
 
-public abstract class LocalStorageNotWritableTestSuite {
+public abstract class StorageReadOnlyTestSuite {
 
     @TempDir
     protected Path storageDir;

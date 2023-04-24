@@ -22,13 +22,13 @@ import org.apache.arrow.memory.RootAllocator;
 import org.finos.tracdap.common.concurrent.ExecutionContext;
 import org.finos.tracdap.common.data.DataContext;
 import org.finos.tracdap.common.storage.IStorageManager;
-import org.finos.tracdap.common.storage.LocalStorageNotWritableTestSuite;
+import org.finos.tracdap.common.storage.StorageReadOnlyTestSuite;
 
 import org.junit.jupiter.api.BeforeEach;
 
 import java.util.Properties;
 
-public class LocalLocalStorageNotWritableTest extends LocalStorageNotWritableTestSuite {
+public class LocalStorageReadOnlyTest extends StorageReadOnlyTestSuite {
 
     @BeforeEach
     void setupStorage() {
