@@ -42,7 +42,8 @@ public class LocalStorageReadOnlyTest extends StorageReadOnlyTestSuite {
         rwProps.put(LocalFileStorage.CONFIG_ROOT_PATH, storageDir.toString());
         rwStorage = new LocalFileStorage("TEST_LOCAL_RW_STORAGE", rwProps);
 
-        var roProps = new Properties(rwProps);
+        var roProps = new Properties();
+        roProps.putAll(rwProps);
         roProps.put(CommonFileStorage.READ_ONLY_CONFIG_KEY, "true");
         roStorage = new LocalFileStorage("TEST_LOCAL_RO_STORAGE", roProps);
 
