@@ -21,99 +21,107 @@ import org.finos.tracdap.common.data.IDataContext;
 import org.finos.tracdap.common.exception.EStorageAccess;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
 
-import java.io.File;
-import java.nio.file.Path;
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Flow;
 
 import static org.finos.tracdap.test.concurrent.ConcurrentTestHelpers.resultOf;
 import static org.finos.tracdap.test.concurrent.ConcurrentTestHelpers.waitFor;
+import static org.finos.tracdap.test.storage.StorageTestHelpers.makeSmallFile;
+import static org.mockito.Mockito.*;
+
 
 public abstract class StorageReadOnlyTestSuite {
 
-    @TempDir
-    protected Path storageDir;
+    //Test suite for readOnly protection on IFileStorage
+    // This should be available for all storage types that use CommonFileStorage as a base
 
     public static final Duration TEST_TIMEOUT = Duration.ofSeconds(10);
+    public static final Duration ASYNC_DELAY = Duration.ofMillis(100);
 
-    protected IFileStorage storage;
+    protected IFileStorage rwStorage;
+    protected IFileStorage roStorage;
     protected IExecutionContext execContext;
     protected IDataContext dataContext;
 
+    @Test
+    void testMkdir_readOnly() throws Exception {
+
+        var dir = roStorage.mkdir("test_dir", false, execContext);
+        waitFor(TEST_TIMEOUT, dir);
+        Assertions.assertThrows(EStorageAccess.class, () -> resultOf(dir));
+
+        var dirPresent = roStorage.exists("test_dir", execContext);
+        waitFor(TEST_TIMEOUT, dirPresent);
+        Assertions.assertFalse(resultOf(dirPresent));
+    }
 
     @Test
-    void testRm_fail() throws Exception {
+    void testRm_readOnly() throws Exception {
 
         // Simplest case - create one file and delete it.
         // The file is created independently of the storage, because the storage is assumed to be read only
         // and the file cannot be created in it.
 
-        File smallFile = new File(storageDir.resolve("test_file.txt").toString());
+        var prepare = makeSmallFile("test_file.txt", rwStorage, execContext);
+        waitFor(TEST_TIMEOUT, prepare);
+        resultOf(prepare);
 
-        boolean fileCreated;
-        String message = null;
+        var created = roStorage.exists("test_file.txt", execContext);
+        waitFor(TEST_TIMEOUT, created);
+        Assertions.assertTrue(resultOf(created));
 
-        try {
-            fileCreated = smallFile.createNewFile();
-        } catch(Exception e) {
-            fileCreated = false;
-            message = e.getMessage();
-        }
-
-        Assertions.assertTrue(fileCreated, message==null?"The test file could not be created.":message);
-
-        var rm = storage.rm("test_file.txt", execContext);
+        var rm = roStorage.rm("test_file.txt", execContext);
         waitFor(TEST_TIMEOUT, rm);
-
         Assertions.assertThrows(EStorageAccess.class, () -> resultOf(rm));
 
         // File should not be gone
 
-        var exists = storage.exists("test_file.txt", execContext);
+        var exists = roStorage.exists("test_file.txt", execContext);
         waitFor(TEST_TIMEOUT, exists);
         Assertions.assertTrue(resultOf(exists));
-
-        boolean fileDeleted;
-        String message2 = null;
-
-        try {
-            fileDeleted = smallFile.delete();
-        } catch (Exception e) {
-            fileDeleted = false;
-            message2 = e.getMessage();
-        }
-
-        Assertions.assertTrue(fileDeleted, message2==null?"The test file could not be deleted.":message2);
     }
 
     @Test
-    void testMkdir_fail() throws Exception {
+    void testRmdir_readOnly() throws Exception {
 
-        var dir = storage.mkdir("test_dir", false, execContext);
-        waitFor(TEST_TIMEOUT, dir);
+        // Simplest case - create one file and delete it.
+        // The file is created independently of the storage, because the storage is assumed to be read only
+        // and the file cannot be created in it.
 
-        Assertions.assertThrows(EStorageAccess.class, () -> resultOf(dir));
+        var prepare = rwStorage.mkdir("test_dir", false, execContext);
+        waitFor(TEST_TIMEOUT, prepare);
+        resultOf(prepare);
 
-        var dirPresent = storage.exists("test_dir", execContext);
-        waitFor(TEST_TIMEOUT, dirPresent);
+        var created = roStorage.exists("test_dir", execContext);
+        waitFor(TEST_TIMEOUT, created);
+        Assertions.assertTrue(resultOf(created));
 
-        Assertions.assertFalse(resultOf(dirPresent));
+        var rmdir = roStorage.rmdir("test_dir", execContext);
+        waitFor(TEST_TIMEOUT, rmdir);
+        Assertions.assertThrows(EStorageAccess.class, () -> resultOf(rmdir));
+
+        // Dir should not be gone
+
+        var exists = roStorage.exists("test_dir", execContext);
+        waitFor(TEST_TIMEOUT, exists);
+        Assertions.assertTrue(resultOf(exists));
     }
 
     @Test
-    void writer_basic_fail() {
+    void testWriter_readOnly() {
 
         var storagePath = "any_file.txt";
 
-        Assertions.assertThrows(EStorageAccess.class, () -> writerTest(storagePath, storage, dataContext));
-    }
-
-    static void writerTest(String storagePath, IFileStorage storage, IDataContext dataContext) {
-
         var writeSignal = new CompletableFuture<Long>();
+        var writer = roStorage.writer(storagePath, writeSignal, dataContext);
 
-        storage.writer(storagePath, writeSignal, dataContext);
+        var subscription = mock(Flow.Subscription.class);
+        writer.onSubscribe(subscription);
+        verify(subscription, timeout(ASYNC_DELAY.toMillis())).cancel();
+
+        waitFor(TEST_TIMEOUT, writeSignal);
+        Assertions.assertThrows(EStorageAccess.class, () -> resultOf(writeSignal));
     }
 }
