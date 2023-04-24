@@ -162,20 +162,35 @@ public abstract class CommonFileStorage implements IFileStorage {
     public CompletionStage<Void>
     mkdir(String storagePath, boolean recursive, IExecutionContext ctx) {
 
-        return wrapOperation("MKDIR", storagePath, (op, path) -> _mkdir(op, path, recursive, ctx));
+        return wrapOperation("MKDIR", storagePath, (op, path) -> mkdir(op, path, recursive, ctx));
     }
 
     private CompletionStage<Void>
-    _mkdir(String operationName, String storagePath, Boolean recursive, IExecutionContext ctx) {
+    mkdir(String operationName, String storagePath, Boolean recursive, IExecutionContext ctx) {
 
-        // TODO: check parent if not recursive
+        var path = resolveObjectKey(operationName, storagePath, false);
+        var parent = path.contains(BACKSLASH) ? path.substring(0, path.lastIndexOf(BACKSLASH)) : null;
 
-        var objectKey = resolveObjectKey(operationName, storagePath, false);
-        var prefix = resolveDirPrefix(objectKey);
+        var checkParent = path.contains(BACKSLASH) && !recursive
+                ? prefixExists(parent, ctx)
+                : CompletableFuture.completedFuture(true);
 
-        var objectExists = objectExists(objectKey, ctx);
+        return checkParent.thenCompose(parentOk -> {
+
+            if (!parentOk)
+                throw errors.explicitError(OBJECT_NOT_FOUND, storagePath, operationName);
+
+            return mkdirParentOk(operationName, storagePath, path, ctx);
+        });
+    }
+
+    private CompletionStage<Void>
+    mkdirParentOk(String operationName, String storagePath, String resolvedPath, IExecutionContext ctx) {
+
+        var prefix = resolveDirPrefix(resolvedPath);
+
+        var objectExists = objectExists(resolvedPath, ctx);
         var dirExists =  prefixExists(prefix, ctx);
-
         var fileExists = objectExists.thenCombine(dirExists, (obj, dir) -> obj && !dir);
 
         return fileExists.thenCompose(exists -> {
