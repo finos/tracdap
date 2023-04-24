@@ -69,6 +69,9 @@ public abstract class CommonFileStorage implements IFileStorage {
 
     // Abstract interface for low-level FS operations
 
+    protected static final boolean BUCKET_SEMANTICS = true;
+    protected static final boolean FILE_SEMANTICS = false;
+
     protected abstract CompletionStage<Boolean> fsExists(String objectKey, IExecutionContext ctx);
     protected abstract CompletionStage<Boolean> fsDirExists(String prefix, IExecutionContext ctx);
     protected abstract CompletionStage<FileStat> fsGetFileInfo(String objectKey, IExecutionContext ctx);
@@ -84,21 +87,24 @@ public abstract class CommonFileStorage implements IFileStorage {
     protected abstract Flow.Publisher<ByteBuf> fsOpenInputStream(String objectKey, IDataContext ctx);
     protected abstract Flow.Subscriber<ByteBuf> fsOpenOutputStream(String objectKey, CompletableFuture<Long> signal, IDataContext ctx);
 
-    private final Logger log = LoggerFactory.getLogger(getClass());
+    // Expose final member variables to avoid duplication in child classes
 
-    private final String storageType;
-    private final String storageKey;
-    private final boolean readOnly;
-    private final boolean bucketSemantics = false;
-    private final StorageErrors errors;
+    protected final Logger log = LoggerFactory.getLogger(getClass());
+
+    protected final boolean bucketSemantics;
+    protected final String storageKey;
+    protected final boolean readOnly;
+
+    protected final StorageErrors errors;
 
     protected CommonFileStorage(
-            String storageType, String storageKey,
-            Properties properties, StorageErrors errors) {
+            boolean bucketSemantics,
+            String storageKey,
+            Properties properties,
+            StorageErrors errors) {
 
-        this.storageType = storageType;
+        this.bucketSemantics = bucketSemantics;
         this.storageKey = storageKey;
-
         this.readOnly = ConfigHelpers.optionalBoolean(
                 storageKey, properties,
                 READ_ONLY_CONFIG_KEY,
@@ -170,7 +176,7 @@ public abstract class CommonFileStorage implements IFileStorage {
         return _stat.thenApply(stat -> {
 
             if (stat.fileType != FileType.FILE)
-                throw errors.explicitError(NOT_A_FILE, storagePath, operationName);
+                throw errors.explicitError(operationName, storagePath, NOT_A_FILE);
 
             return stat.size;
         });
@@ -213,7 +219,7 @@ public abstract class CommonFileStorage implements IFileStorage {
         var path = resolveObjectKey(operationName, storagePath, false);
 
         if (readOnly)
-            throw errors.explicitError(ACCESS_DENIED, storagePath, operationName);
+            throw errors.explicitError(operationName, storagePath, ACCESS_DENIED);
 
         var parent = path.contains(BACKSLASH) ? path.substring(0, path.lastIndexOf(BACKSLASH)) : null;
         var checkParent = path.contains(BACKSLASH) && !recursive
@@ -223,7 +229,7 @@ public abstract class CommonFileStorage implements IFileStorage {
         return checkParent.thenCompose(parentOk -> {
 
             if (!parentOk)
-                throw errors.explicitError(OBJECT_NOT_FOUND, storagePath, operationName);
+                throw errors.explicitError(operationName, storagePath, OBJECT_NOT_FOUND);
 
             return mkdirParentOk(operationName, storagePath, path, ctx);
         });
@@ -241,7 +247,7 @@ public abstract class CommonFileStorage implements IFileStorage {
         return fileExists.thenCompose(exists -> {
 
             if (exists)
-                throw errors.explicitError(OBJECT_ALREADY_EXISTS, storagePath, operationName);
+                throw errors.explicitError(operationName, storagePath, OBJECT_ALREADY_EXISTS);
 
             return fsCreateDir(prefix, ctx);
         });
@@ -260,14 +266,14 @@ public abstract class CommonFileStorage implements IFileStorage {
         var objectKey = resolveObjectKey(operationName, storagePath, false);
 
         if (readOnly)
-            throw errors.explicitError(ACCESS_DENIED, storagePath, operationName);
+            throw errors.explicitError(operationName, storagePath, ACCESS_DENIED);
 
         var fileInfo = stat(operationName, storagePath, ctx);
 
         return fileInfo.thenCompose(fi -> {
 
             if (fi.fileType != FileType.FILE)
-                throw errors.explicitError(NOT_A_FILE, storagePath, operationName);
+                throw errors.explicitError(operationName, storagePath, NOT_A_FILE);
 
             return fsDeleteFile(objectKey, ctx);
         });
@@ -287,14 +293,14 @@ public abstract class CommonFileStorage implements IFileStorage {
         var dirPrefix = resolveDirPrefix(objectKey);
 
         if (readOnly)
-            throw errors.explicitError(ACCESS_DENIED, storagePath, operationName);
+            throw errors.explicitError(operationName, storagePath, ACCESS_DENIED);
 
         var fileInfo = stat(operationName, storagePath, ctx);
 
         return fileInfo.thenCompose(fi -> {
 
             if (fi.fileType != FileType.DIRECTORY)
-                throw errors.explicitError(NOT_A_DIRECTORY, storagePath, operationName);
+                throw errors.explicitError(operationName, storagePath, NOT_A_DIRECTORY);
 
             return fsDeleteDir(dirPrefix, ctx);
         });
@@ -332,23 +338,51 @@ public abstract class CommonFileStorage implements IFileStorage {
     writer(String operationName, String storagePath, CompletableFuture<Long> signal, IDataContext ctx) {
 
         var objectKey = resolveObjectKey(operationName, storagePath, false);
-
-        if (readOnly)
-            throw errors.explicitError(ACCESS_DENIED, storagePath, operationName);
-
         var parent = objectKey.contains(BACKSLASH) ? objectKey.substring(0, objectKey.lastIndexOf(BACKSLASH)) : null;
 
-        var checkParent = objectKey.contains(BACKSLASH) && !bucketSemantics
-                ? fsDirExists(parent, ctx)
-                : CompletableFuture.completedFuture(true);
+        // Before opening the write stream several checks are needed
 
-        var createParent = checkParent.thenCompose(exists -> exists
-                ? CompletableFuture.completedFuture(null)
-                : fsCreateDir(parent, ctx));
+        // Check storage is not readOnly - if it is, return an error before anything else is attempted
+        var prepare = CompletableFuture.completedFuture(true).thenApply(x -> {
 
-        var outputStream = fsOpenOutputStream(objectKey, signal, ctx);  // todo useContext
+            if (readOnly)
+                throw errors.explicitError(operationName, storagePath, ACCESS_DENIED);
 
-        return Flows.waitForSignal(outputStream, createParent);
+            return true;
+
+        // Check whether a parent directory is needed (in bucket semantics parents are never needed)
+        }).thenCompose(x -> {
+
+            if (parent == null || bucketSemantics)
+                return CompletableFuture.completedFuture(true);
+            else
+                return fsDirExists(parent, ctx);
+
+        // If a parent dir is needed, create one (this makes file semantics behave like buckets)
+        }).thenCompose(parentOk -> {
+
+            if (!parentOk)
+                return fsCreateDir(parent, ctx);
+            else
+                return CompletableFuture.completedFuture(true).thenApply(x -> null);
+
+        // Make sure the file being writen to is not a directory
+        // With bucket semantics, a file and a directory can have the same name
+        // This explicit check tries to prevent that confusion
+        // Race conditions are possible, but the structured way TRAC uses storage makes that unlikely in practice
+        }).thenCompose(x -> fsDirExists(objectKey + BACKSLASH, ctx)).thenApply(isDir -> {
+
+            if (isDir)
+                throw errors.explicitError(operationName, storagePath, OBJECT_ALREADY_EXISTS);
+
+            return true;
+        });
+
+        // Create the output stream - it will not activate until it is subscribed to a source
+        var outputStream = fsOpenOutputStream(objectKey, fromContext(ctx, signal), ctx);
+
+        // Return a delayed subscriber, that waits for the prepare step to finish before starting
+        return Flows.waitForSignal(outputStream, toContext(ctx, prepare));
     }
 
     private <TResult> CompletionStage<TResult>
@@ -364,16 +398,16 @@ public abstract class CommonFileStorage implements IFileStorage {
 
             return result.exceptionally(e -> {
 
-                var error = errors.handleException(e, storagePath, operationName);
-                log.error("{}: {}", operation, error.getMessage());
+                var error = errors.handleException(operationName, storagePath, e);
+                log.error("{}: {}", operation, error.getMessage(), error);
 
                 throw error;
             });
         }
         catch (Exception e) {
 
-            var error = errors.handleException(e, storagePath, operationName);
-            log.error("{}: {}", operation, error.getMessage());
+            var error = errors.handleException(operationName, storagePath, e);
+            log.error("{}: {}", operation, error.getMessage(), error);
 
             return CompletableFuture.failedFuture(error);
         }
@@ -395,8 +429,8 @@ public abstract class CommonFileStorage implements IFileStorage {
         }
         catch (Exception e) {
 
-            var error = errors.handleException(e, storagePath, operationName);
-            log.error("{}: {}", operation, error.getMessage());
+            var error = errors.handleException(operationName, storagePath, e);
+            log.error("{}: {}", operation, error.getMessage(), error);
 
             return errFunc.apply(error);
         }
@@ -410,7 +444,7 @@ public abstract class CommonFileStorage implements IFileStorage {
             var isWindows = System.getProperty("os.name").toLowerCase().contains("win");
 
             if (storagePath == null || storagePath.isBlank())
-                throw errors.explicitError(STORAGE_PATH_NULL_OR_BLANK, storagePath, operationName);
+                throw errors.explicitError(operationName, storagePath, STORAGE_PATH_NULL_OR_BLANK);
 
 //            if self._ILLEGAL_PATH_CHARS.match(storage_path):
 //            raise self._explicit_error(self.ExplicitError.STORAGE_PATH_INVALID, operation_name, storage_path)
@@ -418,7 +452,7 @@ public abstract class CommonFileStorage implements IFileStorage {
             var relativePath = Paths.get(storagePath);
 
             if (relativePath.isAbsolute())
-                throw errors.explicitError(STORAGE_PATH_NOT_RELATIVE, storagePath, operationName);
+                throw errors.explicitError(operationName, storagePath, STORAGE_PATH_NOT_RELATIVE);
 
             var rootPath = isWindows ? Paths.get("C:\\root") : Paths.get("/root");
             var absolutePath = rootPath.resolve(relativePath).normalize();
@@ -426,14 +460,14 @@ public abstract class CommonFileStorage implements IFileStorage {
             if (absolutePath.equals(rootPath)) {
 
                 if (!allowRootDir)
-                    throw errors.explicitError(STORAGE_PATH_IS_ROOT, storagePath, operationName);
+                    throw errors.explicitError(operationName, storagePath, STORAGE_PATH_IS_ROOT);
 
                 return "";
             }
             else {
 
                 if (!absolutePath.startsWith(rootPath))
-                    throw errors.explicitError(STORAGE_PATH_OUTSIDE_ROOT, storagePath, operationName);
+                    throw errors.explicitError(operationName, storagePath, STORAGE_PATH_OUTSIDE_ROOT);
 
                 var resolvedPath = rootPath.relativize(absolutePath);
 
@@ -445,7 +479,7 @@ public abstract class CommonFileStorage implements IFileStorage {
         }
         catch (InvalidPathException e) {
 
-            throw errors.exception(STORAGE_PATH_INVALID, e, storagePath, operationName);
+            throw errors.explicitError(operationName, storagePath, STORAGE_PATH_INVALID, e);
         }
     }
 
@@ -457,9 +491,28 @@ public abstract class CommonFileStorage implements IFileStorage {
             return objectKey + BACKSLASH;
     }
 
-    protected <TResult> CompletableFuture<TResult> useContext(IExecutionContext execCtx, CompletionStage<TResult> promise) {
+    protected <TResult> CompletableFuture<TResult> toContext(IExecutionContext execCtx, CompletionStage<TResult> promise) {
 
         var ctxPromise = new CompletableFuture<TResult>();
+
+        useContext(execCtx, promise, ctxPromise);
+
+        return ctxPromise;
+    }
+
+    protected <TResult> CompletableFuture<TResult> fromContext(IExecutionContext execCtx, CompletableFuture<TResult> ctxPromise) {
+
+        var promise = new CompletableFuture<TResult>();
+
+        useContext(execCtx, promise, ctxPromise);
+
+        return promise;
+    }
+
+    protected <TResult> void useContext(
+            IExecutionContext execCtx,
+            CompletionStage<TResult> promise,
+            CompletableFuture<TResult> ctxPromise) {
 
         promise.whenComplete((result, error) -> {
 
@@ -478,8 +531,6 @@ public abstract class CommonFileStorage implements IFileStorage {
                     execCtx.eventLoopExecutor().execute(() -> ctxPromise.complete(result));
             }
         });
-
-        return ctxPromise;
     }
 
     @FunctionalInterface
