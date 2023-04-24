@@ -49,6 +49,18 @@ import static org.finos.tracdap.common.storage.StorageErrors.ExplicitError.*;
  */
 public abstract class CommonFileStorage implements IFileStorage {
 
+    public static final String EXISTS_OPERATION = "exists";
+    public static final String SIZE_OPERATION = "size";
+    public static final String STAT_OPERATION = "stat";
+    public static final String LS_OPERATION = "ls";
+    public static final String MKDIR_OPERATION = "mkdir";
+    public static final String RM_OPERATION = "rm";
+    public static final String RMDIR_OPERATION = "rmdir";
+    public static final String WRITE_OPERATION = "write";
+    public static final String READ_OPERATION = "read";
+
+    public static final String BACKSLASH = "/";
+
     public static final String READ_ONLY_CONFIG_KEY = "readOnly";
     public static final boolean READ_ONLY_CONFIG_DEFAULT = false;
 
@@ -69,9 +81,7 @@ public abstract class CommonFileStorage implements IFileStorage {
 
     private final String storageType;
     private final String storageKey;
-
     private final boolean readOnly;
-
     private final StorageErrors errors;
 
     protected CommonFileStorage(
@@ -94,7 +104,7 @@ public abstract class CommonFileStorage implements IFileStorage {
     public CompletionStage<Boolean>
     exists(String storagePath, IExecutionContext ctx) {
 
-        return wrapOperation("EXISTS", storagePath, (op, path) -> exists(op, path, ctx));
+        return wrapOperation(EXISTS_OPERATION, storagePath, (op, path) -> exists(op, path, ctx));
     }
 
     private CompletionStage<Boolean>
@@ -123,7 +133,7 @@ public abstract class CommonFileStorage implements IFileStorage {
     public CompletionStage<FileStat>
     stat(String storagePath, IExecutionContext ctx) {
 
-        return wrapOperation("STAT", storagePath, (op, path) -> stat(op, path, ctx));
+        return wrapOperation(STAT_OPERATION, storagePath, (op, path) -> stat(op, path, ctx));
     }
 
     private CompletionStage<FileStat>
@@ -141,7 +151,7 @@ public abstract class CommonFileStorage implements IFileStorage {
     public CompletionStage<Long>
     size(String storagePath, IExecutionContext ctx) {
 
-        return wrapOperation("SIZE", storagePath, (op, path) -> size(op, path, ctx));
+        return wrapOperation(SIZE_OPERATION, storagePath, (op, path) -> size(op, path, ctx));
     }
 
     private CompletionStage<Long>
@@ -162,7 +172,7 @@ public abstract class CommonFileStorage implements IFileStorage {
     public CompletionStage<List<FileStat>>
     ls(String storagePath, IExecutionContext ctx) {
 
-        return wrapOperation("LS", storagePath, (op, path) -> ls(op, path, false, ctx));
+        return wrapOperation(LS_OPERATION, storagePath, (op, path) -> ls(op, path, false, ctx));
     }
 
     private CompletionStage<List<FileStat>>
@@ -186,7 +196,7 @@ public abstract class CommonFileStorage implements IFileStorage {
     public CompletionStage<Void>
     mkdir(String storagePath, boolean recursive, IExecutionContext ctx) {
 
-        return wrapOperation("MKDIR", storagePath, (op, path) -> mkdir(op, path, recursive, ctx));
+        return wrapOperation(MKDIR_OPERATION, storagePath, (op, path) -> mkdir(op, path, recursive, ctx));
     }
 
     private CompletionStage<Void>
@@ -233,7 +243,7 @@ public abstract class CommonFileStorage implements IFileStorage {
     public CompletionStage<Void>
     rm(String storagePath, IExecutionContext ctx) {
 
-        return wrapOperation("RM", storagePath, (op, path) -> rm(op, path, ctx));
+        return wrapOperation(RM_OPERATION, storagePath, (op, path) -> rm(op, path, ctx));
     }
 
     private CompletionStage<Void>
@@ -259,7 +269,7 @@ public abstract class CommonFileStorage implements IFileStorage {
     public CompletionStage<Void>
     rmdir(String storagePath, IExecutionContext ctx) {
 
-        return wrapOperation("RMDIR", storagePath, (op, path) -> rmdir(op, path, ctx));
+        return wrapOperation(RMDIR_OPERATION, storagePath, (op, path) -> rmdir(op, path, ctx));
     }
 
     private CompletionStage<Void>

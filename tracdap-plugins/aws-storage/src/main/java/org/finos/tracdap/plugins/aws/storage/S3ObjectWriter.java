@@ -25,7 +25,6 @@ import io.netty.util.concurrent.OrderedEventExecutor;
 
 import software.amazon.awssdk.core.async.AsyncRequestBody;
 import software.amazon.awssdk.services.s3.S3AsyncClient;
-import software.amazon.awssdk.services.s3.model.ObjectLockMode;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
 import org.slf4j.Logger;
@@ -35,7 +34,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Flow;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import static org.finos.tracdap.common.storage.IFileStorage.WRITE_OPERATION;
+import static org.finos.tracdap.common.storage.CommonFileStorage.WRITE_OPERATION;
 import static org.finos.tracdap.common.storage.StorageErrors.ExplicitError.DUPLICATE_SUBSCRIPTION;
 
 

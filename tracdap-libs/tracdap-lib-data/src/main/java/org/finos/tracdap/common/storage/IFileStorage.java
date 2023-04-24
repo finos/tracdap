@@ -30,18 +30,6 @@ import java.util.concurrent.Flow;
 
 public interface IFileStorage extends AutoCloseable {
 
-    String EXISTS_OPERATION = "exists";
-    String SIZE_OPERATION = "size";
-    String STAT_OPERATION = "stat";
-    String LS_OPERATION = "ls";
-    String MKDIR_OPERATION = "mkdir";
-    String RM_OPERATION = "rm";
-    String WRITE_OPERATION = "write";
-    String READ_OPERATION = "read";
-
-    String BACKSLASH = "/";
-
-
     void start(EventLoopGroup eventLoopGroup);
 
     void stop();
