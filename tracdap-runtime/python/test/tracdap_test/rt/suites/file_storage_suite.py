@@ -823,7 +823,7 @@ class FileReadWriteTestSuite:
         # This is in line with cloud bucket semantics
 
         storage_path = "some_file.txt"
-        content = "Some content".encode('utf-8')
+        content = "Some content that is longer than what will be written later".encode('utf-8')
 
         def write_to_path(path_, content_):
             with self.storage.write_byte_stream(path_) as stream:
