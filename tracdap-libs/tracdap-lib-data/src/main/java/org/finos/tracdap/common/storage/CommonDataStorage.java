@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Accenture Global Solutions Limited
+ * Copyright 2023 Accenture Global Solutions Limited
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.storage.flat;
+package org.finos.tracdap.common.storage;
 
 import io.netty.channel.EventLoopGroup;
 import org.finos.tracdap.common.codec.ICodec;
@@ -37,7 +37,7 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
 
-public class FlatDataStorage implements IDataStorage {
+public class CommonDataStorage implements IDataStorage {
 
     public static final String DOWNLOAD_SIZE_LIMIT_KEY = "downloadSizeLimit";
     public static final long DOWNLOAD_SIZE_LIMIT_DEFAULT = 1073741824;
@@ -51,7 +51,7 @@ public class FlatDataStorage implements IDataStorage {
 
     private final long downloadSizeLimit;
 
-    public FlatDataStorage(PluginConfig bucketConfig, IFileStorage fileStorage, ICodecManager formats) {
+    public CommonDataStorage(PluginConfig bucketConfig, IFileStorage fileStorage, ICodecManager formats) {
 
         this.fileStorage = fileStorage;
         this.formats = formats;
