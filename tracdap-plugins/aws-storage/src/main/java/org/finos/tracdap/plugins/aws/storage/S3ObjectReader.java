@@ -46,10 +46,9 @@ public class S3ObjectReader implements Flow.Publisher<ByteBuf> {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
-    private final String storageKey;
     private final String storagePath;
     private final String bucket;
-    private final String absolutePath;
+    private final String objectKey;
 
     private final S3AsyncClient client;
     private final OrderedEventExecutor executor;
@@ -57,21 +56,19 @@ public class S3ObjectReader implements Flow.Publisher<ByteBuf> {
 
     private final AtomicBoolean subscriberSet;
     private Flow.Subscriber<? super ByteBuf> subscriber;
-    private Flow.Subscription subscription;
     private Subscription awsSubscription;
-    private ResponseHandler handler;
 
     private int requestBuffer;
 
     public S3ObjectReader(
-            String storageKey, String storagePath, String bucket, String absolutePath,
-            S3AsyncClient client, OrderedEventExecutor executor,
+            String storagePath, String bucket, String objectKey,
+            S3AsyncClient client,
+            OrderedEventExecutor executor,
             StorageErrors errors) {
 
-        this.storageKey = storageKey;
         this.storagePath = storagePath;
         this.bucket = bucket;
-        this.absolutePath = absolutePath;
+        this.objectKey = objectKey;
 
         this.client = client;
         this.executor = executor;
@@ -91,14 +88,13 @@ public class S3ObjectReader implements Flow.Publisher<ByteBuf> {
             // According to Java API docs, errors in subscribe() should be reported as IllegalStateException
             // https://docs.oracle.com/en/java/javase/11/docs/api/java.base/java/util/concurrent/Flow.Publisher.html#subscribe(java.util.concurrent.Flow.Subscriber)
 
-            var eStorage = errors.explicitError(DUPLICATE_SUBSCRIPTION, storagePath, READ_OPERATION);
+            var eStorage = errors.explicitError(READ_OPERATION, storagePath, DUPLICATE_SUBSCRIPTION);
             var eFlowState = new IllegalStateException(eStorage.getMessage(), eStorage);
             subscriber.onError(eFlowState);
             return;
         }
 
         this.subscriber = subscriber;
-        this.subscription = new ClientSubscription();
 
         // Make sure the doStart action goes into the event loop before calling subscriber.onSubscribe()
         // This makes sure that doStart is called before any requests from the subscription get processed
@@ -110,6 +106,7 @@ public class S3ObjectReader implements Flow.Publisher<ByteBuf> {
         // Otherwise, if the subscription is not yet active, errors should be reported with IllegalStateException
         // File not found is an expected error, reporting it with EStorage makes for cleaner error handling
 
+        var subscription = new ClientSubscription();
         subscriber.onSubscribe(subscription);
     }
 
@@ -117,7 +114,7 @@ public class S3ObjectReader implements Flow.Publisher<ByteBuf> {
 
         var request = GetObjectRequest.builder()
                 .bucket(bucket)
-                .key(absolutePath)
+                .key(objectKey)
                 .build();
 
         var handler = new ResponseHandler();
@@ -154,7 +151,7 @@ public class S3ObjectReader implements Flow.Publisher<ByteBuf> {
 
     private void _onErrorDuringSetup(Throwable error) {
         log.info("Got exception: " + error.getMessage(), error);
-        var tracError = errors.handleException(error, storagePath, READ_OPERATION);
+        var tracError = errors.handleException(READ_OPERATION, storagePath, error);
         subscriber.onError(tracError);
     }
 

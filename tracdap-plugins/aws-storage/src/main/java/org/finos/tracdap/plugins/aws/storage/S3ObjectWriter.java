@@ -42,10 +42,9 @@ public class S3ObjectWriter implements Flow.Subscriber<ByteBuf> {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
-    private final String storageKey;
     private final String storagePath;
     private final String bucket;
-    private final String absolutePath;
+    private final String objectKey;
 
     private final S3AsyncClient client;
     private final CompletableFuture<Long> signal;
@@ -55,17 +54,18 @@ public class S3ObjectWriter implements Flow.Subscriber<ByteBuf> {
     private final AtomicBoolean subscriptionSet;
     private Flow.Subscription subscription;
 
-    private CompositeByteBuf buffer = Unpooled.compositeBuffer();
+    private final CompositeByteBuf buffer = Unpooled.compositeBuffer();
 
     public S3ObjectWriter(
-            String storageKey, String storagePath, String bucket, String absolutePath,
-            S3AsyncClient client, CompletableFuture<Long> signal, OrderedEventExecutor executor,
+            String storagePath, String bucket, String objectKey,
+            S3AsyncClient client,
+            CompletableFuture<Long> signal,
+            OrderedEventExecutor executor,
             StorageErrors errors) {
 
-        this.storageKey = storageKey;
         this.storagePath = storagePath;
         this.bucket = bucket;
-        this.absolutePath = absolutePath;
+        this.objectKey = objectKey;
 
         this.client = client;
         this.signal = signal;
@@ -83,7 +83,7 @@ public class S3ObjectWriter implements Flow.Subscriber<ByteBuf> {
 
         if (!subscribeOk) {
 
-            var eStorage = errors.explicitError(DUPLICATE_SUBSCRIPTION, storagePath, WRITE_OPERATION);
+            var eStorage = errors.explicitError(WRITE_OPERATION, storagePath, DUPLICATE_SUBSCRIPTION);
             throw new IllegalStateException(eStorage.getMessage(), eStorage);
         }
 
@@ -114,7 +114,7 @@ public class S3ObjectWriter implements Flow.Subscriber<ByteBuf> {
 
         var request = PutObjectRequest.builder()
                 .bucket(this.bucket)
-                .key(absolutePath)
+                .key(objectKey)
                 .contentLength(contentLength)
                 .build();
 
@@ -124,14 +124,14 @@ public class S3ObjectWriter implements Flow.Subscriber<ByteBuf> {
 
                 if (error != null) {
 
-                    log.error("Write operation failed: {} [{}]", error.getMessage(), absolutePath, error);
+                    log.error("Write operation failed: {} [{}]", error.getMessage(), objectKey, error);
 
-                    var mappedError = errors.handleException(error, storagePath, WRITE_OPERATION);
+                    var mappedError = errors.handleException(WRITE_OPERATION, storagePath, error);
                     signal.completeExceptionally(mappedError);
                 }
                 else {
 
-                    log.info("Write operation complete: {} bytes written [{}]", contentLength, absolutePath);
+                    log.info("Write operation complete: {} bytes written [{}]", contentLength, objectKey);
 
                     signal.complete(contentLength);
                 }

@@ -16,7 +16,6 @@
 
 package org.finos.tracdap.plugins.aws.storage;
 
-import io.netty.channel.EventLoopGroup;
 import org.finos.tracdap.common.concurrent.IExecutionContext;
 import org.finos.tracdap.common.data.IDataContext;
 import org.finos.tracdap.common.exception.EStartup;
@@ -34,9 +33,7 @@ import software.amazon.awssdk.services.s3.S3AsyncClient;
 import software.amazon.awssdk.services.s3.model.*;
 
 import io.netty.buffer.ByteBuf;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import io.netty.channel.EventLoopGroup;
 
 import java.net.URI;
 import java.util.List;
@@ -64,9 +61,6 @@ public class S3ObjectStorage extends CommonFileStorage {
     public static final String ACCESS_KEY_ID_PROPERTY = "accessKeyId";
     public static final String SECRET_ACCESS_KEY_PROPERTY = "secretAccessKey";
 
-    private final Logger log = LoggerFactory.getLogger(getClass());
-
-    private final String storageKey;
     private final Properties properties;
 
     private final String bucket;
@@ -74,17 +68,14 @@ public class S3ObjectStorage extends CommonFileStorage {
     private final Region region;
     private final URI endpoint;
 
-    private final StorageErrors errors;
-
     // private final AwsCredentialsProvider credentials;
     private S3AsyncClient client;
 
 
     public S3ObjectStorage(String storageKey, Properties properties) {
 
-        super("s3", storageKey, properties, new S3StorageErrors(storageKey, LoggerFactory.getLogger(S3ObjectStorage.class)));
+        super(BUCKET_SEMANTICS, storageKey, properties, new S3StorageErrors(storageKey));
 
-        this.storageKey = storageKey;
         this.properties = properties;
 
         var bucket = properties.getProperty(BUCKET_PROPERTY);
@@ -96,8 +87,6 @@ public class S3ObjectStorage extends CommonFileStorage {
         this.prefix = normalizePrefix(prefix);
         this.region = region != null && !region.isBlank() ? Region.of(region) : null;
         this.endpoint = endpoint != null && !endpoint.isBlank() ? URI.create(endpoint) : null;
-
-        this.errors = new S3StorageErrors(storageKey, log);
     }
 
     private String normalizePrefix(String prefix) {
@@ -212,7 +201,7 @@ public class S3ObjectStorage extends CommonFileStorage {
                 .key(absoluteKey)
                 .build();
 
-        var response = useContext(ctx, client.headObject(request));
+        var response = toContext(ctx, client.headObject(request));
 
         return response
                 .thenApply(x -> true)
@@ -248,7 +237,7 @@ public class S3ObjectStorage extends CommonFileStorage {
                 .maxKeys(1)
                 .build();
 
-        var response = useContext(ctx, client.listObjectsV2(request));
+        var response = toContext(ctx, client.listObjectsV2(request));
 
         return response.thenApply(ListObjectsV2Response::hasContents);
     }
@@ -265,7 +254,7 @@ public class S3ObjectStorage extends CommonFileStorage {
                 .objectAttributes(ObjectAttributes.OBJECT_SIZE)
                 .build();
 
-        var response = useContext(ctx, client.getObjectAttributes(request));
+        var response = toContext(ctx, client.getObjectAttributes(request));
 
         return response.thenApply(attrs -> attrsToFileStat(objectKey, attrs));
     }
@@ -306,7 +295,7 @@ public class S3ObjectStorage extends CommonFileStorage {
             request.delimiter(BACKSLASH);
 
         // Send request and get response onto the EL for execContext
-        var response = useContext(ctx, client.listObjectsV2(request.build()));
+        var response = toContext(ctx, client.listObjectsV2(request.build()));
 
         return response.thenApply(result -> prefixLsResult(directoryKey, absoluteDir, result));
     }
@@ -316,7 +305,7 @@ public class S3ObjectStorage extends CommonFileStorage {
 
         // If no objects / prefixes are matched, the "directory" doesn't exist
         if (response.contents().isEmpty() && response.commonPrefixes().isEmpty()) {
-            throw errors.explicitError(OBJECT_NOT_FOUND, directoryKey, LS_OPERATION);  // todo
+            throw errors.explicitError(LS_OPERATION, directoryKey, OBJECT_NOT_FOUND);
         }
 
         var objects = response.contents();
@@ -355,11 +344,10 @@ public class S3ObjectStorage extends CommonFileStorage {
         var content = AsyncRequestBody.empty();
 
         // Send request and get response onto the EL for execContext
-        var response = useContext(execContext, client.putObject(request, content));
+        var response = toContext(execContext, client.putObject(request, content));
 
         return response.thenAccept(result -> {});
     }
-
 
     @Override
     protected CompletionStage<Void> fsDeleteFile(String objectKey, IExecutionContext ctx) {
@@ -371,7 +359,7 @@ public class S3ObjectStorage extends CommonFileStorage {
                 .key(absoluteKey)
                 .build();
 
-        var response = useContext(ctx, client.deleteObject(request));
+        var response = toContext(ctx, client.deleteObject(request));
 
         return response.thenApply(x -> null);
     }
@@ -392,7 +380,7 @@ public class S3ObjectStorage extends CommonFileStorage {
                 .build();
 
         // Send request and get response onto the EL for execContext
-        var listResponse = useContext(ctx, client.listObjectsV2(listRequest));
+        var listResponse = toContext(ctx, client.listObjectsV2(listRequest));
 
         // TODO: Handle contents more than one page, use list objects iterator, or post back to event loop
 
@@ -400,7 +388,7 @@ public class S3ObjectStorage extends CommonFileStorage {
 
             if (!list.hasContents()) {
                 if (firstPass)
-                    throw errors.explicitError(OBJECT_NOT_FOUND, directoryKey, "RMDIR");
+                    throw errors.explicitError("RMDIR", directoryKey, OBJECT_NOT_FOUND);
                 else
                     return CompletableFuture.completedFuture(0).thenApply(x -> null);
             }
@@ -422,7 +410,7 @@ public class S3ObjectStorage extends CommonFileStorage {
                 .delete(del -> del.objects(objIds))
                 .build();
 
-        var response = useContext(ctx, client.deleteObjects(request));
+        var response = toContext(ctx, client.deleteObjects(request));
 
         return response.thenApply(x -> null);
     }
@@ -433,7 +421,7 @@ public class S3ObjectStorage extends CommonFileStorage {
         var objectKey = usePrefix(storagePath);
 
         return new S3ObjectReader(
-                storageKey, storagePath, bucket, objectKey,
+                storagePath, bucket, objectKey,
                 client, dataContext.eventLoopExecutor(), errors);
     }
 
@@ -443,7 +431,7 @@ public class S3ObjectStorage extends CommonFileStorage {
         var objectKey = usePrefix(storagePath);
 
         return new S3ObjectWriter(
-                storageKey, storagePath, bucket, objectKey,
+                storagePath, bucket, objectKey,
                 client, signal, dataContext.eventLoopExecutor(), errors);
     }
 
