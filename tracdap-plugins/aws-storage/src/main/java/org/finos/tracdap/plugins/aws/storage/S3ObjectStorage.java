@@ -203,7 +203,7 @@ public class S3ObjectStorage extends CommonFileStorage {
 
     @Override
     protected CompletionStage<Boolean>
-    objectExists(String objectKey, IExecutionContext ctx) {
+    fsExists(String objectKey, IExecutionContext ctx) {
 
         var absoluteKey = usePrefix(objectKey);
 
@@ -238,7 +238,7 @@ public class S3ObjectStorage extends CommonFileStorage {
 
     @Override
     protected CompletionStage<Boolean>
-    prefixExists(String directoryKey, IExecutionContext ctx) {
+    fsDirExists(String directoryKey, IExecutionContext ctx) {
 
         var absoluteDir = usePrefix(directoryKey);
 
@@ -255,7 +255,7 @@ public class S3ObjectStorage extends CommonFileStorage {
 
     @Override
     protected CompletionStage<FileStat>
-    objectStat(String objectKey, IExecutionContext ctx) {
+    fsGetFileInfo(String objectKey, IExecutionContext ctx) {
 
         var absoluteKey = usePrefix(objectKey);
 
@@ -272,7 +272,7 @@ public class S3ObjectStorage extends CommonFileStorage {
 
     @Override
     protected CompletionStage<FileStat>
-    prefixStat(String directoryKey, IExecutionContext ctx) {
+    fsGetDirInfo(String directoryKey, IExecutionContext ctx) {
 
         var storagePath = directoryKey.isEmpty() ? "." : directoryKey.substring(0, directoryKey.length() - 1);
 
@@ -290,7 +290,7 @@ public class S3ObjectStorage extends CommonFileStorage {
 
     @Override
     protected CompletionStage<List<FileStat>>
-    prefixLs(String directoryKey, String startAfter, int maxKeys, boolean recursive, IExecutionContext ctx) {
+    fsListContents(String directoryKey, String startAfter, int maxKeys, boolean recursive, IExecutionContext ctx) {
 
         var absoluteDir = usePrefix(directoryKey);
 

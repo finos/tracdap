@@ -35,21 +35,30 @@ import java.util.concurrent.Flow;
 import static org.finos.tracdap.common.storage.StorageErrors.ExplicitError.*;
 
 
+/**
+ * A common implementation of the file storage interface,
+ * based on a set of abstract low-level operations
+ *
+ * <p>This is similar to the approach in Python, which provides a common wrapper
+ * around the NativeFile interface in Apache Arrow. Although Arrow does not provide
+ * an FS implementation in Java, it is still helpful to centralize core storage logic
+ * to reduce duplication and increase compatibility. The abstract interface for
+ * low-level operations is based on Arrow's NativeFile interface</p>
+ */
 public abstract class CommonFileStorage implements IFileStorage {
 
-    protected abstract CompletionStage<Boolean> objectExists(String objectKey, IExecutionContext ctx);
-    protected abstract CompletionStage<Boolean> prefixExists(String prefix, IExecutionContext ctx);
-
-    protected abstract CompletionStage<FileStat> objectStat(String objectKey, IExecutionContext ctx);
-    protected abstract CompletionStage<FileStat> prefixStat(String prefix, IExecutionContext ctx);
-
-    protected abstract CompletionStage<List<FileStat>> prefixLs(
-            String prefix, String startAfter, int maxKeys, boolean recursive,
-            IExecutionContext ctx);
+    // Abstract interface for low-level FS operations
 
     protected abstract CompletionStage<Void> fsCreateDir(String prefix, IExecutionContext ctx);
     protected abstract CompletionStage<Void> fsDeleteFile(String objectKey, IExecutionContext ctx);
     protected abstract CompletionStage<Void> fsDeleteDir(String directoryKey, IExecutionContext ctx);
+    protected abstract CompletionStage<FileStat> fsGetFileInfo(String objectKey, IExecutionContext ctx);
+    protected abstract CompletionStage<FileStat> fsGetDirInfo(String prefix, IExecutionContext ctx);
+    protected abstract CompletionStage<Boolean> fsExists(String objectKey, IExecutionContext ctx);
+    protected abstract CompletionStage<Boolean> fsDirExists(String prefix, IExecutionContext ctx);
+    protected abstract CompletionStage<List<FileStat>> fsListContents(
+            String prefix, String startAfter, int maxKeys, boolean recursive,
+            IExecutionContext ctx);
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
@@ -81,17 +90,17 @@ public abstract class CommonFileStorage implements IFileStorage {
 
         if (storagePath.endsWith(BACKSLASH)) {
 
-            return prefixExists(prefix, ctx).thenCompose(
+            return fsDirExists(prefix, ctx).thenCompose(
                 exists -> exists
                     ? CompletableFuture.completedFuture(true)
-                    : objectExists(objectKey, ctx));
+                    : fsExists(objectKey, ctx));
         }
         else {
 
-            return objectExists(objectKey, ctx).thenCompose(
+            return fsExists(objectKey, ctx).thenCompose(
                 exists -> exists
                     ? CompletableFuture.completedFuture(true)
-                    : prefixExists(prefix, ctx));
+                    : fsDirExists(prefix, ctx));
         }
     }
 
@@ -108,9 +117,9 @@ public abstract class CommonFileStorage implements IFileStorage {
         var objectKey = resolveObjectKey(operationName, storagePath, true);
         var prefix = resolveDirPrefix(objectKey);
 
-        return prefixExists(prefix, ctx).thenCompose(isDir -> isDir
-                ? prefixStat(prefix, ctx)
-                : objectStat(objectKey, ctx));
+        return fsDirExists(prefix, ctx).thenCompose(isDir -> isDir
+                ? fsGetDirInfo(prefix, ctx)
+                : fsGetFileInfo(objectKey, ctx));
     }
 
     @Override
@@ -154,7 +163,7 @@ public abstract class CommonFileStorage implements IFileStorage {
             var objectKey = resolveObjectKey(operationName, storagePath, true);
             var prefix = resolveDirPrefix(objectKey);
 
-            return prefixLs(prefix, null, 1000, false, ctx);
+            return fsListContents(prefix, null, 1000, false, ctx);
         });
     }
 
@@ -172,7 +181,7 @@ public abstract class CommonFileStorage implements IFileStorage {
         var parent = path.contains(BACKSLASH) ? path.substring(0, path.lastIndexOf(BACKSLASH)) : null;
 
         var checkParent = path.contains(BACKSLASH) && !recursive
-                ? prefixExists(parent, ctx)
+                ? fsDirExists(parent, ctx)
                 : CompletableFuture.completedFuture(true);
 
         return checkParent.thenCompose(parentOk -> {
@@ -189,8 +198,8 @@ public abstract class CommonFileStorage implements IFileStorage {
 
         var prefix = resolveDirPrefix(resolvedPath);
 
-        var objectExists = objectExists(resolvedPath, ctx);
-        var dirExists =  prefixExists(prefix, ctx);
+        var objectExists = fsExists(resolvedPath, ctx);
+        var dirExists =  fsDirExists(prefix, ctx);
         var fileExists = objectExists.thenCombine(dirExists, (obj, dir) -> obj && !dir);
 
         return fileExists.thenCompose(exists -> {
