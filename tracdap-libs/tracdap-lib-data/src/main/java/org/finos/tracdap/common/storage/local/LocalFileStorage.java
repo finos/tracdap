@@ -16,7 +16,6 @@
 
 package org.finos.tracdap.common.storage.local;
 
-import io.netty.channel.EventLoopGroup;
 import org.finos.tracdap.common.concurrent.IExecutionContext;
 import org.finos.tracdap.common.data.IDataContext;
 import org.finos.tracdap.common.exception.EStartup;
@@ -24,8 +23,7 @@ import org.finos.tracdap.common.storage.*;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import io.netty.channel.EventLoopGroup;
 
 import java.io.IOException;
 import java.nio.file.*;
@@ -44,33 +42,19 @@ import static org.finos.tracdap.common.storage.StorageErrors.ExplicitError.*;
 public class LocalFileStorage extends CommonFileStorage {
 
     public static final String CONFIG_ROOT_PATH = "rootPath";
-    public static final String CONFIG_READ_ONLY = "readOnly";
 
-    private final Logger log = LoggerFactory.getLogger(getClass());
-    private final StorageErrors errors;
-
-    private final String storageKey;
     private final Path rootPath;
 
-    private final boolean readOnlyFlag;
+    public LocalFileStorage(String storageKey, Properties properties) {
 
-    public LocalFileStorage(String storageKey, Properties config) {
-
-        super("local", storageKey, config, new LocalStorageErrors(storageKey, LoggerFactory.getLogger(LocalFileStorage.class)));
-
-        this.storageKey = storageKey;
-        this.errors = new LocalStorageErrors(storageKey, log);
+        super(FILE_SEMANTICS, storageKey, properties, new LocalStorageErrors(storageKey));
 
         // TODO: Robust config handling
 
-        var rootDirProp = config.getProperty(CONFIG_ROOT_PATH);
+        var rootDirProp = properties.getProperty(CONFIG_ROOT_PATH);
         this.rootPath = Paths.get(rootDirProp)
                 .toAbsolutePath()
                 .normalize();
-
-        String readOnlyFlagString = config.getProperty(CONFIG_READ_ONLY, "false");
-        this.readOnlyFlag = Boolean.parseBoolean(readOnlyFlagString);
-
     }
 
     @Override
@@ -96,7 +80,7 @@ public class LocalFileStorage extends CommonFileStorage {
             throw new EStartup(err);
         }
 
-        if(!readOnlyFlag && !Files.isWritable(rootPath)) {
+        if(!readOnly && !Files.isWritable(rootPath)) {
             var err = String.format("Storage root path is not writable: %s [%s]", storageKey, rootPath);
             log.error(err);
             throw new EStartup(err);
@@ -248,7 +232,7 @@ public class LocalFileStorage extends CommonFileStorage {
         var attrs = Files.readAttributes(absolutePath, attrType);
 
         if (!attrs.isRegularFile() && !attrs.isDirectory())
-            throw errors.explicitError(NOT_A_FILE_OR_DIRECTORY, storagePath, STAT_OPERATION);  // todo
+            throw errors.explicitError(STAT_OPERATION, storagePath, NOT_A_FILE_OR_DIRECTORY);
 
         // Special handling for the root directory - do not return the name of the storage root folder!
         var fileName = absolutePath.equals(rootPath)
@@ -349,9 +333,10 @@ public class LocalFileStorage extends CommonFileStorage {
         var absolutePath = resolvePath(storagePath);
 
         return new LocalFileReader(
-                storageKey, storagePath,
-                absolutePath, ByteBufAllocator.DEFAULT,
-                dataContext.eventLoopExecutor());
+                storagePath, absolutePath,
+                ByteBufAllocator.DEFAULT,
+                dataContext.eventLoopExecutor(),
+                errors);
     }
 
     @Override
@@ -361,9 +346,9 @@ public class LocalFileStorage extends CommonFileStorage {
         var absolutePath = resolvePath(storagePath);
 
         return new LocalFileWriter(
-                storageKey, storagePath,
-                absolutePath, signal,
-                dataContext.eventLoopExecutor());
+                storagePath, absolutePath, signal,
+                dataContext.eventLoopExecutor(),
+                errors);
     }
 
     private Path resolvePath(String storagePath) {

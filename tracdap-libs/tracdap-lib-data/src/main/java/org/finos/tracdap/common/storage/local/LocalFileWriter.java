@@ -43,12 +43,12 @@ public class LocalFileWriter implements Flow.Subscriber<ByteBuf> {
     private static final int CHUNK_BUFFER_MIN_REQUESTS = 8;
 
     private final Logger log = LoggerFactory.getLogger(getClass());
-    private final StorageErrors errors;
-    private final String storagePath;
 
+    private final String storagePath;
     private final Path absolutePath;
     private final CompletableFuture<Long> signal;
     private final OrderedEventExecutor executor;
+    private final StorageErrors errors;
 
     private final AtomicBoolean subscriptionSet;
     private Flow.Subscription subscription;
@@ -65,15 +65,16 @@ public class LocalFileWriter implements Flow.Subscriber<ByteBuf> {
     private final boolean gotCancel;
 
     LocalFileWriter(
-            String storageKey, String storagePath,
-            Path absolutePath, CompletableFuture<Long> signal, OrderedEventExecutor executor) {
+            String storagePath, Path absolutePath,
+            CompletableFuture<Long> signal,
+            OrderedEventExecutor executor,
+            StorageErrors errors) {
 
-        this.errors = new LocalStorageErrors(storageKey, log);
         this.storagePath = storagePath;
-
         this.absolutePath = absolutePath;
         this.signal = signal;
         this.executor = executor;
+        this.errors = errors;
 
         this.subscriptionSet = new AtomicBoolean(false);
         this.subscription = null;
@@ -114,7 +115,7 @@ public class LocalFileWriter implements Flow.Subscriber<ByteBuf> {
 
             // https://docs.oracle.com/en/java/javase/11/docs/api/java.base/java/util/concurrent/Flow.Publisher.html#subscribe(java.util.concurrent.Flow.Subscriber)
 
-            var eStorage = errors.explicitError(DUPLICATE_SUBSCRIPTION, storagePath, WRITE_OPERATION);
+            var eStorage = errors.explicitError(WRITE_OPERATION, storagePath, DUPLICATE_SUBSCRIPTION);
             throw new IllegalStateException(eStorage.getMessage(), eStorage);
         }
 
@@ -176,7 +177,7 @@ public class LocalFileWriter implements Flow.Subscriber<ByteBuf> {
 
             subscription.cancel();
 
-            var eStorage = errors.handleException(e, storagePath, WRITE_OPERATION);
+            var eStorage = errors.handleException(WRITE_OPERATION, storagePath, e);
             signal.completeExceptionally(eStorage);
         }
     }
@@ -375,7 +376,7 @@ public class LocalFileWriter implements Flow.Subscriber<ByteBuf> {
 
             log.error("File channel was not closed cleanly: {} [{}]", e.getMessage(), absolutePath, e);
 
-            var eStorage = errors.handleException(e, storagePath, WRITE_OPERATION);
+            var eStorage = errors.handleException(WRITE_OPERATION, storagePath, e);
             signal.completeExceptionally(eStorage);
         }
     }
@@ -383,7 +384,7 @@ public class LocalFileWriter implements Flow.Subscriber<ByteBuf> {
     private void handleError(Throwable error, boolean internalError) {
 
         var eWrapped = internalError
-                ? errors.handleException(error, storagePath, WRITE_OPERATION)
+                ? errors.handleException(WRITE_OPERATION, storagePath, error)
                 : wrapExternalError(error);
 
         try {

@@ -43,12 +43,12 @@ public class LocalFileReader implements Flow.Publisher<ByteBuf> {
     private static final int DEFAULT_CHUNK_SIZE = 4096;
 
     private final Logger log = LoggerFactory.getLogger(getClass());
-    private final StorageErrors errors;
-    private final String storagePath;
 
+    private final String storagePath;
     private final Path absolutePath;
     private final ByteBufAllocator allocator;
     private final OrderedEventExecutor executor;
+    private final StorageErrors errors;
 
     private final AtomicBoolean subscriberSet;
     private Flow.Subscriber<? super ByteBuf> subscriber;
@@ -64,16 +64,16 @@ public class LocalFileReader implements Flow.Publisher<ByteBuf> {
     private boolean gotError;
 
     LocalFileReader(
-            String storageKey, String storagePath,
-            Path absolutePath, ByteBufAllocator allocator,
-            OrderedEventExecutor executor) {
+            String storagePath, Path absolutePath,
+            ByteBufAllocator allocator,
+            OrderedEventExecutor executor,
+            StorageErrors errors) {
 
-        this.errors = new LocalStorageErrors(storageKey, log);
         this.storagePath = storagePath;
-
         this.absolutePath = absolutePath;
         this.allocator = allocator;
         this.executor = executor;
+        this.errors = errors;
 
         this.subscriberSet = new AtomicBoolean(false);
         this.subscriber = null;
@@ -106,7 +106,7 @@ public class LocalFileReader implements Flow.Publisher<ByteBuf> {
             // According to Java API docs, errors in subscribe() should be reported as IllegalStateException
             // https://docs.oracle.com/en/java/javase/11/docs/api/java.base/java/util/concurrent/Flow.Publisher.html#subscribe(java.util.concurrent.Flow.Subscriber)
 
-            var eStorage = errors.explicitError(DUPLICATE_SUBSCRIPTION, storagePath, READ_OPERATION);
+            var eStorage = errors.explicitError(READ_OPERATION, storagePath, DUPLICATE_SUBSCRIPTION);
             var eFlowState = new IllegalStateException(eStorage.getMessage(), eStorage);
             subscriber.onError(eFlowState);
             return;
@@ -168,7 +168,7 @@ public class LocalFileReader implements Flow.Publisher<ByteBuf> {
             log.error("File channel could not be opened: {} [{}]", e.getMessage(), absolutePath, e);
 
             gotError = true;
-            var eStorage = errors.handleException(e, storagePath, READ_OPERATION);
+            var eStorage = errors.handleException(READ_OPERATION, storagePath, e);
             subscriber.onError(eStorage);
         }
     }
@@ -190,7 +190,7 @@ public class LocalFileReader implements Flow.Publisher<ByteBuf> {
             log.error("File channel was not closed cleanly: {} [{}]", e.getMessage(), absolutePath, e);
 
             gotError = true;
-            var eStorage = errors.handleException(e, storagePath, READ_OPERATION);
+            var eStorage = errors.handleException(READ_OPERATION, storagePath, e);
             subscriber.onError(eStorage);
         }
     }
@@ -380,7 +380,7 @@ public class LocalFileReader implements Flow.Publisher<ByteBuf> {
 
             log.info("File channel closed: [{}]", absolutePath);
 
-            var eStorage = errors.handleException(error, storagePath, READ_OPERATION);
+            var eStorage = errors.handleException(READ_OPERATION, storagePath, error);
             subscriber.onError(eStorage);
         }
         catch (Exception e) {
@@ -389,7 +389,7 @@ public class LocalFileReader implements Flow.Publisher<ByteBuf> {
 
             // Report the original error back up the chain, not the secondary error that occurred on close
 
-            var eStorage = errors.handleException(e, storagePath, READ_OPERATION);
+            var eStorage = errors.handleException(READ_OPERATION, storagePath, e);
             subscriber.onError(eStorage);
         }
     }
