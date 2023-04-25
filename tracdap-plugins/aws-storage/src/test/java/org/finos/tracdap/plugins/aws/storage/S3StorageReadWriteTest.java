@@ -32,6 +32,7 @@ import org.junit.jupiter.api.*;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.Properties;
 import java.util.Random;
 
@@ -42,6 +43,8 @@ import static org.finos.tracdap.test.concurrent.ConcurrentTestHelpers.waitFor;
 @Tag("integration")
 @Tag("int-storage")
 public class S3StorageReadWriteTest extends StorageReadWriteTestSuite {
+
+    static Duration SETUP_TIMEOUT = Duration.of(5, ChronoUnit.SECONDS);
 
     static Properties storageProps;
     static String testSuiteDir;
@@ -80,17 +83,20 @@ public class S3StorageReadWriteTest extends StorageReadWriteTestSuite {
     }
 
     @BeforeEach
-    void setup() {
-
-        execContext = new ExecutionContext(new DefaultEventExecutor(new DefaultThreadFactory("t-events")));
-        dataContext = new DataContext(execContext.eventLoopExecutor(), allocator);
+    void setup() throws Exception {
 
         var testDir = String.format("%stest_%d", testSuiteDir, ++testNumber);
-        setupStorage.mkdir(testDir, false, setupCtx);
-        storageProps.put(S3ObjectStorage.PREFIX_PROPERTY, testDir);
 
+        var mkdir = setupStorage.mkdir(testDir, false, setupCtx);
+        waitFor(SETUP_TIMEOUT, mkdir);
+        resultOf(mkdir);
+
+        storageProps.put(S3ObjectStorage.PREFIX_PROPERTY, testDir);
         storage = new S3ObjectStorage("TEST_" + testNumber, storageProps);
         storage.start(elg);
+
+        execContext = new ExecutionContext(elg.next());
+        dataContext = new DataContext(execContext.eventLoopExecutor(), allocator);
     }
 
     @AfterEach
