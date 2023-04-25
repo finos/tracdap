@@ -20,7 +20,7 @@ import org.finos.tracdap.common.storage.IStorageManager;
 
 import java.util.Properties;
 
-public class StorageEnvProps {
+public class S3StorageEnvProps {
 
     public static final String TRAC_AWS_REGION = "TRAC_AWS_REGION";
     public static final String TRAC_AWS_BUCKET = "TRAC_AWS_BUCKET";

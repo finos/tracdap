@@ -66,7 +66,7 @@ public class S3StorageReadWriteTest extends StorageReadWriteTestSuite {
 
         setupCtx = new ExecutionContext(new DefaultEventExecutor(new DefaultThreadFactory("t-setup")));
 
-        storageProps = StorageEnvProps.readStorageEnvProps();
+        storageProps = S3StorageEnvProps.readStorageEnvProps();
 
         elg = new NioEventLoopGroup(2);
         allocator = new RootAllocator();

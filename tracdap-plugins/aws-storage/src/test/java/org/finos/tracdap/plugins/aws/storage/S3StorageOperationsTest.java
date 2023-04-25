@@ -57,7 +57,7 @@ public class S3StorageOperationsTest extends StorageOperationsTestSuite {
         var timestamp = DateTimeFormatter.ISO_INSTANT.format(Instant.now()).replace(':', '.');
         var random = new Random().nextLong();
 
-        storageProps = StorageEnvProps.readStorageEnvProps();
+        storageProps = S3StorageEnvProps.readStorageEnvProps();
         testSuiteDir = String.format(
                 "platform_storage_ops_test_suite_%s_0x%h/",
                 timestamp, random);

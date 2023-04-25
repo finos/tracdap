@@ -65,7 +65,7 @@ public class S3StorageReadOnlyTest extends StorageReadOnlyTestSuite {
 
         setupCtx = new ExecutionContext(new DefaultEventExecutor(new DefaultThreadFactory("t-setup")));
 
-        storageProps = StorageEnvProps.readStorageEnvProps();
+        storageProps = S3StorageEnvProps.readStorageEnvProps();
 
         elg = new NioEventLoopGroup(2);
         allocator = new RootAllocator();
