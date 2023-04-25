@@ -361,7 +361,8 @@ jobs:
               SETUP_SCRIPT: ".github/scripts/int-storage-s3-setup.sh",
               TRAC_CONFIG_FILE: '.github/config/int-storage-s3.yaml',
               TRAC_SECRET_KEY: short-lived-secret,
-              PYTHON_TESTS: int_storage_aws*.py }
+              PYTHON_TESTS: int_storage_aws*.py,
+              JAVA_TESTS: int-storage }
 
           - { SERVICE: storage,
               TARGET: gcp,
