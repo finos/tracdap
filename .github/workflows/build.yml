@@ -104,7 +104,7 @@ jobs:
               PYSPARK_VERSION: ">= 3.0.0, < 3.1.0",
               PYPANDOC: false }
 
-          # Oldest supported versions, force testing against .0 for Pandas and PySpark
+          # Oldest supported versions, force testing against .0 for Python, Pandas and PySpark
           # If those don't work due to bugs, we need to update README for the supported versions
           - { ENV_NAME: "Linux, 3.7, Pandas 1.2, PySpark 2.4",
               PLATFORM: 'ubuntu-latest',
@@ -123,7 +123,9 @@ jobs:
         with:
           python-version: ${{ matrix.environment.PYTHON_VERSION }}
 
+      # Very old libraries fail to install with newer version of PIP
       - name: PIP Upgrade
+        if: ${{ ! matrix.environment.PYPANDOC }}
         run: python -m pip install --upgrade pip
 
       # fetch-depth = 0 is needed to get tags for version info
