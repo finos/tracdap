@@ -65,7 +65,7 @@ abstract class FileRoundTripTest  {
     static class UnitTest extends FileRoundTripTest {
 
         @RegisterExtension
-        private static final PlatformTest platform = PlatformTest.forConfig(TRAC_CONFIG_UNIT)
+        public static final PlatformTest platform = PlatformTest.forConfig(TRAC_CONFIG_UNIT)
                 .runDbDeploy(true)
                 .addTenant(TEST_TENANT)
                 .startMeta()
@@ -80,18 +80,15 @@ abstract class FileRoundTripTest  {
         }
     }
 
-    // Include this test case for integration against different database backends
+    // Include this test case for integration against different storage backends
     @Tag("integration")
     @Tag("int-storage")
     static class IntegrationTest extends FileRoundTripTest {
 
-        // Slow unit tests count as integration, so fall back to using the unit test config
-        private static final String TRAC_CONFIG_ENV_FILE = System.getenv(TRAC_CONFIG_ENV_VAR) != null
-                ? System.getenv(TRAC_CONFIG_ENV_VAR)
-                : TRAC_CONFIG_UNIT;
+        private static final String TRAC_CONFIG_ENV_FILE = System.getenv(TRAC_CONFIG_ENV_VAR);
 
         @RegisterExtension
-        private static final PlatformTest platform = PlatformTest.forConfig(TRAC_CONFIG_ENV_FILE)
+        public static final PlatformTest platform = PlatformTest.forConfig(TRAC_CONFIG_ENV_FILE)
                 .runDbDeploy(true)
                 .addTenant(TEST_TENANT)
                 .startMeta()

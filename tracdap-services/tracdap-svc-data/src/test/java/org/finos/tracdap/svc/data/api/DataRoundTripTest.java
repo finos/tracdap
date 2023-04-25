@@ -62,7 +62,7 @@ abstract class DataRoundTripTest {
     static class UnitTest extends DataRoundTripTest {
 
         @RegisterExtension
-        private static final PlatformTest platform = PlatformTest.forConfig(TRAC_CONFIG_UNIT)
+        public static final PlatformTest platform = PlatformTest.forConfig(TRAC_CONFIG_UNIT)
                 .runDbDeploy(true)
                 .addTenant(TEST_TENANT)
                 .startMeta()
@@ -76,7 +76,7 @@ abstract class DataRoundTripTest {
         }
     }
 
-    // Include this test case for integration against different database backends
+    // Include this test case for integration against different storage backends
     @Tag("integration")
     @Tag("int-storage")
     static class IntegrationTest extends DataRoundTripTest {
@@ -84,7 +84,7 @@ abstract class DataRoundTripTest {
         private static final String TRAC_CONFIG_ENV_FILE = System.getenv(TRAC_CONFIG_ENV_VAR);
 
         @RegisterExtension
-        private static final PlatformTest platform = PlatformTest.forConfig(TRAC_CONFIG_ENV_FILE)
+        public static final PlatformTest platform = PlatformTest.forConfig(TRAC_CONFIG_ENV_FILE)
                 .runDbDeploy(true)
                 .addTenant(TEST_TENANT)
                 .startMeta()

@@ -66,7 +66,7 @@ abstract class FileOperationsTest {
     static class UnitTest extends FileOperationsTest {
 
         @RegisterExtension
-        private static final PlatformTest platform = PlatformTest.forConfig(TRAC_CONFIG_UNIT)
+        public static final PlatformTest platform = PlatformTest.forConfig(TRAC_CONFIG_UNIT)
                 .runDbDeploy(true)
                 .addTenant(TEST_TENANT)
                 .addTenant(TEST_TENANT_2)
@@ -82,15 +82,15 @@ abstract class FileOperationsTest {
         }
     }
 
-    // Include this test case for integration against different database backends
-    @org.junit.jupiter.api.Tag("integration")
+    // Include this test case for integration against different storage backends
+    @Tag("integration")
     @Tag("int-storage")
     static class IntegrationTest extends FileOperationsTest {
 
         private static final String TRAC_CONFIG_ENV_FILE = System.getenv(TRAC_CONFIG_ENV_VAR);
 
         @RegisterExtension
-        private static final PlatformTest platform = PlatformTest.forConfig(TRAC_CONFIG_ENV_FILE)
+        public static final PlatformTest platform = PlatformTest.forConfig(TRAC_CONFIG_ENV_FILE)
                 .runDbDeploy(true)
                 .addTenant(TEST_TENANT)
                 .addTenant(TEST_TENANT_2)

@@ -57,7 +57,9 @@ storage:
         region: ${TRAC_AWS_REGION}
         bucket: ${TRAC_AWS_BUCKET}
         prefix: int_storage_s3/
-        credentials: default
+        credentials: ${TRAC_AWS_CREDENTIALS}
+        accessKeyId: ${TRAC_AWS_ACCESS_KEY_ID}
+        secretAccessKey: ${TRAC_AWS_SECRET_ACCESS_KEY}
 
 
 repositories:

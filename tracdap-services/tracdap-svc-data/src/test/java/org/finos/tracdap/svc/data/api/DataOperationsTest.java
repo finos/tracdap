@@ -70,7 +70,7 @@ abstract class DataOperationsTest {
     static class UnitTest extends DataOperationsTest {
 
         @RegisterExtension
-        private static final PlatformTest platform = PlatformTest.forConfig(TRAC_CONFIG_UNIT)
+        public static final PlatformTest platform = PlatformTest.forConfig(TRAC_CONFIG_UNIT)
                 .runDbDeploy(true)
                 .addTenant(TEST_TENANT)
                 .startMeta()
@@ -85,7 +85,7 @@ abstract class DataOperationsTest {
         }
     }
 
-    // Include this test case for integration against different database backends
+    // Include this test case for integration against different storage backends
     @Tag("integration")
     @Tag("int-storage")
     static class IntegrationTest extends DataOperationsTest {
@@ -93,7 +93,7 @@ abstract class DataOperationsTest {
         private static final String TRAC_CONFIG_ENV_FILE = System.getenv(TRAC_CONFIG_ENV_VAR);
 
         @RegisterExtension
-        private static final PlatformTest platform = PlatformTest.forConfig(TRAC_CONFIG_ENV_FILE)
+        public static final PlatformTest platform = PlatformTest.forConfig(TRAC_CONFIG_ENV_FILE)
                 .runDbDeploy(true)
                 .addTenant(TEST_TENANT)
                 .startMeta()
