@@ -24,6 +24,7 @@ public class StorageEnvProps {
 
     public static final String TRAC_AWS_REGION = "TRAC_AWS_REGION";
     public static final String TRAC_AWS_BUCKET = "TRAC_AWS_BUCKET";
+    public static final String TRAC_AWS_CREDENTIALS = "TRAC_AWS_CREDENTIALS";
     public static final String TRAC_AWS_ACCESS_KEY_ID = "TRAC_AWS_ACCESS_KEY_ID";
     public static final String TRAC_AWS_SECRET_ACCESS_KEY = "TRAC_AWS_SECRET_ACCESS_KEY";
 
@@ -31,16 +32,24 @@ public class StorageEnvProps {
 
         var region = System.getenv(TRAC_AWS_REGION);
         var bucket = System.getenv(TRAC_AWS_BUCKET);
-        var accessKeyId = System.getenv(TRAC_AWS_ACCESS_KEY_ID);
-        var secretAccessKey = System.getenv(TRAC_AWS_SECRET_ACCESS_KEY);
+        var credentials = System.getenv(TRAC_AWS_CREDENTIALS);
 
         var storageProps = new Properties();
         storageProps.put(IStorageManager.PROP_STORAGE_KEY, "TEST_STORAGE");
         storageProps.put(S3ObjectStorage.REGION_PROPERTY, region);
         storageProps.put(S3ObjectStorage.BUCKET_PROPERTY, bucket);
-        storageProps.put(S3ObjectStorage.CREDENTIALS_PROPERTY, S3ObjectStorage.CREDENTIALS_STATIC);
-        storageProps.put(S3ObjectStorage.ACCESS_KEY_ID_PROPERTY, accessKeyId);
-        storageProps.put(S3ObjectStorage.SECRET_ACCESS_KEY_PROPERTY, secretAccessKey);
+
+        if (credentials != null)
+            storageProps.put(S3ObjectStorage.CREDENTIALS_PROPERTY, credentials);
+
+        if (S3ObjectStorage.CREDENTIALS_STATIC.equals(credentials)) {
+
+            var accessKeyId = System.getenv(TRAC_AWS_ACCESS_KEY_ID);
+            var secretAccessKey = System.getenv(TRAC_AWS_SECRET_ACCESS_KEY);
+
+            storageProps.put(S3ObjectStorage.ACCESS_KEY_ID_PROPERTY, accessKeyId);
+            storageProps.put(S3ObjectStorage.SECRET_ACCESS_KEY_PROPERTY, secretAccessKey);
+        }
 
         return storageProps;
     }
