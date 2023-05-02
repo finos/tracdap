@@ -116,6 +116,16 @@ jobs:
           path: build/plugins/*/reports/**
           retention-days: 7
 
+      # Also include failure output from regular modules
+      # Some integration tests run the core code with a plugin as the back end
+      - name: Store failed test results
+        uses: actions/upload-artifact@v3
+        if: failure()
+        with:
+          name: junit-test-results
+          path: build/modules/*/reports/**
+          retention-days: 7
+
       - name: Integration teardown script
         if: ${{ env.TEARDOWN_SCRIPT != '' }}
         run: |
