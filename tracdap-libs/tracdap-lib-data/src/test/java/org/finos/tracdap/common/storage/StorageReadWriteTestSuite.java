@@ -408,7 +408,7 @@ public abstract class StorageReadWriteTestSuite {
      */
 
     @Test
-    void testWrite_chunksReleased() {
+    void testWrite_chunksReleased() throws Exception {
 
         // Writer takes ownership of chunks when it receives them
         // This test makes sure they are being released after they have been written
@@ -439,6 +439,9 @@ public abstract class StorageReadWriteTestSuite {
         waitFor(TEST_TIMEOUT, writeSignal);
 
         Assertions.assertDoesNotThrow(() -> resultOf(writeSignal));
+
+        // Allow time for background cleanup
+        Thread.sleep(ASYNC_DELAY.toMillis());
 
         for (var chunk : chunks)
             Assertions.assertEquals(0, chunk.refCnt());
