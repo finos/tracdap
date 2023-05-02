@@ -111,14 +111,16 @@ public class S3ObjectWriter implements Flow.Subscriber<ByteBuf> {
     @Override
     public void onError(Throwable throwable) {
 
-        buffer.release();
+        try {
+            var tracError = errors.handleException(WRITE_OPERATION, storagePath, throwable);
 
-        var tracError = errors.handleException(WRITE_OPERATION, storagePath, throwable);
+            log.error("{} {} [{}]: {}", WRITE_OPERATION, storageKey, storagePath, tracError.getMessage(), tracError);
 
-        log.error("{} {} [{}]: {}",
-                WRITE_OPERATION, storageKey, storagePath, tracError.getMessage(), tracError);
-
-        signal.completeExceptionally(throwable);
+            signal.completeExceptionally(throwable);
+        }
+        finally {
+            buffer.release();
+        }
     }
 
     @Override
@@ -146,8 +148,7 @@ public class S3ObjectWriter implements Flow.Subscriber<ByteBuf> {
 
                 var tracError = errors.handleException(WRITE_OPERATION, storagePath, error);
 
-                log.error("{} {} [{}]: {}",
-                        WRITE_OPERATION, storageKey, storagePath, tracError.getMessage(), tracError);
+                log.error("{} {} [{}]: {}", WRITE_OPERATION, storageKey, storagePath, tracError.getMessage(), tracError);
 
                 var mappedError = errors.handleException(WRITE_OPERATION, storagePath, error);
                 signal.completeExceptionally(mappedError);
