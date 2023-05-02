@@ -790,10 +790,9 @@ public abstract class StorageReadWriteTestSuite {
         // Subscription 1 should still work as normal when data is requested
 
         subscription1.get().request(2);
-        Thread.sleep(ASYNC_DELAY.toMillis());
 
-        verify(subscriber1, times(1)).onNext(any(ByteBuf.class));
-        verify(subscriber1, times(1)).onComplete();
+        verify(subscriber1, timeout(TEST_TIMEOUT.toMillis()).times(1)).onNext(any(ByteBuf.class));
+        verify(subscriber1, timeout(TEST_TIMEOUT.toMillis()).times(1)).onComplete();
 
         // Subscription 2 should not receive any further signals
 
@@ -831,9 +830,7 @@ public abstract class StorageReadWriteTestSuite {
         //  - One call into onSubscribe, when the subscriber was subscribed
         //  - Nothing else, because we cancelled before making any requests
 
-        Thread.sleep(ASYNC_DELAY.toMillis());
-
-        verify(subscriber, times(1)).onSubscribe(any(Flow.Subscription.class));
+        verify(subscriber, timeout(TEST_TIMEOUT.toMillis()).times(1)).onSubscribe(any(Flow.Subscription.class));
         verify(subscriber, never()).onNext(any());
         verify(subscriber, never()).onComplete();
         verify(subscriber, never()).onError(any());
@@ -886,9 +883,7 @@ public abstract class StorageReadWriteTestSuite {
         //  - Allow the reader to send at most one chunk after cancelling (in fact, Java Publisher spec allows more)
         //  - No calls to onComplete or onError
 
-        Thread.sleep(ASYNC_DELAY.toMillis());
-
-        verify(subscriber, times(1)).onSubscribe(any(Flow.Subscription.class));
+        verify(subscriber, timeout(TEST_TIMEOUT.toMillis()).times(1)).onSubscribe(any(Flow.Subscription.class));
         verify(subscriber, atMost(2)).onNext(any());
         verify(subscriber, never()).onComplete();
         verify(subscriber, never()).onError(any());
@@ -955,9 +950,7 @@ public abstract class StorageReadWriteTestSuite {
         //  - Allow the reader to send at most one chunk after cancelling (in fact, Java Publisher spec allows more)
         //  - No calls to onComplete or onError
 
-        Thread.sleep(ASYNC_DELAY.toMillis());
-
-        verify(subscriber, times(1)).onSubscribe(any(Flow.Subscription.class));
+        verify(subscriber, timeout(TEST_TIMEOUT.toMillis()).times(1)).onSubscribe(any(Flow.Subscription.class));
         verify(subscriber, atMost(2)).onNext(any());
         verify(subscriber, never()).onComplete();
         verify(subscriber, never()).onError(any());
