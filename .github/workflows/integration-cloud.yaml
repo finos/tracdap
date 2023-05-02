@@ -42,7 +42,7 @@ jobs:
     if: ${{ inputs.enabled && inputs.has_java }}
 
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 20
 
     # To use apt-get install, jobs must run in a container
     container:
@@ -140,7 +140,7 @@ jobs:
     env: ${{ fromJson( inputs.matrix ) }}
 
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 20
 
     # To use apt-get install, jobs must run in a container
     container:

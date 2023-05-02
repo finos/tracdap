@@ -218,6 +218,7 @@ jobs:
   int-metadb:
 
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     container:
       image: ubuntu:latest
