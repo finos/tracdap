@@ -487,7 +487,7 @@ public abstract class StorageReadWriteTestSuite {
 
         var subscription1 = mock(Flow.Subscription.class);
         writer.onSubscribe(subscription1);
-        verify(subscription1, timeout(ASYNC_DELAY.toMillis())).request(anyLong());
+        verify(subscription1, timeout(TEST_TIMEOUT.toMillis())).request(anyLong());
 
         // Second subscription to the writer, should throw illegal state
 
@@ -521,7 +521,7 @@ public abstract class StorageReadWriteTestSuite {
         var subscription = mock(Flow.Subscription.class);
         writer.onSubscribe(subscription);
 
-        verify(subscription, timeout(ASYNC_DELAY.toMillis())).request(anyLong());
+        verify(subscription, timeout(TEST_TIMEOUT.toMillis())).request(anyLong());
 
         // Send an error without calling onNext
         // The writer should clean up and notify failure using the writer signal
@@ -571,7 +571,7 @@ public abstract class StorageReadWriteTestSuite {
         var subscription = mock(Flow.Subscription.class);
         writer.onSubscribe(subscription);
 
-        verify(subscription, timeout(ASYNC_DELAY.toMillis())).request(anyLong());
+        verify(subscription, timeout(TEST_TIMEOUT.toMillis())).request(anyLong());
 
         // Send one chunk to the writer
 
@@ -624,7 +624,7 @@ public abstract class StorageReadWriteTestSuite {
         var chunk1 = Unpooled.wrappedBuffer(bytes);
 
         writer1.onSubscribe(subscription1);
-        verify(subscription1, timeout(ASYNC_DELAY.toMillis())).request(anyLong());
+        verify(subscription1, timeout(TEST_TIMEOUT.toMillis())).request(anyLong());
         writer1.onNext(chunk1);
 
         // Give the writer some time for the chunk to be written to disk
@@ -648,7 +648,7 @@ public abstract class StorageReadWriteTestSuite {
         var chunk2 = Unpooled.wrappedBuffer(bytes);
 
         writer2.onSubscribe(subscription2);
-        verify(subscription2, timeout(ASYNC_DELAY.toMillis())).request(anyLong());
+        verify(subscription2, timeout(TEST_TIMEOUT.toMillis())).request(anyLong());
         writer2.onNext(chunk2);
         writer2.onComplete();
 
@@ -711,7 +711,7 @@ public abstract class StorageReadWriteTestSuite {
         reader.subscribe(subscriber);
 
         // onSubscribe should be received
-        verify(subscriber, timeout(ASYNC_DELAY.toMillis())).onSubscribe(any(Flow.Subscription.class));
+        verify(subscriber, timeout(TEST_TIMEOUT.toMillis())).onSubscribe(any(Flow.Subscription.class));
 
         // The stream should be read until complete
         verify(subscriber, timeout(TEST_TIMEOUT.toMillis())).onComplete();
@@ -750,8 +750,8 @@ public abstract class StorageReadWriteTestSuite {
         Flow.Subscriber<ByteBuf> subscriber = unchecked(mock(Flow.Subscriber.class));
         reader.subscribe(subscriber);
 
-        verify(subscriber, timeout(ASYNC_DELAY.toMillis())).onSubscribe(any(Flow.Subscription.class));
-        verify(subscriber, timeout(ASYNC_DELAY.toMillis())).onError(any(EStorageRequest.class));
+        verify(subscriber, timeout(TEST_TIMEOUT.toMillis())).onSubscribe(any(Flow.Subscription.class));
+        verify(subscriber, timeout(TEST_TIMEOUT.toMillis())).onError(any(EStorageRequest.class));
     }
 
     @Test
@@ -784,8 +784,8 @@ public abstract class StorageReadWriteTestSuite {
         // Second should receive onError with an illegal state exception
         // As per: https://docs.oracle.com/en/java/javase/11/docs/api/java.base/java/util/concurrent/Flow.Publisher.html#subscribe(java.util.concurrent.Flow.Subscriber)
 
-        verify(subscriber1, timeout(ASYNC_DELAY.toMillis())).onSubscribe(any(Flow.Subscription.class));
-        verify(subscriber2, timeout(ASYNC_DELAY.toMillis())).onError(any(IllegalStateException.class));
+        verify(subscriber1, timeout(TEST_TIMEOUT.toMillis())).onSubscribe(any(Flow.Subscription.class));
+        verify(subscriber2, timeout(TEST_TIMEOUT.toMillis())).onError(any(IllegalStateException.class));
 
         // Subscription 1 should still work as normal when data is requested
 
