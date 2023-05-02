@@ -17,8 +17,10 @@
 package org.finos.tracdap.plugins.aws.storage;
 
 import io.netty.buffer.Unpooled;
+import org.finos.tracdap.common.data.IDataContext;
 import org.finos.tracdap.common.storage.StorageErrors;
 
+import org.finos.tracdap.common.util.LoggingHelpers;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 import software.amazon.awssdk.core.async.AsyncResponseTransformer;
@@ -39,7 +41,6 @@ import java.util.concurrent.Flow;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.finos.tracdap.common.storage.CommonFileStorage.READ_OPERATION;
-import static org.finos.tracdap.common.storage.CommonFileStorage.WRITE_OPERATION;
 import static org.finos.tracdap.common.storage.StorageErrors.ExplicitError.DUPLICATE_SUBSCRIPTION;
 
 
@@ -47,6 +48,7 @@ public class S3ObjectReader implements Flow.Publisher<ByteBuf> {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
+    private final String storageKey;
     private final String storagePath;
     private final String bucket;
     private final String objectKey;
@@ -64,17 +66,19 @@ public class S3ObjectReader implements Flow.Publisher<ByteBuf> {
     private boolean gotCancel;
 
     public S3ObjectReader(
-            String storagePath, String bucket, String objectKey,
+            String storageKey, String storagePath,
+            String bucket, String objectKey,
             S3AsyncClient client,
-            OrderedEventExecutor executor,
+            IDataContext dataContext,
             StorageErrors errors) {
 
+        this.storageKey = storageKey;
         this.storagePath = storagePath;
         this.bucket = bucket;
         this.objectKey = objectKey;
 
         this.client = client;
-        this.executor = executor;
+        this.executor = dataContext.eventLoopExecutor();
         this.errors = errors;
 
         this.subscriberSet = new AtomicBoolean();
@@ -121,47 +125,32 @@ public class S3ObjectReader implements Flow.Publisher<ByteBuf> {
                 .build();
 
         var handler = new ResponseHandler();
-
-        var clientCall = client.getObject(request, handler);
-
-        clientCall.handleAsync((stream, error) -> {
-
-            log.info("Call future handler");
-
-
-
-            return null;
-
-        }, executor);
-
-
-        // client.getObject();
+        client.getObject(request, handler);
     }
 
     private void _onPrepare(CompletableFuture<Void> signal) {
-        log.info("Got prepare");
         signal.complete(null);
     }
 
     private void _onResponse(GetObjectResponse response) {
-        log.info("Got response: " + response.contentLength());
+
+        log.info("{} {} [{}]: Object size is [{}]",
+                READ_OPERATION, storageKey, storagePath,
+                LoggingHelpers.formatFileSize(response.contentLength()));
     }
 
     private void _onStream(SdkPublisher<ByteBuffer> publisher) {
-        log.info("Got stream");
         publisher.subscribe(new ResponseStream());
     }
 
-    private void _onErrorDuringSetup(Throwable error) {
-        log.info("Got exception: " + error.getMessage(), error);
-        var tracError = errors.handleException(READ_OPERATION, storagePath, error);
-        subscriber.onError(tracError);
-        gotError = true;
-    }
+    private void _onSubscribe(Subscription awsSubscription) {
 
-    private void _onSubscribe(Subscription s) {
+        if (gotError || gotCancel) {
+            awsSubscription.cancel();
+            return;
+        }
 
-        awsSubscription = s;
+        this.awsSubscription = awsSubscription;
 
         if (requestBuffer > 0) {
             awsSubscription.request(requestBuffer);
@@ -183,14 +172,22 @@ public class S3ObjectReader implements Flow.Publisher<ByteBuf> {
 
     private void _onError(Throwable error) {
 
-        var mappedError = errors.handleException(WRITE_OPERATION, storagePath, error);
+        var tracError = errors.handleException(READ_OPERATION, storagePath, error);
 
-        if (!gotError) {
-            subscriber.onError(mappedError);
-            gotError = true;
+        if (gotError) {
+            log.warn("{} {} [{}]: Read operation already failed, then another error occurred",
+                    READ_OPERATION, storageKey, storagePath, tracError);
+        }
+        else if (gotCancel) {
+            log.warn("{} {} [{}]: Read operation was cancelled, then an error occurred",
+                    READ_OPERATION, storageKey, storagePath, tracError);
         }
         else {
-            log.warn("Another error occurred after the operation already failed", mappedError);
+            log.error("{} {} [{}]: {}",
+                    READ_OPERATION, storageKey, storagePath, tracError.getMessage(), tracError);
+
+            gotError = true;
+            subscriber.onError(tracError);
         }
     }
 
@@ -208,15 +205,18 @@ public class S3ObjectReader implements Flow.Publisher<ByteBuf> {
         @Override
         public void cancel() {
 
-            if (awsSubscription != null)
-                awsSubscription.cancel();
-            else {
-
-                // todo
-                log.warn("Cancel before subscribe");
+            if (!gotCancel) {
+                log.info("CANCEL {} {} [{}]", READ_OPERATION, storageKey, storagePath);
             }
 
             gotCancel = true;
+
+            if (awsSubscription != null)
+                awsSubscription.cancel();
+            else {
+                log.warn("{} {} [{}]: Read operation cancelled before connection was established",
+                        READ_OPERATION, storageKey, storagePath);
+            }
         }
     }
 
@@ -241,7 +241,7 @@ public class S3ObjectReader implements Flow.Publisher<ByteBuf> {
 
         @Override
         public void exceptionOccurred(Throwable error) {
-            executor.submit(() -> _onErrorDuringSetup(error));
+            executor.submit(() -> _onError(error));
         }
     }
 

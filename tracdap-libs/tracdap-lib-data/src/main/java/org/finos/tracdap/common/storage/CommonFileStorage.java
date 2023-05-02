@@ -495,44 +495,12 @@ public abstract class CommonFileStorage implements IFileStorage {
 
     protected <TResult> CompletableFuture<TResult> toContext(IExecutionContext execCtx, CompletionStage<TResult> promise) {
 
-        var ctxPromise = new CompletableFuture<TResult>();
-
-        useContext(execCtx, promise, ctxPromise);
-
-        return ctxPromise;
+        return execCtx.toContext(promise);
     }
 
     protected <TResult> CompletableFuture<TResult> fromContext(IExecutionContext execCtx, CompletableFuture<TResult> ctxPromise) {
 
-        var promise = new CompletableFuture<TResult>();
-
-        useContext(execCtx, promise, ctxPromise);
-
-        return promise;
-    }
-
-    protected <TResult> void useContext(
-            IExecutionContext execCtx,
-            CompletionStage<TResult> promise,
-            CompletableFuture<TResult> ctxPromise) {
-
-        promise.whenComplete((result, error) -> {
-
-            if (execCtx.eventLoopExecutor().inEventLoop()) {
-
-                if (error != null)
-                    ctxPromise.completeExceptionally(error);
-                else
-                    ctxPromise.complete(result);
-            }
-            else {
-
-                if (error != null)
-                    execCtx.eventLoopExecutor().execute(() -> ctxPromise.completeExceptionally(error));
-                else
-                    execCtx.eventLoopExecutor().execute(() -> ctxPromise.complete(result));
-            }
-        });
+        return execCtx.fromContext(ctxPromise);
     }
 
     @FunctionalInterface

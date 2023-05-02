@@ -16,7 +16,9 @@
 
 package org.finos.tracdap.plugins.aws.storage;
 
+import org.finos.tracdap.common.data.IDataContext;
 import org.finos.tracdap.common.storage.StorageErrors;
+import org.finos.tracdap.common.util.LoggingHelpers;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.CompositeByteBuf;
@@ -29,8 +31,10 @@ import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import software.amazon.awssdk.services.s3.model.PutObjectResponse;
 
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Flow;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -42,12 +46,14 @@ public class S3ObjectWriter implements Flow.Subscriber<ByteBuf> {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
+    private final String storageKey;
     private final String storagePath;
     private final String bucket;
     private final String objectKey;
 
     private final S3AsyncClient client;
     private final CompletableFuture<Long> signal;
+    private final IDataContext dataContext;
     private final OrderedEventExecutor executor;
     private final StorageErrors errors;
 
@@ -57,19 +63,22 @@ public class S3ObjectWriter implements Flow.Subscriber<ByteBuf> {
     private final CompositeByteBuf buffer = Unpooled.compositeBuffer();
 
     public S3ObjectWriter(
-            String storagePath, String bucket, String objectKey,
+            String storageKey, String storagePath,
+            String bucket, String objectKey,
             S3AsyncClient client,
             CompletableFuture<Long> signal,
-            OrderedEventExecutor executor,
+            IDataContext dataContext,
             StorageErrors errors) {
 
+        this.storageKey = storageKey;
         this.storagePath = storagePath;
         this.bucket = bucket;
         this.objectKey = objectKey;
 
         this.client = client;
         this.signal = signal;
-        this.executor = executor;
+        this.dataContext = dataContext;
+        this.executor = dataContext.eventLoopExecutor();
         this.errors = errors;
 
         this.subscriptionSet = new AtomicBoolean();
@@ -103,6 +112,12 @@ public class S3ObjectWriter implements Flow.Subscriber<ByteBuf> {
     public void onError(Throwable throwable) {
 
         buffer.release();
+
+        var tracError = errors.handleException(WRITE_OPERATION, storagePath, throwable);
+
+        log.error("{} {} [{}]: {}",
+                WRITE_OPERATION, storageKey, storagePath, tracError.getMessage(), tracError);
+
         signal.completeExceptionally(throwable);
     }
 
@@ -118,30 +133,39 @@ public class S3ObjectWriter implements Flow.Subscriber<ByteBuf> {
                 .contentLength(contentLength)
                 .build();
 
-        client.putObject(request, content).handleAsync((response, error) -> {
+        var response = dataContext.toContext(client.putObject(request, content));
 
-            try {
+        response.handle(this::onCompleteHandler);
+    }
 
-                if (error != null) {
+    private CompletionStage<Void> onCompleteHandler(PutObjectResponse result, Throwable error) {
 
-                    log.error("Write operation failed: {} [{}]", error.getMessage(), objectKey, error);
+        try {
 
-                    var mappedError = errors.handleException(WRITE_OPERATION, storagePath, error);
-                    signal.completeExceptionally(mappedError);
-                }
-                else {
+            if (error != null) {
 
-                    log.info("Write operation complete: {} bytes written [{}]", contentLength, objectKey);
+                var tracError = errors.handleException(WRITE_OPERATION, storagePath, error);
 
-                    signal.complete(contentLength);
-                }
+                log.error("{} {} [{}]: {}",
+                        WRITE_OPERATION, storageKey, storagePath, tracError.getMessage(), tracError);
 
-                return null;
+                var mappedError = errors.handleException(WRITE_OPERATION, storagePath, error);
+                signal.completeExceptionally(mappedError);
             }
-            finally {
-                buffer.release();
+            else {
+
+                var contentLength = (long) buffer.readableBytes();
+
+                log.info("{} {} [{}]: Write operation complete, object size is {}",
+                        WRITE_OPERATION, storageKey, storagePath, LoggingHelpers.formatFileSize(contentLength));
+
+                signal.complete(contentLength);
             }
 
-        }, executor);
+            return CompletableFuture.completedFuture(null);
+        }
+        finally {
+            buffer.release();
+        }
     }
 }

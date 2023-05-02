@@ -421,8 +421,8 @@ public class S3ObjectStorage extends CommonFileStorage {
         var objectKey = usePrefix(storagePath);
 
         return new S3ObjectReader(
-                storagePath, bucket, objectKey,
-                client, dataContext.eventLoopExecutor(), errors);
+                storageKey, storagePath, bucket, objectKey,
+                client, dataContext, errors);
     }
 
     @Override
@@ -431,8 +431,8 @@ public class S3ObjectStorage extends CommonFileStorage {
         var objectKey = usePrefix(storagePath);
 
         return new S3ObjectWriter(
-                storagePath, bucket, objectKey,
-                client, signal, dataContext.eventLoopExecutor(), errors);
+                storageKey, storagePath, bucket, objectKey,
+                client, signal, dataContext, errors);
     }
 
     private FileStat
