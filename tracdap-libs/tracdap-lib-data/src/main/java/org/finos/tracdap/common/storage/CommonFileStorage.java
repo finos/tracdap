@@ -367,7 +367,7 @@ public abstract class CommonFileStorage implements IFileStorage {
             if (!parentOk)
                 return fsCreateDir(parent, ctx);
             else
-                return CompletableFuture.completedFuture(true).thenApply(x -> null);
+                return CompletableFuture.completedFuture(null);
 
         // Make sure the file being writen to is not a directory
         // With bucket semantics, a file and a directory can have the same name
