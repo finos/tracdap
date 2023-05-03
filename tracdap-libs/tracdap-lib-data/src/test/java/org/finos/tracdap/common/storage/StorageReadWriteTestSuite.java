@@ -412,8 +412,8 @@ public abstract class StorageReadWriteTestSuite {
         It is difficult to verify this using the abstracted storage API!
         These tests look for common symptoms of resource leaks that may catch some common errors
 
-        Error states in the streams are checked directly by mocking/spying on the Java Flow API
-        E.g. Illegal state and cancellation exceptions are checked explicitly
+        Tests check error states in the streams directly by mocking/spying on the Java Flow API
+        E.g. Illegal state and cancellation exceptions, which are checked explicitly
         This is different from the functional tests, which unwrap stream state errors to look for EStorage errors
 
         Using the storage API it is not possible to simulate errors that occur in the storage back end
@@ -822,7 +822,7 @@ public abstract class StorageReadWriteTestSuite {
     }
 
     @Test
-    void testRead_cancelImmediately() throws Exception {
+    void testRead_cancelImmediately() {
 
         var storagePath = "some_file.txt";
         var writeSignal = makeSmallFile(storagePath, storage, dataContext);
