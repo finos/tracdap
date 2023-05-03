@@ -16,23 +16,27 @@
 
 package org.finos.tracdap.svc.data.api;
 
-import io.netty.util.concurrent.DefaultEventExecutor;
 import org.finos.tracdap.api.*;
 import org.finos.tracdap.common.concurrent.ExecutionContext;
 import org.finos.tracdap.common.concurrent.IExecutionContext;
+import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.metadata.MetadataUtil;
 import org.finos.tracdap.common.concurrent.Flows;
 import org.finos.tracdap.common.concurrent.Futures;
+import org.finos.tracdap.common.plugin.PluginManager;
 import org.finos.tracdap.metadata.*;
+
 import com.google.protobuf.ByteString;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
+import io.netty.channel.EventLoopGroup;
+import io.netty.channel.nio.NioEventLoopGroup;
+
 import org.finos.tracdap.test.helpers.PlatformTest;
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.BeforeEach;
+import org.finos.tracdap.test.helpers.StorageTestHelpers;
+import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.Tag;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 import java.nio.charset.StandardCharsets;
@@ -57,6 +61,7 @@ abstract class FileOperationsTest {
     public static final String TEST_TENANT_2 = "SOME_OTHER_CORP";
     public static final Duration TEST_TIMEOUT = Duration.ofSeconds(10);
 
+    protected static EventLoopGroup elg;
     protected IExecutionContext execContext;
     protected TracMetadataApiGrpc.TracMetadataApiFutureStub metaClient;
     protected TracDataApiGrpc.TracDataApiStub dataClient;
@@ -74,9 +79,14 @@ abstract class FileOperationsTest {
                 .startData()
                 .build();
 
+        @BeforeAll
+        static void setupClass() {
+            elg = new NioEventLoopGroup(2);
+        }
+
         @BeforeEach
         void setup() {
-            execContext = new ExecutionContext(new DefaultEventExecutor());
+            execContext = new ExecutionContext(elg.next());
             metaClient = platform.metaClientFuture();
             dataClient = platform.dataClient();
         }
@@ -98,11 +108,31 @@ abstract class FileOperationsTest {
                 .startData()
                 .build();
 
+        @BeforeAll
+        static void setupClass() {
+            elg = new NioEventLoopGroup(2);
+        }
+
         @BeforeEach
         void setup() {
-            execContext = new ExecutionContext(new DefaultEventExecutor());
+            execContext = new ExecutionContext(elg.next());
             metaClient = platform.metaClientFuture();
             dataClient = platform.dataClient();
+        }
+
+        @AfterAll
+        static void tearDownClass() throws Exception {
+
+            var plugins = new PluginManager();
+            plugins.initConfigPlugins();
+            plugins.initRegularPlugins();
+
+            var config = new ConfigManager(
+                    platform.platformConfigUrl(),
+                    platform.tracDir(),
+                    plugins);
+
+            StorageTestHelpers.deleteStoragePrefix(config, plugins, elg);
         }
     }
 
