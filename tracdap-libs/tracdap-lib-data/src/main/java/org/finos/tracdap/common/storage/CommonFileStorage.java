@@ -28,6 +28,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.nio.file.InvalidPathException;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
@@ -53,7 +54,13 @@ import static org.finos.tracdap.common.storage.StorageErrors.ExplicitError.*;
  */
 public abstract class CommonFileStorage implements IFileStorage {
 
-    public static final Pattern ILLEGAL_PATH_CHARS = Pattern.compile(".*[\u0000<>:'\"|?*\\\\].*");
+    public static final String BACKSLASH = "/";
+    public static final String DOT = ".";
+    public static final String DOUBLE_DOT = "..";
+
+    public static final Pattern ILLEGAL_PATH_CHARS = Pattern.compile(".*[<>:'\"|?*\\\\].*");
+    public static final Pattern UNICODE_CONTROL_CHARS = Pattern.compile(".*[\u0000-\u001f\u007f\u0080-\u009f].*");
+    public static final Pattern PARENT_DIR_PATH = Pattern.compile("(\\A|.*/)\\.\\.(\\Z|/.*)");
 
     public static final String EXISTS_OPERATION = "exists";
     public static final String SIZE_OPERATION = "size";
@@ -65,15 +72,13 @@ public abstract class CommonFileStorage implements IFileStorage {
     public static final String WRITE_OPERATION = "write";
     public static final String READ_OPERATION = "read";
 
-    public static final String BACKSLASH = "/";
-
     public static final String READ_ONLY_CONFIG_KEY = "readOnly";
     public static final boolean READ_ONLY_CONFIG_DEFAULT = false;
 
-    // Abstract interface for low-level FS operations
-
     protected static final boolean BUCKET_SEMANTICS = true;
     protected static final boolean FILE_SEMANTICS = false;
+
+    // Abstract interface for low-level FS operations
 
     protected abstract CompletionStage<Boolean> fsExists(String objectKey, IExecutionContext ctx);
     protected abstract CompletionStage<Boolean> fsDirExists(String prefix, IExecutionContext ctx);
@@ -439,11 +444,9 @@ public abstract class CommonFileStorage implements IFileStorage {
         }
     }
 
-    protected String resolveObjectKey(String operationName, String storagePath, boolean allowRootDir) {
+    private String resolveObjectKey(String operationName, String storagePath, boolean allowRootDir) {
 
         try {
-
-            var isWindows = System.getProperty("os.name").toLowerCase().contains("win");
 
             if (storagePath == null || storagePath.isBlank())
                 throw errors.explicitError(operationName, storagePath, STORAGE_PATH_NULL_OR_BLANK);
@@ -451,38 +454,54 @@ public abstract class CommonFileStorage implements IFileStorage {
             if (ILLEGAL_PATH_CHARS.matcher(storagePath).matches())
                 throw errors.explicitError(operationName, storagePath, STORAGE_PATH_INVALID);
 
-            var relativePath = Paths.get(storagePath);
+            if (UNICODE_CONTROL_CHARS.matcher(storagePath).matches())
+                throw errors.explicitError(operationName, storagePath, STORAGE_PATH_INVALID);
 
-            if (relativePath.isAbsolute())
+            // Absolute paths of the form C:\foo, \foo or \\foo\bar are not possible,
+            // because ':' and '\' are in ILLEGAL_PATH_CHARS
+
+            if (storagePath.startsWith(BACKSLASH))
                 throw errors.explicitError(operationName, storagePath, STORAGE_PATH_NOT_RELATIVE);
 
-            var rootPath = isWindows ? Paths.get("C:\\root") : Paths.get("/root");
-            var absolutePath = rootPath.resolve(relativePath).normalize();
+            var resolvedPath = normalizeStoragePath(operationName, storagePath);
 
-            if (absolutePath.equals(rootPath)) {
+            if (resolvedPath.equals(DOT) && !allowRootDir)
+                throw errors.explicitError(operationName, storagePath, STORAGE_PATH_IS_ROOT);
 
-                if (!allowRootDir)
-                    throw errors.explicitError(operationName, storagePath, STORAGE_PATH_IS_ROOT);
-
-                return "";
-            }
-            else {
-
-                if (!absolutePath.startsWith(rootPath))
-                    throw errors.explicitError(operationName, storagePath, STORAGE_PATH_OUTSIDE_ROOT);
-
-                var resolvedPath = rootPath.relativize(absolutePath);
-
-                var sections = new ArrayList<String>(resolvedPath.getNameCount());
-                resolvedPath.forEach(section -> sections.add(section.toString()));
-
-                return String.join(BACKSLASH, sections);
-            }
+            return resolvedPath;
         }
         catch (InvalidPathException e) {
 
             throw errors.explicitError(operationName, storagePath, STORAGE_PATH_INVALID, e);
         }
+    }
+
+    private String normalizeStoragePath(String operationName, String storagePath) {
+
+        var rawSections = storagePath.split(BACKSLASH);
+        var normalSections = new ArrayList<String>(rawSections.length);
+
+        for (var section : rawSections) {
+
+            if (section.equals(DOT))
+                continue;
+
+            if (section.equals(DOUBLE_DOT)) {
+
+                if (normalSections.isEmpty())
+                    throw errors.explicitError(operationName, storagePath, STORAGE_PATH_OUTSIDE_ROOT);
+                else
+                    normalSections.remove(normalSections.size() - 1);
+            }
+            else {
+                normalSections.add(section);
+            }
+        }
+
+        if (normalSections.isEmpty())
+            return DOT;
+
+        return String.join(BACKSLASH, normalSections);
     }
 
     protected String resolveDirPrefix(String objectKey) {
