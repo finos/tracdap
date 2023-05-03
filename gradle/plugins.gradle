@@ -54,6 +54,7 @@ ext {
     BUILD_sql_oracle = false
 
     BUILD_gcp_config = false
+    BUILD_gcp_storage = false
 
     BUILD_aws_config = false
     BUILD_aws_storage = false
@@ -67,6 +68,7 @@ ext {
     // (because they refer to individual source sets)
 
     DEPEND_gcp_config = project(":gcp-config")
+    DEPEND_gcp_storage = project(":gcp-storage")
 
     // AWS config project needs updating to AWS SDK v2
     // DEPEND_aws_config = project(":aws-config")
