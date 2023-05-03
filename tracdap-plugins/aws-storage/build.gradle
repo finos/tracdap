@@ -21,8 +21,7 @@ plugins {
 
 apply from: "${rootProject.projectDir.path}/gradle/base-java.gradle"
 
-
-description = "AWS config plugin, load config from S3 buckets and secrets manager"
+description = "AWS storage plugin, store and retrieve data in S3 buckets"
 
 // Put plugins into a separate package group
 group = "org.finos.tracdap.plugins"
