@@ -36,8 +36,11 @@ import java.util.concurrent.*;
 public class GcsObjectStorage extends CommonFileStorage {
 
     public static final String REGION_PROPERTY = "region";
+    public static final String PROJECT_PROPERTY = "project";
     public static final String BUCKET_PROPERTY = "bucket";
     public static final String PREFIX_PROPERTY = "prefix";
+
+    private static final String BUCKET_TEMPLATE = "projects/%s/buckets/%s";
 
     private final String bucket;
     private final String prefix;
@@ -49,10 +52,11 @@ public class GcsObjectStorage extends CommonFileStorage {
 
         super(BUCKET_SEMANTICS, storageKey, properties, new GcsStorageErrors(storageKey));
 
+        var project = properties.getProperty(PREFIX_PROPERTY);
         var bucket = properties.getProperty(BUCKET_PROPERTY);
         var prefix = properties.getProperty(PREFIX_PROPERTY);
 
-        this.bucket = bucket;
+        this.bucket = String.format(BUCKET_TEMPLATE, project, bucket);
         this.prefix = normalizePrefix(prefix);
     }
 
