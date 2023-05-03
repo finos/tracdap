@@ -18,20 +18,28 @@ package org.finos.tracdap.common.concurrent.flow;
 
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Flow;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 
 public class DelayedSubscriber<T> implements Flow.Subscriber<T> {
 
     private final Flow.Subscriber<T> subscriber;
     private final CompletionStage<?> signal;
+    private final AtomicBoolean subscribed;
 
     public DelayedSubscriber(Flow.Subscriber<T> subscriber, CompletionStage<?> signal) {
         this.subscriber = subscriber;
         this.signal = signal;
+        this.subscribed = new AtomicBoolean(false);
     }
 
     @Override
     public void onSubscribe(Flow.Subscription subscription) {
+
+        var firstSubscription = subscribed.compareAndSet(false, true);
+
+        if (!firstSubscription)
+            throw new IllegalStateException();
 
         signal.whenComplete((result, error) -> {
 

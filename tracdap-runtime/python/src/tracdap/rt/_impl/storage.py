@@ -200,6 +200,9 @@ class _NativeFileResource(pa_lib.NativeFile):
 
 class CommonFileStorage(IFileStorage):
 
+    FILE_SEMANTICS_FS_TYPES = ["local"]
+    BUCKET_SEMANTICS_FS_TYPES = ["s3", "gcs"]
+
     def __init__(self, storage_key: str, storage_config: _cfg.PluginConfig, fs_impl: pa_fs.SubTreeFileSystem):
 
         self._log = _util.logger_for_object(self)
@@ -209,6 +212,10 @@ class CommonFileStorage(IFileStorage):
 
         fs_type = fs_impl.base_fs.type_name
         fs_root = fs_impl.base_path
+
+        # Some optimization is possible if the underlying storage semantics are known
+        self._file_semantics = True if fs_type in self.FILE_SEMANTICS_FS_TYPES else False
+        self._bucket_semantics = True if fs_type in self.BUCKET_SEMANTICS_FS_TYPES else False
 
         self._log.info(f"INIT [{self._key}]: Common file storage, fs = [{fs_type}], root = [{fs_root}]")
 
@@ -386,10 +393,12 @@ class CommonFileStorage(IFileStorage):
         resolved_path = self._resolve_path(operation_name, storage_path, False)
 
         # Make sure the parent directory exists
-        # This ensures storage with FS semantics still behaves like a cloud bucket
-        parent_path = self._resolve_parent(resolved_path)
-        if parent_path is not None:
-            self._mkdir(operation_name, parent_path, recursive=True)
+        # In bucket semantics this is not needed and creating a 0-byte object for every real object is a bad idea
+        # For file semantics, or if semantics are not known, create the parent dir to avoid failures
+        if not self._bucket_semantics:
+            parent_path = self._resolve_parent(resolved_path)
+            if parent_path is not None:
+                self._mkdir(operation_name, parent_path, recursive=True)
 
         # Try to prevent WRITE if the object is already defined as a directory or other non-file object
         # In cloud bucket semantics a file and dir can both exist with the same name - very confusing!

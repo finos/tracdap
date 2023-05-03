@@ -16,23 +16,22 @@
 
 package org.finos.tracdap.common.storage.local;
 
-import io.netty.channel.EventLoopGroup;
 import org.finos.tracdap.common.concurrent.IExecutionContext;
 import org.finos.tracdap.common.data.IDataContext;
 import org.finos.tracdap.common.exception.EStartup;
-import org.finos.tracdap.common.exception.ETrac;
 import org.finos.tracdap.common.storage.*;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import io.netty.channel.EventLoopGroup;
 
 import java.io.IOException;
 import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Flow;
 import java.util.stream.Collectors;
@@ -40,42 +39,22 @@ import java.util.stream.Collectors;
 import static org.finos.tracdap.common.storage.StorageErrors.ExplicitError.*;
 
 
-public class LocalFileStorage implements IFileStorage {
+public class LocalFileStorage extends CommonFileStorage {
 
     public static final String CONFIG_ROOT_PATH = "rootPath";
-    public static final String CONFIG_READ_ONLY = "readOnly";
 
-    private final Logger log = LoggerFactory.getLogger(getClass());
-    private final StorageErrors errors;
-
-    private final String storageKey;
     private final Path rootPath;
 
-    private final boolean readOnlyFlag;
+    public LocalFileStorage(String storageKey, Properties properties) {
 
-    public LocalFileStorage(Properties config) {
-
-        this.storageKey = config.getProperty(IStorageManager.PROP_STORAGE_KEY);
-
-        this.errors = new LocalStorageErrors(storageKey, log);
+        super(FILE_SEMANTICS, storageKey, properties, new LocalStorageErrors(storageKey));
 
         // TODO: Robust config handling
 
-        var rootDirProp = config.getProperty(CONFIG_ROOT_PATH);
+        var rootDirProp = properties.getProperty(CONFIG_ROOT_PATH);
         this.rootPath = Paths.get(rootDirProp)
                 .toAbsolutePath()
                 .normalize();
-
-        String readOnlyFlagString = config.getProperty(CONFIG_READ_ONLY, "false");
-        this.readOnlyFlag = Boolean.parseBoolean(readOnlyFlagString);
-
-    }
-
-    private void checkWriteFlag(String storagePath, String operation) throws ETrac {
-
-        if(readOnlyFlag) {
-            throw errors.explicitError(ACCESS_DENIED_EXCEPTION, storagePath, operation);
-        }
     }
 
     @Override
@@ -83,38 +62,28 @@ public class LocalFileStorage implements IFileStorage {
 
         // These are just checks, no need to initialize anything
 
-        if (!Files.exists(this.rootPath)) {
+        if (!Files.exists(rootPath)) {
             var err = String.format("Storage root path does not exist: %s [%s]", storageKey, rootPath);
             log.error(err);
             throw new EStartup(err);
         }
 
-        if (!Files.isDirectory(this.rootPath)) {
+        if (!Files.isDirectory(rootPath)) {
             var err = String.format("Storage root path is not a directory: %s [%s]", storageKey, rootPath);
             log.error(err);
             throw new EStartup(err);
         }
 
-        if(!readOnlyFlag) {
-            if (!Files.isReadable(this.rootPath) || !Files.isWritable(this.rootPath)) {
+        if (!Files.isReadable(rootPath)) {
+            var err = String.format("Storage root path is not readable: %s [%s]", storageKey, rootPath);
+            log.error(err);
+            throw new EStartup(err);
+        }
 
-                var err = String.format(
-                        "Storage root path has insufficient access (read/write required): %s [%s]",
-                        storageKey, rootPath);
-
-                log.error(err);
-                throw new EStartup(err);
-            }
-        } else {
-            if (!Files.isReadable(this.rootPath)) {
-
-                var err = String.format(
-                        "Storage root path has insufficient access (read required): %s [%s]",
-                        storageKey, rootPath);
-
-                log.error(err);
-                throw new EStartup(err);
-            }
+        if(!readOnly && !Files.isWritable(rootPath)) {
+            var err = String.format("Storage root path is not writable: %s [%s]", storageKey, rootPath);
+            log.error(err);
+            throw new EStartup(err);
         }
 
         logFsInfo();
@@ -157,89 +126,71 @@ public class LocalFileStorage implements IFileStorage {
     }
 
     @Override
-    public CompletionStage<Boolean> exists(String storagePath, IExecutionContext execContext) {
+    protected CompletionStage<Boolean> fsExists(String storagePath, IExecutionContext execContext) {
 
-        try {
-            log.info("STORAGE OPERATION: {} {} [{}]", storageKey, EXISTS_OPERATION, storagePath);
+        var absolutePath = resolvePath(storagePath);
+        var exists = Files.exists(absolutePath);
 
-            var absolutePath = resolvePath(storagePath, true, EXISTS_OPERATION);
-
-            var exists = Files.exists(absolutePath);
-
-            return CompletableFuture.completedFuture(exists);
-        }
-        catch (Exception e) {
-
-            var eStorage = errors.handleException(e, EXISTS_OPERATION, storagePath);
-            return CompletableFuture.failedFuture(eStorage);
-        }
+        return CompletableFuture.completedFuture(exists);
     }
 
     @Override
-    public CompletableFuture<Long> size(String storagePath, IExecutionContext execContext) {
+    protected CompletionStage<Boolean> fsDirExists(String storagePath, IExecutionContext execContext) {
 
-        try {
-            log.info("STORAGE OPERATION: {} {} [{}]", storageKey, SIZE_OPERATION, storagePath);
+        var absolutePath = resolvePath(storagePath);
+        var exists = Files.isDirectory(absolutePath);
 
-            var absolutePath = resolvePath(storagePath, true, SIZE_OPERATION);
-
-            var size = Files.size(absolutePath);
-
-            // Size operation for non-regular files can still succeed
-            // So, add an explicit check for directories (and other non-regular files)
-            if (!Files.isRegularFile(absolutePath))
-                throw errors.explicitError(SIZE_OF_DIR, storagePath, SIZE_OPERATION);
-
-            return CompletableFuture.completedFuture(size);
-        }
-        catch (Exception e) {
-
-            var eStorage = errors.handleException(e, storagePath, SIZE_OPERATION);
-            return CompletableFuture.failedFuture(eStorage);
-        }
+        return CompletableFuture.completedFuture(exists);
     }
 
     @Override
-    public CompletionStage<FileStat> stat(String storagePath, IExecutionContext execContext) {
+    protected CompletionStage<FileStat> fsGetFileInfo(String storagePath, IExecutionContext execContext) {
 
         try {
-            log.info("STORAGE OPERATION: {} {} [{}]", storageKey, STAT_OPERATION, storagePath);
-
-            var absolutePath = resolvePath(storagePath, true, STAT_OPERATION);
-            var fileStat = buildFileStat(absolutePath, storagePath, STAT_OPERATION);
+            var absolutePath = resolvePath(storagePath);
+            var fileStat = buildFileStat(absolutePath, storagePath);
 
             return CompletableFuture.completedFuture(fileStat);
         }
-        catch (Exception e) {
-
-            var eStorage = errors.handleException(e, storagePath, STAT_OPERATION);
-            return CompletableFuture.failedFuture(eStorage);
+        catch (IOException e) {
+            return CompletableFuture.failedFuture(new CompletionException(e));
         }
     }
 
     @Override
-    public CompletionStage<DirStat> ls(String storagePath, IExecutionContext execContext) {
+    protected CompletionStage<FileStat> fsGetDirInfo(String storagePath, IExecutionContext execContext) {
+
+        return fsGetFileInfo(storagePath, execContext);
+    }
+
+    @Override
+    protected CompletionStage<List<FileStat>> fsListContents(
+            String storagePath, String startAfter, int maxKeys, boolean recursive,
+            IExecutionContext execContext) {
 
         try {
-            log.info("STORAGE OPERATION: {} {} [{}]", storageKey, LS_OPERATION, storagePath);
+            var absolutePath = resolvePath(storagePath);
+            var stat = buildFileStat(absolutePath, storagePath);
 
-            var absolutePath = resolvePath(storagePath, true, LS_OPERATION);
+            if (stat.fileType != FileType.DIRECTORY) {
+                var listing = List.of(stat);
+                return CompletableFuture.completedFuture(listing);
+            }
 
             try (var paths = Files.list(absolutePath)) {
 
                 var entries = paths
-                        .map(p -> buildFileStat(p, rootPath.relativize(p).toString(), LS_OPERATION))
+                        .map(p -> buildFileStatChecked(p, rootPath.relativize(p).toString()))
                         .collect(Collectors.toList());
 
-                var dirStat = new DirStat(entries);
-
-                return CompletableFuture.completedFuture(dirStat);
+                return CompletableFuture.completedFuture(entries);
             }
         }
-        catch (Exception e) {
-
-            var eStorage = errors.handleException(e, storagePath, LS_OPERATION);
-            return CompletableFuture.failedFuture(eStorage);
+        catch (IOException e) {
+            return CompletableFuture.failedFuture(new CompletionException(e));
+        }
+        catch (CompletionException e) {
+            return CompletableFuture.failedFuture(e);
         }
     }
 
@@ -257,184 +208,154 @@ public class LocalFileStorage implements IFileStorage {
     // In spite of these quirks, the available atime information on Windows may still be useful for housekeeping,
     // however it will cause problems for tasks that rely on precise timing and during testing.
 
-    private FileStat buildFileStat(Path absolutePath, String storagePath, String operationName) {
+    private FileStat buildFileStat(Path absolutePath, String storagePath) throws IOException {
 
         // FileStat does not currently include permissions
         // If/when they are added, there are attribute view classes that do include them
         // We'd need to check for Windows / Posix and choose an attribute view type accordingly
 
+        // Fix separator on Windows FS
+
+        var separator = FileSystems.getDefault().getSeparator();
+
+        if (!separator.equals(BACKSLASH))
+            storagePath = storagePath.replace(separator, BACKSLASH);
+
+        // Fix storage path for the storage root and directory entries
+
+        storagePath =
+                storagePath.isEmpty() ? "." :
+                storagePath.endsWith(BACKSLASH) ? storagePath.substring(0, storagePath.length() - 1) :
+                storagePath;
+
+        var attrType = BasicFileAttributes.class;
+        var attrs = Files.readAttributes(absolutePath, attrType);
+
+        if (!attrs.isRegularFile() && !attrs.isDirectory())
+            throw errors.explicitError(STAT_OPERATION, storagePath, NOT_A_FILE_OR_DIRECTORY);
+
+        // Special handling for the root directory - do not return the name of the storage root folder!
+        var fileName = absolutePath.equals(rootPath)
+            ?   "." : absolutePath.getFileName().toString();
+
+        var fileType = attrs.isRegularFile() ? FileType.FILE : FileType.DIRECTORY;
+
+        // Do not report a size for directories, behavior for doing so is wildly inconsistent!
+        var size = attrs.isRegularFile()
+            ? attrs.size()
+            : 0;
+
+        var mtime = attrs.lastModifiedTime().toInstant();
+        var atime = attrs.lastAccessTime().toInstant();
+
+        return new FileStat(
+                storagePath,
+                fileName, fileType, size,
+                mtime, atime);
+    }
+
+    private FileStat buildFileStatChecked(Path absolutePath, String storagePath) {
+
         try {
-
-            var separator = FileSystems.getDefault().getSeparator();
-            var storagePathWithBackslash = separator.equals(BACKSLASH)
-                    ? storagePath
-                    : storagePath.replace(separator, BACKSLASH);
-
-            var attrType = BasicFileAttributes.class;
-            var attrs = Files.readAttributes(absolutePath, attrType);
-
-            if (!attrs.isRegularFile() && !attrs.isDirectory())
-                throw errors.explicitError(STAT_NOT_FILE_OR_DIR, storagePath, STAT_OPERATION);
-
-            // Special handling for the root directory - do not return the name of the storage root folder!
-            var fileName = absolutePath.equals(rootPath)
-                ?   "." : absolutePath.getFileName().toString();
-
-            var fileType = attrs.isRegularFile() ? FileType.FILE : FileType.DIRECTORY;
-
-            // Do not report a size for directories, behavior for doing so is wildly inconsistent!
-            var size = attrs.isRegularFile()
-                ? attrs.size()
-                : 0;
-
-            var ctime = attrs.creationTime().toInstant();
-            var mtime = attrs.lastModifiedTime().toInstant();
-            var atime = attrs.lastAccessTime().toInstant();
-
-            return new FileStat(
-                    storagePathWithBackslash,
-                    fileName, fileType, size,
-                    ctime, mtime, atime);
+            return buildFileStat(absolutePath, storagePath);
         }
         catch (IOException e) {
-
-            throw errors.handleException(e, storagePath, operationName);
+            throw new CompletionException(e);
         }
     }
 
     @Override
-    public CompletionStage<Void> mkdir(String storagePath, boolean recursive, IExecutionContext execContext) {
+    protected CompletionStage<Void> fsCreateDir(String storagePath, IExecutionContext execContext) {
 
         try {
-            log.info("STORAGE OPERATION: {} {} [{}]", storageKey, MKDIR_OPERATION, storagePath);
-
-            checkWriteFlag(storagePath, MKDIR_OPERATION);
-
-            var absolutePath = resolvePath(storagePath, false, MKDIR_OPERATION);
-
-            if (recursive)
-                Files.createDirectories(absolutePath);
-            else
-                Files.createDirectory(absolutePath);
+            var absolutePath = resolvePath(storagePath);
+            Files.createDirectories(absolutePath);
 
             return CompletableFuture.completedFuture(null);
         }
-        catch (Exception e) {
-
-            var eStorage = errors.handleException(e, storagePath, MKDIR_OPERATION);
-            return CompletableFuture.failedFuture(eStorage);
+        catch (IOException e) {
+            return CompletableFuture.failedFuture(new CompletionException(e));
         }
     }
 
     @Override
-    public CompletionStage<Void> rm(String storagePath, boolean recursive, IExecutionContext execContext) {
+    protected CompletionStage<Void> fsDeleteFile(String storagePath, IExecutionContext execContext) {
 
         try {
-            log.info("STORAGE OPERATION: {} {} [{}]", storageKey, RM_OPERATION, storagePath);
-
-            checkWriteFlag(storagePath, RM_OPERATION);
-
-            var absolutePath = resolvePath(storagePath, false, RM_OPERATION);
-
-            if (recursive) {
-
-                Files.walkFileTree(absolutePath, new SimpleFileVisitor<>() {
-
-                    @Override
-                    public FileVisitResult visitFile(
-                            Path file,
-                            BasicFileAttributes attrs) throws IOException {
-
-                        Files.delete(file);
-                        return FileVisitResult.CONTINUE;
-                    }
-
-                    @Override
-                    public FileVisitResult postVisitDirectory(
-                            Path dir, IOException exc) throws IOException {
-
-                        if (exc != null) throw exc;
-
-                        Files.delete(dir);
-                        return FileVisitResult.CONTINUE;
-                    }
-                });
-            }
-            else {
-
-                // Do not allow rm on a directory with the recursive flag set
-                if (Files.isDirectory(absolutePath))
-                    throw errors.explicitError(RM_DIR_NOT_RECURSIVE, storagePath, RM_OPERATION);
-
-                Files.delete(absolutePath);
-            }
+            var absolutePath = resolvePath(storagePath);
+            Files.delete(absolutePath);
 
             return CompletableFuture.completedFuture(null);
         }
-        catch (Exception e) {
-
-            var eStorage = errors.handleException(e, storagePath, RM_OPERATION);
-            return CompletableFuture.failedFuture(eStorage);
+        catch (IOException e) {
+            return CompletableFuture.failedFuture(new CompletionException(e));
         }
     }
 
     @Override
-    public Flow.Publisher<ByteBuf> reader(String storagePath, IDataContext dataContext) {
+    protected CompletionStage<Void> fsDeleteDir(String storagePath, IExecutionContext execContext) {
 
-        log.info("STORAGE OPERATION: {} {} [{}]", storageKey, READ_OPERATION, storagePath);
+        try {
+            var absolutePath = resolvePath(storagePath);
 
-        var absolutePath = resolvePath(storagePath, false, READ_OPERATION);
+            Files.walkFileTree(absolutePath, new SimpleFileVisitor<>() {
+
+                @Override
+                public FileVisitResult visitFile(
+                        Path file, BasicFileAttributes attrs) throws IOException {
+
+                    Files.delete(file);
+                    return FileVisitResult.CONTINUE;
+                }
+
+                @Override
+                public FileVisitResult postVisitDirectory(
+                        Path dir, IOException exc) throws IOException {
+
+                    if (exc != null) throw exc;
+
+                    Files.delete(dir);
+                    return FileVisitResult.CONTINUE;
+                }
+            });
+
+            return CompletableFuture.completedFuture(null);
+        }
+        catch (IOException e) {
+            return CompletableFuture.failedFuture(new CompletionException(e));
+        }
+    }
+
+    @Override
+    protected Flow.Publisher<ByteBuf>
+    fsOpenInputStream(String storagePath, IDataContext dataContext) {
+
+        var absolutePath = resolvePath(storagePath);
 
         return new LocalFileReader(
-                storageKey, storagePath,
-                absolutePath, ByteBufAllocator.DEFAULT,
-                dataContext.eventLoopExecutor());
+                storagePath, absolutePath,
+                ByteBufAllocator.DEFAULT,
+                dataContext.eventLoopExecutor(),
+                errors);
     }
 
     @Override
-    public Flow.Subscriber<ByteBuf> writer(
-            String storagePath,
-            CompletableFuture<Long> signal,
-            IDataContext dataContext) {
+    protected Flow.Subscriber<ByteBuf>
+    fsOpenOutputStream(String storagePath, CompletableFuture<Long> signal, IDataContext dataContext) {
 
-        log.info("STORAGE OPERATION: {} {} [{}]", storageKey, WRITE_OPERATION, storagePath);
-
-        checkWriteFlag(storagePath, WRITE_OPERATION);
-
-        var absolutePath = resolvePath(storagePath, false, WRITE_OPERATION);
+        var absolutePath = resolvePath(storagePath);
 
         return new LocalFileWriter(
-                storageKey, storagePath,
-                absolutePath, signal,
-                dataContext.eventLoopExecutor());
+                storagePath, absolutePath, signal,
+                dataContext.eventLoopExecutor(),
+                errors);
     }
 
-    private Path resolvePath(String storagePath, boolean allowRootDir, String operationName) {
+    private Path resolvePath(String storagePath) {
 
-        try {
-
-            if (storagePath == null || storagePath.isBlank())
-                throw errors.explicitError(STORAGE_PATH_NULL_OR_BLANK, storagePath, operationName);
-
-            var relativePath = Path.of(storagePath);
-
-            if (relativePath.isAbsolute())
-                throw errors.explicitError(STORAGE_PATH_NOT_RELATIVE, storagePath, operationName);
-
-            var absolutePath = rootPath.resolve(storagePath).normalize();
-
-            if (absolutePath.getNameCount() < rootPath.getNameCount() || !absolutePath.startsWith(rootPath))
-                throw errors.explicitError(STORAGE_PATH_OUTSIDE_ROOT, storagePath, operationName);
-
-
-            if (absolutePath.equals(rootPath) && !allowRootDir)
-                throw errors.explicitError(STORAGE_PATH_IS_ROOT, storagePath, operationName);
-
-            return absolutePath;
-        }
-        catch (InvalidPathException e) {
-
-            throw errors.explicitError(STORAGE_PATH_INVALID, storagePath, operationName);
-        }
+        if (storagePath.isEmpty())
+            return rootPath;
+        else
+            return rootPath.resolve(storagePath);
     }
 }

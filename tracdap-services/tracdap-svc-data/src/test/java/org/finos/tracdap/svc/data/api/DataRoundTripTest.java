@@ -16,20 +16,25 @@
 
 package org.finos.tracdap.svc.data.api;
 
-import io.netty.util.concurrent.DefaultEventExecutor;
 import org.finos.tracdap.api.*;
 import org.finos.tracdap.common.concurrent.ExecutionContext;
 import org.finos.tracdap.common.concurrent.Flows;
 import org.finos.tracdap.common.concurrent.IExecutionContext;
-import org.finos.tracdap.metadata.*;
-
-import org.finos.tracdap.test.data.SampleData;
-import org.finos.tracdap.test.helpers.PlatformTest;
+import org.finos.tracdap.common.config.ConfigManager;
+import org.finos.tracdap.common.plugin.PluginManager;
 import org.finos.tracdap.common.util.ResourceHelpers;
+import org.finos.tracdap.metadata.*;
+import org.finos.tracdap.test.data.SampleData;
+import org.finos.tracdap.test.helpers.StorageTestHelpers;
+import org.finos.tracdap.test.helpers.PlatformTest;
+
 import com.google.common.collect.Streams;
 import com.google.protobuf.ByteString;
 import org.apache.arrow.memory.RootAllocator;
 import org.apache.arrow.vector.ipc.ArrowStreamWriter;
+import io.netty.channel.EventLoopGroup;
+import io.netty.channel.nio.NioEventLoopGroup;
+
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.extension.RegisterExtension;
@@ -55,6 +60,7 @@ abstract class DataRoundTripTest {
     public static final String TRAC_CONFIG_ENV_VAR = "TRAC_CONFIG_FILE";
     public static final String TEST_TENANT = "ACME_CORP";
 
+    protected static EventLoopGroup elg;
     protected static IExecutionContext execContext;
     protected static TracDataApiGrpc.TracDataApiStub dataClient;
 
@@ -62,7 +68,7 @@ abstract class DataRoundTripTest {
     static class UnitTest extends DataRoundTripTest {
 
         @RegisterExtension
-        private static final PlatformTest platform = PlatformTest.forConfig(TRAC_CONFIG_UNIT)
+        public static final PlatformTest platform = PlatformTest.forConfig(TRAC_CONFIG_UNIT)
                 .runDbDeploy(true)
                 .addTenant(TEST_TENANT)
                 .startMeta()
@@ -70,13 +76,18 @@ abstract class DataRoundTripTest {
                 .build();
 
         @BeforeAll
-        static void setup() {
-            execContext = new ExecutionContext(new DefaultEventExecutor());
+        static void setupClass() {
+            elg = new NioEventLoopGroup(2);
             dataClient = platform.dataClient();
+        }
+
+        @BeforeEach
+        void setup() {
+            execContext = new ExecutionContext(elg.next());
         }
     }
 
-    // Include this test case for integration against different database backends
+    // Include this test case for integration against different storage backends
     @Tag("integration")
     @Tag("int-storage")
     static class IntegrationTest extends DataRoundTripTest {
@@ -84,7 +95,7 @@ abstract class DataRoundTripTest {
         private static final String TRAC_CONFIG_ENV_FILE = System.getenv(TRAC_CONFIG_ENV_VAR);
 
         @RegisterExtension
-        private static final PlatformTest platform = PlatformTest.forConfig(TRAC_CONFIG_ENV_FILE)
+        public static final PlatformTest platform = PlatformTest.forConfig(TRAC_CONFIG_ENV_FILE)
                 .runDbDeploy(true)
                 .addTenant(TEST_TENANT)
                 .startMeta()
@@ -92,9 +103,29 @@ abstract class DataRoundTripTest {
                 .build();
 
         @BeforeAll
-        static void setup() {
-            execContext = new ExecutionContext(new DefaultEventExecutor());
+        static void setupClass() {
+            elg = new NioEventLoopGroup(2);
             dataClient = platform.dataClient();
+        }
+
+        @BeforeEach
+        void setup() {
+            execContext = new ExecutionContext(elg.next());
+        }
+
+        @AfterAll
+        static void tearDownClass() throws Exception {
+
+            var plugins = new PluginManager();
+            plugins.initConfigPlugins();
+            plugins.initRegularPlugins();
+
+            var config = new ConfigManager(
+                    platform.platformConfigUrl(),
+                    platform.tracDir(),
+                    plugins);
+
+            StorageTestHelpers.deleteStoragePrefix(config, plugins, elg);
         }
     }
 

@@ -42,7 +42,7 @@ jobs:
     if: ${{ inputs.enabled && inputs.has_java }}
 
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 20
 
     # To use apt-get install, jobs must run in a container
     container:
@@ -108,12 +108,13 @@ jobs:
         run: ./gradlew integration -DintegrationTags="${{ env.JAVA_TESTS }}"
 
       # If the tests fail, make the output available for download
+      # Include build/modules and build/plugins
       - name: Store failed test results
         uses: actions/upload-artifact@v3
         if: failure()
         with:
           name: junit-test-results
-          path: build/plugins/*/reports/**
+          path: build/*/*/reports/**
           retention-days: 7
 
       - name: Integration teardown script
@@ -130,7 +131,7 @@ jobs:
     env: ${{ fromJson( inputs.matrix ) }}
 
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 20
 
     # To use apt-get install, jobs must run in a container
     container:

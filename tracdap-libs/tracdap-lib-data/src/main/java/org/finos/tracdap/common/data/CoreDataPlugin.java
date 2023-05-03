@@ -26,6 +26,7 @@ import org.finos.tracdap.common.exception.EPluginNotAvailable;
 import org.finos.tracdap.common.plugin.PluginServiceInfo;
 import org.finos.tracdap.common.plugin.TracPlugin;
 import org.finos.tracdap.common.storage.IFileStorage;
+import org.finos.tracdap.common.storage.IStorageManager;
 import org.finos.tracdap.common.storage.local.LocalFileStorage;
 
 import java.util.List;
@@ -65,7 +66,10 @@ public class CoreDataPlugin extends TracPlugin {
 
         switch (serviceName) {
 
-            case LOCAL_FILE_STORAGE_NAME: return (T) new LocalFileStorage(properties);
+            case LOCAL_FILE_STORAGE_NAME:
+                var instance = properties.getProperty(IStorageManager.PROP_STORAGE_KEY);
+                return (T) new LocalFileStorage(instance, properties);
+
             case ARROW_STREAM_CODEC_NAME: return (T) new ArrowStreamCodec();
             case ARROW_FILE_CODEC_NAME: return (T) new ArrowFileCodec();
             case CSV_CODEC_NAME: return (T) new CsvCodec();

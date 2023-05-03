@@ -22,7 +22,6 @@ import org.finos.tracdap.common.codec.ICodecManager;
 import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.common.exception.EStorageConfig;
 import org.finos.tracdap.common.plugin.IPluginManager;
-import org.finos.tracdap.common.storage.flat.FlatDataStorage;
 
 import io.netty.channel.EventLoopGroup;
 
@@ -83,7 +82,7 @@ public class StorageManager implements IStorageManager, AutoCloseable {
 
                 for (var fileInstance : backend.fileInstances) {
 
-                    var dataInstance = new FlatDataStorage(bucketConfig, fileInstance, formats);
+                    var dataInstance = new CommonDataStorage(bucketConfig, fileInstance, formats);
                     dataInstance.start(eventLoopGroup);
 
                     backend.dataInstances.add(dataInstance);

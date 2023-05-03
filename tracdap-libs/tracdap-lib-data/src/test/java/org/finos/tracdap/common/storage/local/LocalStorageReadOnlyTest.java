@@ -21,25 +21,31 @@ import io.netty.util.concurrent.DefaultThreadFactory;
 import org.apache.arrow.memory.RootAllocator;
 import org.finos.tracdap.common.concurrent.ExecutionContext;
 import org.finos.tracdap.common.data.DataContext;
+import org.finos.tracdap.common.storage.CommonFileStorage;
 import org.finos.tracdap.common.storage.IStorageManager;
-import org.finos.tracdap.common.storage.LocalStorageNotWritableTestSuite;
+import org.finos.tracdap.common.storage.StorageReadOnlyTestSuite;
 
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.io.TempDir;
 
+import java.nio.file.Path;
 import java.util.Properties;
 
-public class LocalLocalStorageNotWritableTest extends LocalStorageNotWritableTestSuite {
+
+public class LocalStorageReadOnlyTest extends StorageReadOnlyTestSuite {
 
     @BeforeEach
-    void setupStorage() {
+    void setupStorage(@TempDir Path storageDir) {
 
-        var storageProps = new Properties();
+        var rwProps = new Properties();
+        rwProps.put(IStorageManager.PROP_STORAGE_KEY, "TEST_STORAGE_NOT_WRITABLE");
+        rwProps.put(LocalFileStorage.CONFIG_ROOT_PATH, storageDir.toString());
+        rwStorage = new LocalFileStorage("TEST_LOCAL_RW_STORAGE", rwProps);
 
-        storageProps.put(IStorageManager.PROP_STORAGE_KEY, "TEST_STORAGE_NOT_WRITABLE");
-        storageProps.put(LocalFileStorage.CONFIG_ROOT_PATH, storageDir.toString());
-        storageProps.put(LocalFileStorage.CONFIG_READ_ONLY, "true");
-
-        storage = new LocalFileStorage(storageProps);
+        var roProps = new Properties();
+        roProps.putAll(rwProps);
+        roProps.put(CommonFileStorage.READ_ONLY_CONFIG_KEY, "true");
+        roStorage = new LocalFileStorage("TEST_LOCAL_RO_STORAGE", roProps);
 
         execContext = new ExecutionContext(new DefaultEventExecutor(new DefaultThreadFactory("t-events")));
         dataContext = new DataContext(execContext.eventLoopExecutor(), new RootAllocator());

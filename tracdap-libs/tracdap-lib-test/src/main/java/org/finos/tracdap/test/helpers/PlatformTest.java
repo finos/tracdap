@@ -23,10 +23,8 @@ import org.finos.tracdap.api.TracOrchestratorApiGrpc;
 import org.finos.tracdap.api.TrustedMetadataApiGrpc;
 import org.finos.tracdap.common.auth.internal.ClientAuthProvider;
 import org.finos.tracdap.common.auth.external.AuthLogic;
-import org.finos.tracdap.common.auth.internal.JwtProcessor;
 import org.finos.tracdap.common.auth.internal.JwtSetup;
 import org.finos.tracdap.common.auth.internal.UserInfo;
-import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.plugin.PluginManager;
 import org.finos.tracdap.common.startup.StandardArgs;
@@ -53,7 +51,8 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.security.KeyPair;
+import java.time.Instant;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 
@@ -131,6 +130,7 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         }
     }
 
+    private String testId;
     private Path tracDir;
     private Path tracStorageDir;
     private Path tracExecDir;
@@ -177,8 +177,12 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         return ClientAuthProvider.applyIfAvailable(client, authToken);
     }
 
-    public Path storageRootDir() {
-        return tracStorageDir;
+    public String platformConfigUrl() {
+        return platformConfigUrl.toString();
+    }
+
+    public Path tracDir() {
+        return tracDir;
     }
 
     public Path tracRepoDir() {
@@ -187,6 +191,8 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
 
     @Override
     public void beforeAll(ExtensionContext context) throws Exception {
+
+        setTestId();
 
         findDirectories();
         prepareConfig();
@@ -208,6 +214,14 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         stopServices();
 
         cleanupDirectories();
+    }
+
+    void setTestId() {
+
+        var timestamp = DateTimeFormatter.ISO_INSTANT.format(Instant.now()).replace(':', '.');
+        var random = new Random().nextLong();
+
+        testId = String.format("%s_0x%h", timestamp, random);
     }
 
     void findDirectories() throws Exception {
@@ -262,7 +276,8 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
                 "${TRAC_STORAGE_FORMAT}", storageFormat,
                 "${TRAC_EXEC_DIR}", tracExecDir.toString().replace("\\", "\\\\"),
                 "${TRAC_LOCAL_REPO}", tracRepoDir.toString(),
-                "${TRAC_GIT_REPO}", currentGitOrigin);
+                "${TRAC_GIT_REPO}", currentGitOrigin,
+                "${TRAC_TEST_ID}", testId);
 
         var substitutions = new HashMap<>(staticSubstitutions);
 

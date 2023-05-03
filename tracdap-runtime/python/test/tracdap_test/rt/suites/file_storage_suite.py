@@ -61,16 +61,6 @@ class FileOperationsTestSuite:
     # EXISTS
     # ------------------------------------------------------------------------------------------------------------------
 
-    def test_exists_dir(self):
-
-        self.storage.mkdir("test_dir", False)
-
-        dir_present = self.storage.exists("test_dir")
-        dir_not_present = self.storage.exists("other_dir")
-
-        self.assertTrue(dir_present)
-        self.assertFalse(dir_not_present)
-
     def test_exists_file(self):
 
         self.make_small_file("test_file.txt")
@@ -88,6 +78,26 @@ class FileOperationsTestSuite:
         empty_file_exist = self.storage.exists("test_file.txt")
 
         self.assertTrue(empty_file_exist)
+
+    def test_exists_dir(self):
+
+        self.storage.mkdir("test_dir", False)
+
+        dir_present = self.storage.exists("test_dir")
+        dir_not_present = self.storage.exists("other_dir")
+
+        self.assertTrue(dir_present)
+        self.assertFalse(dir_not_present)
+
+    def test_exists_parent_dir(self):
+
+        self.storage.mkdir("parent_dir/child_dir", True)
+
+        dir_present = self.storage.exists("parent_dir")
+        dir_not_present = self.storage.exists("other_dir")
+
+        self.assertTrue(dir_present)
+        self.assertFalse(dir_not_present)
 
     def test_exists_storage_root(self):
 
@@ -223,6 +233,19 @@ class FileOperationsTestSuite:
 
         self.assertEqual("some_dir/test_dir", stat_result.storage_path)
         self.assertEqual("test_dir", stat_result.file_name)
+        self.assertEqual(_storage.FileType.DIRECTORY, stat_result.file_type)
+
+        # Size field for directories should always be set to 0
+        self.assertEqual(0, stat_result.size)
+
+    def test_stat_dir_implicit_ok(self):
+
+        self.storage.mkdir("some_dir/test_dir", True)
+
+        stat_result = self.storage.stat("some_dir")
+
+        self.assertEqual("some_dir", stat_result.storage_path)
+        self.assertEqual("some_dir", stat_result.file_name)
         self.assertEqual(_storage.FileType.DIRECTORY, stat_result.file_type)
 
         # Size field for directories should always be set to 0
@@ -507,6 +530,16 @@ class FileOperationsTestSuite:
         self.fail_for_storage_root(lambda path_: self.storage.mkdir(path_, False))
         self.fail_for_storage_root(lambda path_: self.storage.mkdir(path_, True))
 
+    def test_mkdir_unicode(self):
+
+        self.storage.mkdir("你好/你好", True)
+
+        dir_exists = self.storage.exists("你好")
+        child_exists = self.storage.exists("你好/你好")
+
+        self.assertTrue(dir_exists)
+        self.assertTrue(child_exists)
+
     # ------------------------------------------------------------------------------------------------------------------
     # RM
     # ------------------------------------------------------------------------------------------------------------------
@@ -522,6 +555,19 @@ class FileOperationsTestSuite:
         # File should be gone
 
         exists = self.storage.exists("test_file.txt")
+        self.assertFalse(exists)
+
+    def test_rm_in_subdir_ok(self):
+
+        # Simplest case - create one file and delete it
+
+        self.make_small_file("sub_dir/test_file.txt")
+
+        self.storage.rm("sub_dir/test_file.txt")
+
+        # File should be gone
+
+        exists = self.storage.exists("sub_dir/test_file.txt")
         self.assertFalse(exists)
 
     def test_rm_on_dir(self):
@@ -567,24 +613,17 @@ class FileOperationsTestSuite:
         exists = self.storage.exists("test_dir")
         self.assertFalse(exists)
 
-    def test_rmdir_on_file(self):
+    def test_rmdir_by_prefix(self):
 
-        # Calling rmdir on a file is a bad request
+        self.storage.mkdir("test_dir/sub_dir", True)
 
-        self.make_small_file("test_file.txt")
-
-        self.assertRaises(_ex.EStorageRequest, lambda: self.storage.rmdir("test_file.txt"))
-
-        # File should still exist because rm has failed
-
-        exists = self.storage.exists("test_file.txt")
+        exists = self.storage.exists("test_dir")
         self.assertTrue(exists)
 
-    def test_rmdir_missing(self):
+        self.storage.rmdir("test_dir")
 
-        # Try to delete a path that does not exist
-
-        self.assertRaises(_ex.EStorageRequest, lambda: self.storage.rmdir("missing_path"))
+        exists = self.storage.exists("test_dir")
+        self.assertFalse(exists)
 
     def test_rmdir_with_content(self):
 
@@ -607,6 +646,25 @@ class FileOperationsTestSuite:
         self.assertFalse(exists1)
         self.assertTrue(exists2)
         self.assertTrue(size2a > 0)
+
+    def test_rmdir_on_file(self):
+
+        # Calling rmdir on a file is a bad request
+
+        self.make_small_file("test_file.txt")
+
+        self.assertRaises(_ex.EStorageRequest, lambda: self.storage.rmdir("test_file.txt"))
+
+        # File should still exist because rm has failed
+
+        exists = self.storage.exists("test_file.txt")
+        self.assertTrue(exists)
+
+    def test_rmdir_missing(self):
+
+        # Try to delete a path that does not exist
+
+        self.assertRaises(_ex.EStorageRequest, lambda: self.storage.rmdir("missing_path"))
 
     def test_rmdir_bad_paths(self):
 
@@ -727,6 +785,19 @@ class FileReadWriteTestSuite:
 
         self.do_round_trip(storage_path, [empty_bytes], self.storage)
 
+    def test_round_trip_unicode(self):
+
+        an_ode_to_the_goose = \
+            "鹅、鹅、鹅，\n" + \
+            "曲项向天歌。\n" + \
+            "白毛浮绿水，\n" + \
+            "红掌拨清波"
+
+        storage_path = "咏鹅.txt"
+        storage_bytes = an_ode_to_the_goose.encode('utf-8')
+
+        self.do_round_trip(storage_path, [storage_bytes], self.storage)
+
     def do_round_trip(self, storage_path: str, original_bytes: tp.List[bytes], storage: _storage.IFileStorage):
 
         with storage.write_byte_stream(storage_path) as write_stream:
@@ -775,7 +846,7 @@ class FileReadWriteTestSuite:
         # This is in line with cloud bucket semantics
 
         storage_path = "some_file.txt"
-        content = "Some content".encode('utf-8')
+        content = "Some content that is longer than what will be written later".encode('utf-8')
 
         def write_to_path(path_, content_):
             with self.storage.write_byte_stream(path_) as stream:

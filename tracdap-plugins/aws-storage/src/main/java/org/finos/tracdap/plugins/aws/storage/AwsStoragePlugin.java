@@ -21,6 +21,7 @@ import org.finos.tracdap.common.exception.EPluginNotAvailable;
 import org.finos.tracdap.common.plugin.PluginServiceInfo;
 import org.finos.tracdap.common.plugin.TracPlugin;
 import org.finos.tracdap.common.storage.IFileStorage;
+import org.finos.tracdap.common.storage.IStorageManager;
 
 import java.util.List;
 import java.util.Properties;
@@ -45,12 +46,14 @@ public class AwsStoragePlugin extends TracPlugin {
     }
 
     @Override @SuppressWarnings("unchecked")
-    protected <T> T createService(String serviceName, Properties properties, ConfigManager configManager) {
+    protected <T> T createService(String service, Properties properties, ConfigManager configManager) {
 
-        if (serviceName.equals(S3_OBJECT_STORAGE))
-            return (T) new S3ObjectStorage(properties);
+        if (service.equals(S3_OBJECT_STORAGE)) {
+            var instance = properties.getProperty(IStorageManager.PROP_STORAGE_KEY);
+            return (T) new S3ObjectStorage(instance, properties);
+        }
 
-        var message = String.format("Plugin [%s] does not support the service [%s]", pluginName(), serviceName);
+        var message = String.format("Plugin [%s] does not support the service [%s]", pluginName(), service);
         throw new EPluginNotAvailable(message);
     }
 }

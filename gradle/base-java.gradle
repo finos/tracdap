@@ -54,10 +54,14 @@ java {
 }
 
 tasks.withType(JavaCompile).configureEach {
-  options.encoding = 'UTF-8'
+
+    // Allow UTF-8 encoding in source files
+    options.encoding = 'UTF-8'
 }
 
 compileJava {
+
+    // This is needed for automatic logging calls into interfaces
     options.compilerArgs << '-parameters'
 }
 
@@ -72,6 +76,9 @@ test {
     jvmArgs("--add-opens", "java.base/jdk.internal.misc=ALL-UNNAMED")
     jvmArgs("--add-opens", "java.base/java.nio=ALL-UNNAMED")
     systemProperty("io.netty.tryReflectionSetAccessible", true)
+
+    // Allow UTF-8 literals in test code
+    systemProperty("file.encoding", "utf-8")
 }
 
 task integration(type: Test) {

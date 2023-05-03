@@ -23,14 +23,13 @@ public class FileStat {
     public FileStat(
             String storagePath,
             String fileName, FileType fileType, long size,
-            Instant ctime, Instant mtime, Instant atime) {
+            Instant mtime, Instant atime) {
 
         this.storagePath = storagePath;
         this.fileName = fileName;
         this.fileType = fileType;
         this.size = size;
 
-        this.ctime = ctime;
         this.mtime = mtime;
         this.atime = atime;
     }
@@ -40,7 +39,6 @@ public class FileStat {
     public final FileType fileType;
     public final long size;
 
-    public final Instant ctime;
     public final Instant mtime;
     public final Instant atime;
 }

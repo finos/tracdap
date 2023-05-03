@@ -137,6 +137,23 @@ public abstract class StorageReadWriteTestSuite {
                 storage, dataContext);
     }
 
+    @Test
+    void roundTrip_unicode() throws Exception {
+
+        var anOdeToTheGoose =
+            "鹅、鹅、鹅，\n" +
+            "曲项向天歌。\n" +
+            "白毛浮绿水，\n" +
+            "红掌拨清波";
+
+        var storagePath = "咏鹅.txt";
+        var storageBytes = anOdeToTheGoose.getBytes(StandardCharsets.UTF_8);
+
+        StorageReadWriteTestSuite.roundTripTest(
+                storagePath, List.of(storageBytes),
+                storage, dataContext);
+    }
+
     static void roundTripTest(
             String storagePath, List<byte[]> originalBytes,
             IFileStorage storage, IDataContext dataContext) throws Exception {
@@ -195,31 +212,61 @@ public abstract class StorageReadWriteTestSuite {
     // This exposes the functional cause of errors in the stream, which will be EStorage (or ETrac) errors
 
     @Test
-    void testWrite_missingDir() {
+    void testWrite_missingDir() throws Exception {
 
-        var storagePath = "missing_dir/some_file.txt";
-        var content = ByteBufUtil.encodeString(
-                ByteBufAllocator.DEFAULT,
-                CharBuffer.wrap("Some content"),
-                StandardCharsets.UTF_8);
+        // Basic test without creating the parent dir first
+        // Should be automatically created by the writer
 
-        var contentStream = Flows.publish(Stream.of(content));
+        var storagePath = "parent_dir/haiku.txt";
 
-        var writeSignal = new CompletableFuture<Long>();
-        var writer = storage.writer(storagePath, writeSignal, dataContext);
+        var haiku =
+                "The data goes in;\n" +
+                "For a short while it persists,\n" +
+                "then returns unscathed!";
 
-        Assertions.assertThrows(EStorageRequest.class, () -> {
+        var haikuBytes = haiku.getBytes(StandardCharsets.UTF_8);
 
-            contentStream.subscribe(writer);
-            waitFor(TEST_TIMEOUT, writeSignal);
-            resultOf(writeSignal);
-        });
+        roundTripTest(storagePath, List.of(haikuBytes), storage, dataContext);
     }
 
     @Test
-    void testWrite_alreadyExists() throws Exception {
+    void testWrite_fileAlreadyExists() throws Exception {
+
+        //  Writing a file always overwrites any existing content
+        // This is in line with cloud bucket semantics
 
         var storagePath = "some_file.txt";
+
+        var prepare = makeSmallFile(storagePath, storage, execContext);
+        waitFor(TEST_TIMEOUT, prepare);
+
+        var exists1 = storage.exists(storagePath, execContext);
+        waitFor(TEST_TIMEOUT, exists1);
+        var exists1Result = resultOf(exists1);
+        Assertions.assertTrue(exists1Result);
+
+        var newContent = "small";
+        var newContentBytes = newContent.getBytes(StandardCharsets.UTF_8);
+
+        roundTripTest(storagePath, List.of(newContentBytes), storage, dataContext);
+    }
+
+    @Test
+    void testWrite_dirAlreadyExists() throws Exception {
+
+        // File storage should not allow a file to be written if a dir exists with the same name
+        // TRAC prohibits this even though it is allowed in pure bucket semantics
+
+        var storagePath = "some_file.txt";
+
+        var prepare = storage.mkdir(storagePath, false, execContext);
+        waitFor(TEST_TIMEOUT, prepare);
+
+        var exists1 = storage.exists(storagePath, execContext);
+        waitFor(TEST_TIMEOUT, exists1);
+        var exists1Result = resultOf(exists1);
+        Assertions.assertTrue(exists1Result);
+
         var content = ByteBufUtil.encodeString(
                 ByteBufAllocator.DEFAULT,
                 CharBuffer.wrap("Some content"),
@@ -365,8 +412,8 @@ public abstract class StorageReadWriteTestSuite {
         It is difficult to verify this using the abstracted storage API!
         These tests look for common symptoms of resource leaks that may catch some common errors
 
-        Error states in the streams are checked directly by mocking/spying on the Java Flow API
-        E.g. Illegal state and cancellation exceptions are checked explicitly
+        Tests check error states in the streams directly by mocking/spying on the Java Flow API
+        E.g. Illegal state and cancellation exceptions, which are checked explicitly
         This is different from the functional tests, which unwrap stream state errors to look for EStorage errors
 
         Using the storage API it is not possible to simulate errors that occur in the storage back end
@@ -378,7 +425,7 @@ public abstract class StorageReadWriteTestSuite {
      */
 
     @Test
-    void testWrite_chunksReleased() {
+    void testWrite_chunksReleased() throws Exception {
 
         // Writer takes ownership of chunks when it receives them
         // This test makes sure they are being released after they have been written
@@ -409,6 +456,9 @@ public abstract class StorageReadWriteTestSuite {
         waitFor(TEST_TIMEOUT, writeSignal);
 
         Assertions.assertDoesNotThrow(() -> resultOf(writeSignal));
+
+        // Allow time for background cleanup
+        Thread.sleep(ASYNC_DELAY.toMillis());
 
         for (var chunk : chunks)
             Assertions.assertEquals(0, chunk.refCnt());
@@ -457,7 +507,7 @@ public abstract class StorageReadWriteTestSuite {
 
         var subscription1 = mock(Flow.Subscription.class);
         writer.onSubscribe(subscription1);
-        verify(subscription1, timeout(ASYNC_DELAY.toMillis())).request(anyLong());
+        verify(subscription1, timeout(TEST_TIMEOUT.toMillis())).request(anyLong());
 
         // Second subscription to the writer, should throw illegal state
 
@@ -491,7 +541,7 @@ public abstract class StorageReadWriteTestSuite {
         var subscription = mock(Flow.Subscription.class);
         writer.onSubscribe(subscription);
 
-        verify(subscription, timeout(ASYNC_DELAY.toMillis())).request(anyLong());
+        verify(subscription, timeout(TEST_TIMEOUT.toMillis())).request(anyLong());
 
         // Send an error without calling onNext
         // The writer should clean up and notify failure using the writer signal
@@ -541,7 +591,7 @@ public abstract class StorageReadWriteTestSuite {
         var subscription = mock(Flow.Subscription.class);
         writer.onSubscribe(subscription);
 
-        verify(subscription, timeout(ASYNC_DELAY.toMillis())).request(anyLong());
+        verify(subscription, timeout(TEST_TIMEOUT.toMillis())).request(anyLong());
 
         // Send one chunk to the writer
 
@@ -594,7 +644,7 @@ public abstract class StorageReadWriteTestSuite {
         var chunk1 = Unpooled.wrappedBuffer(bytes);
 
         writer1.onSubscribe(subscription1);
-        verify(subscription1, timeout(ASYNC_DELAY.toMillis())).request(anyLong());
+        verify(subscription1, timeout(TEST_TIMEOUT.toMillis())).request(anyLong());
         writer1.onNext(chunk1);
 
         // Give the writer some time for the chunk to be written to disk
@@ -618,7 +668,7 @@ public abstract class StorageReadWriteTestSuite {
         var chunk2 = Unpooled.wrappedBuffer(bytes);
 
         writer2.onSubscribe(subscription2);
-        verify(subscription2, timeout(ASYNC_DELAY.toMillis())).request(anyLong());
+        verify(subscription2, timeout(TEST_TIMEOUT.toMillis())).request(anyLong());
         writer2.onNext(chunk2);
         writer2.onComplete();
 
@@ -681,7 +731,7 @@ public abstract class StorageReadWriteTestSuite {
         reader.subscribe(subscriber);
 
         // onSubscribe should be received
-        verify(subscriber, timeout(ASYNC_DELAY.toMillis())).onSubscribe(any(Flow.Subscription.class));
+        verify(subscriber, timeout(TEST_TIMEOUT.toMillis())).onSubscribe(any(Flow.Subscription.class));
 
         // The stream should be read until complete
         verify(subscriber, timeout(TEST_TIMEOUT.toMillis())).onComplete();
@@ -713,15 +763,15 @@ public abstract class StorageReadWriteTestSuite {
         resultOf(content).release();
 
         // Delete the file
-        var rm = storage.rm(storagePath, false, dataContext);
+        var rm = storage.rm(storagePath, dataContext);
         waitFor(TEST_TIMEOUT, rm);
 
         // Now try subscribing to the reader - should result in a storage request error
         Flow.Subscriber<ByteBuf> subscriber = unchecked(mock(Flow.Subscriber.class));
         reader.subscribe(subscriber);
 
-        verify(subscriber, timeout(ASYNC_DELAY.toMillis())).onSubscribe(any(Flow.Subscription.class));
-        verify(subscriber, timeout(ASYNC_DELAY.toMillis())).onError(any(EStorageRequest.class));
+        verify(subscriber, timeout(TEST_TIMEOUT.toMillis())).onSubscribe(any(Flow.Subscription.class));
+        verify(subscriber, timeout(TEST_TIMEOUT.toMillis())).onError(any(EStorageRequest.class));
     }
 
     @Test
@@ -754,16 +804,15 @@ public abstract class StorageReadWriteTestSuite {
         // Second should receive onError with an illegal state exception
         // As per: https://docs.oracle.com/en/java/javase/11/docs/api/java.base/java/util/concurrent/Flow.Publisher.html#subscribe(java.util.concurrent.Flow.Subscriber)
 
-        verify(subscriber1, timeout(ASYNC_DELAY.toMillis())).onSubscribe(any(Flow.Subscription.class));
-        verify(subscriber2, timeout(ASYNC_DELAY.toMillis())).onError(any(IllegalStateException.class));
+        verify(subscriber1, timeout(TEST_TIMEOUT.toMillis())).onSubscribe(any(Flow.Subscription.class));
+        verify(subscriber2, timeout(TEST_TIMEOUT.toMillis())).onError(any(IllegalStateException.class));
 
         // Subscription 1 should still work as normal when data is requested
 
         subscription1.get().request(2);
-        Thread.sleep(ASYNC_DELAY.toMillis());
 
-        verify(subscriber1, times(1)).onNext(any(ByteBuf.class));
-        verify(subscriber1, times(1)).onComplete();
+        verify(subscriber1, timeout(TEST_TIMEOUT.toMillis()).times(1)).onNext(any(ByteBuf.class));
+        verify(subscriber1, timeout(TEST_TIMEOUT.toMillis()).times(1)).onComplete();
 
         // Subscription 2 should not receive any further signals
 
@@ -773,7 +822,7 @@ public abstract class StorageReadWriteTestSuite {
     }
 
     @Test
-    void testRead_cancelImmediately() throws Exception {
+    void testRead_cancelImmediately() {
 
         var storagePath = "some_file.txt";
         var writeSignal = makeSmallFile(storagePath, storage, dataContext);
@@ -801,9 +850,7 @@ public abstract class StorageReadWriteTestSuite {
         //  - One call into onSubscribe, when the subscriber was subscribed
         //  - Nothing else, because we cancelled before making any requests
 
-        Thread.sleep(ASYNC_DELAY.toMillis());
-
-        verify(subscriber, times(1)).onSubscribe(any(Flow.Subscription.class));
+        verify(subscriber, timeout(TEST_TIMEOUT.toMillis()).times(1)).onSubscribe(any(Flow.Subscription.class));
         verify(subscriber, never()).onNext(any());
         verify(subscriber, never()).onComplete();
         verify(subscriber, never()).onError(any());
@@ -856,9 +903,7 @@ public abstract class StorageReadWriteTestSuite {
         //  - Allow the reader to send at most one chunk after cancelling (in fact, Java Publisher spec allows more)
         //  - No calls to onComplete or onError
 
-        Thread.sleep(ASYNC_DELAY.toMillis());
-
-        verify(subscriber, times(1)).onSubscribe(any(Flow.Subscription.class));
+        verify(subscriber, timeout(TEST_TIMEOUT.toMillis()).times(1)).onSubscribe(any(Flow.Subscription.class));
         verify(subscriber, atMost(2)).onNext(any());
         verify(subscriber, never()).onComplete();
         verify(subscriber, never()).onError(any());
@@ -925,16 +970,14 @@ public abstract class StorageReadWriteTestSuite {
         //  - Allow the reader to send at most one chunk after cancelling (in fact, Java Publisher spec allows more)
         //  - No calls to onComplete or onError
 
-        Thread.sleep(ASYNC_DELAY.toMillis());
-
-        verify(subscriber, times(1)).onSubscribe(any(Flow.Subscription.class));
+        verify(subscriber, timeout(TEST_TIMEOUT.toMillis()).times(1)).onSubscribe(any(Flow.Subscription.class));
         verify(subscriber, atMost(2)).onNext(any());
         verify(subscriber, never()).onComplete();
         verify(subscriber, never()).onError(any());
 
         // Now delete the file
 
-        var rm = storage.rm(storagePath, false, dataContext);
+        var rm = storage.rm(storagePath, dataContext);
 
         waitFor(TEST_TIMEOUT, rm);
 

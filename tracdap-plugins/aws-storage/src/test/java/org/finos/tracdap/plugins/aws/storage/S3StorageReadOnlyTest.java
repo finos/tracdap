@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Accenture Global Solutions Limited
+ * Copyright 2023 Accenture Global Solutions Limited
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,12 +18,14 @@ package org.finos.tracdap.plugins.aws.storage;
 
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.util.concurrent.DefaultEventExecutor;
 import io.netty.util.concurrent.DefaultThreadFactory;
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.memory.RootAllocator;
 import org.finos.tracdap.common.concurrent.ExecutionContext;
 import org.finos.tracdap.common.data.DataContext;
-import org.finos.tracdap.common.storage.StorageOperationsTestSuite;
+import org.finos.tracdap.common.storage.CommonFileStorage;
+import org.finos.tracdap.common.storage.StorageReadOnlyTestSuite;
 import org.junit.jupiter.api.*;
 
 import java.time.Duration;
@@ -39,7 +41,7 @@ import static org.finos.tracdap.test.concurrent.ConcurrentTestHelpers.waitFor;
 
 @Tag("integration")
 @Tag("int-storage")
-public class S3StorageOperationsTest extends StorageOperationsTestSuite {
+public class S3StorageReadOnlyTest extends StorageReadOnlyTestSuite {
 
     static Duration SETUP_TIMEOUT = Duration.of(5, ChronoUnit.SECONDS);
 
@@ -49,8 +51,8 @@ public class S3StorageOperationsTest extends StorageOperationsTestSuite {
     static EventLoopGroup elg;
     static BufferAllocator allocator;
 
-    static ExecutionContext setupCtx;
     static S3ObjectStorage setupStorage;
+    static ExecutionContext setupCtx;
 
     static int testNumber;
 
@@ -60,15 +62,17 @@ public class S3StorageOperationsTest extends StorageOperationsTestSuite {
         var timestamp = DateTimeFormatter.ISO_INSTANT.format(Instant.now()).replace(':', '.');
         var random = new Random().nextLong();
 
-        storageProps = S3StorageEnvProps.readStorageEnvProps();
         testSuiteDir = String.format(
-                "platform_storage_ops_test_suite_%s_0x%h/",
+                "platform_storage_ro_test_suite_%s_0x%h/",
                 timestamp, random);
 
-        elg = new NioEventLoopGroup(2, new DefaultThreadFactory("ops-test"));
+        setupCtx = new ExecutionContext(new DefaultEventExecutor(new DefaultThreadFactory("t-setup")));
+
+        storageProps = S3StorageEnvProps.readStorageEnvProps();
+
+        elg = new NioEventLoopGroup(2);
         allocator = new RootAllocator();
 
-        setupCtx = new ExecutionContext(elg.next());
         setupStorage = new S3ObjectStorage("STORAGE_SETUP", storageProps);
         setupStorage.start(elg);
 
@@ -87,8 +91,15 @@ public class S3StorageOperationsTest extends StorageOperationsTestSuite {
         resultOf(mkdir);
 
         storageProps.put(S3ObjectStorage.PREFIX_PROPERTY, testDir);
-        storage = new S3ObjectStorage("TEST_" + testNumber, storageProps);
-        storage.start(elg);
+        rwStorage = new S3ObjectStorage("TEST_" + testNumber + "_RW", storageProps);
+        rwStorage.start(elg);
+
+        var roProps = new Properties();
+        roProps.putAll(storageProps);
+        roProps.put(CommonFileStorage.READ_ONLY_CONFIG_KEY, "true");
+
+        roStorage = new S3ObjectStorage("TEST_" + testNumber + "_RO", roProps);
+        roStorage.start(elg);
 
         execContext = new ExecutionContext(elg.next());
         dataContext = new DataContext(execContext.eventLoopExecutor(), allocator);
@@ -97,8 +108,11 @@ public class S3StorageOperationsTest extends StorageOperationsTestSuite {
     @AfterEach
     void tearDown() {
 
-        storage.stop();
-        storage = null;
+        rwStorage.stop();
+        rwStorage = null;
+
+        roStorage.stop();
+        roStorage = null;
     }
 
     @AfterAll

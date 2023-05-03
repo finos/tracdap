@@ -41,7 +41,7 @@ public class LocalStorageReadWriteTest extends StorageReadWriteTestSuite {
         var storageProps = new Properties();
         storageProps.put(IStorageManager.PROP_STORAGE_KEY, "TEST_STORAGE");
         storageProps.put(LocalFileStorage.CONFIG_ROOT_PATH, storageDir.toString());
-        storage = new LocalFileStorage(storageProps);
+        storage = new LocalFileStorage("TEST_STORAGE", storageProps);
 
         execContext = new ExecutionContext(new DefaultEventExecutor(new DefaultThreadFactory("t-events")));
         dataContext = new DataContext(execContext.eventLoopExecutor(), new RootAllocator());

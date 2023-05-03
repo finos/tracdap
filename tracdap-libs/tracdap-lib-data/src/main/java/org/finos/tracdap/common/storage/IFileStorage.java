@@ -22,24 +22,13 @@ import org.finos.tracdap.common.data.IDataContext;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.EventLoopGroup;
 
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Flow;
 
 
 public interface IFileStorage extends AutoCloseable {
-
-    String EXISTS_OPERATION = "exists";
-    String SIZE_OPERATION = "size";
-    String STAT_OPERATION = "stat";
-    String LS_OPERATION = "ls";
-    String MKDIR_OPERATION = "mkdir";
-    String RM_OPERATION = "rm";
-    String WRITE_OPERATION = "write";
-    String READ_OPERATION = "read";
-
-    String BACKSLASH = "/";
-
 
     void start(EventLoopGroup eventLoopGroup);
 
@@ -54,11 +43,13 @@ public interface IFileStorage extends AutoCloseable {
 
     CompletionStage<FileStat> stat(String storagePath, IExecutionContext execContext);
 
-    CompletionStage<DirStat> ls(String storagePath, IExecutionContext execContext);
+    CompletionStage<List<FileStat>> ls(String storagePath, IExecutionContext execContext);
 
     CompletionStage<Void> mkdir(String storagePath, boolean recursive, IExecutionContext execContext);
 
-    CompletionStage<Void> rm(String storagePath, boolean recursive, IExecutionContext execContext);
+    CompletionStage<Void> rm(String storagePath, IExecutionContext execContext);
+
+    CompletionStage<Void> rmdir(String storagePath, IExecutionContext execContext);
 
     Flow.Publisher<ByteBuf> reader(
             String storagePath,
