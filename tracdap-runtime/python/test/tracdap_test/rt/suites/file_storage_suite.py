@@ -530,6 +530,16 @@ class FileOperationsTestSuite:
         self.fail_for_storage_root(lambda path_: self.storage.mkdir(path_, False))
         self.fail_for_storage_root(lambda path_: self.storage.mkdir(path_, True))
 
+    def test_mkdir_unicode(self):
+
+        self.storage.mkdir("你好/你好", False)
+
+        dir_exists = self.storage.exists("你好")
+        child_exists = self.storage.exists("你好/你好")
+
+        self.assertTrue(dir_exists)
+        self.assertTrue(child_exists)
+
     # ------------------------------------------------------------------------------------------------------------------
     # RM
     # ------------------------------------------------------------------------------------------------------------------
@@ -774,6 +784,19 @@ class FileReadWriteTestSuite:
         empty_bytes = bytes()
 
         self.do_round_trip(storage_path, [empty_bytes], self.storage)
+
+    def test_round_trip_unicode(self):
+
+        ode_to_a_goose = \
+            "鹅、鹅、鹅，\n" + \
+            "曲项向天歌。\n" + \
+            "白毛浮绿水，\n" + \
+            "红掌拨清波"
+
+        storage_path = "咏鹅.txt"
+        storage_bytes = ode_to_a_goose.encode('utf-8')
+
+        self.do_round_trip(storage_path, [storage_bytes], self.storage)
 
     def do_round_trip(self, storage_path: str, original_bytes: tp.List[bytes], storage: _storage.IFileStorage):
 
