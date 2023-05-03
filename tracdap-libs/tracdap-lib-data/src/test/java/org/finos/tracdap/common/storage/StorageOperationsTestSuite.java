@@ -765,6 +765,22 @@ public abstract class StorageOperationsTestSuite {
         failForStorageRoot((storagePath, execCtx)  -> storage.mkdir(storagePath, true, execCtx));
     }
 
+    @Test
+    void testMkdir_unicode() throws Exception {
+
+        var mkdir = storage.mkdir("你好/你好", true, execContext);
+        waitFor(TEST_TIMEOUT, mkdir);
+
+        Assertions.assertDoesNotThrow(() -> resultOf(mkdir));
+
+        var dirExists = storage.exists("你好", execContext);
+        var childExists = storage.exists("你好/你好", execContext);
+        waitFor(TEST_TIMEOUT, dirExists, childExists);
+
+        Assertions.assertTrue(resultOf(dirExists));
+        Assertions.assertTrue(resultOf(childExists));
+    }
+
 
     // -----------------------------------------------------------------------------------------------------------------
     // RM

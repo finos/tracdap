@@ -137,6 +137,23 @@ public abstract class StorageReadWriteTestSuite {
                 storage, dataContext);
     }
 
+    @Test
+    void roundTrip_unicode() throws Exception {
+
+        var anOdeToTheGoose =
+            "鹅、鹅、鹅，\n" +
+            "曲项向天歌。\n" +
+            "白毛浮绿水，\n" +
+            "红掌拨清波";
+
+        var storagePath = "test_file.dat";
+        var storageBytes = anOdeToTheGoose.getBytes(StandardCharsets.UTF_8);
+
+        StorageReadWriteTestSuite.roundTripTest(
+                storagePath, List.of(storageBytes),
+                storage, dataContext);
+    }
+
     static void roundTripTest(
             String storagePath, List<byte[]> originalBytes,
             IFileStorage storage, IDataContext dataContext) throws Exception {
