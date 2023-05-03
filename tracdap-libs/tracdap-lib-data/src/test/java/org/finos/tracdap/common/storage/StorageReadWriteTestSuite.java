@@ -146,7 +146,7 @@ public abstract class StorageReadWriteTestSuite {
             "白毛浮绿水，\n" +
             "红掌拨清波";
 
-        var storagePath = "test_file.dat";
+        var storagePath = "咏鹅.txt";
         var storageBytes = anOdeToTheGoose.getBytes(StandardCharsets.UTF_8);
 
         StorageReadWriteTestSuite.roundTripTest(
