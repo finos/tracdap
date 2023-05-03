@@ -51,6 +51,8 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.Instant;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 
@@ -249,6 +251,10 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
                 ? getCurrentGitOrigin()
                 : "git_repo_not_configured";
 
+        var timestamp = DateTimeFormatter.ISO_INSTANT.format(Instant.now()).replace(':', '.');
+        var random = new Random().nextLong();
+        var testId = String.format("%s_0x%h", timestamp, random);
+
         // Substitutions are used by template config files in test resources
         // But it is harmless to apply them to fully defined config files as well
 
@@ -259,7 +265,8 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
                 "${TRAC_STORAGE_FORMAT}", storageFormat,
                 "${TRAC_EXEC_DIR}", tracExecDir.toString().replace("\\", "\\\\"),
                 "${TRAC_LOCAL_REPO}", tracRepoDir.toString(),
-                "${TRAC_GIT_REPO}", currentGitOrigin);
+                "${TRAC_GIT_REPO}", currentGitOrigin,
+                "${TRAC_TEST_ID}", testId);
 
         var substitutions = new HashMap<>(staticSubstitutions);
 
