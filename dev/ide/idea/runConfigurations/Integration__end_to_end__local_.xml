@@ -1,18 +1,14 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="Integration: aws-storage" type="JUnit" factoryName="JUnit">
-    <module name="tracdap.aws-storage.test" />
+  <configuration default="false" name="Integration: end-to-end (local)" type="JUnit" factoryName="JUnit">
+    <module name="tracdap.tracdap-svc-orch.test" />
     <option name="MAIN_CLASS_NAME" value="" />
     <option name="METHOD_NAME" value="" />
     <option name="TEST_OBJECT" value="tags" />
     <option name="VM_PARAMETERS" value="-ea --add-opens java.base/jdk.internal.misc=ALL-UNNAMED --add-opens java.base/java.nio=ALL-UNNAMED -Dio.netty.tryReflectionSetAccessible=true" />
     <envs>
-      <env name="TRAC_AWS_ACCESS_KEY_ID" value="" />
-      <env name="TRAC_AWS_BUCKET" value="tracdap-ci-storage-uk" />
-      <env name="TRAC_AWS_REGION" value="eu-west-2" />
-      <env name="TRAC_AWS_SECRET_ACCESS_KEY" value="" />
-      <env name="TRAC_AWS_CREDENTIALS" value="static" />
+      <env name="TRAC_EXEC_DIR" value="" />
     </envs>
-    <tag value="int-storage" />
+    <tag value="int-e2e" />
     <method v="2">
       <option name="Make" enabled="true" />
     </method>
