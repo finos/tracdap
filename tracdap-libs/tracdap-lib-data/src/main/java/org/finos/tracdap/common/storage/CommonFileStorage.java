@@ -27,9 +27,6 @@ import org.finos.tracdap.common.exception.ETrac;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.nio.file.InvalidPathException;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
@@ -60,7 +57,6 @@ public abstract class CommonFileStorage implements IFileStorage {
 
     public static final Pattern ILLEGAL_PATH_CHARS = Pattern.compile(".*[<>:'\"|?*\\\\].*");
     public static final Pattern UNICODE_CONTROL_CHARS = Pattern.compile(".*[\u0000-\u001f\u007f\u0080-\u009f].*");
-    public static final Pattern PARENT_DIR_PATH = Pattern.compile("(\\A|.*/)\\.\\.(\\Z|/.*)");
 
     public static final String EXISTS_OPERATION = "exists";
     public static final String SIZE_OPERATION = "size";
@@ -446,34 +442,27 @@ public abstract class CommonFileStorage implements IFileStorage {
 
     private String resolveObjectKey(String operationName, String storagePath, boolean allowRootDir) {
 
-        try {
+        if (storagePath == null || storagePath.isBlank())
+            throw errors.explicitError(operationName, storagePath, STORAGE_PATH_NULL_OR_BLANK);
 
-            if (storagePath == null || storagePath.isBlank())
-                throw errors.explicitError(operationName, storagePath, STORAGE_PATH_NULL_OR_BLANK);
+        if (ILLEGAL_PATH_CHARS.matcher(storagePath).matches())
+            throw errors.explicitError(operationName, storagePath, STORAGE_PATH_INVALID);
 
-            if (ILLEGAL_PATH_CHARS.matcher(storagePath).matches())
-                throw errors.explicitError(operationName, storagePath, STORAGE_PATH_INVALID);
+        if (UNICODE_CONTROL_CHARS.matcher(storagePath).matches())
+            throw errors.explicitError(operationName, storagePath, STORAGE_PATH_INVALID);
 
-            if (UNICODE_CONTROL_CHARS.matcher(storagePath).matches())
-                throw errors.explicitError(operationName, storagePath, STORAGE_PATH_INVALID);
+        // Absolute paths of the form C:\foo, \foo or \\foo\bar are not possible,
+        // because ':' and '\' are in ILLEGAL_PATH_CHARS
 
-            // Absolute paths of the form C:\foo, \foo or \\foo\bar are not possible,
-            // because ':' and '\' are in ILLEGAL_PATH_CHARS
+        if (storagePath.startsWith(BACKSLASH))
+            throw errors.explicitError(operationName, storagePath, STORAGE_PATH_NOT_RELATIVE);
 
-            if (storagePath.startsWith(BACKSLASH))
-                throw errors.explicitError(operationName, storagePath, STORAGE_PATH_NOT_RELATIVE);
+        var resolvedPath = normalizeStoragePath(operationName, storagePath);
 
-            var resolvedPath = normalizeStoragePath(operationName, storagePath);
+        if (resolvedPath.isEmpty() && !allowRootDir)
+            throw errors.explicitError(operationName, storagePath, STORAGE_PATH_IS_ROOT);
 
-            if (resolvedPath.equals(DOT) && !allowRootDir)
-                throw errors.explicitError(operationName, storagePath, STORAGE_PATH_IS_ROOT);
-
-            return resolvedPath;
-        }
-        catch (InvalidPathException e) {
-
-            throw errors.explicitError(operationName, storagePath, STORAGE_PATH_INVALID, e);
-        }
+        return resolvedPath;
     }
 
     private String normalizeStoragePath(String operationName, String storagePath) {
@@ -497,9 +486,6 @@ public abstract class CommonFileStorage implements IFileStorage {
                 normalSections.add(section);
             }
         }
-
-        if (normalSections.isEmpty())
-            return DOT;
 
         return String.join(BACKSLASH, normalSections);
     }
