@@ -130,6 +130,7 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         }
     }
 
+    private String testId;
     private Path tracDir;
     private Path tracStorageDir;
     private Path tracExecDir;
@@ -176,8 +177,12 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         return ClientAuthProvider.applyIfAvailable(client, authToken);
     }
 
-    public Path storageRootDir() {
-        return tracStorageDir;
+    public String platformConfigUrl() {
+        return platformConfigUrl.toString();
+    }
+
+    public Path tracDir() {
+        return tracDir;
     }
 
     public Path tracRepoDir() {
@@ -186,6 +191,8 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
 
     @Override
     public void beforeAll(ExtensionContext context) throws Exception {
+
+        setTestId();
 
         findDirectories();
         prepareConfig();
@@ -207,6 +214,14 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         stopServices();
 
         cleanupDirectories();
+    }
+
+    void setTestId() {
+
+        var timestamp = DateTimeFormatter.ISO_INSTANT.format(Instant.now()).replace(':', '.');
+        var random = new Random().nextLong();
+
+        testId = String.format("%s_0x%h", timestamp, random);
     }
 
     void findDirectories() throws Exception {
@@ -250,10 +265,6 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         String currentGitOrigin = startOrch
                 ? getCurrentGitOrigin()
                 : "git_repo_not_configured";
-
-        var timestamp = DateTimeFormatter.ISO_INSTANT.format(Instant.now()).replace(':', '.');
-        var random = new Random().nextLong();
-        var testId = String.format("%s_0x%h", timestamp, random);
 
         // Substitutions are used by template config files in test resources
         // But it is harmless to apply them to fully defined config files as well
