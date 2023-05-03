@@ -16,45 +16,128 @@
 
 package org.finos.tracdap.plugins.gcp.storage;
 
-import io.netty.buffer.ByteBuf;
-import io.netty.channel.EventLoopGroup;
 import org.finos.tracdap.common.concurrent.IExecutionContext;
 import org.finos.tracdap.common.data.IDataContext;
+import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.common.storage.CommonFileStorage;
 import org.finos.tracdap.common.storage.FileStat;
 
+import com.google.api.core.ApiFuture;
+import com.google.storage.v2.*;
+
+import io.netty.buffer.ByteBuf;
+import io.netty.channel.EventLoopGroup;
+
 import java.util.List;
 import java.util.Properties;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionStage;
-import java.util.concurrent.Flow;
+import java.util.concurrent.*;
 
 
 public class GcsObjectStorage extends CommonFileStorage {
 
+    public static final String REGION_PROPERTY = "region";
+    public static final String BUCKET_PROPERTY = "bucket";
+    public static final String PREFIX_PROPERTY = "prefix";
+
+    private final String bucket;
+    private final String prefix;
+
+    private StorageClient storageClient;
+
+
     public GcsObjectStorage(String storageKey, Properties properties) {
 
         super(BUCKET_SEMANTICS, storageKey, properties, new GcsStorageErrors(storageKey));
+
+        var bucket = properties.getProperty(BUCKET_PROPERTY);
+        var prefix = properties.getProperty(PREFIX_PROPERTY);
+
+        this.bucket = bucket;
+        this.prefix = normalizePrefix(prefix);
     }
+
+    private String normalizePrefix(String prefix) {
+
+        if (prefix == null)
+            return "";
+
+        while (prefix.startsWith(BACKSLASH))
+            prefix = prefix.substring(1);
+
+        if (prefix.isBlank())
+            return "";
+
+        if (!prefix.endsWith(BACKSLASH))
+            prefix = prefix + BACKSLASH;
+
+        return prefix;
+    }
+
 
     @Override
     public void start(EventLoopGroup eventLoopGroup) {
 
+        try {
+
+            log.info("INIT [{}], fs = [GCS], bucket = [{}], prefix = [{}]", storageKey, bucket, prefix);
+
+            var settings = StorageSettings.newBuilder().build();
+
+            storageClient = StorageClient.create(settings);
+        }
+        catch (Exception e) {
+            var message = "GCS storage failed to start: " + e.getMessage();
+            throw new EStartup(message, e);
+        }
     }
 
     @Override
     public void stop() {
 
+        log.info("STOP [{}], fs = [GCS], bucket = [{}], prefix = [{}]", storageKey, bucket, prefix);
+
+        storageClient.shutdown();
+        // storageClient.awaitTermination(20, TimeUnit.SECONDS);  todo
+    }
+
+
+    @Override
+    protected CompletionStage<Boolean> fsExists(String storagePath, IExecutionContext ctx) {
+
+        var objectKey = resolveObjectKey(storagePath);
+
+        var request = GetObjectRequest.newBuilder()
+                .setBucket(bucket)
+                .setObject(objectKey)
+                .build();
+
+        var apiCall = storageClient.getObjectCallable().futureCall(request);
+
+        var response = toContext(ctx, javaFuture(apiCall));
+
+        return response.thenApply(x -> true);
     }
 
     @Override
-    protected CompletionStage<Boolean> fsExists(String objectKey, IExecutionContext ctx) {
-        return null;
-    }
+    protected CompletionStage<Boolean> fsDirExists(String storagePath, IExecutionContext ctx) {
 
-    @Override
-    protected CompletionStage<Boolean> fsDirExists(String prefix, IExecutionContext ctx) {
-        return null;
+        var prefix = resolvePrefix(storagePath);
+
+        var request = ListObjectsRequest.newBuilder()
+                .setParent(bucket)
+                .setPrefix(prefix)
+                .setPageSize(1)
+                .build();
+
+        var apiCall = storageClient.listObjectsCallable().futureCall(request);
+
+        var response = toContext(ctx, javaFuture(apiCall));
+
+        // If there are any objects with the dir prefix, then the dir exists
+        // This will include the dir itself if it has an object
+        // Since no delimiter was specified, it is not necessary to check common prefixes
+
+        return response.thenApply(result -> result.getObjectsCount() > 0);
     }
 
     @Override
@@ -73,8 +156,24 @@ public class GcsObjectStorage extends CommonFileStorage {
     }
 
     @Override
-    protected CompletionStage<Void> fsCreateDir(String prefix, IExecutionContext ctx) {
-        return null;
+    protected CompletionStage<Void> fsCreateDir(String storagePath, IExecutionContext ctx) {
+
+        var prefix = resolvePrefix(storagePath);
+
+        var object = com.google.storage.v2.Object.newBuilder()
+                .setBucket(bucket)
+                .setName(prefix)
+                .setSize(0);
+
+        var request = ComposeObjectRequest.newBuilder()
+                .setDestination(object)
+                .build();
+
+        var apiCall = storageClient.composeObjectCallable().futureCall(request);
+
+        var response = toContext(ctx, javaFuture(apiCall));
+
+        return response.thenApply(x -> null);
     }
 
     @Override
@@ -95,5 +194,65 @@ public class GcsObjectStorage extends CommonFileStorage {
     @Override
     protected Flow.Subscriber<ByteBuf> fsOpenOutputStream(String objectKey, CompletableFuture<Long> signal, IDataContext ctx) {
         return null;
+    }
+
+    private String resolveObjectKey(String storagePath) {
+
+        if (prefix.isEmpty())
+            return storagePath;
+
+        if (storagePath.isEmpty())
+            return prefix;
+
+        return prefix + storagePath;
+    }
+
+    private String resolvePrefix(String storagePath) {
+
+        if (prefix.isEmpty())
+            return storagePath;
+
+        if (storagePath.isEmpty())
+            return prefix;
+
+        return prefix + storagePath;
+    }
+
+    private static <T> CompletionStage<T> javaFuture(ApiFuture<T> future) {
+
+        var javaFuture = new CompletableFuture<T>();
+
+        future.addListener(() -> {
+
+            try {
+
+                if (!future.isDone())
+                    javaFuture.completeExceptionally(new IllegalStateException());
+
+                else if (future.isCancelled())
+                    javaFuture.cancel(true);
+
+                else {
+                    var result = future.get();
+                    javaFuture.complete(result);
+                }
+            }
+            catch (InterruptedException | CancellationException e) {
+                javaFuture.completeExceptionally(new IllegalStateException());
+            }
+            catch (ExecutionException e) {
+
+                if (e.getCause() != null)
+                    javaFuture.completeExceptionally(e.getCause());
+                else
+                    javaFuture.completeExceptionally(e);
+            }
+            catch (Throwable e) {
+                javaFuture.completeExceptionally(e);
+            }
+
+        }, Runnable::run);
+
+        return javaFuture;
     }
 }
