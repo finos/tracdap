@@ -32,21 +32,18 @@ dependencies {
 
     // Google cloud libs use the @Generated annotation, which introduces the CDDL license dependency
     // To work around this limitation, TRAC provides a version of just this one annotation class
-    implementation project(':tracdap-lib-annotations')
+//    implementation project(':tracdap-lib-annotations')
 
-    implementation (group: 'com.google.cloud', name: 'google-cloud-storage', version: "$gcp_sdk_version") {
-
-        // Do not pull in the JavaX annotation JAR, which is licensed under CDDL
-        exclude group: 'javax.annotation', module: 'javax.annotation-api'
-    }
+    implementation platform(group: 'com.google.cloud', name: 'libraries-bom', version: "$gcp_bom_version")
+    implementation group: 'com.google.cloud', name: 'google-cloud-storage'
 
     // Google HTTP client components are failing compliance on the latest version
     // Force these versions until the main GCP SDK updates this dependency
-    implementation group: 'com.google.http-client', name: 'google-http-client', version: "$gcp_sdk_http_client_version"
-    implementation group: 'com.google.http-client', name: 'google-http-client-apache-v2', version: "$gcp_sdk_http_client_version"
-    implementation group: 'com.google.http-client', name: 'google-http-client-appengine', version: "$gcp_sdk_http_client_version"
-    implementation group: 'com.google.http-client', name: 'google-http-client-gson', version: "$gcp_sdk_http_client_version"
-    implementation group: 'com.google.http-client', name: 'google-http-client-jackson2', version: "$gcp_sdk_http_client_version"
+//    implementation group: 'com.google.http-client', name: 'google-http-client', version: "$gcp_sdk_http_client_version"
+//    implementation group: 'com.google.http-client', name: 'google-http-client-apache-v2', version: "$gcp_sdk_http_client_version"
+//    implementation group: 'com.google.http-client', name: 'google-http-client-appengine', version: "$gcp_sdk_http_client_version"
+//    implementation group: 'com.google.http-client', name: 'google-http-client-gson', version: "$gcp_sdk_http_client_version"
+//    implementation group: 'com.google.http-client', name: 'google-http-client-jackson2', version: "$gcp_sdk_http_client_version"
 
     // Force the version of Jackson (only latest stable will ever pass compliance)
     implementation group: 'com.fasterxml.jackson.core', name: 'jackson-core', version: "$jackson_version"

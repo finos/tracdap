@@ -31,7 +31,8 @@ dependencies {
     api project(':tracdap-lib-common')
     api project(':tracdap-lib-data')
 
-    implementation group: 'com.google.cloud', name: 'google-cloud-storage', version: "$gcp_sdk_version"
+    implementation platform(group: 'com.google.cloud', name: 'libraries-bom', version: "$gcp_bom_version")
+    implementation group: 'com.google.cloud', name: 'google-cloud-storage'
 
     testImplementation project(path: ':tracdap-lib-data', configuration: 'testSuite')
 }
