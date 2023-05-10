@@ -1079,6 +1079,7 @@ class FileReadWriteTestSuite:
                     read_content = stream.read(64 * 1024)
                     self.assertEqual(content, read_content)
                 except (OSError, ValueError):
+                    # Arrow FS raises ValueError if the stream is already closed
                     pass
 
     def test_read_cancel_immediately(self):
