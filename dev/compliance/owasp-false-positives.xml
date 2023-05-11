@@ -163,6 +163,7 @@
         <packageUrl regex="true">^pkg:maven/org\.yaml/snakeyaml@.*$</packageUrl>
         <cve>CVE-2022-3064</cve>
         <cve>CVE-2021-4235</cve>
+        <cve>CVE-2023-2251</cve>
     </suppress>
 
     <!-- More spurious errors being reported in SonaType -->

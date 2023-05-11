@@ -17,9 +17,15 @@
 # RTD schema version
 version: 2
 
-# Documentation build tools require Python 3.8 and requirements from the dev (build tools) folder
+# Use latest stable image and Python version
+# May 2023: Older versions (Python 3.8) have dependency issues with liburl3 and OpenSSL
+build:
+  os: ubuntu-22.04
+  tools:
+    python: "3.11"
+
+# Use requirements from the dev (build tools) folder
 python:
-  version: "3.8"
   install:
     - requirements: dev/requirements.txt
 
