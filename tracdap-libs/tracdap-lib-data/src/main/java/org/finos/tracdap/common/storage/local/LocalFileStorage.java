@@ -21,10 +21,9 @@ import org.finos.tracdap.common.data.IDataContext;
 import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.common.storage.*;
 
-import org.apache.arrow.memory.ArrowBuf;
 import io.netty.buffer.ByteBuf;
-import io.netty.buffer.ByteBufAllocator;
 import io.netty.channel.EventLoopGroup;
+import org.apache.arrow.memory.ArrowBuf;
 
 import java.io.IOException;
 import java.nio.channels.AsynchronousFileChannel;
@@ -396,16 +395,12 @@ public class LocalFileStorage extends CommonFileStorage {
     }
 
     @Override
-    protected Flow.Publisher<ByteBuf>
+    protected Flow.Publisher<ArrowBuf>
     fsOpenInputStream(String storagePath, IDataContext dataContext) {
 
         var absolutePath = resolvePath(storagePath);
 
-        return new LocalFileReader(
-                storagePath, absolutePath,
-                ByteBufAllocator.DEFAULT,
-                dataContext.eventLoopExecutor(),
-                errors);
+        return new LocalFileReader(storagePath, absolutePath, dataContext, errors);
     }
 
     @Override

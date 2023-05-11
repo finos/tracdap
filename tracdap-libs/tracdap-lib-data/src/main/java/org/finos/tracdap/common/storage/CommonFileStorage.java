@@ -91,7 +91,7 @@ public abstract class CommonFileStorage implements IFileStorage {
     protected abstract CompletionStage<Void> fsDeleteDir(String directoryKey, IExecutionContext ctx);
 
     protected abstract CompletionStage<ArrowBuf> fsReadChunk(String objectKey, long offset, int size, IDataContext ctx);
-    protected abstract Flow.Publisher<ByteBuf> fsOpenInputStream(String objectKey, IDataContext ctx);
+    protected abstract Flow.Publisher<ArrowBuf> fsOpenInputStream(String objectKey, IDataContext ctx);
     protected abstract Flow.Subscriber<ByteBuf> fsOpenOutputStream(String objectKey, CompletableFuture<Long> signal, IDataContext ctx);
 
     // Expose final member variables to avoid duplication in child classes
@@ -354,7 +354,9 @@ public abstract class CommonFileStorage implements IFileStorage {
 
         var objectKey = resolveObjectKey(operationName, storagePath, false);
 
-        return fsOpenInputStream(objectKey, dataContext);
+        return Flows.map(
+                fsOpenInputStream(objectKey, dataContext),
+                NettyArrowBuf::unwrapBuffer);
     }
 
     @Override
