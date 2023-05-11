@@ -38,10 +38,12 @@ public abstract class StorageErrors {
         STORAGE_PATH_OUTSIDE_ROOT,
         STORAGE_PATH_IS_ROOT,
         STORAGE_PATH_INVALID,
+        STORAGE_PARAMS_INVALID,
 
         // Exceptions
         OBJECT_NOT_FOUND,
         OBJECT_ALREADY_EXISTS,
+        OBJECT_SIZE_TOO_SMALL,
         NOT_A_FILE,
         NOT_A_DIRECTORY,
         NOT_A_FILE_OR_DIRECTORY,
@@ -65,9 +67,11 @@ public abstract class StorageErrors {
             Map.entry(STORAGE_PATH_OUTSIDE_ROOT, "Requested storage path is outside the storage root directory: %s %s [%s]"),
             Map.entry(STORAGE_PATH_IS_ROOT, "Requested operation not allowed on the storage root directory: %s %s [%s]"),
             Map.entry(STORAGE_PATH_INVALID, "Requested storage path is invalid: %s %s [%s]"),
+            Map.entry(STORAGE_PARAMS_INVALID, "Requested storage operation is invalid: %s %s [%s]: %s"),
 
             Map.entry(OBJECT_NOT_FOUND, "Object not found in storage layer: %s %s [%s]"),
             Map.entry(OBJECT_ALREADY_EXISTS, "Object already exists in storage layer: %s %s [%s]"),
+            Map.entry(OBJECT_SIZE_TOO_SMALL, "Object is smaller than expected: %s %s [%s]"),
             Map.entry(NOT_A_FILE, "Object is not a file: %s %s [%s]"),
             Map.entry(NOT_A_DIRECTORY, "Object is not a directory: %s %s [%s]"),
             Map.entry(NOT_A_FILE_OR_DIRECTORY, "Object is not a file or directory: %s %s [%s]"),
@@ -87,9 +91,11 @@ public abstract class StorageErrors {
             Map.entry(STORAGE_PATH_OUTSIDE_ROOT, EValidationGap.class),
             Map.entry(STORAGE_PATH_IS_ROOT, EValidationGap.class),
             Map.entry(STORAGE_PATH_INVALID, EValidationGap.class),
+            Map.entry(STORAGE_PARAMS_INVALID, EValidationGap.class),
 
             Map.entry(OBJECT_NOT_FOUND, EStorageRequest.class),
             Map.entry(OBJECT_ALREADY_EXISTS, EStorageRequest.class),
+            Map.entry(OBJECT_SIZE_TOO_SMALL, EStorageRequest.class),
             Map.entry(NOT_A_FILE, EStorageRequest.class),
             Map.entry(NOT_A_DIRECTORY, EStorageRequest.class),
             Map.entry(NOT_A_FILE_OR_DIRECTORY, EStorageRequest.class),
@@ -134,6 +140,25 @@ public abstract class StorageErrors {
 
             var messageTemplate = ERROR_MESSAGE_MAP.get(error);
             var message = String.format(messageTemplate, storageKey, operation, path);
+
+            var errType = EXPLICIT_CONSTRUCTOR_MAP.get(error);
+            return errType.newInstance(message);
+        }
+        catch (
+                InstantiationException |
+                IllegalAccessException |
+                InvocationTargetException e) {
+
+            return new EUnexpected(e);
+        }
+    }
+
+    public ETrac explicitError(String operation, String path, ExplicitError error, String detail) {
+
+        try {
+
+            var messageTemplate = ERROR_MESSAGE_MAP.get(error);
+            var message = String.format(messageTemplate, storageKey, operation, path, detail);
 
             var errType = EXPLICIT_CONSTRUCTOR_MAP.get(error);
             return errType.newInstance(message);

@@ -16,6 +16,8 @@
 
 package org.finos.tracdap.common.storage;
 
+import io.netty.buffer.NettyArrowBuf;
+import org.apache.arrow.memory.ArrowBuf;
 import org.finos.tracdap.common.concurrent.Flows;
 import org.finos.tracdap.common.concurrent.IExecutionContext;
 import org.finos.tracdap.common.config.ConfigHelpers;
@@ -88,6 +90,7 @@ public abstract class CommonFileStorage implements IFileStorage {
     protected abstract CompletionStage<Void> fsDeleteFile(String objectKey, IExecutionContext ctx);
     protected abstract CompletionStage<Void> fsDeleteDir(String directoryKey, IExecutionContext ctx);
 
+    protected abstract CompletionStage<ArrowBuf> fsReadChunk(String objectKey, long offset, int size, IDataContext ctx);
     protected abstract Flow.Publisher<ByteBuf> fsOpenInputStream(String objectKey, IDataContext ctx);
     protected abstract Flow.Subscriber<ByteBuf> fsOpenOutputStream(String objectKey, CompletableFuture<Long> signal, IDataContext ctx);
 
@@ -308,6 +311,32 @@ public abstract class CommonFileStorage implements IFileStorage {
 
             return fsDeleteDir(dirPrefix, ctx);
         });
+    }
+
+    @Override
+    public CompletionStage<ByteBuf> readChunk(String storagePath, long offset, int size, IDataContext ctx) {
+
+        return wrapOperation(READ_OPERATION, storagePath, (op, path) -> readChunk(op, path, offset, size, ctx));
+    }
+
+    private CompletionStage<ByteBuf> readChunk(String operationName, String storagePath, long offset, int size, IDataContext ctx) {
+
+        var objectKey = resolveObjectKey(operationName, storagePath, false);
+
+        if (offset < 0 || size <= 0) {
+            var detail = String.format("offset = %d, size = %d", offset, size);
+            throw errors.explicitError(operationName, storagePath, STORAGE_PARAMS_INVALID, detail);
+        }
+
+        var checkFile = stat(operationName, storagePath, ctx).thenAccept(fi -> {
+
+            if (fi.fileType != FileType.FILE)
+                throw errors.explicitError(operationName, storagePath, NOT_A_FILE);
+        });
+
+        return checkFile
+                .thenCompose(x -> fsReadChunk(objectKey, offset, size, ctx))
+                .thenApply(NettyArrowBuf::unwrapBuffer);
     }
 
     @Override
