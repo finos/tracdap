@@ -16,24 +16,25 @@
 
 package org.finos.tracdap.plugins.aws.storage;
 
-import io.netty.buffer.Unpooled;
+import org.apache.arrow.memory.BufferAllocator;
 import org.finos.tracdap.common.data.IDataContext;
 import org.finos.tracdap.common.storage.StorageErrors;
-
 import org.finos.tracdap.common.util.LoggingHelpers;
-import org.reactivestreams.Subscriber;
-import org.reactivestreams.Subscription;
+
+
 import software.amazon.awssdk.core.async.AsyncResponseTransformer;
 import software.amazon.awssdk.core.async.SdkPublisher;
 import software.amazon.awssdk.services.s3.S3AsyncClient;
+import software.amazon.awssdk.services.s3.model.GetObjectRequest;
+import software.amazon.awssdk.services.s3.model.GetObjectResponse;
+import org.reactivestreams.Subscriber;
+import org.reactivestreams.Subscription;
 
-import io.netty.buffer.ByteBuf;
 import io.netty.util.concurrent.OrderedEventExecutor;
+import org.apache.arrow.memory.ArrowBuf;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import software.amazon.awssdk.services.s3.model.GetObjectRequest;
-import software.amazon.awssdk.services.s3.model.GetObjectResponse;
 
 import java.nio.ByteBuffer;
 import java.util.concurrent.CompletableFuture;
@@ -44,7 +45,7 @@ import static org.finos.tracdap.common.storage.CommonFileStorage.READ_OPERATION;
 import static org.finos.tracdap.common.storage.StorageErrors.ExplicitError.DUPLICATE_SUBSCRIPTION;
 
 
-public class S3ObjectReader implements Flow.Publisher<ByteBuf> {
+public class S3ObjectReader implements Flow.Publisher<ArrowBuf> {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
@@ -55,10 +56,11 @@ public class S3ObjectReader implements Flow.Publisher<ByteBuf> {
 
     private final S3AsyncClient client;
     private final OrderedEventExecutor executor;
+    private final BufferAllocator allocator;
     private final StorageErrors errors;
 
     private final AtomicBoolean subscriberSet;
-    private Flow.Subscriber<? super ByteBuf> subscriber;
+    private Flow.Subscriber<? super ArrowBuf> subscriber;
     private Subscription awsSubscription;
 
     private int requestBuffer;
@@ -79,6 +81,7 @@ public class S3ObjectReader implements Flow.Publisher<ByteBuf> {
 
         this.client = client;
         this.executor = dataContext.eventLoopExecutor();
+        this.allocator = dataContext.arrowAllocator();
         this.errors = errors;
 
         this.subscriberSet = new AtomicBoolean();
@@ -86,7 +89,7 @@ public class S3ObjectReader implements Flow.Publisher<ByteBuf> {
     }
 
     @Override
-    public void subscribe(Flow.Subscriber<? super ByteBuf> subscriber) {
+    public void subscribe(Flow.Subscriber<? super ArrowBuf> subscriber) {
 
         var subscribeOk = subscriberSet.compareAndSet(false, true);
 
@@ -160,8 +163,15 @@ public class S3ObjectReader implements Flow.Publisher<ByteBuf> {
 
     private void _onNext(ByteBuffer byteBuffer) {
 
-        if (!gotError && !gotCancel)
-            subscriber.onNext(Unpooled.wrappedBuffer(byteBuffer));
+        if (!gotError && !gotCancel) {
+
+            var size = byteBuffer.remaining();
+            var buffer = allocator.buffer(size);
+            buffer.setBytes(0, byteBuffer);
+            buffer.writerIndex(size);
+
+            subscriber.onNext(buffer);
+        }
     }
 
     private void _onComplete() {

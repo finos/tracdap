@@ -32,6 +32,7 @@ import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3AsyncClient;
 import software.amazon.awssdk.services.s3.model.*;
 
+import org.apache.arrow.memory.ArrowBuf;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.EventLoopGroup;
 
@@ -416,7 +417,13 @@ public class S3ObjectStorage extends CommonFileStorage {
     }
 
     @Override
-    protected Flow.Publisher<ByteBuf> fsOpenInputStream(String storagePath, IDataContext dataContext) {
+    protected CompletionStage<ArrowBuf> fsReadChunk(String objectKey, long offset, int size, IDataContext ctx) {
+
+        return CompletableFuture.failedFuture(new RuntimeException("Not implemented yet"));
+    }
+
+    @Override
+    protected Flow.Publisher<ArrowBuf> fsOpenInputStream(String storagePath, IDataContext dataContext) {
 
         var objectKey = usePrefix(storagePath);
 
