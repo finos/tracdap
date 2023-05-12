@@ -54,10 +54,13 @@ public class Flows {
     public static <T, U>
     Flow.Publisher<U> map(Flow.Publisher<T> source, Function<T, U> mapping) {
 
-        var map = new MapProcessor<>(mapping);
-        source.subscribe(map);
+        return new MapProcessor<>(mapping, source);
+    }
 
-        return map;
+    public static <T, U>
+    Flow.Subscriber<T> map(Flow.Subscriber<U> target, Function<T, U> mapping) {
+
+        return new MapProcessor<>(mapping, target);
     }
 
     public static <T>
