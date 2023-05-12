@@ -63,16 +63,6 @@ public class Flows {
         return new MapProcessor<>(mapping, target);
     }
 
-    public static <T>
-    CompletionStage<T> reduce(Flow.Publisher<T> source, BiFunction<T, T, T> func) {
-
-        var result = new CompletableFuture<T>();
-        var reduce = new ReduceProcessor<>(func, result, Function.identity());
-        source.subscribe(reduce);
-
-        return result;
-    }
-
     public static <T, U>
     CompletionStage<U> fold(Flow.Publisher<T> source, BiFunction<U, T, U> func, U acc) {
 
@@ -98,15 +88,6 @@ public class Flows {
         publisher.subscribe(subscriber);
 
         return firstFuture;
-    }
-
-    public static <T>
-    CompletionStage<List<T>> toList(Flow.Publisher<T> source) {
-
-        return fold(source, (xs, x) -> {
-            xs.add(x);
-            return xs;
-        }, new ArrayList<>());
     }
 
 }
