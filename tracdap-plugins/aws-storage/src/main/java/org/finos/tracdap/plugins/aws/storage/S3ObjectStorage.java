@@ -16,9 +16,6 @@
 
 package org.finos.tracdap.plugins.aws.storage;
 
-import io.netty.buffer.ByteBufAllocator;
-import io.netty.buffer.PooledByteBufAllocator;
-import io.netty.channel.ChannelOption;
 import org.finos.tracdap.common.concurrent.Flows;
 import org.finos.tracdap.common.concurrent.IExecutionContext;
 import org.finos.tracdap.common.data.IDataContext;
@@ -163,8 +160,6 @@ public class S3ObjectStorage extends CommonFileStorage {
 
         var httpElg = SdkEventLoopGroup.create(eventLoopGroup);
         var httpClient = NettyNioAsyncHttpClient.builder().eventLoopGroup(httpElg);
-
-        httpClient.putChannelOption(ChannelOption.ALLOCATOR, new PooledByteBufAllocator(true));
 
         // Do not post events to another thread, callback directly in the EL
         // Anyway we need to post events to the EL for the current request, so there is no point posting twice
