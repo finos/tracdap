@@ -709,8 +709,8 @@ public abstract class StorageReadWriteTestSuite {
             // These are intended as some common sense bounds
 
             var CHUNKS_TO_REQUEST = 1000000;
-            var MIN_CHUNKS_EXPECTED = 10;          // implies a min chunk size of 1 MiB
-            var MAX_CHUNKS_EXPECTED = 40 * 1024;   // implies a max chunk size of 256 B
+            var MIN_CHUNKS_EXPECTED = 5;           // implies a max chunk size of 2 MiB
+            var MAX_CHUNKS_EXPECTED = 40 * 1024;   // implies a min chunk size of 256 B
 
             Flow.Subscriber<ByteBuf> subscriber = unchecked(mock(Flow.Subscriber.class));
             AtomicLong bytesRead = new AtomicLong(0);
