@@ -16,9 +16,14 @@
 
 package org.finos.tracdap.plugins.aws.storage;
 
+import io.netty.buffer.ByteBufAllocator;
+import io.netty.buffer.PooledByteBufAllocator;
+import io.netty.channel.ChannelOption;
+import org.finos.tracdap.common.concurrent.Flows;
 import org.finos.tracdap.common.concurrent.IExecutionContext;
 import org.finos.tracdap.common.data.IDataContext;
 import org.finos.tracdap.common.exception.EStartup;
+import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.storage.*;
 
 import software.amazon.awssdk.auth.credentials.*;
@@ -37,6 +42,7 @@ import io.netty.buffer.ByteBuf;
 import io.netty.channel.EventLoopGroup;
 
 import java.net.URI;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.CompletableFuture;
@@ -157,6 +163,8 @@ public class S3ObjectStorage extends CommonFileStorage {
 
         var httpElg = SdkEventLoopGroup.create(eventLoopGroup);
         var httpClient = NettyNioAsyncHttpClient.builder().eventLoopGroup(httpElg);
+
+        httpClient.putChannelOption(ChannelOption.ALLOCATOR, new PooledByteBufAllocator(true));
 
         // Do not post events to another thread, callback directly in the EL
         // Anyway we need to post events to the EL for the current request, so there is no point posting twice
@@ -417,9 +425,32 @@ public class S3ObjectStorage extends CommonFileStorage {
     }
 
     @Override
-    protected CompletionStage<ArrowBuf> fsReadChunk(String objectKey, long offset, int size, IDataContext ctx) {
+    protected CompletionStage<ArrowBuf> fsReadChunk(String storagePath, long offset, int size, IDataContext ctx) {
 
-        return CompletableFuture.failedFuture(new RuntimeException("Not implemented yet"));
+        var objectKey = usePrefix(storagePath);
+
+        var reader = new S3ObjectReader(
+                storageKey, storagePath, bucket, objectKey, offset, size,
+                client, ctx, size, errors);
+
+        var list = new ArrayList<ArrowBuf>(1);
+        var collect = Flows.fold(reader, (xs, x) -> { xs.add(x); return xs; }, list);
+
+        return collect.thenApply(xs -> {
+
+            // Should never happen, since chunk size = request size is set for the object reader
+            if (xs.size() != 1)
+                throw new EUnexpected();
+
+            return xs.get(0);
+
+        }).exceptionally(e -> {
+
+            list.forEach(ArrowBuf::close);
+            throw e instanceof CompletionException ? (CompletionException) e : new CompletionException(e);
+        });
+
+        // return CompletableFuture.failedFuture(new RuntimeException("Not implemented yet"));
     }
 
     @Override

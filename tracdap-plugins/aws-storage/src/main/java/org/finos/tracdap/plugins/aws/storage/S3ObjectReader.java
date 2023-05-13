@@ -43,9 +43,12 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.finos.tracdap.common.storage.CommonFileStorage.READ_OPERATION;
 import static org.finos.tracdap.common.storage.StorageErrors.ExplicitError.DUPLICATE_SUBSCRIPTION;
+import static org.finos.tracdap.common.storage.StorageErrors.ExplicitError.OBJECT_SIZE_TOO_SMALL;
 
 
 public class S3ObjectReader implements Flow.Publisher<ArrowBuf> {
+
+    private static final int DEFAULT_CHUNK_SIZE = 1024 * 1024;
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
@@ -53,6 +56,10 @@ public class S3ObjectReader implements Flow.Publisher<ArrowBuf> {
     private final String storagePath;
     private final String bucket;
     private final String objectKey;
+
+    private final boolean useRange;
+    private final long offset;
+    private final int size;
 
     private final S3AsyncClient client;
     private final OrderedEventExecutor executor;
@@ -62,6 +69,9 @@ public class S3ObjectReader implements Flow.Publisher<ArrowBuf> {
     private final AtomicBoolean subscriberSet;
     private Flow.Subscriber<? super ArrowBuf> subscriber;
     private Subscription awsSubscription;
+
+    private final int chunkSize;
+    private ArrowBuf currentChunk;
 
     private int requestBuffer;
     private boolean gotError;
@@ -74,10 +84,51 @@ public class S3ObjectReader implements Flow.Publisher<ArrowBuf> {
             IDataContext dataContext,
             StorageErrors errors) {
 
+        this(storageKey, storagePath, bucket, objectKey, client, dataContext, DEFAULT_CHUNK_SIZE, errors);
+    }
+
+    public S3ObjectReader(
+            String storageKey, String storagePath,
+            String bucket, String objectKey,
+            S3AsyncClient client,
+            IDataContext dataContext,
+            int chunkSize,
+            StorageErrors errors) {
+
+        this(storageKey, storagePath, bucket, objectKey, false, 0, 0,
+                client, dataContext, chunkSize, errors);
+    }
+
+    public S3ObjectReader(
+            String storageKey, String storagePath,
+            String bucket, String objectKey,
+            long offset, int size,
+            S3AsyncClient client,
+            IDataContext dataContext,
+            int chunkSize,
+            StorageErrors errors) {
+
+        this(storageKey, storagePath, bucket, objectKey, true, offset, size,
+                client, dataContext, chunkSize, errors);
+    }
+
+    public S3ObjectReader(
+            String storageKey, String storagePath,
+            String bucket, String objectKey,
+            boolean useRange, long offset, int size,
+            S3AsyncClient client,
+            IDataContext dataContext,
+            int chunkSize,
+            StorageErrors errors) {
+
         this.storageKey = storageKey;
         this.storagePath = storagePath;
         this.bucket = bucket;
         this.objectKey = objectKey;
+
+        this.useRange = useRange;
+        this.offset = offset;
+        this.size = size;
 
         this.client = client;
         this.executor = dataContext.eventLoopExecutor();
@@ -86,6 +137,9 @@ public class S3ObjectReader implements Flow.Publisher<ArrowBuf> {
 
         this.subscriberSet = new AtomicBoolean();
         this.subscriber = null;
+
+        this.chunkSize = chunkSize;
+        this.currentChunk = null;
     }
 
     @Override
@@ -124,11 +178,15 @@ public class S3ObjectReader implements Flow.Publisher<ArrowBuf> {
 
         var request = GetObjectRequest.builder()
                 .bucket(bucket)
-                .key(objectKey)
-                .build();
+                .key(objectKey);
+
+        if (useRange) {
+            var range = String.format("bytes=%d-%d", offset, offset + size - 1);
+            request.range(range);
+        }
 
         var handler = new ResponseHandler();
-        client.getObject(request, handler);
+        client.getObject(request.build(), handler);
     }
 
     private void _onPrepare(CompletableFuture<Void> signal) {
@@ -136,6 +194,12 @@ public class S3ObjectReader implements Flow.Publisher<ArrowBuf> {
     }
 
     private void _onResponse(GetObjectResponse response) {
+
+        if (useRange && response.contentLength() != size) {
+            var error = errors.explicitError(READ_OPERATION, storagePath, OBJECT_SIZE_TOO_SMALL);
+            subscriber.onError(error);
+            gotError = true;
+        }
 
         log.info("{} {} [{}]: Object size is [{}]",
                 READ_OPERATION, storageKey, storagePath,
@@ -163,24 +227,62 @@ public class S3ObjectReader implements Flow.Publisher<ArrowBuf> {
 
     private void _onNext(ByteBuffer byteBuffer) {
 
-        if (!gotError && !gotCancel) {
+        if (gotError || gotCancel)
+            return;
 
-            var size = byteBuffer.remaining();
-            var buffer = allocator.buffer(size);
-            buffer.setBytes(0, byteBuffer);
-            buffer.writerIndex(size);
-
-            subscriber.onNext(buffer);
+        if (!byteBuffer.hasRemaining()) {
+            subscriber.onNext(allocator.getEmpty());
+            return;
         }
+
+        var sent = false;
+
+        while (byteBuffer.remaining() > 0) {
+
+            if (currentChunk == null)
+                currentChunk = allocator.buffer(chunkSize);
+
+            var nBytes = (int) Math.min(byteBuffer.remaining(), currentChunk.writableBytes());
+            var newPosition = byteBuffer.position() + nBytes;
+
+            currentChunk.setBytes(currentChunk.writerIndex(), byteBuffer, byteBuffer.position(), nBytes);
+            currentChunk.writerIndex(currentChunk.writerIndex() + nBytes);
+
+            byteBuffer.position(newPosition);
+
+            if (currentChunk.writableBytes() == 0) {
+                subscriber.onNext(currentChunk);
+                currentChunk = null;
+                sent = true;
+            }
+        }
+
+        if (!sent)
+            awsSubscription.request(1);
+
+        // TODO: Assumption that buf.capacity() > size of byteBuffer
+        // Otherwise we might emit more items that requested - there needs to be a queue
     }
 
     private void _onComplete() {
 
-        if (!gotError && !gotCancel)
-            subscriber.onComplete();
+        if (gotError || gotCancel)
+            return;
+
+        if (currentChunk != null) {
+            subscriber.onNext(currentChunk);
+            currentChunk = null;
+        }
+
+        subscriber.onComplete();
     }
 
     private void _onError(Throwable error) {
+
+        if (currentChunk != null) {
+            subscriber.onNext(currentChunk);
+            currentChunk = null;
+        }
 
         var tracError = errors.handleException(READ_OPERATION, storagePath, error);
 
@@ -214,6 +316,11 @@ public class S3ObjectReader implements Flow.Publisher<ArrowBuf> {
 
         @Override
         public void cancel() {
+
+            if (currentChunk != null) {
+                currentChunk.close();
+                currentChunk = null;
+            }
 
             if (!gotCancel) {
                 log.info("CANCEL {} {} [{}]", READ_OPERATION, storageKey, storagePath);
