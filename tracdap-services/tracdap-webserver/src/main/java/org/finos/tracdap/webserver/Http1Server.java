@@ -16,16 +16,17 @@
 
 package org.finos.tracdap.webserver;
 
-import io.netty.buffer.ByteBuf;
-import io.netty.util.concurrent.OrderedEventExecutor;
 import org.finos.tracdap.common.data.DataContext;
 import org.finos.tracdap.common.exception.EUnexpected;
 
+import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.handler.codec.http.*;
 import io.netty.util.ReferenceCountUtil;
+import io.netty.util.concurrent.OrderedEventExecutor;
+import org.apache.arrow.memory.BufferAllocator;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -43,11 +44,14 @@ public class Http1Server extends ChannelInboundHandlerAdapter {
     private static final Logger log = LoggerFactory.getLogger(Http1Server.class);
 
     private final ContentServer contentServer;
+    private final BufferAllocator arrowAllocator;
 
     private HttpRequest currentRequest;
 
-    public Http1Server(ContentServer contentServer) {
+    public Http1Server(ContentServer contentServer, BufferAllocator arrowAllocator) {
+
         this.contentServer = contentServer;
+        this.arrowAllocator = arrowAllocator;
     }
 
     @Override
@@ -151,7 +155,7 @@ public class Http1Server extends ChannelInboundHandlerAdapter {
     private void serveHeadRequest(ChannelHandlerContext ctx, HttpRequest request) {
 
         var executor = (OrderedEventExecutor) ctx.executor();
-        var dataCtx = new DataContext(executor, null);
+        var dataCtx = new DataContext(executor, arrowAllocator);
 
         contentServer.headRequest(request.uri(), dataCtx)
                 .thenAccept(response -> serverHeadResponse(ctx, request, response))
@@ -173,7 +177,7 @@ public class Http1Server extends ChannelInboundHandlerAdapter {
     private void serveGetRequest(ChannelHandlerContext ctx, HttpRequest request) {
 
         var executor = (OrderedEventExecutor) ctx.executor();
-        var dataCtx = new DataContext(executor, null);
+        var dataCtx = new DataContext(executor, arrowAllocator);
 
         contentServer.getRequest(request.uri(), dataCtx)
                 .thenAccept(response -> serveGetResponse(ctx, request, response))

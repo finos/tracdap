@@ -30,8 +30,11 @@ import static org.finos.tracdap.common.storage.StorageErrors.ExplicitError.*;
 
 public class S3StorageErrors extends StorageErrors {
 
+    private static final int RANGE_NOT_SATISFIABLE = 416;
+
     private static final List<Map.Entry<Integer, ExplicitError>> HTTP_ERROR_CODE_MAP = List.of(
             Map.entry(HttpStatusCode.NOT_FOUND, OBJECT_NOT_FOUND),
+            Map.entry(RANGE_NOT_SATISFIABLE, OBJECT_SIZE_TOO_SMALL),
             Map.entry(HttpStatusCode.FORBIDDEN, ACCESS_DENIED));
 
     public S3StorageErrors(String storageKey) {

@@ -22,20 +22,25 @@ import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.common.storage.*;
 
 import io.netty.buffer.ByteBuf;
-import io.netty.buffer.ByteBufAllocator;
 import io.netty.channel.EventLoopGroup;
+import org.apache.arrow.memory.ArrowBuf;
 
 import java.io.IOException;
+import java.nio.channels.AsynchronousFileChannel;
+import java.nio.channels.Channel;
+import java.nio.channels.CompletionHandler;
 import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.List;
 import java.util.Properties;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Flow;
 import java.util.stream.Collectors;
 
+import static java.nio.file.StandardOpenOption.READ;
 import static org.finos.tracdap.common.storage.StorageErrors.ExplicitError.*;
 
 
@@ -327,16 +332,75 @@ public class LocalFileStorage extends CommonFileStorage {
     }
 
     @Override
-    protected Flow.Publisher<ByteBuf>
+    protected CompletionStage<ArrowBuf> fsReadChunk(String storagePath, long offset, int size, IDataContext ctx) {
+
+        try {
+
+            var absolutePath = resolvePath(storagePath);
+
+            @SuppressWarnings("resource")
+            var channel = AsynchronousFileChannel.open(absolutePath, Set.of(READ), ctx.eventLoopExecutor());
+            var read = new CompletableFuture<Integer>();
+
+            @SuppressWarnings("resource")
+            var allocator = ctx.arrowAllocator();
+            var buffer = allocator.buffer(size);
+
+            channel.read(buffer.nioBuffer(0, size), offset, null, new CompletionHandler<>() {
+                @Override public void completed(Integer result, Object attachment) { read.complete(result); }
+                @Override public void failed(Throwable exc, Object attachment) { read.completeExceptionally(exc); }
+            });
+
+            return read.handle((bytesRead, error) ->
+                    fsReadChunkCallback(storagePath, size, channel, buffer, bytesRead, error));
+        }
+        catch (IOException e) {
+            return CompletableFuture.failedFuture(new CompletionException(e));
+        }
+    }
+
+    private ArrowBuf fsReadChunkCallback(
+            String storagePath, long size,
+            Channel channel, ArrowBuf buffer,
+            long bytesRead, Throwable error) {
+
+        try {
+
+            if (error == null && bytesRead == size) {
+                buffer.writerIndex(size);
+                return buffer;
+            }
+
+            buffer.close();
+
+            if (error == null) {
+                log.warn("Requested: {}, read: {}", size, bytesRead);
+                throw errors.explicitError(READ_OPERATION, storagePath, OBJECT_SIZE_TOO_SMALL);
+            }
+
+            if (error instanceof CompletionException)
+                throw (CompletionException) error;
+
+            throw new CompletionException(error);
+        }
+        finally {
+
+            try {
+                channel.close();
+            }
+            catch (IOException e) {
+                log.warn("{} {} [{}]: Read channel did not close cleanly", READ_OPERATION, storageKey, storagePath, e);
+            }
+        }
+    }
+
+    @Override
+    protected Flow.Publisher<ArrowBuf>
     fsOpenInputStream(String storagePath, IDataContext dataContext) {
 
         var absolutePath = resolvePath(storagePath);
 
-        return new LocalFileReader(
-                storagePath, absolutePath,
-                ByteBufAllocator.DEFAULT,
-                dataContext.eventLoopExecutor(),
-                errors);
+        return new LocalFileReader(storagePath, absolutePath, dataContext, errors);
     }
 
     @Override

@@ -16,9 +16,11 @@
 
 package org.finos.tracdap.plugins.aws.storage;
 
+import org.finos.tracdap.common.concurrent.Flows;
 import org.finos.tracdap.common.concurrent.IExecutionContext;
 import org.finos.tracdap.common.data.IDataContext;
 import org.finos.tracdap.common.exception.EStartup;
+import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.storage.*;
 
 import software.amazon.awssdk.auth.credentials.*;
@@ -32,10 +34,12 @@ import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3AsyncClient;
 import software.amazon.awssdk.services.s3.model.*;
 
+import org.apache.arrow.memory.ArrowBuf;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.EventLoopGroup;
 
 import java.net.URI;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.CompletableFuture;
@@ -416,7 +420,36 @@ public class S3ObjectStorage extends CommonFileStorage {
     }
 
     @Override
-    protected Flow.Publisher<ByteBuf> fsOpenInputStream(String storagePath, IDataContext dataContext) {
+    protected CompletionStage<ArrowBuf> fsReadChunk(String storagePath, long offset, int size, IDataContext ctx) {
+
+        var objectKey = usePrefix(storagePath);
+
+        var reader = new S3ObjectReader(
+                storageKey, storagePath, bucket, objectKey, offset, size,
+                client, ctx, size, errors);
+
+        var list = new ArrayList<ArrowBuf>(1);
+        var collect = Flows.fold(reader, (xs, x) -> { xs.add(x); return xs; }, list);
+
+        return collect.thenApply(xs -> {
+
+            // Should never happen, since chunk size = request size is set for the object reader
+            if (xs.size() != 1)
+                throw new EUnexpected();
+
+            return xs.get(0);
+
+        }).exceptionally(e -> {
+
+            list.forEach(ArrowBuf::close);
+            throw e instanceof CompletionException ? (CompletionException) e : new CompletionException(e);
+        });
+
+        // return CompletableFuture.failedFuture(new RuntimeException("Not implemented yet"));
+    }
+
+    @Override
+    protected Flow.Publisher<ArrowBuf> fsOpenInputStream(String storagePath, IDataContext dataContext) {
 
         var objectKey = usePrefix(storagePath);
 

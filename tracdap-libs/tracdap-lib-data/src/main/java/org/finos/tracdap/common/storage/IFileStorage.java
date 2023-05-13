@@ -51,6 +51,11 @@ public interface IFileStorage extends AutoCloseable {
 
     CompletionStage<Void> rmdir(String storagePath, IExecutionContext execContext);
 
+    CompletionStage<ByteBuf> readChunk(
+            String storagePath,
+            long offset, int size,
+            IDataContext dataContext);
+
     Flow.Publisher<ByteBuf> reader(
             String storagePath,
             IDataContext dataContext);

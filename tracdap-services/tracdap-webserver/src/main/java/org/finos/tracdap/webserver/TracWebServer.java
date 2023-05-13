@@ -16,6 +16,7 @@
 
 package org.finos.tracdap.webserver;
 
+
 import org.finos.tracdap.common.auth.internal.JwtSetup;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.exception.EStartup;
@@ -26,11 +27,15 @@ import org.finos.tracdap.common.storage.IStorageManager;
 import org.finos.tracdap.config.PlatformConfig;
 
 import io.netty.bootstrap.ServerBootstrap;
+import io.netty.buffer.ByteBufAllocator;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.util.concurrent.DefaultThreadFactory;
+import org.apache.arrow.memory.BufferAllocator;
+import org.apache.arrow.memory.NettyAllocationManager;
+import org.apache.arrow.memory.RootAllocator;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -48,6 +53,8 @@ public class TracWebServer extends CommonServiceBase {
     private final PluginManager pluginManager;
     private final ConfigManager configManager;
 
+    private BufferAllocator arrowAllocator = null;
+    private ByteBufAllocator nettyAllocator = null;
     private EventLoopGroup bossGroup = null;
     private EventLoopGroup workerGroup = null;
 
@@ -74,6 +81,21 @@ public class TracWebServer extends CommonServiceBase {
             throw new EStartup(msg);
         }
 
+        // The storage layer uses Arrow's memory framework with ArrowBuf / BufferAllocator
+        // Buffers returned from the storage layer are wrapped (zero-copy) to send on as Netty ByteBuf
+        // Buffers allocated by Netty use nettyAllocator, which is separate atm
+
+        // It would be quite easy to implement ByteBufAllocator as a wrapper on an Arrow BufferAllocator
+        // This would let the web server use a single allocation framework
+
+        var arrowAllocatorConfig = RootAllocator
+                .configBuilder()
+                .allocationManagerFactory(NettyAllocationManager.FACTORY)
+                .build();
+
+        this.arrowAllocator = new RootAllocator(arrowAllocatorConfig);
+        this.nettyAllocator = ByteBufAllocator.DEFAULT;
+
         // TODO: Review configuration of thread pools and channel options
 
         bossGroup = new NioEventLoopGroup(2, new DefaultThreadFactory("boss"));
@@ -96,7 +118,7 @@ public class TracWebServer extends CommonServiceBase {
 
         // Handlers for all support protocols
         var contentServer = new ContentServer(platformConfig.getWebServer(), contentStorage);
-        var http1Handler = (Supplier<Http1Server>) () -> new Http1Server(contentServer);
+        var http1Handler = (Supplier<Http1Server>) () -> new Http1Server(contentServer, arrowAllocator);
         var http2Handler = (Supplier<Http2Server>) () -> new Http2Server(contentServer);
 
         // The protocol negotiator is the top level initializer for new inbound connections
@@ -106,6 +128,7 @@ public class TracWebServer extends CommonServiceBase {
                 .group(bossGroup, workerGroup)
                 .channel(NioServerSocketChannel.class)
                 .childHandler(protocolNegotiator)
+                .option(ChannelOption.ALLOCATOR, nettyAllocator)
                 .option(ChannelOption.SO_BACKLOG, 128)
                 .childOption(ChannelOption.SO_KEEPALIVE, true);
 
@@ -162,6 +185,10 @@ public class TracWebServer extends CommonServiceBase {
             log.error("Web server shutdown did not complete successfully in the allotted time");
             return -1;
         }
+
+        arrowAllocator.close();
+        arrowAllocator = null;
+        nettyAllocator = null;
 
         log.info("All web server connections are closed");
         return 0;

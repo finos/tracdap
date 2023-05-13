@@ -37,6 +37,7 @@ import static org.mockito.Mockito.*;
 import java.nio.CharBuffer;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.CompletableFuture;
@@ -685,63 +686,71 @@ public abstract class StorageReadWriteTestSuite {
     @Test
     void testRead_requestUpfront() {
 
-        var storagePath = "some_file.dat";
+        var chunks = new ArrayList<ByteBuf>();
 
-        // Create a file big enough that it needs many chunks to read
+        try {
 
-        var originalBytes = new byte[10 * 1024 * 1024];
-        var originalContent = ByteBufAllocator.DEFAULT.directBuffer(10000);
+            var storagePath = "some_file.dat";
 
-        var random = new Random();
-        random.nextBytes(originalBytes);
-        originalContent.writeBytes(originalBytes);
+            // Create a file big enough that it needs many chunks to read
 
-        var write = makeFile(storagePath, originalContent, storage, dataContext);
-        waitFor(TEST_TIMEOUT, write);
+            var originalBytes = new byte[10 * 1024 * 1024];
+            var originalContent = ByteBufAllocator.DEFAULT.directBuffer(10000);
 
-        // request a million chunks - way more than needed
-        // Actual chunks received will depend on the storage implementation
-        // These are intended as some common sense bounds
+            var random = new Random();
+            random.nextBytes(originalBytes);
+            originalContent.writeBytes(originalBytes);
 
-        var CHUNKS_TO_REQUEST = 1000000;
-        var MIN_CHUNKS_EXPECTED = 10;          // implies a min chunk size of 1 MiB
-        var MAX_CHUNKS_EXPECTED = 40 * 1024;   // implies a max chunk size of 256 B
+            var write = makeFile(storagePath, originalContent, storage, dataContext);
+            waitFor(TEST_TIMEOUT, write);
 
-        Flow.Subscriber<ByteBuf> subscriber = unchecked(mock(Flow.Subscriber.class));
-        AtomicLong bytesRead = new AtomicLong(0);
+            // request a million chunks - way more than needed
+            // Actual chunks received will depend on the storage implementation
+            // These are intended as some common sense bounds
 
-        // Request all the chunks in one go as soon as onSubscribe is received
-        doAnswer(invocation -> {
-            Flow.Subscription subscription = invocation.getArgument(0);
-            subscription.request(CHUNKS_TO_REQUEST);
-            return null;
-        }).when(subscriber).onSubscribe(any(Flow.Subscription.class));
+            var CHUNKS_TO_REQUEST = 1000000;
+            var MIN_CHUNKS_EXPECTED = 5;           // implies a max chunk size of 2 MiB
+            var MAX_CHUNKS_EXPECTED = 40 * 1024;   // implies a min chunk size of 256 B
 
-        // Count up the bytes received and release buffers
-        doAnswer(invocation -> {
-            ByteBuf chunk = invocation.getArgument(0);
-            bytesRead.addAndGet(chunk.readableBytes());
-            chunk.release();
-            return null;
-        }).when(subscriber).onNext(any(ByteBuf.class));
+            Flow.Subscriber<ByteBuf> subscriber = unchecked(mock(Flow.Subscriber.class));
+            AtomicLong bytesRead = new AtomicLong(0);
 
-        // Create a reader and read using the mocked subscriber
+            // Request all the chunks in one go as soon as onSubscribe is received
+            doAnswer(invocation -> {
+                Flow.Subscription subscription = invocation.getArgument(0);
+                subscription.request(CHUNKS_TO_REQUEST);
+                return null;
+            }).when(subscriber).onSubscribe(any(Flow.Subscription.class));
 
-        var reader = storage.reader(storagePath, dataContext);
-        reader.subscribe(subscriber);
+            // Count up the bytes received and release buffers
+            doAnswer(invocation -> {
+                ByteBuf chunk = invocation.getArgument(0);
+                bytesRead.addAndGet(chunk.readableBytes());
+                chunks.add(chunk);
+                return null;
+            }).when(subscriber).onNext(any(ByteBuf.class));
 
-        // onSubscribe should be received
-        verify(subscriber, timeout(TEST_TIMEOUT.toMillis())).onSubscribe(any(Flow.Subscription.class));
+            // Create a reader and read using the mocked subscriber
 
-        // The stream should be read until complete
-        verify(subscriber, timeout(TEST_TIMEOUT.toMillis())).onComplete();
+            var reader = storage.reader(storagePath, dataContext);
+            reader.subscribe(subscriber);
 
-        // Chunks received - there should be more than one
-        verify(subscriber, atLeast(MIN_CHUNKS_EXPECTED)).onNext(any(ByteBuf.class));
-        verify(subscriber, atMost(MAX_CHUNKS_EXPECTED)).onNext(any(ByteBuf.class));
+            // onSubscribe should be received
+            verify(subscriber, timeout(TEST_TIMEOUT.toMillis())).onSubscribe(any(Flow.Subscription.class));
 
-        // No errors
-        verify(subscriber, never()).onError(any());
+            // The stream should be read until complete
+            verify(subscriber, timeout(TEST_TIMEOUT.toMillis())).onComplete();
+
+            // Chunks received - there should be more than one
+            verify(subscriber, atLeast(MIN_CHUNKS_EXPECTED)).onNext(any(ByteBuf.class));
+            verify(subscriber, atMost(MAX_CHUNKS_EXPECTED)).onNext(any(ByteBuf.class));
+
+            // No errors
+            verify(subscriber, never()).onError(any());
+        }
+        finally {
+            chunks.forEach(ByteBuf::release);
+        }
     }
 
     @Test

@@ -33,6 +33,8 @@ import java.nio.CharBuffer;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Arrays;
+import java.util.Random;
 import java.util.concurrent.*;
 import java.util.function.BiFunction;
 
@@ -983,6 +985,229 @@ public abstract class StorageOperationsTestSuite {
         failForStorageRoot(storage::rmdir);
     }
 
+
+    // -----------------------------------------------------------------------------------------------------------------
+    // READ CHUNK
+    // -----------------------------------------------------------------------------------------------------------------
+
+    @Test
+    void testReadChunk_ok() throws Exception {
+
+        var fileSize = 10 * 1024;
+        var bytes = new byte[fileSize];
+        var random = new Random();
+        random.nextBytes(bytes);
+
+        var content = Unpooled.wrappedBuffer(bytes);
+        var prepare = makeFile("test_file.dat", content, storage, execContext);
+
+        waitFor(TEST_TIMEOUT, prepare);
+        resultOf(prepare);
+
+        var readChunk = storage.readChunk("test_file.dat", 4096, 4096, dataContext);
+        waitFor(TEST_TIMEOUT, readChunk);
+
+        var chunk = resultOf(readChunk);
+
+        try {
+            var expectedBytes = Arrays.copyOfRange(bytes, 4096, 8192);
+            var chunkBytes = new byte[4096];
+            chunk.readBytes(chunkBytes);
+
+            Assertions.assertArrayEquals(expectedBytes, chunkBytes);
+        }
+        finally {
+            chunk.release();
+        }
+    }
+
+    @Test
+    void testReadChunk_first() throws Exception {
+
+        var fileSize = 10 * 1024;
+        var bytes = new byte[fileSize];
+        var random = new Random();
+        random.nextBytes(bytes);
+
+        var content = Unpooled.wrappedBuffer(bytes);
+        var prepare = makeFile("test_file.dat", content, storage, execContext);
+
+        waitFor(TEST_TIMEOUT, prepare);
+        resultOf(prepare);
+
+        var readChunk = storage.readChunk("test_file.dat", 0, 4096, dataContext);
+        waitFor(TEST_TIMEOUT, readChunk);
+
+        var chunk = resultOf(readChunk);
+
+        try {
+            var expectedBytes = Arrays.copyOfRange(bytes, 0, 4096);
+            var chunkBytes = new byte[4096];
+            chunk.readBytes(chunkBytes);
+
+            Assertions.assertArrayEquals(expectedBytes, chunkBytes);
+        }
+        finally {
+            chunk.release();
+        }
+    }
+
+    @Test
+    void testReadChunk_last() throws Exception {
+
+        var fileSize = 10 * 1024;
+        var bytes = new byte[fileSize];
+        var random = new Random();
+        random.nextBytes(bytes);
+
+        var content = Unpooled.wrappedBuffer(bytes);
+        var prepare = makeFile("test_file.dat", content, storage, execContext);
+
+        waitFor(TEST_TIMEOUT, prepare);
+        resultOf(prepare);
+
+        var readChunk = storage.readChunk("test_file.dat", 8192, 2048, dataContext);
+        waitFor(TEST_TIMEOUT, readChunk);
+
+        var chunk = resultOf(readChunk);
+
+        try {
+            var expectedBytes = Arrays.copyOfRange(bytes, 8192, 10240);
+            var chunkBytes = new byte[2048];
+            chunk.readBytes(chunkBytes);
+
+            Assertions.assertArrayEquals(expectedBytes, chunkBytes);
+        }
+        finally {
+            chunk.release();
+        }
+    }
+
+    @Test
+    void testReadChunk_all() throws Exception {
+
+        var fileSize = 10 * 1024;
+        var bytes = new byte[fileSize];
+        var random = new Random();
+        random.nextBytes(bytes);
+
+        var content = Unpooled.wrappedBuffer(bytes);
+        var prepare = makeFile("test_file.dat", content, storage, execContext);
+
+        waitFor(TEST_TIMEOUT, prepare);
+        resultOf(prepare);
+
+        var readChunk = storage.readChunk("test_file.dat", 0, 10240, dataContext);
+        waitFor(TEST_TIMEOUT, readChunk);
+
+        var chunk = resultOf(readChunk);
+
+        try {
+            var expectedBytes = Arrays.copyOfRange(bytes, 0, 10240);
+            var chunkBytes = new byte[10240];
+            chunk.readBytes(chunkBytes);
+
+            Assertions.assertArrayEquals(expectedBytes, chunkBytes);
+        }
+        finally {
+            chunk.release();
+        }
+    }
+
+    @Test
+    void testReadChunk_badSize() throws Exception {
+
+        var fileSize = 10 * 1024;
+        var bytes = new byte[fileSize];
+        var random = new Random();
+        random.nextBytes(bytes);
+
+        var content = Unpooled.wrappedBuffer(bytes);
+        var prepare = makeFile("test_file.dat", content, storage, execContext);
+
+        waitFor(TEST_TIMEOUT, prepare);
+        resultOf(prepare);
+
+        var readChunk = storage.readChunk("test_file.dat", 1024, 10240, dataContext);
+        waitFor(TEST_TIMEOUT, readChunk);
+
+        Assertions.assertThrows(EStorageRequest.class, () -> resultOf(readChunk));
+
+        var readChunk2 = storage.readChunk("test_file.dat", 10241, 1024, dataContext);
+        waitFor(TEST_TIMEOUT, readChunk2);
+
+        Assertions.assertThrows(EStorageRequest.class, () -> resultOf(readChunk2));
+    }
+
+    @Test
+    void testReadChunk_onDir() throws Exception {
+
+        // Calling readChunk on a directory is a storage error
+
+        var prepare = storage.mkdir("test_file.dat", false, execContext);
+        waitFor(TEST_TIMEOUT, prepare);
+        resultOf(prepare);
+
+        var readChunk = storage.readChunk("test_file.dat", 0, 1024, dataContext);
+        waitFor(TEST_TIMEOUT, readChunk);
+
+        Assertions.assertThrows(EStorageRequest.class, () -> resultOf(readChunk));
+    }
+
+    @Test
+    void testReadChunk_missing() {
+
+        // Calling readChunk on a missing file is a storage error
+
+        var readChunk = storage.readChunk("missing_file.dat", 0, 1024, dataContext);
+        waitFor(TEST_TIMEOUT, readChunk);
+        Assertions.assertThrows(EStorageRequest.class, () -> resultOf(readChunk));
+    }
+
+    @Test
+    void testReadChunk_invalidParams() throws Exception {
+
+        var fileSize = 10 * 1024;
+        var bytes = new byte[fileSize];
+        var random = new Random();
+        random.nextBytes(bytes);
+
+        var content = Unpooled.wrappedBuffer(bytes);
+        var prepare = makeFile("test_file.dat", content, storage, execContext);
+
+        waitFor(TEST_TIMEOUT, prepare);
+        resultOf(prepare);
+
+        // Zero size (empty chunk)
+
+        var readChunk = storage.readChunk("test_file.dat", 1024, 0, dataContext);
+        waitFor(TEST_TIMEOUT, readChunk);
+        Assertions.assertThrows(EValidationGap.class, () -> resultOf(readChunk));
+
+        // Negative size
+
+        var readChunk3 = storage.readChunk("test_file.dat", 0, -1024, dataContext);
+        waitFor(TEST_TIMEOUT, readChunk3);
+        Assertions.assertThrows(EValidationGap.class, () -> resultOf(readChunk3));
+
+        // Negative offset
+
+        var readChunk2 = storage.readChunk("test_file.dat", -1, 1024, dataContext);
+        waitFor(TEST_TIMEOUT, readChunk2);
+        Assertions.assertThrows(EValidationGap.class, () -> resultOf(readChunk2));
+    }
+
+    @Test
+    void testReadChunk_badPaths() {
+
+        testBadPaths((path, ctx) -> storage.readChunk(path, 0, 1024, dataContext));
+    }
+
+    @Test
+    void testReadChunk_storageRoot() {
+
+        failForStorageRoot((path, ctx) -> storage.readChunk(path, 0, 1024, dataContext));
+    }
 
     // -----------------------------------------------------------------------------------------------------------------
     // COMMON TESTS (tests applied to several storage calls)

@@ -16,11 +16,13 @@
 
 package org.finos.tracdap.common.storage.local;
 
-import org.finos.tracdap.common.exception.EUnexpected;
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.ByteBufAllocator;
-import io.netty.util.concurrent.OrderedEventExecutor;
+import org.finos.tracdap.common.data.IDataContext;
 import org.finos.tracdap.common.storage.StorageErrors;
+import org.finos.tracdap.common.exception.EUnexpected;
+
+import io.netty.util.concurrent.OrderedEventExecutor;
+import org.apache.arrow.memory.ArrowBuf;
+import org.apache.arrow.memory.BufferAllocator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -38,7 +40,7 @@ import static org.finos.tracdap.common.storage.local.LocalFileStorage.READ_OPERA
 import static java.nio.file.StandardOpenOption.*;
 
 
-public class LocalFileReader implements Flow.Publisher<ByteBuf> {
+public class LocalFileReader implements Flow.Publisher<ArrowBuf> {
 
     private static final int DEFAULT_CHUNK_SIZE = 4096;
 
@@ -46,12 +48,12 @@ public class LocalFileReader implements Flow.Publisher<ByteBuf> {
 
     private final String storagePath;
     private final Path absolutePath;
-    private final ByteBufAllocator allocator;
+    private final BufferAllocator allocator;
     private final OrderedEventExecutor executor;
     private final StorageErrors errors;
 
     private final AtomicBoolean subscriberSet;
-    private Flow.Subscriber<? super ByteBuf> subscriber;
+    private Flow.Subscriber<? super ArrowBuf> subscriber;
 
     private AsynchronousFileChannel channel;
     private ChunkReadHandler readHandler;
@@ -65,14 +67,13 @@ public class LocalFileReader implements Flow.Publisher<ByteBuf> {
 
     LocalFileReader(
             String storagePath, Path absolutePath,
-            ByteBufAllocator allocator,
-            OrderedEventExecutor executor,
+            IDataContext dataContext,
             StorageErrors errors) {
 
         this.storagePath = storagePath;
         this.absolutePath = absolutePath;
-        this.allocator = allocator;
-        this.executor = executor;
+        this.allocator = dataContext.arrowAllocator();
+        this.executor = dataContext.eventLoopExecutor();
         this.errors = errors;
 
         this.subscriberSet = new AtomicBoolean(false);
@@ -94,7 +95,7 @@ public class LocalFileReader implements Flow.Publisher<ByteBuf> {
 
 
     @Override
-    public void subscribe(Flow.Subscriber<? super ByteBuf> subscriber) {
+    public void subscribe(Flow.Subscriber<? super ArrowBuf> subscriber) {
 
         // Avoid concurrency issues - use atomic boolean CAS to ensure the method is only called once
         // No other processing has started at this point
@@ -244,11 +245,7 @@ public class LocalFileReader implements Flow.Publisher<ByteBuf> {
             if (chunkInProgress)
                 throw new EUnexpected();
 
-            var chunk = allocator.ioBuffer(DEFAULT_CHUNK_SIZE);
-
-            if (chunk.nioBufferCount() != 1)
-                throw new EUnexpected();
-
+            var chunk = allocator.buffer(DEFAULT_CHUNK_SIZE);
             var nioChunk = chunk.nioBuffer(0, DEFAULT_CHUNK_SIZE);
 
             channel.read(nioChunk, bytesRead, chunk, readHandler);
@@ -262,7 +259,7 @@ public class LocalFileReader implements Flow.Publisher<ByteBuf> {
         }
     }
 
-    private void readChunkComplete(Integer nBytes, ByteBuf chunk) {
+    private void readChunkComplete(Integer nBytes, ArrowBuf chunk) {
 
         // Update counts
 
@@ -303,7 +300,7 @@ public class LocalFileReader implements Flow.Publisher<ByteBuf> {
         }
     }
 
-    private void readChunkFailed(Throwable error, ByteBuf chunk) {
+    private void readChunkFailed(Throwable error, ArrowBuf chunk) {
 
         chunksPending -= 1;
         chunkInProgress = false;
@@ -331,7 +328,7 @@ public class LocalFileReader implements Flow.Publisher<ByteBuf> {
         handleError(error);
     }
 
-    private void gotChunk(ByteBuf chunk, int nBytes) {
+    private void gotChunk(ArrowBuf chunk, int nBytes) {
 
         try {
 
@@ -394,24 +391,24 @@ public class LocalFileReader implements Flow.Publisher<ByteBuf> {
         }
     }
 
-    private void releaseBuffer(ByteBuf buffer) {
+    private void releaseBuffer(ArrowBuf buffer) {
 
-        var releaseOk = buffer.release();
+        buffer.close();
 
-        if (!releaseOk && buffer.capacity() > 0)
+        if (buffer.refCnt() != 0 && buffer.capacity() > 0)
             log.warn("Chunk buffer was not released (this could indicate a memory leak)");
     }
 
-    private class ChunkReadHandler implements CompletionHandler<Integer, ByteBuf> {
+    private class ChunkReadHandler implements CompletionHandler<Integer, ArrowBuf> {
 
         @Override
-        public void completed(Integer nBytes, ByteBuf chunk) {
+        public void completed(Integer nBytes, ArrowBuf chunk) {
 
             readChunkComplete(nBytes, chunk);
         }
 
         @Override
-        public void failed(Throwable error, ByteBuf chunk) {
+        public void failed(Throwable error, ArrowBuf chunk) {
 
             readChunkFailed(error, chunk);
         }
