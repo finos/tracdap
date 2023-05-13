@@ -16,11 +16,9 @@
 
 package org.finos.tracdap.plugins.aws.storage;
 
-import org.apache.arrow.memory.BufferAllocator;
 import org.finos.tracdap.common.data.IDataContext;
 import org.finos.tracdap.common.storage.StorageErrors;
 import org.finos.tracdap.common.util.LoggingHelpers;
-
 
 import software.amazon.awssdk.core.async.AsyncResponseTransformer;
 import software.amazon.awssdk.core.async.SdkPublisher;
@@ -32,11 +30,14 @@ import org.reactivestreams.Subscription;
 
 import io.netty.util.concurrent.OrderedEventExecutor;
 import org.apache.arrow.memory.ArrowBuf;
+import org.apache.arrow.memory.BufferAllocator;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.nio.ByteBuffer;
+import java.util.ArrayDeque;
+import java.util.Deque;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Flow;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -48,7 +49,8 @@ import static org.finos.tracdap.common.storage.StorageErrors.ExplicitError.OBJEC
 
 public class S3ObjectReader implements Flow.Publisher<ArrowBuf> {
 
-    private static final int DEFAULT_CHUNK_SIZE = 1024 * 1024;
+    private static final long AWS_REQUEST_WINDOW = 32;
+    private static final int DEFAULT_CHUNK_SIZE = 2 * 1024 * 1024;
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
@@ -71,9 +73,14 @@ public class S3ObjectReader implements Flow.Publisher<ArrowBuf> {
     private Subscription awsSubscription;
 
     private final int chunkSize;
+    private final Deque<ArrowBuf> pendingChunks;
     private ArrowBuf currentChunk;
 
-    private int requestBuffer;
+    private long nRequested;
+    private long nSent;
+    private long awsRequested;
+    private long awsReceived;
+    private boolean gotComplete;
     private boolean gotError;
     private boolean gotCancel;
 
@@ -139,6 +146,7 @@ public class S3ObjectReader implements Flow.Publisher<ArrowBuf> {
         this.subscriber = null;
 
         this.chunkSize = chunkSize;
+        this.pendingChunks = new ArrayDeque<>();
         this.currentChunk = null;
     }
 
@@ -218,24 +226,24 @@ public class S3ObjectReader implements Flow.Publisher<ArrowBuf> {
         }
 
         this.awsSubscription = awsSubscription;
+        awsSubscription.request(AWS_REQUEST_WINDOW * 2);
+        awsRequested = AWS_REQUEST_WINDOW * 2;
+    }
 
-        if (requestBuffer > 0) {
-            awsSubscription.request(requestBuffer);
-            requestBuffer = 0;
-        }
+    private void _onRequest(long n) {
+
+        nRequested += n;
+
+        if (!pendingChunks.isEmpty())
+            executor.submit(this::sendPendingChunks);
     }
 
     private void _onNext(ByteBuffer byteBuffer) {
 
+        awsReceived += 1;
+
         if (gotError || gotCancel)
             return;
-
-        if (!byteBuffer.hasRemaining()) {
-            subscriber.onNext(allocator.getEmpty());
-            return;
-        }
-
-        var sent = false;
 
         while (byteBuffer.remaining() > 0) {
 
@@ -251,17 +259,15 @@ public class S3ObjectReader implements Flow.Publisher<ArrowBuf> {
             byteBuffer.position(newPosition);
 
             if (currentChunk.writableBytes() == 0) {
-                subscriber.onNext(currentChunk);
+                sendChunk(currentChunk);
                 currentChunk = null;
-                sent = true;
             }
         }
 
-        if (!sent)
-            awsSubscription.request(1);
-
-        // TODO: Assumption that buf.capacity() > size of byteBuffer
-        // Otherwise we might emit more items that requested - there needs to be a queue
+        if (awsRequested - awsReceived <= AWS_REQUEST_WINDOW) {
+            awsSubscription.request(AWS_REQUEST_WINDOW);
+            awsRequested += AWS_REQUEST_WINDOW;
+        }
     }
 
     private void _onComplete() {
@@ -270,57 +276,43 @@ public class S3ObjectReader implements Flow.Publisher<ArrowBuf> {
             return;
 
         if (currentChunk != null) {
-            subscriber.onNext(currentChunk);
+            sendChunk(currentChunk);
             currentChunk = null;
         }
 
-        subscriber.onComplete();
+        sendComplete();
     }
 
     private void _onError(Throwable error) {
 
-        if (currentChunk != null) {
-            subscriber.onNext(currentChunk);
-            currentChunk = null;
-        }
+        try {
 
-        var tracError = errors.handleException(READ_OPERATION, storagePath, error);
+            var tracError = errors.handleException(READ_OPERATION, storagePath, error);
 
-        if (gotError) {
-            log.warn("{} {} [{}]: Read operation already failed, then another error occurred",
-                    READ_OPERATION, storageKey, storagePath, tracError);
-        }
-        else if (gotCancel) {
-            log.warn("{} {} [{}]: Read operation was cancelled, then an error occurred",
-                    READ_OPERATION, storageKey, storagePath, tracError);
-        }
-        else {
-            log.error("{} {} [{}]: {}",
-                    READ_OPERATION, storageKey, storagePath, tracError.getMessage(), tracError);
+            if (gotError) {
+                log.warn("{} {} [{}]: Read operation already failed, then another error occurred",
+                        READ_OPERATION, storageKey, storagePath, tracError);
+            }
+            else if (gotCancel) {
+                log.warn("{} {} [{}]: Read operation was cancelled, then an error occurred",
+                        READ_OPERATION, storageKey, storagePath, tracError);
+            }
+            else {
+                log.error("{} {} [{}]: {}",
+                        READ_OPERATION, storageKey, storagePath, tracError.getMessage(), tracError);
 
-            gotError = true;
-            subscriber.onError(tracError);
+                gotError = true;
+                subscriber.onError(tracError);
+            }
+        }
+        finally {
+            releasePendingChunks();
         }
     }
 
-    private class ClientSubscription implements Flow.Subscription {
+    private void _onCancel() {
 
-        @Override
-        public void request(long n) {
-
-            if (awsSubscription != null)
-                awsSubscription.request(n);
-            else
-                requestBuffer += n;
-        }
-
-        @Override
-        public void cancel() {
-
-            if (currentChunk != null) {
-                currentChunk.close();
-                currentChunk = null;
-            }
+        try {
 
             if (!gotCancel) {
                 log.info("CANCEL {} {} [{}]", READ_OPERATION, storageKey, storagePath);
@@ -335,7 +327,72 @@ public class S3ObjectReader implements Flow.Publisher<ArrowBuf> {
                         READ_OPERATION, storageKey, storagePath);
             }
         }
+        finally {
+            releasePendingChunks();
+        }
     }
+
+    private void sendChunk(ArrowBuf chunk) {
+
+        if (nSent < nRequested && pendingChunks.isEmpty()) {
+            nSent += 1;
+            subscriber.onNext(chunk);
+        }
+        else {
+            pendingChunks.addLast(chunk);
+        }
+    }
+
+    private void sendPendingChunks() {
+
+        while (nSent < nRequested && !pendingChunks.isEmpty()) {
+            nSent += 1;
+            subscriber.onNext(pendingChunks.pop());
+        }
+
+        if (pendingChunks.isEmpty() && gotComplete) {
+            // Clear the flag, in case sendPendingChunks() is queued multiple times on the executor
+            gotComplete = false;
+            subscriber.onComplete();
+        }
+    }
+
+    private void releasePendingChunks() {
+
+        while (!pendingChunks.isEmpty())
+            pendingChunks.pop().close();
+
+        if (currentChunk != null) {
+            currentChunk.close();
+            currentChunk = null;
+        }
+    }
+
+    private void sendComplete() {
+
+        if (pendingChunks.isEmpty())
+            subscriber.onComplete();
+        else
+            gotComplete = true;
+    }
+
+    // Assuming events that come from the client are already in the data context event loop
+
+    private class ClientSubscription implements Flow.Subscription {
+
+        @Override
+        public void request(long n) {
+            _onRequest(n);
+        }
+
+        @Override
+        public void cancel() {
+            _onCancel();
+        }
+    }
+
+    // Call back events from the AWS SDK are not necessarily in the event loop, so post them back
+    // The AWS client is running with the main ELG, but requests are not sent to a specific EL
 
     private class ResponseHandler implements AsyncResponseTransformer<GetObjectResponse, Void> {
 
