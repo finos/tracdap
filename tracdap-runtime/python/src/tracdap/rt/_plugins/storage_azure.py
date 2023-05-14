@@ -12,6 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import logging
 import typing as tp
 
 # TRAC interfaces
@@ -55,25 +56,29 @@ class AzureBlobStorageProvider(IStorageProvider):
         self._log = _helpers.logger_for_object(self)
         self._properties = properties
 
+        # The Azure SDK is very verbose with logging
+        # Avoid log noise by raising the log level for the Azure namespace
+        azure_log = _helpers.logger_for_namespace("azure.core")
+        azure_log.level = logging.WARNING
+
     def has_arrow_native(self) -> bool:
         return True
 
     def get_arrow_native(self) -> afs.SubTreeFileSystem:
 
         azure_args = self.setup_client_args()
-        azure_fs = adlfs.AzureBlobFileSystem(**azure_args)
+        azure_fs_impl = adlfs.AzureBlobFileSystem(**azure_args)
+        azure_fs = afs.PyFileSystem(afs.FSSpecHandler(azure_fs_impl))
 
         container = _helpers.get_plugin_property(self._properties, self.CONTAINER_PROPERTY)
+        prefix = _helpers.get_plugin_property(self._properties, self.PREFIX_PROPERTY)
 
-        if container is None or len(container.strip()) == 0:
+        if container is None or container.strip() == "":
             message = f"Missing required config property [{self.CONTAINER_PROPERTY}] for Azure blob storage"
             self._log.error(message)
             raise ex.EConfigParse(message)
 
-        protocol = "az"
-        prefix = _helpers.get_plugin_property(self._properties, self.PREFIX_PROPERTY)
-
-        root_path = f"{protocol}://{container}/{prefix}" if prefix else container
+        root_path = f"{container}/{prefix}" if prefix else container
 
         return afs.SubTreeFileSystem(root_path, azure_fs)
 
@@ -107,6 +112,8 @@ class AzureBlobStorageProvider(IStorageProvider):
             return {"anon": False}
 
         if mechanism == self.CREDENTIALS_ACCESS_KEY:
+
+            self._log.info(f"Using [{self.CREDENTIALS_ACCESS_KEY}] credentials mechanism")
 
             access_key = _helpers.get_plugin_property(self._properties, self.ACCESS_KEY_PROPERTY)
 
