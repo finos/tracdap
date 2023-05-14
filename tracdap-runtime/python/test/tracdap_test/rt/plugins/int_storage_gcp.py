@@ -26,7 +26,7 @@ import tracdap.rt._plugins.storage_aws as storage_aws  # noqa
 plugins.PluginManager.register_core_plugins()
 
 
-class AwsArrowNativeStorageTest(unittest.TestCase, FileOperationsTestSuite, FileReadWriteTestSuite):
+class GcsStorageTest(unittest.TestCase, FileOperationsTestSuite, FileReadWriteTestSuite):
 
     suite_storage_prefix = f"runtime_storage_test_suite_{uuid.uuid4()}"
     suite_storage: storage.IFileStorage
@@ -50,7 +50,7 @@ class AwsArrowNativeStorageTest(unittest.TestCase, FileOperationsTestSuite, File
 
         self.suite_storage.mkdir(test_dir)
 
-        AwsArrowNativeStorageTest.test_number += 1
+        GcsStorageTest.test_number += 1
 
         properties = self._properties_from_env()
         properties["prefix"] = test_dir

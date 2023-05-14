@@ -27,7 +27,7 @@ util.configure_logging()
 plugins.PluginManager.register_core_plugins()
 
 
-class AwsArrowNativeStorageTest(unittest.TestCase, FileOperationsTestSuite, FileReadWriteTestSuite):
+class S3StorageTest(unittest.TestCase, FileOperationsTestSuite, FileReadWriteTestSuite):
 
     suite_storage_prefix = f"runtime_storage_test_suite_{uuid.uuid4()}"
     suite_storage: storage.IFileStorage
@@ -52,7 +52,7 @@ class AwsArrowNativeStorageTest(unittest.TestCase, FileOperationsTestSuite, File
 
         self.suite_storage.mkdir(test_dir)
 
-        AwsArrowNativeStorageTest.test_number += 1
+        S3StorageTest.test_number += 1
 
         properties = self._properties_from_env()
         properties["arrowNativeFs"] = "true"
