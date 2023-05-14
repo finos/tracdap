@@ -455,7 +455,8 @@ class CommonFileStorage(IFileStorage):
                 file_info = self._fs.get_file_info(storage_path)
                 if file_info.type != pa_fs.FileType.NotFound:
                     self._fs.delete_file(storage_path)
-            except OSError:
+            except Exception:  # noqa
+                # different implementations can throw different errors here
                 pass
 
         # Stream implementations can raise various types of error during stream operations
