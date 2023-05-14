@@ -26,11 +26,13 @@ util.configure_logging()
 plugins.PluginManager.register_core_plugins()
 
 
-class BlobStorageTest(unittest.TestCase, FileOperationsTestSuite, FileReadWriteTestSuite):
+class AzureBlobStorageTest(unittest.TestCase, FileOperationsTestSuite, FileReadWriteTestSuite):
 
     suite_storage_prefix = f"runtime_storage_test_suite_{uuid.uuid4()}"
     suite_storage: storage.IFileStorage
     test_number: int
+
+    IS_AZURE = True
 
     @classmethod
     def setUpClass(cls) -> None:
@@ -50,7 +52,7 @@ class BlobStorageTest(unittest.TestCase, FileOperationsTestSuite, FileReadWriteT
 
         self.suite_storage.mkdir(test_dir)
 
-        BlobStorageTest.test_number += 1
+        AzureBlobStorageTest.test_number += 1
 
         properties = self._properties_from_env()
         properties["prefix"] = test_dir
