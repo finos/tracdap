@@ -13,15 +13,13 @@
 #  limitations under the License.
 
 import typing as tp
-import datetime as dt
 
+# TRAC interfaces
 import tracdap.rt.exceptions as ex
-
-# Import storage interfaces
 import tracdap.rt.ext.plugins as plugins
 from tracdap.rt.ext.storage import *
 
-from pyarrow import fs as afs
+import pyarrow.fs as afs
 
 try:
     import adlfs
@@ -36,12 +34,21 @@ from . import _helpers
 
 class AzureBlobStorageProvider(IStorageProvider):
 
+    # This client depends on the Azure fsspec implementation, since there is no native implementation from Arrow
+    # To enable it, the tracdap package must be installed with the optional [azure] feature
+
+    # Current supported authentication mechanisms are "default" and "access_key"
+    # Client always uses location mode = primary, version aware = False
+
+    STORAGE_ACCOUNT_PROPERTY = "storageAccount"
     CONTAINER_PROPERTY = "container"
     PREFIX_PROPERTY = "prefix"
-    REGION_PROPERTY = "region"
-    ENDPOINT_PROPERTY = "endpoint"
 
     CREDENTIALS_PROPERTY = "credentials"
+    CREDENTIALS_DEFAULT = "default"
+    CREDENTIALS_ACCESS_KEY = "access_key"
+
+    ACCESS_KEY_PROPERTY = "accessKey"
 
     def __init__(self, properties: tp.Dict[str, str]):
 
@@ -74,14 +81,14 @@ class AzureBlobStorageProvider(IStorageProvider):
 
         client_args = dict()
 
-        region = _helpers.get_plugin_property(self._properties, self.REGION_PROPERTY)
-        endpoint = _helpers.get_plugin_property(self._properties, self.ENDPOINT_PROPERTY)
+        storage_account = _helpers.get_plugin_property(self._properties, self.STORAGE_ACCOUNT_PROPERTY)
 
-        if region is not None:
-            client_args["default_bucket_location"] = region
+        if storage_account is None or len(storage_account.strip()) == 0:
+            message = f"Missing required config property [{self.STORAGE_ACCOUNT_PROPERTY}] for Azure blob storage"
+            self._log.error(message)
+            raise ex.EConfigParse(message)
 
-        if endpoint is not None:
-            client_args["endpoint_override"] = endpoint
+        client_args["account_name"] = storage_account
 
         credentials = self.setup_credentials()
         client_args.update(credentials)
@@ -95,30 +102,25 @@ class AzureBlobStorageProvider(IStorageProvider):
 
         mechanism = _helpers.get_plugin_property(self._properties, self.CREDENTIALS_PROPERTY)
 
-        if mechanism is None or len(mechanism) == 0 or mechanism.lower() == self.CREDENTIALS_ADC:
-            self._log.info(f"Using [{self.CREDENTIALS_ADC}] credentials mechanism")
-            return dict()
+        if mechanism is None or len(mechanism) == 0 or mechanism.lower() == self.CREDENTIALS_DEFAULT:
+            self._log.info(f"Using [{self.CREDENTIALS_DEFAULT}] credentials mechanism")
+            return {"anon": False}
 
-        if mechanism == self.CREDENTIALS_ACCESS_TOKEN:
+        if mechanism == self.CREDENTIALS_ACCESS_KEY:
 
-            access_token = _helpers.get_plugin_property(self._properties, self.ACCESS_TOKEN)
-            access_token_expiry = _helpers.get_plugin_property(self._properties, self.ACCESS_TOKEN_EXPIRY)
+            access_key = _helpers.get_plugin_property(self._properties, self.ACCESS_KEY_PROPERTY)
 
-            if access_token is None or len(access_token.strip()) == 0:
-                message = f"Missing required config property [{self.ACCESS_TOKEN}] for GCP storage"
+            if access_key is None or len(access_key.strip()) == 0:
+                message = f"Missing required config property [{self.ACCESS_KEY_PROPERTY}] for Azure blob storage"
                 raise ex.EConfigParse(message)
 
-            if access_token_expiry is None:
-                access_token_expiry = self.ACCESS_TOKEN_EXPIRY_DEFAULT
-
-            expiry_timestamp = dt.datetime.now(dt.timezone.utc) + dt.timedelta(seconds=float(access_token_expiry))
-
-            return {"access_token": access_token, "credential_token_expiration": expiry_timestamp}
+            return {"account_key": access_key}
 
         message = f"Unrecognised credentials mechanism: [{mechanism}]"
         self._log.error(message)
         raise ex.EStartup(message)
 
 
+# Only register the plugin if the [azure] feature is available
 if azure_available:
     plugins.PluginManager.register_plugin(IStorageProvider, AzureBlobStorageProvider, ["BLOB"])

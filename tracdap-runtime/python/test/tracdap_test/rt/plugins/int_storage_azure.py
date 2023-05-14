@@ -68,7 +68,7 @@ class BlobStorageTest(unittest.TestCase, FileOperationsTestSuite, FileReadWriteT
     def _properties_from_env():
 
         properties = dict()
-        properties["region"] = os.getenv("TRAC_AZURE_REGION")
+        properties["storageAccount"] = os.getenv("TRAC_AZURE_STORAGE_ACCOUNT")
         properties["container"] = os.getenv("TRAC_AZURE_CONTAINER")
 
         credentials = os.getenv("TRAC_AZURE_CREDENTIALS")
@@ -76,8 +76,8 @@ class BlobStorageTest(unittest.TestCase, FileOperationsTestSuite, FileReadWriteT
         if credentials:
             properties["credentials"] = credentials
 
-        if credentials == "static":
-            pass  # TODO
+        if credentials == "access_key":
+            properties["accessKey"] = os.getenv("TRAC_AZURE_ACCESS_KEY")
 
         return properties
 
