@@ -375,6 +375,16 @@ jobs:
               TRAC_SECRET_KEY: short-lived-secret,
               PYTHON_TESTS: int_storage_gcp*.py }
 
+          - { SERVICE: storage,
+              TARGET: azure,
+              PROTOCOL: BLOB,
+              ENABLE_IF: TRAC_AZURE_CONTAINER,
+              BUILD_azure_storage: true,
+              SETUP_SCRIPT: ".github/scripts/int-storage-azure-setup.sh",
+              TRAC_CONFIG_FILE: '.github/config/int-storage-azure.yaml',
+              TRAC_SECRET_KEY: short-lived-secret,
+              PYTHON_TESTS: int_storage_azure*.py }
+
     uses: ./.github/workflows/integration-cloud.yaml
 
     with:
