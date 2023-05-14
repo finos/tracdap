@@ -18,6 +18,7 @@ import pathlib
 import re
 import sys
 import typing as tp
+import traceback as tb
 
 import pyarrow as pa
 import pyarrow.fs as pa_fs
@@ -456,6 +457,26 @@ class CommonFileStorage(IFileStorage):
                     self._fs.delete_file(storage_path)
             except OSError:
                 pass
+
+        # Stream implementations can raise various types of error during stream operations
+        # Errors can have different causes (access, communication, missing / duplicate files etc.)
+        # Also, other errors can occur inside the stream context manager, unrelated to IO
+
+        # In the case of an IO error we want to raise EStorage, other errors should propagate as they are
+        # This handler tries to spot IO errors that come from inside the PyArrow library
+        # It is probably not fail-safe, so some errors could be reported as "unexpected"
+        # Anyway this is only for errors that happen after the stream is opened
+
+        # The alternative is to override every method in _NativeFileResource and try to catch there
+        # However, different implementations raise different error types, so we still need some kind of inspection
+
+        if error is not None:
+
+            stack = tb.extract_tb(exc_info[2])
+            stack = filter(lambda frame: frame.filename is not None, stack)
+
+            if any(filter(lambda frame: frame.filename.startswith("pyarrow/"), stack)):
+                raise _ex.EStorage from error
 
     def _wrap_operation(self, func: tp.Callable, operation_name: str, storage_path: str, *args, **kwargs) -> tp.Any:
 
