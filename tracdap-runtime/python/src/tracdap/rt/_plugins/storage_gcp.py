@@ -104,6 +104,8 @@ class GcpStorageProvider(IStorageProvider):
 
         if mechanism == self.CREDENTIALS_ACCESS_TOKEN:
 
+            self._log.info(f"Using [{self.CREDENTIALS_ACCESS_TOKEN}] credentials mechanism")
+
             access_token = _helpers.get_plugin_property(self._properties, self.ACCESS_TOKEN)
             access_token_expiry = _helpers.get_plugin_property(self._properties, self.ACCESS_TOKEN_EXPIRY)
 
