@@ -31,11 +31,14 @@ from . import _helpers
 
 try:
     # AWS SDK
-    import boto3  # noqa
-    import botocore.response  # noqa
-    import botocore.exceptions as aws_ex  # noqa
+    import boto3
+    import botocore.response
+    import botocore.exceptions as aws_ex
     boto_available = True
 except ImportError:
+    boto3 = None
+    botocore = None
+    aws_ex = None
     boto_available = False
 
 
