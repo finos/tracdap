@@ -18,11 +18,12 @@ package org.finos.tracdap.common.codec.arrow;
 
 import org.finos.tracdap.common.data.util.ByteSeekableChannel;
 
+import org.apache.arrow.memory.ArrowBuf;
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.ipc.ArrowFileReader;
 import org.apache.arrow.vector.ipc.ArrowReader;
 
-import io.netty.buffer.ByteBuf;
+import java.util.List;
 
 
 public class ArrowFileDecoder extends ArrowDecoder {
@@ -34,7 +35,7 @@ public class ArrowFileDecoder extends ArrowDecoder {
     }
 
     @Override
-    protected ArrowReader createReader(ByteBuf buffer) {
+    protected ArrowReader createReader(List<ArrowBuf> buffer) {
         var channel = new ByteSeekableChannel(buffer);
         return new ArrowFileReader(channel, arrowAllocator);
     }
