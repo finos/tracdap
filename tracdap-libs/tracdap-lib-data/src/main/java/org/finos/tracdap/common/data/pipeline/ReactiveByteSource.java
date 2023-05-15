@@ -16,9 +16,10 @@
 
 package org.finos.tracdap.common.data.pipeline;
 
-import io.netty.buffer.ByteBuf;
 import org.finos.tracdap.common.data.DataPipeline;
 import org.finos.tracdap.common.exception.ETracPublic;
+
+import org.apache.arrow.memory.ArrowBuf;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,21 +32,21 @@ public class ReactiveByteSource
         BaseDataProducer<DataPipeline.StreamApi>
     implements
         DataPipeline.SourceStage,
-        Flow.Subscriber<ByteBuf> {
+        Flow.Subscriber<ArrowBuf> {
 
     private static final int BACKPRESSURE_HEADROOM = 256;
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
     private final DataPipelineImpl pipeline;
-    private final Flow.Publisher<? extends ByteBuf> publisher;
+    private final Flow.Publisher<ArrowBuf> publisher;
 
     private Flow.Subscription subscription;
     private long nRequested;
     private long nReceived;
     private boolean cancelled = false;
 
-    public ReactiveByteSource(DataPipelineImpl pipeline, Flow.Publisher<? extends ByteBuf> publisher) {
+    public ReactiveByteSource(DataPipelineImpl pipeline, Flow.Publisher<ArrowBuf> publisher) {
         super(DataPipeline.StreamApi.class);
         this.pipeline = pipeline;
         this.publisher = publisher;
@@ -130,10 +131,10 @@ public class ReactiveByteSource
     }
 
     @Override
-    public void onNext(ByteBuf chunk) {
+    public void onNext(ArrowBuf chunk) {
 
         if (cancelled) {
-            chunk.release();
+            chunk.close();
             return;
         }
 

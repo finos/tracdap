@@ -19,7 +19,7 @@ package org.finos.tracdap.common.data.pipeline;
 import org.finos.tracdap.common.data.DataPipeline;
 import org.finos.tracdap.common.exception.ETracInternal;
 
-import io.netty.buffer.ByteBuf;
+import org.apache.arrow.memory.ArrowBuf;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -34,12 +34,12 @@ public class ReactiveByteSink
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
-    private final Flow.Subscriber<ByteBuf> sink;
+    private final Flow.Subscriber<ArrowBuf> sink;
     private Flow.Subscription subscription;
     private int chunksRequested;
     private int chunksDelivered;
 
-    ReactiveByteSink(DataPipelineImpl pipeline, Flow.Subscriber<ByteBuf> sink) {
+    ReactiveByteSink(DataPipelineImpl pipeline, Flow.Subscriber<ArrowBuf> sink) {
 
         super(pipeline);
 
@@ -114,7 +114,7 @@ public class ReactiveByteSink
     }
 
     @Override
-    public void onNext(ByteBuf chunk) {
+    public void onNext(ArrowBuf chunk) {
 
         if (chunksRequested <= chunksDelivered) {
             var err = new ETracInternal("Data stream is out of sync");
