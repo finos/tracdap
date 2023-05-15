@@ -17,12 +17,17 @@
 package org.finos.tracdap.common.data.util;
 
 import org.finos.tracdap.common.exception.EUnexpected;
+
 import com.google.protobuf.ByteString;
 import com.google.protobuf.UnsafeByteOperations;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
+import org.apache.arrow.memory.ArrowBuf;
+import org.apache.arrow.memory.BufferAllocator;
 
+import java.nio.ByteBuffer;
 import java.util.Arrays;
+import java.util.function.Consumer;
 
 
 public class Bytes {
@@ -76,5 +81,99 @@ public class Bytes {
         finally {
             buf.release();
         }
+    }
+
+    public static ArrowBuf writeToStream(
+            ByteBuffer src, ArrowBuf target,
+            BufferAllocator allocator, int chunkSize,
+            Consumer<ArrowBuf> sink) {
+
+        while (src.remaining() > 0) {
+
+            if (target == null)
+                target = allocator.buffer(chunkSize);
+
+            var nBytes = (int) Math.min(src.remaining(), target.writableBytes());
+            var bytesPosition = src.position() + nBytes;
+            var bufferWriterIndex = target.writerIndex() + nBytes;
+
+            target.setBytes(target.writerIndex(), src, src.position(), nBytes);
+
+            target.writerIndex(bufferWriterIndex);
+            src.position(bytesPosition);
+
+            if (target.writableBytes() == 0) {
+                sink.accept(target);
+                target = null;
+            }
+        }
+
+        return target;
+    }
+
+    public static ArrowBuf writeToStream(
+            byte[] src, int off, int len, ArrowBuf target,
+            BufferAllocator allocator, int chunkSize,
+            Consumer<ArrowBuf> sink) {
+
+        var remaining = len - off;
+
+        while (remaining > 0) {
+
+            if (target == null)
+                target = allocator.buffer(chunkSize);
+
+            var nBytes = (int) Math.min(remaining, target.writableBytes());
+
+            target.writeBytes(src, off, nBytes);
+
+            off += nBytes;
+            remaining -= nBytes;
+
+            if (target.writableBytes() == 0) {
+                sink.accept(target);
+                target = null;
+            }
+        }
+
+        return target;
+    }
+
+    public static ArrowBuf writeToStream(
+            int byte_, ArrowBuf target,
+            BufferAllocator allocator, int chunkSize,
+            Consumer<ArrowBuf> sink) {
+
+        if (target == null)
+            target = allocator.buffer(chunkSize);
+
+        target.writeByte(byte_);
+
+        if (target.writableBytes() == 0) {
+            sink.accept(target);
+            target = null;
+        }
+
+        return target;
+    }
+
+    public static ArrowBuf flushStream(ArrowBuf buffer, Consumer<ArrowBuf> sink) {
+
+        if (buffer != null) {
+            if (buffer.readableBytes() > 0)
+                sink.accept(buffer);
+            else
+                buffer.close();
+        }
+
+        return null;
+    }
+
+    public static ArrowBuf closeStream(ArrowBuf buffer) {
+
+        if (buffer != null)
+            buffer.close();
+
+        return null;
     }
 }
