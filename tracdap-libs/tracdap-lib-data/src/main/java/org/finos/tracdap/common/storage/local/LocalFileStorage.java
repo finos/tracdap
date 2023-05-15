@@ -21,7 +21,6 @@ import org.finos.tracdap.common.data.IDataContext;
 import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.common.storage.*;
 
-import io.netty.buffer.ByteBuf;
 import io.netty.channel.EventLoopGroup;
 import org.apache.arrow.memory.ArrowBuf;
 
