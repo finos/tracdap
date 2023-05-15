@@ -16,6 +16,7 @@
 
 package org.finos.tracdap.common.codec.csv;
 
+import org.apache.arrow.memory.BufferAllocator;
 import org.finos.tracdap.common.codec.StreamingEncoder;
 import org.finos.tracdap.common.codec.json.JacksonValues;
 import org.finos.tracdap.common.exception.EUnexpected;
@@ -38,6 +39,8 @@ public class CsvEncoder extends StreamingEncoder implements AutoCloseable {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
+    private final BufferAllocator allocator;
+
     private VectorSchemaRoot root;
     private Schema actualSchema;
 
@@ -45,8 +48,8 @@ public class CsvEncoder extends StreamingEncoder implements AutoCloseable {
     private CsvGenerator generator;
 
 
-    public CsvEncoder() {
-
+    public CsvEncoder(BufferAllocator allocator) {
+        this.allocator = allocator;
     }
 
     @Override
@@ -71,7 +74,7 @@ public class CsvEncoder extends StreamingEncoder implements AutoCloseable {
                     .build()
                     .withHeader();
 
-            out = new ByteOutputStream(bb -> consumer().onNext(bb));
+            out = new ByteOutputStream(allocator, consumer()::onNext);
             generator = factory.createGenerator(out, JsonEncoding.UTF8);
             generator.setSchema(csvSchema);
 

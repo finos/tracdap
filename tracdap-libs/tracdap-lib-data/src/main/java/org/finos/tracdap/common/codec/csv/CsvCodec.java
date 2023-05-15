@@ -17,6 +17,7 @@
 package org.finos.tracdap.common.codec.csv;
 
 import org.finos.tracdap.common.codec.ICodec;
+import org.finos.tracdap.common.data.DataPipeline;
 
 import org.apache.arrow.vector.types.pojo.Schema;
 import org.apache.arrow.memory.BufferAllocator;
@@ -40,13 +41,15 @@ public class CsvCodec implements ICodec {
     }
 
     @Override
-    public Encoder getEncoder(BufferAllocator arrowAllocator, Schema schema, Map<String, String> options) {
+    public Encoder<DataPipeline.StreamApi>
+    getEncoder(BufferAllocator arrowAllocator, Schema schema, Map<String, String> options) {
 
-        return new CsvEncoder();
+        return new CsvEncoder(arrowAllocator);
     }
 
     @Override
-    public Decoder getDecoder(BufferAllocator arrowAllocator, Schema schema, Map<String, String> options) {
+    public Decoder<DataPipeline.BufferApi>
+    getDecoder(BufferAllocator arrowAllocator, Schema schema, Map<String, String> options) {
 
         return new CsvDecoder(arrowAllocator, schema);
     }

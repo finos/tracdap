@@ -16,17 +16,19 @@
 
 package org.finos.tracdap.common.codec.csv;
 
-import com.fasterxml.jackson.dataformat.csv.CsvSchema;
-import org.apache.arrow.vector.VectorSchemaRoot;
 import org.finos.tracdap.common.codec.BufferDecoder;
 import org.finos.tracdap.common.data.ArrowSchema;
 import org.finos.tracdap.common.codec.json.JacksonValues;
+import org.finos.tracdap.common.data.util.ByteSeekableChannel;
+import org.finos.tracdap.common.data.util.Bytes;
 import org.finos.tracdap.common.exception.EDataCorruption;
 import org.finos.tracdap.common.exception.ETrac;
 import org.finos.tracdap.common.exception.ETracInternal;
 import org.finos.tracdap.common.exception.EUnexpected;
 
+import org.apache.arrow.memory.ArrowBuf;
 import org.apache.arrow.memory.BufferAllocator;
+import org.apache.arrow.vector.VectorSchemaRoot;
 import org.apache.arrow.vector.types.pojo.Schema;
 import org.apache.arrow.vector.types.Types;
 
@@ -35,21 +37,20 @@ import com.fasterxml.jackson.core.JsonToken;
 import com.fasterxml.jackson.dataformat.csv.CsvFactory;
 import com.fasterxml.jackson.dataformat.csv.CsvParser;
 import com.fasterxml.jackson.dataformat.csv.CsvReadException;
+import com.fasterxml.jackson.dataformat.csv.CsvSchema;
 
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.ByteBufInputStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.io.InputStream;
+import java.nio.channels.Channels;
+import java.util.List;
 import java.util.concurrent.Callable;
 
 
 public class CsvDecoder extends BufferDecoder {
 
     private static final int BATCH_SIZE = 1024;
-
     private static final boolean DEFAULT_HEADER_FLAG = true;
 
     private final Logger log = LoggerFactory.getLogger(getClass());
@@ -57,7 +58,7 @@ public class CsvDecoder extends BufferDecoder {
     private final BufferAllocator arrowAllocator;
     private final Schema arrowSchema;
 
-    private ByteBuf buffer;
+    private List<ArrowBuf> buffer;
     private CsvParser csvParser;
     private CsvSchema csvSchema;
     private VectorSchemaRoot root;
@@ -71,7 +72,7 @@ public class CsvDecoder extends BufferDecoder {
     }
 
     @Override
-    public void onBuffer(ByteBuf buffer) {
+    public void onBuffer(List<ArrowBuf> buffer) {
 
         if (log.isTraceEnabled())
             log.trace("CSV DECODER: onBuffer()");
@@ -84,7 +85,7 @@ public class CsvDecoder extends BufferDecoder {
         }
 
         // Empty file can and does happen, treat it as data corruption
-        if (buffer.readableBytes() == 0) {
+        if (Bytes.readableBytes(buffer) == 0) {
             var error = new EDataCorruption("CSV data is empty");
             log.error(error.getMessage(), error);
             throw error;
@@ -104,9 +105,10 @@ public class CsvDecoder extends BufferDecoder {
                     // Permissive handling of extra space (strings with leading/trailing spaces must be quoted anyway)
                     .enable(CsvParser.Feature.TRIM_SPACES);
 
-            var stream = new ByteBufInputStream(buffer);
+            var channel = new ByteSeekableChannel(buffer);
+            var stream = Channels.newInputStream(channel);
 
-            csvParser = csvFactory.createParser((InputStream) stream);
+            csvParser = csvFactory.createParser(stream);
             csvSchema = CsvSchemaMapping
                     .arrowToCsv(this.arrowSchema)
                     //.setNullValue("")
@@ -345,7 +347,7 @@ public class CsvDecoder extends BufferDecoder {
             }
 
             if (buffer != null) {
-                buffer.release();
+                buffer.forEach(ArrowBuf::close);
                 buffer = null;
             }
         }
