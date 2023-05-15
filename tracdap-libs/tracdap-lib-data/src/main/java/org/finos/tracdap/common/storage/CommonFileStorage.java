@@ -16,16 +16,13 @@
 
 package org.finos.tracdap.common.storage;
 
-import io.netty.buffer.NettyArrowBuf;
-import org.apache.arrow.memory.ArrowBuf;
 import org.finos.tracdap.common.concurrent.Flows;
 import org.finos.tracdap.common.concurrent.IExecutionContext;
 import org.finos.tracdap.common.config.ConfigHelpers;
 import org.finos.tracdap.common.data.IDataContext;
-
-import io.netty.buffer.ByteBuf;
-
 import org.finos.tracdap.common.exception.ETrac;
+
+import org.apache.arrow.memory.ArrowBuf;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -92,7 +89,7 @@ public abstract class CommonFileStorage implements IFileStorage {
 
     protected abstract CompletionStage<ArrowBuf> fsReadChunk(String objectKey, long offset, int size, IDataContext ctx);
     protected abstract Flow.Publisher<ArrowBuf> fsOpenInputStream(String objectKey, IDataContext ctx);
-    protected abstract Flow.Subscriber<ByteBuf> fsOpenOutputStream(String objectKey, CompletableFuture<Long> signal, IDataContext ctx);
+    protected abstract Flow.Subscriber<ArrowBuf> fsOpenOutputStream(String objectKey, CompletableFuture<Long> signal, IDataContext ctx);
 
     // Expose final member variables to avoid duplication in child classes
 
@@ -314,12 +311,12 @@ public abstract class CommonFileStorage implements IFileStorage {
     }
 
     @Override
-    public CompletionStage<ByteBuf> readChunk(String storagePath, long offset, int size, IDataContext ctx) {
+    public CompletionStage<ArrowBuf> readChunk(String storagePath, long offset, int size, IDataContext ctx) {
 
         return wrapOperation(READ_OPERATION, storagePath, (op, path) -> readChunk(op, path, offset, size, ctx));
     }
 
-    private CompletionStage<ByteBuf> readChunk(String operationName, String storagePath, long offset, int size, IDataContext ctx) {
+    private CompletionStage<ArrowBuf> readChunk(String operationName, String storagePath, long offset, int size, IDataContext ctx) {
 
         var objectKey = resolveObjectKey(operationName, storagePath, false);
 
@@ -334,13 +331,11 @@ public abstract class CommonFileStorage implements IFileStorage {
                 throw errors.explicitError(operationName, storagePath, NOT_A_FILE);
         });
 
-        return checkFile
-                .thenCompose(x -> fsReadChunk(objectKey, offset, size, ctx))
-                .thenApply(NettyArrowBuf::unwrapBuffer);
+        return checkFile.thenCompose(x -> fsReadChunk(objectKey, offset, size, ctx));
     }
 
     @Override
-    public Flow.Publisher<ByteBuf>
+    public Flow.Publisher<ArrowBuf>
     reader(String storagePath, IDataContext ctx) {
 
         return wrapStreamOperation(
@@ -349,18 +344,16 @@ public abstract class CommonFileStorage implements IFileStorage {
                 err -> { throw err; });
     }
 
-    private Flow.Publisher<ByteBuf>
+    private Flow.Publisher<ArrowBuf>
     reader(String operationName, String storagePath, IDataContext dataContext) {
 
         var objectKey = resolveObjectKey(operationName, storagePath, false);
 
-        return Flows.map(
-                fsOpenInputStream(objectKey, dataContext),
-                NettyArrowBuf::unwrapBuffer);
+        return fsOpenInputStream(objectKey, dataContext);
     }
 
     @Override
-    public Flow.Subscriber<ByteBuf>
+    public Flow.Subscriber<ArrowBuf>
     writer(String storagePath, CompletableFuture<Long> signal, IDataContext ctx) {
 
         return wrapStreamOperation(
@@ -369,7 +362,7 @@ public abstract class CommonFileStorage implements IFileStorage {
                 err -> { throw err; });
     }
 
-    protected Flow.Subscriber<ByteBuf>
+    protected Flow.Subscriber<ArrowBuf>
     writer(String operationName, String storagePath, CompletableFuture<Long> signal, IDataContext ctx) {
 
         var objectKey = resolveObjectKey(operationName, storagePath, false);
