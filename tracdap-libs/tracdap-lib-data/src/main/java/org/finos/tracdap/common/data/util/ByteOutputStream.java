@@ -16,8 +16,8 @@
 
 package org.finos.tracdap.common.data.util;
 
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.ByteBufAllocator;
+import org.apache.arrow.memory.ArrowBuf;
+import org.apache.arrow.memory.BufferAllocator;
 
 import javax.annotation.Nonnull;
 import java.io.IOException;
@@ -29,77 +29,52 @@ public class ByteOutputStream extends OutputStream {
 
     private static final int DEFAULT_CHUNK_SIZE = 2 * 1024 * 1024;
 
-    private final ByteBufAllocator allocator;
-    private final Consumer<ByteBuf> sink;
+    private final BufferAllocator allocator;
+    private final Consumer<ArrowBuf> sink;
 
-    private ByteBuf buffer;
+    private ArrowBuf buffer;
 
-    public ByteOutputStream(Consumer<ByteBuf> sink) {
-        this(sink, ByteBufAllocator.DEFAULT);
-    }
-
-    public ByteOutputStream(Consumer<ByteBuf> sink, ByteBufAllocator allocator) {
+    public ByteOutputStream(BufferAllocator allocator, Consumer<ArrowBuf> sink) {
 
         this.allocator = allocator;
-        this.buffer = null;
         this.sink = sink;
+
+        this.buffer = null;
     }
 
     @Override
     public void write(@Nonnull byte[] b, int off, int len) throws IOException {
 
-        var remaining = len - off;
-
-        while (remaining > 0) {
-
-            if (buffer == null)
-                buffer = allocator.directBuffer(DEFAULT_CHUNK_SIZE);
-
-            var nBytes = Math.min(remaining, buffer.writableBytes());
-
-            buffer.writeBytes(b, off, nBytes);
-
-            off += nBytes;
-            remaining -= nBytes;
-
-            if (buffer.writableBytes() == 0) {
-                sink.accept(buffer);
-                buffer = null;
-            }
-        }
+        buffer = Bytes.writeToStream(
+                b, off, len,
+                buffer, allocator,
+                DEFAULT_CHUNK_SIZE,
+                sink);
     }
 
     @Override
     public void write(int b) throws IOException {
 
-        if (buffer == null)
-            buffer = allocator.directBuffer(DEFAULT_CHUNK_SIZE);
-
-        buffer.writeByte(b);
-
-        if (buffer.writableBytes() == 0) {
-            sink.accept(buffer);
-            buffer = null;
-        }
+        buffer = Bytes.writeToStream(
+                b, buffer, allocator,
+                DEFAULT_CHUNK_SIZE,
+                sink);
     }
 
     @Override
     public void flush() {
 
-        if (buffer != null && buffer.readableBytes() > 0) {
-            sink.accept(buffer);
-            buffer = null;
-        }
+        buffer = Bytes.flushStream(buffer, sink);
     }
 
     @Override
     public void close() throws IOException {
 
-        flush();
-
-        if (buffer != null) {
-            buffer.release();
-            buffer = null;
+        try {
+            buffer = Bytes.flushStream(buffer, sink);
+        }
+        finally {
+            buffer = Bytes.closeStream(buffer);
         }
     }
 }
