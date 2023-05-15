@@ -16,11 +16,10 @@
 
 package org.finos.tracdap.common.data;
 
-
 import org.finos.tracdap.common.data.pipeline.DataPipelineImpl;
 
+import org.apache.arrow.memory.ArrowBuf;
 import org.apache.arrow.vector.VectorSchemaRoot;
-import io.netty.buffer.ByteBuf;
 
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Flow;
@@ -64,13 +63,13 @@ public interface DataPipeline {
         return DataPipelineImpl.forSource(source, ctx);
     }
 
-    static DataPipeline forSource(Flow.Publisher<? extends ByteBuf> source, IDataContext ctx) {
+    static DataPipeline forSource(Flow.Publisher<ArrowBuf> source, IDataContext ctx) {
         return DataPipelineImpl.forSource(source, ctx);
     }
 
     DataPipeline addStage(DataStage stage);
     DataPipeline addSink(SinkStage sink);
-    DataPipeline addSink(Flow.Subscriber<ByteBuf> sink);
+    DataPipeline addSink(Flow.Subscriber<ArrowBuf> sink);
 
 
 
@@ -104,14 +103,14 @@ public interface DataPipeline {
     interface StreamApi extends DataInterface<StreamApi> {
 
         void onStart();
-        void onNext(ByteBuf chunk);
+        void onNext(ArrowBuf chunk);
         void onComplete();
         void onError(Throwable error);
     }
 
     interface BufferApi extends DataInterface<BufferApi> {
 
-        void onBuffer(ByteBuf buffer);
+        void onBuffer(ArrowBuf buffer);
         void onError(Throwable error);
     }
 
