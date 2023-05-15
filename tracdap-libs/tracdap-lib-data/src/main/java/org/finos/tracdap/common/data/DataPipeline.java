@@ -21,6 +21,7 @@ import org.finos.tracdap.common.data.pipeline.DataPipelineImpl;
 import org.apache.arrow.memory.ArrowBuf;
 import org.apache.arrow.vector.VectorSchemaRoot;
 
+import java.util.List;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Flow;
 
@@ -110,7 +111,7 @@ public interface DataPipeline {
 
     interface BufferApi extends DataInterface<BufferApi> {
 
-        void onBuffer(ArrowBuf buffer);
+        void onBuffer(List<ArrowBuf> buffer);
         void onError(Throwable error);
     }
 
