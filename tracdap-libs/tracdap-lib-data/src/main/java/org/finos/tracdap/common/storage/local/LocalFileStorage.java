@@ -404,7 +404,7 @@ public class LocalFileStorage extends CommonFileStorage {
     }
 
     @Override
-    protected Flow.Subscriber<ByteBuf>
+    protected Flow.Subscriber<ArrowBuf>
     fsOpenOutputStream(String storagePath, CompletableFuture<Long> signal, IDataContext dataContext) {
 
         var absolutePath = resolvePath(storagePath);

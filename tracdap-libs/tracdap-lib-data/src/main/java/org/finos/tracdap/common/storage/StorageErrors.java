@@ -191,7 +191,7 @@ public abstract class StorageErrors {
         }
     }
 
-    public ETrac chunkNotFullyWritten(int chunkBytes, int writtenBytes) {
+    public ETrac chunkNotFullyWritten(long chunkBytes, long writtenBytes) {
 
         try {
 
