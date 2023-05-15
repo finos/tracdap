@@ -16,6 +16,7 @@
 
 package org.finos.tracdap.common.data.util;
 
+import com.google.common.collect.Streams;
 import org.finos.tracdap.common.exception.EUnexpected;
 
 import com.google.protobuf.ByteString;
@@ -175,5 +176,12 @@ public class Bytes {
             buffer.close();
 
         return null;
+    }
+
+    public static long readableBytes(Iterable<ArrowBuf> buffers) {
+
+        return Streams.stream(buffers)
+                .mapToLong(ArrowBuf::readableBytes)
+                .sum();
     }
 }
