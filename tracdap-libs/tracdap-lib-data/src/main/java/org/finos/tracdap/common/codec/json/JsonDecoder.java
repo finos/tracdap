@@ -22,6 +22,7 @@ import org.finos.tracdap.common.exception.EDataCorruption;
 import org.finos.tracdap.common.exception.ETrac;
 import org.finos.tracdap.common.exception.EUnexpected;
 
+import org.apache.arrow.memory.ArrowBuf;
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.VectorSchemaRoot;
 import org.apache.arrow.vector.types.pojo.Schema;
@@ -30,7 +31,6 @@ import com.fasterxml.jackson.core.JacksonException;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonToken;
 
-import io.netty.buffer.ByteBuf;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -82,9 +82,9 @@ public class JsonDecoder extends StreamingDecoder {
     }
 
     @Override
-    public void onNext(ByteBuf chunk) {
+    public void onNext(ArrowBuf chunk) {
 
-        try {
+        try (chunk) {  // automatically close chunk as a resource
 
             if (log.isTraceEnabled())
                 log.trace("JSON DECODER: onNext()");
@@ -132,10 +132,6 @@ public class JsonDecoder extends StreamingDecoder {
             // Ensure unexpected errors are still reported to the Flow API
             log.error("Unexpected error during decoding", e);
             throw new EUnexpected(e);
-        }
-        finally {
-
-            chunk.release();
         }
     }
 

@@ -20,6 +20,7 @@ import org.finos.tracdap.common.codec.StreamingEncoder;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.data.util.ByteOutputStream;
 
+import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.VectorSchemaRoot;
 import org.apache.arrow.vector.types.pojo.Schema;
 
@@ -37,14 +38,16 @@ public class JsonEncoder extends StreamingEncoder implements AutoCloseable {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
+    private final BufferAllocator allocator;
+
     private VectorSchemaRoot root;
     private Schema arrowSchema;
 
     private OutputStream out;
     private JsonGenerator generator;
 
-    public JsonEncoder() {
-
+    public JsonEncoder(BufferAllocator allocator) {
+        this.allocator = allocator;
     }
 
     @Override
@@ -60,7 +63,7 @@ public class JsonEncoder extends StreamingEncoder implements AutoCloseable {
             this.root = root;
             this.arrowSchema = root.getSchema();
 
-            out = new ByteOutputStream(bb -> consumer().onNext(bb));
+            out = new ByteOutputStream(allocator, consumer()::onNext);
 
             var factory = new JsonFactory();
             generator = factory.createGenerator(out, JsonEncoding.UTF8);
