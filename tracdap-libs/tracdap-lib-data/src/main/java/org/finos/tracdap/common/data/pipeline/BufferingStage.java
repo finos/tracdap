@@ -19,9 +19,10 @@ package org.finos.tracdap.common.data.pipeline;
 import org.finos.tracdap.common.data.DataPipeline;
 import org.finos.tracdap.common.exception.EUnexpected;
 
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.CompositeByteBuf;
-import io.netty.buffer.Unpooled;
+import org.apache.arrow.memory.ArrowBuf;
+
+import java.util.ArrayList;
+import java.util.List;
 
 
 public class BufferingStage
@@ -31,7 +32,7 @@ public class BufferingStage
         DataPipeline.DataConsumer<DataPipeline.StreamApi>,
         DataPipeline.StreamApi {
 
-    private CompositeByteBuf buffer;
+    private List<ArrowBuf> buffer;
 
     public BufferingStage() {
         super(DataPipeline.BufferApi.class);
@@ -59,14 +60,13 @@ public class BufferingStage
         if (buffer != null)
             throw new EUnexpected();
 
-        buffer = Unpooled.compositeBuffer();
+        buffer = new ArrayList<>();
     }
 
     @Override
-    public void onNext(ByteBuf chunk) {
+    public void onNext(ArrowBuf chunk) {
 
-        buffer.addComponent(chunk);
-        buffer.writerIndex(this.buffer.writerIndex() + chunk.readableBytes());
+        buffer.add(chunk);
     }
 
     @Override
@@ -101,7 +101,7 @@ public class BufferingStage
     public void close() {
 
         if (buffer != null) {
-            buffer.release();
+            buffer.forEach(ArrowBuf::close);
             buffer = null;
         }
     }
