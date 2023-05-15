@@ -203,6 +203,7 @@ class CommonFileStorage(IFileStorage):
 
     FILE_SEMANTICS_FS_TYPES = ["local"]
     BUCKET_SEMANTICS_FS_TYPES = ["s3", "gcs"]
+    EXPLICIT_DIR_SEMANTICS_FS_TYPES = ""
 
     def __init__(self, storage_key: str, storage_config: _cfg.PluginConfig, fs_impl: pa_fs.SubTreeFileSystem):
 
@@ -279,8 +280,24 @@ class CommonFileStorage(IFileStorage):
             file_name = file_info.base_name
             storage_path = file_info.path
 
-        file_type = FileType.FILE if file_info.is_file else FileType.DIRECTORY
-        file_size = file_info.size if file_info.is_file else 0
+        if storage_path.endswith("/"):
+
+            storage_path = storage_path[:-1]
+            file_type = FileType.DIRECTORY
+            file_size = 0
+
+            if not file_name and len(storage_path) > 0:
+                if "/" in storage_path:
+                    sep = storage_path.rfind("/")
+                    file_name = storage_path[sep+1:]
+                else:
+                    file_name = storage_path
+
+        else:
+
+            file_type = FileType.FILE if file_info.is_file else FileType.DIRECTORY
+            file_size = file_info.size if file_info.is_file else 0
+
         mtime = file_info.mtime.astimezone(dt.timezone.utc) if file_info.mtime is not None else None
 
         return FileStat(
@@ -310,6 +327,7 @@ class CommonFileStorage(IFileStorage):
         else:
             selector = pa_fs.FileSelector(resolved_path, recursive=recursive)  # noqa
             file_infos = self._fs.get_file_info(selector)
+            file_infos = filter(lambda fi: not fi.path.endswith("/_trac_empty"), file_infos)
             return list(map(self._info_to_stat, file_infos))
 
     def mkdir(self, storage_path: str, recursive: bool = False):
@@ -328,7 +346,21 @@ class CommonFileStorage(IFileStorage):
         if prior_stat.type == pa_fs.FileType.File or prior_stat.type == pa_fs.FileType.Unknown:
             raise self._explicit_error(self.ExplicitError.OBJECT_ALREADY_EXISTS, operation_name, storage_path)
 
-        self._fs.create_dir(resolved_path, recursive=recursive)
+        if prior_stat.type == pa_fs.FileType.Directory:
+            return
+
+        # self._fs.create_dir(resolved_path, recursive=recursive)
+
+        if not recursive:
+            parent_path = self._resolve_parent(resolved_path)
+            if parent_path is not None:
+                parent_stat: pa_fs.FileInfo = self._fs.get_file_info(parent_path)
+                if parent_stat.type != pa_fs.FileType.Directory:
+                    raise FileNotFoundError
+
+        keep_file = resolved_path + "/_trac_empty"
+        with self._fs.open_output_stream(keep_file) as stream:
+            stream.write(b"")
 
     def rm(self, storage_path: str):
 
@@ -420,10 +452,6 @@ class CommonFileStorage(IFileStorage):
 
     def _close_byte_stream(self, storage_path: str, stream: tp.BinaryIO, is_write: bool, delete_on_error: bool = False):
 
-        # Do not try to close the stream twice
-        if stream.closed:
-            return
-
         # If there has been an error, log it
         exc_info = sys.exc_info()
         error = exc_info[1] if exc_info is not None else None
@@ -439,7 +467,8 @@ class CommonFileStorage(IFileStorage):
         # Close the stream - this may take time for write streams that are not flushed
         # Closing here gives better logs, because any pause is before the close message
         # As a fail-safe, _NativeFileResource always calls close() in a "finally" block
-        stream.close()
+        if not stream.closed:
+            stream.close()
 
         # Log closing of the stream
         if is_write:
@@ -455,8 +484,8 @@ class CommonFileStorage(IFileStorage):
                 file_info = self._fs.get_file_info(storage_path)
                 if file_info.type != pa_fs.FileType.NotFound:
                     self._fs.delete_file(storage_path)
+            # different implementations can throw different errors here
             except Exception:  # noqa
-                # different implementations can throw different errors here
                 pass
 
         # Stream implementations can raise various types of error during stream operations
