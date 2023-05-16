@@ -16,73 +16,24 @@
 
 package org.finos.tracdap.common.data.util;
 
-import com.google.common.collect.Streams;
-import org.finos.tracdap.common.exception.EUnexpected;
+import org.finos.tracdap.common.exception.EDataSize;
 
-import com.google.protobuf.ByteString;
-import com.google.protobuf.UnsafeByteOperations;
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.Unpooled;
 import org.apache.arrow.memory.ArrowBuf;
 import org.apache.arrow.memory.BufferAllocator;
 
 import java.nio.ByteBuffer;
-import java.util.Arrays;
+import java.util.List;
 import java.util.function.Consumer;
 
 
 public class Bytes {
 
-    // Currently, it is not possible to do zero-copy between Netty and gRPC
+    // Currently, it is not possible to do zero-copy between managed buffers and gRPC
     // https://github.com/grpc/grpc-java/issues/1054
 
     // Incoming data has already been copied to create the ByteString
     // Outgoing data needs to be copied before giving to gRPC
     // Because writing to the wire is asynchronous and there is no way to callback for release
-
-    public static ByteBuf fromProtoBytes(ByteString bs) {
-
-        return Unpooled.wrappedBuffer(bs.asReadOnlyByteBuffer());
-    }
-
-    public static ByteString toProtoBytes(ByteBuf buf) {
-
-        try {
-
-            if (buf.nioBufferCount() == 1) {
-
-                var nioBuffer = buf.nioBuffer();
-                return ByteString.copyFrom(nioBuffer);
-            }
-
-            if (buf.nioBufferCount() > 1) {
-
-                var nioBuffers = buf.nioBuffers();
-
-                var byteStream = Arrays.stream(nioBuffers)
-                        .map(ByteString::copyFrom)
-                        .reduce(ByteString::concat);
-
-                if (byteStream.isEmpty())
-                    throw new EUnexpected();
-
-                return byteStream.get();
-            }
-
-            if (buf.hasArray()) {
-
-                return UnsafeByteOperations.unsafeWrap(buf.array());
-            }
-
-            var bufCopy = new byte[buf.readableBytes()];
-            buf.readBytes(bufCopy);
-
-            return UnsafeByteOperations.unsafeWrap(bufCopy);
-        }
-        finally {
-            buf.release();
-        }
-    }
 
     public static ArrowBuf writeToStream(
             ByteBuffer src, ArrowBuf target,
@@ -178,9 +129,60 @@ public class Bytes {
         return null;
     }
 
-    public static long readableBytes(Iterable<ArrowBuf> buffers) {
+    public static void readFromStream(ArrowBuf src, Consumer<ByteBuffer> sink) {
 
-        return Streams.stream(buffers)
+        try (src) {
+
+            while (src.readableBytes() > 0) {
+
+                var nBytes = (int) Math.min(src.readableBytes(), Integer.MAX_VALUE);
+                var target = ByteBuffer.allocateDirect(nBytes);
+
+                src.getBytes(src.readerIndex(), target);
+                src.readerIndex(src.readerIndex() + nBytes);
+
+                target.flip();
+
+                sink.accept(target);
+            }
+        }
+    }
+
+    public static ByteBuffer readFromBuffer(List<ArrowBuf> src) {
+
+        try {
+
+            var bufferSize = readableBytes(src);
+
+            if (bufferSize > Integer.MAX_VALUE)
+                throw new EDataSize("Data size exceeded the limit for a buffered read operation");
+
+            // ArrowBuf does not have a getBytes() method with target offset/size to write directly to ByteBuffer
+            // Only solution is to write to a heap-allocated buffer and wrap
+
+            var target = new byte[(int) bufferSize];
+            var targetOffset = 0;
+
+            for (var chunk : src) {
+
+                var chunkSize = (int) chunk.readableBytes();
+
+                chunk.getBytes(chunk.readerIndex(), target, targetOffset, chunkSize);
+                chunk.readerIndex(chunk.readerIndex() + chunkSize);
+            }
+
+            return ByteBuffer.wrap(target);
+        }
+        finally {
+
+            src.forEach(ArrowBuf::close);
+            src.clear();
+        }
+    }
+
+    public static long readableBytes(List<ArrowBuf> src) {
+
+        return src.stream()
                 .mapToLong(ArrowBuf::readableBytes)
                 .sum();
     }
