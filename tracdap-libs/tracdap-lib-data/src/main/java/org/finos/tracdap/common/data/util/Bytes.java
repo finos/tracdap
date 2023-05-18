@@ -20,6 +20,7 @@ import org.finos.tracdap.common.exception.EDataSize;
 
 import org.apache.arrow.memory.ArrowBuf;
 import org.apache.arrow.memory.BufferAllocator;
+import org.finos.tracdap.common.exception.EUnexpected;
 
 import java.nio.ByteBuffer;
 import java.util.List;
@@ -34,6 +35,51 @@ public class Bytes {
     // Incoming data has already been copied to create the ByteString
     // Outgoing data needs to be copied before giving to gRPC
     // Because writing to the wire is asynchronous and there is no way to callback for release
+
+    public static ArrowBuf copyToBuffer(byte[] src, BufferAllocator allocator) {
+
+        var buffer = allocator.buffer(src.length);
+
+        buffer.writeBytes(src);
+
+        return buffer;
+    }
+
+    public static byte[] copyFromBuffer(ArrowBuf src) {
+
+        if (src.readableBytes() > Integer.MAX_VALUE)
+            throw new EUnexpected();
+
+        var array = new byte[(int) src.writerIndex()];
+
+        src.getBytes(0, array);
+
+        return array;
+    }
+
+    public static byte[] copyFromBuffer(List<ArrowBuf> src) {
+
+        if (src.size() == 1)
+            return copyFromBuffer(src.get(0));
+
+        long size = 0;
+
+        for (var chunk : src)
+            size += chunk.writerIndex();
+
+        if (size > Integer.MAX_VALUE)
+            throw new EUnexpected();
+
+        var array = new byte[(int) size];
+        var pos = 0;
+
+        for (var chunk : src) {
+            chunk.getBytes(0, array, pos, (int) chunk.writerIndex());
+            pos += chunk.readableBytes();
+        }
+
+        return array;
+    }
 
     public static ArrowBuf writeToStream(
             ByteBuffer src, ArrowBuf target,
