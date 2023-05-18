@@ -16,15 +16,12 @@
 
 package org.finos.tracdap.test.storage;
 
-import org.apache.arrow.memory.RootAllocator;
-import org.finos.tracdap.common.concurrent.IExecutionContext;
-import org.finos.tracdap.common.data.DataContext;
-import org.finos.tracdap.common.storage.IFileStorage;
 import org.finos.tracdap.common.concurrent.Flows;
+import org.finos.tracdap.common.data.IDataContext;
+import org.finos.tracdap.common.storage.IFileStorage;
 
-import io.netty.buffer.*;
+import org.apache.arrow.memory.ArrowBuf;
 
-import java.nio.CharBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.*;
 import java.util.stream.Stream;
@@ -33,14 +30,11 @@ import java.util.stream.Stream;
 public class StorageTestHelpers {
 
     public static CompletableFuture<Long> makeFile(
-            String storagePath, ByteBuf content,
-            IFileStorage storage, IExecutionContext execContext) {
-
-        var allocator = new RootAllocator();
-        var dataCtx = new DataContext(execContext.eventLoopExecutor(), allocator);
+            String storagePath, ArrowBuf content,
+            IFileStorage storage, IDataContext dataContext) {
 
         var signal = new CompletableFuture<Long>();
-        var writer = storage.writer(storagePath, signal, dataCtx);
+        var writer = storage.writer(storagePath, signal, dataContext);
 
         Flows.publish(Stream.of(content)).subscribe(writer);
 
@@ -50,28 +44,21 @@ public class StorageTestHelpers {
     public static CompletableFuture<Long> makeSmallFile(
             String storagePath,
             IFileStorage storage,
-            IExecutionContext execContext) {
+            IDataContext dataContext) {
 
-        var content = ByteBufUtil.encodeString(
-                ByteBufAllocator.DEFAULT,
-                CharBuffer.wrap("Small file test content\n"),
-                StandardCharsets.UTF_8);
+        var bytes = "Small file test content\n".getBytes(StandardCharsets.UTF_8);
+        var content = dataContext.arrowAllocator().buffer(bytes.length);
+        content.writeBytes(bytes);
 
-        return makeFile(storagePath, content, storage, execContext);
+        return makeFile(storagePath, content, storage, dataContext);
     }
 
-    public static CompletionStage<ByteBuf> readFile(
+    public static CompletionStage<ArrowBuf> readFile(
             String storagePath,
             IFileStorage storage,
-            IExecutionContext execContext) {
+            IDataContext dataContext) {
 
-        var allocator = new RootAllocator();
-        var dataCtx = new DataContext(execContext.eventLoopExecutor(), allocator);
-
-        var reader = storage.reader(storagePath, dataCtx);
-
-        return Flows.fold(
-                reader, (composite, buf) -> ((CompositeByteBuf) composite).addComponent(true, buf),
-                ByteBufAllocator.DEFAULT.compositeBuffer());
+        return storage.size(storagePath, dataContext).thenCompose(size ->
+                storage.readChunk(storagePath, 0, (int)(long) size, dataContext));
     }
 }
