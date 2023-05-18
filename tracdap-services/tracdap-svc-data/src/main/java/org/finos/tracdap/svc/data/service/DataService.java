@@ -23,13 +23,8 @@ import org.finos.tracdap.common.concurrent.Futures;
 import org.finos.tracdap.common.data.ArrowSchema;
 import org.finos.tracdap.common.data.DataPipeline;
 import org.finos.tracdap.common.exception.EMetadataDuplicate;
-import org.finos.tracdap.config.StorageConfig;
-import org.finos.tracdap.config.TenantConfig;
-import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.common.codec.ICodec;
 import org.finos.tracdap.common.codec.ICodecManager;
-import org.finos.tracdap.common.concurrent.IExecutionContext;
-import org.finos.tracdap.common.data.DataContext;
 import org.finos.tracdap.common.data.IDataContext;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.metadata.MetadataCodec;
@@ -37,9 +32,11 @@ import org.finos.tracdap.common.metadata.MetadataUtil;
 import org.finos.tracdap.common.metadata.PartKeys;
 import org.finos.tracdap.common.storage.IStorageManager;
 import org.finos.tracdap.common.validation.Validator;
+import org.finos.tracdap.config.StorageConfig;
+import org.finos.tracdap.config.TenantConfig;
+import org.finos.tracdap.metadata.*;
 
-import io.netty.buffer.ByteBuf;
-import org.apache.arrow.memory.BufferAllocator;
+import org.apache.arrow.memory.ArrowBuf;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -71,7 +68,6 @@ public class DataService {
 
     private final StorageConfig storageConfig;
     private final Map<String, TenantConfig> tenantConfig;
-    private final BufferAllocator arrowAllocator;
     private final IStorageManager storageManager;
     private final ICodecManager codecManager;
     private final TrustedMetadataApiGrpc.TrustedMetadataApiFutureStub metaClient;
@@ -83,7 +79,6 @@ public class DataService {
     public DataService(
             StorageConfig storageConfig,
             Map<String, TenantConfig> tenantConfig,
-            BufferAllocator arrowAllocator,
             IStorageManager storageManager,
             ICodecManager codecManager,
             TrustedMetadataApiGrpc.TrustedMetadataApiFutureStub metaClient,
@@ -91,7 +86,6 @@ public class DataService {
 
         this.storageConfig = storageConfig;
         this.tenantConfig = tenantConfig;
-        this.arrowAllocator = arrowAllocator;
         this.storageManager = storageManager;
         this.codecManager = codecManager;
         this.metaClient = metaClient;
@@ -100,11 +94,9 @@ public class DataService {
 
     public CompletionStage<TagHeader> createDataset(
             DataWriteRequest request,
-            Flow.Publisher<ByteBuf> contentStream,
-            IExecutionContext execCtx,
+            Flow.Publisher<ArrowBuf> contentStream,
+            IDataContext dataCtx,
             UserInfo userInfo) {
-
-        var dataCtx = new DataContext(execCtx.eventLoopExecutor(), arrowAllocator);
 
         var state = new RequestState();
         state.requestOwner = userInfo;
@@ -154,11 +146,9 @@ public class DataService {
 
     public CompletionStage<TagHeader> updateDataset(
             DataWriteRequest request,
-            Flow.Publisher<ByteBuf> contentStream,
-            IExecutionContext execCtx,
+            Flow.Publisher<ArrowBuf> contentStream,
+            IDataContext dataCtx,
             UserInfo userInfo) {
-
-        var dataCtx = new DataContext(execCtx.eventLoopExecutor(), arrowAllocator);
 
         var state = new RequestState();
         state.requestOwner = userInfo;
@@ -217,11 +207,9 @@ public class DataService {
     public void readDataset(
             DataReadRequest request,
             CompletableFuture<SchemaDefinition> schema,
-            Flow.Subscriber<ByteBuf> contentStream,
-            IExecutionContext execCtx,
+            Flow.Subscriber<ArrowBuf> contentStream,
+            IDataContext dataCtx,
             UserInfo userInfo) {
-
-        var dataCtx = new DataContext(execCtx.eventLoopExecutor(), arrowAllocator);
 
         var state = new RequestState();
         state.requestOwner = userInfo;
@@ -666,7 +654,7 @@ public class DataService {
     }
 
     private void loadAndEncode(
-            RequestState request, Flow.Subscriber<ByteBuf> contentStream,
+            RequestState request, Flow.Subscriber<ArrowBuf> contentStream,
             ICodec codec, Map<String, String> codecOptions,
             IDataContext dataCtx) {
 
@@ -674,7 +662,7 @@ public class DataService {
 
         var storageKey = request.copy.getStorageKey();
         var storage = storageManager.getDataStorage(storageKey);
-        var encoder = codec.getEncoder(arrowAllocator, requiredSchema, codecOptions);
+        var encoder = codec.getEncoder(dataCtx.arrowAllocator(), requiredSchema, codecOptions);
 
         var pipeline = storage.pipelineReader(request.copy, requiredSchema, dataCtx, request.offset, request.limit);
         pipeline.addStage(encoder);
@@ -684,7 +672,7 @@ public class DataService {
     }
 
     private CompletionStage<Long> decodeAndSave(
-            SchemaDefinition schema, Flow.Publisher<ByteBuf> contentStream,
+            SchemaDefinition schema, Flow.Publisher<ArrowBuf> contentStream,
             ICodec codec, Map<String, String> codecOptions,
             StorageCopy copy,
             IDataContext dataCtx) {
