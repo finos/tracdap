@@ -18,14 +18,9 @@ package org.finos.tracdap.common.concurrent;
 
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.MoreExecutors;
-import io.grpc.stub.StreamObserver;
-import io.netty.util.concurrent.Future;
-import io.netty.util.concurrent.GenericFutureListener;
 
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
-import java.util.function.BiConsumer;
-import java.util.function.BiFunction;
 
 
 public class Futures {
@@ -48,22 +43,6 @@ public class Futures {
             }
 
         }, MoreExecutors.directExecutor());
-
-        return javaFuture;
-    }
-
-    public static <T>
-    CompletionStage<T> javaFuture(io.netty.util.concurrent.Future<T> nettyFuture) {
-
-        var javaFuture = new CompletableFuture<T>();
-
-        nettyFuture.addListener((GenericFutureListener<Future<T>>) f -> {
-
-            if (f.isSuccess())
-                javaFuture.complete(f.getNow());
-            else
-                javaFuture.completeExceptionally(f.cause());
-        });
 
         return javaFuture;
     }
