@@ -459,7 +459,7 @@ public class S3ObjectStorage extends CommonFileStorage {
     }
 
     @Override
-    public Flow.Subscriber<ByteBuf> fsOpenOutputStream(String storagePath, CompletableFuture<Long> signal, IDataContext dataContext) {
+    public Flow.Subscriber<ArrowBuf> fsOpenOutputStream(String storagePath, CompletableFuture<Long> signal, IDataContext dataContext) {
 
         var objectKey = usePrefix(storagePath);
 
