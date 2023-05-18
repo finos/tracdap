@@ -27,7 +27,7 @@ import io.netty.channel.EventLoopGroup;
 
 import java.time.Duration;
 
-import static org.finos.tracdap.test.concurrent.ConcurrentTestHelpers.resultOf;
+import static org.finos.tracdap.test.concurrent.ConcurrentTestHelpers.getResultOf;
 import static org.finos.tracdap.test.concurrent.ConcurrentTestHelpers.waitFor;
 
 
@@ -67,7 +67,7 @@ public class StorageTestHelpers {
 
                 var rmdir = storage.rmdir(prefix, execCtx);
                 waitFor(Duration.ofSeconds(30), rmdir);
-                resultOf(rmdir);
+                getResultOf(rmdir);
             }
         }
     }

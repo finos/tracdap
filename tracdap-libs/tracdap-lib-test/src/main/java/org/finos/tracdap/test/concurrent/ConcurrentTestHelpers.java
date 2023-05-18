@@ -47,7 +47,7 @@ public class ConcurrentTestHelpers {
         }
     }
 
-    public static <T> T resultOf(CompletionStage<T> task, boolean unwrap) throws Exception {
+    public static <T> T getResultOf(CompletionStage<T> task, boolean unwrap) throws Exception {
 
         var taskFuture = task.toCompletableFuture();
 
@@ -71,8 +71,12 @@ public class ConcurrentTestHelpers {
         }
     }
 
-    public static <T> T resultOf(CompletionStage<T> task) throws Exception {
+    public static <T> T getResultOf(CompletionStage<T> task) throws Exception {
 
-        return resultOf(task, true);
+        return getResultOf(task, true);
+    }
+
+    public static <T> T resultOf(CompletionStage<T> task) throws Exception {
+        return getResultOf(task, true);
     }
 }
