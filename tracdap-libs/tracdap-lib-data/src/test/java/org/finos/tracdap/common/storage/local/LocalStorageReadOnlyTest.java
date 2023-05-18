@@ -47,7 +47,7 @@ public class LocalStorageReadOnlyTest extends StorageReadOnlyTestSuite {
         roProps.put(CommonFileStorage.READ_ONLY_CONFIG_KEY, "true");
         roStorage = new LocalFileStorage("TEST_LOCAL_RO_STORAGE", roProps);
 
-        execContext = new ExecutionContext(new DefaultEventExecutor(new DefaultThreadFactory("t-events")));
-        dataContext = new DataContext(execContext.eventLoopExecutor(), new RootAllocator());
+        var executor = new DefaultEventExecutor(new DefaultThreadFactory("t-events"));
+        dataContext = new DataContext(executor, new RootAllocator());
     }
 }
