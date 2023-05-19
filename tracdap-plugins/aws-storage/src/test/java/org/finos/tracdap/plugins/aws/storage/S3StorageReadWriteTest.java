@@ -16,15 +16,12 @@
 
 package org.finos.tracdap.plugins.aws.storage;
 
-import io.netty.channel.EventLoopGroup;
-import io.netty.channel.nio.NioEventLoopGroup;
-import org.apache.arrow.memory.BufferAllocator;
-import org.finos.tracdap.common.data.ExecutionContext;
 import org.finos.tracdap.common.data.DataContext;
 import org.finos.tracdap.common.storage.StorageReadWriteTestSuite;
 
-import io.netty.util.concurrent.DefaultEventExecutor;
-import io.netty.util.concurrent.DefaultThreadFactory;
+import io.netty.channel.EventLoopGroup;
+import io.netty.channel.nio.NioEventLoopGroup;
+import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.memory.RootAllocator;
 
 import org.junit.jupiter.api.*;
@@ -53,7 +50,7 @@ public class S3StorageReadWriteTest extends StorageReadWriteTestSuite {
     static BufferAllocator allocator;
 
     static S3ObjectStorage setupStorage;
-    static ExecutionContext setupCtx;
+    static DataContext setupCtx;
 
     static int testNumber;
 
@@ -67,13 +64,12 @@ public class S3StorageReadWriteTest extends StorageReadWriteTestSuite {
                 "platform_storage_rw_test_suite_%s_0x%h/",
                 timestamp, random);
 
-        setupCtx = new ExecutionContext(new DefaultEventExecutor(new DefaultThreadFactory("t-setup")));
-
         storageProps = S3StorageEnvProps.readStorageEnvProps();
 
         elg = new NioEventLoopGroup(2);
         allocator = new RootAllocator();
 
+        setupCtx = new DataContext(elg.next(), allocator);
         setupStorage = new S3ObjectStorage("STORAGE_SETUP", storageProps);
         setupStorage.start(elg);
 

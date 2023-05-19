@@ -16,14 +16,14 @@
 
 package org.finos.tracdap.plugins.aws.storage;
 
+import org.finos.tracdap.common.data.DataContext;
+import org.finos.tracdap.common.storage.StorageOperationsTestSuite;
+
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.util.concurrent.DefaultThreadFactory;
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.memory.RootAllocator;
-import org.finos.tracdap.common.data.ExecutionContext;
-import org.finos.tracdap.common.data.DataContext;
-import org.finos.tracdap.common.storage.StorageOperationsTestSuite;
 import org.junit.jupiter.api.*;
 
 import java.time.Duration;
@@ -49,7 +49,7 @@ public class S3StorageOperationsTest extends StorageOperationsTestSuite {
     static EventLoopGroup elg;
     static BufferAllocator allocator;
 
-    static ExecutionContext setupCtx;
+    static DataContext setupCtx;
     static S3ObjectStorage setupStorage;
 
     static int testNumber;
@@ -68,7 +68,7 @@ public class S3StorageOperationsTest extends StorageOperationsTestSuite {
         elg = new NioEventLoopGroup(2, new DefaultThreadFactory("ops-test"));
         allocator = new RootAllocator();
 
-        setupCtx = new ExecutionContext(elg.next());
+        setupCtx = new DataContext(elg.next(), allocator);
         setupStorage = new S3ObjectStorage("STORAGE_SETUP", storageProps);
         setupStorage.start(elg);
 
