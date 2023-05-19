@@ -16,9 +16,11 @@
 
 package org.finos.tracdap.svc.orch.jobs;
 
+import org.apache.arrow.memory.ArrowBuf;
 import org.apache.arrow.vector.ipc.ArrowFileWriter;
 import org.finos.tracdap.api.*;
 import org.finos.tracdap.common.data.ArrowSchema;
+import org.finos.tracdap.common.data.util.Bytes;
 import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.metadata.MetadataUtil;
 import org.finos.tracdap.common.data.util.ByteOutputChannel;
@@ -51,6 +53,7 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -376,9 +379,9 @@ public abstract class DataRoundTripTest {
 
     TagHeader saveInputData(Schema schema, VectorSchemaRoot data, String testName) throws Exception {
 
-        var buf = Unpooled.compositeBuffer();
+        var buf = new ArrayList<ArrowBuf>();
 
-        try (var channel = new ByteOutputChannel(buf::writeBytes);
+        try (var channel = new ByteOutputChannel(ALLOCATOR, buf::add);
              var writer = new ArrowFileWriter(data, null,  channel)) {
 
             writer.start();
@@ -386,11 +389,16 @@ public abstract class DataRoundTripTest {
             writer.end();
         }
 
+        var bytes = Bytes.copyFromBuffer(buf);
+
+        buf.forEach(ArrowBuf::close);
+        buf.clear();;
+
         var writeRequest = DataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setSchema(SampleData.BASIC_TABLE_SCHEMA)
                 .setFormat("application/vnd.apache.arrow.file")
-                .setContent(ByteString.copyFrom(buf.nioBuffer()))
+                .setContent(ByteString.copyFrom(bytes))
                 .addTagUpdates(TagUpdate.newBuilder()
                         .setAttrName("round_trip_dataset")
                         .setValue(MetadataCodec.encodeValue(testName + ":input")))
@@ -460,14 +468,19 @@ public abstract class DataRoundTripTest {
 
         var dataClient = platform.dataClientBlocking();
         var dataResponse = dataClient.readSmallDataset(readRequest);
-        var dataBuf = Unpooled.wrappedBuffer(dataResponse.getContent().asReadOnlyByteBuffer());
 
         var allocator = new RootAllocator();
+        var arrowBuf = allocator.buffer(dataResponse.getContent().size());
+        arrowBuf.setBytes(0, dataResponse.getContent().asReadOnlyByteBuffer());
+        arrowBuf.writerIndex(dataResponse.getContent().size());
 
-        var reader = new ArrowFileReader(new ByteSeekableChannel(dataBuf), allocator);
+        var reader = new ArrowFileReader(new ByteSeekableChannel(List.of(arrowBuf)), allocator);
         reader.loadNextBatch();
 
         var root = reader.getVectorSchemaRoot();
+
+        reader.close();
+        arrowBuf.close();
 
         var arrowSchema = ArrowSchema.tracToArrow(dataResponse.getSchema());
         Assertions.assertEquals(arrowSchema, root.getSchema());

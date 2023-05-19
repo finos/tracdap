@@ -33,7 +33,6 @@ import com.fasterxml.jackson.dataformat.csv.CsvMapper;
 import com.fasterxml.jackson.dataformat.csv.CsvParser;
 import com.google.protobuf.ByteString;
 import io.grpc.stub.StreamObserver;
-import io.netty.buffer.Unpooled;
 import org.apache.arrow.memory.RootAllocator;
 import org.apache.arrow.vector.ipc.ArrowFileReader;
 import org.apache.arrow.vector.ipc.ArrowStreamReader;
@@ -190,16 +189,23 @@ class DataApiTestHelpers {
 
         var allData = data.stream().reduce(ByteString.EMPTY, ByteString::concat);
 
-        try (var stream = new ByteSeekableChannel(Unpooled.wrappedBuffer(allData.toByteArray()))) {
+        try (var allocator = new RootAllocator()) {
 
-            return decodeArrowFile(schema, stream);
-        }
-        catch (Exception e) {
+            var buffer = allocator.buffer(allData.size());
+            buffer.setBytes(0, allData.asReadOnlyByteBuffer());
+            buffer.writerIndex(allData.size());
 
-            if (e instanceof RuntimeException)
-                throw (RuntimeException) e;
-            else
-                throw new RuntimeException(e);
+            try (buffer; var stream = new ByteSeekableChannel(List.of(buffer))) {
+
+                return decodeArrowFile(schema, stream);
+            }
+            catch (Exception e) {
+
+                if (e instanceof RuntimeException)
+                    throw (RuntimeException) e;
+                else
+                    throw new RuntimeException(e);
+            }
         }
     }
 
