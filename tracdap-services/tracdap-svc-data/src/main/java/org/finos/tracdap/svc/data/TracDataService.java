@@ -241,7 +241,6 @@ public class TracDataService extends CommonServiceBase {
                 .channelType(channelType)
                 .enableFullStreamDecompression()
                 .eventLoopGroup(serviceGroup)
-                .directExecutor()
                 .usePlaintext()
                 .build();
 

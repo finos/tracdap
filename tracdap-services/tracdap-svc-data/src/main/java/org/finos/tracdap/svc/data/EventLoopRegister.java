@@ -36,7 +36,7 @@ public class EventLoopRegister {
         this.elg = elg;
         this.register = new ConcurrentHashMap<>();
 
-        elg.forEach(this::registerEventLoop);
+        elg.forEach(el -> el.submit(() -> registerEventLoop(el)));
     }
 
     public EventLoop currentEventLoop(boolean strict) {
