@@ -21,13 +21,9 @@ import org.finos.tracdap.common.auth.internal.InternalAuthProvider;
 import org.finos.tracdap.common.auth.internal.JwtSetup;
 import org.finos.tracdap.common.auth.internal.InternalAuthValidator;
 import org.finos.tracdap.common.grpc.*;
-import org.finos.tracdap.config.ServiceConfig;
-import org.finos.tracdap.config.PlatformConfig;
-
 import org.finos.tracdap.common.codec.CodecManager;
 import org.finos.tracdap.common.codec.ICodecManager;
 import org.finos.tracdap.common.config.ConfigManager;
-import org.finos.tracdap.common.concurrent.ExecutionRegister;
 import org.finos.tracdap.common.exception.EPluginNotAvailable;
 import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.common.exception.EStorageConfig;
@@ -35,6 +31,8 @@ import org.finos.tracdap.common.plugin.PluginManager;
 import org.finos.tracdap.common.service.CommonServiceBase;
 import org.finos.tracdap.common.storage.IStorageManager;
 import org.finos.tracdap.common.storage.StorageManager;
+import org.finos.tracdap.config.PlatformConfig;
+import org.finos.tracdap.config.ServiceConfig;
 import org.finos.tracdap.config.StorageConfig;
 import org.finos.tracdap.svc.data.api.TracDataApi;
 import org.finos.tracdap.svc.data.service.DataService;
@@ -69,7 +67,6 @@ public class TracDataService extends CommonServiceBase {
 
     private EventLoopGroup bossGroup;
     private EventLoopGroup serviceGroup;
-    private ManagedChannel clientChannel;
     private StorageManager storage;
     private Server server;
 
@@ -132,9 +129,9 @@ public class TracDataService extends CommonServiceBase {
             serviceGroup = new NioEventLoopGroup(serviceThreads, new DefaultThreadFactory("data-svc"));
             bossGroup = new NioEventLoopGroup(1, new DefaultThreadFactory("data-boss"));
 
-            var execRegister = new ExecutionRegister(serviceGroup);
+            var eventLoopRegister = new EventLoopRegister(serviceGroup);
 
-            // TODO: Review setup of Arrow allocator, inc. interaction with Netty / Protobuf allocators
+            // TODO: Review arrow allocator config, for root and child allocators
 
             var arrowAllocatorConfig = RootAllocator
                     .configBuilder()
@@ -154,11 +151,11 @@ public class TracDataService extends CommonServiceBase {
 
             var tokenProcessor = JwtSetup.createProcessor(platformConfig, configManager);
             var internalAuth = new InternalAuthProvider(tokenProcessor, platformConfig.getAuthentication());
-            var metaClient = prepareMetadataClient(platformConfig, clientChannelType);
+            var metaClient = prepareMetadataClient(platformConfig, clientChannelType, eventLoopRegister);
 
-            var fileSvc = new FileService(storageConfig, tenantConfig, arrowAllocator, storage, metaClient, internalAuth);
-            var dataSvc = new DataService(storageConfig, tenantConfig, arrowAllocator, storage, formats, metaClient, internalAuth);
-            var dataApi = new TracDataApi(dataSvc, fileSvc);
+            var fileSvc = new FileService(storageConfig, tenantConfig, storage, metaClient, internalAuth);
+            var dataSvc = new DataService(storageConfig, tenantConfig, storage, formats, metaClient, internalAuth);
+            var dataApi = new TracDataApi(dataSvc, fileSvc, eventLoopRegister, arrowAllocator);
 
             // Create the main server
 
@@ -183,7 +180,6 @@ public class TracDataService extends CommonServiceBase {
                     .intercept(new LoggingServerInterceptor(TracDataApi.class))
                     .intercept(new CompressionServerInterceptor())
                     .intercept(new InternalAuthValidator(platformConfig.getAuthentication(), tokenProcessor))
-                    .intercept(execRegister.registerExecContext())
 
                     .build();
 
@@ -223,7 +219,8 @@ public class TracDataService extends CommonServiceBase {
     private TrustedMetadataApiGrpc.TrustedMetadataApiFutureStub
     prepareMetadataClient(
             PlatformConfig platformConfig,
-            Class<? extends io.netty.channel.Channel> channelType) {
+            Class<? extends io.netty.channel.Channel> channelType,
+            EventLoopRegister eventLoopRegister) {
 
         var metaInstances = platformConfig.getInstances().getMetaList();
 
@@ -239,20 +236,20 @@ public class TracDataService extends CommonServiceBase {
         log.info("Using metadata service instance at [{}:{}]",
                 metaInstance.getHost(), metaInstance.getPort());
 
-        var clientChannelBuilder = NettyChannelBuilder
+        var clientChannel = NettyChannelBuilder
                 .forAddress(metaInstance.getHost(), metaInstance.getPort())
                 .channelType(channelType)
                 .enableFullStreamDecompression()
                 .eventLoopGroup(serviceGroup)
                 .directExecutor()
-                .usePlaintext();
-
-        clientChannel = EventLoopChannel.wrapChannel(clientChannelBuilder, serviceGroup);
+                .usePlaintext()
+                .build();
 
         return TrustedMetadataApiGrpc.newFutureStub(clientChannel)
                 .withCompression(CompressionClientInterceptor.COMPRESSION_TYPE)
                 .withInterceptors(new CompressionClientInterceptor())
-                .withInterceptors(new LoggingClientInterceptor(TracDataService.class));
+                .withInterceptors(new LoggingClientInterceptor(TracDataService.class))
+                .withInterceptors(eventLoopRegister.clientInterceptor());
     }
 
     @Override
@@ -264,12 +261,6 @@ public class TracDataService extends CommonServiceBase {
 
             server.shutdown();
             return server.awaitTermination(remaining.toMillis(), TimeUnit.MILLISECONDS);
-        });
-
-        var clientDown = shutdownResource("Metadata service client", deadline, remaining -> {
-
-            clientChannel.shutdown();
-            return clientChannel.awaitTermination(remaining.toMillis(), TimeUnit.MILLISECONDS);
         });
 
         var storageDown = shutdownResource("Storage service", deadline, remaining -> {
@@ -290,14 +281,11 @@ public class TracDataService extends CommonServiceBase {
             return bossGroup.awaitTermination(remaining.toMillis(), TimeUnit.MILLISECONDS);
         });
 
-        if (serverDown && clientDown && storageDown && workersDown && bossDown)
+        if (serverDown && storageDown && workersDown && bossDown)
             return 0;
 
         if (!serverDown)
             server.shutdownNow();
-
-        if (!clientDown)
-            clientChannel.shutdownNow();
 
         return -1;
     }
