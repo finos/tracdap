@@ -39,11 +39,6 @@ dependencies {
     api group: 'io.grpc', name: 'grpc-api', version: "$grpc_version"
     api group: 'io.grpc', name: 'grpc-stub', version: "$grpc_version"
 
-    // Netty - common lib includes helpers to translate to/from equivalent JDK types
-    api group: 'io.netty', name: 'netty-common', version: "$netty_version"
-    api group: 'io.netty', name: 'netty-buffer', version: "$netty_version"
-    api group: 'io.netty', name: 'netty-handler-proxy', version: "$netty_version"
-
     // CLI is implemented with Apache Commons CLI
     implementation group: 'commons-cli', name: 'commons-cli', version: "$commons_cli_version"
 

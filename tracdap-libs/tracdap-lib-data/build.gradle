@@ -39,6 +39,13 @@ dependencies {
 
     api group: 'org.apache.arrow', name: 'arrow-memory-netty', version: "$arrow_version"
 
+    // Netty - data lib uses Netty event loops / executors
+    api group: 'io.netty', name: 'netty-common', version: "$netty_version"
+
+    // Netty - data lib uses netty event loops / executors
+    api group: 'io.netty', name: 'netty-common', version: "$netty_version"
+    api group: 'io.netty', name: 'netty-transport', version: "$netty_version"
+
     // Jackson used for implementations of formats included as standard
     implementation group: 'com.fasterxml.jackson.core', name: 'jackson-core', version: "$jackson_version"
     implementation group: 'com.fasterxml.jackson.core', name: 'jackson-annotations', version: "$jackson_databind_version"
