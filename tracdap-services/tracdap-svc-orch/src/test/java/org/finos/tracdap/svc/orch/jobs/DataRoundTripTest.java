@@ -476,9 +476,6 @@ public abstract class DataRoundTripTest {
 
         var root = reader.getVectorSchemaRoot();
 
-        reader.close();
-        arrowBuf.close();
-
         var arrowSchema = ArrowSchema.tracToArrow(dataResponse.getSchema());
         Assertions.assertEquals(arrowSchema, root.getSchema());
 
