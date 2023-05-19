@@ -16,7 +16,7 @@
 
 package org.finos.tracdap.test.helpers;
 
-import org.finos.tracdap.common.concurrent.ExecutionContext;
+import org.finos.tracdap.common.data.ExecutionContext;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.plugin.PluginManager;
 import org.finos.tracdap.common.storage.IFileStorage;

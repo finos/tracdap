@@ -17,7 +17,7 @@
 package org.finos.tracdap.plugins.aws.storage;
 
 import org.finos.tracdap.common.concurrent.Flows;
-import org.finos.tracdap.common.concurrent.IExecutionContext;
+import org.finos.tracdap.common.data.IExecutionContext;
 import org.finos.tracdap.common.data.IDataContext;
 import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.common.exception.EUnexpected;
@@ -35,7 +35,6 @@ import software.amazon.awssdk.services.s3.S3AsyncClient;
 import software.amazon.awssdk.services.s3.model.*;
 
 import org.apache.arrow.memory.ArrowBuf;
-import io.netty.buffer.ByteBuf;
 import io.netty.channel.EventLoopGroup;
 
 import java.net.URI;

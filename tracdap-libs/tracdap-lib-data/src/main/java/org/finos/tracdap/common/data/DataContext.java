@@ -16,7 +16,6 @@
 
 package org.finos.tracdap.common.data;
 
-import org.finos.tracdap.common.concurrent.ExecutionContext;
 import io.netty.util.concurrent.OrderedEventExecutor;
 import org.apache.arrow.memory.BufferAllocator;
 

@@ -16,7 +16,7 @@
 
 package org.finos.tracdap.common.storage;
 
-import org.finos.tracdap.common.concurrent.IExecutionContext;
+import org.finos.tracdap.common.data.IExecutionContext;
 import org.finos.tracdap.common.data.IDataContext;
 
 import org.apache.arrow.memory.ArrowBuf;

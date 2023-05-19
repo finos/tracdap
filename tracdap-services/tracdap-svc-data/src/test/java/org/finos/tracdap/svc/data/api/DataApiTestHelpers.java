@@ -17,7 +17,7 @@
 package org.finos.tracdap.svc.data.api;
 
 import org.finos.tracdap.api.FileReadRequest;
-import org.finos.tracdap.common.concurrent.IExecutionContext;
+import org.finos.tracdap.common.data.IExecutionContext;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.metadata.MetadataUtil;
