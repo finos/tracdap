@@ -129,7 +129,7 @@ public class ByteSeekableChannel implements SeekableByteChannel {
                 chunk.getBytes(start, dst);
             }
             else {
-                nBytes = (int) (nextOffset - start);
+                nBytes = (int) (chunk.writerIndex() - start);
                 var window = chunk.nioBuffer(start, nBytes);
                 dst.put(window);
             }
