@@ -165,8 +165,8 @@ abstract class DataRoundTripTest {
             writer.end();
 
             var mimeType = "application/vnd.apache.arrow.stream";
-            roundTripTest(writeChannel.getChunks(), mimeType, mimeType, DataApiTestHelpers::decodeArrowStream, BASIC_TEST_DATA, true);
-            roundTripTest(writeChannel.getChunks(), mimeType, mimeType, DataApiTestHelpers::decodeArrowStream, BASIC_TEST_DATA, false);
+            roundTripTest(writeChannel.getChunks(), mimeType, mimeType, DataApiTestHelpers::decodeArrowStream, true);
+            roundTripTest(writeChannel.getChunks(), mimeType, mimeType, DataApiTestHelpers::decodeArrowStream, false);
         }
     }
 
@@ -191,25 +191,26 @@ abstract class DataRoundTripTest {
             writer.end();
 
             var mimeType = "application/vnd.apache.arrow.file";
-            roundTripTest(writeChannel.getChunks(), mimeType, mimeType, DataApiTestHelpers::decodeArrowFile, BASIC_TEST_DATA, true);
-            roundTripTest(writeChannel.getChunks(), mimeType, mimeType, DataApiTestHelpers::decodeArrowFile, BASIC_TEST_DATA, false);
+            roundTripTest(writeChannel.getChunks(), mimeType, mimeType, DataApiTestHelpers::decodeArrowFile, true);
+            roundTripTest(writeChannel.getChunks(), mimeType, mimeType, DataApiTestHelpers::decodeArrowFile, false);
         }
     }
 
     @Test
     void roundTrip_csv() throws Exception {
 
-        var testDataStream = getClass().getResourceAsStream(BASIC_CSV_DATA);
+        try (var testDataStream = getClass().getResourceAsStream(BASIC_CSV_DATA)) {
 
-        if (testDataStream == null)
-            throw new RuntimeException("Test data not found");
+            if (testDataStream == null)
+                throw new RuntimeException("Test data not found");
 
-        var testDataBytes = testDataStream.readAllBytes();
-        var testData = List.of(ByteString.copyFrom(testDataBytes));
+            var testDataBytes = testDataStream.readAllBytes();
+            var testData = List.of(ByteString.copyFrom(testDataBytes));
 
-        var mimeType = "text/csv";
-        roundTripTest(testData, mimeType, mimeType, DataApiTestHelpers::decodeCsv, BASIC_TEST_DATA, true);
-        roundTripTest(testData, mimeType, mimeType, DataApiTestHelpers::decodeCsv, BASIC_TEST_DATA, false);
+            var mimeType = "text/csv";
+            roundTripTest(testData, mimeType, mimeType, DataApiTestHelpers::decodeCsv, true);
+            roundTripTest(testData, mimeType, mimeType, DataApiTestHelpers::decodeCsv, false);
+        }
     }
 
     @Test
@@ -276,23 +277,24 @@ abstract class DataRoundTripTest {
     @Test
     void roundTrip_json() throws Exception {
 
-        var testDataStream = getClass().getResourceAsStream(BASIC_JSON_DATA);
+        try (var testDataStream = getClass().getResourceAsStream(BASIC_JSON_DATA)) {
 
-        if (testDataStream == null)
-            throw new RuntimeException("Test data not found");
+            if (testDataStream == null)
+                throw new RuntimeException("Test data not found");
 
-        var testDataBytes = testDataStream.readAllBytes();
-        var testData = List.of(ByteString.copyFrom(testDataBytes));
+            var testDataBytes = testDataStream.readAllBytes();
+            var testData = List.of(ByteString.copyFrom(testDataBytes));
 
-        var mimeType = "text/json";
-        roundTripTest(testData, mimeType, mimeType, DataApiTestHelpers::decodeJson, BASIC_TEST_DATA, true);
-        roundTripTest(testData, mimeType, mimeType, DataApiTestHelpers::decodeJson, BASIC_TEST_DATA, false);
+            var mimeType = "text/json";
+            roundTripTest(testData, mimeType, mimeType, DataApiTestHelpers::decodeJson, true);
+            roundTripTest(testData, mimeType, mimeType, DataApiTestHelpers::decodeJson, false);
+        }
     }
 
     private void roundTripTest(
             List<ByteString> content, String writeFormat, String readFormat,
             BiFunction<SchemaDefinition, List<ByteString>, List<Vector<Object>>> decodeFunc,
-            List<Vector<Object>> expectedResult, boolean dataInChunkZero) throws Exception {
+            boolean dataInChunkZero) throws Exception {
 
         var requestParams = DataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
@@ -330,9 +332,9 @@ abstract class DataRoundTripTest {
 
         for (int i = 0; i < roundTripSchema.getTable().getFieldsCount(); i++) {
 
-            for (var row = 0; row < expectedResult.size(); row++) {
+            for (var row = 0; row < DataRoundTripTest.BASIC_TEST_DATA.size(); row++) {
 
-                var expectedVal = expectedResult.get(i).get(row);
+                var expectedVal = DataRoundTripTest.BASIC_TEST_DATA.get(i).get(row);
                 var roundTripVal = roundTripData.get(i).get(row);
 
                 // Allow comparing big decimals with different scales
