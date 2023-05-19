@@ -50,9 +50,9 @@ public class Bytes {
         if (src.readableBytes() > Integer.MAX_VALUE)
             throw new EUnexpected();
 
-        var array = new byte[(int) src.writerIndex()];
+        var array = new byte[(int) src.readableBytes()];
 
-        src.getBytes(0, array);
+        src.getBytes(src.readerIndex(), array);
 
         return array;
     }
@@ -62,10 +62,7 @@ public class Bytes {
         if (src.size() == 1)
             return copyFromBuffer(src.get(0));
 
-        long size = 0;
-
-        for (var chunk : src)
-            size += chunk.writerIndex();
+        long size = readableBytes(src);
 
         if (size > Integer.MAX_VALUE)
             throw new EUnexpected();
@@ -74,7 +71,7 @@ public class Bytes {
         var pos = 0;
 
         for (var chunk : src) {
-            chunk.getBytes(0, array, pos, (int) chunk.writerIndex());
+            chunk.getBytes(chunk.readerIndex(), array, pos, (int) chunk.readableBytes());
             pos += chunk.readableBytes();
         }
 
@@ -207,14 +204,16 @@ public class Bytes {
             // Only solution is to write to a heap-allocated buffer and wrap
 
             var target = new byte[(int) bufferSize];
-            var targetOffset = 0;
+            var position = 0;
 
             for (var chunk : src) {
 
                 var chunkSize = (int) chunk.readableBytes();
 
-                chunk.getBytes(chunk.readerIndex(), target, targetOffset, chunkSize);
+                chunk.getBytes(chunk.readerIndex(), target, position, chunkSize);
                 chunk.readerIndex(chunk.readerIndex() + chunkSize);
+
+                position += chunkSize;
             }
 
             return ByteBuffer.wrap(target);
