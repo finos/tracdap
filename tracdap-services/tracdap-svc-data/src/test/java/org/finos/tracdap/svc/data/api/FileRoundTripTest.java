@@ -85,7 +85,7 @@ abstract class FileRoundTripTest  {
 
         @BeforeEach
         void setup() {
-            execContext = new DataContext(elg.next(), new RootAllocator());;
+            execContext = new DataContext(elg.next(), new RootAllocator());
             metaClient = platform.metaClientFuture();
             dataClient = platform.dataClient();
         }
@@ -116,7 +116,7 @@ abstract class FileRoundTripTest  {
 
         @BeforeEach
         void setup() {
-            execContext = new DataContext(elg.next(), new RootAllocator());;
+            execContext = new DataContext(elg.next(), new RootAllocator());
             metaClient = platform.metaClientFuture();
             dataClient = platform.dataClient();
         }

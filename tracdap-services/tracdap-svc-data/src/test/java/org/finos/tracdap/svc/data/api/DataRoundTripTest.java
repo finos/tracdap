@@ -84,7 +84,7 @@ abstract class DataRoundTripTest {
 
         @BeforeEach
         void setup() {
-            execContext = new DataContext(elg.next(), new RootAllocator());;
+            execContext = new DataContext(elg.next(), new RootAllocator());
         }
     }
 

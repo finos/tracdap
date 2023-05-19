@@ -32,15 +32,12 @@ import org.finos.tracdap.test.data.SampleData;
 import org.finos.tracdap.test.helpers.GitHelpers;
 import org.finos.tracdap.test.helpers.PlatformTest;
 
-
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.memory.RootAllocator;
 import org.apache.arrow.vector.VectorSchemaRoot;
 import org.apache.arrow.vector.ipc.ArrowFileReader;
 import org.apache.arrow.vector.types.pojo.Schema;
-
 import com.google.protobuf.ByteString;
-import io.netty.buffer.Unpooled;
 
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.Tag;
@@ -392,7 +389,7 @@ public abstract class DataRoundTripTest {
         var bytes = Bytes.copyFromBuffer(buf);
 
         buf.forEach(ArrowBuf::close);
-        buf.clear();;
+        buf.clear();
 
         var writeRequest = DataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
