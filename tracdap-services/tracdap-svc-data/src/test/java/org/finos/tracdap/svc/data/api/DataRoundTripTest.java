@@ -16,6 +16,7 @@
 
 package org.finos.tracdap.svc.data.api;
 
+import org.apache.arrow.vector.ipc.ArrowFileWriter;
 import org.finos.tracdap.api.*;
 import org.finos.tracdap.common.concurrent.ExecutionContext;
 import org.finos.tracdap.common.concurrent.Flows;
@@ -166,6 +167,32 @@ abstract class DataRoundTripTest {
             var mimeType = "application/vnd.apache.arrow.stream";
             roundTripTest(writeChannel.getChunks(), mimeType, mimeType, DataApiTestHelpers::decodeArrowStream, BASIC_TEST_DATA, true);
             roundTripTest(writeChannel.getChunks(), mimeType, mimeType, DataApiTestHelpers::decodeArrowStream, BASIC_TEST_DATA, false);
+        }
+    }
+
+    @Test
+    void roundTrip_arrowFile() throws Exception {
+
+        // Create a single batch of Arrow data
+
+        var allocator = new RootAllocator();
+        var root = SampleData.generateBasicData(allocator);
+
+        // Use a writer to encode the batch as a stream of chunks (arrow record batches, including the schema)
+
+        var writeChannel = new ChunkChannel();
+
+        // Keep the writer open until after the test is complete
+        // Closing the writer will close the VSR, which releases the underlying memory
+        try (var writer = new ArrowFileWriter(root, null, writeChannel)) {
+
+            writer.start();
+            writer.writeBatch();
+            writer.end();
+
+            var mimeType = "application/vnd.apache.arrow.file";
+            roundTripTest(writeChannel.getChunks(), mimeType, mimeType, DataApiTestHelpers::decodeArrowFile, BASIC_TEST_DATA, true);
+            roundTripTest(writeChannel.getChunks(), mimeType, mimeType, DataApiTestHelpers::decodeArrowFile, BASIC_TEST_DATA, false);
         }
     }
 
