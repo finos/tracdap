@@ -29,6 +29,7 @@ import org.apache.arrow.memory.BufferAllocator;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Flow;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 
 
@@ -276,10 +277,17 @@ public class GrpcUploadSource<TRequest, TResponse> {
             try {
                 var bytes = accessor.apply(item).asReadOnlyByteBuffer();
 
+                // TODO: Simplify this
+
+                var sent = new AtomicBoolean(false);
+
                 buffer = Bytes.writeToStream(
                         bytes, buffer, allocator,
                         DEFAULT_CHUNK_SIZE,
-                        subscriber::onNext);
+                        x -> { sent.set(true); subscriber.onNext(x); });
+
+                if (! sent.get())
+                    subscription.request(1);
             }
             catch (Exception e) {
                 buffer = Bytes.closeStream(buffer);
