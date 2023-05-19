@@ -19,17 +19,24 @@ package org.finos.tracdap.common.data;
 import io.netty.util.concurrent.OrderedEventExecutor;
 import org.apache.arrow.memory.BufferAllocator;
 
-public class DataContext extends ExecutionContext implements IDataContext {
 
-    private final BufferAllocator arrowAllocator;
+public class DataContext implements IDataContext {
 
-    public DataContext(OrderedEventExecutor eventLoop, BufferAllocator arrowAllocator) {
-        super(eventLoop);
-        this.arrowAllocator = arrowAllocator;
+    private final OrderedEventExecutor eventLoop;
+    private final BufferAllocator allocator;
+
+    public DataContext(OrderedEventExecutor eventLoop, BufferAllocator allocator) {
+        this.eventLoop = eventLoop;
+        this.allocator = allocator;
+    }
+
+    @Override
+    public OrderedEventExecutor eventLoopExecutor() {
+        return eventLoop;
     }
 
     @Override
     public BufferAllocator arrowAllocator() {
-        return arrowAllocator;
+        return allocator;
     }
 }
