@@ -16,64 +16,122 @@
 
 package org.finos.tracdap.common.data.util;
 
-import io.netty.buffer.ByteBuf;
+import org.apache.arrow.memory.ArrowBuf;
+import org.finos.tracdap.common.exception.EUnexpected;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SeekableByteChannel;
+import java.util.ArrayList;
+import java.util.List;
 
 
 public class ByteSeekableChannel implements SeekableByteChannel {
 
-    private final ByteBuf buffer;
+    private final List<ArrowBuf> chunks;
+    private final List<Long> offsets;
     private final long size;
 
+    private long position;
+    private int index;
     private boolean isOpen;
 
-    public ByteSeekableChannel(ByteBuf buffer) {
+    public ByteSeekableChannel(List<ArrowBuf> buffers) {
 
-        this.buffer = buffer;
-        buffer.readerIndex(0);
-        this.size = buffer.readableBytes();
+        this.chunks = buffers;
+        this.offsets = new ArrayList<>(chunks.size());
 
+        for (position = 0, index = 0; index < chunks.size(); index++) {
+            offsets.add(position);
+            position += chunks.get(index).readableBytes();
+        }
+
+        size = position;
+        position = 0;
+        index = 0;
         isOpen = true;
     }
 
     @Override
-    public int read(ByteBuffer dst) throws IOException {
+    public long size() throws IOException {
 
-        var bytesToRead = Math.min(dst.remaining(), buffer.readableBytes());
+        if (!isOpen)
+            throw new ClosedChannelException();
 
-        buffer.readBytes(dst);
-
-        return bytesToRead;
+        return size;
     }
 
     @Override
-    public int write(ByteBuffer src) throws IOException {
-        throw new UnsupportedOperationException();
+    public long position() throws IOException  {
+
+        if (!isOpen)
+            throw new ClosedChannelException();
+
+        return position;
     }
 
     @Override
-    public long position() {
-        return buffer.readerIndex();
-    }
+    public SeekableByteChannel position(long newPosition) throws IOException {
 
-    @Override
-    public SeekableByteChannel position(long newPosition) {
+        if (!isOpen)
+            throw new ClosedChannelException();
 
         if (newPosition < 0)
             throw new IllegalArgumentException();
 
-        var position = Math.min(newPosition, size);
-        buffer.readerIndex((int) position);
+        position = newPosition;
+
+        if (index >= offsets.size()) {
+            updateIndex(0, offsets.size());
+            return this;
+        }
+
+        var chunk = chunks.get(index);
+        var offset = offsets.get(index);
+        var boundary = offset + chunk.readableBytes();
+
+        if (position < offset)
+            updateIndex(0, index);
+
+        if (position >= boundary)
+            updateIndex(index + 1, offsets.size());
 
         return this;
     }
 
     @Override
-    public long size() throws IOException {
-        return size;
+    public int read(ByteBuffer dst) throws IOException {
+
+        if (!isOpen)
+            throw new ClosedChannelException();
+
+        if (position >= size)
+            return -1;
+
+        var offset = offsets.get(index);
+        var chunk = chunks.get(index);
+        var chunkOffset = position - offset;
+
+        var boundary = index + 1 < offsets.size() ? offsets.get(index + 1) : size;
+        var nBytes = (int) Math.min(chunk.readableBytes() - chunkOffset, Integer.MAX_VALUE);
+
+        if (nBytes < dst.remaining())
+            dst.limit(dst.position() + nBytes);
+
+        chunk.getBytes(chunk.readerIndex() + chunkOffset, dst);
+
+        position += nBytes;
+
+        if (position >= boundary)
+            index += 1;
+
+        return nBytes;
+    }
+
+    @Override
+    public int write(ByteBuffer src) throws IOException {
+        throw new UnsupportedOperationException();
     }
 
     @Override
@@ -90,5 +148,32 @@ public class ByteSeekableChannel implements SeekableByteChannel {
     public void close() throws IOException {
 
         isOpen = false;
+    }
+
+    private void updateIndex(int min, int max) {
+
+        if (min == max) {
+            index = min;
+            return;
+        }
+
+        if (position < offsets.get(min))
+            throw new EUnexpected();
+
+        for (var i = min; i < max; i++) {
+
+            var offset = offsets.get(i);
+            var boundary = i + 1 < offsets.size() ? offsets.get(i + 1) : size;
+
+            if (offset <= position && position < boundary) {
+                index = i;
+                return;
+            }
+        }
+
+        if (position == size)
+            index = offsets.size();
+
+        throw new EUnexpected();
     }
 }
