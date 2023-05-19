@@ -17,7 +17,7 @@
 package org.finos.tracdap.svc.data.api;
 
 import org.finos.tracdap.api.*;
-import org.finos.tracdap.common.data.ExecutionContext;
+import org.finos.tracdap.common.data.DataContext;
 import org.finos.tracdap.common.async.Futures;
 import org.finos.tracdap.common.data.IExecutionContext;
 import org.finos.tracdap.common.config.ConfigManager;
@@ -25,15 +25,16 @@ import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.plugin.PluginManager;
 import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.test.data.SampleData;
+import org.finos.tracdap.test.helpers.PlatformTest;
+import org.finos.tracdap.test.helpers.StorageTestHelpers;
 
 import com.google.protobuf.ByteString;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
+import org.apache.arrow.memory.RootAllocator;
 
-import org.finos.tracdap.test.helpers.PlatformTest;
-import org.finos.tracdap.test.helpers.StorageTestHelpers;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.extension.RegisterExtension;
@@ -89,7 +90,7 @@ abstract class DataOperationsTest {
 
         @BeforeEach
         void setup() {
-            execContext = new ExecutionContext(elg.next());
+            execContext = new DataContext(elg.next(), new RootAllocator());
             metaClient = platform.metaClientFuture();
             dataClient = platform.dataClient();
         }
@@ -117,7 +118,7 @@ abstract class DataOperationsTest {
 
         @BeforeEach
         void setup() {
-            execContext = new ExecutionContext(elg.next());
+            execContext = new DataContext(elg.next(), new RootAllocator());
             metaClient = platform.metaClientFuture();
             dataClient = platform.dataClient();
         }

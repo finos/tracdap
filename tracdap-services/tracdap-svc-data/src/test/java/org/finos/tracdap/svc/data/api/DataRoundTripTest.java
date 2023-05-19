@@ -16,9 +16,8 @@
 
 package org.finos.tracdap.svc.data.api;
 
-import org.apache.arrow.vector.ipc.ArrowFileWriter;
 import org.finos.tracdap.api.*;
-import org.finos.tracdap.common.data.ExecutionContext;
+import org.finos.tracdap.common.data.DataContext;
 import org.finos.tracdap.common.async.Flows;
 import org.finos.tracdap.common.data.IExecutionContext;
 import org.finos.tracdap.common.config.ConfigManager;
@@ -32,6 +31,7 @@ import org.finos.tracdap.test.helpers.PlatformTest;
 import com.google.common.collect.Streams;
 import com.google.protobuf.ByteString;
 import org.apache.arrow.memory.RootAllocator;
+import org.apache.arrow.vector.ipc.ArrowFileWriter;
 import org.apache.arrow.vector.ipc.ArrowStreamWriter;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
@@ -84,7 +84,7 @@ abstract class DataRoundTripTest {
 
         @BeforeEach
         void setup() {
-            execContext = new ExecutionContext(elg.next());
+            execContext = new DataContext(elg.next(), new RootAllocator());;
         }
     }
 
@@ -111,7 +111,7 @@ abstract class DataRoundTripTest {
 
         @BeforeEach
         void setup() {
-            execContext = new ExecutionContext(elg.next());
+            execContext = new DataContext(elg.next(), new RootAllocator());
         }
 
         @AfterAll

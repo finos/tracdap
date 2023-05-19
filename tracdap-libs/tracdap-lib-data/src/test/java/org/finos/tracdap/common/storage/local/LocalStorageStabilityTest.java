@@ -16,7 +16,6 @@
 
 package org.finos.tracdap.common.storage.local;
 
-import org.finos.tracdap.common.data.ExecutionContext;
 import org.finos.tracdap.common.data.DataContext;
 import org.finos.tracdap.common.storage.StorageStabilityTestSuite;
 import org.finos.tracdap.common.storage.IStorageManager;
