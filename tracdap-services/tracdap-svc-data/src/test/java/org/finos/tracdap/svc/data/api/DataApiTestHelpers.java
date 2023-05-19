@@ -73,7 +73,7 @@ class DataApiTestHelpers {
             BiConsumer<TReq, StreamObserver<TResp>> grpcMethod,
             TReq request, IExecutionContext execCtx){
 
-        var responseStream = Flows.<TResp>hub(execCtx);
+        var responseStream = Flows.<TResp>hub(execCtx.eventLoopExecutor());
 
         // Collect response messages into a list for direct inspection
         var collectList = Flows.fold(responseStream,
@@ -94,7 +94,7 @@ class DataApiTestHelpers {
         // Server streaming response uses ByteString for binary data
         // ByteString does not need an explicit release
 
-        var msgStream = Flows.<TResp>hub(execCtx);
+        var msgStream = Flows.<TResp>hub(execCtx.eventLoopExecutor());
         var discard = Flows.fold(msgStream, (acc, msg) -> acc, (Void) null);
 
         var grpcStream = GrpcTestStreams.clientResponseStream(msgStream);

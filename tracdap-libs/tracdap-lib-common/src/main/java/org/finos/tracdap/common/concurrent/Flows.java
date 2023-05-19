@@ -16,6 +16,7 @@
 
 package org.finos.tracdap.common.concurrent;
 
+import io.netty.util.concurrent.OrderedEventExecutor;
 import org.finos.tracdap.common.concurrent.flow.*;
 
 import java.util.*;
@@ -74,9 +75,9 @@ public class Flows {
     }
 
     public static <T>
-    Flow.Processor<T, T> hub(IExecutionContext execCtx) {
+    Flow.Processor<T, T> hub(OrderedEventExecutor executor) {
 
-        return new HubProcessor<>(execCtx.eventLoopExecutor());
+        return new HubProcessor<>(executor);
     }
 
     public static <T>

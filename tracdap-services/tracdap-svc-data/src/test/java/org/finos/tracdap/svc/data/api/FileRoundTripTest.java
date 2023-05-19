@@ -273,7 +273,7 @@ abstract class FileRoundTripTest  {
                 .setSelector(selectorFor(objHeader))
                 .build();
 
-        var readResponse = Flows.<FileReadResponse>hub(execContext);
+        var readResponse = Flows.<FileReadResponse>hub(execContext.eventLoopExecutor());
         var readResponse0 = Flows.first(readResponse);
         var readByteStream = Flows.map(readResponse, FileReadResponse::getContent);
         var readBytes = Flows.fold(readByteStream, ByteString::concat, ByteString.EMPTY);

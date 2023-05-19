@@ -253,7 +253,7 @@ abstract class DataRoundTripTest {
                     .setFormat(mimeType)
                     .build();
 
-            var readResponse = Flows.<DataReadResponse>hub(execContext);
+            var readResponse = Flows.<DataReadResponse>hub(execContext.eventLoopExecutor());
             var readResponse0 = Flows.first(readResponse);
             var readByteStream = Flows.map(readResponse, DataReadResponse::getContent);
             var readBytes = Flows.fold(readByteStream, ByteString::concat, ByteString.EMPTY);
@@ -314,7 +314,7 @@ abstract class DataRoundTripTest {
                 .setFormat(readFormat)
                 .build();
 
-        var readResponse = Flows.<DataReadResponse>hub(execContext);
+        var readResponse = Flows.<DataReadResponse>hub(execContext.eventLoopExecutor());
         var readResponse0 = Flows.first(readResponse);
         var readByteStream = Flows.map(readResponse, DataReadResponse::getContent);
         var readBytes = Flows.fold(readByteStream, ByteString::concat, ByteString.EMPTY);
