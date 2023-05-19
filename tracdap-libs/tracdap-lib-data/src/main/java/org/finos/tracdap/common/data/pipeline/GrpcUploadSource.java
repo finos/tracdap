@@ -46,6 +46,7 @@ public class GrpcUploadSource<TRequest, TResponse> {
     private final CompletableFuture<TRequest> firstMessage;
     private Flow.Subscriber<? super TRequest> subscriber;
     private Flow.Subscription subscription;
+    private Runnable cleanup;
 
     private boolean requestedFirst;
     private boolean sentFirst;
@@ -68,19 +69,37 @@ public class GrpcUploadSource<TRequest, TResponse> {
 
     // Setup
 
+    public void whenComplete(Runnable cleanup) {
+        this.cleanup = cleanup;
+    }
+
     public StreamObserver<TRequest> start() {
         response.request(1);
         return request;
     }
 
     public void succeeded(TResponse result) {
-        response.onNext(result);
-        response.onCompleted();
+
+        try {
+            response.onNext(result);
+            response.onCompleted();
+        }
+        finally {
+            if (cleanup != null)
+                cleanup.run();
+        }
     }
 
     public Void failed(Throwable error) {
-        response.onError(error);
-        return null;
+
+        try {
+            response.onError(error);
+            return null;
+        }
+        finally {
+            if (cleanup != null)
+                cleanup.run();
+        }
     }
 
     public CompletionStage<TRequest> firstMessage() {

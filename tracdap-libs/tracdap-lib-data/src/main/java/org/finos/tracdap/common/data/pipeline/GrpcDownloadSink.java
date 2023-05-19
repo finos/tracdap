@@ -56,6 +56,7 @@ public class GrpcDownloadSink<TResponse extends MessageLite, TBuilder extends Me
 
     private CompletableFuture<TBuilder> firstMessage;
     private Flow.Subscription subscription;
+    private Runnable cleanup;
 
     private long nRequested;
     private long nReceived;
@@ -83,6 +84,10 @@ public class GrpcDownloadSink<TResponse extends MessageLite, TBuilder extends Me
         }
     }
 
+    public void whenComplete(Runnable cleanup) {
+        this.cleanup = cleanup;
+    }
+
     public <TRequest extends MessageLite> CompletionStage<TRequest> start(TRequest request) {
 
         return CompletableFuture.completedFuture(request);
@@ -90,15 +95,24 @@ public class GrpcDownloadSink<TResponse extends MessageLite, TBuilder extends Me
 
     public Void failed(Throwable error) {
 
-        if (!streaming)
-            releaseAggregate();
+        try {
 
-        responseStream.onError(error);
+            if (!streaming)
+                releaseAggregate();
 
-        if (subscription != null)
-            subscription.cancel();
+            responseStream.onError(error);
 
-        return null;
+            if (subscription != null)
+                subscription.cancel();
+
+            return null;
+        }
+        finally {
+            if (cleanup != null) {
+                cleanup.run();
+                cleanup = null;
+            }
+        }
     }
 
     @SuppressWarnings("unused")
@@ -156,15 +170,24 @@ public class GrpcDownloadSink<TResponse extends MessageLite, TBuilder extends Me
 
     private Void firstMessageFailed(Throwable error) {
 
-        if (!streaming)
-            releaseAggregate();
+        try {
 
-        responseStream.onError(error);
+            if (!streaming)
+                releaseAggregate();
 
-        if (subscription != null)
-            subscription.cancel();
+            responseStream.onError(error);
 
-        return null;
+            if (subscription != null)
+                subscription.cancel();
+
+            return null;
+        }
+        finally {
+            if (cleanup != null) {
+                cleanup.run();
+                cleanup = null;
+            }
+        }
     }
 
     private void pipelineOnSubscribe(Flow.Subscription subscription) {
@@ -211,27 +234,45 @@ public class GrpcDownloadSink<TResponse extends MessageLite, TBuilder extends Me
     @SuppressWarnings("unchecked")
     private void pipelineOnComplete() {
 
-        if (!streaming) {
+        try {
 
-            var bufferBytes = Bytes.readFromBuffer(aggregateBuffer);
-            var protoBytes = UnsafeByteOperations.unsafeWrap(bufferBytes);
+            if (!streaming) {
 
-            dataFunc.apply(aggregateResponse, protoBytes);
+                var bufferBytes = Bytes.readFromBuffer(aggregateBuffer);
+                var protoBytes = UnsafeByteOperations.unsafeWrap(bufferBytes);
 
-            var protoMsg = (TResponse) aggregateResponse.build();
+                dataFunc.apply(aggregateResponse, protoBytes);
 
-            responseStream.onNext(protoMsg);
+                var protoMsg = (TResponse) aggregateResponse.build();
+
+                responseStream.onNext(protoMsg);
+            }
+
+            responseStream.onCompleted();
         }
-
-        responseStream.onCompleted();
+        finally {
+            if (cleanup != null) {
+                cleanup.run();
+                cleanup = null;
+            }
+        }
     }
 
     private void pipelineOnError(Throwable error) {
 
-        if (!streaming)
-            releaseAggregate();
+        try {
 
-        responseStream.onError(error);
+            if (!streaming)
+                releaseAggregate();
+
+            responseStream.onError(error);
+        }
+        finally {
+            if (cleanup != null) {
+                cleanup.run();
+                cleanup = null;
+            }
+        }
     }
 
     private void requestMore() {

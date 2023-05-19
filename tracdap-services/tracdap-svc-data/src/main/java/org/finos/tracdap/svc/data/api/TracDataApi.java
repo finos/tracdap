@@ -19,8 +19,10 @@ package org.finos.tracdap.svc.data.api;
 import org.finos.tracdap.api.*;
 import org.finos.tracdap.common.auth.internal.AuthHelpers;
 import org.finos.tracdap.common.data.DataContext;
+import org.finos.tracdap.common.data.IDataContext;
 import org.finos.tracdap.common.data.pipeline.GrpcDownloadSink;
 import org.finos.tracdap.common.data.pipeline.GrpcUploadSource;
+import org.finos.tracdap.common.util.LoggingHelpers;
 import org.finos.tracdap.common.validation.Validator;
 import org.finos.tracdap.metadata.FileDefinition;
 import org.finos.tracdap.metadata.SchemaDefinition;
@@ -33,6 +35,8 @@ import com.google.protobuf.Message;
 import io.grpc.MethodDescriptor;
 import io.grpc.stub.StreamObserver;
 import org.apache.arrow.memory.BufferAllocator;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -57,6 +61,8 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
     private static final MethodDescriptor<FileWriteRequest, TagHeader> CREATE_SMALL_FILE_METHOD = TracDataApiGrpc.getCreateSmallFileMethod();
     private static final MethodDescriptor<FileWriteRequest, TagHeader> UPDATE_SMALL_FILE_METHOD = TracDataApiGrpc.getUpdateSmallFileMethod();
     private static final MethodDescriptor<FileReadRequest, FileReadResponse> READ_SMALL_FILE_METHOD = TracDataApiGrpc.getReadSmallFileMethod();
+
+    private final Logger log = LoggerFactory.getLogger(getClass());
 
     private final DataService dataRwService;
     private final FileService fileService;
@@ -98,6 +104,8 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
         var userInfo = AuthHelpers.currentUser();
 
         var upload = new GrpcUploadSource<>(DataWriteRequest.class, responseObserver);
+        upload.whenComplete(() -> closeDataContext(dataContext));
+
         var firstMessage = upload.firstMessage();
         var dataStream = upload.dataStream(DataWriteRequest::getContent, dataContext.arrowAllocator());
 
@@ -128,6 +136,8 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
         var userInfo = AuthHelpers.currentUser();
 
         var upload = new GrpcUploadSource<>(DataWriteRequest.class, responseObserver);
+        upload.whenComplete(() -> closeDataContext(dataContext));
+
         var firstMessage = upload.firstMessage();
         var dataStream = upload.dataStream(DataWriteRequest::getContent, dataContext.arrowAllocator());
 
@@ -172,6 +182,8 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
         var userInfo = AuthHelpers.currentUser();
 
         var download = new GrpcDownloadSink<>(responseObserver, DataReadResponse::newBuilder, streamingMode);
+        download.whenComplete(() -> closeDataContext(dataContext));
+
         var firstMessage = download.firstMessage(DataReadResponse.Builder::setSchema, SchemaDefinition.class);
         var dataStream = download.dataStream(DataReadResponse.Builder::setContent);
 
@@ -188,6 +200,8 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
         var userInfo = AuthHelpers.currentUser();
 
         var upload = new GrpcUploadSource<>(FileWriteRequest.class, responseObserver);
+        upload.whenComplete(() -> closeDataContext(dataContext));
+
         var firstMessage = upload.firstMessage();
         var dataStream = upload.dataStream(FileWriteRequest::getContent, dataContext.arrowAllocator());
 
@@ -224,6 +238,8 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
         var userInfo = AuthHelpers.currentUser();
 
         var upload = new GrpcUploadSource<>(FileWriteRequest.class, responseObserver);
+        upload.whenComplete(() -> closeDataContext(dataContext));
+
         var firstMessage = upload.firstMessage();
         var dataStream = upload.dataStream(FileWriteRequest::getContent, dataContext.arrowAllocator());
 
@@ -275,6 +291,8 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
         var dataContext = prepareDataContext();
         var userInfo = AuthHelpers.currentUser();
 
+        download.whenComplete(() -> closeDataContext(dataContext));
+
         var firstMessage = download.firstMessage(FileReadResponse.Builder::setFileDefinition, FileDefinition.class);
         var dataStream = download.dataStream(FileReadResponse.Builder::setContent);
 
@@ -305,7 +323,39 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
         var eventLoop = eventLoops.currentEventLoop(false);
         var allocator = rootAllocator.newChildAllocator(requestId, reqInitAllocation, reqMaxAllocation);
 
+        log.info("OPEN data context for [{}]", requestId);
+
         return new DataContext(eventLoop, allocator);
+    }
+
+    private void closeDataContext(IDataContext dataContext) {
+
+        // this method is normally triggered by the last onComplete or onError event in the pipeline
+        // However there can be clean-up that still needs to execute, often in finally blocks
+        // Posting back to the event loop lets clean-up complete before the context is closed
+
+        var eventLoop = dataContext.eventLoopExecutor();
+        eventLoop.submit(() -> closeDataContextLater(dataContext));
+    }
+
+    private void closeDataContextLater(IDataContext dataContext) {
+
+        try (var allocator = dataContext.arrowAllocator()) {
+
+            var peak = allocator.getPeakMemoryAllocation();
+            var retained = allocator.getAllocatedMemory();
+
+            if (retained == 0)
+                log.info("CLOSE data context for [{}], peak = [{}], retained = [{}]",
+                        allocator.getName(),
+                        LoggingHelpers.formatFileSize(peak),
+                        LoggingHelpers.formatFileSize(retained));
+            else
+                log.warn("CLOSE data context for [{}], peak = [{}], retained = [{}] (memory leak)",
+                        allocator.getName(),
+                        LoggingHelpers.formatFileSize(peak),
+                        LoggingHelpers.formatFileSize(retained));
+        }
     }
 
     private <TReq extends Message>
