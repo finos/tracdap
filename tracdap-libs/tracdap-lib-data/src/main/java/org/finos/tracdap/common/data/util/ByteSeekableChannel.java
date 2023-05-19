@@ -109,24 +109,39 @@ public class ByteSeekableChannel implements SeekableByteChannel {
         if (position >= size)
             return -1;
 
-        var offset = offsets.get(index);
-        var chunk = chunks.get(index);
-        var chunkOffset = position - offset;
+        int bytesRead = 0;
 
-        var boundary = index + 1 < offsets.size() ? offsets.get(index + 1) : size;
-        var nBytes = (int) Math.min(chunk.readableBytes() - chunkOffset, Integer.MAX_VALUE);
+        while (dst.remaining() > 0 && position < size) {
 
-        if (nBytes < dst.remaining())
-            dst.limit(dst.position() + nBytes);
+            var chunk = chunks.get(index);
+            var offset = offsets.get(index);
+            var nextOffset = index + 1 < offsets.size() ? offsets.get(index + 1) : size;
 
-        chunk.getBytes(chunk.readerIndex() + chunkOffset, dst);
+            var start = position - offset;
+            int nBytes;
 
-        position += nBytes;
+            // ArrowBuf can only read directly to byte buffer if all the requested bytes are available
+            // If the read spans multiple buffers in the list,
+            // then create a window (ByteBuffer) and read from there instead
 
-        if (position >= boundary)
-            index += 1;
+            if (dst.remaining() <= chunk.writerIndex() - start) {
+                nBytes = dst.remaining();
+                chunk.getBytes(start, dst);
+            }
+            else {
+                nBytes = (int) (nextOffset - start);
+                var window = chunk.nioBuffer(start, nBytes);
+                dst.put(window);
+            }
 
-        return nBytes;
+            position += nBytes;
+            bytesRead += nBytes;
+
+            if (position >= nextOffset)
+                updateIndex(index + 1, offsets.size());
+        }
+
+        return bytesRead;
     }
 
     @Override
@@ -163,9 +178,9 @@ public class ByteSeekableChannel implements SeekableByteChannel {
         for (var i = min; i < max; i++) {
 
             var offset = offsets.get(i);
-            var boundary = i + 1 < offsets.size() ? offsets.get(i + 1) : size;
+            var nextOffset = i + 1 < offsets.size() ? offsets.get(i + 1) : size;
 
-            if (offset <= position && position < boundary) {
+            if (offset <= position && position < nextOffset) {
                 index = i;
                 return;
             }
