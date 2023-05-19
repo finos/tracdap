@@ -45,7 +45,7 @@ public class LocalStorageStabilityTest extends StorageStabilityTestSuite {
         storageProps.put(LocalFileStorage.CONFIG_ROOT_PATH, storageDir.toString());
         storage = new LocalFileStorage("TEST_STORAGE", storageProps);
 
-        execContext = new ExecutionContext(new DefaultEventExecutor(new DefaultThreadFactory("t-events")));
-        dataContext = new DataContext(execContext.eventLoopExecutor(), new RootAllocator());
+        var executor = new DefaultEventExecutor(new DefaultThreadFactory("t-events"));
+        dataContext = new DataContext(executor, new RootAllocator());
     }
 }

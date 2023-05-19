@@ -16,7 +16,6 @@
 
 package org.finos.tracdap.common.storage;
 
-import org.finos.tracdap.common.data.IExecutionContext;
 import org.finos.tracdap.common.data.IDataContext;
 
 import org.junit.jupiter.api.*;
@@ -40,7 +39,6 @@ public abstract class StorageStabilityTestSuite {
      */
 
     protected static IFileStorage storage;
-    protected static IExecutionContext execContext;
     protected static IDataContext dataContext;
 
 
