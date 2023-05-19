@@ -19,7 +19,7 @@ package org.finos.tracdap.svc.data.service;
 import org.finos.tracdap.api.*;
 import org.finos.tracdap.common.auth.internal.UserInfo;
 import org.finos.tracdap.common.auth.internal.InternalAuthProvider;
-import org.finos.tracdap.common.concurrent.Futures;
+import org.finos.tracdap.common.async.Futures;
 import org.finos.tracdap.common.data.ArrowSchema;
 import org.finos.tracdap.common.data.DataPipeline;
 import org.finos.tracdap.common.exception.EMetadataDuplicate;

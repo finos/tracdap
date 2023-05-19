@@ -16,7 +16,7 @@
 
 package org.finos.tracdap.plugins.aws.storage;
 
-import org.finos.tracdap.common.concurrent.Flows;
+import org.finos.tracdap.common.async.Flows;
 import org.finos.tracdap.common.data.IExecutionContext;
 import org.finos.tracdap.common.data.IDataContext;
 import org.finos.tracdap.common.exception.EStartup;

@@ -20,7 +20,7 @@ package org.finos.tracdap.svc.data.service;
 import org.finos.tracdap.api.TrustedMetadataApiGrpc.TrustedMetadataApiFutureStub;
 import org.finos.tracdap.common.auth.internal.UserInfo;
 import org.finos.tracdap.common.auth.internal.InternalAuthProvider;
-import org.finos.tracdap.common.concurrent.Futures;
+import org.finos.tracdap.common.async.Futures;
 import org.finos.tracdap.common.data.IDataContext;
 import org.finos.tracdap.common.exception.EMetadataDuplicate;
 import org.finos.tracdap.common.metadata.MetadataUtil;

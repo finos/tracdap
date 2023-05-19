@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Accenture Global Solutions Limited
+ * Copyright 2023 Accenture Global Solutions Limited
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,27 +14,27 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.concurrent.flow;
+package org.finos.tracdap.common.async.flow;
 
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Flow;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 
-public class DelayedSubscriber<T> implements Flow.Subscriber<T> {
+public class DelayedPublisher<T> implements Flow.Publisher<T> {
 
-    private final Flow.Subscriber<T> subscriber;
+    private final Flow.Publisher<T> publisher;
     private final CompletionStage<?> signal;
     private final AtomicBoolean subscribed;
 
-    public DelayedSubscriber(Flow.Subscriber<T> subscriber, CompletionStage<?> signal) {
-        this.subscriber = subscriber;
+    public DelayedPublisher(Flow.Publisher<T> publisher, CompletionStage<?> signal) {
+        this.publisher = publisher;
         this.signal = signal;
         this.subscribed = new AtomicBoolean(false);
     }
 
     @Override
-    public void onSubscribe(Flow.Subscription subscription) {
+    public void subscribe(Flow.Subscriber<? super T> subscriber) {
 
         var firstSubscription = subscribed.compareAndSet(false, true);
 
@@ -44,27 +44,25 @@ public class DelayedSubscriber<T> implements Flow.Subscriber<T> {
         signal.whenComplete((result, error) -> {
 
             if (error == null)
-                subscriber.onSubscribe(subscription);
+                publisher.subscribe(subscriber);
 
             else {
-                subscription.cancel();
+                subscriber.onSubscribe(new FailedSignalSubscription());
                 subscriber.onError(error);
             }
         });
     }
 
-    @Override
-    public void onNext(T item) {
-        subscriber.onNext(item);
-    }
+    private static class FailedSignalSubscription implements Flow.Subscription  {
 
-    @Override
-    public void onError(Throwable throwable) {
-        subscriber.onError(throwable);
-    }
+        @Override
+        public void request(long n) {
 
-    @Override
-    public void onComplete() {
-        subscriber.onComplete();
+        }
+
+        @Override
+        public void cancel() {
+
+        }
     }
 }

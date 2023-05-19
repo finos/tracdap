@@ -18,8 +18,8 @@ package org.finos.tracdap.svc.data.api;
 
 import org.finos.tracdap.api.*;
 import org.finos.tracdap.common.data.ExecutionContext;
-import org.finos.tracdap.common.concurrent.Flows;
-import org.finos.tracdap.common.concurrent.Futures;
+import org.finos.tracdap.common.async.Flows;
+import org.finos.tracdap.common.async.Futures;
 import org.finos.tracdap.common.data.IExecutionContext;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.plugin.PluginManager;

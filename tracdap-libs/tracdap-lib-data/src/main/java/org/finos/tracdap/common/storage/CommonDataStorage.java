@@ -19,7 +19,7 @@ package org.finos.tracdap.common.storage;
 import io.netty.channel.EventLoopGroup;
 import org.finos.tracdap.common.codec.ICodec;
 import org.finos.tracdap.common.codec.ICodecManager;
-import org.finos.tracdap.common.concurrent.Flows;
+import org.finos.tracdap.common.async.Flows;
 import org.finos.tracdap.common.data.DataPipeline;
 import org.finos.tracdap.common.data.IDataContext;
 import org.finos.tracdap.common.data.pipeline.RangeSelector;

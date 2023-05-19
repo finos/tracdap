@@ -16,7 +16,7 @@
 
 package org.finos.tracdap.test.storage;
 
-import org.finos.tracdap.common.concurrent.Flows;
+import org.finos.tracdap.common.async.Flows;
 import org.finos.tracdap.common.data.IDataContext;
 import org.finos.tracdap.common.storage.IFileStorage;
 

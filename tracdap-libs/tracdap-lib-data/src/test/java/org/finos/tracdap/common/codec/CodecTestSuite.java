@@ -21,7 +21,7 @@ import org.finos.tracdap.common.data.ArrowSchema;
 import org.finos.tracdap.common.codec.arrow.ArrowStreamCodec;
 import org.finos.tracdap.common.codec.csv.CsvCodec;
 import org.finos.tracdap.common.codec.json.JsonCodec;
-import org.finos.tracdap.common.concurrent.Flows;
+import org.finos.tracdap.common.async.Flows;
 import org.finos.tracdap.common.data.DataContext;
 import org.finos.tracdap.common.data.DataPipeline;
 import org.finos.tracdap.common.data.util.Bytes;

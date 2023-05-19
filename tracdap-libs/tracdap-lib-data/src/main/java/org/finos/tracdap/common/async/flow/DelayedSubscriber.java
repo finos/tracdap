@@ -14,27 +14,27 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.concurrent.flow;
+package org.finos.tracdap.common.async.flow;
 
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Flow;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 
-public class DelayedPublisher<T> implements Flow.Publisher<T> {
+public class DelayedSubscriber<T> implements Flow.Subscriber<T> {
 
-    private final Flow.Publisher<T> publisher;
+    private final Flow.Subscriber<T> subscriber;
     private final CompletionStage<?> signal;
     private final AtomicBoolean subscribed;
 
-    public DelayedPublisher(Flow.Publisher<T> publisher, CompletionStage<?> signal) {
-        this.publisher = publisher;
+    public DelayedSubscriber(Flow.Subscriber<T> subscriber, CompletionStage<?> signal) {
+        this.subscriber = subscriber;
         this.signal = signal;
         this.subscribed = new AtomicBoolean(false);
     }
 
     @Override
-    public void subscribe(Flow.Subscriber<? super T> subscriber) {
+    public void onSubscribe(Flow.Subscription subscription) {
 
         var firstSubscription = subscribed.compareAndSet(false, true);
 
@@ -44,25 +44,27 @@ public class DelayedPublisher<T> implements Flow.Publisher<T> {
         signal.whenComplete((result, error) -> {
 
             if (error == null)
-                publisher.subscribe(subscriber);
+                subscriber.onSubscribe(subscription);
 
             else {
-                subscriber.onSubscribe(new FailedSignalSubscription());
+                subscription.cancel();
                 subscriber.onError(error);
             }
         });
     }
 
-    private static class FailedSignalSubscription implements Flow.Subscription  {
+    @Override
+    public void onNext(T item) {
+        subscriber.onNext(item);
+    }
 
-        @Override
-        public void request(long n) {
+    @Override
+    public void onError(Throwable throwable) {
+        subscriber.onError(throwable);
+    }
 
-        }
-
-        @Override
-        public void cancel() {
-
-        }
+    @Override
+    public void onComplete() {
+        subscriber.onComplete();
     }
 }
