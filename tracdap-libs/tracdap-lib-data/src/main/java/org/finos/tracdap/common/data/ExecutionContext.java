@@ -19,7 +19,10 @@ package org.finos.tracdap.common.data;
 import io.netty.util.concurrent.OrderedEventExecutor;
 
 
+@Deprecated
 public class ExecutionContext implements IExecutionContext {
+
+    // TODO: Only IDataContext is needed
 
     private final OrderedEventExecutor eventLoopExecutor;
 
