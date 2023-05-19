@@ -90,8 +90,7 @@ public class S3StorageOperationsTest extends StorageOperationsTestSuite {
         storage = new S3ObjectStorage("TEST_" + testNumber, storageProps);
         storage.start(elg);
 
-        execContext = new ExecutionContext(elg.next());
-        dataContext = new DataContext(execContext.eventLoopExecutor(), allocator);
+        dataContext = new DataContext(elg.next(), allocator);
     }
 
     @AfterEach

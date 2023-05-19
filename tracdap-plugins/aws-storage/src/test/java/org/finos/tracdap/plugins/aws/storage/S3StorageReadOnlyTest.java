@@ -101,8 +101,7 @@ public class S3StorageReadOnlyTest extends StorageReadOnlyTestSuite {
         roStorage = new S3ObjectStorage("TEST_" + testNumber + "_RO", roProps);
         roStorage.start(elg);
 
-        execContext = new ExecutionContext(elg.next());
-        dataContext = new DataContext(execContext.eventLoopExecutor(), allocator);
+        dataContext = new DataContext(elg.next(), allocator);
     }
 
     @AfterEach
