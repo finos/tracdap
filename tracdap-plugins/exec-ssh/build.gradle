@@ -39,6 +39,11 @@ dependencies {
     implementation group: "org.apache.sshd", name: "sshd-scp", version: "${apache_sshd_version}"
     implementation group: "org.apache.sshd", name: "sshd-netty", version: "${apache_sshd_version}"
 
+    // Force Netty version to match the core framework
+    implementation group: 'io.netty', name: 'netty-common', version: "$netty_version"
+    implementation group: 'io.netty', name: 'netty-transport', version: "$netty_version"
+    implementation group: 'io.netty', name: 'netty-handler', version: "$netty_version"
+
     // Force version of SLF4J to match other components
     implementation group: 'org.slf4j', name: 'slf4j-api', version: "${slf4j_version}"
     implementation group: 'org.slf4j', name: 'jcl-over-slf4j', version: "${slf4j_version}"
