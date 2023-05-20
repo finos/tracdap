@@ -23,6 +23,7 @@ import org.finos.tracdap.common.data.IDataContext;
 import org.finos.tracdap.common.exception.ETrac;
 
 import org.apache.arrow.memory.ArrowBuf;
+import org.finos.tracdap.common.util.LoggingHelpers;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -406,8 +407,26 @@ public abstract class CommonFileStorage implements IFileStorage {
             return true;
         });
 
+        var fsSignal = new CompletableFuture<Long>();
+
+        fsSignal.whenComplete((size, error) -> {
+
+            // todo: check this
+
+            if (error != null) {
+                log.error(error.getMessage());
+                log.info("close read stream");
+                signal.completeExceptionally(error);
+            }
+            else {
+                log.info("Write operation complete: file size = [{}]", LoggingHelpers.formatFileSize(size));
+                log.info("close read stream");
+                signal.complete(size);
+            }
+        });
+
         // Create the output stream - it will not activate until it is subscribed to a source
-        var outputStream = fsOpenOutputStream(objectKey, fromContext(ctx, signal), ctx);
+        var outputStream = fsOpenOutputStream(objectKey, fromContext(ctx, fsSignal), ctx);
 
         // Return a delayed subscriber, that waits for the prepare step to finish before starting
         return Flows.waitForSignal(outputStream, toContext(ctx, prepare));
