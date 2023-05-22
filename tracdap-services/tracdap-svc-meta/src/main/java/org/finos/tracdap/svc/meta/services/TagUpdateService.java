@@ -17,7 +17,6 @@
 package org.finos.tracdap.svc.meta.services;
 
 import org.finos.tracdap.common.exception.EMetadataBadUpdate;
-import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.exception.EValidationGap;
 import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.common.metadata.TypeSystem;
@@ -30,7 +29,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.function.BiFunction;
-import java.util.function.BinaryOperator;
 
 import static org.finos.tracdap.common.metadata.MetadataConstants.TRAC_RESERVED_IDENTIFIER;
 
@@ -61,16 +59,12 @@ public class TagUpdateService {
 
     public static Tag applyTagUpdates(Tag priorTag, List<TagUpdate> updates) {
 
-        // Combiner should never be called when reducing sequential operations
-        BinaryOperator<Tag.Builder> SEQUENTIAL_COMBINATION =
-                (t1, t2) -> { throw new EUnexpected(); };
+        var builder = priorTag.toBuilder();
 
-        var newTag = updates.stream().reduce(
-                priorTag.toBuilder(),
-                TagUpdateService::applyTagUpdate,
-                SEQUENTIAL_COMBINATION);
+        for (var update : updates)
+            builder = applyTagUpdate(builder, update);
 
-        return newTag.build();
+        return builder.build();
     }
 
     private static Tag.Builder applyTagUpdate(Tag.Builder prior, TagUpdate update) {
