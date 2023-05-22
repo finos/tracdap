@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Accenture Global Solutions Limited
+ * Copyright 2023 Accenture Global Solutions Limited
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,9 +14,10 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.concurrent;
+package org.finos.tracdap.common.async;
 
-import org.finos.tracdap.common.concurrent.flow.*;
+import io.netty.util.concurrent.OrderedEventExecutor;
+import org.finos.tracdap.common.async.flow.*;
 
 import java.util.*;
 import java.util.concurrent.*;
@@ -74,9 +75,9 @@ public class Flows {
     }
 
     public static <T>
-    Flow.Processor<T, T> hub(IExecutionContext execCtx) {
+    Flow.Processor<T, T> hub(OrderedEventExecutor executor) {
 
-        return new HubProcessor<>(execCtx.eventLoopExecutor());
+        return new HubProcessor<>(executor);
     }
 
     public static <T>

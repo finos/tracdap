@@ -16,6 +16,7 @@
 
 package org.finos.tracdap.common.codec.arrow;
 
+import org.apache.arrow.memory.BufferAllocator;
 import org.finos.tracdap.common.data.util.ByteOutputChannel;
 
 import org.apache.arrow.vector.VectorSchemaRoot;
@@ -25,15 +26,13 @@ import org.apache.arrow.vector.ipc.ArrowWriter;
 
 public class ArrowFileEncoder extends ArrowEncoder {
 
-    public ArrowFileEncoder() {
-
-        super();
+    public ArrowFileEncoder(BufferAllocator allocator) {
+        super(allocator);
     }
 
     @Override
-    protected ArrowWriter createWriter(VectorSchemaRoot root) {
-
-        var out = new ByteOutputChannel(bb -> consumer().onNext(bb));
+    protected ArrowWriter createWriter(VectorSchemaRoot root, BufferAllocator allocator) {
+        var out = new ByteOutputChannel(allocator, consumer()::onNext);
         return new ArrowFileWriter(root, /* dictionary provider = */ null, out);
     }
 }

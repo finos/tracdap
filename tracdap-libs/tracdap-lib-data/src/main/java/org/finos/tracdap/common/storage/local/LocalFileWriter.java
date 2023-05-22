@@ -18,9 +18,10 @@ package org.finos.tracdap.common.storage.local;
 
 import org.finos.tracdap.common.exception.ETracInternal;
 import org.finos.tracdap.common.exception.EUnexpected;
-import io.netty.buffer.ByteBuf;
-import io.netty.util.concurrent.OrderedEventExecutor;
 import org.finos.tracdap.common.storage.StorageErrors;
+
+import io.netty.util.concurrent.OrderedEventExecutor;
+import org.apache.arrow.memory.ArrowBuf;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -37,7 +38,7 @@ import static org.finos.tracdap.common.storage.local.LocalFileStorage.WRITE_OPER
 import static java.nio.file.StandardOpenOption.*;
 
 
-public class LocalFileWriter implements Flow.Subscriber<ByteBuf> {
+public class LocalFileWriter implements Flow.Subscriber<ArrowBuf> {
 
     private static final int CHUNK_BUFFER_CAPACITY = 32;
     private static final int CHUNK_BUFFER_MIN_REQUESTS = 8;
@@ -55,7 +56,7 @@ public class LocalFileWriter implements Flow.Subscriber<ByteBuf> {
     private AsynchronousFileChannel channel;
     private ChunkWriteHandler writeHandler;
 
-    private final Queue<ByteBuf> chunkBuffer;
+    private final Queue<ArrowBuf> chunkBuffer;
     private int chunksRequested;
     private boolean chunkInProgress;
     private long bytesReceived;
@@ -125,7 +126,7 @@ public class LocalFileWriter implements Flow.Subscriber<ByteBuf> {
     }
 
     @Override
-    public void onNext(ByteBuf chunk) {
+    public void onNext(ArrowBuf chunk) {
 
         // Avoid concurrency issues - ensure all calls are processed in the ordered event loop
         executor.submit(() -> this.doNext(chunk));
@@ -203,7 +204,7 @@ public class LocalFileWriter implements Flow.Subscriber<ByteBuf> {
         }
     }
 
-    private void doNext(ByteBuf chunk) {
+    private void doNext(ArrowBuf chunk) {
 
         // Do not accept the onNext message if the operation is already finished for any reason
 
@@ -251,7 +252,7 @@ public class LocalFileWriter implements Flow.Subscriber<ByteBuf> {
 
     private void writeNextChunk() {
 
-        ByteBuf chunk = null;
+        ArrowBuf chunk = null;
 
         try {
 
@@ -268,9 +269,6 @@ public class LocalFileWriter implements Flow.Subscriber<ByteBuf> {
             var offset = bytesReceived;
             bytesReceived += chunk.readableBytes();
 
-            if (chunk.nioBufferCount() < 1)
-                throw new EUnexpected();
-
             var nioChunk = chunk.nioBuffer();
 
             channel.write(nioChunk, offset, chunk, writeHandler);
@@ -285,7 +283,7 @@ public class LocalFileWriter implements Flow.Subscriber<ByteBuf> {
         }
     }
 
-    public void writeChunkComplete(Integer nBytes, ByteBuf chunk) {
+    public void writeChunkComplete(Integer nBytes, ArrowBuf chunk) {
 
         // Update counts
         bytesWritten += nBytes;
@@ -332,7 +330,7 @@ public class LocalFileWriter implements Flow.Subscriber<ByteBuf> {
         }
     }
 
-    public void writeChunkFailed(Throwable error, ByteBuf chunk) {
+    public void writeChunkFailed(Throwable error, ArrowBuf chunk) {
 
         // Update counts
         chunkInProgress = false;
@@ -363,8 +361,6 @@ public class LocalFileWriter implements Flow.Subscriber<ByteBuf> {
     private void handleComplete() {
 
         try {
-
-            log.info("Write operation complete: {} bytes written [{}]", bytesWritten, absolutePath);
 
             channel.close();
 
@@ -430,24 +426,24 @@ public class LocalFileWriter implements Flow.Subscriber<ByteBuf> {
             return new CompletionException(error.getMessage(), error);
     }
 
-    private void releaseBuffer(ByteBuf buffer) {
+    private void releaseBuffer(ArrowBuf buffer) {
 
-        var releaseOk = buffer.release();
+        buffer.close();
 
-        if (!releaseOk && buffer.capacity() > 0)
+        if (buffer.refCnt() != 0  && buffer.capacity() > 0)
             log.warn("Chunk buffer was not released (this could indicate a memory leak)");
     }
 
-    private class ChunkWriteHandler implements CompletionHandler<Integer, ByteBuf> {
+    private class ChunkWriteHandler implements CompletionHandler<Integer, ArrowBuf> {
 
         @Override
-        public void completed(Integer nBytes, ByteBuf chunk) {
+        public void completed(Integer nBytes, ArrowBuf chunk) {
 
             writeChunkComplete(nBytes, chunk);
         }
 
         @Override
-        public void failed(Throwable error, ByteBuf chunk) {
+        public void failed(Throwable error, ArrowBuf chunk) {
 
             writeChunkFailed(error, chunk);
         }

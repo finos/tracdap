@@ -18,23 +18,33 @@ package org.finos.tracdap.svc.data.api;
 
 import org.finos.tracdap.api.*;
 import org.finos.tracdap.common.auth.internal.AuthHelpers;
-import org.finos.tracdap.common.concurrent.ExecutionContext;
+import org.finos.tracdap.common.data.DataContext;
+import org.finos.tracdap.common.data.IDataContext;
 import org.finos.tracdap.common.data.pipeline.GrpcDownloadSink;
 import org.finos.tracdap.common.data.pipeline.GrpcUploadSource;
-import org.finos.tracdap.common.data.util.Bytes;
+import org.finos.tracdap.common.util.LoggingHelpers;
 import org.finos.tracdap.common.validation.Validator;
 import org.finos.tracdap.metadata.FileDefinition;
 import org.finos.tracdap.metadata.SchemaDefinition;
 import org.finos.tracdap.metadata.TagHeader;
+import org.finos.tracdap.svc.data.EventLoopRegister;
 import org.finos.tracdap.svc.data.service.DataService;
 import org.finos.tracdap.svc.data.service.FileService;
 
 import com.google.protobuf.Message;
 import io.grpc.MethodDescriptor;
 import io.grpc.stub.StreamObserver;
+import org.apache.arrow.memory.BufferAllocator;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.concurrent.atomic.AtomicLong;
 
 
 public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
+
+    private static final long DEFAULT_INITIAL_ALLOCATION = 16 * 1024 * 1024;
+    private static final long DEFAULT_MAX_ALLOCATION = 128 * 1024 * 1024;
 
     private static final MethodDescriptor<DataWriteRequest, TagHeader> CREATE_DATASET_METHOD = TracDataApiGrpc.getCreateDatasetMethod();
     private static final MethodDescriptor<DataWriteRequest, TagHeader> UPDATE_DATASET_METHOD = TracDataApiGrpc.getUpdateDatasetMethod();
@@ -52,16 +62,34 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
     private static final MethodDescriptor<FileWriteRequest, TagHeader> UPDATE_SMALL_FILE_METHOD = TracDataApiGrpc.getUpdateSmallFileMethod();
     private static final MethodDescriptor<FileReadRequest, FileReadResponse> READ_SMALL_FILE_METHOD = TracDataApiGrpc.getReadSmallFileMethod();
 
+    private final Logger log = LoggerFactory.getLogger(getClass());
+
     private final DataService dataRwService;
     private final FileService fileService;
     private final Validator validator;
 
+    private final EventLoopRegister eventLoops;
+    private final BufferAllocator rootAllocator;
 
-    public TracDataApi(DataService dataRwService, FileService fileService) {
+    private final AtomicLong nextReqId;
+    private final long reqInitAllocation;
+    private final long reqMaxAllocation;
+
+
+    public TracDataApi(
+            DataService dataRwService, FileService fileService,
+            EventLoopRegister eventLoops, BufferAllocator allocator) {
 
         this.dataRwService = dataRwService;
         this.fileService = fileService;
+        this.eventLoops = eventLoops;
+        this.rootAllocator = allocator;
+
         this.validator = new Validator();
+
+        this.nextReqId = new AtomicLong();
+        this.reqInitAllocation = DEFAULT_INITIAL_ALLOCATION;
+        this.reqMaxAllocation = DEFAULT_MAX_ALLOCATION;
     }
 
 
@@ -72,17 +100,18 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
     @Override
     public StreamObserver<DataWriteRequest> createDataset(StreamObserver<TagHeader> responseObserver) {
 
-        var upload = new GrpcUploadSource<>(DataWriteRequest.class, responseObserver);
-
-        var execCtx = ExecutionContext.EXEC_CONTEXT_KEY.get();
+        var dataContext = prepareDataContext();
         var userInfo = AuthHelpers.currentUser();
 
+        var upload = new GrpcUploadSource<>(DataWriteRequest.class, responseObserver);
+        upload.whenComplete(() -> closeDataContext(dataContext));
+
         var firstMessage = upload.firstMessage();
-        var dataStream = upload.dataStream(msg -> Bytes.fromProtoBytes(msg.getContent()));
+        var dataStream = upload.dataStream(DataWriteRequest::getContent, dataContext.arrowAllocator());
 
         firstMessage
                 .thenApply(req -> validateRequest(CREATE_DATASET_METHOD, req))
-                .thenCompose(req -> dataRwService.createDataset(req, dataStream, execCtx, userInfo))
+                .thenCompose(req -> dataRwService.createDataset(req, dataStream, dataContext, userInfo))
                 .thenAccept(upload::succeeded)
                 .exceptionally(upload::failed);
 
@@ -103,17 +132,18 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
     @Override
     public StreamObserver<DataWriteRequest> updateDataset(StreamObserver<TagHeader> responseObserver) {
 
-        var upload = new GrpcUploadSource<>(DataWriteRequest.class, responseObserver);
-
-        var execCtx = ExecutionContext.EXEC_CONTEXT_KEY.get();
+        var dataContext = prepareDataContext();
         var userInfo = AuthHelpers.currentUser();
 
+        var upload = new GrpcUploadSource<>(DataWriteRequest.class, responseObserver);
+        upload.whenComplete(() -> closeDataContext(dataContext));
+
         var firstMessage = upload.firstMessage();
-        var dataStream = upload.dataStream(msg -> Bytes.fromProtoBytes(msg.getContent()));
+        var dataStream = upload.dataStream(DataWriteRequest::getContent, dataContext.arrowAllocator());
 
         firstMessage
                 .thenApply(req -> validateRequest(UPDATE_DATASET_METHOD, req))
-                .thenCompose(req -> dataRwService.updateDataset(req, dataStream, execCtx, userInfo))
+                .thenCompose(req -> dataRwService.updateDataset(req, dataStream, dataContext, userInfo))
                 .thenAccept(upload::succeeded)
                 .exceptionally(upload::failed);
 
@@ -134,43 +164,46 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
     @Override
     public void readDataset(DataReadRequest request, StreamObserver<DataReadResponse> responseObserver) {
 
-        var download = new GrpcDownloadSink<>(responseObserver, DataReadResponse::newBuilder, GrpcDownloadSink.STREAMING);
-        readDataset(READ_DATASET_METHOD, request, download);
+        readDataset(READ_DATASET_METHOD, request, responseObserver, GrpcDownloadSink.STREAMING);
     }
 
     @Override
     public void readSmallDataset(DataReadRequest request, StreamObserver<DataReadResponse> responseObserver) {
 
-        var download = new GrpcDownloadSink<>(responseObserver, DataReadResponse::newBuilder, GrpcDownloadSink.AGGREGATED);
-        readDataset(READ_SMALL_DATASET_METHOD, request, download);
+        readDataset(READ_SMALL_DATASET_METHOD, request, responseObserver, GrpcDownloadSink.AGGREGATED);
     }
 
     private void readDataset(
-            MethodDescriptor<DataReadRequest, DataReadResponse> method, DataReadRequest request,
-            GrpcDownloadSink<DataReadResponse, DataReadResponse.Builder> download) {
+            MethodDescriptor<DataReadRequest, DataReadResponse> method,
+            DataReadRequest request, StreamObserver<DataReadResponse> responseObserver,
+            boolean streamingMode) {
 
-        var execCtx = ExecutionContext.EXEC_CONTEXT_KEY.get();
+        var dataContext = prepareDataContext();
         var userInfo = AuthHelpers.currentUser();
 
-        var firstMessage = download.<SchemaDefinition>firstMessage(DataReadResponse.Builder::setSchema);
-        var dataStream = download.dataStream((msg, chunk) -> msg.setContent(Bytes.toProtoBytes(chunk)));
+        var download = new GrpcDownloadSink<>(responseObserver, DataReadResponse::newBuilder, streamingMode);
+        download.whenComplete(() -> closeDataContext(dataContext));
+
+        var firstMessage = download.firstMessage(DataReadResponse.Builder::setSchema, SchemaDefinition.class);
+        var dataStream = download.dataStream(DataReadResponse.Builder::setContent);
 
         download.start(request)
-                .thenApply(req -> validateRequest(method, request))
-                .thenAccept(req -> dataRwService.readDataset(request, firstMessage, dataStream, execCtx, userInfo))
+                .thenApply(req -> validateRequest(method, req))
+                .thenAccept(req -> dataRwService.readDataset(req, firstMessage, dataStream, dataContext, userInfo))
                 .exceptionally(download::failed);
     }
 
     @Override
     public StreamObserver<FileWriteRequest> createFile(StreamObserver<TagHeader> responseObserver) {
 
-        var upload = new GrpcUploadSource<>(FileWriteRequest.class, responseObserver);
-
-        var execCtx = ExecutionContext.EXEC_CONTEXT_KEY.get();
+        var dataContext = prepareDataContext();
         var userInfo = AuthHelpers.currentUser();
 
+        var upload = new GrpcUploadSource<>(FileWriteRequest.class, responseObserver);
+        upload.whenComplete(() -> closeDataContext(dataContext));
+
         var firstMessage = upload.firstMessage();
-        var dataStream = upload.dataStream(msg -> Bytes.fromProtoBytes(msg.getContent()));
+        var dataStream = upload.dataStream(FileWriteRequest::getContent, dataContext.arrowAllocator());
 
         firstMessage
                 .thenApply(req -> validateRequest(CREATE_FILE_METHOD, req))
@@ -180,7 +213,7 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
                         req.getName(),
                         req.getMimeType(),
                         req.hasSize() ? req.getSize() : null,
-                        dataStream, execCtx, userInfo))
+                        dataStream, dataContext, userInfo))
                 .thenAccept(upload::succeeded)
                 .exceptionally(upload::failed);
 
@@ -201,13 +234,14 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
     @Override
     public StreamObserver<FileWriteRequest> updateFile(StreamObserver<TagHeader> responseObserver) {
 
-        var upload = new GrpcUploadSource<>(FileWriteRequest.class, responseObserver);
-
-        var execCtx = ExecutionContext.EXEC_CONTEXT_KEY.get();
+        var dataContext = prepareDataContext();
         var userInfo = AuthHelpers.currentUser();
 
+        var upload = new GrpcUploadSource<>(FileWriteRequest.class, responseObserver);
+        upload.whenComplete(() -> closeDataContext(dataContext));
+
         var firstMessage = upload.firstMessage();
-        var dataStream = upload.dataStream(msg -> Bytes.fromProtoBytes(msg.getContent()));
+        var dataStream = upload.dataStream(FileWriteRequest::getContent, dataContext.arrowAllocator());
 
         firstMessage
                 .thenApply(req -> validateRequest(UPDATE_FILE_METHOD, req))
@@ -218,7 +252,7 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
                         req.getName(),
                         req.getMimeType(),
                         req.hasSize() ? req.getSize() : null,
-                        dataStream, execCtx, userInfo))
+                        dataStream, dataContext, userInfo))
                 .thenAccept(upload::succeeded)
                 .exceptionally(upload::failed);
 
@@ -254,11 +288,13 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
             MethodDescriptor<FileReadRequest, FileReadResponse> method, FileReadRequest request,
             GrpcDownloadSink<FileReadResponse, FileReadResponse.Builder> download) {
 
-        var execCtx = ExecutionContext.EXEC_CONTEXT_KEY.get();
+        var dataContext = prepareDataContext();
         var userInfo = AuthHelpers.currentUser();
 
-        var firstMessage = download.<FileDefinition>firstMessage(FileReadResponse.Builder::setFileDefinition);
-        var dataStream = download.dataStream((msg, chunk) -> msg.setContent(Bytes.toProtoBytes(chunk)));
+        download.whenComplete(() -> closeDataContext(dataContext));
+
+        var firstMessage = download.firstMessage(FileReadResponse.Builder::setFileDefinition, FileDefinition.class);
+        var dataStream = download.dataStream(FileReadResponse.Builder::setContent);
 
         download.start(request)
                 .thenApply(req -> validateRequest(method, req))
@@ -266,7 +302,7 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
                         request.getTenant(),
                         request.getSelector(),
                         firstMessage, dataStream,
-                        execCtx, userInfo))
+                        dataContext, userInfo))
                 .exceptionally(download::failed);
     }
 
@@ -274,6 +310,53 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
     // -----------------------------------------------------------------------------------------------------------------
     // Common scaffolding for client and server streaming
     // -----------------------------------------------------------------------------------------------------------------
+
+    private DataContext prepareDataContext() {
+
+        // TODO: Universal request ID
+        // This basic req-id is enough to create a unique allocator name for each request
+        // Each service should generate a req-id for every inbound request
+        // If service A calls service B, then B should also record "source-req-id" to link back
+        // req-id and source-req-id should be included with every log message
+
+        var requestId = String.format("REQ-%d", nextReqId.incrementAndGet());
+        var eventLoop = eventLoops.currentEventLoop(false);
+        var allocator = rootAllocator.newChildAllocator(requestId, reqInitAllocation, reqMaxAllocation);
+
+        log.info("OPEN data context for [{}]", requestId);
+
+        return new DataContext(eventLoop, allocator);
+    }
+
+    private void closeDataContext(IDataContext dataContext) {
+
+        // this method is normally triggered by the last onComplete or onError event in the pipeline
+        // However there can be clean-up that still needs to execute, often in finally blocks
+        // Posting back to the event loop lets clean-up complete before the context is closed
+
+        var eventLoop = dataContext.eventLoopExecutor();
+        eventLoop.submit(() -> closeDataContextLater(dataContext));
+    }
+
+    private void closeDataContextLater(IDataContext dataContext) {
+
+        try (var allocator = dataContext.arrowAllocator()) {
+
+            var peak = allocator.getPeakMemoryAllocation();
+            var retained = allocator.getAllocatedMemory();
+
+            if (retained == 0)
+                log.info("CLOSE data context for [{}], peak = [{}], retained = [{}]",
+                        allocator.getName(),
+                        LoggingHelpers.formatFileSize(peak),
+                        LoggingHelpers.formatFileSize(retained));
+            else
+                log.warn("CLOSE data context for [{}], peak = [{}], retained = [{}] (memory leak)",
+                        allocator.getName(),
+                        LoggingHelpers.formatFileSize(peak),
+                        LoggingHelpers.formatFileSize(retained));
+        }
+    }
 
     private <TReq extends Message>
     TReq validateRequest(MethodDescriptor<TReq, ?> method, TReq request) {

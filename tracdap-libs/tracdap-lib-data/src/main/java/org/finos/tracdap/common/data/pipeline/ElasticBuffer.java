@@ -16,11 +16,10 @@
 
 package org.finos.tracdap.common.data.pipeline;
 
-import io.netty.buffer.ByteBufAllocator;
 import org.finos.tracdap.common.data.DataPipeline;
-
-import io.netty.buffer.ByteBuf;
 import org.finos.tracdap.common.exception.ETracInternal;
+
+import org.apache.arrow.memory.ArrowBuf;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -40,11 +39,8 @@ public class ElasticBuffer
     private static final int QUEUE_LIMIT = 1024;
     private static final int QUEUE_SAFETY_LIMIT = 512;
 
-    // The special buffer Unpooled.EMPTY_BUFFER can be (and is) sent out by upstream components
-    // We need a guaranteed unique buffer for the EOS marker, to avoid terminating the stream early
-    private static final ByteBuf EOS = ByteBufAllocator.DEFAULT.buffer(0);
-
-    private final Queue<ByteBuf> queue;
+    private final Queue<ArrowBuf> queue;
+    private boolean eos;
 
     public ElasticBuffer() {
         super(DataPipeline.StreamApi.class);
@@ -60,13 +56,13 @@ public class ElasticBuffer
     public void pump() {
 
         while (consumerReady() && !queue.isEmpty()) {
-
             var chunk = queue.remove();
+            consumer().onNext(chunk);
+        }
 
-            if (chunk == EOS)
-                doComplete();
-            else
-                consumer().onNext(chunk);
+        if (consumerReady() && queue.isEmpty() && eos) {
+            eos = false;
+            doComplete();
         }
     }
 
@@ -82,15 +78,36 @@ public class ElasticBuffer
     }
 
     @Override
-    public void onNext(ByteBuf chunk) {
+    public void onNext(ArrowBuf chunk) {
 
-        queueAndPump(chunk);
+        if (isDone()) {
+            log.warn("Data stage is already done, incoming data will be dropped");
+            chunk.close();
+            return;
+        }
+
+        var queued = queue.offer(chunk);
+
+        if (!queued) {
+            log.warn("Data buffer has overflowed, this data pipeline will fail");
+            chunk.close();
+            throw new ETracInternal("Data buffer has overflowed");
+        }
+
+        pump();
     }
 
     @Override
     public void onComplete() {
 
-        queueAndPump(EOS);
+        if (isDone()) {
+            log.warn("Data stage is already done, incoming EOS will be dropped");
+            return;
+        }
+
+        eos = true;
+
+        pump();
     }
 
     @Override
@@ -103,25 +120,6 @@ public class ElasticBuffer
         finally {
             close();
         }
-    }
-
-    private void queueAndPump(ByteBuf chunk) {
-
-        if (isDone()) {
-            log.warn("Data stage is already done, incoming data will be dropped");
-            chunk.release();
-            return;
-        }
-
-        var queued = queue.offer(chunk);
-
-        if (!queued) {
-            log.warn("Data buffer has overflowed, this data pipeline will fail");
-            chunk.release();
-            throw new ETracInternal("Data buffer has overflowed");
-        }
-
-        pump();
     }
 
     private void doComplete() {
@@ -140,7 +138,7 @@ public class ElasticBuffer
 
         while (!queue.isEmpty()) {
             var chunk = queue.remove();
-            chunk.release();
+            chunk.close();
         }
     }
 }

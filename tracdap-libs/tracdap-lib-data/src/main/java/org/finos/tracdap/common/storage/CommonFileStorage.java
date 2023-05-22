@@ -16,16 +16,14 @@
 
 package org.finos.tracdap.common.storage;
 
-import io.netty.buffer.NettyArrowBuf;
-import org.apache.arrow.memory.ArrowBuf;
-import org.finos.tracdap.common.concurrent.Flows;
-import org.finos.tracdap.common.concurrent.IExecutionContext;
+import org.finos.tracdap.common.async.Flows;
+import org.finos.tracdap.common.data.IExecutionContext;
 import org.finos.tracdap.common.config.ConfigHelpers;
 import org.finos.tracdap.common.data.IDataContext;
-
-import io.netty.buffer.ByteBuf;
-
 import org.finos.tracdap.common.exception.ETrac;
+
+import org.apache.arrow.memory.ArrowBuf;
+import org.finos.tracdap.common.util.LoggingHelpers;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -35,6 +33,7 @@ import java.util.Properties;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Flow;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import java.util.regex.Pattern;
 
@@ -60,15 +59,15 @@ public abstract class CommonFileStorage implements IFileStorage {
     public static final Pattern ILLEGAL_PATH_CHARS = Pattern.compile(".*[<>:'\"|?*\\\\].*");
     public static final Pattern UNICODE_CONTROL_CHARS = Pattern.compile(".*[\u0000-\u001f\u007f\u0080-\u009f].*");
 
-    public static final String EXISTS_OPERATION = "exists";
-    public static final String SIZE_OPERATION = "size";
-    public static final String STAT_OPERATION = "stat";
-    public static final String LS_OPERATION = "ls";
-    public static final String MKDIR_OPERATION = "mkdir";
-    public static final String RM_OPERATION = "rm";
-    public static final String RMDIR_OPERATION = "rmdir";
-    public static final String WRITE_OPERATION = "write";
-    public static final String READ_OPERATION = "read";
+    public static final String EXISTS_OPERATION = "EXISTS";
+    public static final String SIZE_OPERATION = "SIZE";
+    public static final String STAT_OPERATION = "STAT";
+    public static final String LS_OPERATION = "LS";
+    public static final String MKDIR_OPERATION = "MKDIR";
+    public static final String RM_OPERATION = "RM";
+    public static final String RMDIR_OPERATION = "RMDIR";
+    public static final String READ_OPERATION = "READ";
+    public static final String WRITE_OPERATION = "WRITE";
 
     public static final String READ_ONLY_CONFIG_KEY = "readOnly";
     public static final boolean READ_ONLY_CONFIG_DEFAULT = false;
@@ -92,7 +91,7 @@ public abstract class CommonFileStorage implements IFileStorage {
 
     protected abstract CompletionStage<ArrowBuf> fsReadChunk(String objectKey, long offset, int size, IDataContext ctx);
     protected abstract Flow.Publisher<ArrowBuf> fsOpenInputStream(String objectKey, IDataContext ctx);
-    protected abstract Flow.Subscriber<ByteBuf> fsOpenOutputStream(String objectKey, CompletableFuture<Long> signal, IDataContext ctx);
+    protected abstract Flow.Subscriber<ArrowBuf> fsOpenOutputStream(String objectKey, CompletableFuture<Long> signal, IDataContext ctx);
 
     // Expose final member variables to avoid duplication in child classes
 
@@ -314,12 +313,12 @@ public abstract class CommonFileStorage implements IFileStorage {
     }
 
     @Override
-    public CompletionStage<ByteBuf> readChunk(String storagePath, long offset, int size, IDataContext ctx) {
+    public CompletionStage<ArrowBuf> readChunk(String storagePath, long offset, int size, IDataContext ctx) {
 
         return wrapOperation(READ_OPERATION, storagePath, (op, path) -> readChunk(op, path, offset, size, ctx));
     }
 
-    private CompletionStage<ByteBuf> readChunk(String operationName, String storagePath, long offset, int size, IDataContext ctx) {
+    private CompletionStage<ArrowBuf> readChunk(String operationName, String storagePath, long offset, int size, IDataContext ctx) {
 
         var objectKey = resolveObjectKey(operationName, storagePath, false);
 
@@ -334,13 +333,13 @@ public abstract class CommonFileStorage implements IFileStorage {
                 throw errors.explicitError(operationName, storagePath, NOT_A_FILE);
         });
 
-        return checkFile
-                .thenCompose(x -> fsReadChunk(objectKey, offset, size, ctx))
-                .thenApply(NettyArrowBuf::unwrapBuffer);
+        var readChunk = checkFile.thenCompose(x -> fsReadChunk(objectKey, offset, size, ctx));
+
+        return readChunkMonitor(storagePath, readChunk);
     }
 
     @Override
-    public Flow.Publisher<ByteBuf>
+    public Flow.Publisher<ArrowBuf>
     reader(String storagePath, IDataContext ctx) {
 
         return wrapStreamOperation(
@@ -349,18 +348,18 @@ public abstract class CommonFileStorage implements IFileStorage {
                 err -> { throw err; });
     }
 
-    private Flow.Publisher<ByteBuf>
+    private Flow.Publisher<ArrowBuf>
     reader(String operationName, String storagePath, IDataContext dataContext) {
 
         var objectKey = resolveObjectKey(operationName, storagePath, false);
 
-        return Flows.map(
-                fsOpenInputStream(objectKey, dataContext),
-                NettyArrowBuf::unwrapBuffer);
+        var readStream = fsOpenInputStream(objectKey, dataContext);
+
+        return new ReadStreamMonitor(storagePath, readStream);
     }
 
     @Override
-    public Flow.Subscriber<ByteBuf>
+    public Flow.Subscriber<ArrowBuf>
     writer(String storagePath, CompletableFuture<Long> signal, IDataContext ctx) {
 
         return wrapStreamOperation(
@@ -369,7 +368,7 @@ public abstract class CommonFileStorage implements IFileStorage {
                 err -> { throw err; });
     }
 
-    protected Flow.Subscriber<ByteBuf>
+    protected Flow.Subscriber<ArrowBuf>
     writer(String operationName, String storagePath, CompletableFuture<Long> signal, IDataContext ctx) {
 
         var objectKey = resolveObjectKey(operationName, storagePath, false);
@@ -413,63 +412,21 @@ public abstract class CommonFileStorage implements IFileStorage {
             return true;
         });
 
+        // Monitor the result signal to log complete / error events
+        var monitorSignal = writeMonitor(storagePath, signal);
+
         // Create the output stream - it will not activate until it is subscribed to a source
-        var outputStream = fsOpenOutputStream(objectKey, fromContext(ctx, signal), ctx);
+        var outputStream = fsOpenOutputStream(objectKey, fromContext(ctx, monitorSignal), ctx);
 
         // Return a delayed subscriber, that waits for the prepare step to finish before starting
         return Flows.waitForSignal(outputStream, toContext(ctx, prepare));
     }
 
-    private <TResult> CompletionStage<TResult>
-    wrapOperation(String operationName, String storagePath, FsOperation<TResult> func) {
 
-        var operation = String.format("%s %s [%s]", operationName, storageKey, storagePath);
+    // -----------------------------------------------------------------------------------------------------------------
+    // COMMON HELPERS
+    // -----------------------------------------------------------------------------------------------------------------
 
-        try {
-
-            log.info(operation);
-
-            var result = func.call(operationName, storagePath);
-
-            return result.exceptionally(e -> {
-
-                var error = errors.handleException(operationName, storagePath, e);
-                log.error("{}: {}", operation, error.getMessage(), error);
-
-                throw error;
-            });
-        }
-        catch (Exception e) {
-
-            var error = errors.handleException(operationName, storagePath, e);
-            log.error("{}: {}", operation, error.getMessage(), error);
-
-            return CompletableFuture.failedFuture(error);
-        }
-    }
-
-    private <TResult> TResult
-    wrapStreamOperation(
-            String operationName, String storagePath,
-            FsStreamOperation<TResult> func,
-            Function<ETrac, TResult> errFunc) {
-
-        var operation = String.format("%s %s [%s]", operationName, storageKey, storagePath);
-
-        try {
-
-            log.info(operation);
-
-            return func.call(operationName, storagePath);
-        }
-        catch (Exception e) {
-
-            var error = errors.handleException(operationName, storagePath, e);
-            log.error("{}: {}", operation, error.getMessage(), error);
-
-            return errFunc.apply(error);
-        }
-    }
 
     private String resolveObjectKey(String operationName, String storagePath, boolean allowRootDir) {
 
@@ -537,6 +494,160 @@ public abstract class CommonFileStorage implements IFileStorage {
     protected <TResult> CompletableFuture<TResult> fromContext(IExecutionContext execCtx, CompletableFuture<TResult> ctxPromise) {
 
         return execCtx.fromContext(ctxPromise);
+    }
+
+
+    // -----------------------------------------------------------------------------------------------------------------
+    // WRAPPERS FOR LOGGING AND ERROR HANDLING
+    // -----------------------------------------------------------------------------------------------------------------
+
+
+    private <TResult> CompletionStage<TResult>
+    wrapOperation(String operationName, String storagePath, FsOperation<TResult> func) {
+
+        try {
+
+            log.info("{} {}: [{}]", operationName, storageKey, storagePath);
+
+            var result = func.call(operationName, storagePath);
+
+            return result.exceptionally(error -> {
+
+                var mappedError = errors.handleException(operationName, storagePath, error);
+
+                log.error("{} {} FAILED: [{}]", operationName, storageKey, storagePath);
+                log.error(mappedError.getMessage(), mappedError);
+
+                throw mappedError;
+            });
+        }
+        catch (Exception error) {
+
+            var mappedError = errors.handleException(operationName, storagePath, error);
+
+            log.error("{} {} FAILED: [{}]", operationName, storageKey, storagePath);
+            log.error(mappedError.getMessage(), mappedError);
+
+            return CompletableFuture.failedFuture(mappedError);
+        }
+    }
+
+    private <TResult> TResult
+    wrapStreamOperation(
+            String operationName, String storagePath,
+            FsStreamOperation<TResult> func,
+            Function<ETrac, TResult> errFunc) {
+
+        try {
+
+            log.info("{} {} START: [{}]", operationName, storageKey, storagePath);
+
+            return func.call(operationName, storagePath);
+        }
+        catch (Exception error) {
+
+            var mappedError = errors.handleException(operationName, storagePath, error);
+
+            log.error("{} {} FAILED: [{}]", operationName, storageKey, storagePath);
+            log.error(mappedError.getMessage(), mappedError);
+
+            return errFunc.apply(mappedError);
+        }
+    }
+
+    private CompletableFuture<Long> writeMonitor(String storagePath, CompletableFuture<Long> readSignal) {
+
+        var monitorSignal = new CompletableFuture<Long>();
+
+        monitorSignal.whenComplete((size, error) -> {
+
+            if (error != null) {
+                var mappedError = errors.handleException(WRITE_OPERATION, storagePath, error);
+                log.error("{} {} FAILED: [{}]", WRITE_OPERATION, storageKey, storagePath);
+                log.error(mappedError.getMessage(), mappedError);
+                readSignal.completeExceptionally(mappedError);
+            }
+            else {
+                var fileSize = LoggingHelpers.formatFileSize(size);
+                log.info("{} {} COMPLETE: {} [{}]", WRITE_OPERATION, storageKey, fileSize, storagePath);
+                readSignal.complete(size);
+            }
+        });
+
+        return monitorSignal;
+    }
+
+    private CompletionStage<ArrowBuf> readChunkMonitor(String storagePath, CompletionStage<ArrowBuf> readChunk) {
+
+        return readChunk.thenApply(buffer -> {
+
+            var fileSize = LoggingHelpers.formatFileSize(buffer.readableBytes());
+            log.info("{} {} COMPLETE: {} [{}]", READ_OPERATION, storageKey, fileSize, storagePath);
+            return buffer;
+
+        }).exceptionally(error -> {
+
+            var mappedError = errors.handleException(READ_OPERATION, storagePath, error);
+            log.error("{} {} FAILED: [{}]", READ_OPERATION, storageKey, storagePath);
+            log.error(mappedError.getMessage(), mappedError);
+            throw mappedError;
+        });
+    }
+
+    private final class ReadStreamMonitor implements Flow.Processor<ArrowBuf, ArrowBuf> {
+
+        private final String storagePath;
+        private final Flow.Publisher<ArrowBuf> source;
+
+        private final AtomicBoolean targetSet = new AtomicBoolean(false);
+        private Flow.Subscriber<? super ArrowBuf> target;
+
+        private long byteCounter;
+
+        public ReadStreamMonitor(String storagePath, Flow.Publisher<ArrowBuf> source) {
+            this.storagePath = storagePath;
+            this.source = source;
+        }
+
+        @Override
+        public void subscribe(Flow.Subscriber<? super ArrowBuf> subscriber) {
+
+            var firstSubscription = targetSet.compareAndSet(false, true);
+
+            if (!firstSubscription) {
+                subscriber.onError(new IllegalStateException("Duplicate subscription"));
+                return;
+            }
+
+            this.target = subscriber;
+            source.subscribe(this);
+        }
+
+        @Override
+        public void onSubscribe(Flow.Subscription subscription) {
+            target.onSubscribe(subscription);
+        }
+
+        @Override
+        public void onNext(ArrowBuf item) {
+            byteCounter += item.readableBytes();
+            target.onNext(item);
+        }
+
+        @Override
+        public void onError(Throwable error) {
+            var mappedError = errors.handleException(READ_OPERATION, storagePath, error);
+            log.error("{} {} FAILED: [{}]", READ_OPERATION, storageKey, storagePath);
+            log.error(mappedError.getMessage(), mappedError);
+            target.onError(mappedError);
+        }
+
+        @Override
+        public void onComplete() {
+            var fileSize = LoggingHelpers.formatFileSize(byteCounter);
+            log.info("{} {} COMPLETE: {} [{}]", READ_OPERATION, storageKey, fileSize, storagePath);
+            target.onComplete();
+        }
     }
 
     @FunctionalInterface

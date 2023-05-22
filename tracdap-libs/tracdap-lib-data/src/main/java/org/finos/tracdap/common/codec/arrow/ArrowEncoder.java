@@ -20,8 +20,10 @@ import org.finos.tracdap.common.codec.StreamingEncoder;
 import org.finos.tracdap.common.data.DataPipeline;
 import org.finos.tracdap.common.exception.EUnexpected;
 
+import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.VectorSchemaRoot;
 import org.apache.arrow.vector.ipc.ArrowWriter;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -38,13 +40,15 @@ public abstract class ArrowEncoder extends StreamingEncoder implements DataPipel
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
+    private final BufferAllocator allocator;
+
     private VectorSchemaRoot root;
     private ArrowWriter writer;
 
-    protected abstract ArrowWriter createWriter(VectorSchemaRoot root);
+    protected abstract ArrowWriter createWriter(VectorSchemaRoot root, BufferAllocator allocator);
 
-    public ArrowEncoder() {
-
+    public ArrowEncoder(BufferAllocator allocator) {
+        this.allocator = allocator;
     }
 
     @Override
@@ -56,7 +60,7 @@ public abstract class ArrowEncoder extends StreamingEncoder implements DataPipel
                 log.trace("ARROW ENCODER: onStart()");
 
             this.root = root;
-            this.writer = createWriter(root);
+            this.writer = createWriter(root, allocator);
 
             writer.start();
             consumer().onStart();

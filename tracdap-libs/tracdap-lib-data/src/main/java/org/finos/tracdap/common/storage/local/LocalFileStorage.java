@@ -16,12 +16,11 @@
 
 package org.finos.tracdap.common.storage.local;
 
-import org.finos.tracdap.common.concurrent.IExecutionContext;
+import org.finos.tracdap.common.data.IExecutionContext;
 import org.finos.tracdap.common.data.IDataContext;
 import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.common.storage.*;
 
-import io.netty.buffer.ByteBuf;
 import io.netty.channel.EventLoopGroup;
 import org.apache.arrow.memory.ArrowBuf;
 
@@ -404,7 +403,7 @@ public class LocalFileStorage extends CommonFileStorage {
     }
 
     @Override
-    protected Flow.Subscriber<ByteBuf>
+    protected Flow.Subscriber<ArrowBuf>
     fsOpenOutputStream(String storagePath, CompletableFuture<Long> signal, IDataContext dataContext) {
 
         var absolutePath = resolvePath(storagePath);

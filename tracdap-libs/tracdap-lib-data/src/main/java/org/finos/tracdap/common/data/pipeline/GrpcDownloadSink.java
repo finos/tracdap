@@ -16,16 +16,20 @@
 
 package org.finos.tracdap.common.data.pipeline;
 
-import io.netty.buffer.ByteBufAllocator;
-import io.netty.buffer.CompositeByteBuf;
+import org.finos.tracdap.common.data.util.Bytes;
 import org.finos.tracdap.common.exception.ETracInternal;
 import org.finos.tracdap.common.exception.EUnexpected;
 
+import com.google.protobuf.ByteString;
 import com.google.protobuf.MessageLite;
+import com.google.protobuf.UnsafeByteOperations;
 import io.grpc.stub.ServerCallStreamObserver;
 import io.grpc.stub.StreamObserver;
-import io.netty.buffer.ByteBuf;
+import org.apache.arrow.memory.ArrowBuf;
 
+import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Flow;
@@ -45,13 +49,14 @@ public class GrpcDownloadSink<TResponse extends MessageLite, TBuilder extends Me
     private final boolean streaming;
 
     private final Supplier<TBuilder> builder;
-    private BiFunction<TBuilder, ByteBuf, TBuilder> dataFunc;
+    private BiFunction<TBuilder, ByteString, TBuilder> dataFunc;
 
     private final TBuilder aggregateResponse;
-    private final CompositeByteBuf aggregateBuffer;
+    private final List<ArrowBuf> aggregateBuffer;
 
     private CompletableFuture<TBuilder> firstMessage;
     private Flow.Subscription subscription;
+    private Runnable cleanup;
 
     private long nRequested;
     private long nReceived;
@@ -75,8 +80,12 @@ public class GrpcDownloadSink<TResponse extends MessageLite, TBuilder extends Me
         }
         else {
             aggregateResponse = builder.get();
-            aggregateBuffer = ByteBufAllocator.DEFAULT.compositeBuffer();
+            aggregateBuffer = new ArrayList<>();
         }
+    }
+
+    public void whenComplete(Runnable cleanup) {
+        this.cleanup = cleanup;
     }
 
     public <TRequest extends MessageLite> CompletionStage<TRequest> start(TRequest request) {
@@ -86,18 +95,37 @@ public class GrpcDownloadSink<TResponse extends MessageLite, TBuilder extends Me
 
     public Void failed(Throwable error) {
 
-        if (!streaming)
-            releaseAggregate();
+        try {
 
-        responseStream.onError(error);
+            if (!streaming)
+                releaseAggregate();
 
-        if (subscription != null)
-            subscription.cancel();
+            responseStream.onError(error);
 
-        return null;
+            if (subscription != null)
+                subscription.cancel();
+
+            return null;
+        }
+        finally {
+            if (cleanup != null) {
+                cleanup.run();
+                cleanup = null;
+            }
+        }
     }
 
-    public <TResult> CompletableFuture<TResult> firstMessage(BiFunction<TBuilder, TResult, TBuilder> resultFunc) {
+    @SuppressWarnings("unused")
+    public <TResult> CompletableFuture<TResult>
+    firstMessage(BiFunction<TBuilder, TResult, TBuilder> resultFunc, Class<TResult> resultType) {
+
+        // Sometimes TResult cannot be inferred, allow client code to be explicit
+
+        return firstMessage(resultFunc);
+    }
+
+    public <TResult> CompletableFuture<TResult>
+    firstMessage(BiFunction<TBuilder, TResult, TBuilder> resultFunc) {
 
         if (firstMessage != null)
             throw new EUnexpected();
@@ -112,7 +140,8 @@ public class GrpcDownloadSink<TResponse extends MessageLite, TBuilder extends Me
         return future;
     }
 
-    public Flow.Subscriber<ByteBuf> dataStream(BiFunction<TBuilder, ByteBuf, TBuilder> wrapFunc) {
+    public Flow.Subscriber<ArrowBuf>
+    dataStream(BiFunction<TBuilder, ByteString, TBuilder> wrapFunc) {
 
         this.dataFunc = wrapFunc;
         return new DownloadSubscriber();
@@ -141,15 +170,24 @@ public class GrpcDownloadSink<TResponse extends MessageLite, TBuilder extends Me
 
     private Void firstMessageFailed(Throwable error) {
 
-        if (!streaming)
-            releaseAggregate();
+        try {
 
-        responseStream.onError(error);
+            if (!streaming)
+                releaseAggregate();
 
-        if (subscription != null)
-            subscription.cancel();
+            responseStream.onError(error);
 
-        return null;
+            if (subscription != null)
+                subscription.cancel();
+
+            return null;
+        }
+        finally {
+            if (cleanup != null) {
+                cleanup.run();
+                cleanup = null;
+            }
+        }
     }
 
     private void pipelineOnSubscribe(Flow.Subscription subscription) {
@@ -167,39 +205,74 @@ public class GrpcDownloadSink<TResponse extends MessageLite, TBuilder extends Me
         }
     }
 
-    @SuppressWarnings("unchecked")
-    private void pipelineOnNext(ByteBuf chunk) {
+    private void pipelineOnNext(ArrowBuf chunk) {
 
         nReceived += 1;
 
-        if (streaming) {
-            var msg = dataFunc.apply(builder.get(), chunk).build();
-            responseStream.onNext((TResponse) msg);
-        }
+        if (streaming)
+            Bytes.readFromStream(chunk, this::pipelineSendChunk);
         else
-            addToAggregate(chunk);
+            aggregateBuffer.add(chunk);
 
         if (nRequested - nReceived < REQUEST_MIN_BUFFER)
             requestMore();
     }
 
     @SuppressWarnings("unchecked")
+    private void pipelineSendChunk(ByteBuffer chunk) {
+
+        var protoBuilder = builder.get();
+        var protoBytes = UnsafeByteOperations.unsafeWrap(chunk);
+
+        dataFunc.apply(protoBuilder, protoBytes);
+
+        var protoMsg = (TResponse) protoBuilder.build();
+
+        responseStream.onNext(protoMsg);
+    }
+
+    @SuppressWarnings("unchecked")
     private void pipelineOnComplete() {
 
-        if (!streaming) {
-            var msg = dataFunc.apply(aggregateResponse, aggregateBuffer).build();
-            responseStream.onNext((TResponse) msg);
-        }
+        try {
 
-        responseStream.onCompleted();
+            if (!streaming) {
+
+                var bufferBytes = Bytes.readFromBuffer(aggregateBuffer);
+                var protoBytes = UnsafeByteOperations.unsafeWrap(bufferBytes);
+
+                dataFunc.apply(aggregateResponse, protoBytes);
+
+                var protoMsg = (TResponse) aggregateResponse.build();
+
+                responseStream.onNext(protoMsg);
+            }
+
+            responseStream.onCompleted();
+        }
+        finally {
+            if (cleanup != null) {
+                cleanup.run();
+                cleanup = null;
+            }
+        }
     }
 
     private void pipelineOnError(Throwable error) {
 
-        if (!streaming)
-            releaseAggregate();
+        try {
 
-        responseStream.onError(error);
+            if (!streaming)
+                releaseAggregate();
+
+            responseStream.onError(error);
+        }
+        finally {
+            if (cleanup != null) {
+                cleanup.run();
+                cleanup = null;
+            }
+        }
     }
 
     private void requestMore() {
@@ -213,18 +286,13 @@ public class GrpcDownloadSink<TResponse extends MessageLite, TBuilder extends Me
         subscription.request(n);
     }
 
-    private void addToAggregate(ByteBuf chunk) {
-
-        aggregateBuffer.addComponent(true, chunk);
-    }
-
     private void releaseAggregate() {
 
-        if (aggregateBuffer.refCnt() > 0)
-            aggregateBuffer.release();
+        aggregateBuffer.forEach(ArrowBuf::close);
+        aggregateBuffer.clear();
     }
 
-    private class DownloadSubscriber implements Flow.Subscriber<ByteBuf> {
+    private class DownloadSubscriber implements Flow.Subscriber<ArrowBuf> {
 
         @Override
         public void onSubscribe(Flow.Subscription subscription) {
@@ -232,7 +300,7 @@ public class GrpcDownloadSink<TResponse extends MessageLite, TBuilder extends Me
         }
 
         @Override
-        public void onNext(ByteBuf chunk) {
+        public void onNext(ArrowBuf chunk) {
             pipelineOnNext(chunk);
         }
 

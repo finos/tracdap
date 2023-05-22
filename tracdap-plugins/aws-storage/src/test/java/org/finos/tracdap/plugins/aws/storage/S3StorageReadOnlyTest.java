@@ -16,16 +16,14 @@
 
 package org.finos.tracdap.plugins.aws.storage;
 
-import io.netty.channel.EventLoopGroup;
-import io.netty.channel.nio.NioEventLoopGroup;
-import io.netty.util.concurrent.DefaultEventExecutor;
-import io.netty.util.concurrent.DefaultThreadFactory;
-import org.apache.arrow.memory.BufferAllocator;
-import org.apache.arrow.memory.RootAllocator;
-import org.finos.tracdap.common.concurrent.ExecutionContext;
 import org.finos.tracdap.common.data.DataContext;
 import org.finos.tracdap.common.storage.CommonFileStorage;
 import org.finos.tracdap.common.storage.StorageReadOnlyTestSuite;
+
+import io.netty.channel.EventLoopGroup;
+import io.netty.channel.nio.NioEventLoopGroup;
+import org.apache.arrow.memory.BufferAllocator;
+import org.apache.arrow.memory.RootAllocator;
 import org.junit.jupiter.api.*;
 
 import java.time.Duration;
@@ -52,7 +50,7 @@ public class S3StorageReadOnlyTest extends StorageReadOnlyTestSuite {
     static BufferAllocator allocator;
 
     static S3ObjectStorage setupStorage;
-    static ExecutionContext setupCtx;
+    static DataContext setupCtx;
 
     static int testNumber;
 
@@ -66,13 +64,12 @@ public class S3StorageReadOnlyTest extends StorageReadOnlyTestSuite {
                 "platform_storage_ro_test_suite_%s_0x%h/",
                 timestamp, random);
 
-        setupCtx = new ExecutionContext(new DefaultEventExecutor(new DefaultThreadFactory("t-setup")));
-
         storageProps = S3StorageEnvProps.readStorageEnvProps();
 
         elg = new NioEventLoopGroup(2);
         allocator = new RootAllocator();
 
+        setupCtx = new DataContext(elg.next(), allocator);
         setupStorage = new S3ObjectStorage("STORAGE_SETUP", storageProps);
         setupStorage.start(elg);
 
@@ -101,8 +98,7 @@ public class S3StorageReadOnlyTest extends StorageReadOnlyTestSuite {
         roStorage = new S3ObjectStorage("TEST_" + testNumber + "_RO", roProps);
         roStorage.start(elg);
 
-        execContext = new ExecutionContext(elg.next());
-        dataContext = new DataContext(execContext.eventLoopExecutor(), allocator);
+        dataContext = new DataContext(elg.next(), allocator);
     }
 
     @AfterEach

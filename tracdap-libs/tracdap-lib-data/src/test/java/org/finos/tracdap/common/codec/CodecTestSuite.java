@@ -16,29 +16,29 @@
 
 package org.finos.tracdap.common.codec;
 
-import io.netty.util.concurrent.DefaultEventExecutor;
-import org.apache.arrow.vector.types.pojo.Field;
-import org.apache.arrow.vector.types.pojo.FieldType;
 import org.finos.tracdap.common.codec.arrow.ArrowFileCodec;
 import org.finos.tracdap.common.data.ArrowSchema;
 import org.finos.tracdap.common.codec.arrow.ArrowStreamCodec;
 import org.finos.tracdap.common.codec.csv.CsvCodec;
 import org.finos.tracdap.common.codec.json.JsonCodec;
-import org.finos.tracdap.common.concurrent.Flows;
+import org.finos.tracdap.common.async.Flows;
 import org.finos.tracdap.common.data.DataContext;
 import org.finos.tracdap.common.data.DataPipeline;
+import org.finos.tracdap.common.data.util.Bytes;
 import org.finos.tracdap.common.exception.EDataCorruption;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.test.data.SampleData;
 import org.finos.tracdap.test.data.SingleBatchDataSink;
 import org.finos.tracdap.test.data.SingleBatchDataSource;
 import org.finos.tracdap.common.util.ResourceHelpers;
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.ByteBufAllocator;
-import io.netty.buffer.EmptyByteBuf;
-import io.netty.buffer.Unpooled;
+
+import io.netty.util.concurrent.DefaultEventExecutor;
 import org.apache.arrow.memory.RootAllocator;
+import org.apache.arrow.memory.ArrowBuf;
+import org.apache.arrow.vector.types.pojo.Field;
+import org.apache.arrow.vector.types.pojo.FieldType;
 import org.apache.arrow.vector.*;
+
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.condition.EnabledIf;
 
@@ -52,7 +52,7 @@ import java.time.ZoneOffset;
 import java.util.*;
 import java.util.stream.Collectors;
 
-import static org.finos.tracdap.test.concurrent.ConcurrentTestHelpers.resultOf;
+import static org.finos.tracdap.test.concurrent.ConcurrentTestHelpers.getResultOf;
 import static org.finos.tracdap.test.concurrent.ConcurrentTestHelpers.waitFor;
 import static org.finos.tracdap.test.data.SampleData.generateBasicData;
 
@@ -362,7 +362,7 @@ public abstract class CodecTestSuite {
         var root = generateBasicData(allocator);
 
         var testData = ResourceHelpers.loadResourceAsBytes(basicData);
-        var testDataBuf = Unpooled.wrappedBuffer(testData);
+        var testDataBuf = Bytes.copyToBuffer(testData, allocator);
         var testDataStream = Flows.publish(List.of(testDataBuf));
 
         var dataCtx = new DataContext(new DefaultEventExecutor(), allocator);
@@ -394,7 +394,7 @@ public abstract class CodecTestSuite {
 
         // An empty stream (i.e. with no buffers)
 
-        var noBufStream = Flows.publish(List.<ByteBuf>of());
+        var noBufStream = Flows.publish(List.<ArrowBuf>of());
         var arrowSchema = ArrowSchema.tracToArrow(SampleData.BASIC_TABLE_SCHEMA);
 
         var dataCtx = new DataContext(new DefaultEventExecutor(), allocator);
@@ -409,14 +409,14 @@ public abstract class CodecTestSuite {
         var exec = pipeline.execute();
         waitFor(TEST_TIMEOUT, exec);
 
-        Assertions.assertThrows(EDataCorruption.class, () -> resultOf(exec));
+        Assertions.assertThrows(EDataCorruption.class, () -> getResultOf(exec));
 
         // A stream containing a series of empty buffers
 
         var emptyBuffers = List.of(
-                new EmptyByteBuf(ByteBufAllocator.DEFAULT),
-                new EmptyByteBuf(ByteBufAllocator.DEFAULT),
-                new EmptyByteBuf(ByteBufAllocator.DEFAULT));
+                allocator.getEmpty(),
+                allocator.getEmpty(),
+                allocator.getEmpty());
 
         var emptyBufStream = Flows.publish(emptyBuffers);
 
@@ -432,7 +432,7 @@ public abstract class CodecTestSuite {
         var exec2 = pipeline2.execute();
         waitFor(TEST_TIMEOUT, exec2);
 
-        Assertions.assertThrows(EDataCorruption.class, () -> resultOf(exec2));
+        Assertions.assertThrows(EDataCorruption.class, () -> getResultOf(exec2));
     }
 
     @Test
@@ -450,12 +450,14 @@ public abstract class CodecTestSuite {
         var random = new Random();
         testData.forEach(random::nextBytes);
 
-        var testDataBuf = testData.stream().map(Unpooled::wrappedBuffer).collect(Collectors.toList());
+        var allocator = new RootAllocator();
+        var testDataBuf = testData.stream()
+                .map(bytes -> Bytes.copyToBuffer(bytes, allocator))
+                .collect(Collectors.toList());
         var testDataStream = Flows.publish(testDataBuf);
 
         // Run the garbage data through the decoder
 
-        var allocator = new RootAllocator();
         var dataCtx = new DataContext(new DefaultEventExecutor(), allocator);
         var pipeline = DataPipeline.forSource(testDataStream, dataCtx);
 
@@ -468,7 +470,7 @@ public abstract class CodecTestSuite {
         var exec = pipeline.execute();
         waitFor(TEST_TIMEOUT, exec);
 
-        Assertions.assertThrows(EDataCorruption.class, () -> resultOf(exec));
+        Assertions.assertThrows(EDataCorruption.class, () -> getResultOf(exec));
     }
 
 

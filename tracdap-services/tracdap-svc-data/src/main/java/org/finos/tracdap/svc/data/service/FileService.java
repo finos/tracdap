@@ -16,27 +16,25 @@
 
 package org.finos.tracdap.svc.data.service;
 
-import org.apache.arrow.memory.BufferAllocator;
+
 import org.finos.tracdap.api.TrustedMetadataApiGrpc.TrustedMetadataApiFutureStub;
 import org.finos.tracdap.common.auth.internal.UserInfo;
 import org.finos.tracdap.common.auth.internal.InternalAuthProvider;
-import org.finos.tracdap.common.concurrent.Futures;
-import org.finos.tracdap.common.concurrent.IExecutionContext;
-import org.finos.tracdap.common.data.DataContext;
+import org.finos.tracdap.common.async.Futures;
 import org.finos.tracdap.common.data.IDataContext;
 import org.finos.tracdap.common.exception.EMetadataDuplicate;
 import org.finos.tracdap.common.metadata.MetadataUtil;
-import org.finos.tracdap.config.StorageConfig;
-import org.finos.tracdap.config.TenantConfig;
-import org.finos.tracdap.metadata.*;
-
 import org.finos.tracdap.common.exception.EDataSize;
 import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.storage.IFileStorage;
 import org.finos.tracdap.common.storage.IStorageManager;
 import org.finos.tracdap.common.validation.Validator;
+import org.finos.tracdap.config.StorageConfig;
+import org.finos.tracdap.config.TenantConfig;
+import org.finos.tracdap.metadata.*;
 
-import io.netty.buffer.ByteBuf;
+import org.apache.arrow.memory.ArrowBuf;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -73,7 +71,6 @@ public class FileService {
 
     private final StorageConfig storageConfig;
     private final Map<String, TenantConfig> tenantConfig;
-    private final BufferAllocator arrowAllocator;
     private final IStorageManager storageManager;
     private final TrustedMetadataApiFutureStub metaApi;
     private final InternalAuthProvider internalAuth;
@@ -84,14 +81,12 @@ public class FileService {
     public FileService(
             StorageConfig storageConfig,
             Map<String, TenantConfig> tenantConfig,
-            BufferAllocator arrowAllocator,
             IStorageManager storageManager,
             TrustedMetadataApiFutureStub metaApi,
             InternalAuthProvider internalAuth) {
 
         this.storageConfig = storageConfig;
         this.tenantConfig = tenantConfig;
-        this.arrowAllocator = arrowAllocator;
         this.storageManager = storageManager;
         this.metaApi = metaApi;
         this.internalAuth = internalAuth;
@@ -100,11 +95,9 @@ public class FileService {
     public CompletionStage<TagHeader> createFile(
             String tenant, List<TagUpdate> tags,
             String name, String mimeType, Long expectedSize,
-            Flow.Publisher<ByteBuf> contentStream,
-            IExecutionContext execCtx,
+            Flow.Publisher<ArrowBuf> contentStream,
+            IDataContext dataCtx,
             UserInfo userInfo) {
-
-        var dataCtx = new DataContext(execCtx.eventLoopExecutor(), arrowAllocator);
 
         var state = new RequestState();
         state.requestOwner = userInfo;
@@ -179,11 +172,9 @@ public class FileService {
             String tenant, List<TagUpdate> tags,
             TagSelector priorVersion,
             String name, String mimeType, Long expectedSize,
-            Flow.Publisher<ByteBuf> contentStream,
-            IExecutionContext execCtx,
+            Flow.Publisher<ArrowBuf> contentStream,
+            IDataContext dataCtx,
             UserInfo userInfo) {
-
-        var dataCtx = new DataContext(execCtx.eventLoopExecutor(), arrowAllocator);
 
         var state = new RequestState();
         state.requestOwner = userInfo;
@@ -240,11 +231,9 @@ public class FileService {
     public void readFile(
             String tenant, TagSelector selector,
             CompletableFuture<FileDefinition> definition,
-            Flow.Subscriber<ByteBuf> content,
-            IExecutionContext execCtx,
+            Flow.Subscriber<ArrowBuf> content,
+            IDataContext dataCtx,
             UserInfo userInfo) {
-
-        var dataCtx = new DataContext(execCtx.eventLoopExecutor(), arrowAllocator);
 
         var state = new RequestState();
         state.requestOwner = userInfo;
@@ -319,7 +308,7 @@ public class FileService {
 
     private CompletionStage<Long> writeDataItem(
             StorageDefinitionOrBuilder storageDef, String dataItem,
-            Flow.Publisher<ByteBuf> contentStream, IDataContext dataContext) {
+            Flow.Publisher<ArrowBuf> contentStream, IDataContext dataContext) {
 
         var storageItem = storageDef.getDataItemsOrThrow(dataItem);
 
@@ -355,7 +344,7 @@ public class FileService {
 
     private CompletionStage<Long> doWriteDataItem(
             IFileStorage storage, String storagePath,
-            Flow.Publisher<ByteBuf> contentStream, IDataContext dataContext) {
+            Flow.Publisher<ArrowBuf> contentStream, IDataContext dataContext) {
 
         var signal = new CompletableFuture<Long>();
         var writer = storage.writer(storagePath, signal, dataContext);
@@ -363,7 +352,7 @@ public class FileService {
         return signal;
     }
 
-    private Flow.Publisher<ByteBuf> readFile(
+    private Flow.Publisher<ArrowBuf> readFile(
             FileDefinition fileDef, StorageDefinition storageDef,
             IDataContext dataContext) {
 

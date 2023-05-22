@@ -18,19 +18,21 @@ package org.finos.tracdap.common.codec.arrow;
 
 import org.finos.tracdap.common.codec.BufferDecoder;
 import org.finos.tracdap.common.data.DataPipeline;
+import org.finos.tracdap.common.data.util.Bytes;
 import org.finos.tracdap.common.exception.EDataCorruption;
 import org.finos.tracdap.common.exception.ETrac;
 import org.finos.tracdap.common.exception.EUnexpected;
 
+import org.apache.arrow.memory.ArrowBuf;
 import org.apache.arrow.vector.VectorSchemaRoot;
 import org.apache.arrow.vector.ipc.ArrowReader;
 import org.apache.arrow.vector.ipc.InvalidArrowFileException;
 
-import io.netty.buffer.ByteBuf;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.concurrent.Callable;
 
 
@@ -38,7 +40,7 @@ public abstract class ArrowDecoder extends BufferDecoder implements DataPipeline
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
-    private ByteBuf buffer;
+    private List<ArrowBuf> buffer;
     private ArrowReader reader;
     private VectorSchemaRoot root;
 
@@ -46,15 +48,15 @@ public abstract class ArrowDecoder extends BufferDecoder implements DataPipeline
 
     }
 
-    protected abstract ArrowReader createReader(ByteBuf buffer) throws IOException;
+    protected abstract ArrowReader createReader(List<ArrowBuf> buffer) throws IOException;
 
     @Override
-    public void onBuffer(ByteBuf buffer) {
+    public void onBuffer(List<ArrowBuf> buffer) {
 
         if (log.isTraceEnabled())
             log.trace("ARROW DECODER: onBuffer()");
 
-        if (buffer.readableBytes() == 0) {
+        if (Bytes.readableBytes(buffer) == 0) {
             var error = new EDataCorruption("Arrow data file is empty");
             log.error(error.getMessage(), error);
             throw error;
@@ -199,7 +201,7 @@ public abstract class ArrowDecoder extends BufferDecoder implements DataPipeline
             }
 
             if (buffer != null) {
-                buffer.release();
+                buffer.forEach(ArrowBuf::close);
                 buffer = null;
             }
         }

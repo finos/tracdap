@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Accenture Global Solutions Limited
+ * Copyright 2023 Accenture Global Solutions Limited
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,18 +14,13 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.concurrent;
+package org.finos.tracdap.common.async;
 
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.MoreExecutors;
-import io.grpc.stub.StreamObserver;
-import io.netty.util.concurrent.Future;
-import io.netty.util.concurrent.GenericFutureListener;
 
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
-import java.util.function.BiConsumer;
-import java.util.function.BiFunction;
 
 
 public class Futures {
@@ -48,22 +43,6 @@ public class Futures {
             }
 
         }, MoreExecutors.directExecutor());
-
-        return javaFuture;
-    }
-
-    public static <T>
-    CompletionStage<T> javaFuture(io.netty.util.concurrent.Future<T> nettyFuture) {
-
-        var javaFuture = new CompletableFuture<T>();
-
-        nettyFuture.addListener((GenericFutureListener<Future<T>>) f -> {
-
-            if (f.isSuccess())
-                javaFuture.complete(f.getNow());
-            else
-                javaFuture.completeExceptionally(f.cause());
-        });
 
         return javaFuture;
     }

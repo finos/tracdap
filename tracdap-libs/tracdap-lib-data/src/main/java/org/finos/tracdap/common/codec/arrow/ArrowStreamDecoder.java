@@ -16,19 +16,19 @@
 
 package org.finos.tracdap.common.codec.arrow;
 
-import org.apache.arrow.vector.ipc.ArrowStreamReader;
 import org.finos.tracdap.common.exception.EDataCorruption;
 import org.finos.tracdap.common.data.util.ByteSeekableChannel;
 
-import org.apache.arrow.vector.ipc.ArrowReader;
+import org.apache.arrow.memory.ArrowBuf;
 import org.apache.arrow.memory.BufferAllocator;
-
-import io.netty.buffer.ByteBuf;
+import org.apache.arrow.vector.ipc.ArrowReader;
+import org.apache.arrow.vector.ipc.ArrowStreamReader;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.channels.SeekableByteChannel;
+import java.util.List;
 
 
 public class ArrowStreamDecoder extends ArrowDecoder {
@@ -44,7 +44,7 @@ public class ArrowStreamDecoder extends ArrowDecoder {
     }
 
     @Override
-    protected ArrowReader createReader(ByteBuf buffer) throws IOException {
+    protected ArrowReader createReader(List<ArrowBuf> buffer) throws IOException {
 
         var channel = new ByteSeekableChannel(buffer);
         validateStartOfStream(channel);

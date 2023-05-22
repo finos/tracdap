@@ -178,8 +178,6 @@ public class LocalFileReader implements Flow.Publisher<ArrowBuf> {
 
         try {
 
-            log.info("Read operation complete: {} bytes read [{}]", bytesRead, absolutePath);
-
             channel.close();
 
             log.info("File channel closed: [{}]", absolutePath);

@@ -22,7 +22,7 @@ import org.finos.tracdap.common.exception.ETracInternal;
 import org.finos.tracdap.common.exception.ETracPublic;
 import org.finos.tracdap.common.exception.EUnexpected;
 
-import io.netty.buffer.ByteBuf;
+import org.apache.arrow.memory.ArrowBuf;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -236,7 +236,7 @@ public class DataPipelineImpl implements DataPipeline {
         return pipeline;
     }
 
-    public static DataPipeline forSource(Flow.Publisher<? extends ByteBuf> source, IDataContext ctx) {
+    public static DataPipeline forSource(Flow.Publisher<ArrowBuf> source, IDataContext ctx) {
 
         log.info("DATA PIPELINE: New for stream type [{}]", source.getClass().getSimpleName());
 
@@ -280,7 +280,7 @@ public class DataPipelineImpl implements DataPipeline {
         return this;
     }
 
-    public DataPipeline addSink(Flow.Subscriber<ByteBuf> sink) {
+    public DataPipeline addSink(Flow.Subscriber<ArrowBuf> sink) {
 
         var sinkBuffer = new ElasticBuffer();
         addStage(sinkBuffer);

@@ -17,9 +17,9 @@
 package org.finos.tracdap.svc.data.api;
 
 import org.finos.tracdap.api.*;
-import org.finos.tracdap.common.concurrent.ExecutionContext;
-import org.finos.tracdap.common.concurrent.Flows;
-import org.finos.tracdap.common.concurrent.IExecutionContext;
+import org.finos.tracdap.common.data.DataContext;
+import org.finos.tracdap.common.async.Flows;
+import org.finos.tracdap.common.data.IExecutionContext;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.plugin.PluginManager;
 import org.finos.tracdap.common.util.ResourceHelpers;
@@ -31,6 +31,7 @@ import org.finos.tracdap.test.helpers.PlatformTest;
 import com.google.common.collect.Streams;
 import com.google.protobuf.ByteString;
 import org.apache.arrow.memory.RootAllocator;
+import org.apache.arrow.vector.ipc.ArrowFileWriter;
 import org.apache.arrow.vector.ipc.ArrowStreamWriter;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
@@ -83,7 +84,7 @@ abstract class DataRoundTripTest {
 
         @BeforeEach
         void setup() {
-            execContext = new ExecutionContext(elg.next());
+            execContext = new DataContext(elg.next(), new RootAllocator());
         }
     }
 
@@ -110,7 +111,7 @@ abstract class DataRoundTripTest {
 
         @BeforeEach
         void setup() {
-            execContext = new ExecutionContext(elg.next());
+            execContext = new DataContext(elg.next(), new RootAllocator());
         }
 
         @AfterAll
@@ -164,25 +165,52 @@ abstract class DataRoundTripTest {
             writer.end();
 
             var mimeType = "application/vnd.apache.arrow.stream";
-            roundTripTest(writeChannel.getChunks(), mimeType, mimeType, DataApiTestHelpers::decodeArrowStream, BASIC_TEST_DATA, true);
-            roundTripTest(writeChannel.getChunks(), mimeType, mimeType, DataApiTestHelpers::decodeArrowStream, BASIC_TEST_DATA, false);
+            roundTripTest(writeChannel.getChunks(), mimeType, mimeType, DataApiTestHelpers::decodeArrowStream, true);
+            roundTripTest(writeChannel.getChunks(), mimeType, mimeType, DataApiTestHelpers::decodeArrowStream, false);
+        }
+    }
+
+    @Test
+    void roundTrip_arrowFile() throws Exception {
+
+        // Create a single batch of Arrow data
+
+        var allocator = new RootAllocator();
+        var root = SampleData.generateBasicData(allocator);
+
+        // Use a writer to encode the batch as a stream of chunks (arrow record batches, including the schema)
+
+        var writeChannel = new ChunkChannel();
+
+        // Keep the writer open until after the test is complete
+        // Closing the writer will close the VSR, which releases the underlying memory
+        try (var writer = new ArrowFileWriter(root, null, writeChannel)) {
+
+            writer.start();
+            writer.writeBatch();
+            writer.end();
+
+            var mimeType = "application/vnd.apache.arrow.file";
+            roundTripTest(writeChannel.getChunks(), mimeType, mimeType, DataApiTestHelpers::decodeArrowFile, true);
+            roundTripTest(writeChannel.getChunks(), mimeType, mimeType, DataApiTestHelpers::decodeArrowFile, false);
         }
     }
 
     @Test
     void roundTrip_csv() throws Exception {
 
-        var testDataStream = getClass().getResourceAsStream(BASIC_CSV_DATA);
+        try (var testDataStream = getClass().getResourceAsStream(BASIC_CSV_DATA)) {
 
-        if (testDataStream == null)
-            throw new RuntimeException("Test data not found");
+            if (testDataStream == null)
+                throw new RuntimeException("Test data not found");
 
-        var testDataBytes = testDataStream.readAllBytes();
-        var testData = List.of(ByteString.copyFrom(testDataBytes));
+            var testDataBytes = testDataStream.readAllBytes();
+            var testData = List.of(ByteString.copyFrom(testDataBytes));
 
-        var mimeType = "text/csv";
-        roundTripTest(testData, mimeType, mimeType, DataApiTestHelpers::decodeCsv, BASIC_TEST_DATA, true);
-        roundTripTest(testData, mimeType, mimeType, DataApiTestHelpers::decodeCsv, BASIC_TEST_DATA, false);
+            var mimeType = "text/csv";
+            roundTripTest(testData, mimeType, mimeType, DataApiTestHelpers::decodeCsv, true);
+            roundTripTest(testData, mimeType, mimeType, DataApiTestHelpers::decodeCsv, false);
+        }
     }
 
     @Test
@@ -225,7 +253,7 @@ abstract class DataRoundTripTest {
                     .setFormat(mimeType)
                     .build();
 
-            var readResponse = Flows.<DataReadResponse>hub(execContext);
+            var readResponse = Flows.<DataReadResponse>hub(execContext.eventLoopExecutor());
             var readResponse0 = Flows.first(readResponse);
             var readByteStream = Flows.map(readResponse, DataReadResponse::getContent);
             var readBytes = Flows.fold(readByteStream, ByteString::concat, ByteString.EMPTY);
@@ -249,23 +277,24 @@ abstract class DataRoundTripTest {
     @Test
     void roundTrip_json() throws Exception {
 
-        var testDataStream = getClass().getResourceAsStream(BASIC_JSON_DATA);
+        try (var testDataStream = getClass().getResourceAsStream(BASIC_JSON_DATA)) {
 
-        if (testDataStream == null)
-            throw new RuntimeException("Test data not found");
+            if (testDataStream == null)
+                throw new RuntimeException("Test data not found");
 
-        var testDataBytes = testDataStream.readAllBytes();
-        var testData = List.of(ByteString.copyFrom(testDataBytes));
+            var testDataBytes = testDataStream.readAllBytes();
+            var testData = List.of(ByteString.copyFrom(testDataBytes));
 
-        var mimeType = "text/json";
-        roundTripTest(testData, mimeType, mimeType, DataApiTestHelpers::decodeJson, BASIC_TEST_DATA, true);
-        roundTripTest(testData, mimeType, mimeType, DataApiTestHelpers::decodeJson, BASIC_TEST_DATA, false);
+            var mimeType = "text/json";
+            roundTripTest(testData, mimeType, mimeType, DataApiTestHelpers::decodeJson, true);
+            roundTripTest(testData, mimeType, mimeType, DataApiTestHelpers::decodeJson, false);
+        }
     }
 
     private void roundTripTest(
             List<ByteString> content, String writeFormat, String readFormat,
             BiFunction<SchemaDefinition, List<ByteString>, List<Vector<Object>>> decodeFunc,
-            List<Vector<Object>> expectedResult, boolean dataInChunkZero) throws Exception {
+            boolean dataInChunkZero) throws Exception {
 
         var requestParams = DataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
@@ -285,7 +314,7 @@ abstract class DataRoundTripTest {
                 .setFormat(readFormat)
                 .build();
 
-        var readResponse = Flows.<DataReadResponse>hub(execContext);
+        var readResponse = Flows.<DataReadResponse>hub(execContext.eventLoopExecutor());
         var readResponse0 = Flows.first(readResponse);
         var readByteStream = Flows.map(readResponse, DataReadResponse::getContent);
         var readBytes = Flows.fold(readByteStream, ByteString::concat, ByteString.EMPTY);
@@ -303,9 +332,9 @@ abstract class DataRoundTripTest {
 
         for (int i = 0; i < roundTripSchema.getTable().getFieldsCount(); i++) {
 
-            for (var row = 0; row < expectedResult.size(); row++) {
+            for (var row = 0; row < DataRoundTripTest.BASIC_TEST_DATA.size(); row++) {
 
-                var expectedVal = expectedResult.get(i).get(row);
+                var expectedVal = DataRoundTripTest.BASIC_TEST_DATA.get(i).get(row);
                 var roundTripVal = roundTripData.get(i).get(row);
 
                 // Allow comparing big decimals with different scales

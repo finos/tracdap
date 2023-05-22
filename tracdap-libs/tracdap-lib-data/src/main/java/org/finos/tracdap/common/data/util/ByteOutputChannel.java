@@ -16,9 +16,8 @@
 
 package org.finos.tracdap.common.data.util;
 
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.ByteBufAllocator;
-import io.netty.buffer.CompositeByteBuf;
+import org.apache.arrow.memory.ArrowBuf;
+import org.apache.arrow.memory.BufferAllocator;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -30,71 +29,19 @@ public class ByteOutputChannel implements WritableByteChannel {
 
     private static final int CHUNK_SIZE = 2 * 1024 * 1024;
 
-    private final ByteBufAllocator allocator;
-    private final Consumer<ByteBuf> sink;
-    private final boolean useBuffering;
+    private final BufferAllocator allocator;
+    private final Consumer<ArrowBuf> sink;
 
-    private CompositeByteBuf buffer;
-    private boolean isOpen = true;
+    private ArrowBuf buffer;
+    private boolean isOpen;
 
-    public ByteOutputChannel(Consumer<ByteBuf> sink) {
-        this(sink, ByteBufAllocator.DEFAULT);
-    }
-
-    public ByteOutputChannel(Consumer<ByteBuf> sink, ByteBufAllocator allocator) {
-        this(sink, allocator, true);
-    }
-
-    public ByteOutputChannel(Consumer<ByteBuf> sink, ByteBufAllocator allocator, boolean useBuffering) {
+    public ByteOutputChannel(BufferAllocator allocator, Consumer<ArrowBuf> sink) {
 
         this.allocator = allocator;
         this.sink = sink;
-        this.useBuffering = useBuffering;
 
         this.buffer = null;
-
-    }
-
-    @Override
-    public int write(ByteBuffer src) throws IOException {
-
-        if (!isOpen)
-            throw new IOException("Channel is already closed");
-
-        var chunkBuf = allocator.directBuffer(src.remaining());
-        chunkBuf.writeBytes(src);
-        var chunkRemaining = chunkBuf.readableBytes();
-
-        if (!useBuffering) {
-            sink.accept(chunkBuf);
-            return chunkRemaining;
-        }
-
-        var bytesWritten = 0;
-
-        while (chunkRemaining > 0) {
-
-            if (buffer == null)
-                buffer = allocator.compositeBuffer();
-
-            var bufferRemaining = CHUNK_SIZE - buffer.readableBytes();
-            var sliceSize = Math.min(chunkBuf.readableBytes(), bufferRemaining);
-            var slice = chunkBuf.readSlice(sliceSize);
-            slice.retain();
-
-            buffer.addComponent(true, slice);
-            bytesWritten += sliceSize;
-            chunkRemaining = chunkBuf.readableBytes();
-
-            if (buffer.readableBytes() == CHUNK_SIZE) {
-                sink.accept(buffer);
-                buffer = null;
-            }
-        }
-
-        chunkBuf.release();
-
-        return bytesWritten;
+        this.isOpen = true;
     }
 
     @Override
@@ -103,14 +50,30 @@ public class ByteOutputChannel implements WritableByteChannel {
     }
 
     @Override
+    public int write(ByteBuffer src) throws IOException {
+
+        if (!isOpen)
+            throw new IOException("Channel is already closed");
+
+        var startPosition = src.position();
+
+        buffer = Bytes.writeToStream(src, buffer, allocator, CHUNK_SIZE, sink);
+
+        var endPosition = src.position();
+
+        return endPosition - startPosition;
+    }
+
+    @Override
     public void close() throws IOException {
 
         isOpen = false;
 
-        if (buffer != null) {
-
-            sink.accept(buffer);
-            buffer = null;
+        try {
+            buffer = Bytes.flushStream(buffer, sink);
+        }
+        finally {
+            buffer = Bytes.closeStream(buffer);
         }
     }
 }

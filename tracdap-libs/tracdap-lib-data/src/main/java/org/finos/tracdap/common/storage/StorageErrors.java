@@ -139,7 +139,7 @@ public abstract class StorageErrors {
         try {
 
             var messageTemplate = ERROR_MESSAGE_MAP.get(error);
-            var message = String.format(messageTemplate, storageKey, operation, path);
+            var message = String.format(messageTemplate, operation, storageKey, path);
 
             var errType = EXPLICIT_CONSTRUCTOR_MAP.get(error);
             return errType.newInstance(message);
@@ -158,7 +158,7 @@ public abstract class StorageErrors {
         try {
 
             var messageTemplate = ERROR_MESSAGE_MAP.get(error);
-            var message = String.format(messageTemplate, storageKey, operation, path, detail);
+            var message = String.format(messageTemplate, operation, storageKey, operation, path, detail);
 
             var errType = EXPLICIT_CONSTRUCTOR_MAP.get(error);
             return errType.newInstance(message);
@@ -177,7 +177,7 @@ public abstract class StorageErrors {
         try {
 
             var messageTemplate = ERROR_MESSAGE_MAP.get(error);
-            var message = String.format(messageTemplate, storageKey, operation, path);
+            var message = String.format(messageTemplate, operation, storageKey, path);
 
             var errType = EXCEPTION_CONSTRUCTOR_MAP.get(error);
             return errType.newInstance(message, cause);
@@ -191,7 +191,7 @@ public abstract class StorageErrors {
         }
     }
 
-    public ETrac chunkNotFullyWritten(int chunkBytes, int writtenBytes) {
+    public ETrac chunkNotFullyWritten(long chunkBytes, long writtenBytes) {
 
         try {
 

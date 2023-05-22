@@ -19,7 +19,6 @@ package org.finos.tracdap.common.storage.local;
 import io.netty.util.concurrent.DefaultEventExecutor;
 import io.netty.util.concurrent.DefaultThreadFactory;
 import org.apache.arrow.memory.RootAllocator;
-import org.finos.tracdap.common.concurrent.ExecutionContext;
 import org.finos.tracdap.common.data.DataContext;
 import org.finos.tracdap.common.storage.StorageReadWriteTestSuite;
 import org.finos.tracdap.common.storage.IStorageManager;
@@ -43,7 +42,7 @@ public class LocalStorageReadWriteTest extends StorageReadWriteTestSuite {
         storageProps.put(LocalFileStorage.CONFIG_ROOT_PATH, storageDir.toString());
         storage = new LocalFileStorage("TEST_STORAGE", storageProps);
 
-        execContext = new ExecutionContext(new DefaultEventExecutor(new DefaultThreadFactory("t-events")));
-        dataContext = new DataContext(execContext.eventLoopExecutor(), new RootAllocator());
+        var executor = new DefaultEventExecutor(new DefaultThreadFactory("t-events"));
+        dataContext = new DataContext(executor, new RootAllocator());
     }
 }

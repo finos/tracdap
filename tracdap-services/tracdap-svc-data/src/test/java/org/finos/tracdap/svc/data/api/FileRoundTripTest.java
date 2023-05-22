@@ -17,24 +17,25 @@
 package org.finos.tracdap.svc.data.api;
 
 import org.finos.tracdap.api.*;
-import org.finos.tracdap.common.concurrent.ExecutionContext;
-import org.finos.tracdap.common.concurrent.Flows;
-import org.finos.tracdap.common.concurrent.Futures;
-import org.finos.tracdap.common.concurrent.IExecutionContext;
+import org.finos.tracdap.common.data.DataContext;
+import org.finos.tracdap.common.async.Flows;
+import org.finos.tracdap.common.async.Futures;
+import org.finos.tracdap.common.data.IExecutionContext;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.plugin.PluginManager;
 import org.finos.tracdap.metadata.CopyStatus;
 import org.finos.tracdap.metadata.ObjectDefinition;
 import org.finos.tracdap.metadata.ObjectType;
 import org.finos.tracdap.metadata.TagSelector;
+import org.finos.tracdap.test.helpers.PlatformTest;
+import org.finos.tracdap.test.helpers.StorageTestHelpers;
 
 import com.google.common.collect.Streams;
 import com.google.protobuf.ByteString;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
+import org.apache.arrow.memory.RootAllocator;
 
-import org.finos.tracdap.test.helpers.PlatformTest;
-import org.finos.tracdap.test.helpers.StorageTestHelpers;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
@@ -84,7 +85,7 @@ abstract class FileRoundTripTest  {
 
         @BeforeEach
         void setup() {
-            execContext = new ExecutionContext(elg.next());
+            execContext = new DataContext(elg.next(), new RootAllocator());
             metaClient = platform.metaClientFuture();
             dataClient = platform.dataClient();
         }
@@ -115,7 +116,7 @@ abstract class FileRoundTripTest  {
 
         @BeforeEach
         void setup() {
-            execContext = new ExecutionContext(elg.next());
+            execContext = new DataContext(elg.next(), new RootAllocator());
             metaClient = platform.metaClientFuture();
             dataClient = platform.dataClient();
         }
@@ -273,7 +274,7 @@ abstract class FileRoundTripTest  {
                 .setSelector(selectorFor(objHeader))
                 .build();
 
-        var readResponse = Flows.<FileReadResponse>hub(execContext);
+        var readResponse = Flows.<FileReadResponse>hub(execContext.eventLoopExecutor());
         var readResponse0 = Flows.first(readResponse);
         var readByteStream = Flows.map(readResponse, FileReadResponse::getContent);
         var readBytes = Flows.fold(readByteStream, ByteString::concat, ByteString.EMPTY);

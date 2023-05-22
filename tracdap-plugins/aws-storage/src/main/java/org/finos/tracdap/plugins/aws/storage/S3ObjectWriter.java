@@ -17,22 +17,22 @@
 package org.finos.tracdap.plugins.aws.storage;
 
 import org.finos.tracdap.common.data.IDataContext;
+import org.finos.tracdap.common.data.util.Bytes;
 import org.finos.tracdap.common.storage.StorageErrors;
-import org.finos.tracdap.common.util.LoggingHelpers;
-
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.CompositeByteBuf;
-import io.netty.buffer.Unpooled;
-import io.netty.util.concurrent.OrderedEventExecutor;
 
 import software.amazon.awssdk.core.async.AsyncRequestBody;
 import software.amazon.awssdk.services.s3.S3AsyncClient;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
+import software.amazon.awssdk.services.s3.model.PutObjectResponse;
+
+import io.netty.util.concurrent.OrderedEventExecutor;
+import org.apache.arrow.memory.ArrowBuf;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import software.amazon.awssdk.services.s3.model.PutObjectResponse;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Flow;
@@ -42,7 +42,7 @@ import static org.finos.tracdap.common.storage.CommonFileStorage.WRITE_OPERATION
 import static org.finos.tracdap.common.storage.StorageErrors.ExplicitError.DUPLICATE_SUBSCRIPTION;
 
 
-public class S3ObjectWriter implements Flow.Subscriber<ByteBuf> {
+public class S3ObjectWriter implements Flow.Subscriber<ArrowBuf> {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
@@ -60,7 +60,8 @@ public class S3ObjectWriter implements Flow.Subscriber<ByteBuf> {
     private final AtomicBoolean subscriptionSet;
     private Flow.Subscription subscription;
 
-    private final CompositeByteBuf buffer = Unpooled.compositeBuffer();
+    private final List<ArrowBuf> buffer = new ArrayList<>();
+    private long bytesWritten;
 
     public S3ObjectWriter(
             String storageKey, String storagePath,
@@ -102,9 +103,9 @@ public class S3ObjectWriter implements Flow.Subscriber<ByteBuf> {
     }
 
     @Override
-    public void onNext(ByteBuf item) {
+    public void onNext(ArrowBuf item) {
 
-        buffer.addComponent(true, item);
+        buffer.add(item);
         this.subscription.request(1);
     }
 
@@ -119,15 +120,20 @@ public class S3ObjectWriter implements Flow.Subscriber<ByteBuf> {
             signal.completeExceptionally(throwable);
         }
         finally {
-            buffer.release();
+            buffer.forEach(ArrowBuf::close);
+            buffer.clear();
         }
     }
 
     @Override
     public void onComplete() {
 
-        var content = AsyncRequestBody.fromByteBuffer(buffer.nioBuffer());
-        var contentLength = (long) buffer.readableBytes();
+        var content = Bytes.readFromBuffer(buffer);
+        var contentLength = (long) content.remaining();
+        var body = AsyncRequestBody.fromByteBuffer(content);
+
+        // Store bytes written to use in completion handler
+        bytesWritten = contentLength;
 
         var request = PutObjectRequest.builder()
                 .bucket(this.bucket)
@@ -135,7 +141,7 @@ public class S3ObjectWriter implements Flow.Subscriber<ByteBuf> {
                 .contentLength(contentLength)
                 .build();
 
-        var response = dataContext.toContext(client.putObject(request, content));
+        var response = dataContext.toContext(client.putObject(request, body));
 
         response.handle(this::onCompleteHandler);
     }
@@ -145,28 +151,18 @@ public class S3ObjectWriter implements Flow.Subscriber<ByteBuf> {
         try {
 
             if (error != null) {
-
-                var tracError = errors.handleException(WRITE_OPERATION, storagePath, error);
-
-                log.error("{} {} [{}]: {}", WRITE_OPERATION, storageKey, storagePath, tracError.getMessage(), tracError);
-
                 var mappedError = errors.handleException(WRITE_OPERATION, storagePath, error);
                 signal.completeExceptionally(mappedError);
             }
             else {
-
-                var contentLength = (long) buffer.readableBytes();
-
-                log.info("{} {} [{}]: Write operation complete, object size is {}",
-                        WRITE_OPERATION, storageKey, storagePath, LoggingHelpers.formatFileSize(contentLength));
-
-                signal.complete(contentLength);
+                signal.complete(bytesWritten);
             }
 
             return CompletableFuture.completedFuture(null);
         }
         finally {
-            buffer.release();
+            buffer.forEach(ArrowBuf::close);
+            buffer.clear();
         }
     }
 }

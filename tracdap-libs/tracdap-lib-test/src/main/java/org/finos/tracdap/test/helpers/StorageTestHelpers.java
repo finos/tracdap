@@ -16,7 +16,7 @@
 
 package org.finos.tracdap.test.helpers;
 
-import org.finos.tracdap.common.concurrent.ExecutionContext;
+import org.finos.tracdap.common.data.DataContext;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.plugin.PluginManager;
 import org.finos.tracdap.common.storage.IFileStorage;
@@ -24,10 +24,11 @@ import org.finos.tracdap.common.storage.IStorageManager;
 import org.finos.tracdap.config.PlatformConfig;
 
 import io.netty.channel.EventLoopGroup;
+import org.apache.arrow.memory.RootAllocator;
 
 import java.time.Duration;
 
-import static org.finos.tracdap.test.concurrent.ConcurrentTestHelpers.resultOf;
+import static org.finos.tracdap.test.concurrent.ConcurrentTestHelpers.getResultOf;
 import static org.finos.tracdap.test.concurrent.ConcurrentTestHelpers.waitFor;
 
 
@@ -46,7 +47,7 @@ public class StorageTestHelpers {
         // Create a storage instance with the prefix removed, then do rmdir on the prefix
 
         var platformConfig = config.loadRootConfigObject(PlatformConfig.class);
-        var execCtx = new ExecutionContext(elg.next());
+        var execCtx = new DataContext(elg.next(), new RootAllocator());
 
         for (var storageBucket : platformConfig.getStorage().getBucketsMap().entrySet()) {
 
@@ -67,7 +68,7 @@ public class StorageTestHelpers {
 
                 var rmdir = storage.rmdir(prefix, execCtx);
                 waitFor(Duration.ofSeconds(30), rmdir);
-                resultOf(rmdir);
+                getResultOf(rmdir);
             }
         }
     }

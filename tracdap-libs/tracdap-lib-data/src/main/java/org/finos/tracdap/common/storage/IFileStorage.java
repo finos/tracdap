@@ -16,10 +16,10 @@
 
 package org.finos.tracdap.common.storage;
 
-import org.finos.tracdap.common.concurrent.IExecutionContext;
+import org.finos.tracdap.common.data.IExecutionContext;
 import org.finos.tracdap.common.data.IDataContext;
 
-import io.netty.buffer.ByteBuf;
+import org.apache.arrow.memory.ArrowBuf;
 import io.netty.channel.EventLoopGroup;
 
 import java.util.List;
@@ -51,16 +51,16 @@ public interface IFileStorage extends AutoCloseable {
 
     CompletionStage<Void> rmdir(String storagePath, IExecutionContext execContext);
 
-    CompletionStage<ByteBuf> readChunk(
+    CompletionStage<ArrowBuf> readChunk(
             String storagePath,
             long offset, int size,
             IDataContext dataContext);
 
-    Flow.Publisher<ByteBuf> reader(
+    Flow.Publisher<ArrowBuf> reader(
             String storagePath,
             IDataContext dataContext);
 
-    Flow.Subscriber<ByteBuf> writer(
+    Flow.Subscriber<ArrowBuf> writer(
             String storagePath,
             CompletableFuture<Long> signal,
             IDataContext dataContext);

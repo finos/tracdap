@@ -17,24 +17,25 @@
 package org.finos.tracdap.svc.data.api;
 
 import org.finos.tracdap.api.*;
-import org.finos.tracdap.common.concurrent.ExecutionContext;
-import org.finos.tracdap.common.concurrent.IExecutionContext;
+import org.finos.tracdap.common.data.DataContext;
+import org.finos.tracdap.common.data.IExecutionContext;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.metadata.MetadataUtil;
-import org.finos.tracdap.common.concurrent.Flows;
-import org.finos.tracdap.common.concurrent.Futures;
+import org.finos.tracdap.common.async.Flows;
+import org.finos.tracdap.common.async.Futures;
 import org.finos.tracdap.common.plugin.PluginManager;
 import org.finos.tracdap.metadata.*;
+import org.finos.tracdap.test.helpers.PlatformTest;
+import org.finos.tracdap.test.helpers.StorageTestHelpers;
 
 import com.google.protobuf.ByteString;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
+import org.apache.arrow.memory.RootAllocator;
 
-import org.finos.tracdap.test.helpers.PlatformTest;
-import org.finos.tracdap.test.helpers.StorageTestHelpers;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.extension.RegisterExtension;
@@ -86,7 +87,7 @@ abstract class FileOperationsTest {
 
         @BeforeEach
         void setup() {
-            execContext = new ExecutionContext(elg.next());
+            execContext = new DataContext(elg.next(), new RootAllocator());
             metaClient = platform.metaClientFuture();
             dataClient = platform.dataClient();
         }
@@ -115,7 +116,7 @@ abstract class FileOperationsTest {
 
         @BeforeEach
         void setup() {
-            execContext = new ExecutionContext(elg.next());
+            execContext = new DataContext(elg.next(), new RootAllocator());
             metaClient = platform.metaClientFuture();
             dataClient = platform.dataClient();
         }
@@ -202,7 +203,7 @@ abstract class FileOperationsTest {
                 .setSelector(MetadataUtil.selectorFor(fileId))
                 .build();
 
-        var responseStream = Flows.<FileReadResponse>hub(execContext);
+        var responseStream = Flows.<FileReadResponse>hub(execContext.eventLoopExecutor());
         var byteStream = Flows.map(responseStream, FileReadResponse::getContent);
         var content = Flows.fold(byteStream,
                 ByteString::concat,
@@ -458,7 +459,7 @@ abstract class FileOperationsTest {
                 .setSelector(MetadataUtil.selectorFor(fileId))
                 .build();
 
-        var responseStream = Flows.<FileReadResponse>hub(execContext);
+        var responseStream = Flows.<FileReadResponse>hub(execContext.eventLoopExecutor());
         var byteStream = Flows.map(responseStream, FileReadResponse::getContent);
         var content = Flows.fold(byteStream,
                 ByteString::concat,
@@ -518,7 +519,7 @@ abstract class FileOperationsTest {
                 .setSelector(MetadataUtil.selectorFor(v2Id))
                 .build();
 
-        var v2Response = Flows.<FileReadResponse>hub(execContext);
+        var v2Response = Flows.<FileReadResponse>hub(execContext.eventLoopExecutor());
         var v2ByteStream = Flows.map(v2Response, FileReadResponse::getContent);
         var v2Content = Flows.fold(v2ByteStream,
                 ByteString::concat,
@@ -536,7 +537,7 @@ abstract class FileOperationsTest {
                 .setSelector(MetadataUtil.selectorFor(v1Id))
                 .build();
 
-        var v1Response = Flows.<FileReadResponse>hub(execContext);
+        var v1Response = Flows.<FileReadResponse>hub(execContext.eventLoopExecutor());
         var v1ByteStream = Flows.map(v1Response, FileReadResponse::getContent);
         var v1Content = Flows.fold(v1ByteStream,
                 ByteString::concat,
@@ -1095,7 +1096,7 @@ abstract class FileOperationsTest {
                 .setSelector(MetadataUtil.selectorFor(v2Id))
                 .build();
 
-        var responseStream = Flows.<FileReadResponse>hub(execContext);
+        var responseStream = Flows.<FileReadResponse>hub(execContext.eventLoopExecutor());
         var byteStream = Flows.map(responseStream, FileReadResponse::getContent);
         var content = Flows.fold(byteStream,
                 ByteString::concat,
@@ -1162,7 +1163,7 @@ abstract class FileOperationsTest {
         waitFor(TEST_TIMEOUT, createFile);
         var v1Id = resultOf(createFile);
 
-        var responseStream = Flows.<FileReadResponse>hub(execContext);
+        var responseStream = Flows.<FileReadResponse>hub(execContext.eventLoopExecutor());
 
         // Collect response messages into a list for direct inspection
         var collectList = Flows.fold(responseStream,
@@ -1199,7 +1200,7 @@ abstract class FileOperationsTest {
         waitFor(TEST_TIMEOUT, createFile);
         var v1Id = resultOf(createFile);
 
-        var responseStream = Flows.<FileReadResponse>hub(execContext);
+        var responseStream = Flows.<FileReadResponse>hub(execContext.eventLoopExecutor());
 
         // Collect response messages into a list for direct inspection
         var collectList = Flows.fold(responseStream,
@@ -1249,7 +1250,7 @@ abstract class FileOperationsTest {
                 .setLatestObject(true))
                 .build();
 
-        var v2ResponseStream = Flows.<FileReadResponse>hub(execContext);
+        var v2ResponseStream = Flows.<FileReadResponse>hub(execContext.eventLoopExecutor());
         var v2ByteStream = Flows.map(v2ResponseStream, FileReadResponse::getContent);
         var v2Content = Flows.fold(v2ByteStream,
                 ByteString::concat,
@@ -1269,7 +1270,7 @@ abstract class FileOperationsTest {
 
         // Use the same request for latest file read again, should return V2
 
-        var v1ResponseStream = Flows.<FileReadResponse>hub(execContext);
+        var v1ResponseStream = Flows.<FileReadResponse>hub(execContext.eventLoopExecutor());
         var v1ByteStream = Flows.map(v1ResponseStream, FileReadResponse::getContent);
         var v1Content = Flows.fold(v1ByteStream,
                 ByteString::concat,
@@ -1297,7 +1298,7 @@ abstract class FileOperationsTest {
         // Explicit data read for V2
 
         var v2Request = readRequest(TEST_TENANT, v2Id);
-        var v2ResponseStream = Flows.<FileReadResponse>hub(execContext);
+        var v2ResponseStream = Flows.<FileReadResponse>hub(execContext.eventLoopExecutor());
         var v2ByteStream = Flows.map(v2ResponseStream, FileReadResponse::getContent);
         var v2Content = Flows.fold(v2ByteStream,
                 ByteString::concat,
@@ -1311,7 +1312,7 @@ abstract class FileOperationsTest {
         // Explicit data read for V1
 
         var v1Request = readRequest(TEST_TENANT, v1Id);
-        var v1ResponseStream = Flows.<FileReadResponse>hub(execContext);
+        var v1ResponseStream = Flows.<FileReadResponse>hub(execContext.eventLoopExecutor());
         var v1ByteStream = Flows.map(v1ResponseStream, FileReadResponse::getContent);
         var v1Content = Flows.fold(v1ByteStream,
                 ByteString::concat,
@@ -1353,7 +1354,7 @@ abstract class FileOperationsTest {
                 .setObjectAsOf(MetadataCodec.encodeDatetime(v2Timestamp)))
                 .build();
 
-        var v2ResponseStream = Flows.<FileReadResponse>hub(execContext);
+        var v2ResponseStream = Flows.<FileReadResponse>hub(execContext.eventLoopExecutor());
         var v2ByteStream = Flows.map(v2ResponseStream, FileReadResponse::getContent);
         var v2Content = Flows.fold(v2ByteStream,
                 ByteString::concat,
@@ -1371,7 +1372,7 @@ abstract class FileOperationsTest {
                 .setObjectAsOf(MetadataCodec.encodeDatetime(v1Timestamp)))
                 .build();
 
-        var v1ResponseStream = Flows.<FileReadResponse>hub(execContext);
+        var v1ResponseStream = Flows.<FileReadResponse>hub(execContext.eventLoopExecutor());
         var v1ByteStream = Flows.map(v1ResponseStream, FileReadResponse::getContent);
         var v1Content = Flows.fold(v1ByteStream,
                 ByteString::concat,

@@ -16,25 +16,18 @@
 
 package org.finos.tracdap.common.storage;
 
-import org.finos.tracdap.common.concurrent.IExecutionContext;
 import org.finos.tracdap.common.data.IDataContext;
+import org.finos.tracdap.common.data.util.Bytes;
 import org.finos.tracdap.common.exception.EStorageRequest;
 import org.finos.tracdap.common.exception.EValidationGap;
-import org.finos.tracdap.common.concurrent.Flows;
+import org.finos.tracdap.common.async.Flows;
 
-import io.netty.buffer.*;
-import io.netty.util.ReferenceCountUtil;
+import org.apache.arrow.memory.ArrowBuf;
 
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.condition.OS;
 
-import static org.finos.tracdap.test.concurrent.ConcurrentTestHelpers.resultOf;
-import static org.finos.tracdap.test.concurrent.ConcurrentTestHelpers.waitFor;
-import static org.finos.tracdap.test.storage.StorageTestHelpers.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
-
-import java.nio.CharBuffer;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -46,6 +39,13 @@ import java.util.concurrent.Flow;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+
+import static org.finos.tracdap.test.concurrent.ConcurrentTestHelpers.getResultOf;
+import static org.finos.tracdap.test.concurrent.ConcurrentTestHelpers.waitFor;
+import static org.finos.tracdap.test.storage.StorageTestHelpers.*;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
 
 
 public abstract class StorageReadWriteTestSuite {
@@ -68,7 +68,6 @@ public abstract class StorageReadWriteTestSuite {
     public static final Duration ASYNC_DELAY = Duration.ofMillis(100);
 
     protected IFileStorage storage;
-    protected IExecutionContext execContext;
     protected IDataContext dataContext;
 
 
@@ -158,11 +157,9 @@ public abstract class StorageReadWriteTestSuite {
     static void roundTripTest(
             String storagePath, List<byte[]> originalBytes,
             IFileStorage storage, IDataContext dataContext) throws Exception {
-
-        var originalBuffers = originalBytes.stream().map(bytes ->
-                ByteBufAllocator.DEFAULT
-                .directBuffer(bytes.length)
-                .writeBytes(bytes));
+        
+        var originalBuffers = originalBytes.stream()
+                .map(bytes -> Bytes.copyToBuffer(bytes, dataContext.arrowAllocator()));
 
         var writeSignal = new CompletableFuture<Long>();
         var writer = storage.writer(storagePath, writeSignal, dataContext);
@@ -171,34 +168,32 @@ public abstract class StorageReadWriteTestSuite {
         waitFor(Duration.ofHours(1), writeSignal);
 
         // Make sure the write operation did not report an error before trying to read
-        Assertions.assertDoesNotThrow(() -> resultOf(writeSignal));
+        Assertions.assertDoesNotThrow(() -> getResultOf(writeSignal));
 
         var reader = storage.reader(storagePath, dataContext);
         var readResult = Flows.fold(
-                reader, (composite, buf) -> composite.addComponent(true, buf),
-                ByteBufAllocator.DEFAULT.compositeBuffer());
+                reader, (list, buf) -> { list.add(buf); return list; },
+                new ArrayList<ArrowBuf>());
 
         waitFor(TEST_TIMEOUT, readResult);
+        var roundTripBuffers = getResultOf(readResult);
 
-        var roundTripBuffer = resultOf(readResult);
-        var roundTripContent = copyBytes(roundTripBuffer);
+        try {
 
-        // Create a new ByteBuf for the original data
-        // The writer will have released the buffers it received
-        var originalBuffer = Unpooled.wrappedBuffer(originalBytes.toArray(byte[][]::new));
-        var originalContent = copyBytes(originalBuffer);
+            var roundTripContent = Bytes.copyFromBuffer(roundTripBuffers);
 
-        Assertions.assertArrayEquals(originalContent, roundTripContent);
+            // Create a new ByteBuf for the original data
+            // The writer will have released the buffers it received
 
-        originalBuffer.release();
-        roundTripBuffer.release();
-    }
+            var originalSum = originalBytes.stream().mapToInt(bs -> bs.length).sum();
+            var originalBuffer = ByteBuffer.allocate(originalSum);
+            originalBytes.forEach(originalBuffer::put);
 
-    private static byte[] copyBytes(ByteBuf buf) {
-
-        byte[] bs = new byte[buf.readableBytes()];
-        buf.readBytes(bs);
-        return bs;
+            Assertions.assertArrayEquals(originalBuffer.array(), roundTripContent);
+        }
+        finally {
+            roundTripBuffers.forEach(ArrowBuf::close);
+        }
     }
 
 
@@ -209,7 +204,7 @@ public abstract class StorageReadWriteTestSuite {
     // Functional error tests can be set up and verified entirely using the storage API
     // All back ends should behave consistently for these tests
 
-    // Errors are checked using resultOf(), which unwraps stream state errors
+    // Errors are checked using getResultOf(), which unwraps stream state errors
     // This exposes the functional cause of errors in the stream, which will be EStorage (or ETrac) errors
 
     @Test
@@ -238,12 +233,12 @@ public abstract class StorageReadWriteTestSuite {
 
         var storagePath = "some_file.txt";
 
-        var prepare = makeSmallFile(storagePath, storage, execContext);
+        var prepare = makeSmallFile(storagePath, storage, dataContext);
         waitFor(TEST_TIMEOUT, prepare);
 
-        var exists1 = storage.exists(storagePath, execContext);
+        var exists1 = storage.exists(storagePath, dataContext);
         waitFor(TEST_TIMEOUT, exists1);
-        var exists1Result = resultOf(exists1);
+        var exists1Result = getResultOf(exists1);
         Assertions.assertTrue(exists1Result);
 
         var newContent = "small";
@@ -260,18 +255,17 @@ public abstract class StorageReadWriteTestSuite {
 
         var storagePath = "some_file.txt";
 
-        var prepare = storage.mkdir(storagePath, false, execContext);
+        var prepare = storage.mkdir(storagePath, false, dataContext);
         waitFor(TEST_TIMEOUT, prepare);
 
-        var exists1 = storage.exists(storagePath, execContext);
+        var exists1 = storage.exists(storagePath, dataContext);
         waitFor(TEST_TIMEOUT, exists1);
-        var exists1Result = resultOf(exists1);
+        var exists1Result = getResultOf(exists1);
         Assertions.assertTrue(exists1Result);
 
-        var content = ByteBufUtil.encodeString(
-                ByteBufAllocator.DEFAULT,
-                CharBuffer.wrap("Some content"),
-                StandardCharsets.UTF_8);
+        var content = Bytes.copyToBuffer(
+                "Some content".getBytes(StandardCharsets.UTF_8),
+                dataContext.arrowAllocator());
 
         var contentStream = Flows.publish(Stream.of(content));
         var writeSignal = new CompletableFuture<Long>();
@@ -283,7 +277,7 @@ public abstract class StorageReadWriteTestSuite {
         var exists = storage.exists(storagePath, dataContext);
         waitFor(TEST_TIMEOUT, exists);
 
-        Assertions.assertTrue(resultOf(exists));
+        Assertions.assertTrue(getResultOf(exists));
 
         var contentStream2 = Flows.publish(Stream.of(content));
         var writeSignal2 = new CompletableFuture<Long>();
@@ -293,7 +287,7 @@ public abstract class StorageReadWriteTestSuite {
 
             contentStream2.subscribe(writer2);
             waitFor(TEST_TIMEOUT, writeSignal2);
-            resultOf(writeSignal2);
+            getResultOf(writeSignal2);
         });
     }
 
@@ -349,16 +343,19 @@ public abstract class StorageReadWriteTestSuite {
         var storagePath = "missing_file.txt";
 
         var reader = storage.reader(storagePath, dataContext);
+        var result = new ArrayList<ArrowBuf>();
 
         Assertions.assertThrows(EStorageRequest.class, () -> {
 
             var readResult = Flows.fold(
-                    reader, (composite, buf) -> composite.addComponent(true, buf),
-                    ByteBufAllocator.DEFAULT.compositeBuffer());
+                    reader, (list, buf) -> { list.add(buf); return list; },
+                    result);
 
             waitFor(TEST_TIMEOUT, readResult);
-            resultOf(readResult);
+            getResultOf(readResult);
         });
+
+        result.forEach(ArrowBuf::close);
     }
 
     @Test
@@ -444,10 +441,8 @@ public abstract class StorageReadWriteTestSuite {
         var random = new Random();
         bytes.forEach(random::nextBytes);
 
-        var chunks = bytes.stream().map(bs ->
-                ByteBufAllocator.DEFAULT
-                .directBuffer(bs.length)
-                .writeBytes(bs))
+        var chunks = bytes.stream()
+                .map(bs -> Bytes.copyToBuffer(bs, dataContext.arrowAllocator()))
                 .collect(Collectors.toList());
 
         var writeSignal = new CompletableFuture<Long>();
@@ -456,7 +451,7 @@ public abstract class StorageReadWriteTestSuite {
 
         waitFor(TEST_TIMEOUT, writeSignal);
 
-        Assertions.assertDoesNotThrow(() -> resultOf(writeSignal));
+        Assertions.assertDoesNotThrow(() -> getResultOf(writeSignal));
 
         // Allow time for background cleanup
         Thread.sleep(ASYNC_DELAY.toMillis());
@@ -475,7 +470,7 @@ public abstract class StorageReadWriteTestSuite {
 
         var dirExists = storage.exists("some_dir", dataContext);
         waitFor(TEST_TIMEOUT, dirExists);
-        Assertions.assertTrue(resultOf(dirExists));
+        Assertions.assertTrue(getResultOf(dirExists));
 
         // Prepare a writer to write a file inside the new dir
 
@@ -489,7 +484,7 @@ public abstract class StorageReadWriteTestSuite {
         // File should not have been created as onSubscribe has not been called
         var fileExists = storage.exists(storagePath, dataContext);
         waitFor(TEST_TIMEOUT, fileExists);
-        Assertions.assertFalse(resultOf(fileExists));
+        Assertions.assertFalse(getResultOf(fileExists));
     }
 
     @Test
@@ -499,7 +494,7 @@ public abstract class StorageReadWriteTestSuite {
 
         var bytes = new byte[10000];
         new Random().nextBytes(bytes);
-        var chunk = Unpooled.wrappedBuffer(bytes);
+        var chunk = Bytes.copyToBuffer(bytes, dataContext.arrowAllocator());
 
         var writerSignal = new CompletableFuture<Long>();
         var writer = storage.writer(storagePath, writerSignal, dataContext);
@@ -520,12 +515,12 @@ public abstract class StorageReadWriteTestSuite {
         writer.onNext(chunk);
         writer.onComplete();
         waitFor(TEST_TIMEOUT, writerSignal);
-        Assertions.assertDoesNotThrow(() -> resultOf(writerSignal));
+        Assertions.assertDoesNotThrow(() -> getResultOf(writerSignal));
 
         // File should now be visible in storage
         var size = storage.size(storagePath, dataContext);
         waitFor(TEST_TIMEOUT, size);
-        Assertions.assertEquals(bytes.length, resultOf(size));
+        Assertions.assertEquals(bytes.length, getResultOf(size));
     }
 
     @Test
@@ -554,15 +549,16 @@ public abstract class StorageReadWriteTestSuite {
         verify(subscription, never()).cancel();
 
         // For errors received externally via onError(),
-        // The writer should wrap the error with a completion error and use the wrapped error as the result signal
-        Assertions.assertThrows(CompletionException.class, () -> resultOf(writerSignal, false));
-
-        // The wrapped exception should be what was received in onError
+        // The storage layer should wrap any unexpected error types with ETracInternal
+        // The async framework will also wrap in a completion error and use the wrapped error as the result signal
         try {
-            resultOf(writerSignal, false);
+            getResultOf(writerSignal, false);
+            Assertions.fail("Exception was not thrown");
         }
         catch (CompletionException e) {
-            Assertions.assertTrue(e.getCause() instanceof TestException);
+            var internalError = e.getCause();
+            var cause = internalError.getCause();
+            Assertions.assertTrue(cause instanceof TestException);
         }
 
         // If there is a partially written file,
@@ -571,7 +567,7 @@ public abstract class StorageReadWriteTestSuite {
         var exists = storage.exists(storagePath, dataContext);
         waitFor(TEST_TIMEOUT, exists);
 
-        Assertions.assertFalse(resultOf(exists));
+        Assertions.assertFalse(getResultOf(exists));
     }
 
     @Test
@@ -581,7 +577,7 @@ public abstract class StorageReadWriteTestSuite {
 
         var bytes0 = new byte[10000];
         new Random().nextBytes(bytes0);
-        var chunk0 = Unpooled.wrappedBuffer(bytes0);
+        var chunk0 = Bytes.copyToBuffer(bytes0, dataContext.arrowAllocator());
 
         var writerSignal = new CompletableFuture<Long>();
         var writer = storage.writer(storagePath, writerSignal, dataContext);
@@ -609,15 +605,16 @@ public abstract class StorageReadWriteTestSuite {
         verify(subscription, never()).cancel();
 
         // For errors received externally via onError(),
-        // The writer should wrap the error with a completion error and use the wrapped error as the result signal
-        Assertions.assertThrows(CompletionException.class, () -> resultOf(writerSignal, false));
-
-        // The wrapped exception should be what was received in onError
+        // The storage layer should wrap any unexpected error types with ETracInternal
+        // The async framework will also wrap in a completion error and use the wrapped error as the result signal
         try {
-            resultOf(writerSignal, false);
+            getResultOf(writerSignal, false);
+            Assertions.fail("Exception was not thrown");
         }
         catch (CompletionException e) {
-            Assertions.assertTrue(e.getCause() instanceof TestException);
+            var internalError = e.getCause();
+            var cause = internalError.getCause();
+            Assertions.assertTrue(cause instanceof TestException);
         }
 
         // If there is a partially written file,
@@ -626,7 +623,7 @@ public abstract class StorageReadWriteTestSuite {
         var exists = storage.exists(storagePath, dataContext);
         waitFor(TEST_TIMEOUT, exists);
 
-        Assertions.assertFalse(resultOf(exists));
+        Assertions.assertFalse(getResultOf(exists));
     }
 
     @Test
@@ -642,7 +639,7 @@ public abstract class StorageReadWriteTestSuite {
         var writerSignal1 = new CompletableFuture<Long>();
         var writer1 = storage.writer(storagePath, writerSignal1, dataContext);
         var subscription1 = mock(Flow.Subscription.class);
-        var chunk1 = Unpooled.wrappedBuffer(bytes);
+        var chunk1 = Bytes.copyToBuffer(bytes, dataContext.arrowAllocator());
 
         writer1.onSubscribe(subscription1);
         verify(subscription1, timeout(TEST_TIMEOUT.toMillis())).request(anyLong());
@@ -654,19 +651,19 @@ public abstract class StorageReadWriteTestSuite {
         // Send the onError() message and make sure the writer signal reports the failure
         writer1.onError(new TestException());
         waitFor(TEST_TIMEOUT, writerSignal1);
-        Assertions.assertThrows(CompletionException.class, () -> resultOf(writerSignal1, false));
+        Assertions.assertThrows(CompletionException.class, () -> getResultOf(writerSignal1, false));
 
         // File should not exist in storage after an aborted write
         var exists1 = storage.exists(storagePath, dataContext);
         waitFor(TEST_TIMEOUT, exists1);
-        Assertions.assertFalse(resultOf(exists1));
+        Assertions.assertFalse(getResultOf(exists1));
 
         // Set up a second writer to retry the same operation
         // This time, send the chunk and an onComplete() message
         var writerSignal2 = new CompletableFuture<Long>();
         var writer2 = storage.writer(storagePath, writerSignal2, dataContext);
         var subscription2 = mock(Flow.Subscription.class);
-        var chunk2 = Unpooled.wrappedBuffer(bytes);
+        var chunk2 = Bytes.copyToBuffer(bytes, dataContext.arrowAllocator());
 
         writer2.onSubscribe(subscription2);
         verify(subscription2, timeout(TEST_TIMEOUT.toMillis())).request(anyLong());
@@ -675,18 +672,18 @@ public abstract class StorageReadWriteTestSuite {
 
         // Wait for the second operation, which should succeed
         waitFor(TEST_TIMEOUT, writerSignal2);
-        Assertions.assertDoesNotThrow(() -> resultOf(writerSignal2));
+        Assertions.assertDoesNotThrow(() -> getResultOf(writerSignal2));
 
         // File should now be visible in storage
         var size2 = storage.size(storagePath, dataContext);
         waitFor(TEST_TIMEOUT, size2);
-        Assertions.assertEquals(dataSize, resultOf(size2));
+        Assertions.assertEquals(dataSize, getResultOf(size2));
     }
 
     @Test
     void testRead_requestUpfront() {
 
-        var chunks = new ArrayList<ByteBuf>();
+        var chunks = new ArrayList<ArrowBuf>();
 
         try {
 
@@ -695,7 +692,7 @@ public abstract class StorageReadWriteTestSuite {
             // Create a file big enough that it needs many chunks to read
 
             var originalBytes = new byte[10 * 1024 * 1024];
-            var originalContent = ByteBufAllocator.DEFAULT.directBuffer(10000);
+            var originalContent = dataContext.arrowAllocator().buffer(originalBytes.length);
 
             var random = new Random();
             random.nextBytes(originalBytes);
@@ -712,7 +709,7 @@ public abstract class StorageReadWriteTestSuite {
             var MIN_CHUNKS_EXPECTED = 5;           // implies a max chunk size of 2 MiB
             var MAX_CHUNKS_EXPECTED = 40 * 1024;   // implies a min chunk size of 256 B
 
-            Flow.Subscriber<ByteBuf> subscriber = unchecked(mock(Flow.Subscriber.class));
+            Flow.Subscriber<ArrowBuf> subscriber = unchecked(mock(Flow.Subscriber.class));
             AtomicLong bytesRead = new AtomicLong(0);
 
             // Request all the chunks in one go as soon as onSubscribe is received
@@ -724,11 +721,11 @@ public abstract class StorageReadWriteTestSuite {
 
             // Count up the bytes received and release buffers
             doAnswer(invocation -> {
-                ByteBuf chunk = invocation.getArgument(0);
+                ArrowBuf chunk = invocation.getArgument(0);
                 bytesRead.addAndGet(chunk.readableBytes());
                 chunks.add(chunk);
                 return null;
-            }).when(subscriber).onNext(any(ByteBuf.class));
+            }).when(subscriber).onNext(any(ArrowBuf.class));
 
             // Create a reader and read using the mocked subscriber
 
@@ -742,14 +739,14 @@ public abstract class StorageReadWriteTestSuite {
             verify(subscriber, timeout(TEST_TIMEOUT.toMillis())).onComplete();
 
             // Chunks received - there should be more than one
-            verify(subscriber, atLeast(MIN_CHUNKS_EXPECTED)).onNext(any(ByteBuf.class));
-            verify(subscriber, atMost(MAX_CHUNKS_EXPECTED)).onNext(any(ByteBuf.class));
+            verify(subscriber, atLeast(MIN_CHUNKS_EXPECTED)).onNext(any(ArrowBuf.class));
+            verify(subscriber, atMost(MAX_CHUNKS_EXPECTED)).onNext(any(ArrowBuf.class));
 
             // No errors
             verify(subscriber, never()).onError(any());
         }
         finally {
-            chunks.forEach(ByteBuf::release);
+            chunks.forEach(ArrowBuf::close);
         }
     }
 
@@ -768,15 +765,15 @@ public abstract class StorageReadWriteTestSuite {
         // Use another reader to read the file - should be ok
         var content = readFile(storagePath, storage, dataContext);
         waitFor(TEST_TIMEOUT, content);
-        Assertions.assertTrue(resultOf(content).readableBytes() > 0);
-        resultOf(content).release();
+        Assertions.assertTrue(getResultOf(content).readableBytes() > 0);
+        getResultOf(content).close();
 
         // Delete the file
         var rm = storage.rm(storagePath, dataContext);
         waitFor(TEST_TIMEOUT, rm);
 
         // Now try subscribing to the reader - should result in a storage request error
-        Flow.Subscriber<ByteBuf> subscriber = unchecked(mock(Flow.Subscriber.class));
+        Flow.Subscriber<ArrowBuf> subscriber = unchecked(mock(Flow.Subscriber.class));
         reader.subscribe(subscriber);
 
         verify(subscriber, timeout(TEST_TIMEOUT.toMillis())).onSubscribe(any(Flow.Subscription.class));
@@ -793,15 +790,15 @@ public abstract class StorageReadWriteTestSuite {
         // Two subscribers that just record their subscriptions
 
         CompletableFuture<Flow.Subscription> subscription1 = new CompletableFuture<>();
-        Flow.Subscriber<ByteBuf> subscriber1 = unchecked(mock(Flow.Subscriber.class));
+        Flow.Subscriber<ArrowBuf> subscriber1 = unchecked(mock(Flow.Subscriber.class));
         doAnswer(invocation -> subscription1.complete(invocation.getArgument(0)))
             .when(subscriber1).onSubscribe(any(Flow.Subscription.class));
         // Also discard bytes from onNext, since some will be read
-        doAnswer(invocation -> ReferenceCountUtil.release(invocation.getArgument(0)))
-            .when(subscriber1).onNext(any(ByteBuf.class));
+        doAnswer(invocation -> { ((ArrowBuf)invocation.getArgument(0)).close(); return null; })
+            .when(subscriber1).onNext(any(ArrowBuf.class));
 
         CompletableFuture<Flow.Subscription> subscription2 = new CompletableFuture<>();
-        Flow.Subscriber<ByteBuf> subscriber2 = unchecked(mock(Flow.Subscriber.class));
+        Flow.Subscriber<ArrowBuf> subscriber2 = unchecked(mock(Flow.Subscriber.class));
         doAnswer(invocation -> subscription2.complete(invocation.getArgument(0)))
             .when(subscriber2).onSubscribe(any(Flow.Subscription.class));
 
@@ -820,7 +817,7 @@ public abstract class StorageReadWriteTestSuite {
 
         subscription1.get().request(2);
 
-        verify(subscriber1, timeout(TEST_TIMEOUT.toMillis()).times(1)).onNext(any(ByteBuf.class));
+        verify(subscriber1, timeout(TEST_TIMEOUT.toMillis()).times(1)).onNext(any(ArrowBuf.class));
         verify(subscriber1, timeout(TEST_TIMEOUT.toMillis()).times(1)).onComplete();
 
         // Subscription 2 should not receive any further signals
@@ -839,7 +836,7 @@ public abstract class StorageReadWriteTestSuite {
 
         // A subscriber that cancels as soon as it receives onSubscribe
 
-        Flow.Subscriber<ByteBuf> subscriber = unchecked(mock(Flow.Subscriber.class));
+        Flow.Subscriber<ArrowBuf> subscriber = unchecked(mock(Flow.Subscriber.class));
         doAnswer(invocation -> {
 
             var subscription = (Flow.Subscription) invocation.getArgument(0);
@@ -873,7 +870,7 @@ public abstract class StorageReadWriteTestSuite {
         // Create a file big enough that it can't be read in a single chunk
 
         var originalBytes = new byte[10000];
-        var originalContent = ByteBufAllocator.DEFAULT.directBuffer(10000);
+        var originalContent = dataContext.arrowAllocator().buffer(10000);
 
         var random = new Random();
         random.nextBytes(originalBytes);
@@ -884,7 +881,7 @@ public abstract class StorageReadWriteTestSuite {
 
         // A subscriber that will read one chunk and then cancel the subscription
 
-        Flow.Subscriber<ByteBuf> subscriber = unchecked(mock(Flow.Subscriber.class));
+        Flow.Subscriber<ArrowBuf> subscriber = unchecked(mock(Flow.Subscriber.class));
         CompletableFuture<Flow.Subscription> subscription = new CompletableFuture<>();
         doAnswer(invocation -> {
 
@@ -896,11 +893,12 @@ public abstract class StorageReadWriteTestSuite {
         }).when(subscriber).onSubscribe(any(Flow.Subscription.class));
         doAnswer(invocation -> {
 
-            ReferenceCountUtil.release(invocation.getArgument(0));
+            var buffer = (ArrowBuf) invocation.getArgument(0);
+            buffer.close();
             subscription.get().cancel();
             return null;
 
-        }).when(subscriber).onNext(any(ByteBuf.class));
+        }).when(subscriber).onNext(any(ArrowBuf.class));
 
         // Create a reader and read using the mocked subscriber
 
@@ -922,11 +920,11 @@ public abstract class StorageReadWriteTestSuite {
         var retryRead = readFile(storagePath, storage, dataContext);
 
         waitFor(TEST_TIMEOUT, retryRead);
-        var content = resultOf(retryRead);
+        var content = getResultOf(retryRead);
 
-        var bytes = new byte[content.readableBytes()];
+        var bytes = new byte[(int) content.readableBytes()];
         content.readBytes(bytes);
-        content.release();
+        content.close();
 
         Assertions.assertArrayEquals(originalBytes, bytes);
     }
@@ -939,7 +937,7 @@ public abstract class StorageReadWriteTestSuite {
         // Create a file big enough that it can't be read in a single chunk
 
         var originalBytes = new byte[10000];
-        var originalContent = ByteBufAllocator.DEFAULT.directBuffer(10000);
+        var originalContent = dataContext.arrowAllocator().buffer(10000);
 
         var random = new Random();
         random.nextBytes(originalBytes);
@@ -950,7 +948,7 @@ public abstract class StorageReadWriteTestSuite {
 
         // A subscriber that will read one chunk and then cancel the subscription
 
-        Flow.Subscriber<ByteBuf> subscriber = unchecked(mock(Flow.Subscriber.class));
+        Flow.Subscriber<ArrowBuf> subscriber = unchecked(mock(Flow.Subscriber.class));
         CompletableFuture<Flow.Subscription> subscription = new CompletableFuture<>();
         doAnswer(invocation -> {
 
@@ -962,11 +960,12 @@ public abstract class StorageReadWriteTestSuite {
         }).when(subscriber).onSubscribe(any(Flow.Subscription.class));
         doAnswer(invocation -> {
 
-            ReferenceCountUtil.release(invocation.getArgument(0));
+            var buffer = (ArrowBuf) invocation.getArgument(0);
+            buffer.close();
             subscription.get().cancel();
             return null;
 
-        }).when(subscriber).onNext(any(ByteBuf.class));
+        }).when(subscriber).onNext(any(ArrowBuf.class));
 
         // Create a reader and read using the mocked subscriber
 
@@ -993,7 +992,7 @@ public abstract class StorageReadWriteTestSuite {
         var exists = storage.exists(storagePath, dataContext);
 
         waitFor(TEST_TIMEOUT, exists);
-        Assertions.assertFalse(resultOf(exists));
+        Assertions.assertFalse(getResultOf(exists));
     }
 
     @SuppressWarnings("unchecked")

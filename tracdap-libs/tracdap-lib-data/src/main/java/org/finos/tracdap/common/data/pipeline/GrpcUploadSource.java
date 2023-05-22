@@ -16,16 +16,20 @@
 
 package org.finos.tracdap.common.data.pipeline;
 
+import org.finos.tracdap.common.data.util.Bytes;
 import org.finos.tracdap.common.exception.ETracInternal;
 import org.finos.tracdap.common.exception.EUnexpected;
 
+import com.google.protobuf.ByteString;
 import io.grpc.stub.ServerCallStreamObserver;
 import io.grpc.stub.StreamObserver;
-import io.netty.buffer.ByteBuf;
+import org.apache.arrow.memory.ArrowBuf;
+import org.apache.arrow.memory.BufferAllocator;
 
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Flow;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 
 
@@ -43,6 +47,7 @@ public class GrpcUploadSource<TRequest, TResponse> {
     private final CompletableFuture<TRequest> firstMessage;
     private Flow.Subscriber<? super TRequest> subscriber;
     private Flow.Subscription subscription;
+    private Runnable cleanup;
 
     private boolean requestedFirst;
     private boolean sentFirst;
@@ -65,27 +70,45 @@ public class GrpcUploadSource<TRequest, TResponse> {
 
     // Setup
 
+    public void whenComplete(Runnable cleanup) {
+        this.cleanup = cleanup;
+    }
+
     public StreamObserver<TRequest> start() {
         response.request(1);
         return request;
     }
 
     public void succeeded(TResponse result) {
-        response.onNext(result);
-        response.onCompleted();
+
+        try {
+            response.onNext(result);
+            response.onCompleted();
+        }
+        finally {
+            if (cleanup != null)
+                cleanup.run();
+        }
     }
 
     public Void failed(Throwable error) {
-        response.onError(error);
-        return null;
+
+        try {
+            response.onError(error);
+            return null;
+        }
+        finally {
+            if (cleanup != null)
+                cleanup.run();
+        }
     }
 
     public CompletionStage<TRequest> firstMessage() {
         return firstMessage;
     }
 
-    public Flow.Publisher<ByteBuf> dataStream(Function<TRequest, ByteBuf> unwrapFunc) {
-        return new UploadPublisher(unwrapFunc);
+    public Flow.Publisher<ArrowBuf> dataStream(Function<TRequest, ByteString> accessor, BufferAllocator allocator) {
+        return new UploadPublisher(accessor, allocator);
     }
 
 
@@ -222,43 +245,77 @@ public class GrpcUploadSource<TRequest, TResponse> {
         }
     }
 
-    private class UploadPublisher implements Flow.Processor<TRequest, ByteBuf> {
+    private class UploadPublisher implements Flow.Processor<TRequest, ArrowBuf> {
 
-        private final Function<TRequest, ByteBuf> _unwrapFunc;
-        private Flow.Subscriber<? super ByteBuf> _subscriber;
+        private static final int DEFAULT_CHUNK_SIZE = 2 * 1024 * 1024;
 
-        public UploadPublisher(Function<TRequest, ByteBuf> unwrapFunc) {
-            _unwrapFunc = unwrapFunc;
+        private final Function<TRequest, ByteString> accessor;
+        private final BufferAllocator allocator;
+
+        private Flow.Subscriber<? super ArrowBuf> subscriber;
+        private ArrowBuf buffer;
+
+        public UploadPublisher(Function<TRequest, ByteString> accessor, BufferAllocator allocator) {
+            this.accessor = accessor;
+            this.allocator = allocator;
         }
 
         @Override
-        public void subscribe(Flow.Subscriber<? super ByteBuf> subscriber) {
-            _subscriber = subscriber;
+        public void subscribe(Flow.Subscriber<? super ArrowBuf> subscriber) {
+            this.subscriber = subscriber;
             pipelineSubscribe(this);
         }
 
         @Override
         public void onSubscribe(Flow.Subscription subscription) {
-            _subscriber.onSubscribe(subscription);
+            subscriber.onSubscribe(subscription);
         }
 
         @Override
         public void onNext(TRequest item) {
-            // Do not publish empty messages to the data pipeline
-            // Particularly if the first message is empty, this can break some parsers
-            var buffer = _unwrapFunc.apply(item);
-            if (buffer.readableBytes() > 0)
-                _subscriber.onNext(buffer);
+
+            try {
+                var bytes = accessor.apply(item).asReadOnlyByteBuffer();
+
+                // TODO: Simplify this
+
+                var sent = new AtomicBoolean(false);
+
+                buffer = Bytes.writeToStream(
+                        bytes, buffer, allocator,
+                        DEFAULT_CHUNK_SIZE,
+                        x -> { sent.set(true); subscriber.onNext(x); });
+
+                if (! sent.get())
+                    subscription.request(1);
+            }
+            catch (Exception e) {
+                buffer = Bytes.closeStream(buffer);
+                throw e;
+            }
         }
 
         @Override
         public void onError(Throwable throwable) {
-            _subscriber .onError(throwable);
+
+            try {
+                subscriber.onError(throwable);
+            }
+            finally {
+                buffer = Bytes.closeStream(buffer);
+            }
         }
 
         @Override
         public void onComplete() {
-            _subscriber .onComplete();
+
+            try {
+                buffer = Bytes.flushStream(buffer, subscriber::onNext);
+                subscriber.onComplete();
+            }
+            finally {
+                buffer = Bytes.closeStream(buffer);
+            }
         }
     }
 

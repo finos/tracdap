@@ -16,7 +16,6 @@
 
 package org.finos.tracdap.common.data;
 
-import org.finos.tracdap.common.concurrent.IExecutionContext;
 import org.apache.arrow.memory.BufferAllocator;
 
 public interface IDataContext extends IExecutionContext {

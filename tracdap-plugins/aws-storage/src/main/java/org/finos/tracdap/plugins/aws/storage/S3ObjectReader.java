@@ -18,7 +18,6 @@ package org.finos.tracdap.plugins.aws.storage;
 
 import org.finos.tracdap.common.data.IDataContext;
 import org.finos.tracdap.common.storage.StorageErrors;
-import org.finos.tracdap.common.util.LoggingHelpers;
 
 import software.amazon.awssdk.core.async.AsyncResponseTransformer;
 import software.amazon.awssdk.core.async.SdkPublisher;
@@ -208,10 +207,6 @@ public class S3ObjectReader implements Flow.Publisher<ArrowBuf> {
             subscriber.onError(error);
             gotError = true;
         }
-
-        log.info("{} {} [{}]: Object size is [{}]",
-                READ_OPERATION, storageKey, storagePath,
-                LoggingHelpers.formatFileSize(response.contentLength()));
     }
 
     private void _onStream(SdkPublisher<ByteBuffer> publisher) {

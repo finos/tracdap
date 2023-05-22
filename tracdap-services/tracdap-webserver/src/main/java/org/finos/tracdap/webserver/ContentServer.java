@@ -16,10 +16,12 @@
 
 package org.finos.tracdap.webserver;
 
+import io.netty.buffer.NettyArrowBuf;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpResponseStatus;
-import org.finos.tracdap.common.concurrent.IExecutionContext;
+import org.finos.tracdap.common.async.Flows;
+import org.finos.tracdap.common.data.IExecutionContext;
 import org.finos.tracdap.common.data.IDataContext;
 import org.finos.tracdap.common.exception.*;
 import org.finos.tracdap.common.storage.FileStat;
@@ -208,7 +210,9 @@ public class ContentServer {
     private ContentResponse buildContentResponse(FileStat fileStat, IDataContext dataCtx) {
 
         var response = buildHeadResponse(fileStat);
-        response.reader = storage.reader(fileStat.storagePath, dataCtx);
+        var reader = storage.reader(fileStat.storagePath, dataCtx);
+
+        response.reader = Flows.map(reader, NettyArrowBuf::unwrapBuffer);
 
         return response;
     }
