@@ -549,15 +549,16 @@ public abstract class StorageReadWriteTestSuite {
         verify(subscription, never()).cancel();
 
         // For errors received externally via onError(),
-        // The writer should wrap the error with a completion error and use the wrapped error as the result signal
-        Assertions.assertThrows(CompletionException.class, () -> getResultOf(writerSignal, false));
-
-        // The wrapped exception should be what was received in onError
+        // The storage layer should wrap any unexpected error types with ETracInternal
+        // The async framework will also wrap in a completion error and use the wrapped error as the result signal
         try {
             getResultOf(writerSignal, false);
+            Assertions.fail("Exception was not thrown");
         }
         catch (CompletionException e) {
-            Assertions.assertTrue(e.getCause() instanceof TestException);
+            var internalError = e.getCause();
+            var cause = internalError.getCause();
+            Assertions.assertTrue(cause instanceof TestException);
         }
 
         // If there is a partially written file,
@@ -604,15 +605,16 @@ public abstract class StorageReadWriteTestSuite {
         verify(subscription, never()).cancel();
 
         // For errors received externally via onError(),
-        // The writer should wrap the error with a completion error and use the wrapped error as the result signal
-        Assertions.assertThrows(CompletionException.class, () -> getResultOf(writerSignal, false));
-
-        // The wrapped exception should be what was received in onError
+        // The storage layer should wrap any unexpected error types with ETracInternal
+        // The async framework will also wrap in a completion error and use the wrapped error as the result signal
         try {
             getResultOf(writerSignal, false);
+            Assertions.fail("Exception was not thrown");
         }
         catch (CompletionException e) {
-            Assertions.assertTrue(e.getCause() instanceof TestException);
+            var internalError = e.getCause();
+            var cause = internalError.getCause();
+            Assertions.assertTrue(cause instanceof TestException);
         }
 
         // If there is a partially written file,
