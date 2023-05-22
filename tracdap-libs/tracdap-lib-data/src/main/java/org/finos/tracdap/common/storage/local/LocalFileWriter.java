@@ -362,8 +362,6 @@ public class LocalFileWriter implements Flow.Subscriber<ArrowBuf> {
 
         try {
 
-            log.info("Write operation complete: {} bytes written [{}]", bytesWritten, absolutePath);
-
             channel.close();
 
             log.info("File channel closed: [{}]", absolutePath);
