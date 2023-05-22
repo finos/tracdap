@@ -31,7 +31,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Flow;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -499,7 +498,7 @@ public abstract class CommonFileStorage implements IFileStorage {
 
 
     // -----------------------------------------------------------------------------------------------------------------
-    // LOGGING WRAPPERS
+    // WRAPPERS FOR LOGGING AND ERROR HANDLING
     // -----------------------------------------------------------------------------------------------------------------
 
 
@@ -512,24 +511,24 @@ public abstract class CommonFileStorage implements IFileStorage {
 
             var result = func.call(operationName, storagePath);
 
-            return result.exceptionally(e -> {
+            return result.exceptionally(error -> {
 
-                var error = errors.handleException(operationName, storagePath, e);
+                var mappedError = errors.handleException(operationName, storagePath, error);
 
                 log.error("{} {} FAILED: [{}]", operationName, storageKey, storagePath);
-                log.error(error.getMessage(), error);
+                log.error(mappedError.getMessage(), mappedError);
 
-                throw error;
+                throw mappedError;
             });
         }
-        catch (Exception e) {
+        catch (Exception error) {
 
-            var error = errors.handleException(operationName, storagePath, e);
+            var mappedError = errors.handleException(operationName, storagePath, error);
 
             log.error("{} {} FAILED: [{}]", operationName, storageKey, storagePath);
-            log.error(error.getMessage(), error);
+            log.error(mappedError.getMessage(), mappedError);
 
-            return CompletableFuture.failedFuture(error);
+            return CompletableFuture.failedFuture(mappedError);
         }
     }
 
@@ -545,14 +544,14 @@ public abstract class CommonFileStorage implements IFileStorage {
 
             return func.call(operationName, storagePath);
         }
-        catch (Exception e) {
+        catch (Exception error) {
 
-            var error = errors.handleException(operationName, storagePath, e);
+            var mappedError = errors.handleException(operationName, storagePath, error);
 
             log.error("{} {} FAILED: [{}]", operationName, storageKey, storagePath);
-            log.error(error.getMessage(), error);
+            log.error(mappedError.getMessage(), mappedError);
 
-            return errFunc.apply(error);
+            return errFunc.apply(mappedError);
         }
     }
 
@@ -563,9 +562,10 @@ public abstract class CommonFileStorage implements IFileStorage {
         monitorSignal.whenComplete((size, error) -> {
 
             if (error != null) {
+                var mappedError = errors.handleException(WRITE_OPERATION, storagePath, error);
                 log.error("{} {} FAILED: [{}]", WRITE_OPERATION, storageKey, storagePath);
-                log.error(error.getMessage(), error);
-                readSignal.completeExceptionally(error);
+                log.error(mappedError.getMessage(), mappedError);
+                readSignal.completeExceptionally(mappedError);
             }
             else {
                 var fileSize = LoggingHelpers.formatFileSize(size);
@@ -587,13 +587,10 @@ public abstract class CommonFileStorage implements IFileStorage {
 
         }).exceptionally(error -> {
 
+            var mappedError = errors.handleException(READ_OPERATION, storagePath, error);
             log.error("{} {} FAILED: [{}]", READ_OPERATION, storageKey, storagePath);
-            log.error(error.getMessage(), error);
-
-            if (error instanceof CompletionException)
-                throw (CompletionException) error;
-            else
-                throw new CompletionException(error);
+            log.error(mappedError.getMessage(), mappedError);
+            throw mappedError;
         });
     }
 
@@ -639,9 +636,10 @@ public abstract class CommonFileStorage implements IFileStorage {
 
         @Override
         public void onError(Throwable error) {
+            var mappedError = errors.handleException(READ_OPERATION, storagePath, error);
             log.error("{} {} FAILED: [{}]", READ_OPERATION, storageKey, storagePath);
-            log.error(error.getMessage(), error);
-            target.onError(error);
+            log.error(mappedError.getMessage(), mappedError);
+            target.onError(mappedError);
         }
 
         @Override
