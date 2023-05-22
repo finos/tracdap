@@ -19,7 +19,6 @@ package org.finos.tracdap.plugins.aws.storage;
 import org.finos.tracdap.common.data.IDataContext;
 import org.finos.tracdap.common.data.util.Bytes;
 import org.finos.tracdap.common.storage.StorageErrors;
-import org.finos.tracdap.common.util.LoggingHelpers;
 
 import software.amazon.awssdk.core.async.AsyncRequestBody;
 import software.amazon.awssdk.services.s3.S3AsyncClient;
@@ -152,19 +151,10 @@ public class S3ObjectWriter implements Flow.Subscriber<ArrowBuf> {
         try {
 
             if (error != null) {
-
-                var tracError = errors.handleException(WRITE_OPERATION, storagePath, error);
-
-                log.error("{} {} [{}]: {}", WRITE_OPERATION, storageKey, storagePath, tracError.getMessage(), tracError);
-
                 var mappedError = errors.handleException(WRITE_OPERATION, storagePath, error);
                 signal.completeExceptionally(mappedError);
             }
             else {
-
-                log.info("{} {} [{}]: Write operation complete, object size is [{}]",
-                        WRITE_OPERATION, storageKey, storagePath, LoggingHelpers.formatFileSize(bytesWritten));
-
                 signal.complete(bytesWritten);
             }
 
