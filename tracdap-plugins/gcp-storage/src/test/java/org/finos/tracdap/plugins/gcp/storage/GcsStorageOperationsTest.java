@@ -16,7 +16,6 @@
 
 package org.finos.tracdap.plugins.gcp.storage;
 
-import org.finos.tracdap.common.concurrent.ExecutionContext;
 import org.finos.tracdap.common.data.DataContext;
 import org.finos.tracdap.common.storage.StorageOperationsTestSuite;
 
@@ -51,7 +50,7 @@ public class GcsStorageOperationsTest extends StorageOperationsTestSuite {
     static EventLoopGroup elg;
     static BufferAllocator allocator;
 
-    static ExecutionContext setupCtx;
+    static DataContext setupCtx;
     static GcsObjectStorage setupStorage;
 
     static int testNumber;
@@ -70,7 +69,7 @@ public class GcsStorageOperationsTest extends StorageOperationsTestSuite {
         elg = new NioEventLoopGroup(2, new DefaultThreadFactory("ops-test"));
         allocator = new RootAllocator();
 
-        setupCtx = new ExecutionContext(elg.next());
+        setupCtx = new DataContext(elg.next(), allocator);
         setupStorage = new GcsObjectStorage("STORAGE_SETUP", storageProps);
         setupStorage.start(elg);
 
@@ -92,8 +91,7 @@ public class GcsStorageOperationsTest extends StorageOperationsTestSuite {
         storage = new GcsObjectStorage("TEST_" + testNumber, storageProps);
         storage.start(elg);
 
-        execContext = new ExecutionContext(elg.next());
-        dataContext = new DataContext(execContext.eventLoopExecutor(), allocator);
+        dataContext = new DataContext(elg.next(), allocator);
     }
 
     @AfterEach

@@ -16,7 +16,7 @@
 
 package org.finos.tracdap.plugins.gcp.storage;
 
-import org.finos.tracdap.common.concurrent.IExecutionContext;
+import org.finos.tracdap.common.data.IExecutionContext;
 import org.finos.tracdap.common.data.IDataContext;
 import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.common.storage.CommonFileStorage;
@@ -24,9 +24,8 @@ import org.finos.tracdap.common.storage.FileStat;
 
 import com.google.api.core.ApiFuture;
 import com.google.storage.v2.*;
-
-import io.netty.buffer.ByteBuf;
 import io.netty.channel.EventLoopGroup;
+import org.apache.arrow.memory.ArrowBuf;
 
 import java.util.List;
 import java.util.Properties;
@@ -191,12 +190,17 @@ public class GcsObjectStorage extends CommonFileStorage {
     }
 
     @Override
-    protected Flow.Publisher<ByteBuf> fsOpenInputStream(String objectKey, IDataContext ctx) {
+    protected CompletionStage<ArrowBuf> fsReadChunk(String objectKey, long offset, int size, IDataContext ctx) {
         return null;
     }
 
     @Override
-    protected Flow.Subscriber<ByteBuf> fsOpenOutputStream(String objectKey, CompletableFuture<Long> signal, IDataContext ctx) {
+    protected Flow.Publisher<ArrowBuf> fsOpenInputStream(String objectKey, IDataContext ctx) {
+        return null;
+    }
+
+    @Override
+    protected Flow.Subscriber<ArrowBuf> fsOpenOutputStream(String objectKey, CompletableFuture<Long> signal, IDataContext ctx) {
         return null;
     }
 
