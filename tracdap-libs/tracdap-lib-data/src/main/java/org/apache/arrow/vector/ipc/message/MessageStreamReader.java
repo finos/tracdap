@@ -31,7 +31,6 @@ public class MessageStreamReader extends MessageChannelReader {
 
     // Safeguard max allowed size for first (schema) message - 16 MiB should be ample
     private static final int CONTINUATION_MARKER = 0xffffffff;
-    private static final int MAX_FIRST_MESSAGE_SIZE = 16 * 1024 * 1024;
 
     private final BufferAllocator allocator;
     private final Deque<ArrowBuf> byteQueue;
@@ -46,6 +45,7 @@ public class MessageStreamReader extends MessageChannelReader {
     private enum Expectation {
         CONTINUATION,
         LENGTH,
+        LENGTH_WITHOUT_CONTINUATION,
         MESSAGE,
         BODY,
         EOS
@@ -89,22 +89,30 @@ public class MessageStreamReader extends MessageChannelReader {
                 if (continuationMarker == CONTINUATION_MARKER) {
                     expectation = Expectation.LENGTH;
                     bytesExpected = 4;
+                    break;
                 }
-                else if (continuationMarker > 0 && continuationMarker <= MAX_FIRST_MESSAGE_SIZE)
-
-                break;
+                else if (allowLegacyFormat) {
+                    expectation = Expectation.LENGTH_WITHOUT_CONTINUATION;
+                    bytesExpected = continuationMarker;
+                }
+                else
+                    throw new IOException();  // todo error
 
             case LENGTH:
 
                 bytesExpected = consumeInt();
 
-                if (bytesExpected == 0) {
+            case LENGTH_WITHOUT_CONTINUATION:
+
+                if (bytesExpected > 0) {
+                    expectation = Expectation.MESSAGE;
+                }
+                else if (bytesExpected == 0) {
                     expectation = Expectation.EOS;
                     gotEos = true;
                 }
-
-                if (bytesExpected < 0)
-                    ;  // todo error
+                else
+                    throw new IOException();  // todo error
 
                 break;
 
@@ -203,6 +211,8 @@ public class MessageStreamReader extends MessageChannelReader {
         if (byteQueue.isEmpty())
             throw new IOException();  // todo
 
+        bytesConsumed += size;
+
         var head = byteQueue.peek();
 
         if (head.readableBytes() >= size) {
@@ -243,6 +253,8 @@ public class MessageStreamReader extends MessageChannelReader {
 
         if (byteQueue.isEmpty())
             throw new IOException();  // todo
+
+        bytesConsumed += size;
 
         var head = byteQueue.peek();
 
