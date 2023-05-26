@@ -16,11 +16,17 @@
 
 package org.finos.tracdap.common.codec.arrow;
 
+import org.apache.arrow.vector.ipc.message.MessageStreamReader;
+import org.finos.tracdap.common.codec.StreamingDecoder;
+import org.finos.tracdap.common.data.DataPipeline;
+import org.finos.tracdap.common.exception.EData;
 import org.finos.tracdap.common.exception.EDataCorruption;
-import org.finos.tracdap.common.data.util.ByteSeekableChannel;
+import org.finos.tracdap.common.exception.ETracInternal;
 
+import org.apache.arrow.flatbuf.MessageHeader;
 import org.apache.arrow.memory.ArrowBuf;
 import org.apache.arrow.memory.BufferAllocator;
+import org.apache.arrow.vector.VectorSchemaRoot;
 import org.apache.arrow.vector.ipc.ArrowReader;
 import org.apache.arrow.vector.ipc.ArrowStreamReader;
 
@@ -28,28 +34,115 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.channels.SeekableByteChannel;
-import java.util.List;
 
 
-public class ArrowStreamDecoder extends ArrowDecoder {
+public class ArrowStreamDecoder extends StreamingDecoder implements DataPipeline.StreamApi {
 
     // Safeguard max allowed size for first (schema) message - 16 MiB should be ample
     private static final int CONTINUATION_MARKER = 0xffffffff;
     private static final int MAX_FIRST_MESSAGE_SIZE = 16 * 1024 * 1024;
 
-    private final BufferAllocator arrowAllocator;
+    private final MessageStreamReader messageReader;
+    private final ArrowReader arrowReader;
+    private VectorSchemaRoot root;
 
     public ArrowStreamDecoder(BufferAllocator arrowAllocator) {
-        this.arrowAllocator = arrowAllocator;
+        this.messageReader = new MessageStreamReader(arrowAllocator);
+        this.arrowReader = new ArrowStreamReader(messageReader, arrowAllocator);
     }
 
     @Override
-    protected ArrowReader createReader(List<ArrowBuf> buffer) throws IOException {
+    public void onStart() {
 
-        var channel = new ByteSeekableChannel(buffer);
-        validateStartOfStream(channel);
+        // No-op, don't do anything before the data stream starts
+    }
 
-        return new ArrowStreamReader(channel, arrowAllocator);
+    @Override
+    public void onNext(ArrowBuf chunk) {
+
+        try {
+            messageReader.feedBytes(chunk);
+            sendBatches();
+        }
+        catch (Throwable e) {
+            var error = new EData("Arrow stream decoding failed: " + e.getMessage(), e);
+            onError(error);
+        }
+    }
+
+    @Override
+    public void onComplete() {
+
+        try {
+            messageReader.feedEos();
+            sendBatches();
+        }
+        catch (Throwable e) {
+            var error = new EData("Arrow stream decoding failed: " + e.getMessage(), e);
+            onError(error);
+        }
+    }
+
+    @Override
+    public void onError(Throwable error) {
+
+        try {
+            markAsDone();
+            consumer().onError(error);
+        }
+        finally {
+            close();
+        }
+    }
+
+    @Override
+    public void pump() {
+
+        try {
+            sendBatches();
+        }
+        catch (Throwable e) {
+            var error = new EData("Arrow stream decoding failed: " + e.getMessage(), e);
+            onError(error);
+        }
+    }
+
+    private void sendBatches() throws IOException {
+
+        if (root == null) {
+
+            if (messageReader.hasMessage(MessageHeader.Schema)) {
+                root = arrowReader.getVectorSchemaRoot();
+                consumer().onStart(root);
+            }
+            else {
+                return;
+            }
+        }
+
+        while (consumerReady() && messageReader.hasMessage(MessageHeader.RecordBatch)) {
+
+            if (arrowReader.loadNextBatch()) {
+                consumer().onBatch();
+            }
+            else {
+                markAsDone();
+                consumer().onComplete();
+            }
+        }
+    }
+
+    @Override
+    public void close() {
+
+        try {
+            messageReader.close();
+            arrowReader.close();
+            root.close();
+        }
+        catch (Exception e) {
+            throw new  ETracInternal("Failed to close Arrow stream decoder", e);
+        }
     }
 
     private void validateStartOfStream(SeekableByteChannel channel) throws IOException {
