@@ -19,6 +19,7 @@ package org.apache.arrow.vector.ipc.message;
 import org.apache.arrow.flatbuf.Message;
 import org.apache.arrow.memory.ArrowBuf;
 import org.apache.arrow.memory.BufferAllocator;
+import org.apache.arrow.vector.ipc.InvalidArrowFileException;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -96,7 +97,8 @@ public class MessageStreamReader extends MessageChannelReader {
                     bytesExpected = continuationMarker;
                 }
                 else
-                    throw new IOException();  // todo error
+                    // Arrow does not currently have an equivalent InvalidArrowStreamException
+                    throw new InvalidArrowFileException("Data corruption in Arrow data stream");
 
             case LENGTH:
 
