@@ -21,6 +21,7 @@ import org.apache.arrow.memory.ArrowBuf;
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.ipc.InvalidArrowFileException;
 
+import java.io.EOFException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -30,23 +31,25 @@ import java.util.Deque;
 
 public class MessageStreamReader extends MessageChannelReader {
 
-    // Safeguard max allowed size for first (schema) message - 16 MiB should be ample
+    // This class is an alternative implementation of Arrow's MessageChannelReader
+    // It is meant for use with ArrowStreamReader, so the reader's functionality is preserved
+    // We could just implement a new version of ArrowStreamReader instead, which could be done in the tracdap namespace
+    // However we would still need essentially the same functionality and separation
+    // This approach avoids duplicating the code in ArrowStreamReader itself
+
+    // Bytes and the EOS signal are fed in using feedBytes() and feedEos()
+    // Available messages can be checked by calling hasMessage() before doing loadNextBatch() on the reader
+    // If loadNextBatch() is called before a message is available, an IO exception is thrown
+
     private static final int CONTINUATION_MARKER = 0xffffffff;
 
     private final BufferAllocator allocator;
     private final Deque<ArrowBuf> byteQueue;
     private final Deque<MessageResult> messageQueue;
 
-    private final boolean allowLegacyFormat = false;
-
-    private long bytesReceived;
-    private long bytesConsumed;
-    private boolean gotEos;
-
     private enum Expectation {
         CONTINUATION,
         LENGTH,
-        LENGTH_WITHOUT_CONTINUATION,
         MESSAGE,
         BODY,
         EOS
@@ -54,6 +57,10 @@ public class MessageStreamReader extends MessageChannelReader {
 
     private Expectation expectation;
     private long bytesExpected;
+    private long bytesReceived;
+    private long bytesConsumed;
+    private boolean gotEos;
+
     private Message currentMessage;
 
     public MessageStreamReader(BufferAllocator allocator) {
@@ -72,14 +79,14 @@ public class MessageStreamReader extends MessageChannelReader {
 
     public void feedBytes(ArrowBuf chunk) throws IOException {
 
-        if (gotEos) {
-            throw new IOException();  // todo
+        if (gotEos || expectation == Expectation.EOS) {
+            throw new IOException("More data received after Arrow EOS marker");
         }
 
         byteQueue.addLast(chunk);
         bytesReceived += chunk.readableBytes();
 
-        while (bytesExpected <= bytesReceived - bytesExpected && !gotEos) {
+        while (bytesExpected <= bytesReceived - bytesConsumed) {
 
             switch (expectation) {
 
@@ -92,29 +99,24 @@ public class MessageStreamReader extends MessageChannelReader {
                     bytesExpected = 4;
                     break;
                 }
-                else if (allowLegacyFormat) {
-                    expectation = Expectation.LENGTH_WITHOUT_CONTINUATION;
-                    bytesExpected = continuationMarker;
-                }
                 else
                     // Arrow does not currently have an equivalent InvalidArrowStreamException
-                    throw new InvalidArrowFileException("Data corruption in Arrow data stream");
+                    throw new InvalidArrowFileException("Invalid message in the Arrow data stream");
 
             case LENGTH:
 
-                bytesExpected = consumeInt();
+                var messageLength = consumeInt();
 
-            case LENGTH_WITHOUT_CONTINUATION:
-
-                if (bytesExpected > 0) {
+                if (messageLength > 0) {
                     expectation = Expectation.MESSAGE;
+                    bytesExpected = messageLength;
                 }
-                else if (bytesExpected == 0) {
+                else if (messageLength == 0) {
                     expectation = Expectation.EOS;
-                    gotEos = true;
+                    bytesExpected = 0;
                 }
                 else
-                    throw new IOException();  // todo error
+                    throw new InvalidArrowFileException("Invalid message in the Arrow data stream");
 
                 break;
 
@@ -124,15 +126,15 @@ public class MessageStreamReader extends MessageChannelReader {
                 var message = Message.getRootAsMessage(messageBuffer);
 
                 if (message.bodyLength() > 0) {
-                    currentMessage = message;
                     expectation = Expectation.BODY;
                     bytesExpected = message.bodyLength();
+                    currentMessage = message;
                 }
                 else {
                     var result = new MessageResult(message, null);
                     messageQueue.addLast(result);
                     expectation = Expectation.CONTINUATION;
-                    bytesExpected = 0;
+                    bytesExpected = 4;
                 }
 
                 break;
@@ -147,9 +149,19 @@ public class MessageStreamReader extends MessageChannelReader {
                 bytesExpected = 4;
 
                 break;
+
+            case EOS:
+
+                if (bytesReceived > bytesConsumed)
+                    throw new IOException("More data received after Arrow EOS marker");
+
+                // Do not set gotEos = true yet, wait for the explicit signal
+                // The EOS message is still a chunk in the data stream
+                // The explicit signal should come from onComplete() or similar
+
+                return;
             }
         }
-
     }
 
     public void feedEos() {
@@ -158,14 +170,19 @@ public class MessageStreamReader extends MessageChannelReader {
 
     public boolean hasMessage(byte messageType) {
 
-        if (gotEos)
-            return true;
-
         for (var message : messageQueue)
             if (message.getMessage().headerType() == messageType)
                 return true;
 
         return false;
+    }
+
+    public boolean hasMessage() {
+        return ! messageQueue.isEmpty();
+    }
+
+    public boolean hasEos() {
+        return gotEos;
     }
 
     @Override
@@ -177,7 +194,7 @@ public class MessageStreamReader extends MessageChannelReader {
         if (gotEos)
             return null;
 
-        throw new IOException("Unexpected end of stream");
+        throw new EOFException("Unexpected end of Arrow data stream");
     }
 
     @Override
@@ -211,23 +228,33 @@ public class MessageStreamReader extends MessageChannelReader {
     private ByteBuffer consumeByteBuffer(int size) throws IOException {
 
         if (byteQueue.isEmpty())
-            throw new IOException();  // todo
+            throw new EOFException("Unexpected end of Arrow data stream");
 
-        bytesConsumed += size;
-
-        var head = byteQueue.peek();
-
-        if (head.readableBytes() >= size) {
-
-            var buffer = head.nioBuffer(head.readerIndex(), size);
-            head.readerIndex(head.readerIndex() + size);
-
-            return buffer;
-        }
+        // FlatBuffers accesses the ByteBuffer directly to supply values of the Message
+        // Since the ArrowBuf will be closed, we need to allocate a new ByteBuffer and copy the bytes
 
         var buffer = ByteBuffer.allocateDirect(size);
+        var head = byteQueue.peek();
 
-        while (buffer.remaining() > 0 && head != null) {
+        // If the required content is all in the current ArrowBuf, we can copy directly
+
+        if (head != null && head.readableBytes() >= size) {
+
+            head.getBytes(head.readerIndex(), buffer);
+            head.readerIndex(head.readerIndex() + size);
+
+            bytesConsumed += size;
+
+            // Once a chunk is fully consumed, pop and release
+            if (head.readableBytes() == 0)
+                byteQueue.pop().close();
+        }
+
+        // If the required content spans several chunks, we need to read chunk by chunk
+        // Arrow does not have a range-limited getBytes where the target is a ByteBuffer
+        // For now, use slices and limit each slice to match the current chunk
+
+        while (head != null && buffer.remaining() > 0) {
 
             var slice = buffer.slice();
 
@@ -237,6 +264,10 @@ public class MessageStreamReader extends MessageChannelReader {
             head.getBytes(head.readerIndex(), slice);
             head.readerIndex(head.readerIndex() + slice.position());
 
+            buffer.position(buffer.position() + slice.position());
+            bytesConsumed += slice.position();
+
+            // Once a chunk is fully consumed, pop and release
             if (head.readableBytes() == 0) {
                 byteQueue.pop().close();
                 head = byteQueue.peek();
@@ -246,7 +277,7 @@ public class MessageStreamReader extends MessageChannelReader {
         buffer.flip();
 
         if (buffer.remaining() != size)
-            throw new IOException();  // todo
+            throw new EOFException("Unexpected end of Arrow data stream");
 
         return buffer;
     }
@@ -254,33 +285,47 @@ public class MessageStreamReader extends MessageChannelReader {
     private ArrowBuf consumeArrowBuf(long size) throws IOException {
 
         if (byteQueue.isEmpty())
-            throw new IOException();  // todo
-
-        bytesConsumed += size;
+            throw new EOFException("Unexpected end of Arrow data stream");
 
         var head = byteQueue.peek();
 
-        if (head.readableBytes() >= size) {
+        // If the required content is fully in the current chunk, there is no need to copy
+        // Instead use a slice to give a view into the existing buffer
+
+        if (head != null && head.readableBytes() >= size) {
 
             var buffer = head.slice(head.readerIndex(), size);
             head.readerIndex(head.readerIndex() + size);
 
+            // ArrowBuf.slice() does not increment the ref count, so we need to call retain()
+            buffer.getReferenceManager().retain();
+            bytesConsumed += size;
+
+            // Once a chunk is fully consumed, pop and release
             if (head.readableBytes() == 0)
                 byteQueue.pop().close();
 
             return buffer;
         }
 
+        // Arrow does not support compound buffers
+        // If the required content spans several chunks, we need to allocate a new buffer and copy
+
         var buffer = allocator.buffer(size);
 
-        while (buffer.writableBytes() > 0 && head != null) {
+        while (head != null && buffer.writerIndex() < size) {
 
-            var nBytes = Math.min(buffer.writableBytes(), head.readableBytes());
+            // The maximum bytes that can be copied in a single operation is limited to an integer value
+            var nRemaining = size - buffer.writerIndex();
+            var nBytes = Math.min(Math.min(nRemaining, head.readableBytes()), Integer.MAX_VALUE);
 
-            buffer.setBytes(buffer.writerIndex(), head, head.readerIndex(), nBytes);
-            buffer.writerIndex(buffer.writerIndex() + nBytes);
+            head.getBytes(head.readerIndex(), buffer, buffer.writerIndex(), (int) nBytes);
             head.readerIndex(head.readerIndex() + nBytes);
 
+            buffer.writerIndex(buffer.writerIndex() + nBytes);
+            bytesConsumed += nBytes;
+
+            // Once a chunk is fully consumed, pop and release
             if (head.readableBytes() == 0) {
                 byteQueue.pop().close();
                 head = byteQueue.peek();
@@ -288,7 +333,7 @@ public class MessageStreamReader extends MessageChannelReader {
         }
 
         if (buffer.writerIndex() != size)
-            throw new IOException();  // todo
+            throw new EOFException("Unexpected end of Arrow data stream");
 
         return buffer;
     }
