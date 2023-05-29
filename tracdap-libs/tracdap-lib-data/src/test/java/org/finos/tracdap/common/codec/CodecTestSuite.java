@@ -473,6 +473,48 @@ public abstract class CodecTestSuite {
         Assertions.assertThrows(EDataCorruption.class, () -> getResultOf(exec));
     }
 
+    @Test
+    void decode_garbled_arrow_stream() {
+
+        // Garbled data deliberately designed to break the arrow stream codec
+        // The first 8 bytes are a valid continuation and message length, followed by a garbage message
+        // There should be an error parsing the Arrow FlatBuffers message, which should be handled as EDataCorruption
+
+        var arrowSchema = ArrowSchema.tracToArrow(SampleData.BASIC_TABLE_SCHEMA);
+
+        var testDataHeader = new byte[] {
+                (byte) 0xff, (byte) 0xff, (byte) 0xff, (byte) 0xff,
+                (byte) 0x00, (byte) 0x01, (byte) 0x00, (byte) 0x00};
+
+        var testDataMessage = new byte[256];
+        var random = new Random();
+        random.nextBytes(testDataMessage);
+
+        var testData = List.of(testDataHeader, testDataMessage);
+
+        var allocator = new RootAllocator();
+        var testDataBuf = testData.stream()
+                .map(bytes -> Bytes.copyToBuffer(bytes, allocator))
+                .collect(Collectors.toList());
+        var testDataStream = Flows.publish(testDataBuf);
+
+        // Run the garbage data through the decoder
+
+        var dataCtx = new DataContext(new DefaultEventExecutor(), allocator);
+        var pipeline = DataPipeline.forSource(testDataStream, dataCtx);
+
+        var decoder = codec.getDecoder(allocator, arrowSchema, Map.of());
+        pipeline.addStage(decoder);
+
+        var dataSink = new SingleBatchDataSink(pipeline);
+        pipeline.addSink(dataSink);
+
+        var exec = pipeline.execute();
+        waitFor(TEST_TIMEOUT, exec);
+
+        Assertions.assertThrows(EDataCorruption.class, () -> getResultOf(exec));
+    }
+
 
     private void compareBatches(VectorSchemaRoot original, VectorSchemaRoot roundTrip) {
 

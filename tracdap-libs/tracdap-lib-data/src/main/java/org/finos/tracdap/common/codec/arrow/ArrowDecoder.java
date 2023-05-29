@@ -20,13 +20,11 @@ import org.finos.tracdap.common.codec.BufferDecoder;
 import org.finos.tracdap.common.data.DataPipeline;
 import org.finos.tracdap.common.data.util.Bytes;
 import org.finos.tracdap.common.exception.EDataCorruption;
-import org.finos.tracdap.common.exception.ETrac;
 import org.finos.tracdap.common.exception.EUnexpected;
 
 import org.apache.arrow.memory.ArrowBuf;
 import org.apache.arrow.vector.VectorSchemaRoot;
 import org.apache.arrow.vector.ipc.ArrowReader;
-import org.apache.arrow.vector.ipc.InvalidArrowFileException;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -145,43 +143,11 @@ public abstract class ArrowDecoder extends BufferDecoder implements DataPipeline
 
             lambda.call();
         }
-        catch (ETrac e) {
+        catch (Throwable e) {
 
-            // Error has already been handled, propagate as-is
-
-            var errorMessage = "Arrow decoding failed: " + e.getMessage();
-
-            log.error(errorMessage, e);
-            throw e;
-        }
-        catch (InvalidArrowFileException e) {
-
-            // A nice clean validation failure from the Arrow framework
-            // E.g. missing / incorrect magic number at the start (or end) of the file
-
-            var errorMessage = "Arrow decoding failed, file is invalid: " + e.getMessage();
-
-            log.error(errorMessage, e);
-            throw new EDataCorruption(errorMessage, e);
-        }
-        catch (IllegalArgumentException | IndexOutOfBoundsException | IOException  e) {
-
-            // These errors occur if the data stream contains bad values for vector sizes, offsets etc.
-            // This may be as a result of a corrupt data stream, or a maliciously crafted message
-
-            // Decoders work on a stream of buffers, "real" IO exceptions should not occur
-
-            var errorMessage = "Arrow decoding failed, content is garbled";
-
-            log.error(errorMessage, e);
-            throw new EDataCorruption(errorMessage, e);
-        }
-        catch (Throwable e)  {
-
-            // Ensure unexpected errors are still reported to the Flow API
-
-            log.error("Unexpected error in Arrow decoding", e);
-            throw new EUnexpected(e);
+            var error = ArrowErrorMapping.mapDecodingError(e);
+            log.error(error.getMessage(), error);
+            throw error;
         }
     }
 

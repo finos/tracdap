@@ -47,7 +47,7 @@ public class ArrowStreamCodec implements ICodec {
     }
 
     @Override
-    public Decoder<DataPipeline.BufferApi>
+    public Decoder<DataPipeline.StreamApi>
     getDecoder(BufferAllocator arrowAllocator, Schema schema, Map<String, String> options) {
         return new ArrowStreamDecoder(arrowAllocator);
     }

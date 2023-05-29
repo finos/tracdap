@@ -146,7 +146,9 @@ public class ReactiveByteSource
             nReceived += 1;
             consumer().onNext(chunk);
 
-            if (consumerReady()) {
+            // subscription may be null if the stage was closed early due to an error
+
+            if (consumerReady() && subscription != null) {
                 var headroom = BACKPRESSURE_HEADROOM - (nRequested - nReceived);
                 if (headroom > 0) {
                     nRequested += headroom;
