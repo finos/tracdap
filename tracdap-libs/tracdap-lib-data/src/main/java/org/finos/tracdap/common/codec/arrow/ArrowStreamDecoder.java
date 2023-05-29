@@ -19,7 +19,6 @@ package org.finos.tracdap.common.codec.arrow;
 import org.apache.arrow.vector.ipc.message.MessageStreamReader;
 import org.finos.tracdap.common.codec.StreamingDecoder;
 import org.finos.tracdap.common.data.DataPipeline;
-import org.finos.tracdap.common.exception.EData;
 import org.finos.tracdap.common.exception.EDataCorruption;
 import org.finos.tracdap.common.exception.ETracInternal;
 
@@ -31,41 +30,43 @@ import org.apache.arrow.vector.ipc.ArrowReader;
 import org.apache.arrow.vector.ipc.ArrowStreamReader;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
-import java.nio.channels.SeekableByteChannel;
 
 
 public class ArrowStreamDecoder extends StreamingDecoder implements DataPipeline.StreamApi {
 
-    // Safeguard max allowed size for first (schema) message - 16 MiB should be ample
-    private static final int CONTINUATION_MARKER = 0xffffffff;
-    private static final int MAX_FIRST_MESSAGE_SIZE = 16 * 1024 * 1024;
+    // Pure streaming implementation of the arrow stream codec
+    // Uses MessageStreamReader to process incoming bytes and determine when messages are available
+    // Once messages arrive, defer to the regular ArrowStreamReader provided by the core Arrow libraries
 
-    private final MessageStreamReader messageReader;
-    private final ArrowReader arrowReader;
+    private final BufferAllocator allocator;
+
+    private MessageStreamReader messageReader;
+    private ArrowReader arrowReader;
     private VectorSchemaRoot root;
 
-    public ArrowStreamDecoder(BufferAllocator arrowAllocator) {
-        this.messageReader = new MessageStreamReader(arrowAllocator);
-        this.arrowReader = new ArrowStreamReader(messageReader, arrowAllocator);
+    public ArrowStreamDecoder(BufferAllocator allocator) {
+        this.allocator = allocator;
     }
 
     @Override
     public void onStart() {
-
-        // No-op, don't do anything before the data stream starts
+        messageReader = new MessageStreamReader(allocator);
+        arrowReader = new ArrowStreamReader(messageReader, allocator);
     }
 
     @Override
     public void onNext(ArrowBuf chunk) {
 
         try {
+
+            if (messageReader == null)
+                throw new IllegalStateException();
+
             messageReader.feedBytes(chunk);
             sendBatches();
         }
         catch (Throwable e) {
-            var error = new EData("Arrow stream decoding failed: " + e.getMessage(), e);
+            var error = ArrowErrorMapping.mapDecodingError(e);
             onError(error);
         }
     }
@@ -74,11 +75,15 @@ public class ArrowStreamDecoder extends StreamingDecoder implements DataPipeline
     public void onComplete() {
 
         try {
+
+            if (messageReader == null)
+                throw new IllegalStateException();
+
             messageReader.feedEos();
             sendBatches();
         }
         catch (Throwable e) {
-            var error = new EData("Arrow stream decoding failed: " + e.getMessage(), e);
+            var error = ArrowErrorMapping.mapDecodingError(e);
             onError(error);
         }
     }
@@ -99,21 +104,30 @@ public class ArrowStreamDecoder extends StreamingDecoder implements DataPipeline
     public void pump() {
 
         try {
-            sendBatches();
+            if (arrowReader != null)
+                sendBatches();
         }
         catch (Throwable e) {
-            var error = new EData("Arrow stream decoding failed: " + e.getMessage(), e);
+            var error = ArrowErrorMapping.mapDecodingError(e);
             onError(error);
         }
     }
 
     private void sendBatches() throws IOException {
 
+        if (!consumerReady() || isDone())
+            return;
+
         if (root == null) {
 
-            if (messageReader.hasMessage(MessageHeader.Schema)) {
+            if (messageReader.hasMessage()) {
                 root = arrowReader.getVectorSchemaRoot();
                 consumer().onStart(root);
+            }
+            else if (messageReader.hasEos()) {
+                var error = new EDataCorruption("Arrow decoding failed, data stream is empty");
+                onError(error);
+                return;
             }
             else {
                 return;
@@ -121,14 +135,20 @@ public class ArrowStreamDecoder extends StreamingDecoder implements DataPipeline
         }
 
         while (consumerReady() && messageReader.hasMessage(MessageHeader.RecordBatch)) {
+            arrowReader.loadNextBatch();
+            consumer().onBatch();
+        }
 
-            if (arrowReader.loadNextBatch()) {
-                consumer().onBatch();
+        if (consumerReady() && messageReader.hasEos()) {
+
+            if (messageReader.hasMessage()) {
+                var error = new EDataCorruption("Arrow decoding failed, unexpected messages after EOS marker");
+                onError(error);
+                return;
             }
-            else {
-                markAsDone();
-                consumer().onComplete();
-            }
+
+            markAsDone();
+            consumer().onComplete();
         }
     }
 
@@ -136,43 +156,24 @@ public class ArrowStreamDecoder extends StreamingDecoder implements DataPipeline
     public void close() {
 
         try {
-            messageReader.close();
-            arrowReader.close();
-            root.close();
+
+            if (arrowReader != null) {
+                arrowReader.close();
+                arrowReader = null;
+            }
+
+            if (messageReader != null) {
+                messageReader.close();
+                messageReader = null;
+            }
+
+            if (root != null) {
+                root.close();
+                root = null;
+            }
         }
         catch (Exception e) {
             throw new  ETracInternal("Failed to close Arrow stream decoder", e);
         }
-    }
-
-    private void validateStartOfStream(SeekableByteChannel channel) throws IOException {
-
-        // https://arrow.apache.org/docs/format/Columnar.html#encapsulated-message-format
-
-        // Arrow streams are a series of messages followed by optional body data
-        // Each message is preceded by a continuation marker and message size
-        // Just sanity checking these two values should catch some serious decode failures
-        // E.g. if a data stream contains a totally different format
-
-        // Record the stream position, so it can be restored after the validation
-        long pos = channel.position();
-
-        var headerBytes = new byte[8];
-        var headerBuf = ByteBuffer.wrap(headerBytes);
-        headerBuf.order(ByteOrder.LITTLE_ENDIAN);
-
-        channel.position(0);
-
-        var prefaceLength = channel.read(headerBuf);
-        var continuation = headerBuf.getInt(0);
-        var messageSize = headerBuf.getInt(4);
-
-        if (prefaceLength != 8 || continuation != CONTINUATION_MARKER ||
-            messageSize <=0 || messageSize > MAX_FIRST_MESSAGE_SIZE)
-
-            throw new EDataCorruption("Data is corrupt, or not an Arrow stream");
-
-        // Restore original stream position
-        channel.position(pos);
     }
 }
