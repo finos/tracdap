@@ -102,12 +102,14 @@ public class SingleBatchDataSink
     @Override
     public void onComplete() {
 
+        markAsDone();
         reportComplete();
     }
 
     @Override
     public void onError(Throwable error) {
 
+        markAsDone();
         reportRegularError(error);
     }
 }

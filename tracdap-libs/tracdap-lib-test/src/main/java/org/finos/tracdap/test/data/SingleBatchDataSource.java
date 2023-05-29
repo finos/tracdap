@@ -42,6 +42,7 @@ public class SingleBatchDataSource
 
         consumer().onStart(root);
         consumer().onBatch();
+        markAsDone();
         consumer().onComplete();
     }
 
