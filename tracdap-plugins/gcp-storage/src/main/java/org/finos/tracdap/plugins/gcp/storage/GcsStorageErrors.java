@@ -16,10 +16,20 @@
 
 package org.finos.tracdap.plugins.gcp.storage;
 
+import com.google.api.gax.rpc.ApiException;
+import com.google.api.gax.rpc.PermissionDeniedException;
 import org.finos.tracdap.common.storage.StorageErrors;
+
+import java.util.List;
+import java.util.Map;
 
 
 public class GcsStorageErrors extends StorageErrors {
+
+    private static final List<Map.Entry<Class<? extends Exception>, ExplicitError>> EXCEPTION_CLASS_MAP = List.of(
+            Map.entry(PermissionDeniedException.class, ExplicitError.ACCESS_DENIED),
+            // Top-level error for GCP API calls over gRPC - catch all mapped to generic IO error
+            Map.entry(ApiException.class, ExplicitError.IO_ERROR));
 
     public GcsStorageErrors(String storageKey) {
         super(storageKey);
@@ -27,6 +37,17 @@ public class GcsStorageErrors extends StorageErrors {
 
     @Override
     protected ExplicitError checkKnownExceptions(Throwable error) {
+
+        // Look in the map of error types to see if e is an expected exception
+        for (var knownError : EXCEPTION_CLASS_MAP) {
+
+            var errorClass = knownError.getKey();
+
+            if (errorClass.isInstance(error)) {
+                return knownError.getValue();
+            }
+        }
+
         return null;
     }
 }
