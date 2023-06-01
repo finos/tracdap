@@ -16,6 +16,8 @@
 
 package org.finos.tracdap.plugins.gcp.storage;
 
+import com.google.cloud.storage.StorageOptions;
+import io.grpc.alts.GoogleDefaultChannelCredentials;
 import org.finos.tracdap.common.data.IExecutionContext;
 import org.finos.tracdap.common.data.IDataContext;
 import org.finos.tracdap.common.exception.EStartup;
@@ -43,6 +45,7 @@ public class GcsObjectStorage extends CommonFileStorage {
 
     private final String bucket;
     private final String prefix;
+    private final String justBucket;
 
     private StorageClient storageClient;
 
@@ -55,6 +58,7 @@ public class GcsObjectStorage extends CommonFileStorage {
         var bucket = properties.getProperty(BUCKET_PROPERTY);
         var prefix = properties.getProperty(PREFIX_PROPERTY);
 
+        this.justBucket = bucket;
         this.bucket = String.format(BUCKET_TEMPLATE, project, bucket);
         this.prefix = normalizePrefix(prefix);
     }
@@ -87,6 +91,12 @@ public class GcsObjectStorage extends CommonFileStorage {
             var settings = StorageSettings.newBuilder().build();
 
             storageClient = StorageClient.create(settings);
+
+            // Testing with the old-style client through the gRPC interface
+            var options = StorageOptions.grpc().build();
+            var listing = options.getService().list(justBucket);
+            var count = listing.streamValues().count();
+            System.out.println("Got [" + count + "] values using gRPC");
         }
         catch (Exception e) {
             var message = "GCS storage failed to start: " + e.getMessage();
