@@ -125,7 +125,8 @@ def define_parameter(
     If a default value is specified, the model parameter becomes optional. It is ok to omit optional parameters
     when running models or setting up jobs, in which case the default value will be used. If no default is
     specified then the model parameter becomes mandatory, a value must always be supplied in order to execute
-    the model.
+    the model. TRAC will apply type coercion where possible to ensure the default value matches the parameter type,
+    if the default value cannot be coerced to match the parameter type then model validation will fail.
 
     Once defined model parameters can be passed to :py:func:`define_parameters`,
     either as a list or as individual arguments, to create the set of parameters for a model.
