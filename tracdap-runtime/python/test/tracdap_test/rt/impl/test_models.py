@@ -33,7 +33,8 @@ class SampleModel(api.TracModel):
 
         return api.declare_parameters(
             api.P("param1", api.INTEGER, label="A first parameter"),
-            api.P("param2", api.STRING, label="A second parameter"))
+            api.P("param2", api.STRING, label="A second parameter"),
+            api.P("param3", api.FLOAT, label="Param 3, test default type coercion", default_value=1))
 
     def define_inputs(self) -> tp.Dict[str, api.ModelInputSchema]:
 
@@ -183,9 +184,12 @@ class ImportModelTest(unittest.TestCase):
         self.assertIsInstance(model_def, meta.ModelDefinition)
 
         self.assertIsInstance(model_def.parameters, dict)
-        self.assertEqual({"param1", "param2"}, set(model_def.parameters.keys()))
+        self.assertEqual({"param1", "param2", "param3"}, set(model_def.parameters.keys()))
         self.assertEqual(_td(meta.BasicType.INTEGER), model_def.parameters["param1"].paramType, )
         self.assertEqual(_td(meta.BasicType.STRING), model_def.parameters["param2"].paramType)
+        self.assertEqual(_td(meta.BasicType.FLOAT), model_def.parameters["param3"].paramType)
+        # Check type coercion is correctly applied to the default parameter
+        self.assertEqual(_td(meta.BasicType.FLOAT), model_def.parameters["param3"].defaultValue.type)
 
         self.assertIsInstance(model_def.inputs, dict)
         self.assertEqual({"input_table_1"}, set(model_def.inputs.keys()))

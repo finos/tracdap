@@ -82,7 +82,11 @@ class StaticApiImpl(_StaticApiHook):
             param_type_descriptor = _meta.TypeDescriptor(param_type, None, None)
 
         if default_value is not None and not isinstance(default_value, _meta.Value):
-            default_value = _type_system.MetadataCodec.encode_value(default_value)
+            try:
+                default_value = _type_system.MetadataCodec.convert_value(default_value, param_type_descriptor)
+            except _ex.ETrac as e:
+                msg = f"Default value for parameter [{param_name}] does not match the declared type"
+                raise _ex.EModelValidation(msg) from e
 
         return _Named(param_name, _meta.ModelParameter(param_type_descriptor, label, default_value))
 
