@@ -40,27 +40,27 @@ class _TestModel(_api.TracModel):
 
             _api.P("integer_param", _api.BasicType.INTEGER,
                    label="An integer param",
-                   default_value=False),
+                   default_value=1),
 
             _api.P("float_param", _api.BasicType.FLOAT,
                    label="A float param",
-                   default_value=False),
+                   default_value=1.0),
 
             _api.P("decimal_param", _api.BasicType.DECIMAL,
                    label="A decimal param",
-                   default_value=False),
+                   default_value=1.0),
 
             _api.P("string_param", _api.BasicType.STRING,
                    label="A string param",
-                   default_value=False),
+                   default_value="hello"),
 
             _api.P("date_param", _api.BasicType.DATE,
                    label="A date param",
-                   default_value=False),
+                   default_value="2000-01-01"),  # type coercion string -> date
 
             _api.P("datetime_param", _api.BasicType.DATETIME,
                    label="A datetime param",
-                   default_value=False))
+                   default_value=datetime.datetime.now()))  # Using Python datetime values also works
 
     def define_inputs(self) -> tp.Dict[str, _api.ModelInputSchema]:
 
