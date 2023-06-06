@@ -34,17 +34,17 @@ public class OrchApiRestMapping {
         var apiMethods = new ArrayList<RestApiMethod<?, ?, ?>>();
 
         apiMethods.add(RestApiMethod.create(HttpMethod.POST,
-                "/tracdap-orch/api/v1/{tenant}/validate-job",
+                "/trac-orch/api/v1/{tenant}/validate-job",
                 TracOrchestratorApiGrpc.getValidateJobMethod(),
                 JobRequest.getDefaultInstance(), true));
 
         apiMethods.add(RestApiMethod.create(HttpMethod.POST,
-                "/tracdap-orch/api/v1/{tenant}/submit-job",
+                "/trac-orch/api/v1/{tenant}/submit-job",
                 TracOrchestratorApiGrpc.getSubmitJobMethod(),
                 JobRequest.getDefaultInstance(), true));
 
         apiMethods.add(RestApiMethod.create(HttpMethod.POST,
-                "/tracdap-orch/api/v1/{tenant}/check-job",
+                "/trac-orch/api/v1/{tenant}/check-job",
                 TracOrchestratorApiGrpc.getCheckJobMethod(),
                 JobStatusRequest.getDefaultInstance(),
                 "selector", TagSelector.getDefaultInstance()));
