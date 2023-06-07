@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Accenture Global Solutions Limited
+ * Copyright 2023 Accenture Global Solutions Limited
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,12 +14,13 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.gateway;
+package org.finos.tracdap.gateway.proxy.http;
 
 import org.finos.tracdap.common.startup.StandardArgs;
 import org.finos.tracdap.common.startup.Startup;
 
 import io.netty.handler.codec.http.*;
+import org.finos.tracdap.gateway.TracPlatformGateway;
 import org.finos.tracdap.test.helpers.ServiceHelpers;
 import org.finos.tracdap.tools.secrets.SecretTool;
 import org.junit.jupiter.api.*;
