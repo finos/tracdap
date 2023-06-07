@@ -35,7 +35,6 @@ public class TracMetadataApi extends TracMetadataApiGrpc.TracMetadataApiImplBase
     private static final String SERVICE_NAME = TracMetadataApiGrpc.SERVICE_NAME.substring(TracMetadataApiGrpc.SERVICE_NAME.lastIndexOf(".") + 1);
     private static final Descriptors.ServiceDescriptor TRAC_METADATA_SERVICE = Metadata.getDescriptor().findServiceByName(SERVICE_NAME);
 
-
     static final MethodDescriptor<MetadataWriteRequest, TagHeader> CREATE_OBJECT_METHOD = TracMetadataApiGrpc.getCreateObjectMethod();
     static final MethodDescriptor<MetadataWriteBatchRequest, MetadataWriteBatchResponse> CREATE_OBJECT_BATCH_METHOD = TracMetadataApiGrpc.getCreateObjectBatchMethod();
     static final MethodDescriptor<MetadataWriteRequest, TagHeader> UPDATE_OBJECT_METHOD = TracMetadataApiGrpc.getUpdateObjectMethod();
@@ -48,8 +47,8 @@ public class TracMetadataApi extends TracMetadataApiGrpc.TracMetadataApiImplBase
     static final MethodDescriptor<MetadataSearchRequest, MetadataSearchResponse> SEARCH_METHOD = TracMetadataApiGrpc.getSearchMethod();
 
     static final MethodDescriptor<MetadataGetRequest, Tag> GET_OBJECT_METHOD = TracMetadataApiGrpc.getGetObjectMethod();
-    static final MethodDescriptor<MetadataGetRequest, Tag> GET_LATEST_OBJECT_METHOD = TracMetadataApiGrpc.getGetObjectMethod();
-    static final MethodDescriptor<MetadataGetRequest, Tag> GET_LATEST_TAG_METHOD = TracMetadataApiGrpc.getGetObjectMethod();
+    static final MethodDescriptor<MetadataGetRequest, Tag> GET_LATEST_OBJECT_METHOD = TracMetadataApiGrpc.getGetLatestObjectMethod();
+    static final MethodDescriptor<MetadataGetRequest, Tag> GET_LATEST_TAG_METHOD = TracMetadataApiGrpc.getGetLatestTagMethod();
 
     private final MetadataApiImpl apiImpl;
     private final GrpcServerWrap grpcWrap;
