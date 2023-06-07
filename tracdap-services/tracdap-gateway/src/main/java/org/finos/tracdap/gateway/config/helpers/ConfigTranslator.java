@@ -47,7 +47,7 @@ public class ConfigTranslator {
                     "TRAC Metadata Service",
                     services.getMeta(),
                     "/tracdap.api.TracMetadataApi/",
-                    "/tracdap-meta/",
+                    "/trac-meta/",
                     GwRestMapping.TRAC_META);
 
             serviceRoutes.addAll(metaApiRoutes);
@@ -59,7 +59,7 @@ public class ConfigTranslator {
                     "TRAC Data Service",
                     services.getData(),
                     "/tracdap.api.TracDataApi/",
-                    "/tracdap-data/",
+                    "/trac-data/",
                     null);
 
             serviceRoutes.addAll(dataApiRoutes);
@@ -71,7 +71,7 @@ public class ConfigTranslator {
                     "TRAC Orchestrator Service",
                     services.getOrch(),
                     "/tracdap.api.TracOrchestratorApi/",
-                    "/tracdap-orch/",
+                    "/trac-orch/",
                     GwRestMapping.TRAC_ORCH);
 
             serviceRoutes.addAll(orchApiRoutes);
