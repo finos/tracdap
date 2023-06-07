@@ -44,6 +44,16 @@ public class MetaApiRestMapping {
 
         var apiMethods = new ArrayList<RestApiMethod<?, ?, ?>>();
 
+        apiMethods.add(RestApiMethod.create(HttpMethod.GET,
+                "/trac-meta/api/v1/trac/platform-info",
+                TracMetadataApiGrpc.getPlatformInfoMethod(),
+                PlatformInfoRequest.getDefaultInstance()));
+
+        apiMethods.add(RestApiMethod.create(HttpMethod.GET,
+                "/trac-meta/api/v1/trac/list-tenants",
+                TracMetadataApiGrpc.getListTenantsMethod(),
+                ListTenantsRequest.getDefaultInstance()));
+
         apiMethods.add(RestApiMethod.create(HttpMethod.POST,
                 "/trac-meta/api/v1/{tenant}/create-object",
                 TracMetadataApiGrpc.getCreateObjectMethod(),
