@@ -64,7 +64,7 @@ public class RestProxyTest {
                 Map.entry(HttpHeaderNames.ACCEPT, "application/json"));
 
         var client = new Http1Client(HttpScheme.HTTP, LOCALHOST, TEST_GW_PORT);
-        var call = client.getRequest(method);
+        var call = client.getRequest(method, headers);
         call.await(TEST_TIMEOUT);
 
         Assertions.assertTrue(call.isDone());
@@ -90,7 +90,7 @@ public class RestProxyTest {
                 Map.entry(HttpHeaderNames.ACCEPT, "application/json"));
 
         var client = new Http1Client(HttpScheme.HTTP, LOCALHOST, TEST_GW_PORT);
-        var call = client.getRequest(method);
+        var call = client.getRequest(method, headers);
         call.await(TEST_TIMEOUT);
 
         Assertions.assertTrue(call.isDone());

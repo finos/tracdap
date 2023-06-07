@@ -59,6 +59,10 @@ public class Http1Client {
     }
 
     public Future<? extends HttpResponse> headRequest(String path) {
+        return headRequest(path, Map.of());
+    }
+
+    public Future<? extends HttpResponse> headRequest(String path, Map<CharSequence, Object> requestHeaders) {
 
         try {
 
@@ -76,7 +80,9 @@ public class Http1Client {
             var request = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.HEAD, path, Unpooled.EMPTY_BUFFER);
             request.headers().set(HttpHeaderNames.HOST, host);
             request.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
-            request.headers().set(HttpHeaderNames.ACCEPT_ENCODING, HttpHeaderValues.GZIP);
+
+            for (var header : requestHeaders.entrySet())
+                request.headers().set(header.getKey(), header.getValue());
 
             channel.writeAndFlush(request);
 
@@ -89,6 +95,10 @@ public class Http1Client {
     }
 
     public Future<? extends FullHttpResponse> getRequest(String path) {
+        return getRequest(path, Map.of());
+    }
+
+    public Future<? extends FullHttpResponse> getRequest(String path, Map<CharSequence, Object> requestHeaders) {
 
         try {
 
@@ -106,7 +116,9 @@ public class Http1Client {
             var request = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, path, Unpooled.EMPTY_BUFFER);
             request.headers().set(HttpHeaderNames.HOST, host);
             request.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
-            request.headers().set(HttpHeaderNames.ACCEPT_ENCODING, HttpHeaderValues.GZIP);
+
+            for (var header : requestHeaders.entrySet())
+                request.headers().set(header.getKey(), header.getValue());
 
             channel.writeAndFlush(request);
 
