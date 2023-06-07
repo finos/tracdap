@@ -41,6 +41,8 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
+import java.util.Random;
+import java.util.UUID;
 
 import static io.netty.util.NetUtil.LOCALHOST;
 import static org.finos.tracdap.test.meta.TestData.TEST_TENANT;
@@ -182,6 +184,145 @@ public class RestProxyTest {
         var original = parseJson(Unpooled.wrappedBuffer(originalRequest), MetadataWriteRequest.class).getDefinition();
 
         Assertions.assertEquals(original, definition);
+    }
+
+    @Test
+    void missingRoute() throws Exception {
+
+        var method = "/trac-unknown-service/api/v1/trac/get-something";
+
+        var headers = Map.<CharSequence, Object>ofEntries(
+                Map.entry(HttpHeaderNames.CONTENT_TYPE, "application/json"),
+                Map.entry(HttpHeaderNames.ACCEPT, "application/json"));
+
+        var client = new Http1Client(HttpScheme.HTTP, LOCALHOST, TEST_GW_PORT);
+        var call = client.getRequest(method, headers);
+        call.await(TEST_TIMEOUT);
+
+        Assertions.assertTrue(call.isDone());
+        Assertions.assertTrue(call.isSuccess());  // Request succeeds but will have an HTTP error code
+
+        var response = call.getNow();
+
+        Assertions.assertEquals(HttpResponseStatus.NOT_FOUND, response.status());
+    }
+
+    @Test
+    void missingTenant() throws Exception {
+
+        var methodTemplate = "/trac-meta/api/v1/UNKNOWN_TENANT/FLOW/%s/versions/latest/tags/latest";
+        var method = String.format(methodTemplate, UUID.randomUUID());
+
+        var headers = Map.<CharSequence, Object>ofEntries(
+                Map.entry(HttpHeaderNames.CONTENT_TYPE, "application/json"),
+                Map.entry(HttpHeaderNames.ACCEPT, "application/json"));
+
+        var client = new Http1Client(HttpScheme.HTTP, LOCALHOST, TEST_GW_PORT);
+        var call = client.getRequest(method, headers);
+        call.await(TEST_TIMEOUT);
+
+        Assertions.assertTrue(call.isDone());
+        Assertions.assertTrue(call.isSuccess());  // Request succeeds but will have an HTTP error code
+
+        var response = call.getNow();
+
+        Assertions.assertEquals(HttpResponseStatus.NOT_FOUND, response.status());
+    }
+
+    @Test
+    void missingObject() throws Exception {
+
+        var methodTemplate = "/trac-meta/api/v1/ACME_CORP/FLOW/%s/versions/1/tags/latest";
+        var method = String.format(methodTemplate, UUID.randomUUID());
+
+        var headers = Map.<CharSequence, Object>ofEntries(
+                Map.entry(HttpHeaderNames.CONTENT_TYPE, "application/json"),
+                Map.entry(HttpHeaderNames.ACCEPT, "application/json"));
+
+        var client = new Http1Client(HttpScheme.HTTP, LOCALHOST, TEST_GW_PORT);
+        var call = client.getRequest(method, headers);
+        call.await(TEST_TIMEOUT);
+
+        Assertions.assertTrue(call.isDone());
+        Assertions.assertTrue(call.isSuccess());  // Request succeeds but will have an HTTP error code
+
+        var response = call.getNow();
+
+        Assertions.assertEquals(HttpResponseStatus.NOT_FOUND, response.status());
+    }
+
+    @Test
+    void validationFailure() throws Exception {
+
+        var method = "/trac-meta/api/v1/ACME_CORP/read-object";
+
+        var headers = Map.<CharSequence, Object>ofEntries(
+                Map.entry(HttpHeaderNames.CONTENT_TYPE, "application/json"),
+                Map.entry(HttpHeaderNames.ACCEPT, "application/json"));
+
+        // Read request missing required field "selector", should fail validation
+
+        var bodyBytes = "{}".getBytes(StandardCharsets.UTF_8);
+
+        var client = new Http1Client(HttpScheme.HTTP, LOCALHOST, TEST_GW_PORT);
+        var call = client.postRequest(method, headers, Unpooled.wrappedBuffer(bodyBytes));
+        call.await(TEST_TIMEOUT);
+
+        Assertions.assertTrue(call.isDone());
+        Assertions.assertTrue(call.isSuccess());  // Request succeeds but will have an HTTP error code
+
+        var response = call.getNow();
+
+        Assertions.assertEquals(HttpResponseStatus.BAD_REQUEST, response.status());
+    }
+
+    @Test
+    void sendGarbledContent() throws Exception {
+
+        var method = "/trac-meta/api/v1/ACME_CORP/create-object";
+
+        var headers = Map.<CharSequence, Object>ofEntries(
+                Map.entry(HttpHeaderNames.CONTENT_TYPE, "application/json"),
+                Map.entry(HttpHeaderNames.ACCEPT, "application/json"));
+
+        var bodyBytes = new byte[1024];
+        var random = new Random();
+        random.nextBytes(bodyBytes);
+
+        var client = new Http1Client(HttpScheme.HTTP, LOCALHOST, TEST_GW_PORT);
+        var call = client.postRequest(method, headers, Unpooled.wrappedBuffer(bodyBytes));
+        call.await(TEST_TIMEOUT);
+
+        Assertions.assertTrue(call.isDone());
+        Assertions.assertTrue(call.isSuccess());  // Request succeeds but will have an HTTP error code
+
+        var response = call.getNow();
+
+        Assertions.assertEquals(HttpResponseStatus.BAD_REQUEST, response.status());
+    }
+
+    @Test
+    void sendWrongHeaders() throws Exception {
+
+        var method = "/trac-meta/api/v1/ACME_CORP/create-object";
+        var json = "examples/rest_calls/create_flow.json";
+
+        var headers = Map.<CharSequence, Object>ofEntries(
+                Map.entry(HttpHeaderNames.CONTENT_TYPE, "application/xml"),
+                Map.entry(HttpHeaderNames.ACCEPT, "application/xml"));
+
+        var bodyBytes = Files.readAllBytes(tracRepoDir.resolve(json));
+
+        var client = new Http1Client(HttpScheme.HTTP, LOCALHOST, TEST_GW_PORT);
+        var call = client.postRequest(method, headers, Unpooled.wrappedBuffer(bodyBytes));
+        call.await(TEST_TIMEOUT);
+
+        Assertions.assertTrue(call.isDone());
+        Assertions.assertTrue(call.isSuccess());  // Request succeeds but will have an HTTP error code
+
+        var response = call.getNow();
+
+        Assertions.assertEquals(HttpResponseStatus.BAD_REQUEST, response.status());
     }
 
     @SuppressWarnings("unchecked")
