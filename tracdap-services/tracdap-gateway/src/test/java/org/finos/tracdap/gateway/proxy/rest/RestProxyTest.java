@@ -322,7 +322,7 @@ public class RestProxyTest {
 
         var response = call.getNow();
 
-        Assertions.assertEquals(HttpResponseStatus.BAD_REQUEST, response.status());
+        Assertions.assertEquals(HttpResponseStatus.NOT_ACCEPTABLE, response.status());
     }
 
     @SuppressWarnings("unchecked")

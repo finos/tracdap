@@ -147,6 +147,16 @@ public class RestApiProxy extends Http2ChannelDuplexHandler {
                     }
                 }
 
+                // Check the content type for REST requests
+                try {
+                    checkRequestHeaders(headersFrame.headers());
+                }
+                catch (EInputValidation e) {
+                    sendErrorResponse(stream, ctx, HttpResponseStatus.NOT_ACCEPTABLE, e.getMessage());
+                    ctx.close();
+                    return;
+                }
+
                 var callState = callStateMap.get(stream);
                 callState.requestHeaders.add(headersFrame.headers());
 
@@ -197,6 +207,24 @@ public class RestApiProxy extends Http2ChannelDuplexHandler {
         }
 
         return null;
+    }
+
+    private void checkRequestHeaders(Http2Headers restHeaders) {
+
+        if (!restHeaders.contains(HttpHeaderNames.CONTENT_TYPE))
+            throw new EInputValidation("Missing required HTTP header [" + HttpHeaderNames.CONTENT_TYPE + "]");
+
+        if (!restHeaders.contains(HttpHeaderNames.ACCEPT))
+            throw new EInputValidation("Missing required HTTP header [" + HttpHeaderNames.ACCEPT + "]");
+
+        var contentTypeHeader = restHeaders.get(HttpHeaderNames.CONTENT_TYPE).toString().split(";")[0];
+        var acceptHeader = restHeaders.get(HttpHeaderNames.CONTENT_TYPE).toString().split(";")[0];
+
+        if (!contentTypeHeader.equals("application/json"))
+            throw new EInputValidation("Invalid [content-type] header (expected application/json for REST calls)");
+
+        if (!acceptHeader.equals("application/json"))
+            throw new EInputValidation("Invalid [accept] header (expected application/json for REST calls)");
     }
 
     private <TRequest extends Message, TRequestBody extends Message, TResponse extends Message>
