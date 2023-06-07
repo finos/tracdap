@@ -21,6 +21,8 @@ import org.finos.tracdap.common.exception.EUnexpected;
 import java.io.IOException;
 import java.net.URL;
 import java.nio.file.*;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.jar.JarFile;
 
@@ -29,12 +31,14 @@ public class ConfigHelpers {
 
     private static final String BACKSLASH = "/";
 
-    public static URL prepareConfig(
-            String rootConfigFile, Path targetDir,
+    public static List<URL> prepareConfig(
+            List<String> rootConfigFiles, Path targetDir,
             Map<String, String> substitutions)
             throws Exception {
 
         // URL of config file resource in JAR or on file system
+
+        var rootConfigFile = rootConfigFiles.get(0);
 
         var rootConfigUrl = Files.exists(Paths.get(rootConfigFile))
             ? Paths.get(rootConfigFile)
@@ -87,14 +91,20 @@ public class ConfigHelpers {
             ConfigHelpers.copyConfigDir(sourceDir, targetConfigDir);
         }
 
-        // Apply config substitutions
+        var targetRootUrls = new ArrayList<URL>(rootConfigFiles.size());
 
-        var targetRootFile = targetDir.resolve(rootConfigFile);
-        ConfigHelpers.setConfigVars(targetRootFile, substitutions);
+        for (var configRootEntry : rootConfigFiles) {
 
-        // URL of the root file in the target location
+            // Apply config substitutions
+            var targetRootFile = targetDir.resolve(configRootEntry);
+            ConfigHelpers.setConfigVars(targetRootFile, substitutions);
 
-        return targetRootFile.toUri().toURL();
+            // URL of the root file in the target location
+            var targetRootUrl = targetRootFile.toUri().toURL();
+            targetRootUrls.add(targetRootUrl);
+        }
+
+        return targetRootUrls;
     }
 
     public static void copyConfigFromJar(String jarPath, String rootConfigPath, Path targetDir) throws IOException {
@@ -108,9 +118,10 @@ public class ConfigHelpers {
             if (!name.startsWith(rootConfigPath))
                 continue;
 
-            if (entry.isDirectory())
-                Files.createDirectory(targetDir.resolve(name));
-
+            if (entry.isDirectory()) {
+                if (!Files.exists(targetDir.resolve(name)))
+                    Files.createDirectory(targetDir.resolve(name));
+            }
             else {
                 try (var stream = jar.getInputStream(entry)) {
 
