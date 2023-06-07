@@ -16,7 +16,9 @@
 
 package org.finos.tracdap.gateway.proxy.http;
 
+import com.google.api.HttpBody;
 import io.netty.bootstrap.Bootstrap;
+import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
@@ -28,6 +30,7 @@ import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.Promise;
 
 import java.net.InetAddress;
+import java.util.Map;
 
 
 public class Http1Client {
@@ -104,6 +107,41 @@ public class Http1Client {
             request.headers().set(HttpHeaderNames.HOST, host);
             request.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
             request.headers().set(HttpHeaderNames.ACCEPT_ENCODING, HttpHeaderValues.GZIP);
+
+            channel.writeAndFlush(request);
+
+            return responseFuture;
+        }
+        catch (InterruptedException e) {
+
+            return clientGroup.next().newFailedFuture(e);
+        }
+    }
+
+    public Future<? extends FullHttpResponse> postRequest(
+            String path, Map<CharSequence, Object> requestHeaders,
+            ByteBuf requestBody) {
+
+        try {
+
+            // Make the connection attempt.
+            var clientInit = new ClientInitializer();
+            var channel = this.clientBootstrap
+                    .handler(clientInit)
+                    .connect(host, port)
+                    .sync()
+                    .channel();
+
+            var responseFuture = clientInit.getResponseFuture();
+
+            // Prepare the HTTP request.
+            var request = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST, path, requestBody);
+            request.headers().set(HttpHeaderNames.HOST, host);
+            request.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
+            request.headers().set(HttpHeaderNames.CONTENT_LENGTH, requestBody.readableBytes());
+
+            for (var header : requestHeaders.entrySet())
+                request.headers().set(header.getKey(), header.getValue());
 
             channel.writeAndFlush(request);
 
