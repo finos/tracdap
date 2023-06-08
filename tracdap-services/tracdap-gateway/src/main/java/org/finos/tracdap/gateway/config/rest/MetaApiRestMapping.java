@@ -18,8 +18,6 @@ package org.finos.tracdap.gateway.config.rest;
 
 import org.finos.tracdap.api.*;
 import org.finos.tracdap.gateway.proxy.rest.RestApiMethod;
-import org.finos.tracdap.metadata.TagSelector;
-import org.finos.tracdap.metadata.SearchParameters;
 
 import io.netty.handler.codec.http.HttpMethod;
 
@@ -40,9 +38,9 @@ public class MetaApiRestMapping {
     // Only the public meta API is expressed as REST
     // The trusted API is for internal use only and will always be on gRPC
 
-    public static List<RestApiMethod<?, ?, ?>> metaApiRoutes() {
+    public static List<RestApiMethod<?, ?>> metaApiRoutes() {
 
-        var apiMethods = new ArrayList<RestApiMethod<?, ?, ?>>();
+        var apiMethods = new ArrayList<RestApiMethod<?, ?>>();
 
         apiMethods.add(RestApiMethod.create(HttpMethod.GET,
                 "/trac-meta/api/v1/trac/platform-info",
@@ -73,19 +71,19 @@ public class MetaApiRestMapping {
                 "/trac-meta/api/v1/{tenant}/read-object",
                 TracMetadataApiGrpc.getReadObjectMethod(),
                 MetadataReadRequest.getDefaultInstance(),
-                "selector", TagSelector.getDefaultInstance()));
+                "selector"));
 
         apiMethods.add(RestApiMethod.create(HttpMethod.POST,
                 "/trac-meta/api/v1/{tenant}/read-batch",
                 TracMetadataApiGrpc.getReadBatchMethod(),
                 MetadataBatchRequest.getDefaultInstance(),
-                "selector", TagSelector.getDefaultInstance()));
+                "selector"));
 
         apiMethods.add(RestApiMethod.create(HttpMethod.POST,
                 "/trac-meta/api/v1/{tenant}/search",
                 TracMetadataApiGrpc.getSearchMethod(),
                 MetadataSearchRequest.getDefaultInstance(),
-                "searchParams", SearchParameters.getDefaultInstance()));
+                "searchParams"));
 
         apiMethods.add(RestApiMethod.create(HttpMethod.GET,
                 "/trac-meta/api/v1/{tenant}/{objectType}/{objectId}/versions/{objectVersion}/tags/{tagVersion}",

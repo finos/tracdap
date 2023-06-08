@@ -21,58 +21,55 @@ import io.grpc.MethodDescriptor;
 import io.netty.handler.codec.http.HttpMethod;
 
 
-public class RestApiMethod <
-        TRequest extends Message,
-        TRequestBody extends Message,
-        TResponse extends Message> {
+public class RestApiMethod <TRequest extends Message, TResponse extends Message> {
 
-    final boolean hasBody;
     final MethodDescriptor<TRequest, TResponse> grpcMethod;
-
+    final RestApiTranslator<TRequest, TResponse> translator;
     final RestApiMatcher matcher;
-    final RestApiTranslator<TRequest, TRequestBody> translator;
+    final boolean hasBody;
 
     private RestApiMethod(
-            boolean hasBody,
             MethodDescriptor<TRequest, TResponse> grpcMethod,
+            RestApiTranslator<TRequest, TResponse> translator,
             RestApiMatcher matcher,
-            RestApiTranslator<TRequest, TRequestBody> translator) {
+            boolean hasBody) {
 
-        this.hasBody = hasBody;
         this.grpcMethod = grpcMethod;
-
-        this.matcher = matcher;
         this.translator = translator;
-    }
-
-    public static <TRequest extends Message, TRequestBody extends Message, TResponse extends Message>
-    RestApiMethod<TRequest, TRequestBody, TResponse> create(
-            HttpMethod httpMethod, String urlTemplate,
-            MethodDescriptor<TRequest, TResponse> grpcMethod, TRequest blankRequest,
-            String bodyField, TRequestBody bodyTemplate) {
-
-        // Matcher and builder created once and reused for all matching requests
-        var matcher = new RestApiMatcher(httpMethod, urlTemplate, blankRequest);
-        var translator = new RestApiTranslator<>(urlTemplate, blankRequest, bodyField, bodyTemplate);
-
-        return new RestApiMethod<>(true, grpcMethod, matcher, translator);
+        this.matcher = matcher;
+        this.hasBody = hasBody;
     }
 
     public static <TRequest extends Message, TResponse extends Message>
-    RestApiMethod<TRequest, Message, TResponse> create(
+    RestApiMethod<TRequest, TResponse> create(
             HttpMethod httpMethod, String urlTemplate,
-            MethodDescriptor<TRequest, TResponse> grpcMethod, TRequest blankRequest,
+            MethodDescriptor<TRequest, TResponse> grpcMethod,
+            TRequest blankRequest,
+            String bodyField) {
+
+        // Matcher and builder created once and reused for all matching requests
+        var matcher = new RestApiMatcher(httpMethod, urlTemplate, blankRequest);
+        var translator = new RestApiTranslator<TRequest, TResponse>(urlTemplate, blankRequest, bodyField);
+
+        return new RestApiMethod<>(grpcMethod, translator, matcher, true);
+    }
+
+    public static <TRequest extends Message, TResponse extends Message>
+    RestApiMethod<TRequest, TResponse> create(
+            HttpMethod httpMethod, String urlTemplate,
+            MethodDescriptor<TRequest, TResponse> grpcMethod,
+            TRequest blankRequest,
             boolean hasBody) {
 
         // Matcher and builder created once and reused for all matching requests
         var matcher = new RestApiMatcher(httpMethod, urlTemplate, blankRequest);
-        var translator = new RestApiTranslator<>(urlTemplate, blankRequest, hasBody);
+        var translator = new RestApiTranslator<TRequest, TResponse>(urlTemplate, blankRequest, hasBody);
 
-        return new RestApiMethod<>(hasBody, grpcMethod, matcher, translator);
+        return new RestApiMethod<>(grpcMethod, translator, matcher, hasBody);
     }
 
     public static <TRequest extends Message, TResponse extends Message>
-    RestApiMethod<TRequest, Message, TResponse> create(
+    RestApiMethod<TRequest, TResponse> create(
             HttpMethod method, String urlPattern,
             MethodDescriptor<TRequest, TResponse> grpcMethod, TRequest blankRequest) {
 

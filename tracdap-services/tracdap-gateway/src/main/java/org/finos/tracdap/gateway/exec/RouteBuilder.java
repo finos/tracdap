@@ -59,7 +59,7 @@ public class RouteBuilder {
         return new Route(routeIndex, config, matcher, restMethods);
     }
 
-    private static List<RestApiMethod<?, ?, ?>> lookupRestMethods(GwRoute config) {
+    private static List<RestApiMethod<?, ?>> lookupRestMethods(GwRoute config) {
 
         switch (config.getRestMapping()) {
 

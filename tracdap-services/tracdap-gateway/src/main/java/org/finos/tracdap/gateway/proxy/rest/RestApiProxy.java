@@ -56,7 +56,7 @@ public class RestApiProxy extends Http2ChannelDuplexHandler {
 
     private final String grpcHost;
     private final short grpcPort;
-    private final List<RestApiMethod<?, ?, ?>> methods;
+    private final List<RestApiMethod<?, ?>> methods;
 
     private final EventExecutor executor;
     private ManagedChannel serviceChannel;
@@ -64,7 +64,7 @@ public class RestApiProxy extends Http2ChannelDuplexHandler {
     private final Map<Http2FrameStream, RestApiCallState> callStateMap;
 
 
-    public RestApiProxy(String grpcHost, short grpcPort, List<RestApiMethod<?, ?, ?>> methods, EventExecutor executor) {
+    public RestApiProxy(String grpcHost, short grpcPort, List<RestApiMethod<?, ?>> methods, EventExecutor executor) {
 
         this.grpcHost = grpcHost;
         this.grpcPort = grpcPort;
@@ -194,7 +194,7 @@ public class RestApiProxy extends Http2ChannelDuplexHandler {
         }
     }
 
-    private RestApiMethod<?, ?, ?> lookupMethod(Http2HeadersFrame headers) {
+    private RestApiMethod<?, ?> lookupMethod(Http2HeadersFrame headers) {
 
         for (var method: this.methods) {
 
@@ -227,26 +227,21 @@ public class RestApiProxy extends Http2ChannelDuplexHandler {
             throw new EInputValidation("Invalid [accept] header (expected application/json for REST calls)");
     }
 
-    private <TRequest extends Message, TRequestBody extends Message, TResponse extends Message>
+    private <TRequest extends Message, TResponse extends Message>
     void dispatchUnaryRequest(
-            RestApiMethod<TRequest, TRequestBody, TResponse> method,
+            RestApiMethod<TRequest, TResponse> method,
             RestApiCallState callState,
             ChannelHandlerContext ctx) {
 
         try {
             var restUrlPath = callState.requestHeaders.path().toString();
-            TRequest proxyRequest;
 
-            if (method.hasBody) {
-                var requestBody = method.translator.translateRequestBody(callState.requestContent);
-                proxyRequest = method.translator.translateRequest(restUrlPath, requestBody);
-            }
-            else {
-                proxyRequest = method.translator.translateRequest(restUrlPath);
-            }
+            var request = method.hasBody
+                    ? method.translator.translateRequest(restUrlPath, callState.requestContent)
+                    : method.translator.translateRequest(restUrlPath);
 
             var serviceCall = serviceChannel.newCall(method.grpcMethod, callState.options);
-            var proxyCall = ClientCalls.futureUnaryCall(serviceCall, proxyRequest);
+            var proxyCall = ClientCalls.futureUnaryCall(serviceCall, request);
 
             var callback = new UnaryCallback<>(method, callState, ctx);
             Futures.addCallback(proxyCall, callback, executor);
@@ -275,16 +270,15 @@ public class RestApiProxy extends Http2ChannelDuplexHandler {
 
     private class UnaryCallback <
             TRequest extends Message,
-            TRequestBody extends Message,
             TResponse extends Message>
             implements FutureCallback<TResponse> {
 
-        private final RestApiMethod<TRequest, TRequestBody, TResponse> method;
+        private final RestApiMethod<TRequest, TResponse> method;
         private final RestApiCallState callState;
         private final ChannelHandlerContext ctx;
 
         UnaryCallback(
-                RestApiMethod<TRequest, TRequestBody, TResponse> method,
+                RestApiMethod<TRequest, TResponse> method,
                 RestApiCallState callState,
                 ChannelHandlerContext ctx) {
 
@@ -381,7 +375,7 @@ public class RestApiProxy extends Http2ChannelDuplexHandler {
 
     private static class RestApiCallState {
 
-        RestApiMethod<?, ?, ?> method;
+        RestApiMethod<?, ?> method;
 
         Http2Headers requestHeaders;
         CompositeByteBuf requestContent;

@@ -20,7 +20,7 @@ import org.finos.tracdap.api.JobRequest;
 import org.finos.tracdap.api.JobStatusRequest;
 import org.finos.tracdap.api.TracOrchestratorApiGrpc;
 import org.finos.tracdap.gateway.proxy.rest.RestApiMethod;
-import org.finos.tracdap.metadata.TagSelector;
+
 import io.netty.handler.codec.http.HttpMethod;
 
 import java.util.ArrayList;
@@ -29,9 +29,9 @@ import java.util.List;
 
 public class OrchApiRestMapping {
 
-    public static List<RestApiMethod<?, ?, ?>> orchApiRoutes() {
+    public static List<RestApiMethod<?, ?>> orchApiRoutes() {
 
-        var apiMethods = new ArrayList<RestApiMethod<?, ?, ?>>();
+        var apiMethods = new ArrayList<RestApiMethod<?, ?>>();
 
         apiMethods.add(RestApiMethod.create(HttpMethod.POST,
                 "/trac-orch/api/v1/{tenant}/validate-job",
@@ -47,7 +47,7 @@ public class OrchApiRestMapping {
                 "/trac-orch/api/v1/{tenant}/check-job",
                 TracOrchestratorApiGrpc.getCheckJobMethod(),
                 JobStatusRequest.getDefaultInstance(),
-                "selector", TagSelector.getDefaultInstance()));
+                "selector"));
 
         return apiMethods;
     }

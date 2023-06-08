@@ -28,6 +28,7 @@ import io.grpc.StatusRuntimeException;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufInputStream;
 import io.netty.handler.codec.http.HttpResponseStatus;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -42,75 +43,42 @@ import java.util.function.BiFunction;
 import java.util.function.Function;
 
 
-public class RestApiTranslator<TRequest extends Message, TRequestBody extends Message> {
+public class RestApiTranslator<TRequest extends Message, TResponse extends Message> {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
     private final TRequest blankRequest;
-    private final List<BiFunction<URI, TRequest.Builder, TRequest.Builder>> fieldExtractors;
 
+    private final List<BiFunction<URI, TRequest.Builder, TRequest.Builder>> requestFieldExtractors;
+    private final List<Descriptors.FieldDescriptor> requestBodyPath;
     private final boolean hasBody;
-    private final TRequestBody blankBody;
-    private final Function<TRequest.Builder, Message.Builder> bodySubFieldMapper;
-    private final Descriptors.FieldDescriptor bodyFieldDescriptor;
 
-    public RestApiTranslator(String urlTemplate, TRequest blankRequest, String bodyField, TRequestBody blankBody) {
+    public RestApiTranslator(String urlTemplate, TRequest blankRequest, String bodyField) {
 
         this.blankRequest = blankRequest;
-        this.fieldExtractors = prepareFieldExtractors(urlTemplate, blankRequest.getDescriptorForType());
-
-        this.hasBody = true;
-        this.blankBody = blankBody;
 
         var requestDescriptor = blankRequest.getDescriptorForType();
-        var bodyFields = RestApiFields.prepareFieldDescriptors(requestDescriptor, bodyField);
-        this.bodySubFieldMapper = RestApiFields.prepareSubFieldMapper(bodyFields);
-        this.bodyFieldDescriptor = bodyFields.get(bodyFields.size() - 1);
+
+        this.requestFieldExtractors = prepareFieldExtractors(urlTemplate, requestDescriptor);
+        this.requestBodyPath = RestApiFields.prepareFieldDescriptors(requestDescriptor, bodyField);
+        this.hasBody = true;
     }
 
     public RestApiTranslator(String urlTemplate, TRequest blankRequest, boolean hasBody) {
 
         this.blankRequest = blankRequest;
-        this.fieldExtractors = prepareFieldExtractors(urlTemplate, blankRequest.getDescriptorForType());
 
+        var requestDescriptor = blankRequest.getDescriptorForType();
+
+        this.requestFieldExtractors = prepareFieldExtractors(urlTemplate, requestDescriptor);
+        this.requestBodyPath = List.of();
         this.hasBody = hasBody;
-        this.blankBody = null;
 
-        this.bodySubFieldMapper = null;
-        this.bodyFieldDescriptor = null;
     }
-
 
     // -----------------------------------------------------------------------------------------------------------------
     // Runtime methods
     // -----------------------------------------------------------------------------------------------------------------
-
-    @SuppressWarnings("unchecked")
-    public TRequest translateRequest(String url, Message body) {
-
-        // This should be set up correctly when the API route is created
-        if (!this.hasBody)
-            throw new EUnexpected();
-
-        var request = blankRequest.newBuilderForType();
-
-        // If the body is a sub field, use the sub field mapper to add it to the request
-        if (bodySubFieldMapper != null) {
-
-            var bodySubField = bodySubFieldMapper.apply(request);
-            bodySubField.setField(bodyFieldDescriptor, body);
-        }
-        // Otherwise the body is the top level request, merge it before applying URL fields
-        else
-            request.mergeFrom(body);
-
-        var requestUrl = URI.create(url);
-
-        for (var extractor : fieldExtractors)
-            request = extractor.apply(requestUrl, request);
-
-        return (TRequest) request.build();
-    }
 
     @SuppressWarnings("unchecked")
     public TRequest translateRequest(String url) {
@@ -119,31 +87,47 @@ public class RestApiTranslator<TRequest extends Message, TRequestBody extends Me
         if (this.hasBody)
             throw new EUnexpected();
 
-        var request = blankRequest.newBuilderForType();
-
         var requestUrl = URI.create(url);
 
-        for (var extractor : fieldExtractors)
+        var request = blankRequest.newBuilderForType();
+
+        for (var extractor : requestFieldExtractors)
             request = extractor.apply(requestUrl, request);
 
         return (TRequest) request.build();
     }
 
-    public Message translateRequestBody(ByteBuf bodyBuffer) {
+    @SuppressWarnings("unchecked")
+    public TRequest translateRequest(String url, ByteBuf bodyBuffer) {
 
-        if (!hasBody)
+        // This should be set up correctly when the API route is created
+        if (!this.hasBody)
             throw new EUnexpected();
 
-        var bodyType = (blankBody != null) ? blankBody : blankRequest;
+        var requestUrl = URI.create(url);
+
+        var request = blankRequest.newBuilderForType();
+
+        for (var extractor : requestFieldExtractors)
+            request = extractor.apply(requestUrl, request);
+
+        var body = request;
+
+        for (var pathElement : requestBodyPath)
+            body = body.getFieldBuilder(pathElement);
+
+        translateRequestBody(bodyBuffer, body);
+
+        return (TRequest) request.build();
+    }
+
+    private void translateRequestBody(ByteBuf bodyBuffer, Message.Builder body) {
 
         try (var jsonStream = new ByteBufInputStream(bodyBuffer);
              var jsonReader = new InputStreamReader(jsonStream)) {
 
-            var bodyBuilder = bodyType.newBuilderForType();
             var jsonParser = JsonFormat.parser();
-            jsonParser.merge(jsonReader, bodyBuilder);
-
-            return bodyBuilder.build();
+            jsonParser.merge(jsonReader, body);
         }
         catch (InvalidProtocolBufferException e) {
 
@@ -157,7 +141,7 @@ public class RestApiTranslator<TRequest extends Message, TRequestBody extends Me
 
             var message = String.format(
                     "Invalid JSON input for type [%s]: %s",
-                    bodyType.getDescriptorForType().getName(),
+                    body.getDescriptorForType().getName(),
                     detailMessage);
 
             log.warn(message);
