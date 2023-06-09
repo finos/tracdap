@@ -17,6 +17,8 @@
 package org.finos.tracdap.gateway.proxy.rest;
 
 import io.grpc.Status;
+import io.netty.buffer.ByteBufAllocator;
+import io.netty.buffer.Unpooled;
 import org.finos.tracdap.common.exception.EInputValidation;
 import org.finos.tracdap.common.exception.EUnexpected;
 
@@ -25,11 +27,11 @@ import com.google.protobuf.Descriptors;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.Message;
 import com.google.protobuf.util.JsonFormat;
-import io.grpc.StatusRuntimeException;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufInputStream;
 import io.netty.handler.codec.http.HttpResponseStatus;
 
+import org.finos.tracdap.gateway.proxy.grpc.GrpcUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -85,7 +87,7 @@ public class RestApiTranslator<TRequest extends Message, TResponse extends Messa
     // -----------------------------------------------------------------------------------------------------------------
 
     @SuppressWarnings("unchecked")
-    public TRequest translateRequest(String url) {
+    public TRequest decodeRestRequest(String url) {
 
         // This should be set up correctly when the API route is created
         if (this.hasBody)
@@ -101,7 +103,7 @@ public class RestApiTranslator<TRequest extends Message, TResponse extends Messa
     }
 
     @SuppressWarnings("unchecked")
-    public TRequest translateRequest(String url, ByteBuf bodyBuffer) {
+    public TRequest decodeRestRequest(String url, ByteBuf bodyBuffer) {
 
         // This should be set up correctly when the API route is created
         if (!this.hasBody)
@@ -114,12 +116,12 @@ public class RestApiTranslator<TRequest extends Message, TResponse extends Messa
             extractor.apply(requestUrl, request);
 
         var body = lookupField(request, requestBodyPath);
-        translateRequestBody(bodyBuffer, body);
+        decodeRestBody(bodyBuffer, body);
 
         return (TRequest) request.build();
     }
 
-    private void translateRequestBody(ByteBuf bodyBuffer, Message.Builder body) {
+    private void decodeRestBody(ByteBuf bodyBuffer, Message.Builder body) {
 
         try (var jsonStream = new ByteBufInputStream(bodyBuffer);
              var jsonReader = new InputStreamReader(jsonStream)) {
@@ -128,6 +130,8 @@ public class RestApiTranslator<TRequest extends Message, TResponse extends Messa
             jsonParser.merge(jsonReader, body);
         }
         catch (InvalidProtocolBufferException e) {
+
+            // TODO: error handling
 
             // Validation failures will go back to users (API users, i.e. application developers)
             // Strip out GSON class name from the error message for readability
@@ -153,40 +157,31 @@ public class RestApiTranslator<TRequest extends Message, TResponse extends Messa
         }
     }
 
-    public String translateResponseBody(ByteBuf bodyBuffer) {
+    public ByteBuf encodeGrpcRequest(Message msg, ByteBufAllocator allocator) {
 
-        try (var stream = new ByteBufInputStream(bodyBuffer)) {
+        return GrpcUtils.encodeLpm(msg, allocator);
+    }
 
-            var msg = blankResponse
-                    .newBuilderForType()
-                    .mergeFrom(stream)
-                    .build();
+    public TResponse decodeGrpcResponse(ByteBuf bodyBuffer) {
 
-            return JsonFormat.printer().print(msg);
+        try {
+            return GrpcUtils.decodeLpm(blankResponse, bodyBuffer);
         }
         catch (InvalidProtocolBufferException e) {
-
-            // Validation failures will go back to users (API users, i.e. application developers)
-            // Strip out GSON class name from the error message for readability
-            var detailMessage = e.getLocalizedMessage();
-            var classNamePrefix = MalformedJsonException.class.getName() + ": ";
-
-            if (detailMessage.startsWith(classNamePrefix))
-                detailMessage = detailMessage.substring(classNamePrefix.length());
-
-            var message = String.format(
-                    "Invalid JSON input for type [%s]: %s",
-                    blankResponse.getDescriptorForType().getName(),
-                    detailMessage);
-
-            log.warn(message);
-            throw new EInputValidation(message, e);
+            // TODO: error handling
+            throw new EUnexpected(e);
         }
-        catch (IOException e) {
 
-            // Shouldn't happen, reader source is a buffer already held in memory
-            log.error("Unexpected IO error reading from internal buffer", e);
-            throw new EUnexpected();
+    }
+
+    public ByteBuf encodeRestResponse(Message msg) {
+
+        try {
+            var str = JsonFormat.printer().print(msg);
+            return Unpooled.wrappedBuffer(str.getBytes(StandardCharsets.UTF_8));
+        }
+        catch (InvalidProtocolBufferException e) {
+            throw new EUnexpected(e);
         }
     }
 
@@ -194,8 +189,8 @@ public class RestApiTranslator<TRequest extends Message, TResponse extends Messa
 
         switch (grpcStatusCode) {
 
-            case UNAVAILABLE:
-                return HttpResponseStatus.SERVICE_UNAVAILABLE;
+            case OK:
+                return HttpResponseStatus.OK;
 
             case UNAUTHENTICATED:
                 return HttpResponseStatus.UNAUTHORIZED;
@@ -215,27 +210,12 @@ public class RestApiTranslator<TRequest extends Message, TResponse extends Messa
             case FAILED_PRECONDITION:
                 return HttpResponseStatus.PRECONDITION_FAILED;
 
+            case UNAVAILABLE:
+                return HttpResponseStatus.SERVICE_UNAVAILABLE;
+
             default:
                 // For unrecognised errors, send error code 500 with no message
                 return HttpResponseStatus.INTERNAL_SERVER_ERROR;
-        }
-    }
-
-    public String translateGrpcErrorMessage(StatusRuntimeException grpcError) {
-
-        var grpcCode = grpcError.getStatus().getCode();
-
-        switch (grpcCode) {
-
-            case INVALID_ARGUMENT:
-            case NOT_FOUND:
-            case ALREADY_EXISTS:
-            case FAILED_PRECONDITION:
-                return grpcError.getStatus().getDescription();
-
-            default:
-                // For unrecognised errors, send error code 500 with no message
-                return null;
         }
     }
 
