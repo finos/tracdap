@@ -19,6 +19,7 @@ package org.finos.tracdap.gateway.proxy.rest;
 import org.finos.tracdap.common.exception.ENetworkHttp;
 import org.finos.tracdap.gateway.exec.Route;
 import org.finos.tracdap.gateway.proxy.http.Http1to2Proxy;
+import org.finos.tracdap.gateway.proxy.http.Http2FlowControl;
 import org.finos.tracdap.gateway.proxy.http.HttpProtocol;
 import org.finos.tracdap.gateway.routing.CoreRouterLink;
 
@@ -66,6 +67,10 @@ public class RestApiProxyBuilder extends ChannelInitializer<Channel> {
         var initialSettings = new Http2Settings()
                 .maxFrameSize(16 * 1024);
 
+        var target = String.format("%s:%d",
+                routeConfig.getConfig().getTarget().getHost(),
+                routeConfig.getConfig().getTarget().getPort());
+
         var http2Codec = Http2FrameCodecBuilder.forClient()
                 .frameLogger(new Http2FrameLogger(LogLevel.INFO))
                 .initialSettings(initialSettings)
@@ -73,7 +78,10 @@ public class RestApiProxyBuilder extends ChannelInitializer<Channel> {
                 .autoAckPingFrame(true)
                 .build();
 
+        var http2FlowControl = new Http2FlowControl(connId, target, initialSettings);
+
         pipeline.addLast(http2Codec);
+        pipeline.addLast(http2FlowControl);
 
         // REST proxy
 
