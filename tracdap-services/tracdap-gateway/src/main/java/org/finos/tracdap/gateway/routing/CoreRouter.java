@@ -16,12 +16,10 @@
 
 package org.finos.tracdap.gateway.routing;
 
-import org.finos.tracdap.config.GwProtocol;
 import org.finos.tracdap.gateway.exec.Route;
 
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.*;
-import io.netty.channel.embedded.EmbeddedChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpMethod;
@@ -175,32 +173,25 @@ abstract class CoreRouter extends ChannelDuplexHandler {
 
     protected final void openProxyChannel(TargetChannelState target, Route route, ChannelHandlerContext ctx) {
 
-        var channelActiveFuture = ctx.newPromise();
+        var targetConfig = route.getConfig().getTarget();
 
-        target.routeIndex = route.getIndex();
-        target.channelActiveFuture = channelActiveFuture;
+        // Router link signals the router link future once the link is active
+        var routerLinkFuture = ctx.newPromise();
+        var routerLink = new CoreRouterLink(this, ctx, routerLinkFuture, route.getIndex(), connId);
 
-        var routerLink = new CoreRouterLink(this, ctx, channelActiveFuture, route.getIndex(), connId);
+        // Channel initializer is built for the route
+        // It will insert the router link as the last handler in the chain
         var channelInit = initializeProxyRoute(ctx, routerLink, route);
 
-        if (route.getConfig().getRouteType() == GwProtocol.REST) {
+        target.channelOpenFuture = bootstrap
+                .handler(channelInit)
+                .connect(targetConfig.getHost(), targetConfig.getPort());
 
-            target.channel = new EmbeddedChannel(channelInit);
-            target.channelOpenFuture = target.channel.newSucceededFuture();
-        }
-
-        else {
-
-            var targetConfig = route.getConfig().getTarget();
-
-            target.channelOpenFuture = bootstrap
-                    .handler(channelInit)
-                    .connect(targetConfig.getHost(), targetConfig.getPort());
-
-            target.channel = target.channelOpenFuture.channel();
-        }
-
+        target.channel = target.channelOpenFuture.channel();
+        target.channelActiveFuture = routerLinkFuture;
         target.channelCloseFuture = target.channel.closeFuture();
+
+        target.routeIndex = route.getIndex();
 
         target.channelOpenFuture.addListener(future -> proxyChannelOpen(ctx, target, future));
         target.channelActiveFuture.addListener(future -> proxyChannelActive(ctx, target, future));
