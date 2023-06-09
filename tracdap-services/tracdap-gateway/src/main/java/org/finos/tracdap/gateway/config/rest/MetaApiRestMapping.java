@@ -20,6 +20,8 @@ import org.finos.tracdap.api.*;
 import org.finos.tracdap.gateway.proxy.rest.RestApiMethod;
 
 import io.netty.handler.codec.http.HttpMethod;
+import org.finos.tracdap.metadata.Tag;
+import org.finos.tracdap.metadata.TagHeader;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -42,63 +44,77 @@ public class MetaApiRestMapping {
 
         var apiMethods = new ArrayList<RestApiMethod<?, ?>>();
 
-        apiMethods.add(RestApiMethod.create(HttpMethod.GET,
-                "/trac-meta/api/v1/trac/platform-info",
+        apiMethods.add(RestApiMethod.create(
+                HttpMethod.GET, "/trac-meta/api/v1/trac/platform-info",
                 TracMetadataApiGrpc.getPlatformInfoMethod(),
-                PlatformInfoRequest.getDefaultInstance()));
+                PlatformInfoRequest.getDefaultInstance(),
+                PlatformInfoResponse.getDefaultInstance()));
 
-        apiMethods.add(RestApiMethod.create(HttpMethod.GET,
-                "/trac-meta/api/v1/trac/list-tenants",
+        apiMethods.add(RestApiMethod.create(
+                HttpMethod.GET, "/trac-meta/api/v1/trac/list-tenants",
                 TracMetadataApiGrpc.getListTenantsMethod(),
-                ListTenantsRequest.getDefaultInstance()));
+                ListTenantsRequest.getDefaultInstance(),
+                ListTenantsResponse.getDefaultInstance()));
 
-        apiMethods.add(RestApiMethod.create(HttpMethod.POST,
-                "/trac-meta/api/v1/{tenant}/create-object",
+        apiMethods.add(RestApiMethod.create(
+                HttpMethod.POST, "/trac-meta/api/v1/{tenant}/create-object",
                 TracMetadataApiGrpc.getCreateObjectMethod(),
-                MetadataWriteRequest.getDefaultInstance(), true));
+                MetadataWriteRequest.getDefaultInstance(),
+                TagHeader.getDefaultInstance(),
+                true));
 
-        apiMethods.add(RestApiMethod.create(HttpMethod.POST,
-                "/trac-meta/api/v1/{tenant}/update-object",
+        apiMethods.add(RestApiMethod.create(
+                HttpMethod.POST, "/trac-meta/api/v1/{tenant}/update-object",
                 TracMetadataApiGrpc.getUpdateObjectMethod(),
-                MetadataWriteRequest.getDefaultInstance(), true));
+                MetadataWriteRequest.getDefaultInstance(),
+                TagHeader.getDefaultInstance(),
+                true));
 
-        apiMethods.add(RestApiMethod.create(HttpMethod.POST,
-                "/trac-meta/api/v1/{tenant}/update-tag",
+        apiMethods.add(RestApiMethod.create(
+                HttpMethod.POST, "/trac-meta/api/v1/{tenant}/update-tag",
                 TracMetadataApiGrpc.getUpdateTagMethod(),
-                MetadataWriteRequest.getDefaultInstance(), true));
+                MetadataWriteRequest.getDefaultInstance(),
+                TagHeader.getDefaultInstance(),
+                true));
 
-        apiMethods.add(RestApiMethod.create(HttpMethod.POST,
-                "/trac-meta/api/v1/{tenant}/read-object",
+        apiMethods.add(RestApiMethod.create(
+                HttpMethod.POST, "/trac-meta/api/v1/{tenant}/read-object",
                 TracMetadataApiGrpc.getReadObjectMethod(),
                 MetadataReadRequest.getDefaultInstance(),
+                Tag.getDefaultInstance(),
                 "selector"));
 
-        apiMethods.add(RestApiMethod.create(HttpMethod.POST,
-                "/trac-meta/api/v1/{tenant}/read-batch",
+        apiMethods.add(RestApiMethod.create(
+                HttpMethod.POST, "/trac-meta/api/v1/{tenant}/read-batch",
                 TracMetadataApiGrpc.getReadBatchMethod(),
                 MetadataBatchRequest.getDefaultInstance(),
+                MetadataBatchResponse.getDefaultInstance(),
                 "selector"));
 
-        apiMethods.add(RestApiMethod.create(HttpMethod.POST,
-                "/trac-meta/api/v1/{tenant}/search",
+        apiMethods.add(RestApiMethod.create(
+                HttpMethod.POST, "/trac-meta/api/v1/{tenant}/search",
                 TracMetadataApiGrpc.getSearchMethod(),
                 MetadataSearchRequest.getDefaultInstance(),
+                MetadataSearchResponse.getDefaultInstance(),
                 "searchParams"));
 
-        apiMethods.add(RestApiMethod.create(HttpMethod.GET,
-                "/trac-meta/api/v1/{tenant}/{objectType}/{objectId}/versions/{objectVersion}/tags/{tagVersion}",
+        apiMethods.add(RestApiMethod.create(
+                HttpMethod.GET, "/trac-meta/api/v1/{tenant}/{objectType}/{objectId}/versions/{objectVersion}/tags/{tagVersion}",
                 TracMetadataApiGrpc.getGetObjectMethod(),
-                MetadataGetRequest.getDefaultInstance()));
+                MetadataGetRequest.getDefaultInstance(),
+                Tag.getDefaultInstance()));
 
-        apiMethods.add(RestApiMethod.create(HttpMethod.GET,
-                "/trac-meta/api/v1/{tenant}/{objectType}/{objectId}/versions/latest/tags/latest",
+        apiMethods.add(RestApiMethod.create(
+                HttpMethod.GET, "/trac-meta/api/v1/{tenant}/{objectType}/{objectId}/versions/latest/tags/latest",
                 TracMetadataApiGrpc.getGetLatestObjectMethod(),
-                MetadataGetRequest.getDefaultInstance()));
+                MetadataGetRequest.getDefaultInstance(),
+                Tag.getDefaultInstance()));
 
-        apiMethods.add(RestApiMethod.create(HttpMethod.GET,
-                "/trac-meta/api/v1/{tenant}/{objectType}/{objectId}/versions/{objectVersion}/tags/latest",
+        apiMethods.add(RestApiMethod.create(
+                HttpMethod.GET, "/trac-meta/api/v1/{tenant}/{objectType}/{objectId}/versions/{objectVersion}/tags/latest",
                 TracMetadataApiGrpc.getGetLatestTagMethod(),
-                MetadataGetRequest.getDefaultInstance()));
+                MetadataGetRequest.getDefaultInstance(),
+                Tag.getDefaultInstance()));
 
         return apiMethods;
     }

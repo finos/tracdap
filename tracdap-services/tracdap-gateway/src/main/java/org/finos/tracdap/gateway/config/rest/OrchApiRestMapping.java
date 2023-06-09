@@ -17,6 +17,7 @@
 package org.finos.tracdap.gateway.config.rest;
 
 import org.finos.tracdap.api.JobRequest;
+import org.finos.tracdap.api.JobStatus;
 import org.finos.tracdap.api.JobStatusRequest;
 import org.finos.tracdap.api.TracOrchestratorApiGrpc;
 import org.finos.tracdap.gateway.proxy.rest.RestApiMethod;
@@ -33,20 +34,25 @@ public class OrchApiRestMapping {
 
         var apiMethods = new ArrayList<RestApiMethod<?, ?>>();
 
-        apiMethods.add(RestApiMethod.create(HttpMethod.POST,
-                "/trac-orch/api/v1/{tenant}/validate-job",
+        apiMethods.add(RestApiMethod.create(
+                HttpMethod.POST, "/trac-orch/api/v1/{tenant}/validate-job",
                 TracOrchestratorApiGrpc.getValidateJobMethod(),
-                JobRequest.getDefaultInstance(), true));
+                JobRequest.getDefaultInstance(),
+                JobStatus.getDefaultInstance(),
+                true));
 
-        apiMethods.add(RestApiMethod.create(HttpMethod.POST,
-                "/trac-orch/api/v1/{tenant}/submit-job",
+        apiMethods.add(RestApiMethod.create(
+                HttpMethod.POST, "/trac-orch/api/v1/{tenant}/submit-job",
                 TracOrchestratorApiGrpc.getSubmitJobMethod(),
-                JobRequest.getDefaultInstance(), true));
+                JobRequest.getDefaultInstance(),
+                JobStatus.getDefaultInstance(),
+                true));
 
-        apiMethods.add(RestApiMethod.create(HttpMethod.POST,
-                "/trac-orch/api/v1/{tenant}/check-job",
+        apiMethods.add(RestApiMethod.create(
+                HttpMethod.POST, "/trac-orch/api/v1/{tenant}/check-job",
                 TracOrchestratorApiGrpc.getCheckJobMethod(),
                 JobStatusRequest.getDefaultInstance(),
+                JobStatus.getDefaultInstance(),
                 "selector"));
 
         return apiMethods;

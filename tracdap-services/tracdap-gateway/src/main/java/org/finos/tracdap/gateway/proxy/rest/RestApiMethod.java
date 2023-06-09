@@ -44,12 +44,12 @@ public class RestApiMethod <TRequest extends Message, TResponse extends Message>
     RestApiMethod<TRequest, TResponse> create(
             HttpMethod httpMethod, String urlTemplate,
             MethodDescriptor<TRequest, TResponse> grpcMethod,
-            TRequest blankRequest,
+            TRequest blankRequest, TResponse blankResponse,
             String bodyField) {
 
         // Matcher and builder created once and reused for all matching requests
         var matcher = new RestApiMatcher(httpMethod, urlTemplate, blankRequest);
-        var translator = new RestApiTranslator<TRequest, TResponse>(urlTemplate, blankRequest, bodyField);
+        var translator = new RestApiTranslator<>(blankRequest, blankResponse, urlTemplate, bodyField);
 
         return new RestApiMethod<>(grpcMethod, translator, matcher, true);
     }
@@ -58,12 +58,12 @@ public class RestApiMethod <TRequest extends Message, TResponse extends Message>
     RestApiMethod<TRequest, TResponse> create(
             HttpMethod httpMethod, String urlTemplate,
             MethodDescriptor<TRequest, TResponse> grpcMethod,
-            TRequest blankRequest,
+            TRequest blankRequest, TResponse blankResponse,
             boolean hasBody) {
 
         // Matcher and builder created once and reused for all matching requests
         var matcher = new RestApiMatcher(httpMethod, urlTemplate, blankRequest);
-        var translator = new RestApiTranslator<TRequest, TResponse>(urlTemplate, blankRequest, hasBody);
+        var translator = new RestApiTranslator<>(blankRequest, blankResponse, urlTemplate, hasBody);
 
         return new RestApiMethod<>(grpcMethod, translator, matcher, hasBody);
     }
@@ -71,8 +71,9 @@ public class RestApiMethod <TRequest extends Message, TResponse extends Message>
     public static <TRequest extends Message, TResponse extends Message>
     RestApiMethod<TRequest, TResponse> create(
             HttpMethod method, String urlPattern,
-            MethodDescriptor<TRequest, TResponse> grpcMethod, TRequest blankRequest) {
+            MethodDescriptor<TRequest, TResponse> grpcMethod,
+            TRequest blankRequest, TResponse blankResponse) {
 
-        return create(method, urlPattern, grpcMethod, blankRequest, false);
+        return create(method, urlPattern, grpcMethod, blankRequest, blankResponse, false);
     }
 }
