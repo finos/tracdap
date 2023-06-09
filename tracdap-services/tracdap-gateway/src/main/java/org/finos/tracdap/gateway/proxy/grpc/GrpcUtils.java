@@ -16,18 +16,72 @@
 
 package org.finos.tracdap.gateway.proxy.grpc;
 
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.ByteBufAllocator;
+import com.google.protobuf.InvalidProtocolBufferException;
+import com.google.protobuf.Message;
+import io.netty.buffer.*;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http2.DefaultHttp2Headers;
 import io.netty.handler.codec.http2.Http2Headers;
+import org.finos.tracdap.common.exception.ETracInternal;
+import org.finos.tracdap.common.exception.EUnexpected;
 
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 
 
 public class GrpcUtils {
 
     public static int LPM_PREFIX_LENGTH = 5;
+
+    public static <TMsg extends Message>
+    ByteBuf encodeLpm(TMsg msg, ByteBufAllocator allocator) {
+
+        var compression = (byte) 0x00;
+        var msgSize = msg.getSerializedSize();
+        var lpmSize = LPM_PREFIX_LENGTH + msgSize;
+        var buffer = allocator.directBuffer(lpmSize);
+
+        try (var stream = new ByteBufOutputStream(buffer)) {
+
+            stream.writeByte(compression);
+            stream.writeInt(msgSize);
+            msg.writeTo(stream);
+
+            return buffer;
+        }
+        catch (IOException e) {
+            throw new EUnexpected(e);
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    public static <TMsg extends Message>
+    TMsg decodeLpm(TMsg blankMsg, ByteBuf buffer) throws InvalidProtocolBufferException {
+
+        if (buffer.readableBytes() < LPM_PREFIX_LENGTH)
+            throw new InvalidProtocolBufferException("Unexpected end of stream");
+
+        try (var stream = new ByteBufInputStream(buffer)) {
+
+            var compression = stream.readByte();
+            var msgSize = stream.readInt();
+
+            if (buffer.readableBytes() < msgSize)
+                throw new InvalidProtocolBufferException("Unexpected end of stream");
+
+            // TODO: Decompression support
+            if (compression != 0)
+                throw new ETracInternal("compression not supported yet");
+
+            var builder = blankMsg.newBuilderForType();
+            builder.mergeFrom(stream);
+
+            return (TMsg) builder.build();
+        }
+        catch (IOException e) {
+            throw new EUnexpected(e);
+        }
+    }
 
     public static Http2Headers decodeHeadersFrame(ByteBuf headersBuf) {
 
