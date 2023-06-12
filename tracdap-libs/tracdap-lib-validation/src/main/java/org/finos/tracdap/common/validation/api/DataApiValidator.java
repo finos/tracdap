@@ -346,7 +346,7 @@ public class DataApiValidator {
 
         ctx = ctx.push(DR_OBJECT_VERSION)
                 .apply(CommonValidators::required)
-                .apply(CommonValidators::positive)
+                .apply(CommonValidators::positive, Integer.class)
                 .pop();
 
         return ctx;
