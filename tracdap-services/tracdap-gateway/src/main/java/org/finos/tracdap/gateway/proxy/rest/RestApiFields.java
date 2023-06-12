@@ -56,6 +56,11 @@ public class RestApiFields {
     public static List<Descriptors.FieldDescriptor>
     prepareFieldDescriptors(Descriptors.Descriptor messageDescriptor, String fullFieldName) {
 
+        // body = * means fold the body into the top level object
+        // In this case, the sub-field selector should be an empty list
+        if (fullFieldName.equals("*"))
+            return List.of();
+
         var fieldNames = Arrays.asList(fullFieldName.split("\\."));
         var fieldDescriptors = new ArrayList<Descriptors.FieldDescriptor>();
 
