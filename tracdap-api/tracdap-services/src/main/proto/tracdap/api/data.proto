@@ -469,7 +469,7 @@ service TracDataApi {
    */
   rpc downloadFile (DownloadRequest) returns (stream DownloadResponse) {
     option (google.api.http) = {
-      get: "/{tenant}/{objectType=FILE}/{objectId}/versions/{objectVersion}/*"
+      get: "/{tenant}/FILE/{objectId}/versions/{objectVersion}/*"
       response_body: "content"
     };
   }
@@ -482,7 +482,7 @@ service TracDataApi {
    */
   rpc downloadLatestFile (DownloadRequest) returns (stream DownloadResponse) {
     option (google.api.http) = {
-      get: "/{tenant}/{objectType=FILE}/{objectId}/versions/latest/*"
+      get: "/{tenant}/FILE/{objectId}/versions/latest/*"
       response_body: "content"
     };
   }
