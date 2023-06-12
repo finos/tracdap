@@ -50,7 +50,7 @@ services:
       port: 8081
 
   data:
-    protocols: [GRPC_WEB]
+    protocols: [GRPC_WEB, REST]
     target:
       scheme: http
       host: localhost
