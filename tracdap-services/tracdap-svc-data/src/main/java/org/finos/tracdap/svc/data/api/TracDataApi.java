@@ -38,7 +38,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.function.BiFunction;
 
 
 public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
