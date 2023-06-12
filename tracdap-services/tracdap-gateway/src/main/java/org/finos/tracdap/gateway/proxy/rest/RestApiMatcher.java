@@ -58,6 +58,12 @@ public class RestApiMatcher implements IRouteMatcher {
     Function<String, Boolean>
     prepareMatcherForSegment(String segmentTemplate, TRequest blankRequest) {
 
+        // No support for multi-segment wildcard yet (**)
+
+        // The wildcard matches any individual segment
+        if (segmentTemplate.equals("*"))
+            return segment -> true;
+
         // Segments that do not contain variables are a straight-up literal match
         if (!segmentTemplate.contains("{"))
             return segment -> RestApiMatcher.matchLiteralSegment(segmentTemplate, segment);
