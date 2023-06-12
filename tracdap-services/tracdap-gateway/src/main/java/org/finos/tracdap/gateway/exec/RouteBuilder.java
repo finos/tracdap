@@ -17,9 +17,8 @@
 package org.finos.tracdap.gateway.exec;
 
 import org.finos.tracdap.config.GwRoute;
-import org.finos.tracdap.gateway.config.rest.OrchApiRestMapping;
-import org.finos.tracdap.gateway.config.rest.MetaApiRestMapping;
 import org.finos.tracdap.gateway.proxy.rest.RestApiMethod;
+import org.finos.tracdap.gateway.proxy.rest.RestApiSetup;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -63,9 +62,11 @@ public class RouteBuilder {
 
         switch (config.getRestMapping()) {
 
-            case TRAC_META: return MetaApiRestMapping.metaApiRoutes();
+            case TRAC_META: return RestApiSetup.metaApiRoutes();
 
-            case TRAC_ORCH: return OrchApiRestMapping.orchApiRoutes();
+            case TRAC_DATA: return RestApiSetup.dataApiRoutes();
+
+            case TRAC_ORCH: return RestApiSetup.orchApiRoutes();
 
             default:
                 return null;
