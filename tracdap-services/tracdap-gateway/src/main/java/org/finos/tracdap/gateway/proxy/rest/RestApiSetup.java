@@ -91,20 +91,22 @@ public class RestApiSetup {
             if (httpRule.hasGet()) {
 
                 var urlPattern = apiPrefix + httpRule.getGet();
+                var responseBody = httpRule.getResponseBody().isEmpty() ? "*" : httpRule.getResponseBody();
 
-                return RestApiMethod.create(
-                        HttpMethod.GET, urlPattern,
-                        protoMethod, blankRequest, blankResponse);
+                return RestApiMethod.GET(
+                        protoMethod, blankRequest, blankResponse,
+                        urlPattern, responseBody);
             }
 
             if (httpRule.hasPost()) {
 
                 var urlPattern = apiPrefix + httpRule.getPost();
+                var requestBody = httpRule.getBody().isEmpty() ? "*" : httpRule.getBody();
+                var responseBody = httpRule.getResponseBody().isEmpty() ? "*" : httpRule.getResponseBody();
 
-                return RestApiMethod.create(
-                        HttpMethod.POST, urlPattern,
+                return RestApiMethod.POST(
                         protoMethod, blankRequest, blankResponse,
-                        httpRule.getBody());
+                        urlPattern, requestBody, responseBody);
             }
 
             throw new ETracInternal("REST mapping for " + protoMethod.getName() + " uses an unsupported HTTP rule type");

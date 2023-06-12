@@ -16,10 +16,12 @@
 
 package org.finos.tracdap.gateway.proxy.rest;
 
+import com.google.protobuf.ByteString;
 import io.grpc.Status;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.Unpooled;
 import org.finos.tracdap.common.exception.EInputValidation;
+import org.finos.tracdap.common.exception.ETracInternal;
 import org.finos.tracdap.common.exception.EUnexpected;
 
 import com.google.gson.stream.MalformedJsonException;
@@ -55,31 +57,29 @@ public class RestApiTranslator<TRequest extends Message, TResponse extends Messa
 
     private final List<BiFunction<URI, TRequest.Builder, TRequest.Builder>> requestFieldExtractors;
     private final List<Descriptors.FieldDescriptor> requestBodyPath;
+    private final List<Descriptors.FieldDescriptor> responseBodyPath;
     private final boolean hasBody;
 
-    public RestApiTranslator(TRequest blankRequest, TResponse blankResponse, String urlTemplate, String bodyField) {
+    public RestApiTranslator(TRequest blankRequest, TResponse blankResponse, String urlTemplate, String bodyField, String responseBodyField) {
 
         this.blankRequest = blankRequest;
         this.blankResponse = blankResponse;
 
         var requestDescriptor = blankRequest.getDescriptorForType();
+        var responseDescriptor = blankResponse.getDescriptorForType();
 
         this.requestFieldExtractors = prepareFieldExtractors(urlTemplate, requestDescriptor);
-        this.requestBodyPath = RestApiFields.prepareFieldDescriptors(requestDescriptor, bodyField);
-        this.hasBody = true;
-    }
 
-    public RestApiTranslator(TRequest blankRequest, TResponse blankResponse, String urlTemplate) {
+        if (bodyField == null) {
+            this.hasBody = false;
+            this.requestBodyPath = List.of();
+        }
+        else {
+            this.hasBody = true;
+            this.requestBodyPath = RestApiFields.prepareFieldDescriptors(requestDescriptor, bodyField);
+        }
 
-        this.blankRequest = blankRequest;
-        this.blankResponse = blankResponse;
-
-        var requestDescriptor = blankRequest.getDescriptorForType();
-
-        this.requestFieldExtractors = prepareFieldExtractors(urlTemplate, requestDescriptor);
-        this.requestBodyPath = List.of();
-        this.hasBody = false;
-
+        this.responseBodyPath = RestApiFields.prepareFieldDescriptors(responseDescriptor, responseBodyField);
     }
 
     // -----------------------------------------------------------------------------------------------------------------
@@ -177,8 +177,23 @@ public class RestApiTranslator<TRequest extends Message, TResponse extends Messa
     public ByteBuf encodeRestResponse(Message msg) {
 
         try {
-            var str = JsonFormat.printer().print(msg);
-            return Unpooled.wrappedBuffer(str.getBytes(StandardCharsets.UTF_8));
+
+            var responseObject = lookupField(msg, responseBodyPath);
+
+            if (responseObject instanceof Message) {
+
+                var str = JsonFormat.printer().print((Message) responseObject);
+                return Unpooled.wrappedBuffer(str.getBytes(StandardCharsets.UTF_8));
+            }
+            else if (responseObject instanceof ByteString) {
+
+                return Unpooled.wrappedBuffer(((ByteString) responseObject).asReadOnlyByteBuffer());
+            }
+            else {
+
+                throw new ETracInternal("Unsupported response type: " + responseObject.getClass().getName());
+            }
+
         }
         catch (InvalidProtocolBufferException e) {
             throw new EUnexpected(e);
@@ -232,6 +247,28 @@ public class RestApiTranslator<TRequest extends Message, TResponse extends Messa
         var nextMessage = message.getFieldBuilder(nextField);
 
         return lookupField(nextMessage, fieldPath, fieldPathIndex + 1);
+    }
+
+    private Object lookupField(Message message, List<Descriptors.FieldDescriptor> fieldPath) {
+        return lookupField(message, fieldPath, 0);
+    }
+
+    private Object lookupField(Message message, List<Descriptors.FieldDescriptor> fieldPath, int fieldPathIndex) {
+
+        if (fieldPath.size() <= fieldPathIndex)
+            return message;
+
+        var nextField = fieldPath.get(fieldPathIndex);
+        var nextMessage = message.getField(nextField);
+
+        if (fieldPath.size() == fieldPathIndex + 1)
+            return nextMessage;
+
+        if (nextMessage instanceof Message)
+            return lookupField((Message) nextMessage, fieldPath, fieldPathIndex + 1);
+
+        // Should never happen, errors are detected when the routes are compiled
+        throw new EUnexpected();
     }
 
     private String extractPathSegment(int pathSegmentIndex, URI uri) {

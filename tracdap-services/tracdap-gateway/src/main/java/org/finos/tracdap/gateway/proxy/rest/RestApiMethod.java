@@ -41,28 +41,27 @@ public class RestApiMethod <TRequest extends Message, TResponse extends Message>
     }
 
     public static <TRequest extends Message, TResponse extends Message>
-    RestApiMethod<TRequest, TResponse> create(
-            HttpMethod httpMethod, String urlTemplate,
+    RestApiMethod<TRequest, TResponse> POST(
             Descriptors.MethodDescriptor grpcMethod,
             TRequest blankRequest, TResponse blankResponse,
-            String bodyField) {
+            String urlTemplate, String requestBody, String responseBody) {
 
         // Matcher and builder created once and reused for all matching requests
-        var matcher = new RestApiMatcher(httpMethod, urlTemplate, blankRequest);
-        var translator = new RestApiTranslator<>(blankRequest, blankResponse, urlTemplate, bodyField);
+        var matcher = new RestApiMatcher(HttpMethod.POST, urlTemplate, blankRequest);
+        var translator = new RestApiTranslator<>(blankRequest, blankResponse, urlTemplate, requestBody, responseBody);
 
         return new RestApiMethod<>(grpcMethod, translator, matcher, true);
     }
 
     public static <TRequest extends Message, TResponse extends Message>
-    RestApiMethod<TRequest, TResponse> create(
-            HttpMethod httpMethod, String urlTemplate,
+    RestApiMethod<TRequest, TResponse> GET(
             Descriptors.MethodDescriptor grpcMethod,
-            TRequest blankRequest, TResponse blankResponse) {
+            TRequest blankRequest, TResponse blankResponse,
+            String urlTemplate, String responseBody) {
 
         // Matcher and builder created once and reused for all matching requests
-        var matcher = new RestApiMatcher(httpMethod, urlTemplate, blankRequest);
-        var translator = new RestApiTranslator<>(blankRequest, blankResponse, urlTemplate);
+        var matcher = new RestApiMatcher(HttpMethod.GET, urlTemplate, blankRequest);
+        var translator = new RestApiTranslator<>(blankRequest, blankResponse, urlTemplate, null, responseBody);
 
         return new RestApiMethod<>(grpcMethod, translator, matcher, false);
     }
