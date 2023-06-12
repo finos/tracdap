@@ -72,7 +72,6 @@ public class RestProxyTest {
         var method = "/trac-meta/api/v1/trac/platform-info";
 
         var headers = Map.<CharSequence, Object>ofEntries(
-                Map.entry(HttpHeaderNames.CONTENT_TYPE, "application/json"),
                 Map.entry(HttpHeaderNames.ACCEPT, "application/json"));
 
         var client = new Http1Client(HttpScheme.HTTP, LOCALHOST, TEST_GW_PORT);
@@ -98,7 +97,6 @@ public class RestProxyTest {
         var method = "/trac-meta/api/v1/trac/list-tenants";
 
         var headers = Map.<CharSequence, Object>ofEntries(
-                Map.entry(HttpHeaderNames.CONTENT_TYPE, "application/json"),
                 Map.entry(HttpHeaderNames.ACCEPT, "application/json"));
 
         var client = new Http1Client(HttpScheme.HTTP, LOCALHOST, TEST_GW_PORT);
@@ -192,7 +190,6 @@ public class RestProxyTest {
         var method = "/trac-unknown-service/api/v1/trac/get-something";
 
         var headers = Map.<CharSequence, Object>ofEntries(
-                Map.entry(HttpHeaderNames.CONTENT_TYPE, "application/json"),
                 Map.entry(HttpHeaderNames.ACCEPT, "application/json"));
 
         var client = new Http1Client(HttpScheme.HTTP, LOCALHOST, TEST_GW_PORT);
@@ -214,7 +211,6 @@ public class RestProxyTest {
         var method = String.format(methodTemplate, UUID.randomUUID());
 
         var headers = Map.<CharSequence, Object>ofEntries(
-                Map.entry(HttpHeaderNames.CONTENT_TYPE, "application/json"),
                 Map.entry(HttpHeaderNames.ACCEPT, "application/json"));
 
         var client = new Http1Client(HttpScheme.HTTP, LOCALHOST, TEST_GW_PORT);
@@ -236,7 +232,6 @@ public class RestProxyTest {
         var method = String.format(methodTemplate, UUID.randomUUID());
 
         var headers = Map.<CharSequence, Object>ofEntries(
-                Map.entry(HttpHeaderNames.CONTENT_TYPE, "application/json"),
                 Map.entry(HttpHeaderNames.ACCEPT, "application/json"));
 
         var client = new Http1Client(HttpScheme.HTTP, LOCALHOST, TEST_GW_PORT);
