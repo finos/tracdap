@@ -63,19 +63,20 @@ public class RestDownloadTest {
         var content = Files.readAllBytes(tracRepoDir.resolve("README.md"));
 
         var upload = FileWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
                 .setName("README.md")
                 .setMimeType("text/markdown")
                 .setContent(ByteString.copyFrom(content))
                 .build();
 
-        var fileId = dataClient.updateSmallFile(upload);
+        var fileId = dataClient.createSmallFile(upload);
 
         var client = new Http1Client(HttpScheme.HTTP, LOCALHOST, TEST_GW_PORT);
         var commonHeaders = Map.<CharSequence, Object>ofEntries();
 
         var downloadUrl = String.format(
-                "/trac-data/api/v1/FILE/%s/versions/%d/README.md",
-                fileId.getObjectId(), fileId.getObjectVersion());
+                "/trac-data/api/v1/%s/FILE/%s/versions/%d/README.md",
+                TEST_TENANT, fileId.getObjectId(), fileId.getObjectVersion());
 
 
         var downloadCall = client.getRequest(downloadUrl, commonHeaders);
@@ -100,19 +101,20 @@ public class RestDownloadTest {
         var content = Files.readAllBytes(tracRepoDir.resolve("README.md"));
 
         var upload = FileWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
                 .setName("README.md")
                 .setMimeType("text/markdown")
                 .setContent(ByteString.copyFrom(content))
                 .build();
 
-        var fileId = dataClient.updateSmallFile(upload);
+        var fileId = dataClient.createSmallFile(upload);
 
         var client = new Http1Client(HttpScheme.HTTP, LOCALHOST, TEST_GW_PORT);
         var commonHeaders = Map.<CharSequence, Object>ofEntries();
 
         var downloadUrl = String.format(
-                "/trac-data/api/v1/FILE/%s/versions/latest/README.md",
-                fileId.getObjectId());
+                "/trac-data/api/v1/%s/FILE/%s/versions/latest/README.md",
+                TEST_TENANT, fileId.getObjectId());
 
 
         var downloadCall = client.getRequest(downloadUrl, commonHeaders);
