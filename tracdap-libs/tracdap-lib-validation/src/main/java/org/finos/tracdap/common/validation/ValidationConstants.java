@@ -30,7 +30,7 @@ public class ValidationConstants {
             "text", "video");
 
     public static final Pattern PATH_ILLEGAL_CHARS = Pattern.compile(".*[<>\"|?*].*");
-    public static final Pattern PATH_ILLEGAL_WHITESPACE = Pattern.compile(".*[\\s\\vR&&[^ ]].*");
+    public static final Pattern PATH_ILLEGAL_WHITESPACE = Pattern.compile(".*\\h\\v&&[^ ].*");
     public static final Pattern PATH_ILLEGAL_CTRL = Pattern.compile(".*\\p{Cntrl}.*");
 
     public static final Pattern PATH_SEPARATORS = Pattern.compile("[/\\\\]");
