@@ -223,7 +223,7 @@ public class RestApiProxy extends Http2ChannelDuplexHandler {
             // TODO: This content type checking should happen in the router for grpc and rest routes
 
             try {
-                checkRequestHeaders(state.requestHeaders);
+                checkRequestHeaders(state);
             }
             catch (EInputValidation e) {
                 sendErrorResponse(state.stream, ctx, HttpResponseStatus.NOT_ACCEPTABLE, e.getMessage());
@@ -435,22 +435,48 @@ public class RestApiProxy extends Http2ChannelDuplexHandler {
     }
 
 
-    private void checkRequestHeaders(Http2Headers restHeaders) {
+    private void checkRequestHeaders(RestApiCallState state) {
 
-        if (!restHeaders.contains(HttpHeaderNames.CONTENT_TYPE))
-            throw new EInputValidation("Missing required HTTP header [" + HttpHeaderNames.CONTENT_TYPE + "]");
+        var restHeaders = state.requestHeaders;
 
-        if (!restHeaders.contains(HttpHeaderNames.ACCEPT))
-            throw new EInputValidation("Missing required HTTP header [" + HttpHeaderNames.ACCEPT + "]");
+        // POST methods have a JSON payload for the encoded gRPC request type
+        // GET methods do not have a body, the request is entirely built from the URL
 
-        var contentTypeHeader = restHeaders.get(HttpHeaderNames.CONTENT_TYPE).toString().split(";")[0];
-        var acceptHeader = restHeaders.get(HttpHeaderNames.CONTENT_TYPE).toString().split(";")[0];
+        if (state.method.hasBody) {
 
-        if (!contentTypeHeader.equals("application/json"))
-            throw new EInputValidation("Invalid [content-type] header (expected application/json for REST calls)");
+            if (!restHeaders.contains(HttpHeaderNames.CONTENT_TYPE))
+                throw new EInputValidation("Missing required HTTP header [" + HttpHeaderNames.CONTENT_TYPE + "]");
 
-        if (!acceptHeader.equals("application/json"))
-            throw new EInputValidation("Invalid [accept] header (expected application/json for REST calls)");
+            var contentTypeHeader = restHeaders.get(HttpHeaderNames.CONTENT_TYPE).toString().split(";")[0];
+
+            if (!contentTypeHeader.equals("application/json"))
+                throw new EInputValidation("Invalid [content-type] header (expected application/json for REST calls)");
+        }
+        else {
+
+            if (restHeaders.contains(HttpHeaderNames.CONTENT_TYPE))
+                throw new EInputValidation("Unexpected HTTP header [" + HttpHeaderNames.CONTENT_TYPE + "]");
+        }
+
+        // Unary methods return a JSON encoding of the gRPC response type
+        // Server streaming methods are for downloads and must accept whatever type the server sends
+        // E.g. downloading a file, the response content type will depend on the type of the file
+
+        if (!state.method.grpcMethod.isServerStreaming()) {
+
+            if (!restHeaders.contains(HttpHeaderNames.ACCEPT))
+                throw new EInputValidation("Missing required HTTP header [" + HttpHeaderNames.ACCEPT + "]");
+
+            var acceptHeader = restHeaders.get(HttpHeaderNames.CONTENT_TYPE).toString().split(";")[0];
+
+            if (!acceptHeader.equals("application/json"))
+                throw new EInputValidation("Invalid [accept] header (expected application/json for REST calls)");
+        }
+        else {
+
+            if (restHeaders.contains(HttpHeaderNames.ACCEPT))
+                throw new EInputValidation("Unexpected HTTP header [" + HttpHeaderNames.ACCEPT + "]");
+        }
     }
 
     private void sendErrorResponse(
