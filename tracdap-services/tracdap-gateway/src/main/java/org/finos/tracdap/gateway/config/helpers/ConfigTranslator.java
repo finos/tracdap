@@ -60,7 +60,7 @@ public class ConfigTranslator {
                     services.getData(),
                     "/tracdap.api.TracDataApi/",
                     "/trac-data/",
-                    null);
+                    GwRestMapping.TRAC_DATA);
 
             serviceRoutes.addAll(dataApiRoutes);
         }

@@ -461,6 +461,32 @@ service TracDataApi {
    */
   rpc readSmallFile (FileReadRequest) returns (FileReadResponse);
 
+  /**
+   * Download a file as a data stream
+   *
+   * This method is intended for use by browsers and other HTTP clients
+   * to download a file using an HTTP GET request.
+   */
+  rpc downloadFile (DownloadRequest) returns (stream DownloadResponse) {
+    option (google.api.http) = {
+      get: "/{tenant}/{objectType=FILE}/{objectId}/versions/{objectVersion}/*"
+      response_body: "content"
+    };
+  }
+
+  /**
+   * Download the latest version of a file as a data stream
+   *
+   * This method is intended for use by browsers and other HTTP clients
+   * to download a file using an HTTP GET request.
+   */
+  rpc downloadLatestFile (DownloadRequest) returns (stream DownloadResponse) {
+    option (google.api.http) = {
+      get: "/{tenant}/{objectType=FILE}/{objectId}/versions/latest/*"
+      response_body: "content"
+    };
+  }
+
 }
 
 
@@ -764,3 +790,22 @@ message FileReadResponse {
    */
   bytes content = 1000;
 }
+
+
+message DownloadRequest {
+
+  string tenant = 1;
+
+  metadata.ObjectType objectType = 2;
+  string objectId = 3;
+  optional int32 objectVersion = 4;
+};
+
+
+message DownloadResponse {
+
+  optional string contentType = 1;
+  optional uint64 contentLength = 2;
+
+  bytes content = 1000;
+};
