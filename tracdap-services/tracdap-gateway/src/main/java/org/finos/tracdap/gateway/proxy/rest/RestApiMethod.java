@@ -16,20 +16,20 @@
 
 package org.finos.tracdap.gateway.proxy.rest;
 
+import com.google.protobuf.Descriptors;
 import com.google.protobuf.Message;
-import io.grpc.MethodDescriptor;
 import io.netty.handler.codec.http.HttpMethod;
 
 
 public class RestApiMethod <TRequest extends Message, TResponse extends Message> {
 
-    final MethodDescriptor<TRequest, TResponse> grpcMethod;
+    final Descriptors.MethodDescriptor grpcMethod;
     final RestApiTranslator<TRequest, TResponse> translator;
     final RestApiMatcher matcher;
     final boolean hasBody;
 
     private RestApiMethod(
-            MethodDescriptor<TRequest, TResponse> grpcMethod,
+            Descriptors.MethodDescriptor grpcMethod,
             RestApiTranslator<TRequest, TResponse> translator,
             RestApiMatcher matcher,
             boolean hasBody) {
@@ -43,7 +43,7 @@ public class RestApiMethod <TRequest extends Message, TResponse extends Message>
     public static <TRequest extends Message, TResponse extends Message>
     RestApiMethod<TRequest, TResponse> create(
             HttpMethod httpMethod, String urlTemplate,
-            MethodDescriptor<TRequest, TResponse> grpcMethod,
+            Descriptors.MethodDescriptor grpcMethod,
             TRequest blankRequest, TResponse blankResponse,
             String bodyField) {
 
@@ -57,23 +57,13 @@ public class RestApiMethod <TRequest extends Message, TResponse extends Message>
     public static <TRequest extends Message, TResponse extends Message>
     RestApiMethod<TRequest, TResponse> create(
             HttpMethod httpMethod, String urlTemplate,
-            MethodDescriptor<TRequest, TResponse> grpcMethod,
-            TRequest blankRequest, TResponse blankResponse,
-            boolean hasBody) {
+            Descriptors.MethodDescriptor grpcMethod,
+            TRequest blankRequest, TResponse blankResponse) {
 
         // Matcher and builder created once and reused for all matching requests
         var matcher = new RestApiMatcher(httpMethod, urlTemplate, blankRequest);
-        var translator = new RestApiTranslator<>(blankRequest, blankResponse, urlTemplate, hasBody);
+        var translator = new RestApiTranslator<>(blankRequest, blankResponse, urlTemplate);
 
-        return new RestApiMethod<>(grpcMethod, translator, matcher, hasBody);
-    }
-
-    public static <TRequest extends Message, TResponse extends Message>
-    RestApiMethod<TRequest, TResponse> create(
-            HttpMethod method, String urlPattern,
-            MethodDescriptor<TRequest, TResponse> grpcMethod,
-            TRequest blankRequest, TResponse blankResponse) {
-
-        return create(method, urlPattern, grpcMethod, blankRequest, blankResponse, false);
+        return new RestApiMethod<>(grpcMethod, translator, matcher, false);
     }
 }

@@ -150,7 +150,7 @@ public class RestApiProxy extends Http2ChannelDuplexHandler {
             var frame = (Http2StreamFrame) msg;
             var stream = frame.stream();
             var state = callStateMap.get(stream);
-            var unaryResponse = state.method.grpcMethod.getType().serverSendsOneMessage();
+            var unaryResponse = ! state.method.grpcMethod.isServerStreaming();
 
             if (frame instanceof Http2HeadersFrame) {
 
@@ -372,7 +372,7 @@ public class RestApiProxy extends Http2ChannelDuplexHandler {
         // gRPC method
 
         var grpcMethod = state.method.grpcMethod;
-        var httpPath = String.format("/%s/%s", grpcMethod.getServiceName(), grpcMethod.getBareMethodName());
+        var httpPath = String.format("/%s/%s", grpcMethod.getService().getFullName(), grpcMethod.getName());
 
         grpcHeaders.method(HttpMethod.POST.asciiName());
         grpcHeaders.path(httpPath);

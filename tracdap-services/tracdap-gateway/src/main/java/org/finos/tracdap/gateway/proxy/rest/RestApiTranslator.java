@@ -69,7 +69,7 @@ public class RestApiTranslator<TRequest extends Message, TResponse extends Messa
         this.hasBody = true;
     }
 
-    public RestApiTranslator(TRequest blankRequest, TResponse blankResponse, String urlTemplate, boolean hasBody) {
+    public RestApiTranslator(TRequest blankRequest, TResponse blankResponse, String urlTemplate) {
 
         this.blankRequest = blankRequest;
         this.blankResponse = blankResponse;
@@ -78,7 +78,7 @@ public class RestApiTranslator<TRequest extends Message, TResponse extends Messa
 
         this.requestFieldExtractors = prepareFieldExtractors(urlTemplate, requestDescriptor);
         this.requestBodyPath = List.of();
-        this.hasBody = hasBody;
+        this.hasBody = false;
 
     }
 
