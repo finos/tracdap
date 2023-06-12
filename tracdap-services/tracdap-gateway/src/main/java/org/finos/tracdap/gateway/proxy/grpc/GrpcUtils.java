@@ -78,6 +78,9 @@ public class GrpcUtils {
 
             return (TMsg) builder.build();
         }
+        catch (InvalidProtocolBufferException e) {
+            throw e;
+        }
         catch (IOException e) {
             throw new EUnexpected(e);
         }
