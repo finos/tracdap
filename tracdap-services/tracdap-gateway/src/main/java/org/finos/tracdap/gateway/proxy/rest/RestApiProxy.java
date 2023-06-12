@@ -330,10 +330,17 @@ public class RestApiProxy extends Http2ChannelDuplexHandler {
 
     private void dispatchStreamContent(RestApiCallState state, ChannelHandlerContext ctx) {
 
-//        var restData = translateResponseData(state);
-//        restData.forEach(ctx::fireChannelRead);
+        // TODO: Range window on response bytes
+        // Messages do not necessarily align with HTTP frames (in general they do not)
 
-        // todo
+        while (state.responseContent.readableBytes() > 0) {
+
+            var msg = state.translator.decodeGrpcResponse(state.responseContent);
+            var httpContent = state.translator.encodeRestResponse(msg);
+
+            var dataFrame = new DefaultHttp2DataFrame(httpContent).stream(state.stream);
+            ctx.fireChannelRead(dataFrame);
+        }
     }
 
     private void dispatchStreamComplete(RestApiCallState state, ChannelHandlerContext ctx) {

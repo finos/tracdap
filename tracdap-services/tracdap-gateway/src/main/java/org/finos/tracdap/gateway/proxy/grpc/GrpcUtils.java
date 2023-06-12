@@ -73,10 +73,20 @@ public class GrpcUtils {
             if (compression != 0)
                 throw new ETracInternal("compression not supported yet");
 
-            var builder = blankMsg.newBuilderForType();
-            builder.mergeFrom(stream);
+            System.out.println("msg size = " + msgSize + ", readable bytes = " + buffer.readableBytes());
 
-            return (TMsg) builder.build();
+            // TODO: Clean this up
+
+            var slice = buffer.slice(buffer.readerIndex(), msgSize);
+            try (var sliceStream = new ByteBufInputStream(slice)) {
+
+                var builder = blankMsg.newBuilderForType();
+                builder.mergeFrom(sliceStream);
+
+                buffer.readerIndex(buffer.readerIndex() + msgSize);
+
+                return (TMsg) builder.build();
+            }
         }
         catch (IOException e) {
             throw new EUnexpected(e);
