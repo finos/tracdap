@@ -61,32 +61,22 @@ public class GrpcUtils {
         if (buffer.readableBytes() < LPM_PREFIX_LENGTH)
             throw new InvalidProtocolBufferException("Unexpected end of stream");
 
-        try (var stream = new ByteBufInputStream(buffer)) {
+        var compression = buffer.readByte();
+        var msgSize = buffer.readInt();
 
-            var compression = stream.readByte();
-            var msgSize = stream.readInt();
+        if (buffer.readableBytes() < msgSize)
+            throw new InvalidProtocolBufferException("Unexpected end of stream");
 
-            if (buffer.readableBytes() < msgSize)
-                throw new InvalidProtocolBufferException("Unexpected end of stream");
+        // TODO: Decompression support
+        if (compression != 0)
+            throw new ETracInternal("compression not supported yet");
 
-            // TODO: Decompression support
-            if (compression != 0)
-                throw new ETracInternal("compression not supported yet");
+        try (var stream = new ByteBufInputStream(buffer, msgSize)) {
 
-            System.out.println("msg size = " + msgSize + ", readable bytes = " + buffer.readableBytes());
+            var builder = blankMsg.newBuilderForType();
+            builder.mergeFrom(stream);
 
-            // TODO: Clean this up
-
-            var slice = buffer.slice(buffer.readerIndex(), msgSize);
-            try (var sliceStream = new ByteBufInputStream(slice)) {
-
-                var builder = blankMsg.newBuilderForType();
-                builder.mergeFrom(sliceStream);
-
-                buffer.readerIndex(buffer.readerIndex() + msgSize);
-
-                return (TMsg) builder.build();
-            }
+            return (TMsg) builder.build();
         }
         catch (IOException e) {
             throw new EUnexpected(e);
