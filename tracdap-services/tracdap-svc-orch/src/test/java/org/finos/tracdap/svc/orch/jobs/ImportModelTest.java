@@ -62,7 +62,7 @@ public abstract class ImportModelTest {
     }
 
     @RegisterExtension
-    private static final PlatformTest platform = PlatformTest.forConfig(E2E_CONFIG, GW_CONFIG)
+    public static final PlatformTest platform = PlatformTest.forConfig(E2E_CONFIG, GW_CONFIG)
             .addTenant(TEST_TENANT)
             .startAll()
             .build();

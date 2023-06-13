@@ -97,7 +97,7 @@ public abstract class DataRoundTripTest {
     private final Logger log = LoggerFactory.getLogger(getClass());
 
     @RegisterExtension
-    private final PlatformTest platform = PlatformTest.forConfig(E2E_CONFIG, GW_CONFIG)
+    public final PlatformTest platform = PlatformTest.forConfig(E2E_CONFIG, GW_CONFIG)
             .addTenant(TEST_TENANT)
             .storageFormat(storageFormat())
             .startAll()
