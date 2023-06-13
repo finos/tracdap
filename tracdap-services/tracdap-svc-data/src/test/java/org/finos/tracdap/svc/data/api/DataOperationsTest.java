@@ -24,6 +24,7 @@ import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.plugin.PluginManager;
 import org.finos.tracdap.metadata.*;
+import org.finos.tracdap.test.data.DataApiTestHelpers;
 import org.finos.tracdap.test.data.SampleData;
 import org.finos.tracdap.test.helpers.PlatformTest;
 import org.finos.tracdap.test.helpers.StorageTestHelpers;
