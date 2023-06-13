@@ -86,6 +86,20 @@ public class GrpcUtils {
         }
     }
 
+    public static boolean canDecodeLpm(ByteBuf buffer) {
+
+        if (buffer.readableBytes() < LPM_PREFIX_LENGTH)
+            return false;
+
+        // Assume a new LPM starts at readerIndex
+        // compression flag is at readerIndex
+        // msgSize is at readerIndex + 1
+
+        var msgSize = buffer.getInt(buffer.readerIndex() + 1);
+
+        return buffer.readableBytes() >= LPM_PREFIX_LENGTH + msgSize;
+    }
+
     public static Http2Headers decodeHeadersFrame(ByteBuf headersBuf) {
 
         var headers = new DefaultHttp2Headers();

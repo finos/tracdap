@@ -19,6 +19,7 @@ package org.finos.tracdap.gateway.proxy.rest;
 import org.finos.tracdap.common.exception.EInputValidation;
 import org.finos.tracdap.common.exception.ENetworkHttp;
 import org.finos.tracdap.common.exception.EUnexpected;
+import org.finos.tracdap.gateway.proxy.grpc.GrpcUtils;
 
 import io.grpc.Status;
 import io.netty.buffer.ByteBuf;
@@ -330,16 +331,18 @@ public class RestApiProxy extends Http2ChannelDuplexHandler {
 
     private void dispatchStreamContent(RestApiCallState state, ChannelHandlerContext ctx) {
 
-        // TODO: Range window on response bytes
-        // Messages do not necessarily align with HTTP frames (in general they do not)
+        try {
+            while (GrpcUtils.canDecodeLpm(state.responseContent)) {
 
-        while (state.responseContent.readableBytes() > 0) {
+                var msg = state.translator.decodeGrpcResponse(state.responseContent);
+                var httpContent = state.translator.encodeRestResponse(msg);
 
-            var msg = state.translator.decodeGrpcResponse(state.responseContent);
-            var httpContent = state.translator.encodeRestResponse(msg);
-
-            var dataFrame = new DefaultHttp2DataFrame(httpContent).stream(state.stream);
-            ctx.fireChannelRead(dataFrame);
+                var dataFrame = new DefaultHttp2DataFrame(httpContent).stream(state.stream);
+                ctx.fireChannelRead(dataFrame);
+            }
+        }
+        finally {
+            state.responseContent.discardReadComponents();
         }
     }
 
