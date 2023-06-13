@@ -68,7 +68,7 @@ public class RestApiMethod <TRequest extends Message, TResponse extends Message>
         var translator = new RestApiTranslator<>(blankRequest, blankResponse, urlTemplate, null, responseBody);
 
         // Check if this method is a data download endpoint
-        var isDownload = blankRequest.getClass().equals(DownloadResponse.class);
+        var isDownload = blankResponse instanceof DownloadResponse;
 
         return new RestApiMethod<>(grpcMethod, translator, matcher, false, isDownload);
     }
