@@ -18,6 +18,7 @@ package org.finos.tracdap.gateway.proxy.rest;
 
 import org.finos.tracdap.common.exception.EInputValidation;
 import org.finos.tracdap.common.exception.ENetworkHttp;
+import org.finos.tracdap.common.exception.ETracInternal;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.gateway.proxy.grpc.GrpcUtils;
 
@@ -166,6 +167,8 @@ public class RestApiProxy extends Http2ChannelDuplexHandler {
                 }
                 else {
                     dispatchStreamHeaders(state, ctx, grpcFrame.isEndStream());
+                    if (grpcFrame.isEndStream())
+                        dispatchStreamComplete(state, ctx);
                 }
             }
             else if (frame instanceof Http2DataFrame) {
@@ -321,12 +324,15 @@ public class RestApiProxy extends Http2ChannelDuplexHandler {
 
     private void dispatchStreamHeaders(RestApiCallState state, ChannelHandlerContext ctx, boolean eos) {
 
-        // todo: check headers not already sent
-        // if already sent and grpc-status != 0, break the stream to signal error
+        if (!state.responseHeadersSent) {
 
-        var restHeaders = translateResponseHeaders(state.responseHeaders, state, true);
-        var restFrame = new DefaultHttp2HeadersFrame(restHeaders, eos);
-        ctx.fireChannelRead(restFrame);
+            var restHeaders = translateResponseHeaders(state.responseHeaders, state, true);
+            var restFrame = new DefaultHttp2HeadersFrame(restHeaders, eos);
+            ctx.fireChannelRead(restFrame);
+
+            state.responseHeadersSent = true;
+            state.responseHttpStatus = HttpResponseStatus.parseLine(restHeaders.status());
+        }
     }
 
     private void dispatchStreamContent(RestApiCallState state, ChannelHandlerContext ctx) {
@@ -348,9 +354,22 @@ public class RestApiProxy extends Http2ChannelDuplexHandler {
 
     private void dispatchStreamComplete(RestApiCallState state, ChannelHandlerContext ctx) {
 
-        // todo: check grpc-status, if not ok break the stream
+        // It is possible the stream failed after sending an initial 200 OK HTTP HEADERS frame
+        // In this case, fire an exception to try and cause an unclean shutdown of the channel
+        // Otherwise, send an empty EOS data frame
+        // Sending trailers is not compatible with HTTP/1 clients
 
-        ctx.fireChannelRead(new DefaultHttp2DataFrame(true));
+        var finalGrpcStatus = state.responseHeaders.getInt("grpc-status", Status.Code.UNKNOWN.value());
+        var finalGrpcCode = Status.fromCodeValue(finalGrpcStatus).getCode();
+        var finalHttpStatus = state.translator.translateGrpcErrorCode(finalGrpcCode);
+
+        if (state.responseHttpStatus.equals(HttpResponseStatus.OK) && !finalHttpStatus.equals(HttpResponseStatus.OK)) {
+            var error = new ETracInternal("Download stream failed with error code " + finalGrpcCode.name());
+            ctx.fireExceptionCaught(error);
+        }
+        else {
+            ctx.fireChannelRead(new DefaultHttp2DataFrame(true));
+        }
     }
 
     private RestApiMethod<?, ?> lookupMethod(Http2Headers headers) {
@@ -527,12 +546,15 @@ public class RestApiProxy extends Http2ChannelDuplexHandler {
         Http2FrameStream stream;
 
         RestApiMethod<?, ?> method;
-        RestApiTranslator translator;
+        RestApiTranslator<?, ?> translator;
 
         Http2Headers requestHeaders;
         CompositeByteBuf requestContent;
         Http2Headers responseHeaders;
         CompositeByteBuf responseContent;
+
+        boolean responseHeadersSent;
+        HttpResponseStatus responseHttpStatus;
 
         RestApiCallState(ChannelHandlerContext ctx, Http2FrameStream stream) {
 
