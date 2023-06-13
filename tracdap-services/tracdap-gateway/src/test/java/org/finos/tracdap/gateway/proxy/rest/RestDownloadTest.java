@@ -16,6 +16,7 @@
 
 package org.finos.tracdap.gateway.proxy.rest;
 
+import io.netty.handler.codec.http.HttpHeaderNames;
 import org.finos.tracdap.api.*;
 import org.finos.tracdap.common.async.Flows;
 import org.finos.tracdap.gateway.proxy.http.Http1Client;
@@ -102,6 +103,8 @@ public class RestDownloadTest {
 
         var downloadResponse = downloadCall.getNow();
         Assertions.assertEquals(HttpResponseStatus.OK, downloadResponse.status());
+        Assertions.assertEquals("text/markdown", downloadResponse.headers().get(HttpHeaderNames.CONTENT_TYPE));
+        Assertions.assertEquals(content.length, downloadResponse.headers().getInt(HttpHeaderNames.CONTENT_LENGTH));
 
         var downloadBuffer = downloadResponse.content();
         var downloadLength = downloadBuffer.readableBytes();
@@ -158,6 +161,8 @@ public class RestDownloadTest {
 
         var downloadResponse = downloadCall.getNow();
         Assertions.assertEquals(HttpResponseStatus.OK, downloadResponse.status());
+        Assertions.assertEquals("text/csv", downloadResponse.headers().get(HttpHeaderNames.CONTENT_TYPE));
+        Assertions.assertEquals(content.length, downloadResponse.headers().getInt(HttpHeaderNames.CONTENT_LENGTH));
 
         var downloadBuffer = downloadResponse.content();
         var downloadLength = downloadBuffer.readableBytes();
@@ -203,6 +208,8 @@ public class RestDownloadTest {
 
         var downloadResponse = downloadCall.getNow();
         Assertions.assertEquals(HttpResponseStatus.OK, downloadResponse.status());
+        Assertions.assertEquals("text/markdown", downloadResponse.headers().get(HttpHeaderNames.CONTENT_TYPE));
+        Assertions.assertEquals(content.length, downloadResponse.headers().getInt(HttpHeaderNames.CONTENT_LENGTH));
 
         var downloadBuffer = downloadResponse.content();
         var downloadLength = downloadBuffer.readableBytes();
@@ -240,6 +247,8 @@ public class RestDownloadTest {
 
         var downloadResponseV2 = downloadV2.getNow();
         Assertions.assertEquals(HttpResponseStatus.OK, downloadResponseV2.status());
+        Assertions.assertEquals("text/markdown", downloadResponseV2.headers().get(HttpHeaderNames.CONTENT_TYPE));
+        Assertions.assertEquals(updatedContent.length, downloadResponseV2.headers().getInt(HttpHeaderNames.CONTENT_LENGTH));
 
         var downloadBufferV2 = downloadResponseV2.content();
         var downloadLengthV2 = downloadBufferV2.readableBytes();
