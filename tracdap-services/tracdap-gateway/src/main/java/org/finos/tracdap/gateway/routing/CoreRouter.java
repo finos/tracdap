@@ -148,10 +148,8 @@ abstract class CoreRouter extends ChannelDuplexHandler {
 
     protected final Route lookupRoute(URI uri, HttpMethod method, long requestId) {
 
-        HttpHeaders headers = null;  // request.headers();
-
         for (var route : this.routes) {
-            if (route.getMatcher().matches(uri, method, headers)) {
+            if (route.getMatcher().matches(method, uri)) {
 
                 log.info("conn = {}, req = {}, ROUTE MATCHED {} {} -> {} ({})",
                         connId, requestId,

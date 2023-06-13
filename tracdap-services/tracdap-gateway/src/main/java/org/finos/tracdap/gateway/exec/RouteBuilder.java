@@ -49,7 +49,7 @@ public class RouteBuilder {
 
         var matchPath = config.getMatch().getPath();
         var matcher = (IRouteMatcher)
-                (uri, method, headers) -> uri
+                (method, uri) -> uri
                 .getPath()
                 .startsWith(matchPath);
 
