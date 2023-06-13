@@ -96,6 +96,10 @@ public class RestDownloadTest {
         var downloadCall = client.getRequest(downloadUrl, commonHeaders);
         downloadCall.await(TEST_TIMEOUT);
 
+        Assertions.assertTrue(downloadCall.isDone());
+        if (!downloadCall.isSuccess())
+            Assertions.fail(downloadCall.cause());
+
         var downloadResponse = downloadCall.getNow();
         Assertions.assertEquals(HttpResponseStatus.OK, downloadResponse.status());
 
@@ -148,6 +152,10 @@ public class RestDownloadTest {
         var downloadCall = client.getRequest(downloadUrl, commonHeaders);
         downloadCall.await(TEST_TIMEOUT);
 
+        Assertions.assertTrue(downloadCall.isDone());
+        if (!downloadCall.isSuccess())
+            Assertions.fail(downloadCall.cause());
+
         var downloadResponse = downloadCall.getNow();
         Assertions.assertEquals(HttpResponseStatus.OK, downloadResponse.status());
 
@@ -189,6 +197,10 @@ public class RestDownloadTest {
         var downloadCall = client.getRequest(downloadUrl, commonHeaders);
         downloadCall.await(TEST_TIMEOUT);
 
+        Assertions.assertTrue(downloadCall.isDone());
+        if (!downloadCall.isSuccess())
+            Assertions.fail(downloadCall.cause());
+
         var downloadResponse = downloadCall.getNow();
         Assertions.assertEquals(HttpResponseStatus.OK, downloadResponse.status());
 
@@ -221,6 +233,10 @@ public class RestDownloadTest {
 
         var downloadV2 = client.getRequest(downloadUrl, commonHeaders);
         downloadV2.await(TEST_TIMEOUT);
+
+        Assertions.assertTrue(downloadV2.isDone());
+        if (!downloadV2.isSuccess())
+            Assertions.fail(downloadV2.cause());
 
         var downloadResponseV2 = downloadV2.getNow();
         Assertions.assertEquals(HttpResponseStatus.OK, downloadResponseV2.status());
