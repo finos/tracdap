@@ -19,6 +19,7 @@ package org.finos.tracdap.gateway.proxy.rest;
 import com.google.protobuf.Descriptors;
 import com.google.protobuf.Message;
 import io.netty.handler.codec.http.HttpMethod;
+import org.finos.tracdap.api.DownloadResponse;
 
 
 public class RestApiMethod <TRequest extends Message, TResponse extends Message> {
@@ -27,17 +28,20 @@ public class RestApiMethod <TRequest extends Message, TResponse extends Message>
     final RestApiTranslator<TRequest, TResponse> translator;
     final RestApiMatcher matcher;
     final boolean hasBody;
+    final boolean isDownload;
 
     private RestApiMethod(
             Descriptors.MethodDescriptor grpcMethod,
             RestApiTranslator<TRequest, TResponse> translator,
             RestApiMatcher matcher,
-            boolean hasBody) {
+            boolean hasBody,
+            boolean isDownload) {
 
         this.grpcMethod = grpcMethod;
         this.translator = translator;
         this.matcher = matcher;
         this.hasBody = hasBody;
+        this.isDownload = isDownload;
     }
 
     public static <TRequest extends Message, TResponse extends Message>
@@ -50,7 +54,7 @@ public class RestApiMethod <TRequest extends Message, TResponse extends Message>
         var matcher = new RestApiMatcher(HttpMethod.POST, urlTemplate, blankRequest);
         var translator = new RestApiTranslator<>(blankRequest, blankResponse, urlTemplate, requestBody, responseBody);
 
-        return new RestApiMethod<>(grpcMethod, translator, matcher, true);
+        return new RestApiMethod<>(grpcMethod, translator, matcher, true, false);
     }
 
     public static <TRequest extends Message, TResponse extends Message>
@@ -63,6 +67,9 @@ public class RestApiMethod <TRequest extends Message, TResponse extends Message>
         var matcher = new RestApiMatcher(HttpMethod.GET, urlTemplate, blankRequest);
         var translator = new RestApiTranslator<>(blankRequest, blankResponse, urlTemplate, null, responseBody);
 
-        return new RestApiMethod<>(grpcMethod, translator, matcher, false);
+        // Check if this method is a data download endpoint
+        var isDownload = blankRequest.getClass().equals(DownloadResponse.class);
+
+        return new RestApiMethod<>(grpcMethod, translator, matcher, false, isDownload);
     }
 }
