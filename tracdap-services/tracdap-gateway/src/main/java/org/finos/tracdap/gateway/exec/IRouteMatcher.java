@@ -16,7 +16,6 @@
 
 package org.finos.tracdap.gateway.exec;
 
-import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpMethod;
 
 import java.net.URI;
@@ -27,5 +26,5 @@ import java.net.URI;
  */
 public interface IRouteMatcher {
 
-    boolean matches(URI uri, HttpMethod method, HttpHeaders headers);
+    boolean matches(HttpMethod method, URI uri);
 }

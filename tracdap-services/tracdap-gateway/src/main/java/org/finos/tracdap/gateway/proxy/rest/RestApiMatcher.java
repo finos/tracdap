@@ -21,7 +21,6 @@ import org.finos.tracdap.gateway.exec.IRouteMatcher;
 import com.google.protobuf.Descriptors;
 import com.google.protobuf.Message;
 
-import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpMethod;
 
 import org.slf4j.Logger;
@@ -110,7 +109,7 @@ public class RestApiMatcher implements IRouteMatcher {
     // -----------------------------------------------------------------------------------------------------------------
 
     @Override
-    public boolean matches(URI uri, HttpMethod httpMethod, HttpHeaders headers) {
+    public boolean matches(HttpMethod httpMethod, URI uri) {
 
         if (httpMethod != this.httpMethod)
             return false;

@@ -376,11 +376,10 @@ public class RestApiProxy extends Http2ChannelDuplexHandler {
 
         for (var method: this.methods) {
 
-            var uri = URI.create(headers.path().toString());
             var httpMethod = HttpMethod.valueOf(headers.method().toString());
-            var httpHeaders = new DefaultHttpHeaders();  // TODO: Switch matcher to HTTP/2 headers?
+            var uri = URI.create(headers.path().toString());
 
-            if (method.matcher.matches(uri, httpMethod, httpHeaders))
+            if (method.matcher.matches(httpMethod, uri))
                 return method;
         }
 
