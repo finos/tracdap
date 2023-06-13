@@ -16,7 +16,6 @@
 
 package org.finos.tracdap.gateway.proxy.http;
 
-import com.google.api.HttpBody;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
@@ -180,7 +179,7 @@ public class Http1Client {
 
             p.addLast(new HttpClientCodec());
             p.addLast(new HttpContentDecompressor());  // Use automatic content decompression
-            p.addLast(new HttpObjectAggregator(1048576));  // Automatic response aggregation up to a fixed limit
+            p.addLast(new HttpObjectAggregator(50 * 1048576));  // Response aggregation up to 50 MB for testing
 
             response = ch.eventLoop().newPromise();
             p.addLast(new ClientHandler(response));
