@@ -16,10 +16,8 @@
 
 package org.finos.tracdap.gateway.proxy.rest;
 
-import org.finos.tracdap.common.exception.EInputValidation;
-import org.finos.tracdap.common.exception.ENetworkHttp;
-import org.finos.tracdap.common.exception.ETracInternal;
-import org.finos.tracdap.common.exception.EUnexpected;
+import org.finos.tracdap.api.DownloadResponse;
+import org.finos.tracdap.common.exception.*;
 import org.finos.tracdap.gateway.proxy.grpc.GrpcUtils;
 
 import io.grpc.Status;
@@ -166,7 +164,9 @@ public class RestApiProxy extends Http2ChannelDuplexHandler {
                         dispatchUnaryResponse(state, ctx);
                 }
                 else {
-                    dispatchStreamHeaders(state, ctx, grpcFrame.isEndStream());
+                    // Download endpoints need to wait for the first gRPC message before sending headers
+                    if (!state.method.isDownload)
+                        dispatchStreamHeaders(state, ctx, grpcFrame.isEndStream());
                     if (grpcFrame.isEndStream())
                         dispatchStreamComplete(state, ctx);
                 }
@@ -279,7 +279,7 @@ public class RestApiProxy extends Http2ChannelDuplexHandler {
             var grpcContentLength = grpcHeaders.getInt(HttpHeaderNames.CONTENT_LENGTH);
 
             if (grpcContentLength != null && state.responseContent.readableBytes() != grpcContentLength)
-                throw new EUnexpected();  // todo
+                throw new ENetworkHttp(HttpResponseStatus.BAD_GATEWAY.code(), "Garbled response form server");
 
             ByteBuf restResponse;
 
@@ -292,6 +292,7 @@ public class RestApiProxy extends Http2ChannelDuplexHandler {
             }
 
             var restHeaders = translateResponseHeaders(grpcHeaders, state, /* streaming = */ false);
+            restHeaders.add(HttpHeaderNames.CONTENT_TYPE, "application/json; charset=UTF-8");
             restHeaders.add(HttpHeaderNames.CONTENT_LENGTH, Integer.toString(restResponse.readableBytes()));
 
             var headersFrame = new DefaultHttp2HeadersFrame(restHeaders).stream(state.stream);
@@ -335,14 +336,39 @@ public class RestApiProxy extends Http2ChannelDuplexHandler {
         }
     }
 
+    private void dispatchDownloadStreamHeaders(RestApiCallState state, ChannelHandlerContext ctx, DownloadResponse downloadResponse) {
+
+        if (!state.responseHeadersSent) {
+
+            var restHeaders = translateResponseHeaders(state.responseHeaders, state, true);
+
+            if (downloadResponse.hasContentType())
+                restHeaders.add(HttpHeaderNames.CONTENT_TYPE, downloadResponse.getContentType());
+
+            if (downloadResponse.hasContentLength())
+                restHeaders.addLong(HttpHeaderNames.CONTENT_LENGTH, downloadResponse.getContentLength());
+
+            var restFrame = new DefaultHttp2HeadersFrame(restHeaders);
+            ctx.fireChannelRead(restFrame);
+
+            state.responseHeadersSent = true;
+            state.responseHttpStatus = HttpResponseStatus.parseLine(restHeaders.status());
+        }
+    }
+
     private void dispatchStreamContent(RestApiCallState state, ChannelHandlerContext ctx) {
 
         try {
             while (GrpcUtils.canDecodeLpm(state.responseContent)) {
 
                 var msg = state.translator.decodeGrpcResponse(state.responseContent);
-                var httpContent = state.translator.encodeRestResponse(msg);
 
+                // This is some TRAC magic to set the correct content headers for REST-ful data download streams
+                // It is not possible to define this behavior using the HTTP options in the proto file
+                if (!state.responseHeadersSent && msg instanceof DownloadResponse)
+                    dispatchDownloadStreamHeaders(state, ctx, (DownloadResponse) msg);
+
+                var httpContent = state.translator.encodeRestResponse(msg);
                 var dataFrame = new DefaultHttp2DataFrame(httpContent).stream(state.stream);
                 ctx.fireChannelRead(dataFrame);
             }
@@ -353,6 +379,9 @@ public class RestApiProxy extends Http2ChannelDuplexHandler {
     }
 
     private void dispatchStreamComplete(RestApiCallState state, ChannelHandlerContext ctx) {
+
+        if (!state.responseHeadersSent)
+            dispatchStreamHeaders(state, ctx, true);
 
         // It is possible the stream failed after sending an initial 200 OK HTTP HEADERS frame
         // In this case, fire an exception to try and cause an unclean shutdown of the channel
@@ -454,10 +483,6 @@ public class RestApiProxy extends Http2ChannelDuplexHandler {
             var restStatus = new HttpResponseStatus(restStatusCode.code(), "RESPONSE STATUS UNKNOWN");
             restHeaders.status(restStatus.toString());
         }
-
-        // TODO: Content headers
-
-        restHeaders.add(HttpHeaderNames.CONTENT_TYPE, "application/json; charset=UTF-8");
 
         return restHeaders;
     }
