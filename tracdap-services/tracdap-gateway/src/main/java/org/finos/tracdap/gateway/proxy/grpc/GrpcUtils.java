@@ -19,7 +19,6 @@ package org.finos.tracdap.gateway.proxy.grpc;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.Message;
 import io.netty.buffer.*;
-import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http2.DefaultHttp2Headers;
 import io.netty.handler.codec.http2.Http2Headers;
 import org.finos.tracdap.common.exception.ETracInternal;
