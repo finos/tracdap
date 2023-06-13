@@ -150,17 +150,6 @@ service TracMetadataApi {
     }
 
     /**
-     * Perform all operations in UniversalMetadataWriteBatchRequest
-     * in the TRAC metadata store.
-     */
-    rpc writeBatch (UniversalMetadataWriteBatchRequest) returns (UniversalMetadataWriteBatchResponse) {
-        option (google.api.http) = {
-            post: "/{tenant}/write-batch"
-            body: "*"
-        };
-    }
-
-    /**
      * Update an existing object in the TRAC metadata store.
      *
      * To save a new version, supply a metadata write request with the tenant code,
@@ -222,6 +211,51 @@ service TracMetadataApi {
     rpc updateTag (MetadataWriteRequest) returns (metadata.TagHeader) {
         option (google.api.http) = {
             post: "/{tenant}/update-tag"
+            body: "*"
+        };
+    }
+
+    /**
+     * Perform a batch of write operations on the TRAC metadata store.
+     *
+     * Often it is necessary to execute a set of metadata write instructions together.
+     * Using the writeBatch() method allows a large number of objects to be created
+     * or updated without the latency of sending lots of individual requests.
+     *
+     * When a write-batch request is processed the individual requests are processed
+     * in order starting with createObject, then updateObject and finally updateTag.
+     * Each object ID can only occur once for updateObject, while each object version
+     * can only occur once for updateTag. It is allowed to update tags for multiple
+     * object versions in the same request. It is also allowed to use updateObject
+     * and updateTag on the same object, which may be used e.g. to update an object
+     * and also update the tag on the prior version.
+     *
+     * Validation follows mostly the same rules as for individual write requests. The
+     * tenant code must be specified in the batch but it is optional in the individual
+     * request objects, if it is specified it must match what is in the batch request.
+     * Validation also checks for duplicate object IDs in updateObject and duplicates
+     * of the same object version in updateTag.
+     *
+     * Using writeBatch() gives a transactional guarantee on the metadata store, so the
+     * whole batch will either succeed or fail. This can be useful for maintaining
+     * consistency when updating multiple objects that refer to each other.
+     *
+     * The call returns tag headers for all the requested write operations in order.
+     * For example if a request creates two objects and updates 3, then the response
+     * will contain two tag headers for createObject and three for updateObject, in the
+     * same order as the request.
+     *
+     * Error conditions include all the error conditions that can occur for individual
+     * write operations, as well as errors relating to duplicate updates for the same
+     * object ID.
+     *
+     * @see TracMetadataApi.createObject()
+     * @see TracMetadataApi.updateObject()
+     * @see TracMetadataApi.updateTag()
+     */
+    rpc writeBatch (MetadataWriteBatchRequest) returns (MetadataWriteBatchResponse) {
+        option (google.api.http) = {
+            post: "/{tenant}/write-batch"
             body: "*"
         };
     }
@@ -470,9 +504,89 @@ message MetadataWriteRequest {
     repeated metadata.TagUpdate tagUpdates = 5;
 };
 
+/**
+ * Request to create or update a batch of objects in the TRAC metadata store.
+ *
+ * @see TracMetadataApi
+ */
+message MetadataWriteBatchRequest {
+
+    /**
+     * Tenant code for the requested operation, always required.
+     */
+    string tenant = 1;
+
+    /**
+     * Requests to be processed using createObject()
+     */
+    repeated MetadataWriteRequest createObjects = 2;
+
+    /**
+     * Requests to be processed using updateObject()
+     */
+    repeated MetadataWriteRequest updateObjects = 3;
+
+    /**
+     * Requests to be processed using updateTag()
+     */
+    repeated MetadataWriteRequest updateTags = 4;
+
+    /**
+     * Requests to be processed using preallocateId()
+     *
+     * This request type is only available in the internal metadata API.
+     */
+    repeated MetadataWriteRequest preallocateIds = 5;
+
+    /**
+     * Requests to be processed using createPreallocatedObject()
+     *
+     * This request type is only available in the internal metadata API.
+     */
+    repeated MetadataWriteRequest createPreallocated = 6;
+};
+
 
 /**
- * Request to read an object from the TRAC metadata store. An alternative REST-style GET call is available using MetadataGetRequest.
+ * Response to a batch write operation.
+ *
+ * @see TracMetadataApi
+ */
+message MetadataWriteBatchResponse {
+
+    /**
+     * IDs for objects created using createObject()
+     */
+    repeated metadata.TagHeader createObjects = 1;
+
+    /**
+     * IDs for objects updated using updateObject()
+     */
+    repeated metadata.TagHeader updateObjects = 2;
+
+    /**
+     * IDs for tags updated using updateTag()
+     */
+    repeated metadata.TagHeader updateTags = 3;
+
+    /**
+     * IDs created using preallocateId()
+     *
+     * This response type is only available in the internal metadata API.
+     */
+    repeated metadata.TagHeader preallocateIds = 4;
+
+    /**
+     * IDs for objects created using createPreallocatedObject()
+     *
+     * This response type is only available in the internal metadata API.
+     */
+    repeated metadata.TagHeader createPreallocated = 5;
+};
+
+
+/**
+ * Request to read an object from the TRAC metadata store.
  *
  * @see TracMetadataApi
  */
@@ -498,58 +612,6 @@ message MetadataBatchRequest {
 
 
 /**
- * Request to create or update a batch of objects in the TRAC metadata store.
- *
- * @see TracMetadataApi
- */
-message MetadataWriteBatchRequest {
-
-    /**
-     * Tenant code for the requested operation, always required.
-     */
-    string tenant = 1;
-
-    /**
-     * Requests to be realized in batch.
-     *
-     * Tenant in requests must be null.
-     */
-    repeated MetadataWriteRequest requests = 2;
-
-    /**
-     * These attrs will be appended to tagUpdates in each request.
-     */
-    repeated metadata.TagUpdate batchAttrs = 3;
-};
-
-
-/**
- * Request to create or update a batch of objects in the TRAC metadata store.
- *
- * Tenant in requests must be null.
- */
-message UniversalMetadataWriteBatchRequest {
-
-    /**
-     * Tenant code for the requested operation, always required.
-     */
-    string tenant = 1;
-
-    /**
-     * Requests to be realized in batch.
-     *
-     * Tenant in requests must be null.
-     */
-
-    repeated MetadataWriteRequest preallocateObjects = 2;
-    repeated MetadataWriteRequest createObjects = 3;
-    repeated MetadataWriteRequest updateObjects = 4;
-    repeated MetadataWriteRequest updateTags = 5;
-    repeated MetadataWriteRequest preallocateIds = 6;
-};
-
-
-/**
  * Response to reading a batch of objects from the TRAC metadata store.
  *
  * @see TracMetadataApi
@@ -557,35 +619,6 @@ message UniversalMetadataWriteBatchRequest {
 message MetadataBatchResponse {
 
     repeated metadata.Tag tag = 1;
-};
-
-
-/**
- * Response to creating or updating a batch of objects in the TRAC metadata store.
- *
- * @see TracMetadataApi
- */
-message MetadataWriteBatchResponse {
-    /**
-     * Headers of the written tags.
-     *
-     * In the same order as in MetadataWriteBatchRequest.
-     */
-    repeated metadata.TagHeader headers = 1;
-};
-
-
-/**
- * Response to batch write operation.
- *
- * @see UniversalMetadataWriteBatchRequest
- */
-message UniversalMetadataWriteBatchResponse {
-     repeated metadata.TagHeader preallocatedIdHeaders = 1;
-     repeated metadata.TagHeader preallocatedObjectHeaders = 2;
-     repeated metadata.TagHeader createObjectHeaders = 3;
-     repeated metadata.TagHeader updateObjectHeaders = 4;
-     repeated metadata.TagHeader updateTagHeaders = 5;
 };
 
 
@@ -614,7 +647,10 @@ message MetadataSearchResponse {
 
 
 /**
- * Request to get an object from the TRAC metadata store. This is available as an alternative to MetadataGetRequest for use in REST-style GET calls.
+ * Request to get an object from the TRAC metadata store.
+ *
+ * This request type is used for get* methods in the metadata API
+ * and is primarily intended for use with the REST API mapping.
  *
  * @see TracMetadataApi
  */

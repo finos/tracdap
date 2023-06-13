@@ -44,18 +44,6 @@ import "google/api/annotations.proto";
  * @see TracMetadataApi
  */
 service TrustedMetadataApi {
-  /**
-   * Perform all operations in UniversalMetadataWriteBatchRequest
-   * in the TRAC metadata store.
-   *
-   * This call runs without restriction on which types of object can be saved.
-   */
-  rpc writeBatch (UniversalMetadataWriteBatchRequest) returns (UniversalMetadataWriteBatchResponse) {
-    option (google.api.http) = {
-      post: "/{tenant}/trusted/write-batch"
-      body: "*"
-    };
-  }
 
   /**
    * Create a new object in the TRAC metadata store.
@@ -121,40 +109,38 @@ service TrustedMetadataApi {
   }
 
   /**
-   * Preallocate object IDs in batch for objects that will be created later.
-   *
-   * This call is for use by TRAC components that need to reserve an ID before
-   * it is used, particularly if the object ID must be included in the definition
-   * of an object that has not been created yet. When creating an ID the tenant
-   * and object type must be specified, the object that is eventually saved must
-   * match these two conditions. Orphan IDs are expected - if a component request
-   * an ID and encounters an error before that ID is used, the orphan ID is just
-   * ignored.
-   *
-   * @see TrustedMetadataApi.preallocateId()
-   */
-  rpc preallocateIdBatch (MetadataWriteBatchRequest) returns (MetadataWriteBatchResponse) {
-    option (google.api.http) = {
-      post: "/{tenant}/trusted/preallocate-batch"
-      body: "*"
-    };
-  }
-
-  /**
    * Create an object using an ID that was previously preallocated.
    *
-   * This call behaves essentially the same as saveNewObject(), with all the
+   * This call behaves essentially the same as createObject(), with all the
    * same validation. The only difference is that the new definition must be
    * supplied with an object header, including the object ID returned from a
    * prior call to preallocateId().
    *
-   * Error conditions include all the error conditions for saveNewObject().
+   * Error conditions include all the error conditions for createObject().
    * Using a preallocated ID twice, attempting to save to an unknown ID or the
    * ID of another object that already exists are also errors.
    */
   rpc createPreallocatedObject (MetadataWriteRequest) returns (metadata.TagHeader) {
     option (google.api.http) = {
       post: "/{tenant}/trusted/create-preallocated"
+      body: "*"
+    };
+  }
+
+  /**
+   * Perform a batch of write operations on the TRAC metadata store.
+   *
+   * This call behaves similarly to the equivalent public API call. However,
+   * the createObject, updateObject and updateTag request types take their
+   * semantics from the trusted API instead of the public one. It is also
+   * possible to include preallocateId and createPreallocatedObject in the
+   * batch request.
+   *
+   * @see TracMetadataApi.writeBatch()
+   */
+  rpc writeBatch (MetadataWriteBatchRequest) returns (MetadataWriteBatchResponse) {
+    option (google.api.http) = {
+      post: "/{tenant}/trusted/write-batch"
       body: "*"
     };
   }
