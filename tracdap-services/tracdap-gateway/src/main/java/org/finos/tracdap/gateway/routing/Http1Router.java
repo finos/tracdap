@@ -287,7 +287,7 @@ public class Http1Router extends CoreRouter {
             case REST:
 
                 return new RestApiProxyBuilder(
-                        routeConfig, link, ctx.executor(), connId,
+                        routeConfig, link, connId,
                         HttpProtocol.HTTP_1_1);
 
             default:

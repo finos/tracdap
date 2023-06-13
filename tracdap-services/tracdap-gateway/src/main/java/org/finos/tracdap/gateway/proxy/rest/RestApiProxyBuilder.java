@@ -16,20 +16,20 @@
 
 package org.finos.tracdap.gateway.proxy.rest;
 
-import io.netty.handler.codec.http.HttpResponseStatus;
 import org.finos.tracdap.common.exception.ENetworkHttp;
 import org.finos.tracdap.gateway.exec.Route;
 import org.finos.tracdap.gateway.proxy.http.Http1to2Proxy;
+import org.finos.tracdap.gateway.proxy.http.Http2FlowControl;
+import org.finos.tracdap.gateway.proxy.http.HttpProtocol;
+import org.finos.tracdap.gateway.routing.CoreRouterLink;
 
 import io.netty.channel.*;
+import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http2.Http2FrameCodecBuilder;
 import io.netty.handler.codec.http2.Http2FrameLogger;
 import io.netty.handler.codec.http2.Http2Settings;
 import io.netty.handler.logging.LogLevel;
 
-import io.netty.util.concurrent.EventExecutor;
-import org.finos.tracdap.gateway.proxy.http.HttpProtocol;
-import org.finos.tracdap.gateway.routing.CoreRouterLink;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -40,20 +40,17 @@ public class RestApiProxyBuilder extends ChannelInitializer<Channel> {
 
     private final Route routeConfig;
     private final CoreRouterLink routerLink;
-    private final EventExecutor executor;
     private final int connId;
     private final HttpProtocol httpProtocol;
 
     public RestApiProxyBuilder(
             Route routeConfig,
             CoreRouterLink routerLink,
-            EventExecutor executor,
             int connId,
             HttpProtocol httpProtocol) {
 
         this.routeConfig = routeConfig;
         this.routerLink = routerLink;
-        this.executor = executor;
         this.connId = connId;
         this.httpProtocol = httpProtocol;
     }
@@ -70,6 +67,10 @@ public class RestApiProxyBuilder extends ChannelInitializer<Channel> {
         var initialSettings = new Http2Settings()
                 .maxFrameSize(16 * 1024);
 
+        var target = String.format("%s:%d",
+                routeConfig.getConfig().getTarget().getHost(),
+                routeConfig.getConfig().getTarget().getPort());
+
         var http2Codec = Http2FrameCodecBuilder.forClient()
                 .frameLogger(new Http2FrameLogger(LogLevel.INFO))
                 .initialSettings(initialSettings)
@@ -77,16 +78,16 @@ public class RestApiProxyBuilder extends ChannelInitializer<Channel> {
                 .autoAckPingFrame(true)
                 .build();
 
+        var http2FlowControl = new Http2FlowControl(connId, target, initialSettings);
+
         pipeline.addLast(http2Codec);
+        pipeline.addLast(http2FlowControl);
 
         // REST proxy
 
         // TODO: Build this after reading service config and pass it in
         var restApiConfig = routeConfig.getRestMethods();
-
-        var grpcHost = routeConfig.getConfig().getTarget().getHost();
-        var grpcPort = (short) routeConfig.getConfig().getTarget().getPort();
-        var restApiProxy = new RestApiProxy(grpcHost, grpcPort, restApiConfig, executor);
+        var restApiProxy = new RestApiProxy(restApiConfig);
         pipeline.addLast(restApiProxy);
 
         // Router link

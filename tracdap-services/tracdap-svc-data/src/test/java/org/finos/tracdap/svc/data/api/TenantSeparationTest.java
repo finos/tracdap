@@ -23,6 +23,7 @@ import org.finos.tracdap.common.data.IExecutionContext;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.metadata.MetadataUtil;
 import org.finos.tracdap.common.plugin.PluginManager;
+import org.finos.tracdap.test.data.DataApiTestHelpers;
 import org.finos.tracdap.test.helpers.PlatformTest;
 import org.finos.tracdap.test.helpers.StorageTestHelpers;
 
@@ -37,7 +38,7 @@ import org.junit.jupiter.api.extension.RegisterExtension;
 
 import java.time.Duration;
 
-import static org.finos.tracdap.svc.data.api.DataApiTestHelpers.readRequest;
+import static org.finos.tracdap.test.data.DataApiTestHelpers.readRequest;
 import static org.finos.tracdap.test.concurrent.ConcurrentTestHelpers.resultOf;
 import static org.finos.tracdap.test.concurrent.ConcurrentTestHelpers.waitFor;
 import static org.junit.jupiter.api.Assertions.assertEquals;

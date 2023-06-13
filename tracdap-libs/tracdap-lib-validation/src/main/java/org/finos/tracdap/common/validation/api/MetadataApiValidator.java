@@ -479,7 +479,7 @@ public class MetadataApiValidator {
         return ctx;
     }
 
-    @Validator(method = "getObject")
+    @Validator(method = "getLatestObject")
     public static ValidationContext getLatestObject(MetadataGetRequest msg, ValidationContext ctx) {
 
         ctx = ctx.apply(MetadataApiValidator::getRequest, MetadataGetRequest.class);
@@ -495,7 +495,7 @@ public class MetadataApiValidator {
         return ctx;
     }
 
-    @Validator(method = "getObject")
+    @Validator(method = "getLatestTag")
     public static ValidationContext getLatestTag(MetadataGetRequest msg, ValidationContext ctx) {
 
         ctx = ctx.apply(MetadataApiValidator::getRequest, MetadataGetRequest.class);

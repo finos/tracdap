@@ -21,11 +21,7 @@ import org.finos.tracdap.gateway.exec.IRouteMatcher;
 import com.google.protobuf.Descriptors;
 import com.google.protobuf.Message;
 
-import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpMethod;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.net.URI;
 import java.util.Arrays;
@@ -35,8 +31,6 @@ import java.util.stream.Collectors;
 
 
 public class RestApiMatcher implements IRouteMatcher {
-
-    private final static Logger log = LoggerFactory.getLogger(RestApiMatcher.class);
 
     private final HttpMethod httpMethod;
     private final List<Function<String, Boolean>> pathSegmentMatchers;
@@ -57,6 +51,12 @@ public class RestApiMatcher implements IRouteMatcher {
     private <TRequest extends Message>
     Function<String, Boolean>
     prepareMatcherForSegment(String segmentTemplate, TRequest blankRequest) {
+
+        // No support for multi-segment wildcard yet (**)
+
+        // The wildcard matches any individual segment
+        if (segmentTemplate.equals("*"))
+            return segment -> true;
 
         // Segments that do not contain variables are a straight-up literal match
         if (!segmentTemplate.contains("{"))
@@ -104,7 +104,7 @@ public class RestApiMatcher implements IRouteMatcher {
     // -----------------------------------------------------------------------------------------------------------------
 
     @Override
-    public boolean matches(URI uri, HttpMethod httpMethod, HttpHeaders headers) {
+    public boolean matches(HttpMethod httpMethod, URI uri) {
 
         if (httpMethod != this.httpMethod)
             return false;

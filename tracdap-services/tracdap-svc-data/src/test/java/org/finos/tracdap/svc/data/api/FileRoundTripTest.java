@@ -27,6 +27,7 @@ import org.finos.tracdap.metadata.CopyStatus;
 import org.finos.tracdap.metadata.ObjectDefinition;
 import org.finos.tracdap.metadata.ObjectType;
 import org.finos.tracdap.metadata.TagSelector;
+import org.finos.tracdap.test.data.DataApiTestHelpers;
 import org.finos.tracdap.test.helpers.PlatformTest;
 import org.finos.tracdap.test.helpers.StorageTestHelpers;
 

@@ -17,9 +17,8 @@
 package org.finos.tracdap.gateway.exec;
 
 import org.finos.tracdap.config.GwRoute;
-import org.finos.tracdap.gateway.config.rest.OrchApiRestMapping;
-import org.finos.tracdap.gateway.config.rest.MetaApiRestMapping;
 import org.finos.tracdap.gateway.proxy.rest.RestApiMethod;
+import org.finos.tracdap.gateway.proxy.rest.RestApiSetup;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,7 +49,7 @@ public class RouteBuilder {
 
         var matchPath = config.getMatch().getPath();
         var matcher = (IRouteMatcher)
-                (uri, method, headers) -> uri
+                (method, uri) -> uri
                 .getPath()
                 .startsWith(matchPath);
 
@@ -59,13 +58,15 @@ public class RouteBuilder {
         return new Route(routeIndex, config, matcher, restMethods);
     }
 
-    private static List<RestApiMethod<?, ?, ?>> lookupRestMethods(GwRoute config) {
+    private static List<RestApiMethod<?, ?>> lookupRestMethods(GwRoute config) {
 
         switch (config.getRestMapping()) {
 
-            case TRAC_META: return MetaApiRestMapping.metaApiRoutes();
+            case TRAC_META: return RestApiSetup.metaApiRoutes();
 
-            case TRAC_ORCH: return OrchApiRestMapping.orchApiRoutes();
+            case TRAC_DATA: return RestApiSetup.dataApiRoutes();
+
+            case TRAC_ORCH: return RestApiSetup.orchApiRoutes();
 
             default:
                 return null;

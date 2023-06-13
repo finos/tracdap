@@ -26,6 +26,7 @@ import org.finos.tracdap.common.async.Flows;
 import org.finos.tracdap.common.async.Futures;
 import org.finos.tracdap.common.plugin.PluginManager;
 import org.finos.tracdap.metadata.*;
+import org.finos.tracdap.test.data.DataApiTestHelpers;
 import org.finos.tracdap.test.helpers.PlatformTest;
 import org.finos.tracdap.test.helpers.StorageTestHelpers;
 
@@ -48,7 +49,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
-import static org.finos.tracdap.svc.data.api.DataApiTestHelpers.readRequest;
+import static org.finos.tracdap.test.data.DataApiTestHelpers.readRequest;
 import static org.finos.tracdap.test.concurrent.ConcurrentTestHelpers.resultOf;
 import static org.finos.tracdap.test.concurrent.ConcurrentTestHelpers.waitFor;
 import static org.junit.jupiter.api.Assertions.*;

@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Accenture Global Solutions Limited
+ * Copyright 2023 Accenture Global Solutions Limited
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.svc.data.api;
+package org.finos.tracdap.test.data;
 
 import org.finos.tracdap.api.FileReadRequest;
 import org.finos.tracdap.common.data.IExecutionContext;
@@ -57,9 +57,9 @@ import java.util.function.Function;
 import java.util.stream.Stream;
 
 
-class DataApiTestHelpers {
+public class DataApiTestHelpers {
 
-    static <TReq, TResp>
+    public static <TReq, TResp>
     void serverStreaming(
             BiConsumer<TReq, StreamObserver<TResp>> grpcMethod,
             TReq request, Flow.Subscriber<TResp> response) {
@@ -68,7 +68,7 @@ class DataApiTestHelpers {
         grpcMethod.accept(request, responseGrpc);
     }
 
-    static<TReq, TResp>
+    public static<TReq, TResp>
     CompletionStage<List<TResp>> serverStreaming(
             BiConsumer<TReq, StreamObserver<TResp>> grpcMethod,
             TReq request, IExecutionContext execCtx){
@@ -86,7 +86,7 @@ class DataApiTestHelpers {
         return collectList;
     }
 
-    static <TReq, TResp>
+    public static <TReq, TResp>
     CompletionStage<Void> serverStreamingDiscard(
             BiConsumer<TReq, StreamObserver<TResp>> grpcMethod,
             TReq request, IExecutionContext execCtx) {
@@ -103,7 +103,7 @@ class DataApiTestHelpers {
         return discard;
     }
 
-    static <TReq, TResp>
+    public static <TReq, TResp>
     CompletableFuture<TResp> clientStreaming(
             Function<StreamObserver<TResp>, StreamObserver<TReq>> grpcMethod,
             Flow.Publisher<TReq> requestPublisher) {
@@ -119,7 +119,7 @@ class DataApiTestHelpers {
         return response;
     }
 
-    static <TReq, TResp>
+    public static <TReq, TResp>
     CompletableFuture<TResp> clientStreaming(
             Function<StreamObserver<TResp>, StreamObserver<TReq>> grpcMethod,
             TReq request) {
@@ -127,7 +127,7 @@ class DataApiTestHelpers {
         return clientStreaming(grpcMethod, Flows.publish(Stream.of(request)));
     }
 
-    static FileReadRequest readRequest(String tenant, TagHeader fileId) {
+    public static FileReadRequest readRequest(String tenant, TagHeader fileId) {
 
         var fileSelector = MetadataUtil.selectorFor(fileId);
 

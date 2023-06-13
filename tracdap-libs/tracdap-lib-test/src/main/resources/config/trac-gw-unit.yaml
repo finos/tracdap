@@ -15,19 +15,20 @@
 config:
   logging: trac-logging.xml
   secret.type: PKCS12
-  secret.url: secrets.p12
+  secret.url: trac-unit.pfx
 
 
 platformInfo:
-  environment: SANDBOX
+  environment: TEST_ENVIRONMENT
   production: false
+  deploymentInfo:
+    region: UK
 
 
 authentication:
 
-  jwtIssuer: trac_platform
-  jwtExpiry: 3600
-  jwtLimit: 57600
+  jwtIssuer: http://localhost/
+  jwtExpiry: 7200
 
   provider:
     protocol: guest
@@ -62,21 +63,3 @@ services:
       scheme: http
       host: localhost
       port: 8083
-
-
-routes:
-
-#  # This route can be used to run a local development environment against the TRAC APIs
-#
-#  - routeName: Local App
-#    routeType: HTTP
-#
-#    match:
-#      host: localhost
-#      path: /local/app
-#
-#    target:
-#      scheme: http
-#      host: localhost
-#      port: 9090
-#      path: /

@@ -16,18 +16,88 @@
 
 package org.finos.tracdap.gateway.proxy.grpc;
 
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.ByteBufAllocator;
-import io.netty.handler.codec.http.HttpHeaders;
+import com.google.protobuf.InvalidProtocolBufferException;
+import com.google.protobuf.Message;
+import io.netty.buffer.*;
 import io.netty.handler.codec.http2.DefaultHttp2Headers;
 import io.netty.handler.codec.http2.Http2Headers;
+import org.finos.tracdap.common.exception.ETracInternal;
+import org.finos.tracdap.common.exception.EUnexpected;
 
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 
 
 public class GrpcUtils {
 
     public static int LPM_PREFIX_LENGTH = 5;
+
+    public static <TMsg extends Message>
+    ByteBuf encodeLpm(TMsg msg, ByteBufAllocator allocator) {
+
+        var compression = (byte) 0x00;
+        var msgSize = msg.getSerializedSize();
+        var lpmSize = LPM_PREFIX_LENGTH + msgSize;
+        var buffer = allocator.directBuffer(lpmSize);
+
+        try (var stream = new ByteBufOutputStream(buffer)) {
+
+            stream.writeByte(compression);
+            stream.writeInt(msgSize);
+            msg.writeTo(stream);
+
+            return buffer;
+        }
+        catch (IOException e) {
+            throw new EUnexpected(e);
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    public static <TMsg extends Message>
+    TMsg decodeLpm(TMsg blankMsg, ByteBuf buffer) throws InvalidProtocolBufferException {
+
+        if (buffer.readableBytes() < LPM_PREFIX_LENGTH)
+            throw new InvalidProtocolBufferException("Unexpected end of stream");
+
+        var compression = buffer.readByte();
+        var msgSize = buffer.readInt();
+
+        if (buffer.readableBytes() < msgSize)
+            throw new InvalidProtocolBufferException("Unexpected end of stream");
+
+        // TODO: Decompression support
+        if (compression != 0)
+            throw new ETracInternal("compression not supported yet");
+
+        try (var stream = new ByteBufInputStream(buffer, msgSize)) {
+
+            var builder = blankMsg.newBuilderForType();
+            builder.mergeFrom(stream);
+
+            return (TMsg) builder.build();
+        }
+        catch (InvalidProtocolBufferException e) {
+            throw e;
+        }
+        catch (IOException e) {
+            throw new EUnexpected(e);
+        }
+    }
+
+    public static boolean canDecodeLpm(ByteBuf buffer) {
+
+        if (buffer.readableBytes() < LPM_PREFIX_LENGTH)
+            return false;
+
+        // Assume a new LPM starts at readerIndex
+        // compression flag is at readerIndex
+        // msgSize is at readerIndex + 1
+
+        var msgSize = buffer.getInt(buffer.readerIndex() + 1);
+
+        return buffer.readableBytes() >= LPM_PREFIX_LENGTH + msgSize;
+    }
 
     public static Http2Headers decodeHeadersFrame(ByteBuf headersBuf) {
 
@@ -54,23 +124,6 @@ public class GrpcUtils {
         }
 
         return headers;
-    }
-
-    public static ByteBuf lpmHeaders(HttpHeaders headers, ByteBufAllocator allocator) {
-
-        var builder = new StringBuilder();
-
-        for (var header : headers) {
-
-            builder.append(header.getKey());
-            builder.append(": ");
-            builder.append(header.getValue());
-            builder.append("\r\n");
-        }
-
-        // Do not append a final \r\n, as per https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-WEB.md
-
-        return asciiToLpm(builder, allocator);
     }
 
     public static ByteBuf lpmHeaders(Http2Headers headers, ByteBufAllocator allocator) {

@@ -64,6 +64,12 @@ public class DataApiValidator {
     private static final Descriptors.FieldDescriptor FRR_TENANT;
     private static final Descriptors.FieldDescriptor FRR_SELECTOR;
 
+    private static final Descriptors.Descriptor DOWNLOAD_REQUEST;
+    private static final Descriptors.FieldDescriptor DR_TENANT;
+    private static final Descriptors.FieldDescriptor DR_OBJECT_TYPE;
+    private static final Descriptors.FieldDescriptor DR_OBJECT_ID;
+    private static final Descriptors.FieldDescriptor DR_OBJECT_VERSION;
+
     static {
 
         DATA_WRITE_REQUEST = DataWriteRequest.getDescriptor();
@@ -93,6 +99,12 @@ public class DataApiValidator {
         FILE_READ_REQUEST = FileReadRequest.getDescriptor();
         FRR_TENANT = ValidatorUtils.field(FILE_READ_REQUEST, FileReadRequest.TENANT_FIELD_NUMBER);
         FRR_SELECTOR = ValidatorUtils.field(FILE_READ_REQUEST, FileReadRequest.SELECTOR_FIELD_NUMBER);
+
+        DOWNLOAD_REQUEST = DownloadRequest.getDescriptor();
+        DR_TENANT = ValidatorUtils.field(DOWNLOAD_REQUEST, DownloadRequest.TENANT_FIELD_NUMBER);
+        DR_OBJECT_TYPE = ValidatorUtils.field(DOWNLOAD_REQUEST, DownloadRequest.OBJECTTYPE_FIELD_NUMBER);
+        DR_OBJECT_ID = ValidatorUtils.field(DOWNLOAD_REQUEST, DownloadRequest.OBJECTID_FIELD_NUMBER);
+        DR_OBJECT_VERSION = ValidatorUtils.field(DOWNLOAD_REQUEST, DownloadRequest.OBJECTVERSION_FIELD_NUMBER);
     }
 
     @Validator(method = "createDataset")
@@ -315,6 +327,47 @@ public class DataApiValidator {
 
             return ctx.error("Content cannot be empty");
         }
+
+        return ctx;
+    }
+
+    @Validator(method = "downloadFile")
+    public static ValidationContext downloadFile(DownloadRequest msg, ValidationContext ctx) {
+
+        ctx = ctx.push(DR_TENANT)
+                .apply(CommonValidators::required)
+                .apply(CommonValidators::identifier)
+                .pop();
+
+        ctx = ctx.push(DR_OBJECT_ID)
+                .apply(CommonValidators::required)
+                .apply(CommonValidators::uuid)
+                .pop();
+
+        ctx = ctx.push(DR_OBJECT_VERSION)
+                .apply(CommonValidators::required)
+                .apply(CommonValidators::positive, Integer.class)
+                .pop();
+
+        return ctx;
+    }
+
+    @Validator(method = "downloadLatestFile")
+    public static ValidationContext downloadLatestFile(DownloadRequest msg, ValidationContext ctx) {
+
+        ctx = ctx.push(DR_TENANT)
+                .apply(CommonValidators::required)
+                .apply(CommonValidators::identifier)
+                .pop();
+
+        ctx = ctx.push(DR_OBJECT_ID)
+                .apply(CommonValidators::required)
+                .apply(CommonValidators::uuid)
+                .pop();
+
+        ctx = ctx.push(DR_OBJECT_VERSION)
+                .apply(CommonValidators::omitted)
+                .pop();
 
         return ctx;
     }

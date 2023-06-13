@@ -17,6 +17,7 @@
 package org.finos.tracdap.svc.data.api;
 
 import org.finos.tracdap.api.*;
+import org.finos.tracdap.api.Data;
 import org.finos.tracdap.common.auth.internal.AuthHelpers;
 import org.finos.tracdap.common.data.DataContext;
 import org.finos.tracdap.common.data.IDataContext;
@@ -24,9 +25,7 @@ import org.finos.tracdap.common.data.pipeline.GrpcDownloadSink;
 import org.finos.tracdap.common.data.pipeline.GrpcUploadSource;
 import org.finos.tracdap.common.util.LoggingHelpers;
 import org.finos.tracdap.common.validation.Validator;
-import org.finos.tracdap.metadata.FileDefinition;
-import org.finos.tracdap.metadata.SchemaDefinition;
-import org.finos.tracdap.metadata.TagHeader;
+import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.svc.data.EventLoopRegister;
 import org.finos.tracdap.svc.data.service.DataService;
 import org.finos.tracdap.svc.data.service.FileService;
@@ -61,6 +60,9 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
     private static final MethodDescriptor<FileWriteRequest, TagHeader> CREATE_SMALL_FILE_METHOD = TracDataApiGrpc.getCreateSmallFileMethod();
     private static final MethodDescriptor<FileWriteRequest, TagHeader> UPDATE_SMALL_FILE_METHOD = TracDataApiGrpc.getUpdateSmallFileMethod();
     private static final MethodDescriptor<FileReadRequest, FileReadResponse> READ_SMALL_FILE_METHOD = TracDataApiGrpc.getReadSmallFileMethod();
+
+    private static final MethodDescriptor<DownloadRequest, DownloadResponse> DOWNLOAD_FILE_METHOD = TracDataApiGrpc.getDownloadFileMethod();
+    private static final MethodDescriptor<DownloadRequest, DownloadResponse> DOWNLOAD_LATEST_FILE_METHOD = TracDataApiGrpc.getDownloadLatestFileMethod();
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
@@ -306,6 +308,59 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
                 .exceptionally(download::failed);
     }
 
+    @Override
+    public void downloadFile(DownloadRequest request, StreamObserver<DownloadResponse> responseObserver) {
+
+        var selector = TagSelector.newBuilder()
+                .setObjectType(ObjectType.FILE)
+                .setObjectId(request.getObjectId())
+                .setObjectVersion(request.getObjectVersion())
+                .setLatestTag(true)
+                .build();
+
+        var download = new GrpcDownloadSink<>(responseObserver, DownloadResponse::newBuilder, GrpcDownloadSink.STREAMING);
+        downloadFile(DOWNLOAD_FILE_METHOD, request, selector, download);
+    }
+
+    @Override
+    public void downloadLatestFile(DownloadRequest request, StreamObserver<DownloadResponse> responseObserver) {
+
+        var selector = TagSelector.newBuilder()
+                .setObjectType(ObjectType.FILE)
+                .setObjectId(request.getObjectId())
+                .setLatestObject(true)
+                .setLatestTag(true)
+                .build();
+
+        var download = new GrpcDownloadSink<>(responseObserver, DownloadResponse::newBuilder, GrpcDownloadSink.STREAMING);
+        downloadFile(DOWNLOAD_LATEST_FILE_METHOD, request, selector, download);
+    }
+
+    private void downloadFile(
+            MethodDescriptor<DownloadRequest, DownloadResponse> method,
+            DownloadRequest request, TagSelector selector,
+            GrpcDownloadSink<DownloadResponse, DownloadResponse.Builder> download) {
+
+        var dataContext = prepareDataContext();
+        var userInfo = AuthHelpers.currentUser();
+
+        download.whenComplete(() -> closeDataContext(dataContext));
+
+        var firstMessage = download.firstMessage((response, fileDef) -> response
+                .setContentType(fileDef.getMimeType())
+                .setContentLength(fileDef.getSize()),
+                FileDefinition.class);
+
+        var dataStream = download.dataStream(DownloadResponse.Builder::setContent);
+
+        download.start(request)
+                .thenApply(req -> validateRequest(method, req))
+                .thenAccept(req -> fileService.readFile(
+                        request.getTenant(), selector,
+                        firstMessage, dataStream,
+                        dataContext, userInfo))
+                .exceptionally(download::failed);
+    }
 
     // -----------------------------------------------------------------------------------------------------------------
     // Common scaffolding for client and server streaming

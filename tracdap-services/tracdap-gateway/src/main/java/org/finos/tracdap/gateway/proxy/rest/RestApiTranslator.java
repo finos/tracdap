@@ -16,7 +16,12 @@
 
 package org.finos.tracdap.gateway.proxy.rest;
 
+import com.google.protobuf.ByteString;
+import io.grpc.Status;
+import io.netty.buffer.ByteBufAllocator;
+import io.netty.buffer.Unpooled;
 import org.finos.tracdap.common.exception.EInputValidation;
+import org.finos.tracdap.common.exception.ETracInternal;
 import org.finos.tracdap.common.exception.EUnexpected;
 
 import com.google.gson.stream.MalformedJsonException;
@@ -24,10 +29,11 @@ import com.google.protobuf.Descriptors;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.Message;
 import com.google.protobuf.util.JsonFormat;
-import io.grpc.StatusRuntimeException;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufInputStream;
 import io.netty.handler.codec.http.HttpResponseStatus;
+
+import org.finos.tracdap.gateway.proxy.grpc.GrpcUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -42,110 +48,90 @@ import java.util.function.BiFunction;
 import java.util.function.Function;
 
 
-public class RestApiTranslator<TRequest extends Message, TRequestBody extends Message> {
+public class RestApiTranslator<TRequest extends Message, TResponse extends Message> {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
     private final TRequest blankRequest;
-    private final List<BiFunction<URI, TRequest.Builder, TRequest.Builder>> fieldExtractors;
+    private final TResponse blankResponse;
 
+    private final List<BiFunction<URI, TRequest.Builder, TRequest.Builder>> requestFieldExtractors;
+    private final List<Descriptors.FieldDescriptor> requestBodyPath;
+    private final List<Descriptors.FieldDescriptor> responseBodyPath;
     private final boolean hasBody;
-    private final TRequestBody blankBody;
-    private final Function<TRequest.Builder, Message.Builder> bodySubFieldMapper;
-    private final Descriptors.FieldDescriptor bodyFieldDescriptor;
 
-    public RestApiTranslator(String urlTemplate, TRequest blankRequest, String bodyField, TRequestBody blankBody) {
+    public RestApiTranslator(TRequest blankRequest, TResponse blankResponse, String urlTemplate, String bodyField, String responseBodyField) {
 
         this.blankRequest = blankRequest;
-        this.fieldExtractors = prepareFieldExtractors(urlTemplate, blankRequest.getDescriptorForType());
-
-        this.hasBody = true;
-        this.blankBody = blankBody;
+        this.blankResponse = blankResponse;
 
         var requestDescriptor = blankRequest.getDescriptorForType();
-        var bodyFields = RestApiFields.prepareFieldDescriptors(requestDescriptor, bodyField);
-        this.bodySubFieldMapper = RestApiFields.prepareSubFieldMapper(bodyFields);
-        this.bodyFieldDescriptor = bodyFields.get(bodyFields.size() - 1);
+        var responseDescriptor = blankResponse.getDescriptorForType();
+
+        this.requestFieldExtractors = prepareFieldExtractors(urlTemplate, requestDescriptor);
+
+        if (bodyField == null) {
+            this.hasBody = false;
+            this.requestBodyPath = List.of();
+        }
+        else {
+            this.hasBody = true;
+            this.requestBodyPath = RestApiFields.prepareFieldDescriptors(requestDescriptor, bodyField);
+        }
+
+        this.responseBodyPath = RestApiFields.prepareFieldDescriptors(responseDescriptor, responseBodyField);
     }
-
-    public RestApiTranslator(String urlTemplate, TRequest blankRequest, boolean hasBody) {
-
-        this.blankRequest = blankRequest;
-        this.fieldExtractors = prepareFieldExtractors(urlTemplate, blankRequest.getDescriptorForType());
-
-        this.hasBody = hasBody;
-        this.blankBody = null;
-
-        this.bodySubFieldMapper = null;
-        this.bodyFieldDescriptor = null;
-    }
-
 
     // -----------------------------------------------------------------------------------------------------------------
     // Runtime methods
     // -----------------------------------------------------------------------------------------------------------------
 
     @SuppressWarnings("unchecked")
-    public TRequest translateRequest(String url, Message body) {
-
-        // This should be set up correctly when the API route is created
-        if (!this.hasBody)
-            throw new EUnexpected();
-
-        var request = blankRequest.newBuilderForType();
-
-        // If the body is a sub field, use the sub field mapper to add it to the request
-        if (bodySubFieldMapper != null) {
-
-            var bodySubField = bodySubFieldMapper.apply(request);
-            bodySubField.setField(bodyFieldDescriptor, body);
-        }
-        // Otherwise the body is the top level request, merge it before applying URL fields
-        else
-            request.mergeFrom(body);
-
-        var requestUrl = URI.create(url);
-
-        for (var extractor : fieldExtractors)
-            request = extractor.apply(requestUrl, request);
-
-        return (TRequest) request.build();
-    }
-
-    @SuppressWarnings("unchecked")
-    public TRequest translateRequest(String url) {
+    public TRequest decodeRestRequest(String url) {
 
         // This should be set up correctly when the API route is created
         if (this.hasBody)
             throw new EUnexpected();
 
+        var requestUrl = URI.create(url);
         var request = blankRequest.newBuilderForType();
 
-        var requestUrl = URI.create(url);
-
-        for (var extractor : fieldExtractors)
-            request = extractor.apply(requestUrl, request);
+        for (var extractor : requestFieldExtractors)
+            extractor.apply(requestUrl, request);
 
         return (TRequest) request.build();
     }
 
-    public Message translateRequestBody(ByteBuf bodyBuffer) {
+    @SuppressWarnings("unchecked")
+    public TRequest decodeRestRequest(String url, ByteBuf bodyBuffer) {
 
-        if (!hasBody)
+        // This should be set up correctly when the API route is created
+        if (!this.hasBody)
             throw new EUnexpected();
 
-        var bodyType = (blankBody != null) ? blankBody : blankRequest;
+        var requestUrl = URI.create(url);
+        var request = blankRequest.newBuilderForType();
+
+        for (var extractor : requestFieldExtractors)
+            extractor.apply(requestUrl, request);
+
+        var body = lookupField(request, requestBodyPath);
+        decodeRestBody(bodyBuffer, body);
+
+        return (TRequest) request.build();
+    }
+
+    private void decodeRestBody(ByteBuf bodyBuffer, Message.Builder body) {
 
         try (var jsonStream = new ByteBufInputStream(bodyBuffer);
              var jsonReader = new InputStreamReader(jsonStream)) {
 
-            var bodyBuilder = bodyType.newBuilderForType();
             var jsonParser = JsonFormat.parser();
-            jsonParser.merge(jsonReader, bodyBuilder);
-
-            return bodyBuilder.build();
+            jsonParser.merge(jsonReader, body);
         }
         catch (InvalidProtocolBufferException e) {
+
+            // TODO: error handling
 
             // Validation failures will go back to users (API users, i.e. application developers)
             // Strip out GSON class name from the error message for readability
@@ -157,7 +143,7 @@ public class RestApiTranslator<TRequest extends Message, TRequestBody extends Me
 
             var message = String.format(
                     "Invalid JSON input for type [%s]: %s",
-                    bodyType.getDescriptorForType().getName(),
+                    body.getDescriptorForType().getName(),
                     detailMessage);
 
             log.warn(message);
@@ -171,19 +157,55 @@ public class RestApiTranslator<TRequest extends Message, TRequestBody extends Me
         }
     }
 
-    public String translateResponseBody(Message grpcResponseBody) throws Exception {
+    public ByteBuf encodeGrpcRequest(Message msg, ByteBufAllocator allocator) {
 
-        return JsonFormat.printer().print(grpcResponseBody);
+        return GrpcUtils.encodeLpm(msg, allocator);
     }
 
-    public HttpResponseStatus translateGrpcErrorCode(StatusRuntimeException grpcError) {
+    public TResponse decodeGrpcResponse(ByteBuf bodyBuffer) {
 
-        var grpcCode = grpcError.getStatus().getCode();
+        try {
+            return GrpcUtils.decodeLpm(blankResponse, bodyBuffer);
+        }
+        catch (InvalidProtocolBufferException e) {
+            // TODO: error handling
+            throw new EUnexpected(e);
+        }
 
-        switch (grpcCode) {
+    }
 
-            case UNAVAILABLE:
-                return HttpResponseStatus.SERVICE_UNAVAILABLE;
+    public ByteBuf encodeRestResponse(Message msg) {
+
+        try {
+
+            var responseObject = lookupField(msg, responseBodyPath);
+
+            if (responseObject instanceof Message) {
+
+                var str = JsonFormat.printer().print((Message) responseObject);
+                return Unpooled.wrappedBuffer(str.getBytes(StandardCharsets.UTF_8));
+            }
+            else if (responseObject instanceof ByteString) {
+
+                return Unpooled.wrappedBuffer(((ByteString) responseObject).asReadOnlyByteBuffer());
+            }
+            else {
+
+                throw new ETracInternal("Unsupported response type: " + responseObject.getClass().getName());
+            }
+
+        }
+        catch (InvalidProtocolBufferException e) {
+            throw new EUnexpected(e);
+        }
+    }
+
+    public HttpResponseStatus translateGrpcErrorCode(Status.Code grpcStatusCode) {
+
+        switch (grpcStatusCode) {
+
+            case OK:
+                return HttpResponseStatus.OK;
 
             case UNAUTHENTICATED:
                 return HttpResponseStatus.UNAUTHORIZED;
@@ -203,28 +225,50 @@ public class RestApiTranslator<TRequest extends Message, TRequestBody extends Me
             case FAILED_PRECONDITION:
                 return HttpResponseStatus.PRECONDITION_FAILED;
 
+            case UNAVAILABLE:
+                return HttpResponseStatus.SERVICE_UNAVAILABLE;
+
             default:
                 // For unrecognised errors, send error code 500 with no message
                 return HttpResponseStatus.INTERNAL_SERVER_ERROR;
         }
     }
 
-    public String translateGrpcErrorMessage(StatusRuntimeException grpcError) {
+    private Message.Builder lookupField(Message.Builder message, List<Descriptors.FieldDescriptor> fieldPath) {
+        return lookupField(message, fieldPath, 0);
+    }
 
-        var grpcCode = grpcError.getStatus().getCode();
+    private Message.Builder lookupField(Message.Builder message, List<Descriptors.FieldDescriptor> fieldPath, int fieldPathIndex) {
 
-        switch (grpcCode) {
+        if (fieldPath.size() <= fieldPathIndex)
+            return message;
 
-            case INVALID_ARGUMENT:
-            case NOT_FOUND:
-            case ALREADY_EXISTS:
-            case FAILED_PRECONDITION:
-                return grpcError.getStatus().getDescription();
+        var nextField = fieldPath.get(fieldPathIndex);
+        var nextMessage = message.getFieldBuilder(nextField);
 
-            default:
-                // For unrecognised errors, send error code 500 with no message
-                return null;
-        }
+        return lookupField(nextMessage, fieldPath, fieldPathIndex + 1);
+    }
+
+    private Object lookupField(Message message, List<Descriptors.FieldDescriptor> fieldPath) {
+        return lookupField(message, fieldPath, 0);
+    }
+
+    private Object lookupField(Message message, List<Descriptors.FieldDescriptor> fieldPath, int fieldPathIndex) {
+
+        if (fieldPath.size() <= fieldPathIndex)
+            return message;
+
+        var nextField = fieldPath.get(fieldPathIndex);
+        var nextMessage = message.getField(nextField);
+
+        if (fieldPath.size() == fieldPathIndex + 1)
+            return nextMessage;
+
+        if (nextMessage instanceof Message)
+            return lookupField((Message) nextMessage, fieldPath, fieldPathIndex + 1);
+
+        // Should never happen, errors are detected when the routes are compiled
+        throw new EUnexpected();
     }
 
     private String extractPathSegment(int pathSegmentIndex, URI uri) {

@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Accenture Global Solutions Limited
+ * Copyright 2023 Accenture Global Solutions Limited
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,9 +14,10 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.gateway;
+package org.finos.tracdap.gateway.proxy.http;
 
 import io.netty.bootstrap.Bootstrap;
+import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
@@ -28,6 +29,7 @@ import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.Promise;
 
 import java.net.InetAddress;
+import java.util.Map;
 
 
 public class Http1Client {
@@ -56,6 +58,10 @@ public class Http1Client {
     }
 
     public Future<? extends HttpResponse> headRequest(String path) {
+        return headRequest(path, Map.of());
+    }
+
+    public Future<? extends HttpResponse> headRequest(String path, Map<CharSequence, Object> requestHeaders) {
 
         try {
 
@@ -73,7 +79,9 @@ public class Http1Client {
             var request = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.HEAD, path, Unpooled.EMPTY_BUFFER);
             request.headers().set(HttpHeaderNames.HOST, host);
             request.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
-            request.headers().set(HttpHeaderNames.ACCEPT_ENCODING, HttpHeaderValues.GZIP);
+
+            for (var header : requestHeaders.entrySet())
+                request.headers().set(header.getKey(), header.getValue());
 
             channel.writeAndFlush(request);
 
@@ -86,6 +94,10 @@ public class Http1Client {
     }
 
     public Future<? extends FullHttpResponse> getRequest(String path) {
+        return getRequest(path, Map.of());
+    }
+
+    public Future<? extends FullHttpResponse> getRequest(String path, Map<CharSequence, Object> requestHeaders) {
 
         try {
 
@@ -103,7 +115,44 @@ public class Http1Client {
             var request = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, path, Unpooled.EMPTY_BUFFER);
             request.headers().set(HttpHeaderNames.HOST, host);
             request.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
-            request.headers().set(HttpHeaderNames.ACCEPT_ENCODING, HttpHeaderValues.GZIP);
+
+            for (var header : requestHeaders.entrySet())
+                request.headers().set(header.getKey(), header.getValue());
+
+            channel.writeAndFlush(request);
+
+            return responseFuture;
+        }
+        catch (InterruptedException e) {
+
+            return clientGroup.next().newFailedFuture(e);
+        }
+    }
+
+    public Future<? extends FullHttpResponse> postRequest(
+            String path, Map<CharSequence, Object> requestHeaders,
+            ByteBuf requestBody) {
+
+        try {
+
+            // Make the connection attempt.
+            var clientInit = new ClientInitializer();
+            var channel = this.clientBootstrap
+                    .handler(clientInit)
+                    .connect(host, port)
+                    .sync()
+                    .channel();
+
+            var responseFuture = clientInit.getResponseFuture();
+
+            // Prepare the HTTP request.
+            var request = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST, path, requestBody);
+            request.headers().set(HttpHeaderNames.HOST, host);
+            request.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
+            request.headers().set(HttpHeaderNames.CONTENT_LENGTH, requestBody.readableBytes());
+
+            for (var header : requestHeaders.entrySet())
+                request.headers().set(header.getKey(), header.getValue());
 
             channel.writeAndFlush(request);
 
@@ -130,7 +179,7 @@ public class Http1Client {
 
             p.addLast(new HttpClientCodec());
             p.addLast(new HttpContentDecompressor());  // Use automatic content decompression
-            p.addLast(new HttpObjectAggregator(1048576));  // Automatic response aggregation up to a fixed limit
+            p.addLast(new HttpObjectAggregator(50 * 1048576));  // Response aggregation up to 50 MB for testing
 
             response = ch.eventLoop().newPromise();
             p.addLast(new ClientHandler(response));

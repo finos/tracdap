@@ -29,7 +29,7 @@ public class Route {
 
     private final IRouteMatcher matcher;
 
-    private final List<RestApiMethod<?, ?, ?>> restMethods;
+    private final List<RestApiMethod<?, ?>> restMethods;
 
     public Route(int index, GwRoute config, IRouteMatcher matcher) {
         this(index, config, matcher, null);
@@ -38,7 +38,7 @@ public class Route {
     public Route(
             int index, GwRoute config,
             IRouteMatcher matcher,
-            List<RestApiMethod<?, ?, ?>> restMethods) {
+            List<RestApiMethod<?, ?>> restMethods) {
 
         this.config = config;
         this.index = index;
@@ -58,7 +58,7 @@ public class Route {
         return matcher;
     }
 
-    public List<RestApiMethod<?, ?, ?>> getRestMethods() {
+    public List<RestApiMethod<?, ?>> getRestMethods() {
         return restMethods;
     }
 }

@@ -68,6 +68,7 @@ public abstract class DataRoundTripTest {
 
     private static final String TEST_TENANT = "ACME_CORP";
     private static final String E2E_CONFIG = "config/trac-e2e.yaml";
+    private static final String GW_CONFIG = "config/trac-gw-unit.yaml";
 
     // Pandas / NumPy native dates and timestamps are encoded as 64-bit nanoseconds around the Unix epoch
     private static final LocalDateTime MIN_PANDAS_TIMESTAMP = LocalDateTime
@@ -96,7 +97,7 @@ public abstract class DataRoundTripTest {
     private final Logger log = LoggerFactory.getLogger(getClass());
 
     @RegisterExtension
-    private final PlatformTest platform = PlatformTest.forConfig(E2E_CONFIG)
+    public final PlatformTest platform = PlatformTest.forConfig(E2E_CONFIG, GW_CONFIG)
             .addTenant(TEST_TENANT)
             .storageFormat(storageFormat())
             .startAll()

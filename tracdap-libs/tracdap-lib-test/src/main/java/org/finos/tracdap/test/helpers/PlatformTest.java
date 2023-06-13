@@ -35,6 +35,7 @@ import org.finos.tracdap.tools.deploy.metadb.DeployMetaDB;
 import org.finos.tracdap.svc.data.TracDataService;
 import org.finos.tracdap.svc.meta.TracMetadataService;
 import org.finos.tracdap.svc.orch.TracOrchestratorService;
+import org.finos.tracdap.gateway.TracPlatformGateway;
 import org.finos.tracdap.test.config.ConfigHelpers;
 import io.grpc.netty.NettyChannelBuilder;
 import org.junit.jupiter.api.extension.AfterAllCallback;
@@ -75,6 +76,7 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
     private final Logger log = LoggerFactory.getLogger(getClass());
 
     private final String testConfig;
+    private final String gatewayConfig;
     private final List<String> tenants;
     private final String storageFormat;
 
@@ -82,37 +84,47 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
     private final boolean startMeta;
     private final boolean startData;
     private final boolean startOrch;
+    private final boolean startGateway;
 
     private String authToken;
 
     private PlatformTest(
-            String testConfig, List<String> tenants, String storageFormat,
-            boolean runDbDeploy, boolean startMeta, boolean startData, boolean startOrch) {
+            String testConfig, String gatewayConfig, List<String> tenants, String storageFormat,
+            boolean runDbDeploy, boolean startMeta, boolean startData, boolean startOrch, boolean startGateway) {
 
         this.testConfig = testConfig;
+        this.gatewayConfig = gatewayConfig;
         this.tenants = tenants;
         this.storageFormat = storageFormat;
         this.runDbDeploy = runDbDeploy;
         this.startMeta = startMeta;
         this.startData = startData;
         this.startOrch = startOrch;
+        this.startGateway = startGateway;
+    }
+
+    public static Builder forConfig(String testConfig, String gatewayConfig) {
+        var builder = new Builder();
+        builder.testConfig = testConfig;
+        builder.gatewayConfig = gatewayConfig;
+        return builder;
     }
 
     public static Builder forConfig(String testConfig) {
-        var builder = new Builder();
-        builder.testConfig = testConfig;
-        return builder;
+        return forConfig(testConfig, null);
     }
 
     public static class Builder {
 
         private String testConfig;
+        private String gatewayConfig;
         private final List<String> tenants = new ArrayList<>();
         private String storageFormat = DEFAULT_STORAGE_FORMAT;
         private boolean runDbDeploy = true;  // Run DB deploy by default
         private boolean startMeta;
         private boolean startData;
         private boolean startOrch;
+        private boolean startGateway;
 
         public Builder addTenant(String testTenant) { this.tenants.add(testTenant); return this; }
         public Builder storageFormat(String storageFormat) { this.storageFormat = storageFormat; return this; }
@@ -120,13 +132,14 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         public Builder startMeta() { startMeta = true; return this; }
         public Builder startData() { startData = true; return this; }
         public Builder startOrch() { startOrch = true; return this; }
-        public Builder startAll() { return startMeta().startData().startOrch(); }
+        public Builder startGateway() { startGateway = true; return this; }
+        public Builder startAll() { return startMeta().startData().startOrch().startGateway(); }
 
         public PlatformTest build() {
 
             return new PlatformTest(
-                    testConfig, tenants, storageFormat,
-                    runDbDeploy, startMeta, startData, startOrch);
+                    testConfig, gatewayConfig, tenants, storageFormat,
+                    runDbDeploy, startMeta, startData, startOrch, startGateway);
         }
     }
 
@@ -136,12 +149,14 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
     private Path tracExecDir;
     private Path tracRepoDir;
     private URL platformConfigUrl;
+    private URL gatewayConfigUrl;
     private String secretKey;
     private PlatformConfig platformConfig;
 
     private TracMetadataService metaSvc;
     private TracDataService dataSvc;
     private TracOrchestratorService orchSvc;
+    private TracPlatformGateway gatewaySvc;
 
     private ManagedChannel metaChannel;
     private ManagedChannel dataChannel;
@@ -289,9 +304,10 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
             }
         }
 
-        platformConfigUrl = ConfigHelpers.prepareConfig(
-                testConfig, tracDir,
-                substitutions);
+        var configInputs = gatewayConfig != null ? List.of(testConfig, gatewayConfig) : List.of(testConfig);
+        var configOutputs = ConfigHelpers.prepareConfig(configInputs, tracDir, substitutions);
+        platformConfigUrl = configOutputs.get(0);
+        gatewayConfigUrl = gatewayConfig != null ? configOutputs.get(1) : null;
 
         // The Secret key is used for storing and accessing secrets
         // If secrets are set up externally, a key can be passed in the env to access the secret store
@@ -449,9 +465,15 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
 
         if (startOrch)
             orchSvc = ServiceHelpers.startService(TracOrchestratorService.class, tracDir, platformConfigUrl, secretKey);
+
+        if (startGateway)
+            gatewaySvc = ServiceHelpers.startService(TracPlatformGateway.class, tracDir, gatewayConfigUrl, secretKey);
     }
 
     void stopServices() {
+
+        if (gatewaySvc != null)
+            gatewaySvc.stop();
 
         if (orchSvc != null)
             orchSvc.stop();
