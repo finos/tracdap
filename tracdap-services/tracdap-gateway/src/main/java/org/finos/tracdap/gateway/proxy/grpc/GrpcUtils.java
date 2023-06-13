@@ -127,23 +127,6 @@ public class GrpcUtils {
         return headers;
     }
 
-    public static ByteBuf lpmHeaders(HttpHeaders headers, ByteBufAllocator allocator) {
-
-        var builder = new StringBuilder();
-
-        for (var header : headers) {
-
-            builder.append(header.getKey());
-            builder.append(": ");
-            builder.append(header.getValue());
-            builder.append("\r\n");
-        }
-
-        // Do not append a final \r\n, as per https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-WEB.md
-
-        return asciiToLpm(builder, allocator);
-    }
-
     public static ByteBuf lpmHeaders(Http2Headers headers, ByteBufAllocator allocator) {
 
         var builder = new StringBuilder();
