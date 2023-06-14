@@ -151,7 +151,7 @@ public class MetadataWriteService {
             var tag = prepareCreateObject(
                     UUID.randomUUID(),
                     request.getDefinition(),
-                    getTagUpdatesInsideBatch(request, List.of())
+                    request.getTagUpdatesList()
             );
             newTags.add(tag);
         }
@@ -213,7 +213,7 @@ public class MetadataWriteService {
                     userInfo,
                     priorTags.get(i),
                     request.getDefinition(),
-                    getTagUpdatesInsideBatch(request, List.of())
+                    request.getTagUpdatesList()
             );
             newTags.add(newTag);
         }
@@ -270,7 +270,7 @@ public class MetadataWriteService {
 
             var tag = prepareUpdateTag(
                     priorTags.get(i),
-                    getTagUpdatesInsideBatch(request, List.of())
+                    request.getTagUpdatesList()
             );
             newTags.add(tag);
         }
@@ -310,7 +310,7 @@ public class MetadataWriteService {
             var tag = prepareCreateObject(
                     objectId,
                     request.getDefinition(),
-                    getTagUpdatesInsideBatch(request, List.of())
+                    request.getTagUpdatesList()
             );
             tags.add(tag);
         }
@@ -319,13 +319,6 @@ public class MetadataWriteService {
         result.tagHeaders = tags.stream().map(Tag::getHeader).collect(Collectors.toList());
         result.writeOperation = new SavePreallocatedObject(tags);
         return result;
-    }
-
-    private static List<TagUpdate> getTagUpdatesInsideBatch(MetadataWriteRequest r, List<TagUpdate> batchTagUpdates) {
-        var tagUpdates = new ArrayList<>(r.getTagUpdatesList());
-        tagUpdates.addAll(batchTagUpdates);
-
-        return tagUpdates;
     }
 
     private List<TagUpdate> commonCreateAttrs(
