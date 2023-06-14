@@ -53,7 +53,7 @@ public class MetadataWriteService {
 
         var newIds = processPreallocatedIds(List.of(request));
 
-        dal.savePreallocatedIds(tenant, newIds;
+        dal.savePreallocatedIds(tenant, newIds);
 
         return newIds.get(0);
     }
@@ -113,22 +113,22 @@ public class MetadataWriteService {
         var userInfo = AuthHelpers.currentUser();
         var timestamp = Instant.now().atOffset(ZoneOffset.UTC);
 
+        var preallocatedIds = processPreallocatedIds(request.getPreallocateIdsList());
+        var preallocatedObjects = processPreallocatedObjects(request.getCreatePreallocatedList(), userInfo, timestamp);
         var newObjects = processNewObjects(request.getCreateObjectsList(), userInfo, timestamp);
         var newVersions = processNewVersions(tenant, request.getUpdateObjectsList(), userInfo, timestamp);
         var newTags = processNewTags(tenant, request.getUpdateTagsList(), userInfo, timestamp);
-        var preallocatedIds = processPreallocatedIds(request.getPreallocateIdsList());
-        var preallocatedObjects = processPreallocatedObjects(request.getCreatePreallocatedList(), userInfo, timestamp);
 
         var batchUpdate = new MetadataBatchUpdate(
-                newObjects, newVersions, newTags,
-                preallocatedIds, preallocatedObjects);
+                preallocatedIds, preallocatedObjects,
+                newObjects, newVersions, newTags);
 
         dal.saveBatchUpdate(request.getTenant(), batchUpdate);
 
+        var preallocatedObjectIds = preallocatedObjects.stream().map(Tag::getHeader).collect(Collectors.toList());
         var newObjectIds = newObjects.stream().map(Tag::getHeader).collect(Collectors.toList());
         var newVersionIds = newVersions.stream().map(Tag::getHeader).collect(Collectors.toList());
         var newTagIds = newTags.stream().map(Tag::getHeader).collect(Collectors.toList());
-        var preallocatedObjectIds = preallocatedObjects.stream().map(Tag::getHeader).collect(Collectors.toList());
 
         return MetadataWriteBatchResponse.newBuilder()
                 .addAllPreallocateIds(preallocatedIds)

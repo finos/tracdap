@@ -17,8 +17,8 @@
 package org.finos.tracdap.svc.meta.dal;
 
 import org.finos.tracdap.metadata.*;
-import org.finos.tracdap.svc.meta.dal.operations.DalWriteOperation;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -31,14 +31,11 @@ public interface IMetadataDal {
 
     List<TenantInfo> listTenants();
 
-    /**
-     * Run operations in a batch fashion.
-     * Each operation in the list represents a batch write operation.
-     *
-     * @param tenant Tenant name.
-     * @param operations List of operations to do.
-     */
-    void runWriteOperations(String tenant, List<DalWriteOperation> operations);
+    void saveBatchUpdate(String tenant, MetadataBatchUpdate batchUpdate);
+
+    void savePreallocatedIds(String tenant, List<TagHeader> ids);
+
+    void savePreallocatedObjects(String tenant, List<Tag> tags);
 
     void saveNewObjects(String tenant, List<Tag> tags);
 
@@ -46,26 +43,44 @@ public interface IMetadataDal {
 
     void saveNewTags(String tenant, List<Tag> tags);
 
-    void preallocateObjectIds(String tenant, List<ObjectType> objectTypes, List<UUID> objectIds);
-
-    void savePreallocatedObjects(String tenant, List<Tag> tags);
-
     Tag loadObject(String tenant, TagSelector selector);
 
     List<Tag> loadObjects(String tenant, List<TagSelector> selector);
 
-    Tag loadTag(String tenant, ObjectType objectType, UUID objectId, int objectVersion, int tagVersion);
-
-    List<Tag> loadTags(String tenant, List<ObjectType> objectType, List<UUID> objectId, List<Integer> objectVersion, List<Integer> tagVersion);
-
-    Tag loadLatestTag(String tenant, ObjectType objectType, UUID objectId, int objectVersion);
-
-    List<Tag> loadLatestTags(String tenant, List<ObjectType> objectType, List<UUID> objectId, List<Integer> objectVersion);
-
-    Tag loadLatestVersion(String tenant, ObjectType objectType, UUID objectId);
-
-    List<Tag> loadLatestVersions(String tenant, List<ObjectType> objectType, List<UUID> objectId);
-
     List<Tag> search(String tenant, SearchParameters searchParameters);
 
+    // -----------------------------------------------------------------------------------------------------------------
+    // LEGACY LOAD METHODS
+    // -----------------------------------------------------------------------------------------------------------------
+
+    default Tag loadTag(String tenant, ObjectType objectType, UUID objectId, int objectVersion, int tagVersion) {
+
+        var selector = TagSelector.newBuilder()
+                .setObjectType(objectType)
+                .setObjectId(objectId.toString())
+                .setObjectVersion(objectVersion)
+                .setTagVersion(tagVersion)
+                .build();
+
+        return loadObject(tenant, selector);
+    }
+
+    default List<Tag> loadTags(String tenant, List<ObjectType> objectTypes, List<UUID> objectIds, List<Integer> objectVersions, List<Integer> tagVersions) {
+
+        var selectors = new ArrayList<TagSelector>(objectIds.size());
+
+        for (int i = 0; i < objectIds.size(); i++) {
+
+            var selector = TagSelector.newBuilder()
+                    .setObjectType(objectTypes.get(i))
+                    .setObjectId(objectIds.get(i).toString())
+                    .setObjectVersion(objectVersions.get(i))
+                    .setTagVersion(tagVersions.get(i))
+                    .build();
+
+            selectors.add(selector);
+        }
+
+        return loadObjects(tenant, selectors);
+    }
 }
