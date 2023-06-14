@@ -26,13 +26,12 @@ import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.metadata.MetadataConstants;
 import org.finos.tracdap.common.validation.Validator;
 import org.finos.tracdap.svc.meta.dal.IMetadataDal;
-import org.finos.tracdap.svc.meta.dal.operations.*;
+import org.finos.tracdap.svc.meta.dal.MetadataBatchUpdate;
 
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -50,124 +49,224 @@ public class MetadataWriteService {
         this.dal = dal;
     }
 
-    public TagHeader createObject(String tenant, MetadataWriteRequest request) {
+    public TagHeader preallocateId(String tenant, MetadataWriteRequest request) {
 
-        return executeWriteOperation(
-                tenant,
-                createObjectsWriteOperation(List.of(request))
-        ).get(0);
-    }
+        var newIds = processPreallocatedIds(List.of(request));
 
-    public TagHeader updateObject(String tenant, MetadataWriteRequest request) {
+        dal.savePreallocatedIds(tenant, newIds;
 
-        return executeWriteOperation(
-                tenant,
-                updateObjectsWriteOperation(tenant, List.of(request))
-        ).get(0);
-    }
-
-
-
-    public TagHeader updateTag(String tenant, MetadataWriteRequest request) {
-
-        return executeWriteOperation(
-                tenant,
-                updateTagsWriteOperation(tenant, List.of(request))
-        ).get(0);
-    }
-
-    public TagHeader preallocateId(String tenant, ObjectType objectType) {
-
-        var objectId = UUID.randomUUID();
-
-        dal.preallocateObjectIds(tenant, List.of(objectType), List.of(objectId));
-
-        return TagHeader.newBuilder()
-                .setObjectType(objectType)
-                .setObjectId(objectId.toString())
-                .build();
+        return newIds.get(0);
     }
 
     public TagHeader createPreallocatedObject(String tenant, MetadataWriteRequest request) {
 
-        return executeWriteOperation(
-                tenant,
-                createPreallocatedObjectsWriteOperation(List.of(request))
-        ).get(0);
+        var userInfo = AuthHelpers.currentUser();
+        var timestamp = Instant.now().atOffset(ZoneOffset.UTC);
+
+        var preallocatedObjects = processPreallocatedObjects(List.of(request), userInfo, timestamp);
+
+        dal.savePreallocatedObjects(tenant, preallocatedObjects);
+
+        return preallocatedObjects.get(0).getHeader();
+    }
+
+    public TagHeader createObject(String tenant, MetadataWriteRequest request) {
+
+        var userInfo = AuthHelpers.currentUser();
+        var timestamp = Instant.now().atOffset(ZoneOffset.UTC);
+
+        var newObjects = processNewObjects(List.of(request), userInfo, timestamp);
+
+        dal.saveNewObjects(tenant, newObjects);
+
+        return newObjects.get(0).getHeader();
+    }
+
+    public TagHeader updateObject(String tenant, MetadataWriteRequest request) {
+
+        var userInfo = AuthHelpers.currentUser();
+        var timestamp = Instant.now().atOffset(ZoneOffset.UTC);
+
+        var newVersions = processNewVersions(tenant, List.of(request), userInfo, timestamp);
+
+        dal.saveNewVersions(tenant, newVersions);
+
+        return newVersions.get(0).getHeader();
+    }
+
+    public TagHeader updateTag(String tenant, MetadataWriteRequest request) {
+
+        var userInfo = AuthHelpers.currentUser();
+        var timestamp = Instant.now().atOffset(ZoneOffset.UTC);
+
+        var newTags = processNewTags(tenant, List.of(request), userInfo, timestamp);
+
+        dal.saveNewTags(tenant, newTags);
+
+        return newTags.get(0).getHeader();
     }
 
     public MetadataWriteBatchResponse writeBatch(MetadataWriteBatchRequest request) {
 
         var tenant = request.getTenant();
-        var writeOperations = new ArrayList<WriteOperation>();
-
-        var resultBuilder = MetadataWriteBatchResponse.newBuilder();
-
-        if (request.getCreatePreallocatedCount() > 0) {
-            var requests = request.getCreatePreallocatedList();
-            var opers = createPreallocatedObjectsWriteOperation(requests);
-            resultBuilder.addAllCreatePreallocated(opers.tagHeaders);
-            writeOperations.add(opers);
-        }
-
-        if (request.getCreateObjectsCount() > 0) {
-            var requests = request.getCreateObjectsList();
-            var opers = createObjectsWriteOperation(requests);
-            resultBuilder.addAllCreateObjects(opers.tagHeaders);
-            writeOperations.add(opers);
-        }
-
-        if (request.getUpdateObjectsCount() > 0) {
-            var requests = request.getUpdateObjectsList();
-            var opers = updateObjectsWriteOperation(tenant, requests);
-            resultBuilder.addAllUpdateObjects(opers.tagHeaders);
-            writeOperations.add(opers);
-        }
-
-        if (request.getUpdateTagsCount() > 0) {
-            var requests = request.getUpdateTagsList();
-            var opers = updateTagsWriteOperation(tenant, requests);
-            resultBuilder.addAllUpdateTags(opers.tagHeaders);
-            writeOperations.add(opers);
-        }
-
-        dal.runWriteOperations(
-                tenant,
-                writeOperations.stream().map(w -> w.writeOperation).collect(Collectors.toList())
-        );
-
-        return resultBuilder.build();
-    }
-
-    private List<TagHeader> executeWriteOperation(String tenant, WriteOperation oper) {
-        dal.runWriteOperations(tenant, Collections.singletonList(oper.writeOperation));
-        return oper.tagHeaders;
-    }
-
-    private WriteOperation createObjectsWriteOperation(List<MetadataWriteRequest> requests) {
-        var newTags = new ArrayList<Tag>();
-        for (var request : requests) {
-
-            var tag = prepareCreateObject(
-                    UUID.randomUUID(),
-                    request.getDefinition(),
-                    request.getTagUpdatesList()
-            );
-            newTags.add(tag);
-        }
-
-        var result = new WriteOperation();
-        result.tagHeaders = newTags.stream().map(Tag::getHeader).collect(Collectors.toList());
-        result.writeOperation = new SaveNewObject(newTags);
-        return result;
-    }
-
-    private Tag prepareCreateObject(UUID objectId, ObjectDefinition definition, List<TagUpdate> tagUpdates) {
 
         var userInfo = AuthHelpers.currentUser();
-        var userId = userInfo.getUserId();
-        var userName = userInfo.getDisplayName();
         var timestamp = Instant.now().atOffset(ZoneOffset.UTC);
+
+        var newObjects = processNewObjects(request.getCreateObjectsList(), userInfo, timestamp);
+        var newVersions = processNewVersions(tenant, request.getUpdateObjectsList(), userInfo, timestamp);
+        var newTags = processNewTags(tenant, request.getUpdateTagsList(), userInfo, timestamp);
+        var preallocatedIds = processPreallocatedIds(request.getPreallocateIdsList());
+        var preallocatedObjects = processPreallocatedObjects(request.getCreatePreallocatedList(), userInfo, timestamp);
+
+        var batchUpdate = new MetadataBatchUpdate(
+                newObjects, newVersions, newTags,
+                preallocatedIds, preallocatedObjects);
+
+        dal.saveBatchUpdate(request.getTenant(), batchUpdate);
+
+        var newObjectIds = newObjects.stream().map(Tag::getHeader).collect(Collectors.toList());
+        var newVersionIds = newVersions.stream().map(Tag::getHeader).collect(Collectors.toList());
+        var newTagIds = newTags.stream().map(Tag::getHeader).collect(Collectors.toList());
+        var preallocatedObjectIds = preallocatedObjects.stream().map(Tag::getHeader).collect(Collectors.toList());
+
+        return MetadataWriteBatchResponse.newBuilder()
+                .addAllPreallocateIds(preallocatedIds)
+                .addAllCreatePreallocated(preallocatedObjectIds)
+                .addAllCreateObjects(newObjectIds)
+                .addAllUpdateObjects(newVersionIds)
+                .addAllUpdateTags(newTagIds)
+                .build();
+    }
+
+    private List<TagHeader> processPreallocatedIds(List<MetadataWriteRequest> requests) {
+
+        var preallocatedIds = new ArrayList<TagHeader>(requests.size());
+
+        for (var request : requests) {
+
+            // TODO: One function to allocate / log new IDs
+            var objectId = UUID.randomUUID();
+
+            var preallocatedId = TagHeader.newBuilder()
+                    .setObjectType(request.getObjectType())
+                    .setObjectId(objectId.toString())
+                    .build();
+
+            preallocatedIds.add(preallocatedId);
+        }
+
+        return preallocatedIds;
+    }
+
+    private List<Tag> processPreallocatedObjects(
+            List<MetadataWriteRequest> requests,
+            UserInfo userInfo, OffsetDateTime timestamp) {
+
+        var preallocatedObjects = new ArrayList<Tag>(requests.size());
+
+        for (var request : requests) {
+
+            var objectId = UUID.fromString(request.getPriorVersion().getObjectId());
+
+            var preallocatedObject = buildNewObject(
+                    objectId,
+                    request.getDefinition(),
+                    request.getTagUpdatesList(),
+                    userInfo,
+                    timestamp);
+
+            preallocatedObjects.add(preallocatedObject);
+        }
+
+        return preallocatedObjects;
+    }
+
+    private List<Tag> processNewObjects(
+            List<MetadataWriteRequest> requests,
+            UserInfo userInfo, OffsetDateTime timestamp) {
+
+        var newObjects = new ArrayList<Tag>(requests.size());
+
+        for (var request : requests) {
+
+            // TODO: One function to allocate / log new IDs
+            var objectId = UUID.randomUUID();
+
+            var newObject = buildNewObject(
+                    objectId,
+                    request.getDefinition(),
+                    request.getTagUpdatesList(),
+                    userInfo,
+                    timestamp);
+
+            newObjects.add(newObject);
+        }
+
+        return newObjects;
+    }
+
+    private List<Tag> processNewVersions(
+            String tenant, List<MetadataWriteRequest> requests,
+            UserInfo userInfo, OffsetDateTime timestamp) {
+
+        var priorIds = requests.stream().map(MetadataWriteRequest::getPriorVersion).collect(Collectors.toList());
+        var priorVersions = dal.loadObjects(tenant, priorIds);
+
+        var newVersions = new ArrayList<Tag>(requests.size());
+
+        for (var i = 0; i < requests.size(); i++) {
+
+            var request = requests.get(i);
+            var priorVersion = priorVersions.get(i);
+
+            // TODO: Validate for all and collect errors?
+            validator.validateVersion(
+                    request.getDefinition(),
+                    priorVersion.getDefinition());
+
+            var newObject = buildNewVersion(
+                    priorVersion,
+                    request.getDefinition(),
+                    request.getTagUpdatesList(),
+                    userInfo,
+                    timestamp);
+
+            newVersions.add(newObject);
+        }
+
+        return newVersions;
+    }
+
+    private List<Tag> processNewTags(
+            String tenant, List<MetadataWriteRequest> requests,
+            UserInfo userInfo, OffsetDateTime timestamp) {
+
+        var priorIds = requests.stream().map(MetadataWriteRequest::getPriorVersion).collect(Collectors.toList());
+        var priorTags = dal.loadObjects(tenant, priorIds);
+
+        var newTags = new ArrayList<Tag>(requests.size());
+
+        for (var i = 0; i < requests.size(); i++) {
+
+            var request = requests.get(i);
+            var priorTag = priorTags.get(i);
+
+            var newTag = buildNewTag(
+                    priorTag,
+                    request.getTagUpdatesList(),
+                    userInfo,
+                    timestamp);
+
+            newTags.add(newTag);
+        }
+
+        return newTags;
+    }
+
+    private Tag buildNewObject(
+            UUID objectId, ObjectDefinition definition, List<TagUpdate> tagUpdates,
+            UserInfo userInfo, OffsetDateTime timestamp) {
 
         var newHeader = TagHeader.newBuilder()
                 .setObjectType(definition.getObjectType())
@@ -188,49 +287,21 @@ public class MetadataWriteService {
         newTag = TagUpdateService.applyTagUpdates(newTag, tagUpdates);
 
         // Apply the common controlled trac_ tags for newly created objects
+
+        var userId = userInfo.getUserId();
+        var userName = userInfo.getDisplayName();
         var createAttrs = commonCreateAttrs(timestamp, userId, userName);
         var updateAttrs = commonUpdateAttrs(timestamp, userId, userName);
+
         newTag = TagUpdateService.applyTagUpdates(newTag, createAttrs);
         newTag = TagUpdateService.applyTagUpdates(newTag, updateAttrs);
 
         return newTag;
     }
 
-    private WriteOperation updateObjectsWriteOperation(String tenant, List<MetadataWriteRequest> requests) {
-
-        var userInfo = AuthHelpers.currentUser();
-
-        var priorVersions = requests.stream()
-                .map(MetadataWriteRequest::getPriorVersion)
-                .collect(Collectors.toList());
-        var priorTags = dal.loadObjects(tenant, priorVersions);
-
-        var newTags = new ArrayList<Tag>();
-        for (int i = 0; i < requests.size(); i++) {
-            var request = requests.get(i);
-
-            var newTag = prepareUpdateObject(
-                    userInfo,
-                    priorTags.get(i),
-                    request.getDefinition(),
-                    request.getTagUpdatesList()
-            );
-            newTags.add(newTag);
-        }
-
-        var result = new WriteOperation();
-        result.tagHeaders = newTags.stream().map(Tag::getHeader).collect(Collectors.toList());
-        result.writeOperation = new SaveNewVersion(newTags);
-        return result;
-    }
-
-    private Tag prepareUpdateObject(UserInfo userInfo, Tag priorTag, ObjectDefinition definition, List<TagUpdate> tagUpdates) {
-        // Validate version increment on the object
-        validator.validateVersion(definition, priorTag.getDefinition());
-
-        var userId = userInfo.getUserId();
-        var userName = userInfo.getDisplayName();
-        var timestamp = Instant.now().atOffset(ZoneOffset.UTC);
+    private Tag buildNewVersion(
+            Tag priorTag, ObjectDefinition definition, List<TagUpdate> tagUpdates,
+            UserInfo userInfo, OffsetDateTime timestamp) {
 
         var oldHeader = priorTag.getHeader();
 
@@ -251,39 +322,21 @@ public class MetadataWriteService {
         newTag = TagUpdateService.applyTagUpdates(newTag, tagUpdates);
 
         // Apply the common controlled trac_ tags for updated objects
+
+        var userId = userInfo.getUserId();
+        var userName = userInfo.getDisplayName();
         var commonAttrs = commonUpdateAttrs(timestamp, userId, userName);
+
         newTag = TagUpdateService.applyTagUpdates(newTag, commonAttrs);
 
         return newTag;
     }
 
-    private WriteOperation updateTagsWriteOperation(String tenant, List<MetadataWriteRequest> requests) {
+    private static Tag buildNewTag(
+            Tag priorTag, List<TagUpdate> tagUpdates,
+            UserInfo userInfo, OffsetDateTime timestamp) {
 
-        var priorVersions = requests.stream()
-                .map(MetadataWriteRequest::getPriorVersion)
-                .collect(Collectors.toList());
-        var priorTags = dal.loadObjects(tenant, priorVersions);
-
-        var newTags = new ArrayList<Tag>();
-        for (int i = 0; i < requests.size(); i++) {
-            var request = requests.get(i);
-
-            var tag = prepareUpdateTag(
-                    priorTags.get(i),
-                    request.getTagUpdatesList()
-            );
-            newTags.add(tag);
-        }
-
-
-        var result = new WriteOperation();
-        result.tagHeaders = newTags.stream().map(Tag::getHeader).collect(Collectors.toList());
-        result.writeOperation = new SaveNewTag(newTags);
-        return result;
-    }
-
-    private static Tag prepareUpdateTag(Tag priorTag, List<TagUpdate> tagUpdates) {
-        var timestamp = Instant.now().atOffset(ZoneOffset.UTC);
+        // TODO: Record user info for tag-only updates
 
         var oldHeader = priorTag.getHeader();
 
@@ -298,30 +351,11 @@ public class MetadataWriteService {
                 .build();
 
         newTag = TagUpdateService.applyTagUpdates(newTag, tagUpdates);
+
         return newTag;
     }
 
-    private WriteOperation createPreallocatedObjectsWriteOperation(List<MetadataWriteRequest> requests) {
-
-        var tags = new ArrayList<Tag>();
-
-        for (var request : requests) {
-            var objectId = UUID.fromString(request.getPriorVersion().getObjectId());
-            var tag = prepareCreateObject(
-                    objectId,
-                    request.getDefinition(),
-                    request.getTagUpdatesList()
-            );
-            tags.add(tag);
-        }
-
-        var result = new WriteOperation();
-        result.tagHeaders = tags.stream().map(Tag::getHeader).collect(Collectors.toList());
-        result.writeOperation = new SavePreallocatedObject(tags);
-        return result;
-    }
-
-    private List<TagUpdate> commonCreateAttrs(
+    private static List<TagUpdate> commonCreateAttrs(
             OffsetDateTime createTime,
             String createUserId,
             String createUserName) {
@@ -344,7 +378,7 @@ public class MetadataWriteService {
         return List.of(createTimeAttr, createUserIdAttr, createUserNameAttr);
     }
 
-    private List<TagUpdate> commonUpdateAttrs(
+    private static List<TagUpdate> commonUpdateAttrs(
             OffsetDateTime createTime,
             String createUserId,
             String createUserName) {
@@ -366,10 +400,4 @@ public class MetadataWriteService {
 
         return List.of(updateTimeAttr, updateUserIdAttr, updateUserNameAttr);
     }
-
-    private static class WriteOperation {
-        DalWriteOperation writeOperation;
-        List<TagHeader> tagHeaders;
-    }
-
 }
