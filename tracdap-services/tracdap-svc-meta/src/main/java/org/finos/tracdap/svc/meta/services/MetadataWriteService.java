@@ -54,10 +54,7 @@ public class MetadataWriteService {
 
         return executeWriteOperation(
                 tenant,
-                createObjectsWriteOperation(
-                        List.of(request),
-                        List.of()
-                )
+                createObjectsWriteOperation(List.of(request))
         ).get(0);
     }
 
@@ -65,11 +62,7 @@ public class MetadataWriteService {
 
         return executeWriteOperation(
                 tenant,
-                updateObjectsWriteOperation(
-                        tenant,
-                        List.of(request),
-                        List.of()
-                )
+                updateObjectsWriteOperation(tenant, List.of(request))
         ).get(0);
     }
 
@@ -79,11 +72,7 @@ public class MetadataWriteService {
 
         return executeWriteOperation(
                 tenant,
-                updateTagsWriteOperation(
-                        tenant,
-                        List.of(request),
-                        List.of()
-                )
+                updateTagsWriteOperation(tenant, List.of(request))
         ).get(0);
     }
 
@@ -103,9 +92,7 @@ public class MetadataWriteService {
 
         return executeWriteOperation(
                 tenant,
-                createPreallocatedObjectsWriteOperation(
-                        List.of(request), List.of()
-                )
+                createPreallocatedObjectsWriteOperation(List.of(request))
         ).get(0);
     }
 
@@ -118,39 +105,28 @@ public class MetadataWriteService {
 
         if (request.getCreatePreallocatedCount() > 0) {
             var requests = request.getCreatePreallocatedList();
-            var opers = createPreallocatedObjectsWriteOperation(requests, Collections.emptyList());
+            var opers = createPreallocatedObjectsWriteOperation(requests);
             resultBuilder.addAllCreatePreallocated(opers.tagHeaders);
             writeOperations.add(opers);
         }
 
         if (request.getCreateObjectsCount() > 0) {
             var requests = request.getCreateObjectsList();
-            var opers = createObjectsWriteOperation(
-                    requests,
-                    Collections.emptyList()
-            );
+            var opers = createObjectsWriteOperation(requests);
             resultBuilder.addAllCreateObjects(opers.tagHeaders);
             writeOperations.add(opers);
         }
 
         if (request.getUpdateObjectsCount() > 0) {
             var requests = request.getUpdateObjectsList();
-            var opers = updateObjectsWriteOperation(
-                    tenant,
-                    requests,
-                    Collections.emptyList()
-            );
+            var opers = updateObjectsWriteOperation(tenant, requests);
             resultBuilder.addAllUpdateObjects(opers.tagHeaders);
             writeOperations.add(opers);
         }
 
         if (request.getUpdateTagsCount() > 0) {
             var requests = request.getUpdateTagsList();
-            var opers = updateTagsWriteOperation(
-                    tenant,
-                    requests,
-                    Collections.emptyList()
-            );
+            var opers = updateTagsWriteOperation(tenant, requests);
             resultBuilder.addAllUpdateTags(opers.tagHeaders);
             writeOperations.add(opers);
         }
@@ -168,16 +144,14 @@ public class MetadataWriteService {
         return oper.tagHeaders;
     }
 
-    private WriteOperation createObjectsWriteOperation(
-            List<MetadataWriteRequest> requests,
-            List<TagUpdate> batchTagUpdates) {
+    private WriteOperation createObjectsWriteOperation(List<MetadataWriteRequest> requests) {
         var newTags = new ArrayList<Tag>();
         for (var request : requests) {
 
             var tag = prepareCreateObject(
                     UUID.randomUUID(),
                     request.getDefinition(),
-                    getTagUpdatesInsideBatch(request, batchTagUpdates)
+                    getTagUpdatesInsideBatch(request, List.of())
             );
             newTags.add(tag);
         }
@@ -222,10 +196,7 @@ public class MetadataWriteService {
         return newTag;
     }
 
-    private WriteOperation updateObjectsWriteOperation(
-            String tenant,
-            List<MetadataWriteRequest> requests,
-            List<TagUpdate> batchTagUpdates) {
+    private WriteOperation updateObjectsWriteOperation(String tenant, List<MetadataWriteRequest> requests) {
 
         var userInfo = AuthHelpers.currentUser();
 
@@ -242,7 +213,7 @@ public class MetadataWriteService {
                     userInfo,
                     priorTags.get(i),
                     request.getDefinition(),
-                    getTagUpdatesInsideBatch(request, batchTagUpdates)
+                    getTagUpdatesInsideBatch(request, List.of())
             );
             newTags.add(newTag);
         }
@@ -286,10 +257,7 @@ public class MetadataWriteService {
         return newTag;
     }
 
-    private WriteOperation updateTagsWriteOperation(
-            String tenant,
-            List<MetadataWriteRequest> requests,
-            List<TagUpdate> batchTagUpdates) {
+    private WriteOperation updateTagsWriteOperation(String tenant, List<MetadataWriteRequest> requests) {
 
         var priorVersions = requests.stream()
                 .map(MetadataWriteRequest::getPriorVersion)
@@ -302,7 +270,7 @@ public class MetadataWriteService {
 
             var tag = prepareUpdateTag(
                     priorTags.get(i),
-                    getTagUpdatesInsideBatch(request, batchTagUpdates)
+                    getTagUpdatesInsideBatch(request, List.of())
             );
             newTags.add(tag);
         }
@@ -333,22 +301,18 @@ public class MetadataWriteService {
         return newTag;
     }
 
-    private WriteOperation createPreallocatedObjectsWriteOperation(
-            List<MetadataWriteRequest> requests,
-            List<TagUpdate> batchTagUpdates) {
+    private WriteOperation createPreallocatedObjectsWriteOperation(List<MetadataWriteRequest> requests) {
 
         var tags = new ArrayList<Tag>();
-        var uuids = new ArrayList<UUID>();
 
         for (var request : requests) {
             var objectId = UUID.fromString(request.getPriorVersion().getObjectId());
             var tag = prepareCreateObject(
                     objectId,
                     request.getDefinition(),
-                    getTagUpdatesInsideBatch(request, batchTagUpdates)
+                    getTagUpdatesInsideBatch(request, List.of())
             );
             tags.add(tag);
-            uuids.add(objectId);
         }
 
         var result = new WriteOperation();
