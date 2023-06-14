@@ -104,9 +104,8 @@ public class MetadataApiImpl {
         validateRequest(PREALLOCATE_ID_METHOD, request);
 
         var tenant = request.getTenant();
-        var objectType = request.getObjectType();
 
-        return writeService.preallocateId(tenant, objectType);
+        return writeService.preallocateId(tenant, request);
     }
 
     TagHeader createPreallocatedObject(MetadataWriteRequest request) {
