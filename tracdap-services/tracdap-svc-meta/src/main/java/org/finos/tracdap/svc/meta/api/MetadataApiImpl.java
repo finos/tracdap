@@ -28,16 +28,13 @@ import com.google.protobuf.Message;
 import io.grpc.MethodDescriptor;
 import io.grpc.Status;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 import static org.finos.tracdap.common.metadata.MetadataConstants.PUBLIC_WRITABLE_OBJECT_TYPES;
 import static org.finos.tracdap.svc.meta.api.TracMetadataApi.*;
 import static org.finos.tracdap.svc.meta.api.TrustedMetadataApi.CREATE_PREALLOCATED_OBJECT_METHOD;
 import static org.finos.tracdap.svc.meta.api.TrustedMetadataApi.PREALLOCATE_ID_METHOD;
-import static org.finos.tracdap.svc.meta.api.TrustedMetadataApi.PREALLOCATE_ID_BATCH_METHOD;
 import static org.finos.tracdap.svc.meta.services.MetadataConstants.PUBLIC_API;
 
 
@@ -84,10 +81,7 @@ public class MetadataApiImpl {
         validateRequest(CREATE_OBJECT_METHOD, request);
         validateObjectType(request.getObjectType());
 
-        return writeService.createObjects(
-                request.getTenant(),
-                Collections.singletonList(request),
-                Collections.emptyList()).get(0);
+        return writeService.createObject(request.getTenant(), request);
     }
 
     TagHeader updateObject(MetadataWriteRequest request) {
@@ -95,28 +89,14 @@ public class MetadataApiImpl {
         validateRequest(UPDATE_OBJECT_METHOD, request);
         validateObjectType(request.getObjectType());
 
-        return writeService.updateObjects(
-                request.getTenant(),
-                Collections.singletonList(request),
-                Collections.emptyList()).get(0);
-    }
-
-    private void validateObjectType(ObjectType objectType) {
-        if (apiTrustLevel == PUBLIC_API && !PUBLIC_WRITABLE_OBJECT_TYPES.contains(objectType)) {
-            var message = String.format("Object type %s cannot be created via the TRAC public API", objectType);
-            var status = Status.PERMISSION_DENIED.withDescription(message);
-            throw status.asRuntimeException();
-        }
+        return writeService.updateObject(request.getTenant(), request);
     }
 
     TagHeader updateTag(MetadataWriteRequest request) {
 
         validateRequest(UPDATE_TAG_METHOD, request);
 
-        return writeService.updateTagBatch(
-                request.getTenant(),
-                Collections.singletonList(request),
-                Collections.emptyList()).get(0);
+        return writeService.updateTag(request.getTenant(), request);
     }
 
     TagHeader preallocateId(MetadataWriteRequest request) {
@@ -126,49 +106,24 @@ public class MetadataApiImpl {
         var tenant = request.getTenant();
         var objectType = request.getObjectType();
 
-        return writeService.preallocateIdBatch(tenant, Collections.singletonList(objectType)).get(0);
-    }
-
-    MetadataWriteBatchResponse preallocateIdBatch(MetadataWriteBatchRequest request) {
-
-        validateRequest(PREALLOCATE_ID_BATCH_METHOD, request);
-
-        var tenant = request.getTenant();
-        var objectTypes = request.getRequestsList().stream()
-                .map(MetadataWriteRequest::getObjectType)
-                .collect(Collectors.toList());
-
-        var tagHeaders = writeService.preallocateIdBatch(tenant, objectTypes);
-        return MetadataWriteBatchResponse.newBuilder()
-                .addAllHeaders(tagHeaders)
-                .build();
+        return writeService.preallocateId(tenant, objectType);
     }
 
     TagHeader createPreallocatedObject(MetadataWriteRequest request) {
 
         validateRequest(CREATE_PREALLOCATED_OBJECT_METHOD, request);
 
-        return writeService.createPreallocatedObjectBatch(
-                request.getTenant(),
-                Collections.singletonList(request),
-                Collections.emptyList()).get(0);
+        return writeService.createPreallocatedObject(request.getTenant(), request);
     }
 
-    private void validateListForObjectType(List<MetadataWriteRequest> requestsList) {
-        for (var rq : requestsList) {
-            validateObjectType(rq.getObjectType());
-        }
-
-    }
-
-    public UniversalMetadataWriteBatchResponse writeBatch(UniversalMetadataWriteBatchRequest request) {
+    public MetadataWriteBatchResponse writeBatch(MetadataWriteBatchRequest request) {
 
         validateRequest(TrustedMetadataApiGrpc.getWriteBatchMethod(), request);
 
-        validateListForObjectType(request.getPreallocateObjectsList());
         validateListForObjectType(request.getCreateObjectsList());
         validateListForObjectType(request.getUpdateObjectsList());
-        validateListForObjectType(request.getPreallocateObjectsList());
+        validateListForObjectType(request.getUpdateTagsList());
+        validateListForObjectType(request.getPreallocateIdsList());
         validateListForObjectType(request.getPreallocateIdsList());
 
         return writeService.writeBatch(request);
@@ -247,4 +202,18 @@ public class MetadataApiImpl {
         validator.validateFixedMethod(request, protoMethod);
     }
 
+    private void validateObjectType(ObjectType objectType) {
+        if (apiTrustLevel == PUBLIC_API && !PUBLIC_WRITABLE_OBJECT_TYPES.contains(objectType)) {
+            var message = String.format("Object type %s cannot be created via the TRAC public API", objectType);
+            var status = Status.PERMISSION_DENIED.withDescription(message);
+            throw status.asRuntimeException();
+        }
+    }
+
+    private void validateListForObjectType(List<MetadataWriteRequest> requestsList) {
+        for (var rq : requestsList) {
+            validateObjectType(rq.getObjectType());
+        }
+
+    }
 }

@@ -19,8 +19,6 @@ package org.finos.tracdap.svc.meta.services;
 import org.finos.tracdap.api.MetadataWriteBatchRequest;
 import org.finos.tracdap.api.MetadataWriteBatchResponse;
 import org.finos.tracdap.api.MetadataWriteRequest;
-import org.finos.tracdap.api.UniversalMetadataWriteBatchRequest;
-import org.finos.tracdap.api.UniversalMetadataWriteBatchResponse;
 import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.common.auth.internal.AuthHelpers;
 import org.finos.tracdap.common.auth.internal.UserInfo;
@@ -52,9 +50,63 @@ public class MetadataWriteService {
         this.dal = dal;
     }
 
-    private static class WriteOperation {
-        DalWriteOperation writeOperation;
-        List<TagHeader> tagHeaders;
+    public TagHeader createObject(String tenant, MetadataWriteRequest request) {
+
+        return executeWriteOperation(
+                tenant,
+                createObjectsWriteOperation(
+                        List.of(request),
+                        List.of()
+                )
+        ).get(0);
+    }
+
+    public TagHeader updateObject(String tenant, MetadataWriteRequest request) {
+
+        return executeWriteOperation(
+                tenant,
+                updateObjectsWriteOperation(
+                        tenant,
+                        List.of(request),
+                        List.of()
+                )
+        ).get(0);
+    }
+
+
+
+    public TagHeader updateTag(String tenant, MetadataWriteRequest request) {
+
+        return executeWriteOperation(
+                tenant,
+                updateTagsWriteOperation(
+                        tenant,
+                        List.of(request),
+                        List.of()
+                )
+        ).get(0);
+    }
+
+    public TagHeader preallocateId(String tenant, ObjectType objectType) {
+
+        var objectId = UUID.randomUUID();
+
+        dal.preallocateObjectIds(tenant, List.of(objectType), List.of(objectId));
+
+        return TagHeader.newBuilder()
+                .setObjectType(objectType)
+                .setObjectId(objectId.toString())
+                .build();
+    }
+
+    public TagHeader createPreallocatedObject(String tenant, MetadataWriteRequest request) {
+
+        return executeWriteOperation(
+                tenant,
+                createPreallocatedObjectsWriteOperation(
+                        List.of(request), List.of()
+                )
+        ).get(0);
     }
 
     public MetadataWriteBatchResponse writeBatch(MetadataWriteBatchRequest request) {
@@ -116,19 +168,6 @@ public class MetadataWriteService {
         return oper.tagHeaders;
     }
 
-    public List<TagHeader> createObjects(
-            String tenant,
-            List<MetadataWriteRequest> requests,
-            List<TagUpdate> batchTagUpdates) {
-        return executeWriteOperation(
-                tenant,
-                createObjectsWriteOperation(
-                        requests,
-                        batchTagUpdates
-                )
-        );
-    }
-
     private WriteOperation createObjectsWriteOperation(
             List<MetadataWriteRequest> requests,
             List<TagUpdate> batchTagUpdates) {
@@ -181,21 +220,6 @@ public class MetadataWriteService {
         newTag = TagUpdateService.applyTagUpdates(newTag, updateAttrs);
 
         return newTag;
-    }
-
-    public List<TagHeader> updateObjects(
-            String tenant,
-            List<MetadataWriteRequest> requests,
-            List<TagUpdate> batchTagUpdates) {
-
-        return executeWriteOperation(
-                tenant,
-                updateObjectsWriteOperation(
-                        tenant,
-                        requests,
-                        batchTagUpdates
-                )
-        );
     }
 
     private WriteOperation updateObjectsWriteOperation(
@@ -262,21 +286,6 @@ public class MetadataWriteService {
         return newTag;
     }
 
-    public List<TagHeader> updateTagBatch(
-            String tenant,
-            List<MetadataWriteRequest> requests,
-            List<TagUpdate> batchTagUpdates) {
-
-        return executeWriteOperation(
-                tenant,
-                updateTagsWriteOperation(
-                        tenant,
-                        requests,
-                        batchTagUpdates
-                )
-        );
-    }
-
     private WriteOperation updateTagsWriteOperation(
             String tenant,
             List<MetadataWriteRequest> requests,
@@ -322,34 +331,6 @@ public class MetadataWriteService {
 
         newTag = TagUpdateService.applyTagUpdates(newTag, tagUpdates);
         return newTag;
-    }
-
-    public List<TagHeader> preallocateIdBatch(String tenant, List<ObjectType> objectTypes) {
-        var objectIds = objectTypes.stream().map(objectType -> UUID.randomUUID()).collect(Collectors.toList());
-
-        dal.preallocateObjectIds(tenant, objectTypes, objectIds);
-
-        var tagHeaders = new ArrayList<TagHeader>();
-        for (int i = 0; i < objectTypes.size(); i++) {
-            var tagHeader = TagHeader.newBuilder()
-                    .setObjectType(objectTypes.get(i))
-                    .setObjectId(objectIds.get(i).toString())
-                    .build();
-            tagHeaders.add(tagHeader);
-        }
-        return tagHeaders;
-    }
-
-    public List<TagHeader> createPreallocatedObjectBatch(
-            String tenant,
-            List<MetadataWriteRequest> requests,
-            List<TagUpdate> batchTagUpdates) {
-        return executeWriteOperation(
-                tenant,
-                createPreallocatedObjectsWriteOperation(
-                        requests, batchTagUpdates
-                )
-        );
     }
 
     private WriteOperation createPreallocatedObjectsWriteOperation(
@@ -427,6 +408,11 @@ public class MetadataWriteService {
                 .build();
 
         return List.of(updateTimeAttr, updateUserIdAttr, updateUserNameAttr);
+    }
+
+    private static class WriteOperation {
+        DalWriteOperation writeOperation;
+        List<TagHeader> tagHeaders;
     }
 
 }
