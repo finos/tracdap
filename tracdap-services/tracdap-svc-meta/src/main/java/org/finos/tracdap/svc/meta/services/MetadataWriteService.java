@@ -16,6 +16,8 @@
 
 package org.finos.tracdap.svc.meta.services;
 
+import org.finos.tracdap.api.MetadataWriteBatchRequest;
+import org.finos.tracdap.api.MetadataWriteBatchResponse;
 import org.finos.tracdap.api.MetadataWriteRequest;
 import org.finos.tracdap.api.UniversalMetadataWriteBatchRequest;
 import org.finos.tracdap.api.UniversalMetadataWriteBatchResponse;
@@ -55,17 +57,17 @@ public class MetadataWriteService {
         List<TagHeader> tagHeaders;
     }
 
-    public UniversalMetadataWriteBatchResponse writeBatch(
-            UniversalMetadataWriteBatchRequest request
-    ) {
+    public MetadataWriteBatchResponse writeBatch(MetadataWriteBatchRequest request) {
+
         var tenant = request.getTenant();
         var writeOperations = new ArrayList<WriteOperation>();
-        var resultBuilder = UniversalMetadataWriteBatchResponse.newBuilder();
 
-        if (request.getPreallocateObjectsCount() > 0) {
-            var requests = request.getPreallocateObjectsList();
+        var resultBuilder = MetadataWriteBatchResponse.newBuilder();
+
+        if (request.getCreatePreallocatedCount() > 0) {
+            var requests = request.getCreatePreallocatedList();
             var opers = createPreallocatedObjectsWriteOperation(requests, Collections.emptyList());
-            resultBuilder.addAllPreallocatedObjectHeaders(opers.tagHeaders);
+            resultBuilder.addAllCreatePreallocated(opers.tagHeaders);
             writeOperations.add(opers);
         }
 
@@ -75,7 +77,7 @@ public class MetadataWriteService {
                     requests,
                     Collections.emptyList()
             );
-            resultBuilder.addAllCreateObjectHeaders(opers.tagHeaders);
+            resultBuilder.addAllCreateObjects(opers.tagHeaders);
             writeOperations.add(opers);
         }
 
@@ -86,7 +88,7 @@ public class MetadataWriteService {
                     requests,
                     Collections.emptyList()
             );
-            resultBuilder.addAllUpdateObjectHeaders(opers.tagHeaders);
+            resultBuilder.addAllUpdateObjects(opers.tagHeaders);
             writeOperations.add(opers);
         }
 
@@ -97,7 +99,7 @@ public class MetadataWriteService {
                     requests,
                     Collections.emptyList()
             );
-            resultBuilder.addAllUpdateTagHeaders(opers.tagHeaders);
+            resultBuilder.addAllUpdateTags(opers.tagHeaders);
             writeOperations.add(opers);
         }
 
