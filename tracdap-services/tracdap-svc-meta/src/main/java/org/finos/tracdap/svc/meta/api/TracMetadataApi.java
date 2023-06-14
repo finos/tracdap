@@ -75,7 +75,7 @@ public class TracMetadataApi extends TracMetadataApiGrpc.TracMetadataApiImplBase
     }
 
     @Override
-    public void writeBatch(UniversalMetadataWriteBatchRequest request, StreamObserver<UniversalMetadataWriteBatchResponse> response) {
+    public void writeBatch(MetadataWriteBatchRequest request, StreamObserver<MetadataWriteBatchResponse> response) {
 
         grpcWrap.unaryCall(request, response, apiImpl::writeBatch);
     }

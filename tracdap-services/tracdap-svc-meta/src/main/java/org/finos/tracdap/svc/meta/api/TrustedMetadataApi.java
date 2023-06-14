@@ -36,7 +36,6 @@ public class TrustedMetadataApi extends TrustedMetadataApiGrpc.TrustedMetadataAp
     private static final Descriptors.ServiceDescriptor TRUSTED_METADATA_SERVICE = MetadataTrusted.getDescriptor().findServiceByName(SERVICE_NAME);
 
     static final MethodDescriptor<MetadataWriteRequest, TagHeader> PREALLOCATE_ID_METHOD = TrustedMetadataApiGrpc.getPreallocateIdMethod();
-    static final MethodDescriptor<MetadataWriteBatchRequest, MetadataWriteBatchResponse> PREALLOCATE_ID_BATCH_METHOD = TrustedMetadataApiGrpc.getPreallocateIdBatchMethod();
     static final MethodDescriptor<MetadataWriteRequest, TagHeader> CREATE_PREALLOCATED_OBJECT_METHOD = TrustedMetadataApiGrpc.getCreatePreallocatedObjectMethod();
 
 
@@ -57,7 +56,7 @@ public class TrustedMetadataApi extends TrustedMetadataApiGrpc.TrustedMetadataAp
     }
 
     @Override
-    public void writeBatch(UniversalMetadataWriteBatchRequest request, StreamObserver<UniversalMetadataWriteBatchResponse> response) {
+    public void writeBatch(MetadataWriteBatchRequest request, StreamObserver<MetadataWriteBatchResponse> response) {
 
         grpcWrap.unaryCall(request, response, apiImpl::writeBatch);
     }
@@ -84,12 +83,6 @@ public class TrustedMetadataApi extends TrustedMetadataApiGrpc.TrustedMetadataAp
     public void preallocateId(MetadataWriteRequest request, StreamObserver<TagHeader> response) {
 
         grpcWrap.unaryCall(request, response, apiImpl::preallocateId);
-    }
-
-    @Override
-    public void preallocateIdBatch(MetadataWriteBatchRequest request, StreamObserver<MetadataWriteBatchResponse> response) {
-
-        grpcWrap.unaryCall(request, response, apiImpl::preallocateIdBatch);
     }
 
     @Override
