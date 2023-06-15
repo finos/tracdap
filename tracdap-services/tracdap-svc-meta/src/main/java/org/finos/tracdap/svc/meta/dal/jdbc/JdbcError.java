@@ -35,7 +35,8 @@ class JdbcError {
     static final String WRONG_OBJECT_TYPE = "Metadata does not match the expected type for {0} [{1}]";
     static final String WRONG_OBJECT_TYPE_MULTIPLE = "Metadata does not match the expected type for one or more objects";
 
-    static final String DUPLICATE_OBJECT_ID = "Duplicate object id {0}";
+    static final String DUPLICATE_OBJECT_ID = "Duplicate object id for {0} [{1}]";
+    static final String DUPLICATE_OBJECT_ID_MULTIPLE = "Duplicate object id for one or more objects";
 
     static final String OBJECT_VERSION_SUPERSEDED = "Metadata has been superseded for {0} [{1}] version {2}";
     static final String OBJECT_VERSION_SUPERSEDED_MULTIPLE = "Metadata has been superseded for one or more objects";
@@ -101,9 +102,18 @@ class JdbcError {
     static void duplicateObjectId(SQLException error, JdbcErrorCode code, JdbcMetadataDal.ObjectParts parts) {
 
         if (code == JdbcErrorCode.INSERT_DUPLICATE) {
+
             if (parts.objectId.length == 1) {
-                var message = MessageFormat.format(DUPLICATE_OBJECT_ID, parts.objectId[0]);
+
+                var message = MessageFormat.format(DUPLICATE_OBJECT_ID,
+                        parts.objectType[0],
+                        parts.objectId[0]);
+
                 throw new EMetadataDuplicate(message, error);
+            }
+            else {
+
+                throw new EMetadataDuplicate(DUPLICATE_OBJECT_ID_MULTIPLE, error);
             }
         }
     }
