@@ -60,13 +60,13 @@ public class JobProcessorHelpers {
     /**
      * Add a request without sending it.
      */
-    private static void addUpdateToWriteBatch(UniversalMetadataWriteBatchRequest.Builder builder, MetadataWriteRequest update) {
+    private static void addUpdateToWriteBatch(MetadataWriteBatchRequest.Builder builder, MetadataWriteRequest update) {
         if (!update.hasDefinition()) {
             builder.addUpdateTags(update);
         } else if (!update.hasPriorVersion()) {
             builder.addCreateObjects(update);
         } else if (update.getPriorVersion().getObjectVersion() < OBJECT_FIRST_VERSION) {
-            builder.addPreallocateObjects(update);
+            builder.addCreatePreallocated(update);
         } else {
             builder.addUpdateObjects(update);
         }
@@ -213,13 +213,13 @@ public class JobProcessorHelpers {
 
         var request = MetadataWriteBatchRequest.newBuilder()
                 .setTenant(jobState.tenant)
-                .addAllRequests(requests)
+                .addAllPreallocateIds(requests)
                 .build();
 
         var client = metaClient.withCallCredentials(jobState.credentials);
 
-        var preallocatedIds = client.preallocateIdBatch(request)
-                .getHeadersList();
+        var preallocatedIds = client.writeBatch(request)
+                .getPreallocateIdsList();
 
         for (int i = 0; i < keys.size(); i++) {
             var resultKey = keys.get(i);
@@ -335,7 +335,7 @@ public class JobProcessorHelpers {
                 ? buildJobSucceededUpdate(jobState)
                 : buildJobFailedUpdate(jobState);
 
-        var requestBuilder = UniversalMetadataWriteBatchRequest.newBuilder();
+        var requestBuilder = MetadataWriteBatchRequest.newBuilder();
         requestBuilder.setTenant(jobState.tenant);
 
         for (var update : metaUpdates) {
@@ -346,7 +346,7 @@ public class JobProcessorHelpers {
 
         addUpdateToWriteBatch(requestBuilder, scrapTenant(jobUpdate));
 
-        UniversalMetadataWriteBatchRequest request = requestBuilder.build();
+        MetadataWriteBatchRequest request = requestBuilder.build();
 
         boolean anyToSend = isAnyToSend(request);
 
@@ -356,12 +356,12 @@ public class JobProcessorHelpers {
         }
     }
 
-    private static boolean isAnyToSend(UniversalMetadataWriteBatchRequest request) {
+    private static boolean isAnyToSend(MetadataWriteBatchRequest request) {
         var c = 0;
         c += request.getCreateObjectsCount();
         c += request.getUpdateObjectsCount();
         c += request.getUpdateTagsCount();
-        c += request.getPreallocateObjectsCount();
+        c += request.getCreatePreallocatedCount();
         return c != 0;
     }
 
