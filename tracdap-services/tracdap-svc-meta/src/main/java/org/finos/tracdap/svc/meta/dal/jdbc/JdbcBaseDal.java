@@ -28,17 +28,12 @@ import java.time.Instant;
 
 class JdbcBaseDal {
 
+    private final DataSource source;
     protected final IDialect dialect;
 
-    private final DataSource source;
-
-    JdbcBaseDal(JdbcDialect dialect, DataSource source) {
-        this.dialect = Dialect.dialectFor(dialect);
+    JdbcBaseDal(DataSource source, JdbcDialect dialect) {
         this.source = source;
-    }
-
-    IDialect getDialect() {
-        return dialect;
+        this.dialect = Dialect.dialectFor(dialect);
     }
 
     void prepareMappingTable(Connection conn) throws SQLException {
@@ -56,7 +51,7 @@ class JdbcBaseDal {
         }
     }
 
-    <TResult> TResult wrapTransaction(JdbcFunction<TResult> func, JdbcErrorHandler... errorHandlers) {
+    <TResult> TResult wrapTransaction(JdbcFunction<TResult> func) {
 
         try (var conn = source.getConnection()) {
 
@@ -69,24 +64,16 @@ class JdbcBaseDal {
         }
         catch (SQLException error) {
 
-            // TODO: Logging?
-
-            var code = dialect.mapErrorCode(error);
-
-            // If the error code is not recognised, throw an internal error type
-            JdbcError.handleUnknownError(error, code, dialect);
-
-            for (JdbcErrorHandler handler: errorHandlers)
-                handler.handle(error, code);
-
-            // If the error code is not handled, throw an internal error type
-            throw JdbcError.unhandledError(error, code);
+            throw JdbcError.catchAll(error, dialect);
         }
     }
 
-    void wrapTransaction(JdbcAction func, JdbcErrorHandler... errorHandlers) {
+    void wrapTransaction(JdbcAction func) {
 
-        wrapTransaction(conn -> {func.apply(conn); return null;}, errorHandlers);
+        wrapTransaction(conn -> {
+            func.apply(conn);
+            return null;
+        });
     }
 
     @FunctionalInterface
@@ -99,12 +86,6 @@ class JdbcBaseDal {
     interface JdbcAction {
 
         void apply(Connection conn) throws SQLException;
-    }
-
-    @FunctionalInterface
-    interface JdbcErrorHandler {
-
-        void handle(SQLException error, JdbcErrorCode code);
     }
 
     static class KeyedItem<TItem> {
@@ -149,7 +130,7 @@ class JdbcBaseDal {
         }
 
         KeyedItems(long[] keys, TItem[] items) {
-            this(keys, null, null, items, null);
+            this(keys, null, items);
         }
     }
 }

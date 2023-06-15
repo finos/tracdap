@@ -53,7 +53,7 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
 
     public JdbcMetadataDal(JdbcDialect dialect, DataSource dataSource) {
 
-        super(dialect, dataSource);
+        super(dataSource, dialect);
 
         this.dataSource = dataSource;
 
@@ -162,7 +162,7 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
         });
     }
 
-    private void savePreallocatedIds(Connection conn, String tenant, List<TagHeader> objectIds) throws SQLException {
+    private void savePreallocatedIds(Connection conn, String tenant, List<TagHeader> objectIds) {
 
         var parts = separateIdParts(objectIds);
 
@@ -174,13 +174,15 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
         }
         catch (SQLException error) {
 
-            JdbcError.handleDuplicateObjectId(error, code, parts);
+            var code = dialect.mapErrorCode(error);
 
-            throw error;
+            JdbcError.duplicateObjectId(error, code, parts);
+
+            throw JdbcError.catchAll(error, dialect);
         }
     }
 
-    private void savePreallocatedObjects(Connection conn, String tenant, List<Tag> tags) throws SQLException {
+    private void savePreallocatedObjects(Connection conn, String tenant, List<Tag> tags) {
 
         var parts = separateParts(tags);
 
@@ -197,15 +199,17 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
         }
         catch (SQLException error) {
 
-            JdbcError.handleMissingItem(error, code, parts);   // TODO: different errors
-            JdbcError.handleDuplicateObjectId(error, code, parts);  // TODO: different errors
-            JdbcError.savePreallocated_WrongType(error, code, parts);
+            var code = dialect.mapErrorCode(error);
 
-            throw error;
+            JdbcError.missingItem(error, code, parts);   // TODO: different errors
+            JdbcError.duplicateObjectId(error, code, parts);  // TODO: different errors
+            JdbcError.wrongObjectType(error, code, parts);
+
+            throw JdbcError.catchAll(error, dialect);
         }
     }
 
-    private void saveNewObjects(Connection conn, String tenant, List<Tag> tags) throws SQLException {
+    private void saveNewObjects(Connection conn, String tenant, List<Tag> tags) {
 
         var parts = separateParts(tags);
 
@@ -220,12 +224,15 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
         }
         catch (SQLException error) {
 
-            JdbcError.handleDuplicateObjectId(error, null, parts);
-            throw error;
+            var code = dialect.mapErrorCode(error);
+
+            JdbcError.duplicateObjectId(error, code, parts);
+
+            throw JdbcError.catchAll(error, dialect);
         }
     }
 
-    private void saveNewVersions(Connection conn, String tenant, List<Tag> tags) throws SQLException {
+    private void saveNewVersions(Connection conn, String tenant, List<Tag> tags) {
 
         var parts = separateParts(tags);
 
@@ -244,15 +251,17 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
         }
         catch (SQLException error) {
 
-            JdbcError.handleMissingItem(error, code, parts);
-            JdbcError.handleDuplicateObjectId(error, code, parts);
-            JdbcError.newVersion_WrongType(error, code, parts);
+            var code = dialect.mapErrorCode(error);
 
-            throw error;
+            JdbcError.missingItem(error, code, parts);
+            JdbcError.objectVersionSuperseded(error, code, parts);
+            JdbcError.wrongObjectType(error, code, parts);
+
+            throw JdbcError.catchAll(error, dialect);
         }
     }
 
-    private void saveNewTags(Connection conn, String tenant, List<Tag> tags) throws SQLException {
+    private void saveNewTags(Connection conn, String tenant, List<Tag> tags) {
 
         var parts = separateParts(tags);
 
@@ -271,11 +280,13 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
         }
         catch (SQLException error) {
 
-            JdbcError.handleMissingItem(error, code, parts);
-            JdbcError.handleDuplicateObjectId(error, code, parts);
-            JdbcError.newTag_WrongType(error, code, parts);
+            var code = dialect.mapErrorCode(error);
 
-            throw error;
+            JdbcError.missingItem(error, code, parts);
+            JdbcError.tagVersionSuperseded(error, code, parts);
+            JdbcError.wrongObjectType(error, code, parts);
+
+            throw JdbcError.catchAll(error, dialect);
         }
     }
 
@@ -293,13 +304,22 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
     @Override
     public Tag loadObject(String tenant, TagSelector selector) {
 
-        var parts = selectorParts(selector);
+        // Single item reads don't use the mapping table, so prepareMappingTable() is not needed
 
         return wrapTransaction(conn -> {
+            return loadObject(conn, tenant, selector);
+        });
+    }
+
+    private Tag loadObject(Connection conn, String tenant, TagSelector selector) {
+
+        var parts = selectorParts(selector);
+
+        try {
 
             var tenantId = tenants.getTenantId(conn, tenant);
-            var objectType = readSingle.readObjectTypeById(conn, tenantId, parts.objectId[0]);
 
+            var objectType = readSingle.readObjectTypeById(conn, tenantId, parts.objectId[0]);
             checkObjectType(parts, objectType);
 
             var definition = readSingle.readDefinition(conn, tenantId, objectType.key, parts.selector[0]);
@@ -307,9 +327,16 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
             var tagAttrs = readSingle.readTagAttrs(conn, tenantId, tagRecord.key);
 
             return buildTag(objectType.item, parts.objectId[0], definition, tagRecord, tagAttrs);
-        },
-        (error, code) -> JdbcError.loadOne_missingItem(error, code, selector),
-        (error, code) -> JdbcError.loadOne_WrongObjectType(error, code, selector));
+        }
+        catch (SQLException error) {
+
+            var code = dialect.mapErrorCode(error);
+
+            JdbcError.loadOne_missingItem(error, code, selector);
+            JdbcError.loadOne_WrongObjectType(error, code, selector);
+
+            throw JdbcError.catchAll(error, dialect);
+        }
     }
 
 
@@ -320,24 +347,37 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
     @Override
     public List<Tag> loadObjects(String tenant, List<TagSelector> selectors) {
 
+        return wrapTransaction(conn -> {
+            prepareMappingTable(conn);
+            return loadObjects(conn, tenant, selectors);
+        });
+    }
+
+    private List<Tag> loadObjects(Connection conn, String tenant, List<TagSelector> selectors) {
+
         var parts = selectorParts(selectors);
 
-        return wrapTransaction(conn -> {
-
-            prepareMappingTable(conn);
+        try {
 
             var tenantId = tenants.getTenantId(conn, tenant);
-            var objectType = readBatch.readObjectTypeById(conn, tenantId, parts.objectId);
 
+            var objectType = readBatch.readObjectTypeById(conn, tenantId, parts.objectId);
             checkObjectTypes(parts, objectType);
 
             var definition = readBatch.readDefinition(conn, tenantId, objectType.keys, parts.selector);
             var tag = readBatch.readTag(conn, tenantId, definition.keys, parts.selector);
 
             return buildTags(objectType.items, parts.objectId, definition, tag);
-        },
-        (error, code) -> JdbcError.loadBatch_missingItem(error, code, selectors),
-        (error, code) -> JdbcError.loadBatch_WrongObjectType(error, code, selectors));
+        }
+        catch (SQLException error) {
+
+            var code = dialect.mapErrorCode(error);
+
+            JdbcError.loadBatch_missingItem(error, code, selectors);
+            JdbcError.loadBatch_WrongObjectType(error, code, selectors);
+
+            throw JdbcError.catchAll(error, dialect);
+        }
     }
 
 
@@ -349,18 +389,28 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
     public List<Tag> search(String tenant, SearchParameters searchParameters) {
 
         return wrapTransaction(conn -> {
-
             prepareMappingTable(conn);
+            return search(conn, tenant, searchParameters);
+        });
+    }
+
+    private List<Tag> search(Connection conn, String tenant, SearchParameters searchParameters) {
+
+        try {
 
             var tenantId = tenants.getTenantId(conn, tenant);
-            long[] tagPk = search.search(conn, tenantId, searchParameters);
 
+            long[] tagPk = search.search(conn, tenantId, searchParameters);
             var tag = readBatch.readTagWithHeader(conn, tenantId, tagPk);
 
             return Arrays.stream(tag.items)
                     .map(Tag.Builder::build)
                     .collect(Collectors.toList());
-        });
+        }
+        catch (SQLException error) {
+
+            throw JdbcError.catchAll(error, dialect);
+        }
     }
 
 
