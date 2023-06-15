@@ -218,27 +218,25 @@ service TracMetadataApi {
     /**
      * Perform a batch of write operations on the TRAC metadata store.
      *
-     * Often it is necessary to execute a set of metadata write instructions together.
-     * Using the writeBatch() method allows a large number of objects to be created
-     * or updated without the latency of sending lots of individual requests.
+     * A writeBatch request allows multiple createObject, updateObject and updateTag
+     * requests to be combined into a single API call. It can result in considerable
+     * performance gains when a large number of objects are created or updated together.
+     * Using writeBatch() also gives a transactional guarantee on the metadata store,
+     * so the whole batch will either succeed or fail. This can be useful for maintaining
+     * consistency when updating multiple objects that refer to each other.
      *
-     * When a write-batch request is processed the individual requests are processed
-     * in order starting with createObject, then updateObject and finally updateTag.
      * Each object ID can only occur once for updateObject, while each object version
      * can only occur once for updateTag. It is allowed to update tags for multiple
      * object versions in the same request. It is also allowed to use updateObject
      * and updateTag on the same object, which may be used e.g. to update an object
-     * and also update the tag on the prior version.
+     * and also update the tag on the prior version. It is not possible to create a
+     * new object version and update the tag of that new version in the same request.
      *
      * Validation follows mostly the same rules as for individual write requests. The
-     * tenant code must be specified in the batch but it is optional in the individual
-     * request objects, if it is specified it must match what is in the batch request.
+     * tenant code must be specified in the batch and is optional in the individual
+     * request objects, if specified it must match what is in the batch request.
      * Validation also checks for duplicate object IDs in updateObject and duplicates
      * of the same object version in updateTag.
-     *
-     * Using writeBatch() gives a transactional guarantee on the metadata store, so the
-     * whole batch will either succeed or fail. This can be useful for maintaining
-     * consistency when updating multiple objects that refer to each other.
      *
      * The call returns tag headers for all the requested write operations in order.
      * For example if a request creates two objects and updates 3, then the response
