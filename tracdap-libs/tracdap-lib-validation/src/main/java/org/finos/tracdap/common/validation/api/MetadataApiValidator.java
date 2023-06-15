@@ -445,7 +445,7 @@ public class MetadataApiValidator {
     private static ValidationContext uniquePriorObject(MetadataWriteRequest msg, ValidationContext ctx, Set<String> knownObjectIds) {
 
         var priorId = msg.getPriorVersion().getObjectId();
-        var alreadyPresent = knownObjectIds.add(priorId);
+        var alreadyPresent = ! knownObjectIds.add(priorId);
 
         if (alreadyPresent) {
 
@@ -465,7 +465,7 @@ public class MetadataApiValidator {
     private static ValidationContext uniquePriorVersion(MetadataWriteRequest msg, ValidationContext ctx, Set<String> knownObjectIds) {
 
         var priorKey = MetadataUtil.objectKey(msg.getPriorVersion());
-        var alreadyPresent = knownObjectIds.add(priorKey);
+        var alreadyPresent = ! knownObjectIds.add(priorKey);
 
         if (alreadyPresent) {
 
