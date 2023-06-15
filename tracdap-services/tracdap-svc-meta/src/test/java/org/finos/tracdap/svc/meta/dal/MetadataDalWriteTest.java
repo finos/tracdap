@@ -25,6 +25,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
+import org.finos.tracdap.metadata.TagHeader;
 import org.finos.tracdap.test.meta.IDalTestable;
 import org.finos.tracdap.test.meta.JdbcUnit;
 import org.finos.tracdap.test.meta.JdbcIntegration;
@@ -440,31 +441,22 @@ abstract class MetadataDalWriteTest implements IDalTestable {
         // Save one
         var origDef = dummyDataDef();
         var origTag = dummyTag(origDef, INCLUDE_HEADER);
-        var origId = UUID.fromString(origTag.getHeader().getObjectId());
 
-        dal.preallocateObjectIds(
-                TEST_TENANT,
-                Collections.singletonList(ObjectType.DATA),
-                Collections.singletonList(origId)
-        );
+        dal.savePreallocatedIds(TEST_TENANT, List.of(origTag.getHeader()));
         dal.savePreallocatedObjects(TEST_TENANT, Collections.singletonList(origTag));
-        var result = dal.loadTag(TEST_TENANT, ObjectType.DATA, origId, 1, 1);
+        var result = dal.loadObject(TEST_TENANT, selectorForTag(origTag));
 
         assertEquals(origTag, result);
 
         // Save multiple
         var multi1 = dummyTagForObjectType(ObjectType.MODEL);
         var multi2 = dummyTagForObjectType(ObjectType.MODEL);
-        var id1 = UUID.fromString(multi1.getHeader().getObjectId());
-        var id2 = UUID.fromString(multi2.getHeader().getObjectId());
 
-       dal.preallocateObjectIds(TEST_TENANT,
-                List.of(ObjectType.MODEL, ObjectType.MODEL),
-                List.of(id1, id2));
+       dal.savePreallocatedIds(TEST_TENANT, List.of(multi1.getHeader(), multi2.getHeader()));
        dal.savePreallocatedObjects(TEST_TENANT, List.of(multi1, multi2));
 
-        var result1 = dal.loadTag(TEST_TENANT, ObjectType.MODEL, UUID.fromString(multi1.getHeader().getObjectId()), 1, 1);
-        var result2 = dal.loadTag(TEST_TENANT, ObjectType.MODEL, UUID.fromString(multi2.getHeader().getObjectId()), 1, 1);
+        var result1 = dal.loadObject(TEST_TENANT, selectorForTag(multi1));
+        var result2 = dal.loadObject(TEST_TENANT, selectorForTag(multi2));
 
         assertEquals(multi1, result1);
         assertEquals(multi2, result2);
@@ -474,28 +466,21 @@ abstract class MetadataDalWriteTest implements IDalTestable {
     void testPreallocate_duplicate() {
 
         var id1 = UUID.randomUUID();
+        var header1 = TagHeader.newBuilder().setObjectType(ObjectType.DATA).setObjectId(id1.toString()).build();
 
-        dal.preallocateObjectIds(
-                TEST_TENANT,
-                Collections.singletonList(ObjectType.DATA),
-                Collections.singletonList(id1)
-        );
-        assertThrows(EMetadataDuplicate.class,
-                () -> dal.preallocateObjectIds(
-                        TEST_TENANT,
-                        Collections.singletonList(ObjectType.DATA),
-                        Collections.singletonList(id1)
-                ));
+        dal.savePreallocatedIds(TEST_TENANT, List.of(header1));
+
+        assertThrows(EMetadataDuplicate.class, () ->
+                dal.savePreallocatedIds(TEST_TENANT, List.of(header1)));
 
         var obj2 = dummyTagForObjectType(ObjectType.MODEL);
-        var id2 = UUID.fromString(obj2.getHeader().getObjectId());
         var id3 = UUID.randomUUID();
+        var header3 = TagHeader.newBuilder().setObjectType(ObjectType.DATA).setObjectId(id3.toString()).build();
 
         dal.saveNewObjects(TEST_TENANT, Collections.singletonList(obj2));
-        assertThrows(EMetadataDuplicate.class,
-                () -> dal.preallocateObjectIds(TEST_TENANT,
-                        List.of(ObjectType.MODEL, ObjectType.MODEL),
-                        List.of(id2, id3)));
+
+        assertThrows(EMetadataDuplicate.class, () ->
+                dal.savePreallocatedIds(TEST_TENANT, List.of(obj2.getHeader(), header3)));
     }
 
     @Test
@@ -507,13 +492,8 @@ abstract class MetadataDalWriteTest implements IDalTestable {
                 () -> dal.savePreallocatedObjects(TEST_TENANT, Collections.singletonList(obj1)));
 
         var obj2 = dummyTagForObjectType(ObjectType.DATA);
-        var id2 = UUID.fromString(obj2.getHeader().getObjectId());
 
-        dal.preallocateObjectIds(
-                TEST_TENANT,
-                Collections.singletonList(ObjectType.DATA),
-                Collections.singletonList(id2)
-        );
+        dal.savePreallocatedIds(TEST_TENANT, List.of(obj2.getHeader()));
 
         assertThrows(EMetadataNotFound.class,
                 () -> dal.savePreallocatedObjects(TEST_TENANT, List.of(obj1, obj2)));
@@ -523,27 +503,18 @@ abstract class MetadataDalWriteTest implements IDalTestable {
     void testPreallocate_wrongObjectType() {
 
         var obj1 = dummyTagForObjectType(ObjectType.MODEL);
-        var id1 = UUID.fromString(obj1.getHeader().getObjectId());
+        var wrongHeader = obj1.getHeader().toBuilder().setObjectType(ObjectType.DATA).build();
 
-        dal.preallocateObjectIds(
-                TEST_TENANT,
-                Collections.singletonList(ObjectType.DATA),
-                Collections.singletonList(id1)
-        );
+        dal.savePreallocatedIds(TEST_TENANT, List.of(wrongHeader));
 
-        assertThrows(EMetadataWrongType.class,
-                () -> dal.savePreallocatedObjects(TEST_TENANT, Collections.singletonList(obj1)));
+        assertThrows(EMetadataWrongType.class, () ->
+                dal.savePreallocatedObjects(TEST_TENANT, Collections.singletonList(obj1)));
 
         var obj2 = dummyTagForObjectType(ObjectType.DATA);
-        var id2 = UUID.fromString(obj2.getHeader().getObjectId());
 
-        dal.preallocateObjectIds(
-                TEST_TENANT,
-                Collections.singletonList(ObjectType.DATA),
-                Collections.singletonList(id2)
-        );
+        dal.savePreallocatedIds(TEST_TENANT, List.of(obj2.getHeader()));
 
-        assertThrows(EMetadataWrongType.class,
-                () -> dal.savePreallocatedObjects(TEST_TENANT, List.of(obj1, obj2)));
+        assertThrows(EMetadataWrongType.class, () ->
+                dal.savePreallocatedObjects(TEST_TENANT, List.of(obj1, obj2)));
     }
 }
