@@ -20,10 +20,10 @@ ext {
 
     // Core platform technologies
     netty_version = '4.1.86.Final'
-    guava_version = '32.0.0-jre'
-    proto_version = '3.21.10'
-    grpc_version = '1.49.0'
-    gapi_version = '2.9.2'
+    guava_version = '32.0.1-jre'
+    proto_version = '3.23.3'
+    grpc_version = '1.56.0'
+    gapi_version = '2.20.0'
 
 
     // Data technologies
