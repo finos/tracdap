@@ -197,7 +197,7 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
         }
         catch (SQLException error) {
 
-            JdbcError.idNotAllocated(error, dialect, parts);
+            JdbcError.idNotPreallocated(error, dialect, parts);
             JdbcError.idAlreadyInUse(error, dialect, parts);
             JdbcError.wrongObjectType(error, dialect, parts);
 

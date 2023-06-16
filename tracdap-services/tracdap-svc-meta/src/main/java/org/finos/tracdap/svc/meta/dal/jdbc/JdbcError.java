@@ -37,20 +37,20 @@ class JdbcError {
     static final String DUPLICATE_OBJECT_ID = "Duplicate object ID for {0} [{1}]";
     static final String DUPLICATE_OBJECT_ID_MULTIPLE = "Duplicate object ID for one or more objects";
 
-    static final String ID_NOT_ALLOCATED = "Object ID was not allocated for {0} [{1}]";
-    static final String ID_NOT_ALLOCATED_MULTIPLE = "Object ID was not allocated for one or more objects";
+    static final String ID_NOT_PREALLOCATED = "Object ID was not preallocated for {0} [{1}]";
+    static final String ID_NOT_PREALLOCATED_MULTIPLE = "Object ID was not preallocated for one or more objects";
     static final String ID_ALREADY_IN_USE = "Object ID already in use for {0} [{1}]";
     static final String ID_ALREADY_IN_USE_MULTIPLE = "Object ID already in use for one or more objects";
 
-    static final String PRIOR_VERSION_MISSING = "Metadata not found for {0} [{1}] updating version {2}";
-    static final String PRIOR_VERSION_MISSING_MULTIPLE = "Metadata not found for one or more version updates";
-    static final String VERSION_SUPERSEDED = "Metadata has been superseded for {0} [{1}] updating version {2}";
-    static final String VERSION_SUPERSEDED_MULTIPLE = "Metadata has been superseded for one or more version updates";
+    static final String PRIOR_VERSION_MISSING = "Prior version not found for {0} [{1}] (version = {2})";
+    static final String PRIOR_VERSION_MISSING_MULTIPLE = "Prior version not found for one or more version updates";
+    static final String VERSION_SUPERSEDED = "Prior version has been superseded for {0} [{1}] (version = {2})";
+    static final String VERSION_SUPERSEDED_MULTIPLE = "Prior version has been superseded for one or more version updates";
 
-    static final String PRIOR_TAG_MISSING = "Metadata not found for {0} [{1}] updating tag {3} of version {2}";
-    static final String PRIOR_TAG_MISSING_MULTIPLE = "Metadata not found for one or more tag updates";
-    static final String TAG_SUPERSEDED = "Metadata has been superseded for {0} [{1}] updating tag {3} of version {2}";
-    static final String TAG_SUPERSEDED_MULTIPLE = "Metadata has been superseded for one or more tag updates";
+    static final String PRIOR_TAG_MISSING = "Prior tag not found for {0} [{1}] (version = {2}, tag = {3})";
+    static final String PRIOR_TAG_MISSING_MULTIPLE = "Prior tag not found for one or more tag updates";
+    static final String TAG_SUPERSEDED = "Prior tag has been superseded for {0} [{1}] (version = {2}, tag = {3})";
+    static final String TAG_SUPERSEDED_MULTIPLE = "Prior tag has been superseded for one or more tag updates";
 
     static final String UNRECOGNISED_ERROR_CODE = "Unrecognised SQL Error code: {0}, sqlstate = {1}, error code = {2}";
     static final String UNHANDLED_ERROR = "Unhandled SQL Error code: {0}";
@@ -126,7 +126,7 @@ class JdbcError {
         throw new EMetadataDuplicate(message, error);
     }
 
-    static void idNotAllocated(SQLException error, IDialect dialect, JdbcMetadataDal.ObjectParts parts) {
+    static void idNotPreallocated(SQLException error, IDialect dialect, JdbcMetadataDal.ObjectParts parts) {
 
         var code = dialect.mapErrorCode(error);
 
@@ -134,9 +134,9 @@ class JdbcError {
             return;
 
         if (parts.objectId.length != 1)
-            throw new EMetadataNotFound(ID_NOT_ALLOCATED_MULTIPLE, error);
+            throw new EMetadataNotFound(ID_NOT_PREALLOCATED_MULTIPLE, error);
 
-        var message = MessageFormat.format(ID_NOT_ALLOCATED,
+        var message = MessageFormat.format(ID_NOT_PREALLOCATED,
                 parts.objectType[0],
                 parts.objectId[0]);
 
