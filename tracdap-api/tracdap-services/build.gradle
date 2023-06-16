@@ -71,7 +71,7 @@ dependencies {
     api project(':tracdap-api-metadata')
 
     // Google APIs framework for REST APIs
-    api group: 'com.google.api.grpc', name: 'proto-google-common-protos', version: "$gapi_version"
+    api group: 'com.google.api.grpc', name: 'grpc-google-common-protos', version: "$gapi_version"
 
     // gRPC has a dependency on Guava - make sure we get the right version
     implementation group: 'com.google.guava', name: 'guava', version: "$guava_version"
