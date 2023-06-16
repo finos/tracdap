@@ -210,6 +210,10 @@ public class MetadataWriteService {
             String tenant, List<MetadataWriteRequest> requests,
             UserInfo userInfo, OffsetDateTime timestamp) {
 
+        // Do not query the DAL if there are no requests
+        if (requests.isEmpty())
+            return List.of();
+
         var priorIds = requests.stream().map(MetadataWriteRequest::getPriorVersion).collect(Collectors.toList());
         var priorVersions = dal.loadObjects(tenant, priorIds);
 
@@ -241,6 +245,10 @@ public class MetadataWriteService {
     private List<Tag> processNewTags(
             String tenant, List<MetadataWriteRequest> requests,
             UserInfo userInfo, OffsetDateTime timestamp) {
+
+        // Do not query the DAL if there are no requests
+        if (requests.isEmpty())
+            return List.of();
 
         var priorIds = requests.stream().map(MetadataWriteRequest::getPriorVersion).collect(Collectors.toList());
         var priorTags = dal.loadObjects(tenant, priorIds);
