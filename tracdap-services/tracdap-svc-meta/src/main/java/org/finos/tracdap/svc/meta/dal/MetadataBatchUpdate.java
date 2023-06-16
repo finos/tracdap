@@ -64,4 +64,21 @@ public class MetadataBatchUpdate {
     public List<Tag> getNewTags() {
         return newTags;
     }
+
+    @Override
+    public String toString() {
+
+        // For logging / debugging
+
+        var nPrealloatedIds = preallocatedIds == null ? "(null)" : preallocatedIds.size();
+        var nPreallocatedObjects = preallocatedIds == null ? "(null)" : preallocatedObjects.size();
+        var nNewObjects = preallocatedIds == null ? "(null)" : newObjects.size();
+        var nNewVersions = preallocatedIds == null ? "(null)" : newVersions.size();
+        var nNewTags = preallocatedIds == null ? "(null)" : newTags.size();
+
+        return String.format(
+                "{preallocatedIds = %s, preallocatedObjects = %s, newObjects = %s, newVersions = %s, newTags = %s}",
+                nPrealloatedIds, nPreallocatedObjects,
+                nNewObjects, nNewVersions, nNewTags);
+    }
 }
