@@ -16,6 +16,7 @@
 
 package org.finos.tracdap.svc.meta.dal;
 
+import org.finos.tracdap.common.metadata.MetadataUtil;
 import org.finos.tracdap.metadata.ObjectType;
 import org.finos.tracdap.common.exception.EMetadataDuplicate;
 import org.finos.tracdap.common.exception.EMetadataNotFound;
@@ -26,6 +27,7 @@ import java.util.List;
 import java.util.UUID;
 
 import org.finos.tracdap.metadata.TagHeader;
+import org.finos.tracdap.metadata.TagSelector;
 import org.finos.tracdap.test.meta.IDalTestable;
 import org.finos.tracdap.test.meta.JdbcUnit;
 import org.finos.tracdap.test.meta.JdbcIntegration;
@@ -428,11 +430,22 @@ abstract class MetadataDalWriteTest implements IDalTestable {
         dal.saveNewObjects(TEST_TENANT, Collections.singletonList(origTag2));
 
         assertThrows(EMetadataWrongType.class, () -> dal.saveNewTags(TEST_TENANT, List.of(nextTag, nextTag2)));
-        assertThrows(EMetadataNotFound.class, () -> dal.loadTags(TEST_TENANT,
-                List.of(ObjectType.DATA, ObjectType.MODEL),
-                List.of(origId, origId2),
-                List.of(1, 1),
-                List.of(2, 2)));
+
+        var selector1 = TagSelector.newBuilder()
+                .setObjectType(ObjectType.DATA)
+                .setObjectId(origId.toString())
+                .setObjectVersion(1)
+                .setTagVersion(2)
+                .build();
+
+        var selector2 = TagSelector.newBuilder()
+                .setObjectType(ObjectType.MODEL)
+                .setObjectId(origId2.toString())
+                .setObjectVersion(1)
+                .setTagVersion(2)
+                .build();
+
+        assertThrows(EMetadataNotFound.class, () -> dal.loadObjects(TEST_TENANT, List.of(selector1, selector2)));
     }
 
     @Test

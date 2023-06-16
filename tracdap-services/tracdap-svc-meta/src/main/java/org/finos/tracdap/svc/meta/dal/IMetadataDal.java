@@ -65,8 +65,11 @@ public interface IMetadataDal {
     }
 
     // -----------------------------------------------------------------------------------------------------------------
-    // LEGACY LOAD METHODS
+    // LEGACY LOAD API
     // -----------------------------------------------------------------------------------------------------------------
+
+    // Legacy API for loading a single object with explicit versions
+    // Now this is just a wrapper around loadObject(), there is no need to implement separately
 
     default Tag loadTag(String tenant, ObjectType objectType, UUID objectId, int objectVersion, int tagVersion) {
 
@@ -78,24 +81,5 @@ public interface IMetadataDal {
                 .build();
 
         return loadObject(tenant, selector);
-    }
-
-    default List<Tag> loadTags(String tenant, List<ObjectType> objectTypes, List<UUID> objectIds, List<Integer> objectVersions, List<Integer> tagVersions) {
-
-        var selectors = new ArrayList<TagSelector>(objectIds.size());
-
-        for (int i = 0; i < objectIds.size(); i++) {
-
-            var selector = TagSelector.newBuilder()
-                    .setObjectType(objectTypes.get(i))
-                    .setObjectId(objectIds.get(i).toString())
-                    .setObjectVersion(objectVersions.get(i))
-                    .setTagVersion(tagVersions.get(i))
-                    .build();
-
-            selectors.add(selector);
-        }
-
-        return loadObjects(tenant, selectors);
     }
 }
