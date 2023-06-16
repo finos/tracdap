@@ -145,7 +145,8 @@ public class MetadataWriteService {
 
         for (var request : requests) {
 
-            // TODO: One function to allocate / log new IDs
+            // Assigning object IDs could be moved to a central function and logged
+            // There's nothing special about them though, so this is fine for now
             var objectId = UUID.randomUUID();
 
             var preallocatedId = TagHeader.newBuilder()
@@ -190,7 +191,8 @@ public class MetadataWriteService {
 
         for (var request : requests) {
 
-            // TODO: One function to allocate / log new IDs
+            // Assigning object IDs could be moved to a central function and logged
+            // There's nothing special about them though, so this is fine for now
             var objectId = UUID.randomUUID();
 
             var newObject = buildNewObject(
@@ -224,7 +226,9 @@ public class MetadataWriteService {
             var request = requests.get(i);
             var priorVersion = priorVersions.get(i);
 
-            // TODO: Validate for all and collect errors?
+            // TODO: Apply the version validator in bulk across a batch of updates
+            // Will need an update in the validator, currently 50 object updates -> 50 separate validation passes
+
             validator.validateVersion(
                     request.getDefinition(),
                     priorVersion.getDefinition());
@@ -345,6 +349,8 @@ public class MetadataWriteService {
             UserInfo userInfo, OffsetDateTime timestamp) {
 
         // TODO: Record user info for tag-only updates
+        // Audit history for object revisions is most important
+        // Audit for tag updates will be needed too at some point
 
         var oldHeader = priorTag.getHeader();
 
