@@ -541,7 +541,7 @@ message MetadataWriteBatchRequest {
      *
      * This request type is only available in the internal metadata API.
      */
-    repeated MetadataWriteRequest createPreallocated = 6;
+    repeated MetadataWriteRequest createPreallocatedObjects = 6;
 };
 
 
@@ -579,7 +579,7 @@ message MetadataWriteBatchResponse {
      *
      * This response type is only available in the internal metadata API.
      */
-    repeated metadata.TagHeader createPreallocated = 5;
+    repeated metadata.TagHeader createPreallocatedObjects = 5;
 };
 
 
