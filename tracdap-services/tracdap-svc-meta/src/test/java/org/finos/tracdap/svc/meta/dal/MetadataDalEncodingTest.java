@@ -65,7 +65,7 @@ abstract class MetadataDalEncodingTest implements IDalTestable {
         var origId = UUID.fromString(origTag.getHeader().getObjectId());
 
         dal.saveNewObjects(TEST_TENANT, Collections.singletonList(origTag));
-        var result = dal.loadTag(TEST_TENANT, ObjectType.DATA, origId, 1, 1);
+        var result = dal.loadObject(TEST_TENANT, ObjectType.DATA, origId, 1, 1);
 
         assertEquals(origTag, result);
     }
@@ -79,7 +79,7 @@ abstract class MetadataDalEncodingTest implements IDalTestable {
         var origId = UUID.fromString(origTag.getHeader().getObjectId());
 
         dal.saveNewObjects(TEST_TENANT, Collections.singletonList(origTag));
-        var result = dal.loadTag(TEST_TENANT, objectType, origId, 1, 1);
+        var result = dal.loadObject(TEST_TENANT, objectType, origId, 1, 1);
 
         assertEquals(origTag, result);
     }
@@ -101,7 +101,7 @@ abstract class MetadataDalEncodingTest implements IDalTestable {
                 .build();
 
         dal.saveNewObjects(TEST_TENANT, Collections.singletonList(testTag));
-        var result = dal.loadTag(TEST_TENANT, ObjectType.DATA, origId, 1, 1);
+        var result = dal.loadObject(TEST_TENANT, ObjectType.DATA, origId, 1, 1);
 
         assertEquals(testTag, result);
     }

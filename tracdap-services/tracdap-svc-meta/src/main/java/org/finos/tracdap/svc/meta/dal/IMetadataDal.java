@@ -18,7 +18,6 @@ package org.finos.tracdap.svc.meta.dal;
 
 import org.finos.tracdap.metadata.*;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -54,7 +53,8 @@ public interface IMetadataDal {
     // -----------------------------------------------------------------------------------------------------------------
 
     // These two methods are functionally equivalent to loadObjects()
-    // They are provided as alternates in case implementations want to perform different error handling
+    // They are used when the write service to load prior versions during object / tag updates
+    // It is fine to use the default versions, or implementations can override to provide different error handling
 
     default List<Tag> loadPriorObjects(String tenant, List<TagSelector> selector) {
         return loadObjects(tenant, selector);
@@ -69,9 +69,9 @@ public interface IMetadataDal {
     // -----------------------------------------------------------------------------------------------------------------
 
     // Legacy API for loading a single object with explicit versions
-    // Now this is just a wrapper around loadObject(), there is no need to implement separately
+    // This is just a convenience wrapper and should not be implemented separately
 
-    default Tag loadTag(String tenant, ObjectType objectType, UUID objectId, int objectVersion, int tagVersion) {
+    default Tag loadObject(String tenant, ObjectType objectType, UUID objectId, int objectVersion, int tagVersion) {
 
         var selector = TagSelector.newBuilder()
                 .setObjectType(objectType)
