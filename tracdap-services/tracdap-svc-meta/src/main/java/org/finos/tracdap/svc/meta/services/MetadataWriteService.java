@@ -114,7 +114,7 @@ public class MetadataWriteService {
         var timestamp = Instant.now().atOffset(ZoneOffset.UTC);
 
         var preallocatedIds = processPreallocatedIds(request.getPreallocateIdsList());
-        var preallocatedObjects = processPreallocatedObjects(request.getCreatePreallocatedList(), userInfo, timestamp);
+        var preallocatedObjects = processPreallocatedObjects(request.getCreatePreallocatedObjectsList(), userInfo, timestamp);
         var newObjects = processNewObjects(request.getCreateObjectsList(), userInfo, timestamp);
         var newVersions = processNewVersions(tenant, request.getUpdateObjectsList(), userInfo, timestamp);
         var newTags = processNewTags(tenant, request.getUpdateTagsList(), userInfo, timestamp);
@@ -132,7 +132,7 @@ public class MetadataWriteService {
 
         return MetadataWriteBatchResponse.newBuilder()
                 .addAllPreallocateIds(preallocatedIds)
-                .addAllCreatePreallocated(preallocatedObjectIds)
+                .addAllCreatePreallocatedObjects(preallocatedObjectIds)
                 .addAllCreateObjects(newObjectIds)
                 .addAllUpdateObjects(newVersionIds)
                 .addAllUpdateTags(newTagIds)

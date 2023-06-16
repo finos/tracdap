@@ -66,7 +66,7 @@ public class JobProcessorHelpers {
         } else if (!update.hasPriorVersion()) {
             builder.addCreateObjects(update);
         } else if (update.getPriorVersion().getObjectVersion() < OBJECT_FIRST_VERSION) {
-            builder.addCreatePreallocated(update);
+            builder.addCreatePreallocatedObjects(update);
         } else {
             builder.addUpdateObjects(update);
         }
@@ -358,10 +358,10 @@ public class JobProcessorHelpers {
 
     private static boolean isAnyToSend(MetadataWriteBatchRequest request) {
         var c = 0;
+        c += request.getCreatePreallocatedObjectsCount();
         c += request.getCreateObjectsCount();
         c += request.getUpdateObjectsCount();
         c += request.getUpdateTagsCount();
-        c += request.getCreatePreallocatedCount();
         return c != 0;
     }
 

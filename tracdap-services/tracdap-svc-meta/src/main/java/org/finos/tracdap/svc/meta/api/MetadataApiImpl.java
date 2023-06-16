@@ -124,7 +124,7 @@ public class MetadataApiImpl {
         validateRequest(TrustedMetadataApiGrpc.getWriteBatchMethod(), request);
 
         validateListForObjectType(request.getPreallocateIdsList());
-        validateListForObjectType(request.getCreatePreallocatedList());
+        validateListForObjectType(request.getCreatePreallocatedObjectsList());
         validateListForObjectType(request.getCreateObjectsList());
         validateListForObjectType(request.getUpdateObjectsList());
 

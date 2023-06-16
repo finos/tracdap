@@ -2345,10 +2345,10 @@ abstract class MetadataWriteApiTest {
 
         var writeRequest = MetadataWriteBatchRequest.newBuilder()
                 .setTenant(TEST_TENANT)
-                .addAllCreatePreallocated(requestsData.stream().map(r -> r.writeRequest).collect(Collectors.toList()))
+                .addAllCreatePreallocatedObjects(requestsData.stream().map(r -> r.writeRequest).collect(Collectors.toList()))
                 .build();
 
-        var tagHeaders = trustedApi.writeBatch(writeRequest).getCreatePreallocatedList();
+        var tagHeaders = trustedApi.writeBatch(writeRequest).getCreatePreallocatedObjectsList();
         assertEquals(13, tagHeaders.size());
 
         for (int i = 0; i < 13; i++) {
@@ -2420,7 +2420,7 @@ abstract class MetadataWriteApiTest {
 
         var writeBatchRequest = MetadataWriteBatchRequest.newBuilder()
                 .setTenant(TEST_TENANT)
-                .addAllCreatePreallocated(writeRequests)
+                .addAllCreatePreallocatedObjects(writeRequests)
                 .build();
 
         var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.writeBatch(writeBatchRequest));

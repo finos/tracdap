@@ -52,7 +52,7 @@ public class MetadataApiValidator {
     private static final Descriptors.FieldDescriptor MWBR_UPDATE_OBJECTS;
     private static final Descriptors.FieldDescriptor MWBR_UPDATE_TAGS;
     private static final Descriptors.FieldDescriptor MWBR_PREALLOCATE_IDS;
-    private static final Descriptors.FieldDescriptor MWBR_CREATE_PREALLOCATED;
+    private static final Descriptors.FieldDescriptor MWBR_CREATE_PREALLOCATED_OBJECTS;
 
     private static final Descriptors.Descriptor METADATA_READ_REQUEST;
     private static final Descriptors.FieldDescriptor MRR_TENANT;
@@ -96,7 +96,7 @@ public class MetadataApiValidator {
         MWBR_UPDATE_OBJECTS = field(METADATA_WRITE_BATCH_REQUEST, MetadataWriteBatchRequest.UPDATEOBJECTS_FIELD_NUMBER);
         MWBR_UPDATE_TAGS = field(METADATA_WRITE_BATCH_REQUEST, MetadataWriteBatchRequest.UPDATETAGS_FIELD_NUMBER);
         MWBR_PREALLOCATE_IDS = field(METADATA_WRITE_BATCH_REQUEST, MetadataWriteBatchRequest.PREALLOCATEIDS_FIELD_NUMBER);
-        MWBR_CREATE_PREALLOCATED = field(METADATA_WRITE_BATCH_REQUEST, MetadataWriteBatchRequest.CREATEPREALLOCATED_FIELD_NUMBER);
+        MWBR_CREATE_PREALLOCATED_OBJECTS = field(METADATA_WRITE_BATCH_REQUEST, MetadataWriteBatchRequest.CREATEPREALLOCATEDOBJECTS_FIELD_NUMBER);
 
         METADATA_SEARCH_REQUEST = MetadataSearchRequest.getDescriptor();
         MSR_TENANT = field(METADATA_SEARCH_REQUEST, MetadataSearchRequest.TENANT_FIELD_NUMBER);
@@ -250,7 +250,7 @@ public class MetadataApiValidator {
             msg.getUpdateObjectsCount() == 0 &&
             msg.getUpdateTagsCount() == 0 &&
             msg.getPreallocateIdsCount() == 0 &&
-            msg.getCreatePreallocatedCount() == 0) {
+            msg.getCreatePreallocatedObjectsCount() == 0) {
 
             return ctx.error("Write batch request does not contain any operations");
         }
@@ -273,7 +273,7 @@ public class MetadataApiValidator {
                 .applyRepeated((m, c) -> preallocateId(m, c, msg.getTenant()), MetadataWriteRequest.class)
                 .pop();
 
-        ctx = ctx.pushRepeated(MWBR_CREATE_PREALLOCATED)
+        ctx = ctx.pushRepeated(MWBR_CREATE_PREALLOCATED_OBJECTS)
                 .applyRepeated((m, c) -> createPreallocatedObject(m, c, msg.getTenant()), MetadataWriteRequest.class)
                 .applyRepeated(uniquePriorObject(), MetadataWriteRequest.class)
                 .pop();
