@@ -91,22 +91,25 @@ public class LoggingClientInterceptor implements ClientInterceptor {
         public void onClose(Status status, Metadata trailers) {
 
             if (status.isOk()) {
+
                 log.info("CLIENT CALL SUCCEEDED: {}", methodName);
+            }
+            else if (status.getCause() != null) {
+
+                log.error("CLIENT CALL FAILED: {} {}",
+                        methodName,
+                        status.getDescription(),
+                        status.getCause());
             }
             else {
 
-                // There is no GrpcErrorMapping.processError, because:
-                // 1) grpcError is always StatusRuntimeException
-                // 2) GrpcErrorMapping.processError passes through StatusRuntimeException
+                // When a failed status has no cause, it is not possible to get a helpful stack trace
+                // For client calls, it may be possible to get a stack trace by using an error interceptor
+                // Create an error when the call starts, and use it as the cause if there is a failure
+                // This would impact the server-side error mapping logic, which looks at causes for failed status
 
-                var grpcError = status.asRuntimeException();
-
-                log.error(
-                        "CLIENT CALL FAILED: {} {}",
-                        methodName,
-                        grpcError.getMessage(),
-                        grpcError
-                );
+                log.error("CLIENT CALL FAILED: {} {}", methodName, status.getDescription());
+                log.error("(stack trace not available)");
             }
 
             delegate().onClose(status, trailers);

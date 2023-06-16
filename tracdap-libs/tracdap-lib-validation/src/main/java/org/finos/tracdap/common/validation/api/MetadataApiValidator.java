@@ -17,6 +17,7 @@
 package org.finos.tracdap.common.validation.api;
 
 import org.finos.tracdap.api.*;
+import org.finos.tracdap.common.metadata.MetadataUtil;
 import org.finos.tracdap.common.validation.core.ValidationContext;
 import org.finos.tracdap.common.validation.core.ValidationFunction;
 import org.finos.tracdap.common.validation.core.ValidationType;
@@ -45,6 +46,14 @@ public class MetadataApiValidator {
     private static final Descriptors.FieldDescriptor MWR_DEFINITION;
     private static final Descriptors.FieldDescriptor MWR_ATTRS;
 
+    private static final Descriptors.Descriptor METADATA_WRITE_BATCH_REQUEST;
+    private static final Descriptors.FieldDescriptor MWBR_TENANT;
+    private static final Descriptors.FieldDescriptor MWBR_CREATE_OBJECTS;
+    private static final Descriptors.FieldDescriptor MWBR_UPDATE_OBJECTS;
+    private static final Descriptors.FieldDescriptor MWBR_UPDATE_TAGS;
+    private static final Descriptors.FieldDescriptor MWBR_PREALLOCATE_IDS;
+    private static final Descriptors.FieldDescriptor MWBR_CREATE_PREALLOCATED_OBJECTS;
+
     private static final Descriptors.Descriptor METADATA_READ_REQUEST;
     private static final Descriptors.FieldDescriptor MRR_TENANT;
     private static final Descriptors.FieldDescriptor MRR_SELECTOR;
@@ -52,10 +61,6 @@ public class MetadataApiValidator {
     private static final Descriptors.Descriptor BATCH_READ_REQUEST;
     private static final Descriptors.FieldDescriptor BRR_TENANT;
     private static final Descriptors.FieldDescriptor BRR_SELECTORS;
-
-    private static final Descriptors.Descriptor BATCH_WRITE_REQUEST;
-    private static final Descriptors.FieldDescriptor BWR_TENANT;
-    private static final Descriptors.FieldDescriptor BWR_REQUESTS;
 
     private static final Descriptors.Descriptor METADATA_SEARCH_REQUEST;
     private static final Descriptors.FieldDescriptor MSR_TENANT;
@@ -67,9 +72,6 @@ public class MetadataApiValidator {
     private static final Descriptors.FieldDescriptor MGR_OBJECT_ID;
     private static final Descriptors.FieldDescriptor MGR_OBJECT_VERSION;
     private static final Descriptors.FieldDescriptor MGR_TAG_VERSION;
-
-    private static final Descriptors.Descriptor UNIVERSAL_METADATA_WRITE_BATCH_REQUEST;
-    private static final Descriptors.FieldDescriptor UMWBR_TENANT;
 
     static {
 
@@ -88,9 +90,13 @@ public class MetadataApiValidator {
         BRR_TENANT = field(BATCH_READ_REQUEST, MetadataBatchRequest.TENANT_FIELD_NUMBER);
         BRR_SELECTORS = field(BATCH_READ_REQUEST, MetadataBatchRequest.SELECTOR_FIELD_NUMBER);
 
-        BATCH_WRITE_REQUEST = MetadataWriteBatchRequest.getDescriptor();
-        BWR_TENANT = field(BATCH_WRITE_REQUEST, MetadataWriteBatchRequest.TENANT_FIELD_NUMBER);
-        BWR_REQUESTS = field(BATCH_WRITE_REQUEST, MetadataWriteBatchRequest.REQUESTS_FIELD_NUMBER);
+        METADATA_WRITE_BATCH_REQUEST = MetadataWriteBatchRequest.getDescriptor();
+        MWBR_TENANT = field(METADATA_WRITE_BATCH_REQUEST, MetadataWriteBatchRequest.TENANT_FIELD_NUMBER);
+        MWBR_CREATE_OBJECTS = field(METADATA_WRITE_BATCH_REQUEST, MetadataWriteBatchRequest.CREATEOBJECTS_FIELD_NUMBER);
+        MWBR_UPDATE_OBJECTS = field(METADATA_WRITE_BATCH_REQUEST, MetadataWriteBatchRequest.UPDATEOBJECTS_FIELD_NUMBER);
+        MWBR_UPDATE_TAGS = field(METADATA_WRITE_BATCH_REQUEST, MetadataWriteBatchRequest.UPDATETAGS_FIELD_NUMBER);
+        MWBR_PREALLOCATE_IDS = field(METADATA_WRITE_BATCH_REQUEST, MetadataWriteBatchRequest.PREALLOCATEIDS_FIELD_NUMBER);
+        MWBR_CREATE_PREALLOCATED_OBJECTS = field(METADATA_WRITE_BATCH_REQUEST, MetadataWriteBatchRequest.CREATEPREALLOCATEDOBJECTS_FIELD_NUMBER);
 
         METADATA_SEARCH_REQUEST = MetadataSearchRequest.getDescriptor();
         MSR_TENANT = field(METADATA_SEARCH_REQUEST, MetadataSearchRequest.TENANT_FIELD_NUMBER);
@@ -102,57 +108,17 @@ public class MetadataApiValidator {
         MGR_OBJECT_ID = field(METADATA_GET_REQUEST, MetadataGetRequest.OBJECTID_FIELD_NUMBER);
         MGR_OBJECT_VERSION = field(METADATA_GET_REQUEST, MetadataGetRequest.OBJECTVERSION_FIELD_NUMBER);
         MGR_TAG_VERSION = field(METADATA_GET_REQUEST, MetadataGetRequest.TAGVERSION_FIELD_NUMBER);
-
-        UNIVERSAL_METADATA_WRITE_BATCH_REQUEST = UniversalMetadataWriteBatchRequest.getDescriptor();
-        UMWBR_TENANT = field(UNIVERSAL_METADATA_WRITE_BATCH_REQUEST, UniversalMetadataWriteBatchRequest.TENANT_FIELD_NUMBER);
-    }
-
-    @Validator(method = "writeBatch")
-    public static ValidationContext writeBatch(UniversalMetadataWriteBatchRequest msg, ValidationContext ctx) {
-        return writeBatch(msg, ctx, MetadataApiValidator.PUBLIC_API);
-    }
-
-    public static ValidationContext writeBatch(UniversalMetadataWriteBatchRequest msg, ValidationContext ctx, boolean apiTrust) {
-        ctx = ctx.push(UMWBR_TENANT)
-                .apply(CommonValidators::required)
-                .apply(CommonValidators::identifier)
-                .pop();
-
-        var knownObjectIds = new HashSet<String>();
-        var objectIdCheck = uniqueObjectIdCheck(knownObjectIds);
-
-        ctx = ctx.pushRepeated(field(UNIVERSAL_METADATA_WRITE_BATCH_REQUEST, UniversalMetadataWriteBatchRequest.CREATEOBJECTS_FIELD_NUMBER))
-                .applyRepeated((m, c) -> createObject(m, c, apiTrust, false), MetadataWriteRequest.class)
-                .applyRepeated(objectIdCheck, MetadataWriteRequest.class)
-                .pop();
-
-        ctx = ctx.pushRepeated(field(UNIVERSAL_METADATA_WRITE_BATCH_REQUEST, UniversalMetadataWriteBatchRequest.PREALLOCATEOBJECTS_FIELD_NUMBER))
-                .applyRepeated((m, c) -> createPreallocatedObject(m, c, false), MetadataWriteRequest.class)
-                .applyRepeated(objectIdCheck, MetadataWriteRequest.class)
-                .pop();
-
-        ctx = ctx.pushRepeated(field(UNIVERSAL_METADATA_WRITE_BATCH_REQUEST, UniversalMetadataWriteBatchRequest.UPDATEOBJECTS_FIELD_NUMBER))
-                .applyRepeated((m, c) -> updateObject(m, c, apiTrust, false), MetadataWriteRequest.class)
-                .applyRepeated(objectIdCheck, MetadataWriteRequest.class)
-                .pop();
-
-        ctx = ctx.pushRepeated(field(UNIVERSAL_METADATA_WRITE_BATCH_REQUEST, UniversalMetadataWriteBatchRequest.UPDATETAGS_FIELD_NUMBER))
-                .applyRepeated((m, c) -> updateTag(m, c, apiTrust, false), MetadataWriteRequest.class)
-                .applyRepeated(objectIdCheck, MetadataWriteRequest.class)
-                .pop();
-
-        return ctx;
     }
 
     @Validator(method = "createObject")
     public static ValidationContext createObject(MetadataWriteRequest msg, ValidationContext ctx) {
 
-        return createObject(msg, ctx, PUBLIC_API, true);
+        return createObject(msg, ctx, PUBLIC_API, null);
     }
 
-    static ValidationContext createObject(MetadataWriteRequest msg, ValidationContext ctx, boolean apiTrust, boolean tenantRequired) {
+    static ValidationContext createObject(MetadataWriteRequest msg, ValidationContext ctx, boolean apiTrust, String expectedTenant) {
 
-        ctx = createOrUpdate(ctx, false, apiTrust, tenantRequired);
+        ctx = createOrUpdate(ctx, false, apiTrust, expectedTenant);
 
         ctx = ctx.push(MWR_PRIOR_VERSION)
                 .apply(CommonValidators::omitted)
@@ -170,12 +136,12 @@ public class MetadataApiValidator {
     @Validator(method = "updateObject")
     public static ValidationContext updateObject(MetadataWriteRequest msg, ValidationContext ctx) {
 
-        return updateObject(msg, ctx, PUBLIC_API, true);
+        return updateObject(msg, ctx, PUBLIC_API, null);
     }
 
-    static ValidationContext updateObject(MetadataWriteRequest msg, ValidationContext ctx, boolean apiTrust, boolean tenantRequired) {
+    static ValidationContext updateObject(MetadataWriteRequest msg, ValidationContext ctx, boolean apiTrust, String expectedTenant) {
 
-        ctx = createOrUpdate(ctx, true, apiTrust, tenantRequired);
+        ctx = createOrUpdate(ctx, true, apiTrust, expectedTenant);
 
         ctx = ctx.push(MWR_PRIOR_VERSION)
                 .apply(CommonValidators::required)
@@ -196,12 +162,12 @@ public class MetadataApiValidator {
     @Validator(method = "updateTag")
     public static ValidationContext updateTag(MetadataWriteRequest msg, ValidationContext ctx) {
 
-        return updateTag(msg, ctx, PUBLIC_API, true);
+        return updateTag(msg, ctx, PUBLIC_API, null);
     }
 
-    static ValidationContext updateTag(MetadataWriteRequest msg, ValidationContext ctx, boolean apiTrust, boolean tenantRequired) {
+    static ValidationContext updateTag(MetadataWriteRequest msg, ValidationContext ctx, boolean apiTrust, String expectedTenant) {
 
-        ctx = createOrUpdate(ctx, false, apiTrust, tenantRequired);
+        ctx = createOrUpdate(ctx, false, apiTrust, expectedTenant);
 
         ctx = ctx.push(MWR_PRIOR_VERSION)
                 .apply(CommonValidators::required)
@@ -220,11 +186,12 @@ public class MetadataApiValidator {
 
     static ValidationContext preallocateId(MetadataWriteRequest msg, ValidationContext ctx) {
 
-        return preallocateId(msg, ctx, true);
+        return preallocateId(msg, ctx, null);
     }
 
-    private static ValidationContext preallocateId(MetadataWriteRequest msg, ValidationContext ctx, boolean tenantRequired) {
-        ctx = createOrUpdate(ctx, false, TRUSTED_API, tenantRequired);
+    private static ValidationContext preallocateId(MetadataWriteRequest msg, ValidationContext ctx, String expectedTenant) {
+
+        ctx = createOrUpdate(ctx, false, TRUSTED_API, expectedTenant);
 
         ctx = ctx.push(MWR_PRIOR_VERSION)
                 .apply(CommonValidators::omitted)
@@ -237,29 +204,14 @@ public class MetadataApiValidator {
         return ctx;
     }
 
-    static ValidationContext preallocateIdBatch(MetadataWriteBatchRequest msg, ValidationContext ctx) {
-
-        ctx = ctx.push(BWR_TENANT)
-                .apply(CommonValidators::required)
-                .apply(CommonValidators::identifier)
-                .pop();
-
-        ctx = ctx.pushRepeated(BWR_REQUESTS)
-                .apply(CommonValidators::listNotEmpty)
-                .applyRepeated((MetadataWriteRequest r, ValidationContext c) ->
-                        MetadataApiValidator.preallocateId(r, c, false), MetadataWriteRequest.class)
-                .pop();
-
-        return ctx;
-    }
-
     static ValidationContext createPreallocatedObject(MetadataWriteRequest msg, ValidationContext ctx) {
 
-        return createPreallocatedObject(msg, ctx, true);
+        return createPreallocatedObject(msg, ctx, null);
     }
 
-    private static ValidationContext createPreallocatedObject(MetadataWriteRequest msg, ValidationContext ctx, boolean tenantRequired) {
-        ctx = createOrUpdate(ctx, false, TRUSTED_API, tenantRequired);
+    private static ValidationContext createPreallocatedObject(MetadataWriteRequest msg, ValidationContext ctx, String expectedTenantd) {
+
+        ctx = createOrUpdate(ctx, false, TRUSTED_API, expectedTenantd);
 
         // Do not use the regular tag selector validator (ObjectIdValidator::tagSelector)
         // The regular validator will enforce object and tag version > 0
@@ -277,19 +229,76 @@ public class MetadataApiValidator {
                 .apply(ObjectValidator::objectType, ObjectDefinition.class, msg.getObjectType())
                 .applyRegistered()
                 .pop();
+
         return ctx;
     }
 
-    private static ValidationContext createOrUpdate(ValidationContext ctx, boolean isVersioned, boolean apiTrust, boolean tenantRequired) {
+    @Validator(method = "writeBatch")
+    public static ValidationContext writeBatch(MetadataWriteBatchRequest msg, ValidationContext ctx) {
 
-        if (tenantRequired) {
+        return writeBatch(msg, ctx, PUBLIC_API);
+    }
+
+    public static ValidationContext writeBatch(MetadataWriteBatchRequest msg, ValidationContext ctx, boolean apiTrust) {
+
+        ctx = ctx.push(MWBR_TENANT)
+                .apply(CommonValidators::required)
+                .apply(CommonValidators::identifier)
+                .pop();
+
+        if (msg.getCreateObjectsCount() == 0 &&
+            msg.getUpdateObjectsCount() == 0 &&
+            msg.getUpdateTagsCount() == 0 &&
+            msg.getPreallocateIdsCount() == 0 &&
+            msg.getCreatePreallocatedObjectsCount() == 0) {
+
+            return ctx.error("Write batch request does not contain any operations");
+        }
+
+        ctx = ctx.pushRepeated(MWBR_CREATE_OBJECTS)
+                .applyRepeated((m, c) -> createObject(m, c, apiTrust, msg.getTenant()), MetadataWriteRequest.class)
+                .pop();
+
+        ctx = ctx.pushRepeated(MWBR_UPDATE_OBJECTS)
+                .applyRepeated((m, c) -> updateObject(m, c, apiTrust, msg.getTenant()), MetadataWriteRequest.class)
+                .applyRepeated(uniquePriorObject(), MetadataWriteRequest.class)
+                .pop();
+
+        ctx = ctx.pushRepeated(MWBR_UPDATE_TAGS)
+                .applyRepeated((m, c) -> updateTag(m, c, apiTrust, msg.getTenant()), MetadataWriteRequest.class)
+                .applyRepeated(uniquePriorVersion(), MetadataWriteRequest.class)
+                .pop();
+
+        ctx = ctx.pushRepeated(MWBR_PREALLOCATE_IDS)
+                .applyRepeated((m, c) -> preallocateId(m, c, msg.getTenant()), MetadataWriteRequest.class)
+                .pop();
+
+        ctx = ctx.pushRepeated(MWBR_CREATE_PREALLOCATED_OBJECTS)
+                .applyRepeated((m, c) -> createPreallocatedObject(m, c, msg.getTenant()), MetadataWriteRequest.class)
+                .applyRepeated(uniquePriorObject(), MetadataWriteRequest.class)
+                .pop();
+
+        return ctx;
+    }
+
+    private static ValidationContext createOrUpdate(ValidationContext ctx, boolean isVersioned, boolean apiTrust, String expectedTenant) {
+
+        // For individual requests, expectedTenant == null and the tenant must be specified in the request
+        if (expectedTenant == null) {
+
             ctx = ctx.push(MWR_TENANT)
                     .apply(CommonValidators::required)
                     .apply(CommonValidators::identifier)
                     .pop();
-        } else {
+        }
+        // For batch requests, expectedTenant is the batch request tenant
+        // Including tenant in the individual requests is optional, if it is specified it must match the batch request
+        else {
+
             ctx = ctx.push(MWR_TENANT)
-                    .apply(CommonValidators::omitted)
+                    .apply(CommonValidators::optional)
+                    .apply(CommonValidators::identifier)
+                    .apply(CommonValidators.equalTo(expectedTenant, "Tenant does not match the batch request"))
                     .pop();
         }
 
@@ -427,25 +436,46 @@ public class MetadataApiValidator {
         return ctx;
     }
 
-    private static ValidationFunction.Typed<MetadataWriteRequest> uniqueObjectIdCheck(Set<String> knownObjectIds) {
-        return (request, ctx) -> {
-            var objectId = request.getPriorVersion().getObjectId();
-            if (request.getPriorVersion().getObjectId().isEmpty()) {
-                return ctx;
-            }
+    private static ValidationFunction.Typed<MetadataWriteRequest> uniquePriorObject() {
 
-            if (knownObjectIds.contains(objectId)) {
+        var knownIds = new HashSet<String>();
+        return (msg, ctx) -> uniquePriorObject(msg, ctx, knownIds);
+    }
 
-                var err = String.format(
-                        "object ID [%s] is already modified in the write batch",
-                        objectId
-                );
+    private static ValidationContext uniquePriorObject(MetadataWriteRequest msg, ValidationContext ctx, Set<String> knownObjectIds) {
 
-                return ctx.error(err);
-            }
+        var priorId = msg.getPriorVersion().getObjectId();
+        var alreadyPresent = ! knownObjectIds.add(priorId);
 
-            knownObjectIds.add(objectId);
-            return ctx;
-        };
+        if (alreadyPresent) {
+
+            var err = String.format("Duplicate object ID [%s] in batch operation", priorId);
+            return ctx.error(err);
+        }
+
+        return ctx;
+    }
+
+    private static ValidationFunction.Typed<MetadataWriteRequest> uniquePriorVersion() {
+
+        var knownVersions = new HashSet<String>();
+        return (msg, ctx) -> uniquePriorVersion(msg, ctx, knownVersions);
+    }
+
+    private static ValidationContext uniquePriorVersion(MetadataWriteRequest msg, ValidationContext ctx, Set<String> knownObjectIds) {
+
+        var priorKey = MetadataUtil.objectKey(msg.getPriorVersion());
+        var alreadyPresent = ! knownObjectIds.add(priorKey);
+
+        if (alreadyPresent) {
+
+            var err = String.format(
+                    "Duplicate operation for object [%s] version [%d] in batch operation",
+                    msg.getPriorVersion().getObjectId(), msg.getPriorVersion().getObjectVersion());
+
+            return ctx.error(err);
+        }
+
+        return ctx;
     }
 }

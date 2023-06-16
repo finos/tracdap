@@ -36,27 +36,22 @@ public class MetadataTrustedApiValidator {
 
     @Validator(method = "createObject")
     public static ValidationContext createObject(MetadataWriteRequest msg, ValidationContext ctx) {
-        return MetadataApiValidator.createObject(msg, ctx, MetadataApiValidator.TRUSTED_API, true);
+        return MetadataApiValidator.createObject(msg, ctx, MetadataApiValidator.TRUSTED_API, null);
     }
 
     @Validator(method = "updateObject")
     public static ValidationContext updateObject(MetadataWriteRequest msg, ValidationContext ctx) {
-        return MetadataApiValidator.updateObject(msg, ctx, MetadataApiValidator.TRUSTED_API, true);
+        return MetadataApiValidator.updateObject(msg, ctx, MetadataApiValidator.TRUSTED_API, null);
     }
 
     @Validator(method = "updateTag")
     public static ValidationContext updateTag(MetadataWriteRequest msg, ValidationContext ctx) {
-        return MetadataApiValidator.updateTag(msg, ctx, MetadataApiValidator.TRUSTED_API, true);
+        return MetadataApiValidator.updateTag(msg, ctx, MetadataApiValidator.TRUSTED_API, null);
     }
 
     @Validator(method = "preallocateId")
     public static ValidationContext preallocateId(MetadataWriteRequest msg, ValidationContext ctx) {
         return MetadataApiValidator.preallocateId(msg, ctx);  // always a trusted call
-    }
-
-    @Validator(method = "preallocateIdBatch")
-    public static ValidationContext preallocateIdBatch(MetadataWriteBatchRequest msg, ValidationContext ctx) {
-        return MetadataApiValidator.preallocateIdBatch(msg, ctx);  // always a trusted call
     }
 
     @Validator(method = "createPreallocatedObject")
@@ -65,7 +60,7 @@ public class MetadataTrustedApiValidator {
     }
 
     @Validator(method = "writeBatch")
-    public static ValidationContext writeBatch(UniversalMetadataWriteBatchRequest msg, ValidationContext ctx) {
+    public static ValidationContext writeBatch(MetadataWriteBatchRequest msg, ValidationContext ctx) {
         return MetadataApiValidator.writeBatch(msg, ctx, MetadataApiValidator.TRUSTED_API);
     }
 

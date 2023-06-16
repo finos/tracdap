@@ -31,8 +31,7 @@ public class LoggingServerInterceptor implements ServerInterceptor {
 
     @Override
     public <ReqT, RespT> ServerCall.Listener<ReqT> interceptCall(
-            ServerCall<ReqT, RespT> call,
-            Metadata headers,
+            ServerCall<ReqT, RespT> call, Metadata headers,
             ServerCallHandler<ReqT, RespT> next) {
 
         var method = call.getMethodDescriptor();
@@ -68,15 +67,27 @@ public class LoggingServerInterceptor implements ServerInterceptor {
             var method = getMethodDescriptor();
 
             if (status.isOk()) {
+
                 log.info("API CALL SUCCEEDED: {}()", method.getBareMethodName());
             }
-            else {
-                var grpcError = status.asRuntimeException();
-                // There is no GrpcErrorMapping.processError, because:
-                // 1) grpcError is always StatusRuntimeException
-                // 2) GrpcErrorMapping.processError passes through StatusRuntimeException
+            else if (status.getCause() != null) {
 
-                log.error("API CALL FAILED: {}() {}", method.getBareMethodName(), grpcError.getMessage(), grpcError);
+                // Error mapping has already happened in ErrorMappingInterceptor
+
+                log.error("API CALL FAILED: {}() {}",
+                        method.getBareMethodName(),
+                        status.getDescription(),
+                        status.getCause());
+            }
+            else {
+
+                // When a failed status has no cause, it is not possible to get a helpful stack trace
+                // Calling status.asRuntimeException() will make a stack trace for this logging interceptor
+                // Typically this happens when gRPC status exceptions are created by directly by application code
+                // The solution is to always raise an ETrac* error in application error handling
+
+                log.error("API CALL FAILED: {}() {}", method.getBareMethodName(), status.getDescription());
+                log.error("(stack trace not available)");
             }
 
             delegate().close(status, trailers);

@@ -55,7 +55,7 @@ abstract class MetadataWriteApiTest {
     static class UnitTest extends MetadataWriteApiTest {
 
         @RegisterExtension
-        private static final PlatformTest platform = PlatformTest.forConfig(TRAC_CONFIG_UNIT)
+        public static final PlatformTest platform = PlatformTest.forConfig(TRAC_CONFIG_UNIT)
                 .addTenant(TEST_TENANT)
                 .startMeta()
                 .build();
@@ -75,7 +75,7 @@ abstract class MetadataWriteApiTest {
         private static final String TRAC_CONFIG_ENV_FILE = System.getenv(TRAC_CONFIG_ENV_VAR);
 
         @RegisterExtension
-        private static final PlatformTest platform = PlatformTest.forConfig(TRAC_CONFIG_ENV_FILE)
+        public static final PlatformTest platform = PlatformTest.forConfig(TRAC_CONFIG_ENV_FILE)
                 .addTenant(TEST_TENANT)
                 .runDbDeploy(false)
                 .startMeta()
@@ -97,9 +97,7 @@ abstract class MetadataWriteApiTest {
             names = {"OBJECT_TYPE_NOT_SET", "UNRECOGNIZED"})
     void writeBatch_trustedTypesOk(ObjectType objectType) {
 
-        createObjectBatch_ok(objectType, request ->
-                deuniversalizeCreateObjectBatchResponse(trustedApi.writeBatch(universalizeCreateObjectBatchRequest(request)))
-        );
+        createObjectBatch_ok(objectType, trustedApi::writeBatch);
     }
 
     @ParameterizedTest
@@ -109,25 +107,7 @@ abstract class MetadataWriteApiTest {
 
         // All object types should be either in this test, or publicTypesNotAllowed
 
-        createObjectBatch_ok(objectType, request ->
-                        deuniversalizeCreateObjectBatchResponse(publicApi.writeBatch(universalizeCreateObjectBatchRequest(request)))
-                );
-    }
-
-    private UniversalMetadataWriteBatchRequest universalizeCreateObjectBatchRequest(MetadataWriteBatchRequest request) {
-        var b = UniversalMetadataWriteBatchRequest.newBuilder();
-        b.setTenant(request.getTenant());
-        b.addAllCreateObjects(
-                request.getRequestsList().stream().map(MetadataWriteApiTest::scrapTenant).collect(Collectors.toList())
-        );
-
-        return b.build();
-    }
-
-    private MetadataWriteBatchResponse deuniversalizeCreateObjectBatchResponse(UniversalMetadataWriteBatchResponse response) {
-        return MetadataWriteBatchResponse.newBuilder()
-                .addAllHeaders(response.getCreateObjectHeadersList())
-                .build();
+        createObjectBatch_ok(objectType, publicApi::writeBatch);
     }
 
 
@@ -169,7 +149,6 @@ abstract class MetadataWriteApiTest {
                 .addAllTagUpdates(tagUpdates)
                 .build();
 
-        // noinspection ResultOfMethodCallIgnored
         var error = assertThrows(StatusRuntimeException.class, () -> publicApi.createObject(writeRequest));
         assertEquals(Status.Code.PERMISSION_DENIED, error.getStatus().getCode());
     }
@@ -244,11 +223,9 @@ abstract class MetadataWriteApiTest {
                 .addAllTagUpdates(tagUpdates)
                 .build();
 
-        // noinspection ResultOfMethodCallIgnored
         var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.createObject(writeRequest));
         assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
 
-        // noinspection ResultOfMethodCallIgnored
         var error2 = assertThrows(StatusRuntimeException.class, () -> publicApi.createObject(writeRequest));
         assertEquals(Status.Code.INVALID_ARGUMENT, error2.getStatus().getCode());
     }
@@ -281,11 +258,9 @@ abstract class MetadataWriteApiTest {
                 .addAllTagUpdates(tagUpdates)
                 .build();
 
-        // noinspection ResultOfMethodCallIgnored
         var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.createObject(writeRequest));
         assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
 
-        // noinspection ResultOfMethodCallIgnored
         var error2 = assertThrows(StatusRuntimeException.class, () -> publicApi.createObject(writeRequest));
         assertEquals(Status.Code.INVALID_ARGUMENT, error2.getStatus().getCode());
     }
@@ -310,11 +285,9 @@ abstract class MetadataWriteApiTest {
                 .addAllTagUpdates(tagUpdates)
                 .build();
 
-        // noinspection ResultOfMethodCallIgnored
         var error = assertThrows(StatusRuntimeException.class, () -> publicApi.createObject(writeRequest));
         assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
 
-        // noinspection ResultOfMethodCallIgnored
         var error2 = assertThrows(StatusRuntimeException.class, () -> trustedApi.createObject(writeRequest));
         assertEquals(Status.Code.INVALID_ARGUMENT, error2.getStatus().getCode());
     }
@@ -341,11 +314,10 @@ abstract class MetadataWriteApiTest {
 
         // Setting reserved attributes is allowed through the trusted API but not the public API
 
-        // At present this is enforced through validation, so it should come back as INVALID_ATTRIBUTE
+        // At present this is enforced through validation, so it should come back as INVALID_ARGUMENT
         // In the future if public/trusted APIs are unified and reserved attrs are managed with permissions,
         // Then the result would be PERMISSION_DENIED instead
 
-        // noinspection ResultOfMethodCallIgnored
         var error = assertThrows(StatusRuntimeException.class, () -> publicApi.createObject(writeRequest));
         assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
 
@@ -358,67 +330,65 @@ abstract class MetadataWriteApiTest {
 
     @ParameterizedTest
     @EnumSource(value = ObjectType.class, mode = EnumSource.Mode.EXCLUDE,
-            names = {"OBJECT_TYPE_NOT_SET", "UNRECOGNIZED", "SCHEMA", "FLOW", "CUSTOM"})
+                names = {"OBJECT_TYPE_NOT_SET", "UNRECOGNIZED", "SCHEMA", "FLOW", "CUSTOM"})
     void createObjectBatch_publicTypesNotAllowed(ObjectType objectType) {
 
         List<MetadataWriteRequest> requests = new ArrayList<>();
 
         for (int i = 0; i < 7; i++) {
+
             var objToSave = TestData.dummyDefinitionForType(objectType);
             var tagToSave = TestData.dummyTag(objToSave, TestData.NO_HEADER);
             var tagUpdates = TestData.tagUpdatesForAttrs(tagToSave.getAttrsMap());
 
-            requests.add(
-                    MetadataWriteRequest.newBuilder()
-                            .setObjectType(objectType)
-                            .setDefinition(objToSave)
-                            .addAllTagUpdates(tagUpdates)
-                            .build()
-            );
+            requests.add(MetadataWriteRequest.newBuilder()
+                    .setObjectType(objectType)
+                    .setDefinition(objToSave)
+                    .addAllTagUpdates(tagUpdates)
+                    .build());
         }
 
         var writeRequest = MetadataWriteBatchRequest.newBuilder()
                 .setTenant(TEST_TENANT)
-                .addAllRequests(requests)
+                .addAllCreateObjects(requests)
                 .build();
 
-        // noinspection ResultOfMethodCallIgnored
-        var error = assertThrows(StatusRuntimeException.class, () ->  publicApi.writeBatch(universalizeCreateObjectBatchRequest(writeRequest)));
+        var error = assertThrows(StatusRuntimeException.class, () -> publicApi.writeBatch(writeRequest));
         assertEquals(Status.Code.PERMISSION_DENIED, error.getStatus().getCode());
     }
 
     void createObjectBatch_ok(ObjectType objectType, Function<MetadataWriteBatchRequest, MetadataWriteBatchResponse> saveApiCall) {
+
         List<MetadataWriteRequest> requests = new ArrayList<>();
         List<Tag> tagsToSave = new ArrayList<>();
 
         for (int i = 0; i < 7; i++) {
+
             var objToSave = TestData.dummyDefinitionForType(objectType);
             var tagToSave = TestData.dummyTag(objToSave, TestData.NO_HEADER);
             var tagUpdates = TestData.tagUpdatesForAttrs(tagToSave.getAttrsMap());
 
-            requests.add(
-                    MetadataWriteRequest.newBuilder()
+            requests.add(MetadataWriteRequest.newBuilder()
                     .setObjectType(objectType)
                     .setDefinition(objToSave)
                     .addAllTagUpdates(tagUpdates)
-                    .build()
-                    );
+                    .build());
+
             tagsToSave.add(tagToSave);
         }
 
         var writeRequest = MetadataWriteBatchRequest.newBuilder()
                 .setTenant(TEST_TENANT)
-                .addAllRequests(requests)
+                .addAllCreateObjects(requests)
                 .build();
 
-
-        var tagHeaders = saveApiCall.apply(writeRequest).getHeadersList();
+        var tagHeaders = saveApiCall.apply(writeRequest).getCreateObjectsList();
         assertEquals(7, tagHeaders.size());
 
         for (int i = 0; i < tagHeaders.size(); i++) {
+
             var tagHeader = tagHeaders.get(i);
             var tagToSave = tagsToSave.get(i);
-
             var objectId = UUID.fromString(tagHeader.getObjectId());
 
             assertEquals(objectType, tagHeader.getObjectType());
@@ -467,47 +437,46 @@ abstract class MetadataWriteApiTest {
         List<MetadataWriteRequest> requests = new ArrayList<>();
 
         for (int i = 0; i < 7; i++) {
+
             var objToSave = TestData.dummyDefinitionForType(ObjectType.CUSTOM);
             var tagToSave = TestData.dummyTag(objToSave, TestData.NO_HEADER);
             var tagUpdates = TestData.tagUpdatesForAttrs(tagToSave.getAttrsMap());
 
             // Request to save a MODEL, even though the definition is for DATA
-            requests.add(
-                MetadataWriteRequest.newBuilder()
+            requests.add(MetadataWriteRequest.newBuilder()
                     .setObjectType(ObjectType.FLOW)
                     .setDefinition(objToSave)
                     .addAllTagUpdates(tagUpdates)
-                    .build()
-            );
+                    .build());
         }
 
         var writeRequest = MetadataWriteBatchRequest.newBuilder()
                 .setTenant(TEST_TENANT)
-                .addAllRequests(requests)
+                .addAllCreateObjects(requests)
                 .build();
 
-        // noinspection ResultOfMethodCallIgnored
-        var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.writeBatch(universalizeCreateObjectBatchRequest(writeRequest)));
+        var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.writeBatch(writeRequest));
         assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
 
-        // noinspection ResultOfMethodCallIgnored
-        var error2 = assertThrows(StatusRuntimeException.class, () -> publicApi.writeBatch(universalizeCreateObjectBatchRequest(writeRequest)));
+        var error2 = assertThrows(StatusRuntimeException.class, () -> publicApi.writeBatch(writeRequest));
         assertEquals(Status.Code.INVALID_ARGUMENT, error2.getStatus().getCode());
     }
 
     @Test
     void createObjectBatch_invalidContent() {
+
         List<MetadataWriteRequest> requests = new ArrayList<>();
 
         for (int i = 0; i < 7; i++) {
+
             var validFlow = TestData.dummyFlowDef();
 
             // Create a flow with an invalid node graph, this should get picked up by the validation layer
 
             var brokenEdges = validFlow.getFlow().toBuilder()
                     .addEdges(FlowEdge.newBuilder()
-                            .setTarget(FlowSocket.newBuilder().setNode("another_absent_node").setSocket("missing_socket"))
-                            .setSource(FlowSocket.newBuilder().setNode("node_totally_not_present")))
+                    .setTarget(FlowSocket.newBuilder().setNode("another_absent_node").setSocket("missing_socket"))
+                    .setSource(FlowSocket.newBuilder().setNode("node_totally_not_present")))
                     .build();
 
             var invalidFlow = validFlow.toBuilder()
@@ -523,26 +492,24 @@ abstract class MetadataWriteApiTest {
                     .setObjectType(ObjectType.FLOW)
                     .setDefinition(invalidFlow)
                     .addAllTagUpdates(tagUpdates)
-                    .build()
-            );
+                    .build());
         }
 
         var writeRequest = MetadataWriteBatchRequest.newBuilder()
                 .setTenant(TEST_TENANT)
-                .addAllRequests(requests)
+                .addAllCreateObjects(requests)
                 .build();
 
-        // noinspection ResultOfMethodCallIgnored
-        var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.writeBatch(universalizeCreateObjectBatchRequest(writeRequest)));
+        var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.writeBatch(writeRequest));
         assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
 
-        // noinspection ResultOfMethodCallIgnored
-        var error2 = assertThrows(StatusRuntimeException.class, () -> publicApi.writeBatch(universalizeCreateObjectBatchRequest(writeRequest)));
+        var error2 = assertThrows(StatusRuntimeException.class, () -> publicApi.writeBatch(writeRequest));
         assertEquals(Status.Code.INVALID_ARGUMENT, error2.getStatus().getCode());
     }
 
     @Test
     void createObjectBatch_invalidAttrs() {
+
         List<MetadataWriteRequest> requests = new ArrayList<>();
 
         for (int i = 0; i < 7; i++) {
@@ -562,29 +529,28 @@ abstract class MetadataWriteApiTest {
                     .setObjectType(ObjectType.CUSTOM)
                     .setDefinition(objToSave)
                     .addAllTagUpdates(tagUpdates)
-                    .build()
-            );
+                    .build());
         }
 
         var writeRequest = MetadataWriteBatchRequest.newBuilder()
                 .setTenant(TEST_TENANT)
-                .addAllRequests(requests)
+                .addAllCreateObjects(requests)
                 .build();
 
-        // noinspection ResultOfMethodCallIgnored
-        var error = assertThrows(StatusRuntimeException.class, () -> publicApi.writeBatch(universalizeCreateObjectBatchRequest(writeRequest)));
+        var error = assertThrows(StatusRuntimeException.class, () -> publicApi.writeBatch(writeRequest));
         assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
 
-        // noinspection ResultOfMethodCallIgnored
-        var error2 = assertThrows(StatusRuntimeException.class, () -> trustedApi.writeBatch(universalizeCreateObjectBatchRequest(writeRequest)));
+        var error2 = assertThrows(StatusRuntimeException.class, () -> trustedApi.writeBatch(writeRequest));
         assertEquals(Status.Code.INVALID_ARGUMENT, error2.getStatus().getCode());
     }
 
     @Test
     void createObjectBatch_reservedAttrs() {
+
         List<MetadataWriteRequest> requests = new ArrayList<>();
 
         for (int i = 0; i < 7; i++) {
+
             var objToSave = TestData.dummyDefinitionForType(ObjectType.CUSTOM);
             var validTag = TestData.dummyTag(objToSave, TestData.NO_HEADER);
 
@@ -600,26 +566,24 @@ abstract class MetadataWriteApiTest {
                     .setObjectType(ObjectType.CUSTOM)
                     .setDefinition(objToSave)
                     .addAllTagUpdates(tagUpdates)
-                    .build()
-            );
+                    .build());
         }
 
         var writeRequest = MetadataWriteBatchRequest.newBuilder()
                 .setTenant(TEST_TENANT)
-                .addAllRequests(requests)
+                .addAllCreateObjects(requests)
                 .build();
 
         // Setting reserved attributes is allowed through the trusted API but not the public API
 
-        // At present this is enforced through validation, so it should come back as INVALID_ATTRIBUTE
+        // At present this is enforced through validation, so it should come back as INVALID_ARGUMENT
         // In the future if public/trusted APIs are unified and reserved attrs are managed with permissions,
         // Then the result would be PERMISSION_DENIED instead
 
-        // noinspection ResultOfMethodCallIgnored
-        var error = assertThrows(StatusRuntimeException.class, () -> publicApi.writeBatch(universalizeCreateObjectBatchRequest(writeRequest)));
+        var error = assertThrows(StatusRuntimeException.class, () -> publicApi.writeBatch(writeRequest));
         assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
 
-        assertDoesNotThrow(() -> trustedApi.writeBatch(universalizeCreateObjectBatchRequest(writeRequest)));
+        assertDoesNotThrow(() -> trustedApi.writeBatch(writeRequest));
     }
     
     // -----------------------------------------------------------------------------------------------------------------
@@ -662,7 +626,6 @@ abstract class MetadataWriteApiTest {
                 .setDefinition(v2Obj)
                 .build();
 
-        // noinspection ResultOfMethodCallIgnored
         var error = assertThrows(StatusRuntimeException.class, () -> publicApi.updateObject(v2WriteRequest));
         assertEquals(Status.Code.PERMISSION_DENIED, error.getStatus().getCode());
     }
@@ -685,14 +648,12 @@ abstract class MetadataWriteApiTest {
                 .setDefinition(v2Obj)
                 .build();
 
-        // noinspection ResultOfMethodCallIgnored
         var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.updateObject(v2WriteRequest));
         assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
 
         // Also check the public API for object types where public write is allowed
         if (objectType.equals(ObjectType.FLOW)) {
 
-            // noinspection ResultOfMethodCallIgnored
             var publicError = assertThrows(StatusRuntimeException.class, () -> publicApi.updateObject(v2WriteRequest));
             assertEquals(Status.Code.INVALID_ARGUMENT, publicError.getStatus().getCode());
         }
@@ -871,11 +832,9 @@ abstract class MetadataWriteApiTest {
                 .setDefinition(v2Obj)
                 .build();
 
-        // noinspection ResultOfMethodCallIgnored
         var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.updateObject(v2WriteRequest));
         assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
 
-        // noinspection ResultOfMethodCallIgnored
         var error2 = assertThrows(StatusRuntimeException.class, () -> publicApi.updateObject(v2WriteRequest));
         assertEquals(Status.Code.INVALID_ARGUMENT, error2.getStatus().getCode());
     }
@@ -904,7 +863,6 @@ abstract class MetadataWriteApiTest {
                 .setDefinition(v2Obj)
                 .build();
 
-        // noinspection ResultOfMethodCallIgnored
         var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.updateObject(v2WriteRequest));
         assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
 
@@ -922,7 +880,6 @@ abstract class MetadataWriteApiTest {
                 .setDefinition(v2Obj)
                 .build();
 
-        // noinspection ResultOfMethodCallIgnored
         var error2 = assertThrows(StatusRuntimeException.class, () -> trustedApi.updateObject(v2WriteRequestData));
         assertEquals(Status.Code.FAILED_PRECONDITION, error2.getStatus().getCode());
     }
@@ -943,11 +900,9 @@ abstract class MetadataWriteApiTest {
                 .setDefinition(v2Obj)
                 .build();
 
-        // noinspection ResultOfMethodCallIgnored
         var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.updateObject(v2WriteRequest));
         assertEquals(Status.Code.NOT_FOUND, error.getStatus().getCode());
 
-        // noinspection ResultOfMethodCallIgnored
         var error2 = assertThrows(StatusRuntimeException.class, () -> publicApi.updateObject(v2WriteRequest));
         assertEquals(Status.Code.NOT_FOUND, error2.getStatus().getCode());
     }
@@ -972,11 +927,9 @@ abstract class MetadataWriteApiTest {
                 .setDefinition(v3Obj)
                 .build();
 
-        // noinspection ResultOfMethodCallIgnored
         var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.updateObject(v3WriteRequest));
         assertEquals(Status.Code.NOT_FOUND, error.getStatus().getCode());
 
-        // noinspection ResultOfMethodCallIgnored
         var error2 = assertThrows(StatusRuntimeException.class, () -> publicApi.updateObject(v3WriteRequest));
         assertEquals(Status.Code.NOT_FOUND, error2.getStatus().getCode());
     }
@@ -1003,11 +956,9 @@ abstract class MetadataWriteApiTest {
 
         // Trying to create V2 a second time is an error
 
-        // noinspection ResultOfMethodCallIgnored
         var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.updateObject(v2WriteRequest));
         assertEquals(Status.Code.ALREADY_EXISTS, error.getStatus().getCode());
 
-        // noinspection ResultOfMethodCallIgnored
         var error2 = assertThrows(StatusRuntimeException.class, () -> publicApi.updateObject(v2WriteRequest));
         assertEquals(Status.Code.ALREADY_EXISTS, error2.getStatus().getCode());
     }
@@ -1042,11 +993,9 @@ abstract class MetadataWriteApiTest {
                 .setDefinition(v2Obj)
                 .build();
 
-        // noinspection ResultOfMethodCallIgnored
         var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.updateObject(v2WriteRequest));
         assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
 
-        // noinspection ResultOfMethodCallIgnored
         var error2 = assertThrows(StatusRuntimeException.class, () -> publicApi.updateObject(v2WriteRequest));
         assertEquals(Status.Code.INVALID_ARGUMENT, error2.getStatus().getCode());
     }
@@ -1072,11 +1021,9 @@ abstract class MetadataWriteApiTest {
                 .addTagUpdates(tagUpdate)
                 .build();
 
-        // noinspection ResultOfMethodCallIgnored
         var error = assertThrows(StatusRuntimeException.class, () -> publicApi.updateObject(v2WriteRequest));
         assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
 
-        // noinspection ResultOfMethodCallIgnored
         var error2 = assertThrows(StatusRuntimeException.class, () -> trustedApi.updateObject(v2WriteRequest));
         assertEquals(Status.Code.INVALID_ARGUMENT, error2.getStatus().getCode());
     }
@@ -1104,11 +1051,10 @@ abstract class MetadataWriteApiTest {
 
         // Setting reserved attributes is allowed through the trusted API but not the public API
 
-        // At present this is enforced through validation, so it should come back as INVALID_ATTRIBUTE
+        // At present this is enforced through validation, so it should come back as INVALID_ARGUMENT
         // In the future if public/trusted APIs are unified and reserved attrs are managed with permissions,
         // Then the result would be PERMISSION_DENIED instead
 
-        // noinspection ResultOfMethodCallIgnored
         var error = assertThrows(StatusRuntimeException.class, () -> publicApi.updateObject(v2WriteRequest));
         assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
 
@@ -1122,29 +1068,31 @@ abstract class MetadataWriteApiTest {
     // Versioned types, as listed in MetadataConstants.VERSIONED_OBJECT_TYPES
     @ParameterizedTest
     @EnumSource(value = ObjectType.class, mode = EnumSource.Mode.INCLUDE,
-            names = {"DATA", "FILE", "STORAGE", "SCHEMA", "CUSTOM"})
+                names = {"DATA", "FILE", "STORAGE", "SCHEMA", "CUSTOM"})
     void updateObjectBatch_trustedTypesOk(ObjectType objectType) {
 
-        updateObjectBatch_ok(objectType, request -> trustedApi.writeBatch(request));
+        updateObjectBatch_ok(objectType, trustedApi::writeBatch);
     }
 
     // Versioned types that are also publicly writable
     @ParameterizedTest
     @EnumSource(value = ObjectType.class, mode = EnumSource.Mode.INCLUDE,
-            names = {"SCHEMA", "CUSTOM"})
+                names = {"SCHEMA", "CUSTOM"})
     void updateObjectBatch_publicTypesOk(ObjectType objectType) {
 
-        updateObjectBatch_ok(objectType, request -> publicApi.writeBatch(request));
+        updateObjectBatch_ok(objectType, publicApi::writeBatch);
     }
 
     // Versioned types that are not publicly writable
     @ParameterizedTest
     @EnumSource(value = ObjectType.class, mode = EnumSource.Mode.INCLUDE,
-            names = {"DATA", "FILE", "STORAGE"})
+                names = {"DATA", "FILE", "STORAGE"})
     void updateObjectBatch_publicTypesNotAllowed(ObjectType objectType) {
+
         List<MetadataWriteRequest> requests = new ArrayList<>();
 
         for (int i = 0; i < 7; i++) {
+
             var v1SavedTag = updateObject_prepareV1(objectType);
             var v1Selector = selectorForTag(v1SavedTag);
 
@@ -1155,21 +1103,20 @@ abstract class MetadataWriteApiTest {
                     .setObjectType(objectType)
                     .setPriorVersion(v1Selector)
                     .setDefinition(v2Obj)
-                    .build()
-            );
+                    .build());
         }
 
-        var v2WriteRequest = UniversalMetadataWriteBatchRequest.newBuilder()
+        var v2WriteRequest = MetadataWriteBatchRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .addAllUpdateObjects(requests)
                 .build();
 
-        // noinspection ResultOfMethodCallIgnored
         var error = assertThrows(StatusRuntimeException.class, () -> publicApi.writeBatch(v2WriteRequest));
         assertEquals(Status.Code.PERMISSION_DENIED, error.getStatus().getCode());
     }
 
-    void updateObjectBatch_ok(ObjectType objectType, Function<UniversalMetadataWriteBatchRequest, UniversalMetadataWriteBatchResponse> saveApiCall) {
+    void updateObjectBatch_ok(ObjectType objectType, Function<MetadataWriteBatchRequest, MetadataWriteBatchResponse> saveApiCall) {
+
         class RequestData {
             MetadataWriteRequest writeRequest;
             UUID v1ObjectId;
@@ -1177,11 +1124,12 @@ abstract class MetadataWriteApiTest {
             Tag v1SavedTag;
             String v2NewAttrName;
             Value v2NewAttrValue;
-
         }
+
         List<RequestData> requests = new ArrayList<>();
 
         for (int i = 0; i < 7; i++) {
+
             var r = new RequestData();
 
             r.v1SavedTag = updateObject_prepareV1(objectType);
@@ -1206,18 +1154,17 @@ abstract class MetadataWriteApiTest {
             requests.add(r);
         }
 
-        var updateRequest = UniversalMetadataWriteBatchRequest.newBuilder()
+        var updateRequest = MetadataWriteBatchRequest.newBuilder()
                 .setTenant(TEST_TENANT)
-                .addAllUpdateObjects(
-                        requests.stream().map(r -> r.writeRequest).collect(Collectors.toList())
-                )
+                .addAllUpdateObjects(requests.stream().map(r -> r.writeRequest).collect(Collectors.toList()))
                 .build();
 
-        var v2TagHeaders = saveApiCall.apply(updateRequest).getUpdateObjectHeadersList();
+        var v2TagHeaders = saveApiCall.apply(updateRequest).getUpdateObjectsList();
 
         assertEquals(7, v2TagHeaders.size());
 
         for (int i = 0; i < v2TagHeaders.size(); i++) {
+
             var v2TagHeader = v2TagHeaders.get(i);
             var r = requests.get(i);
 
@@ -1614,11 +1561,9 @@ abstract class MetadataWriteApiTest {
                 .addTagUpdates(t2Update)
                 .build();
 
-        // noinspection ResultOfMethodCallIgnored
         var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.updateTag(t2WriteRequest));
         assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
 
-        // noinspection ResultOfMethodCallIgnored
         var error2 = assertThrows(StatusRuntimeException.class, () -> publicApi.updateTag(t2WriteRequest));
         assertEquals(Status.Code.INVALID_ARGUMENT, error2.getStatus().getCode());
     }
@@ -1652,11 +1597,9 @@ abstract class MetadataWriteApiTest {
                 .addTagUpdates(t2Update)
                 .build();
 
-        // noinspection ResultOfMethodCallIgnored
         var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.updateTag(t2WriteRequest));
         assertEquals(Status.Code.FAILED_PRECONDITION, error.getStatus().getCode());
 
-        // noinspection ResultOfMethodCallIgnored
         var error2 = assertThrows(StatusRuntimeException.class, () -> publicApi.updateTag(t2WriteRequest));
         assertEquals(Status.Code.FAILED_PRECONDITION, error2.getStatus().getCode());
     }
@@ -1680,11 +1623,9 @@ abstract class MetadataWriteApiTest {
                 .addTagUpdates(t2Update)
                 .build();
 
-        // noinspection ResultOfMethodCallIgnored
         var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.updateTag(t2WriteRequest));
         assertEquals(Status.Code.NOT_FOUND, error.getStatus().getCode());
 
-        // noinspection ResultOfMethodCallIgnored
         var error2 = assertThrows(StatusRuntimeException.class, () -> publicApi.updateTag(t2WriteRequest));
         assertEquals(Status.Code.NOT_FOUND, error2.getStatus().getCode());
     }
@@ -1710,11 +1651,9 @@ abstract class MetadataWriteApiTest {
                 .addTagUpdates(t2Update)
                 .build();
 
-        // noinspection ResultOfMethodCallIgnored
         var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.updateTag(v2t2WriteRequest));
         assertEquals(Status.Code.NOT_FOUND, error.getStatus().getCode());
 
-        // noinspection ResultOfMethodCallIgnored
         var error2 = assertThrows(StatusRuntimeException.class, () -> publicApi.updateTag(v2t2WriteRequest));
         assertEquals(Status.Code.NOT_FOUND, error2.getStatus().getCode());
     }
@@ -1740,11 +1679,9 @@ abstract class MetadataWriteApiTest {
                 .addTagUpdates(t2Update)
                 .build();
 
-        // noinspection ResultOfMethodCallIgnored
         var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.updateTag(t3WriteRequest));
         assertEquals(Status.Code.NOT_FOUND, error.getStatus().getCode());
 
-        // noinspection ResultOfMethodCallIgnored
         var error2 = assertThrows(StatusRuntimeException.class, () -> publicApi.updateTag(t3WriteRequest));
         assertEquals(Status.Code.NOT_FOUND, error2.getStatus().getCode());
     }
@@ -1773,11 +1710,9 @@ abstract class MetadataWriteApiTest {
 
         // Trying to save tag version 2 a second time is an error
 
-        // noinspection ResultOfMethodCallIgnored
         var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.updateTag(v2t2WriteRequest));
         assertEquals(Status.Code.ALREADY_EXISTS, error.getStatus().getCode());
 
-        // noinspection ResultOfMethodCallIgnored
         var error2 = assertThrows(StatusRuntimeException.class, () -> publicApi.updateTag(v2t2WriteRequest));
         assertEquals(Status.Code.ALREADY_EXISTS, error2.getStatus().getCode());
     }
@@ -1800,11 +1735,9 @@ abstract class MetadataWriteApiTest {
                 .addTagUpdates(t2Update)
                 .build();
 
-        // noinspection ResultOfMethodCallIgnored
         var error = assertThrows(StatusRuntimeException.class, () -> publicApi.updateTag(t2WriteRequest));
         assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
 
-        // noinspection ResultOfMethodCallIgnored
         var error2 = assertThrows(StatusRuntimeException.class, () -> trustedApi.updateTag(t2WriteRequest));
         assertEquals(Status.Code.INVALID_ARGUMENT, error2.getStatus().getCode());
     }
@@ -1829,11 +1762,10 @@ abstract class MetadataWriteApiTest {
 
         // Setting reserved attributes is allowed through the trusted API but not the public API
 
-        // At present this is enforced through validation, so it should come back as INVALID_ATTRIBUTE
+        // At present this is enforced through validation, so it should come back as INVALID_ARGUMENT
         // In the future if public/trusted APIs are unified and reserved attrs are managed with permissions,
         // Then the result would be PERMISSION_DENIED instead
 
-        // noinspection ResultOfMethodCallIgnored
         var error = assertThrows(StatusRuntimeException.class, () -> publicApi.updateTag(t2WriteRequest));
         assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
 
@@ -1846,9 +1778,11 @@ abstract class MetadataWriteApiTest {
 
     @ParameterizedTest
     @EnumSource(value = ObjectType.class, mode = EnumSource.Mode.EXCLUDE,
-            names = {"OBJECT_TYPE_NOT_SET", "UNRECOGNIZED"})
+                names = {"OBJECT_TYPE_NOT_SET", "UNRECOGNIZED"})
     void updateTagBatch_AllTypesOk(ObjectType objectType) {
+
         class RequestData {
+
             MetadataWriteRequest writeRequest;
 
             UUID v1ObjectId;
@@ -1864,6 +1798,7 @@ abstract class MetadataWriteApiTest {
             public TagUpdate t3Update;
 
         }
+
         List<RequestData> requests = new ArrayList<>();
 
         for (int i = 0; i < 7; i++) {
@@ -1890,18 +1825,17 @@ abstract class MetadataWriteApiTest {
             requests.add(r);
         }
 
-        var t2WriteRequest = UniversalMetadataWriteBatchRequest.newBuilder()
+        var t2WriteRequest = MetadataWriteBatchRequest.newBuilder()
                 .setTenant(TEST_TENANT)
-                .addAllUpdateTags(
-                        requests.stream().map(r -> r.writeRequest).collect(Collectors.toList())
-                )
+                .addAllUpdateTags(requests.stream().map(r -> r.writeRequest).collect(Collectors.toList()))
                 .build();
 
-        var t2headers = trustedApi.writeBatch(t2WriteRequest).getUpdateTagHeadersList();
+        var t2headers = trustedApi.writeBatch(t2WriteRequest).getUpdateTagsList();
 
         assertEquals(7, t2headers.size());
 
         for (int i = 0; i < 7; i++) {
+
             var r = requests.get(i);
             var t2header = t2headers.get(i);
 
@@ -1947,18 +1881,19 @@ abstract class MetadataWriteApiTest {
                     .build();
         }
 
-        var t3WriteRequest = UniversalMetadataWriteBatchRequest.newBuilder()
+        var t3WriteRequest = MetadataWriteBatchRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .addAllUpdateTags(
                         requests.stream().map(r -> r.t3WriteRequest).collect(Collectors.toList())
                 )
                 .build();
 
-        var t3Headers = publicApi.writeBatch(t3WriteRequest).getUpdateTagHeadersList();
+        var t3Headers = publicApi.writeBatch(t3WriteRequest).getUpdateTagsList();
 
         assertEquals(7, t3Headers.size());
 
         for (int i = 0; i < 7; i++) {
+
             var r = requests.get(i);
             var t3Header = t3Headers.get(i);
 
@@ -2076,7 +2011,6 @@ abstract class MetadataWriteApiTest {
                 .addAllTagUpdates(tagUpdates)
                 .build();
 
-        // noinspection ResultOfMethodCallIgnored
         var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.createPreallocatedObject(writeRequest));
         assertEquals(Status.Code.NOT_FOUND, error.getStatus().getCode());
     }
@@ -2111,7 +2045,6 @@ abstract class MetadataWriteApiTest {
         var tagHeader = trustedApi.createPreallocatedObject(writeRequest);
         assertEquals(preallocateHeader.getObjectId(), tagHeader.getObjectId());
 
-        // noinspection ResultOfMethodCallIgnored
         var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.createPreallocatedObject(writeRequest));
         assertEquals(Status.Code.ALREADY_EXISTS, error.getStatus().getCode());
     }
@@ -2147,7 +2080,6 @@ abstract class MetadataWriteApiTest {
                 .addAllTagUpdates(tagUpdates)
                 .build();
 
-        // noinspection ResultOfMethodCallIgnored
         var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.createPreallocatedObject(writeRequest));
         assertEquals(Status.Code.FAILED_PRECONDITION, error.getStatus().getCode());
     }
@@ -2184,7 +2116,6 @@ abstract class MetadataWriteApiTest {
                 .addAllTagUpdates(tagUpdates)
                 .build();
 
-        // noinspection ResultOfMethodCallIgnored
         var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.createPreallocatedObject(writeRequest));
         assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
 
@@ -2198,7 +2129,6 @@ abstract class MetadataWriteApiTest {
                 .addAllTagUpdates(tagUpdates)
                 .build();
 
-        // noinspection ResultOfMethodCallIgnored
         var error2 = assertThrows(StatusRuntimeException.class, () -> trustedApi.createPreallocatedObject(writeRequest2));
         assertEquals(Status.Code.INVALID_ARGUMENT, error2.getStatus().getCode());
 
@@ -2216,7 +2146,6 @@ abstract class MetadataWriteApiTest {
                 .addAllTagUpdates(tagUpdates)
                 .build();
 
-        // noinspection ResultOfMethodCallIgnored
         var error3 = assertThrows(StatusRuntimeException.class, () -> trustedApi.createPreallocatedObject(writeRequest3));
         assertEquals(Status.Code.INVALID_ARGUMENT, error3.getStatus().getCode());
     }
@@ -2261,7 +2190,6 @@ abstract class MetadataWriteApiTest {
                 .addAllTagUpdates(tagUpdates)
                 .build();
 
-        // noinspection ResultOfMethodCallIgnored
         var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.createPreallocatedObject(writeRequest));
         assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
     }
@@ -2298,7 +2226,6 @@ abstract class MetadataWriteApiTest {
                 .addAllTagUpdates(tagUpdates)
                 .build();
 
-        // noinspection ResultOfMethodCallIgnored
         var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.updateObject(newVersionRequest));
         assertEquals(Status.Code.NOT_FOUND, error.getStatus().getCode());
     }
@@ -2335,7 +2262,6 @@ abstract class MetadataWriteApiTest {
                 .addTagUpdates(t2TagUpdate)
                 .build();
 
-        // noinspection ResultOfMethodCallIgnored
         var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.updateTag(newTagRequest));
         assertEquals(Status.Code.NOT_FOUND, error.getStatus().getCode());
     }
@@ -2364,7 +2290,6 @@ abstract class MetadataWriteApiTest {
 
         // Try reading with explicit version / tag, latest tag and latest version
 
-        // noinspection ResultOfMethodCallIgnored
         var error = assertThrows(StatusRuntimeException.class, () -> readApi.readObject(readRequest));
         assertEquals(Status.Code.NOT_FOUND, error.getStatus().getCode());
     }
@@ -2381,7 +2306,7 @@ abstract class MetadataWriteApiTest {
 
         var preallocateRequest = MetadataWriteBatchRequest.newBuilder()
                 .setTenant(TEST_TENANT)
-                .addAllRequests(
+                .addAllPreallocateIds(
                         IntStream.range(0, 13)
                                 .mapToObj(i -> MetadataWriteRequest.newBuilder()
                                         .setObjectType(ObjectType.DATA)
@@ -2390,7 +2315,7 @@ abstract class MetadataWriteApiTest {
                 )
                 .build();
 
-        var preallocatedHeaders = trustedApi.preallocateIdBatch(preallocateRequest).getHeadersList();
+        var preallocatedHeaders = trustedApi.writeBatch(preallocateRequest).getPreallocateIdsList();
         assertEquals(13, preallocatedHeaders.size());
 
         class RequestData {
@@ -2399,6 +2324,7 @@ abstract class MetadataWriteApiTest {
         }
 
         var requestsData = preallocatedHeaders.stream().map(preallocateHeader -> {
+
             var r = new RequestData();
             var preallocateSelector = selectorForTag(preallocateHeader);
 
@@ -2414,17 +2340,19 @@ abstract class MetadataWriteApiTest {
                     .build();
 
             return r;
+
         }).collect(Collectors.toList());
 
-        var writeRequest = UniversalMetadataWriteBatchRequest.newBuilder()
+        var writeRequest = MetadataWriteBatchRequest.newBuilder()
                 .setTenant(TEST_TENANT)
-                .addAllPreallocateObjects(requestsData.stream().map(r -> r.writeRequest).collect(Collectors.toList()))
+                .addAllCreatePreallocatedObjects(requestsData.stream().map(r -> r.writeRequest).collect(Collectors.toList()))
                 .build();
 
-        var tagHeaders = trustedApi.writeBatch(writeRequest).getPreallocatedObjectHeadersList();
+        var tagHeaders = trustedApi.writeBatch(writeRequest).getCreatePreallocatedObjectsList();
         assertEquals(13, tagHeaders.size());
 
         for (int i = 0; i < 13; i++) {
+
             var preallocateHeader = preallocatedHeaders.get(i);
             var r = requestsData.get(i);
             var tagHeader = tagHeaders.get(i);
@@ -2468,6 +2396,7 @@ abstract class MetadataWriteApiTest {
         // If the ID is not reserved, that is an item not found error
 
         var writeRequests = IntStream.range(0, 3).mapToObj(i -> {
+
             var newObjectId = UUID.randomUUID();
             var selector = TagSelector.newBuilder()
                     .setObjectType(ObjectType.DATA)
@@ -2486,24 +2415,15 @@ abstract class MetadataWriteApiTest {
                     .setDefinition(newObject)
                     .addAllTagUpdates(tagUpdates)
                     .build();
+
         }).collect(Collectors.toList());
 
-        var writeBatchRequest = UniversalMetadataWriteBatchRequest.newBuilder()
+        var writeBatchRequest = MetadataWriteBatchRequest.newBuilder()
                 .setTenant(TEST_TENANT)
-                .addAllPreallocateObjects(writeRequests)
+                .addAllCreatePreallocatedObjects(writeRequests)
                 .build();
 
-        // noinspection ResultOfMethodCallIgnored
         var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.writeBatch(writeBatchRequest));
         assertEquals(Status.Code.NOT_FOUND, error.getStatus().getCode());
-    }
-
-    /**
-     * Remove tenant from write request.
-     * Necessary when you want to add the request to a batch write request.
-     */
-    private static MetadataWriteRequest scrapTenant(MetadataWriteRequest request) {
-        return MetadataWriteRequest.newBuilder(request)
-                .clearTenant().build();
     }
 }
