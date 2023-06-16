@@ -55,7 +55,19 @@ class JdbcError {
     static final String UNRECOGNISED_ERROR_CODE = "Unrecognised SQL Error code: {0}, sqlstate = {1}, error code = {2}";
     static final String UNHANDLED_ERROR = "Unhandled SQL Error code: {0}";
 
-    static void objectNotFound(SQLException error, IDialect dialect, JdbcMetadataDal.ObjectParts parts) {
+    static void objectNotFound(
+            SQLException error, IDialect dialect, JdbcMetadataDal.ObjectParts parts,
+            boolean priorVersions, boolean priorTags) {
+
+        var multipleItemMessage =
+                priorVersions ? PRIOR_VERSION_MISSING_MULTIPLE :
+                priorTags ? PRIOR_TAG_MISSING_MULTIPLE :
+                MISSING_ITEM_MULTIPLE;
+
+        var singleItemMessage =
+                priorVersions ? PRIOR_VERSION_MISSING :
+                priorTags ? PRIOR_TAG_MISSING :
+                MISSING_ITEM;
 
         var code = dialect.mapErrorCode(error);
 
@@ -63,7 +75,7 @@ class JdbcError {
             return;
 
         if (parts.objectId.length != 1)
-            throw new EMetadataNotFound(MISSING_ITEM_MULTIPLE, error);
+            throw new EMetadataNotFound(multipleItemMessage, error);
 
         var selector  = parts.selector[0];
         String version;
@@ -83,7 +95,7 @@ class JdbcError {
         else
             tag = "latest";
 
-        var message = MessageFormat.format(MISSING_ITEM,
+        var message = MessageFormat.format(singleItemMessage,
                 parts.objectType[0],
                 parts.objectId[0],
                 version,

@@ -50,6 +50,21 @@ public interface IMetadataDal {
     List<Tag> search(String tenant, SearchParameters searchParameters);
 
     // -----------------------------------------------------------------------------------------------------------------
+    // ALTERNATE LOAD METHODS
+    // -----------------------------------------------------------------------------------------------------------------
+
+    // These two methods are functionally equivalent to loadObjects()
+    // They are provided as alternates in case implementations want to perform different error handling
+
+    default List<Tag> loadPriorObjects(String tenant, List<TagSelector> selector) {
+        return loadObjects(tenant, selector);
+    }
+
+    default List<Tag> loadPriorTags(String tenant, List<TagSelector> selector) {
+        return loadObjects(tenant, selector);
+    }
+
+    // -----------------------------------------------------------------------------------------------------------------
     // LEGACY LOAD METHODS
     // -----------------------------------------------------------------------------------------------------------------
 

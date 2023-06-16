@@ -320,7 +320,7 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
         }
         catch (SQLException error) {
 
-            JdbcError.objectNotFound(error, dialect, parts);
+            JdbcError.objectNotFound(error, dialect, parts, false, false);
             JdbcError.wrongObjectType(error, dialect, parts);
 
             throw JdbcError.catchAll(error, dialect);
@@ -337,11 +337,31 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
 
         return wrapTransaction(conn -> {
             prepareMappingTable(conn);
-            return loadObjects(conn, tenant, selectors);
+            return loadObjects(conn, tenant, selectors, false, false);
         });
     }
 
-    private List<Tag> loadObjects(Connection conn, String tenant, List<TagSelector> selectors) {
+    @Override
+    public List<Tag> loadPriorObjects(String tenant, List<TagSelector> selectors) {
+
+        return wrapTransaction(conn -> {
+            prepareMappingTable(conn);
+            return loadObjects(conn, tenant, selectors, true, false);
+        });
+    }
+
+    @Override
+    public List<Tag> loadPriorTags(String tenant, List<TagSelector> selectors) {
+
+        return wrapTransaction(conn -> {
+            prepareMappingTable(conn);
+            return loadObjects(conn, tenant, selectors, false, true);
+        });
+    }
+
+    private List<Tag> loadObjects(
+            Connection conn, String tenant, List<TagSelector> selectors,
+            boolean priorVersions, boolean priorTags) {
 
         var parts = selectorParts(selectors);
 
@@ -359,7 +379,7 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
         }
         catch (SQLException error) {
 
-            JdbcError.objectNotFound(error, dialect, parts);
+            JdbcError.objectNotFound(error, dialect, parts, priorVersions, priorTags);
             JdbcError.wrongObjectType(error, dialect, parts);
 
             throw JdbcError.catchAll(error, dialect);

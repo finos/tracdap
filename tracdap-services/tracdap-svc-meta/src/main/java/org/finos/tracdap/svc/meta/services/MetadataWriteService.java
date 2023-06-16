@@ -217,7 +217,7 @@ public class MetadataWriteService {
             return List.of();
 
         var priorIds = requests.stream().map(MetadataWriteRequest::getPriorVersion).collect(Collectors.toList());
-        var priorVersions = dal.loadObjects(tenant, priorIds);
+        var priorVersions = dal.loadPriorObjects(tenant, priorIds);
 
         var newVersions = new ArrayList<Tag>(requests.size());
 
@@ -255,7 +255,7 @@ public class MetadataWriteService {
             return List.of();
 
         var priorIds = requests.stream().map(MetadataWriteRequest::getPriorVersion).collect(Collectors.toList());
-        var priorTags = dal.loadObjects(tenant, priorIds);
+        var priorTags = dal.loadPriorTags(tenant, priorIds);
 
         var newTags = new ArrayList<Tag>(requests.size());
 
