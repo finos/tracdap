@@ -14,7 +14,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# List bucket contents to check the connection
-# (bucket may be empty, otherwise limit to first 10 objects)
+export DEBIAN_FRONTEND=noninteractive
 
-aws s3api list-objects-v2 --bucket ${TRAC_AWS_BUCKET} --region ${TRAC_AWS_REGION} --max-items 10
+apt-get update
+apt-get upgrade -y
+apt-get install -y curl gnupg apt-transport-https ca-certificates
+
+echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | tee -a /etc/apt/sources.list.d/google-cloud-sdk.list
+curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key --keyring /usr/share/keyrings/cloud.google.gpg add -
+
+apt-get update
+apt-get install -y google-cloud-cli
