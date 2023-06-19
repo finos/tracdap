@@ -1,0 +1,25 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Runtime (PY): Integration (Azure)" type="tests" factoryName="Unittests">
+    <module name="tracdap-runtime-py" />
+    <option name="INTERPRETER_OPTIONS" value="" />
+    <option name="PARENT_ENVS" value="true" />
+    <envs>
+      <env name="TRAC_AZURE_CREDENTIALS" value="access_key" />
+      <env name="TRAC_AZURE_ACCESS_KEY" value="(enter access key)" />
+      <env name="TRAC_AZURE_STORAGE_ACCOUNT" value="(enter storage account)" />
+      <env name="TRAC_AZURE_CONTAINER" value="(enter container)" />
+    </envs>
+    <option name="SDK_HOME" value="$PROJECT_DIR$/tracdap-runtime/python/venv/bin/python" />
+    <option name="SDK_NAME" value="Python 3.10 (trac)" />
+    <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
+    <option name="IS_MODULE_SDK" value="true" />
+    <option name="ADD_CONTENT_ROOTS" value="false" />
+    <option name="ADD_SOURCE_ROOTS" value="true" />
+    <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
+    <option name="_new_pattern" value="&quot;&quot;" />
+    <option name="_new_additionalArguments" value="&quot;discover -s tracdap-runtime/python/test/tracdap_test -t tracdap-runtime/python/test -p int_storage_azure*.py&quot;" />
+    <option name="_new_target" value="&quot;&quot;" />
+    <option name="_new_targetType" value="&quot;CUSTOM&quot;" />
+    <method v="2" />
+  </configuration>
+</component>
