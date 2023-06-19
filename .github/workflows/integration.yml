@@ -380,6 +380,7 @@ jobs:
               PROTOCOL: BLOB,
               ENABLE_IF: TRAC_AZURE_CONTAINER,
               BUILD_azure_storage: true,
+              INSTALL_SCRIPT: ".github/scripts/int-storage-azure-install.sh",
               SETUP_SCRIPT: ".github/scripts/int-storage-azure-setup.sh",
               TRAC_CONFIG_FILE: '.github/config/int-storage-azure.yaml',
               TRAC_SECRET_KEY: short-lived-secret,

@@ -57,6 +57,12 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Integration install script
+        if: ${{ env.INSTALL_SCRIPT != '' }}
+        env: ${{ vars }}
+        run: |
+          ${{ env.INSTALL_SCRIPT }}
+
       # Using IdP for AWS, set the repo secret AWS_CI_ROLE to use
       # https://docs.github.com/en/actions/deployment/security-hardening-your-deployments/configuring-openid-connect-in-amazon-web-services
       # https://github.com/aws-actions/configure-aws-credentials
@@ -158,6 +164,12 @@ jobs:
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
+
+      - name: Integration install script
+        if: ${{ env.INSTALL_SCRIPT != '' }}
+        env: ${{ vars }}
+        run: |
+          ${{ env.INSTALL_SCRIPT }}
 
       # Using IdP for AWS, set the repo secret AWS_CI_ROLE to use
       # https://docs.github.com/en/actions/deployment/security-hardening-your-deployments/configuring-openid-connect-in-amazon-web-services
