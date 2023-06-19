@@ -42,6 +42,7 @@ jobs:
     if: ${{ inputs.enabled && inputs.has_java }}
 
     runs-on: ubuntu-latest
+    environment: integration
     timeout-minutes: 20
 
     # To use apt-get install, jobs must run in a container
@@ -67,6 +68,18 @@ jobs:
           role-to-assume: ${{ secrets.AWS_CI_ROLE }}
           role-session-name: tracdap-ci-session
           aws-region: ${{ vars.TRAC_AWS_REGION }}
+
+      # Using IdP for Azure
+      # https://docs.github.com/en/actions/deployment/security-hardening-your-deployments/configuring-openid-connect-in-azure
+      # https://github.com/Azure/login
+
+      - name: Authenticate to Azure
+        if: ${{ inputs.target == 'azure' }}
+        uses: azure/login@v1
+        with:
+          client-id: ${{ secrets.AZURE_CI_CLIENT }}
+          tenant-id: ${{ secrets.AZURE_CI_TENANT }}
+          subscription-id: ${{ secrets.AZURE_CI_SUBSCRIPTION }}
 
       # Using IdP for GCP
       # https://docs.github.com/en/actions/deployment/security-hardening-your-deployments/configuring-openid-connect-in-google-cloud-platform
@@ -131,6 +144,7 @@ jobs:
     env: ${{ fromJson( inputs.matrix ) }}
 
     runs-on: ubuntu-latest
+    environment: integration
     timeout-minutes: 20
 
     # To use apt-get install, jobs must run in a container
