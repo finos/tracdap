@@ -18,6 +18,7 @@
 # (bucket may be empty, otherwise limit to first 10 objects)
 
 az storage blob list \
+    --auth-mode login \
     --account-name ${TRAC_AZURE_STORAGE_ACCOUNT} \
     --container-name ${TRAC_AZURE_CONTAINER} \
     --num-results 10
