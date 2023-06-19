@@ -57,7 +57,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Integration install script
+      - name: Install required packages
         if: ${{ env.INSTALL_SCRIPT != '' }}
         env: ${{ vars }}
         run: |
@@ -75,6 +75,17 @@ jobs:
           role-session-name: tracdap-ci-session
           aws-region: ${{ vars.TRAC_AWS_REGION }}
 
+      # Using IdP for GCP
+      # https://docs.github.com/en/actions/deployment/security-hardening-your-deployments/configuring-openid-connect-in-google-cloud-platform
+      # https://github.com/google-github-actions/auth
+
+      - name: Authenticate to GCP
+        if: ${{ inputs.target == 'gcp' }}
+        uses: google-github-actions/auth@v1
+        with:
+          workload_identity_provider: projects/158849182108/locations/global/workloadIdentityPools/github/providers/github
+          service_account: ${{ secrets.GCP_CI_USER }}
+
       # Using IdP for Azure
       # https://docs.github.com/en/actions/deployment/security-hardening-your-deployments/configuring-openid-connect-in-azure
       # https://github.com/Azure/login
@@ -86,17 +97,6 @@ jobs:
           client-id: ${{ secrets.AZURE_CI_CLIENT }}
           tenant-id: ${{ secrets.AZURE_CI_TENANT }}
           subscription-id: ${{ secrets.AZURE_CI_SUBSCRIPTION }}
-
-      # Using IdP for GCP
-      # https://docs.github.com/en/actions/deployment/security-hardening-your-deployments/configuring-openid-connect-in-google-cloud-platform
-      # https://github.com/google-github-actions/auth
-
-      - name: Authenticate to GCP
-        if: ${{ inputs.target == 'gcp' }}
-        uses: google-github-actions/auth@v1
-        with:
-          workload_identity_provider: projects/158849182108/locations/global/workloadIdentityPools/github/providers/github
-          service_account: ${{ secrets.GCP_CI_USER }}
 
       - name: Integration setup script
         if: ${{ env.SETUP_SCRIPT != '' }}
@@ -165,7 +165,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Integration install script
+      - name: Install required packages
         if: ${{ env.INSTALL_SCRIPT != '' }}
         env: ${{ vars }}
         run: |
@@ -183,6 +183,17 @@ jobs:
           role-session-name: tracdap-ci-session
           aws-region: ${{ vars.TRAC_AWS_REGION }}
 
+      # Using IdP for GCP
+      # https://docs.github.com/en/actions/deployment/security-hardening-your-deployments/configuring-openid-connect-in-google-cloud-platform
+      # https://github.com/google-github-actions/auth
+
+      - name: Authenticate to GCP
+        if: ${{ inputs.target == 'gcp' }}
+        uses: google-github-actions/auth@v1
+        with:
+          workload_identity_provider: projects/158849182108/locations/global/workloadIdentityPools/github/providers/github
+          service_account: ${{ secrets.GCP_CI_USER }}
+
       # Using IdP for Azure
       # https://docs.github.com/en/actions/deployment/security-hardening-your-deployments/configuring-openid-connect-in-azure
       # https://github.com/Azure/login
@@ -194,17 +205,6 @@ jobs:
           client-id: ${{ secrets.AZURE_CI_CLIENT }}
           tenant-id: ${{ secrets.AZURE_CI_TENANT }}
           subscription-id: ${{ secrets.AZURE_CI_SUBSCRIPTION }}
-
-      # Using IdP for GCP
-      # https://docs.github.com/en/actions/deployment/security-hardening-your-deployments/configuring-openid-connect-in-google-cloud-platform
-      # https://github.com/google-github-actions/auth
-
-      - name: Authenticate to GCP
-        if: ${{ inputs.target == 'gcp' }}
-        uses: google-github-actions/auth@v1
-        with:
-          workload_identity_provider: projects/158849182108/locations/global/workloadIdentityPools/github/providers/github
-          service_account: ${{ secrets.GCP_CI_USER }}
 
       - name: Integration setup script
         if: ${{ env.SETUP_SCRIPT != '' }}
