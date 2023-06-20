@@ -7,16 +7,16 @@
 # ----------------------------------------------------------------------------------------------------------------------
 
 # Core protobuf support for metadata / config classes
-protobuf == 4.21.10
+protobuf == 4.23.2
 
 # Core data framework is based on Arrow
-pyarrow == 12.0.0
+pyarrow == 12.0.1
 
 # PyYAML is used to load config supplied in YAML format
 pyyaml == 6.0
 
 # Python implementation of Git, for model loading
-dulwich == 0.21.2
+dulwich == 0.21.5
 
 # Requests, used for downloading model packages
 requests == 2.31.0
@@ -40,18 +40,6 @@ pandas >= 1.2.0, < 1.6.0
 # PySpark - Support the 3.x series
 
 pyspark >= 3.0.0, < 3.5.0
-
-
-# ----------------------------------------------------------------------------------------------------------------------
-# Dependencies for back end plugins
-# ----------------------------------------------------------------------------------------------------------------------
-
-# Install all of these for development
-# Client code should not be using these features directly, so we can fix the version
-# Dependencies in the dist package are controlled as optional features
-
-# AWS
-boto3 == 1.26.22
 
 
 # ----------------------------------------------------------------------------------------------------------------------

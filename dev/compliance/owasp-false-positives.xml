@@ -189,4 +189,12 @@
         <cve>CVE-2021-37533</cve>
     </suppress>
 
+    <!-- Another over-zealous report on Sonatype -->
+    <!-- Jackson are considering a fix for 2.16 series, although there is no way to exploit this issue -->
+    <!-- https://github.com/FasterXML/jackson-databind/issues/3972 -->
+    <suppress>
+        <packageUrl regex="true">^pkg:maven/com\.fasterxml\.jackson\.core/jackson\-databind@.*$</packageUrl>
+        <vulnerabilityName>CVE-2023-35116</vulnerabilityName>
+    </suppress>
+
 </suppressions>

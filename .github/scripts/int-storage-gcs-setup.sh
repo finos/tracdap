@@ -14,20 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Install CLI tools
-
-export DEBIAN_FRONTEND=noninteractive
-
-apt-get update
-apt-get upgrade -y
-apt-get install -y curl gnupg apt-transport-https ca-certificates
-
-echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | tee -a /etc/apt/sources.list.d/google-cloud-sdk.list
-curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key --keyring /usr/share/keyrings/cloud.google.gpg add -
-
-apt-get update
-apt-get install -y google-cloud-cli
-
 # Log in to GCP using the credentials provided by the GitHub Action for Google Auth
 
 gcloud auth login --cred-file ${GOOGLE_GHA_CREDS_PATH}

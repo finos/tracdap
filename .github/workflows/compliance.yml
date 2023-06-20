@@ -93,10 +93,12 @@ jobs:
       - name: PIP Upgrade
         run: python -m pip install --upgrade pip
 
+      # Make sure to check compliance on both core and plugin dependencies
       - name: Install dependencies
         run: |
           cd tracdap-runtime/python
           pip install -r requirements.txt
+          pip install -r requirements_plugins.txt
 
       - name: Safety check
         run: |

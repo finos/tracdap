@@ -14,7 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# List bucket contents to check the connection
-# (bucket may be empty, otherwise limit to first 10 objects)
+export DEBIAN_FRONTEND=noninteractive
 
-aws s3api list-objects-v2 --bucket ${TRAC_AWS_BUCKET} --region ${TRAC_AWS_REGION} --max-items 10
+apt-get update
+apt-get upgrade -y
+apt-get install -y awscli

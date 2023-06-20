@@ -42,6 +42,7 @@ jobs:
     if: ${{ inputs.enabled && inputs.has_java }}
 
     runs-on: ubuntu-latest
+    environment: integration
     timeout-minutes: 20
 
     # To use apt-get install, jobs must run in a container
@@ -55,6 +56,12 @@ jobs:
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
+
+      - name: Install required packages
+        if: ${{ env.INSTALL_SCRIPT != '' }}
+        env: ${{ vars }}
+        run: |
+          ${{ env.INSTALL_SCRIPT }}
 
       # Using IdP for AWS, set the repo secret AWS_CI_ROLE to use
       # https://docs.github.com/en/actions/deployment/security-hardening-your-deployments/configuring-openid-connect-in-amazon-web-services
@@ -78,6 +85,18 @@ jobs:
         with:
           workload_identity_provider: projects/158849182108/locations/global/workloadIdentityPools/github/providers/github
           service_account: ${{ secrets.GCP_CI_USER }}
+
+      # Using IdP for Azure
+      # https://docs.github.com/en/actions/deployment/security-hardening-your-deployments/configuring-openid-connect-in-azure
+      # https://github.com/Azure/login
+
+      - name: Authenticate to Azure
+        if: ${{ inputs.target == 'azure' }}
+        uses: azure/login@v1
+        with:
+          client-id: ${{ secrets.AZURE_CI_CLIENT }}
+          tenant-id: ${{ secrets.AZURE_CI_TENANT }}
+          subscription-id: ${{ secrets.AZURE_CI_SUBSCRIPTION }}
 
       - name: Integration setup script
         if: ${{ env.SETUP_SCRIPT != '' }}
@@ -131,6 +150,7 @@ jobs:
     env: ${{ fromJson( inputs.matrix ) }}
 
     runs-on: ubuntu-latest
+    environment: integration
     timeout-minutes: 20
 
     # To use apt-get install, jobs must run in a container
@@ -144,6 +164,12 @@ jobs:
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
+
+      - name: Install required packages
+        if: ${{ env.INSTALL_SCRIPT != '' }}
+        env: ${{ vars }}
+        run: |
+          ${{ env.INSTALL_SCRIPT }}
 
       # Using IdP for AWS, set the repo secret AWS_CI_ROLE to use
       # https://docs.github.com/en/actions/deployment/security-hardening-your-deployments/configuring-openid-connect-in-amazon-web-services
@@ -168,6 +194,18 @@ jobs:
           workload_identity_provider: projects/158849182108/locations/global/workloadIdentityPools/github/providers/github
           service_account: ${{ secrets.GCP_CI_USER }}
 
+      # Using IdP for Azure
+      # https://docs.github.com/en/actions/deployment/security-hardening-your-deployments/configuring-openid-connect-in-azure
+      # https://github.com/Azure/login
+
+      - name: Authenticate to Azure
+        if: ${{ inputs.target == 'azure' }}
+        uses: azure/login@v1
+        with:
+          client-id: ${{ secrets.AZURE_CI_CLIENT }}
+          tenant-id: ${{ secrets.AZURE_CI_TENANT }}
+          subscription-id: ${{ secrets.AZURE_CI_SUBSCRIPTION }}
+
       - name: Integration setup script
         if: ${{ env.SETUP_SCRIPT != '' }}
         env: ${{ vars }}
@@ -190,6 +228,7 @@ jobs:
           . ./venv/bin/activate
           cd tracdap-runtime/python
           pip install -r requirements.txt
+          pip install -r requirements_plugins.txt
 
       - name: Protoc code generation
         run: |

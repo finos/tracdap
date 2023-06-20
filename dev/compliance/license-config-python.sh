@@ -12,7 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-ALLOWED_LICENSES="Apache Software License;MIT License;BSD License;BSD-3-Clause;3-Clause BSD License"
+ALLOWED_LICENSES="Apache Software License"
+ALLOWED_LICENSES="${ALLOWED_LICENSES};MIT License"
+ALLOWED_LICENSES="${ALLOWED_LICENSES};BSD License"
+ALLOWED_LICENSES="${ALLOWED_LICENSES};BSD-3-Clause"
+ALLOWED_LICENSES="${ALLOWED_LICENSES};3-Clause BSD License;"
+ALLOWED_LICENSES="${ALLOWED_LICENSES};Python Software Foundation License"
 
 # The "certifi" package is a dependency of Python Safety, licensed under MPL 2.0
 # It is OK to use since the compliance tools are not distributed

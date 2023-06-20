@@ -18,6 +18,7 @@ import pathlib
 import re
 import sys
 import typing as tp
+import traceback as tb
 
 import pyarrow as pa
 import pyarrow.fs as pa_fs
@@ -200,24 +201,41 @@ class _NativeFileResource(pa_lib.NativeFile):
 
 class CommonFileStorage(IFileStorage):
 
-    FILE_SEMANTICS_FS_TYPES = ["local"]
-    BUCKET_SEMANTICS_FS_TYPES = ["s3", "gcs"]
+    _TRAC_DIR_MARKER = "/.trac_dir"
 
-    def __init__(self, storage_key: str, storage_config: _cfg.PluginConfig, fs_impl: pa_fs.SubTreeFileSystem):
+    FILE_SEMANTICS_FS_TYPES = ["local"]
+    BUCKET_SEMANTICS_FS_TYPES = ["s3", "gcs", "abfs"]
+    EXPLICIT_DIR_FS_TYPES = ["abfs"]
+
+    def __init__(self, storage_key: str, storage_config: _cfg.PluginConfig, fs: pa_fs.SubTreeFileSystem):
 
         self._log = _util.logger_for_object(self)
         self._key = storage_key
         self._config = storage_config
-        self._fs = fs_impl
+        self._fs = fs
 
-        fs_type = fs_impl.base_fs.type_name
-        fs_root = fs_impl.base_path
+        fs_type = fs.base_fs.type_name
+        fs_impl = "arrow"
+        fs_root = fs.base_path
+
+        # If this is an FSSpec implementation, take the protocol from FSSpec as the FS type
+        base_fs = fs.base_fs
+        if isinstance(base_fs, pa_fs.PyFileSystem):
+            handler = base_fs.handler
+            if isinstance(handler, pa_fs.FSSpecHandler):
+                fs_type = handler.fs.protocol
+                fs_impl = "fsspec"
 
         # Some optimization is possible if the underlying storage semantics are known
         self._file_semantics = True if fs_type in self.FILE_SEMANTICS_FS_TYPES else False
         self._bucket_semantics = True if fs_type in self.BUCKET_SEMANTICS_FS_TYPES else False
+        self._explicit_dir_semantics = True if fs_type in self.EXPLICIT_DIR_FS_TYPES else False
 
-        self._log.info(f"INIT [{self._key}]: Common file storage, fs = [{fs_type}], root = [{fs_root}]")
+        self._log.info(
+            f"INIT [{self._key}]: Common file storage, " +
+            f"fs = [{fs_type}], " +
+            f"impl = [{fs_impl}], " +
+            f"root = [{fs_root}]")
 
     def exists(self, storage_path: str) -> bool:
 
@@ -280,6 +298,13 @@ class CommonFileStorage(IFileStorage):
 
         file_type = FileType.FILE if file_info.is_file else FileType.DIRECTORY
         file_size = file_info.size if file_info.is_file else 0
+
+        # Normalization in case the impl gives back directory entries with a trailing slash
+        if file_type == FileType.DIRECTORY and storage_path.endswith("/"):
+            storage_path = storage_path[:-1]
+            separator = storage_path.rfind("/")
+            file_name = storage_path[separator+1:]
+
         mtime = file_info.mtime.astimezone(dt.timezone.utc) if file_info.mtime is not None else None
 
         return FileStat(
@@ -309,6 +334,7 @@ class CommonFileStorage(IFileStorage):
         else:
             selector = pa_fs.FileSelector(resolved_path, recursive=recursive)  # noqa
             file_infos = self._fs.get_file_info(selector)
+            file_infos = filter(lambda fi: not fi.path.endswith(self._TRAC_DIR_MARKER), file_infos)
             return list(map(self._info_to_stat, file_infos))
 
     def mkdir(self, storage_path: str, recursive: bool = False):
@@ -323,11 +349,32 @@ class CommonFileStorage(IFileStorage):
         # In cloud bucket semantics a file and dir can both exist with the same name - very confusing!
         # There is a race condition here because a file could be created by another process
         # But, given the very structured way TRAC uses file storage, this is extremely unlikely
+
         prior_stat: pa_fs.FileInfo = self._fs.get_file_info(resolved_path)
         if prior_stat.type == pa_fs.FileType.File or prior_stat.type == pa_fs.FileType.Unknown:
             raise self._explicit_error(self.ExplicitError.OBJECT_ALREADY_EXISTS, operation_name, storage_path)
 
-        self._fs.create_dir(resolved_path, recursive=recursive)
+        # For most FS types, it is fine to use the Arrow create_dir() method
+        # For bucket-like storage, this will normally create an empty blob with a name like "my_dir/"
+
+        if not self._explicit_dir_semantics:
+            self._fs.create_dir(resolved_path, recursive=recursive)
+            return
+
+        # Some FS backends for bucket-like storage do not allow empty blobs as directories
+        # For these backends, we have to create an explicit marker file inside the directory
+        # In this case it is also necessary to check parents explicitly for non-recursive requests
+
+        if not recursive and prior_stat.type == pa_fs.FileType.NotFound:
+            parent_path = self._resolve_parent(resolved_path)
+            if parent_path is not None:
+                parent_stat: pa_fs.FileInfo = self._fs.get_file_info(parent_path)
+                if parent_stat.type != pa_fs.FileType.Directory:
+                    raise FileNotFoundError
+
+        dir_marker = resolved_path + self._TRAC_DIR_MARKER
+        with self._fs.open_output_stream(dir_marker) as stream:
+            stream.write(b"")
 
     def rm(self, storage_path: str):
 
@@ -419,10 +466,6 @@ class CommonFileStorage(IFileStorage):
 
     def _close_byte_stream(self, storage_path: str, stream: tp.BinaryIO, is_write: bool, delete_on_error: bool = False):
 
-        # Do not try to close the stream twice
-        if stream.closed:
-            return
-
         # If there has been an error, log it
         exc_info = sys.exc_info()
         error = exc_info[1] if exc_info is not None else None
@@ -438,7 +481,8 @@ class CommonFileStorage(IFileStorage):
         # Close the stream - this may take time for write streams that are not flushed
         # Closing here gives better logs, because any pause is before the close message
         # As a fail-safe, _NativeFileResource always calls close() in a "finally" block
-        stream.close()
+        if not stream.closed:
+            stream.close()
 
         # Log closing of the stream
         if is_write:
@@ -454,8 +498,32 @@ class CommonFileStorage(IFileStorage):
                 file_info = self._fs.get_file_info(storage_path)
                 if file_info.type != pa_fs.FileType.NotFound:
                     self._fs.delete_file(storage_path)
-            except OSError:
+            # different implementations can throw different errors here
+            except Exception:  # noqa
                 pass
+
+        # Stream implementations can raise various types of error during stream operations
+        # Errors can have different causes (access, communication, missing / duplicate files etc.)
+        # Also, other errors can occur inside the stream context manager, unrelated to IO
+
+        # In the case of an IO error we want to raise EStorage, other errors should propagate as they are
+        # This handler tries to spot IO errors from inside the PyArrow library, it is probably not fail-safe
+        # If an IO error is not spotted, the original error will propagate and get reported as EUnexpected
+        # Anyway this handler is only for errors that happen after the stream is opened
+
+        # The alternative is to override every method in _NativeFileResource and try to catch there
+        # However, different implementations raise different error types, so we still need some kind of inspection
+
+        if error is not None:
+
+            if isinstance(error, OSError):
+                raise _ex.EStorage from error
+
+            stack = tb.extract_tb(exc_info[2])
+            stack = filter(lambda frame: frame.filename is not None, stack)
+
+            if any(filter(lambda frame: frame.filename.startswith("pyarrow/"), stack)):
+                raise _ex.EStorage from error
 
     def _wrap_operation(self, func: tp.Callable, operation_name: str, storage_path: str, *args, **kwargs) -> tp.Any:
 

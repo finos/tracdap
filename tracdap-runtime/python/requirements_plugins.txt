@@ -1,0 +1,36 @@
+
+# Dependencies for back end plugins
+# Install all of these for plugin development
+
+# Client code should not be using these features directly, so we can fix the version
+# Dependencies in the dist package are controlled as optional features
+
+# Some of these libraries do not support the oldest versions of Python
+# So e.g. to use the Azure libraries, Python 3.8 is required
+# We can still support older Python versions, so long as those plugins are not being used
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+# AWS
+# ----------------------------------------------------------------------------------------------------------------------
+
+botocore == 1.29.133
+boto3 == 1.26.133
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+# GCP
+# ----------------------------------------------------------------------------------------------------------------------
+
+# Currently GCP is entirely supported using Arrow's native storage implementation
+# No need for extra libs at present
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+# Azure
+# ----------------------------------------------------------------------------------------------------------------------
+
+azure-core == 1.26.4
+azure-identity == 1.13.0
+azure-storage-blob == 12.16.0
+adlfs == 2023.4.0

@@ -17,4 +17,8 @@
 # List bucket contents to check the connection
 # (bucket may be empty, otherwise limit to first 10 objects)
 
-aws s3api list-objects-v2 --bucket ${TRAC_AWS_BUCKET} --region ${TRAC_AWS_REGION} --max-items 10
+az storage blob list \
+    --auth-mode login \
+    --account-name ${TRAC_AZURE_STORAGE_ACCOUNT} \
+    --container-name ${TRAC_AZURE_CONTAINER} \
+    --num-results 10
