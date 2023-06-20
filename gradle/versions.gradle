@@ -61,7 +61,7 @@ ext {
 
     // Plugins
 
-    aws_sdk_version = '2.19.10'
+    aws_sdk_version = '2.20.88'
 
     apache_sshd_version = "2.9.2"
 
