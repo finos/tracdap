@@ -507,14 +507,17 @@ class CommonFileStorage(IFileStorage):
         # Also, other errors can occur inside the stream context manager, unrelated to IO
 
         # In the case of an IO error we want to raise EStorage, other errors should propagate as they are
-        # This handler tries to spot IO errors that come from inside the PyArrow library
-        # It is probably not fail-safe, so some errors could be reported as "unexpected"
-        # Anyway this is only for errors that happen after the stream is opened
+        # This handler tries to spot IO errors from inside the PyArrow library, it is probably not fail-safe
+        # If an IO error is not spotted, the original error will propagate and get reported as EUnexpected
+        # Anyway this handler is only for errors that happen after the stream is opened
 
         # The alternative is to override every method in _NativeFileResource and try to catch there
         # However, different implementations raise different error types, so we still need some kind of inspection
 
         if error is not None:
+
+            if isinstance(error, OSError):
+                raise _ex.EStorage from error
 
             stack = tb.extract_tb(exc_info[2])
             stack = filter(lambda frame: frame.filename is not None, stack)
