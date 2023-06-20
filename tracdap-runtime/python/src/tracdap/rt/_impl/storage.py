@@ -233,7 +233,7 @@ class CommonFileStorage(IFileStorage):
 
         self._log.info(
             f"INIT [{self._key}]: Common file storage, " +
-            f"fs = [{fs_type} ], " +
+            f"fs = [{fs_type}], " +
             f"impl = [{fs_impl}], " +
             f"root = [{fs_root}]")
 
