@@ -201,25 +201,41 @@ class _NativeFileResource(pa_lib.NativeFile):
 
 class CommonFileStorage(IFileStorage):
 
-    FILE_SEMANTICS_FS_TYPES = ["local"]
-    BUCKET_SEMANTICS_FS_TYPES = ["s3", "gcs"]
-    EXPLICIT_DIR_SEMANTICS_FS_TYPES = ""
+    _TRAC_DIR_MARKER = "/.trac_dir"
 
-    def __init__(self, storage_key: str, storage_config: _cfg.PluginConfig, fs_impl: pa_fs.SubTreeFileSystem):
+    FILE_SEMANTICS_FS_TYPES = ["local"]
+    BUCKET_SEMANTICS_FS_TYPES = ["s3", "gcs", "abfs"]
+    EXPLICIT_DIR_FS_TYPES = ["abfs"]
+
+    def __init__(self, storage_key: str, storage_config: _cfg.PluginConfig, fs: pa_fs.SubTreeFileSystem):
 
         self._log = _util.logger_for_object(self)
         self._key = storage_key
         self._config = storage_config
-        self._fs = fs_impl
+        self._fs = fs
 
-        fs_type = fs_impl.base_fs.type_name
-        fs_root = fs_impl.base_path
+        fs_type = fs.base_fs.type_name
+        fs_impl = "arrow"
+        fs_root = fs.base_path
+
+        # If this is an FSSpec implementation, take the protocol from FSSpec as the FS type
+        base_fs = fs.base_fs
+        if isinstance(base_fs, pa_fs.PyFileSystem):
+            handler = base_fs.handler
+            if isinstance(handler, pa_fs.FSSpecHandler):
+                fs_type = handler.fs.protocol
+                fs_impl = "fsspec"
 
         # Some optimization is possible if the underlying storage semantics are known
         self._file_semantics = True if fs_type in self.FILE_SEMANTICS_FS_TYPES else False
         self._bucket_semantics = True if fs_type in self.BUCKET_SEMANTICS_FS_TYPES else False
+        self._explicit_dir_semantics = True if fs_type in self.EXPLICIT_DIR_FS_TYPES else False
 
-        self._log.info(f"INIT [{self._key}]: Common file storage, fs = [{fs_type}], root = [{fs_root}]")
+        self._log.info(
+            f"INIT [{self._key}]: Common file storage, " +
+            f"fs = [{fs_type} ], " +
+            f"impl = [{fs_impl}], " +
+            f"root = [{fs_root}]")
 
     def exists(self, storage_path: str) -> bool:
 
@@ -280,23 +296,14 @@ class CommonFileStorage(IFileStorage):
             file_name = file_info.base_name
             storage_path = file_info.path
 
-        if storage_path.endswith("/"):
+        file_type = FileType.FILE if file_info.is_file else FileType.DIRECTORY
+        file_size = file_info.size if file_info.is_file else 0
 
+        # Normalization in case the impl gives back directory entries with a trailing slash
+        if file_type == FileType.DIRECTORY and storage_path.endswith("/"):
             storage_path = storage_path[:-1]
-            file_type = FileType.DIRECTORY
-            file_size = 0
-
-            if not file_name and len(storage_path) > 0:
-                if "/" in storage_path:
-                    sep = storage_path.rfind("/")
-                    file_name = storage_path[sep+1:]
-                else:
-                    file_name = storage_path
-
-        else:
-
-            file_type = FileType.FILE if file_info.is_file else FileType.DIRECTORY
-            file_size = file_info.size if file_info.is_file else 0
+            separator = storage_path.rfind("/")
+            file_name = storage_path[separator+1:]
 
         mtime = file_info.mtime.astimezone(dt.timezone.utc) if file_info.mtime is not None else None
 
@@ -327,7 +334,7 @@ class CommonFileStorage(IFileStorage):
         else:
             selector = pa_fs.FileSelector(resolved_path, recursive=recursive)  # noqa
             file_infos = self._fs.get_file_info(selector)
-            file_infos = filter(lambda fi: not fi.path.endswith("/_trac_empty"), file_infos)
+            file_infos = filter(lambda fi: not fi.path.endswith(self._TRAC_DIR_MARKER), file_infos)
             return list(map(self._info_to_stat, file_infos))
 
     def mkdir(self, storage_path: str, recursive: bool = False):
@@ -342,24 +349,31 @@ class CommonFileStorage(IFileStorage):
         # In cloud bucket semantics a file and dir can both exist with the same name - very confusing!
         # There is a race condition here because a file could be created by another process
         # But, given the very structured way TRAC uses file storage, this is extremely unlikely
+
         prior_stat: pa_fs.FileInfo = self._fs.get_file_info(resolved_path)
         if prior_stat.type == pa_fs.FileType.File or prior_stat.type == pa_fs.FileType.Unknown:
             raise self._explicit_error(self.ExplicitError.OBJECT_ALREADY_EXISTS, operation_name, storage_path)
 
-        if prior_stat.type == pa_fs.FileType.Directory:
+        # For most FS types, it is fine to use the Arrow create_dir() method
+        # For bucket-like storage, this will normally create an empty blob with a name like "my_dir/"
+
+        if not self._explicit_dir_semantics:
+            self._fs.create_dir(resolved_path, recursive=recursive)
             return
 
-        # self._fs.create_dir(resolved_path, recursive=recursive)
+        # Some FS backends for bucket-like storage do not allow empty blobs as directories
+        # For these backends, we have to create an explicit marker file inside the directory
+        # In this case it is also necessary to check parents explicitly for non-recursive requests
 
-        if not recursive:
+        if not recursive and prior_stat.type == pa_fs.FileType.NotFound:
             parent_path = self._resolve_parent(resolved_path)
             if parent_path is not None:
                 parent_stat: pa_fs.FileInfo = self._fs.get_file_info(parent_path)
                 if parent_stat.type != pa_fs.FileType.Directory:
                     raise FileNotFoundError
 
-        keep_file = resolved_path + "/_trac_empty"
-        with self._fs.open_output_stream(keep_file) as stream:
+        dir_marker = resolved_path + self._TRAC_DIR_MARKER
+        with self._fs.open_output_stream(dir_marker) as stream:
             stream.write(b"")
 
     def rm(self, storage_path: str):
