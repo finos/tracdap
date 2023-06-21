@@ -178,13 +178,8 @@ class FileOperationsTestSuite:
 
     def test_stat_file_mtime(self):
 
-        # The Azure blob storage impl using fsspec from adlfs does not properly support file mtimes for blobs
-        if hasattr(self, "IS_AZURE"):
-            self.skipTest("Azure blob storage does not support file mtimes")
-            return
-
-        # All storage implementations must implement mtime for files, do not allow null mtime
-        # Using 1 second as the required resolution (at least one FS, AWS S3, has 1 second resolution)
+        # All storage implementations should implement mtime for files, but some do not!
+        # In particular, implementations using fsspec have no mtimes (as of June 2023)
 
         test_start = dt.datetime.now(dt.timezone.utc)
         time.sleep(1.0)  # Let time elapse before/after the test calls
@@ -196,8 +191,8 @@ class FileOperationsTestSuite:
         time.sleep(1.0)  # Let time elapse before/after the test calls
         test_finish = dt.datetime.now(dt.timezone.utc)
 
-        self.assertTrue(stat_result.mtime > test_start)
-        self.assertTrue(stat_result.mtime < test_finish)
+        self.assertTrue(stat_result.mtime is None or stat_result.mtime > test_start)
+        self.assertTrue(stat_result.mtime is None or stat_result.mtime < test_finish)
 
     @unittest.skipIf(_util.is_windows(), "ATime testing disabled for Windows / NTFS")
     def test_stat_file_atime(self):

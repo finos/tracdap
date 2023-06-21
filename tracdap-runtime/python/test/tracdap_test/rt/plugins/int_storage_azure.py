@@ -32,8 +32,6 @@ class AzureBlobStorageTest(unittest.TestCase, FileOperationsTestSuite, FileReadW
     suite_storage: storage.IFileStorage
     test_number: int
 
-    IS_AZURE = True
-
     @classmethod
     def setUpClass(cls) -> None:
 
