@@ -53,7 +53,7 @@ class GcsArrowStorageTest(unittest.TestCase, FileOperationsTestSuite, FileReadWr
 
         self.suite_storage.mkdir(test_dir)
 
-        GcsArrowStorageTest.test_number += 1
+        self.__class__.test_number += 1
 
         properties = self._properties_from_env()
         properties["prefix"] = test_dir
@@ -121,7 +121,7 @@ class GcsFsspecStorageTest(unittest.TestCase, FileOperationsTestSuite, FileReadW
 
         self.suite_storage.mkdir(test_dir)
 
-        GcsArrowStorageTest.test_number += 1
+        self.__class__.test_number += 1
 
         properties = self._properties_from_env()
         properties["prefix"] = test_dir
