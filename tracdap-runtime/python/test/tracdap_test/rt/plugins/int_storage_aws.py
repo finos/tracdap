@@ -27,7 +27,7 @@ util.configure_logging()
 plugins.PluginManager.register_core_plugins()
 
 
-class S3StorageTest(unittest.TestCase, FileOperationsTestSuite, FileReadWriteTestSuite):
+class S3ArrowStorageTest(unittest.TestCase, FileOperationsTestSuite, FileReadWriteTestSuite):
 
     suite_storage_prefix = f"runtime_storage_test_suite_{uuid.uuid4()}"
     suite_storage: storage.IFileStorage
@@ -37,7 +37,6 @@ class S3StorageTest(unittest.TestCase, FileOperationsTestSuite, FileReadWriteTes
     def setUpClass(cls) -> None:
 
         properties = cls._properties_from_env()
-        properties["arrowNativeFs"] = "true"
 
         suite_storage_config = cfg.PluginConfig(protocol="S3", properties=properties)
 
@@ -52,7 +51,7 @@ class S3StorageTest(unittest.TestCase, FileOperationsTestSuite, FileReadWriteTes
 
         self.suite_storage.mkdir(test_dir)
 
-        S3StorageTest.test_number += 1
+        self.__class__.test_number += 1
 
         properties = self._properties_from_env()
         properties["arrowNativeFs"] = "true"
@@ -71,6 +70,7 @@ class S3StorageTest(unittest.TestCase, FileOperationsTestSuite, FileReadWriteTes
     def _properties_from_env():
 
         properties = dict()
+        properties["runtimeFs"] = "arrow"
         properties["region"] = os.getenv("TRAC_AWS_REGION")
         properties["bucket"] = os.getenv("TRAC_AWS_BUCKET")
 

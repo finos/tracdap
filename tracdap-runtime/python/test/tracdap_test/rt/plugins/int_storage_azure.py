@@ -26,7 +26,7 @@ util.configure_logging()
 plugins.PluginManager.register_core_plugins()
 
 
-class AzureBlobStorageTest(unittest.TestCase, FileOperationsTestSuite, FileReadWriteTestSuite):
+class BlobFsspecStorageTest(unittest.TestCase, FileOperationsTestSuite, FileReadWriteTestSuite):
 
     suite_storage_prefix = f"runtime_storage_test_suite_{uuid.uuid4()}"
     suite_storage: storage.IFileStorage
@@ -50,7 +50,7 @@ class AzureBlobStorageTest(unittest.TestCase, FileOperationsTestSuite, FileReadW
 
         self.suite_storage.mkdir(test_dir)
 
-        AzureBlobStorageTest.test_number += 1
+        self.__class__.test_number += 1
 
         properties = self._properties_from_env()
         properties["prefix"] = test_dir
