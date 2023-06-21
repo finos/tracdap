@@ -35,8 +35,12 @@ from . import _helpers
 class LocalStorageProvider(IStorageProvider):
 
     ROOT_PATH_PROPERTY = "rootPath"
-    ARROW_NATIVE_FS_PROPERTY = "arrowNativeFs"
-    ARROW_NATIVE_FS_DEFAULT = False
+
+    RUNTIME_FS_PROPERTY = "runtimeFs"
+    RUNTIME_FS_AUTO = "auto"
+    RUNTIME_FS_ARROW = "arrow"
+    RUNTIME_FS_PYTHON = "python"
+    RUNTIME_FS_DEFAULT = RUNTIME_FS_AUTO
 
     def __init__(self, properties: tp.Dict[str, str]):
 
@@ -45,14 +49,15 @@ class LocalStorageProvider(IStorageProvider):
 
         self._root_path = self.check_root_path(self._properties, self._log)
 
-        self._arrow_native = _helpers.get_plugin_property_boolean(
-            properties, self.ARROW_NATIVE_FS_PROPERTY, self.ARROW_NATIVE_FS_DEFAULT)
+        self._runtime_fs = _helpers.get_plugin_property(
+            properties, self.RUNTIME_FS_PROPERTY) \
+            or self.RUNTIME_FS_DEFAULT
 
     def has_arrow_native(self) -> bool:
-        return True if self._arrow_native else False
+        return self._runtime_fs in [self.RUNTIME_FS_ARROW, self.RUNTIME_FS_AUTO]
 
     def has_file_storage(self) -> bool:
-        return False if self._arrow_native else True
+        return self._runtime_fs == self.RUNTIME_FS_PYTHON
 
     def get_arrow_native(self) -> afs.SubTreeFileSystem:
         root_fs = afs.LocalFileSystem()
