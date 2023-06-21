@@ -205,7 +205,6 @@ class CommonFileStorage(IFileStorage):
 
     FILE_SEMANTICS_FS_TYPES = ["local"]
     BUCKET_SEMANTICS_FS_TYPES = ["s3", "gcs", "abfs"]
-    EXPLICIT_DIR_FS_TYPES = ["abfs"]
 
     def __init__(self, storage_key: str, storage_config: _cfg.PluginConfig, fs: pa_fs.SubTreeFileSystem):
 
@@ -223,13 +222,13 @@ class CommonFileStorage(IFileStorage):
         if isinstance(base_fs, pa_fs.PyFileSystem):
             handler = base_fs.handler
             if isinstance(handler, pa_fs.FSSpecHandler):
-                fs_type = handler.fs.protocol
+                fs_type = handler.fs.protocol[0] if isinstance(handler.fs.protocol, tuple) else handler.fs.protocol
                 fs_impl = "fsspec"
 
         # Some optimization is possible if the underlying storage semantics are known
         self._file_semantics = True if fs_type in self.FILE_SEMANTICS_FS_TYPES else False
         self._bucket_semantics = True if fs_type in self.BUCKET_SEMANTICS_FS_TYPES else False
-        self._explicit_dir_semantics = True if fs_type in self.EXPLICIT_DIR_FS_TYPES else False
+        self._explicit_dir_semantics = True if self._bucket_semantics and fs_impl == "fsspec" else False
 
         self._log.info(
             f"INIT [{self._key}]: Common file storage, " +
