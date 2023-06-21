@@ -84,12 +84,12 @@ class IFileStorage:
         pass
 
     @_abc.abstractmethod
-    def read_byte_stream(self, storage_path: str) -> _tp.BinaryIO:
+    def read_byte_stream(self, storage_path: str) -> _tp.ContextManager[_tp.BinaryIO]:
         """The read_byte_stream method only works for existing files"""
         pass
 
     @_abc.abstractmethod
-    def write_byte_stream(self, storage_path: str) -> _tp.BinaryIO:
+    def write_byte_stream(self, storage_path: str) -> _tp.ContextManager[_tp.BinaryIO]:
         """The write_byte_stream method will always overwrite an existing file if it exists"""
         pass
 

@@ -179,20 +179,17 @@ class StorageManager:
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class _NativeFileResource(pa_lib.NativeFile):
+class _NativeFileContext(tp.ContextManager[tp.BinaryIO]):
 
     def __init__(self, nf: pa_lib.NativeFile, close_func: tp.Callable):
         super().__init__()
         self.__nf = nf
         self.__close_func = close_func
 
-    def __getattribute__(self, item):
-        if item == "close" or item == "_NativeFileResource__nf" or item == "_NativeFileResource__close_func":
-            return object.__getattribute__(self, item)
-        else:
-            return object.__getattribute__(self.__nf, item)
+    def __enter__(self):
+        return self.__nf
 
-    def close(self):
+    def __exit__(self, exc_type, exc_val, exc_tb):
         try:
             self.__close_func()
         finally:
@@ -404,11 +401,11 @@ class CommonFileStorage(IFileStorage):
 
         self._fs.delete_dir(resolved_path)
 
-    def read_byte_stream(self, storage_path: str) -> tp.BinaryIO:
+    def read_byte_stream(self, storage_path: str) -> tp.ContextManager[tp.BinaryIO]:
 
         return self._wrap_operation(self._read_byte_stream, "OPEN BYTE STREAM (READ)", storage_path)
 
-    def _read_byte_stream(self, operation_name: str, storage_path: str) -> tp.BinaryIO:
+    def _read_byte_stream(self, operation_name: str, storage_path: str) -> tp.ContextManager[tp.BinaryIO]:
 
         resolved_path = self._resolve_path(operation_name, storage_path, False)
 
@@ -429,13 +426,13 @@ class CommonFileStorage(IFileStorage):
         stream = self._fs.open_input_file(resolved_path)
 
         # Return impl of PyArrow NativeFile instead of BinaryIO - this is the same thing PyArrow does
-        return _NativeFileResource(stream, lambda: self._close_byte_stream(storage_path, stream, False))  # noqa
+        return _NativeFileContext(stream, lambda: self._close_byte_stream(storage_path, stream, False))  # noqa
 
-    def write_byte_stream(self, storage_path: str) -> tp.BinaryIO:
+    def write_byte_stream(self, storage_path: str) -> tp.ContextManager[tp.BinaryIO]:
 
         return self._wrap_operation(self._write_byte_stream, "OPEN BYTE STREAM (WRITE)", storage_path)
 
-    def _write_byte_stream(self, operation_name: str, storage_path: str) -> tp.BinaryIO:
+    def _write_byte_stream(self, operation_name: str, storage_path: str) -> tp.ContextManager[tp.BinaryIO]:
 
         resolved_path = self._resolve_path(operation_name, storage_path, False)
 
@@ -462,7 +459,7 @@ class CommonFileStorage(IFileStorage):
         stream = self._fs.open_output_stream(resolved_path)
 
         # Return impl of  PyArrow NativeFile instead of BinaryIO - this is the same thing PyArrow does
-        return _NativeFileResource(stream, lambda: self._close_byte_stream(storage_path, stream, True, delete_on_error))  # noqa
+        return _NativeFileContext(stream, lambda: self._close_byte_stream(storage_path, stream, True, delete_on_error))  # noqa
 
     def _close_byte_stream(self, storage_path: str, stream: tp.BinaryIO, is_write: bool, delete_on_error: bool = False):
 
