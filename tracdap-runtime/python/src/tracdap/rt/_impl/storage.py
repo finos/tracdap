@@ -331,7 +331,8 @@ class CommonFileStorage(IFileStorage):
 
         # Otherwise do a normal directory listing
         else:
-            selector = pa_fs.FileSelector(resolved_path, recursive=recursive)  # noqa
+            # A trailing slash prevents some implementations including the directory in its own listing
+            selector = pa_fs.FileSelector(resolved_path + "/", recursive=recursive)  # noqa
             file_infos = self._fs.get_file_info(selector)
             file_infos = filter(lambda fi: not fi.path.endswith(self._TRAC_DIR_MARKER), file_infos)
             return list(map(self._info_to_stat, file_infos))
