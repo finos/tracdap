@@ -23,9 +23,12 @@ import tracdap.rt._impl.util as util  # noqa
 import tracdap.rt._impl.storage as storage  # noqa
 import tracdap.rt._plugins.storage_aws as storage_aws  # noqa
 
+import pyarrow.fs as pa_fs
+
 plugins.PluginManager.register_core_plugins()
 
 
+@unittest.skipIf(pa_fs.GcsFileSystem is None, "Arrow GCS file system is not available on this platform")
 class GcsArrowStorageTest(unittest.TestCase, FileOperationsTestSuite, FileReadWriteTestSuite):
 
     suite_storage_prefix = f"runtime_storage_test_suite_{uuid.uuid4()}"
