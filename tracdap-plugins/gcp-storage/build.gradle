@@ -33,6 +33,7 @@ dependencies {
 
     implementation platform(group: 'com.google.cloud', name: 'libraries-bom', version: "$gcp_bom_version")
     implementation group: 'com.google.cloud', name: 'google-cloud-storage'
+    implementation group: 'com.google.cloud', name: 'google-cloud-resourcemanager'
 
     testImplementation project(path: ':tracdap-lib-data', configuration: 'testSuite')
 }

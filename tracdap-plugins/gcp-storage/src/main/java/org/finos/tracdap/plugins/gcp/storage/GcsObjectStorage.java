@@ -16,11 +16,21 @@
 
 package org.finos.tracdap.plugins.gcp.storage;
 
+import com.google.api.gax.rpc.ApiException;
+import com.google.api.gax.rpc.PermissionDeniedException;
+import com.google.api.services.cloudresourcemanager.CloudResourceManager;
+import com.google.cloud.resourcemanager.ResourceManagerOptions;
+import com.google.cloud.resourcemanager.v3.GetProjectRequest;
+import com.google.cloud.resourcemanager.v3.ProjectsClient;
+import com.google.cloud.resourcemanager.v3.ProjectsSettings;
+import com.google.cloud.resourcemanager.v3.stub.ProjectsStubSettings;
 import com.google.cloud.storage.StorageOptions;
+import io.grpc.StatusRuntimeException;
 import io.grpc.alts.GoogleDefaultChannelCredentials;
 import org.finos.tracdap.common.data.IExecutionContext;
 import org.finos.tracdap.common.data.IDataContext;
 import org.finos.tracdap.common.exception.EStartup;
+import org.finos.tracdap.common.exception.EStorageCommunication;
 import org.finos.tracdap.common.storage.CommonFileStorage;
 import org.finos.tracdap.common.storage.FileStat;
 
@@ -43,9 +53,9 @@ public class GcsObjectStorage extends CommonFileStorage {
 
     private static final String BUCKET_TEMPLATE = "projects/%s/buckets/%s";
 
+    private final String project;
     private final String bucket;
     private final String prefix;
-    private final String justBucket;
 
     private StorageClient storageClient;
 
@@ -54,12 +64,12 @@ public class GcsObjectStorage extends CommonFileStorage {
 
         super(BUCKET_SEMANTICS, storageKey, properties, new GcsStorageErrors(storageKey));
 
-        var project = properties.getProperty(PREFIX_PROPERTY);
+        var project = properties.getProperty(PROJECT_PROPERTY);
         var bucket = properties.getProperty(BUCKET_PROPERTY);
         var prefix = properties.getProperty(PREFIX_PROPERTY);
 
-        this.justBucket = bucket;
-        this.bucket = String.format(BUCKET_TEMPLATE, project, bucket);
+        this.project = project;
+        this.bucket = bucket;
         this.prefix = normalizePrefix(prefix);
     }
 
@@ -86,17 +96,51 @@ public class GcsObjectStorage extends CommonFileStorage {
 
         try {
 
+            String projectId = this.project;
+
+//            try (var projects = ProjectsClient.create()){
+//
+//                log.info("LOOKUP PROJECT [{}]", project);
+//
+//                var request = GetProjectRequest.newBuilder()
+//                        .setName(ProjectName.of(project).toString())
+//                        .build();
+//
+//                var projectInfo = projects.getProject(request);
+//                projectId = projectInfo.getProjectId();
+//            }
+
             log.info("INIT [{}], fs = [GCS], bucket = [{}], prefix = [{}]", storageKey, bucket, prefix);
 
             var settings = StorageSettings.newBuilder().build();
-
             storageClient = StorageClient.create(settings);
 
-            // Testing with the old-style client through the gRPC interface
-            var options = StorageOptions.grpc().build();
-            var listing = options.getService().list(justBucket);
-            var count = listing.streamValues().count();
+            var bucketName = BucketName.of(projectId, bucket);
+            var request = ListObjectsRequest.newBuilder()
+                    .setParent(bucketName.toString())
+                    .setPrefix(prefix)
+                    .setDelimiter(BACKSLASH)
+                    .setPageSize(10)
+                    .build();
+
+            var ls = storageClient.listObjects(request);
+
+            var count =
+                    ls.getPage().getResponse().getObjectsCount() +
+                    ls.getPage().getResponse().getPrefixesCount();
+
             System.out.println("Got [" + count + "] values using gRPC");
+        }
+        catch (ApiException e) {
+
+            var cause = e.getCause();
+
+            var statusMessage = cause instanceof StatusRuntimeException
+                    ? ((StatusRuntimeException) cause).getStatus().getDescription()
+                    : cause.getMessage();
+
+            var message = "GCS storage failed to start: " + statusMessage;
+            throw new EStartup(message, e);
         }
         catch (Exception e) {
             var message = "GCS storage failed to start: " + e.getMessage();
