@@ -325,7 +325,7 @@ class S3ObjectStorage(IFileStorage):
         data = self.read_bytes(storage_path)
         return io.BytesIO(data)
 
-    def _read_impl(self, storage_path: str) -> botocore.response.StreamingBody:
+    def _read_impl(self, storage_path: str):
 
         try:
 
