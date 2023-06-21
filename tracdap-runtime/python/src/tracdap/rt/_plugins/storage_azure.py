@@ -23,11 +23,14 @@ from tracdap.rt.ext.storage import *
 import pyarrow.fs as afs
 
 try:
-    import adlfs
-    azure_available = True
+    # These dependencies are provided by the optional [azure] feature
+    # For local development, pip install -r requirements_plugins.txt
+    import azure.storage.blob as az_blob  # noqa
+    import adlfs  # noqa
+    __azure_available = True
 except ImportError:
     adlfs = None
-    azure_available = False
+    __azure_available = False
 
 # Set of common helpers across the core plugins (do not reference rt._impl)
 from . import _helpers
@@ -51,10 +54,19 @@ class AzureBlobStorageProvider(IStorageProvider):
 
     ACCESS_KEY_PROPERTY = "accessKey"
 
+    RUNTIME_FS_PROPERTY = "runtimeFs"
+    RUNTIME_FS_AUTO = "auto"
+    RUNTIME_FS_FSSPEC = "fsspec"
+    RUNTIME_FS_DEFAULT = RUNTIME_FS_AUTO
+
     def __init__(self, properties: tp.Dict[str, str]):
 
         self._log = _helpers.logger_for_object(self)
         self._properties = properties
+
+        self._runtime_fs = _helpers.get_plugin_property(
+            properties, self.RUNTIME_FS_PROPERTY) \
+            or self.RUNTIME_FS_DEFAULT
 
         # The Azure SDK is very verbose with logging
         # Avoid log noise by raising the log level for the Azure namespace
@@ -66,9 +78,14 @@ class AzureBlobStorageProvider(IStorageProvider):
 
     def get_arrow_native(self) -> afs.SubTreeFileSystem:
 
-        azure_args = self.setup_client_args()
-        azure_fs_impl = adlfs.AzureBlobFileSystem(**azure_args)
-        azure_fs = afs.PyFileSystem(afs.FSSpecHandler(azure_fs_impl))
+        if self._runtime_fs == self.RUNTIME_FS_AUTO and adlfs.AzureBlobFileSystem is not None:
+            azure_fs = self.create_fsspec()
+        elif self._runtime_fs == self.RUNTIME_FS_FSSPEC:
+            azure_fs = self.create_fsspec()
+        else:
+            message = f"Requested runtime FS [{self._runtime_fs}] is not available for Azure storage"
+            self._log.error(message)
+            raise ex.EStartup(message)
 
         container = _helpers.get_plugin_property(self._properties, self.CONTAINER_PROPERTY)
         prefix = _helpers.get_plugin_property(self._properties, self.PREFIX_PROPERTY)
@@ -81,6 +98,13 @@ class AzureBlobStorageProvider(IStorageProvider):
         root_path = f"{container}/{prefix}" if prefix else container
 
         return afs.SubTreeFileSystem(root_path, azure_fs)
+
+    def create_fsspec(self) -> afs.PyFileSystem:
+
+        azure_fsspec_args = self.setup_client_args()
+        azure_fsspec = adlfs.AzureBlobFileSystem(**azure_fsspec_args)
+
+        return afs.PyFileSystem(afs.FSSpecHandler(azure_fsspec))
 
     def setup_client_args(self) -> tp.Dict[str, tp.Any]:
 
@@ -129,5 +153,5 @@ class AzureBlobStorageProvider(IStorageProvider):
 
 
 # Only register the plugin if the [azure] feature is available
-if azure_available:
+if __azure_available:
     plugins.PluginManager.register_plugin(IStorageProvider, AzureBlobStorageProvider, ["BLOB"])

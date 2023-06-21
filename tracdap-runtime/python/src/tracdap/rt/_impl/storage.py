@@ -179,20 +179,17 @@ class StorageManager:
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class _NativeFileResource(pa_lib.NativeFile):
+class _NativeFileContext(tp.ContextManager[tp.BinaryIO]):
 
     def __init__(self, nf: pa_lib.NativeFile, close_func: tp.Callable):
         super().__init__()
         self.__nf = nf
         self.__close_func = close_func
 
-    def __getattribute__(self, item):
-        if item == "close" or item == "_NativeFileResource__nf" or item == "_NativeFileResource__close_func":
-            return object.__getattribute__(self, item)
-        else:
-            return object.__getattribute__(self.__nf, item)
+    def __enter__(self):
+        return self.__nf
 
-    def close(self):
+    def __exit__(self, exc_type, exc_val, exc_tb):
         try:
             self.__close_func()
         finally:
@@ -205,7 +202,6 @@ class CommonFileStorage(IFileStorage):
 
     FILE_SEMANTICS_FS_TYPES = ["local"]
     BUCKET_SEMANTICS_FS_TYPES = ["s3", "gcs", "abfs"]
-    EXPLICIT_DIR_FS_TYPES = ["abfs"]
 
     def __init__(self, storage_key: str, storage_config: _cfg.PluginConfig, fs: pa_fs.SubTreeFileSystem):
 
@@ -223,13 +219,13 @@ class CommonFileStorage(IFileStorage):
         if isinstance(base_fs, pa_fs.PyFileSystem):
             handler = base_fs.handler
             if isinstance(handler, pa_fs.FSSpecHandler):
-                fs_type = handler.fs.protocol
+                fs_type = handler.fs.protocol[0] if isinstance(handler.fs.protocol, tuple) else handler.fs.protocol
                 fs_impl = "fsspec"
 
         # Some optimization is possible if the underlying storage semantics are known
         self._file_semantics = True if fs_type in self.FILE_SEMANTICS_FS_TYPES else False
         self._bucket_semantics = True if fs_type in self.BUCKET_SEMANTICS_FS_TYPES else False
-        self._explicit_dir_semantics = True if fs_type in self.EXPLICIT_DIR_FS_TYPES else False
+        self._explicit_dir_semantics = True if self._bucket_semantics and fs_impl == "fsspec" else False
 
         self._log.info(
             f"INIT [{self._key}]: Common file storage, " +
@@ -332,7 +328,8 @@ class CommonFileStorage(IFileStorage):
 
         # Otherwise do a normal directory listing
         else:
-            selector = pa_fs.FileSelector(resolved_path, recursive=recursive)  # noqa
+            # A trailing slash prevents some implementations including the directory in its own listing
+            selector = pa_fs.FileSelector(resolved_path + "/", recursive=recursive)  # noqa
             file_infos = self._fs.get_file_info(selector)
             file_infos = filter(lambda fi: not fi.path.endswith(self._TRAC_DIR_MARKER), file_infos)
             return list(map(self._info_to_stat, file_infos))
@@ -404,11 +401,11 @@ class CommonFileStorage(IFileStorage):
 
         self._fs.delete_dir(resolved_path)
 
-    def read_byte_stream(self, storage_path: str) -> tp.BinaryIO:
+    def read_byte_stream(self, storage_path: str) -> tp.ContextManager[tp.BinaryIO]:
 
         return self._wrap_operation(self._read_byte_stream, "OPEN BYTE STREAM (READ)", storage_path)
 
-    def _read_byte_stream(self, operation_name: str, storage_path: str) -> tp.BinaryIO:
+    def _read_byte_stream(self, operation_name: str, storage_path: str) -> tp.ContextManager[tp.BinaryIO]:
 
         resolved_path = self._resolve_path(operation_name, storage_path, False)
 
@@ -429,13 +426,13 @@ class CommonFileStorage(IFileStorage):
         stream = self._fs.open_input_file(resolved_path)
 
         # Return impl of PyArrow NativeFile instead of BinaryIO - this is the same thing PyArrow does
-        return _NativeFileResource(stream, lambda: self._close_byte_stream(storage_path, stream, False))  # noqa
+        return _NativeFileContext(stream, lambda: self._close_byte_stream(storage_path, stream, False))  # noqa
 
-    def write_byte_stream(self, storage_path: str) -> tp.BinaryIO:
+    def write_byte_stream(self, storage_path: str) -> tp.ContextManager[tp.BinaryIO]:
 
         return self._wrap_operation(self._write_byte_stream, "OPEN BYTE STREAM (WRITE)", storage_path)
 
-    def _write_byte_stream(self, operation_name: str, storage_path: str) -> tp.BinaryIO:
+    def _write_byte_stream(self, operation_name: str, storage_path: str) -> tp.ContextManager[tp.BinaryIO]:
 
         resolved_path = self._resolve_path(operation_name, storage_path, False)
 
@@ -462,7 +459,7 @@ class CommonFileStorage(IFileStorage):
         stream = self._fs.open_output_stream(resolved_path)
 
         # Return impl of  PyArrow NativeFile instead of BinaryIO - this is the same thing PyArrow does
-        return _NativeFileResource(stream, lambda: self._close_byte_stream(storage_path, stream, True, delete_on_error))  # noqa
+        return _NativeFileContext(stream, lambda: self._close_byte_stream(storage_path, stream, True, delete_on_error))  # noqa
 
     def _close_byte_stream(self, storage_path: str, stream: tp.BinaryIO, is_write: bool, delete_on_error: bool = False):
 

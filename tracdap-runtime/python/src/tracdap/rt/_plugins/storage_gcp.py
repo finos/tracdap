@@ -27,10 +27,19 @@ from pyarrow import fs as afs
 from . import _helpers
 
 
-class GcpStorageProvider(IStorageProvider):
+try:
+    # These dependencies are provided by the optional [gcp] feature
+    # For local development, pip install -r requirements_plugins.txt
+    import google.cloud.storage as gcs  # noqa
+    import gcsfs  # noqa
+    __gcp_available = True
+except ImportError:
+    gcs = None
+    gcsfs = None
+    __gcp_available = False
 
-    ARROW_NATIVE_FS_PROPERTY = "arrowNativeFs"
-    ARROW_NATIVE_FS_DEFAULT = False
+
+class GcpStorageProvider(IStorageProvider):
 
     BUCKET_PROPERTY = "bucket"
     PREFIX_PROPERTY = "prefix"
@@ -45,35 +54,73 @@ class GcpStorageProvider(IStorageProvider):
     ACCESS_TOKEN_EXPIRY = "accessTokenExpiry"
     ACCESS_TOKEN_EXPIRY_DEFAULT = 3600
 
+    RUNTIME_FS_PROPERTY = "runtimeFs"
+    RUNTIME_FS_AUTO = "auto"
+    RUNTIME_FS_ARROW = "arrow"
+    RUNTIME_FS_FSSPEC = "fsspec"
+    RUNTIME_FS_DEFAULT = RUNTIME_FS_AUTO
+
+    ARROW_CLIENT_ARGS = {
+        REGION_PROPERTY: "default_bucket_location",
+        ENDPOINT_PROPERTY: "endpoint_override"
+    }
+
+    FSSPEC_CLIENT_ARGS = {
+        REGION_PROPERTY: "default_location",
+        ENDPOINT_PROPERTY: "endpoint_url"
+    }
+
     def __init__(self, properties: tp.Dict[str, str]):
 
         self._log = _helpers.logger_for_object(self)
         self._properties = properties
 
-        self._arrow_native = _helpers.get_plugin_property_boolean(
-            properties, self.ARROW_NATIVE_FS_PROPERTY, self.ARROW_NATIVE_FS_DEFAULT)
+        self._runtime_fs = _helpers.get_plugin_property(
+            properties, self.RUNTIME_FS_PROPERTY) \
+            or self.RUNTIME_FS_DEFAULT
 
     def has_arrow_native(self) -> bool:
         return True
 
     def get_arrow_native(self) -> afs.SubTreeFileSystem:
 
-        gcs_args = self.setup_client_args()
-        gcs_fs = afs.GcsFileSystem(**gcs_args)
+        if self._runtime_fs == self.RUNTIME_FS_AUTO:
+            gcs_fs = self.create_arrow() if afs.GcsFileSystem is not None else self.create_fsspec()
+        elif self._runtime_fs == self.RUNTIME_FS_ARROW:
+            gcs_fs = self.create_arrow()
+        elif self._runtime_fs == self.RUNTIME_FS_FSSPEC:
+            gcs_fs = self.create_fsspec()
+        else:
+            message = f"Requested runtime FS [{self._runtime_fs}] is not available for GCP storage"
+            self._log.error(message)
+            raise ex.EStartup(message)
 
         bucket = _helpers.get_plugin_property(self._properties, self.BUCKET_PROPERTY)
+        prefix = _helpers.get_plugin_property(self._properties, self.PREFIX_PROPERTY)
 
         if bucket is None or len(bucket.strip()) == 0:
             message = f"Missing required config property [{self.BUCKET_PROPERTY}] for GCP storage"
             self._log.error(message)
             raise ex.EConfigParse(message)
 
-        prefix = _helpers.get_plugin_property(self._properties, self.PREFIX_PROPERTY)
         root_path = f"{bucket}/{prefix}" if prefix else bucket
 
         return afs.SubTreeFileSystem(root_path, gcs_fs)
 
-    def setup_client_args(self) -> tp.Dict[str, tp.Any]:
+    def create_arrow(self) -> afs.GcsFileSystem:
+
+        gcs_arrow_args = self.setup_client_args(self.ARROW_CLIENT_ARGS)
+
+        return afs.GcsFileSystem(**gcs_arrow_args)
+
+    def create_fsspec(self) -> afs.PyFileSystem:
+
+        gcs_fsspec_args = self.setup_client_args(self.FSSPEC_CLIENT_ARGS)
+        gcs_fsspec = gcsfs.GCSFileSystem(**gcs_fsspec_args)
+
+        return afs.PyFileSystem(afs.FSSpecHandler(gcs_fsspec))
+
+    def setup_client_args(self, arg_mapping: tp.Dict[str, str]) -> tp.Dict[str, tp.Any]:
 
         client_args = dict()
 
@@ -81,10 +128,12 @@ class GcpStorageProvider(IStorageProvider):
         endpoint = _helpers.get_plugin_property(self._properties, self.ENDPOINT_PROPERTY)
 
         if region is not None:
-            client_args["default_bucket_location"] = region
+            region_key = arg_mapping[self.REGION_PROPERTY]
+            client_args[region_key] = region
 
         if endpoint is not None:
-            client_args["endpoint_override"] = endpoint
+            endpoint_key = arg_mapping[self.ENDPOINT_PROPERTY]
+            client_args[endpoint_key] = endpoint
 
         credentials = self.setup_credentials()
         client_args.update(credentials)
@@ -125,4 +174,5 @@ class GcpStorageProvider(IStorageProvider):
         raise ex.EStartup(message)
 
 
-plugins.PluginManager.register_plugin(IStorageProvider, GcpStorageProvider, ["GCS"])
+if __gcp_available:
+    plugins.PluginManager.register_plugin(IStorageProvider, GcpStorageProvider, ["GCS"])

@@ -14,23 +14,40 @@
 # AWS
 # ----------------------------------------------------------------------------------------------------------------------
 
-botocore == 1.29.133
-boto3 == 1.26.133
+# AWS client libraries
 
+botocore == 1.29.156
+boto3 == 1.26.156
+
+# S3 FS Spec implementation depends on aiobotocore
+# This is a separate library that depends on a very old version of botocore
+# It is not really possible to use them together and maintain compliance
 
 # ----------------------------------------------------------------------------------------------------------------------
 # GCP
 # ----------------------------------------------------------------------------------------------------------------------
 
-# Currently GCP is entirely supported using Arrow's native storage implementation
-# No need for extra libs at present
+# GCP client libraries
+
+google-auth == 2.20.0
+google-cloud-core == 2.3.2
+google-cloud-storage == 2.9.0
+
+# GCS implementation of FS Spec
+
+gcsfs == 2023.6.0
 
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Azure
 # ----------------------------------------------------------------------------------------------------------------------
 
+# AWS client libraries
+
 azure-core == 1.26.4
 azure-identity == 1.13.0
 azure-storage-blob == 12.16.0
+
+# Asure implementation of FS Spec
+
 adlfs == 2023.4.0
