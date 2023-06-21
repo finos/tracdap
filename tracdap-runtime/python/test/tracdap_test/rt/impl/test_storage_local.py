@@ -34,7 +34,7 @@ _plugins.PluginManager.register_core_plugins()
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class LocalFileStorageTest(unittest.TestCase, FileOperationsTestSuite, FileReadWriteTestSuite):
+class LocalArrowImplStorageTest(unittest.TestCase, FileOperationsTestSuite, FileReadWriteTestSuite):
 
     storage_root: tempfile.TemporaryDirectory
     test_number: int
@@ -50,11 +50,13 @@ class LocalFileStorageTest(unittest.TestCase, FileOperationsTestSuite, FileReadW
         test_dir = pathlib.Path(self.storage_root.name).joinpath(f"test_{self.test_number}")
         test_dir.mkdir()
 
-        LocalFileStorageTest.test_number += 1
+        self.__class__.test_number += 1
 
         test_storage_config = _cfg.PluginConfig(
             protocol="LOCAL",
-            properties={"rootPath": str(test_dir)})
+            properties={
+                "rootPath": str(test_dir),
+                "runtimeFs": "arrow"})
 
         sys_config = _cfg.RuntimeConfig()
         sys_config.storage = _cfg.StorageConfig()
@@ -69,7 +71,7 @@ class LocalFileStorageTest(unittest.TestCase, FileOperationsTestSuite, FileReadW
         cls.storage_root.cleanup()
 
 
-class LocalArrowNativeStorageTest(unittest.TestCase, FileOperationsTestSuite, FileReadWriteTestSuite):
+class LocalPythonImplStorageTest(unittest.TestCase, FileOperationsTestSuite, FileReadWriteTestSuite):
 
     storage_root: tempfile.TemporaryDirectory
     test_number: int
@@ -85,13 +87,13 @@ class LocalArrowNativeStorageTest(unittest.TestCase, FileOperationsTestSuite, Fi
         test_dir = pathlib.Path(self.storage_root.name).joinpath(f"test_{self.test_number}")
         test_dir.mkdir()
 
-        LocalArrowNativeStorageTest.test_number += 1
+        self.__class__.test_number += 1
 
         test_storage_config = _cfg.PluginConfig(
             protocol="LOCAL",
             properties={
                 "rootPath": str(test_dir),
-                "arrowNativeFs": "true"})
+                "runtimeFs": "python"})
 
         sys_config = _cfg.RuntimeConfig()
         sys_config.storage = _cfg.StorageConfig()
@@ -153,7 +155,7 @@ class LocalStorageTest(DataStorageTestSuite):
                 self.storage_format, schema))
 
 
-class LocalCsvStorageTest(unittest.TestCase, LocalStorageTest):
+class LocalCsvFormatStorageTest(unittest.TestCase, LocalStorageTest):
 
     @classmethod
     def setUpClass(cls) -> None:
@@ -299,7 +301,7 @@ class LocalCsvStorageTest(unittest.TestCase, LocalStorageTest):
         self.assertEqual(10, table.num_rows)
 
 
-class LocalArrowStorageTest(unittest.TestCase, LocalStorageTest):
+class LocalArrowFormatStorageTest(unittest.TestCase, LocalStorageTest):
 
     @classmethod
     def setUpClass(cls) -> None:
@@ -311,7 +313,7 @@ class LocalArrowStorageTest(unittest.TestCase, LocalStorageTest):
         cls.storage_root.cleanup()
 
 
-class LocalParquetStorageTest(unittest.TestCase, LocalStorageTest):
+class LocalParquetFormatStorageTest(unittest.TestCase, LocalStorageTest):
 
     @classmethod
     def setUpClass(cls) -> None:
