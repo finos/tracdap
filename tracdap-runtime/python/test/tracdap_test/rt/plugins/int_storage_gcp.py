@@ -27,8 +27,13 @@ import pyarrow.fs as pa_fs
 
 plugins.PluginManager.register_core_plugins()
 
+try:
+    __arrow_available = pa_fs.GcsFileSystem is not None
+except ImportError:
+    __arrow_available = False
 
-@unittest.skipIf(pa_fs.GcsFileSystem is None, "Arrow GCS file system is not available on this platform")
+
+@unittest.skipIf(not __arrow_available, "Arrow GCS file system is not available on this platform")
 class GcsArrowStorageTest(unittest.TestCase, FileOperationsTestSuite, FileReadWriteTestSuite):
 
     suite_storage_prefix = f"runtime_storage_test_suite_{uuid.uuid4()}"

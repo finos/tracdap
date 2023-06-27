@@ -21,7 +21,7 @@ import tracdap.rt.exceptions as ex
 import tracdap.rt.ext.plugins as plugins
 from tracdap.rt.ext.storage import *
 
-from pyarrow import fs as afs
+from pyarrow import fs as pa_fs
 
 # Set of common helpers across the core plugins (do not reference rt._impl)
 from . import _helpers
@@ -70,6 +70,11 @@ class GcpStorageProvider(IStorageProvider):
         ENDPOINT_PROPERTY: "endpoint_url"
     }
 
+    try:
+        __arrow_available = pa_fs.GcsFileSystem is not None
+    except ImportError:
+        __arrow_available = False
+
     def __init__(self, properties: tp.Dict[str, str]):
 
         self._log = _helpers.logger_for_object(self)
@@ -82,10 +87,10 @@ class GcpStorageProvider(IStorageProvider):
     def has_arrow_native(self) -> bool:
         return True
 
-    def get_arrow_native(self) -> afs.SubTreeFileSystem:
+    def get_arrow_native(self) -> pa_fs.SubTreeFileSystem:
 
         if self._runtime_fs == self.RUNTIME_FS_AUTO:
-            gcs_fs = self.create_arrow() if afs.GcsFileSystem is not None else self.create_fsspec()
+            gcs_fs = self.create_arrow() if self.__arrow_available else self.create_fsspec()
         elif self._runtime_fs == self.RUNTIME_FS_ARROW:
             gcs_fs = self.create_arrow()
         elif self._runtime_fs == self.RUNTIME_FS_FSSPEC:
@@ -105,20 +110,20 @@ class GcpStorageProvider(IStorageProvider):
 
         root_path = f"{bucket}/{prefix}" if prefix else bucket
 
-        return afs.SubTreeFileSystem(root_path, gcs_fs)
+        return pa_fs.SubTreeFileSystem(root_path, gcs_fs)
 
-    def create_arrow(self) -> afs.GcsFileSystem:
+    def create_arrow(self) -> pa_fs.FileSystem:
 
         gcs_arrow_args = self.setup_client_args(self.ARROW_CLIENT_ARGS)
 
-        return afs.GcsFileSystem(**gcs_arrow_args)
+        return pa_fs.GcsFileSystem(**gcs_arrow_args)
 
-    def create_fsspec(self) -> afs.PyFileSystem:
+    def create_fsspec(self) -> pa_fs.FileSystem:
 
         gcs_fsspec_args = self.setup_client_args(self.FSSPEC_CLIENT_ARGS)
         gcs_fsspec = gcsfs.GCSFileSystem(**gcs_fsspec_args)
 
-        return afs.PyFileSystem(afs.FSSpecHandler(gcs_fsspec))
+        return pa_fs.PyFileSystem(pa_fs.FSSpecHandler(gcs_fsspec))
 
     def setup_client_args(self, arg_mapping: tp.Dict[str, str]) -> tp.Dict[str, tp.Any]:
 
