@@ -57,11 +57,15 @@ tasks.withType(JavaCompile).configureEach {
 
     // Allow UTF-8 encoding in source files
     options.encoding = 'UTF-8'
+
+    // Show information about deprecated APIs during compilation
+    options.compilerArgs << '-Xlint:deprecation'
 }
 
 compileJava {
 
     // This is needed for automatic logging calls into interfaces
+    // Only needed for the main compileJava task, not for different source sets etc.
     options.compilerArgs << '-parameters'
 }
 

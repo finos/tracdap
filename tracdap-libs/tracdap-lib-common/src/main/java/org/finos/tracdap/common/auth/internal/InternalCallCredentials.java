@@ -85,11 +85,6 @@ public class InternalCallCredentials extends CallCredentials implements Serializ
         applier.apply(authHeaders);
     }
 
-    @Override
-    public void thisUsesUnstableApi() {
-
-    }
-
     private String regenerateToken(Instant refreshTime) {
 
         session.setIssueTime(refreshTime);

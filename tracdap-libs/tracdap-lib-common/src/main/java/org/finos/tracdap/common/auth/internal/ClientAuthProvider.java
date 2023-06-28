@@ -64,9 +64,4 @@ public class ClientAuthProvider extends CallCredentials {
             applier.apply(authHeaders);
         }
     }
-
-    @Override
-    public void thisUsesUnstableApi() {
-
-    }
 }
