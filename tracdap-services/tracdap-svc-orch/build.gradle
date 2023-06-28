@@ -67,6 +67,9 @@ dependencies {
         // Do not pull in JUnit 4, use migration support from JUnit 5 instead
         exclude group: 'junit', module: 'junit'
     }
+
+    // gRPC testing requires Jackson annotations
+    testImplementation group: 'com.fasterxml.jackson.core', name: 'jackson-annotations', version: "$jackson_databind_version"
 }
 
 // Add any plugin dependencies enabled at build time
