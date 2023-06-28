@@ -17,20 +17,10 @@
 package org.finos.tracdap.plugins.gcp.storage;
 
 import com.google.api.gax.rpc.ApiException;
-import com.google.api.gax.rpc.PermissionDeniedException;
-import com.google.api.services.cloudresourcemanager.CloudResourceManager;
-import com.google.cloud.resourcemanager.ResourceManagerOptions;
-import com.google.cloud.resourcemanager.v3.GetProjectRequest;
-import com.google.cloud.resourcemanager.v3.ProjectsClient;
-import com.google.cloud.resourcemanager.v3.ProjectsSettings;
-import com.google.cloud.resourcemanager.v3.stub.ProjectsStubSettings;
-import com.google.cloud.storage.StorageOptions;
 import io.grpc.StatusRuntimeException;
-import io.grpc.alts.GoogleDefaultChannelCredentials;
 import org.finos.tracdap.common.data.IExecutionContext;
 import org.finos.tracdap.common.data.IDataContext;
 import org.finos.tracdap.common.exception.EStartup;
-import org.finos.tracdap.common.exception.EStorageCommunication;
 import org.finos.tracdap.common.storage.CommonFileStorage;
 import org.finos.tracdap.common.storage.FileStat;
 
@@ -51,13 +41,12 @@ public class GcsObjectStorage extends CommonFileStorage {
     public static final String BUCKET_PROPERTY = "bucket";
     public static final String PREFIX_PROPERTY = "prefix";
 
-    private static final String BUCKET_TEMPLATE = "projects/%s/buckets/%s";
-
     private final String project;
     private final String bucket;
     private final String prefix;
 
     private StorageClient storageClient;
+    private BucketName bucketName;
 
 
     public GcsObjectStorage(String storageKey, Properties properties) {
@@ -98,6 +87,8 @@ public class GcsObjectStorage extends CommonFileStorage {
 
             String projectId = this.project;
 
+            bucketName = BucketName.of(projectId, bucket);
+
 //            try (var projects = ProjectsClient.create()){
 //
 //                log.info("LOOKUP PROJECT [{}]", project);
@@ -110,12 +101,13 @@ public class GcsObjectStorage extends CommonFileStorage {
 //                projectId = projectInfo.getProjectId();
 //            }
 
+
+
             log.info("INIT [{}], fs = [GCS], bucket = [{}], prefix = [{}]", storageKey, bucket, prefix);
 
             var settings = StorageSettings.newBuilder().build();
             storageClient = StorageClient.create(settings);
 
-            var bucketName = BucketName.of(projectId, bucket);
             var request = ListObjectsRequest.newBuilder()
                     .setParent(bucketName.toString())
                     .setPrefix(prefix)
@@ -164,7 +156,7 @@ public class GcsObjectStorage extends CommonFileStorage {
         var objectKey = resolveObjectKey(storagePath);
 
         var request = GetObjectRequest.newBuilder()
-                .setBucket(bucket)
+                .setBucket(bucketName.toString())
                 .setObject(objectKey)
                 .build();
 
@@ -181,7 +173,7 @@ public class GcsObjectStorage extends CommonFileStorage {
         var prefix = resolvePrefix(storagePath);
 
         var request = ListObjectsRequest.newBuilder()
-                .setParent(bucket)
+                .setParent(bucketName.toString())
                 .setPrefix(prefix)
                 .setPageSize(1)
                 .build();
@@ -218,7 +210,7 @@ public class GcsObjectStorage extends CommonFileStorage {
         var prefix = resolvePrefix(storagePath);
 
         var object = com.google.storage.v2.Object.newBuilder()
-                .setBucket(bucket)
+                .setBucket(bucketName.toString())
                 .setName(prefix)
                 .setSize(0);
 
