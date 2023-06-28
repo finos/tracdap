@@ -78,9 +78,7 @@ class AzureBlobStorageProvider(IStorageProvider):
 
     def get_arrow_native(self) -> afs.SubTreeFileSystem:
 
-        if self._runtime_fs == self.RUNTIME_FS_AUTO and adlfs.AzureBlobFileSystem is not None:
-            azure_fs = self.create_fsspec()
-        elif self._runtime_fs == self.RUNTIME_FS_FSSPEC:
+        if self._runtime_fs == self.RUNTIME_FS_AUTO or self._runtime_fs == self.RUNTIME_FS_FSSPEC:
             azure_fs = self.create_fsspec()
         else:
             message = f"Requested runtime FS [{self._runtime_fs}] is not available for Azure storage"
@@ -99,7 +97,7 @@ class AzureBlobStorageProvider(IStorageProvider):
 
         return afs.SubTreeFileSystem(root_path, azure_fs)
 
-    def create_fsspec(self) -> afs.PyFileSystem:
+    def create_fsspec(self) -> afs.FileSystem:
 
         azure_fsspec_args = self.setup_client_args()
         azure_fsspec = adlfs.AzureBlobFileSystem(**azure_fsspec_args)
