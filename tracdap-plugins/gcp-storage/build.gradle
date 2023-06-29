@@ -32,10 +32,18 @@ dependencies {
     api project(':tracdap-lib-data')
 
     implementation platform(group: 'com.google.cloud', name: 'libraries-bom', version: "$gcp_bom_version")
-    implementation group: 'com.google.cloud', name: 'google-cloud-storage'
-    implementation group: 'com.google.cloud', name: 'google-cloud-resourcemanager'
+    implementation ("com.google.cloud:google-cloud-storage") { exclude group: "io.grpc", module: "grpc-netty-shaded" }
+    implementation ("com.google.cloud:google-cloud-resourcemanager") { exclude group: "io.grpc", module: "grpc-netty-shaded" }
+    implementation "io.grpc:grpc-netty"
 
     testImplementation project(path: ':tracdap-lib-data', configuration: 'testSuite')
+}
+
+configurations { main }
+configurations.main.resolutionStrategy.dependencySubstitution {
+
+    // Substitute one module dependency for another
+    substitute module("io.grpc:grpc-netty-shaded:${grpc_version}") using module("io.grpc:grpc-netty:${grpc_version}")
 }
 
 

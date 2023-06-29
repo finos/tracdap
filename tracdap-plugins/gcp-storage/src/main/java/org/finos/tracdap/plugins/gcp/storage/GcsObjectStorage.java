@@ -16,17 +16,28 @@
 
 package org.finos.tracdap.plugins.gcp.storage;
 
-import com.google.api.gax.rpc.ApiException;
-import io.grpc.StatusRuntimeException;
+import io.grpc.netty.NettyChannelBuilder;
+import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.channel.socket.nio.NioSocketChannel;
 import org.finos.tracdap.common.data.IExecutionContext;
 import org.finos.tracdap.common.data.IDataContext;
 import org.finos.tracdap.common.exception.EStartup;
+import org.finos.tracdap.common.exception.ETracInternal;
 import org.finos.tracdap.common.storage.CommonFileStorage;
 import org.finos.tracdap.common.storage.FileStat;
 
 import com.google.api.core.ApiFuture;
+import com.google.api.gax.grpc.GrpcCallContext;
+import com.google.api.gax.grpc.InstantiatingGrpcChannelProvider;
+import com.google.api.gax.rpc.ApiException;
+import com.google.api.gax.rpc.UnaryCallable;
 import com.google.storage.v2.*;
+
+import io.grpc.CallOptions;
+import io.grpc.ManagedChannelBuilder;
+import io.grpc.StatusRuntimeException;
 import io.netty.channel.EventLoopGroup;
+
 import org.apache.arrow.memory.ArrowBuf;
 
 import java.util.List;
@@ -94,7 +105,7 @@ public class GcsObjectStorage extends CommonFileStorage {
 //                log.info("LOOKUP PROJECT [{}]", project);
 //
 //                var request = GetProjectRequest.newBuilder()
-//                        .setName(ProjectName.of(project).toString())
+//                        .setName(ProjectName.of(project).toString())Hey
 //                        .build();
 //
 //                var projectInfo = projects.getProject(request);
@@ -105,7 +116,14 @@ public class GcsObjectStorage extends CommonFileStorage {
 
             log.info("INIT [{}], fs = [GCS], bucket = [{}], prefix = [{}]", storageKey, bucket, prefix);
 
-            var settings = StorageSettings.newBuilder().build();
+            var transportProvider = InstantiatingGrpcChannelProvider.newBuilder()
+                    .setChannelConfigurator(cb -> configureChannel(cb, eventLoopGroup))
+                    .build();
+
+            var settings = StorageSettings.newBuilder()
+                    .setTransportChannelProvider(transportProvider)
+                    .build();
+
             storageClient = StorageClient.create(settings);
 
             var request = ListObjectsRequest.newBuilder()
@@ -140,6 +158,27 @@ public class GcsObjectStorage extends CommonFileStorage {
         }
     }
 
+    private ManagedChannelBuilder<?> configureChannel(ManagedChannelBuilder<?> channelBuilder, EventLoopGroup elg) {
+
+        if (channelBuilder instanceof NettyChannelBuilder)
+            return configureNettyChannel((NettyChannelBuilder) channelBuilder, elg);
+
+        return channelBuilder;
+    }
+
+    private NettyChannelBuilder configureNettyChannel(NettyChannelBuilder channelBuilder, EventLoopGroup elg) {
+
+        if (elg instanceof NioEventLoopGroup) {
+
+            return channelBuilder
+                    .channelType(NioSocketChannel.class)
+                    .eventLoopGroup(elg);
+        }
+        else {
+            return channelBuilder;
+        }
+    }
+
     @Override
     public void stop() {
 
@@ -160,11 +199,20 @@ public class GcsObjectStorage extends CommonFileStorage {
                 .setObject(objectKey)
                 .build();
 
-        var apiCall = storageClient.getObjectCallable().futureCall(request);
+        var apiCall = storageClient.getObjectCallable();
 
-        var response = toContext(ctx, javaFuture(apiCall));
+        var response = unaryCall(apiCall, request, ctx);
 
-        return response.thenApply(x -> true);
+        return response.handle((result, error) -> fsExistsCallback(storagePath, result, error));
+    }
+
+    protected boolean fsExistsCallback(String storagePath, com.google.storage.v2.Object result, Throwable error) {
+
+        if (error != null) {
+            throw errors.handleException("EXISTS", storagePath, error);
+        }
+
+        return true;
     }
 
     @Override
@@ -178,9 +226,9 @@ public class GcsObjectStorage extends CommonFileStorage {
                 .setPageSize(1)
                 .build();
 
-        var apiCall = storageClient.listObjectsCallable().futureCall(request);
+        var apiCall = storageClient.listObjectsCallable();
 
-        var response = toContext(ctx, javaFuture(apiCall));
+        var response = unaryCall(apiCall, request, ctx).exceptionally(e -> errorGuard(e));
 
         // If there are any objects with the dir prefix, then the dir exists
         // This will include the dir itself if it has an object
@@ -218,9 +266,8 @@ public class GcsObjectStorage extends CommonFileStorage {
                 .setDestination(object)
                 .build();
 
-        var apiCall = storageClient.composeObjectCallable().futureCall(request);
-
-        var response = toContext(ctx, javaFuture(apiCall));
+        var apiCall = storageClient.composeObjectCallable();
+        var response = unaryCall(apiCall, request, ctx).exceptionally(e -> errorGuard(e));
 
         return response.thenApply(x -> null);
     }
@@ -272,6 +319,22 @@ public class GcsObjectStorage extends CommonFileStorage {
         return prefix + storagePath;
     }
 
+    private <TRequest, TResponse> CompletionStage<TResponse> unaryCall(
+            UnaryCallable<TRequest, TResponse> callable,
+            TRequest request,
+            IExecutionContext dataCtx) {
+
+        var callOptions = CallOptions.DEFAULT
+                .withExecutor(dataCtx.eventLoopExecutor());
+
+        var callCtx = GrpcCallContext.createDefault()
+                .withCallOptions(callOptions);
+
+        var apiCall = callable.futureCall(request, callCtx);
+
+        return toContext(dataCtx, javaFuture(apiCall));
+    }
+
     private static <T> CompletionStage<T> javaFuture(ApiFuture<T> future) {
 
         var javaFuture = new CompletableFuture<T>();
@@ -308,5 +371,10 @@ public class GcsObjectStorage extends CommonFileStorage {
         }, Runnable::run);
 
         return javaFuture;
+    }
+
+    private <T> T errorGuard(Throwable error) {
+
+        throw new ETracInternal("Error marker", error);
     }
 }
