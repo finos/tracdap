@@ -14,11 +14,52 @@
  * limitations under the License.
  */
 
-pluginManagement.plugins {
-    id 'com.google.protobuf' version "0.8.13"
-}
+apply from: "${rootProject.projectDir.path}/gradle/versions.gradle"
 
 rootProject.name = 'tracdap'
+
+pluginManagement.plugins {
+    id 'com.google.protobuf' version "${proto_plugin_version}"
+}
+
+dependencyResolutionManagement {
+
+    // Force versions for key parts of the dependency stack
+    // This ensures all the core frameworks are on one consistent version across the project
+
+    // For example: Suppose the AWS plugin has a transitive dependencies on Netty and Jackson
+    // This will force those libraries to match the versions declared by TRAC in versions.gradle
+    // That may not be the same as the versions declared in the AWS SDK BOM
+    // But this seems less dangerous than having two versions of the same framework on the classpath
+    // Also from a compliance point of view, transitive dependencies on old library versions is a problem
+
+    components.all { lib ->
+
+        if (lib.id.group == "io.netty")
+            lib.belongsTo("io.netty:netty-bom:${netty_version}")
+
+        if (lib.id.group == "io.grpc")
+            lib.belongsTo("io.grpc:grpc-bom:${grpc_version}")
+
+        if (lib.id.group == "com.google.protobuf")
+            lib.belongsTo("com.google.protobuf:protobuf-bom:${proto_version}")
+
+        if (lib.id.group == "com.google.guava")
+            lib.belongsTo("com.google.guava:guava-bom:${guava_version}")
+
+        if (lib.id.group.startsWith("com.fasterxml.jackson"))
+            lib.belongsTo("com.fasterxml.jackson:jackson-bom:${jackson_version}")
+
+        if (lib.id.group == "org.slf4j")
+            lib.belongsTo("org.slf4j:slf4j-parent:${slf4j_version}")
+
+        if (lib.id.group == "org.apache.logging.log4j")
+            lib.belongsTo("org.apache.logging.log4j:log4j-bom:${slf4j_version}")
+
+        // Closure should return a value
+        null
+    }
+}
 
 // API components
 
