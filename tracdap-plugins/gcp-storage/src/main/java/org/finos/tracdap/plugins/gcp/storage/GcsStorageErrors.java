@@ -17,6 +17,7 @@
 package org.finos.tracdap.plugins.gcp.storage;
 
 import com.google.api.gax.rpc.ApiException;
+import com.google.api.gax.rpc.NotFoundException;
 import com.google.api.gax.rpc.PermissionDeniedException;
 import org.finos.tracdap.common.storage.StorageErrors;
 
@@ -28,6 +29,7 @@ public class GcsStorageErrors extends StorageErrors {
 
     private static final List<Map.Entry<Class<? extends Exception>, ExplicitError>> EXCEPTION_CLASS_MAP = List.of(
             Map.entry(PermissionDeniedException.class, ExplicitError.ACCESS_DENIED),
+            Map.entry(NotFoundException.class, ExplicitError.OBJECT_NOT_FOUND),
             // Top-level error for GCP API calls over gRPC - catch all mapped to generic IO error
             Map.entry(ApiException.class, ExplicitError.IO_ERROR));
 

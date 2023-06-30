@@ -16,27 +16,28 @@
 
 package org.finos.tracdap.plugins.gcp.storage;
 
-import io.grpc.netty.NettyChannelBuilder;
-import io.netty.channel.nio.NioEventLoopGroup;
-import io.netty.channel.socket.nio.NioSocketChannel;
 import org.finos.tracdap.common.data.IExecutionContext;
 import org.finos.tracdap.common.data.IDataContext;
 import org.finos.tracdap.common.exception.EStartup;
-import org.finos.tracdap.common.exception.ETracInternal;
 import org.finos.tracdap.common.storage.CommonFileStorage;
 import org.finos.tracdap.common.storage.FileStat;
+import org.finos.tracdap.common.storage.StorageErrors;
 
-import com.google.api.core.ApiFuture;
 import com.google.api.gax.grpc.GrpcCallContext;
 import com.google.api.gax.grpc.InstantiatingGrpcChannelProvider;
 import com.google.api.gax.rpc.ApiException;
+import com.google.api.gax.rpc.ClientStreamingCallable;
+import com.google.api.gax.rpc.NotFoundException;
 import com.google.api.gax.rpc.UnaryCallable;
 import com.google.storage.v2.*;
 
 import io.grpc.CallOptions;
 import io.grpc.ManagedChannelBuilder;
 import io.grpc.StatusRuntimeException;
+import io.grpc.netty.NettyChannelBuilder;
 import io.netty.channel.EventLoopGroup;
+import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.channel.socket.nio.NioSocketChannel;
 
 import org.apache.arrow.memory.ArrowBuf;
 
@@ -201,12 +202,15 @@ public class GcsObjectStorage extends CommonFileStorage {
 
         var apiCall = storageClient.getObjectCallable();
 
-        var response = unaryCall(apiCall, request, ctx);
+        var response = GcpUtils.unaryCall(apiCall, request, ctx.eventLoopExecutor());
 
         return response.handle((result, error) -> fsExistsCallback(storagePath, result, error));
     }
 
     protected boolean fsExistsCallback(String storagePath, com.google.storage.v2.Object result, Throwable error) {
+
+        if (error instanceof NotFoundException)
+            return false;
 
         if (error != null) {
             throw errors.handleException("EXISTS", storagePath, error);
@@ -228,13 +232,22 @@ public class GcsObjectStorage extends CommonFileStorage {
 
         var apiCall = storageClient.listObjectsCallable();
 
-        var response = unaryCall(apiCall, request, ctx).exceptionally(e -> errorGuard(e));
+        var response = GcpUtils.unaryCall(apiCall, request, ctx.eventLoopExecutor());
+
+        return response.handle((result, error) -> fsDirExistsCallback(storagePath, result, error));
+    }
+
+    private boolean fsDirExistsCallback(String storagePath, ListObjectsResponse result, Throwable error) {
+
+        if (error != null) {
+            throw errors.handleException("EXISTS", storagePath, error);
+        }
 
         // If there are any objects with the dir prefix, then the dir exists
         // This will include the dir itself if it has an object
         // Since no delimiter was specified, it is not necessary to check common prefixes
 
-        return response.thenApply(result -> result.getObjectsCount() > 0);
+        return result.getObjectsCount() > 0;
     }
 
     @Override
@@ -255,21 +268,36 @@ public class GcsObjectStorage extends CommonFileStorage {
     @Override
     protected CompletionStage<Void> fsCreateDir(String storagePath, IExecutionContext ctx) {
 
-        var prefix = resolvePrefix(storagePath);
+        var prefix = resolvePrefix(storagePath) + BACKSLASH;
 
         var object = com.google.storage.v2.Object.newBuilder()
                 .setBucket(bucketName.toString())
-                .setName(prefix)
-                .setSize(0);
+                .setName(prefix);
 
-        var request = ComposeObjectRequest.newBuilder()
-                .setDestination(object)
+        var request = WriteObjectRequest.newBuilder()
+                .setWriteObjectSpec(WriteObjectSpec.newBuilder()
+                .setResource(object)
+                .setObjectSize(0))
+                .setFinishWrite(true)
                 .build();
 
-        var apiCall = storageClient.composeObjectCallable();
-        var response = unaryCall(apiCall, request, ctx).exceptionally(e -> errorGuard(e));
+        var apiCall = storageClient.writeObjectCallable();
 
-        return response.thenApply(x -> null);
+        var response = GcpUtils.clientStreamingCall(apiCall, request, ctx.eventLoopExecutor());
+
+        return response.handle((result, error) -> fsCreateDirCallback(storagePath, result, error));
+    }
+
+    private Void fsCreateDirCallback(String storagePath, WriteObjectResponse result, Throwable error) {
+
+        if (error != null) {
+            throw errors.handleException("MKDIR", storagePath, error);
+        }
+
+        if (!result.hasResource())
+            throw errors.explicitError("MKDIR", storagePath, StorageErrors.ExplicitError.UNKNOWN_ERROR, "Directory was not created");
+
+        return null;
     }
 
     @Override
@@ -310,71 +338,6 @@ public class GcsObjectStorage extends CommonFileStorage {
 
     private String resolvePrefix(String storagePath) {
 
-        if (prefix.isEmpty())
-            return storagePath;
-
-        if (storagePath.isEmpty())
-            return prefix;
-
-        return prefix + storagePath;
-    }
-
-    private <TRequest, TResponse> CompletionStage<TResponse> unaryCall(
-            UnaryCallable<TRequest, TResponse> callable,
-            TRequest request,
-            IExecutionContext dataCtx) {
-
-        var callOptions = CallOptions.DEFAULT
-                .withExecutor(dataCtx.eventLoopExecutor());
-
-        var callCtx = GrpcCallContext.createDefault()
-                .withCallOptions(callOptions);
-
-        var apiCall = callable.futureCall(request, callCtx);
-
-        return toContext(dataCtx, javaFuture(apiCall));
-    }
-
-    private static <T> CompletionStage<T> javaFuture(ApiFuture<T> future) {
-
-        var javaFuture = new CompletableFuture<T>();
-
-        future.addListener(() -> {
-
-            try {
-
-                if (!future.isDone())
-                    javaFuture.completeExceptionally(new IllegalStateException());
-
-                else if (future.isCancelled())
-                    javaFuture.cancel(true);
-
-                else {
-                    var result = future.get();
-                    javaFuture.complete(result);
-                }
-            }
-            catch (InterruptedException | CancellationException e) {
-                javaFuture.completeExceptionally(new IllegalStateException());
-            }
-            catch (ExecutionException e) {
-
-                if (e.getCause() != null)
-                    javaFuture.completeExceptionally(e.getCause());
-                else
-                    javaFuture.completeExceptionally(e);
-            }
-            catch (Throwable e) {
-                javaFuture.completeExceptionally(e);
-            }
-
-        }, Runnable::run);
-
-        return javaFuture;
-    }
-
-    private <T> T errorGuard(Throwable error) {
-
-        throw new ETracInternal("Error marker", error);
+        return resolveObjectKey(storagePath) + BACKSLASH;
     }
 }
