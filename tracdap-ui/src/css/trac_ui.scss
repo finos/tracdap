@@ -1,0 +1,1736 @@
+:root {
+    // This is so we have a css variable for the input disabled colour. Bootstrap
+    // does not set a css variable for this colour so we create our own here.
+    --bs-form-control-disabled-bg: #{$input-disabled-bg};
+}
+
+/* Make the TRAC UI customizations */
+$side-menu-text: #2b2b2b;
+$side-menu-background: #d8dee4;
+$side-menu-text-dark-theme: tint-color(#8d8d93, 10%);
+$side-menu-background-dark-theme: #212522;
+
+/* import bootstrap to set changes */
+//@import "../node_modules/bootstrap/scss/bootstrap";
+
+$top-menu-height: 3.75rem;
+
+// This does not impact the Bootstrap base font size and the scaling of the layouts
+html {
+    font-size: 0.85rem;
+}
+
+body {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-shadow: 1px 1px 1px rgba(0, 0, 0, 0.04);
+    text-rendering: optimizeLegibility;
+    overflow: scroll;
+}
+
+// Used by the HeaderTitle and RichTextEditor components Scene titles */
+.h2, h2 {
+    color: var(--secondary-text);
+    font-weight: $font-weight-light;
+}
+
+.h3, h3 {
+    color: var(--tertiary-text);
+    font-weight: $font-weight-light;
+}
+
+.h4, h4 {
+    color: var(--secondary-text);
+}
+
+.h5, h5 {
+    font-weight: bold !important;
+}
+
+.h6, h6 {
+    color: var(--tertiary-text);
+    font-weight: normal;
+}
+
+/* Make info buttons have white text, we changed the color and the auto contrast says black otherwise */
+.btn-info {
+    color: $info-btn-color;
+
+    &:focus {
+        color: $info-btn-color;
+    }
+}
+
+/* The default active state colour of the info button is not that different to the regular background so we increase
+the contrast */
+.btn-light {
+    &:active, &.active {
+        //background-color: shade-color($light, 8%)
+        background-color: shade-color(darken($table-striped-bg, 8%), 8%)
+    }
+
+    &:hover {
+        //background-color: shade-color($light, 3%)
+        background-color: shade-color(darken($table-striped-bg, 8%), 3%)
+
+    }
+}
+
+/* Make the footer stick to the bottom of the screen. root is the
+div that the react app is rendered into, this is wrapper of the
+head, main and footer elements and is where the css needs to be applied.*/
+#root {
+    display: flex !important;
+    flex-direction: column !important;
+    min-height: 100vh;
+}
+
+footer {
+    margin-top: auto;
+}
+
+/* Give all of the scenes a minimum height */
+main {
+    min-height: 50rem;
+}
+
+// Used in HeaderTitle and TextBlock components to make the text more spaced out
+.spaced-text {
+    letter-spacing: 0.3px;
+}
+
+/* The top menu bar css. This is used in the TopMenu component */
+#top-menu {
+    z-index: 1021;
+    padding: .5rem 1rem;
+    display: flex;
+    flex-wrap: wrap;
+    background-color: var(--top-menu-background);
+    color: var(--top-menu-text);
+    height: $top-menu-height;
+}
+
+/* A customer burger or menu icon used to opening/closing menus. This is used by the Burger component */
+.burger {
+
+    display: flex;
+    flex-direction: column;
+    justify-content: space-around;
+    background-color: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    z-index: 10;
+    font-size: 1.2rem;
+
+    &.burger-md {
+
+        width: 2rem;
+        height: 2rem;
+
+    }
+
+    &.burger-sm {
+
+        width: 1.25rem;
+        height: 1.25rem;
+
+    }
+
+    &:focus {
+        outline: none;
+    }
+
+    div {
+        width: 100%;
+        height: 2px;
+        transition: all 0.3s linear;
+        transform-origin: 1px;
+        background-color: var(--top-menu-text);
+    }
+
+    &.open div {
+        &:first-child {
+
+            transform: rotate(45deg);
+        }
+
+        &:nth-child(2) {
+
+            opacity: 0;
+            transform: translate(20px);
+        }
+
+        &:nth-child(3) {
+
+            transform: rotate(-45deg);
+        }
+    }
+
+    &.closed div {
+        &:first-child {
+
+            transform: rotate(0deg);
+        }
+
+        &:nth-child(2) {
+
+            opacity: 1;
+            transform: translate(0px);
+        }
+
+        &:nth-child(3) {
+
+            transform: rotate(0deg);
+        }
+    }
+}
+
+/* The side menu css. This is used in the SideMenu component */
+#side-menu {
+
+    width: 20vw;
+    min-width: 260px;
+    height: 100vh;
+    position: fixed;
+    top: $top-menu-height;
+    left: 0;
+    transition: transform .3s cubic-bezier(0, 0.52, 0, 1);
+    overflow: hidden;
+    z-index: 1050;
+    opacity: 0.97;
+    color: var(--side-menu-text);
+    background-color: var(--side-menu-background);
+
+    &.hide {
+        /* We move it a little more than the width so that a 1px line can't be seen */
+        transform: translate3d(min(-20.5vw, -260px), 0, 0);
+    }
+
+    &.show {
+        transform: translate3d(0, 0, 0);
+    }
+
+    //ipad Air - make the menu come in further
+    @media screen and (max-width: 768px) {
+
+        width: 35vw;
+
+        &.hide {
+            transform: translate3d(min(-35.5vw, -260px), 0, 0);
+        }
+    }
+
+    //iPhone 12 - make the menu come across full width
+    @media screen and (max-width: 576px) {
+
+        width: 100vw;
+
+        &.hide {
+            transform: translate3d(min(-100.5vw, -260px), 0, 0);
+        }
+    }
+
+    #side-menu-image {
+
+        padding-top: 0.5rem;
+        padding-bottom: 0.5rem;
+        text-align: center;
+
+        img {
+
+            width: 150px;
+        }
+    }
+
+    .side-menu-nav-link {
+
+        font-size: 1rem;
+        text-decoration: none;
+        border-radius: 0.5rem;
+        color: inherit;
+        -webkit-tap-highlight-color: darken($side-menu-background, 3%);
+
+        &.darkTheme {
+            -webkit-tap-highlight-color: lighten($side-menu-background-dark-theme, 3%);
+        }
+
+        /* We can not use lighten and darken with var from the themes, so we have a hard coded hover and active
+        colour pair for the side menu */
+        &:hover {
+            color: darken($side-menu-text, 10%);
+            background-color: darken($side-menu-background, 3%);
+            text-shadow: 0 0 2px lighten($side-menu-text, 60%);
+        }
+
+        &.active {
+            color: darken($side-menu-text, 10%);
+            background-color: darken($side-menu-background, 6%);
+            text-shadow: 0 0 2px lighten($side-menu-text, 60%);
+        }
+
+        &.darkTheme:hover {
+            color: lighten($side-menu-text-dark-theme, 10%);
+            background-color: lighten($side-menu-background-dark-theme, 3%);
+            text-shadow: 0 0 2px darken($side-menu-text-dark-theme, 60%);
+        }
+
+        &.darkTheme.active {
+            color: lighten($side-menu-text-dark-theme, 10%);
+            background-color: lighten($side-menu-background-dark-theme, 6%);
+            text-shadow: 0 0 2px darken($side-menu-text-dark-theme, 60%);
+        }
+    }
+
+    /* Side menu expandable headers i.e. the ones with menu items inside */
+    .side-menu-expandable-header {
+
+        font-size: 1rem;
+        cursor: pointer;
+        color: lighten($side-menu-text, 30%);
+        text-shadow: 0 0 2px lighten($side-menu-text, 80%);
+
+        &.darkTheme {
+            color: lighten($side-menu-text-dark-theme, 20%);
+            text-shadow: 0 0 3px darken($side-menu-background-dark-theme, 80%);
+        }
+    }
+}
+
+/* This is for links in the menu (SideMenu component) and un-open folders in a file tree explorer (FileTree component)
+being hidden or shown based on whether they are in an expandable menu */
+#side-menu, .folder {
+
+    .expandable-show {
+
+        visibility: visible;
+        overflow: visible;
+        opacity: 1;
+        transition-property: opacity, max-height;
+        -webkit-transition-property: opacity, max-height;
+        -moz-transition-property: opacity, max-height;
+        transition-duration: 0.4s, 0.2s;
+        -webkit-transition-duration: 0.4s, 0.2s;
+        -moz-transition-duration: 0.4s, 0.2s;
+    }
+
+    .expandable-hide {
+        visibility: hidden;
+        overflow: hidden;
+        opacity: 0;
+        max-height: 0;
+        transition-property: opacity, max-height;
+        -webkit-transition-property: opacity, max-height;
+        -moz-transition-property: opacity, max-height;
+        transition-duration: 0.4s, 0.2s;
+        -webkit-transition-duration: 0.4s, 0.2s;
+        -moz-transition-duration: 0.4s, 0.2s;
+    }
+}
+
+/* The banner css. This is used in the TopBanner component */
+#top-banner {
+
+    //Default theme is lightTheme
+    background-image: url("../images/superhero-1199-2.jpg");
+    background-repeat: no-repeat;
+    background-size: cover;
+    background-position: center;
+    height: 300px;
+
+    &.darkTheme {
+
+        background-image: url("../images/technical-1199.jpg");
+    }
+
+    &.clientTheme {
+
+        background-image: url("../images/superhero-1199-2.jpg");
+    }
+
+    @media all and (max-width: 1199px) {
+
+        // Bootstrap 5 lg and below
+        // https://getbootstrap.com/docs/5.0/layout/breakpoints/
+        background-image: url("../images/childhood-1199.jpg");
+    }
+
+    @media all and (max-width: 991px) {
+
+        // Bootstrap 5 md and below
+        height: 225px;
+        background-image: url("../images/childhood-991.jpg");
+    }
+
+    @media all and (max-width: 767px) {
+
+        // Bootstrap 5 sm and below
+        height: 150px;
+        background-image: url("../images/childhood-991.jpg");
+    }
+
+    @media all and (max-width: 575px) {
+
+        // Bootstrap 5 xs
+        height: 90px;
+        background-image: url("../images/childhood-575.jpg");
+    }
+}
+
+.shading-mask-red {
+
+    overflow: hidden;
+    width: 100%;
+    height: 100%;
+    background: -webkit-linear-gradient(45deg, rgba(0, 0, 0, 0.7), rgba(239, 36, 28, 0.35) 100%);
+    background: linear-gradient(45deg, rgba(0, 0, 0, 0.7), rgba(239, 36, 28, 0.35) 100%);
+}
+
+.shading-mask-blue {
+
+    overflow: hidden;
+    width: 100%;
+    height: 100%;
+    background: -webkit-linear-gradient(45deg, rgba(0, 0, 0, 0.7), rgba(46, 81, 124, 0.6) 100%);
+    background: linear-gradient(45deg, rgba(0, 0, 0, 0.7), rgba(46, 81, 124, 0.6) 100%);
+}
+
+.shading-mask-purple {
+    overflow: hidden;
+    width: 100%;
+    height: 100%;
+    background: -webkit-linear-gradient(45deg, rgba(0, 0, 0, 0.6), rgba(61, 0, 145, 0.6) 100%);
+    background: linear-gradient(45deg, rgba(0, 0, 0, 0.6), rgba(61, 0, 145, 0.6) 100%);
+}
+
+.shading-mask-green {
+    overflow: hidden;
+    width: 100%;
+    height: 100%;
+    background: -webkit-linear-gradient(45deg, rgba(0, 0, 0, 0.6), rgba(1, 50, 10, 0.5) 100%);
+    background: linear-gradient(45deg, rgba(0, 0, 0, 0.6), rgba(1, 50, 10, 0.5) 100%);
+}
+
+.shading-mask.darkTheme {
+    overflow: hidden;
+    width: 100%;
+    height: 100%;
+    background: -webkit-linear-gradient(45deg, rgba(0, 0, 0, 0.5), rgba(52, 58, 64, 0.3) 100%);
+    background: linear-gradient(45deg, rgba(14, 14, 14, 0.8), rgba(120, 120, 100, 0.6) 100%)
+}
+
+.shading-mask.clientTheme {
+
+    background: -webkit-linear-gradient(45deg, rgba(0, 0, 0, 0.7), rgba(30, 134, 79, 0.6) 100%);
+    background: linear-gradient(45deg, rgba(0, 0, 0, 0.7), rgba(30, 134, 79, 0.6) 100%);
+}
+
+/* The css for the application logo on the left of the TopBanner component */
+.banner-logo {
+    color: #fff;
+
+    &.title {
+        font-size: 4rem;
+    }
+
+    &.tagline {
+        font-size: 1.5rem;
+    }
+
+    &.font-tracdap {
+        font-family: 'K2D', sans-serif;
+    }
+}
+
+/* This is used in the BottomMenu component */
+#bottom-menu {
+
+    margin-top: 6rem;
+    background-color: var(--bottom-menu-background);
+    color: var(--bottom-menu-text);
+
+    .container > div > div {
+
+        margin: 2rem;
+    }
+
+    svg {
+
+        height: 3rem;
+        fill: var(--bottom-menu-text);
+    }
+
+    @media all and (max-width: 991px) {
+        svg {
+            // Bootstrap 5 md and below
+            height: 2rem;
+        }
+    }
+
+    @media all and (max-width: 767px) {
+
+        .container > div > div {
+
+            margin-top: 1.2rem;
+            margin-bottom: 1.2rem;
+        }
+        svg {
+            // Bootstrap 5 sm and below
+            height: 1.5rem;
+
+        }
+    }
+
+    @media all and (max-width: 575px) {
+        .container > div > div {
+
+            margin-top: 0.8rem;
+            margin-bottom: 0.8rem;
+        }
+
+        svg {
+            // Bootstrap 5 xs
+            height: 1.5rem;
+        }
+    }
+
+}
+
+/* The SelectOption component uses a plugin called react-select. Out of the box this does not match the Bootstrap formatting.
+A class is added to the SelectOption component that enables the Bootstrap sass variables to be passed to the
+react-select control box. See https://getbootstrap.com/docs/5.0/forms/overview/ for the sass variables.
+
+Note that the react-select component has a separate styles object used to style some of the elements, that is used in
+conjunction with the classes below. */
+
+// Set the text css for the menu, this is the div that is shown when the list of options is needed
+
+// For information on the #custom-react-select selector see the notes on the div in App.tsx
+#custom-react-select > div > div[class$='-menu'] {
+    // In tables that have SelectOption components inside we need to force the drop down
+    // menu to be the full width of the main component.
+    min-width: 100%;
+    width: auto;
+}
+
+.custom-react-select > div[class$='-menu'], #custom-react-select > div > div[class$='-menu'] {
+
+    border-radius: $border-radius !important;
+    border: $input-border-width solid $input-border-color !important;
+    box-shadow: 0 4px 11px $input-border-color;
+    z-index: 1001;
+
+    div[class$='-MenuList'] {
+
+        padding-left: 3px;
+        padding-right: 3px;
+    }
+
+    div[class$='-MenuList'] div[class$='-option'] {
+
+        font-size: $font-size-select-menus;
+        padding: 2px 3px 3px 5px;
+
+    }
+
+    // The wrapper for the headers/options when using labels/groups
+    div[class$='-MenuList'] div[class$='-Group'] {
+
+        padding-top: 5px;
+        padding-bottom: 5px;
+
+        // The heading in the options when using labels/groups
+        div[class$='-group'] {
+
+            padding-top: 2px;
+            padding-bottom: 2px;
+            padding-left: 5px;
+            border-bottom: 1px dotted var(--tertiary-background) !important;
+            margin-left: 0;
+        }
+    }
+}
+
+/* The first div in a SelectOption component is the control div */
+.custom-react-select > div[class$='-control'] {
+
+    min-height: 33px !important;
+    line-height: 1.3;
+    border-radius: $border-radius !important;
+    border: $input-border-width solid $input-border-color;
+    box-shadow: none !important;
+
+    /* This is the clear icon and the down arrow icon */
+    div[class$='-indicatorContainer'] {
+        padding: 0 4px;
+        color: $input-color;
+    }
+
+    /* When not the last child its a clear icon showing next to the down arrow icon*/
+    div[class$='-indicatorContainer']:not(:last-child) {
+        padding: 0 4px 0 0px;
+        color: $input-color;
+    }
+
+    // Set the text css for the values selected
+    div[class$='-ValueContainer'] {
+
+        // A bit more space to the left-hand side
+        padding: 0 4px;
+
+        div[class$='-Input'] {
+            padding-left: 4px
+        }
+    }
+
+    // Set the text css for the values selected when handling single options
+    div[class$='-ValueContainer'] > div[class$='-singleValue'] {
+
+        padding-left: 4px;
+        font-size: $input-font-size;
+        color: $input-color;
+        font-weight: $input-font-weight;
+    }
+
+    // Set the text css for the values selected when handling multiple options, this is the label and the delete button wrapper
+    div[class$='-ValueContainer'] > div[class$='-multiValue'] {
+
+        background-color: var(--focused-background);
+        padding: 0 2px;
+        margin: 2px;
+    }
+
+    // Set the text css for the values selected when handling multiple options, this is the label and the delete button divs
+    div[class$='-ValueContainer'] > div[class$='-multiValue'] > div {
+
+        font-size: $input-font-size;
+        color: $input-color;
+        font-weight: $input-font-weight;
+    }
+
+    // Set the text css for the placeholder text
+    div > div[id$='-placeholder'] {
+
+        color: $input-placeholder-color;
+        padding: 0 4px;
+    }
+}
+
+// Css specific to small form controls applied to SelectOption
+.custom-react-select-sm > div[class$='-control'] {
+
+    min-height: 27px !important;
+    border-radius: $border-radius-sm !important;
+
+    // Set the text css for the values selected when handling single options
+    div[class$='-ValueContainer'] > div[class$='-singleValue'] {
+
+        padding-left: 3px;
+        font-size: $input-font-size-sm;
+        color: $input-color;
+        font-weight: $input-font-weight;
+    }
+
+
+    // Set the text css for the values selected
+    div[class$='-ValueContainer'] > div[class$='-multiValue'] > div {
+        font-size: $input-font-size-sm;
+    }
+}
+
+// Css specific to large form controls applied to SelectOption
+.custom-react-select-lg > div[class$='-control'] {
+
+    min-height: 35px !important;
+    border-radius: $border-radius-lg !important;
+
+    // Set the text css for the values selected
+    div[class$='-ValueContainer'] > div[class$='-multiValue'] > div {
+        font-size: $input-font-size-lg;
+    }
+}
+
+/* In the SelectToggle component show a red border when the value is invalid,
+ when a SelectOption component is invalid then add the border to the control div */
+.is-invalid .react-switch-bg, .custom-react-select.is-invalid > div, .is-invalid {
+
+    border-color: $danger !important;
+}
+
+/* In the SelectToggle component we set the height to match the height of the other
+ bootstrap elements, however to make the switch look centered we have to make it one
+ pixel smaller, this adds in the pixel so it is the exact height 31px.*/
+.react-switch {
+
+    margin-top: 1px;
+}
+
+/* The SelectDate component uses a plugin called react-datepicker. Out of the box this does not match the Bootstrap formatting. */
+
+/*The pop up div when you want to select a date*/
+.react-datepicker {
+
+    border-radius: $border-radius !important;
+    font-size: $font-size-select-menus !important;
+    border: $input-border-width solid $input-border-color !important;
+    z-index: 1001;
+
+
+    /* Fix for triangle position github.com/Hacker0x01/react-datepicker/issues/3176 */
+    .react-datepicker__triangle {
+        left: -50px !important;
+        background-color: var(--secondary-background);
+    }
+
+    /* Anything selected has this colour applied */
+    div[class*='--selected'] {
+        background-color: $info !important;
+    }
+
+    /* Anything selected via the keyboard has this colour applied, this is needed
+     so that if the user navigates the calendar using the arrow keys then can see (although not selected)
+     where the cursor is*/
+    div[class*='--keyboard-selected'] {
+        background-color: darken($table-striped-bg, 3%) !important;
+    }
+
+    /* The main div for the time selector in the popup */
+    div.react-datepicker__input-time-container {
+        margin: 15px 0;
+        padding-top: 15px;
+        float: unset;
+        display: flex;
+        justify-content: center;
+    }
+
+    /* The 'Time:' label*/
+    div.react-datepicker-time__caption {
+        margin-top: auto;
+        margin-bottom: auto;
+        min-width: 30px;
+        font-size: $font-size-base;
+    }
+
+    /* When only showing a time input we add some more spacing*/
+    &.react-datepicker--time-only {
+        padding-left: 15px;
+        padding-right: 15px;
+
+        /* Shading for the triangle*/
+        div.react-datepicker__triangle::after {
+            border-bottom-color: var(--primary-background);
+        }
+    }
+
+    /* The user input for setting the time */
+    div.react-datepicker-time__input-container {
+
+        margin-left: 10px;
+        /* The right margin makes the input appear to be in the model*/
+        margin-right: 10px + 30px;
+
+        div.react-datepicker-time__input {
+            margin: 0;
+
+            input[type="time"] {
+                min-height: 33px;
+                min-width: 100px;
+                margin: 0;
+                letter-spacing: 0.4rem;
+                border-radius: $border-radius;
+                font-size: $font-size-base;
+                border: $input-border-width solid $input-border-color;
+                text-align: center;
+
+                /* See https://stackoverflow.com/questions/61934148/hide-the-icon-on-a-html-time-input-field-in-chrome */
+                &::-webkit-calendar-picker-indicator {
+                    background: none;
+                    display: none;
+                }
+
+                /* See https://stackoverflow.com/questions/5392882/why-is-chrome-showing-a-please-fill-out-this-field-tooltip-on-empty-fields*/
+                &::-webkit-validation-bubble-message {
+                    display: none;
+                }
+
+                &:focus, &:active {
+                    border-color: $component-active-bg !important;
+                    outline: none;
+                }
+            }
+        }
+    }
+
+    $react-datepicker-header-top-padding: 1rem;
+
+    /* The left and right icons */
+    .react-datepicker__navigation-icon {
+        height: 21px;
+
+        margin-top: $react-datepicker-header-top-padding * 0.6;
+
+        /* Bootstrap adds this in and we need to take it out to make the arrows bigger */
+        &:before {
+            box-sizing: unset;
+        }
+    }
+
+    div[role='option'], div.react-datepicker__year-text {
+
+        &:hover:not(div[class*='--selected'], div[class*='--keyboard-selected'], .react-datepicker__day--highlighted-custom) {
+            background-color: $info-light !important;
+        }
+    }
+
+    /* The day tiles when not using custom weeks */
+    /* The Mo, Tu etc at the top of the calendar */
+    div.react-datepicker__day, div.react-datepicker__day-name, div.react-datepicker__week-number {
+        font-size: $font-size-select-menus;
+        width: $font-size-select-menus * 2.2;
+        line-height: $font-size-select-menus * 2.2;
+        padding: 0;
+        margin: 0.2rem;
+    }
+
+    /* A customer class added in the SelectDate component that allows weeks to be highlighted in one go  when a day is selected */
+    &.datepicker-select-week-custom {
+
+        $datepicker-select-week-custom-multiplier: 2.7;
+
+        /* Anything selected or hovered has no radius so that you don't see the curved edges when a week highlight is applied
+         this is just a visual cleanup */
+        div[class*='--selected'], div[class*='--keyboard-selected'], div.react-datepicker__day--highlighted-custom:hover {
+            border-radius: 0;
+        }
+
+        /* The Mo, Tu etc at the top of the calendar, we can't use margin here as we want to create a solid block of
+         hover and select values, so we move to padding*/
+        div.react-datepicker__day-name {
+            margin: 0;
+            padding-top: 0.2rem;
+            padding-bottom: 0.2rem;
+            width: $font-size-select-menus * $datepicker-select-week-custom-multiplier;
+        }
+
+        /* A custom class that is applied to all days in the selected week */
+        div.react-datepicker__day--highlighted-custom {
+
+            background-color: $info !important;
+            color: $info-btn-color;
+        }
+
+        /* Allows weeks to be highlighted in one go when hovered */
+        div.react-datepicker__week:hover {
+            background-color: $info-light !important;
+        }
+
+        /* The week number has the hover and select colours removed by styling the div in front */
+        div.react-datepicker__week-number {
+            background-color: var(--primary-background) !important;
+            color: var(--tertiary-text);
+            margin: 0;
+            width: $font-size-select-menus * $datepicker-select-week-custom-multiplier;
+            line-height: $font-size-select-menus * $datepicker-select-week-custom-multiplier
+        }
+
+
+        /* The day tiles when using weeks */
+        div.react-datepicker__day, .react-datepicker__week > div {
+            margin: 0;
+            width: $font-size-select-menus * $datepicker-select-week-custom-multiplier;
+            line-height: $font-size-select-menus * $datepicker-select-week-custom-multiplier;
+        }
+    }
+
+    $react-datepicker-month-year-quarter-margin: 0.2rem;
+
+    /* Sizing the divs for the options for months/quarters/years*/
+    div.react-datepicker__month-text, div.react-datepicker__quarter-text {
+        width: $font-size-select-menus * 6;
+        line-height: $font-size-select-menus * 2;
+        padding: 0;
+        margin: $react-datepicker-month-year-quarter-margin;
+    }
+
+    /* Sizing the divs for the options for months/quarters/years*/
+    div.react-datepicker__year-text {
+        width: calc(33% - 2 * #{$react-datepicker-month-year-quarter-margin});
+        line-height: $font-size-select-menus * 2;
+        padding: 0;
+        margin: 0.2rem;
+    }
+
+
+    /* The title at the top of the date select pop up */
+    .react-datepicker__header {
+        padding: $react-datepicker-header-top-padding 0.2rem 0.7rem 0.2rem;
+        font-size: $font-size-select-menus * 1.25;
+        border-top-left-radius: $border-radius !important;
+        border-top-right-radius: $border-radius !important;
+        border-bottom: $input-border-width solid $input-border-color !important;
+        background-color: var(--secondary-background);
+
+        /* The month and year at the top of the header */
+        div.react-datepicker__current-month {
+            margin-bottom: 10px;
+        }
+
+        /* The month name across the top, sometimes it's in a child div */
+        > div:first-child {
+            font-size: inherit;
+        }
+    }
+}
+
+/* The input that allows you to click and pick a date, this for form-control added as a class on the SelectDate
+component so most of the Bootstrap css is applied through that */
+
+.react-datepicker-wrapper {
+    /* Make datepicker look more like bootstrap */
+    .react-datepicker__input-container {
+
+        /* The X that clears the input value */
+        .react-datepicker__close-icon {
+            vertical-align: unset !important;
+            display: unset !important;
+            background-color: transparent;
+            padding-bottom: 0.125rem;
+        }
+
+        button.react-datepicker__close-icon::after {
+            display: unset !important;
+            text-align: unset !important;
+            vertical-align: unset !important;
+            background-color: inherit;
+            color: $input-color;
+            padding: 2px;
+            font-size: 22px;
+            font-weight: 800;
+        }
+    }
+}
+
+/* A class for setting text as a different colour than the primary text, this is used for the Select component labels */
+.label {
+    color: var(--tertiary-text);
+}
+
+/* A class for setting text as a different colour than the primary text, nav component*/
+.text-secondary {
+    color: darken($table-striped-bg, 50%) !important;
+}
+
+/* A class for setting text as a different colour than the primary text, this is used for the Select component labels */
+.text-tertiary {
+    color: var(--tertiary-text);
+}
+
+/* A class for setting backgrounds as a different colour than the primary background, this is used GitHubLogin component*/
+.background-secondary {
+    background-color: darken($table-striped-bg, 1%);
+}
+
+/* A class for setting backgrounds as a different colour than the primary background, this is used GitHubLogin component*/
+.background-tertiary {
+    background-color: lighten($table-striped-bg, 0%);
+}
+
+
+/* Used to make tabbed areas bordered */
+.tab-content-bordered {
+
+    border: solid $border-width $border-color;
+    border-top: 0;
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+}
+
+/* The GitHub components used in the UploadAModelScene scene uses these additional classes */
+.git {
+
+    font-family: 'Roboto', sans-serif;
+
+    &.git-header, .git-header {
+
+        border: solid $border-width $border-color;
+        color: var(--secondary-text);
+        border-radius: $border-radius $border-radius 0 0;
+        word-wrap: break-word;
+    }
+
+    &.git-body, .git-body {
+
+        border-top: 0;
+        border-bottom: 0;
+        border-left: solid $border-width $border-color;
+        border-right: solid $border-width $border-color;
+        color: var(--primary-text);
+    }
+
+    &.git-footer, .git-footer {
+
+        border: solid $border-width $border-color;
+        border-radius: 0 0 $border-radius $border-radius;
+        color: var(--secondary-text);
+    }
+
+    &.git-title, .git-title {
+        color: var(--secondary-text);
+        overflow-wrap: break-word;
+
+        //iPhone 12 - make the text smaller on phone
+        @media screen and (max-width: 576px) {
+
+            font-size: 1.5rem;
+        }
+    }
+
+    &.git-link, .git-link {
+        color: var(--secondary-text) !important;
+        text-decoration-line: none;
+
+        &:hover {
+            text-decoration-style: dotted;
+            text-decoration-line: underline;
+            color: var(--primary-text);
+        }
+    }
+
+    &.git-repo-description, .git-repo-description {
+        text-shadow: none;
+    }
+}
+
+/* Make a div have the hand icon when hovering over */
+.pointer {
+    cursor: pointer;
+}
+
+/* Repositions a modal so that it appears top right e.g. SettingsModal component*/
+.modal-dialog-top-right {
+
+    margin: 1rem 1rem 1rem auto;
+}
+
+/* The FileImportModal component */
+.file-import-modal {
+
+    /* The progress circle */
+    .circle {
+        height: 100px;
+        width: 100px;
+        color: var(--tertiary-text);
+    }
+
+    /* Custom styling for file load boxes see https://tympanus.net/codrops/2015/09/15/styling-customizing-file-inputs-smart-way/*/
+    .input-file {
+        width: 0.1px;
+        height: 0.1px;
+        opacity: 0;
+        overflow: hidden;
+        position: absolute;
+        z-index: -1;
+    }
+
+    .input-file + label {
+        cursor: pointer;
+        -webkit-user-select: none;
+        -moz-user-select: none;
+        -ms-user-select: none;
+        user-select: none;
+        transition: $btn-transition;
+    }
+
+    .input-file + label * {
+
+        pointer-events: none;
+    }
+
+    .input-file:focus, .input-file.focus {
+
+        box-shadow: $input-btn-focus-box-shadow
+    }
+
+    .drag-and-drop {
+
+        min-height: 200px;
+        width: 75%;
+        border-color: var(--tertiary-text) !important;
+        border-style: dashed !important;
+        border-width: 2px !important;
+
+        &.drag-hover {
+            background-color: var(--secondary-background);
+        }
+    }
+}
+
+// Utility mixin to apply animation in scss
+// See https://dev.to/inverseswirl/how-to-add-keyframes-animation-code-in-scss-46k8
+@mixin animate($animation,$duration,$method,$times) {
+    animation: $animation $duration $method $times;
+}
+
+@mixin keyframes($name) {
+    @keyframes #{$name}{
+        @content;
+    }
+}
+
+// The Loading component css
+// Loading spinner css see https://stackoverflow.com/questions/18715950/creating-this-rotating-animation-using-css
+.loading-spinner {
+
+    $loading-spinner-width: 45px;
+
+    display: flex;
+    margin: auto;
+    width: $loading-spinner-width;
+    height: $loading-spinner-width;
+
+    @include keyframes(rotate) {
+        0% {
+            transform: rotate(-360deg);
+        }
+    }
+
+    @include animate(rotate, 1.75s, linear, infinite);
+
+    .loading-box {
+
+        position: absolute;
+        width: $loading-spinner-width;
+        height: $loading-spinner-width;
+
+        &.box1 {
+            transform: rotate(0deg);
+        }
+
+        &.box2 {
+            transform: rotate(90deg);
+        }
+
+        &.box3 {
+            transform: rotate(135deg);
+        }
+
+        &.box4 {
+            transform: rotate(180deg);
+        }
+
+        &.box5 {
+            transform: rotate(225deg);
+        }
+
+        &.box6 {
+            transform: rotate(270deg);
+        }
+
+        &.box7 {
+            transform: rotate(315deg);
+        }
+
+        .circle {
+            position: relative;
+            top: 0;
+            left: 25px;
+            border-radius: 50%;
+            background-color: var(--quaternary-text);
+            height: 8px !important;
+            width: 8px !important;
+        }
+    }
+}
+
+// The text below the loading spinner in the Loading component
+.loading-text {
+    color: var(--tertiary-text);
+    text-align: center;
+}
+
+// A utility for hiding a div but hav it still take up space in the DOM
+.hidden {
+    visibility: hidden !important;
+}
+
+// A utility that forces each word in a div on a new line
+.word-spacing {
+    word-spacing: 999999999px;
+}
+
+
+/* Classes for the ModelChainBuilder components */
+.model-card {
+    box-shadow: 0 20px 25px -15px rgba(0, 0, 0, 0.8);
+    border-radius: 5px 5px 5px 5px;
+    border-color: black;
+
+    .model-card-header {
+        border-color: shade-color($side-menu-text-dark-theme, 50%) !important;
+        color: tint-color($side-menu-text-dark-theme, 70%);
+        border-radius: 4px 4px 0 0 !important;
+        background: -webkit-linear-gradient(45deg, lighten($side-menu-background-dark-theme, 3%), lighten($side-menu-background-dark-theme, 13%) 100%);
+        background: linear-gradient(45deg, lighten($side-menu-background-dark-theme, 3%), lighten($side-menu-background-dark-theme, 13%) 100%)
+    }
+
+    .model-card-body {
+        background-color: $side-menu-background-dark-theme;
+        color: $side-menu-text-dark-theme;
+        min-height: 3rem;
+    }
+
+    .model-card-footer {
+
+        border-color: shade-color($side-menu-text-dark-theme, 50%) !important;
+        background-color: $side-menu-background-dark-theme;
+        color: $side-menu-text-dark-theme;
+        border-radius: 0 0 4px 4px !important;
+        background: -webkit-linear-gradient(45deg, lighten($side-menu-background-dark-theme, 0%), lighten($side-menu-background-dark-theme, 5%) 100%);
+        background: linear-gradient(45deg, lighten($side-menu-background-dark-theme, 0%), lighten($side-menu-background-dark-theme, 5%) 100%)
+    }
+
+    table.model-card-info tbody.td {
+
+        padding: 0 0.7rem;
+        line-height: 1.2;
+    }
+
+    .model-card-link {
+        font-size: 0.8rem;
+        line-height: 1 !important;
+    }
+}
+
+/*
+Classes for danger and success on inverted background, for the light theme this is against a dark background
+ */
+.text-danger-inverted-background {
+    color: $danger-dark-background;
+}
+
+.text-success-inverted-background {
+    color: $success-dark-background;
+}
+
+// Change the text colour in dark tables
+.table-dark {
+    color: $side-menu-text-dark-theme;
+}
+
+// Make the React Bootstrap table have a border at the top when there is no header
+.table > :not(caption) > * > * {
+    border-top-width: 1px;
+}
+
+.table.table-no-outline tr:first-child td {
+
+    border-top: none !important;
+}
+
+.table.table-no-outline tr:last-child td {
+
+    border-bottom: none !important;
+}
+
+
+// Classes for the RichTextEditor component
+.rich-text-editor {
+
+    &.editing {
+        min-height: 10rem;
+        border-radius: $border-radius;
+    }
+
+    code {
+        line-height: 1.2rem;
+        word-break: break-word;
+    }
+
+    blockquote {
+        color: var(--tertiary-text);
+    }
+
+    blockquote::before, blockquote::after {
+        line-height: 1.2rem;
+        color: var(--quaternary-text);
+        word-break: break-word;
+        font-size: 1.5rem;
+    }
+
+    blockquote::before {
+        content: "\201C";
+    }
+
+    blockquote::after {
+        content: "\201D";
+    }
+
+    ul {
+        list-style-type: circle;
+    }
+}
+
+// Used in the Icon component to visually make icon centered
+.svg-icon-button-offset {
+    margin-top: -0.15em;
+}
+
+// Used by the ProgressBar component to format the circles
+.progress-ring {
+
+    $width: 16px;
+    // How big the width gets to with the animation
+    $scale: 2;
+
+    $margin: $scale * $width * 0.25 ;
+
+    position: relative;
+    height: $width;
+    width: $width;
+    border-radius: 50%;
+    margin: $margin;
+    border: 2px solid var(--tertiary-background);
+
+    &.loaded {
+        background-color: var(--secondary-background);
+    }
+
+    &.running {
+
+        span {
+            position: absolute;
+            content: '';
+            height: 100%;
+            width: 100%;
+            top: 0;
+            left: 0;
+            border-radius: 50%;
+
+        }
+
+        span.half {
+
+            border-top-left-radius: 50px;
+            border-bottom-left-radius: 50px;
+            background-color: var(--secondary-background);
+            width: 50%;
+            height: 100%;
+            border-right: solid var(--tertiary-background) 1px;
+        }
+
+        @include keyframes(scale) {
+            0% {
+                opacity: 0;
+                transform: scale(1);
+            }
+            80% {
+                opacity: 1;
+            }
+            100% {
+                transform: scale($scale);
+                opacity: 0;
+            }
+        }
+
+        &::before, div::after {
+
+            @include animate(scale, 1.75s, ease-out, infinite);
+            position: absolute;
+            content: '';
+            height: 100%;
+            width: 100%;
+            top: 0;
+            left: 0;
+            border-radius: 50%;
+            box-shadow: 0 0 3px 3px var(--tertiary-background);
+        }
+
+        &::after {
+            animation-delay: .66s;
+        }
+
+    }
+}
+
+// Remove button halos
+.no-halo:focus, .no-halo:active:focus {
+    outline: none !important;
+    box-shadow: none !important;
+}
+
+
+// Tables
+// A fix for striped tables with active classes see https://github.com/twbs/bootstrap/issues/33913
+.table-striped > tbody > tr.table-active > * {
+    --bs-table-accent-bg: var(--bs-table-active-bg);
+}
+
+// Make the thead border thinner see https://github.com/twbs/bootstrap/issues/35342
+.table > :not(:first-child) {
+    border-top: 0;
+}
+
+// Add a matching border to the top of the head
+.table > thead {
+    border-top: 1px solid currentColor;
+    border-bottom: 1px solid currentColor;
+}
+
+// Add a border at the bottom
+.table-bordered tbody tr:last-child td {
+
+    border-bottom: 1px solid currentColor;
+}
+
+// To add a border to the top and bottom of the table when the borders are separate we add the border to a div wrapping the
+// table
+.table-top-and-bottom-border {
+    border-bottom: darken($table-striped-bg, 20%) 1px solid;
+    border-top: darken($table-striped-bg, 20%) 1px solid;
+}
+
+.dataHtmlTable {
+
+    color: darken($table-striped-bg, 50%);
+    font-size: 0.875rem;
+    // To have borders on the sticky header we need to separate rather than collapse the borders
+    // See https://stackoverflow.com/questions/50361698/border-style-do-not-work-with-sticky-position-element
+    border-collapse: separate;
+    border-spacing: 0;
+
+    &.dataHtmlTable-sticky-top {
+        tbody {
+            tr {
+                // Don't add a row border on the last row as the table will have a dark border at the bottom
+                &:not(.widgets):last-child td {
+                    border-bottom: none !important;
+                }
+            }
+        }
+
+        thead {
+            th {
+                border-top: none !important;
+            }
+        }
+    }
+
+    &:not(.dataHtmlTable-sticky-top) {
+        tbody {
+            tr {
+                // Don't add a row border on the last row as the table will have a dark border at the bottom
+                &:not(.widgets):last-child td {
+                    border-bottom: darken($table-striped-bg, 20%) 1px solid;
+                }
+            }
+        }
+
+        thead {
+            th {
+                border-top: darken($table-striped-bg, 20%) 1px solid;
+            }
+        }
+    }
+
+
+    thead {
+
+        th {
+            border-bottom: darken($table-striped-bg, 20%) 1px solid;
+            background-color: darken($table-striped-bg, 1%);
+            line-height: 1.2 !important;
+            vertical-align: middle;
+            padding: 0.9rem 0.5rem;
+            font-weight: bolder;
+
+            div.order {
+                padding: 0 0.5rem 0;
+                background-color: #fff;
+                height: 100%;
+                width: 100%;
+                border: none;
+            }
+
+            // The css for the sorting icons
+            div.asc::after, div.desc::after, div.none::after {
+                display: inline-block;
+                vertical-align: -.125em;
+                margin-left: 0.4rem;
+                content: "";
+                background-repeat: no-repeat;
+                background-size: 0.875rem 0.875rem;
+                width: 0.875rem;
+                height: 0.875rem;
+                background-color: darken($table-striped-bg, 40%);
+            }
+
+            // This svg is the bootstrap icon down arrow https://icons.getbootstrap.com/icons/arrow-down/
+            $icon-down-arrow: "data:image/svg+xml,<svg viewBox='0 0 16 16' xmlns='http://www.w3.org/2000/svg'><path fill-rule='evenodd' d='M8 1a.5.5 0 0 1 .5.5v11.793l3.146-3.147a.5.5 0 0 1 .708.708l-4 4a.5.5 0 0 1-.708 0l-4-4a.5.5 0 0 1 .708-.708L7.5 13.293V1.5A.5.5 0 0 1 8 1z' clip-rule='evenodd'/></svg>";
+
+            div.desc::after {
+                // Fallback in case browser does not support masks
+                //background-image: url($icon-down-arrow);
+                // The masking allows us to use a background on the svg that will be used as the fill
+                -webkit-mask: url($icon-down-arrow) no-repeat 50% 50%;
+                mask: url($icon-down-arrow) no-repeat 50% 50%;
+                -webkit-mask-size: cover;
+                mask-size: cover;
+            }
+
+            // This svg is the bootstrap icon up arrow https://icons.getbootstrap.com/icons/arrow-up/
+            $icon-up-arrow: "data:image/svg+xml,<svg viewBox='0 0 16 16' xmlns='http://www.w3.org/2000/svg'><path fill-rule='evenodd' d='M8 15a.5.5 0 0 0 .5-.5V2.707l3.146 3.147a.5.5 0 0 0 .708-.708l-4-4a.5.5 0 0 0-.708 0l-4 4a.5.5 0 1 0 .708.708L7.5 2.707V14.5a.5.5 0 0 0 .5.5z' clip-rule='evenodd'/></svg>";
+
+            div.asc::after {
+                // Fallback in case browser does not support masks
+                //background-image: url($icon-up-arrow);
+                // The masking allows us to use a background on the svg that will be used as the fill
+                -webkit-mask: url($icon-up-arrow) no-repeat 50% 50%;
+                mask: url($icon-up-arrow) no-repeat 50% 50%;
+                -webkit-mask-size: cover;
+                mask-size: cover;
+            }
+
+            // This svg is the bootstrap icon up and down https://icons.getbootstrap.com/icons/arrow-down-up/
+            // This does not show as it means unsorted but if an icon is needed then use this. See the Table component.
+            $icon-up-down-arrow: "data:image/svg+xml,<svg viewBox='0 0 16 16' fill='%23333' xmlns='http://www.w3.org/2000/svg'><path fill-rule='evenodd' d='M11.5 15a.5.5 0 0 0 .5-.5V2.707l3.146 3.147a.5.5 0 0 0 .708-.708l-4-4a.5.5 0 0 0-.708 0l-4 4a.5.5 0 1 0 .708.708L11 2.707V14.5a.5.5 0 0 0 .5.5zm-7-14a.5.5 0 0 1 .5.5v11.793l3.146-3.147a.5.5 0 0 1 .708.708l-4 4a.5.5 0 0 1-.708 0l-4-4a.5.5 0 0 1 .708-.708L4 13.293V1.5a.5.5 0 0 1 .5-.5z' clip-rule='evenodd'/></svg>";
+
+            div.none::after {
+                // Fallback in case browser does not support masks
+                //background-image: url($icon-up-down-arrow);
+                // The masking allows us to use a background on the svg that will be used as the fill
+                -webkit-mask: url($icon-up-down-arrow) no-repeat 50% 50%;
+                mask: url($icon-up-down-arrow) no-repeat 50% 50%;
+                -webkit-mask-size: cover;
+                mask-size: cover;
+            }
+        }
+    }
+
+    tbody {
+
+        tr {
+            // Widgets is a row with some tools in it to help the user interact with the table
+            &.widgets {
+                background-color: #fff;
+
+                td {
+                    padding: 0.7rem 0.5rem;
+                    border-bottom: darken($table-striped-bg, 20%) 1px solid;
+                }
+            }
+
+            &.selected {
+                background-color: $table-active-bg;
+                color: #fff;
+            }
+
+            &:not(.widgets):not(.selected):nth-of-type(odd) {
+                background-color: lighten($table-striped-bg, 0%);
+            }
+
+            &:not(.widgets):not(.selected):nth-of-type(even) {
+                background-color: darken($table-striped-bg, 1%);
+            }
+
+            &:not(.widgets):not(last-child) td {
+                border-bottom: darken($table-striped-bg, 10%) 1px solid;
+                border-top: none;
+                padding: 0.7rem 0.5rem;
+            }
+        }
+    }
+
+    // If there is no thead then add a top border to the first row
+    tbody:first-child {
+        tr:first-child {
+            &:not(.widgets) td {
+                border-top: darken($table-striped-bg, 20%) 1px solid;
+                padding: 0.7rem 0.5rem;
+            }
+        }
+    }
+}
+
+
+input.editable-data {
+    border-width: 0;
+    background-color: inherit;
+
+    &.focus {
+        border-width: 1px;
+        background-color: #fff;
+    }
+}
+
+// In the Table component we have rows that contain widgets that are stickied if the table is not paginated and is
+// therefore scrollable. In these cases the widgets can have drop downs, so we need to set their z-index to auto to
+// make the dropdowns visible.
+table tbody tr.widgets.sticky-top, table thead.sticky-top {
+    z-index: auto;
+}
+
+// A style to apply to the table header so that it doesn't change height when the user toggles the table search widget.
+.table-navbar {
+    min-height: 47px;
+}
+
+// Used in FlowSvg component to set outline of selected boxes
+.red-svg-box {
+
+    stroke: var(--danger) !important;
+    stroke-width: 3 !important;
+}
+
+// Used in FlowSvg component to set line colours on connectors between boxes
+.red-svg-line {
+
+    stroke: var(--danger) !important;
+    stroke-width: 3 !important;
+
+    &.trac-ui-svg-arrow {
+        fill: var(--danger) !important;
+    }
+}
+
+// Used in FlowSvg in setting mouse icon in menu
+.zoom-in {
+
+    cursor: zoom-in !important;
+}
+
+.bg-input-body-background {
+    .form-control {
+        background-color: $body-bg;
+    }
+}
+
+/* A css style for code text */
+.code-lite {
+    line-height: 1.2rem;
+    font-size: 1rem;
+    color: $danger;
+    word-break: break-word;
+    font-family: $font-family-monospace;
+    tab-size: 4;
+}
+
+/* Make sure the tabs have a minimum height, so that the UI does not jump when tabs are changed */
+.min-height-tab-pane {
+    min-height: 13rem;
+}
+
+/* Make alternative rows in the SchemaEditor component be shaded */
+.schema-editor {
+
+    .schema-editor-item:nth-of-type(odd) {
+        background-color: lighten($table-striped-bg, 0%);
+    }
+}
+
+/* Remove the carousel margin and the bottom and move it downwards outside the carousel content */
+.carousel-indicators {
+    margin-bottom: 0;
+    bottom: -23px;
+}
+
+/* A class to allow us to control the padding on inputs when they ar showing as invalid, if the input is in a
+table then switching the icon can cause jumps in the UI*/
+.form-control.is-invalid {
+    padding: $input-padding-y $input-padding-x;
+}
+
+/* A class for the cards in the homepage */
+.homepage-card {
+    background-color: darken($table-striped-bg, 1%);
+    border-bottom: darken($table-striped-bg, 20%) 1px solid;
+    border-top: darken($table-striped-bg, 20%) 1px solid;
+    color: darken($table-striped-bg, 50%);
+    top: 0;
+
+    .trac-ui-card-img {
+        background-image: url("../images/tracdap_logo_dark_background_500.png");
+        background-repeat: no-repeat;
+
+        &.part-0 {
+            background-position: 0 center;
+        }
+
+        &.part-1 {
+            background-position: 33.3% center;
+        }
+
+        &.part-2 {
+            background-position: 66.7% center;
+        }
+
+        &.part-3 {
+            background-position: 100% center;
+        }
+    }
+
+    .card-header {
+        background-color: darken($table-striped-bg, 5%);
+
+        .trac-ui-card-icon {
+            transition: all 1s ease-in-out;
+            color: $info-dark !important;
+
+            &:before {
+                transition: all 0.3s ease-in-out;
+            }
+        }
+
+        .trac-ui-card-title {
+            transition: all 0.3s ease-in-out;
+        }
+    }
+
+    .card-footer {
+        background-color: darken($table-striped-bg, 5%);
+    }
+
+    &:hover {
+        transition: all 0.3s ease-in-out;
+        box-shadow: 0 4px 8px rgba(38, 38, 38, 0.2);
+        top: -4px;
+        background-color: white;
+
+        .card-header {
+            transition: all 0.3s ease-in-out;
+            background-color: darken($table-striped-bg, 1%);
+
+            .trac-ui-card-icon {
+                transition: all 1s ease-in-out;
+                color: darken($table-striped-bg, 50%) !important;
+
+                i {
+                    &:before {
+
+                        transition: all 0.3s ease-in-out;
+                        transform: scale(1.3);
+                    }
+                }
+            }
+
+            .trac-ui-card-title {
+                transition: all 0.3s ease-in-out;
+                transform: scale(0.85);
+            }
+        }
+
+        .card-footer {
+            transition: all 0.3s ease-in-out;
+            background-color: darken($table-striped-bg, 1%);
+        }
+    }
+
+    .list-group-item {
+        background-color: inherit;
+        color: darken($table-striped-bg, 50%);
+
+        &:hover {
+            color: $info-dark;
+            transition: all 0.2s ease-out;
+        }
+    }
+}

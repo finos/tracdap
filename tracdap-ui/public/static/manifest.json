@@ -1,0 +1,25 @@
+{
+  "short_name": "TRAC UI",
+  "name": "TRAC UI demo",
+  "icons": [
+    {
+      "src": "./images/favicon.ico",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/x-icon"
+    },
+    {
+      "src": "./images/2022_tracdap_icon_purple_192.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "./images/2022_tracdap_icon_purple_512.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#000000",
+  "background_color": "#ffffff"
+}

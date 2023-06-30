@@ -1,0 +1,18 @@
+{
+  "compilerOptions": {
+    "target": "es2016",
+    "downlevelIteration": true,
+    "tsx": "react",
+    "noEmit": true,
+    "allowSyntheticDefaultImports": true,
+    "jsx": "react"
+  },
+  "entryPoints": [
+    "./src"
+  ],
+  "$schema": "https://typedoc.org/schema.json",
+  "out": "docs",
+  "json": "docs/docs-json",
+  "entryPointStrategy": "expand",
+  "categorizeByGroup": false
+}
