@@ -76,24 +76,6 @@ public class GcsObjectStorage extends CommonFileStorage {
         this.prefix = normalizePrefix(prefix);
     }
 
-    private String normalizePrefix(String prefix) {
-
-        if (prefix == null)
-            return "";
-
-        while (prefix.startsWith(BACKSLASH))
-            prefix = prefix.substring(1);
-
-        if (prefix.isBlank())
-            return "";
-
-        if (!prefix.endsWith(BACKSLASH))
-            prefix = prefix + BACKSLASH;
-
-        return prefix;
-    }
-
-
     @Override
     public void start(EventLoopGroup eventLoopGroup) {
 
@@ -470,6 +452,23 @@ public class GcsObjectStorage extends CommonFileStorage {
         var objectKey = usePrefix(storagePath);
 
         return new GcsObjectWriter(storageClient, ctx, bucketName, objectKey, signal);
+    }
+
+    private String normalizePrefix(String prefix) {
+
+        if (prefix == null)
+            return "";
+
+        while (prefix.startsWith(BACKSLASH))
+            prefix = prefix.substring(1);
+
+        if (prefix.isBlank())
+            return "";
+
+        if (!prefix.endsWith(BACKSLASH))
+            prefix = prefix + BACKSLASH;
+
+        return prefix;
     }
 
     private String usePrefix(String relativeKey) {
