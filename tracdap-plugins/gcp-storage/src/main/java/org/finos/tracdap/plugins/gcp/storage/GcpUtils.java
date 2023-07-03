@@ -55,13 +55,12 @@ public class GcpUtils {
         var callCtx = GrpcCallContext.createDefault()
                 .withCallOptions(callOptions);
 
-        var requestStream = callable.clientStreamingCall(null, callCtx);
+        var responseStream = new GcpUnaryResponse<TResponse>();
+        var requestStream = callable.clientStreamingCall(responseStream, callCtx);
         requestStream.onNext(request);
         requestStream.onCompleted();
 
-        var apiCall = callable.futureCall(request, callCtx);
-
-        return GcpUtils.gcpCallback(apiCall);
+        return responseStream.getResult();
     }
 
     public static <T>
