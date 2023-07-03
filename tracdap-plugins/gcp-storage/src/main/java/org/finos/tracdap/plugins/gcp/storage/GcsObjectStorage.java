@@ -25,13 +25,9 @@ import org.finos.tracdap.common.storage.StorageErrors;
 
 import com.google.api.gax.grpc.GrpcCallContext;
 import com.google.api.gax.grpc.InstantiatingGrpcChannelProvider;
-import com.google.api.gax.rpc.ApiException;
-import com.google.api.gax.rpc.ClientStreamingCallable;
-import com.google.api.gax.rpc.NotFoundException;
-import com.google.api.gax.rpc.UnaryCallable;
+import com.google.api.gax.rpc.*;
 import com.google.storage.v2.*;
 
-import io.grpc.CallOptions;
 import io.grpc.ManagedChannelBuilder;
 import io.grpc.StatusRuntimeException;
 import io.grpc.netty.NettyChannelBuilder;
@@ -42,6 +38,7 @@ import io.netty.channel.socket.nio.NioSocketChannel;
 import org.apache.arrow.memory.ArrowBuf;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.*;
 
@@ -281,7 +278,7 @@ public class GcsObjectStorage extends CommonFileStorage {
                 .setFinishWrite(true)
                 .build();
 
-        var apiCall = storageClient.writeObjectCallable();
+        var apiCall = addMissingRequestParams(storageClient.writeObjectCallable());
 
         var response = GcpUtils.clientStreamingCall(apiCall, request, ctx.eventLoopExecutor());
 
@@ -339,5 +336,22 @@ public class GcsObjectStorage extends CommonFileStorage {
     private String resolvePrefix(String storagePath) {
 
         return resolveObjectKey(storagePath) + BACKSLASH;
+    }
+
+    private <TRequest, TResponse>
+    ClientStreamingCallable<TRequest, TResponse>
+    addMissingRequestParams(ClientStreamingCallable<TRequest, TResponse> callable) {
+
+        // https://github.com/googleapis/java-storage/blob/main/google-cloud-storage/src/main/java/com/google/cloud/storage/WriteFlushStrategy.java#L89
+
+        // GCP SDK adds in this required header
+        // For some API calls / usage patterns, the header does not get added
+
+        var callParams = String.format("bucket=%s", bucketName);
+        var callMetadata = Map.of("x-goog-request-params", List.of(callParams));
+
+        var defaultContext = GrpcCallContext.createDefault().withExtraHeaders(callMetadata);
+
+        return callable.withDefaultCallContext(defaultContext);
     }
 }
