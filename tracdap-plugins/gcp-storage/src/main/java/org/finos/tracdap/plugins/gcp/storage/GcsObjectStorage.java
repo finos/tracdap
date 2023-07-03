@@ -16,7 +16,6 @@
 
 package org.finos.tracdap.plugins.gcp.storage;
 
-import com.google.storage.v2.Object;
 import org.finos.tracdap.common.data.IExecutionContext;
 import org.finos.tracdap.common.data.IDataContext;
 import org.finos.tracdap.common.exception.EStartup;
@@ -29,6 +28,7 @@ import com.google.api.gax.grpc.GrpcCallContext;
 import com.google.api.gax.grpc.InstantiatingGrpcChannelProvider;
 import com.google.api.gax.rpc.*;
 import com.google.storage.v2.*;
+import com.google.storage.v2.Object;
 
 import io.grpc.ManagedChannelBuilder;
 import io.grpc.StatusRuntimeException;
@@ -193,7 +193,7 @@ public class GcsObjectStorage extends CommonFileStorage {
     @Override
     protected CompletionStage<Boolean> fsExists(String storagePath, IExecutionContext ctx) {
 
-        var objectKey = resolveObjectKey(storagePath);
+        var objectKey = usePrefix(storagePath);
 
         var request = GetObjectRequest.newBuilder()
                 .setBucket(bucketName.toString())
@@ -222,7 +222,7 @@ public class GcsObjectStorage extends CommonFileStorage {
     @Override
     protected CompletionStage<Boolean> fsDirExists(String storagePath, IExecutionContext ctx) {
 
-        var prefix = resolvePrefix(storagePath);
+        var prefix = usePrefix(storagePath);
 
         var request = ListObjectsRequest.newBuilder()
                 .setParent(bucketName.toString())
@@ -253,7 +253,7 @@ public class GcsObjectStorage extends CommonFileStorage {
     @Override
     protected CompletionStage<FileStat> fsGetFileInfo(String storagePath, IExecutionContext ctx) {
 
-        var objectKey = resolveObjectKey(storagePath);
+        var objectKey = usePrefix(storagePath);
 
         var request = GetObjectRequest.newBuilder()
                 .setBucket(bucketName.toString())
@@ -297,7 +297,7 @@ public class GcsObjectStorage extends CommonFileStorage {
     }
 
     @Override
-    protected CompletionStage<FileStat> fsGetDirInfo(String prefix, IExecutionContext ctx) {
+    protected CompletionStage<FileStat> fsGetDirInfo(String directoryKey, IExecutionContext ctx) {
         return null;
     }
 
@@ -309,7 +309,7 @@ public class GcsObjectStorage extends CommonFileStorage {
     @Override
     protected CompletionStage<Void> fsCreateDir(String storagePath, IExecutionContext ctx) {
 
-        var prefix = resolvePrefix(storagePath) + BACKSLASH;
+        var prefix = usePrefix(storagePath);
 
         var object = com.google.storage.v2.Object.newBuilder()
                 .setBucket(bucketName.toString())
@@ -344,7 +344,7 @@ public class GcsObjectStorage extends CommonFileStorage {
     @Override
     protected CompletionStage<Void> fsDeleteFile(String storagePath, IExecutionContext ctx) {
 
-        var objectKey = resolveObjectKey(storagePath);
+        var objectKey = usePrefix(storagePath);
 
         var request = DeleteObjectRequest.newBuilder()
                 .setBucket(bucketName.toString())
@@ -369,6 +369,7 @@ public class GcsObjectStorage extends CommonFileStorage {
 
     @Override
     protected CompletionStage<Void> fsDeleteDir(String directoryKey, IExecutionContext ctx) {
+
         return null;
     }
 
@@ -385,25 +386,20 @@ public class GcsObjectStorage extends CommonFileStorage {
     @Override
     protected Flow.Subscriber<ArrowBuf> fsOpenOutputStream(String storagePath, CompletableFuture<Long> signal, IDataContext ctx) {
 
-        var objectKey = resolveObjectKey(storagePath);
+        var objectKey = usePrefix(storagePath);
 
         return new GcsObjectWriter(storageClient, ctx, bucketName, objectKey, signal);
     }
 
-    private String resolveObjectKey(String storagePath) {
+    private String usePrefix(String relativeKey) {
 
         if (prefix.isEmpty())
-            return storagePath;
+            return relativeKey;
 
-        if (storagePath.isEmpty())
+        if (relativeKey.isEmpty())
             return prefix;
 
-        return prefix + storagePath;
-    }
-
-    private String resolvePrefix(String storagePath) {
-
-        return resolveObjectKey(storagePath) + BACKSLASH;
+        return prefix + relativeKey;
     }
 
     private <TRequest, TResponse>
