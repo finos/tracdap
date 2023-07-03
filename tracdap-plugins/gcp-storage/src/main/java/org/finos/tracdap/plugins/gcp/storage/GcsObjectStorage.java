@@ -298,7 +298,21 @@ public class GcsObjectStorage extends CommonFileStorage {
 
     @Override
     protected CompletionStage<FileStat> fsGetDirInfo(String directoryKey, IExecutionContext ctx) {
-        return null;
+
+        // TODO: Move this to the common layer?
+
+        var storagePath = directoryKey.isEmpty() ? "." : directoryKey.substring(0, directoryKey.length() - 1);
+
+        var name = storagePath.contains(BACKSLASH)
+                ? storagePath.substring(storagePath.lastIndexOf(BACKSLASH) + 1)
+                : storagePath;
+
+        var fileType = FileType.DIRECTORY;
+        var size = 0;
+
+        var stat = new FileStat(storagePath, name, fileType, size, /* mtime = */ null, /* atime = */ null);
+
+        return CompletableFuture.completedFuture(stat);
     }
 
     @Override
