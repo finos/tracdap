@@ -16,11 +16,13 @@
 
 package org.finos.tracdap.plugins.gcp.storage;
 
+import com.google.storage.v2.Object;
 import org.finos.tracdap.common.data.IExecutionContext;
 import org.finos.tracdap.common.data.IDataContext;
 import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.common.storage.CommonFileStorage;
 import org.finos.tracdap.common.storage.FileStat;
+import org.finos.tracdap.common.storage.FileType;
 import org.finos.tracdap.common.storage.StorageErrors;
 
 import com.google.api.gax.grpc.GrpcCallContext;
@@ -37,6 +39,7 @@ import io.netty.channel.socket.nio.NioSocketChannel;
 
 import org.apache.arrow.memory.ArrowBuf;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -248,7 +251,7 @@ public class GcsObjectStorage extends CommonFileStorage {
     }
 
     @Override
-    protected CompletionStage<FileStat> fsGetFileInfo(String objectKey, IExecutionContext ctx) {
+    protected CompletionStage<FileStat> fsGetFileInfo(String storagePath, IExecutionContext ctx) {
         return null;
     }
 
@@ -339,8 +342,11 @@ public class GcsObjectStorage extends CommonFileStorage {
     }
 
     @Override
-    protected Flow.Subscriber<ArrowBuf> fsOpenOutputStream(String objectKey, CompletableFuture<Long> signal, IDataContext ctx) {
-        return null;
+    protected Flow.Subscriber<ArrowBuf> fsOpenOutputStream(String storagePath, CompletableFuture<Long> signal, IDataContext ctx) {
+
+        var objectKey = resolveObjectKey(storagePath);
+
+        return new GcsObjectWriter(storageClient, ctx, bucketName, objectKey, signal);
     }
 
     private String resolveObjectKey(String storagePath) {
