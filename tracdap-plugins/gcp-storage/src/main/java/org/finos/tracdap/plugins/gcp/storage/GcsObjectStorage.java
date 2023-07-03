@@ -19,6 +19,7 @@ package org.finos.tracdap.plugins.gcp.storage;
 import org.finos.tracdap.common.data.IExecutionContext;
 import org.finos.tracdap.common.data.IDataContext;
 import org.finos.tracdap.common.exception.EStartup;
+import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.storage.CommonFileStorage;
 import org.finos.tracdap.common.storage.FileStat;
 import org.finos.tracdap.common.storage.FileType;
@@ -40,6 +41,7 @@ import io.netty.channel.socket.nio.NioSocketChannel;
 import org.apache.arrow.memory.ArrowBuf;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -273,15 +275,84 @@ public class GcsObjectStorage extends CommonFileStorage {
             throw errors.handleException("STAT", storagePath, error);
         }
 
-        var path = object.getName().endsWith(BACKSLASH)
-                ? object.getName().substring(0, object.getName().length() - 1)
-                : object.getName();
+        return buildFileStat(object);
+    }
+
+    @Override
+    protected CompletionStage<FileStat> fsGetDirInfo(String directoryKey, IExecutionContext ctx) {
+
+        var absolutePrefix = usePrefix(directoryKey);
+
+        var stat = buildDirStat(absolutePrefix);
+
+        return CompletableFuture.completedFuture(stat);
+    }
+
+    @Override
+    protected CompletionStage<List<FileStat>> fsListContents(String prefix, String startAfter, int maxKeys, boolean recursive, IExecutionContext ctx) {
+
+        var absolutePrefix = usePrefix(prefix);
+
+        var request = ListObjectsRequest.newBuilder()
+                .setParent(bucketName.toString())
+                .setPrefix(absolutePrefix);
+
+        if (startAfter != null)
+            request.setLexicographicStart(startAfter);
+
+        if (maxKeys > 0)
+            request.setPageSize(maxKeys + 1);
+
+        if (!recursive)
+            request = request.setDelimiter(BACKSLASH);
+
+        var apiCall = storageClient.listObjectsCallable();
+
+        var response = GcpUtils.unaryCall(apiCall, request.build(), ctx.eventLoopExecutor());
+
+        var excludeKey = startAfter != null && startAfter.compareTo(absolutePrefix) > 0
+                ? startAfter
+                : absolutePrefix;
+
+        return response.handle((result, error) -> fsListContentsCallback(prefix, excludeKey, result, error));
+    }
+
+    private List<FileStat> fsListContentsCallback(String storagePath, String excludeKey, ListObjectsResponse result, Throwable error) {
+
+        if (error != null) {
+            throw errors.handleException("LS", storagePath, error);
+        }
+
+        var response = new ArrayList<FileStat>(result.getObjectsCount() + result.getPrefixesCount());
+
+        for (var object: result.getObjectsList()) {
+            if (!object.getName().equals(excludeKey)) {
+                var stat = buildFileStat(object);
+                response.add(stat);
+            }
+        }
+
+        for (var prefix : result.getPrefixesList()) {
+            var stat = buildDirStat(prefix);
+            response.add(stat);
+        }
+
+        return response;
+    }
+
+    private FileStat buildFileStat(Object object) {
+
+        var relativeName = removePrefix(object.getName());
+
+        var path = relativeName.endsWith(BACKSLASH)
+                ? relativeName.substring(0, relativeName.length() - 1)
+                : relativeName;
 
         var name = path.contains(BACKSLASH)
                 ? path.substring(path.lastIndexOf(BACKSLASH) + 1)
                 : path;
 
-        var fileType = storagePath.endsWith(BACKSLASH)
+        var fileType = relativeName.endsWith(BACKSLASH)
                 ? FileType.DIRECTORY
                 : FileType.FILE;
 
@@ -296,12 +367,15 @@ public class GcsObjectStorage extends CommonFileStorage {
         return new FileStat(path, name, fileType, size, mtime, null);
     }
 
-    @Override
-    protected CompletionStage<FileStat> fsGetDirInfo(String directoryKey, IExecutionContext ctx) {
+    private FileStat buildDirStat(String dirPrefix) {
 
-        // TODO: Move this to the common layer?
+        var relativePrefix = removePrefix(dirPrefix);
 
-        var storagePath = directoryKey.isEmpty() ? "." : directoryKey.substring(0, directoryKey.length() - 1);
+        var storagePath = relativePrefix.isEmpty()
+                ? "."
+                : relativePrefix.endsWith(BACKSLASH)
+                    ? relativePrefix.substring(0, relativePrefix.length() - 1)
+                    : relativePrefix;
 
         var name = storagePath.contains(BACKSLASH)
                 ? storagePath.substring(storagePath.lastIndexOf(BACKSLASH) + 1)
@@ -310,14 +384,7 @@ public class GcsObjectStorage extends CommonFileStorage {
         var fileType = FileType.DIRECTORY;
         var size = 0;
 
-        var stat = new FileStat(storagePath, name, fileType, size, /* mtime = */ null, /* atime = */ null);
-
-        return CompletableFuture.completedFuture(stat);
-    }
-
-    @Override
-    protected CompletionStage<List<FileStat>> fsListContents(String prefix, String startAfter, int maxKeys, boolean recursive, IExecutionContext ctx) {
-        return null;
+        return new FileStat(storagePath, name, fileType, size, /* mtime = */ null, /* atime = */ null);
     }
 
     @Override
@@ -414,6 +481,17 @@ public class GcsObjectStorage extends CommonFileStorage {
             return prefix;
 
         return prefix + relativeKey;
+    }
+
+    private String removePrefix(String absoluteKey) {
+
+        if (prefix.isEmpty())
+            return absoluteKey;
+
+        if (!absoluteKey.startsWith(prefix))
+            throw new EUnexpected();  // TODO
+
+        return absoluteKey.substring(prefix.length());
     }
 
     private <TRequest, TResponse>
