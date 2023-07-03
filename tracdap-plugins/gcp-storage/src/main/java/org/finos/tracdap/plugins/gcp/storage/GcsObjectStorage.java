@@ -298,7 +298,28 @@ public class GcsObjectStorage extends CommonFileStorage {
     }
 
     @Override
-    protected CompletionStage<Void> fsDeleteFile(String objectKey, IExecutionContext ctx) {
+    protected CompletionStage<Void> fsDeleteFile(String storagePath, IExecutionContext ctx) {
+
+        var objectKey = resolveObjectKey(storagePath);
+
+        var request = DeleteObjectRequest.newBuilder()
+                .setBucket(bucketName.toString())
+                .setObject(objectKey)
+                .build();
+
+        var apiCall = storageClient.deleteObjectCallable();
+
+        var response = GcpUtils.unaryCall(apiCall, request, ctx.eventLoopExecutor());
+
+        return response.handle((result, error) -> fsDeleteFileCallback(storagePath, error));
+    }
+
+    private Void fsDeleteFileCallback(String storagePath, Throwable error) {
+
+        if (error != null) {
+            throw errors.handleException("RM", storagePath, error);
+        }
+
         return null;
     }
 
