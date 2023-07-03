@@ -252,7 +252,48 @@ public class GcsObjectStorage extends CommonFileStorage {
 
     @Override
     protected CompletionStage<FileStat> fsGetFileInfo(String storagePath, IExecutionContext ctx) {
-        return null;
+
+        var objectKey = resolveObjectKey(storagePath);
+
+        var request = GetObjectRequest.newBuilder()
+                .setBucket(bucketName.toString())
+                .setObject(objectKey)
+                .build();
+
+        var apiCall = storageClient.getObjectCallable();
+
+        var response = GcpUtils.unaryCall(apiCall, request, ctx.eventLoopExecutor());
+
+        return response.handle((result, error) -> fsGetFileInfoCallback(storagePath, result, error));
+    }
+
+    private FileStat fsGetFileInfoCallback(String storagePath, Object object, Throwable error) {
+
+        if (error != null) {
+            throw errors.handleException("STAT", storagePath, error);
+        }
+
+        var path = object.getName().endsWith(BACKSLASH)
+                ? object.getName().substring(0, object.getName().length() - 1)
+                : object.getName();
+
+        var name = path.contains(BACKSLASH)
+                ? path.substring(path.lastIndexOf(BACKSLASH) + 1)
+                : path;
+
+        var fileType = storagePath.endsWith(BACKSLASH)
+                ? FileType.DIRECTORY
+                : FileType.FILE;
+
+        var size = fileType == FileType.FILE
+                ? object.getSize()
+                : 0;
+
+        var mtime = Instant.ofEpochSecond(
+                object.getUpdateTime().getSeconds(),
+                object.getUpdateTime().getNanos());
+
+        return new FileStat(path, name, fileType, size, mtime, null);
     }
 
     @Override
