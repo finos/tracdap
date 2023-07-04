@@ -443,15 +443,18 @@ public class GcsObjectStorage extends CommonFileStorage {
 
     @Override
     protected Flow.Publisher<ArrowBuf> fsOpenInputStream(String objectKey, IDataContext ctx) {
-        return null;
+
+        var absoluteKey = usePrefix(objectKey);
+
+        return new GcsObjectReader(storageClient, ctx, errors, objectKey, bucketName, absoluteKey);
     }
 
     @Override
-    protected Flow.Subscriber<ArrowBuf> fsOpenOutputStream(String storagePath, CompletableFuture<Long> signal, IDataContext ctx) {
+    protected Flow.Subscriber<ArrowBuf> fsOpenOutputStream(String objectKey, CompletableFuture<Long> signal, IDataContext ctx) {
 
-        var objectKey = usePrefix(storagePath);
+        var absoluteKey = usePrefix(objectKey);
 
-        return new GcsObjectWriter(storageClient, ctx, bucketName, objectKey, signal);
+        return new GcsObjectWriter(storageClient, ctx, bucketName, absoluteKey, signal);
     }
 
     private String normalizePrefix(String prefix) {
