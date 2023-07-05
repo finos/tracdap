@@ -21,6 +21,7 @@ import org.finos.tracdap.common.data.IDataContext;
 import org.apache.arrow.memory.ArrowBuf;
 import org.apache.arrow.memory.BufferAllocator;
 
+import org.finos.tracdap.common.exception.ETracInternal;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -138,12 +139,12 @@ public abstract class CommonFileReader implements Flow.Publisher<ArrowBuf> {
 
         @Override
         public void request(long n) {
-            dataContext.eventLoopExecutor().submit(() -> request(n));
+            dataContext.eventLoopExecutor().submit(() -> CommonFileReader.this.request(n));
         }
 
         @Override
         public void cancel() {
-            dataContext.eventLoopExecutor().submit(this::cancel);
+            dataContext.eventLoopExecutor().submit(CommonFileReader.this::cancel);
         }
     }
 
@@ -159,7 +160,7 @@ public abstract class CommonFileReader implements Flow.Publisher<ArrowBuf> {
             clientRequest(initialRequest);
         }
         catch (Exception e) {
-
+            throw new ETracInternal(e.getMessage(), e);  // todo
         }
     }
 
@@ -175,15 +176,10 @@ public abstract class CommonFileReader implements Flow.Publisher<ArrowBuf> {
 
             sendPendingChunks();
 
-            if (pendingChunks.size() < chunkBufferTarget) {
-                if (clientRequested - clientReceived < clientBufferTarget) {
-                    clientRequested += clientBufferTarget;
-                    clientRequest(clientBufferTarget);
-                }
-            }
+            askForMore();
         }
         catch (Exception e) {
-
+            throw new ETracInternal(e.getMessage(), e);  // todo
         }
     }
 
@@ -252,9 +248,11 @@ public abstract class CommonFileReader implements Flow.Publisher<ArrowBuf> {
                     currentChunk = null;
                 }
             }
+
+            askForMore();
         }
         catch (Exception e) {
-
+            throw new ETracInternal(e.getMessage(), e);  // todo
         }
     }
 
@@ -266,9 +264,11 @@ public abstract class CommonFileReader implements Flow.Publisher<ArrowBuf> {
             bytesReceived += chunk.readableBytes();
 
             sendChunk(chunk);
+
+            askForMore();
         }
         catch (Exception e) {
-
+            throw new ETracInternal(e.getMessage(), e);  // todo
         }
     }
 
@@ -277,15 +277,21 @@ public abstract class CommonFileReader implements Flow.Publisher<ArrowBuf> {
         if (gotError || gotCancel || gotComplete)
             return;
 
-        if (currentChunk != null) {
-            sendChunk(currentChunk);
-            currentChunk = null;
-        }
+        try {
 
-        if (pendingChunks.isEmpty())
-            subscriber.onComplete();
-        else
-            gotComplete = true;
+            if (currentChunk != null) {
+                sendChunk(currentChunk);
+                currentChunk = null;
+            }
+
+            if (pendingChunks.isEmpty())
+                subscriber.onComplete();
+            else
+                gotComplete = true;
+        }
+        catch (Exception e) {
+            throw new ETracInternal(e.getMessage(), e);  // todo
+        }
     }
 
     protected final void onError(Throwable error) {
@@ -312,6 +318,16 @@ public abstract class CommonFileReader implements Flow.Publisher<ArrowBuf> {
         }
         finally {
             releasePendingChunks();
+        }
+    }
+
+    private void askForMore() {
+
+        if (pendingChunks.size() < chunkBufferTarget) {
+            if (clientRequested - clientReceived < clientBufferTarget) {
+                clientRequested += clientBufferTarget;
+                clientRequest(clientBufferTarget);
+            }
         }
     }
 
