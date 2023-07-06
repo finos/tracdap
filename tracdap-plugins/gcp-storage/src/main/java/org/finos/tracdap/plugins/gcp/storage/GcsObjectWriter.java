@@ -124,8 +124,15 @@ public class GcsObjectWriter implements Flow.Subscriber<ArrowBuf> {
     public void onError(Throwable throwable) {
 
         if (upstreamError == null) {
+
             upstreamError = throwable;
-            apiStream.onError(throwable);
+
+            // onError() can be called before onSubscribe() if there was a problem during subscription
+
+            if (apiStream != null)
+                apiStream.onError(throwable);
+            else
+                signal.completeExceptionally(throwable);
         }
         else {
 
