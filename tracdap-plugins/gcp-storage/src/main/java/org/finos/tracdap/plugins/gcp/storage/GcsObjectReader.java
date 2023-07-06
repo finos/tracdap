@@ -30,6 +30,8 @@ import io.grpc.CallOptions;
 public class GcsObjectReader extends CommonFileReader {
 
     private static final long DEFAULT_CHUNK_SIZE = 2 * 1048576;  // 2 MB
+    private static final int DEFAULT_CHUNK_BUFFER = 2;
+    private static final int DEFAULT_CLIENT_BUFFER = 2;
 
     private final StorageClient storageClient;
     private final IDataContext dataContext;
@@ -47,9 +49,11 @@ public class GcsObjectReader extends CommonFileReader {
 
     GcsObjectReader(
             StorageClient storageClient, IDataContext dataContext, StorageErrors errors,
-            String storagePath, BucketName bucketName, String objectKey, long offset, long limit) {
+            String storagePath, BucketName bucketName, String objectKey, long offset, long limit,
+            long chunkSize, int chunkBuffer, int clientBuffer) {
 
-        super(dataContext, errors, null, storagePath, DEFAULT_CHUNK_SIZE, 2, 32);  // TODO
+        super(dataContext, errors, null, storagePath,
+                chunkSize, chunkBuffer, clientBuffer);
 
         this.storageClient = storageClient;
         this.dataContext = dataContext;
@@ -60,6 +64,25 @@ public class GcsObjectReader extends CommonFileReader {
         this.objectKey = objectKey;
         this.offset = offset;
         this.limit = limit;
+    }
+
+    GcsObjectReader(
+            StorageClient storageClient, IDataContext dataContext, StorageErrors errors,
+            String storagePath, BucketName bucketName, String objectKey, long offset, long limit,
+            long chunkSize) {
+
+        this(storageClient, dataContext, errors,
+                storagePath, bucketName, objectKey, offset, limit,
+                chunkSize, DEFAULT_CHUNK_BUFFER, DEFAULT_CLIENT_BUFFER);
+    }
+
+    GcsObjectReader(
+            StorageClient storageClient, IDataContext dataContext, StorageErrors errors,
+            String storagePath, BucketName bucketName, String objectKey, long offset, long limit) {
+
+        this(storageClient, dataContext, errors,
+                storagePath, bucketName, objectKey, offset, limit,
+                DEFAULT_CHUNK_SIZE);
     }
 
     GcsObjectReader(

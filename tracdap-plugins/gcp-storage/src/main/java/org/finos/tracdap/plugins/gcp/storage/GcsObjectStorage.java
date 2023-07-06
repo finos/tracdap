@@ -16,6 +16,7 @@
 
 package org.finos.tracdap.plugins.gcp.storage;
 
+import org.finos.tracdap.common.async.Flows;
 import org.finos.tracdap.common.data.IExecutionContext;
 import org.finos.tracdap.common.data.IDataContext;
 import org.finos.tracdap.common.exception.EStartup;
@@ -46,6 +47,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.*;
+
+import static org.finos.tracdap.common.storage.StorageErrors.ExplicitError.IO_ERROR;
+import static org.finos.tracdap.common.storage.StorageErrors.ExplicitError.OBJECT_SIZE_TOO_SMALL;
 
 
 public class GcsObjectStorage extends CommonFileStorage {
@@ -438,7 +442,41 @@ public class GcsObjectStorage extends CommonFileStorage {
 
     @Override
     protected CompletionStage<ArrowBuf> fsReadChunk(String objectKey, long offset, int size, IDataContext ctx) {
-        return null;
+
+        var absoluteKey = usePrefix(objectKey);
+
+        var readStream = new GcsObjectReader(
+                storageClient, ctx, errors,
+                objectKey,
+                bucketName, absoluteKey,
+                offset, size,
+                /* chunkSize = */ size);
+
+        // TODO: This is common logic that could be moved into CommonFileStorage
+        // The abstract API should include a method to request a read stream for a range
+
+        var list = new ArrayList<ArrowBuf>(1);
+        var collect = Flows.fold(readStream, (xs, x) -> { xs.add(x); return xs; }, list);
+
+        return collect.thenApply(xs -> {
+
+            // Should never happen, since chunk size = request size is set for the object reader
+            if (xs.size() != 1)
+                throw new EUnexpected();
+
+            var chunk = xs.get(0);
+
+            // On GCP the read call uses offset and limit, it may return fewer bytes than requested
+            if (chunk.readableBytes() < size)
+                throw errors.explicitError(READ_OPERATION, objectKey, OBJECT_SIZE_TOO_SMALL);
+
+            return chunk;
+
+        }).exceptionally(e -> {
+
+            list.forEach(ArrowBuf::close);
+            throw e instanceof CompletionException ? (CompletionException) e : new CompletionException(e);
+        });
     }
 
     @Override
