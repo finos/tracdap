@@ -20,17 +20,21 @@ import org.finos.tracdap.common.async.Flows;
 import org.finos.tracdap.common.data.IExecutionContext;
 import org.finos.tracdap.common.data.IDataContext;
 import org.finos.tracdap.common.exception.EStartup;
+import org.finos.tracdap.common.exception.EStorageRequest;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.storage.CommonFileStorage;
 import org.finos.tracdap.common.storage.FileStat;
 import org.finos.tracdap.common.storage.FileType;
-import org.finos.tracdap.common.storage.StorageErrors;
 
 import com.google.api.gax.grpc.GrpcCallContext;
 import com.google.api.gax.grpc.InstantiatingGrpcChannelProvider;
 import com.google.api.gax.rpc.*;
 import com.google.storage.v2.*;
 import com.google.storage.v2.Object;
+
+// Legacy GCP API
+import com.google.cloud.BatchResult;
+import com.google.cloud.storage.*;
 
 import io.grpc.ManagedChannelBuilder;
 import io.grpc.StatusRuntimeException;
@@ -48,8 +52,8 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.*;
 
-import static org.finos.tracdap.common.storage.StorageErrors.ExplicitError.IO_ERROR;
 import static org.finos.tracdap.common.storage.StorageErrors.ExplicitError.OBJECT_SIZE_TOO_SMALL;
+import static org.finos.tracdap.common.storage.StorageErrors.ExplicitError.UNKNOWN_ERROR;
 
 
 public class GcsObjectStorage extends CommonFileStorage {
@@ -64,6 +68,7 @@ public class GcsObjectStorage extends CommonFileStorage {
     private final String prefix;
 
     private StorageClient storageClient;
+    private Storage legacyClient;
     private BucketName bucketName;
 
 
@@ -114,6 +119,8 @@ public class GcsObjectStorage extends CommonFileStorage {
                     .build();
 
             storageClient = StorageClient.create(settings);
+
+            legacyClient = StorageOptions.http().build().getService();
 
             var request = ListObjectsRequest.newBuilder()
                     .setParent(bucketName.toString())
@@ -403,7 +410,7 @@ public class GcsObjectStorage extends CommonFileStorage {
         }
 
         if (!result.hasResource())
-            throw errors.explicitError("MKDIR", storagePath, StorageErrors.ExplicitError.UNKNOWN_ERROR, "Directory was not created");
+            throw errors.explicitError("MKDIR", storagePath, UNKNOWN_ERROR, "Directory was not created");
 
         return null;
     }
@@ -437,7 +444,82 @@ public class GcsObjectStorage extends CommonFileStorage {
     @Override
     protected CompletionStage<Void> fsDeleteDir(String directoryKey, IExecutionContext ctx) {
 
-        return null;
+        var absolutePrefix = usePrefix(directoryKey);
+
+        log.info("Delete dir prefix = [{}]", absolutePrefix);
+
+        var request = ListObjectsRequest.newBuilder()
+                .setParent(bucketName.toString())
+                .setPrefix(absolutePrefix);
+
+//        if (startAfter != null)
+//            request.setLexicographicStart(startAfter);
+//
+//        if (maxKeys > 0)
+//            request.setPageSize(maxKeys + 1);
+
+        var listCall = storageClient.listObjectsCallable();
+
+        var listResponse = GcpUtils.unaryCall(listCall, request.build(), ctx.eventLoopExecutor());
+
+        return listResponse.thenCompose(this::fsDeleteDirBatch);
+    }
+
+    private CompletionStage<Void> fsDeleteDirBatch(ListObjectsResponse listing) {
+
+        // Directory not found
+        if (listing.getObjectsCount() == 0)
+            return CompletableFuture.completedFuture(null);
+
+        var batch = legacyClient.batch();
+        var results = new ArrayList<StorageBatchResult<Boolean>>(listing.getObjectsCount());
+
+        for (var object : listing.getObjectsList()) {
+
+            var result = batch.delete(bucketName.getBucket(), object.getName());
+            results.add(result);
+        }
+
+        var callback = new CompletableFuture<List<StorageBatchResult<Boolean>>>();
+
+        results.get(0).notify(new BatchResult.Callback<>() {
+
+            @Override
+            public void success(Boolean result) {
+                callback.complete(results);
+            }
+
+            @Override
+            public void error(StorageException exception) {
+                callback.completeExceptionally(exception);
+            }
+        });
+
+        batch.submit();
+
+        return callback.thenCompose(this::fsDeleteDirCallback);
+    }
+
+    private CompletionStage<Void> fsDeleteDirCallback(List<StorageBatchResult<Boolean>> results) {
+
+        var failures = 0;
+
+        try {
+
+            for (var result : results) {
+                if (!result.get())
+                    failures += 1;
+            }
+
+            if (failures > 0)
+                throw new EStorageRequest(String.format("RMDIR failed, [%d] object(s) were left undeleted", failures));
+
+            return CompletableFuture.completedFuture(null);
+        }
+        catch (Throwable e) {
+
+            return CompletableFuture.failedFuture(e);
+        }
     }
 
     @Override
@@ -464,7 +546,7 @@ public class GcsObjectStorage extends CommonFileStorage {
             if (xs.size() != 1)
                 throw new EUnexpected();
 
-            var chunk = xs.get(0);
+            var chunk = (ArrowBuf) xs.get(0);
 
             // On GCP the read call uses offset and limit, it may return fewer bytes than requested
             if (chunk.readableBytes() < size)
