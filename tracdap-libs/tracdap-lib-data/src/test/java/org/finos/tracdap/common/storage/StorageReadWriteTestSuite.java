@@ -167,8 +167,9 @@ public abstract class StorageReadWriteTestSuite {
 
         waitFor(Duration.ofHours(1), writeSignal);
 
-        // Make sure the write operation did not report an error before trying to read
-        Assertions.assertDoesNotThrow(() -> getResultOf(writeSignal));
+        // Make sure the write operation completed successfully and reports the correct size
+        var expectedSize = originalBytes.stream().mapToInt(bytes -> bytes.length).sum();
+        Assertions.assertEquals(expectedSize, getResultOf(writeSignal));
 
         var reader = storage.reader(storagePath, dataContext);
         var readResult = Flows.fold(
