@@ -174,9 +174,10 @@ public class GcsObjectWriter implements Flow.Subscriber<ArrowBuf> {
             return;
         }
 
-        long size = result.getPersistedSize();
+        // result.getPersistedSize() only contains a value if the operation is not finalized
+        // This is normally zero, so, use bytesSent, which counted as chunks were dispatched
 
-        signal.complete(size);
+        signal.complete(bytesSent);
     }
 
     private <TRequest, TResponse>
