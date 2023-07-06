@@ -16,16 +16,18 @@
 
 package org.finos.tracdap.plugins.gcp.storage;
 
+import org.finos.tracdap.common.data.IDataContext;
+
 import com.google.api.gax.grpc.GrpcCallContext;
 import com.google.api.gax.rpc.ApiStreamObserver;
+import com.google.api.gax.rpc.CancelledException;
 import com.google.api.gax.rpc.ClientStreamingCallable;
 import com.google.protobuf.ByteString;
-import com.google.protobuf.UnsafeByteOperations;
 import com.google.storage.v2.*;
 import com.google.storage.v2.Object;
 import io.grpc.CallOptions;
+
 import org.apache.arrow.memory.ArrowBuf;
-import org.finos.tracdap.common.data.IDataContext;
 
 import java.util.List;
 import java.util.Map;
@@ -43,6 +45,8 @@ public class GcsObjectWriter implements Flow.Subscriber<ArrowBuf> {
     private Flow.Subscription subscription;
     private ApiStreamObserver<WriteObjectRequest> apiStream;
     private long bytesSent;
+
+    private Throwable upstreamError;
 
     GcsObjectWriter(
             StorageClient storageClient, IDataContext dataContext,
@@ -83,32 +87,50 @@ public class GcsObjectWriter implements Flow.Subscriber<ArrowBuf> {
     @Override
     public void onNext(ArrowBuf item) {
 
-        System.out.println("Sending next");
+        try (item) {
 
-        var protoBytes = ByteString.copyFrom(item.nioBuffer());  // UnsafeByteOperations.unsafeWrap(item.nioBuffer());
+            System.out.println("Sending next");
 
-        var data = ChecksummedData.newBuilder()
-                .setContent(protoBytes);
+            var MAX_CHUNK_SIZE = 2 * 1048576;  // 2 MB
 
-        var request = WriteObjectRequest.newBuilder()
-                .setWriteObjectSpec(objectSpec)
-                .setChecksummedData(data)
-                .setWriteOffset(bytesSent)
-                .build();
+            var buffer = item.nioBuffer();
 
-        bytesSent += protoBytes.size();
+            while (buffer.remaining() > 0) {
 
-        apiStream.onNext(request);
+                var chunkSize = Math.min(buffer.remaining(), MAX_CHUNK_SIZE);
+                var protoBytes = ByteString.copyFrom(buffer, chunkSize);
 
-        subscription.request(1);
+                var data = ChecksummedData.newBuilder()
+                        .setContent(protoBytes);
 
-        System.out.println("Sent next, bytes = " + bytesSent);
+                var request = WriteObjectRequest.newBuilder()
+                        .setWriteObjectSpec(objectSpec)
+                        .setChecksummedData(data)
+                        .setWriteOffset(bytesSent)
+                        .build();
+
+                bytesSent += protoBytes.size();
+
+                apiStream.onNext(request);
+            }
+
+            subscription.request(1);
+
+            System.out.println("Sent next, bytes = " + bytesSent);
+        }
     }
 
     @Override
     public void onError(Throwable throwable) {
 
-        apiStream.onError(throwable);
+        if (upstreamError == null) {
+            upstreamError = throwable;
+            apiStream.onError(throwable);
+        }
+        else {
+
+            // todo: log warning for any subsequent errors
+        }
     }
 
     @Override
@@ -133,7 +155,15 @@ public class GcsObjectWriter implements Flow.Subscriber<ArrowBuf> {
         System.out.println("In the callback");
 
         if (error != null) {
-            signal.completeExceptionally(error);
+
+            // If the error is a cancellation due to an up-stream error,
+            // Then the client will want the original error instead of the cancellation signal
+
+            if (error instanceof CancelledException && upstreamError != null)
+                signal.completeExceptionally(upstreamError);
+            else
+                signal.completeExceptionally(error);
+
             return;
         }
 
