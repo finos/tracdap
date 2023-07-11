@@ -27,7 +27,7 @@
   },
   "devDependencies": {
     "protobufjs-cli": "~1.1.1",
-    "license-checker-rseidelsohn": "^4.2.6",
+    "license-checker-rseidelsohn": "^3.3.0",
     "owasp-dependency-check": "0.0.21",
     "node-fetch": "^3.3.1"
   },
