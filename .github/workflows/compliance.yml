@@ -58,7 +58,7 @@ jobs:
           key: compliance-cache-data
           path: ./build/compliance-cache
 
-      - name: OWASP dependency checkout
+      - name: OWASP dependency check
         run: ./gradlew dependencyCheckAggregate
 
       - name: License check
