@@ -32,18 +32,21 @@ dependencies {
     api project(':tracdap-lib-data')
 
     implementation platform(group: 'com.google.cloud', name: 'libraries-bom', version: "$gcp_bom_version")
-    implementation ("com.google.cloud:google-cloud-storage") { exclude group: "io.grpc", module: "grpc-netty-shaded" }
-    implementation ("com.google.cloud:google-cloud-resourcemanager") { exclude group: "io.grpc", module: "grpc-netty-shaded" }
-    implementation "io.grpc:grpc-netty"
+    implementation "com.google.cloud:google-cloud-storage"
+    implementation "com.google.cloud:google-cloud-resourcemanager"
 
     testImplementation project(path: ':tracdap-lib-data', configuration: 'testSuite')
 }
 
-configurations { main }
-configurations.main.resolutionStrategy.dependencySubstitution {
+configurations.configureEach {
+    resolutionStrategy.dependencySubstitution {
 
-    // Substitute one module dependency for another
-    substitute module("io.grpc:grpc-netty-shaded:${grpc_version}") using module("io.grpc:grpc-netty:${grpc_version}")
+        // GCP SDK defaults to using grpc-netty-shaded, but TRAC already uses the full Netty stack
+        substitute module("io.grpc:grpc-netty-shaded") using module("io.grpc:grpc-netty:${grpc_version}")
+
+        // Do not pull in the JavaX annotations library for licensing reasons
+        substitute module("javax.annotation:javax.annotation-api") using project(":tracdap-lib-annotations")
+    }
 }
 
 
