@@ -93,7 +93,6 @@ public class LocalJobCache<TValue> implements IJobCache<TValue> {
 
             var newEntry = priorEntry.clone();
             newEntry.ticket = ticket;
-            newEntry.revision += 1;
 
             return newEntry;
         });
