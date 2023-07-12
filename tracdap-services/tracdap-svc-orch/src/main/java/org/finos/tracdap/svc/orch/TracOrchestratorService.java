@@ -20,6 +20,7 @@ import org.finos.tracdap.api.TrustedMetadataApiGrpc;
 import org.finos.tracdap.common.auth.internal.InternalAuthProvider;
 import org.finos.tracdap.common.auth.internal.JwtSetup;
 import org.finos.tracdap.common.auth.internal.InternalAuthValidator;
+import org.finos.tracdap.common.cache.IJobCache;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.common.grpc.*;
@@ -70,6 +71,7 @@ public class TracOrchestratorService extends CommonServiceBase {
     private ManagedChannel clientChannel;
 
     private IBatchExecutor<?> jobExecutor;
+    private IJobCache<JobState> jobCache;
     private JobManager jobManager;
 
     public TracOrchestratorService(PluginManager pluginManager, ConfigManager configManager) {
@@ -120,7 +122,12 @@ public class TracOrchestratorService extends CommonServiceBase {
                     platformConfig.getExecutor(),
                     configManager);
 
-            var jobCache = new LocalJobCache<JobState>();
+            // TODO: Type safety on ticket type
+
+            jobCache = (IJobCache<JobState>) pluginManager.createService(
+                    IJobCache.class,
+                    platformConfig.getJobCache(),
+                    configManager);
 
             var jobProcessorHelpers = new JobProcessorHelpers(platformConfig, metaClient);
             var jobProcessor = new JobProcessor(metaClient, internalAuth, jobExecutor, jobProcessorHelpers);

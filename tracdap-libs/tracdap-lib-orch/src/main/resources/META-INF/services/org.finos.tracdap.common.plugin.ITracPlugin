@@ -12,5 +12,5 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Core data plugin supplies core formats and local file storage
-org.finos.tracdap.common.exec.local.LocalExecutorPlugin
+# Core orchestrator plugin supplies local + jdbc job cache and local execution
+org.finos.tracdap.common.orch.CoreOrchestratorPlugin
