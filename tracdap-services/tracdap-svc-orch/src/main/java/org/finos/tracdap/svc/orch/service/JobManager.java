@@ -344,7 +344,7 @@ public class JobManager {
 
     private JobOperation getNextOperation(CacheEntry<JobState> cacheEntry) {
 
-        return getNextOperation(cacheEntry.key(), cacheEntry.revision(), cacheEntry.getStatus());
+        return getNextOperation(cacheEntry.key(), cacheEntry.revision(), cacheEntry.status());
     }
 
     private JobOperation getNextOperation(String key, int revision, String cacheStatus) {
@@ -454,10 +454,10 @@ public class JobManager {
         var operation = new JobOperation();
         operation.jobKey = cacheEntry.key();
         operation.revision = cacheEntry.revision();
-        operation.cacheStatus = cacheEntry.getStatus();
+        operation.cacheStatus = cacheEntry.status();
         operation.timeout = cacheTicketDuration;
 
-        if (STATUS_FOR_RUNNING_JOBS.contains(cacheEntry.getStatus())) {
+        if (STATUS_FOR_RUNNING_JOBS.contains(cacheEntry.status())) {
 
             operation.operationName = "record_job_status";
             operation.operation = state -> processor.recordJobStatus(state, pollResult);
@@ -468,7 +468,7 @@ public class JobManager {
 
             log.error(
                     "Internal job state error, key = [{}], revision = [{}], cache state = [{}]",
-                    cacheEntry.key(), cacheEntry.revision(), cacheEntry.getStatus());
+                    cacheEntry.key(), cacheEntry.revision(), cacheEntry.status());
 
             var message = "Internal job state error";
             var error = new ETracInternal(message);

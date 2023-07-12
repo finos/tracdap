@@ -39,7 +39,7 @@ public class CacheEntry<TValue> {
         return revision;
     }
 
-    public String getStatus() {
+    public String status() {
         return status;
     }
 
