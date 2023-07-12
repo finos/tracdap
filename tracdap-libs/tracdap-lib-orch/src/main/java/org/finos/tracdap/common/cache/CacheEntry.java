@@ -17,14 +17,14 @@
 package org.finos.tracdap.common.cache;
 
 
-public class CacheQueryResult<TValue> {
+public class CacheEntry<TValue> {
 
     private final String key;
     private final int revision;
     private final String status;
     private final TValue value;
 
-    public CacheQueryResult(String key, int revision, String status, TValue value) {
+    public CacheEntry(String key, int revision, String status, TValue value) {
         this.key = key;
         this.revision = revision;
         this.status = status;

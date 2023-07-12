@@ -16,7 +16,7 @@
 
 package org.finos.tracdap.common.cache.local;
 
-import org.finos.tracdap.common.cache.CacheQueryResult;
+import org.finos.tracdap.common.cache.CacheEntry;
 import org.finos.tracdap.common.cache.IJobCache;
 import org.finos.tracdap.common.cache.Ticket;
 import org.finos.tracdap.common.exception.ECacheNotFound;
@@ -202,7 +202,7 @@ public class LocalJobCache<TValue> implements IJobCache<TValue> {
     }
 
     @Override
-    public CacheQueryResult<TValue> getEntry(Ticket ticket) {
+    public CacheEntry<TValue> getEntry(Ticket ticket) {
 
         var entry = _cache.get(ticket.key());
 
@@ -218,11 +218,11 @@ public class LocalJobCache<TValue> implements IJobCache<TValue> {
             throw new ECacheTicket(message);
         }
 
-        return new CacheQueryResult<>(ticket.key(), entry.revision, entry.stateKey, entry.value);
+        return new CacheEntry<>(ticket.key(), entry.revision, entry.stateKey, entry.value);
     }
 
     @Override
-    public CacheQueryResult<TValue> getEntry(String key, int revision) {
+    public CacheEntry<TValue> getEntry(String key, int revision) {
 
         var entry = _cache.get(key);
 
@@ -238,11 +238,11 @@ public class LocalJobCache<TValue> implements IJobCache<TValue> {
             throw new ECacheTicket(message);
         }
 
-        return new CacheQueryResult<>(key, entry.revision, entry.stateKey, entry.value);
+        return new CacheEntry<>(key, entry.revision, entry.stateKey, entry.value);
     }
 
     @Override
-    public CacheQueryResult<TValue> getLatestEntry(String key) {
+    public CacheEntry<TValue> getLatestEntry(String key) {
 
         var entry = _cache.get(key);
 
@@ -252,21 +252,21 @@ public class LocalJobCache<TValue> implements IJobCache<TValue> {
             throw new ECacheNotFound(message);
         }
 
-        return new CacheQueryResult<>(key, entry.revision, entry.stateKey, entry.value);
+        return new CacheEntry<>(key, entry.revision, entry.stateKey, entry.value);
     }
 
     @Override
-    public List<CacheQueryResult<TValue>> queryState(List<String> states) {
+    public List<CacheEntry<TValue>> queryState(List<String> states) {
 
         return queryState(states, false);
     }
 
     @Override
-    public List<CacheQueryResult<TValue>> queryState(List<String> states, boolean includeOpenTickets) {
+    public List<CacheEntry<TValue>> queryState(List<String> states, boolean includeOpenTickets) {
 
         var queryTime = Instant.now();
 
-        var results = new ArrayList<CacheQueryResult<TValue>>();
+        var results = new ArrayList<CacheEntry<TValue>>();
 
         _cache.forEach((_key, _entry) -> {
 
@@ -277,7 +277,7 @@ public class LocalJobCache<TValue> implements IJobCache<TValue> {
                 if (!includeOpenTickets)
                     return;
 
-            var result = new CacheQueryResult<>(_key, _entry.revision, _entry.stateKey, _entry.value);
+            var result = new CacheEntry<>(_key, _entry.revision, _entry.stateKey, _entry.value);
             results.add(result);
         });
 

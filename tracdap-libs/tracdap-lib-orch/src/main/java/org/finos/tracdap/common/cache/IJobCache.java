@@ -32,10 +32,10 @@ public interface IJobCache<TValue> {
     int updateEntry(Ticket ticket, String status, TValue value);
     void removeEntry(Ticket ticket);
 
-    CacheQueryResult<TValue> getEntry(Ticket ticket);
-    CacheQueryResult<TValue> getEntry(String key, int revision);
-    CacheQueryResult<TValue> getLatestEntry(String key);
+    CacheEntry<TValue> getEntry(Ticket ticket);
+    CacheEntry<TValue> getEntry(String key, int revision);
+    CacheEntry<TValue> getLatestEntry(String key);
 
-    List<CacheQueryResult<TValue>> queryState(List<String> states);
-    List<CacheQueryResult<TValue>> queryState(List<String> states, boolean includeOpenTickets);
+    List<CacheEntry<TValue>> queryState(List<String> states);
+    List<CacheEntry<TValue>> queryState(List<String> states, boolean includeOpenTickets);
 }

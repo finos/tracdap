@@ -20,7 +20,7 @@ import io.grpc.Status;
 import io.grpc.StatusException;
 import io.grpc.StatusRuntimeException;
 import org.finos.tracdap.common.exception.*;
-import org.finos.tracdap.common.cache.CacheQueryResult;
+import org.finos.tracdap.common.cache.CacheEntry;
 import org.finos.tracdap.common.cache.IJobCache;
 import org.finos.tracdap.common.exec.ExecutorJobInfo;
 import org.finos.tracdap.common.metadata.MetadataUtil;
@@ -342,7 +342,7 @@ public class JobManager {
     // The polling loop will only request the next operation when the job is ready to be updated
     // E.g. when a launch slot is available, or the polling result changes
 
-    private JobOperation getNextOperation(CacheQueryResult<JobState> cacheEntry) {
+    private JobOperation getNextOperation(CacheEntry<JobState> cacheEntry) {
 
         return getNextOperation(cacheEntry.key(), cacheEntry.revision(), cacheEntry.getStatus());
     }
@@ -449,7 +449,7 @@ public class JobManager {
         return operation;
     }
 
-    private JobOperation getNextOperation(CacheQueryResult<JobState> cacheEntry, ExecutorJobInfo pollResult) {
+    private JobOperation getNextOperation(CacheEntry<JobState> cacheEntry, ExecutorJobInfo pollResult) {
 
         var operation = new JobOperation();
         operation.jobKey = cacheEntry.key();
