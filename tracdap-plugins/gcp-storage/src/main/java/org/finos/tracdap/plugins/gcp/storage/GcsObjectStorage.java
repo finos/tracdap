@@ -90,25 +90,10 @@ public class GcsObjectStorage extends CommonFileStorage {
 
         try {
 
-            String projectId = this.project;
+            bucketName = BucketName.of(project, bucket);
 
-            bucketName = BucketName.of(projectId, bucket);
-
-//            try (var projects = ProjectsClient.create()){
-//
-//                log.info("LOOKUP PROJECT [{}]", project);
-//
-//                var request = GetProjectRequest.newBuilder()
-//                        .setName(ProjectName.of(project).toString())Hey
-//                        .build();
-//
-//                var projectInfo = projects.getProject(request);
-//                projectId = projectInfo.getProjectId();
-//            }
-
-
-
-            log.info("INIT [{}], fs = [GCS], bucket = [{}], prefix = [{}]", storageKey, bucket, prefix);
+            log.info("INIT [{}], fs = [GCS], project=[{}], bucket = [{}], prefix = [{}]",
+                    storageKey, project, bucket, prefix);
 
             var transportProvider = InstantiatingGrpcChannelProvider.newBuilder()
                     .setChannelConfigurator(cb -> configureChannel(cb, eventLoopGroup))
