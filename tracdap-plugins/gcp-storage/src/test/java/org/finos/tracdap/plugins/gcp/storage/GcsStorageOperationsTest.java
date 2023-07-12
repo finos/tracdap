@@ -40,6 +40,7 @@ import static org.finos.tracdap.test.concurrent.ConcurrentTestHelpers.waitFor;
 
 @Tag("integration")
 @Tag("int-storage")
+@Tag("gcp-platform")
 public class GcsStorageOperationsTest extends StorageOperationsTestSuite {
 
     static Duration SETUP_TIMEOUT = Duration.of(5, ChronoUnit.SECONDS);

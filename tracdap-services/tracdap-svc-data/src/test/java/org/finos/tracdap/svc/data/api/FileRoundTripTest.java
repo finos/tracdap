@@ -95,6 +95,7 @@ abstract class FileRoundTripTest  {
     // Include this test case for integration against different storage backends
     @Tag("integration")
     @Tag("int-storage")
+    @Tag("all-platforms")
     static class IntegrationTest extends FileRoundTripTest {
 
         // Slow unit tests count as integration, so fall back to using the unit test config

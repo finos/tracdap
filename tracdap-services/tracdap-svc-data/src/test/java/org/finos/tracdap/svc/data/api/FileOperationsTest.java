@@ -97,6 +97,7 @@ abstract class FileOperationsTest {
     // Include this test case for integration against different storage backends
     @Tag("integration")
     @Tag("int-storage")
+    @Tag("all-platforms")
     static class IntegrationTest extends FileOperationsTest {
 
         private static final String TRAC_CONFIG_ENV_FILE = System.getenv(TRAC_CONFIG_ENV_VAR);
