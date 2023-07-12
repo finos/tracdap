@@ -29,15 +29,17 @@ public class GcsStorageEnvProps {
 
     public static Properties readStorageEnvProps() {
 
-        var region = System.getenv(TRAC_GCP_REGION);
         var project = System.getenv(TRAC_GCP_PROJECT);
         var bucket = System.getenv(TRAC_GCP_BUCKET);
+        var region = System.getenv(TRAC_GCP_REGION);
 
         var storageProps = new Properties();
         storageProps.put(IStorageManager.PROP_STORAGE_KEY, "TEST_STORAGE");
-        storageProps.put(GcsObjectStorage.REGION_PROPERTY, region);
         storageProps.put(GcsObjectStorage.PROJECT_PROPERTY, project);
         storageProps.put(GcsObjectStorage.BUCKET_PROPERTY, bucket);
+
+        if (region != null)
+            storageProps.put(GcsObjectStorage.REGION_PROPERTY, region);
 
         return storageProps;
     }
