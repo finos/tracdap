@@ -204,7 +204,7 @@ public class JobManager {
 
     public JobState queryJob(String jobKey) {
 
-        var cacheEntry = cache.getLatestEntry(jobKey);
+        var cacheEntry = cache.lookupKey(jobKey);
 
         return cacheEntry != null ? cacheEntry.value() : null;
     }

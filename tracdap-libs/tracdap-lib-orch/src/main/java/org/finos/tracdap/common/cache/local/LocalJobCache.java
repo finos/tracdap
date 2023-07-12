@@ -21,9 +21,11 @@ import org.finos.tracdap.common.cache.IJobCache;
 import org.finos.tracdap.common.cache.Ticket;
 import org.finos.tracdap.common.exception.ECacheNotFound;
 import org.finos.tracdap.common.exception.ECacheTicket;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nullable;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -212,47 +214,20 @@ public class LocalJobCache<TValue> implements IJobCache<TValue> {
             throw new ECacheNotFound(message);
         }
 
-        if (entry.ticket != ticket) {
-            var message = String.format("Entry for [%s] does not match the expected ticket", ticket.key());
-            log.error(message);
-            throw new ECacheTicket(message);
-        }
+        checkEntryMatchesTicket(entry, ticket, "get");
 
         return new CacheEntry<>(ticket.key(), entry.revision, entry.stateKey, entry.value);
     }
 
-    @Override
-    public CacheEntry<TValue> getEntry(String key, int revision) {
+    @Override @Nullable
+    public CacheEntry<TValue> lookupKey(String key) {
 
         var entry = _cache.get(key);
 
-        if (entry == null) {
-            var message = String.format("Entry for [%s] is not in the cache", key);
-            log.error(message);
-            throw new ECacheNotFound(message);
-        }
-
-        if (entry.revision != revision) {
-            var message = String.format("Entry for [%s] does not match the expected revision", key);
-            log.error(message);
-            throw new ECacheTicket(message);
-        }
-
-        return new CacheEntry<>(key, entry.revision, entry.stateKey, entry.value);
-    }
-
-    @Override
-    public CacheEntry<TValue> getLatestEntry(String key) {
-
-        var entry = _cache.get(key);
-
-        if (entry == null) {
-            var message = String.format("Entry for [%s] is not in the cache", key);
-            log.error(message);
-            throw new ECacheNotFound(message);
-        }
-
-        return new CacheEntry<>(key, entry.revision, entry.stateKey, entry.value);
+        if (entry == null)
+            return null;
+        else
+            return new CacheEntry<>(key, entry.revision, entry.stateKey, entry.value);
     }
 
     @Override
@@ -315,6 +290,12 @@ public class LocalJobCache<TValue> implements IJobCache<TValue> {
 
         if (entry.ticket != ticket){
             var message = String.format("Cannot %s [%s], another operation is in progress", operation, ticket.key());
+            log.error(message);
+            throw new ECacheTicket(message);
+        }
+
+        if (entry.revision != ticket.revision()) {
+            var message = String.format("Cannot %s [%s], ticket is superseded", operation, ticket.key());
             log.error(message);
             throw new ECacheTicket(message);
         }

@@ -16,6 +16,7 @@
 
 package org.finos.tracdap.common.cache;
 
+import javax.annotation.Nullable;
 import java.time.Duration;
 import java.util.List;
 
@@ -31,10 +32,9 @@ public interface IJobCache<TValue> {
     int addEntry(Ticket ticket, String status, TValue value);
     int updateEntry(Ticket ticket, String status, TValue value);
     void removeEntry(Ticket ticket);
-
     CacheEntry<TValue> getEntry(Ticket ticket);
-    CacheEntry<TValue> getEntry(String key, int revision);
-    CacheEntry<TValue> getLatestEntry(String key);
+
+    @Nullable CacheEntry<TValue> lookupKey(String key);
 
     List<CacheEntry<TValue>> queryState(List<String> states);
     List<CacheEntry<TValue>> queryState(List<String> states, boolean includeOpenTickets);
