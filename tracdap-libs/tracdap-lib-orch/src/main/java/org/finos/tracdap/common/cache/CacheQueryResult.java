@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.svc.orch.cache;
+package org.finos.tracdap.common.cache;
 
 
 public class CacheQueryResult<TValue> {

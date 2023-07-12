@@ -20,13 +20,13 @@ import io.grpc.Status;
 import io.grpc.StatusException;
 import io.grpc.StatusRuntimeException;
 import org.finos.tracdap.common.exception.*;
+import org.finos.tracdap.common.cache.CacheQueryResult;
+import org.finos.tracdap.common.cache.IJobCache;
 import org.finos.tracdap.common.exec.ExecutorJobInfo;
 import org.finos.tracdap.common.metadata.MetadataUtil;
 import org.finos.tracdap.config.PlatformConfig;
 import org.finos.tracdap.config.PluginConfig;
 import org.finos.tracdap.metadata.JobStatusCode;
-import org.finos.tracdap.svc.orch.cache.CacheQueryResult;
-import org.finos.tracdap.svc.orch.cache.IJobCache;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

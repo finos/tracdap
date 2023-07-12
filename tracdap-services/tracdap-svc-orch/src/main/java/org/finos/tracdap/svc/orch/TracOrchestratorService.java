@@ -28,7 +28,7 @@ import org.finos.tracdap.common.service.CommonServiceBase;
 import org.finos.tracdap.config.PlatformConfig;
 import org.finos.tracdap.config.ServiceConfig;
 import org.finos.tracdap.svc.orch.api.TracOrchestratorApi;
-import org.finos.tracdap.svc.orch.cache.local.LocalJobCache;
+import org.finos.tracdap.common.cache.local.LocalJobCache;
 import org.finos.tracdap.common.exec.IBatchExecutor;
 import org.finos.tracdap.svc.orch.service.JobManager;
 import org.finos.tracdap.svc.orch.service.JobProcessor;
