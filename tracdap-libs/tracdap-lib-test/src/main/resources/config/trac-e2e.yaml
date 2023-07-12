@@ -77,6 +77,10 @@ executor:
     pollInterval: 1
 
 
+jobCache:
+  protocol: LOCAL
+
+
 instances:
 
   meta:

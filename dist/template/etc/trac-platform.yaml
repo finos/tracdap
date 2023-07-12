@@ -66,11 +66,16 @@ repositories:
     properties:
       repoUrl: https://github.com/finos/tracdap
 
+
 executor:
   protocol: LOCAL
   properties:
     # Set this to the venv of your local TRAC execution environment
     venvPath: /path/to/venv
+
+
+jobCache:
+  protocol: LOCAL
 
 
 instances:

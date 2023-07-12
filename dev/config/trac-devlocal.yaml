@@ -72,6 +72,10 @@ executor:
     venvPath: C:\Dev\trac\venv
 
 
+jobCache:
+  protocol: LOCAL
+
+
 instances:
 
   meta:
