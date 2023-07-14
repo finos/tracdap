@@ -128,5 +128,119 @@ public abstract class JobCacheTestSuite {
         Assertions.assertNull(removedVEntry);
     }
 
+    @Test
+    void openNewTicket_ok() {
+        Assertions.fail();
+    }
+
+    @Test
+    void openNewTicket_badKey() {
+        Assertions.fail();
+    }
+
+    @Test
+    void openNewTicket_badDuration() {
+        Assertions.fail();
+    }
+
+    @Test
+    void openNewTicket_duplicate() {
+        Assertions.fail();
+    }
+
+    @Test
+    void openNewTicket_durationTooLong() {
+        Assertions.fail();
+    }
+
+    @Test
+    void openNewTicket_entryExists() {
+        Assertions.fail();
+    }
+
+    @Test
+    void openNewTicket_timeoutNoAction() {
+        Assertions.fail();
+    }
+
+    @Test
+    void openNewTicket_timeoutAfterCreate() {
+        Assertions.fail();
+    }
+
+    @Test
+    void openTicket_ok() {
+        Assertions.fail();
+    }
+
+    @Test
+    void openTicket_badKey() {
+        Assertions.fail();
+    }
+
+    @Test
+    void openTicket_badRevision() {
+        Assertions.fail();
+    }
+
+    @Test
+    void openTicket_badDuration() {
+        Assertions.fail();
+    }
+
+    @Test
+    void openTicket_duplicate() {
+        Assertions.fail();
+    }
+
+    @Test
+    void openTicket_durationTooLong() {
+        Assertions.fail();
+    }
+
+    @Test
+    void openTicket_missingEntry() {
+        Assertions.fail();
+    }
+
+    @Test
+    void openTicket_missingRevision() {
+        Assertions.fail();
+    }
+
+    @Test
+    void openTicket_timeoutNoAction() {
+        Assertions.fail();
+    }
+
+    @Test
+    void openTicket_timeoutAfterCreate() {
+        Assertions.fail();
+    }
+
+    @Test
+    void closeTicket_ok() {
+        Assertions.fail();
+    }
+
+    @Test
+    void closeTicket_badTicket() {
+        Assertions.fail();
+    }
+
+    @Test
+    void closeTicket_unknownTicket() {
+        Assertions.fail();
+    }
+
+    @Test
+    void closeTicket_noAction() {
+        Assertions.fail();
+    }
+
+    @Test
+    void closeTicket_afterTimeout() {
+        Assertions.fail();
+    }
 
 }
