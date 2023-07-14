@@ -16,15 +16,17 @@
 
 package org.finos.tracdap.common.cache;
 
-import org.finos.tracdap.common.cache.local.LocalJobCache;
+import org.finos.tracdap.common.exception.ECacheTicket;
 import org.finos.tracdap.metadata.TagHeader;
+
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import java.io.Serializable;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.UUID;
+import java.util.function.BiFunction;
 
 
 public abstract class JobCacheTestSuite {
@@ -45,13 +47,13 @@ public abstract class JobCacheTestSuite {
 
         int revision;
 
-        try (var ticket = cache.openNewTicket(key)) {
+        try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
             revision = cache.addEntry(ticket, status, value);
         }
 
         CacheEntry<DummyState> cacheEntry;
 
-        try (var ticket = cache.openTicket(key, revision)) {
+        try (var ticket = cache.openTicket(key, revision, TICKET_TIMEOUT)) {
             cacheEntry = cache.getEntry(ticket);
         }
 
@@ -60,7 +62,7 @@ public abstract class JobCacheTestSuite {
         Assertions.assertEquals(status, cacheEntry.status());
         Assertions.assertEquals(value, cacheEntry.value());
 
-        try (var ticket = cache.openTicket(key, revision)) {
+        try (var ticket = cache.openTicket(key, revision, TICKET_TIMEOUT)) {
             cache.removeEntry(ticket);
         }
 
@@ -80,7 +82,7 @@ public abstract class JobCacheTestSuite {
 
         int revision;
 
-        try (var ticket = cache.openNewTicket(key)) {
+        try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
             revision = cache.addEntry(ticket, status, value);
         }
 
@@ -88,7 +90,7 @@ public abstract class JobCacheTestSuite {
         int revision2;
         DummyState value2;
 
-        try (var ticket = cache.openTicket(key, revision)) {
+        try (var ticket = cache.openTicket(key, revision, TICKET_TIMEOUT)) {
 
             var cacheEntry = cache.getEntry(ticket);
             var cacheValue = cacheEntry.value();
@@ -101,7 +103,7 @@ public abstract class JobCacheTestSuite {
 
         CacheEntry<DummyState> cacheEntry;
 
-        try (var ticket = cache.openTicket(key, revision2)) {
+        try (var ticket = cache.openTicket(key, revision2, TICKET_TIMEOUT)) {
             cacheEntry = cache.getEntry(ticket);
         }
 
@@ -110,7 +112,7 @@ public abstract class JobCacheTestSuite {
         Assertions.assertEquals(status2, cacheEntry.status());
         Assertions.assertEquals(value2, cacheEntry.value());
 
-        try (var ticket = cache.openTicket(key, revision2)) {
+        try (var ticket = cache.openTicket(key, revision2, TICKET_TIMEOUT)) {
             cache.removeEntry(ticket);
         }
 
@@ -121,42 +123,185 @@ public abstract class JobCacheTestSuite {
 
     @Test
     void openNewTicket_ok() {
-        Assertions.fail();
+
+        var key = newKey();
+        var status = "status1";
+        var value = new DummyState();
+        value.intVar = 42;
+        value.stringVar = "the droids you're looking for";
+
+        int revision;
+
+        // Basic use of openNewTicket
+
+        try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
+
+            Assertions.assertEquals(key, ticket.key());
+            Assertions.assertEquals(0, ticket.revision());
+            Assertions.assertFalse(ticket.missing());
+            Assertions.assertFalse(ticket.superseded());
+            Assertions.assertTrue(ticket.grantTime().isBefore(Instant.now()));
+            Assertions.assertTrue(ticket.expiry().isAfter(Instant.now()));
+
+            revision = cache.addEntry(ticket, status, value);
+        }
+
+        // Check result is as expected
+
+        var entry = cache.lookupKey(key);
+
+        Assertions.assertNotNull(entry);
+        Assertions.assertEquals(key, entry.key());
+        Assertions.assertEquals(revision, entry.revision());
+        Assertions.assertEquals(value, entry.value());
+
+        // First revision should be numbered 1
+        Assertions.assertEquals(1, entry.revision());
     }
 
     @Test
     void openNewTicket_badKey() {
-        Assertions.fail();
+
+        Assertions.assertThrows(IllegalArgumentException.class, () -> failToOpen(cache::openNewTicket, null, TICKET_TIMEOUT));
+        Assertions.assertThrows(IllegalArgumentException.class, () -> failToOpen(cache::openNewTicket, "", TICKET_TIMEOUT));
+        Assertions.assertThrows(IllegalArgumentException.class, () -> failToOpen(cache::openNewTicket, "_reserved", TICKET_TIMEOUT));
+        Assertions.assertThrows(IllegalArgumentException.class, () -> failToOpen(cache::openNewTicket, "_trac_reserved", TICKET_TIMEOUT));
+        Assertions.assertThrows(IllegalArgumentException.class, () -> failToOpen(cache::openNewTicket, "$%#3&--!", TICKET_TIMEOUT));
+        Assertions.assertThrows(IllegalArgumentException.class, () -> failToOpen(cache::openNewTicket, "你好", TICKET_TIMEOUT));
     }
 
     @Test
     void openNewTicket_badDuration() {
-        Assertions.fail();
+
+        Assertions.assertThrows(IllegalArgumentException.class, () -> failToOpen(cache::openNewTicket, newKey(), null));
+        Assertions.assertThrows(IllegalArgumentException.class, () -> failToOpen(cache::openNewTicket, newKey(), Duration.ZERO));
+        Assertions.assertThrows(IllegalArgumentException.class, () -> failToOpen(cache::openNewTicket, newKey(), Duration.ofSeconds(-1)));
+        Assertions.assertThrows(IllegalArgumentException.class, () -> failToOpen(cache::openNewTicket, newKey(), Duration.ofNanos(-1)));
     }
 
     @Test
     void openNewTicket_duplicate() {
-        Assertions.fail();
+
+        var key = newKey();
+
+        try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
+
+            Assertions.assertThrows(ECacheTicket.class, () -> failToOpen(cache::openNewTicket, key, TICKET_TIMEOUT));
+            Assertions.assertThrows(ECacheTicket.class, () -> failToOpen(cache::openTicket, key, ticket.revision(), TICKET_TIMEOUT));
+        }
     }
 
     @Test
     void openNewTicket_durationTooLong() {
-        Assertions.fail();
+
+        // One day ticket duration should exceed the max grant
+
+        Assertions.assertThrows(ECacheTicket.class, () -> failToOpen(cache::openNewTicket, newKey(), Duration.ofDays(1)));
     }
 
     @Test
     void openNewTicket_entryExists() {
-        Assertions.fail();
+
+        var key = newKey();
+        var status = "status1";
+        var value = new DummyState();
+        value.intVar = 42;
+        value.stringVar = "the droids you're looking for";
+
+        try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
+            cache.addEntry(ticket, status, value);
+        }
+
+        // Check entry was created
+
+        var entry = cache.lookupKey(key);
+        Assertions.assertNotNull(entry);
+
+        // Opening a new ticket for an existing key should create a superseded ticket
+        // Trying to use a superseded ticket should result in ECacheTicket
+
+        try (var ticket2 = cache.openNewTicket(key, TICKET_TIMEOUT)) {
+            Assertions.assertTrue(ticket2.superseded());
+            Assertions.assertThrows(ECacheTicket.class, () -> cache.addEntry(ticket2, status, value));
+            Assertions.assertThrows(ECacheTicket.class, () -> cache.removeEntry(ticket2));
+        }
     }
 
     @Test
-    void openNewTicket_timeoutNoAction() {
-        Assertions.fail();
+    @SuppressWarnings("resource")
+    void openNewTicket_timeoutNoAction() throws Exception {
+
+        var key = newKey();
+        var status = "status1";
+        var value = new DummyState();
+        value.intVar = 42;
+        value.stringVar = "the droids you're looking for";
+
+        // Open a ticket and do nothing with it
+        // It should expire even if it is not explicitly closed
+
+        var ticket1 = cache.openNewTicket(key, Duration.ofMillis(50));
+        Thread.sleep(100);
+        Assertions.assertTrue(ticket1.expiry().isBefore(Instant.now()));
+
+        // The entry was not created, so getting a regular ticket should not be possible
+
+        try (var ticket2 = cache.openTicket(key, 1, TICKET_TIMEOUT)) {
+            Assertions.assertTrue(ticket2.missing());
+            Assertions.assertFalse(ticket2.superseded());
+        }
+
+        // After the timeout expires, get a new ticket to create the same key
+
+        try (var ticket3 = cache.openNewTicket(key, TICKET_TIMEOUT)) {
+            cache.addEntry(ticket3, status, value);
+        }
+
+        var entry = cache.lookupKey(key);
+        Assertions.assertNotNull(entry);
+
+        // First revision number should not be affected by the expired ticket
+        Assertions.assertEquals(1, entry.revision());
     }
 
     @Test
-    void openNewTicket_timeoutAfterCreate() {
-        Assertions.fail();
+    void openNewTicket_timeoutAfterCreate() throws Exception {
+
+        // Tickets are not transactions, updates take effect even if the ticket is not closed
+        // The close() just releases the ticket so other operations can happen without waiting for timeout
+
+        var key = newKey();
+        var status = "status1";
+        var value = new DummyState();
+        value.intVar = 42;
+        value.stringVar = "the droids you're looking for";
+
+        // Open a ticket and do nothing with it
+        // It should expire even if it is not explicitly closed
+
+        var ticket1 = cache.openNewTicket(key, Duration.ofMillis(250));
+        cache.addEntry(ticket1, status, value);
+
+        Thread.sleep(300);
+
+        var entry = cache.lookupKey(key);
+        Assertions.assertNotNull(entry);
+        Assertions.assertEquals(1, entry.revision());
+
+        Assertions.assertTrue(ticket1.expiry().isBefore(Instant.now()));
+
+        // After the timeout, openNewTicket() should give a superseded result because the key exists
+
+        try (var ticket2 = cache.openNewTicket(key, TICKET_TIMEOUT)) {
+            Assertions.assertTrue(ticket2.superseded());
+        }
+
+        // After the first ticket expires, it should be possible to get a regular ticket for the same key
+
+        try (var ticket2 = cache.openTicket(key, entry.revision(), TICKET_TIMEOUT)) {
+            var t2Entry = cache.getEntry(ticket2);
+            Assertions.assertEquals(value, t2Entry.value());
+        }
     }
 
     @Test
@@ -234,6 +379,23 @@ public abstract class JobCacheTestSuite {
         Assertions.fail();
     }
 
+    private String newKey() {
+        return UUID.randomUUID().toString();
+    }
+
+    private <T, U> void failToOpen(BiFunction<T, U, AutoCloseable> openFunc, T param1, U param2) throws Exception {
+
+        try (var closable = openFunc.apply(param1, param2)) {
+            Assertions.fail("unexpectedly succeeded creating [" + closable.getClass().getSimpleName() + "]");
+        }
+    }
+
+    private <T, U, V> void failToOpen(TriFunction<T, U, V, AutoCloseable> openFunc, T param1, U param2, V param3) throws Exception {
+
+        try (var closable = openFunc.apply(param1, param2, param3)) {
+            Assertions.fail("unexpectedly succeeded creating [" + closable.getClass().getSimpleName() + "]");
+        }
+    }
 
     static class DummyState implements Serializable {
 
@@ -245,5 +407,11 @@ public abstract class JobCacheTestSuite {
 
         TagHeader objectId;
         Throwable exception;
+    }
+
+    @FunctionalInterface
+    private interface TriFunction <T, U, V, X> {
+
+        X apply(T param1, U param2, V param3);
     }
 }
