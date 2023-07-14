@@ -19,13 +19,14 @@ package org.finos.tracdap.common.cache;
 import javax.annotation.Nullable;
 import java.time.Duration;
 import java.util.List;
+import java.util.regex.Pattern;
 
 
 public interface IJobCache<TValue> {
 
-    Ticket openNewTicket(String key);
+    Pattern VALID_KEY = Pattern.compile("\\A[\\w\\-]+\\Z");
+
     Ticket openNewTicket(String key, Duration duration);
-    Ticket openTicket(String key, int revision);
     Ticket openTicket(String key, int revision, Duration duration);
     void closeTicket(Ticket ticket);
 

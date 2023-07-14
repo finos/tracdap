@@ -21,6 +21,7 @@ import org.finos.tracdap.common.cache.IJobCache;
 import org.finos.tracdap.common.cache.Ticket;
 import org.finos.tracdap.common.exception.ECacheNotFound;
 import org.finos.tracdap.common.exception.ECacheTicket;
+import org.finos.tracdap.common.metadata.MetadataConstants;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -52,36 +53,30 @@ public class LocalJobCache<TValue> implements IJobCache<TValue> {
     }
 
     @Override
-    public Ticket openNewTicket(String key) {
-
-        return openNewTicket(key, DEFAULT_TICKET_DURATION);
-    }
-
-    @Override
     public Ticket openNewTicket(String key, Duration duration) {
 
+        checkKey(key);
+        checkDuration(duration);
+        checkMaxDuration(key, duration);
+
         var grantTime = Instant.now();
-        var grantDuration = duration.compareTo(MAX_TICKET_DURATION) < 0 ? duration : MAX_TICKET_DURATION;
 
         if (_cache.containsKey(key))
             return Ticket.supersededTicket(key, FIRST_REVISION, grantTime);
         else
-            return Ticket.forDuration(this, key, FIRST_REVISION, grantTime, grantDuration);
-    }
-
-    @Override
-    public Ticket openTicket(String key, int revision) {
-
-        return openTicket(key, revision, DEFAULT_TICKET_DURATION);
+            return Ticket.forDuration(this, key, FIRST_REVISION, grantTime, duration);
     }
 
     @Override
     public Ticket openTicket(String key, int revision, Duration duration) {
 
-        var grantTime = Instant.now();
-        var grantDuration = duration.compareTo(MAX_TICKET_DURATION) < 0 ? duration : MAX_TICKET_DURATION;
+        checkKey(key);
+        checkRevision(revision);
+        checkDuration(duration);
+        checkMaxDuration(key, duration);
 
-        var ticket = Ticket.forDuration(this, key, revision, grantTime, grantDuration);
+        var grantTime = Instant.now();
+        var ticket = Ticket.forDuration(this, key, revision, grantTime, duration);
 
         var cacheEntry = _cache.computeIfPresent(key, (_key, priorEntry) -> {
 
@@ -300,4 +295,42 @@ public class LocalJobCache<TValue> implements IJobCache<TValue> {
         }
     }
 
+    private void checkKey(String key) {
+
+        if (key == null)
+            throw new IllegalArgumentException();
+
+        if (!VALID_KEY.matcher(key).matches())
+            throw new IllegalArgumentException();
+
+        if (MetadataConstants.TRAC_RESERVED_IDENTIFIER.matcher(key).matches())
+            throw new IllegalArgumentException();
+    }
+
+    private void checkRevision(int revision) {
+
+        if (revision < 0)
+            throw new IllegalArgumentException();
+    }
+
+    private void checkDuration(Duration duration) {
+
+        if (duration == null)
+            throw new IllegalArgumentException();
+
+        if (duration.isZero() || duration.isNegative())
+            throw new IllegalArgumentException();
+    }
+
+    private void checkMaxDuration(String key, Duration duration) {
+
+        if (duration.compareTo(MAX_TICKET_DURATION) > 0) {
+
+            var message = String.format(
+                    "Requested ticket duration of [%s] for [%s] exceeds the maximum grant time",
+                    duration, key);
+
+            throw new ECacheTicket(message);
+        }
+    }
 }

@@ -19,7 +19,8 @@ package org.finos.tracdap.common.cache;
 import java.time.Duration;
 import java.time.Instant;
 
-public class Ticket implements AutoCloseable {
+
+public final class Ticket implements AutoCloseable {
 
     private final IJobCache<?> cache;
 
@@ -32,7 +33,7 @@ public class Ticket implements AutoCloseable {
 
     public static Ticket missingEntryTicket(String key, int revision, Instant grantTime) {
 
-        return new Ticket(null, key, revision, grantTime, grantTime, true, true);
+        return new Ticket(null, key, revision, grantTime, grantTime, false, true);
     }
 
     public static Ticket supersededTicket(String key, int revision, Instant grantTime) {
@@ -81,7 +82,7 @@ public class Ticket implements AutoCloseable {
     }
 
     public boolean superseded() {
-        return superseded || missing;
+        return superseded;
     }
 
     public boolean missing() {
