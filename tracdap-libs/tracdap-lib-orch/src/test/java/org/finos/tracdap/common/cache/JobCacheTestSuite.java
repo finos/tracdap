@@ -19,29 +19,20 @@ package org.finos.tracdap.common.cache;
 import org.finos.tracdap.common.cache.local.LocalJobCache;
 import org.finos.tracdap.metadata.TagHeader;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import java.io.Serializable;
+import java.time.Duration;
 import java.util.UUID;
 
 
 public abstract class JobCacheTestSuite {
 
-    static class UnitTest extends JobCacheTestSuite {}
+    public static final Duration TICKET_TIMEOUT = Duration.ofSeconds(5);
 
-    static class DummyState implements Serializable {
-
-        int intVar;
-        String stringVar;
-        byte[] blobVar;
-
-        transient String transientVar;
-
-        TagHeader objectId;
-        Throwable exception;
-    }
-
-    private final IJobCache<DummyState> cache = new LocalJobCache<>();
+    // To use the test suite, create the cache instance in a @BeforeAll method
+    protected static IJobCache<DummyState> cache;
 
     @Test
     void lifecycle_createReadDelete() {
@@ -243,4 +234,16 @@ public abstract class JobCacheTestSuite {
         Assertions.fail();
     }
 
+
+    static class DummyState implements Serializable {
+
+        int intVar;
+        String stringVar;
+        byte[] blobVar;
+
+        transient String transientVar;
+
+        TagHeader objectId;
+        Throwable exception;
+    }
 }
