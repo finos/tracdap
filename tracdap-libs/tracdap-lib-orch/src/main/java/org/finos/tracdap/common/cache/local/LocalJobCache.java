@@ -95,8 +95,12 @@ public class LocalJobCache<TValue> implements IJobCache<TValue> {
         if (cacheEntry == null)
             return Ticket.missingEntryTicket(key, revision, grantTime);
 
-        if (cacheEntry.ticket != ticket)
-            return Ticket.supersededTicket(key, revision, grantTime);
+        if (cacheEntry.ticket != ticket) {
+            if (cacheEntry.revision >= revision)
+                return Ticket.supersededTicket(key, revision, grantTime);
+            else
+                return Ticket.missingEntryTicket(key, revision, grantTime);
+        }
 
         return ticket;
     }

@@ -165,7 +165,7 @@ public abstract class JobCacheTestSuite {
         Assertions.assertThrows(IllegalArgumentException.class, () -> failToOpen(cache::openNewTicket, null, TICKET_TIMEOUT));
         Assertions.assertThrows(IllegalArgumentException.class, () -> failToOpen(cache::openNewTicket, "", TICKET_TIMEOUT));
         Assertions.assertThrows(IllegalArgumentException.class, () -> failToOpen(cache::openNewTicket, "_reserved", TICKET_TIMEOUT));
-        Assertions.assertThrows(IllegalArgumentException.class, () -> failToOpen(cache::openNewTicket, "_trac_reserved", TICKET_TIMEOUT));
+        Assertions.assertThrows(IllegalArgumentException.class, () -> failToOpen(cache::openNewTicket, "trac_reserved", TICKET_TIMEOUT));
         Assertions.assertThrows(IllegalArgumentException.class, () -> failToOpen(cache::openNewTicket, "$%#3&--!", TICKET_TIMEOUT));
         Assertions.assertThrows(IllegalArgumentException.class, () -> failToOpen(cache::openNewTicket, "你好", TICKET_TIMEOUT));
     }
@@ -186,15 +186,61 @@ public abstract class JobCacheTestSuite {
 
         try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
 
-            Assertions.assertThrows(ECacheTicket.class, () -> failToOpen(cache::openNewTicket, key, TICKET_TIMEOUT));
-            Assertions.assertThrows(ECacheTicket.class, () -> failToOpen(cache::openTicket, key, ticket.revision(), TICKET_TIMEOUT));
+            Assertions.assertFalse(ticket.superseded());
+            Assertions.assertFalse(ticket.missing());
+
+            // Ticket is superseded because another ticket exists to add this key
+            // The missing flag is not set for openNewTicket()
+            try (var ticket2 = cache.openNewTicket(key, TICKET_TIMEOUT)) {
+                Assertions.assertTrue(ticket2.superseded());
+                Assertions.assertFalse(ticket2.missing());
+            }
+
+            // Ticket is superseded because another ticket is open for this key
+            // It is also missing, because no entry exists yet
+            try (var ticket3 = cache.openTicket(key, ticket.revision(), TICKET_TIMEOUT)) {
+                Assertions.assertTrue(ticket3.superseded());
+                Assertions.assertTrue(ticket3.missing());
+            }
         }
+    }
+
+    @Test
+    void openNewTicket_unused() {
+
+        // Ticket closed without being used, key is available to retry the add operation
+
+        var key = newKey();
+        var status = "status1";
+        var value = new DummyState();
+        value.intVar = 42;
+        value.stringVar = "the droids you're looking for";
+
+        try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
+            Assertions.assertFalse(ticket.superseded());
+            Assertions.assertFalse(ticket.missing());
+        }
+
+        try (var ticket2 = cache.openNewTicket(key, TICKET_TIMEOUT)) {
+            Assertions.assertFalse(ticket2.superseded());
+            Assertions.assertFalse(ticket2.missing());
+            cache.addEntry(ticket2, status, value);
+        }
+
+        var entry = cache.lookupKey(key);
+
+        Assertions.assertNotNull(entry);
+        Assertions.assertEquals(key, entry.key());
+        Assertions.assertEquals(1, entry.revision());
+        Assertions.assertEquals(value, entry.value());
     }
 
     @Test
     void openNewTicket_durationTooLong() {
 
         // One day ticket duration should exceed the max grant
+
+        // TODO: What is the right behavior here?
 
         Assertions.assertThrows(ECacheTicket.class, () -> failToOpen(cache::openNewTicket, newKey(), Duration.ofDays(1)));
     }
@@ -306,42 +352,225 @@ public abstract class JobCacheTestSuite {
 
     @Test
     void openTicket_ok() {
-        Assertions.fail();
+
+        var key = newKey();
+        var status = "status1";
+        var value = new DummyState();
+        value.intVar = 42;
+        value.stringVar = "the droids you're looking for";
+
+        try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
+            cache.addEntry(ticket, status, value);
+        }
+
+        var status2 = "status2";
+        var value2 = new DummyState();
+        value2.intVar = 43;
+        value2.stringVar = "move along";
+
+        int revision;
+
+        // Basic use of openTicket()
+
+        try (var ticket = cache.openTicket(key, 1, TICKET_TIMEOUT)) {
+
+            Assertions.assertEquals(key, ticket.key());
+            Assertions.assertEquals(1, ticket.revision());
+            Assertions.assertFalse(ticket.missing());
+            Assertions.assertFalse(ticket.superseded());
+            Assertions.assertTrue(ticket.grantTime().isBefore(Instant.now()));
+            Assertions.assertTrue(ticket.expiry().isAfter(Instant.now()));
+
+            revision = cache.updateEntry(ticket, status2, value2);
+        }
+
+        // Check result is as expected
+
+        var entry = cache.lookupKey(key);
+
+        Assertions.assertNotNull(entry);
+        Assertions.assertEquals(key, entry.key());
+        Assertions.assertEquals(revision, entry.revision());
+        Assertions.assertEquals(value2, entry.value());
+
+        // First revision should be numbered 1
+        Assertions.assertEquals(2, entry.revision());
     }
 
     @Test
     void openTicket_badKey() {
-        Assertions.fail();
+
+        // Since these are bad keys, it's not possible to prepare a valid initial entry
+
+        Assertions.assertThrows(IllegalArgumentException.class, () -> failToOpen(cache::openTicket, null, 1, TICKET_TIMEOUT));
+        Assertions.assertThrows(IllegalArgumentException.class, () -> failToOpen(cache::openTicket, "", 1, TICKET_TIMEOUT));
+        Assertions.assertThrows(IllegalArgumentException.class, () -> failToOpen(cache::openTicket, "_reserved", 1, TICKET_TIMEOUT));
+        Assertions.assertThrows(IllegalArgumentException.class, () -> failToOpen(cache::openTicket, "trac_reserved", 1, TICKET_TIMEOUT));
+        Assertions.assertThrows(IllegalArgumentException.class, () -> failToOpen(cache::openTicket, "$%#3&--!", 1, TICKET_TIMEOUT));
+        Assertions.assertThrows(IllegalArgumentException.class, () -> failToOpen(cache::openTicket, "你好", 1, TICKET_TIMEOUT));
     }
 
     @Test
     void openTicket_badRevision() {
-        Assertions.fail();
+
+        var key = newKey();
+        var status = "status1";
+        var value = new DummyState();
+
+        try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
+            cache.addEntry(ticket, status, value);
+        }
+
+        Assertions.assertThrows(IllegalArgumentException.class, () -> failToOpen(cache::openTicket, key, -1, TICKET_TIMEOUT));
     }
 
     @Test
     void openTicket_badDuration() {
-        Assertions.fail();
+
+        var key = newKey();
+        var status = "status1";
+        var value = new DummyState();
+
+        int rev;
+
+        try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
+            rev = cache.addEntry(ticket, status, value);
+        }
+
+        Assertions.assertThrows(IllegalArgumentException.class, () -> failToOpen(cache::openTicket, key, rev, null));
+        Assertions.assertThrows(IllegalArgumentException.class, () -> failToOpen(cache::openTicket, key, rev, Duration.ZERO));
+        Assertions.assertThrows(IllegalArgumentException.class, () -> failToOpen(cache::openTicket, key, rev, Duration.ofSeconds(-1)));
+        Assertions.assertThrows(IllegalArgumentException.class, () -> failToOpen(cache::openTicket, key, rev, Duration.ofNanos(-1)));
     }
 
     @Test
     void openTicket_duplicate() {
-        Assertions.fail();
+
+        var key = newKey();
+        var status = "status1";
+        var value = new DummyState();
+
+        int rev;
+
+        try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
+            rev = cache.addEntry(ticket, status, value);
+        }
+
+        try (var ticket = cache.openTicket(key, rev, TICKET_TIMEOUT)) {
+
+            Assertions.assertFalse(ticket.superseded());
+            Assertions.assertFalse(ticket.missing());
+
+            try (var ticket2 = cache.openNewTicket(key, TICKET_TIMEOUT)) {
+                Assertions.assertTrue(ticket2.superseded());
+                Assertions.assertFalse(ticket2.missing());
+            }
+
+            try (var ticket3 = cache.openTicket(key, rev, TICKET_TIMEOUT)) {
+                Assertions.assertTrue(ticket3.superseded());
+                Assertions.assertFalse(ticket3.missing());
+            }
+        }
+    }
+
+    @Test
+    void openTicket_unused() {
+
+        // Ticket closed without being used, key is available to retry the add operation
+
+        var key = newKey();
+        var status = "status1";
+        var value = new DummyState();
+        value.intVar = 42;
+        value.stringVar = "the droids you're looking for";
+
+        int rev;
+
+        try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
+            rev = cache.addEntry(ticket, status, value);
+        }
+
+        var status2 = "status2";
+        var value2 = new DummyState();
+        value2.intVar = 43;
+        value2.stringVar = "move along";
+
+        int rev2;
+
+        try (var ticket = cache.openTicket(key, rev, TICKET_TIMEOUT)) {
+            Assertions.assertFalse(ticket.superseded());
+            Assertions.assertFalse(ticket.missing());
+        }
+
+        // The original revision can be re-used, since the ticket was closed without an update
+
+        try (var ticket2 = cache.openTicket(key, rev, TICKET_TIMEOUT)) {
+            Assertions.assertFalse(ticket2.superseded());
+            Assertions.assertFalse(ticket2.missing());
+            rev2 = cache.updateEntry(ticket2, status2, value2);
+        }
+
+        var entry = cache.lookupKey(key);
+
+        Assertions.assertNotNull(entry);
+        Assertions.assertEquals(key, entry.key());
+        Assertions.assertEquals(rev2, entry.revision());
+        Assertions.assertEquals(value2, entry.value());
     }
 
     @Test
     void openTicket_durationTooLong() {
-        Assertions.fail();
+
+        // One day ticket duration should exceed the max grant
+
+        var key = newKey();
+        var status = "status1";
+        var value = new DummyState();
+        value.intVar = 42;
+        value.stringVar = "the droids you're looking for";
+
+        int rev;
+
+        try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
+            rev = cache.addEntry(ticket, status, value);
+        }
+
+        // TODO: What is the right behavior here?
+
+        Assertions.assertThrows(ECacheTicket.class, () -> failToOpen(cache::openTicket, key, rev, Duration.ofDays(1)));
     }
 
     @Test
     void openTicket_missingEntry() {
-        Assertions.fail();
+
+        var key = newKey();
+        var rev = 1;
+
+        try (var ticket = cache.openTicket(key, rev, TICKET_TIMEOUT)) {
+            Assertions.assertTrue(ticket.missing());
+            Assertions.assertFalse(ticket.superseded());
+        }
     }
 
     @Test
     void openTicket_missingRevision() {
-        Assertions.fail();
+
+        var key = newKey();
+        var status = "status1";
+        var value = new DummyState();
+        value.intVar = 42;
+        value.stringVar = "the droids you're looking for";
+
+        int rev;
+
+        try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
+            rev = cache.addEntry(ticket, status, value);
+        }
+
+        try (var ticket = cache.openTicket(key, rev + 1, TICKET_TIMEOUT)) {
+            Assertions.assertTrue(ticket.missing());
+            Assertions.assertFalse(ticket.superseded());
+        }
     }
 
     @Test
