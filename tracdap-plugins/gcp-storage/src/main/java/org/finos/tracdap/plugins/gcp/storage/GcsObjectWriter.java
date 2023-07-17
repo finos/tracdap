@@ -28,6 +28,8 @@ import com.google.storage.v2.Object;
 import io.grpc.CallOptions;
 
 import org.apache.arrow.memory.ArrowBuf;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.List;
 import java.util.Map;
@@ -37,15 +39,25 @@ import java.util.concurrent.Flow;
 
 public class GcsObjectWriter implements Flow.Subscriber<ArrowBuf> {
 
+    // gRPC has a default max message size of 4 MB, message over this size will be rejected
+    // Using a max chunk size of 3 MB is safely inside the limit
+    // Allowing a range of chunk sizes should allow chunks to flow with less fragmentation
+
+    private final static long MAX_CHUNK_SIZE = 3145728;  // 3 MB
+    private final static long MIN_CHUNK_SIZE = 1572864;  // 1.5 MB
+
+    private final Logger log = LoggerFactory.getLogger(getClass());
+
     private final StorageClient storageClient;
     private final IDataContext dataContext;
-    private final WriteObjectSpec objectSpec;
     private final CompletableFuture<Long> signal;
 
-    private Flow.Subscription subscription;
-    private ApiStreamObserver<WriteObjectRequest> apiStream;
-    private long bytesSent;
+    private final WriteObjectSpec gcsObjectSpec;
+    private ApiStreamObserver<WriteObjectRequest> gcsWriteStream;
 
+    private Flow.Subscription subscription;
+    private ByteString pendingChunk;
+    private long bytesSent;
     private Throwable upstreamError;
 
     GcsObjectWriter(
@@ -57,15 +69,22 @@ public class GcsObjectWriter implements Flow.Subscriber<ArrowBuf> {
         this.dataContext = dataContext;
         this.signal = signal;
 
-        this.objectSpec = WriteObjectSpec.newBuilder()
+        this.gcsObjectSpec = WriteObjectSpec.newBuilder()
                 .setResource(Object.newBuilder()
                 .setBucket(bucketName.toString())
                 .setName(objectKey))
                 .build();
+
+        this.pendingChunk = ByteString.empty();
     }
 
     @Override
     public void onSubscribe(Flow.Subscription subscription) {
+
+        if (this.subscription != null)
+            throw new IllegalStateException();
+        else
+            this.subscription = subscription;
 
         var callOptions = CallOptions.DEFAULT
                 .withExecutor(dataContext.eventLoopExecutor());
@@ -73,55 +92,72 @@ public class GcsObjectWriter implements Flow.Subscriber<ArrowBuf> {
         var callCtx = GrpcCallContext.createDefault()
                 .withCallOptions(callOptions);
 
-        var responseStream = new GcpUnaryResponse<WriteObjectResponse>();
-
         var apiCall = addMissingRequestParams(storageClient.writeObjectCallable());
-        this.apiStream = apiCall.clientStreamingCall(responseStream, callCtx);
-        this.subscription = subscription;
 
-        responseStream.getResult().whenComplete(this::writeCompleteHandler);
+        var gcsResponseStream = new GcpUnaryResponse<WriteObjectResponse>();
+        this.gcsWriteStream = apiCall.clientStreamingCall(gcsResponseStream, callCtx);
+        gcsResponseStream.getResult().whenComplete(this::writeCompleteHandler);
 
-        subscription.request(1);
+        var initialRequest = WriteObjectRequest.newBuilder()
+                .setWriteObjectSpec(gcsObjectSpec)
+                .build();
+
+        gcsWriteStream.onNext(initialRequest);
+
+        subscription.request(2);
     }
 
     @Override
     public void onNext(ArrowBuf item) {
 
-        try (item) {
-
-            System.out.println("Sending next");
-
-            var MAX_CHUNK_SIZE = 2 * 1048576;  // 2 MB
+        try (item) {  // auto-release buffer content
 
             var buffer = item.nioBuffer();
 
             while (buffer.remaining() > 0) {
 
-                var chunkSize = Math.min(buffer.remaining(), MAX_CHUNK_SIZE);
-                var protoBytes = ByteString.copyFrom(buffer, chunkSize);
+                var chunkRemaining = MAX_CHUNK_SIZE - pendingChunk.size();
+                var nBytes = (int) Math.min(buffer.remaining(), chunkRemaining);
 
-                var data = ChecksummedData.newBuilder()
-                        .setContent(protoBytes);
+                // There is no easy way to release bytes once the chunk is written to the stream
+                // So we have to copy and let ByteString handle cleanup, which relies on the Java GC
 
-                var request = WriteObjectRequest.newBuilder()
-                        .setWriteObjectSpec(objectSpec)
-                        .setChecksummedData(data)
-                        .setWriteOffset(bytesSent)
-                        .build();
+                var protoBytes = ByteString.copyFrom(buffer, nBytes);
+                pendingChunk = pendingChunk.concat(protoBytes);
 
-                bytesSent += protoBytes.size();
+                if (pendingChunk.size() >= MIN_CHUNK_SIZE) {
 
-                apiStream.onNext(request);
+                    var data = ChecksummedData.newBuilder()
+                            .setContent(protoBytes);
+
+                    var request = WriteObjectRequest.newBuilder()
+                            .setChecksummedData(data)
+                            .setWriteOffset(bytesSent)
+                            .build();
+
+                    gcsWriteStream.onNext(request);
+
+                    bytesSent += pendingChunk.size();
+                    pendingChunk = ByteString.empty();
+                }
             }
 
             subscription.request(1);
-
-            System.out.println("Sent next, bytes = " + bytesSent);
         }
     }
 
     @Override
     public void onError(Throwable throwable) {
+
+        // A call to onError() means an error occurred upstream in the data pipeline
+        // It is not an error that occurred in the storage client
+
+        // If the GCS stream is open, we can pass the onError signal into the stream
+        // This will cause the stream to cancel and call back the write complete handler
+        // Otherwise, we have to notify the write complete signal directly
+
+        // Only one error can be sent down the pipe and ultimately get passed back to the client
+        // There can be multiple errors if the stream doesn't fail cleanly, in this case log a warning
 
         if (upstreamError == null) {
 
@@ -129,14 +165,15 @@ public class GcsObjectWriter implements Flow.Subscriber<ArrowBuf> {
 
             // onError() can be called before onSubscribe() if there was a problem during subscription
 
-            if (apiStream != null)
-                apiStream.onError(throwable);
+            if (gcsWriteStream != null)
+                gcsWriteStream.onError(throwable);
             else
                 signal.completeExceptionally(throwable);
         }
         else {
 
-            // todo: log warning for any subsequent errors
+            log.warn("Another error was reported after the write operation already failed");
+            log.warn(throwable.getMessage(), throwable);
         }
     }
 
@@ -146,20 +183,22 @@ public class GcsObjectWriter implements Flow.Subscriber<ArrowBuf> {
         System.out.println("Sending complete");
 
         var request = WriteObjectRequest.newBuilder()
-                .setWriteObjectSpec(objectSpec)
-                .setWriteOffset(bytesSent)
-                .setFinishWrite(true)
-                .build();
+                .setFinishWrite(true);
 
-        apiStream.onNext(request);
-        apiStream.onCompleted();
+        if (pendingChunk.size() > 0) {
 
-        System.out.println("Sent complete, bytes = " + bytesSent);
+            var data = ChecksummedData.newBuilder().setContent(pendingChunk);
+            request.setWriteOffset(bytesSent).setChecksummedData(data);
+
+            bytesSent += pendingChunk.size();
+            pendingChunk = ByteString.empty();
+        }
+
+        gcsWriteStream.onNext(request.build());
+        gcsWriteStream.onCompleted();
     }
 
     private void writeCompleteHandler(WriteObjectResponse result, Throwable error) {
-
-        System.out.println("In the callback");
 
         if (error != null) {
 
@@ -189,10 +228,7 @@ public class GcsObjectWriter implements Flow.Subscriber<ArrowBuf> {
         // GCP SDK adds in this required header
         // For some API calls / usage patterns, the header does not get added
 
-        var bucket = objectSpec.getResource().getBucket();
-        System.out.println(bucket);
-
-        var callParams = String.format("bucket=%s", objectSpec.getResource().getBucket());
+        var callParams = String.format("bucket=%s", gcsObjectSpec.getResource().getBucket());
         var callMetadata = Map.of("x-goog-request-params", List.of(callParams));
 
         var defaultContext = GrpcCallContext.createDefault().withExtraHeaders(callMetadata);
