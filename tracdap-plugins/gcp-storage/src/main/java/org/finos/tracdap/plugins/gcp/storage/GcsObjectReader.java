@@ -35,9 +35,7 @@ public class GcsObjectReader extends CommonFileReader {
 
     private final StorageClient storageClient;
     private final IDataContext dataContext;
-    private final StorageErrors errors;
 
-    private final String storagePath;
     private final BucketName bucketName;
     private final String objectKey;
     private final long offset;
@@ -49,17 +47,15 @@ public class GcsObjectReader extends CommonFileReader {
 
     GcsObjectReader(
             StorageClient storageClient, IDataContext dataContext, StorageErrors errors,
-            String storagePath, BucketName bucketName, String objectKey, long offset, long limit,
-            long chunkSize, int chunkBuffer, int clientBuffer) {
+            String storageKey, String storagePath, BucketName bucketName, String objectKey,
+            long offset, long limit, long chunkSize, int chunkBuffer, int clientBuffer) {
 
-        super(dataContext, errors, null, storagePath,
+        super(dataContext, errors, storageKey, storagePath,
                 chunkSize, chunkBuffer, clientBuffer);
 
         this.storageClient = storageClient;
         this.dataContext = dataContext;
-        this.errors = errors;
 
-        this.storagePath = storagePath;
         this.bucketName = bucketName;
         this.objectKey = objectKey;
         this.offset = offset;
@@ -68,28 +64,29 @@ public class GcsObjectReader extends CommonFileReader {
 
     GcsObjectReader(
             StorageClient storageClient, IDataContext dataContext, StorageErrors errors,
-            String storagePath, BucketName bucketName, String objectKey, long offset, long limit,
-            long chunkSize) {
+            String storageKey, String storagePath, BucketName bucketName, String objectKey,
+            long offset, long limit, long chunkSize) {
 
         this(storageClient, dataContext, errors,
-                storagePath, bucketName, objectKey, offset, limit,
+                storageKey, storagePath, bucketName, objectKey, offset, limit,
                 chunkSize, DEFAULT_CHUNK_BUFFER, DEFAULT_CLIENT_BUFFER);
     }
 
     GcsObjectReader(
             StorageClient storageClient, IDataContext dataContext, StorageErrors errors,
-            String storagePath, BucketName bucketName, String objectKey, long offset, long limit) {
+            String storageKey, String storagePath, BucketName bucketName, String objectKey,
+            long offset, long limit) {
 
         this(storageClient, dataContext, errors,
-                storagePath, bucketName, objectKey, offset, limit,
+                storageKey, storagePath, bucketName, objectKey, offset, limit,
                 DEFAULT_CHUNK_SIZE);
     }
 
     GcsObjectReader(
             StorageClient storageClient, IDataContext dataContext, StorageErrors errors,
-            String storagePath, BucketName bucketName, String objectKey) {
+            String storageKey, String storagePath, BucketName bucketName, String objectKey) {
 
-        this(storageClient, dataContext, errors, storagePath, bucketName, objectKey, 0, 0);
+        this(storageClient, dataContext, errors, storageKey, storagePath, bucketName, objectKey, 0, 0);
     }
 
     @Override

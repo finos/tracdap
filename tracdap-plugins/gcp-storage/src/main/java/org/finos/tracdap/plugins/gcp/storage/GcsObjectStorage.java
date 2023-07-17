@@ -63,6 +63,8 @@ public class GcsObjectStorage extends CommonFileStorage {
     public static final String BUCKET_PROPERTY = "bucket";
     public static final String PREFIX_PROPERTY = "prefix";
 
+    private static final int DELETE_PAGE_SIZE = 1000;
+
     private final String project;
     private final String bucket;
     private final String prefix;
@@ -107,6 +109,8 @@ public class GcsObjectStorage extends CommonFileStorage {
 
             legacyClient = StorageOptions.http().build().getService();
 
+            // Make a basic request so any connectivity errors are detected during startup
+
             var request = ListObjectsRequest.newBuilder()
                     .setParent(bucketName.toString())
                     .setPrefix(prefix)
@@ -114,13 +118,7 @@ public class GcsObjectStorage extends CommonFileStorage {
                     .setPageSize(10)
                     .build();
 
-            var ls = storageClient.listObjects(request);
-
-            var count =
-                    ls.getPage().getResponse().getObjectsCount() +
-                    ls.getPage().getResponse().getPrefixesCount();
-
-            System.out.println("Got [" + count + "] values using gRPC");
+            storageClient.listObjects(request);
         }
         catch (ApiException e) {
 
@@ -166,7 +164,6 @@ public class GcsObjectStorage extends CommonFileStorage {
         log.info("STOP [{}], fs = [GCS], bucket = [{}], prefix = [{}]", storageKey, bucket, prefix);
 
         storageClient.shutdown();
-        // storageClient.awaitTermination(20, TimeUnit.SECONDS);  todo
     }
 
 
@@ -184,10 +181,10 @@ public class GcsObjectStorage extends CommonFileStorage {
 
         var response = GcpUtils.unaryCall(apiCall, request, ctx.eventLoopExecutor());
 
-        return response.handle((result, error) -> fsExistsCallback(storagePath, result, error));
+        return response.handle((result, error) -> fsExistsCallback(storagePath, error));
     }
 
-    protected boolean fsExistsCallback(String storagePath, com.google.storage.v2.Object result, Throwable error) {
+    protected boolean fsExistsCallback(String storagePath, Throwable error) {
 
         if (error instanceof NotFoundException)
             return false;
@@ -195,6 +192,9 @@ public class GcsObjectStorage extends CommonFileStorage {
         if (error != null) {
             throw errors.handleException("EXISTS", storagePath, error);
         }
+
+        // No need to check anything about the object
+        // The fact that getObject() did not return an error is enough
 
         return true;
     }
@@ -435,22 +435,17 @@ public class GcsObjectStorage extends CommonFileStorage {
 
         var request = ListObjectsRequest.newBuilder()
                 .setParent(bucketName.toString())
-                .setPrefix(absolutePrefix);
-
-//        if (startAfter != null)
-//            request.setLexicographicStart(startAfter);
-//
-//        if (maxKeys > 0)
-//            request.setPageSize(maxKeys + 1);
+                .setPrefix(absolutePrefix)
+                .setPageSize(DELETE_PAGE_SIZE);
 
         var listCall = storageClient.listObjectsCallable();
 
         var listResponse = GcpUtils.unaryCall(listCall, request.build(), ctx.eventLoopExecutor());
 
-        return listResponse.thenCompose(this::fsDeleteDirBatch);
+        return listResponse.thenCompose(listing -> fsDeleteDirBatch(listing, absolutePrefix, ctx));
     }
 
-    private CompletionStage<Void> fsDeleteDirBatch(ListObjectsResponse listing) {
+    private CompletionStage<Void> fsDeleteDirBatch(ListObjectsResponse listing, String absolutePrefix, IExecutionContext ctx) {
 
         // Directory not found
         if (listing.getObjectsCount() == 0)
@@ -482,24 +477,42 @@ public class GcsObjectStorage extends CommonFileStorage {
 
         batch.submit();
 
-        return callback.thenCompose(this::fsDeleteDirCallback);
+        return callback.thenCompose(results_ ->
+                fsDeleteDirCallback(results_, absolutePrefix, listing.getNextPageToken(), ctx));
     }
 
-    private CompletionStage<Void> fsDeleteDirCallback(List<StorageBatchResult<Boolean>> results) {
-
-        var failures = 0;
+    private CompletionStage<Void> fsDeleteDirCallback(
+            List<StorageBatchResult<Boolean>> results,
+            String absolutePrefix, String nextToken,
+            IExecutionContext ctx) {
 
         try {
 
-            for (var result : results) {
-                if (!result.get())
-                    failures += 1;
+            // If there were failed deletes, stop the operation and report a failure
+            if (results.stream().anyMatch(ok -> !ok.get())) {
+
+                var failures = results.stream()
+                        .mapToInt(ok -> ok.get() ? 0 : 1)
+                        .sum();
+
+                throw new EStorageRequest(String.format("RMDIR failed, [%d] object(s) were left undeleted", failures));
             }
 
-            if (failures > 0)
-                throw new EStorageRequest(String.format("RMDIR failed, [%d] object(s) were left undeleted", failures));
+            // If all the objects are gone, report a success
+            if (nextToken == null || nextToken.isEmpty())
+                return CompletableFuture.completedFuture(null);
 
-            return CompletableFuture.completedFuture(null);
+            // Otherwise, list the next batch and repeat the process
+            var nextRequest = ListObjectsRequest.newBuilder()
+                    .setParent(bucketName.toString())
+                    .setPrefix(absolutePrefix)
+                    .setPageSize(DELETE_PAGE_SIZE);
+
+            var listCall = storageClient.listObjectsCallable();
+
+            var listResponse = GcpUtils.unaryCall(listCall, nextRequest.build(), ctx.eventLoopExecutor());
+
+            return listResponse.thenCompose(listing -> fsDeleteDirBatch(listing, absolutePrefix, ctx));
         }
         catch (Throwable e) {
 
@@ -514,7 +527,7 @@ public class GcsObjectStorage extends CommonFileStorage {
 
         var readStream = new GcsObjectReader(
                 storageClient, ctx, errors,
-                objectKey,
+                storageKey, objectKey,
                 bucketName, absoluteKey,
                 offset, size,
                 /* chunkSize = */ size);
@@ -551,7 +564,7 @@ public class GcsObjectStorage extends CommonFileStorage {
 
         var absoluteKey = usePrefix(objectKey);
 
-        return new GcsObjectReader(storageClient, ctx, errors, objectKey, bucketName, absoluteKey);
+        return new GcsObjectReader(storageClient, ctx, errors, storageKey, objectKey, bucketName, absoluteKey);
     }
 
     @Override
@@ -592,11 +605,14 @@ public class GcsObjectStorage extends CommonFileStorage {
 
     private String removePrefix(String absoluteKey) {
 
-        if (prefix.isEmpty())
-            return absoluteKey;
+        // This method is only called on results of get/list operations using the prefix
+        // It should never happen that those results don't start with the prefix
 
         if (!absoluteKey.startsWith(prefix))
-            throw new EUnexpected();  // TODO
+            throw new EUnexpected();
+
+        if (prefix.isEmpty())
+            return absoluteKey;
 
         return absoluteKey.substring(prefix.length());
     }

@@ -180,8 +180,6 @@ public class GcsObjectWriter implements Flow.Subscriber<ArrowBuf> {
     @Override
     public void onComplete() {
 
-        System.out.println("Sending complete");
-
         var request = WriteObjectRequest.newBuilder()
                 .setFinishWrite(true);
 
