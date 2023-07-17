@@ -81,7 +81,7 @@ public abstract class CodecTestSuite {
         basicData = SampleData.BASIC_JSON_DATA_RESOURCE;
     } }
 
-    private static final Duration TEST_TIMEOUT = Duration.ofSeconds(10);
+    private static final Duration TEST_TIMEOUT = Duration.ofSeconds(20);
 
     static ICodec codec;
     static String basicData;

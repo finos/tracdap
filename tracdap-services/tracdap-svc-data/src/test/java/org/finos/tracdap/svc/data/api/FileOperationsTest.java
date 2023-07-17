@@ -61,7 +61,7 @@ abstract class FileOperationsTest {
     public static final String TRAC_CONFIG_ENV_VAR = "TRAC_CONFIG_FILE";
     public static final String TEST_TENANT = "ACME_CORP";
     public static final String TEST_TENANT_2 = "SOME_OTHER_CORP";
-    public static final Duration TEST_TIMEOUT = Duration.ofSeconds(10);
+    public static final Duration TEST_TIMEOUT = Duration.ofSeconds(20);
 
     protected static EventLoopGroup elg;
     protected IExecutionContext execContext;

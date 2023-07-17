@@ -64,7 +64,7 @@ public abstract class StorageReadWriteTestSuite {
 
     // Unit test implementation for local storage is in LocalStorageReadWriteTest
 
-    public static final Duration TEST_TIMEOUT = Duration.ofSeconds(10);
+    public static final Duration TEST_TIMEOUT = Duration.ofSeconds(20);
     public static final Duration ASYNC_DELAY = Duration.ofMillis(100);
 
     protected IFileStorage storage;

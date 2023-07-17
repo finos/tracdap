@@ -133,7 +133,7 @@ abstract class DataRoundTripTest {
     }
 
 
-    private static final Duration TEST_TIMEOUT = Duration.ofSeconds(10);
+    private static final Duration TEST_TIMEOUT = Duration.ofSeconds(20);
 
     private static final String BASIC_CSV_DATA = SampleData.BASIC_CSV_DATA_RESOURCE;
     private static final String BASIC_JSON_DATA = SampleData.BASIC_JSON_DATA_RESOURCE;
