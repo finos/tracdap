@@ -102,12 +102,17 @@
     </suppress>
 
     <suppress>
-        <packageUrl regex="true">^pkg:maven/com\.fasterxml\.jackson\.core/jackson\-core@.*$</packageUrl>
+        <packageUrl regex="true">^pkg:maven/com\.google\.api/gax\-httpjson@.*$</packageUrl>
         <cpe>cpe:/a:json-java_project:json-java</cpe>
     </suppress>
 
     <suppress>
         <packageUrl regex="true">^pkg:maven/software\.amazon\.awssdk/json\-utils@.*$</packageUrl>
+        <cpe>cpe:/a:json-java_project:json-java</cpe>
+    </suppress>
+
+    <suppress>
+        <packageUrl regex="true">^pkg:maven/com\.fasterxml\.jackson\.core/jackson\-core@.*$</packageUrl>
         <cpe>cpe:/a:json-java_project:json-java</cpe>
     </suppress>
 

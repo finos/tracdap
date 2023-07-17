@@ -124,7 +124,7 @@ jobs:
 
       - name: Integration tests
         env: ${{ vars }}
-        run: ./gradlew integration -DintegrationTags="${{ env.JAVA_TESTS }}"
+        run: ./gradlew integration -DintegrationTags="${{ env.JAVA_TESTS }} & ( ${{ inputs.target }}-platform | all-platforms )"
 
       # If the tests fail, make the output available for download
       # Include build/modules and build/plugins

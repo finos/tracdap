@@ -51,7 +51,7 @@ abstract class TenantSeparationTest {
     public static final String TRAC_CONFIG_ENV_VAR = "TRAC_CONFIG_FILE";
     public static final String TEST_TENANT = "ACME_CORP";
     public static final String TEST_TENANT_2 = "SOME_OTHER_CORP";
-    public static final Duration TEST_TIMEOUT = Duration.ofSeconds(10);
+    public static final Duration TEST_TIMEOUT = Duration.ofSeconds(20);
 
     protected static EventLoopGroup elg;
     protected IExecutionContext execContext;
@@ -87,6 +87,7 @@ abstract class TenantSeparationTest {
     // Include this test case for integration against different storage backends
     @Tag("integration")
     @Tag("int-storage")
+    @Tag("all-platforms")
     static class IntegrationTest extends TenantSeparationTest {
 
         private static final String TRAC_CONFIG_ENV_FILE = System.getenv(TRAC_CONFIG_ENV_VAR);

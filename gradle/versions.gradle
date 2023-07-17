@@ -18,13 +18,15 @@ ext {
 
     java_min_version = JavaVersion.VERSION_11
 
+    // Gradle plugin versions
+    proto_plugin_version = "0.8.13"
+
     // Core platform technologies
     netty_version = '4.1.93.Final'
     guava_version = '32.0.1-jre'
     proto_version = '3.23.2'
     grpc_version = '1.56.0'
     gapi_version = '2.20.0'
-
 
     // Data technologies
     arrow_version = '12.0.1'
@@ -70,8 +72,8 @@ ext {
     reactive_streams_version = '1.0.4'
 
 
-    gcp_sdk_version = '2.6.1'
-    gcp_sdk_http_client_version = '1.41.8'  // Force Google HTTP client version needed for compliance
+    gcp_bom_version = '26.18.0'
+    // gcp_sdk_http_client_version = '1.41.8'  // Force Google HTTP client version needed for compliance
 
 
     // Test dependencies

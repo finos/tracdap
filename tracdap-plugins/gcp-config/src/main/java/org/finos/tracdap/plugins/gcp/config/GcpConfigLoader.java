@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Accenture Global Solutions Limited
+ * Copyright 2023 Accenture Global Solutions Limited
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.plugins.config.gcp;
+package org.finos.tracdap.plugins.gcp.config;
 
 import org.finos.tracdap.common.config.IConfigLoader;
 import org.finos.tracdap.common.exception.EStartup;

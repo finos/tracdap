@@ -57,7 +57,7 @@ public abstract class StorageOperationsTestSuite {
 
     // Unit test implementation for local storage is in LocalStorageOperationsTest
 
-    public static final Duration TEST_TIMEOUT = Duration.ofSeconds(10);
+    public static final Duration TEST_TIMEOUT = Duration.ofSeconds(20);
 
     protected IFileStorage storage;
     protected IDataContext dataContext;

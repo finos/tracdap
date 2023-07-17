@@ -37,7 +37,7 @@ public abstract class StorageReadOnlyTestSuite {
     //Test suite for readOnly protection on IFileStorage
     // This should be available for all storage types that use CommonFileStorage as a base
 
-    public static final Duration TEST_TIMEOUT = Duration.ofSeconds(10);
+    public static final Duration TEST_TIMEOUT = Duration.ofSeconds(20);
     public static final Duration ASYNC_DELAY = Duration.ofMillis(100);
 
     protected IFileStorage rwStorage;

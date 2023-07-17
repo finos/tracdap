@@ -6,10 +6,11 @@
     <option name="TEST_OBJECT" value="tags" />
     <option name="VM_PARAMETERS" value="-ea --add-opens java.base/jdk.internal.misc=ALL-UNNAMED --add-opens java.base/java.nio=ALL-UNNAMED -Dio.netty.tryReflectionSetAccessible=true" />
     <envs>
-      <env name="TRAC_AWS_ACCESS_KEY_ID" value="&lt; set me &gt;" />
-      <env name="TRAC_AWS_BUCKET" value="&lt; set me &gt;" />
-      <env name="TRAC_AWS_REGION" value="&lt; set me &gt;" />
-      <env name="TRAC_AWS_SECRET_ACCESS_KEY" value="&lt; set me &gt;" />
+      <env name="TRAC_AWS_ACCESS_KEY_ID" value="" />
+      <env name="TRAC_AWS_BUCKET" value="tracdap-ci-storage-uk" />
+      <env name="TRAC_AWS_REGION" value="eu-west-2" />
+      <env name="TRAC_AWS_SECRET_ACCESS_KEY" value="" />
+      <env name="TRAC_AWS_CREDENTIALS" value="static" />
     </envs>
     <tag value="int-storage" />
     <method v="2">

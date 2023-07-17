@@ -1,0 +1,17 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Integration: gcp-storage" type="JUnit" factoryName="JUnit">
+    <module name="tracdap.gcp-storage.test" />
+    <option name="MAIN_CLASS_NAME" value="" />
+    <option name="METHOD_NAME" value="" />
+    <option name="TEST_OBJECT" value="tags" />
+    <option name="VM_PARAMETERS" value="-ea --add-opens java.base/jdk.internal.misc=ALL-UNNAMED --add-opens java.base/java.nio=ALL-UNNAMED -Dio.netty.tryReflectionSetAccessible=true" />
+    <envs>
+      <env name="TRAC_GCP_BUCKET" value="tracdap-ci-storage-uk" />
+      <env name="TRAC_GCP_REGION" value="eu-west-2" />
+    </envs>
+    <tag value="int-storage" />
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>

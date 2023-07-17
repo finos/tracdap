@@ -38,6 +38,10 @@
     {
       "moduleName": "io.netty:netty-tcnative-classes",
       "moduleLicense": null
+    },
+    {
+      "moduleName": "com.google.cloud:libraries-bom",
+      "moduleLicense": null
     }
   ]
 }

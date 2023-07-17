@@ -64,7 +64,7 @@ public abstract class StorageReadWriteTestSuite {
 
     // Unit test implementation for local storage is in LocalStorageReadWriteTest
 
-    public static final Duration TEST_TIMEOUT = Duration.ofSeconds(10);
+    public static final Duration TEST_TIMEOUT = Duration.ofSeconds(20);
     public static final Duration ASYNC_DELAY = Duration.ofMillis(100);
 
     protected IFileStorage storage;
@@ -167,8 +167,9 @@ public abstract class StorageReadWriteTestSuite {
 
         waitFor(Duration.ofHours(1), writeSignal);
 
-        // Make sure the write operation did not report an error before trying to read
-        Assertions.assertDoesNotThrow(() -> getResultOf(writeSignal));
+        // Make sure the write operation completed successfully and reports the correct size
+        var expectedSize = originalBytes.stream().mapToInt(bytes -> bytes.length).sum();
+        Assertions.assertEquals(expectedSize, getResultOf(writeSignal));
 
         var reader = storage.reader(storagePath, dataContext);
         var readResult = Flows.fold(

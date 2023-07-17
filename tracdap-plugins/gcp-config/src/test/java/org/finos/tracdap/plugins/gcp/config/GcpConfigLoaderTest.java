@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Accenture Global Solutions Limited
+ * Copyright 2023 Accenture Global Solutions Limited
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,13 +14,14 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.plugins.config.aws;
+package org.finos.tracdap.plugins.gcp.config;
 
 import org.finos.tracdap.common.exception.EStartup;
-import org.finos.tracdap.plugins.config.gcp.GcpConfigLoader;
+
 import com.google.cloud.storage.Bucket;
 import com.google.cloud.storage.Storage;
 import com.google.cloud.storage.StorageOptions;
+
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
@@ -31,13 +32,14 @@ import java.net.URI;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+
 @Tag("integration")
-@Tag("int-gcp")
+@Tag("int-config")
 class GcpConfigLoaderTest {
 
-    private static String BUCKET_NAME = "accenture-trac-test";
-    private static String FILE_NAME = "test-config.properties";
-    private static String TEST_CONTENT = "trac-test = true";
+    private static final String BUCKET_NAME = "accenture-trac-test";
+    private static final String FILE_NAME = "test-config.properties";
+    private static final String TEST_CONTENT = "trac-test = true";
 
     GcpConfigLoader gcpConfigLoader;
 

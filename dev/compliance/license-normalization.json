@@ -1,8 +1,22 @@
 {
   "bundles" : [
-    { "bundleName" : "apache2", "licenseName" : "Apache License, Version 2.0", "licenseUrl" : "https://www.apache.org/licenses/LICENSE-2.0" }
+    {
+      "bundleName" : "apache2",
+      "licenseName" : "Apache License, Version 2.0", "licenseUrl" : "https://www.apache.org/licenses/LICENSE-2.0"
+    },
+    {
+      "bundleName" : "bsd3",
+      "licenseName" : "The 3-Clause BSD License", "licenseUrl" : "https://opensource.org/license/bsd-3-clause"
+    }
   ],
   "transformationRules" : [
-    { "bundleName" : "apache2", "licenseNamePattern" : "Apache License V2.0" }
+    {
+      "bundleName" : "apache2",
+      "licenseNamePattern" : "Apache License V2.0"
+    },
+    {
+      "bundleName" : "bsd3",
+      "licenseNamePattern" : "Go License"
+    }
   ]
 }

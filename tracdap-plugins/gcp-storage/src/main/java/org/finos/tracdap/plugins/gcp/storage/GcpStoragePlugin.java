@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Accenture Global Solutions Limited
+ * Copyright 2023 Accenture Global Solutions Limited
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,27 +14,26 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.plugins.config.gcp;
+package org.finos.tracdap.plugins.gcp.storage;
 
-import org.finos.tracdap.common.config.IConfigLoader;
+import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.exception.EPluginNotAvailable;
 import org.finos.tracdap.common.plugin.PluginServiceInfo;
 import org.finos.tracdap.common.plugin.TracPlugin;
+import org.finos.tracdap.common.storage.IFileStorage;
+import org.finos.tracdap.common.storage.IStorageManager;
 
 import java.util.List;
 import java.util.Properties;
 
 
-/**
- * A config loader plugin for loading from GCP buckets.
- */
-public class GcpConfigPlugin extends TracPlugin {
+public class GcpStoragePlugin extends TracPlugin {
 
-    private static final String PLUGIN_NAME = "GCP_CONFIG";
-    private static final String SERVICE_NAME = "GCP_CONFIG";
+    private static final String PLUGIN_NAME = "GCP_STORAGE";
+    private static final String GCS_OBJECT_STORAGE = "GCS_OBJECT_STORAGE";
 
     private static final List<PluginServiceInfo> serviceInfo = List.of(
-            new PluginServiceInfo(IConfigLoader.class, SERVICE_NAME, List.of("gcp")));
+            new PluginServiceInfo(IFileStorage.class, GCS_OBJECT_STORAGE, List.of("gcs")));
 
     @Override
     public String pluginName() {
@@ -47,12 +46,14 @@ public class GcpConfigPlugin extends TracPlugin {
     }
 
     @Override @SuppressWarnings("unchecked")
-    protected <T> T createConfigService(String serviceName, Properties properties) {
+    protected <T> T createService(String service, Properties properties, ConfigManager configManager) {
 
-        if (serviceName.equals(SERVICE_NAME))
-            return (T) new GcpConfigLoader();
+        if (service.equals(GCS_OBJECT_STORAGE)) {
+            var instance = properties.getProperty(IStorageManager.PROP_STORAGE_KEY);
+            return (T) new GcsObjectStorage(instance, properties);
+        }
 
-        var message = String.format("Plugin [%s] does not support the service [%s]", pluginName(), serviceName);
+        var message = String.format("Plugin [%s] does not support the service [%s]", pluginName(), service);
         throw new EPluginNotAvailable(message);
     }
 }
