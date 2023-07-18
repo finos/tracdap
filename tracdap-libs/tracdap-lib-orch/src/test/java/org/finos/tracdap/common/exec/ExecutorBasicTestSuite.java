@@ -38,6 +38,8 @@ public abstract class ExecutorBasicTestSuite {
         return (IBatchExecutor<T>) executor;
     }
 
+    protected abstract boolean targetIsWindows();
+
     @Test
     void runBasicJob_ok() throws Exception {
 
@@ -65,11 +67,23 @@ public abstract class ExecutorBasicTestSuite {
 
             // Set up a basic copy command
 
-            var launchCmd = LaunchCmd.custom("cp");
-            var launchArgs = List.of(
-                    LaunchArg.string("-v"),
-                    LaunchArg.path("config", "lorem_ipsum.txt"),
-                    LaunchArg.path("outputs", "lorem_ipsum_copy.txt"));
+            LaunchCmd launchCmd;
+            List<LaunchArg> launchArgs;
+
+            if (targetIsWindows()) {
+                launchCmd = LaunchCmd.custom("cmd");
+                launchArgs = List.of(
+                        LaunchArg.string("/C"), LaunchArg.string("copy"),
+                        LaunchArg.path("config", "lorem_ipsum.txt"),
+                        LaunchArg.path("outputs", "lorem_ipsum_copy.txt"));
+            }
+            else {
+                launchCmd = LaunchCmd.custom("cp");
+                launchArgs = List.of(
+                        LaunchArg.string("-v"),
+                        LaunchArg.path("config", "lorem_ipsum.txt"),
+                        LaunchArg.path("outputs", "lorem_ipsum_copy.txt"));
+            }
 
             // Start the batch
 
@@ -112,11 +126,23 @@ public abstract class ExecutorBasicTestSuite {
 
             // Set up a basic copy command
 
-            var launchCmd = LaunchCmd.custom("cp");
-            var launchArgs = List.of(
-                    LaunchArg.string("-v"),
-                    LaunchArg.path("config", "lorem_ipsum.txt"),
-                    LaunchArg.path("outputs", "lorem_ipsum_copy.txt"));
+            LaunchCmd launchCmd;
+            List<LaunchArg> launchArgs;
+
+            if (targetIsWindows()) {
+                launchCmd = LaunchCmd.custom("cmd");
+                launchArgs = List.of(
+                        LaunchArg.string("/C"), LaunchArg.string("copy"),
+                        LaunchArg.path("config", "lorem_ipsum.txt"),
+                        LaunchArg.path("outputs", "lorem_ipsum_copy.txt"));
+            }
+            else {
+                launchCmd = LaunchCmd.custom("cp");
+                launchArgs = List.of(
+                        LaunchArg.string("-v"),
+                        LaunchArg.path("config", "lorem_ipsum.txt"),
+                        LaunchArg.path("outputs", "lorem_ipsum_copy.txt"));
+            }
 
             // Start the batch
 

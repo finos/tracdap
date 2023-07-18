@@ -35,4 +35,10 @@ public class LocalExecutorBasicTest extends ExecutorBasicTestSuite {
         executor = new LocalBatchExecutor(executorProps);
         executor.start();
     }
+
+    @Override
+    protected boolean targetIsWindows() {
+
+        return System.getProperty("os.name", "unknown").toLowerCase().startsWith("win");
+    }
 }
