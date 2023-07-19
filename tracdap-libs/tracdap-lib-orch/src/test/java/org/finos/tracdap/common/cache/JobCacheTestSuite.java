@@ -122,7 +122,7 @@ public abstract class JobCacheTestSuite {
     }
 
     @Test
-    void openNewTicket_ok() {
+    void openNewTicket_ok() throws Exception {
 
         var key = newKey();
         var status = "status1";
@@ -135,6 +135,8 @@ public abstract class JobCacheTestSuite {
         // Basic use of openNewTicket
 
         try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
+
+            Thread.sleep(1);
 
             Assertions.assertEquals(key, ticket.key());
             Assertions.assertEquals(0, ticket.revision());
@@ -274,6 +276,34 @@ public abstract class JobCacheTestSuite {
     }
 
     @Test
+    void openNewTicket_entryDeleted() {
+
+        // After an entry is removed, it should be possible to get a ticket to create it again
+        // The cache doesn't know anything about entries after they are deleted
+
+        var key = newKey();
+        var status = "status1";
+        var value = new DummyState();
+        value.intVar = 42;
+        value.stringVar = "the droids you're looking for";
+
+        int revision;
+
+        try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
+            revision = cache.addEntry(ticket, status, value);
+        }
+
+        try (var ticket2 = cache.openTicket(key, revision, TICKET_TIMEOUT)) {
+            cache.removeEntry(ticket2);
+        }
+
+        try (var ticket3 = cache.openNewTicket(key, TICKET_TIMEOUT)) {
+            Assertions.assertFalse(ticket3.missing());
+            Assertions.assertFalse(ticket3.superseded());
+        }
+    }
+
+    @Test
     @SuppressWarnings("resource")
     void openNewTicket_timeoutNoAction() throws Exception {
 
@@ -351,7 +381,7 @@ public abstract class JobCacheTestSuite {
     }
 
     @Test
-    void openTicket_ok() {
+    void openTicket_ok() throws Exception {
 
         var key = newKey();
         var status = "status1";
@@ -373,6 +403,8 @@ public abstract class JobCacheTestSuite {
         // Basic use of openTicket()
 
         try (var ticket = cache.openTicket(key, 1, TICKET_TIMEOUT)) {
+
+            Thread.sleep(1);
 
             Assertions.assertEquals(key, ticket.key());
             Assertions.assertEquals(1, ticket.revision());
@@ -574,13 +606,152 @@ public abstract class JobCacheTestSuite {
     }
 
     @Test
-    void openTicket_timeoutNoAction() {
-        Assertions.fail();
+    void openTicket_entryDeleted() {
+
+        // After an entry is removed, it is not possible to open a regular ticket for read/update
+        // To recreate the entry, it is necessary to use openNewTicket() and addEntry()
+        // The cache doesn't know anything about entries after they are deleted
+
+        var key = newKey();
+        var status = "status1";
+        var value = new DummyState();
+        value.intVar = 42;
+        value.stringVar = "the droids you're looking for";
+
+        int revision;
+
+        try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
+            revision = cache.addEntry(ticket, status, value);
+        }
+
+        try (var ticket2 = cache.openTicket(key, revision, TICKET_TIMEOUT)) {
+            cache.removeEntry(ticket2);
+        }
+
+        try (var ticket3 = cache.openTicket(key, revision, TICKET_TIMEOUT)) {
+            Assertions.assertTrue(ticket3.missing());
+            Assertions.assertFalse(ticket3.superseded());
+        }
     }
 
     @Test
-    void openTicket_timeoutAfterCreate() {
-        Assertions.fail();
+    @SuppressWarnings("resource")
+    void openTicket_timeoutNoAction() throws Exception {
+
+        var key = newKey();
+        var status = "status1";
+        var value = new DummyState();
+        value.intVar = 42;
+        value.stringVar = "the droids you're looking for";
+
+        int revision;
+
+        try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
+            revision = cache.addEntry(ticket, status, value);
+        }
+
+        // Open a ticket on the new entry and let it time out
+
+        var unusedTicket = cache.openTicket(key, revision, Duration.ofMillis(50));
+        Thread.sleep(100);
+        Assertions.assertTrue(unusedTicket.expiry().isBefore(Instant.now()));
+
+        // Now perform a regular update - it should be fine to grant a new ticket now
+
+        var status2 = "status2";
+        var value2 = new DummyState();
+        value2.intVar = 43;
+        value2.stringVar = "move along";
+
+        int revision2;
+
+        try (var ticket = cache.openTicket(key, revision, TICKET_TIMEOUT)) {
+
+            Thread.sleep(1);
+
+            Assertions.assertEquals(key, ticket.key());
+            Assertions.assertEquals(1, ticket.revision());
+            Assertions.assertFalse(ticket.missing());
+            Assertions.assertFalse(ticket.superseded());
+            Assertions.assertTrue(ticket.grantTime().isBefore(Instant.now()));
+            Assertions.assertTrue(ticket.expiry().isAfter(Instant.now()));
+
+            revision2 = cache.updateEntry(ticket, status2, value2);
+        }
+
+        // Check result is as expected
+
+        var entry = cache.lookupKey(key);
+
+        Assertions.assertNotNull(entry);
+        Assertions.assertEquals(key, entry.key());
+        Assertions.assertEquals(revision2, entry.revision());
+        Assertions.assertEquals(value2, entry.value());
+
+        // First revision should be numbered 1
+        Assertions.assertEquals(2, entry.revision());
+    }
+
+    @Test
+    void openTicket_timeoutAfterUpdate() throws Exception {
+
+        var key = newKey();
+        var status = "status1";
+        var value = new DummyState();
+        value.intVar = 42;
+        value.stringVar = "the droids you're looking for";
+
+        int revision;
+
+        try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
+            revision = cache.addEntry(ticket, status, value);
+        }
+
+        // Open a ticket that will not be closed
+
+        var unclosedTicket = cache.openTicket(key, revision, Duration.ofMillis(250));
+
+        // Now perform a regular update - it should be fine to grant a new ticket now
+
+        var status2 = "status2";
+        var value2 = new DummyState();
+        value2.intVar = 43;
+        value2.stringVar = "move along";
+
+        cache.updateEntry(unclosedTicket, status2, value2);
+
+        // Now let the ticket expire
+
+        Thread.sleep(300);
+
+        // Looking up the entry, the new revision should be available
+
+        var entry = cache.lookupKey(key);
+        Assertions.assertNotNull(entry);
+        Assertions.assertEquals(2, entry.revision());
+        Assertions.assertEquals(status2, entry.status());
+        Assertions.assertEquals(value2, entry.value());
+
+        // The original revision should be superseded
+
+        try (var ticket2 = cache.openTicket(key, revision, TICKET_TIMEOUT)) {
+            Assertions.assertFalse(ticket2.missing());
+            Assertions.assertTrue(ticket2.superseded());
+        }
+
+        // But it should be possible to get a ticket on the latest revision
+
+        try (var ticket3 = cache.openTicket(key, entry.revision(), TICKET_TIMEOUT)) {
+            Assertions.assertFalse(ticket3.missing());
+            Assertions.assertFalse(ticket3.superseded());
+        }
+
+        // Getting a ticket for a new entry should also not be possible
+
+        try (var ticket3 = cache.openNewTicket(key, TICKET_TIMEOUT)) {
+            Assertions.assertFalse(ticket3.missing());
+            Assertions.assertTrue(ticket3.superseded());
+        }
     }
 
     @Test
