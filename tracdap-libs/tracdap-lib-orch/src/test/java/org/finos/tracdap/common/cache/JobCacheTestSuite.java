@@ -17,6 +17,8 @@
 package org.finos.tracdap.common.cache;
 
 import org.finos.tracdap.common.exception.ECacheTicket;
+import org.finos.tracdap.common.metadata.MetadataCodec;
+import org.finos.tracdap.metadata.ObjectType;
 import org.finos.tracdap.metadata.TagHeader;
 
 import org.junit.jupiter.api.Assertions;
@@ -25,7 +27,9 @@ import org.junit.jupiter.api.Test;
 import java.io.Serializable;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Random;
 import java.util.UUID;
+import java.util.concurrent.CompletionException;
 import java.util.function.BiFunction;
 
 
@@ -119,6 +123,56 @@ public abstract class JobCacheTestSuite {
         var removedVEntry = cache.lookupKey(key);
 
         Assertions.assertNull(removedVEntry);
+    }
+
+    @Test
+    void lifecycle_dataTypes() {
+
+        var value = new DummyState();
+        value.intVar = 42;
+        value.stringVar = "the droids you're looking for";
+        value.blobVar = new byte[1234];
+        new Random().nextBytes(value.blobVar);
+        value.objectId = TagHeader.newBuilder()
+                .setObjectType(ObjectType.CUSTOM)
+                .setObjectId(UUID.randomUUID().toString())
+                .setObjectVersion(1)
+                .setObjectTimestamp(MetadataCodec.encodeDatetime(Instant.now()))
+                .setTagVersion(2)
+                .setTagTimestamp(MetadataCodec.encodeDatetime(Instant.now()))
+                .build();
+        value.exception = new CompletionException(new RuntimeException("out msg", new RuntimeException("inner msg")));
+
+        var key = UUID.randomUUID().toString();
+        var status = "status1";
+
+        int revision;
+
+        try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
+            revision = cache.addEntry(ticket, status, value);
+        }
+
+        CacheEntry<DummyState> cacheEntry;
+
+        try (var ticket = cache.openTicket(key, revision, TICKET_TIMEOUT)) {
+            cacheEntry = cache.getEntry(ticket);
+        }
+
+        Assertions.assertEquals(key, cacheEntry.key());
+        Assertions.assertEquals(revision, cacheEntry.revision());
+        Assertions.assertEquals(status, cacheEntry.status());
+
+        // Check all the members of value
+
+        Assertions.assertEquals(value.intVar, cacheEntry.value().intVar);
+        Assertions.assertEquals(value.stringVar, cacheEntry.value().stringVar);
+        Assertions.assertEquals(value.blobVar, cacheEntry.value().blobVar);
+        Assertions.assertEquals(value.objectId, cacheEntry.value().objectId);
+        Assertions.assertEquals(value.exception, cacheEntry.value().exception);
+
+        // Check top level object (really this is all that is needed)
+
+        Assertions.assertEquals(value, cacheEntry.value());
     }
 
     @Test
