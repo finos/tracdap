@@ -122,6 +122,57 @@ public abstract class JobCacheTestSuite {
     }
 
     @Test
+    void lifecycle_transientValues() {
+
+        var key = UUID.randomUUID().toString();
+        var status = "status1";
+        var value = new DummyState();
+        value.intVar = 42;
+        value.stringVar = "the droids you're looking for";
+        value.transientVar = "ephemeral content";
+
+        int revision;
+
+        try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
+            revision = cache.addEntry(ticket, status, value);
+        }
+
+        CacheEntry<DummyState> cacheEntry;
+
+        try (var ticket = cache.openTicket(key, revision, TICKET_TIMEOUT)) {
+            cacheEntry = cache.getEntry(ticket);
+        }
+
+        // Regular vars are persisted, transient vars are not
+
+        Assertions.assertEquals(42, cacheEntry.value().intVar);
+        Assertions.assertEquals("the droids you're looking for", cacheEntry.value().stringVar);
+        Assertions.assertNull(cacheEntry.value().transientVar);
+
+        try (var ticket = cache.openTicket(key, revision, TICKET_TIMEOUT)) {
+
+            var updateEntry = cache.getEntry(ticket);
+            var updateValue = updateEntry.value();
+            updateValue.intVar += 1;
+            updateValue.transientVar = "more ephemeral data";
+
+            cache.updateEntry(ticket, "status2", updateValue);
+        }
+
+        var modifiedEntry = cache.lookupKey(key);
+
+        Assertions.assertNotNull(modifiedEntry);
+        Assertions.assertTrue(modifiedEntry.revision() > revision);
+        Assertions.assertEquals("status2", modifiedEntry.status());
+
+        // The intVar member should be updated
+        // transientVar should still be null
+
+        Assertions.assertEquals(43, cacheEntry.value().intVar);
+        Assertions.assertNull(cacheEntry.value().transientVar);
+    }
+
+    @Test
     void openNewTicket_ok() throws Exception {
 
         var key = newKey();
