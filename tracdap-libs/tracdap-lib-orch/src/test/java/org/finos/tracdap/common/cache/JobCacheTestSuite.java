@@ -42,6 +42,12 @@ public abstract class JobCacheTestSuite {
     // To use the test suite, create the cache instance in a @BeforeAll method
     protected static IJobCache<DummyState> cache;
 
+
+    // -----------------------------------------------------------------------------------------------------------------
+    // LIFECYCLE TESTS (high level smoke testing)
+    // -----------------------------------------------------------------------------------------------------------------
+
+
     @Test
     void lifecycle_createReadDelete() {
 
@@ -225,6 +231,12 @@ public abstract class JobCacheTestSuite {
         Assertions.assertEquals(43, modifiedEntry.get().value().intVar);
         Assertions.assertNull(modifiedEntry.get().value().transientVar);
     }
+
+
+    // -----------------------------------------------------------------------------------------------------------------
+    // TICKETS
+    // -----------------------------------------------------------------------------------------------------------------
+
 
     @Test
     void openNewTicket_ok() throws Exception {
@@ -985,6 +997,73 @@ public abstract class JobCacheTestSuite {
 
         Assertions.assertDoesNotThrow(() -> cache.closeTicket(ticket));
     }
+
+
+    // -----------------------------------------------------------------------------------------------------------------
+    // CACHE ENTRIES (CRUD OPERATIONS)
+    // -----------------------------------------------------------------------------------------------------------------
+
+
+    @Test
+    void addEntry_ok() {
+        // TODO
+    }
+
+    @Test
+    void addEntry_badTicket() {
+        // TODO
+    }
+
+    @Test
+    void addEntry_badStatus() {
+        // TODO
+    }
+
+    @Test
+    void addEntry_badValue() {
+        // TODO
+    }
+
+    @Test
+    void addEntry_alreadyExists() {
+        // TODO
+    }
+
+    @Test
+    void addEntry_afterRemoval() {
+        // TODO
+    }
+
+    @Test
+    void addEntry_afterUnusedTicket() {
+        // TODO
+    }
+
+    @Test
+    void addEntry_ticketUnknown() {
+        // TODO
+    }
+
+    @Test
+    void addEntry_ticketSuperseded() {
+        // TODO
+    }
+
+    @Test
+    void addEntry_ticketExpired() {
+        // TODO
+    }
+
+    @Test
+    void addEntry_ticketNeverClosed() {
+        // TODO
+    }
+
+
+    // -----------------------------------------------------------------------------------------------------------------
+    // HELPERS AND EXTRAS
+    // -----------------------------------------------------------------------------------------------------------------
+
 
     private String newKey() {
         return UUID.randomUUID().toString();
