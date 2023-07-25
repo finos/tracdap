@@ -27,6 +27,8 @@ import org.junit.jupiter.api.Test;
 import java.io.Serializable;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Arrays;
+import java.util.Objects;
 import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.CompletionException;
@@ -70,9 +72,9 @@ public abstract class JobCacheTestSuite {
             cache.removeEntry(ticket);
         }
 
-        var removedVEntry = cache.lookupKey(key);
+        var removedVEntry = cache.queryKey(key);
 
-        Assertions.assertNull(removedVEntry);
+        Assertions.assertTrue(removedVEntry.isEmpty());
     }
 
     @Test
@@ -120,9 +122,9 @@ public abstract class JobCacheTestSuite {
             cache.removeEntry(ticket);
         }
 
-        var removedVEntry = cache.lookupKey(key);
+        var removedVEntry = cache.queryKey(key);
 
-        Assertions.assertNull(removedVEntry);
+        Assertions.assertTrue(removedVEntry.isEmpty());
     }
 
     @Test
@@ -166,13 +168,11 @@ public abstract class JobCacheTestSuite {
 
         Assertions.assertEquals(value.intVar, cacheEntry.value().intVar);
         Assertions.assertEquals(value.stringVar, cacheEntry.value().stringVar);
-        Assertions.assertEquals(value.blobVar, cacheEntry.value().blobVar);
+        Assertions.assertArrayEquals(value.blobVar, cacheEntry.value().blobVar);
         Assertions.assertEquals(value.objectId, cacheEntry.value().objectId);
-        Assertions.assertEquals(value.exception, cacheEntry.value().exception);
-
-        // Check top level object (really this is all that is needed)
-
-        Assertions.assertEquals(value, cacheEntry.value());
+        // Can't compare equality of exceptions directly, so check message and stack trace
+        Assertions.assertEquals(value.exception.getMessage(), cacheEntry.value().exception.getMessage());
+        Assertions.assertArrayEquals(value.exception.getStackTrace(), cacheEntry.value().exception.getStackTrace());
     }
 
     @Test
@@ -213,17 +213,17 @@ public abstract class JobCacheTestSuite {
             cache.updateEntry(ticket, "status2", updateValue);
         }
 
-        var modifiedEntry = cache.lookupKey(key);
+        var modifiedEntry = cache.queryKey(key);
 
-        Assertions.assertNotNull(modifiedEntry);
-        Assertions.assertTrue(modifiedEntry.revision() > revision);
-        Assertions.assertEquals("status2", modifiedEntry.status());
+        Assertions.assertTrue(modifiedEntry.isPresent());
+        Assertions.assertTrue(modifiedEntry.get().revision() > revision);
+        Assertions.assertEquals("status2", modifiedEntry.get().status());
 
         // The intVar member should be updated
         // transientVar should still be null
 
-        Assertions.assertEquals(43, cacheEntry.value().intVar);
-        Assertions.assertNull(cacheEntry.value().transientVar);
+        Assertions.assertEquals(43, modifiedEntry.get().value().intVar);
+        Assertions.assertNull(modifiedEntry.get().value().transientVar);
     }
 
     @Test
@@ -255,15 +255,15 @@ public abstract class JobCacheTestSuite {
 
         // Check result is as expected
 
-        var entry = cache.lookupKey(key);
+        var entry = cache.queryKey(key);
 
-        Assertions.assertNotNull(entry);
-        Assertions.assertEquals(key, entry.key());
-        Assertions.assertEquals(revision, entry.revision());
-        Assertions.assertEquals(value, entry.value());
+        Assertions.assertTrue(entry.isPresent());
+        Assertions.assertEquals(key, entry.get().key());
+        Assertions.assertEquals(revision, entry.get().revision());
+        Assertions.assertEquals(value, entry.get().value());
 
         // First revision should be numbered 1
-        Assertions.assertEquals(1, entry.revision());
+        Assertions.assertEquals(1, entry.get().revision());
     }
 
     @Test
@@ -334,12 +334,12 @@ public abstract class JobCacheTestSuite {
             cache.addEntry(ticket2, status, value);
         }
 
-        var entry = cache.lookupKey(key);
+        var entry = cache.queryKey(key);
 
-        Assertions.assertNotNull(entry);
-        Assertions.assertEquals(key, entry.key());
-        Assertions.assertEquals(1, entry.revision());
-        Assertions.assertEquals(value, entry.value());
+        Assertions.assertTrue(entry.isPresent());
+        Assertions.assertEquals(key, entry.get().key());
+        Assertions.assertEquals(1, entry.get().revision());
+        Assertions.assertEquals(value, entry.get().value());
     }
 
     @Test
@@ -367,7 +367,7 @@ public abstract class JobCacheTestSuite {
 
         // Check entry was created
 
-        var entry = cache.lookupKey(key);
+        var entry = cache.queryKey(key);
         Assertions.assertNotNull(entry);
 
         // Opening a new ticket for an existing key should create a superseded ticket
@@ -438,11 +438,11 @@ public abstract class JobCacheTestSuite {
             cache.addEntry(ticket3, status, value);
         }
 
-        var entry = cache.lookupKey(key);
-        Assertions.assertNotNull(entry);
-
         // First revision number should not be affected by the expired ticket
-        Assertions.assertEquals(1, entry.revision());
+
+        var entry = cache.queryKey(key);
+        Assertions.assertTrue(entry.isPresent());
+        Assertions.assertEquals(1, entry.get().revision());
     }
 
     @Test
@@ -465,9 +465,9 @@ public abstract class JobCacheTestSuite {
 
         Thread.sleep(300);
 
-        var entry = cache.lookupKey(key);
-        Assertions.assertNotNull(entry);
-        Assertions.assertEquals(1, entry.revision());
+        var entry = cache.queryKey(key);
+        Assertions.assertTrue(entry.isPresent());
+        Assertions.assertEquals(1, entry.get().revision());
 
         Assertions.assertTrue(ticket1.expiry().isBefore(Instant.now()));
 
@@ -479,7 +479,7 @@ public abstract class JobCacheTestSuite {
 
         // After the first ticket expires, it should be possible to get a regular ticket for the same key
 
-        try (var ticket2 = cache.openTicket(key, entry.revision(), TICKET_TIMEOUT)) {
+        try (var ticket2 = cache.openTicket(key, entry.get().revision(), TICKET_TIMEOUT)) {
             var t2Entry = cache.getEntry(ticket2);
             Assertions.assertEquals(value, t2Entry.value());
         }
@@ -523,15 +523,15 @@ public abstract class JobCacheTestSuite {
 
         // Check result is as expected
 
-        var entry = cache.lookupKey(key);
+        var entry = cache.queryKey(key);
 
-        Assertions.assertNotNull(entry);
-        Assertions.assertEquals(key, entry.key());
-        Assertions.assertEquals(revision, entry.revision());
-        Assertions.assertEquals(value2, entry.value());
+        Assertions.assertTrue(entry.isPresent());
+        Assertions.assertEquals(key, entry.get().key());
+        Assertions.assertEquals(revision, entry.get().revision());
+        Assertions.assertEquals(value2, entry.get().value());
 
         // First revision should be numbered 1
-        Assertions.assertEquals(2, entry.revision());
+        Assertions.assertEquals(2, entry.get().revision());
     }
 
     @Test
@@ -647,12 +647,12 @@ public abstract class JobCacheTestSuite {
             rev2 = cache.updateEntry(ticket2, status2, value2);
         }
 
-        var entry = cache.lookupKey(key);
+        var entry = cache.queryKey(key);
 
-        Assertions.assertNotNull(entry);
-        Assertions.assertEquals(key, entry.key());
-        Assertions.assertEquals(rev2, entry.revision());
-        Assertions.assertEquals(value2, entry.value());
+        Assertions.assertTrue(entry.isPresent());
+        Assertions.assertEquals(key, entry.get().key());
+        Assertions.assertEquals(rev2, entry.get().revision());
+        Assertions.assertEquals(value2, entry.get().value());
     }
 
     @Test
@@ -786,15 +786,15 @@ public abstract class JobCacheTestSuite {
 
         // Check result is as expected
 
-        var entry = cache.lookupKey(key);
+        var entry = cache.queryKey(key);
 
-        Assertions.assertNotNull(entry);
-        Assertions.assertEquals(key, entry.key());
-        Assertions.assertEquals(revision2, entry.revision());
-        Assertions.assertEquals(value2, entry.value());
+        Assertions.assertTrue(entry.isPresent());
+        Assertions.assertEquals(key, entry.get().key());
+        Assertions.assertEquals(revision2, entry.get().revision());
+        Assertions.assertEquals(value2, entry.get().value());
 
         // First revision should be numbered 1
-        Assertions.assertEquals(2, entry.revision());
+        Assertions.assertEquals(2, entry.get().revision());
     }
 
     @Test
@@ -831,11 +831,11 @@ public abstract class JobCacheTestSuite {
 
         // Looking up the entry, the new revision should be available
 
-        var entry = cache.lookupKey(key);
-        Assertions.assertNotNull(entry);
-        Assertions.assertEquals(2, entry.revision());
-        Assertions.assertEquals(status2, entry.status());
-        Assertions.assertEquals(value2, entry.value());
+        var entry = cache.queryKey(key);
+        Assertions.assertTrue(entry.isPresent());
+        Assertions.assertEquals(2, entry.get().revision());
+        Assertions.assertEquals(status2, entry.get().status());
+        Assertions.assertEquals(value2, entry.get().value());
 
         // The original revision should be superseded
 
@@ -846,7 +846,7 @@ public abstract class JobCacheTestSuite {
 
         // But it should be possible to get a ticket on the latest revision
 
-        try (var ticket3 = cache.openTicket(key, entry.revision(), TICKET_TIMEOUT)) {
+        try (var ticket3 = cache.openTicket(key, entry.get().revision(), TICKET_TIMEOUT)) {
             Assertions.assertFalse(ticket3.missing());
             Assertions.assertFalse(ticket3.superseded());
         }
@@ -912,6 +912,30 @@ public abstract class JobCacheTestSuite {
 
         TagHeader objectId;
         Throwable exception;
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+
+            DummyState that = (DummyState) o;
+
+            if (intVar != that.intVar) return false;
+            if (!Objects.equals(stringVar, that.stringVar)) return false;
+            if (!Arrays.equals(blobVar, that.blobVar)) return false;
+            if (!Objects.equals(objectId, that.objectId)) return false;
+            return Objects.equals(exception, that.exception);
+        }
+
+        @Override
+        public int hashCode() {
+            int result = intVar;
+            result = 31 * result + (stringVar != null ? stringVar.hashCode() : 0);
+            result = 31 * result + Arrays.hashCode(blobVar);
+            result = 31 * result + (objectId != null ? objectId.hashCode() : 0);
+            result = 31 * result + (exception != null ? exception.hashCode() : 0);
+            return result;
+        }
     }
 
     @FunctionalInterface
