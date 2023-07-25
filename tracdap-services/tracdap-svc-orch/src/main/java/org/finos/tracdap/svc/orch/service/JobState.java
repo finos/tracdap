@@ -37,41 +37,51 @@ import java.util.Map;
 
 public class JobState implements Serializable, Cloneable {
 
-    String tenant;
-    UserInfo owner;
+    private final static long serialVersionUID = 1L;
 
-    // Do not serialize credentials to the cache
+    // Original request as received from the client
+    UserInfo owner;
+    String tenant;
+    JobRequest jobRequest;
+
+    // Internal credentials used to authenticate within the TRAC platform
+    // Do not serialize to the cache, can be recreated using the internal key as a delegate
     transient InternalCallCredentials credentials;
 
-    JobRequest jobRequest;
+    // Identifiers
     String jobKey;
     TagHeader jobId;
     JobType jobType;
 
+    // Status information
     JobStatusCode tracStatus;
-    ExecutorJobStatus batchStatus;
     String cacheStatus;
     String statusMessage;
     String errorDetail;
     Exception exception;
     int retries;
 
+    // Job definition and resources, built up by the job logic
     JobDefinition definition;
     Map<String, ObjectDefinition> resources = new HashMap<>();
     Map<String, TagHeader> resourceMapping = new HashMap<>();
     Map<String, TagHeader> resultMapping = new HashMap<>();
 
+    // Input / output config files for communicating with the runtime
     RuntimeConfig sysConfig;
     JobConfig jobConfig;
     JobResult jobResult;
 
-    byte[] batchState;
-
+    // Executor state data
+    ExecutorJobStatus executorStatus;
+    Serializable executorState;
 
     @Override
     public JobState clone() {
+
         try {
-            JobState clone = (JobState) super.clone();
+
+            var clone = (JobState) super.clone();
 
             clone.resources = new HashMap<>(this.resources);
             clone.resourceMapping = new HashMap<>(this.resourceMapping);

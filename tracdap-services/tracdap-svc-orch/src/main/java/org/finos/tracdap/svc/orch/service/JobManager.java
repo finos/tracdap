@@ -34,7 +34,7 @@ import org.slf4j.LoggerFactory;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
-import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -202,11 +202,18 @@ public class JobManager {
         }
     }
 
-    public JobState queryJob(String jobKey) {
+    public Optional<JobState> queryJob(String jobKey) {
 
-        var cacheEntry = cache.lookupKey(jobKey);
+        var cacheEntry = cache.queryKey(jobKey);
 
-        return cacheEntry != null ? cacheEntry.value() : null;
+        if (cacheEntry.isEmpty())
+            return Optional.empty();
+
+        else if (cacheEntry.get().cacheOk())
+            return Optional.of(cacheEntry.get().value());
+
+        else
+            throw cacheEntry.get().cacheError();
     }
 
     private void pollCache() {
@@ -220,7 +227,7 @@ public class JobManager {
             // Or filter down the query so not all nodes attempt all updates
             // But the ticket.superseded() mechanism should be sufficient unless the load is extreme
 
-            var updatedJobs = cache.queryState(STATUS_FOR_UPDATE);
+            var updatedJobs = cache.queryStatus(STATUS_FOR_UPDATE);
 
             for (var job : updatedJobs) {
                 var operation = getNextOperation(job);
@@ -231,8 +238,8 @@ public class JobManager {
             // Currently just a simple capacity cap to prevent spamming the executor with too many jobs
             // No queuing or prioritisation yet!!
 
-            var launchableJobs = cache.queryState(STATUS_FOR_LAUNCH);
-            var runningJobs = cache.queryState(STATUS_FOR_RUNNING_JOBS, true);  // Include jobs with launch in progress
+            var launchableJobs = cache.queryStatus(STATUS_FOR_LAUNCH);
+            var runningJobs = cache.queryStatus(STATUS_FOR_RUNNING_JOBS, true);  // Include jobs with launch in progress
 
             var launchCapacity = Math.max(executorJobLimit - runningJobs.size(), 0);
             var launchJobs = launchableJobs.size() > launchCapacity
@@ -285,23 +292,25 @@ public class JobManager {
 
         try {
 
-            var runningJobs = cache.queryState(STATUS_FOR_RUNNING_JOBS)
+            // TODO: Handle cache errors in polling and processing for running jobs
+            // For pollCache, errors are included in the working set
+
+            var runningJobs = cache.queryStatus(STATUS_FOR_RUNNING_JOBS)
+                    .stream()
+                    // Filter out entries with cache errors
+                    .filter(CacheEntry::cacheOk)
                     // Only poll jobs that have an executor state
-                    .stream().filter(j -> j.value().batchState != null)
+                    .filter(j -> j.value().executorState != null)
                     .collect(Collectors.toList());
 
-            var pollRequests = runningJobs.stream()
-                    .map(j -> Map.entry(j.key(), j.value()))
-                    .collect(Collectors.toList());
+            var pollResults = processor.pollExecutorJobs(runningJobs);
 
-            var pollResults = processor.pollExecutorJobs(pollRequests);
-
-            for (var i = 0; i < pollRequests.size(); i++) {
+            for (var i = 0; i < runningJobs.size(); i++) {
 
                 var job = runningJobs.get(i);
                 var pollResult = pollResults.get(i);
 
-                if (pollResult.getStatus() != job.value().batchStatus) {
+                if (pollResult.getStatus() != job.value().executorStatus) {
 
                     var operation = getNextOperation(job, pollResult);
                     javaExecutor.submit(() -> processJobOperation(operation));

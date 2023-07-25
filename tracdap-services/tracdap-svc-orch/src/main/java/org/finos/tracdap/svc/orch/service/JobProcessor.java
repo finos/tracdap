@@ -22,6 +22,7 @@ import org.finos.tracdap.api.MetadataWriteRequest;
 import org.finos.tracdap.api.TrustedMetadataApiGrpc.TrustedMetadataApiBlockingStub;
 import org.finos.tracdap.common.auth.internal.AuthHelpers;
 import org.finos.tracdap.common.auth.internal.InternalAuthProvider;
+import org.finos.tracdap.common.cache.CacheEntry;
 import org.finos.tracdap.common.config.ConfigFormat;
 import org.finos.tracdap.common.config.ConfigParser;
 import org.finos.tracdap.common.exception.*;
@@ -32,14 +33,12 @@ import org.finos.tracdap.common.validation.Validator;
 import org.finos.tracdap.config.JobResult;
 import org.finos.tracdap.metadata.JobStatusCode;
 
-import com.google.protobuf.InvalidProtocolBufferException;
-import com.google.protobuf.Message;
-
 import org.finos.tracdap.metadata.ObjectType;
 import org.finos.tracdap.metadata.TagUpdate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.Serializable;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -225,33 +224,34 @@ public class JobProcessor {
         var newState = jobState.clone();
         newState.tracStatus = JobStatusCode.SUBMITTED;
         newState.cacheStatus = CacheStatus.SENT_TO_EXECUTOR;
-        newState.batchStatus = ExecutorJobStatus.STATUS_UNKNOWN;
-        newState.batchState = batchState.toByteArray();
+        newState.executorStatus = ExecutorJobStatus.STATUS_UNKNOWN;
+        newState.executorState = batchState;
 
         return newState;
     }
 
-    public List<ExecutorJobInfo> pollExecutorJobs(List<Map.Entry<String, JobState>> jobs) {
+    public List<ExecutorJobInfo> pollExecutorJobs(List<CacheEntry<JobState>> jobs) {
 
         var executor = stronglyTypedExecutor();
 
         var jobState = jobs.stream()
+                .map(CacheEntry::value)
                 // Only poll jobs that have an executor state
-                .filter(j -> j.getValue().batchState != null)
-                .map(j -> Map.entry(j.getKey(), stronglyTypedState(executor, j.getValue().batchState)))
+                .filter(j -> j.executorState != null)
+                .map(j -> Map.entry(j.jobKey, stronglyTypedState(executor, j.executorState)))
                 .collect(Collectors.toList());
 
         return executor.pollBatches(jobState);
     }
 
-    public JobState recordJobStatus(JobState jobState, ExecutorJobInfo batchInfo) {
+    public JobState recordJobStatus(JobState jobState, ExecutorJobInfo executorJobInfo) {
 
         var newState = jobState.clone();
-        newState.batchStatus = batchInfo.getStatus();
+        newState.executorStatus = executorJobInfo.getStatus();
 
-        log.info("Job status received from executor: [{}] {}", newState.jobKey, newState.batchStatus);
+        log.info("Job status received from executor: [{}] {}", newState.jobKey, newState.executorStatus);
 
-        switch (batchInfo.getStatus()) {
+        switch (executorJobInfo.getStatus()) {
 
             // Change to SUBMITTED / RUNNING state is significant, send update to metadata service
 
@@ -281,11 +281,11 @@ public class JobProcessor {
             case FAILED:
                 newState.tracStatus = JobStatusCode.FAILED;
                 newState.cacheStatus = CacheStatus.EXECUTOR_FAILED;
-                newState.statusMessage = batchInfo.getStatusMessage();
-                newState.errorDetail = batchInfo.getErrorDetail();
+                newState.statusMessage = executorJobInfo.getStatusMessage();
+                newState.errorDetail = executorJobInfo.getErrorDetail();
 
-                log.error("Execution failed for [{}]: {}", newState.jobKey, batchInfo.getStatusMessage());
-                log.error("Error detail for [{}]\n{}", newState.jobKey, batchInfo.getErrorDetail());
+                log.error("Execution failed for [{}]: {}", newState.jobKey, executorJobInfo.getStatusMessage());
+                log.error("Error detail for [{}]\n{}", newState.jobKey, executorJobInfo.getErrorDetail());
 
                 return newState;
 
@@ -312,9 +312,9 @@ public class JobProcessor {
     public JobState fetchJobResult(JobState jobState) {
 
         var batchExecutor = stronglyTypedExecutor();
-        var batchState = stronglyTypedState(batchExecutor, jobState.batchState);
+        var batchState = stronglyTypedState(batchExecutor, jobState.executorState);
 
-        if (jobState.batchState == null) {
+        if (jobState.executorState == null) {
 
             log.info("Cannot fetch job result: [{}] Executor state is not available", jobState.jobKey);
 
@@ -387,17 +387,17 @@ public class JobProcessor {
 
     public JobState cleanUpJob(JobState jobState) {
 
-        if (jobState.batchState != null) {
+        if (jobState.executorState != null) {
 
             var batchExecutor = stronglyTypedExecutor();
-            var batchState = stronglyTypedState(batchExecutor, jobState.batchState);
+            var batchState = stronglyTypedState(batchExecutor, jobState.executorState);
 
             batchExecutor.destroyBatch(jobState.jobKey, batchState);
 
             var newState = jobState.clone();
             newState.cacheStatus = CacheStatus.READY_TO_REMOVE;
-            newState.batchStatus = ExecutorJobStatus.STATUS_UNKNOWN;
-            newState.batchState = null;
+            newState.executorStatus = ExecutorJobStatus.STATUS_UNKNOWN;
+            newState.executorState = null;
 
             return newState;
         }
@@ -405,7 +405,7 @@ public class JobProcessor {
 
             var newState = jobState.clone();
             newState.cacheStatus = CacheStatus.READY_TO_REMOVE;
-            newState.batchStatus = ExecutorJobStatus.STATUS_UNKNOWN;
+            newState.executorStatus = ExecutorJobStatus.STATUS_UNKNOWN;
 
             log.warn("Job could not be cleaned up: [{}] Executor state is not available", jobState.jobKey);
             log.warn("There may be an orphaned task in the executor");
@@ -440,18 +440,29 @@ public class JobProcessor {
     }
 
     @SuppressWarnings("unchecked")
-    private <TState extends Message>
+    private <TState extends Serializable>
     IBatchExecutor<TState> stronglyTypedExecutor() {
         return (IBatchExecutor<TState>) executor;
     }
 
-    private <TState extends Message>
-    TState stronglyTypedState(IBatchExecutor<TState> batchExecutor, byte[] stateBytes) {
-        try {
-            return batchExecutor.stateDecoder().parseFrom(stateBytes);
+    @SuppressWarnings("unchecked")
+    private <TState extends Serializable>
+    TState stronglyTypedState(IBatchExecutor<TState> executor, Object executorState) {
+
+        var stateClass = executor.stateClass();
+
+        if (executorState == null)
+            throw new ETracInternal("Invalid job state: null");
+
+        if (stateClass.isInstance(executorState)) {
+
+            String message = String.format(
+                    "Invalid job state: Expected [%s], got [%s]",
+                    stateClass.getName(), executorState.getClass().getName());
+
+            throw new ETracInternal(message);
         }
-        catch (InvalidProtocolBufferException e) {
-            throw new ETracInternal("Invalid job state: " + e.getMessage(), e);
-        }
+
+        return (TState) executorState;
     }
 }
