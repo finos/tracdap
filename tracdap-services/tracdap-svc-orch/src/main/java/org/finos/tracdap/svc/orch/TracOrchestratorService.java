@@ -32,9 +32,9 @@ import org.finos.tracdap.config.ServiceConfig;
 import org.finos.tracdap.svc.orch.api.TracOrchestratorApi;
 import org.finos.tracdap.svc.orch.service.JobManager;
 import org.finos.tracdap.svc.orch.service.JobProcessor;
+import org.finos.tracdap.svc.orch.service.JobProcessorHelpers;
 import org.finos.tracdap.svc.orch.service.JobState;
 
-import org.finos.tracdap.svc.orch.service.JobProcessorHelpers;
 import io.grpc.ManagedChannel;
 import io.grpc.Server;
 import io.grpc.netty.NettyChannelBuilder;
