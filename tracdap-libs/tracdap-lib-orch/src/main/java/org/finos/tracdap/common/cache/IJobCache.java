@@ -16,15 +16,25 @@
 
 package org.finos.tracdap.common.cache;
 
+import java.io.Serializable;
 import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 import java.util.regex.Pattern;
 
 
-public interface IJobCache<TValue> {
+public interface IJobCache<TValue extends Serializable> {
 
     Pattern VALID_KEY = Pattern.compile("\\A[\\w\\-]+\\Z");
+
+    @SuppressWarnings("unchecked")
+    static <T extends Serializable> IJobCache<T> forType(IJobCache<?> untyped) {
+
+        // This method provides compile-time type safety only
+        // In practice, the job cache only uses a single cache value type
+
+        return (IJobCache<T>) untyped;
+    }
 
     CacheTicket openNewTicket(String key, Duration duration);
     CacheTicket openTicket(String key, int revision, Duration duration);

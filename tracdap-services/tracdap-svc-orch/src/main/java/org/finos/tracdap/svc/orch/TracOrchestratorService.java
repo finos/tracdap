@@ -22,6 +22,7 @@ import org.finos.tracdap.common.auth.internal.JwtSetup;
 import org.finos.tracdap.common.auth.internal.InternalAuthValidator;
 import org.finos.tracdap.common.cache.IJobCache;
 import org.finos.tracdap.common.config.ConfigManager;
+import org.finos.tracdap.common.exec.IBatchExecutor;
 import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.common.grpc.*;
 import org.finos.tracdap.common.plugin.PluginManager;
@@ -29,8 +30,6 @@ import org.finos.tracdap.common.service.CommonServiceBase;
 import org.finos.tracdap.config.PlatformConfig;
 import org.finos.tracdap.config.ServiceConfig;
 import org.finos.tracdap.svc.orch.api.TracOrchestratorApi;
-import org.finos.tracdap.common.cache.local.LocalJobCache;
-import org.finos.tracdap.common.exec.IBatchExecutor;
 import org.finos.tracdap.svc.orch.service.JobManager;
 import org.finos.tracdap.svc.orch.service.JobProcessor;
 import org.finos.tracdap.svc.orch.service.JobState;
@@ -122,12 +121,12 @@ public class TracOrchestratorService extends CommonServiceBase {
                     platformConfig.getExecutor(),
                     configManager);
 
-            // TODO: Type safety on ticket type
-
-            jobCache = (IJobCache<JobState>) pluginManager.createService(
+            var untypedCache = pluginManager.createService(
                     IJobCache.class,
                     platformConfig.getJobCache(),
                     configManager);
+
+            jobCache = IJobCache.forType(untypedCache);
 
             var jobProcessorHelpers = new JobProcessorHelpers(platformConfig, metaClient);
             var jobProcessor = new JobProcessor(metaClient, internalAuth, jobExecutor, jobProcessorHelpers);
