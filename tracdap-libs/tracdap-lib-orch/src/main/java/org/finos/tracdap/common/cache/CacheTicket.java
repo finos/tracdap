@@ -82,7 +82,7 @@ public final class CacheTicket implements AutoCloseable {
     }
 
     public boolean superseded() {
-        return superseded;
+        return superseded || expiry.isBefore(Instant.now());
     }
 
     public boolean missing() {
