@@ -26,6 +26,9 @@ description = "Executor plugin for remote execution over SSH"
 // Put plugins into a separate package group
 group = "org.finos.tracdap.plugins"
 
+// Use a different build dir (don't include plugins in the main release package)
+project.buildDir = rootProject.buildDir.path + '/plugins/' + project.name
+
 dependencies {
 
     api project(':tracdap-lib-common')
@@ -37,18 +40,6 @@ dependencies {
     implementation group: "org.apache.sshd", name: "sshd-scp", version: "${apache_sshd_version}"
     implementation group: "org.apache.sshd", name: "sshd-netty", version: "${apache_sshd_version}"
 
-    // Force Netty version to match the core framework
-    implementation group: 'io.netty', name: 'netty-common', version: "$netty_version"
-    implementation group: 'io.netty', name: 'netty-transport', version: "$netty_version"
-    implementation group: 'io.netty', name: 'netty-handler', version: "$netty_version"
-
-    // Force version of SLF4J to match other components
-    implementation group: 'org.slf4j', name: 'slf4j-api', version: "${slf4j_version}"
-    implementation group: 'org.slf4j', name: 'jcl-over-slf4j', version: "${slf4j_version}"
-
     // Pull in the executor test suite for testing
     testImplementation project(path: ':tracdap-lib-orch', configuration: 'testSuite')
 }
-
-// Use a different build dir (don't include plugins in the main release package)
-project.buildDir = rootProject.buildDir.path + '/plugins/' + project.name
