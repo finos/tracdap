@@ -861,27 +861,129 @@ public abstract class JobCacheTestSuite {
 
     @Test
     void closeTicket_ok() {
-        Assertions.fail();
+
+        var key = newKey();
+        var status = "status1";
+        var value = new DummyState();
+        value.intVar = 42;
+        value.stringVar = "the droids you're looking for";
+
+        int revision;
+
+        try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
+            revision = cache.addEntry(ticket, status, value);
+        }
+
+        // Create a ticket it and use it to read an entry
+
+        var ticket = cache.openTicket(key, revision, TICKET_TIMEOUT);
+
+        var entry = cache.getEntry(ticket);
+        Assertions.assertTrue(entry.cacheOk());
+        Assertions.assertEquals(entry.value(), value);
+
+        // After closing the ticket, any attempt to use it should throw ECacheTicket
+
+        cache.closeTicket(ticket);
+
+        Assertions.assertThrows(ECacheTicket.class, () -> cache.getEntry(ticket));
     }
 
     @Test
     void closeTicket_badTicket() {
-        Assertions.fail();
+
+        Assertions.assertThrows(IllegalArgumentException.class, () -> cache.closeTicket(null));
+
+        // Create an invalid ticket - closing it should have no effect
+        // In practice invalid tickets should never be created
+
+        try (var ticket1 = CacheTicket.forDuration(cache, "", -1, Instant.now().minusSeconds(1), Duration.ofSeconds(-1))) {
+            Assertions.assertDoesNotThrow(() -> cache.closeTicket(ticket1));
+        }
     }
 
     @Test
-    void closeTicket_unknownTicket() {
-        Assertions.fail();
+    void closeTicket_unknownTicket() throws Exception {
+
+        // Create a ticket that could be valid, but doesn't have a real entry in the cache
+        // Closing tickets for missing entries is a no-op, the ticket didn't grant any rights anyway
+
+        var key = newKey();
+        var revision = 1;
+
+        try (var ticket1 = CacheTicket.forDuration(cache, key, revision, Instant.now(), Duration.ofMinutes(1))) {
+            Thread.sleep(100);
+            Assertions.assertDoesNotThrow(() -> cache.closeTicket(ticket1));
+        }
     }
 
     @Test
     void closeTicket_noAction() {
-        Assertions.fail();
+
+        var key = newKey();
+        var status = "status1";
+        var value = new DummyState();
+        value.intVar = 42;
+        value.stringVar = "the droids you're looking for";
+
+        int revision;
+
+        try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
+            revision = cache.addEntry(ticket, status, value);
+        }
+
+        // Open a ticket it and close it without doing anything
+
+        var ticket = cache.openTicket(key, revision, TICKET_TIMEOUT);
+        cache.closeTicket(ticket);
+
+        Assertions.assertThrows(ECacheTicket.class, () -> cache.getEntry(ticket));
+
+        // It should be possible to open a new ticket for the same key / revision
+
+        try (var ticket2 = cache.openTicket(key, revision, TICKET_TIMEOUT)) {
+            var entry = cache.getEntry(ticket2);
+            Assertions.assertTrue(entry.cacheOk());
+            Assertions.assertEquals(entry.value(), value);
+        }
     }
 
     @Test
-    void closeTicket_afterTimeout() {
-        Assertions.fail();
+    @SuppressWarnings("resource")
+    void closeTicket_afterTimeout() throws Exception {
+
+        var key = newKey();
+        var status = "status1";
+        var value = new DummyState();
+        value.intVar = 42;
+        value.stringVar = "the droids you're looking for";
+
+        int revision;
+
+        try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
+            revision = cache.addEntry(ticket, status, value);
+        }
+
+        // Open a ticket it and let it time out without doing anything
+
+        var ticket = cache.openTicket(key, revision, Duration.ofMillis(50));
+        Thread.sleep(100);
+
+        // It should not be possible to use the ticket
+
+        Assertions.assertThrows(ECacheTicket.class, () -> cache.getEntry(ticket));
+
+        // It should be possible to open a new ticket for the same key / revision
+
+        try (var ticket2 = cache.openTicket(key, revision, TICKET_TIMEOUT)) {
+            var entry = cache.getEntry(ticket2);
+            Assertions.assertTrue(entry.cacheOk());
+            Assertions.assertEquals(entry.value(), value);
+        }
+
+        // Closing the original ticket should not raise an error (this is a no-op)
+
+        Assertions.assertDoesNotThrow(() -> cache.closeTicket(ticket));
     }
 
     private String newKey() {
