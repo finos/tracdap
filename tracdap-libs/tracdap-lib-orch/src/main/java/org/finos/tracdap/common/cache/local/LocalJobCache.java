@@ -60,11 +60,29 @@ public class LocalJobCache<TValue extends Serializable> implements IJobCache<TVa
         checkMaxDuration(key, duration);
 
         var grantTime = Instant.now();
+        var ticket = CacheTicket.forDuration(this, key, FIRST_REVISION, grantTime, duration);
 
-        if (_cache.containsKey(key))
+        var cacheEntry = _cache.compute(key, (_key, priorEntry) -> {
+
+            if (priorEntry != null) {
+
+                if (priorEntry.encodedValue != null)
+                    return priorEntry;
+
+                if (priorEntry.ticket != null && priorEntry.ticket.expiry().isAfter(grantTime))
+                    return priorEntry;
+            }
+
+            var newEntry = new LocalJobCacheEntry();
+            newEntry.ticket = ticket;
+
+            return newEntry;
+        });
+
+        if (cacheEntry.ticket != ticket)
             return CacheTicket.supersededTicket(key, FIRST_REVISION, grantTime);
-        else
-            return CacheTicket.forDuration(this, key, FIRST_REVISION, grantTime, duration);
+
+        return ticket;
     }
 
     @Override
@@ -118,6 +136,9 @@ public class LocalJobCache<TValue extends Serializable> implements IJobCache<TVa
             if (priorEntry.ticket != ticket)
                 return priorEntry;
 
+            if (priorEntry.encodedValue == null)
+                return null;
+
             var newEntry = priorEntry.clone();
             newEntry.ticket = null;
 
@@ -134,7 +155,7 @@ public class LocalJobCache<TValue extends Serializable> implements IJobCache<TVa
 
         var added = _cache.compute(ticket.key(), (_key, _entry) -> {
 
-            if (_entry != null) {
+            if (_entry != null && _entry.encodedValue != null) {
                 var message = String.format("Cannot create [%s], item is already in the cache", ticket.key());
                 log.error(message);
                 throw new ECacheTicket(message);
@@ -191,7 +212,7 @@ public class LocalJobCache<TValue extends Serializable> implements IJobCache<TVa
 
         _cache.compute(ticket.key(), (_key, _entry) -> {
 
-            if (_entry == null) {
+            if (_entry == null || _entry.encodedValue == null) {
                 var message = String.format("Cannot remove [%s], item is not in the cache", ticket.key());
                 log.error(message);
                 throw new ECacheNotFound(message);
@@ -199,7 +220,10 @@ public class LocalJobCache<TValue extends Serializable> implements IJobCache<TVa
 
             checkEntryMatchesTicket(_entry, ticket, "remove");
 
-            return null;
+            var newEntry = _entry.clone();
+            newEntry.encodedValue = null;
+
+            return newEntry;
         });
     }
 

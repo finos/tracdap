@@ -304,10 +304,10 @@ public abstract class JobCacheTestSuite {
             }
 
             // Ticket is superseded because another ticket is open for this key
-            // It is also missing, because no entry exists yet
+            // Missing flag is not set, because a ticket is open even though the entry isn't added yet
             try (var ticket3 = cache.openTicket(key, ticket.revision(), TICKET_TIMEOUT)) {
                 Assertions.assertTrue(ticket3.superseded());
-                Assertions.assertTrue(ticket3.missing());
+                Assertions.assertFalse(ticket3.missing());
             }
         }
     }
