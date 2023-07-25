@@ -20,8 +20,6 @@ import org.finos.tracdap.common.exception.*;
 import org.finos.tracdap.common.exec.*;
 import org.finos.tracdap.common.metadata.MetadataConstants;
 
-import com.google.protobuf.Parser;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -88,8 +86,8 @@ public class LocalBatchExecutor implements IBatchExecutor<LocalBatchState> {
     }
 
     @Override
-    public Parser<LocalBatchState> stateDecoder() {
-        return LocalBatchState.parser();
+    public Class<LocalBatchState> stateClass() {
+        return LocalBatchState.class;
     }
 
     @Override
