@@ -419,7 +419,7 @@ public abstract class JobCacheTestSuite {
         value.stringVar = "the droids you're looking for";
 
         // Open a ticket and do nothing with it
-        // It should expire even if it is not explicitly closed
+        // The ticket should expire even if it is not explicitly closed
 
         var ticket1 = cache.openNewTicket(key, Duration.ofMillis(50));
         Thread.sleep(100);
@@ -458,7 +458,7 @@ public abstract class JobCacheTestSuite {
         value.stringVar = "the droids you're looking for";
 
         // Open a ticket and do nothing with it
-        // It should expire even if it is not explicitly closed
+        // The ticket should expire even if it is not explicitly closed
 
         var ticket1 = cache.openNewTicket(key, Duration.ofMillis(250));
         cache.addEntry(ticket1, status, value);
