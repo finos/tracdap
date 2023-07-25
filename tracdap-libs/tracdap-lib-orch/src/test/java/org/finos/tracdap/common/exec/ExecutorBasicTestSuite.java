@@ -18,10 +18,10 @@ package org.finos.tracdap.common.exec;
 
 import org.finos.tracdap.common.util.ResourceHelpers;
 
-import com.google.protobuf.Message;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
+import java.io.Serializable;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -34,7 +34,7 @@ public abstract class ExecutorBasicTestSuite {
     protected IBatchExecutor<?> executor;
 
     @SuppressWarnings("unchecked")
-    private <T extends Message> IBatchExecutor<T> stronglyTypedExecutor() {
+    private <T extends Serializable> IBatchExecutor<T> stronglyTypedExecutor() {
         return (IBatchExecutor<T>) executor;
     }
 
