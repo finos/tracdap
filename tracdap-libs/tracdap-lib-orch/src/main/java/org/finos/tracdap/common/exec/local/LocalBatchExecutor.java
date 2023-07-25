@@ -108,9 +108,7 @@ public class LocalBatchExecutor implements IBatchExecutor<LocalBatchState> {
                 batchDirOwner = Files.getOwner(batchDir);
             }
 
-            var batchState = LocalBatchState.newBuilder()
-                    .setBatchDir(batchDir.toString())
-                    .build();
+            var batchState = new LocalBatchState(batchDir.toString());
 
             log.info("Job [{}] sandbox directory created: [{}], owner = [{}]", jobKey, batchDir, batchDirOwner);
 
@@ -207,9 +205,7 @@ public class LocalBatchExecutor implements IBatchExecutor<LocalBatchState> {
 
             Files.createDirectory(volumeDir);
 
-            return batchState.toBuilder()
-                    .addVolumes(volumeName)
-                    .build();
+            return batchState.withVolume(volumeName);
         }
         catch (AccessDeniedException e) {
 
@@ -241,7 +237,7 @@ public class LocalBatchExecutor implements IBatchExecutor<LocalBatchState> {
             var batchState = validState(state);
             var process = processMap.get(batchState.getPid());
 
-            if (!batchState.getVolumesList().contains(volumeName)) {
+            if (!batchState.getVolumes().contains(volumeName)) {
                 var errorMsg = String.format("Requested Volume does not exist: [%s]", volumeName);
                 log.error(errorMsg);
                 throw new ETracInternal(errorMsg);
@@ -277,7 +273,7 @@ public class LocalBatchExecutor implements IBatchExecutor<LocalBatchState> {
             var batchState = validState(state);
             var process = processMap.get(batchState.getPid());
 
-            if (!batchState.getVolumesList().contains(volumeName)) {
+            if (!batchState.getVolumes().contains(volumeName)) {
                 var errorMsg = String.format("Volume for readFile() does not exist: [%s]", volumeName);
                 log.error(errorMsg);
                 throw new ETracInternal(errorMsg);
@@ -359,9 +355,7 @@ public class LocalBatchExecutor implements IBatchExecutor<LocalBatchState> {
 
             logBatchStart(jobKey, pb, process);
 
-            return batchState.toBuilder()
-                    .setPid(process.pid())
-                    .build();
+            return batchState.withPid(process.pid());
         }
         catch (IOException e) {
             e.printStackTrace();
@@ -546,7 +540,7 @@ public class LocalBatchExecutor implements IBatchExecutor<LocalBatchState> {
                 var batchDir = Path.of(batchState.getBatchDir());
                 var volume = arg.getPathVolume();
 
-                if (!batchState.getVolumesList().contains(volume)) {
+                if (!batchState.getVolumes().contains(volume)) {
                     var errorMsg = String.format("Requested volume does not exist: [%s]", volume);
                     log.error(errorMsg);
                     throw new ETracInternal(errorMsg);
