@@ -32,8 +32,6 @@ import org.apache.sshd.scp.client.ScpClient;
 import org.apache.sshd.scp.client.ScpClientCreator;
 import org.apache.sshd.scp.common.helpers.ScpTimestampCommandDetails;
 
-import com.google.protobuf.Parser;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -173,8 +171,8 @@ public class SshExecutor implements IBatchExecutor<SshBatchState> {
     }
 
     @Override
-    public Parser<SshBatchState> stateDecoder() {
-        return SshBatchState.parser();
+    public Class<SshBatchState> stateClass() {
+        return SshBatchState.class;
     }
 
     @Override
