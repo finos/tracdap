@@ -26,14 +26,14 @@ public interface IJobCache<TValue> {
 
     Pattern VALID_KEY = Pattern.compile("\\A[\\w\\-]+\\Z");
 
-    Ticket openNewTicket(String key, Duration duration);
-    Ticket openTicket(String key, int revision, Duration duration);
-    void closeTicket(Ticket ticket);
+    CacheTicket openNewTicket(String key, Duration duration);
+    CacheTicket openTicket(String key, int revision, Duration duration);
+    void closeTicket(CacheTicket ticket);
 
-    int addEntry(Ticket ticket, String status, TValue value);
-    int updateEntry(Ticket ticket, String status, TValue value);
-    void removeEntry(Ticket ticket);
-    CacheEntry<TValue> getEntry(Ticket ticket);
+    int addEntry(CacheTicket ticket, String status, TValue value);
+    int updateEntry(CacheTicket ticket, String status, TValue value);
+    void removeEntry(CacheTicket ticket);
+    CacheEntry<TValue> getEntry(CacheTicket ticket);
 
     Optional<CacheEntry<TValue>> queryKey(String key);
     List<CacheEntry<TValue>> queryStatus(List<String> statuses);

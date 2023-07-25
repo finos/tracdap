@@ -20,7 +20,7 @@ import java.time.Duration;
 import java.time.Instant;
 
 
-public final class Ticket implements AutoCloseable {
+public final class CacheTicket implements AutoCloseable {
 
     private final IJobCache<?> cache;
 
@@ -31,25 +31,25 @@ public final class Ticket implements AutoCloseable {
     private final boolean superseded;
     private final boolean missing;
 
-    public static Ticket missingEntryTicket(String key, int revision, Instant grantTime) {
+    public static CacheTicket missingEntryTicket(String key, int revision, Instant grantTime) {
 
-        return new Ticket(null, key, revision, grantTime, grantTime, false, true);
+        return new CacheTicket(null, key, revision, grantTime, grantTime, false, true);
     }
 
-    public static Ticket supersededTicket(String key, int revision, Instant grantTime) {
+    public static CacheTicket supersededTicket(String key, int revision, Instant grantTime) {
 
-        return new Ticket(null, key, revision, grantTime, grantTime, true, false);
+        return new CacheTicket(null, key, revision, grantTime, grantTime, true, false);
     }
 
-    public static Ticket forDuration(
+    public static CacheTicket forDuration(
             IJobCache<?> cache,
             String key, int revision,
             Instant grantTime, Duration grantDuration) {
 
-        return new Ticket(cache, key, revision, grantTime, grantTime.plus(grantDuration), false, false);
+        return new CacheTicket(cache, key, revision, grantTime, grantTime.plus(grantDuration), false, false);
     }
 
-    protected Ticket(
+    protected CacheTicket(
             IJobCache<?> cache,
             String key, int iteration,
             Instant grantTime, Instant expiry,
