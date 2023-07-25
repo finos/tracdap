@@ -17,26 +17,26 @@
 package org.finos.tracdap.common.cache.local;
 
 import org.finos.tracdap.common.cache.CacheEntry;
+import org.finos.tracdap.common.cache.CacheTicket;
 import org.finos.tracdap.common.cache.IJobCache;
-import org.finos.tracdap.common.cache.Ticket;
-import org.finos.tracdap.common.exception.ECacheNotFound;
-import org.finos.tracdap.common.exception.ECacheTicket;
+import org.finos.tracdap.common.exception.*;
 import org.finos.tracdap.common.metadata.MetadataConstants;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.annotation.Nullable;
+import java.io.*;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
 
-public class LocalJobCache<TValue> implements IJobCache<TValue> {
+public class LocalJobCache<TValue extends Serializable> implements IJobCache<TValue> {
 
     public static final Duration DEFAULT_TICKET_DURATION = Duration.of(30, ChronoUnit.SECONDS);
     public static final Duration MAX_TICKET_DURATION = Duration.of(5, ChronoUnit.MINUTES);
@@ -45,7 +45,7 @@ public class LocalJobCache<TValue> implements IJobCache<TValue> {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
-    private final ConcurrentMap<String, LocalJobCacheEntry<TValue>> _cache;
+    private final ConcurrentMap<String, LocalJobCacheEntry> _cache;
 
     public LocalJobCache() {
 
@@ -53,7 +53,7 @@ public class LocalJobCache<TValue> implements IJobCache<TValue> {
     }
 
     @Override
-    public Ticket openNewTicket(String key, Duration duration) {
+    public CacheTicket openNewTicket(String key, Duration duration) {
 
         checkKey(key);
         checkDuration(duration);
@@ -62,13 +62,13 @@ public class LocalJobCache<TValue> implements IJobCache<TValue> {
         var grantTime = Instant.now();
 
         if (_cache.containsKey(key))
-            return Ticket.supersededTicket(key, FIRST_REVISION, grantTime);
+            return CacheTicket.supersededTicket(key, FIRST_REVISION, grantTime);
         else
-            return Ticket.forDuration(this, key, FIRST_REVISION, grantTime, duration);
+            return CacheTicket.forDuration(this, key, FIRST_REVISION, grantTime, duration);
     }
 
     @Override
-    public Ticket openTicket(String key, int revision, Duration duration) {
+    public CacheTicket openTicket(String key, int revision, Duration duration) {
 
         checkKey(key);
         checkRevision(revision);
@@ -76,7 +76,7 @@ public class LocalJobCache<TValue> implements IJobCache<TValue> {
         checkMaxDuration(key, duration);
 
         var grantTime = Instant.now();
-        var ticket = Ticket.forDuration(this, key, revision, grantTime, duration);
+        var ticket = CacheTicket.forDuration(this, key, revision, grantTime, duration);
 
         var cacheEntry = _cache.computeIfPresent(key, (_key, priorEntry) -> {
 
@@ -93,20 +93,20 @@ public class LocalJobCache<TValue> implements IJobCache<TValue> {
         });
 
         if (cacheEntry == null)
-            return Ticket.missingEntryTicket(key, revision, grantTime);
+            return CacheTicket.missingEntryTicket(key, revision, grantTime);
 
         if (cacheEntry.ticket != ticket) {
             if (cacheEntry.revision >= revision)
-                return Ticket.supersededTicket(key, revision, grantTime);
+                return CacheTicket.supersededTicket(key, revision, grantTime);
             else
-                return Ticket.missingEntryTicket(key, revision, grantTime);
+                return CacheTicket.missingEntryTicket(key, revision, grantTime);
         }
 
         return ticket;
     }
 
     @Override
-    public void closeTicket(Ticket ticket) {
+    public void closeTicket(CacheTicket ticket) {
 
         if (ticket.superseded())
             return;
@@ -124,7 +124,7 @@ public class LocalJobCache<TValue> implements IJobCache<TValue> {
     }
 
     @Override
-    public int addEntry(Ticket ticket, String status, TValue value) {
+    public int addEntry(CacheTicket ticket, String status, TValue value) {
 
         var commitTime = Instant.now();
 
@@ -138,12 +138,12 @@ public class LocalJobCache<TValue> implements IJobCache<TValue> {
                 throw new ECacheTicket(message);
             }
 
-            var newEntry = new LocalJobCacheEntry<TValue>();
+            var newEntry = new LocalJobCacheEntry();
             newEntry.ticket = ticket;
             newEntry.revision = ticket.revision() + 1;
             newEntry.lastActivity = commitTime;
-            newEntry.stateKey = status;
-            newEntry.value = value;
+            newEntry.status = status;
+            newEntry.encodedValue = encodeValue(value);
 
             return newEntry;
         });
@@ -152,7 +152,7 @@ public class LocalJobCache<TValue> implements IJobCache<TValue> {
     }
 
     @Override
-    public int updateEntry(Ticket ticket, String stateKey, TValue value) {
+    public int updateEntry(CacheTicket ticket, String stateKey, TValue value) {
 
         var commitTime = Instant.now();
 
@@ -171,8 +171,8 @@ public class LocalJobCache<TValue> implements IJobCache<TValue> {
             var newEntry = _entry.clone();
             newEntry.revision += 1;
             newEntry.lastActivity = commitTime;
-            newEntry.stateKey = stateKey;
-            newEntry.value = value;
+            newEntry.status = stateKey;
+            newEntry.encodedValue = encodeValue(value);
 
             return newEntry;
         });
@@ -181,7 +181,7 @@ public class LocalJobCache<TValue> implements IJobCache<TValue> {
     }
 
     @Override
-    public void removeEntry(Ticket ticket) {
+    public void removeEntry(CacheTicket ticket) {
 
         var commitTime = Instant.now();
 
@@ -202,7 +202,7 @@ public class LocalJobCache<TValue> implements IJobCache<TValue> {
     }
 
     @Override
-    public CacheEntry<TValue> getEntry(Ticket ticket) {
+    public CacheEntry<TValue> getEntry(CacheTicket ticket) {
 
         var entry = _cache.get(ticket.key());
 
@@ -214,28 +214,36 @@ public class LocalJobCache<TValue> implements IJobCache<TValue> {
 
         checkEntryMatchesTicket(entry, ticket, "get");
 
-        return new CacheEntry<>(ticket.key(), entry.revision, entry.stateKey, entry.value);
+        var cacheValue = decodeValue(entry.encodedValue);
+
+        return CacheEntry.forValue(ticket.key(), entry.revision, entry.status, cacheValue);
     }
 
-    @Override @Nullable
-    public CacheEntry<TValue> lookupKey(String key) {
+    @Override
+    public Optional<CacheEntry<TValue>> queryKey(String key) {
 
         var entry = _cache.get(key);
 
         if (entry == null)
-            return null;
-        else
-            return new CacheEntry<>(key, entry.revision, entry.stateKey, entry.value);
+            return Optional.empty();
+
+        try {
+            var cacheValue = decodeValue(entry.encodedValue);
+            return Optional.of(CacheEntry.forValue(key, entry.revision, entry.status, cacheValue));
+        }
+        catch (ECacheCorruption cacheError) {
+            return Optional.of(CacheEntry.error(key, entry.revision, entry.status, cacheError));
+        }
     }
 
     @Override
-    public List<CacheEntry<TValue>> queryState(List<String> states) {
+    public List<CacheEntry<TValue>> queryStatus(List<String> statuses) {
 
-        return queryState(states, false);
+        return queryStatus(statuses, false);
     }
 
     @Override
-    public List<CacheEntry<TValue>> queryState(List<String> states, boolean includeOpenTickets) {
+    public List<CacheEntry<TValue>> queryStatus(List<String> statuses, boolean includeOpenTickets) {
 
         var queryTime = Instant.now();
 
@@ -243,21 +251,32 @@ public class LocalJobCache<TValue> implements IJobCache<TValue> {
 
         _cache.forEach((_key, _entry) -> {
 
-            if (!states.contains(_entry.stateKey))
+            if (!statuses.contains(_entry.status))
                 return;
 
             if (_entry.ticket != null && _entry.ticket.expiry().isAfter(queryTime))
                 if (!includeOpenTickets)
                     return;
 
-            var result = new CacheEntry<>(_key, _entry.revision, _entry.stateKey, _entry.value);
-            results.add(result);
+            // Errors decoding individual cache values must not invalidate the whole query
+            // For any values with a decoding error, add an explicit error entry to the results
+            // Client code can decide how to handle these errors, bad values can still be updated or removed
+
+            try {
+                var cacheValue = decodeValue(_entry.encodedValue);
+                var result = CacheEntry.forValue(_key, _entry.revision, _entry.status, cacheValue);
+                results.add(result);
+            }
+            catch (ECacheCorruption cacheError) {
+                var result = CacheEntry.<TValue>error(_key, _entry.revision, _entry.status, cacheError);
+                results.add(result);
+            }
         });
 
         return results;
     }
 
-    private void checkValidTicket(Ticket ticket, String operation, Instant operationTime) {
+    private void checkValidTicket(CacheTicket ticket, String operation, Instant operationTime) {
 
         if (ticket.missing()) {
             var message = String.format("Cannot %s [%s], item is not in the cache", operation, ticket.key());
@@ -278,7 +297,7 @@ public class LocalJobCache<TValue> implements IJobCache<TValue> {
         }
     }
 
-    private void checkEntryMatchesTicket(LocalJobCacheEntry<TValue> entry, Ticket ticket, String operation) {
+    private void checkEntryMatchesTicket(LocalJobCacheEntry entry, CacheTicket ticket, String operation) {
 
         if (entry.ticket == null){
             var message = String.format("Cannot %s [%s], ticket is no longer valid", operation, ticket.key());
@@ -335,6 +354,52 @@ public class LocalJobCache<TValue> implements IJobCache<TValue> {
                     duration, key);
 
             throw new ECacheTicket(message);
+        }
+    }
+
+    private byte[] encodeValue(TValue value) {
+
+        try (var stream = new ZCByteArrayOutputStream();
+             var serialize = new ObjectOutputStream(stream)) {
+
+            serialize.writeObject(value);
+            serialize.flush();
+
+            return stream.toByteArray();
+        }
+        catch (IOException e) {
+            throw new EUnexpected(e);
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private TValue decodeValue(byte[] encodedValue) throws ECacheCorruption {
+
+        try (var stream = new ByteArrayInputStream(encodedValue);
+             var deserialize = new ObjectInputStream(stream)) {
+
+            var object = deserialize.readObject();
+
+            return (TValue) object;
+        }
+        catch (InvalidClassException e) {
+            var message = "The job cache references an old code version for class [" + e.classname + "]";
+            throw new ECacheCorruption(message, e);
+        }
+        catch (ClassNotFoundException e) {
+            var message = "The job cache references code for an unknown class [" + e.getMessage() + "]";
+            throw new ECacheCorruption(message, e);
+        }
+        catch (IOException e) {
+            var message = "The job cache contains a corrupt entry that cannot be decoded";
+            throw new ECacheCorruption(message, e);
+        }
+    }
+
+    private static class ZCByteArrayOutputStream extends ByteArrayOutputStream {
+        @Override
+        public byte[] toByteArray() {
+            return this.buf;
         }
     }
 }

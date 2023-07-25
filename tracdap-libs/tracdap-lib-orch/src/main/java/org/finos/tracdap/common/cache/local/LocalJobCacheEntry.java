@@ -16,26 +16,26 @@
 
 package org.finos.tracdap.common.cache.local;
 
-import org.finos.tracdap.common.cache.Ticket;
+import org.finos.tracdap.common.cache.CacheTicket;
 
 import java.time.Instant;
 
 
-class LocalJobCacheEntry<TValue> implements Cloneable {
+class LocalJobCacheEntry implements Cloneable {
 
     public int revision;
-    String stateKey;
-    TValue value;
+    String status;
+
+    byte[] encodedValue;
 
     Instant lastActivity;
-    Ticket ticket;
+    CacheTicket ticket;
 
     @Override
-    @SuppressWarnings("unchecked")
-    public LocalJobCacheEntry<TValue> clone() {
+    public LocalJobCacheEntry clone() {
 
         try {
-            return (LocalJobCacheEntry<TValue>) super.clone();
+            return (LocalJobCacheEntry) super.clone();
         }
         catch (CloneNotSupportedException e) {
             throw new AssertionError();
