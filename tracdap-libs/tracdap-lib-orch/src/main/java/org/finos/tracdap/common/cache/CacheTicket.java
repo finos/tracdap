@@ -49,7 +49,7 @@ public final class CacheTicket implements AutoCloseable {
         return new CacheTicket(cache, key, revision, grantTime, grantTime.plus(grantDuration), false, false);
     }
 
-    protected CacheTicket(
+    private CacheTicket(
             IJobCache<?> cache,
             String key, int iteration,
             Instant grantTime, Instant expiry,
