@@ -108,6 +108,8 @@ public class LocalJobCache<TValue extends Serializable> implements IJobCache<TVa
     @Override
     public void closeTicket(CacheTicket ticket) {
 
+        checkTicket(ticket);
+
         if (ticket.superseded())
             return;
 
@@ -203,6 +205,10 @@ public class LocalJobCache<TValue extends Serializable> implements IJobCache<TVa
 
     @Override
     public CacheEntry<TValue> getEntry(CacheTicket ticket) {
+
+        var accessTime = Instant.now();
+
+        checkValidTicket(ticket, "update", accessTime);
 
         var entry = _cache.get(ticket.key());
 
@@ -321,7 +327,7 @@ public class LocalJobCache<TValue extends Serializable> implements IJobCache<TVa
     private void checkKey(String key) {
 
         if (key == null)
-            throw new IllegalArgumentException();
+            throw new IllegalArgumentException(new NullPointerException());
 
         if (!VALID_KEY.matcher(key).matches())
             throw new IllegalArgumentException();
@@ -339,10 +345,16 @@ public class LocalJobCache<TValue extends Serializable> implements IJobCache<TVa
     private void checkDuration(Duration duration) {
 
         if (duration == null)
-            throw new IllegalArgumentException();
+            throw new IllegalArgumentException(new NullPointerException());
 
         if (duration.isZero() || duration.isNegative())
             throw new IllegalArgumentException();
+    }
+
+    private void checkTicket(CacheTicket ticket) {
+
+        if (ticket == null)
+            throw new IllegalArgumentException(new NullPointerException());
     }
 
     private void checkMaxDuration(String key, Duration duration) {
