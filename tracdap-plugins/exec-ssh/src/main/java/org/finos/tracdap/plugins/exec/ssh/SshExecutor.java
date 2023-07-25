@@ -54,7 +54,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 
-public class SshExecutor implements IBatchExecutor<SshBatchState> {
+public class SshExecutor implements IBatchExecutor<SshExecutorState> {
 
     public static final String REMOTE_HOST_KEY = "remoteHost";
     public static final String REMOTE_PORT_KEY = "remotePort";
@@ -171,12 +171,12 @@ public class SshExecutor implements IBatchExecutor<SshBatchState> {
     }
 
     @Override
-    public Class<SshBatchState> stateClass() {
-        return SshBatchState.class;
+    public Class<SshExecutorState> stateClass() {
+        return SshExecutorState.class;
     }
 
     @Override
-    public SshBatchState createBatch(String batchKey) {
+    public SshExecutorState createBatch(String batchKey) {
 
         try {
 
@@ -199,12 +199,7 @@ public class SshExecutor implements IBatchExecutor<SshBatchState> {
 
             session.executeRemoteCommand(volumesCmd);
 
-            return SshBatchState.newBuilder()
-                    .setRemoteHost(remoteHost)
-                    .setRemotePort(remotePort)
-                    .setBatchUser(batchUser)
-                    .setBatchDir(batchDir)
-                    .build();
+            return new SshExecutorState(remoteHost, remotePort, batchUser,batchDir);
         }
         catch (IOException e) {
 
@@ -219,7 +214,7 @@ public class SshExecutor implements IBatchExecutor<SshBatchState> {
     }
 
     @Override
-    public void destroyBatch(String batchKey, SshBatchState batchState) {
+    public void destroyBatch(String batchKey, SshExecutorState batchState) {
 
         boolean processDown = false;
 
@@ -262,7 +257,7 @@ public class SshExecutor implements IBatchExecutor<SshBatchState> {
     }
 
     @Override
-    public SshBatchState createVolume(String batchKey, SshBatchState batchState, String volumeName, ExecutorVolumeType volumeType) {
+    public SshExecutorState createVolume(String batchKey, SshExecutorState batchState, String volumeName, ExecutorVolumeType volumeType) {
 
         try {
 
@@ -276,9 +271,7 @@ public class SshExecutor implements IBatchExecutor<SshBatchState> {
 
             session.executeRemoteCommand(command);
 
-            return batchState.toBuilder()
-                    .addVolumes(volumeName)
-                    .build();
+            return batchState.withVolume(volumeName);
         }
         catch (IOException e) {
 
@@ -291,8 +284,8 @@ public class SshExecutor implements IBatchExecutor<SshBatchState> {
     }
 
     @Override
-    public SshBatchState writeFile(
-            String batchKey, SshBatchState batchState,
+    public SshExecutorState writeFile(
+            String batchKey, SshExecutorState batchState,
             String volumeName, String fileName,
             byte[] fileContent) {
 
@@ -302,8 +295,8 @@ public class SshExecutor implements IBatchExecutor<SshBatchState> {
                 DEFAULT_DIRECTORY_PERMISSIONS);
     }
 
-    private SshBatchState writeFile(
-            String batchKey, SshBatchState batchState,
+    private SshExecutorState writeFile(
+            String batchKey, SshExecutorState batchState,
             String volumeName, String fileName,
             byte[] fileContent, List<PosixFilePermission> posixPermissions) {
 
@@ -337,7 +330,7 @@ public class SshExecutor implements IBatchExecutor<SshBatchState> {
     }
 
     @Override
-    public byte[] readFile(String batchKey, SshBatchState batchState, String volumeName, String fileName) {
+    public byte[] readFile(String batchKey, SshExecutorState batchState, String volumeName, String fileName) {
 
         try {
 
@@ -362,7 +355,7 @@ public class SshExecutor implements IBatchExecutor<SshBatchState> {
     }
 
     @Override
-    public SshBatchState startBatch(String batchKey, SshBatchState batchState, LaunchCmd launchCmd, List<LaunchArg> launchArgs) {
+    public SshExecutorState startBatch(String batchKey, SshExecutorState batchState, LaunchCmd launchCmd, List<LaunchArg> launchArgs) {
 
         try {
 
@@ -371,7 +364,7 @@ public class SshExecutor implements IBatchExecutor<SshBatchState> {
             var session = getSession(batchState);
             var command = buildBatchCommand(batchKey, batchState, launchCmd, launchArgs);
 
-            if (!batchState.getVolumesList().contains("log"))
+            if (!batchState.getVolumes().contains("log"))
                 throw new ETracInternal("Executor log volume has not been configured");
 
             var executePermissions = new ArrayList<>(DEFAULT_FILE_PERMISSIONS);
@@ -420,9 +413,7 @@ public class SshExecutor implements IBatchExecutor<SshBatchState> {
             var pidText = session.executeRemoteCommand(pidCommand);
             var pid = tryParseLong(pidText, "Start batch failed, invalid value for [pid]");
 
-            return batchState.toBuilder()
-                    .setPid(pid)
-                    .build();
+            return batchState.withPid(pid);
         }
         catch (IOException e) {
 
@@ -437,7 +428,7 @@ public class SshExecutor implements IBatchExecutor<SshBatchState> {
     }
 
     @Override
-    public ExecutorJobInfo pollBatch(String batchKey, SshBatchState batchState) {
+    public ExecutorJobInfo pollBatch(String batchKey, SshExecutorState batchState) {
 
         try {
 
@@ -501,7 +492,7 @@ public class SshExecutor implements IBatchExecutor<SshBatchState> {
     }
 
     @Override
-    public List<ExecutorJobInfo> pollBatches(List<Map.Entry<String, SshBatchState>> priorStates) {
+    public List<ExecutorJobInfo> pollBatches(List<Map.Entry<String, SshExecutorState>> priorStates) {
 
         var results = new ArrayList<ExecutorJobInfo>();
 
@@ -536,7 +527,7 @@ public class SshExecutor implements IBatchExecutor<SshBatchState> {
         return getSession(remoteHost, port, batchUser).session;
     }
 
-    private ClientSession getSession(SshBatchState batchState) throws IOException {
+    private ClientSession getSession(SshExecutorState batchState) throws IOException {
 
         var remoteHost = batchState.getRemoteHost();
         var remotePort = (short) batchState.getRemotePort();
@@ -545,7 +536,7 @@ public class SshExecutor implements IBatchExecutor<SshBatchState> {
         return getSession(remoteHost, remotePort, batchUser).session;
     }
 
-    private ScpClient getSessionScp(SshBatchState batchState) throws IOException {
+    private ScpClient getSessionScp(SshExecutorState batchState) throws IOException {
 
         var remoteHost = batchState.getRemoteHost();
         var remotePort = (short) batchState.getRemotePort();
@@ -658,7 +649,7 @@ public class SshExecutor implements IBatchExecutor<SshBatchState> {
         return batchPath.toString();
     }
 
-    private String buildVolumePath(SshBatchState batchState, String volumeName) {
+    private String buildVolumePath(SshExecutorState batchState, String volumeName) {
 
         var volumePath = new StringBuilder();
         volumePath.append(batchState.getBatchDir());
@@ -672,12 +663,12 @@ public class SshExecutor implements IBatchExecutor<SshBatchState> {
         return volumePath.toString();
     }
 
-    private String buildRemotePath(SshBatchState batchState, String volumeName, String fileName) {
+    private String buildRemotePath(SshExecutorState batchState, String volumeName, String fileName) {
 
         return buildVolumePath(batchState, volumeName) + "/" + fileName;
     }
 
-    private String buildBatchCommand(String batchKey, SshBatchState batchState, LaunchCmd launchCmd, List<LaunchArg> launchArgs) {
+    private String buildBatchCommand(String batchKey, SshExecutorState batchState, LaunchCmd launchCmd, List<LaunchArg> launchArgs) {
 
 
 
@@ -704,7 +695,7 @@ public class SshExecutor implements IBatchExecutor<SshBatchState> {
         return String.join(" ", processArgs);
     }
 
-    private String decodeLaunchArg(LaunchArg arg, SshBatchState batchState) {
+    private String decodeLaunchArg(LaunchArg arg, SshExecutorState batchState) {
 
         switch (arg.getArgType()) {
 
@@ -715,7 +706,7 @@ public class SshExecutor implements IBatchExecutor<SshBatchState> {
 
                 var volume = arg.getPathVolume();
 
-                if (!batchState.getVolumesList().contains(volume)) {
+                if (!batchState.getVolumes().contains(volume)) {
                     var errorMsg = String.format("Requested volume does not exist: [%s]", volume);
                     log.error(errorMsg);
                     throw new ETracInternal(errorMsg);
