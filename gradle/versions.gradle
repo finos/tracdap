@@ -64,15 +64,14 @@ ext {
     // Plugins
 
     aws_sdk_version = '2.20.88'
-
-    apache_sshd_version = "2.10.0"
+    gcp_sdk_version = '26.18.0'
+    azure_sdk_version = '1.2.15'
 
     // AWS SDK uses Reactive Streams
     // Only the latest version has a good license (MIT-0, prior versions were Creative Commons)
     reactive_streams_version = '1.0.4'
 
-
-    gcp_sdk_version = '26.18.0'
+    apache_sshd_version = "2.10.0"
 
 
     // Test dependencies

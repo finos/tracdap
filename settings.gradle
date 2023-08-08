@@ -121,24 +121,27 @@ project(":secret-tool").projectDir = file("tracdap-tools/secret-tool")
 
 // Plugins
 
+// AWS config plugin still uses AWS v1 API - needs porting to V2
+
+//include 'aws-config'
+include 'aws-storage'
+include 'gcp-config'
+include 'gcp-storage'
+include 'azure-storage'
+include 'exec-ssh'
+
+//project(":aws-config").projectDir = file("tracdap-plugins/aws-config")
+project(":aws-storage").projectDir = file("tracdap-plugins/aws-storage")
+project(":gcp-config").projectDir = file("tracdap-plugins/gcp-config")
+project(":gcp-storage").projectDir = file("tracdap-plugins/gcp-storage")
+project(":azure-storage").projectDir = file("tracdap-plugins/azure-storage")
+project(":exec-ssh").projectDir = file("tracdap-plugins/exec-ssh")
+
+
+// SQL dialects
+
 include 'sql-postgresql'
 include 'sql-sqlserver'
 
 project(":sql-postgresql").projectDir = file("tracdap-plugins/sql-postgresql")
 project(":sql-sqlserver").projectDir = file("tracdap-plugins/sql-sqlserver")
-
-
-// AWS config plugin still uses AWS v1 API - needs porting to V2
-//include 'aws-config'
-//project(":aws-config").projectDir = file("tracdap-plugins/aws-config")
-
-include 'aws-storage'
-project(":aws-storage").projectDir = file("tracdap-plugins/aws-storage")
-
-include 'gcp-config'
-include 'gcp-storage'
-project(":gcp-config").projectDir = file("tracdap-plugins/gcp-config")
-project(":gcp-storage").projectDir = file("tracdap-plugins/gcp-storage")
-
-include 'exec-ssh'
-project(":exec-ssh").projectDir = file("tracdap-plugins/exec-ssh")
