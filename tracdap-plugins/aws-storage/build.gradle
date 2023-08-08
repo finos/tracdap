@@ -28,32 +28,20 @@ group = "org.finos.tracdap.plugins"
 
 dependencies {
 
-    api project(':tracdap-lib-common')
-    api project(':tracdap-lib-data')
+    implementation project(":tracdap-lib-common")
+    implementation project(":tracdap-lib-data")
 
-    implementation group: 'software.amazon.awssdk', name: 'aws-core', version: "$aws_sdk_version"
-    implementation group: 'software.amazon.awssdk', name: 'netty-nio-client', version: "$aws_sdk_version"
-    implementation group: 'software.amazon.awssdk', name: 's3', version: "$aws_sdk_version"
-
-    // Force Netty onto the same version as the rest of the TRAC platform
-    // Do not run different versions of Netty inside the same service / JVM
-    implementation group: 'io.netty', name: 'netty-common', version: "$netty_version"
-    implementation group: 'io.netty', name: 'netty-buffer', version: "$netty_version"
-    implementation group: 'io.netty', name: 'netty-codec-http2', version: "$netty_version"
-    implementation group: 'io.netty', name: 'netty-transport-classes-epoll', version: "$netty_version"
+    implementation platform(group: "software.amazon.awssdk", name: "bom", version: "${aws_sdk_version}")
+    implementation "software.amazon.awssdk:aws-core"
+    implementation "software.amazon.awssdk:netty-nio-client"
+    implementation "software.amazon.awssdk:s3"
 
     // AWS SDK uses Reactive Streams
     // Only the latest version has a good license (MIT-0, prior versions were Creative Commons)
-    implementation group: 'org.reactivestreams', name: 'reactive-streams', version: "$reactive_streams_version"
+    implementation group: "org.reactivestreams", name: "reactive-streams", version: "${reactive_streams_version}"
 
-    // Force the version of Jackson (only latest stable will ever pass compliance)
-    implementation group: 'com.fasterxml.jackson.core', name: 'jackson-core', version: "$jackson_version"
-    implementation group: 'com.fasterxml.jackson.core', name: 'jackson-databind', version: "$jackson_databind_version"
-
-    testImplementation project(path: ':tracdap-lib-data', configuration: 'testSuite')
+    testImplementation project(path: ":tracdap-lib-data", configuration: "testSuite")
 }
 
-
 // Use a different build dir (don't include plugins in the main release package)
-project.buildDir = rootProject.buildDir.path + '/plugins/' + project.name
-
+project.buildDir = "${rootProject.buildDir.path}/plugins/${project.name}"
