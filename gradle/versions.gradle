@@ -72,8 +72,7 @@ ext {
     reactive_streams_version = '1.0.4'
 
 
-    gcp_bom_version = '26.18.0'
-    // gcp_sdk_http_client_version = '1.41.8'  // Force Google HTTP client version needed for compliance
+    gcp_sdk_version = '26.18.0'
 
 
     // Test dependencies

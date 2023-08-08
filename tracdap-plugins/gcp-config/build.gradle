@@ -20,7 +20,6 @@ plugins {
 
 apply from: "${rootProject.projectDir.path}/gradle/base-java.gradle"
 
-
 description = "GCP config plugin, load config from GCP cloud storage and secret manager"
 
 // Put plugins into a separate package group
@@ -28,13 +27,14 @@ group = "org.finos.tracdap.plugins"
 
 dependencies {
 
-    api project(':tracdap-lib-common')
+    implementation project(":tracdap-lib-common")
 
-    implementation platform(group: 'com.google.cloud', name: 'libraries-bom', version: "$gcp_bom_version")
+    implementation platform(group: "com.google.cloud", name: "libraries-bom", version: "$gcp_sdk_version")
     implementation "com.google.cloud:google-cloud-storage"
 }
 
 configurations.configureEach {
+
     resolutionStrategy.dependencySubstitution {
 
         // GCP SDK defaults to using grpc-netty-shaded, but TRAC already uses the full Netty stack
@@ -44,3 +44,6 @@ configurations.configureEach {
         substitute module("javax.annotation:javax.annotation-api") using project(":tracdap-lib-annotations")
     }
 }
+
+// Use a different build dir (don't include plugins in the main release package)
+project.buildDir = "${rootProject.buildDir.path}/plugins/${project.name}"

@@ -28,19 +28,17 @@ group = "org.finos.tracdap.plugins"
 
 dependencies {
 
-    api project(':tracdap-lib-common')
-    api project(':tracdap-lib-data')
+    implementation project(":tracdap-lib-common")
+    implementation project(":tracdap-lib-data")
 
-    implementation platform(group: 'com.google.cloud', name: 'libraries-bom', version: "$gcp_bom_version")
+    implementation platform(group: "com.google.cloud", name: "libraries-bom", version: "$gcp_sdk_version")
     implementation "com.google.cloud:google-cloud-storage"
 
-    // Explicit dependency required to configure transport
-    implementation "io.grpc:grpc-netty"
-
-    testImplementation project(path: ':tracdap-lib-data', configuration: 'testSuite')
+    testImplementation project(path: ":tracdap-lib-data", configuration: "testSuite")
 }
 
 configurations.configureEach {
+
     resolutionStrategy.dependencySubstitution {
 
         // GCP SDK defaults to using grpc-netty-shaded, but TRAC already uses the full Netty stack
@@ -53,5 +51,5 @@ configurations.configureEach {
 
 
 // Use a different build dir (don't include plugins in the main release package)
-project.buildDir = rootProject.buildDir.path + '/plugins/' + project.name
+project.buildDir = "${rootProject.buildDir.path}/plugins/${project.name}"
 
