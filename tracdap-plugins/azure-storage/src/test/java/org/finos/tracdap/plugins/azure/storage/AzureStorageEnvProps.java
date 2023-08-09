@@ -25,16 +25,27 @@ public class AzureStorageEnvProps {
 
     public static final String TRAC_AZURE_STORAGE_ACCOUNT = "TRAC_AZURE_STORAGE_ACCOUNT";
     public static final String TRAC_AZURE_CONTAINER = "TRAC_AZURE_CONTAINER";
+    public static final String TRAC_AZURE_CREDENTIALS = "TRAC_AZURE_CREDENTIALS";
+    public static final String TRAC_AZURE_ACCESS_KEY = "TRAC_AZURE_ACCESS_KEY";
 
     public static Properties readStorageEnvProps() {
 
         var storageAccount = System.getenv(TRAC_AZURE_STORAGE_ACCOUNT);
         var container = System.getenv(TRAC_AZURE_CONTAINER);
+        var credentials = System.getenv(TRAC_AZURE_CREDENTIALS);
 
         var storageProps = new Properties();
         storageProps.put(IStorageManager.PROP_STORAGE_KEY, "TEST_STORAGE");
         storageProps.put(AzureBlobStorage.STORAGE_ACCOUNT_PROPERTY, storageAccount);
         storageProps.put(AzureBlobStorage.CONTAINER_PROPERTY, container);
+
+        if (credentials != null)
+            storageProps.put(AzureBlobStorage.CREDENTIALS_PROPERTY, credentials);
+
+        if (AzureBlobStorage.CREDENTIALS_ACCESS_KEY.equalsIgnoreCase(credentials)) {
+            var accessKey = System.getenv(TRAC_AZURE_ACCESS_KEY);
+            storageProps.put(AzureBlobStorage.ACCESS_KEY_PROPERTY, accessKey);
+        }
 
         return storageProps;
     }

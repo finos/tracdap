@@ -16,6 +16,8 @@
 
 package org.finos.tracdap.plugins.azure.storage;
 
+import com.azure.storage.common.StorageSharedKeyCredential;
+import com.fasterxml.jackson.databind.annotation.JsonAppend;
 import org.finos.tracdap.common.data.IDataContext;
 import org.finos.tracdap.common.data.IExecutionContext;
 import org.finos.tracdap.common.exception.EStartup;
@@ -52,12 +54,19 @@ public class AzureBlobStorage extends CommonFileStorage {
     public static final String CONTAINER_PROPERTY = "container";
     public static final String PREFIX_PROPERTY = "prefix";
 
+    public static final String CREDENTIALS_PROPERTY = "credentials";
+    public static final String CREDENTIALS_DEFAULT = "default";
+    public static final String CREDENTIALS_ACCESS_KEY = "accessKey";
+    public static final String ACCESS_KEY_PROPERTY = "accessKey";
+
     public static final String BLOB_ENDPOINT_TEMPLATE = "https://%s.blob.core.windows.net/";
     public static final Duration STARTUP_TIMEOUT = Duration.of(1, ChronoUnit.MINUTES);
 
     private final String storageAccount;
     private final String container;
     private final String prefix;
+
+    private final CredentialsProvider credentialsProvider;
 
     private BlobContainerAsyncClient containerClient;
 
@@ -72,27 +81,54 @@ public class AzureBlobStorage extends CommonFileStorage {
         this.storageAccount = storageAccount;
         this.container = container;
         this.prefix = normalizePrefix(prefix);
+
+        this.credentialsProvider = prepareCredentials(properties);
     }
 
-    private TokenCredential prepareCredentials() {
+    private CredentialsProvider prepareCredentials(Properties properties) {
 
-        return new DefaultAzureCredentialBuilder().build();
+        var mechanism = properties.containsKey(CREDENTIALS_PROPERTY)
+                ? properties.getProperty(CREDENTIALS_PROPERTY)
+                : CREDENTIALS_DEFAULT;
+
+        if (CREDENTIALS_DEFAULT.equalsIgnoreCase(mechanism)) {
+
+            log.info("Using [{}] credentials mechanism", CREDENTIALS_DEFAULT);
+            var credentials = new DefaultAzureCredentialBuilder().build();
+
+            return builder -> builder.credential(credentials);
+        }
+
+        if (CREDENTIALS_ACCESS_KEY.equalsIgnoreCase(mechanism)) {
+
+            log.info("Using [{}] credentials mechanism", CREDENTIALS_ACCESS_KEY);
+
+            var accessKey = properties.getProperty(ACCESS_KEY_PROPERTY);
+            var credentials = new StorageSharedKeyCredential(storageAccount, accessKey);
+
+            return builder -> builder.credential(credentials);
+        }
+
+        var message = String.format("Unrecognised credentials mechanism: [%s]", mechanism);
+        log.error(message);
+        throw new EStartup(message);
     }
 
     @Override
     public void start(EventLoopGroup eventLoopGroup) {
 
         var endpoint = String.format(BLOB_ENDPOINT_TEMPLATE, storageAccount);
-        var credentials = prepareCredentials();
 
         var httpClient = new NettyAsyncHttpClientBuilder()
                 .eventLoopGroup(eventLoopGroup)
                 .build();
 
-        var serviceClient = new BlobServiceClientBuilder()
+        var serviceClientBuilder = new BlobServiceClientBuilder()
                 .endpoint(endpoint)
-                .credential(credentials)
-                .httpClient(httpClient)
+                .httpClient(httpClient);
+
+        var serviceClient = credentialsProvider
+                .setCredentials(serviceClientBuilder)
                 .buildAsyncClient();
 
         containerClient = serviceClient.getBlobContainerAsyncClient(container);
@@ -331,5 +367,11 @@ public class AzureBlobStorage extends CommonFileStorage {
             return blobName;
 
         return blobName.substring(prefix.length());
+    }
+
+    @FunctionalInterface
+    private interface CredentialsProvider {
+
+        BlobServiceClientBuilder setCredentials(BlobServiceClientBuilder builder);
     }
 }
