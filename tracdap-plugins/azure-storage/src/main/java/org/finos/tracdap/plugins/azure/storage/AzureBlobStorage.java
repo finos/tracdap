@@ -33,6 +33,9 @@ import java.util.concurrent.Flow;
 
 public class AzureBlobStorage extends CommonFileStorage {
 
+    public static final String PREFIX_PROPERTY = "prefix";
+
+
     public AzureBlobStorage(String storageKey, Properties properties) {
         super(BUCKET_SEMANTICS, storageKey, properties, new AzureStorageErrors(storageKey));
     }
