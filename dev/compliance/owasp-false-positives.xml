@@ -112,8 +112,28 @@
     </suppress>
 
     <suppress>
+        <packageUrl regex="true">^pkg:maven/com\.azure/azure\-json@.*$</packageUrl>
+        <cpe>cpe:/a:json-java_project:json-java</cpe>
+    </suppress>
+
+    <suppress>
         <packageUrl regex="true">^pkg:maven/com\.fasterxml\.jackson\.core/jackson\-core@.*$</packageUrl>
         <cpe>cpe:/a:json-java_project:json-java</cpe>
+    </suppress>
+
+    <!-- Vulnerabilities in the YAML implementation for Go language detected as yaml_project -->
+    <!-- Come on OWASP - we're not even using the GO language! -->
+
+    <suppress>
+        <packageUrl regex="true">^pkg:maven/org\.yaml/snakeyaml@.*$</packageUrl>
+        <cpe>cpe:/a:yaml_project:yaml</cpe>
+    </suppress>
+
+    <!-- Another wrong language - part of the Jackson XML stack detected as xml-rs for Rust -->
+
+    <suppress>
+        <packageUrl regex="true">^pkg:maven/com\.sun\.xml\.bind\.jaxb/isorelax@.*$</packageUrl>
+        <cpe>cpe:/a:xml_library_project:xml_library</cpe>
     </suppress>
 
 
@@ -127,7 +147,7 @@
 
     Since unaddressed vulnerabilities block merging, new vulnerabilities with no fix available are also added here.
     This does bring into question whether forcing compliance to pass before merging is the right strategy.
-    On balance I think this approach gets more attention on security issues, so they get resolved more quickly.
+    On balance, I think this approach gets more attention on security issues, so they get resolved more quickly.
     But it is a trade-off, having to mark issues as false positives until the fix comes out.
     Either way, it relies on core devs keeping an eye on outstanding security issues.
     -->
@@ -159,16 +179,6 @@
         <vulnerabilityName>CVE-2022-38751</vulnerabilityName>
         <vulnerabilityName>CVE-2022-41854</vulnerabilityName>
         <vulnerabilityName>CVE-2022-1471</vulnerabilityName>
-    </suppress>
-
-    <!-- Vulnerabilities in the YAML implementation for Go language detected as yaml_project -->
-    <!-- Come on OWASP - we're not even using the GO language! -->
-
-    <suppress>
-        <packageUrl regex="true">^pkg:maven/org\.yaml/snakeyaml@.*$</packageUrl>
-        <cve>CVE-2022-3064</cve>
-        <cve>CVE-2021-4235</cve>
-        <cve>CVE-2023-2251</cve>
     </suppress>
 
     <!-- More spurious errors being reported in SonaType -->
