@@ -23,10 +23,18 @@ import java.util.Properties;
 
 public class AzureStorageEnvProps {
 
+    public static final String TRAC_AZURE_STORAGE_ACCOUNT = "TRAC_AZURE_STORAGE_ACCOUNT";
+    public static final String TRAC_AZURE_CONTAINER = "TRAC_AZURE_CONTAINER";
+
     public static Properties readStorageEnvProps() {
+
+        var storageAccount = System.getenv(TRAC_AZURE_STORAGE_ACCOUNT);
+        var container = System.getenv(TRAC_AZURE_CONTAINER);
 
         var storageProps = new Properties();
         storageProps.put(IStorageManager.PROP_STORAGE_KEY, "TEST_STORAGE");
+        storageProps.put(AzureBlobStorage.STORAGE_ACCOUNT_PROPERTY, storageAccount);
+        storageProps.put(AzureBlobStorage.CONTAINER_PROPERTY, container);
 
         return storageProps;
     }

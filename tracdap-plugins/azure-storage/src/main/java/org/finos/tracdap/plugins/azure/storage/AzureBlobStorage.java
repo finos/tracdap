@@ -24,8 +24,10 @@ import org.finos.tracdap.common.storage.CommonFileStorage;
 import org.finos.tracdap.common.storage.FileStat;
 import org.finos.tracdap.common.storage.FileType;
 
+import com.azure.core.credential.TokenCredential;
 import com.azure.core.http.netty.NettyAsyncHttpClientBuilder;
 import com.azure.core.util.BinaryData;
+import com.azure.identity.DefaultAzureCredentialBuilder;
 import com.azure.storage.blob.BlobContainerAsyncClient;
 import com.azure.storage.blob.BlobServiceClientBuilder;
 import com.azure.storage.blob.models.BlobProperties;
@@ -36,6 +38,7 @@ import io.netty.channel.EventLoopGroup;
 import org.apache.arrow.memory.ArrowBuf;
 
 import java.time.Duration;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.CompletableFuture;
@@ -49,28 +52,46 @@ public class AzureBlobStorage extends CommonFileStorage {
     public static final String CONTAINER_PROPERTY = "container";
     public static final String PREFIX_PROPERTY = "prefix";
 
+    public static final String BLOB_ENDPOINT_TEMPLATE = "https://%s.blob.core.windows.net/";
+    public static final Duration STARTUP_TIMEOUT = Duration.of(1, ChronoUnit.MINUTES);
 
+    private final String storageAccount;
     private final String container;
     private final String prefix;
 
-    private final Duration opsTimeout;
-
     private BlobContainerAsyncClient containerClient;
-
 
     public AzureBlobStorage(String storageKey, Properties properties) {
 
         super(BUCKET_SEMANTICS, storageKey, properties, new AzureStorageErrors(storageKey));
+
+        var storageAccount = properties.getProperty(STORAGE_ACCOUNT_PROPERTY);
+        var container = properties.getProperty(CONTAINER_PROPERTY);
+        var prefix = properties.getProperty(PREFIX_PROPERTY);
+
+        this.storageAccount = storageAccount;
+        this.container = container;
+        this.prefix = normalizePrefix(prefix);
+    }
+
+    private TokenCredential prepareCredentials() {
+
+        return new DefaultAzureCredentialBuilder().build();
     }
 
     @Override
     public void start(EventLoopGroup eventLoopGroup) {
+
+        var endpoint = String.format(BLOB_ENDPOINT_TEMPLATE, storageAccount);
+        var credentials = prepareCredentials();
 
         var httpClient = new NettyAsyncHttpClientBuilder()
                 .eventLoopGroup(eventLoopGroup)
                 .build();
 
         var serviceClient = new BlobServiceClientBuilder()
+                .endpoint(endpoint)
+                .credential(credentials)
                 .httpClient(httpClient)
                 .buildAsyncClient();
 
@@ -88,7 +109,7 @@ public class AzureBlobStorage extends CommonFileStorage {
         if (prefix == null || prefix.isEmpty()) {
 
             var existsResult = containerClient.exists();
-            var exists0 = existsResult.blockOptional(opsTimeout);
+            var exists0 = existsResult.blockOptional(STARTUP_TIMEOUT);
             rootExists = exists0.isPresent() && exists0.get();
         }
         else {
@@ -98,7 +119,7 @@ public class AzureBlobStorage extends CommonFileStorage {
                     .setMaxResultsPerPage(1);
 
             var listResult = containerClient.listBlobs(listOptions);
-            var listResult0 = listResult.blockFirst(opsTimeout);
+            var listResult0 = listResult.blockFirst(STARTUP_TIMEOUT);
             rootExists = listResult0 != null;
         }
 
@@ -268,6 +289,23 @@ public class AzureBlobStorage extends CommonFileStorage {
     @Override
     protected Flow.Subscriber<ArrowBuf> fsOpenOutputStream(String objectKey, CompletableFuture<Long> signal, IDataContext ctx) {
         return null;
+    }
+
+    private String normalizePrefix(String prefix) {
+
+        if (prefix == null)
+            return "";
+
+        while (prefix.startsWith(BACKSLASH))
+            prefix = prefix.substring(1);
+
+        if (prefix.isBlank())
+            return "";
+
+        if (!prefix.endsWith(BACKSLASH))
+            prefix = prefix + BACKSLASH;
+
+        return prefix;
     }
 
     private String usePrefix(String storagePath) {
