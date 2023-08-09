@@ -136,6 +136,16 @@
         <cpe>cpe:/a:xml_library_project:xml_library</cpe>
     </suppress>
 
+    <!-- This is an issue in Jackson's woodstox impl that was fixed in 6.4.0, latest Jackson uses 6.5.1 -->
+    <!-- OWASP is detecting the Codehaus dependency stax2-api 4.2.1 as being Jackson woodstox < 6.4.0 -->
+    <!-- https://nvd.nist.gov/vuln/detail/CVE-2022-40152 -->
+    <!-- https://github.com/FasterXML/woodstox/issues/160 -->
+
+    <suppress>
+        <packageUrl regex="true">^pkg:maven/org\.codehaus\.woodstox/stax2\-api@.*$</packageUrl>
+        <cpe>cpe:/a:fasterxml:woodstox</cpe>
+    </suppress>
+
 
     <!-- ================== -->
     <!-- Special exceptions -->
