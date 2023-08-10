@@ -16,8 +16,6 @@
 
 package org.finos.tracdap.plugins.azure.storage;
 
-import com.azure.storage.common.StorageSharedKeyCredential;
-import com.fasterxml.jackson.databind.annotation.JsonAppend;
 import org.finos.tracdap.common.data.IDataContext;
 import org.finos.tracdap.common.data.IExecutionContext;
 import org.finos.tracdap.common.exception.EStartup;
@@ -26,7 +24,6 @@ import org.finos.tracdap.common.storage.CommonFileStorage;
 import org.finos.tracdap.common.storage.FileStat;
 import org.finos.tracdap.common.storage.FileType;
 
-import com.azure.core.credential.TokenCredential;
 import com.azure.core.http.netty.NettyAsyncHttpClientBuilder;
 import com.azure.core.util.BinaryData;
 import com.azure.identity.DefaultAzureCredentialBuilder;
@@ -35,6 +32,7 @@ import com.azure.storage.blob.BlobServiceClientBuilder;
 import com.azure.storage.blob.models.BlobProperties;
 import com.azure.storage.blob.models.BlockBlobItem;
 import com.azure.storage.blob.models.ListBlobsOptions;
+import com.azure.storage.common.StorageSharedKeyCredential;
 
 import io.netty.channel.EventLoopGroup;
 import org.apache.arrow.memory.ArrowBuf;

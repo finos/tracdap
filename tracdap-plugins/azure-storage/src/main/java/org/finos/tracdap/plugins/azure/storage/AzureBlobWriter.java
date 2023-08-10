@@ -16,10 +16,11 @@
 
 package org.finos.tracdap.plugins.azure.storage;
 
+import org.finos.tracdap.common.data.IDataContext;
+
 import com.azure.storage.blob.BlobAsyncClient;
 import com.azure.storage.blob.models.BlockBlobItem;
 import com.azure.storage.blob.models.ParallelTransferOptions;
-import org.finos.tracdap.common.data.IDataContext;
 import org.reactivestreams.Processor;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
