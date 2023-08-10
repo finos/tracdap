@@ -323,8 +323,12 @@ public class AzureBlobStorage extends CommonFileStorage {
     }
 
     @Override
-    protected Flow.Subscriber<ArrowBuf> fsOpenOutputStream(String objectKey, CompletableFuture<Long> signal, IDataContext ctx) {
-        return null;
+    protected Flow.Subscriber<ArrowBuf> fsOpenOutputStream(String storagePath, CompletableFuture<Long> signal, IDataContext ctx) {
+
+        var blobName = usePrefix(storagePath);
+        var blobClient = containerClient.getBlobAsyncClient(blobName);
+
+        return new AzureBlobWriter(blobClient, signal, ctx);
     }
 
     private String normalizePrefix(String prefix) {
