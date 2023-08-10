@@ -370,38 +370,48 @@ public class S3ObjectStorage extends CommonFileStorage {
     @Override
     protected CompletionStage<Void> fsDeleteDir(String directoryKey, IExecutionContext ctx) {
 
-        return fsDeleteDir(directoryKey, true, ctx);
+        return fsDeleteDirPage(directoryKey, null, ctx);
     }
 
-    protected CompletionStage<Void> fsDeleteDir(String directoryKey, boolean firstPass, IExecutionContext ctx) {
+    protected CompletionStage<Void> fsDeleteDirPage(String directoryKey, String continuation, IExecutionContext ctx) {
 
         var absoluteDir = usePrefix(directoryKey);
 
+        // Using default page size of 1000 keys
         var listRequest = ListObjectsV2Request.builder()
                 .bucket(bucket)
                 .prefix(absoluteDir)
+                .continuationToken(continuation)
                 .build();
 
         // Send request and get response onto the EL for execContext
         var listResponse = toContext(ctx, client.listObjectsV2(listRequest));
 
-        // TODO: Handle contents more than one page, use list objects iterator, or post back to event loop
+        return listResponse.thenCompose(contents -> {
 
-        return listResponse.thenCompose(list -> {
-
-            if (!list.hasContents()) {
-                if (firstPass)
+            if (!contents.hasContents()) {
+                if (continuation == null)
                     throw errors.explicitError("RMDIR", directoryKey, OBJECT_NOT_FOUND);
                 else
-                    return CompletableFuture.completedFuture(0).thenApply(x -> null);
+                    throw errors.explicitError("RMDIR", directoryKey, IO_ERROR, "Expected more objects during delete");
             }
 
-            return fsDeleteDirContents(list, ctx);
+            var delete = fsDeleteDirContents(contents, ctx);
+            var nextPage = contents.nextContinuationToken();
+
+            if (nextPage == null)
+                return delete;
+
+            else
+                return delete.thenCompose(x -> fsDeleteDirPage(directoryKey, nextPage, ctx));
         });
     }
 
     private CompletionStage<Void>
     fsDeleteDirContents(ListObjectsV2Response contents, IExecutionContext ctx) {
+
+        if (!contents.hasContents())
+            return CompletableFuture.completedFuture(null);
 
         var objIds = contents.contents()
                 .stream()
