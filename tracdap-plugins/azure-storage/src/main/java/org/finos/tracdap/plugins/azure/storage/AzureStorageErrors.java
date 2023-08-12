@@ -16,17 +16,34 @@
 
 package org.finos.tracdap.plugins.azure.storage;
 
+import com.azure.storage.blob.models.BlobErrorCode;
+import com.azure.storage.blob.models.BlobStorageException;
 import org.finos.tracdap.common.storage.StorageErrors;
+
+import java.util.Map;
 
 
 public class AzureStorageErrors extends StorageErrors {
+
+    public static Map<BlobErrorCode, ExplicitError> BLOB_ERROR_CODE_MAP = Map.ofEntries(
+            Map.entry(BlobErrorCode.BLOB_NOT_FOUND, ExplicitError.OBJECT_NOT_FOUND));
 
     public AzureStorageErrors(String storageKey) {
         super(storageKey);
     }
 
     @Override
-    protected ExplicitError checkKnownExceptions(Throwable e) {
+    protected ExplicitError checkKnownExceptions(Throwable error) {
+
+        if (error instanceof BlobStorageException) {
+            return checkBlobStorageErrorCode((BlobStorageException) error);
+        }
+
         return null;
+    }
+
+    private ExplicitError checkBlobStorageErrorCode(BlobStorageException error) {
+
+        return BLOB_ERROR_CODE_MAP.getOrDefault(error.getErrorCode(), null);
     }
 }

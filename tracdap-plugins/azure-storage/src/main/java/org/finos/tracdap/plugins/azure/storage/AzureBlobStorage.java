@@ -36,6 +36,7 @@ import com.azure.storage.common.StorageSharedKeyCredential;
 
 import io.netty.channel.EventLoopGroup;
 import org.apache.arrow.memory.ArrowBuf;
+import reactor.core.scheduler.Schedulers;
 
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
@@ -219,7 +220,6 @@ public class AzureBlobStorage extends CommonFileStorage {
     protected CompletionStage<FileStat> fsGetFileInfo(String storagePath, IExecutionContext ctx) {
 
         var blobName = usePrefix(storagePath);
-
         var blobClient = containerClient.getBlobAsyncClient(blobName);
 
         var propsCall = blobClient.getProperties();
@@ -242,12 +242,12 @@ public class AzureBlobStorage extends CommonFileStorage {
 
     @Override
     protected CompletionStage<FileStat> fsGetDirInfo(String prefix, IExecutionContext ctx) {
-        return null;
+        return CompletableFuture.failedFuture(new RuntimeException("not implemented yet"));
     }
 
     @Override
     protected CompletionStage<List<FileStat>> fsListContents(String prefix, String startAfter, int maxKeys, boolean recursive, IExecutionContext ctx) {
-        return null;
+        return CompletableFuture.failedFuture(new RuntimeException("not implemented yet"));
     }
 
     private FileStat buildFileStat(String blobName, BlobProperties properties) {
@@ -270,8 +270,8 @@ public class AzureBlobStorage extends CommonFileStorage {
                 ? properties.getBlobSize()
                 : 0;
 
-        var mtime = properties.getLastModified().toInstant();
-        var atime = properties.getLastAccessedTime().toInstant();
+        var mtime = properties.getLastModified() != null ? properties.getLastModified().toInstant() : null;
+        var atime = properties.getLastAccessedTime() != null ? properties.getLastAccessedTime().toInstant() : null;
 
         return new FileStat(path, name, fileType, size, mtime, atime);
     }
@@ -301,18 +301,34 @@ public class AzureBlobStorage extends CommonFileStorage {
     }
 
     @Override
-    protected CompletionStage<Void> fsDeleteFile(String objectKey, IExecutionContext ctx) {
+    protected CompletionStage<Void> fsDeleteFile(String storagePath, IExecutionContext ctx) {
+
+        var blobName = usePrefix(storagePath);
+        var blobClient = containerClient.getBlobAsyncClient(blobName);
+
+        var deleteCall = blobClient.delete();
+
+        return deleteCall.toFuture().handleAsync(
+                (result, error) -> fsDeleteFileCallback(error),
+                ctx.eventLoopExecutor());
+    }
+
+    private Void fsDeleteFileCallback(Throwable error) {
+
+        if (error != null)
+            throw errors.handleException("RM", "", error);  // TODO
+
         return null;
     }
 
     @Override
     protected CompletionStage<Void> fsDeleteDir(String directoryKey, IExecutionContext ctx) {
-        return null;
+        return CompletableFuture.failedFuture(new RuntimeException("not implemented yet"));
     }
 
     @Override
     protected CompletionStage<ArrowBuf> fsReadChunk(String objectKey, long offset, int size, IDataContext ctx) {
-        return null;
+        return CompletableFuture.failedFuture(new RuntimeException("not implemented yet"));
     }
 
     @Override
