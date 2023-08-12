@@ -16,7 +16,6 @@
 
 package org.finos.tracdap.plugins.azure.storage;
 
-import com.azure.storage.blob.models.*;
 import org.finos.tracdap.common.data.IDataContext;
 import org.finos.tracdap.common.data.IExecutionContext;
 import org.finos.tracdap.common.exception.EStartup;
@@ -26,6 +25,7 @@ import org.finos.tracdap.common.storage.FileStat;
 import org.finos.tracdap.common.storage.FileType;
 
 import com.azure.core.http.netty.NettyAsyncHttpClientBuilder;
+import com.azure.core.http.rest.PagedResponse;
 import com.azure.core.util.BinaryData;
 import com.azure.identity.DefaultAzureCredentialBuilder;
 import com.azure.storage.blob.BlobContainerAsyncClient;
@@ -33,6 +33,7 @@ import com.azure.storage.blob.BlobServiceClientBuilder;
 import com.azure.storage.blob.batch.BlobBatchAsyncClient;
 import com.azure.storage.blob.batch.BlobBatchClientBuilder;
 import com.azure.storage.common.StorageSharedKeyCredential;
+import com.azure.storage.blob.models.*;
 
 import io.netty.channel.EventLoopGroup;
 import org.apache.arrow.memory.ArrowBuf;
@@ -45,6 +46,9 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Flow;
 import java.util.stream.Collectors;
+
+import static org.finos.tracdap.common.storage.StorageErrors.ExplicitError.IO_ERROR;
+import static org.finos.tracdap.common.storage.StorageErrors.ExplicitError.OBJECT_NOT_FOUND;
 
 
 public class AzureBlobStorage extends CommonFileStorage {
@@ -243,13 +247,43 @@ public class AzureBlobStorage extends CommonFileStorage {
     }
 
     @Override
-    protected CompletionStage<FileStat> fsGetDirInfo(String prefix, IExecutionContext ctx) {
-        return CompletableFuture.failedFuture(new RuntimeException("not implemented yet"));
+    protected CompletionStage<FileStat> fsGetDirInfo(String storagePath, IExecutionContext ctx) {
+
+        var absolutePrefix = usePrefix(storagePath);
+
+        var stat = buildDirStat(absolutePrefix);
+
+        return CompletableFuture.completedFuture(stat);
     }
 
     @Override
     protected CompletionStage<List<FileStat>> fsListContents(String prefix, String startAfter, int maxKeys, boolean recursive, IExecutionContext ctx) {
         return CompletableFuture.failedFuture(new RuntimeException("not implemented yet"));
+    }
+
+    private CompletionStage<PagedResponse<BlobItem>> fsListDirPage(String storagePath, String continuation, IExecutionContext ctx) {
+
+        var dirPrefix = usePrefix(storagePath);
+
+        var listOptions = new ListBlobsOptions()
+                .setPrefix(dirPrefix);
+
+        var listCall = continuation != null
+                ? containerClient.listBlobs(listOptions, continuation)
+                : containerClient.listBlobs(listOptions);
+
+        return listCall.byPage().next().toFuture().handleAsync(
+                (result, error) -> fsListDirPageCallback(storagePath, result, error),
+                ctx.eventLoopExecutor());
+    }
+
+    private PagedResponse<BlobItem> fsListDirPageCallback(String storagePath, PagedResponse<BlobItem> results, Throwable error) {
+
+        if (error != null) {
+            throw errors.handleException("LS", storagePath, error);  // TODO
+        }
+
+        return results;
     }
 
     private FileStat buildFileStat(String blobName, BlobProperties properties) {
@@ -276,6 +310,26 @@ public class AzureBlobStorage extends CommonFileStorage {
         var atime = properties.getLastAccessedTime() != null ? properties.getLastAccessedTime().toInstant() : null;
 
         return new FileStat(path, name, fileType, size, mtime, atime);
+    }
+
+    private FileStat buildDirStat(String dirPrefix) {
+
+        var relativePrefix = removePrefix(dirPrefix);
+
+        var storagePath = relativePrefix.isEmpty()
+                ? "."
+                : relativePrefix.endsWith(BACKSLASH)
+                ? relativePrefix.substring(0, relativePrefix.length() - 1)
+                : relativePrefix;
+
+        var name = storagePath.contains(BACKSLASH)
+                ? storagePath.substring(storagePath.lastIndexOf(BACKSLASH) + 1)
+                : storagePath;
+
+        var fileType = FileType.DIRECTORY;
+        var size = 0;
+
+        return new FileStat(storagePath, name, fileType, size, /* mtime = */ null, /* atime = */ null);
     }
 
     @Override
@@ -311,51 +365,51 @@ public class AzureBlobStorage extends CommonFileStorage {
         var deleteCall = blobClient.delete();
 
         return deleteCall.toFuture().handleAsync(
-                (result, error) -> fsDeleteFileCallback(error),
+                (result, error) -> fsDeleteFileCallback(storagePath, error),
                 ctx.eventLoopExecutor());
     }
 
-    private Void fsDeleteFileCallback(Throwable error) {
+    private Void fsDeleteFileCallback(String storagePath, Throwable error) {
 
         if (error != null)
-            throw errors.handleException("RM", "", error);  // TODO
+            throw errors.handleException("RM", storagePath, error);
 
         return null;
     }
 
     @Override
-    protected CompletionStage<Void> fsDeleteDir(String directoryKey, IExecutionContext ctx) {
+    protected CompletionStage<Void> fsDeleteDir(String storagePath, IExecutionContext ctx) {
 
-        var deleteCall = batchClient.deleteBlobs(List.of(), DeleteSnapshotsOptionType.INCLUDE);
+        return fsDeleteDirPage(storagePath, null, ctx);
     }
 
-    @Override
-    protected CompletionStage<Void> fsDeleteDirPage(String directoryKey, IExecutionContext ctx) {
+    private CompletionStage<Void> fsDeleteDirPage(String storagePath, String continuation, IExecutionContext ctx) {
 
-        var deleteCall = batchClient.deleteBlobs(List.of(), DeleteSnapshotsOptionType.INCLUDE);
-    }
+        var listPage = fsListDirPage(storagePath, continuation, ctx);
 
-    private CompletionStage<List<Void>> fsListDirPage(String storagePath, String continuation, IExecutionContext ctx) {
+        return listPage.thenComposeAsync(contents -> {
 
-        var dirPrefix = usePrefix(storagePath);
+            if (contents.getStatusCode() != 200) {
+                if (continuation == null)
+                    throw errors.explicitError("RMDIR", storagePath, OBJECT_NOT_FOUND);
+                else
+                    throw errors.explicitError("RMDIR", storagePath, IO_ERROR, "Expected more objects during delete");
+            }
 
-        var listOptions = new ListBlobsOptions()
-                .setPrefix(dirPrefix);
+            var delete = fsDeleteDirContent(storagePath, contents.getValue(), ctx);
+            var nextPage = contents.getContinuationToken();
 
-        var listCall = continuation != null
-                ? containerClient.listBlobs(listOptions, continuation)
-                : containerClient.listBlobs(listOptions);
+            if (nextPage == null)
+                return delete;
 
-        var listPage = listCall.byPage().next();
-
-
-
-        var deleteCall = batchClient.deleteBlobs(List.of(), DeleteSnapshotsOptionType.INCLUDE);
+            else
+                return delete.thenCompose(x -> fsDeleteDirPage(storagePath, nextPage, ctx));
+        });
     }
 
     private CompletionStage<Void> fsDeleteDirContent(String storagePath, List<BlobItem> blobs, IExecutionContext ctx) {
 
-        var containerUrl = containerClient.getBlobContainerUrl();
+        var containerUrl = containerClient.getBlobContainerUrl() + BACKSLASH;
 
         var blobUrls = blobs.stream()
                 .map(blob -> containerUrl + blob.getName())
@@ -363,7 +417,18 @@ public class AzureBlobStorage extends CommonFileStorage {
 
         var deleteCall = batchClient.deleteBlobs(blobUrls, DeleteSnapshotsOptionType.INCLUDE);
 
-        return deleteCall.collectList().toFuture();
+        return deleteCall.collectList().toFuture().handleAsync(
+                (result, error) -> fsDeleteDirContentCallback(storagePath, error),
+                ctx.eventLoopExecutor());
+    }
+
+    private Void fsDeleteDirContentCallback(String storagePath, Throwable error) {
+
+        if (error != null) {
+            throw errors.handleException("RMDIR", storagePath, error);
+        }
+
+        return null;
     }
 
     @Override
