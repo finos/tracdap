@@ -28,6 +28,7 @@ import com.azure.core.http.netty.NettyAsyncHttpClientBuilder;
 import com.azure.core.http.rest.PagedResponse;
 import com.azure.core.util.BinaryData;
 import com.azure.identity.DefaultAzureCredentialBuilder;
+import com.azure.storage.blob.BlobAsyncClient;
 import com.azure.storage.blob.BlobContainerAsyncClient;
 import com.azure.storage.blob.BlobServiceClientBuilder;
 import com.azure.storage.blob.batch.BlobBatchAsyncClient;
@@ -409,10 +410,13 @@ public class AzureBlobStorage extends CommonFileStorage {
 
     private CompletionStage<Void> fsDeleteDirContent(String storagePath, List<BlobItem> blobs, IExecutionContext ctx) {
 
-        var containerUrl = containerClient.getBlobContainerUrl() + BACKSLASH;
+        if (blobs.isEmpty())
+            return CompletableFuture.completedFuture(null);
 
         var blobUrls = blobs.stream()
-                .map(blob -> containerUrl + blob.getName())
+                .map(BlobItem::getName)
+                .map(containerClient::getBlobAsyncClient)
+                .map(BlobAsyncClient::getBlobUrl)
                 .collect(Collectors.toList());
 
         var deleteCall = batchClient.deleteBlobs(blobUrls, DeleteSnapshotsOptionType.INCLUDE);
