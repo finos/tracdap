@@ -66,6 +66,8 @@ public class AzureBlobStorage extends CommonFileStorage {
     public static final String BLOB_ENDPOINT_TEMPLATE = "https://%s.blob.core.windows.net/";
     public static final Duration STARTUP_TIMEOUT = Duration.of(1, ChronoUnit.MINUTES);
 
+    private static final boolean ALWAYS_OVERWRITE = true;
+
     private final String storageAccount;
     private final String container;
     private final String prefix;
@@ -341,7 +343,7 @@ public class AzureBlobStorage extends CommonFileStorage {
         var blobClient = containerClient.getBlobAsyncClient(dirPrefix);
         var blobData = BinaryData.fromBytes(new byte[0]);
 
-        var uploadCall = blobClient.upload(blobData);
+        var uploadCall = blobClient.upload(blobData, ALWAYS_OVERWRITE);
 
         return uploadCall
                 .toFuture()
