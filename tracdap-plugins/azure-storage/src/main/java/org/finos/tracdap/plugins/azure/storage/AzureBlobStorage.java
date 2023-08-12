@@ -16,6 +16,7 @@
 
 package org.finos.tracdap.plugins.azure.storage;
 
+import com.azure.storage.blob.models.*;
 import org.finos.tracdap.common.data.IDataContext;
 import org.finos.tracdap.common.data.IExecutionContext;
 import org.finos.tracdap.common.exception.EStartup;
@@ -29,14 +30,12 @@ import com.azure.core.util.BinaryData;
 import com.azure.identity.DefaultAzureCredentialBuilder;
 import com.azure.storage.blob.BlobContainerAsyncClient;
 import com.azure.storage.blob.BlobServiceClientBuilder;
-import com.azure.storage.blob.models.BlobProperties;
-import com.azure.storage.blob.models.BlockBlobItem;
-import com.azure.storage.blob.models.ListBlobsOptions;
+import com.azure.storage.blob.batch.BlobBatchAsyncClient;
+import com.azure.storage.blob.batch.BlobBatchClientBuilder;
 import com.azure.storage.common.StorageSharedKeyCredential;
 
 import io.netty.channel.EventLoopGroup;
 import org.apache.arrow.memory.ArrowBuf;
-import reactor.core.scheduler.Schedulers;
 
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
@@ -45,6 +44,7 @@ import java.util.Properties;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Flow;
+import java.util.stream.Collectors;
 
 
 public class AzureBlobStorage extends CommonFileStorage {
@@ -68,6 +68,7 @@ public class AzureBlobStorage extends CommonFileStorage {
     private final CredentialsProvider credentialsProvider;
 
     private BlobContainerAsyncClient containerClient;
+    private BlobBatchAsyncClient batchClient;
 
     public AzureBlobStorage(String storageKey, Properties properties) {
 
@@ -131,6 +132,7 @@ public class AzureBlobStorage extends CommonFileStorage {
                 .buildAsyncClient();
 
         containerClient = serviceClient.getBlobContainerAsyncClient(container);
+        batchClient = new BlobBatchClientBuilder(serviceClient).buildAsyncClient();
 
         checkRootExists();
     }
@@ -323,7 +325,45 @@ public class AzureBlobStorage extends CommonFileStorage {
 
     @Override
     protected CompletionStage<Void> fsDeleteDir(String directoryKey, IExecutionContext ctx) {
-        return CompletableFuture.failedFuture(new RuntimeException("not implemented yet"));
+
+        var deleteCall = batchClient.deleteBlobs(List.of(), DeleteSnapshotsOptionType.INCLUDE);
+    }
+
+    @Override
+    protected CompletionStage<Void> fsDeleteDirPage(String directoryKey, IExecutionContext ctx) {
+
+        var deleteCall = batchClient.deleteBlobs(List.of(), DeleteSnapshotsOptionType.INCLUDE);
+    }
+
+    private CompletionStage<List<Void>> fsListDirPage(String storagePath, String continuation, IExecutionContext ctx) {
+
+        var dirPrefix = usePrefix(storagePath);
+
+        var listOptions = new ListBlobsOptions()
+                .setPrefix(dirPrefix);
+
+        var listCall = continuation != null
+                ? containerClient.listBlobs(listOptions, continuation)
+                : containerClient.listBlobs(listOptions);
+
+        var listPage = listCall.byPage().next();
+
+
+
+        var deleteCall = batchClient.deleteBlobs(List.of(), DeleteSnapshotsOptionType.INCLUDE);
+    }
+
+    private CompletionStage<Void> fsDeleteDirContent(String storagePath, List<BlobItem> blobs, IExecutionContext ctx) {
+
+        var containerUrl = containerClient.getBlobContainerUrl();
+
+        var blobUrls = blobs.stream()
+                .map(blob -> containerUrl + blob.getName())
+                .collect(Collectors.toList());
+
+        var deleteCall = batchClient.deleteBlobs(blobUrls, DeleteSnapshotsOptionType.INCLUDE);
+
+        return deleteCall.collectList().toFuture();
     }
 
     @Override

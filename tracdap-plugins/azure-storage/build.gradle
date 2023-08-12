@@ -33,6 +33,7 @@ dependencies {
 
     implementation platform(group: "com.azure", name: "azure-sdk-bom", version: "$azure_sdk_version")
     implementation "com.azure:azure-storage-blob"
+    implementation "com.azure:azure-storage-blob-batch"
     implementation "com.azure:azure-identity"
 
     testImplementation project(path: ":tracdap-lib-data", configuration: "testSuite")
