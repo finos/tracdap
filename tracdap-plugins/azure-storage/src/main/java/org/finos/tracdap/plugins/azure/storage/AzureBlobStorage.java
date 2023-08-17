@@ -448,7 +448,7 @@ public class AzureBlobStorage extends CommonFileStorage {
         var blobName = usePrefix(storagePath);
         var blobClient = containerClient.getBlobAsyncClient(blobName);
 
-        return new AzureBlobReader(blobClient, ctx);
+        return new AzureBlobReader(blobClient, ctx, errors, storageKey, storagePath);
     }
 
     @Override

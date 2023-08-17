@@ -17,6 +17,8 @@
 package org.finos.tracdap.plugins.azure.storage;
 
 import org.finos.tracdap.common.data.IDataContext;
+import org.finos.tracdap.common.storage.CommonFileReader;
+import org.finos.tracdap.common.storage.StorageErrors;
 
 import com.azure.storage.blob.BlobAsyncClient;
 import com.azure.storage.blob.models.BlobDownloadAsyncResponse;
@@ -26,37 +28,54 @@ import com.azure.storage.blob.models.DownloadRetryOptions;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 
-import org.apache.arrow.memory.ArrowBuf;
-
 import java.nio.ByteBuffer;
-import java.util.concurrent.Flow;
 
 
-public class AzureBlobReader implements Flow.Publisher<ArrowBuf> {
+public class AzureBlobReader extends CommonFileReader {
 
+    private static final int DEFAULT_CHUNK_SIZE = 2097152;  // 2 MB
     private static final int DEFAULT_RETRIES = 1;
     private static final boolean NO_MD5_CHECK = false;
 
     private final BlobAsyncClient blobClient;
     private final IDataContext dataContext;
 
+    private final long offset;
+    private final long size;
+
     private FluxSubscriber fluxSubscriber;
+    private Subscription subscription;
+    private int requestCache;
 
-    private boolean cancelled;
-    private boolean failed;
+    AzureBlobReader(
+            BlobAsyncClient blobClient, IDataContext dataContext, StorageErrors errors,
+            String storageKey, String storagePath,
+            long offset, long limit, long chunkSize) {
 
-    AzureBlobReader(BlobAsyncClient blobClient, IDataContext dataContext) {
+        super(dataContext, errors, storageKey, storagePath, chunkSize, 2, 32);
 
         this.blobClient = blobClient;
         this.dataContext = dataContext;
+
+        this.offset = offset;
+        this.size = limit;
+    }
+
+    AzureBlobReader(
+            BlobAsyncClient blobClient, IDataContext dataContext, StorageErrors errors,
+            String storageKey, String storagePath) {
+
+        this(blobClient, dataContext, errors, storageKey, storagePath, 0, 0, DEFAULT_CHUNK_SIZE);
     }
 
     @Override
-    public void subscribe(Flow.Subscriber<? super ArrowBuf> subscriber) {
+    protected void clientStart() {
 
-        fluxSubscriber = new FluxSubscriber(subscriber);
+        fluxSubscriber = new FluxSubscriber();
 
-        var range = new BlobRange(0);  // or offset, size
+        var range = size > 0
+                ? new BlobRange(offset, size)
+                : new BlobRange(offset);
 
         var options = new DownloadRetryOptions()
                 .setMaxRetryRequests(DEFAULT_RETRIES);
@@ -70,6 +89,24 @@ public class AzureBlobReader implements Flow.Publisher<ArrowBuf> {
                 .subscribe(this::onDownload, fluxSubscriber::onError);
     }
 
+    @Override
+    protected void clientRequest(long n) {
+
+        if (subscription != null)
+            subscription.request(n);
+        else
+            requestCache += n;
+    }
+
+    @Override
+    protected void clientCancel() {
+
+        if (subscription != null) {
+            subscription.cancel();
+            subscription = null;
+        }
+    }
+
     private void onDownload(BlobDownloadAsyncResponse asyncDownload) {
 
         var eventLoop = AzureScheduling.schedulerFor(dataContext.eventLoopExecutor());
@@ -81,76 +118,33 @@ public class AzureBlobReader implements Flow.Publisher<ArrowBuf> {
 
     private class FluxSubscriber implements Subscriber<ByteBuffer> {
 
-        private final Flow.Subscriber<? super ArrowBuf> subscriber;
-
-        FluxSubscriber(Flow.Subscriber<? super ArrowBuf> innerSubscriber) {
-            this.subscriber = innerSubscriber;
-        }
-
         @Override
-        public void onSubscribe(Subscription innerSubscription) {
+        public void onSubscribe(Subscription subscription) {
 
-            var subscription = new FluxSubscription(innerSubscription);
-            subscriber.onSubscribe(subscription);
-        }
-
-        @Override
-        public void onNext(ByteBuffer buffer) {
-
-            if (cancelled || failed)
+            if (isDone())
                 return;
 
-            var allocator = dataContext.arrowAllocator();
-            var size = buffer.remaining();
+            AzureBlobReader.this.subscription = subscription;
 
-            try (var arrowBuf = allocator.buffer(size)) {
-
-                arrowBuf.setBytes(0, buffer);
-                arrowBuf.writerIndex(size);
-
-                arrowBuf.getReferenceManager().retain();
-
-                subscriber.onNext(arrowBuf);
+            if (requestCache > 0) {
+                subscription.request(requestCache);
+                requestCache = 0;
             }
         }
 
         @Override
-        public void onError(Throwable t) {
+        public void onNext(ByteBuffer buffer) {
+            AzureBlobReader.this.onChunk(buffer);
+        }
 
-            if (cancelled || failed)
-                return;
-
-            failed = true;
-            subscriber.onError(t);
+        @Override
+        public void onError(Throwable error) {
+            AzureBlobReader.this.onError(error);
         }
 
         @Override
         public void onComplete() {
-
-            if (cancelled || failed)
-                return;
-
-            subscriber.onComplete();
-        }
-    }
-
-    private class FluxSubscription implements Flow.Subscription {
-
-        private final Subscription innerSubscription;
-
-        FluxSubscription(Subscription innerSubscription) {
-            this.innerSubscription = innerSubscription;
-        }
-
-        @Override
-        public void request(long n) {
-            innerSubscription.request(n);
-        }
-
-        @Override
-        public void cancel() {
-            cancelled = true;
-            innerSubscription.cancel();
+            AzureBlobReader.this.onComplete();
         }
     }
 }
