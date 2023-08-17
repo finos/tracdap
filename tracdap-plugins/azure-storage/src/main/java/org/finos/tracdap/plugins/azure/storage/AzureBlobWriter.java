@@ -42,12 +42,7 @@ public class AzureBlobWriter implements Flow.Subscriber<ArrowBuf> {
     private final CompletableFuture<Long> signal;
     private final IDataContext dataContext;
 
-    private FluxSubscription fluxSubscription;
     private FluxTransformer fluxTransformer;
-
-    private Flux<ByteBuffer> byteStream;
-    private Mono<BlockBlobItem> result;
-
     private long nBytes;
 
     AzureBlobWriter(BlobAsyncClient blobClient, CompletableFuture<Long> signal, IDataContext dataContext) {
@@ -60,18 +55,19 @@ public class AzureBlobWriter implements Flow.Subscriber<ArrowBuf> {
     @Override
     public void onSubscribe(Flow.Subscription subscription) {
 
-        fluxSubscription = new FluxSubscription(subscription);
         fluxTransformer = new FluxTransformer();
-        fluxTransformer.onSubscribe(fluxSubscription);
 
-        byteStream = Flux.from(fluxTransformer);
+        var fluxSubscription = new FluxSubscription(subscription);
+        fluxTransformer.onSubscribe(fluxSubscription);
 
         // Using default transfer options
         var options = new ParallelTransferOptions();
 
-        result = blobClient.upload(byteStream, options, ALWAYS_OVERWRITE);
+        var scheduler = AzureScheduling.schedulerFor(dataContext.eventLoopExecutor());
 
-        result.toFuture().whenCompleteAsync(this::resultCallback, dataContext.eventLoopExecutor());
+        blobClient.upload(Flux.from(fluxTransformer), options, ALWAYS_OVERWRITE)
+                .subscribeOn(scheduler)
+                .subscribe(this::onSuccess, this::onFailure);
     }
 
     @Override
@@ -81,8 +77,15 @@ public class AzureBlobWriter implements Flow.Subscriber<ArrowBuf> {
     }
 
     @Override
-    public void onError(Throwable throwable) {
-        fluxTransformer.onError(throwable);
+    public void onError(Throwable error) {
+
+        // onError() can be called before onSubscribe() in some cases
+        // In this case, pass the error straight to the callback signal
+
+        if (fluxTransformer != null)
+            fluxTransformer.onError(error);
+        else
+            signal.completeExceptionally(error);
     }
 
     @Override
@@ -90,12 +93,12 @@ public class AzureBlobWriter implements Flow.Subscriber<ArrowBuf> {
         fluxTransformer.onComplete();
     }
 
-    private void resultCallback(BlockBlobItem blob, Throwable error) {
+    private void onSuccess(BlockBlobItem blob) {
+        signal.complete(nBytes);
+    }
 
-        if (error != null)
-            signal.completeExceptionally(error);
-        else
-            signal.complete(nBytes);
+    private void onFailure(Throwable error) {
+        signal.completeExceptionally(error);
     }
 
     private static class FluxTransformer implements Processor<ArrowBuf, ByteBuffer> {
@@ -135,8 +138,8 @@ public class AzureBlobWriter implements Flow.Subscriber<ArrowBuf> {
         }
 
         @Override
-        public void onError(Throwable t) {
-            subscriber.onError(t);
+        public void onError(Throwable error) {
+            subscriber.onError(error);
         }
 
         @Override
