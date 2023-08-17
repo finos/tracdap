@@ -42,6 +42,9 @@ public class AzureBlobReader implements Flow.Publisher<ArrowBuf> {
 
     private FluxSubscriber fluxSubscriber;
 
+    private boolean cancelled;
+    private boolean failed;
+
     AzureBlobReader(BlobAsyncClient blobClient, IDataContext dataContext) {
 
         this.blobClient = blobClient;
@@ -94,6 +97,9 @@ public class AzureBlobReader implements Flow.Publisher<ArrowBuf> {
         @Override
         public void onNext(ByteBuffer buffer) {
 
+            if (cancelled || failed)
+                return;
+
             var allocator = dataContext.arrowAllocator();
             var size = buffer.remaining();
 
@@ -110,16 +116,25 @@ public class AzureBlobReader implements Flow.Publisher<ArrowBuf> {
 
         @Override
         public void onError(Throwable t) {
+
+            if (cancelled || failed)
+                return;
+
+            failed = true;
             subscriber.onError(t);
         }
 
         @Override
         public void onComplete() {
+
+            if (cancelled || failed)
+                return;
+
             subscriber.onComplete();
         }
     }
 
-    private static class FluxSubscription implements Flow.Subscription {
+    private class FluxSubscription implements Flow.Subscription {
 
         private final Subscription innerSubscription;
 
@@ -134,6 +149,7 @@ public class AzureBlobReader implements Flow.Publisher<ArrowBuf> {
 
         @Override
         public void cancel() {
+            cancelled = true;
             innerSubscription.cancel();
         }
     }
