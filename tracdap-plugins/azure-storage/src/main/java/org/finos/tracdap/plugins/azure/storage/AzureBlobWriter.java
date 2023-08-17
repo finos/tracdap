@@ -25,7 +25,6 @@ import org.reactivestreams.Processor;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
 
 import org.apache.arrow.memory.ArrowBuf;
 
