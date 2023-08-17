@@ -37,7 +37,6 @@ public class AzureBlobReader implements Flow.Publisher<ArrowBuf> {
     private static final int DEFAULT_RETRIES = 1;
     private static final boolean NO_MD5_CHECK = false;
 
-
     private final BlobAsyncClient blobClient;
     private final IDataContext dataContext;
 
@@ -50,7 +49,6 @@ public class AzureBlobReader implements Flow.Publisher<ArrowBuf> {
     }
 
     @Override
-    @SuppressWarnings("unused")
     public void subscribe(Flow.Subscriber<? super ArrowBuf> subscriber) {
 
         fluxSubscriber = new FluxSubscriber(subscriber);
@@ -62,14 +60,11 @@ public class AzureBlobReader implements Flow.Publisher<ArrowBuf> {
 
         var conditions = new BlobRequestConditions();  // no special conditions
 
-        var download = blobClient.downloadStreamWithResponse(range, options, conditions, NO_MD5_CHECK);
-
         var eventLoop = AzureScheduling.schedulerFor(dataContext.eventLoopExecutor());
 
-        // ignore unused
-        download.subscribeOn(eventLoop)
-                .doOnSuccess(this::onDownload)
-                .doOnError(fluxSubscriber::onError);
+        blobClient.downloadStreamWithResponse(range, options, conditions, NO_MD5_CHECK)
+                .subscribeOn(eventLoop)
+                .subscribe(this::onDownload, fluxSubscriber::onError);
     }
 
     private void onDownload(BlobDownloadAsyncResponse asyncDownload) {
@@ -80,7 +75,6 @@ public class AzureBlobReader implements Flow.Publisher<ArrowBuf> {
                 .subscribeOn(eventLoop)
                 .subscribe(fluxSubscriber);
     }
-
 
     private class FluxSubscriber implements Subscriber<ByteBuffer> {
 
@@ -94,9 +88,7 @@ public class AzureBlobReader implements Flow.Publisher<ArrowBuf> {
         public void onSubscribe(Subscription innerSubscription) {
 
             var subscription = new FluxSubscription(innerSubscription);
-
-            if (subscriber != null)
-                subscriber.onSubscribe(subscription);
+            subscriber.onSubscribe(subscription);
         }
 
         @Override
