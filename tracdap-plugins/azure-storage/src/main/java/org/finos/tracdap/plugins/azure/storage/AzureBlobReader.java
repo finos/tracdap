@@ -16,7 +16,133 @@
 
 package org.finos.tracdap.plugins.azure.storage;
 
+import org.finos.tracdap.common.data.IDataContext;
 
-public class AzureBlobReader {
+import com.azure.storage.blob.BlobAsyncClient;
+import com.azure.storage.blob.models.BlobDownloadAsyncResponse;
+import com.azure.storage.blob.models.BlobRange;
+import com.azure.storage.blob.models.BlobRequestConditions;
+import com.azure.storage.blob.models.DownloadRetryOptions;
+import org.reactivestreams.Subscriber;
+import org.reactivestreams.Subscription;
 
+import org.apache.arrow.memory.ArrowBuf;
+
+import java.nio.ByteBuffer;
+import java.util.concurrent.Flow;
+
+
+public class AzureBlobReader implements Flow.Publisher<ArrowBuf> {
+
+    private static final int DEFAULT_RETRIES = 1;
+    private static final boolean NO_MD5_CHECK = false;
+
+
+    private final BlobAsyncClient blobClient;
+    private final IDataContext dataContext;
+
+    private FluxSubscriber fluxSubscriber;
+
+    AzureBlobReader(BlobAsyncClient blobClient, IDataContext dataContext) {
+
+        this.blobClient = blobClient;
+        this.dataContext = dataContext;
+    }
+
+    @Override
+    @SuppressWarnings("unused")
+    public void subscribe(Flow.Subscriber<? super ArrowBuf> subscriber) {
+
+        fluxSubscriber = new FluxSubscriber(subscriber);
+
+        var range = new BlobRange(0);  // or offset, size
+
+        var options = new DownloadRetryOptions()
+                .setMaxRetryRequests(DEFAULT_RETRIES);
+
+        var conditions = new BlobRequestConditions();  // no special conditions
+
+        var download = blobClient.downloadStreamWithResponse(range, options, conditions, NO_MD5_CHECK);
+
+        var eventLoop = AzureScheduling.schedulerFor(dataContext.eventLoopExecutor());
+
+        // ignore unused
+        download.subscribeOn(eventLoop)
+                .doOnSuccess(this::onDownload)
+                .doOnError(fluxSubscriber::onError);
+    }
+
+    private void onDownload(BlobDownloadAsyncResponse asyncDownload) {
+
+        var eventLoop = AzureScheduling.schedulerFor(dataContext.eventLoopExecutor());
+
+        asyncDownload.getValue()
+                .subscribeOn(eventLoop)
+                .subscribe(fluxSubscriber);
+    }
+
+
+    private class FluxSubscriber implements Subscriber<ByteBuffer> {
+
+        private final Flow.Subscriber<? super ArrowBuf> subscriber;
+
+        FluxSubscriber(Flow.Subscriber<? super ArrowBuf> innerSubscriber) {
+            this.subscriber = innerSubscriber;
+        }
+
+        @Override
+        public void onSubscribe(Subscription innerSubscription) {
+
+            var subscription = new FluxSubscription(innerSubscription);
+
+            if (subscriber != null)
+                subscriber.onSubscribe(subscription);
+        }
+
+        @Override
+        public void onNext(ByteBuffer buffer) {
+
+            var allocator = dataContext.arrowAllocator();
+            var size = buffer.remaining();
+
+            try (var arrowBuf = allocator.buffer(size)) {
+
+                arrowBuf.setBytes(0, buffer);
+                arrowBuf.writerIndex(size);
+
+                arrowBuf.getReferenceManager().retain();
+
+                subscriber.onNext(arrowBuf);
+            }
+        }
+
+        @Override
+        public void onError(Throwable t) {
+            subscriber.onError(t);
+        }
+
+        @Override
+        public void onComplete() {
+            subscriber.onComplete();
+        }
+    }
+
+    private static class FluxSubscription implements Flow.Subscription {
+
+        private final Subscription innerSubscription;
+
+        FluxSubscription(Subscription innerSubscription) {
+            this.innerSubscription = innerSubscription;
+        }
+
+        @Override
+        public void request(long n) {
+            innerSubscription.request(n);
+        }
+
+        @Override
+        public void cancel() {
+            innerSubscription.cancel();
+        }
+    }
 }

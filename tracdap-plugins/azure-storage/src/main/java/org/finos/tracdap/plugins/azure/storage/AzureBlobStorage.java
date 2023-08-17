@@ -443,8 +443,12 @@ public class AzureBlobStorage extends CommonFileStorage {
     }
 
     @Override
-    protected Flow.Publisher<ArrowBuf> fsOpenInputStream(String objectKey, IDataContext ctx) {
-        return null;
+    protected Flow.Publisher<ArrowBuf> fsOpenInputStream(String storagePath, IDataContext ctx) {
+
+        var blobName = usePrefix(storagePath);
+        var blobClient = containerClient.getBlobAsyncClient(blobName);
+
+        return new AzureBlobReader(blobClient, ctx);
     }
 
     @Override
