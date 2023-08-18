@@ -262,8 +262,40 @@ public class AzureBlobStorage extends CommonFileStorage {
     }
 
     @Override
-    protected CompletionStage<List<FileStat>> fsListContents(String prefix, String startAfter, int maxKeys, boolean recursive, IExecutionContext ctx) {
-        return CompletableFuture.failedFuture(new RuntimeException("not implemented yet"));
+    protected CompletionStage<List<FileStat>> fsListContents(String storagePath, String startAfter, int maxKeys, boolean recursive, IExecutionContext ctx) {
+
+        var dirPrefix = usePrefix(storagePath);
+
+        var listDetails = new BlobListDetails()
+                .setRetrieveMetadata(true);
+
+        var listOptions = new ListBlobsOptions()
+                .setPrefix(dirPrefix)
+                .setMaxResultsPerPage(maxKeys)
+                .setDetails(listDetails);
+
+        var scheduler = AzureScheduling.schedulerFor(ctx.eventLoopExecutor());
+
+        var listCall = recursive
+                ? containerClient.listBlobs(listOptions).byPage()
+                : containerClient.listBlobsByHierarchy(dirPrefix, listOptions).byPage();
+
+        return listCall.next()  // first page
+                .publishOn(scheduler)
+                .toFuture()
+                .handle((page, error) -> fsListContentsCallback(page, error));
+    }
+
+    private List<FileStat> fsListContentsCallback(PagedResponse<BlobItem> page, Throwable error) {
+
+        if (error != null) {
+            throw errors.handleException("LS", "", error);  // todo
+        }
+
+        return page.getValue()
+                .stream()
+                .map(blob -> buildFileStat(blob.getName(), blob.getProperties()))
+                .collect(Collectors.toList());
     }
 
     private CompletionStage<PagedResponse<BlobItem>> fsListDirPage(String storagePath, String continuation, IExecutionContext ctx) {
@@ -309,6 +341,32 @@ public class AzureBlobStorage extends CommonFileStorage {
 
         var size = fileType == FileType.FILE
                 ? properties.getBlobSize()
+                : 0;
+
+        var mtime = properties.getLastModified() != null ? properties.getLastModified().toInstant() : null;
+        var atime = properties.getLastAccessedTime() != null ? properties.getLastAccessedTime().toInstant() : null;
+
+        return new FileStat(path, name, fileType, size, mtime, atime);
+    }
+
+    private FileStat buildFileStat(String blobName, BlobItemProperties properties) {
+
+        var relativeName = removePrefix(blobName);
+
+        var path = relativeName.endsWith(BACKSLASH)
+                ? relativeName.substring(0, relativeName.length() - 1)
+                : relativeName;
+
+        var name = path.contains(BACKSLASH)
+                ? path.substring(path.lastIndexOf(BACKSLASH) + 1)
+                : path;
+
+        var fileType = relativeName.endsWith(BACKSLASH)
+                ? FileType.DIRECTORY
+                : FileType.FILE;
+
+        var size = fileType == FileType.FILE
+                ? properties.getContentLength()
                 : 0;
 
         var mtime = properties.getLastModified() != null ? properties.getLastModified().toInstant() : null;
