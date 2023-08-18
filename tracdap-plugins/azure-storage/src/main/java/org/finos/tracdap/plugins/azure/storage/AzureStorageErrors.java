@@ -26,7 +26,8 @@ import java.util.Map;
 public class AzureStorageErrors extends StorageErrors {
 
     public static Map<BlobErrorCode, ExplicitError> BLOB_ERROR_CODE_MAP = Map.ofEntries(
-            Map.entry(BlobErrorCode.BLOB_NOT_FOUND, ExplicitError.OBJECT_NOT_FOUND));
+            Map.entry(BlobErrorCode.BLOB_NOT_FOUND, ExplicitError.OBJECT_NOT_FOUND),
+            Map.entry(BlobErrorCode.INVALID_RANGE, ExplicitError.OBJECT_SIZE_TOO_SMALL));
 
     public AzureStorageErrors(String storageKey) {
         super(storageKey);
