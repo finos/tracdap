@@ -70,6 +70,12 @@ public class AzureBlobStorage extends CommonFileStorage {
 
     private static final boolean ALWAYS_OVERWRITE = true;
 
+    // Azure puts a default limit on the size of delete batch operations
+    // The limit can be changed, but we want the storage implementation to work out-of-the-box
+    // So, use a batch size for delete operations that is inside the default limit
+
+    private static final int DELETE_BATCH_SIZE = 250;
+
     private final String storageAccount;
     private final String container;
     private final String prefix;
@@ -302,12 +308,13 @@ public class AzureBlobStorage extends CommonFileStorage {
                 .collect(Collectors.toList());
     }
 
-    private CompletionStage<PagedResponse<BlobItem>> fsListDirPage(String storagePath, String continuation, IExecutionContext ctx) {
+    private CompletionStage<PagedResponse<BlobItem>> fsListDirPage(String storagePath, int pageSize, String continuation, IExecutionContext ctx) {
 
         var dirPrefix = usePrefix(storagePath);
 
         var listOptions = new ListBlobsOptions()
-                .setPrefix(dirPrefix);
+                .setPrefix(dirPrefix)
+                .setMaxResultsPerPage(pageSize);
 
         var listCall = continuation != null
                 ? containerClient.listBlobs(listOptions, continuation)
@@ -452,7 +459,7 @@ public class AzureBlobStorage extends CommonFileStorage {
 
     private CompletionStage<Void> fsDeleteDirPage(String storagePath, String continuation, IExecutionContext ctx) {
 
-        var listPage = fsListDirPage(storagePath, continuation, ctx);
+        var listPage = fsListDirPage(storagePath, DELETE_BATCH_SIZE, continuation, ctx);
 
         return listPage.thenComposeAsync(contents -> {
 
