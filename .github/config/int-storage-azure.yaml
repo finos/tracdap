@@ -57,6 +57,8 @@ storage:
         storageAccount: ${TRAC_AZURE_STORAGE_ACCOUNT}
         container: ${TRAC_AZURE_CONTAINER}
         prefix: int_storage_${TRAC_TEST_ID}/
+        credentials: ${TRAC_AZURE_CREDENTIALS}
+        accessKey: ${TRAC_AZURE_ACCESS_KEY}
 
 
 repositories:
