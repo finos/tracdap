@@ -65,7 +65,7 @@ public class AzureBlobWriter implements Flow.Subscriber<ArrowBuf> {
         var scheduler = AzureScheduling.schedulerFor(dataContext.eventLoopExecutor());
 
         blobClient.upload(Flux.from(fluxTransformer), options, ALWAYS_OVERWRITE)
-                .subscribeOn(scheduler)
+                .publishOn(scheduler)
                 .subscribe(this::onSuccess, this::onFailure);
     }
 

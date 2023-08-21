@@ -85,7 +85,7 @@ public class AzureBlobReader extends CommonFileReader {
         var eventLoop = AzureScheduling.schedulerFor(dataContext.eventLoopExecutor());
 
         blobClient.downloadStreamWithResponse(range, options, conditions, NO_MD5_CHECK)
-                .subscribeOn(eventLoop)
+                .publishOn(eventLoop)
                 .subscribe(this::onDownload, fluxSubscriber::onError);
     }
 
@@ -112,7 +112,7 @@ public class AzureBlobReader extends CommonFileReader {
         var eventLoop = AzureScheduling.schedulerFor(dataContext.eventLoopExecutor());
 
         asyncDownload.getValue()
-                .subscribeOn(eventLoop)
+                .publishOn(eventLoop)
                 .subscribe(fluxSubscriber);
     }
 
