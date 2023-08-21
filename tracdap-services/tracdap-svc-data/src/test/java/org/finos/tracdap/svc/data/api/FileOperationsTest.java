@@ -19,16 +19,13 @@ package org.finos.tracdap.svc.data.api;
 import org.finos.tracdap.api.*;
 import org.finos.tracdap.common.data.DataContext;
 import org.finos.tracdap.common.data.IExecutionContext;
-import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.metadata.MetadataUtil;
 import org.finos.tracdap.common.async.Flows;
 import org.finos.tracdap.common.async.Futures;
-import org.finos.tracdap.common.plugin.PluginManager;
 import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.test.data.DataApiTestHelpers;
 import org.finos.tracdap.test.helpers.PlatformTest;
-import org.finos.tracdap.test.helpers.StorageTestHelpers;
 
 import com.google.protobuf.ByteString;
 import io.grpc.Status;
@@ -105,6 +102,7 @@ abstract class FileOperationsTest {
         @RegisterExtension
         public static final PlatformTest platform = PlatformTest.forConfig(TRAC_CONFIG_ENV_FILE)
                 .runDbDeploy(true)
+                .manageDataPrefix(true)
                 .addTenant(TEST_TENANT)
                 .addTenant(TEST_TENANT_2)
                 .startMeta()
@@ -116,26 +114,16 @@ abstract class FileOperationsTest {
             elg = new NioEventLoopGroup(2);
         }
 
+        @AfterAll
+        static void tearDownClass() {
+            elg.shutdownGracefully();
+        }
+
         @BeforeEach
         void setup() {
             execContext = new DataContext(elg.next(), new RootAllocator());
             metaClient = platform.metaClientFuture();
             dataClient = platform.dataClient();
-        }
-
-        @AfterAll
-        static void tearDownClass() throws Exception {
-
-            var plugins = new PluginManager();
-            plugins.initConfigPlugins();
-            plugins.initRegularPlugins();
-
-            var config = new ConfigManager(
-                    platform.platformConfigUrl(),
-                    platform.tracDir(),
-                    plugins);
-
-            StorageTestHelpers.deleteStoragePrefix(config, plugins, elg);
         }
     }
 

@@ -20,12 +20,9 @@ import org.finos.tracdap.api.TracDataApiGrpc;
 import org.finos.tracdap.api.TracMetadataApiGrpc;
 import org.finos.tracdap.common.data.DataContext;
 import org.finos.tracdap.common.data.IExecutionContext;
-import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.metadata.MetadataUtil;
-import org.finos.tracdap.common.plugin.PluginManager;
 import org.finos.tracdap.test.data.DataApiTestHelpers;
 import org.finos.tracdap.test.helpers.PlatformTest;
-import org.finos.tracdap.test.helpers.StorageTestHelpers;
 
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
@@ -95,6 +92,7 @@ abstract class TenantSeparationTest {
         @RegisterExtension
         public static final PlatformTest platform = PlatformTest.forConfig(TRAC_CONFIG_ENV_FILE)
                 .runDbDeploy(true)
+                .manageDataPrefix(true)
                 .addTenant(TEST_TENANT)
                 .addTenant(TEST_TENANT_2)
                 .startMeta()
@@ -106,26 +104,16 @@ abstract class TenantSeparationTest {
             elg = new NioEventLoopGroup(2);
         }
 
+        @AfterAll
+        static void tearDownClass() {
+            elg.shutdownGracefully();
+        }
+
         @BeforeEach
         void setup() {
             execContext = new DataContext(elg.next(), new RootAllocator());
             metaClient = platform.metaClientFuture();
             dataClient = platform.dataClient();
-        }
-
-        @AfterAll
-        static void tearDownClass() throws Exception {
-
-            var plugins = new PluginManager();
-            plugins.initConfigPlugins();
-            plugins.initRegularPlugins();
-
-            var config = new ConfigManager(
-                    platform.platformConfigUrl(),
-                    platform.tracDir(),
-                    plugins);
-
-            StorageTestHelpers.deleteStoragePrefix(config, plugins, elg);
         }
     }
 
