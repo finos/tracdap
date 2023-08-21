@@ -280,13 +280,16 @@ public class AzureBlobStorage extends CommonFileStorage {
                 ? containerClient.listBlobs(listOptions).byPage()
                 : containerClient.listBlobsByHierarchy(dirPrefix, listOptions).byPage();
 
+        var excludeKey = startAfter != null
+                ? startAfter : dirPrefix;
+
         return listCall.next()  // first page
                 .publishOn(scheduler)
                 .toFuture()
-                .handle((page, error) -> fsListContentsCallback(page, error));
+                .handle((page, error) -> fsListContentsCallback(page, excludeKey, error));
     }
 
-    private List<FileStat> fsListContentsCallback(PagedResponse<BlobItem> page, Throwable error) {
+    private List<FileStat> fsListContentsCallback(PagedResponse<BlobItem> page, String excludeKey, Throwable error) {
 
         if (error != null) {
             throw errors.handleException("LS", "", error);  // todo
@@ -294,6 +297,7 @@ public class AzureBlobStorage extends CommonFileStorage {
 
         return page.getValue()
                 .stream()
+                .filter(blob -> ! blob.getName().equals(excludeKey))
                 .map(blob -> buildFileStat(blob.getName(), blob.getProperties()))
                 .collect(Collectors.toList());
     }
