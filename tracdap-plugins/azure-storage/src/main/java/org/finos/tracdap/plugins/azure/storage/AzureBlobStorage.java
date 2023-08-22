@@ -157,8 +157,6 @@ public class AzureBlobStorage extends CommonFileStorage {
 
     private void checkRootExists() {
 
-        // todo use fsDirExists(".")
-
         boolean rootExists;
 
         if (prefix == null || prefix.isEmpty()) {
@@ -193,14 +191,13 @@ public class AzureBlobStorage extends CommonFileStorage {
     @Override
     public void stop() {
 
-        // TODO: Azure client classes have no shutdown methods
+        // No-op: Azure client classes have no shutdown methods
     }
 
     @Override
     protected CompletionStage<Boolean> fsExists(String storagePath, IExecutionContext ctx) {
 
         var blob = usePrefix(storagePath);
-
         var blobClient = containerClient.getBlobAsyncClient(blob);
 
         var existsCall = blobClient.exists();
@@ -229,7 +226,12 @@ public class AzureBlobStorage extends CommonFileStorage {
                 .setPrefix(dirPrefix)
                 .setMaxResultsPerPage(1);
 
-        var listCall = containerClient.listBlobs(listOptions).any(blob -> true);
+        // If storagePath = "." and there is no prefix, then we just need to check the container exists
+        // Otherwise we need to check there is at least on object with the resolved prefix
+
+        var listCall = (dirPrefix == null || dirPrefix.isEmpty())
+                ? containerClient.exists()
+                : containerClient.listBlobs(listOptions).any(blob -> true);
 
         return handle(listCall, ctx,
                 this::fsExistsCallback,
