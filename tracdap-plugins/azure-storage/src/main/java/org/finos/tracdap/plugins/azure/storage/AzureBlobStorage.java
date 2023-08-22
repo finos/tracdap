@@ -20,6 +20,7 @@ import org.finos.tracdap.common.async.Flows;
 import org.finos.tracdap.common.data.IDataContext;
 import org.finos.tracdap.common.data.IExecutionContext;
 import org.finos.tracdap.common.exception.EStartup;
+import org.finos.tracdap.common.exception.ETrac;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.storage.CommonFileStorage;
 import org.finos.tracdap.common.storage.FileStat;
@@ -39,6 +40,7 @@ import com.azure.storage.blob.models.*;
 
 import io.netty.channel.EventLoopGroup;
 import org.apache.arrow.memory.ArrowBuf;
+import reactor.core.publisher.Mono;
 
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
@@ -49,6 +51,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Flow;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static org.finos.tracdap.common.storage.StorageErrors.ExplicitError.*;
@@ -202,18 +205,19 @@ public class AzureBlobStorage extends CommonFileStorage {
 
         var existsCall = blobClient.exists();
 
-        return existsCall
-                .toFuture()
-                .handleAsync(this::fsExistsCallback, ctx.eventLoopExecutor());
+        return handle(existsCall, ctx,
+                this::fsExistsCallback,
+                error -> fsExistsError(storagePath, error));
     }
 
-    private boolean fsExistsCallback(boolean exists, Throwable error) {
-
-        if (error != null) {
-            throw errors.handleException("EXISTS", "", error);  // todo
-        }
+    private boolean fsExistsCallback(boolean exists) {
 
         return exists;
+    }
+
+    private ETrac fsExistsError(String storagePath, Throwable error) {
+
+        return errors.handleException("EXISTS", storagePath, error);
     }
 
     @Override
@@ -225,12 +229,11 @@ public class AzureBlobStorage extends CommonFileStorage {
                 .setPrefix(dirPrefix)
                 .setMaxResultsPerPage(1);
 
-        var listCall = containerClient.listBlobs(listOptions);
+        var listCall = containerClient.listBlobs(listOptions).any(blob -> true);
 
-        return listCall
-                .any(blob -> true)
-                .toFuture()
-                .handleAsync(this::fsExistsCallback, ctx.eventLoopExecutor());
+        return handle(listCall, ctx,
+                this::fsExistsCallback,
+                error -> fsExistsError(storagePath, error));
     }
 
     @Override
@@ -239,22 +242,23 @@ public class AzureBlobStorage extends CommonFileStorage {
         var blobName = usePrefix(storagePath);
         var blobClient = containerClient.getBlobAsyncClient(blobName);
 
-        var propsCall = blobClient.getProperties();
+        var propertiesCall = blobClient.getProperties();
 
-        return propsCall
-                .toFuture()
-                .handleAsync((props, error) -> fsGetFileInfoCallback(storagePath, props, error));
+        return handle(propertiesCall, ctx,
+                properties -> fsGetFileInfoCallback(storagePath, properties),
+                error -> fsGetFileInfoError(storagePath, error));
     }
 
-    private FileStat fsGetFileInfoCallback(String storagePath, BlobProperties properties, Throwable error) {
-
-        if (error != null) {
-            throw errors.handleException("STAT", storagePath, error);
-        }
+    private FileStat fsGetFileInfoCallback(String storagePath, BlobProperties properties) {
 
         var blobName = usePrefix(storagePath);
 
         return buildFileStat(blobName, properties);
+    }
+
+    private ETrac fsGetFileInfoError(String storagePath, Throwable error) {
+
+        return errors.handleException("STAT", storagePath, error);
     }
 
     @Override
@@ -280,26 +284,19 @@ public class AzureBlobStorage extends CommonFileStorage {
                 .setMaxResultsPerPage(maxKeys)
                 .setDetails(listDetails);
 
-        var scheduler = AzureScheduling.schedulerFor(ctx.eventLoopExecutor());
-
         var listCall = recursive
-                ? containerClient.listBlobs(listOptions).byPage()
-                : containerClient.listBlobsByHierarchy(dirPrefix, listOptions).byPage();
+                ? containerClient.listBlobs(listOptions).byPage().next()
+                : containerClient.listBlobsByHierarchy(dirPrefix, listOptions).byPage().next();
 
         var excludeKey = startAfter != null
                 ? startAfter : dirPrefix;
 
-        return listCall.next()  // first page
-                .publishOn(scheduler)
-                .toFuture()
-                .handle((page, error) -> fsListContentsCallback(page, excludeKey, error));
+        return handle(listCall, ctx,
+                page -> fsListContentsCallback(page, excludeKey),
+                error -> fsListContentsError(storagePath, error));
     }
 
-    private List<FileStat> fsListContentsCallback(PagedResponse<BlobItem> page, String excludeKey, Throwable error) {
-
-        if (error != null) {
-            throw errors.handleException("LS", "", error);  // todo
-        }
+    private List<FileStat> fsListContentsCallback(PagedResponse<BlobItem> page, String excludeKey) {
 
         return page.getValue()
                 .stream()
@@ -308,30 +305,9 @@ public class AzureBlobStorage extends CommonFileStorage {
                 .collect(Collectors.toList());
     }
 
-    private CompletionStage<PagedResponse<BlobItem>> fsListDirPage(String storagePath, int pageSize, String continuation, IExecutionContext ctx) {
+    private ETrac fsListContentsError(String storagePath, Throwable error) {
 
-        var dirPrefix = usePrefix(storagePath);
-
-        var listOptions = new ListBlobsOptions()
-                .setPrefix(dirPrefix)
-                .setMaxResultsPerPage(pageSize);
-
-        var listCall = continuation != null
-                ? containerClient.listBlobs(listOptions, continuation)
-                : containerClient.listBlobs(listOptions);
-
-        return listCall.byPage().next().toFuture().handleAsync(
-                (result, error) -> fsListDirPageCallback(storagePath, result, error),
-                ctx.eventLoopExecutor());
-    }
-
-    private PagedResponse<BlobItem> fsListDirPageCallback(String storagePath, PagedResponse<BlobItem> results, Throwable error) {
-
-        if (error != null) {
-            throw errors.handleException("LS", storagePath, error);  // TODO
-        }
-
-        return results;
+        return errors.handleException("LS", storagePath, error);
     }
 
     private FileStat buildFileStat(String blobName, BlobProperties properties) {
@@ -416,18 +392,12 @@ public class AzureBlobStorage extends CommonFileStorage {
 
         var uploadCall = blobClient.upload(blobData, ALWAYS_OVERWRITE);
 
-        return uploadCall
-                .toFuture()
-                .handleAsync(this::fsCreateDirCallback, ctx.eventLoopExecutor());
+        return handle(uploadCall, ctx, error -> fsCreateDirError(storagePath, error));
     }
 
-    private Void fsCreateDirCallback(BlockBlobItem blobItem, Throwable error) {
+    private ETrac fsCreateDirError(String storagePath, Throwable error) {
 
-        if (error != null) {
-            throw errors.handleException("MKDIR", "", error);  // todo
-        }
-
-        return null;
+        return errors.handleException("MKDIR", storagePath, error);
     }
 
     @Override
@@ -438,74 +408,76 @@ public class AzureBlobStorage extends CommonFileStorage {
 
         var deleteCall = blobClient.delete();
 
-        return deleteCall.toFuture().handleAsync(
-                (result, error) -> fsDeleteFileCallback(storagePath, error),
-                ctx.eventLoopExecutor());
+        return handle(deleteCall, ctx, error -> fsDeleteFileError(storagePath, error));
     }
 
-    private Void fsDeleteFileCallback(String storagePath, Throwable error) {
+    private ETrac fsDeleteFileError(String storagePath, Throwable error) {
 
-        if (error != null)
-            throw errors.handleException("RM", storagePath, error);
-
-        return null;
+        return errors.handleException("RM", storagePath, error);
     }
 
     @Override
     protected CompletionStage<Void> fsDeleteDir(String storagePath, IExecutionContext ctx) {
 
-        return fsDeleteDirPage(storagePath, null, ctx);
+        var deleteAllPages = fsDeleteDirPage(storagePath, null, ctx);
+
+        return handle(deleteAllPages, ctx, error -> fsDeleteDirError(storagePath, error));
     }
 
-    private CompletionStage<Void> fsDeleteDirPage(String storagePath, String continuation, IExecutionContext ctx) {
+    private Mono<Void> fsDeleteDirPage(String storagePath, String continuation, IExecutionContext ctx) {
 
-        var listPage = fsListDirPage(storagePath, DELETE_BATCH_SIZE, continuation, ctx);
+        var dirPrefix = usePrefix(storagePath);
 
-        return listPage.thenComposeAsync(contents -> {
+        var listOptions = new ListBlobsOptions()
+                .setPrefix(dirPrefix)
+                .setMaxResultsPerPage(DELETE_BATCH_SIZE);
 
-            if (contents.getStatusCode() != 200) {
-                if (continuation == null)
-                    throw errors.explicitError("RMDIR", storagePath, OBJECT_NOT_FOUND);
-                else
-                    throw errors.explicitError("RMDIR", storagePath, IO_ERROR, "Expected more objects during delete");
-            }
+        var listCall = continuation != null
+                ? containerClient.listBlobs(listOptions, continuation).byPage()
+                : containerClient.listBlobs(listOptions).byPage();
 
-            var delete = fsDeleteDirContent(storagePath, contents.getValue(), ctx);
-            var nextPage = contents.getContinuationToken();
+        var scheduler = AzureScheduling.schedulerFor(ctx.eventLoopExecutor());
 
-            if (nextPage == null)
-                return delete;
+        return listCall
+                .publishOn(scheduler)
+                .next()
+                .flatMap(page -> fsDeleteDirContent(storagePath, continuation, page, ctx));
+    }
 
+    private Mono<Void> fsDeleteDirContent(String storagePath, String continuation, PagedResponse<BlobItem> blobs, IExecutionContext ctx) {
+
+        if (blobs.getStatusCode() != 200) {
+            if (continuation == null)
+                throw errors.explicitError("RMDIR", storagePath, OBJECT_NOT_FOUND);
             else
-                return delete.thenCompose(x -> fsDeleteDirPage(storagePath, nextPage, ctx));
-        });
-    }
+                throw errors.explicitError("RMDIR", storagePath, IO_ERROR, "Expected more objects during delete");
+        }
 
-    private CompletionStage<Void> fsDeleteDirContent(String storagePath, List<BlobItem> blobs, IExecutionContext ctx) {
+        if (blobs.getValue().isEmpty())
+            return Mono.empty();
 
-        if (blobs.isEmpty())
-            return CompletableFuture.completedFuture(null);
-
-        var blobUrls = blobs.stream()
+        var blobUrls = blobs.getValue()
+                .stream()
                 .map(BlobItem::getName)
                 .map(containerClient::getBlobAsyncClient)
                 .map(BlobAsyncClient::getBlobUrl)
                 .collect(Collectors.toList());
 
-        var deleteCall = batchClient.deleteBlobs(blobUrls, DeleteSnapshotsOptionType.INCLUDE);
+        var deleteCall = batchClient.deleteBlobs(blobUrls, DeleteSnapshotsOptionType.INCLUDE).collectList();
 
-        return deleteCall.collectList().toFuture().handleAsync(
-                (result, error) -> fsDeleteDirContentCallback(storagePath, error),
-                ctx.eventLoopExecutor());
+        if (blobs.getContinuationToken() == null)
+            return deleteCall.mapNotNull(result -> null);
+
+        var scheduler = AzureScheduling.schedulerFor(ctx.eventLoopExecutor());
+
+        return deleteCall
+                .publishOn(scheduler)
+                .then(fsDeleteDirPage(storagePath, blobs.getContinuationToken(), ctx));
     }
 
-    private Void fsDeleteDirContentCallback(String storagePath, Throwable error) {
+    private ETrac fsDeleteDirError(String storagePath, Throwable error) {
 
-        if (error != null) {
-            throw errors.handleException("RMDIR", storagePath, error);
-        }
-
-        return null;
+        return errors.handleException("RMDIR", storagePath, error);
     }
 
     @Override
@@ -610,5 +582,32 @@ public class AzureBlobStorage extends CommonFileStorage {
     private interface CredentialsProvider {
 
         BlobServiceClientBuilder setCredentials(BlobServiceClientBuilder builder);
+    }
+
+    private <T, S> CompletionStage<S> handle(
+            Mono<T> clientCall, IExecutionContext ctx,
+            Function<T, S> handler,
+            Function<Throwable, ETrac> errorHandler) {
+
+        var scheduler = AzureScheduling.schedulerFor(ctx.eventLoopExecutor());
+
+        return clientCall
+                .publishOn(scheduler)
+                .map(handler)
+                .onErrorMap(errorHandler)
+                .toFuture();
+    }
+
+    private <T> CompletionStage<Void> handle(
+            Mono<T> clientCall, IExecutionContext ctx,
+            Function<Throwable, ETrac> errorHandler) {
+
+        var scheduler = AzureScheduling.schedulerFor(ctx.eventLoopExecutor());
+
+        return clientCall
+                .publishOn(scheduler)
+                .mapNotNull(result -> (Void) null)
+                .onErrorMap(errorHandler)
+                .toFuture();
     }
 }
