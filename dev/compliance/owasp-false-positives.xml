@@ -146,11 +146,16 @@
         <cpe>cpe:/a:fasterxml:woodstox</cpe>
     </suppress>
 
-    <!-- Another mis-detection, accessors-smart and json-smart are not the same thing -->
+    <!-- Another mis-detection, accessors-smart is not either of the JavaScript projects -->
 
     <suppress>
         <packageUrl regex="true">^pkg:maven/net\.minidev/accessors\-smart@.*$</packageUrl>
         <cpe>cpe:/a:json-smart_project:json-smart</cpe>
+    </suppress>
+
+    <suppress>
+        <packageUrl regex="true">^pkg:maven/net\.minidev/accessors\-smart@.*$</packageUrl>
+        <cpe>cpe:/a:json-java_project:json-java</cpe>
     </suppress>
 
 
