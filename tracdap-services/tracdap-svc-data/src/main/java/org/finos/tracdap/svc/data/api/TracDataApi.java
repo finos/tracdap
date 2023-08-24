@@ -374,8 +374,11 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
         // If service A calls service B, then B should also record "source-req-id" to link back
         // req-id and source-req-id should be included with every log message
 
+        // Enforce strict requirement on the event loop
+        // All processing for the request must happen on the EL originally assigned to the request
+
         var requestId = String.format("REQ-%d", nextReqId.incrementAndGet());
-        var eventLoop = eventLoops.currentEventLoop(false);
+        var eventLoop = eventLoops.currentEventLoop(/* strict = */ true);
         var allocator = rootAllocator.newChildAllocator(requestId, reqInitAllocation, reqMaxAllocation);
 
         log.info("OPEN data context for [{}]", requestId);

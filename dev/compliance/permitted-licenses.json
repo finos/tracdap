@@ -18,7 +18,6 @@
     {
       "moduleLicense": "BSD Zero Clause License"
     },
-
     {
       "moduleName": "org.junit.jupiter:.*",
       "moduleLicense": "Eclipse Public License - v 2.0"
@@ -28,7 +27,11 @@
       "moduleLicense": "Eclipse Public License - v 2.0"
     },
     {
-      "moduleName": "org.junit:junit-bom",
+      "moduleName": "org.slf4j:slf4j-parent",
+      "moduleLicense": null
+    },
+    {
+      "moduleName": "org.apache.logging.log4j:log4j-bom",
       "moduleLicense": null
     },
     {
@@ -36,11 +39,39 @@
       "moduleLicense": null
     },
     {
+      "moduleName": "com.google.protobuf:protobuf-bom",
+      "moduleLicense": null
+    },
+    {
+      "moduleName": "com.google.guava:guava-bom",
+      "moduleLicense": null
+    },
+    {
+      "moduleName": "io.netty:netty-bom",
+      "moduleLicense": null
+    },
+    {
       "moduleName": "io.netty:netty-tcnative-classes",
       "moduleLicense": null
     },
     {
+      "moduleName": "io.grpc:grpc-bom",
+      "moduleLicense": null
+    },
+    {
+      "moduleName": "org.junit:junit-bom",
+      "moduleLicense": null
+    },
+    {
+      "moduleName": "software.amazon.awssdk:bom",
+      "moduleLicense": null
+    },
+    {
       "moduleName": "com.google.cloud:libraries-bom",
+      "moduleLicense": null
+    },
+    {
+      "moduleName": "com.azure:azure-sdk-bom",
       "moduleLicense": null
     }
   ]

@@ -16,7 +16,6 @@
 
 package org.finos.tracdap.test.helpers;
 
-import io.grpc.*;
 import org.finos.tracdap.api.TracDataApiGrpc;
 import org.finos.tracdap.api.TracMetadataApiGrpc;
 import org.finos.tracdap.api.TracOrchestratorApiGrpc;
@@ -37,12 +36,16 @@ import org.finos.tracdap.svc.meta.TracMetadataService;
 import org.finos.tracdap.svc.orch.TracOrchestratorService;
 import org.finos.tracdap.gateway.TracPlatformGateway;
 import org.finos.tracdap.test.config.ConfigHelpers;
+
+import io.grpc.*;
 import io.grpc.netty.NettyChannelBuilder;
+import io.netty.channel.nio.NioEventLoopGroup;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import org.junit.jupiter.api.extension.AfterAllCallback;
 import org.junit.jupiter.api.extension.BeforeAllCallback;
 import org.junit.jupiter.api.extension.ExtensionContext;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
@@ -81,6 +84,8 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
     private final String storageFormat;
 
     private final boolean runDbDeploy;
+    private final boolean manageDataPrefix;
+
     private final boolean startMeta;
     private final boolean startData;
     private final boolean startOrch;
@@ -90,13 +95,15 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
 
     private PlatformTest(
             String testConfig, String gatewayConfig, List<String> tenants, String storageFormat,
-            boolean runDbDeploy, boolean startMeta, boolean startData, boolean startOrch, boolean startGateway) {
+            boolean runDbDeploy, boolean manageDataPrefix,
+            boolean startMeta, boolean startData, boolean startOrch, boolean startGateway) {
 
         this.testConfig = testConfig;
         this.gatewayConfig = gatewayConfig;
         this.tenants = tenants;
         this.storageFormat = storageFormat;
         this.runDbDeploy = runDbDeploy;
+        this.manageDataPrefix = manageDataPrefix;
         this.startMeta = startMeta;
         this.startData = startData;
         this.startOrch = startOrch;
@@ -121,6 +128,7 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         private final List<String> tenants = new ArrayList<>();
         private String storageFormat = DEFAULT_STORAGE_FORMAT;
         private boolean runDbDeploy = true;  // Run DB deploy by default
+        private boolean manageDataPrefix = false;
         private boolean startMeta;
         private boolean startData;
         private boolean startOrch;
@@ -129,6 +137,7 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         public Builder addTenant(String testTenant) { this.tenants.add(testTenant); return this; }
         public Builder storageFormat(String storageFormat) { this.storageFormat = storageFormat; return this; }
         public Builder runDbDeploy(boolean runDbDeploy) { this.runDbDeploy = runDbDeploy; return this; }
+        public Builder manageDataPrefix(boolean manageDataPrefix) { this.manageDataPrefix = manageDataPrefix; return this; }
         public Builder startMeta() { startMeta = true; return this; }
         public Builder startData() { startData = true; return this; }
         public Builder startOrch() { startOrch = true; return this; }
@@ -139,15 +148,15 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
 
             return new PlatformTest(
                     testConfig, gatewayConfig, tenants, storageFormat,
-                    runDbDeploy, startMeta, startData, startOrch, startGateway);
+                    runDbDeploy, manageDataPrefix,
+                    startMeta, startData, startOrch, startGateway);
         }
     }
 
     private String testId;
     private Path tracDir;
     private Path tracStorageDir;
-    private Path tracExecDir;
-    private Path tracRepoDir;
+    private Path tracExecDir;    private Path tracRepoDir;
     private URL platformConfigUrl;
     private URL gatewayConfigUrl;
     private String secretKey;
@@ -218,6 +227,9 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         if (runDbDeploy)
             prepareDatabase();
 
+        if (manageDataPrefix)
+            prepareDataPrefix();
+
         startServices();
         startClients();
     }
@@ -227,6 +239,9 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
 
         stopClients();
         stopServices();
+
+        if (manageDataPrefix)
+            cleanupDataPrefix();
 
         cleanupDirectories();
     }
@@ -400,6 +415,42 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         }
 
         ServiceHelpers.runDbDeploy(tracDir, platformConfigUrl, secretKey, databaseTasks);
+    }
+
+    void prepareDataPrefix() throws Exception {
+
+        var elg = new NioEventLoopGroup(2);
+
+        var plugins = new PluginManager();
+        plugins.initConfigPlugins();
+        plugins.initRegularPlugins();
+
+        var config = new ConfigManager(
+                platformConfigUrl(),
+                tracDir(),
+                plugins);
+
+        StorageTestHelpers.createStoragePrefix(config, plugins, elg);
+
+        elg.shutdownGracefully();
+    }
+
+    void cleanupDataPrefix() throws Exception {
+
+        var elg = new NioEventLoopGroup(2);
+
+        var plugins = new PluginManager();
+        plugins.initConfigPlugins();
+        plugins.initRegularPlugins();
+
+        var config = new ConfigManager(
+                platformConfigUrl(),
+                tracDir(),
+                plugins);
+
+        StorageTestHelpers.deleteStoragePrefix(config, plugins, elg);
+
+        elg.shutdownGracefully();
     }
 
     void preparePlugins() throws Exception {

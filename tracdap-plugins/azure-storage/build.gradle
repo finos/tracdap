@@ -21,24 +21,20 @@ plugins {
 
 apply from: "${rootProject.projectDir.path}/gradle/base-java.gradle"
 
-description = "AWS storage plugin, store and retrieve data in S3 buckets"
+description = "Azure storage plugin, store and retrieve data in BLOB storage"
 
 // Put plugins into a separate package group
 group = "org.finos.tracdap.plugins"
 
 dependencies {
 
-    implementation project(":tracdap-lib-common")
-    implementation project(":tracdap-lib-data")
+    api project(":tracdap-lib-common")
+    api project(":tracdap-lib-data")
 
-    implementation platform(group: "software.amazon.awssdk", name: "bom", version: "${aws_sdk_version}")
-    implementation "software.amazon.awssdk:aws-core"
-    implementation "software.amazon.awssdk:netty-nio-client"
-    implementation "software.amazon.awssdk:s3"
-
-    // AWS SDK uses Reactive Streams
-    // Only the latest version has a good license (MIT-0, prior versions were Creative Commons)
-    implementation group: "org.reactivestreams", name: "reactive-streams", version: "${reactive_streams_version}"
+    implementation platform(group: "com.azure", name: "azure-sdk-bom", version: "$azure_sdk_version")
+    implementation "com.azure:azure-storage-blob"
+    implementation "com.azure:azure-storage-blob-batch"
+    implementation "com.azure:azure-identity"
 
     testImplementation project(path: ":tracdap-lib-data", configuration: "testSuite")
 }

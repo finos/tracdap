@@ -74,7 +74,11 @@ public class EventLoopRegister {
                 CallOptions callOptions,
                 Channel channel) {
 
-            var el = currentEventLoop(false);
+            // Enforce strict requirement on the event loop
+            // Client interceptor is used when the data service makes calls to other TRAC services
+            // Those calls must come back on the same EL, so processing is not split across ELs
+
+            var el = currentEventLoop(/* strict = */ true);
             var options = callOptions.withExecutor(el);
 
             return channel.newCall(method, options);
