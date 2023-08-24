@@ -53,7 +53,6 @@ sourceSets {
 dependencies {
 
     // Core protobuf for Java
-    api enforcedPlatform(group: "com.google.protobuf", name: "protobuf-bom", version: "${proto_version}")
     api "com.google.protobuf:protobuf-java"
 }
 
