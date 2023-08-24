@@ -26,6 +26,8 @@ description = "TRAC D.A.P. common library, interfaces and utilities used across 
 dependencies {
 
     // Export framework version constraints for 3rd party plugins, but do not enforce them
+    // Enforcing hard constraints on 3rd-party code with API dependencies is flagged as an error by Gradle (rightly so)!
+    // Constraints for modules that are part of the TRAC codebase are hard enforced in base-java.gradle
     api platform(group: "io.netty", name: "netty-bom", version: "${netty_version}")
     api platform(group: "io.grpc", name: "grpc-bom", version: "${grpc_version}")
     api platform(group: "com.google.protobuf", name: "protobuf-bom", version: "${proto_version}")
