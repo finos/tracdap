@@ -21,13 +21,13 @@ repositories {
 dependencies {
 
     // Enforce a single consistent set of versions for core frameworks across the entire project
-    implementation enforcedPlatform(group: "io.netty", name: "netty-bom", version: "${netty_version}")
-    implementation enforcedPlatform(group: "io.grpc", name: "grpc-bom", version: "${grpc_version}")
-    implementation enforcedPlatform(group: "com.google.protobuf", name: "protobuf-bom", version: "${proto_version}")
-    implementation enforcedPlatform(group: "com.google.guava", name: "guava-bom", version: "${guava_version}")
-    implementation enforcedPlatform(group: "com.fasterxml.jackson", name: "jackson-bom", version: "${jackson_version}")
-    implementation enforcedPlatform(group: "org.slf4j", name: "slf4j-parent", version: "${slf4j_version}")
-    implementation enforcedPlatform(group: "org.apache.logging.log4j", name: "log4j-bom", version: "${log4j_version}")
+    implementation platform(group: "io.netty", name: "netty-bom", version: "${netty_version}")
+    implementation platform(group: "io.grpc", name: "grpc-bom", version: "${grpc_version}")
+    implementation platform(group: "com.google.protobuf", name: "protobuf-bom", version: "${proto_version}")
+    implementation platform(group: "com.google.guava", name: "guava-bom", version: "${guava_version}")
+    implementation platform(group: "com.fasterxml.jackson", name: "jackson-bom", version: "${jackson_version}")
+    implementation platform(group: "org.slf4j", name: "slf4j-parent", version: "${slf4j_version}")
+    implementation platform(group: "org.apache.logging.log4j", name: "log4j-bom", version: "${log4j_version}")
 
     // Logging with SLF 4J, available in all Java modules
     implementation group: 'org.slf4j', name: 'slf4j-api', version: "$slf4j_version"
