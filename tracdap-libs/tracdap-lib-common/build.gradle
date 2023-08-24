@@ -25,6 +25,15 @@ description = "TRAC D.A.P. common library, interfaces and utilities used across 
 
 dependencies {
 
+    // Export framework version constraints for 3rd party plugins, but do not enforce them
+    api platform(group: "io.netty", name: "netty-bom", version: "${netty_version}")
+    api platform(group: "io.grpc", name: "grpc-bom", version: "${grpc_version}")
+    api platform(group: "com.google.protobuf", name: "protobuf-bom", version: "${proto_version}")
+    api platform(group: "com.google.guava", name: "guava-bom", version: "${guava_version}")
+    api platform(group: "com.fasterxml.jackson", name: "jackson-bom", version: "${jackson_version}")
+    api platform(group: "org.slf4j", name: "slf4j-parent", version: "${slf4j_version}")
+    api platform(group: "org.apache.logging.log4j", name: "log4j-bom", version: "${log4j_version}")
+
     api project(':tracdap-api-metadata')
     api project(':tracdap-api-config')
 
