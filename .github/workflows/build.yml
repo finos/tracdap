@@ -102,9 +102,9 @@ jobs:
 
           # Oldest supported versions, force testing against .0 for Python, Pandas and PySpark
           # If those don't work due to bugs, we need to update README for the supported versions
-          - { ENV_NAME: "Linux, 3.7, Pandas 1.2, PySpark 3.0",
+          - { ENV_NAME: "Linux, 3.8, Pandas 1.2, PySpark 3.0",
               PLATFORM: 'ubuntu-latest',
-              PYTHON_VERSION: "3.7",
+              PYTHON_VERSION: "3.8",
               PANDAS_VERSION: "== 1.2.0",
               PYSPARK_VERSION: "== 3.0.0" }
 
