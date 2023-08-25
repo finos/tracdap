@@ -220,12 +220,12 @@
         <vulnerabilityName>CVE-2023-35116</vulnerabilityName>
     </suppress>
 
-    <!-- Currently TRAC uses Netty version 4.1.93.Final -->
-    <!-- This is the latest version compatible with Apache Arrow 12 -->
-    <!-- There appears to be a recent fix in Netty, we need Apache Arrow 13 before we can update -->
+    <!-- More NVD Noise - this is a vulnerability in Postgres itself, not the JDBC driver -->
+    <!-- CVE itself is very weak, assumes attacker is on the server console and can send signals to the DB process -->
+
     <suppress>
-        <packageUrl regex="true">^pkg:maven/io\.netty/netty\-.*@4.1.93.Final</packageUrl>
-        <vulnerabilityName>CVE-2023-34462</vulnerabilityName>
+        <packageUrl regex="true">^pkg:maven/org\.postgresql/postgresql@.*$</packageUrl>
+        <vulnerabilityName>CVE-2020-21469</vulnerabilityName>
     </suppress>
 
 </suppressions>
