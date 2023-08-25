@@ -220,4 +220,12 @@
         <vulnerabilityName>CVE-2023-35116</vulnerabilityName>
     </suppress>
 
+    <!-- More NVD Noise - this is a vulnerability in Postgres itself, not the JDBC driver -->
+    <!-- CVE itself is very weak, assumes attacker is on the server console and can send signals to the DB process -->
+
+    <suppress>
+        <packageUrl regex="true">^pkg:maven/org\.postgresql/postgresql@.*$</packageUrl>
+        <vulnerabilityName>CVE-2020-21469</vulnerabilityName>
+    </suppress>
+
 </suppressions>
