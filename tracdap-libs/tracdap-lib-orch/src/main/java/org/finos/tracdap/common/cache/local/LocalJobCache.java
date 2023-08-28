@@ -47,7 +47,10 @@ public class LocalJobCache<TValue extends Serializable> implements IJobCache<TVa
 
     private final ConcurrentMap<String, LocalJobCacheEntry> _cache;
 
-    public LocalJobCache() {
+    // Package-local constructor
+    // Instances must be created by LocalJobCacheManager
+
+    LocalJobCache() {
 
         this._cache = new ConcurrentHashMap<>();
     }

@@ -27,15 +27,6 @@ public interface IJobCache<TValue extends Serializable> {
 
     Pattern VALID_KEY = Pattern.compile("\\A[\\w\\-]+\\Z");
 
-    @SuppressWarnings("unchecked")
-    static <T extends Serializable> IJobCache<T> forType(IJobCache<?> untyped) {
-
-        // This method provides compile-time type safety only
-        // In practice, the job cache only uses a single cache value type
-
-        return (IJobCache<T>) untyped;
-    }
-
     CacheTicket openNewTicket(String key, Duration duration);
     CacheTicket openTicket(String key, int revision, Duration duration);
     void closeTicket(CacheTicket ticket);
