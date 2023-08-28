@@ -21,6 +21,7 @@ import org.finos.tracdap.common.auth.internal.InternalAuthProvider;
 import org.finos.tracdap.common.auth.internal.JwtSetup;
 import org.finos.tracdap.common.auth.internal.InternalAuthValidator;
 import org.finos.tracdap.common.cache.IJobCache;
+import org.finos.tracdap.common.cache.IJobCacheManager;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.exec.IBatchExecutor;
 import org.finos.tracdap.common.exception.EStartup;
@@ -55,6 +56,7 @@ import java.util.concurrent.TimeUnit;
 
 public class TracOrchestratorService extends CommonServiceBase {
 
+    private static final String JOB_CACHE_NAME = "TRAC_JOB_STATE";
     private static final int CONCURRENT_REQUESTS = 30;
 
     private final Logger log = LoggerFactory.getLogger(getClass());
@@ -121,12 +123,12 @@ public class TracOrchestratorService extends CommonServiceBase {
                     platformConfig.getExecutor(),
                     configManager);
 
-            var untypedCache = pluginManager.createService(
-                    IJobCache.class,
+            var cacheManager = pluginManager.createService(
+                    IJobCacheManager.class,
                     platformConfig.getJobCache(),
                     configManager);
 
-            jobCache = IJobCache.forType(untypedCache);
+            jobCache = cacheManager.getCache(JOB_CACHE_NAME, JobState.class);
 
             var jobProcessorHelpers = new JobProcessorHelpers(platformConfig, metaClient);
             var jobProcessor = new JobProcessor(metaClient, internalAuth, jobExecutor, jobProcessorHelpers);
