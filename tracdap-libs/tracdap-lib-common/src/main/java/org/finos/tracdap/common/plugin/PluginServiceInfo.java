@@ -75,7 +75,7 @@ public class PluginServiceInfo {
             Map.entry("org.finos.tracdap.common.storage.IFileStorage", FILE_STORAGE_SERVICE_TYPE),
             Map.entry("org.finos.tracdap.common.storage.IDataStorage", DATA_STORAGE_SERVICE_TYPE),
             Map.entry("org.finos.tracdap.common.exec.IBatchExecutor", EXECUTION_SERVICE_TYPE),
-            Map.entry("org.finos.tracdap.common.cache.IJobCache", JOB_CACHE_SERVICE_TYPE),
+            Map.entry("org.finos.tracdap.common.cache.IJobCacheManager", JOB_CACHE_SERVICE_TYPE),
             Map.entry("org.finos.tracdap.svc.meta.dal.IMetadataDal", METADATA_DAL_SERVICE_TYPE));
 
     private final Class<?> serviceClass;
