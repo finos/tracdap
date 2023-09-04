@@ -16,6 +16,7 @@
 
 package org.finos.tracdap.common.cache;
 
+import org.finos.tracdap.common.exception.ECacheDuplicate;
 import org.finos.tracdap.common.exception.ECacheTicket;
 import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.metadata.ObjectType;
@@ -1006,7 +1007,25 @@ public abstract class JobCacheTestSuite {
 
     @Test
     void addEntry_ok() {
-        // TODO
+
+        var key = newKey();
+        var status = "status1";
+        var value = new DummyState();
+        value.intVar = 42;
+        value.stringVar = "the droids you're looking for";
+
+        int revision;
+
+        try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
+            revision = cache.addEntry(ticket, status, value);
+        }
+
+        var entry = cache.queryKey(key);
+
+        Assertions.assertTrue(entry.isPresent());
+        Assertions.assertEquals(revision, entry.get().revision());
+        Assertions.assertEquals(status, entry.get().status());
+        Assertions.assertEquals(value, entry.get().value());
     }
 
     @Test
@@ -1026,22 +1045,130 @@ public abstract class JobCacheTestSuite {
 
     @Test
     void addEntry_alreadyExists() {
-        // TODO
+
+        var key = newKey();
+        var status = "status1";
+        var value = new DummyState();
+        value.intVar = 42;
+        value.stringVar = "the droids you're looking for";
+
+        int revision;
+
+        try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
+
+            revision = cache.addEntry(ticket, status, value);
+
+            // Add the same entry a second time using the same ticket
+            Assertions.assertThrows(ECacheDuplicate.class, () -> cache.addEntry(ticket, status, value));
+        }
+
+        // Make sure the entry exists
+        var entry = cache.queryKey(key);
+        Assertions.assertTrue(entry.isPresent());
+
+        // Not possible to add again using a second new item ticket, because the ticket will be superseded
+        try (var ticket2 = cache.openNewTicket(key, TICKET_TIMEOUT)) {
+            Assertions.assertTrue(ticket2.superseded());
+        }
+
+        // Try using a regular ticket instead
+        try (var ticket3 = cache.openTicket(key, revision, TICKET_TIMEOUT)) {
+
+            // Check ticket2 should be a valid ticket
+            Assertions.assertFalse(ticket3.superseded());
+            Assertions.assertFalse(ticket3.missing());
+
+            // Add the same entry a second time using a new valid ticket
+            Assertions.assertThrows(ECacheDuplicate.class, () -> cache.addEntry(ticket3, status, value));
+        }
     }
 
     @Test
     void addEntry_afterRemoval() {
-        // TODO
+
+        var key = newKey();
+        var status = "status1";
+        var value = new DummyState();
+        value.intVar = 42;
+        value.stringVar = "the droids you're looking for";
+
+        int revision;
+
+        try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
+            revision = cache.addEntry(ticket, status, value);
+        }
+
+        Assertions.assertTrue(cache.queryKey(key).isPresent());
+
+        try (var ticket2 = cache.openTicket(key, revision, TICKET_TIMEOUT)) {
+            cache.removeEntry(ticket2);
+        }
+
+        Assertions.assertFalse(cache.queryKey(key).isPresent());
+
+        try (var ticket3 = cache.openNewTicket(key, TICKET_TIMEOUT)) {
+            cache.addEntry(ticket3, "status2", value);
+        }
+
+        var entry = cache.queryKey(key);
+        Assertions.assertTrue(entry.isPresent());
+        Assertions.assertEquals("status2", entry.get().status());
+        Assertions.assertEquals(value, entry.get().value());
     }
 
     @Test
     void addEntry_afterUnusedTicket() {
-        // TODO
+
+        var key = newKey();
+        var status = "status1";
+        var value = new DummyState();
+        value.intVar = 42;
+        value.stringVar = "the droids you're looking for";
+
+        try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
+
+            Assertions.assertFalse(ticket.superseded());
+            Assertions.assertFalse(ticket.missing());
+
+            // Do not use the ticket
+        }
+
+        // No entry created, it should be possible to open a fresh ticket and create
+
+        int revision;
+
+        try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
+
+            Assertions.assertFalse(ticket.superseded());
+            Assertions.assertFalse(ticket.missing());
+
+            revision = cache.addEntry(ticket, status, value);
+        }
+
+        var entry = cache.queryKey(key);
+
+        Assertions.assertTrue(entry.isPresent());
+        Assertions.assertEquals(revision, entry.get().revision());
+        Assertions.assertEquals(status, entry.get().status());
+        Assertions.assertEquals(value, entry.get().value());
     }
 
     @Test
     void addEntry_ticketUnknown() {
-        // TODO
+
+        var key = newKey();
+        var status = "status1";
+        var value = new DummyState();
+        value.intVar = 42;
+        value.stringVar = "the droids you're looking for";
+
+        // Create a ticket without going through the cache implementation
+
+        try (var ticket = CacheTicket.forDuration(cache, key, 0, Instant.now(), TICKET_TIMEOUT)) {
+            Assertions.assertThrows(ECacheTicket.class, () -> cache.addEntry(ticket, status, value));
+        }
+
+        // TODO check this test
     }
 
     @Test
