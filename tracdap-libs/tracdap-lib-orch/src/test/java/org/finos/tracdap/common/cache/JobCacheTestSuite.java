@@ -1030,17 +1030,17 @@ public abstract class JobCacheTestSuite {
 
     @Test
     void addEntry_badTicket() {
-        // TODO
+        Assertions.fail("Test not implemented");
     }
 
     @Test
     void addEntry_badStatus() {
-        // TODO
+        Assertions.fail("Test not implemented");
     }
 
     @Test
     void addEntry_badValue() {
-        // TODO
+        Assertions.fail("Test not implemented");
     }
 
     @Test
@@ -1173,17 +1173,17 @@ public abstract class JobCacheTestSuite {
 
     @Test
     void addEntry_ticketSuperseded() {
-        // TODO
+        Assertions.fail("Test not implemented");
     }
 
     @Test
     void addEntry_ticketExpired() {
-        // TODO
+        Assertions.fail("Test not implemented");
     }
 
     @Test
     void addEntry_ticketNeverClosed() {
-        // TODO
+        Assertions.fail("Test not implemented");
     }
 
 
@@ -1210,7 +1210,7 @@ public abstract class JobCacheTestSuite {
         }
     }
 
-    static class DummyState implements Serializable {
+    protected static class DummyState implements Serializable {
 
         int intVar;
         String stringVar;

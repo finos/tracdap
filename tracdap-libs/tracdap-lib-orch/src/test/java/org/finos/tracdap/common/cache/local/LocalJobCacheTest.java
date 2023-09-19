@@ -24,6 +24,9 @@ public class LocalJobCacheTest extends JobCacheTestSuite {
 
     @BeforeAll
     static void createLocalCache() {
-        cache = new LocalJobCache<>();
+
+        var manager = new LocalJobCacheManager();
+
+        cache = manager.getCache("dummy_state_cache", DummyState.class);
     }
 }
