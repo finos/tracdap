@@ -43,7 +43,7 @@ jobs:
 
     runs-on: ubuntu-latest
     environment: integration
-    timeout-minutes: 20
+    timeout-minutes: 60
 
     # To use apt-get install, jobs must run in a container
     container:
@@ -151,7 +151,7 @@ jobs:
 
     runs-on: ubuntu-latest
     environment: integration
-    timeout-minutes: 20
+    timeout-minutes: 60
 
     # To use apt-get install, jobs must run in a container
     container:
