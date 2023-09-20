@@ -1173,17 +1173,69 @@ public abstract class JobCacheTestSuite {
 
     @Test
     void addEntry_ticketSuperseded() {
-        Assertions.fail("Test not implemented");
+
+        var key = newKey();
+        var status = "status1";
+        var value = new DummyState();
+        value.intVar = 42;
+        value.stringVar = "the droids you're looking for";
+
+        try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
+
+            Assertions.assertFalse(ticket.superseded());
+
+            try (var ticket2 = cache.openNewTicket(key, TICKET_TIMEOUT)) {
+
+                Assertions.assertTrue(ticket2.superseded());
+                Assertions.assertThrows(ECacheTicket.class, () -> cache.addEntry(ticket2, status, value));
+            }
+        }
+
+        var entry = cache.queryKey(key);
+        Assertions.assertFalse(entry.isPresent());
     }
 
     @Test
-    void addEntry_ticketExpired() {
-        Assertions.fail("Test not implemented");
+    void addEntry_ticketExpired() throws Exception {
+
+        var key = newKey();
+        var status = "status1";
+        var value = new DummyState();
+        value.intVar = 42;
+        value.stringVar = "the droids you're looking for";
+
+        try (var ticket = cache.openNewTicket(key, Duration.ofMillis(50))) {
+
+            // Wait for ticket to expire
+            Thread.sleep(51);
+
+            Assertions.assertThrows(ECacheTicket.class, () -> cache.addEntry(ticket, status, value));
+        }
+
+        var entry = cache.queryKey(key);
+        Assertions.assertFalse(entry.isPresent());
     }
 
     @Test
     void addEntry_ticketNeverClosed() {
-        Assertions.fail("Test not implemented");
+
+        var key = newKey();
+        var status = "status1";
+        var value = new DummyState();
+        value.intVar = 42;
+        value.stringVar = "the droids you're looking for";
+
+        var ticket = cache.openNewTicket(key, TICKET_TIMEOUT);
+        var revision = cache.addEntry(ticket, status, value);
+
+        // Query the entry without closing the ticket - should still be fine
+
+        var entry = cache.queryKey(key);
+
+        Assertions.assertTrue(entry.isPresent());
+        Assertions.assertEquals(revision, entry.get().revision());
+        Assertions.assertEquals(status, entry.get().status());
+        Assertions.assertEquals(value, entry.get().value());
     }
 
 

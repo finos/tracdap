@@ -131,9 +131,6 @@ public class LocalJobCache<TValue extends Serializable> implements IJobCache<TVa
 
         checkTicket(ticket);
 
-        if (ticket.superseded())
-            return;
-
         _cache.computeIfPresent(ticket.key(), (_key, priorEntry) -> {
 
             if (priorEntry.ticket != ticket)
@@ -158,10 +155,12 @@ public class LocalJobCache<TValue extends Serializable> implements IJobCache<TVa
 
         var added = _cache.compute(ticket.key(), (_key, _entry) -> {
 
+            checkEntryMatchesTicket(_entry, ticket, "create");
+
             if (_entry != null && _entry.encodedValue != null) {
                 var message = String.format("Cannot create [%s], item is already in the cache", ticket.key());
                 log.error(message);
-                throw new ECacheTicket(message);
+                throw new ECacheDuplicate(message);
             }
 
             var newEntry = new LocalJobCacheEntry();
@@ -186,13 +185,13 @@ public class LocalJobCache<TValue extends Serializable> implements IJobCache<TVa
 
         var updated = _cache.compute(ticket.key(), (_key, _entry) -> {
 
-            if (_entry == null) {
+            checkEntryMatchesTicket(_entry, ticket, "update");
+
+            if (_entry == null || _entry.encodedValue == null) {
                 var message = String.format("Cannot update [%s], item is not in the cache", ticket.key());
                 log.error(message);
                 throw new ECacheNotFound(message);
             }
-
-            checkEntryMatchesTicket(_entry, ticket, "update");
 
             var newEntry = _entry.clone();
             newEntry.revision += 1;
@@ -215,13 +214,13 @@ public class LocalJobCache<TValue extends Serializable> implements IJobCache<TVa
 
         _cache.compute(ticket.key(), (_key, _entry) -> {
 
+            checkEntryMatchesTicket(_entry, ticket, "remove");
+
             if (_entry == null || _entry.encodedValue == null) {
                 var message = String.format("Cannot remove [%s], item is not in the cache", ticket.key());
                 log.error(message);
                 throw new ECacheNotFound(message);
             }
-
-            checkEntryMatchesTicket(_entry, ticket, "remove");
 
             var newEntry = _entry.clone();
             newEntry.encodedValue = null;
@@ -235,17 +234,17 @@ public class LocalJobCache<TValue extends Serializable> implements IJobCache<TVa
 
         var accessTime = Instant.now();
 
-        checkValidTicket(ticket, "update", accessTime);
+        checkValidTicket(ticket, "get", accessTime);
 
         var entry = _cache.get(ticket.key());
 
-        if (entry == null) {
-            var message = String.format("Entry for [%s] is not in the cache", ticket.key());
+        checkEntryMatchesTicket(entry, ticket, "get");
+
+        if (entry == null || entry.encodedValue == null) {
+            var message = String.format("Cannot get [%s], item is not in the cache", ticket.key());
             log.error(message);
             throw new ECacheNotFound(message);
         }
-
-        checkEntryMatchesTicket(entry, ticket, "get");
 
         var cacheValue = decodeValue(entry.encodedValue);
 
@@ -257,7 +256,7 @@ public class LocalJobCache<TValue extends Serializable> implements IJobCache<TVa
 
         var entry = _cache.get(key);
 
-        if (entry == null)
+        if (entry == null || entry.encodedValue == null)
             return Optional.empty();
 
         try {
@@ -318,13 +317,13 @@ public class LocalJobCache<TValue extends Serializable> implements IJobCache<TVa
         }
 
         if (ticket.superseded()) {
-            var message = String.format("Ticket to %s [%s] has been superseded", operation, ticket.key());
+            var message = String.format("Cannot %s [%s], ticket has been superseded", operation, ticket.key());
             log.error(message);
             throw new ECacheTicket(message);
         }
 
         if (operationTime.isAfter(ticket.expiry())) {
-            var message = String.format("Ticket to %s [%s] has expired", operation, ticket.key());
+            var message = String.format("Failed to %s [%s], ticket has expired", operation, ticket.key());
             log.error(message);
             throw new ECacheTicket(message);
         }
@@ -332,20 +331,8 @@ public class LocalJobCache<TValue extends Serializable> implements IJobCache<TVa
 
     private void checkEntryMatchesTicket(LocalJobCacheEntry entry, CacheTicket ticket, String operation) {
 
-        if (entry.ticket == null){
-            var message = String.format("Cannot %s [%s], ticket is no longer valid", operation, ticket.key());
-            log.error(message);
-            throw new ECacheTicket(message);
-        }
-
-        if (entry.ticket != ticket){
-            var message = String.format("Cannot %s [%s], another operation is in progress", operation, ticket.key());
-            log.error(message);
-            throw new ECacheTicket(message);
-        }
-
-        if (entry.revision != ticket.revision()) {
-            var message = String.format("Cannot %s [%s], ticket is superseded", operation, ticket.key());
+        if (entry == null || entry.ticket != ticket) {
+            var message = String.format("Cannot %s [%s], ticket is not recognized", operation, ticket.key());
             log.error(message);
             throw new ECacheTicket(message);
         }
