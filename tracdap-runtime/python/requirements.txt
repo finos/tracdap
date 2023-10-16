@@ -35,7 +35,7 @@ requests == 2.31.0
 # Pandas - baseline support for series 1.x
 # We do not support the 0.x series! 1.2 added the new dType for integers which supports nulls
 
-pandas >= 1.2.0, < 1.6.0
+pandas >= 1.2.0, < 2.2.0
 
 # PySpark - Support the 3.x series
 
