@@ -138,8 +138,10 @@ class DataMappingTest(unittest.TestCase):
             pd.StringDtype(),
 
             # Date/time types being converted as NumPy native (datetime64[ns])
-            pd.to_datetime([dt.date(1970, 1, 1)]).dtype,
-            pd.to_datetime([dt.datetime(1970, 1, 1)]).dtype]
+            _data.DataMapping.pandas_date_type(),
+            _data.DataMapping.pandas_datetime_type()]
+
+        # .astype("datetime64[ms]") coming through in Pandas 2
 
         self.assertListEqual(expect_dtypes, df.dtypes.to_list())
 
