@@ -20,6 +20,7 @@ import datetime as dt
 import decimal
 import platform
 
+import pandas.util.version
 import pyarrow as pa
 import pyarrow.compute as pc
 import pandas as pd
@@ -112,7 +113,8 @@ class DataMapping:
 
     # Check the Pandas dtypes for handling floats are available before setting up the type mapping
     __PANDAS_FLOAT_DTYPE_CHECK = _DataInternal.float_dtype_check()
-    __PANDAS_DATETIME_TYPE = pd.to_datetime([]).dtype
+    __PANDAS_DATE_TYPE = pd.to_datetime([dt.date(2000, 1, 1)]).as_unit(__TRAC_TIMESTAMP_UNIT).dtype
+    __PANDAS_DATETIME_TYPE = pd.to_datetime([dt.datetime(2000, 1, 1, 0, 0, 0)]).as_unit(__TRAC_TIMESTAMP_UNIT).dtype
 
     # Only partial mapping is possible, decimal and temporal dtypes cannot be mapped this way
     __ARROW_TO_PANDAS_TYPE_MAPPING = {
@@ -222,6 +224,10 @@ class DataMapping:
         return pa.decimal128(
             cls.__TRAC_DECIMAL_PRECISION,
             cls.__TRAC_DECIMAL_SCALE)
+
+    @classmethod
+    def pandas_date_type(cls):
+        return cls.__PANDAS_DATE_TYPE
 
     @classmethod
     def pandas_datetime_type(cls):
@@ -382,6 +388,8 @@ class DataConformance:
     __E_TIMEZONE_DOES_NOT_MATCH = \
         "Field [{field_name}] cannot be converted from {vector_type} to {field_type}, " + \
         "source and target have different time zones"
+
+    __PANDAS_MAJOR_VERSION = pd.util.version.parse(pd.__version__).major
 
     @classmethod
     def column_filter(cls, columns: tp.List[str], schema: tp.Optional[pa.Schema]) -> tp.Optional[tp.List[str]]:
@@ -691,16 +699,20 @@ class DataConformance:
     @classmethod
     def _coerce_date(cls, vector: pa.Array, field: pa.Field, pandas_type=None) -> pa.Array:
 
-        # Allow casting date32 -> date64, both range and precision are greater so there is no data loss
         if pa.types.is_date(vector.type):
+            # Allow casting date32 -> date64, both range and precision are greater so there is no data loss
             if field.type.bit_width >= vector.type.bit_width:
                 return pc.cast(vector, field.type)
+            # else:
+            #     # rv = pc.round_temporal()
+            #     # rounded_vector = cls._round_temporal(vector, field)
+            #     return pc.cast(vector, field.type)
 
-        # Special handling for Pandas/NumPy date values
-        # These are encoded as np.datetime64[ns] in Pandas -> pa.timestamp64[ns] in Arrow
-        # Only allow this conversion if the vector is coming from Pandas with datetime type
-        if pandas_type == DataMapping.pandas_datetime_type():
-            if pa.types.is_timestamp(vector.type) and vector.type.unit == "ns":
+        # Special handling for date values coming from Pandas/NumPy
+        # Only allow these conversions if the vector is supplied with Pandas type info
+        # Pandas 1.x series, dates encoded as np.datetime64[ns] in Pandas -> pa.timestamp64[ns] in Arrow
+        if pandas_type is not None:
+            if pa.types.is_timestamp(vector.type) and pd.api.types.is_datetime64_any_dtype(pandas_type):
                 return pc.cast(vector, field.type)
 
         error_message = cls._format_error(cls.__E_WRONG_DATA_TYPE, vector, field)
@@ -735,22 +747,11 @@ class DataConformance:
                 if platform.system().lower().startswith("win"):
                     return cls._coerce_timestamp_windows(vector, field)
 
-                if field.type.unit == "s":
-                    rounding_unit = "second"
-                elif field.type.unit == "ms":
-                    rounding_unit = "millisecond"
-                elif field.type.unit == "us":
-                    rounding_unit = "microsecond"
-                elif field.type.unit == "ns":
-                    rounding_unit = "nanosecond"
-                else:
-                    raise _ex.EUnexpected()
-
                 # Loss of precision is allowed, loss of data is not
                 # Rounding will prevent errors in cast() due to loss of precision
                 # cast() will fail if the source value is outside the range of the target type
 
-                rounded_vector = pc.round_temporal(vector, unit=rounding_unit)  # noqa
+                rounded_vector = cls._round_temporal(vector, field)
                 return pc.cast(rounded_vector, field.type)
 
             else:
@@ -763,6 +764,29 @@ class DataConformance:
             error_message = cls._format_error(cls.__E_DATA_LOSS_DID_OCCUR, vector, field, e)
             cls.__log.error(error_message)
             raise _ex.EDataConformance(error_message) from e
+
+    @classmethod
+    def _round_temporal(cls, vector: pa.Array, field: pa.Field):
+
+        if pa.types.is_timestamp(field.type):
+            if field.type.unit == "s":
+                rounding_unit = "second"
+            elif field.type.unit == "ms":
+                rounding_unit = "millisecond"
+            elif field.type.unit == "us":
+                rounding_unit = "microsecond"
+            elif field.type.unit == "ns":
+                rounding_unit = "nanosecond"
+            else:
+                raise _ex.EUnexpected()
+        elif pa.types.is_date64(field.type):
+            rounding_unit = "ms"
+        elif pa.types.is_date32(field.type):
+            rounding_unit = "day"
+        else:
+            raise _ex.EUnexpected()
+
+        return pc.round_temporal(vector, unit=rounding_unit)  # noqa
 
     @classmethod
     def _coerce_timestamp_windows(cls, vector: pa.Array, field: pa.Field):
