@@ -94,7 +94,7 @@ jobs:
               PYSPARK_VERSION: "~= 3.4.0" }
 
           # Intermediate supported versions
-          - { ENV_NAME: "Linux, 3.9, Pandas 2.9, PySpark 3.3",
+          - { ENV_NAME: "Linux, 3.9, Pandas 2.0, PySpark 3.3",
               PLATFORM: 'ubuntu-latest',
               PYTHON_VERSION: "3.9",
               # Force .0 patch version for Pandas 2.0 series
@@ -104,7 +104,7 @@ jobs:
           - { ENV_NAME: "Linux, 3.9, Pandas 1.5, PySpark 3.2",
               PLATFORM: 'ubuntu-latest',
               PYTHON_VERSION: "3.9",
-              PANDAS_VERSION: "~= 1.5.9",
+              PANDAS_VERSION: "~= 1.5.0",
               PYSPARK_VERSION: "~= 3.2.0" }
 
           # Oldest supported versions, force testing against .0 for Python, Pandas and PySpark
