@@ -75,11 +75,7 @@ class DataView:
 
 
 class _DataInternal:
-
-    @staticmethod
-    def float_dtype_check():
-        if "Float64Dtype" not in pd.__dict__:
-            raise _ex.EStartup("TRAC D.A.P. requires Pandas >= 1.2")
+    pass
 
 
 class DataMapping:
@@ -112,9 +108,19 @@ class DataMapping:
     }
 
     # Check the Pandas dtypes for handling floats are available before setting up the type mapping
-    __PANDAS_FLOAT_DTYPE_CHECK = _DataInternal.float_dtype_check()
-    __PANDAS_DATE_TYPE = pd.to_datetime([dt.date(2000, 1, 1)]).as_unit(__TRAC_TIMESTAMP_UNIT).dtype
-    __PANDAS_DATETIME_TYPE = pd.to_datetime([dt.datetime(2000, 1, 1, 0, 0, 0)]).as_unit(__TRAC_TIMESTAMP_UNIT).dtype
+    __PANDAS_VERSION = pd.util.version.parse(pd.__version__)
+
+    if __PANDAS_VERSION.major == 2:
+        __PANDAS_DATE_TYPE = pd.to_datetime([dt.date(2000, 1, 1)]).as_unit(__TRAC_TIMESTAMP_UNIT).dtype
+        __PANDAS_DATETIME_TYPE = pd.to_datetime([dt.datetime(2000, 1, 1, 0, 0, 0)]).as_unit(__TRAC_TIMESTAMP_UNIT).dtype
+
+    # pd.Float64Dtype was introduced in Pandas 1.2
+    elif __PANDAS_VERSION.major == 1 and __PANDAS_VERSION.minor >= 2:
+        __PANDAS_DATE_TYPE = pd.to_datetime([dt.date(2000, 1, 1)]).dtype
+        __PANDAS_DATETIME_TYPE = pd.to_datetime([dt.datetime(2000, 1, 1, 0, 0, 0)]).dtype
+
+    else:
+        raise _ex.EStartup(f"Pandas version not supported: [{pd.__version__}]")
 
     # Only partial mapping is possible, decimal and temporal dtypes cannot be mapped this way
     __ARROW_TO_PANDAS_TYPE_MAPPING = {
@@ -230,8 +236,14 @@ class DataMapping:
         return cls.__PANDAS_DATE_TYPE
 
     @classmethod
-    def pandas_datetime_type(cls):
-        return cls.__PANDAS_DATETIME_TYPE
+    def pandas_datetime_type(cls, tz=None):
+        if tz is None:
+            return cls.__PANDAS_DATETIME_TYPE
+        else:
+            if cls.__PANDAS_VERSION.major == 1:
+                return pd.DatetimeTZDtype(tz=tz)
+            else:
+                return pd.DatetimeTZDtype(tz=tz, unit=cls.__TRAC_TIMESTAMP_UNIT)
 
     @classmethod
     def view_to_pandas(
@@ -471,7 +483,7 @@ class DataConformance:
 
                 table_column: pa.Array = table.column(table_index)
 
-                pandas_type = pandas_types[table_index] \
+                pandas_type = pandas_types.iloc[table_index] \
                     if pandas_types is not None \
                     else None
 
