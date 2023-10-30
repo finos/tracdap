@@ -20,7 +20,6 @@ import datetime as dt
 import decimal
 import platform
 
-import pandas.util.version
 import pyarrow as pa
 import pyarrow.compute as pc
 import pandas as pd
@@ -108,14 +107,16 @@ class DataMapping:
     }
 
     # Check the Pandas dtypes for handling floats are available before setting up the type mapping
-    __PANDAS_VERSION = pd.util.version.parse(pd.__version__)
+    __PANDAS_VERSION_ELEMENTS = pd.__version__.split(".")
+    __PANDAS_VERSION_MAJOR = int(__PANDAS_VERSION_ELEMENTS[0])
+    __PANDAS_VERSION_MINOR = int(__PANDAS_VERSION_ELEMENTS[1])
 
-    if __PANDAS_VERSION.major == 2:
+    if __PANDAS_VERSION_MAJOR == 2:
         __PANDAS_DATE_TYPE = pd.to_datetime([dt.date(2000, 1, 1)]).as_unit(__TRAC_TIMESTAMP_UNIT).dtype
         __PANDAS_DATETIME_TYPE = pd.to_datetime([dt.datetime(2000, 1, 1, 0, 0, 0)]).as_unit(__TRAC_TIMESTAMP_UNIT).dtype
 
     # pd.Float64Dtype was introduced in Pandas 1.2
-    elif __PANDAS_VERSION.major == 1 and __PANDAS_VERSION.minor >= 2:
+    elif __PANDAS_VERSION_MAJOR == 1 and __PANDAS_VERSION_MINOR >= 2:
         __PANDAS_DATE_TYPE = pd.to_datetime([dt.date(2000, 1, 1)]).dtype
         __PANDAS_DATETIME_TYPE = pd.to_datetime([dt.datetime(2000, 1, 1, 0, 0, 0)]).dtype
 
@@ -240,7 +241,7 @@ class DataMapping:
         if tz is None:
             return cls.__PANDAS_DATETIME_TYPE
         else:
-            if cls.__PANDAS_VERSION.major == 1:
+            if cls.__PANDAS_VERSION_MAJOR == 1:
                 return pd.DatetimeTZDtype(tz=tz)
             else:
                 return pd.DatetimeTZDtype(tz=tz, unit=cls.__TRAC_TIMESTAMP_UNIT)
@@ -400,8 +401,6 @@ class DataConformance:
     __E_TIMEZONE_DOES_NOT_MATCH = \
         "Field [{field_name}] cannot be converted from {vector_type} to {field_type}, " + \
         "source and target have different time zones"
-
-    __PANDAS_MAJOR_VERSION = pd.util.version.parse(pd.__version__).major
 
     @classmethod
     def column_filter(cls, columns: tp.List[str], schema: tp.Optional[pa.Schema]) -> tp.Optional[tp.List[str]]:
