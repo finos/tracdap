@@ -25,7 +25,7 @@ ext {
     netty_version = '4.1.100.Final'
     guava_version = '32.0.1-jre'
     proto_version = '3.23.2'
-    grpc_version = '1.57.2'
+    grpc_version = '1.59.0'
     gapi_version = '2.20.0'
 
     // Data technologies
