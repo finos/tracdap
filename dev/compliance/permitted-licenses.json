@@ -47,6 +47,10 @@
       "moduleLicense": null
     },
     {
+      "moduleName": "com.google.guava:guava-parent",
+      "moduleLicense": null
+    },
+    {
       "moduleName": "io.netty:netty-bom",
       "moduleLicense": null
     },
