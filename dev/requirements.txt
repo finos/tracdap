@@ -1,16 +1,16 @@
 # Requirements for all the Python build scripts
 
 # Protoc is required for the codegen scripts which work off the API proto files
+protobuf ~= 4.23.0
 protoc-wheel-0 >= 21, < 22
-protobuf >= 4.21, < 4.22
 googleapis-common-protos >= 1.56, < 2.0
 
 # Doc generation
-sphinx >= 5.1, < 6.0
-sphinx-autoapi >= 1.9, < 2.0
-sphinx-design >= 0.3
-sphinxcontrib-fulltoc >= 1.2, < 2.0
-cloud-sptheme >= 1.10, < 2.0
+sphinx ~= 7.2.0
+sphinx-autoapi ~= 3.0.0
+sphinx-design ~= 0.5.0
+sphinxcontrib-fulltoc ~= 1.2
+cloud-sptheme ~= 1.10
 
 # Cloud Sphinx theme uses jinja2.Markup, which was deprecated in jinja2 3.0 and removed in 3.1
 # I raised an issue here: foss.heptapod.net/doc-utils/cloud_sptheme/-/issues/47

@@ -16,17 +16,17 @@
 
 plugins {
 
-    id "org.owasp.dependencycheck" version "7.3.2"
-    id 'com.github.jk1.dependency-license-report' version '2.0'
+    id "org.owasp.dependencycheck"
+    id "com.github.jk1.dependency-license-report"
 
-    id 'maven-publish'
-    id 'signing'
-    id "io.github.gradle-nexus.publish-plugin" version "1.1.0"
+    id "maven-publish"
+    id "signing"
+    id "io.github.gradle-nexus.publish-plugin"
 }
 
-apply from: 'gradle/versions.gradle'
-apply from: 'gradle/functions.gradle'
-apply from: 'gradle/publish.gradle'
+apply from: "gradle/versions.gradle"
+apply from: "gradle/functions.gradle"
+apply from: "gradle/publish.gradle"
 
 import com.github.jk1.license.filter.*
 
@@ -63,8 +63,28 @@ dependencyCheck {
 
     failBuildOnCVSS = 4
 
+    // NVD cache directory - do not overlap with OWASP check for other languages
+    // Note: Cache corruption can stop the scan from running, in which case the cache should be cleared
     data {
-        directory = rootProject.buildDir.path + '/compliance-cache/nvd_platform/'
+        directory = rootProject.buildDir.path + '/compliance-cache/nvd_platform_java/'
+    }
+
+    // Disable analyzers for other languages
+    // This check is for the Java platform components only
+    analyzers {
+
+        nodeEnabled = false
+        assemblyEnabled = false
+        msbuildEnabled = false
+        nuspecEnabled = false
+
+        retirejs {
+            enabled = false
+        }
+
+        nodeAudit {
+            enabled = false
+        }
     }
 }
 

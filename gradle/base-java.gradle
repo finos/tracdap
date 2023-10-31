@@ -25,6 +25,7 @@ dependencies {
     implementation platform(group: "io.grpc", name: "grpc-bom", version: "${grpc_version}")
     implementation platform(group: "com.google.protobuf", name: "protobuf-bom", version: "${proto_version}")
     implementation platform(group: "com.google.guava", name: "guava-bom", version: "${guava_version}")
+    implementation platform(group: "com.google.guava", name: "guava-parent", version: "${guava_version}")
     implementation platform(group: "com.fasterxml.jackson", name: "jackson-bom", version: "${jackson_version}")
     implementation platform(group: "org.slf4j", name: "slf4j-parent", version: "${slf4j_version}")
     implementation platform(group: "org.apache.logging.log4j", name: "log4j-bom", version: "${log4j_version}")

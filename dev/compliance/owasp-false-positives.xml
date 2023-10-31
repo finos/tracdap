@@ -158,6 +158,15 @@
         <cpe>cpe:/a:json-java_project:json-java</cpe>
     </suppress>
 
+    <!-- Yet another mis-detection for the wrong language -->
+    <!-- Java module is already updated to a fixed version -->
+    <!-- https://github.com/jeremylong/DependencyCheck/issues/5992 -->
+
+    <suppress>
+        <packageUrl regex="true">^pkg:maven/com\.azure/azure-identity@.*$</packageUrl>
+        <vulnerabilityName>CVE-2023-36415</vulnerabilityName>
+    </suppress>
+
 
     <!-- ================== -->
     <!-- Special exceptions -->
@@ -233,7 +242,7 @@
     <!-- https://github.com/netty/netty/issues/8537 -->
 
     <suppress>
-        <packageUrl regex="true">^pkg:maven/io\.netty/netty\-handler@.*$</packageUrl>
+        <packageUrl regex="true">^pkg:maven/io\.netty/netty\-.*@.*$</packageUrl>
         <vulnerabilityName>CVE-2023-4586</vulnerabilityName>
     </suppress>
 

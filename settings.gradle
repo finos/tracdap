@@ -20,6 +20,9 @@ rootProject.name = 'tracdap'
 
 pluginManagement.plugins {
     id 'com.google.protobuf' version "${proto_plugin_version}"
+    id "io.github.gradle-nexus.publish-plugin" version "${nexus_publish_plugin_version}"
+    id "org.owasp.dependencycheck" version "${owasp_check_plugin_version}"
+    id 'com.github.jk1.dependency-license-report' version "${license_check_plugin_version}"
 }
 
 
