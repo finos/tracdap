@@ -22,7 +22,7 @@ ext {
     proto_plugin_version = "0.8.13"
 
     // Core platform technologies
-    netty_version = '4.1.97.Final'
+    netty_version = '4.1.100.Final'
     guava_version = '32.0.1-jre'
     proto_version = '3.23.2'
     grpc_version = '1.57.2'
