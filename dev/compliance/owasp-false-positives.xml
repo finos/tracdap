@@ -174,18 +174,4 @@
         <cve>CVE-2022-45868</cve>
     </suppress>
 
-    <!-- This is a new vulnerability in all Netty components, no fix version is available yet -->
-    <!-- So, adding a false positive -->
-
-    <suppress>
-        <packageUrl regex="true">^pkg:maven/io\.netty/netty\-.*@4.1.86.Final$</packageUrl>
-        <cve>CVE-2022-41915</cve>
-    </suppress>
-
-    <!-- pending upgrade to SLF4J 2 -->
-    <suppress>
-        <packageUrl regex="true">^pkg:maven/org\.slf4j/jcl\-over\-slf4j@.*$</packageUrl>
-        <cve>CVE-2021-37533</cve>
-    </suppress>
-
 </suppressions>
