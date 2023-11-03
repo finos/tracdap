@@ -17,9 +17,14 @@
 # RTD schema version
 version: 2
 
-# Documentation build tools require Python 3.8 and requirements from the dev (build tools) folder
+# OS and Python version for build environment
+build:
+  os: ubuntu-22.04
+  tools:
+    python: "3.11"
+
+# Documentation build requirements from the dev (build tools) folder
 python:
-  version: "3.8"
   install:
     - requirements: dev/requirements.txt
 
