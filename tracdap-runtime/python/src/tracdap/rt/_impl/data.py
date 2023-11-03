@@ -717,18 +717,18 @@ class DataConformance:
     @classmethod
     def _coerce_date(cls, vector: pa.Array, field: pa.Field, pandas_type=None) -> pa.Array:
 
+        # The bit-width restriction could be removed here
+        # For date types there is never loss of precision and pa.cast will raise an error on overflow
+        # Impact to client code is unlikely, still this change should happen with a TRAC minor version update
         if pa.types.is_date(vector.type):
-            # Allow casting date32 -> date64, both range and precision are greater so there is no data loss
             if field.type.bit_width >= vector.type.bit_width:
                 return pc.cast(vector, field.type)
-            # else:
-            #     # rv = pc.round_temporal()
-            #     # rounded_vector = cls._round_temporal(vector, field)
-            #     return pc.cast(vector, field.type)
 
         # Special handling for date values coming from Pandas/NumPy
         # Only allow these conversions if the vector is supplied with Pandas type info
-        # Pandas 1.x series, dates encoded as np.datetime64[ns] in Pandas -> pa.timestamp64[ns] in Arrow
+        # For Pandas 1.x, dates are always encoded as np.datetime64[ns]
+        # For Pandas 2.x dates are still np.datetime64 but can be in s, ms, us or ns
+        # This conversion will not apply to dates held in Pandas using the Python date object types
         if pandas_type is not None:
             if pa.types.is_timestamp(vector.type) and pd.api.types.is_datetime64_any_dtype(pandas_type):
                 return pc.cast(vector, field.type)
