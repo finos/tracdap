@@ -55,7 +55,7 @@ dependencies {
     h2RuntimeOnly group: 'com.h2database', name: 'h2', version: "$h2_version"
 
     // Do not let MySQL pull in protobuf! We want to use the version from the core TRAC libs
-    mysqlRuntimeOnly (group: 'mysql', name: 'mysql-connector-java', version: "$mysql_version") {
+    mysqlRuntimeOnly (group: 'com.mysql', name: 'mysql-connector-j', version: "$mysql_version") {
         exclude group: 'com.google.protobuf', module: 'protobuf-java'
     }
 
