@@ -132,18 +132,13 @@ jobs:
         with:
           fetch-depth: 0
 
-      # PyPanDoc dependency is not managed correctly by PySpark 2.4 package
-      # It needs to be installed explicitly first
-      # Also, PyPanDoc >=1.8 breaks with PySpark 2.4
-      # This workaround could be dropped if TRAC set baseline support for Spark at Spark 3.0...
-      - name: Install pre-req dependencies
-        if: ${{ matrix.environment.PYPANDOC }}
-        run: |
-          pip install "pypandoc <1.8"
+      #  For PySpark, dependencies removed from build since Spark is not supported in 0.5 series
+      #  PyPanDoc was required for Spark 2.x series, however minimum supported Spark version is now 3.0
+      #  pip install "pypandoc <1.8"
+      #  pip install "pyspark ${{ matrix.environment.PYSPARK_VERSION }}"
 
       - name: Install dependencies
         run: |
-          pip install "pyspark ${{ matrix.environment.PYSPARK_VERSION }}"
           pip install "pandas ${{ matrix.environment.PANDAS_VERSION }}"
           cd tracdap-runtime/python
           pip install -r requirements.txt

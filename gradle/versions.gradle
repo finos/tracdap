@@ -19,28 +19,28 @@ ext {
     java_min_version = JavaVersion.VERSION_11
 
     // Core platform technologies
-    netty_version = '4.1.86.Final'
-    guava_version = '31.1-jre'
-    proto_version = '3.21.10'
-    grpc_version = '1.49.0'
-    gapi_version = '2.9.2'
+    netty_version = '4.1.100.Final'
+    guava_version = '32.1.3-jre'
+    proto_version = '3.23.2'
+    grpc_version = '1.59.0'
+    gapi_version = '2.20.0'
 
 
     // Data technologies
-    arrow_version = '10.0.1'
-    jackson_version = '2.14.1'
-    jackson_databind_version = '2.14.1'
+    arrow_version = '12.0.1'
+    jackson_version = '2.15.2'
+    jackson_databind_version = '2.15.2'
 
     // Util libraries
-    slf4j_version = '1.7.36'
-    log4j_version = '2.17.2'
+    slf4j_version = '2.0.7'
+    log4j_version = '2.20.0'
     commons_cli_version = "1.5.0"
     jwt_version = "4.2.1"
 
 
     // SQL (JDBC) drivers
     h2_version = '2.1.214'
-    mysql_version = '8.0.31'
+    mysql_version = '8.2.0'
     mariadb_version = '3.0.8'
     postgresql_version = '42.5.1'
     sqlserver_version = '9.4.1.jre11'     // Update to SqlServer 10.x driver series is a breaking change
@@ -61,17 +61,16 @@ ext {
 
     // Plugins
 
-    aws_sdk_version = '2.19.10'
+    aws_sdk_version = '2.21.11'
 
-    apache_sshd_version = "2.9.2"
+    apache_sshd_version = "2.10.0"
 
     // AWS SDK uses Reactive Streams
     // Only the latest version has a good license (MIT-0, prior versions were Creative Commons)
     reactive_streams_version = '1.0.4'
 
 
-    gcp_sdk_version = '2.6.1'
-    gcp_sdk_http_client_version = '1.41.8'  // Force Google HTTP client version needed for compliance
+    gcp_sdk_version = '26.26.0'
 
 
     // Test dependencies

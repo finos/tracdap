@@ -38,6 +38,14 @@
     {
       "moduleName": "io.netty:netty-tcnative-classes",
       "moduleLicense": null
+    },
+    {
+      "moduleLicense": null,
+      "moduleName": "com.google.cloud:libraries-bom"
+    },
+    {
+      "moduleLicense": null,
+      "moduleName": "io.grpc:grpc-bom"
     }
   ]
 }
