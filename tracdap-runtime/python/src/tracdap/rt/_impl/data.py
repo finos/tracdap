@@ -765,11 +765,22 @@ class DataConformance:
                 if platform.system().lower().startswith("win"):
                     return cls._coerce_timestamp_windows(vector, field)
 
+                if field.type.unit == "s":
+                    rounding_unit = "second"
+                elif field.type.unit == "ms":
+                    rounding_unit = "millisecond"
+                elif field.type.unit == "us":
+                    rounding_unit = "microsecond"
+                elif field.type.unit == "ns":
+                    rounding_unit = "nanosecond"
+                else:
+                    raise _ex.EUnexpected()
+
                 # Loss of precision is allowed, loss of data is not
                 # Rounding will prevent errors in cast() due to loss of precision
                 # cast() will fail if the source value is outside the range of the target type
 
-                rounded_vector = cls._round_temporal(vector, field)
+                rounded_vector = pc.round_temporal(vector, unit=rounding_unit)  # noqa
                 return pc.cast(rounded_vector, field.type)
 
             else:
@@ -782,29 +793,6 @@ class DataConformance:
             error_message = cls._format_error(cls.__E_DATA_LOSS_DID_OCCUR, vector, field, e)
             cls.__log.error(error_message)
             raise _ex.EDataConformance(error_message) from e
-
-    @classmethod
-    def _round_temporal(cls, vector: pa.Array, field: pa.Field):
-
-        if pa.types.is_timestamp(field.type):
-            if field.type.unit == "s":
-                rounding_unit = "second"
-            elif field.type.unit == "ms":
-                rounding_unit = "millisecond"
-            elif field.type.unit == "us":
-                rounding_unit = "microsecond"
-            elif field.type.unit == "ns":
-                rounding_unit = "nanosecond"
-            else:
-                raise _ex.EUnexpected()
-        elif pa.types.is_date64(field.type):
-            rounding_unit = "ms"
-        elif pa.types.is_date32(field.type):
-            rounding_unit = "day"
-        else:
-            raise _ex.EUnexpected()
-
-        return pc.round_temporal(vector, unit=rounding_unit)  # noqa
 
     @classmethod
     def _coerce_timestamp_windows(cls, vector: pa.Array, field: pa.Field):
