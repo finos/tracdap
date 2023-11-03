@@ -25,6 +25,7 @@ jobs:
         JAVA_VERSION:
           - 11
           - 17
+          - 21
 
     steps:
 
