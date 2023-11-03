@@ -14,11 +14,11 @@ on:
   workflow_dispatch:
 
 
-# Use baseline language versions for integration builds
+# Use latest supported language versions for integration testing
 env:
-  JAVA_VERSION: 17
+  JAVA_VERSION: 21
   JAVA_DISTRIBUTION: zulu
-  PYTHON_VERSION: "3.11"
+  PYTHON_VERSION: 3.11
   NODE_VERSION: 18
 
 
