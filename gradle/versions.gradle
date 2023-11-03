@@ -40,7 +40,7 @@ ext {
 
     // SQL (JDBC) drivers
     h2_version = '2.1.214'
-    mysql_version = '8.0.33'
+    mysql_version = '8.2.0'
     mariadb_version = '3.0.8'
     postgresql_version = '42.5.1'
     sqlserver_version = '9.4.1.jre11'     // Update to SqlServer 10.x driver series is a breaking change
@@ -70,8 +70,7 @@ ext {
     reactive_streams_version = '1.0.4'
 
 
-    gcp_sdk_version = '2.6.1'
-    gcp_sdk_http_client_version = '1.41.8'  // Force Google HTTP client version needed for compliance
+    gcp_sdk_version = '26.26.0'
 
 
     // Test dependencies
