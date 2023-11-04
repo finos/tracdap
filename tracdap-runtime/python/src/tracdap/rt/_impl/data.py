@@ -330,7 +330,7 @@ class DataMapping:
             DataConformance.check_duplicate_fields(table.schema.names, False)
 
         # Use Arrow's built-in function to convert to Pandas
-        df_from_arrow = table.to_pandas(
+        return table.to_pandas(
 
             # Mapping for arrow -> pandas types for core types
             types_mapper=cls.__ARROW_TO_PANDAS_TYPE_MAPPING.get,
@@ -345,33 +345,6 @@ class DataMapping:
             # Do not consolidate memory across columns when preparing the Pandas vectors
             # This is a significant performance win for very wide datasets
             split_blocks=True)  # noqa
-
-        # Arrow 12 doesn't support the new precision handling for datetime values supported in Pandas 2
-        # However Arrow 13 dropped support for Python 3.7, which is a requirement for the TRAC 0.5.x series
-        # So to backport Pandas 2 support, special handling is needed for datetime fields when using Pandas 2
-        # This is not needed from TRAC 0.6 onward, which upgrades to Arrow 13 and drops Python 3.7 support
-        # Also it is not needed if the temporal objects flag is set, since it only affects NumPy datetime64
-
-        if cls.__PANDAS_MAJOR_VERSION == 2 and not temporal_objects_flag:
-            # Use table.schema, it is always present and has been normalized if a separate schema was supplied
-            return cls._fix_pandas_2_datetime_precision(df_from_arrow, table.schema)
-        else:
-            return df_from_arrow
-
-    @classmethod
-    def _fix_pandas_2_datetime_precision(cls, df: pd.DataFrame, schema: pa.Schema) -> pd.DataFrame:
-
-        for field in schema:
-            if pa.types.is_date(field.type):
-                dtype = cls.__PANDAS_DATE_TYPE
-                if df[field.name].dtype != dtype:
-                    df[field.name] = df[field.name].astype(dtype)
-            if pa.types.is_timestamp(field.type):
-                dtype = cls.__pandas_datetime_type(field.type.tz, field.type.unit)
-                if df[field.name].dtype != dtype:
-                    df[field.name] = df[field.name].astype(dtype)
-
-        return df
 
     @classmethod
     def pandas_to_arrow(cls, df: pd.DataFrame, schema: tp.Optional[pa.Schema] = None) -> pa.Table:
