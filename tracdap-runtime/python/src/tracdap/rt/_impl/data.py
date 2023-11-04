@@ -108,10 +108,10 @@ class DataMapping:
 
     # Check the Pandas dtypes for handling floats are available before setting up the type mapping
     __PANDAS_VERSION_ELEMENTS = pd.__version__.split(".")
-    __PANDAS_VERSION_MAJOR = int(__PANDAS_VERSION_ELEMENTS[0])
-    __PANDAS_VERSION_MINOR = int(__PANDAS_VERSION_ELEMENTS[1])
+    __PANDAS_MAJOR_VERSION = int(__PANDAS_VERSION_ELEMENTS[0])
+    __PANDAS_MINOR_VERSION = int(__PANDAS_VERSION_ELEMENTS[1])
 
-    if __PANDAS_VERSION_MAJOR == 2:
+    if __PANDAS_MAJOR_VERSION == 2:
 
         __PANDAS_DATE_TYPE = pd.to_datetime([dt.date(2000, 1, 1)]).as_unit(__TRAC_TIMESTAMP_UNIT).dtype
         __PANDAS_DATETIME_TYPE = pd.to_datetime([dt.datetime(2000, 1, 1, 0, 0, 0)]).as_unit(__TRAC_TIMESTAMP_UNIT).dtype
@@ -127,7 +127,7 @@ class DataMapping:
                 return pd.DatetimeTZDtype(tz=tz, unit=_unit)
 
     # Minimum supported version for Pandas is 1.2, when pd.Float64Dtype was introduced
-    elif __PANDAS_VERSION_MAJOR == 1 and __PANDAS_VERSION_MINOR >= 2:
+    elif __PANDAS_MAJOR_VERSION == 1 and __PANDAS_MINOR_VERSION >= 2:
 
         __PANDAS_DATE_TYPE = pd.to_datetime([dt.date(2000, 1, 1)]).dtype
         __PANDAS_DATETIME_TYPE = pd.to_datetime([dt.datetime(2000, 1, 1, 0, 0, 0)]).dtype
@@ -352,7 +352,7 @@ class DataMapping:
         # This is not needed from TRAC 0.6 onward, which upgrades to Arrow 13 and drops Python 3.7 support
         # Also it is not needed if the temporal objects flag is set, since it only affects NumPy datetime64
 
-        if cls.__PANDAS_VERSION_MAJOR == 2 and not temporal_objects_flag:
+        if cls.__PANDAS_MAJOR_VERSION == 2 and not temporal_objects_flag:
             # Use table.schema, it is always present and has been normalized if a separate schema was supplied
             return cls._fix_pandas_2_datetime_precision(df_from_arrow, table.schema)
         else:
