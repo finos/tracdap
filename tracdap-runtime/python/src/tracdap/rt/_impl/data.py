@@ -117,8 +117,14 @@ class DataMapping:
         __PANDAS_DATETIME_TYPE = pd.to_datetime([dt.datetime(2000, 1, 1, 0, 0, 0)]).as_unit(__TRAC_TIMESTAMP_UNIT).dtype
 
         @classmethod
-        def __pandas_datetime_tz_type(cls, tz):
-            return pd.DatetimeTZDtype(tz=tz, unit=cls.__TRAC_TIMESTAMP_UNIT)
+        def __pandas_datetime_type(cls, tz, unit):
+            if tz is None and unit is None:
+                return cls.__PANDAS_DATETIME_TYPE
+            _unit = unit if unit is not None else cls.__TRAC_TIMESTAMP_UNIT
+            if tz is None:
+                return pd.to_datetime([dt.datetime(2000, 1, 1, 0, 0, 0)]).as_unit(_unit).dtype
+            else:
+                return pd.DatetimeTZDtype(tz=tz, unit=_unit)
 
     # Minimum supported version for Pandas is 1.2, when pd.Float64Dtype was introduced
     elif __PANDAS_VERSION_MAJOR == 1 and __PANDAS_VERSION_MINOR >= 2:
@@ -127,8 +133,11 @@ class DataMapping:
         __PANDAS_DATETIME_TYPE = pd.to_datetime([dt.datetime(2000, 1, 1, 0, 0, 0)]).dtype
 
         @classmethod
-        def __pandas_datetime_tz_type(cls, tz):
-            return pd.DatetimeTZDtype(tz=tz)
+        def __pandas_datetime_type(cls, tz, unit):  # noqa
+            if tz is None:
+                return cls.__PANDAS_DATETIME_TYPE
+            else:
+                return pd.DatetimeTZDtype(tz=tz)
 
     else:
         raise _ex.EStartup(f"Pandas version not supported: [{pd.__version__}]")
@@ -247,11 +256,8 @@ class DataMapping:
         return cls.__PANDAS_DATE_TYPE
 
     @classmethod
-    def pandas_datetime_type(cls, tz=None):
-        if tz is None:
-            return cls.__PANDAS_DATETIME_TYPE
-        else:
-            return cls.__pandas_datetime_tz_type(tz)
+    def pandas_datetime_type(cls, tz=None, unit=None):
+        return cls.__pandas_datetime_type(tz, unit)
 
     @classmethod
     def view_to_pandas(
@@ -323,7 +329,8 @@ class DataMapping:
         else:
             DataConformance.check_duplicate_fields(table.schema.names, False)
 
-        return table.to_pandas(
+        # Use Arrow's built-in function to convert to Pandas
+        df_from_arrow = table.to_pandas(
 
             # Mapping for arrow -> pandas types for core types
             types_mapper=cls.__ARROW_TO_PANDAS_TYPE_MAPPING.get,
@@ -338,6 +345,33 @@ class DataMapping:
             # Do not consolidate memory across columns when preparing the Pandas vectors
             # This is a significant performance win for very wide datasets
             split_blocks=True)  # noqa
+
+        # Arrow 12 doesn't support the new precision handling for datetime values supported in Pandas 2
+        # However Arrow 13 dropped support for Python 3.7, which is a requirement for the TRAC 0.5.x series
+        # So to backport Pandas 2 support, special handling is needed for datetime fields when using Pandas 2
+        # This is not needed from TRAC 0.6 onward, which upgrades to Arrow 13 and drops Python 3.7 support
+        # Also it is not needed if the temporal objects flag is set, since it only affects NumPy datetime64
+
+        if cls.__PANDAS_VERSION_MAJOR == 2 and not temporal_objects_flag:
+            # Use table.schema, it is always present and has been normalized if a separate schema was supplied
+            return cls._fix_pandas_2_datetime_precision(df_from_arrow, table.schema)
+        else:
+            return df_from_arrow
+
+    @classmethod
+    def _fix_pandas_2_datetime_precision(cls, df: pd.DataFrame, schema: pa.Schema) -> pd.DataFrame:
+
+        for field in schema:
+            if pa.types.is_date(field.type):
+                dtype = cls.__PANDAS_DATE_TYPE
+                if df[field.name].dtype != dtype:
+                    df[field.name] = df[field.name].astype(dtype)
+            if pa.types.is_timestamp(field.type):
+                dtype = cls.__pandas_datetime_type(field.type.tz, field.type.unit)
+                if df[field.name].dtype != dtype:
+                    df[field.name] = df[field.name].astype(dtype)
+
+        return df
 
     @classmethod
     def pandas_to_arrow(cls, df: pd.DataFrame, schema: tp.Optional[pa.Schema] = None) -> pa.Table:
