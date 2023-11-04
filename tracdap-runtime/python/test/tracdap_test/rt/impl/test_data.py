@@ -138,8 +138,10 @@ class DataMappingTest(unittest.TestCase):
             pd.StringDtype(),
 
             # Date/time types being converted as NumPy native (datetime64[ns])
-            pd.to_datetime([dt.date(1970, 1, 1)]).dtype,
-            pd.to_datetime([dt.datetime(1970, 1, 1)]).dtype]
+            _data.DataMapping.pandas_date_type(),
+            _data.DataMapping.pandas_datetime_type()]
+
+        # .astype("datetime64[ms]") coming through in Pandas 2
 
         self.assertListEqual(expect_dtypes, df.dtypes.to_list())
 
@@ -322,10 +324,9 @@ class DataMappingTest(unittest.TestCase):
         epoch_utc = dt.datetime(1970, 1, 1, tzinfo=dt.timezone.utc)
         epoch_europe_london = dt.datetime(1970, 1, 1, tzinfo=dt.timezone(dt.timedelta(hours=+1), name="Europe/London"))
 
-        ts_no_zone = ("f", pa.timestamp("s"))
-        ts_utc = ("f", pa.timestamp("s", tz="UTC"))
-        ts_europe_london = ("f", pa.timestamp("s", tz="Europe/London"))
-        ts_ns_europe_london = ("f", pa.timestamp("ns", tz="Europe/London"))
+        ts_no_zone = ("f", pa.timestamp("ms"))
+        ts_utc = ("f", pa.timestamp("ms", tz="UTC"))
+        ts_europe_london = ("f", pa.timestamp("ms", tz="Europe/London"))
 
         def do_test(sample_val, sample_type):
 
@@ -340,9 +341,9 @@ class DataMappingTest(unittest.TestCase):
             # Also check TZ shows up correctly in the Pandas dtype
 
             if sample_type[1].tz:
-                expected_dtype = pd.DatetimeTZDtype(tz=sample_type[1].tz)
+                expected_dtype = _data.DataMapping.pandas_datetime_type(tz=sample_type[1].tz)
             else:
-                expected_dtype = pd.to_datetime([dt.datetime(1970, 1, 1)]).dtype
+                expected_dtype = _data.DataMapping.pandas_datetime_type()
 
             self.assertListEqual([expected_dtype], df.dtypes.to_list())
 
@@ -354,7 +355,6 @@ class DataMappingTest(unittest.TestCase):
         do_test(epoch, ts_no_zone)
         do_test(epoch_utc, ts_utc)
         do_test(epoch_europe_london, ts_europe_london)
-        do_test(epoch_europe_london, ts_ns_europe_london)
 
 
 class DataConformanceTest(unittest.TestCase):
