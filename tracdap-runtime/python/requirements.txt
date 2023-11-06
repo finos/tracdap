@@ -13,7 +13,7 @@ protobuf == 4.23.2
 pyarrow == 14.0.2
 
 # PyYAML is used to load config supplied in YAML format
-pyyaml == 6.0
+pyyaml == 6.0.1
 
 # Python implementation of Git, for model loading
 dulwich == 0.21.5
