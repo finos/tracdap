@@ -9,8 +9,8 @@ on:
 
 
 env:
-  JAVA_DISTRIBUTION: zulu
-  NODE_VERSION: 14.x
+  JAVA_DISTRIBUTION: "zulu"
+  NODE_VERSION: "20"
 
 
 jobs:
@@ -21,6 +21,10 @@ jobs:
     timeout-minutes: 20
 
     strategy:
+
+      # Try to finish all jobs - it can be helpful to see if some succeed and others fail
+      fail-fast: false
+
       matrix:
         JAVA_VERSION:
           - 11
