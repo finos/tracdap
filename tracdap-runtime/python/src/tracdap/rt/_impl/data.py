@@ -74,11 +74,7 @@ class DataView:
 
 
 class _DataInternal:
-
-    @staticmethod
-    def float_dtype_check():
-        if "Float64Dtype" not in pd.__dict__:
-            raise _ex.EStartup("TRAC D.A.P. requires Pandas >= 1.2")
+    pass
 
 
 class DataMapping:
@@ -111,8 +107,40 @@ class DataMapping:
     }
 
     # Check the Pandas dtypes for handling floats are available before setting up the type mapping
-    __PANDAS_FLOAT_DTYPE_CHECK = _DataInternal.float_dtype_check()
-    __PANDAS_DATETIME_TYPE = pd.to_datetime([]).dtype
+    __PANDAS_VERSION_ELEMENTS = pd.__version__.split(".")
+    __PANDAS_MAJOR_VERSION = int(__PANDAS_VERSION_ELEMENTS[0])
+    __PANDAS_MINOR_VERSION = int(__PANDAS_VERSION_ELEMENTS[1])
+
+    if __PANDAS_MAJOR_VERSION == 2:
+
+        __PANDAS_DATE_TYPE = pd.to_datetime([dt.date(2000, 1, 1)]).as_unit(__TRAC_TIMESTAMP_UNIT).dtype
+        __PANDAS_DATETIME_TYPE = pd.to_datetime([dt.datetime(2000, 1, 1, 0, 0, 0)]).as_unit(__TRAC_TIMESTAMP_UNIT).dtype
+
+        @classmethod
+        def __pandas_datetime_type(cls, tz, unit):
+            if tz is None and unit is None:
+                return cls.__PANDAS_DATETIME_TYPE
+            _unit = unit if unit is not None else cls.__TRAC_TIMESTAMP_UNIT
+            if tz is None:
+                return pd.to_datetime([dt.datetime(2000, 1, 1, 0, 0, 0)]).as_unit(_unit).dtype
+            else:
+                return pd.DatetimeTZDtype(tz=tz, unit=_unit)
+
+    # Minimum supported version for Pandas is 1.2, when pd.Float64Dtype was introduced
+    elif __PANDAS_MAJOR_VERSION == 1 and __PANDAS_MINOR_VERSION >= 2:
+
+        __PANDAS_DATE_TYPE = pd.to_datetime([dt.date(2000, 1, 1)]).dtype
+        __PANDAS_DATETIME_TYPE = pd.to_datetime([dt.datetime(2000, 1, 1, 0, 0, 0)]).dtype
+
+        @classmethod
+        def __pandas_datetime_type(cls, tz, unit):  # noqa
+            if tz is None:
+                return cls.__PANDAS_DATETIME_TYPE
+            else:
+                return pd.DatetimeTZDtype(tz=tz)
+
+    else:
+        raise _ex.EStartup(f"Pandas version not supported: [{pd.__version__}]")
 
     # Only partial mapping is possible, decimal and temporal dtypes cannot be mapped this way
     __ARROW_TO_PANDAS_TYPE_MAPPING = {
@@ -224,8 +252,12 @@ class DataMapping:
             cls.__TRAC_DECIMAL_SCALE)
 
     @classmethod
-    def pandas_datetime_type(cls):
-        return cls.__PANDAS_DATETIME_TYPE
+    def pandas_date_type(cls):
+        return cls.__PANDAS_DATE_TYPE
+
+    @classmethod
+    def pandas_datetime_type(cls, tz=None, unit=None):
+        return cls.__pandas_datetime_type(tz, unit)
 
     @classmethod
     def view_to_pandas(
@@ -297,6 +329,7 @@ class DataMapping:
         else:
             DataConformance.check_duplicate_fields(table.schema.names, False)
 
+        # Use Arrow's built-in function to convert to Pandas
         return table.to_pandas(
 
             # Mapping for arrow -> pandas types for core types
@@ -463,7 +496,7 @@ class DataConformance:
 
                 table_column: pa.Array = table.column(table_index)
 
-                pandas_type = pandas_types[table_index] \
+                pandas_type = pandas_types.iloc[table_index] \
                     if pandas_types is not None \
                     else None
 
@@ -691,16 +724,20 @@ class DataConformance:
     @classmethod
     def _coerce_date(cls, vector: pa.Array, field: pa.Field, pandas_type=None) -> pa.Array:
 
-        # Allow casting date32 -> date64, both range and precision are greater so there is no data loss
+        # The bit-width restriction could be removed here
+        # For date types there is never loss of precision and pa.cast will raise an error on overflow
+        # Impact to client code is unlikely, still this change should happen with a TRAC minor version update
         if pa.types.is_date(vector.type):
             if field.type.bit_width >= vector.type.bit_width:
                 return pc.cast(vector, field.type)
 
-        # Special handling for Pandas/NumPy date values
-        # These are encoded as np.datetime64[ns] in Pandas -> pa.timestamp64[ns] in Arrow
-        # Only allow this conversion if the vector is coming from Pandas with datetime type
-        if pandas_type == DataMapping.pandas_datetime_type():
-            if pa.types.is_timestamp(vector.type) and vector.type.unit == "ns":
+        # Special handling for date values coming from Pandas/NumPy
+        # Only allow these conversions if the vector is supplied with Pandas type info
+        # For Pandas 1.x, dates are always encoded as np.datetime64[ns]
+        # For Pandas 2.x dates are still np.datetime64 but can be in s, ms, us or ns
+        # This conversion will not apply to dates held in Pandas using the Python date object types
+        if pandas_type is not None:
+            if pa.types.is_timestamp(vector.type) and pd.api.types.is_datetime64_any_dtype(pandas_type):
                 return pc.cast(vector, field.type)
 
         error_message = cls._format_error(cls.__E_WRONG_DATA_TYPE, vector, field)
