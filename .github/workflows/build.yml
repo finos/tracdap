@@ -10,7 +10,7 @@ on:
 
 env:
   JAVA_DISTRIBUTION: "zulu"
-  NODE_VERSION: "20"
+  NODE_VERSION: "18"
 
 
 jobs:

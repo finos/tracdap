@@ -31,7 +31,7 @@ env:
   JAVA_VERSION: "21"
   JAVA_DISTRIBUTION: "zulu"
   PYTHON_VERSION: "3.11"
-  NODE_VERSION: "20"
+  NODE_VERSION: "18"
 
 
 jobs:
