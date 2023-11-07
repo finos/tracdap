@@ -21,12 +21,20 @@ import io.netty.channel.EventLoop;
 import io.netty.channel.EventLoopGroup;
 import io.netty.util.concurrent.EventExecutor;
 import org.finos.tracdap.common.exception.ETracInternal;
+import org.finos.tracdap.common.exception.EUnexpected;
 
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 
 public class EventLoopRegister {
+
+    // Java 19 introduces Thread.threadId() and deprecates Thread.getId()
+    // The GET_THREAD_ID method is resolved to one or other depending on the Java version
+
+    private static final Method GET_THREAD_ID = getThreadIdMethod();
 
     private final EventLoopGroup elg;
     private final Map<Long, EventLoop> register;
@@ -39,9 +47,56 @@ public class EventLoopRegister {
         elg.forEach(el -> el.submit(() -> registerEventLoop(el)));
     }
 
+    @SuppressWarnings("all")
+    private static Method getThreadIdMethod() {
+
+        // Try to find the best method for getting thread IDs
+        // Reflective access to non-existent methods is a warning, so using SuppressWarnings on this method
+
+        try {
+
+            // Thread.threadId() should be available for Java 19+ and is the first choice
+            try {
+                return Thread.class.getMethod("threadId");
+            }
+            catch (NoSuchMethodException e) {
+                // no-op
+            }
+
+            // Thread.getId() is deprecated as of Java 19 and is the fallback choice
+            // As of Java 21, Thread.getId() has not been removed
+            try {
+                return Thread.class.getMethod("getId");
+            }
+            catch (NoSuchMethodException e) {
+                // no-op
+            }
+
+            // Errors are not expected, at least one of these methods should be available
+
+            throw new EUnexpected();
+        }
+        catch (Exception e) {
+            throw new EUnexpected(e);
+        }
+    }
+
+    private static long getThreadId(Thread thread) {
+
+        // Invoke the method that was found for GET_THREAD_ID
+        // Errors are not expected
+
+        try {
+            return (long) GET_THREAD_ID.invoke(thread);
+        }
+        catch (InvocationTargetException | IllegalAccessException e) {
+            throw new EUnexpected(e);
+        }
+    }
+
     public EventLoop currentEventLoop(boolean strict) {
 
-        var threadId = Thread.currentThread().getId();
+        var threadId = getThreadId(Thread.currentThread());
         var el = register.get(threadId);
 
         if (el != null)
@@ -61,7 +116,7 @@ public class EventLoopRegister {
     private void registerEventLoop(EventExecutor executor) {
 
         if (executor instanceof EventLoop) {
-            var threadId = Thread.currentThread().getId();
+            var threadId = getThreadId(Thread.currentThread());
             register.put(threadId, (EventLoop) executor);
         }
     }

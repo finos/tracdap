@@ -32,7 +32,7 @@ Deploying the sandbox
 
 **Java**
 
-TRAC requires Java version 11 or higher, using LTS 11 or LTS 17 is recommended.
+TRAC requires Java version 11 or higher, using LTS version 11, 17 or 21 is recommended.
 Suitable JDKs are available from
 `Azul (Zulu) <https://www.azul.com/downloads/?package=jdk>`_ and
 `Adoptium (Eclipse Temurin) <https://adoptium.net/>`_.
@@ -41,10 +41,10 @@ so long as it is version 11 or higher.
 
 **Python**
 
-TRAC requires Python 3.7 or higher, which can be downloaded and installed from
+TRAC requires Python 3.8 or higher, which can be downloaded and installed from
 `python.org <https://www.python.org/downloads/>`_.
 If your company restricts software deployment, it is fine to use the Python package they provide
-so long as it is version 3.7 or higher.
+so long as it is version 3.8 or higher.
 
 **TRAC Services**
 
