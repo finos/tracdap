@@ -75,46 +75,47 @@ jobs:
         environment:
 
           # Latest supported versions on all 3 major platforms
-          - { PLATFORM: "windows",
-              PYTHON_VERSION: "3.12",
-              PANDAS_DEPENDENCY: "pandas ~= 2.1.0",
-              PYSPARK_DEPENDENCY: "pyspark ~= 3.5.0" }
-
-          - { PLATFORM: "macos",
-              PYTHON_VERSION: "3.12",
-              PANDAS_DEPENDENCY: "pandas ~= 2.1.0",
-              PYSPARK_DEPENDENCY: "pyspark ~= 3.5.0" }
-
-          - { PLATFORM: "ubuntu",
-              PYTHON_VERSION: "3.12",
-              PANDAS_DEPENDENCY: "pandas ~= 2.1.0",
-              PYSPARK_DEPENDENCY: "pyspark ~= 3.5.0" }
-
-          # Intermediate supported versions, force testing against .0 for Pandas 2.0
-          - { PLATFORM: "ubuntu",
+          - { ENV_NAME: "Windows, 3.11, Pandas 2.1, PySpark 3.4",
+              PLATFORM: 'windows-latest',
               PYTHON_VERSION: "3.11",
-              PANDAS_DEPENDENCY: "pandas == 2.0.0",
-              PYSPARK_DEPENDENCY: "pyspark ~= 3.4.0" }
+              PANDAS_VERSION: "~= 2.1.0",
+              PYSPARK_VERSION: "~= 3.4.0" }
 
-          - { PLATFORM: "ubuntu",
-              PYTHON_VERSION: "3.10",
-              PANDAS_DEPENDENCY: "pandas ~= 1.5.0",
-              PYSPARK_DEPENDENCY: "pyspark ~= 3.3.0" }
+          - { ENV_NAME: "macOS, 3.11, Pandas 2.1, PySpark 3.4",
+              PLATFORM: 'macos-latest',
+              PYTHON_VERSION: "3.11",
+              PANDAS_VERSION: "~= 2.1.0",
+              PYSPARK_VERSION: "~= 3.4.0" }
 
-          - { PLATFORM: "ubuntu",
+          - { ENV_NAME: "Linux, 3.11, Pandas 2.1, PySpark 3.4",
+              PLATFORM: 'ubuntu-latest',
+              PYTHON_VERSION: "3.11",
+              PANDAS_VERSION: "~= 2.1.0",
+              PYSPARK_VERSION: "~= 3.4.0" }
+
+          # Intermediate supported versions
+          - { ENV_NAME: "Linux, 3.9, Pandas 2.0, PySpark 3.3",
+              PLATFORM: 'ubuntu-latest',
               PYTHON_VERSION: "3.9",
-              PANDAS_DEPENDENCY: "pandas ~= 1.3.0",
-              PYSPARK_DEPENDENCY: "pyspark ~= 3.1.0" }
+              # Force .0 patch version for Pandas 2.0 series
+              PANDAS_VERSION: "== 2.0.0",
+              PYSPARK_VERSION: "~= 3.3.0" }
 
-          # Oldest supported versions, force testing against .0 for Pandas and PySpark
+          - { ENV_NAME: "Linux, 3.9, Pandas 1.5, PySpark 3.2",
+              PLATFORM: 'ubuntu-latest',
+              PYTHON_VERSION: "3.9",
+              PANDAS_VERSION: "~= 1.5.0",
+              PYSPARK_VERSION: "~= 3.2.0" }
+
+          # Oldest supported versions, force testing against .0 for Python, Pandas and PySpark
           # If those don't work due to bugs, we need to update README for the supported versions
-          - { PLATFORM: "ubuntu",
+          - { ENV_NAME: "Linux, 3.8, Pandas 1.2, PySpark 3.0",
+              PLATFORM: 'ubuntu-latest',
               PYTHON_VERSION: "3.8",
-              PANDAS_DEPENDENCY: "pandas == 1.2.0",
-              PYSPARK_DEPENDENCY: "pyspark == 3.0.0" }
+              PANDAS_VERSION: "== 1.2.0",
+              PYSPARK_VERSION: "== 3.0.0" }
 
-    # E.g. platform = "windows" -> build image = "windows-latest"
-    runs-on: ${{ matrix.environment.PLATFORM }}-latest
+    runs-on: ${{ matrix.environment.PLATFORM }}
     timeout-minutes: 20
 
     steps:
@@ -135,9 +136,9 @@ jobs:
 
       - name: Install dependencies
         run: |
+          pip install "pyspark ${{ matrix.environment.PYSPARK_VERSION }}"
+          pip install "pandas ${{ matrix.environment.PANDAS_VERSION }}"
           cd tracdap-runtime/python
-          pip install "${{ matrix.environment.PANDAS_DEPENDENCY }}"
-          pip install "${{ matrix.environment.PYSPARK_DEPENDENCY }}"
           pip install -r requirements.txt
 
       - name: Protoc code generation
