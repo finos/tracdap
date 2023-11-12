@@ -17,6 +17,7 @@
 package org.finos.tracdap.common.cache;
 
 import org.finos.tracdap.common.exception.ECacheDuplicate;
+import org.finos.tracdap.common.exception.ECacheOperation;
 import org.finos.tracdap.common.exception.ECacheTicket;
 import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.metadata.ObjectType;
@@ -1006,7 +1007,7 @@ public abstract class JobCacheTestSuite {
 
 
     @Test
-    void addEntry_ok() {
+    void createEntry_ok() {
 
         var key = newKey();
         var status = "status1";
@@ -1029,22 +1030,7 @@ public abstract class JobCacheTestSuite {
     }
 
     @Test
-    void addEntry_badTicket() {
-        Assertions.fail("Test not implemented");
-    }
-
-    @Test
-    void addEntry_badStatus() {
-        Assertions.fail("Test not implemented");
-    }
-
-    @Test
-    void addEntry_badValue() {
-        Assertions.fail("Test not implemented");
-    }
-
-    @Test
-    void addEntry_alreadyExists() {
+    void createEntry_alreadyExists() {
 
         var key = newKey();
         var status = "status1";
@@ -1084,7 +1070,7 @@ public abstract class JobCacheTestSuite {
     }
 
     @Test
-    void addEntry_afterRemoval() {
+    void createEntry_afterRemoval() {
 
         var key = newKey();
         var status = "status1";
@@ -1117,7 +1103,7 @@ public abstract class JobCacheTestSuite {
     }
 
     @Test
-    void addEntry_afterUnusedTicket() {
+    void createEntry_afterUnusedTicket() {
 
         var key = newKey();
         var status = "status1";
@@ -1154,7 +1140,7 @@ public abstract class JobCacheTestSuite {
     }
 
     @Test
-    void addEntry_ticketUnknown() {
+    void createEntry_ticketUnknown() {
 
         var key = newKey();
         var status = "status1";
@@ -1172,7 +1158,7 @@ public abstract class JobCacheTestSuite {
     }
 
     @Test
-    void addEntry_ticketSuperseded() {
+    void createEntry_ticketSuperseded() {
 
         var key = newKey();
         var status = "status1";
@@ -1196,7 +1182,7 @@ public abstract class JobCacheTestSuite {
     }
 
     @Test
-    void addEntry_ticketExpired() throws Exception {
+    void createEntry_ticketExpired() throws Exception {
 
         var key = newKey();
         var status = "status1";
@@ -1217,7 +1203,7 @@ public abstract class JobCacheTestSuite {
     }
 
     @Test
-    void addEntry_ticketNeverClosed() {
+    void createEntry_ticketNeverClosed() {
 
         var key = newKey();
         var status = "status1";
@@ -1236,6 +1222,220 @@ public abstract class JobCacheTestSuite {
         Assertions.assertEquals(revision, entry.get().revision());
         Assertions.assertEquals(status, entry.get().status());
         Assertions.assertEquals(value, entry.get().value());
+    }
+
+    @Test
+    void createEntry_statusInvalid() {
+
+        var key = newKey();
+        var value = new DummyState();
+        value.intVar = 42;
+        value.stringVar = "the droids you're looking for";
+
+        try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
+
+            Assertions.assertThrows(ECacheOperation.class, () -> cache.addEntry(ticket, "", value));
+            Assertions.assertThrows(ECacheOperation.class, () -> cache.addEntry(ticket, " ", value));
+            Assertions.assertThrows(ECacheOperation.class, () -> cache.addEntry(ticket, "-", value));
+            Assertions.assertThrows(ECacheOperation.class, () -> cache.addEntry(ticket, " leading_space", value));
+            Assertions.assertThrows(ECacheOperation.class, () -> cache.addEntry(ticket, "trailing_space ", value));
+            Assertions.assertThrows(ECacheOperation.class, () -> cache.addEntry(ticket, "@%&^*&£", value));
+            Assertions.assertThrows(ECacheOperation.class, () -> cache.addEntry(ticket, "你好", value));
+        }
+
+        var entry = cache.queryKey(key);
+
+        Assertions.assertFalse(entry.isPresent());
+    }
+
+    @Test
+    void createEntry_statusReserved() {
+
+        var key = newKey();
+        var value = new DummyState();
+        value.intVar = 42;
+        value.stringVar = "the droids you're looking for";
+
+        try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
+
+            Assertions.assertThrows(ECacheOperation.class, () -> cache.addEntry(ticket, "_reserved_status", value));
+            Assertions.assertThrows(ECacheOperation.class, () -> cache.addEntry(ticket, "trac_reserved_status", value));
+        }
+
+        var entry = cache.queryKey(key);
+
+        Assertions.assertFalse(entry.isPresent());
+    }
+
+    @Test
+    void createEntry_nulls() {
+
+        var key = newKey();
+        var status = "status1";
+        var value = new DummyState();
+        value.intVar = 42;
+        value.stringVar = "the droids you're looking for";
+
+        try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
+
+            Assertions.assertThrows(ECacheOperation.class, () -> cache.addEntry(null, status, value));
+            Assertions.assertThrows(ECacheOperation.class, () -> cache.addEntry(ticket, null, value));
+            Assertions.assertThrows(ECacheOperation.class, () -> cache.addEntry(ticket, status, null));
+        }
+
+        var entry = cache.queryKey(key);
+
+        Assertions.assertFalse(entry.isPresent());
+    }
+
+    @Test
+    void readEntry_ok() {
+        Assertions.fail("Not implemented yet");
+    }
+
+    @Test
+    void readEntry_missing() {
+        Assertions.fail("Not implemented yet");
+    }
+
+    @Test
+    void readEntry_afterRemoval() {
+        Assertions.fail("Not implemented yet");
+    }
+
+    @Test
+    void readEntry_afterUnusedTicket() {
+        Assertions.fail("Not implemented yet");
+    }
+
+    @Test
+    void readEntry_ticketUnknown() {
+        Assertions.fail("Not implemented yet");
+    }
+
+    @Test
+    void readEntry_ticketSuperseded() {
+        Assertions.fail("Not implemented yet");
+    }
+
+    @Test
+    void readEntry_ticketExpired() {
+        Assertions.fail("Not implemented yet");
+    }
+
+    @Test
+    void readEntry_ticketNeverClosed() {
+        Assertions.fail("Not implemented yet");
+    }
+
+    @Test
+    void readEntry_nulls() {
+        Assertions.fail("Not implemented yet");
+    }
+
+    @Test
+    void updateEntry_ok() {
+        Assertions.fail("Not implemented yet");
+    }
+
+    @Test
+    void updateEntry_noChanges() {
+        Assertions.fail("Not implemented yet");
+    }
+
+    @Test
+    void updateEntry_sameStatus() {
+        Assertions.fail("Not implemented yet");
+    }
+
+    @Test
+    void updateEntry_sameValue() {
+        Assertions.fail("Not implemented yet");
+    }
+
+    @Test
+    void updateEntry_missing() {
+        Assertions.fail("Not implemented yet");
+    }
+
+    @Test
+    void updateEntry_afterRemoval() {
+        Assertions.fail("Not implemented yet");
+    }
+
+    @Test
+    void updateEntry_ticketUnknown() {
+        Assertions.fail("Not implemented yet");
+    }
+
+    @Test
+    void updateEntry_ticketSuperseded() {
+        Assertions.fail("Not implemented yet");
+    }
+
+    @Test
+    void updateEntry_ticketExpired() {
+        Assertions.fail("Not implemented yet");
+    }
+
+    @Test
+    void updateEntry_ticketNeverClosed() {
+        Assertions.fail("Not implemented yet");
+    }
+
+    @Test
+    void updateEntry_statusInvalid() {
+        Assertions.fail("Not implemented yet");
+    }
+
+    @Test
+    void updateEntry_statusReserved() {
+        Assertions.fail("Not implemented yet");
+    }
+
+    @Test
+    void updateEntry_nulls() {
+        Assertions.fail("Not implemented yet");
+    }
+
+    @Test
+    void deleteEntry_ok() {
+        Assertions.fail("Not implemented yet");
+    }
+
+    @Test
+    void deleteEntry_missing() {
+        Assertions.fail("Not implemented yet");
+    }
+
+    @Test
+    void deleteEntry_afterRemoval() {
+        Assertions.fail("Not implemented yet");
+    }
+
+    @Test
+    void deleteEntry_ticketUnknown() {
+        Assertions.fail("Not implemented yet");
+    }
+
+    @Test
+    void deleteEntry_ticketSuperseded() {
+        Assertions.fail("Not implemented yet");
+    }
+
+    @Test
+    void deleteEntry_ticketExpired() {
+        Assertions.fail("Not implemented yet");
+    }
+
+    @Test
+    void deleteEntry_ticketNeverClosed() {
+        Assertions.fail("Not implemented yet");
+    }
+
+    @Test
+    void deleteEntry_nulls() {
+        Assertions.fail("Not implemented yet");
     }
 
 
