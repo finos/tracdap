@@ -63,13 +63,13 @@ public abstract class JobCacheTestSuite {
         int revision;
 
         try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
-            revision = cache.addEntry(ticket, status, value);
+            revision = cache.createEntry(ticket, status, value);
         }
 
         CacheEntry<DummyState> cacheEntry;
 
         try (var ticket = cache.openTicket(key, revision, TICKET_TIMEOUT)) {
-            cacheEntry = cache.getEntry(ticket);
+            cacheEntry = cache.readEntry(ticket);
         }
 
         Assertions.assertEquals(key, cacheEntry.key());
@@ -78,7 +78,7 @@ public abstract class JobCacheTestSuite {
         Assertions.assertEquals(value, cacheEntry.value());
 
         try (var ticket = cache.openTicket(key, revision, TICKET_TIMEOUT)) {
-            cache.removeEntry(ticket);
+            cache.deleteEntry(ticket);
         }
 
         var removedVEntry = cache.queryKey(key);
@@ -98,7 +98,7 @@ public abstract class JobCacheTestSuite {
         int revision;
 
         try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
-            revision = cache.addEntry(ticket, status, value);
+            revision = cache.createEntry(ticket, status, value);
         }
 
         var status2 = "status2";
@@ -107,7 +107,7 @@ public abstract class JobCacheTestSuite {
 
         try (var ticket = cache.openTicket(key, revision, TICKET_TIMEOUT)) {
 
-            var cacheEntry = cache.getEntry(ticket);
+            var cacheEntry = cache.readEntry(ticket);
             var cacheValue = cacheEntry.value();
             cacheValue.intVar += 1;
             cacheValue.stringVar += ", these are not";
@@ -119,7 +119,7 @@ public abstract class JobCacheTestSuite {
         CacheEntry<DummyState> cacheEntry;
 
         try (var ticket = cache.openTicket(key, revision2, TICKET_TIMEOUT)) {
-            cacheEntry = cache.getEntry(ticket);
+            cacheEntry = cache.readEntry(ticket);
         }
 
         Assertions.assertEquals(key, cacheEntry.key());
@@ -128,7 +128,7 @@ public abstract class JobCacheTestSuite {
         Assertions.assertEquals(value2, cacheEntry.value());
 
         try (var ticket = cache.openTicket(key, revision2, TICKET_TIMEOUT)) {
-            cache.removeEntry(ticket);
+            cache.deleteEntry(ticket);
         }
 
         var removedVEntry = cache.queryKey(key);
@@ -160,13 +160,13 @@ public abstract class JobCacheTestSuite {
         int revision;
 
         try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
-            revision = cache.addEntry(ticket, status, value);
+            revision = cache.createEntry(ticket, status, value);
         }
 
         CacheEntry<DummyState> cacheEntry;
 
         try (var ticket = cache.openTicket(key, revision, TICKET_TIMEOUT)) {
-            cacheEntry = cache.getEntry(ticket);
+            cacheEntry = cache.readEntry(ticket);
         }
 
         Assertions.assertEquals(key, cacheEntry.key());
@@ -197,13 +197,13 @@ public abstract class JobCacheTestSuite {
         int revision;
 
         try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
-            revision = cache.addEntry(ticket, status, value);
+            revision = cache.createEntry(ticket, status, value);
         }
 
         CacheEntry<DummyState> cacheEntry;
 
         try (var ticket = cache.openTicket(key, revision, TICKET_TIMEOUT)) {
-            cacheEntry = cache.getEntry(ticket);
+            cacheEntry = cache.readEntry(ticket);
         }
 
         // Regular vars are persisted, transient vars are not
@@ -214,7 +214,7 @@ public abstract class JobCacheTestSuite {
 
         try (var ticket = cache.openTicket(key, revision, TICKET_TIMEOUT)) {
 
-            var updateEntry = cache.getEntry(ticket);
+            var updateEntry = cache.readEntry(ticket);
             var updateValue = updateEntry.value();
             updateValue.intVar += 1;
             updateValue.transientVar = "more ephemeral data";
@@ -265,7 +265,7 @@ public abstract class JobCacheTestSuite {
             Assertions.assertTrue(ticket.grantTime().isBefore(Instant.now()));
             Assertions.assertTrue(ticket.expiry().isAfter(Instant.now()));
 
-            revision = cache.addEntry(ticket, status, value);
+            revision = cache.createEntry(ticket, status, value);
         }
 
         // Check result is as expected
@@ -346,7 +346,7 @@ public abstract class JobCacheTestSuite {
         try (var ticket2 = cache.openNewTicket(key, TICKET_TIMEOUT)) {
             Assertions.assertFalse(ticket2.superseded());
             Assertions.assertFalse(ticket2.missing());
-            cache.addEntry(ticket2, status, value);
+            cache.createEntry(ticket2, status, value);
         }
 
         var entry = cache.queryKey(key);
@@ -377,7 +377,7 @@ public abstract class JobCacheTestSuite {
         value.stringVar = "the droids you're looking for";
 
         try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
-            cache.addEntry(ticket, status, value);
+            cache.createEntry(ticket, status, value);
         }
 
         // Check entry was created
@@ -390,8 +390,8 @@ public abstract class JobCacheTestSuite {
 
         try (var ticket2 = cache.openNewTicket(key, TICKET_TIMEOUT)) {
             Assertions.assertTrue(ticket2.superseded());
-            Assertions.assertThrows(ECacheTicket.class, () -> cache.addEntry(ticket2, status, value));
-            Assertions.assertThrows(ECacheTicket.class, () -> cache.removeEntry(ticket2));
+            Assertions.assertThrows(ECacheTicket.class, () -> cache.createEntry(ticket2, status, value));
+            Assertions.assertThrows(ECacheTicket.class, () -> cache.deleteEntry(ticket2));
         }
     }
 
@@ -410,11 +410,11 @@ public abstract class JobCacheTestSuite {
         int revision;
 
         try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
-            revision = cache.addEntry(ticket, status, value);
+            revision = cache.createEntry(ticket, status, value);
         }
 
         try (var ticket2 = cache.openTicket(key, revision, TICKET_TIMEOUT)) {
-            cache.removeEntry(ticket2);
+            cache.deleteEntry(ticket2);
         }
 
         try (var ticket3 = cache.openNewTicket(key, TICKET_TIMEOUT)) {
@@ -450,7 +450,7 @@ public abstract class JobCacheTestSuite {
         // After the timeout expires, get a new ticket to create the same key
 
         try (var ticket3 = cache.openNewTicket(key, TICKET_TIMEOUT)) {
-            cache.addEntry(ticket3, status, value);
+            cache.createEntry(ticket3, status, value);
         }
 
         // First revision number should not be affected by the expired ticket
@@ -476,7 +476,7 @@ public abstract class JobCacheTestSuite {
         // The ticket should expire even if it is not explicitly closed
 
         var ticket1 = cache.openNewTicket(key, Duration.ofMillis(250));
-        cache.addEntry(ticket1, status, value);
+        cache.createEntry(ticket1, status, value);
 
         Thread.sleep(300);
 
@@ -495,7 +495,7 @@ public abstract class JobCacheTestSuite {
         // After the first ticket expires, it should be possible to get a regular ticket for the same key
 
         try (var ticket2 = cache.openTicket(key, entry.get().revision(), TICKET_TIMEOUT)) {
-            var t2Entry = cache.getEntry(ticket2);
+            var t2Entry = cache.readEntry(ticket2);
             Assertions.assertEquals(value, t2Entry.value());
         }
     }
@@ -510,7 +510,7 @@ public abstract class JobCacheTestSuite {
         value.stringVar = "the droids you're looking for";
 
         try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
-            cache.addEntry(ticket, status, value);
+            cache.createEntry(ticket, status, value);
         }
 
         var status2 = "status2";
@@ -570,7 +570,7 @@ public abstract class JobCacheTestSuite {
         var value = new DummyState();
 
         try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
-            cache.addEntry(ticket, status, value);
+            cache.createEntry(ticket, status, value);
         }
 
         Assertions.assertThrows(IllegalArgumentException.class, () -> failToOpen(cache::openTicket, key, -1, TICKET_TIMEOUT));
@@ -586,7 +586,7 @@ public abstract class JobCacheTestSuite {
         int rev;
 
         try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
-            rev = cache.addEntry(ticket, status, value);
+            rev = cache.createEntry(ticket, status, value);
         }
 
         Assertions.assertThrows(IllegalArgumentException.class, () -> failToOpen(cache::openTicket, key, rev, null));
@@ -605,7 +605,7 @@ public abstract class JobCacheTestSuite {
         int rev;
 
         try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
-            rev = cache.addEntry(ticket, status, value);
+            rev = cache.createEntry(ticket, status, value);
         }
 
         try (var ticket = cache.openTicket(key, rev, TICKET_TIMEOUT)) {
@@ -639,7 +639,7 @@ public abstract class JobCacheTestSuite {
         int rev;
 
         try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
-            rev = cache.addEntry(ticket, status, value);
+            rev = cache.createEntry(ticket, status, value);
         }
 
         var status2 = "status2";
@@ -684,7 +684,7 @@ public abstract class JobCacheTestSuite {
         int rev;
 
         try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
-            rev = cache.addEntry(ticket, status, value);
+            rev = cache.createEntry(ticket, status, value);
         }
 
         // TODO: What is the right behavior here?
@@ -716,7 +716,7 @@ public abstract class JobCacheTestSuite {
         int rev;
 
         try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
-            rev = cache.addEntry(ticket, status, value);
+            rev = cache.createEntry(ticket, status, value);
         }
 
         try (var ticket = cache.openTicket(key, rev + 1, TICKET_TIMEOUT)) {
@@ -741,11 +741,11 @@ public abstract class JobCacheTestSuite {
         int revision;
 
         try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
-            revision = cache.addEntry(ticket, status, value);
+            revision = cache.createEntry(ticket, status, value);
         }
 
         try (var ticket2 = cache.openTicket(key, revision, TICKET_TIMEOUT)) {
-            cache.removeEntry(ticket2);
+            cache.deleteEntry(ticket2);
         }
 
         try (var ticket3 = cache.openTicket(key, revision, TICKET_TIMEOUT)) {
@@ -767,7 +767,7 @@ public abstract class JobCacheTestSuite {
         int revision;
 
         try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
-            revision = cache.addEntry(ticket, status, value);
+            revision = cache.createEntry(ticket, status, value);
         }
 
         // Open a ticket on the new entry and let it time out
@@ -824,7 +824,7 @@ public abstract class JobCacheTestSuite {
         int revision;
 
         try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
-            revision = cache.addEntry(ticket, status, value);
+            revision = cache.createEntry(ticket, status, value);
         }
 
         // Open a ticket that will not be closed
@@ -886,14 +886,14 @@ public abstract class JobCacheTestSuite {
         int revision;
 
         try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
-            revision = cache.addEntry(ticket, status, value);
+            revision = cache.createEntry(ticket, status, value);
         }
 
         // Create a ticket it and use it to read an entry
 
         var ticket = cache.openTicket(key, revision, TICKET_TIMEOUT);
 
-        var entry = cache.getEntry(ticket);
+        var entry = cache.readEntry(ticket);
         Assertions.assertTrue(entry.cacheOk());
         Assertions.assertEquals(entry.value(), value);
 
@@ -901,7 +901,7 @@ public abstract class JobCacheTestSuite {
 
         cache.closeTicket(ticket);
 
-        Assertions.assertThrows(ECacheTicket.class, () -> cache.getEntry(ticket));
+        Assertions.assertThrows(ECacheTicket.class, () -> cache.readEntry(ticket));
     }
 
     @Test
@@ -944,7 +944,7 @@ public abstract class JobCacheTestSuite {
         int revision;
 
         try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
-            revision = cache.addEntry(ticket, status, value);
+            revision = cache.createEntry(ticket, status, value);
         }
 
         // Open a ticket it and close it without doing anything
@@ -952,12 +952,12 @@ public abstract class JobCacheTestSuite {
         var ticket = cache.openTicket(key, revision, TICKET_TIMEOUT);
         cache.closeTicket(ticket);
 
-        Assertions.assertThrows(ECacheTicket.class, () -> cache.getEntry(ticket));
+        Assertions.assertThrows(ECacheTicket.class, () -> cache.readEntry(ticket));
 
         // It should be possible to open a new ticket for the same key / revision
 
         try (var ticket2 = cache.openTicket(key, revision, TICKET_TIMEOUT)) {
-            var entry = cache.getEntry(ticket2);
+            var entry = cache.readEntry(ticket2);
             Assertions.assertTrue(entry.cacheOk());
             Assertions.assertEquals(entry.value(), value);
         }
@@ -976,7 +976,7 @@ public abstract class JobCacheTestSuite {
         int revision;
 
         try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
-            revision = cache.addEntry(ticket, status, value);
+            revision = cache.createEntry(ticket, status, value);
         }
 
         // Open a ticket it and let it time out without doing anything
@@ -986,12 +986,12 @@ public abstract class JobCacheTestSuite {
 
         // It should not be possible to use the ticket
 
-        Assertions.assertThrows(ECacheTicket.class, () -> cache.getEntry(ticket));
+        Assertions.assertThrows(ECacheTicket.class, () -> cache.readEntry(ticket));
 
         // It should be possible to open a new ticket for the same key / revision
 
         try (var ticket2 = cache.openTicket(key, revision, TICKET_TIMEOUT)) {
-            var entry = cache.getEntry(ticket2);
+            var entry = cache.readEntry(ticket2);
             Assertions.assertTrue(entry.cacheOk());
             Assertions.assertEquals(entry.value(), value);
         }
@@ -1019,7 +1019,7 @@ public abstract class JobCacheTestSuite {
         int revision;
 
         try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
-            revision = cache.addEntry(ticket, status, value);
+            revision = cache.createEntry(ticket, status, value);
         }
 
         var entry = cache.queryKey(key);
@@ -1043,10 +1043,10 @@ public abstract class JobCacheTestSuite {
 
         try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
 
-            revision = cache.addEntry(ticket, status, value);
+            revision = cache.createEntry(ticket, status, value);
 
             // Add the same entry a second time using the same ticket
-            Assertions.assertThrows(ECacheDuplicate.class, () -> cache.addEntry(ticket, status, value));
+            Assertions.assertThrows(ECacheDuplicate.class, () -> cache.createEntry(ticket, status, value));
         }
 
         // Make sure the entry exists
@@ -1066,7 +1066,7 @@ public abstract class JobCacheTestSuite {
             Assertions.assertFalse(ticket3.missing());
 
             // Add the same entry a second time using a new valid ticket
-            Assertions.assertThrows(ECacheDuplicate.class, () -> cache.addEntry(ticket3, status, value));
+            Assertions.assertThrows(ECacheDuplicate.class, () -> cache.createEntry(ticket3, status, value));
         }
     }
 
@@ -1082,19 +1082,19 @@ public abstract class JobCacheTestSuite {
         int revision;
 
         try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
-            revision = cache.addEntry(ticket, status, value);
+            revision = cache.createEntry(ticket, status, value);
         }
 
         Assertions.assertTrue(cache.queryKey(key).isPresent());
 
         try (var ticket2 = cache.openTicket(key, revision, TICKET_TIMEOUT)) {
-            cache.removeEntry(ticket2);
+            cache.deleteEntry(ticket2);
         }
 
         Assertions.assertFalse(cache.queryKey(key).isPresent());
 
         try (var ticket3 = cache.openNewTicket(key, TICKET_TIMEOUT)) {
-            cache.addEntry(ticket3, "status2", value);
+            cache.createEntry(ticket3, "status2", value);
         }
 
         var entry = cache.queryKey(key);
@@ -1129,7 +1129,7 @@ public abstract class JobCacheTestSuite {
             Assertions.assertFalse(ticket.superseded());
             Assertions.assertFalse(ticket.missing());
 
-            revision = cache.addEntry(ticket, status, value);
+            revision = cache.createEntry(ticket, status, value);
         }
 
         var entry = cache.queryKey(key);
@@ -1152,7 +1152,7 @@ public abstract class JobCacheTestSuite {
         // Create a ticket without going through the cache implementation
 
         try (var ticket = CacheTicket.forDuration(cache, key, 0, Instant.now(), TICKET_TIMEOUT)) {
-            Assertions.assertThrows(ECacheTicket.class, () -> cache.addEntry(ticket, status, value));
+            Assertions.assertThrows(ECacheTicket.class, () -> cache.createEntry(ticket, status, value));
         }
 
         // TODO check this test
@@ -1174,7 +1174,7 @@ public abstract class JobCacheTestSuite {
             try (var ticket2 = cache.openNewTicket(key, TICKET_TIMEOUT)) {
 
                 Assertions.assertTrue(ticket2.superseded());
-                Assertions.assertThrows(ECacheTicket.class, () -> cache.addEntry(ticket2, status, value));
+                Assertions.assertThrows(ECacheTicket.class, () -> cache.createEntry(ticket2, status, value));
             }
         }
 
@@ -1196,7 +1196,7 @@ public abstract class JobCacheTestSuite {
             // Wait for ticket to expire
             Thread.sleep(51);
 
-            Assertions.assertThrows(ECacheTicket.class, () -> cache.addEntry(ticket, status, value));
+            Assertions.assertThrows(ECacheTicket.class, () -> cache.createEntry(ticket, status, value));
         }
 
         var entry = cache.queryKey(key);
@@ -1213,7 +1213,7 @@ public abstract class JobCacheTestSuite {
         value.stringVar = "the droids you're looking for";
 
         var ticket = cache.openNewTicket(key, TICKET_TIMEOUT);
-        var revision = cache.addEntry(ticket, status, value);
+        var revision = cache.createEntry(ticket, status, value);
 
         // Query the entry without closing the ticket - should still be fine
 
@@ -1235,13 +1235,13 @@ public abstract class JobCacheTestSuite {
 
         try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
 
-            Assertions.assertThrows(ECacheOperation.class, () -> cache.addEntry(ticket, "", value));
-            Assertions.assertThrows(ECacheOperation.class, () -> cache.addEntry(ticket, " ", value));
-            Assertions.assertThrows(ECacheOperation.class, () -> cache.addEntry(ticket, "-", value));
-            Assertions.assertThrows(ECacheOperation.class, () -> cache.addEntry(ticket, " leading_space", value));
-            Assertions.assertThrows(ECacheOperation.class, () -> cache.addEntry(ticket, "trailing_space ", value));
-            Assertions.assertThrows(ECacheOperation.class, () -> cache.addEntry(ticket, "@%&^*&£", value));
-            Assertions.assertThrows(ECacheOperation.class, () -> cache.addEntry(ticket, "你好", value));
+            Assertions.assertThrows(ECacheOperation.class, () -> cache.createEntry(ticket, "", value));
+            Assertions.assertThrows(ECacheOperation.class, () -> cache.createEntry(ticket, " ", value));
+            Assertions.assertThrows(ECacheOperation.class, () -> cache.createEntry(ticket, "-", value));
+            Assertions.assertThrows(ECacheOperation.class, () -> cache.createEntry(ticket, " leading_space", value));
+            Assertions.assertThrows(ECacheOperation.class, () -> cache.createEntry(ticket, "trailing_space ", value));
+            Assertions.assertThrows(ECacheOperation.class, () -> cache.createEntry(ticket, "@%&^*&£", value));
+            Assertions.assertThrows(ECacheOperation.class, () -> cache.createEntry(ticket, "你好", value));
         }
 
         var entry = cache.queryKey(key);
@@ -1259,8 +1259,8 @@ public abstract class JobCacheTestSuite {
 
         try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
 
-            Assertions.assertThrows(ECacheOperation.class, () -> cache.addEntry(ticket, "_reserved_status", value));
-            Assertions.assertThrows(ECacheOperation.class, () -> cache.addEntry(ticket, "trac_reserved_status", value));
+            Assertions.assertThrows(ECacheOperation.class, () -> cache.createEntry(ticket, "_reserved_status", value));
+            Assertions.assertThrows(ECacheOperation.class, () -> cache.createEntry(ticket, "trac_reserved_status", value));
         }
 
         var entry = cache.queryKey(key);
@@ -1279,9 +1279,9 @@ public abstract class JobCacheTestSuite {
 
         try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
 
-            Assertions.assertThrows(ECacheOperation.class, () -> cache.addEntry(null, status, value));
-            Assertions.assertThrows(ECacheOperation.class, () -> cache.addEntry(ticket, null, value));
-            Assertions.assertThrows(ECacheOperation.class, () -> cache.addEntry(ticket, status, null));
+            Assertions.assertThrows(ECacheOperation.class, () -> cache.createEntry(null, status, value));
+            Assertions.assertThrows(ECacheOperation.class, () -> cache.createEntry(ticket, null, value));
+            Assertions.assertThrows(ECacheOperation.class, () -> cache.createEntry(ticket, status, null));
         }
 
         var entry = cache.queryKey(key);
@@ -1302,11 +1302,11 @@ public abstract class JobCacheTestSuite {
 
         try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
 
-            revision = cache.addEntry(ticket, status, value);
+            revision = cache.createEntry(ticket, status, value);
 
             // Read inside original ticket
 
-            var entry = cache.getEntry(ticket);
+            var entry = cache.readEntry(ticket);
             Assertions.assertTrue(entry.cacheOk());
             Assertions.assertEquals(revision, entry.revision());
             Assertions.assertEquals(status, entry.status());
@@ -1317,7 +1317,7 @@ public abstract class JobCacheTestSuite {
 
             // Read in subsequent ticket
 
-            var entry = cache.getEntry(ticket);
+            var entry = cache.readEntry(ticket);
             Assertions.assertTrue(entry.cacheOk());
             Assertions.assertEquals(revision, entry.revision());
             Assertions.assertEquals(status, entry.status());
@@ -1338,7 +1338,7 @@ public abstract class JobCacheTestSuite {
 
         try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
 
-            revision = cache.addEntry(ticket, status, value);
+            revision = cache.createEntry(ticket, status, value);
         }
 
         var status2 = "status2";
@@ -1354,7 +1354,7 @@ public abstract class JobCacheTestSuite {
 
         try (var ticket = cache.openTicket(key, revision2, TICKET_TIMEOUT)) {
 
-            var entry = cache.getEntry(ticket);
+            var entry = cache.readEntry(ticket);
             Assertions.assertTrue(entry.cacheOk());
             Assertions.assertEquals(revision2, entry.revision());
             Assertions.assertEquals(status2, entry.status());
@@ -1374,7 +1374,7 @@ public abstract class JobCacheTestSuite {
         int revision;
 
         try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
-            revision = cache.addEntry(ticket, status, value);
+            revision = cache.createEntry(ticket, status, value);
         }
 
         var entry = cache.queryKey(key);
@@ -1384,12 +1384,12 @@ public abstract class JobCacheTestSuite {
         Assertions.assertEquals(value, entry.get().value());
 
         try (var ticket = cache.openTicket(key, revision, TICKET_TIMEOUT)) {
-            cache.removeEntry(ticket);
-            Assertions.assertThrows(ECacheNotFound.class, () -> cache.getEntry(ticket));
+            cache.deleteEntry(ticket);
+            Assertions.assertThrows(ECacheNotFound.class, () -> cache.readEntry(ticket));
         }
 
         try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
-            Assertions.assertThrows(ECacheNotFound.class, () -> cache.getEntry(ticket));
+            Assertions.assertThrows(ECacheNotFound.class, () -> cache.readEntry(ticket));
         }
     }
 
@@ -1405,7 +1405,7 @@ public abstract class JobCacheTestSuite {
         try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
 
             Assertions.assertTrue(ticket.missing());
-            Assertions.assertThrows(ECacheNotFound.class, () -> cache.getEntry(ticket));
+            Assertions.assertThrows(ECacheNotFound.class, () -> cache.readEntry(ticket));
         }
     }
 
@@ -1415,7 +1415,7 @@ public abstract class JobCacheTestSuite {
         var key = newKey();
 
         try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
-            Assertions.assertThrows(ECacheNotFound.class, () -> cache.getEntry(ticket));
+            Assertions.assertThrows(ECacheNotFound.class, () -> cache.readEntry(ticket));
         }
     }
 
@@ -1433,13 +1433,13 @@ public abstract class JobCacheTestSuite {
         int revision;
 
         try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
-            revision = cache.addEntry(ticket, status, value);
+            revision = cache.createEntry(ticket, status, value);
         }
 
         // Try to read the entry using a ticket that was not created by the cache implementation
 
         try (var ticket = CacheTicket.forDuration(cache, key, 0, Instant.now(), TICKET_TIMEOUT)) {
-            Assertions.assertThrows(ECacheTicket.class, () -> cache.getEntry(ticket));
+            Assertions.assertThrows(ECacheTicket.class, () -> cache.readEntry(ticket));
         }
     }
 
@@ -1455,7 +1455,7 @@ public abstract class JobCacheTestSuite {
         int revision;
 
         try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
-            revision = cache.addEntry(ticket, status, value);
+            revision = cache.createEntry(ticket, status, value);
         }
 
         try (var ticket = cache.openTicket(key, revision, TICKET_TIMEOUT)) {
@@ -1465,7 +1465,7 @@ public abstract class JobCacheTestSuite {
             try (var ticket2 = cache.openTicket(key, revision, TICKET_TIMEOUT)) {
 
                 Assertions.assertTrue(ticket2.superseded());
-                Assertions.assertThrows(ECacheTicket.class, () -> cache.getEntry(ticket2));
+                Assertions.assertThrows(ECacheTicket.class, () -> cache.readEntry(ticket2));
             }
         }
     }
@@ -1482,7 +1482,7 @@ public abstract class JobCacheTestSuite {
         int revision;
 
         try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
-            revision = cache.addEntry(ticket, status, value);
+            revision = cache.createEntry(ticket, status, value);
         }
 
         try (var ticket = cache.openTicket(key, revision, Duration.ofMillis(50))) {
@@ -1490,7 +1490,7 @@ public abstract class JobCacheTestSuite {
             // Wait for ticket to expire
             Thread.sleep(51);
 
-            Assertions.assertThrows(ECacheTicket.class, () -> cache.getEntry(ticket));
+            Assertions.assertThrows(ECacheTicket.class, () -> cache.readEntry(ticket));
         }
     }
 
@@ -1504,14 +1504,14 @@ public abstract class JobCacheTestSuite {
         value.stringVar = "the droids you're looking for";
 
         var ticket = cache.openNewTicket(key, TICKET_TIMEOUT);
-        var revision = cache.addEntry(ticket, status, value);
+        var revision = cache.createEntry(ticket, status, value);
 
         // Query the entry without closing the ticket - should still be fine
 
         CacheEntry<DummyState> entry;
 
         try (var ticket2 = cache.openTicket(key, revision, TICKET_TIMEOUT)) {
-            entry = cache.getEntry(ticket2);
+            entry = cache.readEntry(ticket2);
         }
 
         Assertions.assertTrue(entry.cacheOk());
@@ -1525,7 +1525,7 @@ public abstract class JobCacheTestSuite {
     @Test
     void readEntry_nulls() {
 
-        Assertions.assertThrows(ECacheTicket.class, () -> cache.getEntry(null));
+        Assertions.assertThrows(ECacheTicket.class, () -> cache.readEntry(null));
     }
 
     @Test
@@ -1540,7 +1540,7 @@ public abstract class JobCacheTestSuite {
         int revision;
 
         try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
-            revision = cache.addEntry(ticket, status, value);
+            revision = cache.createEntry(ticket, status, value);
         }
 
         var status2 = "status2";
@@ -1574,7 +1574,7 @@ public abstract class JobCacheTestSuite {
         int revision;
 
         try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
-            revision = cache.addEntry(ticket, status, value);
+            revision = cache.createEntry(ticket, status, value);
         }
 
         int revision2;
@@ -1607,7 +1607,7 @@ public abstract class JobCacheTestSuite {
         int revision;
 
         try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
-            revision = cache.addEntry(ticket, status, value);
+            revision = cache.createEntry(ticket, status, value);
         }
 
         var status2 = "status2";
@@ -1640,7 +1640,7 @@ public abstract class JobCacheTestSuite {
         int revision;
 
         try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
-            revision = cache.addEntry(ticket, status, value);
+            revision = cache.createEntry(ticket, status, value);
         }
 
         var value2 = new DummyState();
@@ -1675,11 +1675,11 @@ public abstract class JobCacheTestSuite {
         int revision;
 
         try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
-            revision = cache.addEntry(ticket, status, value);
+            revision = cache.createEntry(ticket, status, value);
         }
 
         try (var ticket = cache.openTicket(key, revision, TICKET_TIMEOUT)) {
-            cache.removeEntry(ticket);
+            cache.deleteEntry(ticket);
         }
 
         var status2 = "status2";
@@ -1741,7 +1741,7 @@ public abstract class JobCacheTestSuite {
         int revision;
 
         try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
-            revision = cache.addEntry(ticket, status, value);
+            revision = cache.createEntry(ticket, status, value);
         }
 
         // Try to update the entry using a ticket that was not created by the cache implementation
@@ -1752,7 +1752,7 @@ public abstract class JobCacheTestSuite {
         value2.stringVar = "move along";
 
         try (var ticket = CacheTicket.forDuration(cache, key, revision, Instant.now(), TICKET_TIMEOUT)) {
-            Assertions.assertThrows(ECacheTicket.class, () -> cache.addEntry(ticket, status2, value2));
+            Assertions.assertThrows(ECacheTicket.class, () -> cache.createEntry(ticket, status2, value2));
         }
     }
 
@@ -1768,7 +1768,7 @@ public abstract class JobCacheTestSuite {
         int revision;
 
         try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
-            revision = cache.addEntry(ticket, status, value);
+            revision = cache.createEntry(ticket, status, value);
         }
 
         var status2 = "status1";
@@ -1800,7 +1800,7 @@ public abstract class JobCacheTestSuite {
         int revision;
 
         try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
-            revision = cache.addEntry(ticket, status, value);
+            revision = cache.createEntry(ticket, status, value);
         }
 
         var status2 = "status1";
@@ -1835,7 +1835,7 @@ public abstract class JobCacheTestSuite {
         int revision;
 
         try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
-            revision = cache.addEntry(ticket, status, value);
+            revision = cache.createEntry(ticket, status, value);
         }
 
         var value2 = new DummyState();
@@ -1873,7 +1873,7 @@ public abstract class JobCacheTestSuite {
         int revision;
 
         try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
-            revision = cache.addEntry(ticket, status, value);
+            revision = cache.createEntry(ticket, status, value);
         }
 
         var value2 = new DummyState();
@@ -1906,7 +1906,7 @@ public abstract class JobCacheTestSuite {
         int revision;
 
         try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
-            revision = cache.addEntry(ticket, status, value);
+            revision = cache.createEntry(ticket, status, value);
         }
 
         var status2 = "status2";
@@ -1933,11 +1933,11 @@ public abstract class JobCacheTestSuite {
         int revision;
 
         try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
-            revision = cache.addEntry(ticket, status, value);
+            revision = cache.createEntry(ticket, status, value);
         }
 
         try (var ticket = cache.openTicket(key, revision, TICKET_TIMEOUT)) {
-            cache.removeEntry(ticket);
+            cache.deleteEntry(ticket);
         }
 
         var entry = cache.queryKey(key);
@@ -1951,11 +1951,11 @@ public abstract class JobCacheTestSuite {
         var key = newKey();
 
         try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
-            Assertions.assertThrows(ECacheNotFound.class, () -> cache.removeEntry(ticket));
+            Assertions.assertThrows(ECacheNotFound.class, () -> cache.deleteEntry(ticket));
         }
 
         try (var ticket = cache.openTicket(key, 0, TICKET_TIMEOUT)) {
-            Assertions.assertThrows(ECacheNotFound.class, () -> cache.removeEntry(ticket));
+            Assertions.assertThrows(ECacheNotFound.class, () -> cache.deleteEntry(ticket));
         }
 
         var entry = cache.queryKey(key);
@@ -1975,19 +1975,19 @@ public abstract class JobCacheTestSuite {
         int revision;
 
         try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
-            revision = cache.addEntry(ticket, status, value);
+            revision = cache.createEntry(ticket, status, value);
         }
 
         try (var ticket = cache.openTicket(key, revision, TICKET_TIMEOUT)) {
 
-            cache.removeEntry(ticket);
+            cache.deleteEntry(ticket);
 
-            Assertions.assertThrows(ECacheNotFound.class, () -> cache.removeEntry(ticket));
+            Assertions.assertThrows(ECacheNotFound.class, () -> cache.deleteEntry(ticket));
         }
 
         try (var ticket = cache.openTicket(key, revision, TICKET_TIMEOUT)) {
 
-            Assertions.assertThrows(ECacheNotFound.class, () -> cache.removeEntry(ticket));
+            Assertions.assertThrows(ECacheNotFound.class, () -> cache.deleteEntry(ticket));
         }
 
         var entry = cache.queryKey(key);
@@ -2007,13 +2007,13 @@ public abstract class JobCacheTestSuite {
         int revision;
 
         try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
-            revision = cache.addEntry(ticket, status, value);
+            revision = cache.createEntry(ticket, status, value);
         }
 
         // Try to delete the entry using a ticket that was not created by the cache implementation
 
         try (var ticket = CacheTicket.forDuration(cache, key, revision, Instant.now(), TICKET_TIMEOUT)) {
-            Assertions.assertThrows(ECacheTicket.class, () -> cache.removeEntry(ticket));
+            Assertions.assertThrows(ECacheTicket.class, () -> cache.deleteEntry(ticket));
         }
 
         // Entry should not have been affected
@@ -2038,7 +2038,7 @@ public abstract class JobCacheTestSuite {
         int revision;
 
         try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
-            revision = cache.addEntry(ticket, status, value);
+            revision = cache.createEntry(ticket, status, value);
         }
 
         try (var ticket = cache.openTicket(key, revision, TICKET_TIMEOUT)) {
@@ -2048,7 +2048,7 @@ public abstract class JobCacheTestSuite {
             try (var ticket2 = cache.openTicket(key, revision, TICKET_TIMEOUT)) {
 
                 Assertions.assertTrue(ticket2.superseded());
-                Assertions.assertThrows(ECacheTicket.class, () -> cache.removeEntry(ticket2));
+                Assertions.assertThrows(ECacheTicket.class, () -> cache.deleteEntry(ticket2));
             }
         }
     }
@@ -2065,7 +2065,7 @@ public abstract class JobCacheTestSuite {
         int revision;
 
         try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
-            revision = cache.addEntry(ticket, status, value);
+            revision = cache.createEntry(ticket, status, value);
         }
 
         try (var ticket = cache.openTicket(key, revision, Duration.ofMillis(50))) {
@@ -2073,7 +2073,7 @@ public abstract class JobCacheTestSuite {
             // Wait for ticket to expire
             Thread.sleep(51);
 
-            Assertions.assertThrows(ECacheTicket.class, () -> cache.removeEntry(ticket));
+            Assertions.assertThrows(ECacheTicket.class, () -> cache.deleteEntry(ticket));
         }
     }
 
@@ -2086,7 +2086,7 @@ public abstract class JobCacheTestSuite {
     @Test
     void deleteEntry_nulls() {
 
-        Assertions.assertThrows(ECacheOperation.class, () -> cache.removeEntry(null));
+        Assertions.assertThrows(ECacheOperation.class, () -> cache.deleteEntry(null));
     }
 
 

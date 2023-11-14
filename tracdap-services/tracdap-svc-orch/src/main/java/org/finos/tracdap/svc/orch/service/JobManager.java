@@ -180,7 +180,7 @@ public class JobManager {
                 if (ticket.superseded())
                     throw new ECacheTicket("Job could not be created because it already exists");
 
-                cache.addEntry(ticket, newState.cacheStatus, newState);
+                cache.createEntry(ticket, newState.cacheStatus, newState);
             }
 
             // Avoid polling delay if multiple updates are processed in succession
@@ -523,7 +523,7 @@ public class JobManager {
             if (ticket.superseded())
                 return;
 
-            var cacheEntry = cache.getEntry(ticket);
+            var cacheEntry = cache.readEntry(ticket);
             var jobState = cacheEntry.value();
 
             var newState = processRetryOrFail(operation, jobState);
@@ -535,7 +535,7 @@ public class JobManager {
             }
             else {
                 // Null new state indicates the job can be removed
-                cache.removeEntry(ticket);
+                cache.deleteEntry(ticket);
             }
         }
         catch (Exception e) {

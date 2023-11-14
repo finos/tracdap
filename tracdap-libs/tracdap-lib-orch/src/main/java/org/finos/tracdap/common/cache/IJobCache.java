@@ -31,10 +31,10 @@ public interface IJobCache<TValue extends Serializable> {
     CacheTicket openTicket(String key, int revision, Duration duration);
     void closeTicket(CacheTicket ticket);
 
-    int addEntry(CacheTicket ticket, String status, TValue value);
+    int createEntry(CacheTicket ticket, String status, TValue value);
     int updateEntry(CacheTicket ticket, String status, TValue value);
-    void removeEntry(CacheTicket ticket);
-    CacheEntry<TValue> getEntry(CacheTicket ticket);
+    void deleteEntry(CacheTicket ticket);
+    CacheEntry<TValue> readEntry(CacheTicket ticket);
 
     Optional<CacheEntry<TValue>> queryKey(String key);
     List<CacheEntry<TValue>> queryStatus(List<String> statuses);

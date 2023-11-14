@@ -147,7 +147,7 @@ public class LocalJobCache<TValue extends Serializable> implements IJobCache<TVa
     }
 
     @Override
-    public int addEntry(CacheTicket ticket, String status, TValue value) {
+    public int createEntry(CacheTicket ticket, String status, TValue value) {
 
         var commitTime = Instant.now();
 
@@ -206,7 +206,7 @@ public class LocalJobCache<TValue extends Serializable> implements IJobCache<TVa
     }
 
     @Override
-    public void removeEntry(CacheTicket ticket) {
+    public void deleteEntry(CacheTicket ticket) {
 
         var commitTime = Instant.now();
 
@@ -230,7 +230,7 @@ public class LocalJobCache<TValue extends Serializable> implements IJobCache<TVa
     }
 
     @Override
-    public CacheEntry<TValue> getEntry(CacheTicket ticket) {
+    public CacheEntry<TValue> readEntry(CacheTicket ticket) {
 
         var accessTime = Instant.now();
 
