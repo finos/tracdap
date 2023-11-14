@@ -1422,9 +1422,21 @@ public abstract class JobCacheTestSuite {
     @Test
     void readEntry_ticketUnknown() {
 
-        var key = newKey();
+        // Add a valid entry
 
-        // Create a ticket without going through the cache implementation
+        var key = newKey();
+        var status = "status1";
+        var value = new DummyState();
+        value.intVar = 42;
+        value.stringVar = "the droids you're looking for";
+
+        int revision;
+
+        try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
+            revision = cache.addEntry(ticket, status, value);
+        }
+
+        // Try to read the entry using a ticket that was not created by the cache implementation
 
         try (var ticket = CacheTicket.forDuration(cache, key, 0, Instant.now(), TICKET_TIMEOUT)) {
             Assertions.assertThrows(ECacheTicket.class, () -> cache.getEntry(ticket));
@@ -1433,7 +1445,6 @@ public abstract class JobCacheTestSuite {
 
     @Test
     void readEntry_ticketSuperseded() {
-
 
         var key = newKey();
         var status = "status1";
@@ -1507,6 +1518,8 @@ public abstract class JobCacheTestSuite {
         Assertions.assertEquals(revision, entry.revision());
         Assertions.assertEquals(status, entry.status());
         Assertions.assertEquals(value, entry.value());
+
+        // TODO
     }
 
     @Test
@@ -1517,112 +1530,563 @@ public abstract class JobCacheTestSuite {
 
     @Test
     void updateEntry_ok() {
-        Assertions.fail("Not implemented yet");
+
+        var key = newKey();
+        var status = "status1";
+        var value = new DummyState();
+        value.intVar = 42;
+        value.stringVar = "the droids you're looking for";
+
+        int revision;
+
+        try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
+            revision = cache.addEntry(ticket, status, value);
+        }
+
+        var status2 = "status2";
+        var value2 = new DummyState();
+        value2.intVar = 43;
+        value2.stringVar = "move along";
+
+        int revision2;
+
+        try (var ticket = cache.openTicket(key, revision, TICKET_TIMEOUT)) {
+            revision2 = cache.updateEntry(ticket, status2, value2);
+        }
+
+        var entry = cache.queryKey(key);
+
+        Assertions.assertTrue(entry.isPresent());
+        Assertions.assertEquals(revision2, entry.get().revision());
+        Assertions.assertEquals(status2, entry.get().status());
+        Assertions.assertEquals(value2, entry.get().value());
     }
 
     @Test
     void updateEntry_noChanges() {
-        Assertions.fail("Not implemented yet");
+
+        var key = newKey();
+        var status = "status1";
+        var value = new DummyState();
+        value.intVar = 42;
+        value.stringVar = "the droids you're looking for";
+
+        int revision;
+
+        try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
+            revision = cache.addEntry(ticket, status, value);
+        }
+
+        int revision2;
+
+        try (var ticket = cache.openTicket(key, revision, TICKET_TIMEOUT)) {
+            revision2 = cache.updateEntry(ticket, status, value);
+        }
+
+        // Revision should still increase
+        // Job cache does not try to compare between versions
+        Assertions.assertTrue(revision2 > revision);
+
+        var entry = cache.queryKey(key);
+
+        Assertions.assertTrue(entry.isPresent());
+        Assertions.assertEquals(revision2, entry.get().revision());
+        Assertions.assertEquals(status, entry.get().status());
+        Assertions.assertEquals(value, entry.get().value());
     }
 
     @Test
     void updateEntry_sameStatus() {
-        Assertions.fail("Not implemented yet");
+
+        var key = newKey();
+        var status = "status1";
+        var value = new DummyState();
+        value.intVar = 42;
+        value.stringVar = "the droids you're looking for";
+
+        int revision;
+
+        try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
+            revision = cache.addEntry(ticket, status, value);
+        }
+
+        var status2 = "status2";
+
+        int revision2;
+
+        try (var ticket = cache.openTicket(key, revision, TICKET_TIMEOUT)) {
+            revision2 = cache.updateEntry(ticket, status2, value);
+        }
+
+        Assertions.assertTrue(revision2 > revision);
+
+        var entry = cache.queryKey(key);
+
+        Assertions.assertTrue(entry.isPresent());
+        Assertions.assertEquals(revision2, entry.get().revision());
+        Assertions.assertEquals(status2, entry.get().status());
+        Assertions.assertEquals(value, entry.get().value());
     }
 
     @Test
     void updateEntry_sameValue() {
-        Assertions.fail("Not implemented yet");
+
+        var key = newKey();
+        var status = "status1";
+        var value = new DummyState();
+        value.intVar = 42;
+        value.stringVar = "the droids you're looking for";
+
+        int revision;
+
+        try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
+            revision = cache.addEntry(ticket, status, value);
+        }
+
+        var value2 = new DummyState();
+        value2.intVar = 43;
+        value2.stringVar = "move along";
+
+        int revision2;
+
+        try (var ticket = cache.openTicket(key, revision, TICKET_TIMEOUT)) {
+            revision2 = cache.updateEntry(ticket, status, value2);
+        }
+
+        Assertions.assertTrue(revision2 > revision);
+
+        var entry = cache.queryKey(key);
+
+        Assertions.assertTrue(entry.isPresent());
+        Assertions.assertEquals(revision2, entry.get().revision());
+        Assertions.assertEquals(status, entry.get().status());
+        Assertions.assertEquals(value2, entry.get().value());
     }
 
     @Test
     void updateEntry_afterRemoval() {
-        Assertions.fail("Not implemented yet");
+
+        var key = newKey();
+        var status = "status1";
+        var value = new DummyState();
+        value.intVar = 42;
+        value.stringVar = "the droids you're looking for";
+
+        int revision;
+
+        try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
+            revision = cache.addEntry(ticket, status, value);
+        }
+
+        try (var ticket = cache.openTicket(key, revision, TICKET_TIMEOUT)) {
+            cache.removeEntry(ticket);
+        }
+
+        var status2 = "status2";
+        var value2 = new DummyState();
+        value2.intVar = 43;
+        value2.stringVar = "move along";
+
+        try (var ticket = cache.openTicket(key, revision, TICKET_TIMEOUT)) {
+            Assertions.assertThrows(ECacheNotFound.class, ()-> cache.updateEntry(ticket, status2, value2));
+        }
     }
 
     @Test
     void updateEntry_afterUnusedTicket() {
-        Assertions.fail("Not implemented yet");
+
+        var key = newKey();
+
+        try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
+            // no-op
+        }
+
+        var status2 = "status2";
+        var value2 = new DummyState();
+        value2.intVar = 43;
+        value2.stringVar = "move along";
+
+        try (var ticket = cache.openTicket(key, 0, TICKET_TIMEOUT)) {
+            Assertions.assertThrows(ECacheNotFound.class, ()-> cache.updateEntry(ticket, status2, value2));
+        }
     }
 
     @Test
     void updateEntry_missing() {
-        Assertions.fail("Not implemented yet");
+
+        var key = newKey();
+
+        var status2 = "status2";
+        var value2 = new DummyState();
+        value2.intVar = 43;
+        value2.stringVar = "move along";
+
+        try (var ticket = cache.openTicket(key, 0, TICKET_TIMEOUT)) {
+            Assertions.assertTrue(ticket.missing());
+            Assertions.assertThrows(ECacheNotFound.class, ()-> cache.updateEntry(ticket, status2, value2));
+        }
     }
 
     @Test
     void updateEntry_ticketUnknown() {
-        Assertions.fail("Not implemented yet");
+
+        // Add a valid entry
+
+        var key = newKey();
+        var status = "status1";
+        var value = new DummyState();
+        value.intVar = 42;
+        value.stringVar = "the droids you're looking for";
+
+        int revision;
+
+        try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
+            revision = cache.addEntry(ticket, status, value);
+        }
+
+        // Try to update the entry using a ticket that was not created by the cache implementation
+
+        var status2 = "status1";
+        var value2 = new DummyState();
+        value2.intVar = 43;
+        value2.stringVar = "move along";
+
+        try (var ticket = CacheTicket.forDuration(cache, key, revision, Instant.now(), TICKET_TIMEOUT)) {
+            Assertions.assertThrows(ECacheTicket.class, () -> cache.addEntry(ticket, status2, value2));
+        }
     }
 
     @Test
     void updateEntry_ticketSuperseded() {
-        Assertions.fail("Not implemented yet");
+
+        var key = newKey();
+        var status = "status1";
+        var value = new DummyState();
+        value.intVar = 42;
+        value.stringVar = "the droids you're looking for";
+
+        int revision;
+
+        try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
+            revision = cache.addEntry(ticket, status, value);
+        }
+
+        var status2 = "status1";
+        var value2 = new DummyState();
+        value2.intVar = 43;
+        value2.stringVar = "move along";
+
+        try (var ticket = cache.openTicket(key, revision, TICKET_TIMEOUT)) {
+
+            Assertions.assertFalse(ticket.superseded());
+
+            try (var ticket2 = cache.openTicket(key, revision, TICKET_TIMEOUT)) {
+
+                Assertions.assertTrue(ticket2.superseded());
+                Assertions.assertThrows(ECacheTicket.class, () -> cache.updateEntry(ticket2, status2, value2));
+            }
+        }
     }
 
     @Test
-    void updateEntry_ticketExpired() {
-        Assertions.fail("Not implemented yet");
+    void updateEntry_ticketExpired() throws Exception {
+
+        var key = newKey();
+        var status = "status1";
+        var value = new DummyState();
+        value.intVar = 42;
+        value.stringVar = "the droids you're looking for";
+
+        int revision;
+
+        try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
+            revision = cache.addEntry(ticket, status, value);
+        }
+
+        var status2 = "status1";
+        var value2 = new DummyState();
+        value2.intVar = 43;
+        value2.stringVar = "move along";
+
+        try (var ticket = cache.openTicket(key, revision, Duration.ofMillis(50))) {
+
+            // Wait for ticket to expire
+            Thread.sleep(51);
+
+            Assertions.assertThrows(ECacheTicket.class, () -> cache.updateEntry(ticket, status2, value2));
+        }
     }
 
     @Test
     void updateEntry_ticketNeverClosed() {
         Assertions.fail("Not implemented yet");
+        // TODO
     }
 
     @Test
     void updateEntry_statusInvalid() {
-        Assertions.fail("Not implemented yet");
+
+        var key = newKey();
+        var status = "status1";
+        var value = new DummyState();
+        value.intVar = 42;
+        value.stringVar = "the droids you're looking for";
+
+        int revision;
+
+        try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
+            revision = cache.addEntry(ticket, status, value);
+        }
+
+        var value2 = new DummyState();
+        value2.intVar = 43;
+        value2.stringVar = "move along";
+
+        try (var ticket = cache.openTicket(key, revision, TICKET_TIMEOUT)) {
+
+            Assertions.assertThrows(ECacheOperation.class, () -> cache.updateEntry(ticket, "", value2));
+            Assertions.assertThrows(ECacheOperation.class, () -> cache.updateEntry(ticket, " ", value2));
+            Assertions.assertThrows(ECacheOperation.class, () -> cache.updateEntry(ticket, "-", value2));
+            Assertions.assertThrows(ECacheOperation.class, () -> cache.updateEntry(ticket, " leading_space", value2));
+            Assertions.assertThrows(ECacheOperation.class, () -> cache.updateEntry(ticket, "trailing_space ", value2));
+            Assertions.assertThrows(ECacheOperation.class, () -> cache.updateEntry(ticket, "@%&^*&£", value2));
+            Assertions.assertThrows(ECacheOperation.class, () -> cache.updateEntry(ticket, "你好", value2));
+        }
+
+        var entry = cache.queryKey(key);
+
+        Assertions.assertTrue(entry.isPresent());
+        Assertions.assertEquals(revision, entry.get().revision());
+        Assertions.assertEquals(status, entry.get().status());
+        Assertions.assertEquals(value, entry.get().value());
     }
 
     @Test
     void updateEntry_statusReserved() {
-        Assertions.fail("Not implemented yet");
+
+        var key = newKey();
+        var status = "status1";
+        var value = new DummyState();
+        value.intVar = 42;
+        value.stringVar = "the droids you're looking for";
+
+        int revision;
+
+        try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
+            revision = cache.addEntry(ticket, status, value);
+        }
+
+        var value2 = new DummyState();
+        value2.intVar = 43;
+        value2.stringVar = "move along";
+
+        try (var ticket = cache.openTicket(key, revision, TICKET_TIMEOUT)) {
+
+            Assertions.assertThrows(ECacheOperation.class, () -> cache.updateEntry(ticket, "_reserved_status", value2));
+            Assertions.assertThrows(ECacheOperation.class, () -> cache.updateEntry(ticket, "trac_reserved_status", value2));
+        }
+
+        var entry = cache.queryKey(key);
+
+        Assertions.assertTrue(entry.isPresent());
+        Assertions.assertEquals(revision, entry.get().revision());
+        Assertions.assertEquals(status, entry.get().status());
+        Assertions.assertEquals(value, entry.get().value());
     }
 
     @Test
     void updateEntry_nulls() {
-        Assertions.fail("Not implemented yet");
+
+        var key = newKey();
+        var status = "status1";
+        var value = new DummyState();
+        value.intVar = 42;
+        value.stringVar = "the droids you're looking for";
+
+        int revision;
+
+        try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
+            revision = cache.addEntry(ticket, status, value);
+        }
+
+        var status2 = "status2";
+        var value2 = new DummyState();
+        value2.intVar = 43;
+        value2.stringVar = "move along";
+
+        try (var ticket = cache.openTicket(key, revision, TICKET_TIMEOUT)) {
+            Assertions.assertThrows(ECacheOperation.class, () -> cache.updateEntry(null, status2, value2));
+            Assertions.assertThrows(ECacheOperation.class, () -> cache.updateEntry(ticket, null, value2));
+            Assertions.assertThrows(ECacheOperation.class, () -> cache.updateEntry(ticket, status2, null));
+        }
     }
 
     @Test
     void deleteEntry_ok() {
-        Assertions.fail("Not implemented yet");
+
+        var key = newKey();
+        var status = "status1";
+        var value = new DummyState();
+        value.intVar = 42;
+        value.stringVar = "the droids you're looking for";
+
+        int revision;
+
+        try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
+            revision = cache.addEntry(ticket, status, value);
+        }
+
+        try (var ticket = cache.openTicket(key, revision, TICKET_TIMEOUT)) {
+            cache.removeEntry(ticket);
+        }
+
+        var entry = cache.queryKey(key);
+
+        Assertions.assertFalse(entry.isPresent());
     }
 
     @Test
     void deleteEntry_missing() {
-        Assertions.fail("Not implemented yet");
+
+        var key = newKey();
+
+        try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
+            Assertions.assertThrows(ECacheNotFound.class, () -> cache.removeEntry(ticket));
+        }
+
+        try (var ticket = cache.openTicket(key, 0, TICKET_TIMEOUT)) {
+            Assertions.assertThrows(ECacheNotFound.class, () -> cache.removeEntry(ticket));
+        }
+
+        var entry = cache.queryKey(key);
+
+        Assertions.assertFalse(entry.isPresent());
     }
 
     @Test
     void deleteEntry_afterRemoval() {
-        Assertions.fail("Not implemented yet");
+
+        var key = newKey();
+        var status = "status1";
+        var value = new DummyState();
+        value.intVar = 42;
+        value.stringVar = "the droids you're looking for";
+
+        int revision;
+
+        try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
+            revision = cache.addEntry(ticket, status, value);
+        }
+
+        try (var ticket = cache.openTicket(key, revision, TICKET_TIMEOUT)) {
+
+            cache.removeEntry(ticket);
+
+            Assertions.assertThrows(ECacheNotFound.class, () -> cache.removeEntry(ticket));
+        }
+
+        try (var ticket = cache.openTicket(key, revision, TICKET_TIMEOUT)) {
+
+            Assertions.assertThrows(ECacheNotFound.class, () -> cache.removeEntry(ticket));
+        }
+
+        var entry = cache.queryKey(key);
+
+        Assertions.assertFalse(entry.isPresent());
     }
 
     @Test
     void deleteEntry_ticketUnknown() {
-        Assertions.fail("Not implemented yet");
+
+        var key = newKey();
+        var status = "status1";
+        var value = new DummyState();
+        value.intVar = 42;
+        value.stringVar = "the droids you're looking for";
+
+        int revision;
+
+        try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
+            revision = cache.addEntry(ticket, status, value);
+        }
+
+        // Try to delete the entry using a ticket that was not created by the cache implementation
+
+        try (var ticket = CacheTicket.forDuration(cache, key, revision, Instant.now(), TICKET_TIMEOUT)) {
+            Assertions.assertThrows(ECacheTicket.class, () -> cache.removeEntry(ticket));
+        }
+
+        // Entry should not have been affected
+
+        var entry = cache.queryKey(key);
+
+        Assertions.assertTrue(entry.isPresent());
+        Assertions.assertEquals(revision, entry.get().revision());
+        Assertions.assertEquals(status, entry.get().status());
+        Assertions.assertEquals(value, entry.get().value());
     }
 
     @Test
     void deleteEntry_ticketSuperseded() {
-        Assertions.fail("Not implemented yet");
+
+        var key = newKey();
+        var status = "status1";
+        var value = new DummyState();
+        value.intVar = 42;
+        value.stringVar = "the droids you're looking for";
+
+        int revision;
+
+        try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
+            revision = cache.addEntry(ticket, status, value);
+        }
+
+        try (var ticket = cache.openTicket(key, revision, TICKET_TIMEOUT)) {
+
+            Assertions.assertFalse(ticket.superseded());
+
+            try (var ticket2 = cache.openTicket(key, revision, TICKET_TIMEOUT)) {
+
+                Assertions.assertTrue(ticket2.superseded());
+                Assertions.assertThrows(ECacheTicket.class, () -> cache.removeEntry(ticket2));
+            }
+        }
     }
 
     @Test
-    void deleteEntry_ticketExpired() {
-        Assertions.fail("Not implemented yet");
+    void deleteEntry_ticketExpired() throws Exception {
+
+        var key = newKey();
+        var status = "status1";
+        var value = new DummyState();
+        value.intVar = 42;
+        value.stringVar = "the droids you're looking for";
+
+        int revision;
+
+        try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
+            revision = cache.addEntry(ticket, status, value);
+        }
+
+        try (var ticket = cache.openTicket(key, revision, Duration.ofMillis(50))) {
+
+            // Wait for ticket to expire
+            Thread.sleep(51);
+
+            Assertions.assertThrows(ECacheTicket.class, () -> cache.removeEntry(ticket));
+        }
     }
 
     @Test
     void deleteEntry_ticketNeverClosed() {
         Assertions.fail("Not implemented yet");
+        // TODO
     }
 
     @Test
     void deleteEntry_nulls() {
-        Assertions.fail("Not implemented yet");
+
+        Assertions.assertThrows(ECacheOperation.class, () -> cache.removeEntry(null));
     }
 
 
