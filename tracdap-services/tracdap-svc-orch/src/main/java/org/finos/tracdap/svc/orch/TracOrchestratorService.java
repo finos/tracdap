@@ -243,7 +243,6 @@ public class TracOrchestratorService extends CommonServiceBase {
         var clientChannelBuilder = NettyChannelBuilder
                 .forAddress(metaInstance.getHost(), metaInstance.getPort())
                 .channelType(channelType)
-                .enableFullStreamDecompression()
                 .eventLoopGroup(nettyGroup)
                 .executor(serviceGroup)
                 .usePlaintext();
