@@ -10,7 +10,7 @@
 protobuf == 4.23.2
 
 # Core data framework is based on Arrow
-pyarrow == 13.0.0
+pyarrow == 14.0.2
 
 # PyYAML is used to load config supplied in YAML format
 pyyaml == 6.0
