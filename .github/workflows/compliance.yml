@@ -90,8 +90,11 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
+      # Explicit syntax for PIP upgrade, try to prevent safety check detecting the old version
       - name: PIP Upgrade
-        run: python -m pip install --upgrade pip
+        run: |
+          python -m pip install --upgrade --force pip
+          python3 -m pip install --upgrade --force pip
 
       # Make sure to check compliance on both core and plugin dependencies
       - name: Install dependencies
