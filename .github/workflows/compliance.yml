@@ -100,7 +100,7 @@ jobs:
           pip install -r requirements.txt
           pip install -r requirements_plugins.txt
 
-      # CVE-2023-5752 is a vulnerability in pip itself, fixed in the most recent version (23.3)
+      # CVE-2023-5752 (safety id: 62044) is a vulnerability in pip itself, fixed in the most recent version (23.3)
       # Although pip is updated, safety check detects the old version (perhaps because pip is part of the base package)
       # Anyway pip is not a dependency of the tracdap-runtime package, clients will get pip from their Python install
       # Once the base Python used in CI bumps up to include a later pip, the --ignore flag can be removed
@@ -108,8 +108,8 @@ jobs:
         run: |
           mkdir -p build/compliance/python-runtime-safety
           cd tracdap-runtime/python
-          safety check --ignore CVE-2023-5752 --output text > ../../build/compliance/python-runtime-safety/python-runtime-safety-report.txt
-          safety check --ignore CVE-2023-5752 --output json > ../../build/compliance/python-runtime-safety/python-runtime-safety-report.json
+          safety check --ignore 62044 --output text > ../../build/compliance/python-runtime-safety/python-runtime-safety-report.txt
+          safety check --ignore 62044 --output json > ../../build/compliance/python-runtime-safety/python-runtime-safety-report.json
 
       - name: License check
         run: |
