@@ -22,17 +22,19 @@
   ],
   "main": "tracdap.js",
   "dependencies": {
-    "grpc-web": "~1.4.2",
-    "protobufjs": "~7.2.4"
+    "grpc-web": "~1.5.0",
+    "protobufjs": "~7.2.5"
   },
   "devDependencies": {
-    "protobufjs-cli": "~1.1.1",
-    "license-checker-rseidelsohn": "^3.3.0",
+    "protobufjs-cli": "~1.1.2",
+    "license-checker-rseidelsohn": "^4.3.0",
     "owasp-dependency-check": "0.0.21",
-    "node-fetch": "^3.3.1"
+    "node-fetch": "^3.3.2"
   },
   "overrides": {
-    "taffydb": "2.7.3"
+    "taffydb": "^2.7.3",
+    "semver": "^7.5.4",
+    "follow-redirects": "^1.15.5"
   },
   "scripts": {
     "tracVersion:windows": "for /f %v in ('powershell -ExecutionPolicy Bypass -File ..\\..\\..\\dev\\version.ps1') do npm version \"%v\"",
