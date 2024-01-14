@@ -96,6 +96,7 @@ jobs:
           python -m pip install --upgrade --force pip
           python3 -m pip install --upgrade --force pip
           pip --version
+          pip2 --version
           pip3 --version
 
       # Make sure to check compliance on both core and plugin dependencies
@@ -110,6 +111,7 @@ jobs:
           mkdir -p build/compliance/python-runtime-safety
           cd tracdap-runtime/python
           pip --version
+          pip2 --version
           pip3 --version
           safety check --output text > ../../build/compliance/python-runtime-safety/python-runtime-safety-report.txt
           safety check --output json > ../../build/compliance/python-runtime-safety/python-runtime-safety-report.json
