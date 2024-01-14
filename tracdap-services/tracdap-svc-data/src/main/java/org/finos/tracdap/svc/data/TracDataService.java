@@ -239,7 +239,6 @@ public class TracDataService extends CommonServiceBase {
         var clientChannel = NettyChannelBuilder
                 .forAddress(metaInstance.getHost(), metaInstance.getPort())
                 .channelType(channelType)
-                .enableFullStreamDecompression()
                 .eventLoopGroup(serviceGroup)
                 .usePlaintext()
                 .build();
