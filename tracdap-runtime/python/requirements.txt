@@ -49,7 +49,7 @@ pyspark >= 3.0.0, < 3.5.0
 # Protoc generation
 
 protoc-wheel-0 >= 21, < 22
-googleapis-common-protos >= 1.56, < 2.0
+googleapis-common-protos >= 1.62, < 2.0
 
 # Tools for building and packaging the Python runtime
 

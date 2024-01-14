@@ -44,10 +44,14 @@ gcsfs == 2023.6.0
 
 # AWS client libraries
 
-azure-core == 1.26.4
-azure-identity == 1.13.0
-azure-storage-blob == 12.16.0
+azure-core == 1.29.6
+azure-identity == 1.15.0
+azure-storage-blob == 12.19.0
 
-# Asure implementation of FS Spec
+# Azure implementation of FS Spec
 
 adlfs == 2023.4.0
+
+# azure-identity is still pulling in a compromised version of the cryptography package
+# force a compatible version with the required fix
+cryptography~=41.0.7
