@@ -167,6 +167,13 @@
         <vulnerabilityName>CVE-2023-36415</vulnerabilityName>
     </suppress>
 
+    <!-- This one is a vulnerability in the Azure CLI using REST commands -->
+    <!-- It should not apply to Java libraries at all -->
+    <suppress>
+        <packageUrl regex="true">^pkg:maven/com\.azure/azure\-.*@.*$</packageUrl>
+        <cve>CVE-2023-36052</cve>
+    </suppress>
+
 
     <!-- ================== -->
     <!-- Special exceptions -->
