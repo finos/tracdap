@@ -367,7 +367,7 @@ jobs:
               JAVA_TESTS: int-storage }
 
           # GCP does not support Python 3.12 yet, so run integration tests on 3.11
-          # See https://github.com/googleapis/python-crc32c/issues/178
+          # See https://github.com/googleapis/python-crc32c/issues/178 (there may be more dependencies affected)
           - { SERVICE: storage,
               TARGET: gcp,
               PROTOCOL: GCS,
@@ -381,6 +381,8 @@ jobs:
               PYTHON_VERSION: "3.11",
               JAVA_TESTS: int-storage }
 
+          # Azure does not support Python 3.12 yet, so run integration tests on 3.11
+          # See https://github.com/aio-libs/multidict/issues/887 (there may be more dependencies affected)
           - { SERVICE: storage,
               TARGET: azure,
               PROTOCOL: BLOB,
@@ -391,6 +393,7 @@ jobs:
               TRAC_CONFIG_FILE: '.github/config/int-storage-azure.yaml',
               TRAC_SECRET_KEY: short-lived-secret,
               PYTHON_TESTS: int_storage_azure*.py,
+              PYTHON_VERSION: "3.11",
               JAVA_TESTS: int-storage }
 
     uses: ./.github/workflows/integration-cloud.yaml
