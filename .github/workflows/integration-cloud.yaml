@@ -204,9 +204,7 @@ jobs:
 
       - name: Authenticate to Azure
         if: ${{ inputs.target == 'azure' }}
-        # There was a breaking change in azure/login, so we need to force the version
-        # https://github.com/Azure/login/issues/403
-        uses: azure/login@v1.6.1
+        uses: azure/login@v1
         with:
           client-id: ${{ secrets.AZURE_CI_CLIENT }}
           tenant-id: ${{ secrets.AZURE_CI_TENANT }}
@@ -229,12 +227,19 @@ jobs:
           . ./venv/bin/activate
           python -m pip install --upgrade pip
 
+      # Filter plugin dependencies, only install for the plugin being tested
+      # This prevents dependency issues in one plugin affecting all the others
+      - name: Select plugin dependencies
+        run: |
+          cd tracdap-runtime/python
+          sed -n '/BEGIN_PLUGIN ${{ inputs.target }}/, /END_PLUGIN ${{ inputs.target }}/p' requirements_plugins.txt > requirements_selected.txt
+
       - name: Install dependencies
         run: |
           . ./venv/bin/activate
           cd tracdap-runtime/python
           pip install -r requirements.txt
-          pip install -r requirements_plugins.txt
+          pip install -r requirements_selected.txt
 
       - name: Protoc code generation
         run: |

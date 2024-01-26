@@ -9,10 +9,17 @@
 # So e.g. to use the Azure libraries, Python 3.8 is required
 # We can still support older Python versions, so long as those plugins are not being used
 
+# To control dependencies installed during CI, the BEGIN_PLUGIN and END_PLUGIN markers are used
+# Running CI for a particular plugin will only install the dependencies between those markers
+# This prevents dependency issues with one plugin breaking CI for all other plugins
+# It also cuts down the setup time of integration jobs
+
 
 # ----------------------------------------------------------------------------------------------------------------------
 # AWS
 # ----------------------------------------------------------------------------------------------------------------------
+
+# BEGIN_PLUGIN aws
 
 # AWS client libraries
 
@@ -23,9 +30,13 @@ boto3 == 1.26.156
 # This is a separate library that depends on a very old version of botocore
 # It is not really possible to use them together and maintain compliance
 
+# END_PLUGIN aws
+
 # ----------------------------------------------------------------------------------------------------------------------
 # GCP
 # ----------------------------------------------------------------------------------------------------------------------
+
+# BEGIN_PLUGIN gcp
 
 # GCP client libraries
 
@@ -37,12 +48,16 @@ google-cloud-storage == 2.9.0
 
 gcsfs == 2023.6.0
 
+# END_PLUGIN gcp
+
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Azure
 # ----------------------------------------------------------------------------------------------------------------------
 
-# AWS client libraries
+# BEGIN_PLUGIN azure
+
+# Azure client libraries
 
 azure-core == 1.29.6
 azure-identity == 1.15.0
@@ -55,3 +70,5 @@ adlfs == 2023.4.0
 # azure-identity is still pulling in a compromised version of the cryptography package
 # force a compatible version with the required fix
 cryptography~=41.0.7
+
+# END_PLUGIN azure

@@ -21,7 +21,7 @@ The TRAC runtime for Python has these requirements:
 * PySpark 3.0 up to 3.5 (optional)
 
 3rd party libraries may impose additional constraints on supported versions of Python, Pandas or PySpark.
-
+As of January 2024, the Python libraries for GCP and Azure do not yet support Python 3.12.
 
 ## Installing the runtime
 
