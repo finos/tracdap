@@ -204,9 +204,7 @@ jobs:
 
       - name: Authenticate to Azure
         if: ${{ inputs.target == 'azure' }}
-        # There was a breaking change in azure/login, so we need to force the version
-        # https://github.com/Azure/login/issues/403
-        uses: azure/login@v1.6.1
+        uses: azure/login@v1
         with:
           client-id: ${{ secrets.AZURE_CI_CLIENT }}
           tenant-id: ${{ secrets.AZURE_CI_TENANT }}
