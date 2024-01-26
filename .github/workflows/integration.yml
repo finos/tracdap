@@ -366,6 +366,8 @@ jobs:
               PYTHON_TESTS: int_storage_aws*.py,
               JAVA_TESTS: int-storage }
 
+          # GCP does not support Python 3.12 yet, so run integration tests on 3.11
+          # See https://github.com/googleapis/python-crc32c/issues/178
           - { SERVICE: storage,
               TARGET: gcp,
               PROTOCOL: GCS,
@@ -376,6 +378,7 @@ jobs:
               TRAC_CONFIG_FILE: '.github/config/int-storage-gcs.yaml',
               TRAC_SECRET_KEY: short-lived-secret,
               PYTHON_TESTS: int_storage_gcp*.py,
+              PYTHON_VERSION: "3.11",
               JAVA_TESTS: int-storage }
 
           - { SERVICE: storage,
