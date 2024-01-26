@@ -227,6 +227,8 @@ jobs:
           . ./venv/bin/activate
           python -m pip install --upgrade pip
 
+      # Filter plugin dependencies, only install for the plugin being tested
+      # This prevents dependency issues in one plugin affecting all the others
       - name: Select plugin dependencies
         run: |
           cd tracdap-runtime/python
