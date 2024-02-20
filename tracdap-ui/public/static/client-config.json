@@ -1,0 +1,150 @@
+{
+  "application": {
+    "name": "trac",
+    "tagline": "data & analytics platform",
+    "maskColour": "purple",
+    "webpageTitle": "TRAC dap"
+  },
+  "codeRepositories": [
+    {
+      "name": "test_models",
+      "owner": "greg-wiltshire",
+      "ownerType": "user",
+      "type": "gitHub",
+      "modelFileExtensions": [
+        "py"
+      ],
+      "modelMetadataExtension": "json",
+      "modelMetadataName": "_metadata",
+      "tracConfigName": "test_models_repo",
+      "httpUrl": "https://github.com",
+      "apiUrl": "https://api.github.com",
+      "tenants": [
+        "DEMO",
+        "RISK",
+        "HSBC",
+        "SPDJI"
+      ]
+    },
+    {
+      "name": "Local demo",
+      "owner": "greg-wiltshire",
+      "ownerType": "user",
+      "type": "gitHub",
+      "modelFileExtensions": [
+        "py"
+      ],
+      "modelMetadataExtension": "json",
+      "modelMetadataName": "_metadata",
+      "tracConfigName": "local_demo",
+      "httpUrl": "https://github.com",
+      "apiUrl": "https://api.github.com",
+      "tenants": [
+        "DEMO",
+        "SPDJI"
+      ]
+    }
+  ],
+  "images": {
+    "client": {
+      "darkBackground": {
+        "src": "/trac-ui/app/static/images/accenture_logo.png",
+        "naturalWidth": 246,
+        "naturalHeight": 66,
+        "displayWidth": 200,
+        "displayHeight": 57,
+        "alt": "Accenture",
+        "style": {
+          "marginBottom": "2rem"
+        }
+      },
+      "lightBackground": {
+        "src": "/trac-ui/app/static/images/accenture_logo.png",
+        "naturalWidth": 246,
+        "naturalHeight": 66,
+        "displayWidth": 200,
+        "displayHeight": 57,
+        "alt": "Accenture",
+        "style": {
+          "marginBottom": "2rem"
+        }
+      }
+    },
+    "application": {
+      "darkBackground": {
+        "src": "/trac-ui/app/static/images/tracdap_logo_dark_background.svg",
+        "naturalWidth": 280,
+        "naturalHeight": 280,
+        "displayWidth": 90,
+        "displayHeight": 90,
+        "alt": "TRAC logo",
+        "style": {
+          "marginTop": "0.5rem"
+        }
+      },
+      "lightBackground": {
+        "src": "/trac-ui/app/static/images/tracdap_logo_light_background.svg",
+        "naturalWidth": 280,
+        "naturalHeight": 280,
+        "displayWidth": 30,
+        "displayHeight": 30,
+        "alt": "TRAC logo",
+        "style": {
+          "marginTop": "0.5rem"
+        }
+      }
+    }
+  },
+  "searches": {
+    "maximumNumberOfOptionsReturned": 1000
+  },
+  "options": {
+    "onlyAllowCookiesOnSsl": false
+  },
+  "uploading": {
+    "data": {
+      "sizeLimit": {
+        "default": 20971520,
+        "csv": 53687091200,
+        "xlsx": 20971520
+      },
+      "processing": {
+        "maximumRowsToUseToGuessSchema": 50000,
+        "maximumRowsToShowInSample": 1000,
+        "messageSize": 3145728
+      }
+    },
+    "file": {
+      "sizeLimit": {
+        "default": 20971520
+      }
+    }
+  },
+  "externalLinks": {
+    "modelCode": {
+      "label": "model code",
+      "application": "github",
+      "url": null
+    },
+    "uiCode": {
+      "label": "UI code",
+      "application": null,
+      "url": null
+    },
+    "tracCode": {
+      "label": "TRAC code",
+      "application": "github",
+      "url": "https://github.com/finos/tracdap"
+    },
+    "projectDocumentation": {
+      "label": "TRAC docs",
+      "application": "confluence",
+      "url": "https://tracdap.finos.org/en/stable/"
+    },
+    "projectIssues": {
+      "label": "issues/tickets",
+      "application": null,
+      "url": null
+    }
+  }
+}
