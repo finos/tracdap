@@ -152,6 +152,7 @@ public class LocalJobCache<TValue extends Serializable> implements IJobCache<TVa
         var commitTime = Instant.now();
 
         checkValidTicket(ticket, "create", commitTime);
+        checkValidStatus(ticket, status);
 
         var added = _cache.compute(ticket.key(), (_key, _entry) -> {
 
@@ -177,11 +178,12 @@ public class LocalJobCache<TValue extends Serializable> implements IJobCache<TVa
     }
 
     @Override
-    public int updateEntry(CacheTicket ticket, String stateKey, TValue value) {
+    public int updateEntry(CacheTicket ticket, String status, TValue value) {
 
         var commitTime = Instant.now();
 
         checkValidTicket(ticket, "update", commitTime);
+        checkValidStatus(ticket, status);
 
         var updated = _cache.compute(ticket.key(), (_key, _entry) -> {
 
@@ -196,7 +198,7 @@ public class LocalJobCache<TValue extends Serializable> implements IJobCache<TVa
             var newEntry = _entry.clone();
             newEntry.revision += 1;
             newEntry.lastActivity = commitTime;
-            newEntry.status = stateKey;
+            newEntry.status = status;
             newEntry.encodedValue = encodeValue(value);
 
             return newEntry;
@@ -326,6 +328,21 @@ public class LocalJobCache<TValue extends Serializable> implements IJobCache<TVa
             var message = String.format("Failed to %s [%s], ticket has expired", operation, ticket.key());
             log.error(message);
             throw new ECacheTicket(message);
+        }
+    }
+
+    private void checkValidStatus(CacheTicket ticket, String status) {
+
+        if (!MetadataConstants.VALID_IDENTIFIER.matcher(status).matches()) {
+            var message = String.format("Cannot set status [%s] for [%s] (status must be a valid identifier)", status, ticket.key());
+            log.error(message);
+            throw new ECacheOperation(message);
+        }
+
+        if (MetadataConstants.TRAC_RESERVED_IDENTIFIER.matcher(status).matches()) {
+            var message = String.format("Cannot set status [%s] for [%s] (status cannot be a reserved identifier)r", status, ticket.key());
+            log.error(message);
+            throw new ECacheOperation(message);
         }
     }
 

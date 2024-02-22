@@ -1955,7 +1955,7 @@ public abstract class JobCacheTestSuite {
         }
 
         try (var ticket = cache.openTicket(key, 0, TICKET_TIMEOUT)) {
-            Assertions.assertThrows(ECacheNotFound.class, () -> cache.deleteEntry(ticket));
+            Assertions.assertThrows(ECacheTicket.class, () -> cache.deleteEntry(ticket));
         }
 
         var entry = cache.queryKey(key);
