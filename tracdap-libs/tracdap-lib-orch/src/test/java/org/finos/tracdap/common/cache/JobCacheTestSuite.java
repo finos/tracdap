@@ -1384,11 +1384,20 @@ public abstract class JobCacheTestSuite {
         Assertions.assertEquals(value, entry.get().value());
 
         try (var ticket = cache.openTicket(key, revision, TICKET_TIMEOUT)) {
+            // Ticket is valid but entry removed, error should be ECacheNotFound
             cache.deleteEntry(ticket);
             Assertions.assertThrows(ECacheNotFound.class, () -> cache.readEntry(ticket));
         }
 
+        try (var ticket = cache.openTicket(key, revision, TICKET_TIMEOUT)) {
+            // Ticket is in missing status, error should be ECacheTicket
+            Assertions.assertTrue(ticket.missing());
+            Assertions.assertThrows(ECacheTicket.class, () -> cache.readEntry(ticket));
+        }
+
         try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
+            // New ticket is not in missing status, error should be ECacheNotFound
+            Assertions.assertFalse(ticket.missing());
             Assertions.assertThrows(ECacheNotFound.class, () -> cache.readEntry(ticket));
         }
     }
@@ -1397,14 +1406,21 @@ public abstract class JobCacheTestSuite {
     void readEntry_afterUnusedTicket() {
 
         var key = newKey();
+        int revision;
 
         try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
-            Assertions.assertEquals(key, ticket.key());  // No-op
+            revision = ticket.revision();
+        }
+
+        try (var ticket = cache.openTicket(key, revision, TICKET_TIMEOUT)) {
+            // Ticket will be in missing status, error should be ECacheTicket
+            Assertions.assertTrue(ticket.missing());
+            Assertions.assertThrows(ECacheTicket.class, () -> cache.readEntry(ticket));
         }
 
         try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
-
-            Assertions.assertTrue(ticket.missing());
+            // New ticket is not in missing status, error should be ECacheNotFound
+            Assertions.assertFalse(ticket.missing());
             Assertions.assertThrows(ECacheNotFound.class, () -> cache.readEntry(ticket));
         }
     }
@@ -1414,7 +1430,15 @@ public abstract class JobCacheTestSuite {
 
         var key = newKey();
 
+        try (var ticket = cache.openTicket(key, 1, TICKET_TIMEOUT)) {
+            // Ticket will be in missing status, error should be ECacheTicket
+            Assertions.assertTrue(ticket.missing());
+            Assertions.assertThrows(ECacheTicket.class, () -> cache.readEntry(ticket));
+        }
+
         try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
+            // New ticket is not in missing status, error should be ECacheNotFound
+            Assertions.assertFalse(ticket.missing());
             Assertions.assertThrows(ECacheNotFound.class, () -> cache.readEntry(ticket));
         }
     }
@@ -1678,17 +1702,21 @@ public abstract class JobCacheTestSuite {
             revision = cache.createEntry(ticket, status, value);
         }
 
-        try (var ticket = cache.openTicket(key, revision, TICKET_TIMEOUT)) {
-            cache.deleteEntry(ticket);
-        }
-
         var status2 = "status2";
         var value2 = new DummyState();
         value2.intVar = 43;
         value2.stringVar = "move along";
 
         try (var ticket = cache.openTicket(key, revision, TICKET_TIMEOUT)) {
-            Assertions.assertThrows(ECacheNotFound.class, ()-> cache.updateEntry(ticket, status2, value2));
+            // Ticket is valid but entry is already deleted, error should be ECacheNoteFound
+            cache.deleteEntry(ticket);
+            Assertions.assertThrows(ECacheNotFound.class, () -> cache.updateEntry(ticket, status2, value2));
+        }
+
+        try (var ticket = cache.openTicket(key, revision, TICKET_TIMEOUT)) {
+            // When a new ticket is opened, ticket status is missing so error is ECacheTicket
+            Assertions.assertTrue(ticket.missing());
+            Assertions.assertThrows(ECacheTicket.class, () -> cache.updateEntry(ticket, status2, value2));
         }
     }
 
@@ -1707,7 +1735,8 @@ public abstract class JobCacheTestSuite {
         value2.stringVar = "move along";
 
         try (var ticket = cache.openTicket(key, 0, TICKET_TIMEOUT)) {
-            Assertions.assertThrows(ECacheNotFound.class, ()-> cache.updateEntry(ticket, status2, value2));
+            Assertions.assertTrue(ticket.missing());
+            Assertions.assertThrows(ECacheTicket.class, ()-> cache.updateEntry(ticket, status2, value2));
         }
     }
 
@@ -1723,7 +1752,7 @@ public abstract class JobCacheTestSuite {
 
         try (var ticket = cache.openTicket(key, 0, TICKET_TIMEOUT)) {
             Assertions.assertTrue(ticket.missing());
-            Assertions.assertThrows(ECacheNotFound.class, ()-> cache.updateEntry(ticket, status2, value2));
+            Assertions.assertThrows(ECacheTicket.class, ()-> cache.updateEntry(ticket, status2, value2));
         }
     }
 
@@ -1979,15 +2008,14 @@ public abstract class JobCacheTestSuite {
         }
 
         try (var ticket = cache.openTicket(key, revision, TICKET_TIMEOUT)) {
-
+            // Ticket is valid but entry is already removed, error should be ECacheNotFound
             cache.deleteEntry(ticket);
-
             Assertions.assertThrows(ECacheNotFound.class, () -> cache.deleteEntry(ticket));
         }
 
         try (var ticket = cache.openTicket(key, revision, TICKET_TIMEOUT)) {
-
-            Assertions.assertThrows(ECacheNotFound.class, () -> cache.deleteEntry(ticket));
+            // Ticket is not valid, error should be ECacheTicket
+            Assertions.assertThrows(ECacheTicket.class, () -> cache.deleteEntry(ticket));
         }
 
         var entry = cache.queryKey(key);
