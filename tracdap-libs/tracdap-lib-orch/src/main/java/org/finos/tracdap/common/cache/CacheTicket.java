@@ -22,6 +22,8 @@ import java.time.Instant;
 
 public final class CacheTicket implements AutoCloseable {
 
+    private static final Instant NO_EXPIRY = Instant.MAX;
+
     private final IJobCache<?> cache;
 
     private final String key;
@@ -33,12 +35,12 @@ public final class CacheTicket implements AutoCloseable {
 
     public static CacheTicket missingEntryTicket(String key, int revision, Instant grantTime) {
 
-        return new CacheTicket(null, key, revision, grantTime, grantTime, false, true);
+        return new CacheTicket(null, key, revision, grantTime, NO_EXPIRY, false, true);
     }
 
     public static CacheTicket supersededTicket(String key, int revision, Instant grantTime) {
 
-        return new CacheTicket(null, key, revision, grantTime, grantTime, true, false);
+        return new CacheTicket(null, key, revision, grantTime, NO_EXPIRY, true, false);
     }
 
     public static CacheTicket forDuration(
