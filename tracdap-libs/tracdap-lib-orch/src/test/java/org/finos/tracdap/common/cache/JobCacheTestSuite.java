@@ -16,10 +16,7 @@
 
 package org.finos.tracdap.common.cache;
 
-import org.finos.tracdap.common.exception.ECacheDuplicate;
-import org.finos.tracdap.common.exception.ECacheNotFound;
-import org.finos.tracdap.common.exception.ECacheOperation;
-import org.finos.tracdap.common.exception.ECacheTicket;
+import org.finos.tracdap.common.exception.*;
 import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.metadata.ObjectType;
 import org.finos.tracdap.metadata.TagHeader;
@@ -1279,9 +1276,9 @@ public abstract class JobCacheTestSuite {
 
         try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
 
-            Assertions.assertThrows(ECacheOperation.class, () -> cache.createEntry(null, status, value));
-            Assertions.assertThrows(ECacheOperation.class, () -> cache.createEntry(ticket, null, value));
-            Assertions.assertThrows(ECacheOperation.class, () -> cache.createEntry(ticket, status, null));
+            Assertions.assertThrows(ETracInternal.class, () -> cache.createEntry(null, status, value));
+            Assertions.assertThrows(ETracInternal.class, () -> cache.createEntry(ticket, null, value));
+            Assertions.assertThrows(ETracInternal.class, () -> cache.createEntry(ticket, status, null));
         }
 
         var entry = cache.queryKey(key);
@@ -1462,7 +1459,7 @@ public abstract class JobCacheTestSuite {
 
         // Try to read the entry using a ticket that was not created by the cache implementation
 
-        try (var ticket = CacheTicket.forDuration(cache, key, 0, Instant.now(), TICKET_TIMEOUT)) {
+        try (var ticket = CacheTicket.forDuration(cache, key, revision, Instant.now(), TICKET_TIMEOUT)) {
             Assertions.assertThrows(ECacheTicket.class, () -> cache.readEntry(ticket));
         }
     }
@@ -1519,7 +1516,7 @@ public abstract class JobCacheTestSuite {
     }
 
     @Test
-    void readEntry_ticketNeverClosed() {
+    void readEntry_ticketNeverClosed() throws Exception {
 
         var key = newKey();
         var status = "status1";
@@ -1527,8 +1524,12 @@ public abstract class JobCacheTestSuite {
         value.intVar = 42;
         value.stringVar = "the droids you're looking for";
 
-        var ticket = cache.openNewTicket(key, TICKET_TIMEOUT);
+        var ticketDuration = Duration.ofMillis(250);
+        var ticket = cache.openNewTicket(key, ticketDuration);
+
         var revision = cache.createEntry(ticket, status, value);
+
+        Thread.sleep(ticketDuration.toMillis() + 1);
 
         // Query the entry without closing the ticket - should still be fine
 
@@ -1542,14 +1543,12 @@ public abstract class JobCacheTestSuite {
         Assertions.assertEquals(revision, entry.revision());
         Assertions.assertEquals(status, entry.status());
         Assertions.assertEquals(value, entry.value());
-
-        // TODO
     }
 
     @Test
     void readEntry_nulls() {
 
-        Assertions.assertThrows(ECacheTicket.class, () -> cache.readEntry(null));
+        Assertions.assertThrows(ETracInternal.class, () -> cache.readEntry(null));
     }
 
     @Test
@@ -1726,7 +1725,7 @@ public abstract class JobCacheTestSuite {
         var key = newKey();
 
         try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
-            // no-op
+            Assertions.assertFalse(ticket.missing() || ticket.superseded());
         }
 
         var status2 = "status2";
@@ -1847,9 +1846,44 @@ public abstract class JobCacheTestSuite {
     }
 
     @Test
-    void updateEntry_ticketNeverClosed() {
-        Assertions.fail("Not implemented yet");
-        // TODO
+    void updateEntry_ticketNeverClosed() throws Exception {
+
+        var key = newKey();
+        var status = "status1";
+        var value = new DummyState();
+        value.intVar = 42;
+        value.stringVar = "the droids you're looking for";
+
+        int revision;
+
+        try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
+            revision = cache.createEntry(ticket, status, value);
+        }
+
+        var ticketDuration = Duration.ofMillis(250);
+        var ticket = cache.openTicket(key, revision, ticketDuration);
+
+        var status2 = "status2";
+        var value2 = new DummyState();
+        value2.intVar = 43;
+        value2.stringVar = "not the droids you're looking for";
+
+        var revision2 = cache.updateEntry(ticket, status2, value2);
+
+        Thread.sleep(ticketDuration.toMillis() + 1);
+
+        // Query the entry without closing the ticket - should still be fine
+
+        CacheEntry<DummyState> entry;
+
+        try (var ticket2 = cache.openTicket(key, revision2, TICKET_TIMEOUT)) {
+            entry = cache.readEntry(ticket2);
+        }
+
+        Assertions.assertTrue(entry.cacheOk());
+        Assertions.assertEquals(revision2, entry.revision());
+        Assertions.assertEquals(status2, entry.status());
+        Assertions.assertEquals(value2, entry.value());
     }
 
     @Test
@@ -1944,9 +1978,9 @@ public abstract class JobCacheTestSuite {
         value2.stringVar = "move along";
 
         try (var ticket = cache.openTicket(key, revision, TICKET_TIMEOUT)) {
-            Assertions.assertThrows(ECacheOperation.class, () -> cache.updateEntry(null, status2, value2));
-            Assertions.assertThrows(ECacheOperation.class, () -> cache.updateEntry(ticket, null, value2));
-            Assertions.assertThrows(ECacheOperation.class, () -> cache.updateEntry(ticket, status2, null));
+            Assertions.assertThrows(ETracInternal.class, () -> cache.updateEntry(null, status2, value2));
+            Assertions.assertThrows(ETracInternal.class, () -> cache.updateEntry(ticket, null, value2));
+            Assertions.assertThrows(ETracInternal.class, () -> cache.updateEntry(ticket, status2, null));
         }
     }
 
@@ -2106,15 +2140,38 @@ public abstract class JobCacheTestSuite {
     }
 
     @Test
-    void deleteEntry_ticketNeverClosed() {
-        Assertions.fail("Not implemented yet");
-        // TODO
+    void deleteEntry_ticketNeverClosed() throws Exception {
+
+        var key = newKey();
+        var status = "status1";
+        var value = new DummyState();
+        value.intVar = 42;
+        value.stringVar = "the droids you're looking for";
+
+        int revision;
+
+        try (var ticket = cache.openNewTicket(key, TICKET_TIMEOUT)) {
+            revision = cache.createEntry(ticket, status, value);
+        }
+
+        var ticketDuration = Duration.ofMillis(250);
+        var ticket = cache.openTicket(key, revision, ticketDuration);
+
+        cache.deleteEntry(ticket);
+
+        Thread.sleep(ticketDuration.toMillis() + 1);
+
+        // Query the entry without closing the ticket - should still be fine
+
+        var entry = cache.queryKey(key);
+
+        Assertions.assertFalse(entry.isPresent());
     }
 
     @Test
     void deleteEntry_nulls() {
 
-        Assertions.assertThrows(ECacheOperation.class, () -> cache.deleteEntry(null));
+        Assertions.assertThrows(ETracInternal.class, () -> cache.deleteEntry(null));
     }
 
 

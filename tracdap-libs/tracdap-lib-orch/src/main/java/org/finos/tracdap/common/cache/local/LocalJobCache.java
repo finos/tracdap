@@ -153,6 +153,7 @@ public class LocalJobCache<TValue extends Serializable> implements IJobCache<TVa
 
         checkValidTicket(ticket, "create", commitTime);
         checkValidStatus(ticket, status);
+        checkValidValue(ticket, value);
 
         var added = _cache.compute(ticket.key(), (_key, _entry) -> {
 
@@ -184,6 +185,7 @@ public class LocalJobCache<TValue extends Serializable> implements IJobCache<TVa
 
         checkValidTicket(ticket, "update", commitTime);
         checkValidStatus(ticket, status);
+        checkValidValue(ticket, value);
 
         var updated = _cache.compute(ticket.key(), (_key, _entry) -> {
 
@@ -312,6 +314,9 @@ public class LocalJobCache<TValue extends Serializable> implements IJobCache<TVa
 
     private void checkValidTicket(CacheTicket ticket, String operation, Instant operationTime) {
 
+        if (ticket == null)
+            throw new ETracInternal("Cache ticket is null");
+
         if (ticket.missing()) {
             var message = String.format("Cannot %s [%s], item is not in the cache", operation, ticket.key());
             log.error(message);
@@ -333,6 +338,9 @@ public class LocalJobCache<TValue extends Serializable> implements IJobCache<TVa
 
     private void checkValidStatus(CacheTicket ticket, String status) {
 
+        if (status == null)
+            throw new ETracInternal(String.format("Cache ticket status is null for [%s]", ticket.key()));
+
         if (!MetadataConstants.VALID_IDENTIFIER.matcher(status).matches()) {
             var message = String.format("Cannot set status [%s] for [%s] (status must be a valid identifier)", status, ticket.key());
             log.error(message);
@@ -344,6 +352,12 @@ public class LocalJobCache<TValue extends Serializable> implements IJobCache<TVa
             log.error(message);
             throw new ECacheOperation(message);
         }
+    }
+
+    private void checkValidValue(CacheTicket ticket, TValue value) {
+
+        if (value == null)
+            throw new ETracInternal(String.format("Cache value is null for [%s]", ticket.key()));
     }
 
     private void checkEntryMatchesTicket(LocalJobCacheEntry entry, CacheTicket ticket, String operation) {
@@ -402,8 +416,7 @@ public class LocalJobCache<TValue extends Serializable> implements IJobCache<TVa
 
     private byte[] encodeValue(TValue value) {
 
-        try (var stream = new ZCByteArrayOutputStream();
-             var serialize = new ObjectOutputStream(stream)) {
+        try (var stream = new ZCByteArrayOutputStream(); var serialize = new ObjectOutputStream(stream)) {
 
             serialize.writeObject(value);
             serialize.flush();
@@ -418,8 +431,7 @@ public class LocalJobCache<TValue extends Serializable> implements IJobCache<TVa
     @SuppressWarnings("unchecked")
     private TValue decodeValue(byte[] encodedValue) throws ECacheCorruption {
 
-        try (var stream = new ByteArrayInputStream(encodedValue);
-             var deserialize = new ObjectInputStream(stream)) {
+        try (var stream = new ByteArrayInputStream(encodedValue); var deserialize = new ObjectInputStream(stream)) {
 
             var object = deserialize.readObject();
 
