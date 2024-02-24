@@ -70,6 +70,9 @@ ext {
     gcp_sdk_version = '26.26.0'
     azure_sdk_version = '1.2.20'
 
+    // Temporary override to address CVE-2023-52428 (remove once Azure SDK updates this dependency)
+    azure_nimbus_version = '9.37.3'
+
     // AWS SDK uses Reactive Streams
     // Only the latest version has a good license (MIT-0, prior versions were Creative Commons)
     reactive_streams_version = '1.0.4'
