@@ -232,6 +232,10 @@ public class JobProcessor {
 
     public List<ExecutorJobInfo> pollExecutorJobs(List<CacheEntry<JobState>> jobs) {
 
+        // TODO: Handle errors decoding the executor state, in stronglyTypeState()
+        // This could happen if e.g. the platform configuration is changed with a new executor
+        // Probably the job should be failed and removed from the cache
+
         var executor = stronglyTypedExecutor();
 
         var jobState = jobs.stream()
@@ -311,6 +315,10 @@ public class JobProcessor {
 
     public JobState fetchJobResult(JobState jobState) {
 
+        // TODO: Handle errors decoding the executor state, in stronglyTypeState()
+        // This could happen if e.g. the platform configuration is changed with a new executor
+        // Probably the job should be failed and removed from the cache
+
         var batchExecutor = stronglyTypedExecutor();
         var batchState = stronglyTypedState(batchExecutor, jobState.executorState);
 
@@ -387,6 +395,10 @@ public class JobProcessor {
 
     public JobState cleanUpJob(JobState jobState) {
 
+        // TODO: Handle errors decoding the executor state, in stronglyTypeState()
+        // This could happen if e.g. the platform configuration is changed with a new executor
+        // Probably the job should be failed and removed from the cache
+
         if (jobState.executorState != null) {
 
             var batchExecutor = stronglyTypedExecutor();
@@ -454,7 +466,7 @@ public class JobProcessor {
         if (executorState == null)
             throw new ETracInternal("Invalid job state: null");
 
-        if (stateClass.isInstance(executorState)) {
+        if (!stateClass.isInstance(executorState)) {
 
             String message = String.format(
                     "Invalid job state: Expected [%s], got [%s]",

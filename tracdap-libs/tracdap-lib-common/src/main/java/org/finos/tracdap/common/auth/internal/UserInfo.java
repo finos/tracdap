@@ -16,8 +16,12 @@
 
 package org.finos.tracdap.common.auth.internal;
 
+import java.io.Serializable;
 
-public class UserInfo {
+
+public class UserInfo implements Serializable {
+
+    private final static long serialVersionUID = 1L;
 
     private String userId;
     private String displayName;
