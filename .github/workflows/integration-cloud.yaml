@@ -71,7 +71,7 @@ jobs:
 
       - name: Authenticate to AWS
         if: ${{ inputs.target == 'aws' }}
-        uses: aws-actions/configure-aws-credentials@v2
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_CI_ROLE }}
           role-session-name: tracdap-ci-session
@@ -94,9 +94,7 @@ jobs:
 
       - name: Authenticate to Azure
         if: ${{ inputs.target == 'azure' }}
-        # There was a breaking change in azure/login, so we need to force the version
-        # https://github.com/Azure/login/issues/403
-        uses: azure/login@v1.6.1
+        uses: azure/login@v1
         with:
           client-id: ${{ secrets.AZURE_CI_CLIENT }}
           tenant-id: ${{ secrets.AZURE_CI_TENANT }}
@@ -181,7 +179,7 @@ jobs:
 
       - name: Authenticate to AWS
         if: ${{ inputs.target == 'aws' }}
-        uses: aws-actions/configure-aws-credentials@v2
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_CI_ROLE }}
           role-session-name: tracdap-ci-session
@@ -217,7 +215,7 @@ jobs:
           ${{ env.SETUP_SCRIPT }}
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
