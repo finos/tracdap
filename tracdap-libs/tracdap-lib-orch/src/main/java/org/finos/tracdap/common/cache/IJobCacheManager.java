@@ -14,31 +14,13 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.auth.internal;
+package org.finos.tracdap.common.cache;
 
 import java.io.Serializable;
 
 
-public class UserInfo implements Serializable {
+public interface IJobCacheManager {
 
-    private final static long serialVersionUID = 1L;
-
-    private String userId;
-    private String displayName;
-
-    public String getUserId() {
-        return userId;
-    }
-
-    public void setUserId(String userId) {
-        this.userId = userId;
-    }
-
-    public String getDisplayName() {
-        return displayName;
-    }
-
-    public void setDisplayName(String displayName) {
-        this.displayName = displayName;
-    }
+    <TValue extends Serializable>
+    IJobCache<TValue> getCache(String cacheName, Class<TValue> cacheType);
 }

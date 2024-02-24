@@ -14,12 +14,15 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.svc.orch.cache;
+package org.finos.tracdap.common.cache;
 
 import java.time.Duration;
 import java.time.Instant;
 
-public class Ticket implements AutoCloseable {
+
+public final class CacheTicket implements AutoCloseable {
+
+    private static final Instant NO_EXPIRY = Instant.MAX;
 
     private final IJobCache<?> cache;
 
@@ -30,25 +33,25 @@ public class Ticket implements AutoCloseable {
     private final boolean superseded;
     private final boolean missing;
 
-    public static Ticket missingEntryTicket(String key, int revision, Instant grantTime) {
+    public static CacheTicket missingEntryTicket(String key, int revision, Instant grantTime) {
 
-        return new Ticket(null, key, revision, grantTime, grantTime, true, true);
+        return new CacheTicket(null, key, revision, grantTime, NO_EXPIRY, false, true);
     }
 
-    public static Ticket supersededTicket(String key, int revision, Instant grantTime) {
+    public static CacheTicket supersededTicket(String key, int revision, Instant grantTime) {
 
-        return new Ticket(null, key, revision, grantTime, grantTime, true, false);
+        return new CacheTicket(null, key, revision, grantTime, NO_EXPIRY, true, false);
     }
 
-    public static Ticket forDuration(
+    public static CacheTicket forDuration(
             IJobCache<?> cache,
             String key, int revision,
             Instant grantTime, Duration grantDuration) {
 
-        return new Ticket(cache, key, revision, grantTime, grantTime.plus(grantDuration), false, false);
+        return new CacheTicket(cache, key, revision, grantTime, grantTime.plus(grantDuration), false, false);
     }
 
-    protected Ticket(
+    private CacheTicket(
             IJobCache<?> cache,
             String key, int iteration,
             Instant grantTime, Instant expiry,
@@ -81,7 +84,7 @@ public class Ticket implements AutoCloseable {
     }
 
     public boolean superseded() {
-        return superseded || missing;
+        return superseded || expiry.isBefore(Instant.now());
     }
 
     public boolean missing() {

@@ -18,10 +18,10 @@ package org.finos.tracdap.common.exec;
 
 import org.finos.tracdap.common.util.ResourceHelpers;
 
-import com.google.protobuf.Message;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
+import java.io.Serializable;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -34,9 +34,11 @@ public abstract class ExecutorBasicTestSuite {
     protected IBatchExecutor<?> executor;
 
     @SuppressWarnings("unchecked")
-    private <T extends Message> IBatchExecutor<T> stronglyTypedExecutor() {
+    private <T extends Serializable> IBatchExecutor<T> stronglyTypedExecutor() {
         return (IBatchExecutor<T>) executor;
     }
+
+    protected abstract boolean targetIsWindows();
 
     @Test
     void runBasicJob_ok() throws Exception {
@@ -65,11 +67,23 @@ public abstract class ExecutorBasicTestSuite {
 
             // Set up a basic copy command
 
-            var launchCmd = LaunchCmd.custom("cp");
-            var launchArgs = List.of(
-                    LaunchArg.string("-v"),
-                    LaunchArg.path("config", "lorem_ipsum.txt"),
-                    LaunchArg.path("outputs", "lorem_ipsum_copy.txt"));
+            LaunchCmd launchCmd;
+            List<LaunchArg> launchArgs;
+
+            if (targetIsWindows()) {
+                launchCmd = LaunchCmd.custom("cmd");
+                launchArgs = List.of(
+                        LaunchArg.string("/C"), LaunchArg.string("copy"),
+                        LaunchArg.path("config", "lorem_ipsum.txt"),
+                        LaunchArg.path("outputs", "lorem_ipsum_copy.txt"));
+            }
+            else {
+                launchCmd = LaunchCmd.custom("cp");
+                launchArgs = List.of(
+                        LaunchArg.string("-v"),
+                        LaunchArg.path("config", "lorem_ipsum.txt"),
+                        LaunchArg.path("outputs", "lorem_ipsum_copy.txt"));
+            }
 
             // Start the batch
 
@@ -112,11 +126,23 @@ public abstract class ExecutorBasicTestSuite {
 
             // Set up a basic copy command
 
-            var launchCmd = LaunchCmd.custom("cp");
-            var launchArgs = List.of(
-                    LaunchArg.string("-v"),
-                    LaunchArg.path("config", "lorem_ipsum.txt"),
-                    LaunchArg.path("outputs", "lorem_ipsum_copy.txt"));
+            LaunchCmd launchCmd;
+            List<LaunchArg> launchArgs;
+
+            if (targetIsWindows()) {
+                launchCmd = LaunchCmd.custom("cmd");
+                launchArgs = List.of(
+                        LaunchArg.string("/C"), LaunchArg.string("copy"),
+                        LaunchArg.path("config", "lorem_ipsum.txt"),
+                        LaunchArg.path("outputs", "lorem_ipsum_copy.txt"));
+            }
+            else {
+                launchCmd = LaunchCmd.custom("cp");
+                launchArgs = List.of(
+                        LaunchArg.string("-v"),
+                        LaunchArg.path("config", "lorem_ipsum.txt"),
+                        LaunchArg.path("outputs", "lorem_ipsum_copy.txt"));
+            }
 
             // Start the batch
 

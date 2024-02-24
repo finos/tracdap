@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Accenture Global Solutions Limited
+ * Copyright 2023 Accenture Global Solutions Limited
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,22 +14,19 @@
  * limitations under the License.
  */
 
-syntax = 'proto3';
-package tracdap.exec.local;
-
-option java_package = "org.finos.tracdap.common.exec.local";
-option java_multiple_files = true;
+package org.finos.tracdap.common.exception;
 
 
-message LocalBatchState {
+/**
+ * A request was made to perform an illegal cache operation.
+ */
+public class ECacheOperation extends ECache {
 
-  string batchDir = 1;
-  repeated string volumes = 2;
-  int64 pid = 3;
-}
+    public ECacheOperation(String message, Throwable cause) {
+        super(message, cause);
+    }
 
-
-message LocalExecutorState {
-
-
+    public ECacheOperation(String message) {
+        super(message);
+    }
 }

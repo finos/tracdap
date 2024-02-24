@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Accenture Global Solutions Limited
+ * Copyright 2023 Accenture Global Solutions Limited
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,25 +14,31 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.exec.local;
+package org.finos.tracdap.common.orch;
 
+import org.finos.tracdap.common.cache.IJobCacheManager;
+import org.finos.tracdap.common.cache.local.LocalJobCacheManager;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.exception.EPluginNotAvailable;
+import org.finos.tracdap.common.exec.IBatchExecutor;
+import org.finos.tracdap.common.exec.local.LocalBatchExecutor;
 import org.finos.tracdap.common.plugin.PluginServiceInfo;
 import org.finos.tracdap.common.plugin.TracPlugin;
-import org.finos.tracdap.common.exec.IBatchExecutor;
 
 import java.util.List;
 import java.util.Properties;
 
-public class LocalExecutorPlugin extends TracPlugin {
 
-    private static final String PLUGIN_NAME = "LOCAL_EXECUTOR";
+public class CoreOrchestratorPlugin extends TracPlugin {
 
-    private static final String LOCAL_BATCH_EXECUTOR_NAME = "LOCAL_BATCH";
+    private static final String PLUGIN_NAME = "CORE_ORCHESTRATOR";
+
+    private static final String LOCAL_EXECUTOR_NAME = "LOCAL_EXECUTOR";
+    private static final String LOCAL_JOB_CACHE_NAME = "LOCAL_JOB_CACHE";
 
     private static final List<PluginServiceInfo> psi = List.of(
-            new PluginServiceInfo(IBatchExecutor.class, LOCAL_BATCH_EXECUTOR_NAME, List.of("LOCAL")));
+            new PluginServiceInfo(IBatchExecutor.class, LOCAL_EXECUTOR_NAME, List.of("LOCAL")),
+            new PluginServiceInfo(IJobCacheManager.class, LOCAL_JOB_CACHE_NAME, List.of("LOCAL")));
 
 
     @Override
@@ -48,10 +54,18 @@ public class LocalExecutorPlugin extends TracPlugin {
     @Override @SuppressWarnings("unchecked")
     protected <T> T createService(String serviceName, Properties properties, ConfigManager configManager) {
 
-        if (serviceName.equals(LOCAL_BATCH_EXECUTOR_NAME))
-            return (T) new LocalBatchExecutor(properties);
+        switch (serviceName) {
 
-        var message = String.format("Plugin [%s] does not support the service [%s]", pluginName(), serviceName);
-        throw new EPluginNotAvailable(message);
+            case LOCAL_EXECUTOR_NAME: return (T) new LocalBatchExecutor(properties);
+            case LOCAL_JOB_CACHE_NAME: return (T) new LocalJobCacheManager();
+
+            default:
+
+                var message = String.format(
+                        "Plugin [%s] does not support the service [%s]",
+                        pluginName(), serviceName);
+
+                throw new EPluginNotAvailable(message);
+        }
     }
 }

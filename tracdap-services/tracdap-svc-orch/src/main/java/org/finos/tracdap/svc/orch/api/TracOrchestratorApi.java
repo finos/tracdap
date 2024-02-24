@@ -19,7 +19,7 @@ package org.finos.tracdap.svc.orch.api;
 import com.google.protobuf.Descriptors;
 import com.google.protobuf.Message;
 import org.finos.tracdap.api.*;
-import org.finos.tracdap.common.exception.EMetadataNotFound;
+import org.finos.tracdap.common.exception.ECacheNotFound;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.grpc.GrpcServerWrap;
 import org.finos.tracdap.common.metadata.MetadataUtil;
@@ -133,13 +133,12 @@ public class TracOrchestratorApi extends TracOrchestratorApiGrpc.TracOrchestrato
         var jobKey = MetadataUtil.objectKey(request.getSelector());
         var jobState = jobManager.queryJob(jobKey);
 
-        // TODO: Should there be a different error for jobs not found in the cache? EJobNotLive?
-        if (jobState == null) {
+        if (jobState.isEmpty()) {
             var message = String.format("Job not found (it may have completed): [%s]", jobKey);
             log.error(message);
-            throw new EMetadataNotFound(message);
+            throw new ECacheNotFound(message);
         }
 
-        return jobProcessor.getStatus(jobState);
+        return jobProcessor.getStatus(jobState.get());
     }
 }

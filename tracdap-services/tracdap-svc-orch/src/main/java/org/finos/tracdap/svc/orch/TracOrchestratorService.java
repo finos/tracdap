@@ -20,7 +20,10 @@ import org.finos.tracdap.api.TrustedMetadataApiGrpc;
 import org.finos.tracdap.common.auth.internal.InternalAuthProvider;
 import org.finos.tracdap.common.auth.internal.JwtSetup;
 import org.finos.tracdap.common.auth.internal.InternalAuthValidator;
+import org.finos.tracdap.common.cache.IJobCache;
+import org.finos.tracdap.common.cache.IJobCacheManager;
 import org.finos.tracdap.common.config.ConfigManager;
+import org.finos.tracdap.common.exec.IBatchExecutor;
 import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.common.grpc.*;
 import org.finos.tracdap.common.plugin.PluginManager;
@@ -28,13 +31,11 @@ import org.finos.tracdap.common.service.CommonServiceBase;
 import org.finos.tracdap.config.PlatformConfig;
 import org.finos.tracdap.config.ServiceConfig;
 import org.finos.tracdap.svc.orch.api.TracOrchestratorApi;
-import org.finos.tracdap.svc.orch.cache.local.LocalJobCache;
-import org.finos.tracdap.common.exec.IBatchExecutor;
 import org.finos.tracdap.svc.orch.service.JobManager;
 import org.finos.tracdap.svc.orch.service.JobProcessor;
+import org.finos.tracdap.svc.orch.service.JobProcessorHelpers;
 import org.finos.tracdap.svc.orch.service.JobState;
 
-import org.finos.tracdap.svc.orch.service.JobProcessorHelpers;
 import io.grpc.ManagedChannel;
 import io.grpc.Server;
 import io.grpc.netty.NettyChannelBuilder;
@@ -55,6 +56,7 @@ import java.util.concurrent.TimeUnit;
 
 public class TracOrchestratorService extends CommonServiceBase {
 
+    private static final String JOB_CACHE_NAME = "TRAC_JOB_STATE";
     private static final int CONCURRENT_REQUESTS = 30;
 
     private final Logger log = LoggerFactory.getLogger(getClass());
@@ -70,6 +72,7 @@ public class TracOrchestratorService extends CommonServiceBase {
     private ManagedChannel clientChannel;
 
     private IBatchExecutor<?> jobExecutor;
+    private IJobCache<JobState> jobCache;
     private JobManager jobManager;
 
     public TracOrchestratorService(PluginManager pluginManager, ConfigManager configManager) {
@@ -120,7 +123,12 @@ public class TracOrchestratorService extends CommonServiceBase {
                     platformConfig.getExecutor(),
                     configManager);
 
-            var jobCache = new LocalJobCache<JobState>();
+            var cacheManager = pluginManager.createService(
+                    IJobCacheManager.class,
+                    platformConfig.getJobCache(),
+                    configManager);
+
+            jobCache = cacheManager.getCache(JOB_CACHE_NAME, JobState.class);
 
             var jobProcessorHelpers = new JobProcessorHelpers(platformConfig, metaClient);
             var jobProcessor = new JobProcessor(metaClient, internalAuth, jobExecutor, jobProcessorHelpers);

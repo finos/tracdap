@@ -16,14 +16,12 @@
 
 package org.finos.tracdap.common.exec;
 
-import com.google.protobuf.Message;
-import com.google.protobuf.Parser;
-
+import java.io.Serializable;
 import java.util.List;
 import java.util.Map;
 
 
-public interface IBatchExecutor<TState extends Message> {
+public interface IBatchExecutor<TState extends Serializable> {
 
     // Interface for running batch jobs, i.e. a job that runs using one-shot using a one-shot process
 
@@ -31,7 +29,7 @@ public interface IBatchExecutor<TState extends Message> {
 
     void stop();
 
-    Parser<TState> stateDecoder();
+    Class<TState> stateClass();
 
     TState createBatch(String batchKey);
 

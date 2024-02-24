@@ -14,21 +14,38 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.svc.orch.cache;
+package org.finos.tracdap.common.cache;
+
+import org.finos.tracdap.common.exception.ECache;
 
 
-public class CacheQueryResult<TValue> {
+public final class CacheEntry<TValue> {
 
     private final String key;
     private final int revision;
     private final String status;
     private final TValue value;
+    private final ECache cacheError;
 
-    public CacheQueryResult(String key, int revision, String status, TValue value) {
+    public static <TValue>
+    CacheEntry<TValue> forValue(String key, int revision, String status, TValue value) {
+
+        return new CacheEntry<>(key, revision, status, value, null);
+    }
+
+    public static <TValue>
+    CacheEntry<TValue> error(String key, int revision, String status, ECache cacheError) {
+
+        return new CacheEntry<>(key, revision, status, null, cacheError);
+    }
+
+    private CacheEntry(String key, int revision, String status, TValue value, ECache cacheError) {
+
         this.key = key;
         this.revision = revision;
         this.status = status;
         this.value = value;
+        this.cacheError = cacheError;
     }
 
     public String key() {
@@ -39,11 +56,24 @@ public class CacheQueryResult<TValue> {
         return revision;
     }
 
-    public String getStatus() {
+    public String status() {
         return status;
     }
 
     public TValue value() {
+
+        // Attempting to access the value for an invalid entry - throw the error
+        if (cacheError != null)
+            throw cacheError;
+
         return value;
+    }
+
+    public boolean cacheOk() {
+        return cacheError == null;
+    }
+
+    public ECache cacheError() {
+        return cacheError;
     }
 }

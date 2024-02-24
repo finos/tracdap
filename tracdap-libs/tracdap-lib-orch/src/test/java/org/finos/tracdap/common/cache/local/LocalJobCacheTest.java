@@ -14,31 +14,19 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.auth.internal;
+package org.finos.tracdap.common.cache.local;
 
-import java.io.Serializable;
+import org.finos.tracdap.common.cache.JobCacheTestSuite;
+import org.junit.jupiter.api.BeforeAll;
 
 
-public class UserInfo implements Serializable {
+public class LocalJobCacheTest extends JobCacheTestSuite {
 
-    private final static long serialVersionUID = 1L;
+    @BeforeAll
+    static void createLocalCache() {
 
-    private String userId;
-    private String displayName;
+        var manager = new LocalJobCacheManager();
 
-    public String getUserId() {
-        return userId;
-    }
-
-    public void setUserId(String userId) {
-        this.userId = userId;
-    }
-
-    public String getDisplayName() {
-        return displayName;
-    }
-
-    public void setDisplayName(String displayName) {
-        this.displayName = displayName;
+        cache = manager.getCache("dummy_state_cache", DummyState.class);
     }
 }

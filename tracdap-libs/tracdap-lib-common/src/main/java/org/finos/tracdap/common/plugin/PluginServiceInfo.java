@@ -54,6 +54,9 @@ public class PluginServiceInfo {
     /** Standard service types for execution services **/
     public static final String EXECUTION_SERVICE_TYPE = "EXECUTION";
 
+    /** Standard service types for execution services **/
+    public static final String JOB_CACHE_SERVICE_TYPE = "JOB_CACHE";
+
     /** Standard service type for the metadata DAL **/
     public static final String METADATA_DAL_SERVICE_TYPE = "METADATA_DAL";
 
@@ -72,6 +75,7 @@ public class PluginServiceInfo {
             Map.entry("org.finos.tracdap.common.storage.IFileStorage", FILE_STORAGE_SERVICE_TYPE),
             Map.entry("org.finos.tracdap.common.storage.IDataStorage", DATA_STORAGE_SERVICE_TYPE),
             Map.entry("org.finos.tracdap.common.exec.IBatchExecutor", EXECUTION_SERVICE_TYPE),
+            Map.entry("org.finos.tracdap.common.cache.IJobCacheManager", JOB_CACHE_SERVICE_TYPE),
             Map.entry("org.finos.tracdap.svc.meta.dal.IMetadataDal", METADATA_DAL_SERVICE_TYPE));
 
     private final Class<?> serviceClass;

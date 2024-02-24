@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Accenture Global Solutions Limited
+ * Copyright 2023 Accenture Global Solutions Limited
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,27 +14,18 @@
  * limitations under the License.
  */
 
-syntax = 'proto3';
-package tracdap.exec.ssh;
+package org.finos.tracdap.common.exception;
 
-option java_package = "org.finos.tracdap.plugins.exec.ssh";
-option java_multiple_files = true;
+/**
+ * Job already exists in the orchestrator service
+ */
+public class ECacheDuplicate extends ECache {
 
+    public ECacheDuplicate(String message, Throwable cause) {
+        super(message, cause);
+    }
 
-message SshBatchState {
-
-  string remoteHost = 1;
-  int32 remotePort = 2;
-  string batchUser = 3;
-
-  string batchDir = 4;
-  repeated string volumes = 5;
-
-  int64 pid = 6;
-}
-
-
-message SshExecutorState {
-
-
+    public ECacheDuplicate(String message) {
+        super(message);
+    }
 }

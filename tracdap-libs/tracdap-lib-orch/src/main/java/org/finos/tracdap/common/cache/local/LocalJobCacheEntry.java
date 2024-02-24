@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Accenture Global Solutions Limited
+ * Copyright 2023 Accenture Global Solutions Limited
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,28 +14,28 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.svc.orch.cache.local;
+package org.finos.tracdap.common.cache.local;
 
-import org.finos.tracdap.svc.orch.cache.Ticket;
+import org.finos.tracdap.common.cache.CacheTicket;
 
 import java.time.Instant;
 
 
-class LocalJobCacheEntry<TValue> implements Cloneable {
+class LocalJobCacheEntry implements Cloneable {
 
     public int revision;
-    String stateKey;
-    TValue value;
+    String status;
+
+    byte[] encodedValue;
 
     Instant lastActivity;
-    Ticket ticket;
+    CacheTicket ticket;
 
     @Override
-    @SuppressWarnings("unchecked")
-    public LocalJobCacheEntry<TValue> clone() {
+    public LocalJobCacheEntry clone() {
 
         try {
-            return (LocalJobCacheEntry<TValue>) super.clone();
+            return (LocalJobCacheEntry) super.clone();
         }
         catch (CloneNotSupportedException e) {
             throw new AssertionError();
