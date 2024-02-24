@@ -37,7 +37,7 @@ jobs:
           fetch-depth: 0
 
       - name: Setup - Java
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v4
         with:
           distribution: ${{ env.JAVA_DISTRIBUTION }}
           java-version: ${{ env.JAVA_VERSION }}
@@ -46,7 +46,7 @@ jobs:
           cache: gradle
 
       - name: Setup -Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
 
@@ -135,12 +135,12 @@ jobs:
 
       # fetch-depth = 0 is needed to get tags for version info
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
       - name: Set up Java
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v4
         with:
           distribution: ${{ env.JAVA_DISTRIBUTION }}
           java-version: ${{ env.JAVA_VERSION }}
@@ -154,7 +154,7 @@ jobs:
 
       # If the tests fail, make the output available for download
       - name: Store failed test results
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         if: failure()
         with:
           name: junit-test-results
@@ -176,7 +176,7 @@ jobs:
           fetch-depth: 0
 
       - name: Java - Setup
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v4
         with:
           distribution: ${{ env.JAVA_DISTRIBUTION }}
           java-version: ${{ env.JAVA_VERSION }}
@@ -188,7 +188,7 @@ jobs:
         run: ./gradlew testClasses
 
       - name: Python - setup
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
@@ -207,7 +207,7 @@ jobs:
 
       # If the tests fail, make the output available for download
       - name: Store failed test results
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         if: failure()
         with:
           name: junit-test-results
@@ -298,12 +298,12 @@ jobs:
 
       # fetch-depth = 0 is needed to get tags for version info
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
       - name: Set up Java
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v4
         with:
           distribution: ${{ env.JAVA_DISTRIBUTION }}
           java-version: ${{ env.JAVA_VERSION }}
@@ -335,7 +335,7 @@ jobs:
 
       # If the tests fail, make the output available for download
       - name: Store failed test results
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         if: failure()
         with:
           name: junit-test-results
