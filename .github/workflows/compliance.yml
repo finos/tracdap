@@ -33,7 +33,7 @@ jobs:
   platform_compliance:
 
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 60
 
     steps:
 
@@ -75,7 +75,7 @@ jobs:
   python_runtime_compliance:
 
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 60
 
     steps:
 
@@ -134,7 +134,7 @@ jobs:
   web_api_compliance:
 
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 60
 
     steps:
 
