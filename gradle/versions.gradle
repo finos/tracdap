@@ -47,7 +47,7 @@ ext {
     h2_version = '2.1.214'
     mysql_version = '8.2.0'
     mariadb_version = '3.0.8'
-    postgresql_version = '42.6.0'
+    postgresql_version = '42.7.2'
     sqlserver_version = '9.4.1.jre11'     // Update to SqlServer 10.x driver series is a breaking change
     oracle_version = '19.14.0.0'
 
@@ -68,7 +68,7 @@ ext {
 
     aws_sdk_version = '2.21.11'
     gcp_sdk_version = '26.26.0'
-    azure_sdk_version = '1.2.19'
+    azure_sdk_version = '1.2.20'
 
     // AWS SDK uses Reactive Streams
     // Only the latest version has a good license (MIT-0, prior versions were Creative Commons)
