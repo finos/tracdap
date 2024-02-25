@@ -61,3 +61,12 @@ message AuthenticationConfig {
   sint32 systemTicketDuration = 10;
   sint32 systemTicketRefresh = 11;
 }
+
+
+message StorageConfig {
+
+  map<string, PluginConfig> buckets = 1;
+
+  string defaultBucket = 2;
+  string defaultFormat = 3;
+}

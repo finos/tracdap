@@ -59,15 +59,6 @@ message MetadataConfig {
 }
 
 
-message StorageConfig {
-
-  map<string, PluginConfig> buckets = 1;
-
-  string defaultBucket = 2;
-  string defaultFormat = 3;
-}
-
-
 message TenantConfig {
 
   optional string defaultBucket = 1;
