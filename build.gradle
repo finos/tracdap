@@ -37,6 +37,9 @@ allprojects {
 
     group 'org.finos.tracdap'
     version versionNumber
+
+    // Task for printing out the full solution dependency tree
+    tasks.register("dependencyReport", DependencyReportTask)
 }
 
 subprojects {
