@@ -34,7 +34,7 @@
   "overrides": {
     "taffydb": "^2.7.3",
     "semver": "^7.5.4",
-    "follow-redirects": "^1.15.5"
+    "follow-redirects": "^1.15.6"
   },
   "scripts": {
     "tracVersion:windows": "for /f %v in ('powershell -ExecutionPolicy Bypass -File ..\\..\\..\\dev\\version.ps1') do npm version \"%v\"",
