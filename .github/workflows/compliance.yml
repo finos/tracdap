@@ -164,10 +164,18 @@ jobs:
           cd tracdap-api/packages/web
           npm install
 
+      # The OWASP dependency check tool for NPM is broken upstream
+      # https://github.com/etnetera/owasp-dependency-check/issues/22
+
+      # For now we are linking an unreleased version and forcing the version of the ODC binary
+      # This is described in the linked GitHub issue
+      # It also requires creating the dependency-check-bin folder before the task can run
+
       - name: OWASP dependency check
         run: |
           mkdir -p build/compliance
           cd tracdap-api/packages/web
+          mkdir dependency-check-bin
           npm run compliance-owasp
 
       - name: License check
