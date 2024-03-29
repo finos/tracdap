@@ -69,6 +69,6 @@ adlfs == 2023.4.0
 
 # azure-identity is still pulling in a compromised version of the cryptography package
 # force a compatible version with the required fix
-cryptography~=41.0.7
+cryptography~=42.0.5
 
 # END_PLUGIN azure
