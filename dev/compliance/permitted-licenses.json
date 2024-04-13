@@ -19,6 +19,9 @@
       "moduleLicense": "BSD Zero Clause License"
     },
     {
+      "moduleLicense": "Eclipse Distribution License - v 1.0"
+    },
+    {
       "moduleName": "org.junit.jupiter:.*",
       "moduleLicense": "Eclipse Public License - v 2.0"
     },
