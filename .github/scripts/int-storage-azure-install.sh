@@ -18,4 +18,4 @@
 apt-get update
 apt-get install -y curl python3
 
-curl -L https://aka.ms/InstallAzureCli | bash
+curl -L https://aka.ms/InstallAzureCLIDeb | bash
