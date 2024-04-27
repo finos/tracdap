@@ -14,6 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+apt-get install -y curl
+
 curl "https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-473.0.0-linux-x86_64.tar.gz" -o goocle-cloud-cli.tar.gz
 tar -xf goocle-cloud-cli.tar.gz
 ./google-cloud-sdk/install.sh

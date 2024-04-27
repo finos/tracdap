@@ -14,4 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+apt-get install -y curl
+
 curl -L https://aka.ms/InstallAzureCli | bash
