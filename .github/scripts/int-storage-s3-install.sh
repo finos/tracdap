@@ -14,8 +14,5 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-export DEBIAN_FRONTEND=noninteractive
+snap install aws-cli
 
-apt-get update
-apt-get upgrade -y
-apt-get install -y awscli
