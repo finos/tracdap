@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # Copyright 2023 Accenture Global Solutions Limited
 #
@@ -13,6 +13,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+# GCP CLI uses bash profile to setup CLI paths
+# So this script requires bash rather than just sh
+
+. ~/.bashrc
 
 # Log in to GCP using the credentials provided by the GitHub Action for Google Auth
 

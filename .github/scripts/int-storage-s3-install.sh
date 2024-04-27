@@ -14,8 +14,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-export DEBIAN_FRONTEND=noninteractive
-
 apt-get update
-apt-get upgrade -y
-apt-get install -y awscli
+apt-get install -y curl unzip
+
+curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+unzip awscliv2.zip
+./aws/install

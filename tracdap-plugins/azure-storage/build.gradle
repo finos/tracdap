@@ -37,9 +37,6 @@ dependencies {
     implementation "com.azure:azure-identity"
 
     testImplementation project(path: ":tracdap-lib-data", configuration: "testSuite")
-
-    // Temporary
-    implementation "com.nimbusds:nimbus-jose-jwt:${azure_nimbus_version}"
 }
 
 // Use a different build dir (don't include plugins in the main release package)

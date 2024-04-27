@@ -1,9 +1,9 @@
 # Requirements for all the Python build scripts
 
 # Protoc is required for the codegen scripts which work off the API proto files
-protobuf ~= 4.23.0
-protoc-wheel-0 >= 21, < 22
-googleapis-common-protos >= 1.62, < 2.0
+protobuf ~= 4.25.3
+protoc-wheel-0 ~= 25.0
+googleapis-common-protos ~= 1.63
 
 # Doc generation
 sphinx ~= 7.2.0

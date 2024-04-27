@@ -34,8 +34,8 @@ import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.util.concurrent.DefaultThreadFactory;
 import org.apache.arrow.memory.BufferAllocator;
-import org.apache.arrow.memory.NettyAllocationManager;
 import org.apache.arrow.memory.RootAllocator;
+import org.apache.arrow.memory.netty.NettyAllocationManager;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
