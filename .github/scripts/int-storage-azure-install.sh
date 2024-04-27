@@ -16,6 +16,10 @@
 
 export DEBIAN_FRONTEND=noninteractive
 
+echo SOURCES_START
+cat /etc/apt/source.list
+echo SOURCES_END
+
 apt-get update
 apt-get upgrade -y
 apt-get install -y ca-certificates curl apt-transport-https lsb-release gnupg
