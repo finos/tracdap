@@ -38,7 +38,7 @@ dependencies {
 
     // AWS SDK uses Reactive Streams
     // Only the latest version has a good license (MIT-0, prior versions were Creative Commons)
-    implementation group: "org.reactivestreams", name: "reactive-streams", version: "${reactive_streams_version}"
+    // implementation group: "org.reactivestreams", name: "reactive-streams", version: "${reactive_streams_version}"
 
     testImplementation project(path: ":tracdap-lib-data", configuration: "testSuite")
 }
