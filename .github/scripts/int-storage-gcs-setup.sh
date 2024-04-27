@@ -16,7 +16,7 @@
 
 # GCP profile script depends on BASH, not SH (other options are available)
 
-. ~/.bash_profile
+. ~/.bashrc
 
 # Log in to GCP using the credentials provided by the GitHub Action for Google Auth
 
