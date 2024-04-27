@@ -14,9 +14,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+GCLOUD_VERSION=473.0.0-linux-x86_64
+
 apt-get update
 apt-get install -y curl
 
-curl "https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-473.0.0-linux-x86_64.tar.gz" -o goocle-cloud-cli.tar.gz
+curl "https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-${GCLOUD_VERSION}.tar.gz" -o goocle-cloud-cli.tar.gz
 tar -xf goocle-cloud-cli.tar.gz
-./google-cloud-sdk/install.sh
+./google-cloud-sdk/install.sh --path-update=true --usage-reporting=false
+
+gcloud components update
