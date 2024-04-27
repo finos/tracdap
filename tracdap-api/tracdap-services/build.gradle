@@ -17,11 +17,9 @@
 plugins {
     id "com.google.protobuf"
     id "java-library"
-    id "idea"  // IDEA plugin is required to make IDEA work properly with protobuf
 }
 
 apply from: "${rootProject.projectDir.path}/gradle/base-java.gradle"
-
 
 description = "TRAC D.A.P. platform API, contains service API definitions for the TRAC platform services"
 
@@ -37,26 +35,17 @@ protobuf {
         }
     }
 
-    generateProtoTasks.generatedFilesBaseDir = "${project.buildDir}/generated-sources"
+    generateProtoTasks {
 
-    generateProtoTasks.all().configureEach {
+        all().configureEach { task ->
 
-        builtins {
-            java { }
-        }
+            task.builtins {
+                java {}
+            }
 
-        plugins {
-            grpc { }
-        }
-    }
-}
-
-sourceSets {
-    main {
-        java {
-            // Include generated code from protoc / gRPC
-            srcDirs "${project.buildDir}/generated-sources/main/java"
-            srcDirs "${project.buildDir}/generated-sources/main/grpc"
+            task.plugins {
+                grpc {}
+            }
         }
     }
 }
