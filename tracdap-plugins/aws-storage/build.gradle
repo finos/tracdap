@@ -36,10 +36,6 @@ dependencies {
     implementation "software.amazon.awssdk:netty-nio-client"
     implementation "software.amazon.awssdk:s3"
 
-    // AWS SDK uses Reactive Streams
-    // Only the latest version has a good license (MIT-0, prior versions were Creative Commons)
-    // implementation group: "org.reactivestreams", name: "reactive-streams", version: "${reactive_streams_version}"
-
     testImplementation project(path: ":tracdap-lib-data", configuration: "testSuite")
 }
 
