@@ -47,7 +47,7 @@ dependencies {
     api group: 'io.netty', name: 'netty-codec-http2', version: "$netty_version"
 
     // JWT auth
-    implementation group: 'com.auth0', name: 'java-jwt', version: "$jwt_version"
+    implementation group: 'com.auth0', name: 'java-jwt', version: "$auth0_jwt_version"
 
     // For local users database
     implementation project(':tracdap-lib-db')

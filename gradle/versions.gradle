@@ -37,10 +37,10 @@ ext {
     jackson_databind_version = '2.17.0'
 
     // Util libraries
-    slf4j_version = '2.0.7'
-    log4j_version = '2.20.0'
-    commons_cli_version = "1.5.0"
-    jwt_version = "4.2.1"
+    slf4j_version = '2.0.13'
+    log4j_version = '2.23.1'
+    commons_cli_version = "1.7.0"
+    auth0_jwt_version = "4.4.0"
 
 
     // SQL (JDBC) drivers
