@@ -71,7 +71,7 @@ ext {
     // Only the latest version has a good license (MIT-0, prior versions were Creative Commons)
     reactive_streams_version = '1.0.4'
 
-    apache_sshd_version = "2.11.0"
+    apache_sshd_version = "2.12.1"
 
 
     // Test dependencies
