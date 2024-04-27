@@ -14,7 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Azure setup script uses Python 3
 apt-get update
-apt-get install -y curl
+apt-get install -y curl python3
 
 curl -L https://aka.ms/InstallAzureCli | bash
