@@ -263,4 +263,21 @@
         <cve>CVE-2023-48795</cve>
     </suppress>
 
+    <!--
+
+    This package is a backport of JSR-310 date/time functionality to Java 6 & 7
+    It is pulled in by the GCP SDK, which supports very old versions of Java
+    Whether it is actually used when running on Java 8+ is a question
+    The package authors do not believe these are real vulnerabilities
+
+    https://github.com/ThreeTen/threetenbp/blob/main/src/site/markdown/security.md
+
+    -->
+
+    <suppress>
+        <packageUrl regex="true">^pkg:maven/org\.threeten/threetenbp@.*$</packageUrl>
+        <vulnerabilityName>CVE-2024-23082</vulnerabilityName>
+        <vulnerabilityName>CVE-2024-23081</vulnerabilityName>
+    </suppress>
+
 </suppressions>
