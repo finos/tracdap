@@ -14,6 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# GCP profile script depends on BASH, not SH (other options are available)
+
 . ~/.bash_profile
 
 # Log in to GCP using the credentials provided by the GitHub Action for Google Auth
