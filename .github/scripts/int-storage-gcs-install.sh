@@ -21,4 +21,4 @@ apt-get install -y curl
 
 curl "https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-${GCLOUD_VERSION}.tar.gz" -o goocle-cloud-cli.tar.gz
 tar -xzf goocle-cloud-cli.tar.gz
-./google-cloud-sdk/install.sh --path-update=true --bash-completion=false --usage-reporting=false
+./google-cloud-sdk/install.sh --path-update=true --rc-path=~/.bash_profile --usage-reporting=false

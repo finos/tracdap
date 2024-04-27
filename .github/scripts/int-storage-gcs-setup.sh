@@ -14,6 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+. ~/.bash_profile
+
 # Log in to GCP using the credentials provided by the GitHub Action for Google Auth
 
 gcloud auth login --cred-file ${GOOGLE_GHA_CREDS_PATH}
