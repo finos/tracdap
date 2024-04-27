@@ -25,16 +25,16 @@ ext {
     license_check_plugin_version = "2.0"
 
     // Core platform technologies
-    netty_version = '4.1.100.Final'
-    guava_version = '32.1.3-jre'
-    proto_version = '3.23.2'
-    grpc_version = '1.61.0'
-    gapi_version = '2.20.0'
+    netty_version = '4.1.109.Final'
+    guava_version = '33.1.0-jre'
+    proto_version = '3.25.3'
+    grpc_version = '1.63.0'
+    gapi_version = '2.38.0'
 
     // Data technologies
-    arrow_version = '14.0.2'
-    jackson_version = '2.15.2'
-    jackson_databind_version = '2.15.2'
+    arrow_version = '16.0.0'
+    jackson_version = '2.17.0'
+    jackson_databind_version = '2.17.0'
 
     // Util libraries
     slf4j_version = '2.0.7'
