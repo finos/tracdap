@@ -44,24 +44,18 @@ ext {
 
 
     // SQL (JDBC) drivers
-    h2_version = '2.1.214'
-    mysql_version = '8.2.0'
-    mariadb_version = '3.0.8'
-    postgresql_version = '42.7.2'
+    h2_version = '2.2.224'
+    mysql_version = '8.3.0'
+    mariadb_version = '3.3.3'
+    postgresql_version = '42.7.3'
     sqlserver_version = '9.4.1.jre11'     // Update to SqlServer 10.x driver series is a breaking change
-    oracle_version = '19.14.0.0'
+    oracle_version = '19.22.0.0'
 
     // JDBC Connection pool
-    hikari_cp_version = '5.0.1'
+    hikari_cp_version = '5.1.0'
 
     // Flyway (database deploy tool)
-
-    // NOTE: At version 9.3.1, Flyway introduced a dependency on com.electronwill.night-config:toml
-    // This is a GPL v2 project, which breaks licensing compliance
-    // For now, stick on version 9.3.0
-    // Issue raised with Flyway: https://github.com/flyway/flyway/issues/3565
-
-    flyway_version = '9.3.0'
+    flyway_version = '10.11.1'
 
 
     // Plugins
