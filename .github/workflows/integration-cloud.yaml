@@ -32,8 +32,6 @@ env:
   JAVA_DISTRIBUTION: "zulu"
   PYTHON_VERSION: "3.12"
   NODE_VERSION: "18"
-  # Make sure new OS versions are supported by cloud CLIs before upgrading
-  JOB_RUNNER: "ubuntu-22.04"
 
 
 jobs:
@@ -45,7 +43,8 @@ jobs:
     env: ${{ fromJson( inputs.matrix ) }}
     if: ${{ inputs.enabled && inputs.has_java }}
 
-    runs-on: ${{ env.JOB_RUNNER }}
+    # Make sure new OS versions are supported by cloud CLIs before upgrading
+    runs-on: ubuntu-22.04
     environment: integration
     timeout-minutes: 20
 
@@ -155,7 +154,8 @@ jobs:
     if: ${{ inputs.enabled && inputs.has_python }}
     env: ${{ fromJson( inputs.matrix ) }}
 
-    runs-on: ${{ env.JOB_RUNNER }}
+    # Make sure new OS versions are supported by cloud CLIs before upgrading
+    runs-on: ubuntu-22.04
     environment: integration
     timeout-minutes: 20
 
