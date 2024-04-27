@@ -14,7 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# GCP profile script depends on BASH, not SH (other options are available)
+# GCP CLI uses bash profile to setup CLI paths
+# So this script requires bash rather than just sh
 
 . ~/.bashrc
 
