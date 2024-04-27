@@ -60,9 +60,9 @@ ext {
 
     // Plugins
 
-    aws_sdk_version = '2.21.11'
-    gcp_sdk_version = '26.26.0'
-    azure_sdk_version = '1.2.20'
+    aws_sdk_version = '2.25.40'
+    gcp_sdk_version = '26.37.0'
+    azure_sdk_version = '1.2.23'
 
     // Temporary override to address CVE-2023-52428 (remove once Azure SDK updates this dependency)
     azure_nimbus_version = '9.37.3'
