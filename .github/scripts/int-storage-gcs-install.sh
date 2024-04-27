@@ -14,14 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-export DEBIAN_FRONTEND=noninteractive
-
-apt-get update
-apt-get upgrade -y
-apt-get install -y curl gnupg apt-transport-https ca-certificates
-
-echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | tee -a /etc/apt/sources.list.d/google-cloud-sdk.list
-curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key --keyring /usr/share/keyrings/cloud.google.gpg add -
-
-apt-get update
-apt-get install -y google-cloud-cli
+curl "https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-473.0.0-linux-x86_64.tar.gz" -o goocle-cloud-cli.tar.gz
+tar -xf goocle-cloud-cli.tar.gz
+./google-cloud-sdk/install.sh

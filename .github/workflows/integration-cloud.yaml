@@ -43,8 +43,7 @@ jobs:
     env: ${{ fromJson( inputs.matrix ) }}
     if: ${{ inputs.enabled && inputs.has_java }}
 
-    # Make sure new OS versions are supported by cloud CLIs before upgrading
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     environment: integration
     timeout-minutes: 20
 
@@ -154,8 +153,7 @@ jobs:
     if: ${{ inputs.enabled && inputs.has_python }}
     env: ${{ fromJson( inputs.matrix ) }}
 
-    # Make sure new OS versions are supported by cloud CLIs before upgrading
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     environment: integration
     timeout-minutes: 20
 
