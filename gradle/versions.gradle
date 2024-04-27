@@ -55,7 +55,8 @@ ext {
     hikari_cp_version = '5.1.0'
 
     // Flyway (database deploy tool)
-    flyway_version = '10.11.1'
+    // Flyway 10.x series no longer supports Java 11
+    flyway_version = '9.22.3'
 
 
     // Plugins
