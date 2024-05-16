@@ -1,0 +1,422 @@
+// 1. Include functions first (so you can manipulate colors, SVGs, calc, etc)
+@import "../../node_modules/bootstrap/scss/functions";
+
+//
+$grid-breakpoints: (
+        xs: 0,
+        sm: 576px,
+        md: 768px,
+        lg: 992px,
+        xl: 1200px,
+        xxl: 1400px,
+        xxxl: 1800px
+);
+
+$container-max-widths: (
+        sm: 540px,
+        md: 720px,
+        lg: 960px,
+        xl: 1140px,
+        xxl: 1320px,
+        xxxl: 1700px
+);
+
+// Set the text colour for the info theme, this overrides the default method that auto calculates it based on contrast
+$info-btn-color: #fff;
+//$info: tomato;
+// DB blue
+$info: #03436a;
+// Ho blue
+$info: #0000a0;
+// Greg's blue
+$info: #17a2b8;
+$info-dark: shade-color($info, 15%);
+
+// Hover colour
+$info-light: tint-color($info, 40%);
+$danger: #EF241C;
+
+// Make small tables have less padding
+$table-cell-padding-y-sm: .2rem;
+$table-cell-padding-x-sm: .5rem;
+
+// Make table sticky headers appear behind any dropdown menus that overlap them (dropdowns are z-index 1000)
+$zindex-sticky: 999;
+
+// Make the standard modal a bit wider
+$modal-md: 600px;
+
+// Makes badges have larger font size and be normal weight
+$badge-font-size: 0.9rem;
+$badge-font-weight: normal;
+
+// Set the form elements shadow border when active
+$component-active-bg: $info;
+$input-btn-focus-color-opacity: 0.50;
+$input-btn-focus-width: .1rem;
+$input-btn-focus-blur: .1rem;
+//$input-color: $info;
+$input-bg: transparent;
+//$input-border-color: mix(#dee2e6, #836953, 80%);
+
+// Set the text colour for the info theme, this overrides the default method that auto calculates it based on contrast
+$border-color: var(--border-color);
+
+//$border-color: lighten($input-border-color, 5%);
+$border-radius: 0.25rem;
+$border-radius-sm: 0.125rem;
+$border-radius-lg: 0.5rem;
+$border-radius-pill: 0.7rem;
+
+// Make HR colour the same as borders
+$hr-color: $border-color;
+$hr-opacity: 1;
+
+$link-color: #EF241C;
+$link-hover-color: darken($link-color, 20%);
+
+// Make the striped table lighter
+$table-striped-bg-factor: 1;
+$table-striped-bg: #fafafa;
+
+// Make the table hover row have a different colour - same as the modified bg-light
+$table-hover-bg: #e4e5e6;
+
+// Make the table selected rows have a different colour
+$table-active-bg: $info-light;
+
+// Set the font weight
+$font-weight-base: 400;
+$headings-font-weight: 350;
+
+// Make inputs have not shadow when selected, border colour changes.
+$input-focus-box-shadow: None;
+$input-focus-border-color: $info;
+
+// Give dropdowns in menus a bigger space or margin from the thing that opened them.
+$dropdown-spacer: 0.5em;
+
+// Make the accordian headers more compact
+$accordion-padding-y: 0.5rem;
+
+@import "../../node_modules/bootstrap/scss/variables";
+
+// Define some SASS functions that mimic the Bootstrap 5 mixin functions. We need this for the FileImportModal component.
+// The button in that component that is used to select a file is ot a regular button and although it has the Bootstrap 5
+// classes added to it it does not pick up the hover states. You can see this in the trac_ui.scss file where a different
+// approach is needed to make hover states apply. So what we do it mimic the Bootstrap hover button functions below and
+// then we have the colours available here to apply to the FileImportModal button in trac_ui.scss.
+@function btn-hover-background($background) {
+    $color: color-contrast($background);
+    @return if($color == $color-contrast-light, shade-color($background, $btn-hover-bg-shade-amount), tint-color($background, $btn-hover-bg-tint-amount));
+}
+
+@function btn-hover-color($background) {
+    $color: color-contrast($background);
+    $hover-background: if($color == $color-contrast-light, shade-color($background, $btn-hover-bg-shade-amount), tint-color($background, $btn-hover-bg-tint-amount));
+    @return color-contrast($hover-background);
+}
+
+@function btn-hover-border($background, $border) {
+    $color: color-contrast($background);
+    $border-color: rgba(var(--bs-success-rgb), var(--bs-border-opacity)) !important;
+    @return if($color == $color-contrast-light, shade-color($border, $btn-hover-border-shade-amount), tint-color($border, $btn-hover-border-tint-amount));
+}
+
+// Make the default secondary colour lighter
+//$secondary: lighten($secondary, 40%);
+
+// Change the warning colour
+$warning: $yellow-600;
+
+// Change the select disabled color
+$input-disabled-bg: $gray-100;
+
+// Make tabs wider
+$nav-link-padding-x: 2rem;
+
+// Popover overrides
+$popover-body-padding-y: $spacer * .5;
+
+// Make the option feedback font smaller than default, change the margin at the top
+$form-feedback-font-size: $font-size-base * 0.9;
+// Equivalent to mt-1
+$form-feedback-margin-top: $spacer * .25;
+
+// Alert overrides
+$alert-margin-bottom: 0;
+$alert-padding-y: $spacer * .5;
+
+$custom-colors: (
+        "table": darken($table-striped-bg, 1%)
+);
+
+// 2. Include any default variable overrides here
+$theme-colors: (
+        "info": $info,
+        "danger": $danger,
+        "primary": $primary,
+        "secondary": $secondary,
+        //The default light colour is ridiculously light
+        "light": darken($table-striped-bg, 8%),
+        "dark": $dark,
+        "warning": $warning,
+        "success": $success
+);
+
+$theme-colors: map-merge($theme-colors, $custom-colors);
+
+/* Danger and success theme colours for dark backgrounds */
+$danger-dark-background: tint-color($danger, 30%);
+$success-dark-background: tint-color($success, 30%);
+
+// Headers
+$headings-margin-bottom: 0;
+$h1-font-size: $font-size-base * 2.5;
+$h2-font-size: $font-size-base * 1.75;
+$h3-font-size: $font-size-base * 1.5;
+$h4-font-size: $font-size-base * 1.25;
+$h5-font-size: $font-size-base;
+$h6-font-size: $font-size-base;
+
+// Make the carousel buttons not be moved in from the edge of the parent
+$carousel-control-width: $carousel-control-icon-width;
+
+// Map the sizes to the font classes so fs-1 class will use the scaling below
+
+$font-sizes: (
+        1: $font-size-base * 2.5, // was 0.85
+        2: $font-size-base * 2, //was 0.75
+        3: $font-size-base * 1.75, // was 1.5
+        4: $font-size-base * 1.5,
+        5: $font-size-base * 1.25,
+        6: $font-size-base, // was2.5
+        7: $font-size-base,
+        8: $font-size-base * 0.85,
+        9: $font-size-base * 1.5,
+        10: $font-size-base * 2.0,
+        11: $font-size-base * 1.25,
+        12: $font-size-base * 1.1,
+        13: $font-size-base * 0.9
+);
+
+$font-size-select-menus: $font-size-base * 0.875;
+
+$spacers: (
+        0: 0,
+        1: $spacer * .25,
+        2: $spacer * .5,
+        3: $spacer,
+        4: $spacer * 1.5,
+        5: $spacer * 3,
+        6: $spacer * 4
+);
+
+@import "../../node_modules/bootstrap/scss/maps";
+@import "../../node_modules/bootstrap/scss/utilities";
+
+// Add a width 0 class, this is useful when making table columns fit their contents
+$utilities: map-merge(
+                $utilities,
+                (
+                        "width": map-merge(
+                                        map-get($utilities, "width"),
+                                        (
+                                                values: map-merge(
+                                                                map-get(map-get($utilities, "width"), "values"),
+                                                                (0: 0, 10: 10%, 20: 20%, 25: 25%, 33: 33% ),
+                                                ),
+                                        ),
+                        ),
+                )
+);
+
+$utilities: map-merge(
+                $utilities,
+                (
+                        "min-width-px": (
+                                property: min-width,
+                                class: min-width-px,
+                                responsive: false,
+                                values: (0: 0, 10: 10px, 25: 25px, 30: 30px, 45: 45px, 60: 60px,70: 70px, 80: 80px, 100: 100px, 125: 125px, 150: 150px, 300: 300px),
+                        )
+                )
+);
+
+// Make the width utility that can set w-50 for example have responsive breakpoints
+$utilities: map-merge(
+                $utilities, (
+                "width": map-merge(
+                                map-get($utilities, "width"),
+                                (responsive: true),
+                )
+        )
+);
+
+// Add default overflow x and y classes
+$utilities: map-merge(
+                $utilities,
+                (
+                        "overflow-x": (
+                                property: overflow-x,
+                                values:scroll auto,
+                        )
+                )
+);
+
+$utilities: map-merge(
+                $utilities,
+                (
+                        "overflow-y": (
+                                property: overflow-y,
+                                values:hidden auto,
+                        )
+                )
+);
+
+//@import "bootstrap_dark_theme";
+@import "../../node_modules/bootstrap/scss/mixins";
+
+//@import "../node_modules/bootstrap/scss/bootstrap";
+// 4. Include any optional Bootstrap components as you like
+// Layout & components
+@import "../../node_modules/bootstrap/scss/root";
+@import "../../node_modules/bootstrap/scss/reboot";
+@import "../../node_modules/bootstrap/scss/type";
+@import "../../node_modules/bootstrap/scss/images";
+@import "../../node_modules/bootstrap/scss/containers";
+@import "../../node_modules/bootstrap/scss/grid";
+@import "../../node_modules/bootstrap/scss/tables";
+@import "../../node_modules/bootstrap/scss/forms";
+@import "../../node_modules/bootstrap/scss/buttons";
+@import "../../node_modules/bootstrap/scss/transitions";
+@import "../../node_modules/bootstrap/scss/dropdown";
+@import "../../node_modules/bootstrap/scss/button-group";
+@import "../../node_modules/bootstrap/scss/nav";
+@import "../../node_modules/bootstrap/scss/navbar";
+@import "../../node_modules/bootstrap/scss/card";
+@import "../../node_modules/bootstrap/scss/accordion";
+@import "../../node_modules/bootstrap/scss/breadcrumb";
+@import "../../node_modules/bootstrap/scss/pagination";
+@import "../../node_modules/bootstrap/scss/badge";
+@import "../../node_modules/bootstrap/scss/alert";
+@import "../../node_modules/bootstrap/scss/progress";
+@import "../../node_modules/bootstrap/scss/list-group";
+@import "../../node_modules/bootstrap/scss/close";
+@import "../../node_modules/bootstrap/scss/toasts";
+@import "../../node_modules/bootstrap/scss/modal";
+@import "../../node_modules/bootstrap/scss/tooltip";
+@import "../../node_modules/bootstrap/scss/popover";
+@import "../../node_modules/bootstrap/scss/carousel";
+@import "../../node_modules/bootstrap/scss/spinners";
+@import "../../node_modules/bootstrap/scss/offcanvas";
+
+// Helpers
+@import "../../node_modules/bootstrap/scss/helpers";
+
+// Utilities
+@import "../../node_modules/bootstrap/scss/utilities/api";
+
+@import "trac_ui";
+@import "legacy.css";
+
+@import "../../node_modules/bootstrap-icons/font/bootstrap-icons.css";
+
+// Load up the toastify scss
+@import "../../node_modules/react-toastify/scss/main";
+
+/* Make the toast wider and make the font the same as the Bootstrap font*/
+:root {
+    --toastify-toast-width: 500px;
+    --toastify-font-family: $font-family-base;
+    --toastify-text-color-danger: shift-color($danger, $alert-bg-scale + 40%);
+    --toastify-text-color-success: shift-color($success, $alert-bg-scale + 40%);
+    --toastify-text-color-info: shift-color($info, $alert-bg-scale + 40%);
+    --toastify-text-color-warning: shift-color($warning, $alert-bg-scale + 40%);
+}
+
+.#{$rt-namespace}__toast {
+    // Add a border to the toast
+    border-style: solid;
+    border-width: 1px;
+    border-radius: 0.4rem 0.4rem 0 0;
+    padding: 0;
+    // Remove the white background of the light theme
+    background: transparent !important;
+
+    // Make the content fit the toast and add padding/margins to the internal divs
+    &-body {
+        padding: 0;
+    }
+
+    div.toast-title {
+        padding: 5px 10px;
+        backdrop-filter: blur(6px);
+    }
+
+    div.toast-message, div.details {
+        padding-left: 10px;
+        padding-right: 10px;
+        backdrop-filter: blur(6px);
+    }
+
+    &--error {
+        border-color: shift-color($danger, $alert-border-scale + 30%);
+
+        div.toast-title {
+            //The extra change to the alert-border-scale is offset by the opacity, you get the same but transparent colour
+            background-color: rgba(shift-color($danger, $alert-bg-scale + 20%), 0.7);
+            color: shift-color($danger, $alert-color-scale);
+        }
+
+        div.toast-message, div.details {
+            color: shift-color($danger, $alert-color-scale);
+            background-color: rgba(shift-color($danger, $alert-bg-scale - 10%), 0.7);
+        }
+    }
+
+    &--success {
+        border-color: shift-color($success, $alert-bg-scale + 30%);
+
+        div.toast-title {
+            //The extra change to the alert-border-scale is offset by the opacity, you get the same but transparent colour
+            background-color: rgba(shift-color($success, $alert-bg-scale + 20%), 0.7);
+            color: shift-color($success, $alert-color-scale);
+        }
+
+        div.toast-message, div.details {
+            color: shift-color($success, $alert-color-scale);
+            background-color: rgba(shift-color($success, $alert-bg-scale - 10%), 0.7);
+        }
+    }
+
+    &--info {
+        border-color: shift-color($info, $alert-bg-scale + 30%);
+
+        div.toast-title {
+            //The extra change to the alert-border-scale is offset by the opacity, you get the same but transparent colour
+            background-color: rgba(shift-color($info, $alert-bg-scale + 20%), 0.7);
+            color: shift-color($info, $alert-color-scale);
+        }
+
+        div.toast-message, div.details {
+            color: shift-color($info, $alert-color-scale);
+            background-color: rgba(shift-color($info, $alert-bg-scale - 10%), 0.7);
+        }
+    }
+
+    &--warning {
+        border-color: shift-color($warning, $alert-bg-scale + 30%);
+
+        div.toast-title {
+            //The extra change to the alert-border-scale is offset by the opacity, you get the same but transparent colour
+            background-color: rgba(shift-color($warning, $alert-bg-scale + 20%), 0.7);
+            color: shift-color($warning, $alert-color-scale);
+        }
+
+        div.toast-message, div.details {
+            color: shift-color($warning, $alert-color-scale);
+            background-color: rgba(shift-color($warning, $alert-bg-scale - 10%), 0.7);
+        }
+    }
+}

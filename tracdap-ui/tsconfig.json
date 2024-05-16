@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "outDir": "./dist/",
+    "noImplicitAny": true,
+    // Which module system you're using, this affects your local files and how it can read something from your node_modules
+    "module": "esnext",
+    // Which version of ECMAScript you're using to code
+    "target": "es6",
+    "jsx": "react",
+    "allowJs": false,
+    "moduleResolution": "node",
+    "sourceMap": true,
+    "removeComments": true,
+    "esModuleInterop": true,
+    //"allowSyntheticDefaultImports": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmitOnError": true
+  }
+}
