@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Accenture Global Solutions Limited
+ * Copyright 2024 Accenture Global Solutions Limited
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.gateway.proxy.rest;
+package org.finos.tracdap.gateway.config.build;
 
 import org.finos.tracdap.api.Data;
 import org.finos.tracdap.api.Metadata;
@@ -24,14 +24,14 @@ import org.finos.tracdap.common.exception.ETracInternal;
 import com.google.api.HttpRule;
 import com.google.protobuf.Descriptors;
 import com.google.protobuf.Message;
-import io.netty.handler.codec.http.HttpMethod;
+import org.finos.tracdap.gateway.proxy.rest.RestApiMethod;
 
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.List;
 
 
-public class RestApiSetup {
+public class RestApiBuilder {
 
     public static List<RestApiMethod<?, ?>> metaApiRoutes() {
 
