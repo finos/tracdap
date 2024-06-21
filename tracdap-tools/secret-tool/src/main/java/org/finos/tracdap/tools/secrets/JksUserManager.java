@@ -20,7 +20,7 @@ import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.config.CryptoHelpers;
 import org.finos.tracdap.common.exception.ETracPublic;
-import org.finos.tracdap.config.GatewayConfig;
+import org.finos.tracdap.config.PlatformConfig;
 
 import java.net.URI;
 import java.nio.file.Paths;
@@ -41,7 +41,7 @@ public class JksUserManager implements IUserManager {
     @Override
     public void initTracUsers() {
 
-        var config = configManager.loadRootConfigObject(GatewayConfig.class);
+        var config = configManager.loadRootConfigObject(PlatformConfig.class);
         var userDbType = config.getConfigOrThrow(ConfigKeys.USER_DB_TYPE);
         var userDbUrl = config.getConfigOrThrow(ConfigKeys.USER_DB_URL);
         var userDbSecret = config.getConfigOrThrow(ConfigKeys.USER_DB_KEY);
@@ -61,7 +61,7 @@ public class JksUserManager implements IUserManager {
 
             var userDb = loadUserDb();
 
-            var config = configManager.loadRootConfigObject(GatewayConfig.class);
+            var config = configManager.loadRootConfigObject(PlatformConfig.class);
             var userDbSecret = config.getConfigOrThrow(ConfigKeys.USER_DB_KEY);
             var userDbKey = configManager.loadPassword(userDbSecret);
 
@@ -91,7 +91,7 @@ public class JksUserManager implements IUserManager {
 
     private KeyStore loadUserDb() {
 
-        var config = configManager.loadRootConfigObject(GatewayConfig.class);
+        var config = configManager.loadRootConfigObject(PlatformConfig.class);
         var userDbType = config.getConfigOrThrow(ConfigKeys.USER_DB_TYPE);
         var userDbUrl = config.getConfigOrThrow(ConfigKeys.USER_DB_URL);
         var userDbSecret = config.getConfigOrThrow(ConfigKeys.USER_DB_KEY);
@@ -104,7 +104,7 @@ public class JksUserManager implements IUserManager {
 
     private void saveUserDb(KeyStore userDb) {
 
-        var config = configManager.loadRootConfigObject(GatewayConfig.class);
+        var config = configManager.loadRootConfigObject(PlatformConfig.class);
         var userDbUrl = config.getConfigOrThrow(ConfigKeys.USER_DB_URL);
         var userDbSecret = config.getConfigOrThrow(ConfigKeys.USER_DB_KEY);
 

@@ -21,7 +21,7 @@ import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.db.JdbcSetup;
 import org.finos.tracdap.common.exception.EAuthorization;
-import org.finos.tracdap.config.GatewayConfig;
+import org.finos.tracdap.config.PlatformConfig;
 
 import javax.sql.DataSource;
 import java.net.URI;
@@ -39,7 +39,7 @@ public class SqlUserManager implements IUserManager {
 
     private DataSource createDatasource() {
 
-        var config = configManager.loadRootConfigObject(GatewayConfig.class);
+        var config = configManager.loadRootConfigObject(PlatformConfig.class);
         var dialect = config.getConfigOrThrow(ConfigKeys.USER_DB_TYPE);
         var usersUrl = config.getConfigOrThrow(ConfigKeys.USER_DB_URL);
 

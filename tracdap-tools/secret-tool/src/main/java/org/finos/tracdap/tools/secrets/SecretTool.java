@@ -23,7 +23,7 @@ import org.finos.tracdap.common.config.CryptoHelpers;
 import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.common.startup.StandardArgs;
 import org.finos.tracdap.common.startup.Startup;
-import org.finos.tracdap.config.GatewayConfig;
+import org.finos.tracdap.config.PlatformConfig;
 import org.finos.tracdap.config._ConfigFile;
 
 import org.slf4j.Logger;
@@ -205,7 +205,7 @@ public class SecretTool {
 
     private void initTracUsers() {
 
-        var config = configManager.loadRootConfigObject(GatewayConfig.class);
+        var config = configManager.loadRootConfigObject(PlatformConfig.class);
 
         if (!config.containsConfig(ConfigKeys.USER_DB_TYPE)) {
             var template = "TRAC user database is not enabled (set config key [%s] to turn it on)";
@@ -270,7 +270,7 @@ public class SecretTool {
 
     private IUserManager getUserManager() {
 
-        var config = configManager.loadRootConfigObject(GatewayConfig.class);
+        var config = configManager.loadRootConfigObject(PlatformConfig.class);
 
         if (!config.containsConfig(ConfigKeys.USER_DB_TYPE)) {
             var template = "TRAC user database is not enabled (set config key [%s] to turn it on)";
