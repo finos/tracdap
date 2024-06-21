@@ -23,6 +23,16 @@ option java_multiple_files = true;
 import "tracdap/metadata/common.proto";
 import "tracdap/config/common.proto";
 
+enum TracServiceKey {
+
+  SERVICE_NOT_SET = 0;
+
+  METADATA = 1;
+  DATA = 2;
+  ORCHESTRATOR = 3;
+  WEB_SERVER = 4;
+  GATEWAY = 5;
+}
 
 message PlatformConfig {
 
@@ -46,8 +56,9 @@ message PlatformConfig {
 
   optional WebServerConfig webServer = 11;
 
-  InstantMap instances = 3;
-  ServiceMap services = 4;
+  optional GatewayConfig gateway = 13;
+
+  map<string, ServiceConfig> services = 4;
 }
 
 
@@ -89,29 +100,57 @@ message WebServerRedirect {
   int32 status = 3;
 }
 
+message GatewayConfig {
 
-message InstantMap {
+  uint32 idleTimeout = 1;
+  // optional uint32 idle2 = 2;
 
-  repeated InstanceConfig meta = 1;
-  repeated InstanceConfig data = 2;
-  repeated InstanceConfig orch = 3;
+  repeated RouteConfig routes = 2;
 }
 
-message InstanceConfig {
+message RouteConfig {
 
-  string scheme = 1;
-  string host = 2;
-  uint32 port = 3;
+  enum Protocol {
+    PROTOCOL_NOT_SET = 0;
+    HTTP = 1;
+    GRPC = 2;
+    GRPC_WEB = 3;
+    REST = 4;
+  }
+
+  message Match {
+    string host = 1;
+    string path = 2;
+  }
+
+  message Target {
+    string scheme = 1;
+    string host = 2;
+    uint32 port = 3;
+    string path = 4;
+  }
+
+  string routeName = 1;
+  Protocol routeType = 2;
+  repeated Protocol protocols = 3;
+
+  Match match = 5;
+  Target target = 6;
 }
 
 message ServiceMap {
 
-  ServiceConfig meta = 1;
+  ServiceConfig metadata = 1;
   ServiceConfig data = 2;
-  ServiceConfig orch = 3;
+  ServiceConfig orchestrator = 3;
+  ServiceConfig webServer = 4;
+  ServiceConfig gateway = 5;
 }
 
 message ServiceConfig {
 
-  uint32 port = 1;
+  optional bool enabled = 1;
+
+  string alias = 2;
+  uint32 port = 3;
 }
