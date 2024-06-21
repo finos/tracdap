@@ -16,7 +16,7 @@
 
 package org.finos.tracdap.gateway.exec;
 
-import org.finos.tracdap.config.GwRoute;
+import org.finos.tracdap.config.RouteConfig;
 import org.finos.tracdap.gateway.proxy.rest.RestApiMethod;
 
 import java.util.List;
@@ -25,18 +25,17 @@ import java.util.List;
 public class Route {
 
     private final int index;
-    private final GwRoute config;
-
+    private final RouteConfig config;
     private final IRouteMatcher matcher;
-
     private final List<RestApiMethod<?, ?>> restMethods;
 
-    public Route(int index, GwRoute config, IRouteMatcher matcher) {
+    public Route(int index, RouteConfig config, IRouteMatcher matcher) {
         this(index, config, matcher, null);
     }
 
     public Route(
-            int index, GwRoute config,
+            int index,
+            RouteConfig config,
             IRouteMatcher matcher,
             List<RestApiMethod<?, ?>> restMethods) {
 
@@ -50,7 +49,7 @@ public class Route {
         return index;
     }
 
-    public GwRoute getConfig() {
+    public RouteConfig getConfig() {
         return config;
     }
 
