@@ -27,6 +27,11 @@ platformInfo:
 authentication:
   jwtIssuer: http://localhost/
   jwtExpiry: 7200
+  provider:
+    protocol: guest
+    properties:
+      userId: guest
+      userName: Guest User
 
 metadata:
   format: PROTO
@@ -40,12 +45,6 @@ metadata:
       pool.overflow: 5
     secrets:
       mysql.password: metadb_secret
-
-instances:
-  meta:
-    - scheme: http
-      host: localhost
-      port: 8081
 
 services:
   meta:
