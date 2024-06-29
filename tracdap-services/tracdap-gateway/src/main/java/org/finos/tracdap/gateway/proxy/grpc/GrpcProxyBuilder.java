@@ -20,7 +20,7 @@ import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.logging.LogLevel;
 import org.finos.tracdap.common.exception.ENetworkHttp;
 import org.finos.tracdap.common.exception.EUnexpected;
-import org.finos.tracdap.config.GwRoute;
+import org.finos.tracdap.config.RouteConfig;
 import org.finos.tracdap.gateway.proxy.http.Http1to2Proxy;
 
 import io.netty.channel.*;
@@ -31,7 +31,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nonnull;
-import java.net.SocketAddress;
 
 
 public class GrpcProxyBuilder extends ChannelInitializer<Channel> {
@@ -49,7 +48,7 @@ public class GrpcProxyBuilder extends ChannelInitializer<Channel> {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
-    private final GwRoute routeConfig;
+    private final RouteConfig routeConfig;
     private final ChannelDuplexHandler routerLink;
 
     private final int connId;
@@ -59,7 +58,7 @@ public class GrpcProxyBuilder extends ChannelInitializer<Channel> {
     private final String target;
 
     public GrpcProxyBuilder(
-            GwRoute routeConfig,
+            RouteConfig routeConfig,
             ChannelDuplexHandler routerLink,
             int connId,
             HttpProtocol httpProtocol,

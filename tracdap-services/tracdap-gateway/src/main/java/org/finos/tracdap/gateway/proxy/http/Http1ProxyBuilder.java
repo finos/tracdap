@@ -16,7 +16,7 @@
 
 package org.finos.tracdap.gateway.proxy.http;
 
-import org.finos.tracdap.config.GwRoute;
+import org.finos.tracdap.config.RouteConfig;
 
 import io.netty.channel.*;
 import io.netty.handler.codec.http.HttpClientCodec;
@@ -28,12 +28,12 @@ public class Http1ProxyBuilder extends ChannelInitializer<Channel> {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
-    private final GwRoute routeConfig;
+    private final RouteConfig routeConfig;
     ChannelDuplexHandler routerLink;
     private final int connId;
 
     public Http1ProxyBuilder(
-            GwRoute routeConfig,
+            RouteConfig routeConfig,
             ChannelDuplexHandler routerLink,
             int connId) {
 
