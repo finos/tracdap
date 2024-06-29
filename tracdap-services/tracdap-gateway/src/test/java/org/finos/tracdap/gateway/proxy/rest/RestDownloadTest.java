@@ -56,12 +56,11 @@ public class RestDownloadTest {
     public static final String LARGE_TEST_FILE = "tracdap-services/tracdap-svc-data/src/test/resources/large_csv_data_100000.csv";
 
     public static final String TRAC_CONFIG_UNIT = "config/trac-unit.yaml";
-    public static final String TRAC_GW_CONFIG_UNIT = "config/trac-gw-unit.yaml";
 
     public static final long UPLOAD_CHUNK_SIZE = 2 * 1024 * 1024;
 
     @RegisterExtension
-    public static final PlatformTest platform = PlatformTest.forConfig(TRAC_CONFIG_UNIT, TRAC_GW_CONFIG_UNIT)
+    public static final PlatformTest platform = PlatformTest.forConfig(TRAC_CONFIG_UNIT)
             .addTenant(TEST_TENANT)
             .startMeta()
             .startData()
