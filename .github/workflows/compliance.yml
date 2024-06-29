@@ -59,6 +59,8 @@ jobs:
           path: ./build/compliance-cache
 
       - name: OWASP dependency check
+        env:
+          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
         run: ./gradlew dependencyCheckAggregate
 
       - name: License check

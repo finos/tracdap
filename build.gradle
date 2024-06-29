@@ -66,6 +66,14 @@ dependencyCheck {
 
     failBuildOnCVSS = 4
 
+    def NVD_API_KEY = System.getenv("NVD_API_KEY")
+
+    if (NVD_API_KEY != null && !NVD_API_KEY.allWhitespace()) {
+        nvd {
+            apiKey "${NVD_API_KEY}"
+        }
+    }
+
     // NVD cache directory - do not overlap with OWASP check for other languages
     // Note: Cache corruption can stop the scan from running, in which case the cache should be cleared
     data {
