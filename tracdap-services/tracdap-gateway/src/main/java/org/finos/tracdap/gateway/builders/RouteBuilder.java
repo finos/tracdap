@@ -29,8 +29,10 @@ import java.util.List;
 
 public class RouteBuilder {
 
-    private static final ClassLoader API_CLASSLOADER = RouteBuilder.class.getClassLoader();
     private static final Logger log = LoggerFactory.getLogger(RouteBuilder.class);
+
+    private static final ClassLoader API_CLASSLOADER = RouteBuilder.class.getClassLoader();
+    private static final String HTTP_SCHEME = "http";
 
     private int nextRouteIndex;
 
@@ -91,6 +93,7 @@ public class RouteBuilder {
 
         var target = RouteConfig.Target.newBuilder()
                 .mergeFrom(routing)
+                .setScheme(HTTP_SCHEME)
                 .setPath(grpcPath);
 
         var routeConfig = RouteConfig.newBuilder()
@@ -121,6 +124,7 @@ public class RouteBuilder {
 
         var target = RouteConfig.Target.newBuilder()
                 .mergeFrom(routing)
+                .setScheme(HTTP_SCHEME)
                 .setPath(restPath);
 
         var routeConfig = RouteConfig.newBuilder()
