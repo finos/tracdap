@@ -27,6 +27,11 @@ platformInfo:
 authentication:
   jwtIssuer: http://localhost/
   jwtExpiry: 7200
+  provider:
+    protocol: guest
+    properties:
+      userId: guest
+      userName: Guest User
 
 
 # Stick with H2 database for storage integration testing
@@ -75,31 +80,17 @@ executor:
     venvPath: ${TRAC_EXEC_DIR}/venv
 
 
-instances:
-
-  meta:
-    - scheme: http
-      host: localhost
-      port: 8081
-
-  data:
-    - scheme: http
-      host: localhost
-      port: 8082
-
-  orch:
-    - scheme: http
-      host: localhost
-      port: 8083
+jobCache:
+  protocol: LOCAL
 
 
 services:
 
-  meta:
+  metadata:
     port: 8081
 
   data:
     port: 8082
 
-  orch:
+  orchestrator:
     port: 8083

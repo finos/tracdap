@@ -47,5 +47,5 @@ metadata:
       mariadb.password: metadb_secret
 
 services:
-  meta:
+  metadata:
     port: 8081
