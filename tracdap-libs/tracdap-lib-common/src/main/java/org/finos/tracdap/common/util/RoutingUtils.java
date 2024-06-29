@@ -20,7 +20,7 @@ import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.exception.EConfig;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.config.PlatformConfig;
-import org.finos.tracdap.config.RouteConfig;
+import org.finos.tracdap.config.RoutingTarget;
 
 import java.util.Map;
 
@@ -35,7 +35,7 @@ public class RoutingUtils {
             Map.entry(ConfigKeys.WEB_SERVER_SERVICE_KEY, "tracdap-webserver"),
             Map.entry(ConfigKeys.GATEWAY_SERVICE_KEY, "tracdap-gateway"));
 
-    public static RouteConfig.Target serviceTarget(PlatformConfig platformConfig, String serviceKey) {
+    public static RoutingTarget serviceTarget(PlatformConfig platformConfig, String serviceKey) {
 
         if (!platformConfig.containsServices(serviceKey))
             throw new EConfig(String.format("Missing or invalid config: services.%s", serviceKey));
@@ -49,7 +49,7 @@ public class RoutingUtils {
 
             case SANDBOX:
 
-                return RouteConfig.Target.newBuilder()
+                return RoutingTarget.newBuilder()
                         .setHost("localhost")
                         .setPort(serviceConfig.getPort())
                         .build();
@@ -59,7 +59,7 @@ public class RoutingUtils {
                 var hostedAlias = serviceConfig.getAlias();
                 var serviceAlias = hostedAlias.isEmpty() ? STANDARD_ALIASES.get(serviceKey) : hostedAlias;
 
-                return RouteConfig.Target.newBuilder()
+                return RoutingTarget.newBuilder()
                         .setHost(serviceAlias)
                         .setPort(serviceConfig.getPort())
                         .build();
@@ -71,7 +71,7 @@ public class RoutingUtils {
                 if (customAlias.isEmpty())
                     throw new EConfig(String.format("Missing or invalid config: services.%s.alias", serviceKey));
 
-                return RouteConfig.Target.newBuilder()
+                return RoutingTarget.newBuilder()
                         .setHost(customAlias)
                         .setPort(serviceConfig.getPort())
                         .build();

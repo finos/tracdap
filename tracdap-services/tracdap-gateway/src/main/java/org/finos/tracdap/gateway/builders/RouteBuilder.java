@@ -81,17 +81,17 @@ public class RouteBuilder {
 
         var routeIndex = nextRouteIndex++;
         var routeName = serviceInfo.serviceName;
-        var routeType = RouteConfig.Protocol.GRPC;
+        var routeType = RoutingProtocol.GRPC;
 
         var grpcPath = '/' + serviceInfo.descriptor.getFullName() + "/";
         var matcher = (IRouteMatcher) (method, url) -> url.getPath().startsWith(grpcPath);
-        var protocols = List.of(RouteConfig.Protocol.GRPC, RouteConfig.Protocol.GRPC_WEB);
+        var protocols = List.of(RoutingProtocol.GRPC, RoutingProtocol.GRPC_WEB);
         var routing = RoutingUtils.serviceTarget(platformConfig, serviceInfo.serviceKey);
 
-        var match = RouteConfig.Match.newBuilder()
+        var match = RoutingMatch.newBuilder()
                 .setPath(grpcPath);
 
-        var target = RouteConfig.Target.newBuilder()
+        var target = RoutingTarget.newBuilder()
                 .mergeFrom(routing)
                 .setScheme(HTTP_SCHEME)
                 .setPath(grpcPath);
@@ -111,18 +111,18 @@ public class RouteBuilder {
 
         var routeIndex = nextRouteIndex++;
         var routeName = serviceInfo.serviceName;
-        var routeType = RouteConfig.Protocol.REST;
+        var routeType = RoutingProtocol.REST;
 
         var restPath = serviceInfo.restPrefix + "/";
         var matcher = (IRouteMatcher) (method, url) -> url.getPath().startsWith(restPath);
-        var protocols = List.of(RouteConfig.Protocol.REST);
+        var protocols = List.of(RoutingProtocol.REST);
         var routing = RoutingUtils.serviceTarget(platformConfig, serviceInfo.serviceKey);
         var restMethods = RestApiBuilder.buildAllMethods(serviceInfo.descriptor, serviceInfo.restPrefix, API_CLASSLOADER);
 
-        var match = RouteConfig.Match.newBuilder()
+        var match = RoutingMatch.newBuilder()
                 .setPath(restPath);
 
-        var target = RouteConfig.Target.newBuilder()
+        var target = RoutingTarget.newBuilder()
                 .mergeFrom(routing)
                 .setScheme(HTTP_SCHEME)
                 .setPath(restPath);

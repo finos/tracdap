@@ -99,32 +99,32 @@ message GatewayConfig {
 
 message RouteConfig {
 
-  enum Protocol {
-    PROTOCOL_NOT_SET = 0;
-    HTTP = 1;
-    GRPC = 2;
-    GRPC_WEB = 3;
-    REST = 4;
-  }
-
-  message Match {
-    string host = 1;
-    string path = 2;
-  }
-
-  message Target {
-    string scheme = 1;
-    string host = 2;
-    uint32 port = 3;
-    string path = 4;
-  }
-
   string routeName = 1;
-  Protocol routeType = 2;
-  repeated Protocol protocols = 3;
+  RoutingProtocol routeType = 2;
+  repeated RoutingProtocol protocols = 3;
 
-  Match match = 5;
-  Target target = 6;
+  RoutingMatch match = 5;
+  RoutingTarget target = 6;
+}
+
+enum RoutingProtocol {
+  PROTOCOL_NOT_SET = 0;
+  HTTP = 1;
+  GRPC = 2;
+  GRPC_WEB = 3;
+  REST = 4;
+}
+
+message RoutingMatch {
+  string host = 1;
+  string path = 2;
+}
+
+message RoutingTarget {
+  string scheme = 1;
+  string host = 2;
+  uint32 port = 3;
+  string path = 4;
 }
 
 message ServiceConfig {
