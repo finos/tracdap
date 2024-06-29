@@ -23,9 +23,12 @@ authentication:
 webServer:
 
   enabled: true
-  port: 9876
 
   contentRoot:
     protocol: LOCAL
     properties:
       rootPath: src/test/resources/content
+
+services:
+  webServer:
+    port: 9876
