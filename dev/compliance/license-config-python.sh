@@ -18,6 +18,7 @@ ALLOWED_LICENSES="${ALLOWED_LICENSES};BSD License"
 ALLOWED_LICENSES="${ALLOWED_LICENSES};BSD-3-Clause"
 ALLOWED_LICENSES="${ALLOWED_LICENSES};3-Clause BSD License;"
 ALLOWED_LICENSES="${ALLOWED_LICENSES};Python Software Foundation License"
+ALLOWED_LICENSES="${ALLOWED_LICENSES};ISC License (ISCL)"
 
 # The "certifi" package is a dependency of Python Safety, licensed under MPL 2.0
 # It is OK to use since the compliance tools are not distributed
