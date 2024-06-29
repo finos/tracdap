@@ -24,10 +24,11 @@ import org.finos.tracdap.common.auth.internal.ClientAuthProvider;
 import org.finos.tracdap.common.auth.external.AuthLogic;
 import org.finos.tracdap.common.auth.internal.JwtSetup;
 import org.finos.tracdap.common.auth.internal.UserInfo;
+import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.plugin.PluginManager;
 import org.finos.tracdap.common.startup.StandardArgs;
-import org.finos.tracdap.config.InstanceConfig;
+import org.finos.tracdap.common.util.RoutingUtils;
 import org.finos.tracdap.config.PlatformConfig;
 import org.finos.tracdap.tools.secrets.SecretTool;
 import org.finos.tracdap.tools.deploy.metadb.DeployMetaDB;
@@ -539,13 +540,13 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
     void startClients() {
 
         if (startMeta)
-            metaChannel = channelForInstance(platformConfig.getInstances().getMeta(0));
+            metaChannel = channelForService(platformConfig, ConfigKeys.METADATA_SERVICE_KEY);
 
         if (startData)
-            dataChannel = channelForInstance(platformConfig.getInstances().getData(0));
+            dataChannel = channelForService(platformConfig, ConfigKeys.DATA_SERVICE_KEY);
 
         if (startOrch)
-            orchChannel = channelForInstance(platformConfig.getInstances().getOrch(0));
+            orchChannel = channelForService(platformConfig, ConfigKeys.ORCHESTRATOR_SERVICE_KEY);
     }
 
     void stopClients() throws Exception {
@@ -560,13 +561,13 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
             metaChannel.shutdown().awaitTermination(10, TimeUnit.SECONDS);
     }
 
-    ManagedChannel channelForInstance(InstanceConfig instance) {
+    ManagedChannel channelForService(PlatformConfig platformConfig, String serviceKey) {
 
-        var builder = NettyChannelBuilder.forAddress(instance.getHost(), instance.getPort());
+        var serviceTarget = RoutingUtils.serviceTarget(platformConfig, serviceKey);
 
-        if (instance.getScheme().equalsIgnoreCase("HTTP"))
-            builder.usePlaintext();
-
+        var builder = NettyChannelBuilder.forAddress(serviceTarget.getHost(), serviceTarget.getPort());
+        // Tests run on basic HTTP for now
+        builder.usePlaintext();
         builder.directExecutor();
 
         return builder.build();
