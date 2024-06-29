@@ -167,10 +167,16 @@ jobs:
           npm install
 
       - name: OWASP dependency check
+        env:
+          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
         run: |
           mkdir -p build/compliance
           cd tracdap-api/packages/web
-          npm run compliance-owasp
+          if [ -n "${NVD_API_KEY} ]; then
+            npm run compliance-owasp -- --nvdApiKey "${NVD_API_KEY}"
+          else
+            npm run compliance-owasp
+          fi
 
       - name: License check
         run: |
