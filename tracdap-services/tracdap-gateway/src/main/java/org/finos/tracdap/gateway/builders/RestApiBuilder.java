@@ -14,12 +14,9 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.gateway.config.build;
+package org.finos.tracdap.gateway.builders;
 
-import org.finos.tracdap.api.Data;
-import org.finos.tracdap.api.Metadata;
-import org.finos.tracdap.api.Orchestrator;
-import org.finos.tracdap.common.exception.ETracInternal;
+import org.finos.tracdap.common.exception.EConfig;
 
 import com.google.api.HttpRule;
 import com.google.protobuf.Descriptors;
@@ -33,26 +30,12 @@ import java.util.List;
 
 public class RestApiBuilder {
 
-    public static List<RestApiMethod<?, ?>> metaApiRoutes() {
-
-        return registerService(Metadata.getDescriptor(), "TracMetadataApi", "/trac-meta/api/v1");
-    }
-
-    public static List<RestApiMethod<?, ?>> dataApiRoutes() {
-
-        return registerService(Data.getDescriptor(), "TracDataApi", "/trac-data/api/v1");
-    }
-
-    public static List<RestApiMethod<?, ?>> orchApiRoutes() {
-
-        return registerService(Orchestrator.getDescriptor(), "TracOrchestratorApi", "/trac-orch/api/v1");
-    }
-
-    static List<RestApiMethod<?, ?>> registerService(Descriptors.FileDescriptor protoFile, String serviceName, String apiPrefix) {
+    static List<RestApiMethod<?, ?>> buildAllMethods(
+            Descriptors.ServiceDescriptor protoService,
+            String apiPrefix, ClassLoader classLoader) {
 
         var methodList = new ArrayList<RestApiMethod<?, ?>>();
 
-        var protoService = protoFile.findServiceByName(serviceName);
         var protoMethods = protoService.getMethods();
 
         for (var protoMethod : protoMethods) {
@@ -64,7 +47,7 @@ public class RestApiBuilder {
 
             if (httpOption.isPresent()) {
                 var httpRule = (HttpRule) httpOption.get().getValue();
-                var proxyMethod = registerMethod(protoMethod, apiPrefix, httpRule);
+                var proxyMethod = buildMethod(protoMethod, apiPrefix, httpRule, classLoader);
                 methodList.add(proxyMethod);
             }
         }
@@ -72,20 +55,23 @@ public class RestApiBuilder {
         return methodList;
     }
 
-    static RestApiMethod<?, ?> registerMethod(Descriptors.MethodDescriptor protoMethod, String apiPrefix, HttpRule httpRule) {
+    static RestApiMethod<?, ?> buildMethod(
+            Descriptors.MethodDescriptor protoMethod,
+            String apiPrefix, HttpRule httpRule,
+            ClassLoader classLoader) {
 
         try {
 
             var requestProtoType = protoMethod.getInputType();
             var requestJavaPackage = requestProtoType.getFile().getOptions().getJavaPackage();
             var requestJavaTypeName = requestJavaPackage + "." + requestProtoType.getName();
-            var requestJavaType = Metadata.class.getClassLoader().loadClass(requestJavaTypeName);
+            var requestJavaType = classLoader.loadClass(requestJavaTypeName);
             var blankRequest = (Message) requestJavaType.getMethod("getDefaultInstance").invoke(null);
 
             var responseProtoType = protoMethod.getOutputType();
             var responseJavaPackage = responseProtoType.getFile().getOptions().getJavaPackage();
             var responseJavaTypeName= responseJavaPackage + "." + responseProtoType.getName();
-            var responseJavaType = Metadata.class.getClassLoader().loadClass(responseJavaTypeName);
+            var responseJavaType = classLoader.loadClass(responseJavaTypeName);
             var blankResponse = (Message) responseJavaType.getMethod("getDefaultInstance").invoke(null);
 
             if (httpRule.hasGet()) {
@@ -109,11 +95,11 @@ public class RestApiBuilder {
                         urlPattern, requestBody, responseBody);
             }
 
-            throw new ETracInternal("REST mapping for " + protoMethod.getName() + " uses an unsupported HTTP rule type");
+            throw new EConfig("REST mapping for " + protoMethod.getName() + " uses an unsupported HTTP rule type");
         }
         catch (ClassNotFoundException | NoSuchMethodException | InvocationTargetException | IllegalAccessException e) {
 
-            throw new ETracInternal("REST mapping for " + protoMethod.getName() + " could not be created", e);
+            throw new EConfig("REST mapping for " + protoMethod.getName() + " could not be created", e);
         }
     }
 }
