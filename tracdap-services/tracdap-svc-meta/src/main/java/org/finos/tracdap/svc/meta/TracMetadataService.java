@@ -18,6 +18,7 @@ package org.finos.tracdap.svc.meta;
 
 import org.finos.tracdap.common.auth.internal.JwtSetup;
 import org.finos.tracdap.common.auth.internal.InternalAuthValidator;
+import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.common.grpc.CompressionServerInterceptor;
@@ -119,8 +120,8 @@ public class TracMetadataService extends CommonServiceBase {
 
             // Create the main server
 
-            var metaSvcConfig = platformConfig.getServices().getMeta();
-            var servicePort = metaSvcConfig.getPort();
+            var serviceConfig = platformConfig.getServicesOrThrow(ConfigKeys.METADATA_SERVICE_KEY);
+            var servicePort = serviceConfig.getPort();
 
             // Interceptor order: Last added is executed first
             // But note, on close it is the other way round, because the stack is unwinding
