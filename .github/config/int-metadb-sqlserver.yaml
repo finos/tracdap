@@ -50,3 +50,6 @@ metadata:
 services:
   metadata:
     port: 8081
+
+deployment:
+  layout: SANDBOX

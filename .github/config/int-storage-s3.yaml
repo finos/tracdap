@@ -94,3 +94,6 @@ services:
 
   orchestrator:
     port: 8083
+
+deployment:
+  layout: SANDBOX
