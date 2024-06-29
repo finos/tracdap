@@ -16,6 +16,7 @@
 
 package org.finos.tracdap.gateway.builders;
 
+import org.finos.tracdap.common.util.RoutingUtils;
 import org.finos.tracdap.config.*;
 import org.finos.tracdap.gateway.exec.IRouteMatcher;
 import org.finos.tracdap.gateway.exec.Route;
@@ -48,12 +49,12 @@ public class RouteBuilder {
         var routes = new ArrayList<Route>(nRoutes);
 
         for (var serviceInfo : services) {
-            var grpcRoute = buildGrpcRoute(serviceInfo);
+            var grpcRoute = buildGrpcRoute(platformConfig, serviceInfo);
             routes.add(grpcRoute);
         }
 
         for (var serviceInfo : services) {
-            var restApiRoute = buildRestApiRoute(serviceInfo);
+            var restApiRoute = buildRestApiRoute(platformConfig, serviceInfo);
             routes.add(restApiRoute);
         }
 
@@ -74,7 +75,7 @@ public class RouteBuilder {
         return routes;
     }
 
-    private Route buildGrpcRoute(ServiceInfo serviceInfo) {
+    private Route buildGrpcRoute(PlatformConfig platformConfig, ServiceInfo serviceInfo) {
 
         var routeIndex = nextRouteIndex++;
         var routeName = serviceInfo.serviceName;
@@ -83,13 +84,13 @@ public class RouteBuilder {
         var grpcPath = '/' + serviceInfo.descriptor.getFullName() + "/";
         var matcher = (IRouteMatcher) (method, url) -> url.getPath().startsWith(grpcPath);
         var protocols = List.of(RouteConfig.Protocol.GRPC, RouteConfig.Protocol.GRPC_WEB);
+        var routing = RoutingUtils.serviceTarget(platformConfig, serviceInfo.serviceKey);
 
         var match = RouteConfig.Match.newBuilder()
                 .setPath(grpcPath);
 
         var target = RouteConfig.Target.newBuilder()
-                .setHost(serviceInfo.config.getAlias())  // TODO: Target for different deployment layouts
-                .setPort(serviceInfo.config.getPort())
+                .mergeFrom(routing)
                 .setPath(grpcPath);
 
         var routeConfig = RouteConfig.newBuilder()
@@ -103,7 +104,7 @@ public class RouteBuilder {
         return new Route(routeIndex, routeConfig, matcher);
     }
 
-    private Route buildRestApiRoute(ServiceInfo serviceInfo) {
+    private Route buildRestApiRoute(PlatformConfig platformConfig, ServiceInfo serviceInfo) {
 
         var routeIndex = nextRouteIndex++;
         var routeName = serviceInfo.serviceName;
@@ -112,14 +113,14 @@ public class RouteBuilder {
         var restPath = serviceInfo.restPrefix + "/";
         var matcher = (IRouteMatcher) (method, url) -> url.getPath().startsWith(restPath);
         var protocols = List.of(RouteConfig.Protocol.REST);
+        var routing = RoutingUtils.serviceTarget(platformConfig, serviceInfo.serviceKey);
         var restMethods = RestApiBuilder.buildAllMethods(serviceInfo.descriptor, serviceInfo.restPrefix, API_CLASSLOADER);
 
         var match = RouteConfig.Match.newBuilder()
                 .setPath(restPath);
 
         var target = RouteConfig.Target.newBuilder()
-                .setHost(serviceInfo.config.getAlias())  // TODO: Target for different deployment layouts
-                .setPort(serviceInfo.config.getPort())
+                .mergeFrom(routing)
                 .setPath(restPath);
 
         var routeConfig = RouteConfig.newBuilder()

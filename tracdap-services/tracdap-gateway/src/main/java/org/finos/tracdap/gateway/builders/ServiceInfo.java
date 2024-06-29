@@ -34,19 +34,20 @@ public class ServiceInfo {
     // Alternatively, it could be set up as defaults in the service config
 
     public ServiceInfo(
-            Descriptors.ServiceDescriptor descriptor,
-            ServiceConfig config,
-            String serviceName, String restPrefix) {
+            Descriptors.ServiceDescriptor descriptor, ServiceConfig config,
+            String serviceKey, String serviceName, String restPrefix) {
 
         this.descriptor = descriptor;
         this.config = config;
 
+        this.serviceKey = serviceKey;
         this.serviceName = serviceName;
         this.restPrefix = restPrefix;
     }
 
     Descriptors.ServiceDescriptor descriptor;
     ServiceConfig config;
+    String serviceKey;
     String serviceName;
     String restPrefix;
 
@@ -62,9 +63,9 @@ public class ServiceInfo {
 
         var services = new ArrayList<ServiceInfo>();
 
-        services.add(new ServiceInfo(metaDescriptor, metaConfig, "TRAC Metadata Service", "/trac-meta/api/v1"));
-        services.add(new ServiceInfo(dataDescriptor, dataConfig, "TRAC Data Service", "/trac-data/api/v1"));
-        services.add(new ServiceInfo(orchDescriptor, orchConfig, "TRAC Orchestrator Service", "/trac-orch/api/v1"));
+        services.add(new ServiceInfo(metaDescriptor, metaConfig, ConfigKeys.METADATA_SERVICE_KEY, "TRAC Metadata Service", "/trac-meta/api/v1"));
+        services.add(new ServiceInfo(dataDescriptor, dataConfig, ConfigKeys.DATA_SERVICE_KEY, "TRAC Data Service", "/trac-data/api/v1"));
+        services.add(new ServiceInfo(orchDescriptor, orchConfig, ConfigKeys.ORCHESTRATOR_SERVICE_KEY, "TRAC Orchestrator Service", "/trac-orch/api/v1"));
 
         return services;
     }
