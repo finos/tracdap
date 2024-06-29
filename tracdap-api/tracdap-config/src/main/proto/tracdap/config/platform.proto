@@ -48,6 +48,8 @@ message PlatformConfig {
   optional GatewayConfig gateway = 13;
 
   map<string, ServiceConfig> services = 4;
+
+  DeploymentConfig deployment = 14;
 }
 
 
@@ -131,4 +133,16 @@ message ServiceConfig {
 
   string alias = 2;
   uint32 port = 3;
+}
+
+message DeploymentConfig {
+
+  DeploymentLayout layout = 1;
+}
+
+enum DeploymentLayout {
+  LAYOUT_NOT_SET = 0;
+  SANDBOX = 1;
+  HOSTED = 2;
+  CUSTOM = 3;
 }

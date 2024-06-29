@@ -138,3 +138,7 @@ services:
 
   webServer:
     port: 8090
+
+
+deployment:
+  layout: SANDBOX
