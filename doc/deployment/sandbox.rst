@@ -169,17 +169,14 @@ environment they are connected to.
     :language: yaml
     :lines: 21 - 23
 
-The *authentication* section controls the platform's internal authentication mechanism, which uses JWT.
-This is to allow the platform to validate user tokens and to let different platform services talk to each other.
-
-The task of actually logging users in and obtaining their details is handled by the gateway component, so the
-configuration for this is in the gateway config file. The JWT details supplied here need to match what is in
-the gateway config file.
+The *authentication* section is configured to use guest authentication by default, which logs everyone in
+automatically with a single guest user ID. For local development, this is often sufficient. To use a
+different authentication mechanism, see :doc:`authentication </deployment/authentication>`.
 
 .. literalinclude:: ../../dist/template/etc/trac-platform.yaml
     :name: trac_platform_yaml_authentication
     :language: yaml
-    :lines: 26 - 29
+    :lines: 26 - 36
 
 The *metadata* section describes how and where the TRAC metadata will be stored. The current implementation
 uses SQL to store metadata and several common SQL dialects are supported. The default sandbox config uses the
@@ -191,7 +188,7 @@ created above. For examples of how to configure other SQL dialects, see the depl
 .. literalinclude:: ../../dist/template/etc/trac-platform.yaml
     :name: trac_platform_yaml_metadata
     :language: yaml
-    :lines: 32 - 44
+    :lines: 39 - 51
 
 .. note::
     H2 is mostly used in development scenarios where the password is not sensitive.
@@ -210,7 +207,7 @@ The sample configuration contains one storage bucket, you just need to specify a
 .. literalinclude:: ../../dist/template/etc/trac-platform.yaml
     :name: trac_platform_yaml_storage
     :language: yaml
-    :lines: 47 - 58
+    :lines: 54 - 65
 
 .. note::
     Pay particular attention to the bucket key, which is *STORAGE1* in this example.
@@ -225,7 +222,7 @@ You can add multiple repositories if required, so long as each one has a unique 
 .. literalinclude:: ../../dist/template/etc/trac-platform.yaml
     :name: trac_platform_yaml_repositories
     :language: yaml
-    :lines: 61 - 67
+    :lines: 68 - 74
 
 The last thing you need to add in the platform config is an executor. The example config is already set up
 with a local executor, so you just need to add the path for the VENV you built in the deployment step.
@@ -233,23 +230,20 @@ with a local executor, so you just need to add the path for the VENV you built i
 .. literalinclude:: ../../dist/template/etc/trac-platform.yaml
     :name: trac_platform_yaml_executor
     :language: yaml
-    :lines: 69 - 73
+    :lines: 77 - 81
 
-There are two more sections in the platform config, *services* and *instances*. The *services* section sets
-up the service properties for each service, most importantly the ports they should run on. The *instances*
-section lists the instances of each service. For a sandbox setup there is no need to alter these sections.
+The remaining sections in the config file can be left as they are for noq. They are:
 
+    * The *jobCache* section, which allows for different job cache mechanisms
+      when TRAC is running on a distributed cluster
+    * The *webServer* section, which can be enabled to provide a light-weight embedded web server
+    * The *gateway* section, which can be used to customize routing in the TRAC gateway
+      (by default it will just relay any TRAC platform services that are enabled)
+    * The *services* section provides common options for all the TRAC services,
+      including the network port they each listen on
+    * The *deployment* section tells TRAC about different deployment layouts, so the services
+      can communicate with each other.
 
-**Gateway configuration**
-
-The gateway example config will work without alteration to serve the API endpoints for the TRAC services.
-However, the gateway can also be used to route requests for client applications; this is particularly
-useful for web applications in a dev / test scenario, because it provides a direct route to access the TRAC
-API and avoids CORS issues. If you want to use this capability, look in the gateway config and you will find
-an example of setting up an additional HTTP route. You can add as many HTTP routes as you need.
-
-The example configuration uses *guest* authentication, which logs all users in as "guest" without requiring
-a password. To set up real user logins, see the deployment docs for :doc:`authentication </deployment/authentication>`.
 
 **Logging**
 

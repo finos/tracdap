@@ -65,7 +65,7 @@ before running *secret-tool*. For more details on the *secret-tool*, see :doc:`s
 JWT configuration
 -----------------
 
-You will need to add an authentication block in both config files, specifying the issuer
+The *authentication* block in *trac-platform.yaml* can be used to specify the issuer
 and expiry times for JWT tokens. If you know the DNS address that TRAC will be served from you
 could use this as the JWT issuer, other options could be the user ID of a service account you
 have set up to run TRAC, or a TRAC reserved identifier such as "trac_platform".
@@ -95,7 +95,9 @@ will have to log in again.
 Providers
 ---------
 
-You need to configure one provider in the authentication section of the gateway config file.
+You need to configure a provider in the authentication section of the platform config file.
+The authentication provider is a plugin, so the particular settings required will depend on
+the protocol you choose.
 
 Guest Provider
 ^^^^^^^^^^^^^^
@@ -121,7 +123,7 @@ Basic Provider
 The basic provider uses HTTP basic authentication, which typically causes the browser
 authentication window to appear when users try to access pages in a browser. To use
 the basic provider you will need to enable TRAC's built in user database, by adding
-these settings into the *config* section of the gateway config file.
+these settings into the *config* section of the platform config file.
 
 .. code-block:: yaml
 

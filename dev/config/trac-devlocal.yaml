@@ -27,6 +27,7 @@ authentication:
 
   jwtIssuer: http://localhost:8080/
   jwtExpiry: 7200
+  jwtLimit: 57600
 
   provider:
     protocol: guest
