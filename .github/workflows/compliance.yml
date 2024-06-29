@@ -52,11 +52,11 @@ jobs:
 
       # Use a cache to save downloading the whole NVD on every build
       # Dependency check will automatically look for updates and download the delta
-      - name: NVD cache
+      - name: NVD cache (Java Platform)
         uses: actions/cache@v3
         with:
-          key: compliance-cache-data
-          path: ./build/compliance-cache
+          key: nvd-cache-java-platform
+          path: ./build/compliance-cache/nvd_java_platform
 
       - name: OWASP dependency check
         env:
@@ -153,11 +153,11 @@ jobs:
 
       # Use a cache to save downloading global compliance data on every build (e.g. NVD)
       # Compliance tasks will automatically look for updates and download deltas
-      - name: NVD cache
-        uses: actions/cache@v3
+      - name: NVD cache (Web API)
+        uses: actions/cache@v4
         with:
-          key: compliance-cache-data
-          path: ./build/compliance-cache
+          key: nvd-cache-web-api
+          path: ./build/compliance-cache/nvd_web_api
 
       - name: Install dependencies
         run: |

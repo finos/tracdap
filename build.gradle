@@ -77,7 +77,8 @@ dependencyCheck {
     // NVD cache directory - do not overlap with OWASP check for other languages
     // Note: Cache corruption can stop the scan from running, in which case the cache should be cleared
     data {
-        directory = rootProject.buildDir.path + '/compliance-cache/nvd_platform_java/'
+
+        directory = rootProject.projectDir.absolutePath + '/build/compliance-cache/nvd_java_platform'
     }
 
     // Disable analyzers for other languages
