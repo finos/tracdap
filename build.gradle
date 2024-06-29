@@ -68,7 +68,7 @@ dependencyCheck {
 
     def NVD_API_KEY = System.getenv("NVD_API_KEY")
 
-    if (NVD_API_KEY != null && !NVD_API_KEY.allWhitespace()) {
+    if (NVD_API_KEY != null && !NVD_API_KEY.allWhitespace) {
         nvd {
             apiKey "${NVD_API_KEY}"
         }
