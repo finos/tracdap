@@ -70,7 +70,7 @@ dependencyCheck {
 
     if (NVD_API_KEY != null && !NVD_API_KEY.allWhitespace) {
         nvd {
-            apiKey "${NVD_API_KEY}"
+            apiKey = NVD_API_KEY
         }
     }
 
