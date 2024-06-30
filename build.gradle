@@ -57,6 +57,9 @@ subprojects {
 
 dependencyCheck {
 
+    def DATAFEED_URL = "https://dependency-check.github.io/DependencyCheck_Builder/nvd_cache/"
+    def NVD_API_KEY = System.getenv("NVD_API_KEY")
+
     outputDirectory = "$projectDir/build/compliance/platform-owasp"
 
     suppressionFiles = ["$projectDir/dev/compliance/owasp-false-positives.xml"]
@@ -66,10 +69,9 @@ dependencyCheck {
 
     failBuildOnCVSS = 4
 
-    def NVD_API_KEY = System.getenv("NVD_API_KEY")
-
-    if (NVD_API_KEY != null && !NVD_API_KEY.allWhitespace) {
-        nvd {
+    nvd {
+        datafeedUrl = DATAFEED_URL
+        if (NVD_API_KEY != null && !NVD_API_KEY.allWhitespace) {
             apiKey = NVD_API_KEY.trim()
             maxRetryCount = 10
             delay = 1000
