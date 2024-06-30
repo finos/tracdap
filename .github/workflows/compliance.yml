@@ -50,6 +50,9 @@ jobs:
           java-version: ${{ env.JAVA_VERSION }}
           cache: gradle
 
+      - name: License check
+        run: ./gradlew checkLicense
+
       # Use a cache to save downloading the whole NVD on every build
       # Dependency check will automatically look for updates and download the delta
       - name: NVD restore cache (Java Platform)
@@ -76,9 +79,6 @@ jobs:
         with:
           key: nvd-cache-java-platform
           path: ./build/compliance-cache/nvd_java_platform
-
-      - name: License check
-        run: ./gradlew checkLicense
 
       # Always save the reports - they are especially needed when the checks have failed!
       - name: Store compliance reports
@@ -116,15 +116,6 @@ jobs:
           pip install -r requirements.txt
           pip install -r requirements_plugins.txt
 
-      # CVE-2019-8341 (safety id: 70612) is a vulnerability in the latest version of Jinja2, no fix is available
-      # It is only pulled in as a dependency of safety check itself, it is not a dependency of the dist wheels
-      - name: Safety check
-        run: |
-          mkdir -p build/compliance/python-runtime-safety
-          cd tracdap-runtime/python
-          safety check --ignore 70612 --output text > ../../build/compliance/python-runtime-safety/python-runtime-safety-report.txt
-          safety check --ignore 70612 --output json > ../../build/compliance/python-runtime-safety/python-runtime-safety-report.json
-
       - name: License check
         run: |
 
@@ -136,6 +127,15 @@ jobs:
           pip-licenses --format=json --ignore-packages $IGNORE_LICENSE > ../../build/compliance/python-runtime-licenses/python-runtime-licenses.json
           pip-licenses --format=html --ignore-packages $IGNORE_LICENSE > ../../build/compliance/python-runtime-licenses/python-runtime-licenses.html
           pip-licenses --allow-only="$ALLOWED_LICENSES" --ignore-packages $IGNORE_LICENSE
+
+      # CVE-2019-8341 (safety id: 70612) is a vulnerability in the latest version of Jinja2, no fix is available
+      # It is only pulled in as a dependency of safety check itself, it is not a dependency of the dist wheels
+      - name: Safety check
+        run: |
+          mkdir -p build/compliance/python-runtime-safety
+          cd tracdap-runtime/python
+          safety check --ignore 70612 --output text > ../../build/compliance/python-runtime-safety/python-runtime-safety-report.txt
+          safety check --ignore 70612 --output json > ../../build/compliance/python-runtime-safety/python-runtime-safety-report.json
 
       # Always save the reports - they are especially needed when the checks have failed!
       - name: Store compliance reports
@@ -170,6 +170,17 @@ jobs:
           cd tracdap-api/packages/web
           npm install
 
+      - name: License check
+        run: |
+          cd tracdap-api/packages/web
+          npm run compliance-licenses
+
+      - name: NPM audit
+        run: |
+          mkdir -p build/compliance/web-api-npm-audit
+          cd tracdap-api/packages/web
+          npm run compliance-audit
+
       # Use a cache to save downloading global compliance data on every build (e.g. NVD)
       # Compliance tasks will automatically look for updates and download deltas
       - name: NVD restore cache (Web API)
@@ -196,17 +207,6 @@ jobs:
         with:
           key: nvd-cache-web-api
           path: ./build/compliance-cache/nvd_web_api
-
-      - name: License check
-        run: |
-          cd tracdap-api/packages/web
-          npm run compliance-licenses
-
-      - name: NPM audit
-        run: |
-          mkdir -p build/compliance/web-api-npm-audit
-          cd tracdap-api/packages/web
-          npm run compliance-audit
 
       # Always save the reports - they are especially needed when the checks have failed!
       - name: Store compliance reports
