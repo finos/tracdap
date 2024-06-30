@@ -52,16 +52,30 @@ jobs:
 
       # Use a cache to save downloading the whole NVD on every build
       # Dependency check will automatically look for updates and download the delta
-      - name: NVD cache (Java Platform)
-        uses: actions/cache@v3
+      - name: NVD restore cache (Java Platform)
+        id: cacheRestore
+        uses: actions/cache/restore@v4
         with:
           key: nvd-cache-java-platform
           path: ./build/compliance-cache/nvd_java_platform
+
+      - name: OWASP recreate cache
+        if: steps.cacheRestore.outputs.cache-hit != 'true'
+        env:
+          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+        run: ./gradlew dependencyCheckUpdate
 
       - name: OWASP dependency check
         env:
           NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
         run: ./gradlew dependencyCheckAggregate
+
+      - name: NVD save cache (Java Platform)
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          key: nvd-cache-java-platform
+          path: ./build/compliance-cache/nvd_java_platform
 
       - name: License check
         run: ./gradlew checkLicense
