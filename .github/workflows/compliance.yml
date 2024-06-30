@@ -65,11 +65,13 @@ jobs:
       - name: OWASP recreate cache
         if: steps.cacheRestore.outputs.cache-hit != 'true'
         env:
+          NVD_DATAFEED: "https://dependency-check.github.io/DependencyCheck_Builder/nvd_cache/"
           NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
         run: ./gradlew dependencyCheckUpdate
 
       - name: OWASP dependency check
         env:
+          NVD_DATAFEED: "https://dependency-check.github.io/DependencyCheck_Builder/nvd_cache/"
           NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
         run: ./gradlew dependencyCheckAggregate
 
@@ -191,14 +193,15 @@ jobs:
 
       - name: OWASP dependency check
         env:
+          NVD_DATAFEED: "https://dependency-check.github.io/DependencyCheck_Builder/nvd_cache/"
           NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
         run: |
           mkdir -p build/compliance
           cd tracdap-api/packages/web
           if [ -n "${NVD_API_KEY}" ]; then
-            npm run compliance-owasp -- --nvdApiKey "${NVD_API_KEY}"
+            npm run compliance-owasp -- --nvdDatafeed "${NVD_DATAFEED}" --nvdApiKey "${NVD_API_KEY}"
           else
-            npm run compliance-owasp
+            npm run compliance-owasp -- --nvdDatafeed "${NVD_DATAFEED}"
           fi
 
       - name: NVD save cache (Web API)
