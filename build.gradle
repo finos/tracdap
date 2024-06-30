@@ -71,6 +71,8 @@ dependencyCheck {
     if (NVD_API_KEY != null && !NVD_API_KEY.allWhitespace) {
         nvd {
             apiKey = NVD_API_KEY.trim()
+            maxRetryCount = 10
+            delay = 1000
         }
     }
 
