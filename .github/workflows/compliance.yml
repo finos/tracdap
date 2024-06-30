@@ -165,18 +165,18 @@ jobs:
           cache: npm
           cache-dependency-path: tracdap-api/packages/web/package-lock.json
 
-      # Use a cache to save downloading global compliance data on every build (e.g. NVD)
-      # Compliance tasks will automatically look for updates and download deltas
-      - name: NVD cache (Web API)
-        uses: actions/cache@v4
-        with:
-          key: nvd-cache-web-api
-          path: ./build/compliance-cache/nvd_web_api
-
       - name: Install dependencies
         run: |
           cd tracdap-api/packages/web
           npm install
+
+      # Use a cache to save downloading global compliance data on every build (e.g. NVD)
+      # Compliance tasks will automatically look for updates and download deltas
+      - name: NVD restore cache (Web API)
+        uses: actions/cache/restore@v4
+        with:
+          key: nvd-cache-web-api
+          path: ./build/compliance-cache/nvd_web_api
 
       - name: OWASP dependency check
         env:
@@ -189,6 +189,13 @@ jobs:
           else
             npm run compliance-owasp
           fi
+
+      - name: NVD save cache (Web API)
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          key: nvd-cache-web-api
+          path: ./build/compliance-cache/nvd_web_api
 
       - name: License check
         run: |
