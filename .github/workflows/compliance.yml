@@ -194,16 +194,16 @@ jobs:
       # ODC version must be forced because the NodeJS wrapper breaks for versions >= 10.0.0
       - name: OWASP dependency check
         env:
-          ODC_VERSION: "9.2.0"
+          ODC_VERSION_TAG: "v9.2.0"
           NVD_DATAFEED: "https://dependency-check.github.io/DependencyCheck_Builder/nvd_cache/"
           NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
         run: |
           mkdir -p build/compliance
           cd tracdap-api/packages/web
           if [ -n "${NVD_API_KEY}" ]; then
-            npm run compliance-owasp -- --odc-version "${ODC_VERSION}" --nvdDatafeed "${NVD_DATAFEED}" --nvdApiKey "${NVD_API_KEY}"
+            npm run compliance-owasp -- --odc-version "${ODC_VERSION_TAG}" --nvdDatafeed "${NVD_DATAFEED}" --nvdApiKey "${NVD_API_KEY}"
           else
-            npm run compliance-owasp -- --odc-version "${ODC_VERSION}" --nvdDatafeed "${NVD_DATAFEED}"
+            npm run compliance-owasp -- --odc-version "${ODC_VERSION_TAG}" --nvdDatafeed "${NVD_DATAFEED}"
           fi
 
       - name: NVD save cache (Web API)
