@@ -28,7 +28,7 @@
   "devDependencies": {
     "protobufjs-cli": "~1.1.2",
     "license-checker-rseidelsohn": "~4.1.1",
-    "owasp-dependency-check": "0.0.21",
+    "owasp-dependency-check": "etnetera/owasp-dependency-check",
     "node-fetch": "^3.3.2"
   },
   "overrides": {
