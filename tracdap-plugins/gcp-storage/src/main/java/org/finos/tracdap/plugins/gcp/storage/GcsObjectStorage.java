@@ -64,6 +64,8 @@ public class GcsObjectStorage extends CommonFileStorage {
     public static final String PREFIX_PROPERTY = "prefix";
 
     private static final int DELETE_PAGE_SIZE = 1000;
+
+    // Project name must be set as "_" in the bucket name, since bucket names are globally unique
     private static final String PROJECT_DEFINED_BY_BUCKET = "_";
 
     private final String project;
