@@ -19,7 +19,7 @@ package org.finos.tracdap.gateway;
 import org.finos.tracdap.common.auth.external.Http1AuthHandler;
 import org.finos.tracdap.common.auth.external.IAuthProvider;
 import org.finos.tracdap.common.auth.internal.JwtProcessor;
-import org.finos.tracdap.config.GatewayConfig;
+import org.finos.tracdap.config.AuthenticationConfig;
 
 import io.netty.channel.*;
 import io.netty.channel.socket.SocketChannel;
@@ -31,6 +31,7 @@ import io.netty.handler.timeout.IdleStateHandler;
 import io.netty.util.AsciiString;
 import io.netty.util.ReferenceCountUtil;
 
+import org.finos.tracdap.config.PlatformConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -61,7 +62,7 @@ public class ProtocolNegotiator extends ChannelInitializer<SocketChannel> {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
-    private final GatewayConfig config;
+    private final AuthenticationConfig authCConfig;
     private final int idleTimeout;
     private final IAuthProvider authProvider;
     private final JwtProcessor jwtProcessor;
@@ -73,14 +74,14 @@ public class ProtocolNegotiator extends ChannelInitializer<SocketChannel> {
     private final AtomicInteger connId = new AtomicInteger();
 
     public ProtocolNegotiator(
-            GatewayConfig config, IAuthProvider authProvider, JwtProcessor jwtProcessor,
+            PlatformConfig config, IAuthProvider authProvider, JwtProcessor jwtProcessor,
             ProtocolSetup<?> http1Handler, ProtocolSetup<?> http2Handler,
             ProtocolSetup<WebSocketServerProtocolConfig> webSocketsHandler) {
 
-        this.config = config;
+        this.authCConfig = config.getAuthentication();
 
-        this.idleTimeout = config.getIdleTimeout() > 0
-                ? config.getIdleTimeout()
+        this.idleTimeout = config.getGateway().getIdleTimeout() > 0
+                ? config.getGateway().getIdleTimeout()
                 : DEFAULT_TIMEOUT;
 
         this.authProvider = authProvider;
@@ -276,7 +277,7 @@ public class ProtocolNegotiator extends ChannelInitializer<SocketChannel> {
             // Different approaches are needed for system-to-system auth
 
             var authHandler = new Http1AuthHandler(
-                    config.getAuthentication(), conn,
+                    authCConfig, conn,
                     jwtProcessor, authProvider);
 
             pipeline.addAfter(CLIENT_TIMEOUT, HTTP_1_AUTH, authHandler);
@@ -365,7 +366,7 @@ public class ProtocolNegotiator extends ChannelInitializer<SocketChannel> {
             pipeline.addAfter(HTTP_1_CODEC, CLIENT_TIMEOUT, idleHandler);
 
             var authHandler = new Http1AuthHandler(
-                    config.getAuthentication(), conn,
+                    authCConfig, conn,
                     jwtProcessor, authProvider);
 
             pipeline.addAfter(CLIENT_TIMEOUT, HTTP_1_AUTH, authHandler);

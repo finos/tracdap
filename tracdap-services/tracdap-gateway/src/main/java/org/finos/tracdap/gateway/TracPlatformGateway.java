@@ -18,14 +18,14 @@ package org.finos.tracdap.gateway;
 
 import org.finos.tracdap.common.auth.external.IAuthProvider;
 import org.finos.tracdap.common.auth.internal.JwtSetup;
+import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.common.plugin.PluginManager;
 import org.finos.tracdap.common.service.CommonServiceBase;
-import org.finos.tracdap.config.GatewayConfig;
-import org.finos.tracdap.gateway.config.helpers.ConfigTranslator;
+import org.finos.tracdap.config.PlatformConfig;
 import org.finos.tracdap.gateway.exec.Route;
-import org.finos.tracdap.gateway.exec.RouteBuilder;
+import org.finos.tracdap.gateway.builders.RouteBuilder;
 import org.finos.tracdap.gateway.routing.Http1Router;
 import org.finos.tracdap.gateway.routing.Http2Router;
 import org.finos.tracdap.gateway.routing.WebSocketsRouter;
@@ -65,7 +65,7 @@ public class TracPlatformGateway extends CommonServiceBase {
     private final PluginManager pluginManager;
     private final ConfigManager configManager;
 
-    private GatewayConfig gatewayConfig;
+    private PlatformConfig platformConfig;
 
     private EventLoopGroup bossGroup = null;
     private EventLoopGroup workerGroup = null;
@@ -86,11 +86,13 @@ public class TracPlatformGateway extends CommonServiceBase {
         try {
             log.info("Preparing gateway config...");
 
-            var rawGatewayConfig = configManager.loadRootConfigObject(GatewayConfig.class);
-            gatewayConfig = ConfigTranslator.translateServiceRoutes(rawGatewayConfig);
+            platformConfig = configManager.loadRootConfigObject(PlatformConfig.class);
 
-            proxyPort = (short) gatewayConfig.getPort();
-            routes = RouteBuilder.buildAll(gatewayConfig.getRoutesList());
+            proxyPort = (short) platformConfig
+                    .getServicesOrThrow(ConfigKeys.GATEWAY_SERVICE_KEY)
+                    .getPort();
+
+            routes = new RouteBuilder().buildRoutes(platformConfig);
 
             log.info("Gateway config looks ok");
         }
@@ -105,15 +107,15 @@ public class TracPlatformGateway extends CommonServiceBase {
 
             log.info("Starting the gateway server on port {}...", proxyPort);
 
-            var authProviderConfig = gatewayConfig.getAuthentication().getProvider();
+            var authProviderConfig = platformConfig.getAuthentication().getProvider();
             var authProvider = pluginManager.createService(IAuthProvider.class, authProviderConfig, configManager);
 
             // JWT processor is responsible for signing and validating auth tokens
-            var jwtProcessor = JwtSetup.createProcessor(gatewayConfig, configManager);
+            var jwtProcessor = JwtSetup.createProcessor(platformConfig, configManager);
 
             // Handlers for all support protocols
             var http1Handler = ProtocolSetup.setup(connId -> new Http1Router(routes, connId));
-            var http2Handler = ProtocolSetup.setup(connId -> new Http2Router(gatewayConfig.getRoutesList()));
+            var http2Handler = ProtocolSetup.setup(connId -> new Http2Router(routes));
 
             var webSocketOptions = WebSocketServerProtocolConfig.newBuilder()
                     .subprotocols("grpc-websockets")
@@ -126,7 +128,7 @@ public class TracPlatformGateway extends CommonServiceBase {
 
             // The protocol negotiator is the top level initializer for new inbound connections
             var protocolNegotiator = new ProtocolNegotiator(
-                    gatewayConfig, authProvider, jwtProcessor,
+                    platformConfig, authProvider, jwtProcessor,
                     http1Handler, http2Handler,
                     webSocketsHandler);
 

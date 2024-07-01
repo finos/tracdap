@@ -18,11 +18,11 @@ package org.finos.tracdap.gateway.routing;
 
 import org.finos.tracdap.common.exception.EUnexpected;
 
-import org.finos.tracdap.config.GwRoute;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http2.Http2ChannelDuplexHandler;
 import io.netty.handler.codec.http2.Http2Frame;
 
+import org.finos.tracdap.gateway.exec.Route;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -33,7 +33,7 @@ public class Http2Router extends Http2ChannelDuplexHandler {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
-    public Http2Router(List<GwRoute> routeConfigs) {
+    public Http2Router(List<Route> routes) {
 
     }
 

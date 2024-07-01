@@ -57,6 +57,9 @@ subprojects {
 
 dependencyCheck {
 
+    def NVD_DATAFEED = System.getenv("NVD_DATAFEED")
+    def NVD_API_KEY = System.getenv("NVD_API_KEY")
+
     outputDirectory = "$projectDir/build/compliance/platform-owasp"
 
     suppressionFiles = ["$projectDir/dev/compliance/owasp-false-positives.xml"]
@@ -66,10 +69,22 @@ dependencyCheck {
 
     failBuildOnCVSS = 4
 
+    nvd {
+        if (NVD_DATAFEED != null && !NVD_DATAFEED.allWhitespace) {
+            datafeedUrl = NVD_DATAFEED
+        }
+        if (NVD_API_KEY != null && !NVD_API_KEY.allWhitespace) {
+            apiKey = NVD_API_KEY.trim()
+            maxRetryCount = 10
+            delay = 1000
+        }
+    }
+
     // NVD cache directory - do not overlap with OWASP check for other languages
     // Note: Cache corruption can stop the scan from running, in which case the cache should be cleared
     data {
-        directory = rootProject.buildDir.path + '/compliance-cache/nvd_platform_java/'
+
+        directory = rootProject.projectDir.absolutePath + '/build/compliance-cache/nvd_java_platform'
     }
 
     // Disable analyzers for other languages

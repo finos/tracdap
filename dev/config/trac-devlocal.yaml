@@ -24,8 +24,16 @@ platformInfo:
 
 
 authentication:
+
   jwtIssuer: http://localhost:8080/
   jwtExpiry: 7200
+  jwtLimit: 57600
+
+  provider:
+    protocol: guest
+    properties:
+      userId: guest
+      userName: Guest User
 
 
 metadata:
@@ -76,31 +84,64 @@ jobCache:
   protocol: LOCAL
 
 
-instances:
+webServer:
 
-  meta:
-    - scheme: http
-      host: localhost
-      port: 8081
+  # To use the TRAC web server, set the enabled flag and uncomment the configuration
 
-  data:
-    - scheme: http
-      host: localhost
-      port: 8082
+  enabled: false
 
-  orch:
-    - scheme: http
-      host: localhost
-      port: 8083
+#  contentRoot:
+#    protocol: LOCAL
+#    properties:
+#      rootPath: path/to/web/content/root
+#
+#  rewriteRules:
+#
+#  redirects:
+#    - source: /
+#      target: /index.html
+#      status: 302
 
+
+gateway:
+
+  idleTimeout: 10
+
+  # Routing for the TRAC services will be configured automatically
+  # To add custom routes, uncomment this configuration and modify as required
+
+#  routes:
+#
+#    - routeName: Local Web Server
+#      routeType: HTTP
+#
+#      match:
+#        host: localhost
+#        path: /local/app
+#
+#      target:
+#        scheme: http
+#        host: localhost
+#        port: 9090
+#        path: /
 
 services:
 
-  meta:
+  gateway:
+    port: 8080
+
+  metadata:
     port: 8081
 
   data:
     port: 8082
 
-  orch:
+  orchestrator:
     port: 8083
+
+  webServer:
+    port: 8090
+
+
+deployment:
+  layout: SANDBOX

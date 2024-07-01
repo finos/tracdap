@@ -17,7 +17,7 @@
 package org.finos.tracdap.gateway.routing;
 
 import org.finos.tracdap.common.exception.EUnexpected;
-import org.finos.tracdap.config.GwProtocol;
+import org.finos.tracdap.config.RoutingProtocol;
 import org.finos.tracdap.gateway.exec.Route;
 import org.finos.tracdap.gateway.proxy.grpc.GrpcProtocol;
 import org.finos.tracdap.gateway.proxy.grpc.GrpcProxyBuilder;
@@ -229,7 +229,7 @@ public class WebSocketsRouter extends CoreRouter {
             ChannelHandlerContext ctx, CoreRouterLink link,
             Route routeConfig) {
 
-        if (routeConfig.getConfig().getRouteType() != GwProtocol.GRPC)
+        if (routeConfig.getConfig().getRouteType() != RoutingProtocol.GRPC)
             throw new EUnexpected();
 
         return new GrpcProxyBuilder(

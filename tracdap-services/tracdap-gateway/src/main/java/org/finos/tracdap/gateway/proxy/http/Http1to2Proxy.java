@@ -17,7 +17,7 @@
 package org.finos.tracdap.gateway.proxy.http;
 
 import org.finos.tracdap.common.exception.EUnexpected;
-import org.finos.tracdap.config.GwRoute;
+import org.finos.tracdap.config.RouteConfig;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPromise;
 import io.netty.handler.codec.http.*;
@@ -37,7 +37,7 @@ public class Http1to2Proxy extends Http2ChannelDuplexHandler {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
-    private final GwRoute routeConfig;
+    private final RouteConfig routeConfig;
 
     private final Map<Integer, Http2FrameStream> streams;
     private final AtomicInteger nextSeqId;
@@ -45,7 +45,7 @@ public class Http1to2Proxy extends Http2ChannelDuplexHandler {
 
     private int inboundSeqId;
 
-    public Http1to2Proxy(GwRoute routeConfig, int connId) {
+    public Http1to2Proxy(RouteConfig routeConfig, int connId) {
 
         this.routeConfig = routeConfig;
         this.connId = connId;

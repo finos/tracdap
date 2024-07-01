@@ -23,7 +23,7 @@ import org.finos.tracdap.common.exception.EPluginNotAvailable;
 import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.common.plugin.PluginServiceInfo;
 import org.finos.tracdap.common.plugin.TracPlugin;
-import org.finos.tracdap.config.GatewayConfig;
+import org.finos.tracdap.config.PlatformConfig;
 
 import java.util.List;
 import java.util.Properties;
@@ -76,7 +76,7 @@ public class CommonAuthPlugin extends TracPlugin {
         // TODO: Use plugin manager to get the user DB plugin
         // Requires passing plugin manager into createService for non-config plugins
 
-        var config = configManager.loadRootConfigObject(GatewayConfig.class);
+        var config = configManager.loadRootConfigObject(PlatformConfig.class);
         var secretType = config.getConfigOrDefault("users.type", "PKCS12");
 
         if ("PKCS12".equals(secretType) || "JKS".equals(secretType))

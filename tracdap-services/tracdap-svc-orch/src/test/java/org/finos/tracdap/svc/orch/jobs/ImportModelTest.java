@@ -44,7 +44,6 @@ public abstract class ImportModelTest {
 
     private static final String TEST_TENANT = "ACME_CORP";
     private static final String E2E_CONFIG = "config/trac-e2e.yaml";
-    private static final String GW_CONFIG = "config/trac-gw-unit.yaml";
 
     // Test model import using different repo types
     // This will test the E2E model loading mechanism
@@ -62,7 +61,7 @@ public abstract class ImportModelTest {
     }
 
     @RegisterExtension
-    public static final PlatformTest platform = PlatformTest.forConfig(E2E_CONFIG, GW_CONFIG)
+    public static final PlatformTest platform = PlatformTest.forConfig(E2E_CONFIG)
             .addTenant(TEST_TENANT)
             .startAll()
             .build();

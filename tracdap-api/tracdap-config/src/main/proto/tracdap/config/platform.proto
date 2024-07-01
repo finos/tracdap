@@ -23,7 +23,6 @@ option java_multiple_files = true;
 import "tracdap/metadata/common.proto";
 import "tracdap/config/common.proto";
 
-
 message PlatformConfig {
 
   map<string, string> config = 1;
@@ -46,8 +45,11 @@ message PlatformConfig {
 
   optional WebServerConfig webServer = 11;
 
-  InstantMap instances = 3;
-  ServiceMap services = 4;
+  optional GatewayConfig gateway = 13;
+
+  map<string, ServiceConfig> services = 4;
+
+  DeploymentConfig deployment = 14;
 }
 
 
@@ -56,15 +58,6 @@ message MetadataConfig {
   PluginConfig database = 1;
 
   metadata.MetadataFormat format = 2;
-}
-
-
-message StorageConfig {
-
-  map<string, PluginConfig> buckets = 1;
-
-  string defaultBucket = 2;
-  string defaultFormat = 3;
 }
 
 
@@ -78,7 +71,6 @@ message TenantConfig {
 message WebServerConfig {
 
   bool enabled = 1;
-  int32 port = 2;
 
   PluginConfig contentRoot = 3;
   repeated WebServerRewriteRule rewriteRules = 4;
@@ -98,29 +90,59 @@ message WebServerRedirect {
   int32 status = 3;
 }
 
+message GatewayConfig {
 
-message InstantMap {
+  uint32 idleTimeout = 1;
 
-  repeated InstanceConfig meta = 1;
-  repeated InstanceConfig data = 2;
-  repeated InstanceConfig orch = 3;
+  repeated RouteConfig routes = 2;
 }
 
-message InstanceConfig {
+message RouteConfig {
 
+  string routeName = 1;
+  RoutingProtocol routeType = 2;
+  repeated RoutingProtocol protocols = 3;
+
+  RoutingMatch match = 5;
+  RoutingTarget target = 6;
+}
+
+enum RoutingProtocol {
+  PROTOCOL_NOT_SET = 0;
+  HTTP = 1;
+  GRPC = 2;
+  GRPC_WEB = 3;
+  REST = 4;
+}
+
+message RoutingMatch {
+  string host = 1;
+  string path = 2;
+}
+
+message RoutingTarget {
   string scheme = 1;
   string host = 2;
   uint32 port = 3;
-}
-
-message ServiceMap {
-
-  ServiceConfig meta = 1;
-  ServiceConfig data = 2;
-  ServiceConfig orch = 3;
+  string path = 4;
 }
 
 message ServiceConfig {
 
-  uint32 port = 1;
+  optional bool enabled = 1;
+
+  string alias = 2;
+  uint32 port = 3;
+}
+
+message DeploymentConfig {
+
+  DeploymentLayout layout = 1;
+}
+
+enum DeploymentLayout {
+  LAYOUT_NOT_SET = 0;
+  SANDBOX = 1;
+  HOSTED = 2;
+  CUSTOM = 3;
 }

@@ -52,7 +52,6 @@ public class RunFlowTest {
 
     private static final String TEST_TENANT = "ACME_CORP";
     private static final String E2E_CONFIG = "config/trac-e2e.yaml";
-    private static final String GW_CONFIG = "config/trac-gw-unit.yaml";
 
     private static final String LOANS_INPUT_PATH = "examples/models/python/data/inputs/loan_final313_100_shortform.csv";
     private static final String CURRENCY_INPUT_PATH = "examples/models/python/data/inputs/currency_data_sample.csv";
@@ -66,7 +65,7 @@ public class RunFlowTest {
 
 
     @RegisterExtension
-    public static final PlatformTest platform = PlatformTest.forConfig(E2E_CONFIG, GW_CONFIG)
+    public static final PlatformTest platform = PlatformTest.forConfig(E2E_CONFIG)
             .addTenant(TEST_TENANT)
             .startAll()
             .build();

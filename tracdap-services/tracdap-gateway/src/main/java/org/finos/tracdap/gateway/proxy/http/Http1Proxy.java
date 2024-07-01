@@ -17,7 +17,7 @@
 package org.finos.tracdap.gateway.proxy.http;
 
 import org.finos.tracdap.common.exception.EUnexpected;
-import org.finos.tracdap.config.GwRoute;
+import org.finos.tracdap.config.RouteConfig;
 
 import io.netty.channel.ChannelDuplexHandler;
 import io.netty.channel.ChannelHandlerContext;
@@ -31,13 +31,13 @@ import java.util.List;
 
 public class Http1Proxy extends ChannelDuplexHandler {
 
-    private final GwRoute routeConfig;
+    private final RouteConfig routeConfig;
 
     private final String sourcePrefix;
     private final String targetPrefix;
 
 
-    public Http1Proxy(GwRoute routeConfig) {
+    public Http1Proxy(RouteConfig routeConfig) {
 
         this.routeConfig = routeConfig;
 

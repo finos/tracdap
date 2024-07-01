@@ -27,6 +27,11 @@ platformInfo:
 authentication:
   jwtIssuer: http://localhost/
   jwtExpiry: 7200
+  provider:
+    protocol: guest
+    properties:
+      userId: guest
+      userName: Guest User
 
 metadata:
   format: PROTO
@@ -42,12 +47,9 @@ metadata:
     secrets:
       sqlserver.password: metadb_secret
 
-instances:
-  meta:
-    - scheme: http
-      host: localhost
-      port: 8081
-
 services:
-  meta:
+  metadata:
     port: 8081
+
+deployment:
+  layout: SANDBOX

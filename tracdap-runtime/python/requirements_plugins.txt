@@ -48,6 +48,10 @@ google-cloud-storage == 2.16.0
 
 gcsfs == 2024.3.1
 
+# Force dependency versions for compliance
+
+aiohttp >= 3.9.5
+
 # END_PLUGIN gcp
 
 
@@ -66,5 +70,11 @@ azure-storage-blob == 12.19.1
 # Azure implementation of FS Spec
 
 adlfs == 2024.4.1
+
+# Force dependency versions for compliance
+
+cryptography >= 42.0.8
+aiohttp >= 3.9.5
+anyio >= 4.4.0
 
 # END_PLUGIN azure

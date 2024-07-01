@@ -24,10 +24,11 @@ import org.finos.tracdap.common.auth.internal.ClientAuthProvider;
 import org.finos.tracdap.common.auth.external.AuthLogic;
 import org.finos.tracdap.common.auth.internal.JwtSetup;
 import org.finos.tracdap.common.auth.internal.UserInfo;
+import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.plugin.PluginManager;
 import org.finos.tracdap.common.startup.StandardArgs;
-import org.finos.tracdap.config.InstanceConfig;
+import org.finos.tracdap.common.util.RoutingUtils;
 import org.finos.tracdap.config.PlatformConfig;
 import org.finos.tracdap.tools.secrets.SecretTool;
 import org.finos.tracdap.tools.deploy.metadb.DeployMetaDB;
@@ -79,7 +80,6 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
     private final Logger log = LoggerFactory.getLogger(getClass());
 
     private final String testConfig;
-    private final String gatewayConfig;
     private final List<String> tenants;
     private final String storageFormat;
 
@@ -94,12 +94,11 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
     private String authToken;
 
     private PlatformTest(
-            String testConfig, String gatewayConfig, List<String> tenants, String storageFormat,
+            String testConfig, List<String> tenants, String storageFormat,
             boolean runDbDeploy, boolean manageDataPrefix,
             boolean startMeta, boolean startData, boolean startOrch, boolean startGateway) {
 
         this.testConfig = testConfig;
-        this.gatewayConfig = gatewayConfig;
         this.tenants = tenants;
         this.storageFormat = storageFormat;
         this.runDbDeploy = runDbDeploy;
@@ -110,21 +109,15 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         this.startGateway = startGateway;
     }
 
-    public static Builder forConfig(String testConfig, String gatewayConfig) {
+    public static Builder forConfig(String testConfig) {
         var builder = new Builder();
         builder.testConfig = testConfig;
-        builder.gatewayConfig = gatewayConfig;
         return builder;
-    }
-
-    public static Builder forConfig(String testConfig) {
-        return forConfig(testConfig, null);
     }
 
     public static class Builder {
 
         private String testConfig;
-        private String gatewayConfig;
         private final List<String> tenants = new ArrayList<>();
         private String storageFormat = DEFAULT_STORAGE_FORMAT;
         private boolean runDbDeploy = true;  // Run DB deploy by default
@@ -147,7 +140,7 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         public PlatformTest build() {
 
             return new PlatformTest(
-                    testConfig, gatewayConfig, tenants, storageFormat,
+                    testConfig, tenants, storageFormat,
                     runDbDeploy, manageDataPrefix,
                     startMeta, startData, startOrch, startGateway);
         }
@@ -158,7 +151,6 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
     private Path tracStorageDir;
     private Path tracExecDir;    private Path tracRepoDir;
     private URL platformConfigUrl;
-    private URL gatewayConfigUrl;
     private String secretKey;
     private PlatformConfig platformConfig;
 
@@ -319,10 +311,9 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
             }
         }
 
-        var configInputs = gatewayConfig != null ? List.of(testConfig, gatewayConfig) : List.of(testConfig);
+        var configInputs = List.of(testConfig);
         var configOutputs = ConfigHelpers.prepareConfig(configInputs, tracDir, substitutions);
         platformConfigUrl = configOutputs.get(0);
-        gatewayConfigUrl = gatewayConfig != null ? configOutputs.get(1) : null;
 
         // The Secret key is used for storing and accessing secrets
         // If secrets are set up externally, a key can be passed in the env to access the secret store
@@ -518,7 +509,7 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
             orchSvc = ServiceHelpers.startService(TracOrchestratorService.class, tracDir, platformConfigUrl, secretKey);
 
         if (startGateway)
-            gatewaySvc = ServiceHelpers.startService(TracPlatformGateway.class, tracDir, gatewayConfigUrl, secretKey);
+            gatewaySvc = ServiceHelpers.startService(TracPlatformGateway.class, tracDir, platformConfigUrl, secretKey);
     }
 
     void stopServices() {
@@ -539,13 +530,13 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
     void startClients() {
 
         if (startMeta)
-            metaChannel = channelForInstance(platformConfig.getInstances().getMeta(0));
+            metaChannel = channelForService(platformConfig, ConfigKeys.METADATA_SERVICE_KEY);
 
         if (startData)
-            dataChannel = channelForInstance(platformConfig.getInstances().getData(0));
+            dataChannel = channelForService(platformConfig, ConfigKeys.DATA_SERVICE_KEY);
 
         if (startOrch)
-            orchChannel = channelForInstance(platformConfig.getInstances().getOrch(0));
+            orchChannel = channelForService(platformConfig, ConfigKeys.ORCHESTRATOR_SERVICE_KEY);
     }
 
     void stopClients() throws Exception {
@@ -560,13 +551,13 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
             metaChannel.shutdown().awaitTermination(10, TimeUnit.SECONDS);
     }
 
-    ManagedChannel channelForInstance(InstanceConfig instance) {
+    ManagedChannel channelForService(PlatformConfig platformConfig, String serviceKey) {
 
-        var builder = NettyChannelBuilder.forAddress(instance.getHost(), instance.getPort());
+        var serviceTarget = RoutingUtils.serviceTarget(platformConfig, serviceKey);
 
-        if (instance.getScheme().equalsIgnoreCase("HTTP"))
-            builder.usePlaintext();
-
+        var builder = NettyChannelBuilder.forAddress(serviceTarget.getHost(), serviceTarget.getPort());
+        // Tests run on basic HTTP for now
+        builder.usePlaintext();
         builder.directExecutor();
 
         return builder.build();

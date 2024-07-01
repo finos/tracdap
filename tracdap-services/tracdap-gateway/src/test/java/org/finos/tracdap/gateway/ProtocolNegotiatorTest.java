@@ -24,7 +24,8 @@ import org.finos.tracdap.common.auth.external.*;
 import org.finos.tracdap.common.auth.internal.JwtSetup;
 import org.finos.tracdap.common.auth.internal.UserInfo;
 import org.finos.tracdap.config.AuthenticationConfig;
-import org.finos.tracdap.config.GatewayConfig;
+import org.finos.tracdap.config.PlatformConfig;
+import org.finos.tracdap.config.PlatformInfo;
 
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.buffer.Unpooled;
@@ -36,7 +37,6 @@ import io.netty.handler.codec.http.*;
 import io.netty.handler.codec.http2.*;
 import io.netty.util.concurrent.DefaultThreadFactory;
 
-import org.finos.tracdap.config.PlatformInfo;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -74,7 +74,7 @@ public class ProtocolNegotiatorTest {
             ProtocolSetup<WebSocketServerProtocolConfig> webSockets)
             throws Exception {
 
-        var gatewayConfig = GatewayConfig.newBuilder()
+        var gatewayConfig = PlatformConfig.newBuilder()
                 .setAuthentication(AuthenticationConfig.newBuilder()
                         .setJwtIssuer("trac_test_issuer")
                         .setDisableSigning(true))

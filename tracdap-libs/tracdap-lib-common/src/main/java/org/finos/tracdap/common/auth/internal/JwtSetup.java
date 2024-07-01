@@ -46,26 +46,8 @@ public class JwtSetup {
             PlatformConfig platformConfig,
             ConfigManager configManager) {
 
-        return createProcessor(
-                platformConfig.getAuthentication(),
-                platformConfig.getPlatformInfo(),
-                configManager);
-    }
-
-    public static JwtProcessor createProcessor(
-            GatewayConfig gatewayConfig,
-            ConfigManager configManager) {
-
-        return createProcessor(
-                gatewayConfig.getAuthentication(),
-                gatewayConfig.getPlatformInfo(),
-                configManager);
-    }
-
-    private static JwtProcessor createProcessor(
-            AuthenticationConfig authConfig,
-            PlatformInfo platformInfo,
-            ConfigManager configManager) {
+        var authConfig = platformConfig.getAuthentication();
+        var platformInfo = platformConfig.getPlatformInfo();
 
         if (configManager.hasSecret(ConfigKeys.TRAC_AUTH_PUBLIC_KEY) && configManager.hasSecret(ConfigKeys.TRAC_AUTH_PRIVATE_KEY)) {
             var publicKey = configManager.loadPublicKey(ConfigKeys.TRAC_AUTH_PUBLIC_KEY);

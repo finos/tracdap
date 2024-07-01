@@ -22,12 +22,14 @@ import org.finos.tracdap.common.auth.internal.JwtSetup;
 import org.finos.tracdap.common.auth.internal.InternalAuthValidator;
 import org.finos.tracdap.common.cache.IJobCache;
 import org.finos.tracdap.common.cache.IJobCacheManager;
+import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.exec.IBatchExecutor;
 import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.common.grpc.*;
 import org.finos.tracdap.common.plugin.PluginManager;
 import org.finos.tracdap.common.service.CommonServiceBase;
+import org.finos.tracdap.common.util.RoutingUtils;
 import org.finos.tracdap.config.PlatformConfig;
 import org.finos.tracdap.config.ServiceConfig;
 import org.finos.tracdap.svc.orch.api.TracOrchestratorApi;
@@ -85,13 +87,13 @@ public class TracOrchestratorService extends CommonServiceBase {
     protected void doStartup(Duration startupTimeout) {
 
         PlatformConfig platformConfig;
-        ServiceConfig orchestratorConfig;
+        ServiceConfig serviceConfig;
 
         try {
             log.info("Loading TRAC platform config...");
 
             platformConfig = configManager.loadRootConfigObject(PlatformConfig.class);
-            orchestratorConfig = platformConfig.getServices().getOrch();
+            serviceConfig = platformConfig.getServicesOrThrow(ConfigKeys.ORCHESTRATOR_SERVICE_KEY);
 
             // TODO: Config validation
 
@@ -139,7 +141,7 @@ public class TracOrchestratorService extends CommonServiceBase {
             jobManager.start();
 
             this.server = NettyServerBuilder
-                    .forPort(orchestratorConfig.getPort())
+                    .forPort(serviceConfig.getPort())
 
                     // Netty config
                     .channelType(channelType)
@@ -234,22 +236,13 @@ public class TracOrchestratorService extends CommonServiceBase {
             PlatformConfig platformConfig,
             Class<? extends io.netty.channel.Channel> channelType) {
 
-        var metaInstances = platformConfig.getInstances().getMetaList();
+        var metadataTarget = RoutingUtils.serviceTarget(platformConfig, ConfigKeys.METADATA_SERVICE_KEY);
 
-        if (metaInstances.isEmpty()) {
-
-            var err = "Configuration contains no instances of the metadata service";
-            log.error(err);
-            throw new EStartup(err);
-        }
-
-        var metaInstance = metaInstances.get(0);  // Just use the first instance for now
-
-        log.info("Using metadata service instance at [{}:{}]",
-                metaInstance.getHost(), metaInstance.getPort());
+        log.info("Using metadata service at [{}:{}]",
+                metadataTarget.getHost(), metadataTarget.getPort());
 
         var clientChannelBuilder = NettyChannelBuilder
-                .forAddress(metaInstance.getHost(), metaInstance.getPort())
+                .forAddress(metadataTarget.getHost(), metadataTarget.getPort())
                 .channelType(channelType)
                 .eventLoopGroup(nettyGroup)
                 .executor(serviceGroup)

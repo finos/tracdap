@@ -31,58 +31,73 @@ authentication:
       userId: guest
       userName: Guest User
 
-port: 8080
+gateway:
 
-routes:
+  routes:
 
-  - routeName: TRAC Metadata Service
-    routeType: GRPC
+    - routeName: TRAC Metadata Service
+      routeType: GRPC
 
-    match:
-      host: localhost
-      path: /trac.api.TracMetadataApi/.*
+      match:
+        host: localhost
+        path: /trac.api.TracMetadataApi/.*
 
-    target:
-      scheme: http
-      host: localhost
-      port: 8081
-      path: /trac.api.TracMetadataApi/
+      target:
+        scheme: http
+        host: localhost
+        port: 8081
+        path: /trac.api.TracMetadataApi/
 
-  - routeName: Static Docs
-    routeType: HTTP
+    - routeName: Static Docs
+      routeType: HTTP
 
-    match:
-      host: localhost
-      path: /static/docs
+      match:
+        host: localhost
+        path: /static/docs
 
-    target:
-      scheme: http
-      host: localhost
-      port: 8090
-      path: /
+      target:
+        scheme: http
+        host: localhost
+        port: 8090
+        path: /
 
-  - routeName: Server timeout
-    routeType: HTTP
+    - routeName: Server timeout
+      routeType: HTTP
 
-    match:
-      host: localhost
-      path: /static/server_timeout
+      match:
+        host: localhost
+        path: /static/server_timeout
 
-    target:
-      scheme: http
-      host: localhost
-      port: 8091
-      path: /
+      target:
+        scheme: http
+        host: localhost
+        port: 8091
+        path: /
 
-  - routeName: Server down
-    routeType: HTTP
+    - routeName: Server down
+      routeType: HTTP
 
-    match:
-      host: localhost
-      path: /static/server_down
+      match:
+        host: localhost
+        path: /static/server_down
 
-    target:
-      scheme: http
-      host: localhost
-      port: 8092
-      path: /
+      target:
+        scheme: http
+        host: localhost
+        port: 8092
+        path: /
+
+
+services:
+  gateway:
+    port: 8080
+  metadata:
+    port: 8081
+  data:
+    port: 8082
+  orchestrator:
+    port: 8083
+
+
+deployment:
+  layout: SANDBOX

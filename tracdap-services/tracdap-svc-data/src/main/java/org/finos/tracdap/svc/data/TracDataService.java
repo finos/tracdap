@@ -20,6 +20,7 @@ import org.finos.tracdap.api.TrustedMetadataApiGrpc;
 import org.finos.tracdap.common.auth.internal.InternalAuthProvider;
 import org.finos.tracdap.common.auth.internal.JwtSetup;
 import org.finos.tracdap.common.auth.internal.InternalAuthValidator;
+import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.grpc.*;
 import org.finos.tracdap.common.codec.CodecManager;
 import org.finos.tracdap.common.codec.ICodecManager;
@@ -31,6 +32,7 @@ import org.finos.tracdap.common.plugin.PluginManager;
 import org.finos.tracdap.common.service.CommonServiceBase;
 import org.finos.tracdap.common.storage.IStorageManager;
 import org.finos.tracdap.common.storage.StorageManager;
+import org.finos.tracdap.common.util.RoutingUtils;
 import org.finos.tracdap.config.PlatformConfig;
 import org.finos.tracdap.config.ServiceConfig;
 import org.finos.tracdap.config.StorageConfig;
@@ -79,8 +81,8 @@ public class TracDataService extends CommonServiceBase {
     protected void doStartup(Duration startupTimeout) {
 
         PlatformConfig platformConfig;
+        ServiceConfig serviceConfig;
         StorageConfig storageConfig;
-        ServiceConfig dataSvcConfig;
 
         // Force initialization of Arrow MemoryUtil, rather than waiting until the first API call
         // This can fail on Java versions >= 16 if the java.nio module is not marked as open
@@ -99,8 +101,8 @@ public class TracDataService extends CommonServiceBase {
             log.info("Loading TRAC platform config...");
 
             platformConfig = configManager.loadRootConfigObject(PlatformConfig.class);
+            serviceConfig = platformConfig.getServicesOrThrow(ConfigKeys.DATA_SERVICE_KEY);
             storageConfig = platformConfig.getStorage();
-            dataSvcConfig = platformConfig.getServices().getData();
 
             // TODO: Config validation
 
@@ -160,7 +162,7 @@ public class TracDataService extends CommonServiceBase {
             // Create the main server
 
             this.server = NettyServerBuilder
-                    .forPort(dataSvcConfig.getPort())
+                    .forPort(serviceConfig.getPort())
 
                     // Netty setup
                     .channelType(channelType)
@@ -222,22 +224,13 @@ public class TracDataService extends CommonServiceBase {
             Class<? extends io.netty.channel.Channel> channelType,
             EventLoopRegister eventLoopRegister) {
 
-        var metaInstances = platformConfig.getInstances().getMetaList();
+        var metadataTarget = RoutingUtils.serviceTarget(platformConfig, ConfigKeys.METADATA_SERVICE_KEY);
 
-        if (metaInstances.isEmpty()) {
-
-            var err = "Configuration contains no instances of the metadata service";
-            log.error(err);
-            throw new EStartup(err);
-        }
-
-        var metaInstance = metaInstances.get(0);  // Just use the first instance for now
-
-        log.info("Using metadata service instance at [{}:{}]",
-                metaInstance.getHost(), metaInstance.getPort());
+        log.info("Using metadata service at [{}:{}]",
+                metadataTarget.getHost(), metadataTarget.getPort());
 
         var clientChannel = NettyChannelBuilder
-                .forAddress(metaInstance.getHost(), metaInstance.getPort())
+                .forAddress(metadataTarget.getHost(), metadataTarget.getPort())
                 .channelType(channelType)
                 .eventLoopGroup(serviceGroup)
                 .usePlaintext()

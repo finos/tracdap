@@ -55,10 +55,9 @@ public class RestProxyTest {
     public static final long TEST_TIMEOUT = 10 * 1000;  // 10 second timeout
 
     public static final String TRAC_CONFIG_UNIT = "config/trac-unit.yaml";
-    public static final String TRAC_GW_CONFIG_UNIT = "config/trac-gw-unit.yaml";
 
     @RegisterExtension
-    public static final PlatformTest platform = PlatformTest.forConfig(TRAC_CONFIG_UNIT, TRAC_GW_CONFIG_UNIT)
+    public static final PlatformTest platform = PlatformTest.forConfig(TRAC_CONFIG_UNIT)
             .addTenant(TEST_TENANT)
             .startMeta()
             .startGateway()

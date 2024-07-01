@@ -18,6 +18,7 @@ package org.finos.tracdap.webserver;
 
 
 import org.finos.tracdap.common.auth.internal.JwtSetup;
+import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.common.plugin.PluginManager;
@@ -88,6 +89,8 @@ public class TracWebServer extends CommonServiceBase {
         // It would be quite easy to implement ByteBufAllocator as a wrapper on an Arrow BufferAllocator
         // This would let the web server use a single allocation framework
 
+        var serviceconfig = platformConfig.getServicesOrThrow(ConfigKeys.WEB_SERVER_SERVICE_KEY);
+
         var arrowAllocatorConfig = RootAllocator
                 .configBuilder()
                 .allocationManagerFactory(NettyAllocationManager.FACTORY)
@@ -133,8 +136,8 @@ public class TracWebServer extends CommonServiceBase {
                 .childOption(ChannelOption.SO_KEEPALIVE, true);
 
         // Bind and start to accept incoming connections.
-        log.info("Starting web server on port [{}]", webServerConfig.getPort());
-        var startupFuture = bootstrap.bind(webServerConfig.getPort());
+        log.info("Starting web server on port [{}]", serviceconfig.getPort());
+        var startupFuture = bootstrap.bind(serviceconfig.getPort());
 
         // Block until the server channel is ready - it's just easier this way!
         // The sync call will rethrow any errors, so they can be handled before leaving the start() method

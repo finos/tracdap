@@ -280,4 +280,24 @@
         <vulnerabilityName>CVE-2024-23081</vulnerabilityName>
     </suppress>
 
+
+    <!-- This is an issue in the Azure cloud stack for auth / identity -->
+    <!-- It is fixed in the latest SDK version according to MS, but still being flagged -->
+    <!-- https://msrc.microsoft.com/update-guide/vulnerability/CVE-2024-35255 -->
+
+    <suppress>
+        <packageUrl regex="true">^pkg:maven/com\.azure/azure\-identity@.*$</packageUrl>
+        <cve>CVE-2024-35255</cve>
+    </suppress>
+
+    <suppress>
+        <packageUrl regex="true">^pkg:maven/com\.microsoft\.azure/msal4j@.*$</packageUrl>
+        <cve>CVE-2024-35255</cve>
+    </suppress>
+
+    <suppress>
+        <packageUrl regex="true">^pkg:maven/com\.microsoft\.azure/msal4j\-persistence\-extension@.*$</packageUrl>
+        <cve>CVE-2024-35255</cve>
+    </suppress>
+
 </suppressions>

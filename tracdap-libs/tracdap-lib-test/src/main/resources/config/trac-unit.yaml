@@ -26,8 +26,15 @@ platformInfo:
 
 
 authentication:
+
   jwtIssuer: http://localhost/
   jwtExpiry: 7200
+
+  provider:
+    protocol: guest
+    properties:
+      userId: guest
+      userName: Guest User
 
 
 metadata:
@@ -74,31 +81,27 @@ jobCache:
   protocol: LOCAL
 
 
-instances:
-
-  meta:
-    - scheme: http
-      host: localhost
-      port: 8081
-
-  data:
-    - scheme: http
-      host: localhost
-      port: 8082
-
-  orch:
-    - scheme: http
-      host: localhost
-      port: 8083
+gateway:
+  idleTimeout: 10
 
 
 services:
 
-  meta:
+  gateway:
+    port: 8080
+
+  metadata:
     port: 8081
 
   data:
     port: 8082
 
-  orch:
+  orchestrator:
     port: 8083
+
+  webServer:
+    port: 9000
+
+
+deployment:
+  layout: SANDBOX

@@ -24,7 +24,7 @@ on:
 env:
   JAVA_VERSION: "21"
   JAVA_DISTRIBUTION: "zulu"
-  PYTHON_VERSION: "3.12"
+  PYTHON_VERSION: "3.11"
   NODE_VERSION: "18"
 
 
@@ -50,19 +50,37 @@ jobs:
           java-version: ${{ env.JAVA_VERSION }}
           cache: gradle
 
-      # Use a cache to save downloading the whole NVD on every build
-      # Dependency check will automatically look for updates and download the delta
-      - name: NVD cache
-        uses: actions/cache@v3
-        with:
-          key: compliance-cache-data
-          path: ./build/compliance-cache
-
-      - name: OWASP dependency check
-        run: ./gradlew dependencyCheckAggregate
-
       - name: License check
         run: ./gradlew checkLicense
+
+      # Use a cache to save downloading the whole NVD on every build
+      # Dependency check will automatically look for updates and download the delta
+      - name: NVD restore cache (Java Platform)
+        id: cacheRestore
+        uses: actions/cache/restore@v4
+        with:
+          key: nvd-cache-java-platform
+          path: ./build/compliance-cache/nvd_java_platform
+
+      - name: OWASP recreate cache
+        if: steps.cacheRestore.outputs.cache-hit != 'true'
+        env:
+          NVD_DATAFEED: "https://dependency-check.github.io/DependencyCheck_Builder/nvd_cache/"
+          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+        run: ./gradlew dependencyCheckUpdate
+
+      - name: OWASP dependency check
+        env:
+          NVD_DATAFEED: "https://dependency-check.github.io/DependencyCheck_Builder/nvd_cache/"
+          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+        run: ./gradlew dependencyCheckAggregate
+
+      - name: NVD save cache (Java Platform)
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          key: nvd-cache-java-platform
+          path: ./build/compliance-cache/nvd_java_platform
 
       # Always save the reports - they are especially needed when the checks have failed!
       - name: Store compliance reports
@@ -100,17 +118,6 @@ jobs:
           pip install -r requirements.txt
           pip install -r requirements_plugins.txt
 
-      # CVE-2023-5752 (safety id: 62044) is a vulnerability in pip itself, fixed in the most recent version (23.3)
-      # Although pip is updated, safety check detects the old version (perhaps because pip is part of the base package)
-      # Anyway pip is not a dependency of the tracdap-runtime package, clients will get pip from their Python install
-      # Once the base Python used in CI bumps up to include a later pip, the --ignore flag can be removed
-      - name: Safety check
-        run: |
-          mkdir -p build/compliance/python-runtime-safety
-          cd tracdap-runtime/python
-          safety check --ignore 62044 --output text > ../../build/compliance/python-runtime-safety/python-runtime-safety-report.txt
-          safety check --ignore 62044 --output json > ../../build/compliance/python-runtime-safety/python-runtime-safety-report.json
-
       - name: License check
         run: |
 
@@ -122,6 +129,15 @@ jobs:
           pip-licenses --format=json --ignore-packages $IGNORE_LICENSE > ../../build/compliance/python-runtime-licenses/python-runtime-licenses.json
           pip-licenses --format=html --ignore-packages $IGNORE_LICENSE > ../../build/compliance/python-runtime-licenses/python-runtime-licenses.html
           pip-licenses --allow-only="$ALLOWED_LICENSES" --ignore-packages $IGNORE_LICENSE
+
+      # CVE-2019-8341 (safety id: 70612) is a vulnerability in the latest version of Jinja2, no fix is available
+      # It is only pulled in as a dependency of safety check itself, it is not a dependency of the dist wheels
+      - name: Safety check
+        run: |
+          mkdir -p build/compliance/python-runtime-safety
+          cd tracdap-runtime/python
+          safety check --ignore 70612 --output text > ../../build/compliance/python-runtime-safety/python-runtime-safety-report.txt
+          safety check --ignore 70612 --output json > ../../build/compliance/python-runtime-safety/python-runtime-safety-report.json
 
       # Always save the reports - they are especially needed when the checks have failed!
       - name: Store compliance reports
@@ -151,24 +167,10 @@ jobs:
           cache: npm
           cache-dependency-path: tracdap-api/packages/web/package-lock.json
 
-      # Use a cache to save downloading global compliance data on every build (e.g. NVD)
-      # Compliance tasks will automatically look for updates and download deltas
-      - name: NVD cache
-        uses: actions/cache@v3
-        with:
-          key: compliance-cache-data
-          path: ./build/compliance-cache
-
       - name: Install dependencies
         run: |
           cd tracdap-api/packages/web
           npm install
-
-      - name: OWASP dependency check
-        run: |
-          mkdir -p build/compliance
-          cd tracdap-api/packages/web
-          npm run compliance-owasp
 
       - name: License check
         run: |
@@ -180,6 +182,34 @@ jobs:
           mkdir -p build/compliance/web-api-npm-audit
           cd tracdap-api/packages/web
           npm run compliance-audit
+
+      # Use a cache to save downloading global compliance data on every build (e.g. NVD)
+      # Compliance tasks will automatically look for updates and download deltas
+      - name: NVD restore cache (Web API)
+        uses: actions/cache/restore@v4
+        with:
+          key: nvd-cache-web-api
+          path: ./build/compliance-cache/nvd_web_api
+
+      - name: OWASP dependency check
+        env:
+          NVD_DATAFEED: "https://dependency-check.github.io/DependencyCheck_Builder/nvd_cache/"
+          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+        run: |
+          mkdir -p build/compliance
+          cd tracdap-api/packages/web
+          if [ -n "${NVD_API_KEY}" ]; then
+            npm run compliance-owasp -- --nvdDatafeed "${NVD_DATAFEED}" --nvdApiKey "${NVD_API_KEY}"
+          else
+            npm run compliance-owasp -- --nvdDatafeed "${NVD_DATAFEED}"
+          fi
+
+      - name: NVD save cache (Web API)
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          key: nvd-cache-web-api
+          path: ./build/compliance-cache/nvd_web_api
 
       # Always save the reports - they are especially needed when the checks have failed!
       - name: Store compliance reports
