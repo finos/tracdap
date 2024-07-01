@@ -21,7 +21,7 @@ import logging
 import tempfile
 
 import protoc
-import google.api  # noqa
+import google.api.http_pb2 as gapi_http_module
 
 
 SCRIPT_NAME = pathlib.Path(__file__).stem
@@ -85,7 +85,7 @@ class ProtoApiExtensions:
         _copytree(protoc_inc_src, protoc_inc_dst)
 
         # Google API protos for annotating web services
-        gapi_src = pathlib.Path(google.api.__file__).parent
+        gapi_src = pathlib.Path(gapi_http_module.__file__).parent
         gapi_dst = pathlib.Path(self.temp_dir_name).joinpath("google/api")
 
         _log.info(f"Copying {gapi_src} -> {gapi_dst}")
