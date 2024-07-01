@@ -22,7 +22,7 @@
     "apache-arrow": "^10.0.1",
     "node-fetch": "^3.3.0",
     "tracdap-web-api": "file:../../../tracdap-api/packages/web",
-    "ws": "^8.11.0",
+    "ws": "^8.17.1",
     "xhr2": "^0.2.1"
   },
   "scripts": {
