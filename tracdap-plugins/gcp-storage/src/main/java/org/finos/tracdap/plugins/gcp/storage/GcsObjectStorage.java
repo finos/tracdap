@@ -64,6 +64,7 @@ public class GcsObjectStorage extends CommonFileStorage {
     public static final String PREFIX_PROPERTY = "prefix";
 
     private static final int DELETE_PAGE_SIZE = 1000;
+    private static final String PROJECT_DEFINED_BY_BUCKET = "_";
 
     private final String project;
     private final String bucket;
@@ -92,7 +93,7 @@ public class GcsObjectStorage extends CommonFileStorage {
 
         try {
 
-            bucketName = BucketName.of(project, bucket);
+            bucketName = BucketName.of(PROJECT_DEFINED_BY_BUCKET, bucket);
 
             log.info("INIT [{}], fs = [GCS], project=[{}], bucket = [{}], prefix = [{}]",
                     storageKey, project, bucket, prefix);
