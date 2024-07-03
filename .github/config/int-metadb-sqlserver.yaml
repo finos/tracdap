@@ -42,6 +42,8 @@ metadata:
       jdbcUrl: //metadb:1433
       sqlserver.databaseName: master
       sqlserver.user: sa
+      sqlserver.encrypt: true
+      sqlserver.trustServerCertificate: true
       pool.size: 2
       pool.overflow: 5
     secrets:
