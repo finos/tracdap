@@ -248,7 +248,7 @@ jobs:
           - { DB_NAME: MariaDB,
               DB_IMAGE: 'mariadb:11.4',
               DB_PORT: 3306,
-              DB_OPTIONS: '--health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=3',
+              DB_OPTIONS: '--health-cmd="healthcheck.sh --innodb_initialized" --health-interval=10s --health-timeout=5s --health-retries=3',
               BUILD_sql_mariadb: true,
               TRAC_CONFIG_FILE: '.github/config/int-metadb-mariadb.yaml',
               TRAC_SECRET_KEY: uYhnKwq8+esS,
