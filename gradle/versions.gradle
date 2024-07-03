@@ -48,7 +48,7 @@ ext {
     mysql_version = '8.3.0'
     mariadb_version = '3.3.3'
     postgresql_version = '42.7.3'
-    sqlserver_version = '9.4.1.jre11'     // Update to SqlServer 10.x driver series is a breaking change
+    sqlserver_version = '12.6.3.jre11'
     oracle_version = '19.22.0.0'
 
     // JDBC Connection pool
