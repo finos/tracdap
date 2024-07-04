@@ -79,7 +79,7 @@ jobs:
             cp -R $MODULE build/dist/tracdap-platform-${VERSION}
           done
           cd build/dist
-          tar -czvf tracdap-platform-${VERSION}.tgz tracdap-platform-${VERSION}/*
+          zip -r tracdap-platform-${VERSION}.zip tracdap-platform-${VERSION}/*
 
       - name: Assemble sandbox package
         run: |
@@ -115,7 +115,7 @@ jobs:
             fi
           done
           cd build/dist
-          tar -czvf tracdap-plugins-${VERSION}.tgz tracdap-plugins-${VERSION}/*
+          zip -r tracdap-plugins-${VERSION}.zip tracdap-plugins-${VERSION}/*
 
       - name: Save packages
         uses: actions/upload-artifact@v3
