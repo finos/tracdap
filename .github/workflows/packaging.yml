@@ -101,7 +101,7 @@ jobs:
           mkdir -p build/dist/tracdap-plugins-${VERSION}
           for PLUGIN in build/plugins/*/install/*; do
             PLUGIN_NAME=`basename ${PLUGIN}`
-            if [ "${PLUGIN_NAME} == "sql-drivers" ]; then
+            if [ "${PLUGIN_NAME}" == "sql-drivers" ]; then
               cp -R ${PLUGIN} build/dist/tracdap-plugins-${VERSION}/
             else
               mkdir build/dist/tracdap-plugins-${VERSION}/${PLUGIN_NAME}
