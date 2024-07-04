@@ -13,9 +13,9 @@ The MySQL driver (MySQL Connector/J) is licensed under version 2 of the GNU Gene
 License (GPLv2) subject to the Universal FOSS Exception, version 1.0, as allowed by the
 Licensing Information User Manual for v 8.0.x of MySQL Connector/J:
 
-https://opensource.org/licenses/gpl-2.0.php
-https://oss.oracle.com/licenses/universal-foss-exception/
-https://downloads.mysql.com/docs/licenses/connector-j-8.0-gpl-en.pdf
+https://downloads.mysql.com/docs/licenses/connector-j-8.4-gpl-en.pdf
+https://opensource.org/licenses/gpl-2.0
+https://oss.oracle.com/licenses/universal-foss-exception
 
 The MySQL driver is not enabled by default, you may enable it under these terms.
 
