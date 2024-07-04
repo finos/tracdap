@@ -1,0 +1,95 @@
+/*
+ * Copyright 2024 Accenture Global Solutions Limited
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+plugins {
+    id "java"
+    id "distribution"
+}
+
+description = "JDBC drivers for supported SQL dialects"
+
+// Put plugins into a separate package group
+group = "org.finos.tracdap.plugins"
+
+// Use a different build dir (don't include plugins in the main release package)
+project.buildDir = rootProject.buildDir.path + '/plugins/' + project.name
+
+repositories {
+    mavenCentral()
+}
+
+sourceSets {
+
+    h2 {}
+    h2Compat {}
+    mysql {}
+    postgresql {}
+    sqlserver {}
+}
+
+dependencies {
+
+    h2RuntimeOnly group: 'com.h2database', name: 'h2', version: "$h2_version"
+
+    h2CompatRuntimeOnly group: 'com.h2database', name: 'h2', version: "$h2_compat_version"
+
+    // Do not let MySQL pull in protobuf! We want to use the version from the core TRAC libs
+    mysqlRuntimeOnly (group: 'com.mysql', name: 'mysql-connector-j', version: "$mysql_version") {
+        exclude group: 'com.google.protobuf', module: 'protobuf-java'
+    }
+
+    postgresqlRuntimeOnly group: 'org.postgresql', name: 'postgresql', version: "$postgresql_version"
+
+    sqlserverRuntimeOnly group: 'com.microsoft.sqlserver', name: 'mssql-jdbc', version: "$sqlserver_version"
+
+    // Additional dependencies for Flyway, used by the deploy-metadb tool
+    // Only pull in the specialized driver JAR, not flyway-core and the dependency tree
+
+    mysqlRuntimeOnly (group: 'org.flywaydb', name: 'flyway-mysql', version: "$flyway_version") {
+        exclude group: 'org.flywaydb', module: 'flyway-core'
+    }
+
+    sqlserverRuntimeOnly (group: 'org.flywaydb', name: 'flyway-sqlserver', version: "$flyway_version") {
+        exclude group: 'org.flywaydb', module: 'flyway-core'
+    }
+}
+
+distributions {
+    main {
+        contents {
+
+            from(configurations["h2RuntimeClasspath"]) {
+                into 'h2'
+            }
+
+            from(configurations["h2CompatRuntimeClasspath"]) {
+                into 'h2-compat'
+            }
+
+            from(configurations["mysqlRuntimeClasspath"]) {
+                into 'mysql'
+            }
+
+            from(configurations["postgresqlRuntimeClasspath"]) {
+                into 'postgresql'
+            }
+
+            from(configurations["sqlserverRuntimeClasspath"]) {
+                into 'sqlserver'
+            }
+        }
+    }
+}
