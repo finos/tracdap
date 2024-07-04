@@ -94,20 +94,25 @@ jobs:
       # The dist for each plugin includes all its dependency JARs
       # We filter out JARs that are already included as part of the TRAC platform
       # This avoids putting the same JAR on the classpath twice when a plugin is installed
+      # SQL Drivers plugin has special handling as it prepares its own distribution layout
       - name: Assemble plugins package
         run: |
           VERSION=`dev/version.sh`
           mkdir -p build/dist/tracdap-plugins-${VERSION}
           for PLUGIN in build/plugins/*/install/*; do
             PLUGIN_NAME=`basename ${PLUGIN}`
-            mkdir build/dist/tracdap-plugins-${VERSION}/${PLUGIN_NAME}
-            cp ${PLUGIN}/*.jar build/dist/tracdap-plugins-${VERSION}/${PLUGIN_NAME}/
-            for JAR in ${PLUGIN}/lib/*.jar; do
-              JAR_NAME=`basename ${JAR}`
-              if [ ! -f build/dist/tracdap-sandbox-${VERSION}/lib/${JAR_NAME} ]; then
-                cp ${JAR} build/dist/tracdap-plugins-${VERSION}/${PLUGIN_NAME}/
-              fi
-            done
+            if [ "${PLUGIN_NAME} == "sql-drivers" ]; then
+              cp -R ${PLUGIN} build/dist/tracdap-plugins-${VERSION}/
+            else
+              mkdir build/dist/tracdap-plugins-${VERSION}/${PLUGIN_NAME}
+              cp ${PLUGIN}/*.jar build/dist/tracdap-plugins-${VERSION}/${PLUGIN_NAME}/
+              for JAR in ${PLUGIN}/lib/*.jar; do
+                JAR_NAME=`basename ${JAR}`
+                if [ ! -f build/dist/tracdap-sandbox-${VERSION}/lib/${JAR_NAME} ]; then
+                  cp ${JAR} build/dist/tracdap-plugins-${VERSION}/${PLUGIN_NAME}/
+                fi
+              done
+            fi
           done
           cd build/dist
           tar -czvf tracdap-plugins-${VERSION}.tgz tracdap-plugins-${VERSION}/*
