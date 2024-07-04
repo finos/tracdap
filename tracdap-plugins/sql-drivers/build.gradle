@@ -71,24 +71,27 @@ distributions {
     main {
         contents {
 
-            from(configurations["h2RuntimeClasspath"]) {
-                into 'h2'
+            into("h2") {
+                from(configurations["h2RuntimeClasspath"])
+                from("dist/h2")
             }
 
-            from(configurations["h2CompatRuntimeClasspath"]) {
-                into 'h2-compat'
+            into("h2-compat") {
+                from(configurations["h2CompatRuntimeClasspath"])
+                from("dist/h2")
             }
 
-            from(configurations["mysqlRuntimeClasspath"]) {
-                into 'mysql'
+            into("mysql") {
+                from(configurations["mysqlRuntimeClasspath"])
+                from("dist/mysql")
             }
 
-            from(configurations["postgresqlRuntimeClasspath"]) {
-                into 'postgresql'
+            into("postgresql") {
+                from(configurations["postgresqlRuntimeClasspath"])
             }
 
-            from(configurations["sqlserverRuntimeClasspath"]) {
-                into 'sqlserver'
+            into("sqlserver") {
+                from(configurations["sqlserverRuntimeClasspath"])
             }
         }
     }
