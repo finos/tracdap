@@ -19,10 +19,8 @@ plugins {
     id "distribution"
 }
 
-description = "JDBC drivers for supported SQL dialects"
-
-// Put plugins into a separate package group
-group = "org.finos.tracdap.plugins"
+// SQL Drivers is not a project itself, there is no sql-drivers JAR file
+// Instead it is a way to pull in and package dependencies for the supported SQL dialects
 
 // Use a different build dir (don't include plugins in the main release package)
 project.buildDir = rootProject.buildDir.path + '/plugins/' + project.name
@@ -31,41 +29,9 @@ repositories {
     mavenCentral()
 }
 
-sourceSets {
-
-    h2 {}
-    h2Compat {}
-    mysql {}
-    postgresql {}
-    sqlserver {}
-}
-
-dependencies {
-
-    h2RuntimeOnly group: 'com.h2database', name: 'h2', version: "$h2_version"
-
-    h2CompatRuntimeOnly group: 'com.h2database', name: 'h2', version: "$h2_compat_version"
-
-    // Do not let MySQL pull in protobuf! We want to use the version from the core TRAC libs
-    mysqlRuntimeOnly (group: 'com.mysql', name: 'mysql-connector-j', version: "$mysql_version") {
-        exclude group: 'com.google.protobuf', module: 'protobuf-java'
-    }
-
-    postgresqlRuntimeOnly group: 'org.postgresql', name: 'postgresql', version: "$postgresql_version"
-
-    sqlserverRuntimeOnly group: 'com.microsoft.sqlserver', name: 'mssql-jdbc', version: "$sqlserver_version"
-
-    // Additional dependencies for Flyway, used by the deploy-metadb tool
-    // Only pull in the specialized driver JAR, not flyway-core and the dependency tree
-
-    mysqlRuntimeOnly (group: 'org.flywaydb', name: 'flyway-mysql', version: "$flyway_version") {
-        exclude group: 'org.flywaydb', module: 'flyway-core'
-    }
-
-    sqlserverRuntimeOnly (group: 'org.flywaydb', name: 'flyway-sqlserver', version: "$flyway_version") {
-        exclude group: 'org.flywaydb', module: 'flyway-core'
-    }
-}
+// Pull in source sets and dependencies for the individual drivers
+apply from: "drivers.gradle"
+apply from: "flyway.gradle"
 
 distributions {
     main {

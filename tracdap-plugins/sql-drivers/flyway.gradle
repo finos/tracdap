@@ -1,0 +1,52 @@
+/*
+ * Copyright 2024 Accenture Global Solutions Limited
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+sourceSets {
+
+    h2 {}
+    h2Compat {}
+    mysql {}
+    mariadb {}
+    postgresql {}
+    sqlserver {}
+    oracle {}
+}
+
+dependencies {
+
+    // Additional dependencies for Flyway, used by the deploy-metadb tool
+    // Only pull in the specialized driver JAR, not flyway-core and the dependency tree
+
+    mysqlRuntimeOnly (group: 'org.flywaydb', name: 'flyway-mysql', version: "$flyway_version") {
+        exclude group: 'org.flywaydb', module: 'flyway-core'
+    }
+
+    mariadbRuntimeOnly (group: 'org.flywaydb', name: 'flyway-mysql', version: "$flyway_version") {
+        exclude group: 'org.flywaydb', module: 'flyway-core'
+    }
+
+    sqlserverRuntimeOnly (group: 'org.flywaydb', name: 'flyway-sqlserver', version: "$flyway_version") {
+        exclude group: 'org.flywaydb', module: 'flyway-core'
+    }
+}
+
+ext.DEPEND_sql_h2 = null
+ext.DEPEND_sql_h2_compat  = null
+ext.DEPEND_sql_mysql = sourceSets.mysql.runtimeClasspath
+ext.DEPEND_sql_mariadb = sourceSets.mariadb.runtimeClasspath
+ext.DEPEND_sql_postgresql = null
+ext.DEPEND_sql_sqlserver = sourceSets.sqlserver.runtimeClasspath
+ext.DEPEND_sql_oracle = null

@@ -91,7 +91,7 @@ def isFeatureEnabled(String key) {
 }
 
 
-def enableBuildTimePlugins(List<String> filters) {
+def enableBuildTimePlugins(List<String> filters, boolean optional = false) {
 
     for (key in ext.properties.keySet()) {
 
@@ -115,8 +115,10 @@ def enableBuildTimePlugins(List<String> filters) {
         var dependency = ext.properties.get(dependencyKey)
 
         if (dependency == null) {
-            println("Plugin ${plugin} could not be enabled (no DEPEND_ key defined in plugins.gradle)")
-            continue
+            if (!optional)
+                throw new Exception("Plugin ${plugin} could not be enabled (no DEPEND_ key defined in plugins.gradle)")
+            else
+                continue
         }
 
         println("Enabling plugin: ${plugin}")
@@ -132,5 +134,6 @@ ext {
     addVersionInfo = { SourceSet sourceSet, String name -> this.addVersionInfo(sourceSet, name) }
     getVersionFromGit = { -> getVersionFromGit() }
     isFeatureEnabled = { String key -> this.isFeatureEnabled(key) }
-    enableBuildTimePlugins = { List<String> filters -> enableBuildTimePlugins(filters) }
+    enableBuildTimePlugins = { List<String> filters, boolean optional = false -> enableBuildTimePlugins(filters, optional) }
+    OPTIONAL = true
 }
