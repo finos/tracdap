@@ -37,44 +37,12 @@ dependencies {
 }
 
 
+// The DB library can pull in runtime dependencies for SQL drivers
+// Individual drivers can be enabled/disabled via gradle/plugins.gradle
+// JARs published to Maven do not have any SQL dependencies
+// There may be licensing implications to enabling certain JDBC drivers
+// See the NOTICE file for more information on licensing restrictions
 
-// Set up source sets and dependencies for all supported SQL dialects
-
-sourceSets {
-
-    h2 {}
-    mysql {}
-    mariadb {}
-    postgresql {}
-    sqlserver {}
-    oracle {}
-}
-
-dependencies {
-
-    h2RuntimeOnly group: 'com.h2database', name: 'h2', version: "$h2_version"
-
-    // Do not let MySQL pull in protobuf! We want to use the version from the core TRAC libs
-    mysqlRuntimeOnly (group: 'com.mysql', name: 'mysql-connector-j', version: "$mysql_version") {
-        exclude group: 'com.google.protobuf', module: 'protobuf-java'
-    }
-
-    mariadbRuntimeOnly group: 'org.mariadb.jdbc', name: 'mariadb-java-client', version: "$mariadb_version"
-    postgresqlRuntimeOnly group: 'org.postgresql', name: 'postgresql', version: "$postgresql_version"
-    sqlserverRuntimeOnly group: 'com.microsoft.sqlserver', name: 'mssql-jdbc', version: "$sqlserver_version"
-    oracleRuntimeOnly group: 'com.oracle.database.jdbc', name: 'ojdbc10', version: "$oracle_version"
-}
-
-
-// set up dependencies for SQL driver plugins
-// Done here because there isn't an obvious way to reference source sets in plugins.gradle
-ext.DEPEND_sql_h2 = sourceSets.h2.runtimeClasspath
-ext.DEPEND_sql_mysql = sourceSets.mysql.runtimeClasspath
-ext.DEPEND_sql_mariadb = sourceSets.mariadb.runtimeClasspath
-ext.DEPEND_sql_postgresql = sourceSets.postgresql.runtimeClasspath
-ext.DEPEND_sql_sqlserver = sourceSets.sqlserver.runtimeClasspath
-ext.DEPEND_sql_oracle = sourceSets.oracle.runtimeClasspath
-
-// Enable build time dependencies for SQL
-// Done here because the DEPEND_ variables aren't visible in the application projects (-svc-meta, deploy-metadb)
+// Enable SQL drivers according to plugins.gradle or corresponding env vars
+apply from: "${rootProject.projectDir.path}/tracdap-plugins/sql-drivers/drivers.gradle"
 ext.enableBuildTimePlugins(["sql"])

@@ -1,0 +1,54 @@
+/*
+ * Copyright 2024 Accenture Global Solutions Limited
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+sourceSets {
+
+    h2 {}
+    h2Compat {}
+    mysql {}
+    mariadb {}
+    postgresql {}
+    sqlserver {}
+    oracle {}
+}
+
+dependencies {
+
+    h2RuntimeOnly group: 'com.h2database', name: 'h2', version: "$h2_version"
+
+    h2CompatRuntimeOnly group: 'com.h2database', name: 'h2', version: "$h2_compat_version"
+
+    // Do not let MySQL pull in protobuf! We want to use the version from the core TRAC libs
+    mysqlRuntimeOnly (group: 'com.mysql', name: 'mysql-connector-j', version: "$mysql_version") {
+        exclude group: 'com.google.protobuf', module: 'protobuf-java'
+    }
+
+    mariadbRuntimeOnly group: 'org.mariadb.jdbc', name: 'mariadb-java-client', version: "$mariadb_version"
+
+    postgresqlRuntimeOnly group: 'org.postgresql', name: 'postgresql', version: "$postgresql_version"
+
+    sqlserverRuntimeOnly group: 'com.microsoft.sqlserver', name: 'mssql-jdbc', version: "$sqlserver_version"
+
+    oracleRuntimeOnly group: 'com.oracle.database.jdbc', name: 'ojdbc10', version: "$oracle_version"
+}
+
+ext.DEPEND_sql_h2 = sourceSets.h2.runtimeClasspath
+ext.DEPEND_sql_h2_compat = sourceSets.h2Compat.runtimeClasspath
+ext.DEPEND_sql_mysql = sourceSets.mysql.runtimeClasspath
+ext.DEPEND_sql_mariadb = sourceSets.mariadb.runtimeClasspath
+ext.DEPEND_sql_postgresql = sourceSets.postgresql.runtimeClasspath
+ext.DEPEND_sql_sqlserver = sourceSets.sqlserver.runtimeClasspath
+ext.DEPEND_sql_oracle = sourceSets.oracle.runtimeClasspath

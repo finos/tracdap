@@ -39,59 +39,20 @@ dependencies {
 
     implementation project(':tracdap-api-config')
     implementation project(':tracdap-lib-common')
-
-    // The DB library can pull in runtime dependencies for SQL drivers
-    // Individual drivers can be enabled/disabled via gradle/plugins.gradle
-    // JARs published to Maven do not have any SQL dependencies
-    // There may be licensing implications to enabling certain JDBC drivers
-    // See the NOTICE file for more information on licensing restrictions
-
     implementation project(':tracdap-lib-db')
 
     implementation group: 'org.flywaydb', name: 'flyway-core', version: "$flyway_version"
 }
+
+// Enable Flyway extensions according to SQL settings from plugins.gradle or corresponding env vars
+apply from: "${rootProject.projectDir.path}/tracdap-plugins/sql-drivers/flyway.gradle"
+ext.enableBuildTimePlugins(["sql"], ext.OPTIONAL)
 
 // Bring DDL files into main JAR as resources
 processResources {
 
     from "${project(':tracdap-svc-meta').projectDir.path}/src/schema"
 }
-
-
-// As of version 8, Flyway requires some databases are supported by specific Flyway modules
-
-sourceSets {
-
-    h2 {}
-    mysql {}
-    mariadb {}
-    postgresql {}
-    sqlserver {}
-    oracle {}
-}
-
-dependencies {
-
-    // MySQL, Maria and SQL Server have support modules maintained by Flyway
-    mysqlRuntimeOnly group: 'org.flywaydb', name: 'flyway-mysql', version: "$flyway_version"
-    mariadbRuntimeOnly group: 'org.flywaydb', name: 'flyway-mysql', version: "$flyway_version"
-    sqlserverRuntimeOnly group: 'org.flywaydb', name: 'flyway-sqlserver', version: "$flyway_version"
-
-    // Other DBs just require the database driver JAR, which will be pulled in by -lib-db
-}
-
-
-// Mirror handling of SQL drivers from -lib-db, for Flyway extensions
-
-ext.DEPEND_sql_h2 = sourceSets.h2.runtimeClasspath
-ext.DEPEND_sql_mysql = sourceSets.mysql.runtimeClasspath
-ext.DEPEND_sql_mariadb = sourceSets.mariadb.runtimeClasspath
-ext.DEPEND_sql_postgresql = sourceSets.postgresql.runtimeClasspath
-ext.DEPEND_sql_sqlserver = sourceSets.sqlserver.runtimeClasspath
-ext.DEPEND_sql_oracle = sourceSets.oracle.runtimeClasspath
-
-ext.enableBuildTimePlugins(["sql"])
-
 
 distributions {
     main {

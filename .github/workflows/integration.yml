@@ -233,7 +233,7 @@ jobs:
         database:
 
           - { DB_NAME: MySQL,
-              DB_IMAGE: 'mysql:8.0',
+              DB_IMAGE: 'mysql:8.4',
               DB_PORT: 3306,
               DB_OPTIONS: '--health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=3',
               BUILD_sql_mysql: true,
@@ -246,9 +246,9 @@ jobs:
               MYSQL_ALLOW_EMPTY_PASSWORD: yes }
 
           - { DB_NAME: MariaDB,
-              DB_IMAGE: 'mariadb:10.3',
+              DB_IMAGE: 'mariadb:11.4',
               DB_PORT: 3306,
-              DB_OPTIONS: '--health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=3',
+              DB_OPTIONS: '--health-cmd="healthcheck.sh --innodb_initialized" --health-interval=10s --health-timeout=5s --health-retries=3',
               BUILD_sql_mariadb: true,
               TRAC_CONFIG_FILE: '.github/config/int-metadb-mariadb.yaml',
               TRAC_SECRET_KEY: uYhnKwq8+esS,
@@ -259,7 +259,7 @@ jobs:
               MYSQL_ALLOW_EMPTY_PASSWORD: yes }
 
           - { DB_NAME: PostgreSQL,
-              DB_IMAGE: 'postgres:10-alpine',
+              DB_IMAGE: 'postgres:16-alpine',
               DB_PORT: 5432,
               DB_OPTIONS: '--health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5',
               BUILD_sql_postgresql: true,
@@ -271,7 +271,7 @@ jobs:
               POSTGRES_PASSWORD: trac_admin }
 
           - { DB_NAME: SQLServer,
-              DB_IMAGE: 'mcr.microsoft.com/mssql/server:2019-latest',
+              DB_IMAGE: 'mcr.microsoft.com/mssql/server:2022-latest',
               DB_PORT: 1433,
               DB_OPTIONS: '-e "NO_DB_OPTIONS=not_used"',  # docker run -e flag sets an env variable, passing '' causes errors
               BUILD_sql_sqlserver: true,

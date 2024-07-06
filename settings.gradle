@@ -93,6 +93,7 @@ include 'gcp-config'
 include 'gcp-storage'
 include 'azure-storage'
 include 'ssh-executor'
+include 'sql-drivers'
 
 //project(":aws-config").projectDir = file("tracdap-plugins/aws-config")
 project(":aws-storage").projectDir = file("tracdap-plugins/aws-storage")
@@ -100,12 +101,4 @@ project(":gcp-config").projectDir = file("tracdap-plugins/gcp-config")
 project(":gcp-storage").projectDir = file("tracdap-plugins/gcp-storage")
 project(":azure-storage").projectDir = file("tracdap-plugins/azure-storage")
 project(":ssh-executor").projectDir = file("tracdap-plugins/ssh-executor")
-
-
-// SQL dialects
-
-include 'sql-postgresql'
-include 'sql-sqlserver'
-
-project(":sql-postgresql").projectDir = file("tracdap-plugins/sql-postgresql")
-project(":sql-sqlserver").projectDir = file("tracdap-plugins/sql-sqlserver")
+project(":sql-drivers").projectDir = file("tracdap-plugins/sql-drivers")

@@ -21,8 +21,8 @@ ext {
     // Gradle plugin versions
     proto_plugin_version = "0.9.4"
     nexus_publish_plugin_version = "2.0.0"
-    owasp_check_plugin_version = "9.2.0"
-    license_check_plugin_version = "2.7"
+    owasp_check_plugin_version = "10.0.1"
+    license_check_plugin_version = "2.8"
 
     // Core platform technologies
     netty_version = '4.1.109.Final'
@@ -45,10 +45,11 @@ ext {
 
     // SQL (JDBC) drivers
     h2_version = '2.2.224'
-    mysql_version = '8.3.0'
-    mariadb_version = '3.3.3'
+    h2_compat_version = '2.1.214'
+    mysql_version = '8.4.0'
+    mariadb_version = '3.4.0'
     postgresql_version = '42.7.3'
-    sqlserver_version = '9.4.1.jre11'     // Update to SqlServer 10.x driver series is a breaking change
+    sqlserver_version = '12.6.3.jre11'
     oracle_version = '19.22.0.0'
 
     // JDBC Connection pool

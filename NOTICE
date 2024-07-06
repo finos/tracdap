@@ -1,30 +1,61 @@
-TRAC d.a.p. - FINOS
-Copyright 2022 Accenture Global Solutions Limited
+FINOS TRAC D.A.P.
+Copyright 2024 Accenture Global Solutions Limited
 
-This product includes software developed at Accenture (http://www.accenture.com/) and the Fintech Open Source Foundation (https://www.finos.org/).
+This product includes software developed at Accenture (http://www.accenture.com/) and the
+Fintech Open Source Foundation (https://www.finos.org/).
 
-TRAC d.a.p. is based on original work developed at Parker Fitzgerald Ltd from 2017 to 2019.
+TRAC D.A.P. is based on original work developed at Parker Fitzgerald Ltd from 2017 to 2019.
 Parker Fitzgerald was acquired by Accenture in August 2019.
 
 
 Third Party Components - SQL (JDBC) drivers
+===========================================
+
+TRAC supports a number of SQL dialects, by means of JDBC "drivers" added to the classpath.
+SQL drivers can be enabled for development in the Gradle config file "gradle/plugins.gradle".
+Any drivers that are enabled may only be used under the terms of their respective licenses.
+If you are planning to redistribute TRAC you should be aware of the legal implications of
+adjusting these settings for a release build.
+
+TRAC may be built with support for all SQL drivers disabled, as SQL drivers can be supplied
+at run time. By building the platform this way, it is not combined with any driver code.
+All the public releases of TRAC D.A.P. are built in this way. A person or organisation deploying
+the platform will be able to supply SQL drivers under their own license terms.
+
+There is a plugins package released with each public release of TRAC D.A.P. This plugins package
+contains some of the available SQL drivers, licensed under there own terms, where licensing
+conditions allow.
+
+H2 JDBC Driver
+--------------
+
+The H2 JDBC driver contains unmodified binary redistributions for
+H2 database engine (https://h2database.com/),
+which is dual licensed and available under the MPL 2.0
+(Mozilla Public License) or under the EPL 1.0 (Eclipse Public License).
+An original copy of the license agreement can be found at:
+https://h2database.com/html/license.html
+
+The H2 driver is not enabled by default, you may enable it under these terms.
+
+MySQL JDBC Driver
+-----------------
 
 The MySQL driver (MySQL Connector/J) is licensed under version 2 of the GNU General Public
 License (GPLv2) subject to the Universal FOSS Exception, version 1.0, as allowed by the
 Licensing Information User Manual for v 8.0.x of MySQL Connector/J:
 
-https://opensource.org/licenses/gpl-2.0.php
-https://oss.oracle.com/licenses/universal-foss-exception/
-https://downloads.mysql.com/docs/licenses/connector-j-8.0-gpl-en.pdf
+https://downloads.mysql.com/docs/licenses/connector-j-8.4-gpl-en.pdf
+https://opensource.org/licenses/gpl-2.0
+https://oss.oracle.com/licenses/universal-foss-exception
 
 The MySQL driver is not enabled by default, you may enable it under these terms.
 
-SQL drivers can be enabled and disabled in the Gradle config file "gradle/plugins.gradle".
-Any drivers that are enabled may only be used under the terms of their respective licenses.
-If you are planning to redistribute TRAC you should be aware of the legal implications of
-adjusting these settings.
+MariaDB JDBC Driver
+-------------------
 
-TRAC may be built with support for all SQL drivers disabled, as SQL drivers can be supplied
-at run time. By building the platform this way, it is not combined with any driver code.
-The person or organisation deploying the platform will be able to supply SQL drivers under
-their own license terms.
+The MariaDB driver is licensed under LGPL version 2.1.
+
+https://mariadb.com/kb/en/mariadb-licenses/#mariadb-lgpl-client-libraries-for-c-and-java
+
+The MariaDB driver is not enabled by default, you may enable it under these terms.
