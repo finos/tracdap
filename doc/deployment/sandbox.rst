@@ -135,6 +135,14 @@ The pip install command will download the TRAC runtime package for Python from P
 If you are behind a corporate firewall, you may need to use a web proxy and/or
 point at a Nexus server hosted inside your network.
 
+.. note::
+
+    TRAC supports both Pandas 1.X and 2.X. Models written for 1.X might not work with 2.X and vice versa.
+    From TRAC 0.6 onward, new installations default to Pandas 2.X. To change the version of Pandas in your
+    sandbox environment, you can use the pip install command::
+
+        pip install "pandas == 1.5.3"
+
 
 Quick configuration
 -------------------

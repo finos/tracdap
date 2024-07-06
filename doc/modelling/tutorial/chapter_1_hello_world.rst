@@ -31,7 +31,10 @@ dependencies. If you want to target particular versions, you can install them ex
 .. note::
 
     TRAC supports both Pandas 1.X and 2.X. Models written for 1.X might not work with 2.X and vice versa.
-    From TRAC 0.6 onward, new installations default to Pandas 2.X.
+    From TRAC 0.6 onward, new installations default to Pandas 2.X. To change the version of Pandas in your
+    sandbox environment, you can use the pip install command::
+
+        pip install "pandas == 1.5.3"
 
 
 Writing a model
