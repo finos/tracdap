@@ -24,7 +24,14 @@ The TRAC runtime package can be installed directly from PyPI::
     pip install tracdap-runtime
 
 The TRAC runtime depends on Pandas and PySpark, so these libraries will be pulled in as
-dependencies. If you want to target particular versions, install them explicitly first.
+dependencies. If you want to target particular versions, you can install them explicitly::
+
+    pip install "pandas == 2.1.4"
+
+.. note::
+
+    TRAC supports both Pandas 1.X and 2.X. Models written for 1.X might not work with 2.X and vice versa.
+    From TRAC 0.6 onward, new installations default to Pandas 2.X.
 
 
 Writing a model
