@@ -82,17 +82,17 @@ jobs:
           # Latest supported versions on all 3 major platforms
           - { PLATFORM: "windows",
               PYTHON_VERSION: "3.12",
-              PANDAS_DEPENDENCY: "pandas ~= 2.1.0",
+              PANDAS_DEPENDENCY: "pandas ~= 2.2.0",
               PYSPARK_DEPENDENCY: "pyspark ~= 3.5.0" }
 
           - { PLATFORM: "macos",
               PYTHON_VERSION: "3.12",
-              PANDAS_DEPENDENCY: "pandas ~= 2.1.0",
+              PANDAS_DEPENDENCY: "pandas ~= 2.2.0",
               PYSPARK_DEPENDENCY: "pyspark ~= 3.5.0" }
 
           - { PLATFORM: "ubuntu",
               PYTHON_VERSION: "3.12",
-              PANDAS_DEPENDENCY: "pandas ~= 2.1.0",
+              PANDAS_DEPENDENCY: "pandas ~= 2.2.0",
               PYSPARK_DEPENDENCY: "pyspark ~= 3.5.0" }
 
           # Intermediate supported versions, force testing against .0 for Pandas 2.0
