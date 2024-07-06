@@ -19,8 +19,10 @@ plugins {
     id "distribution"
 }
 
-// SQL Drivers is not a project itself, there is no sql-drivers JAR file
-// Instead it is a way to pull in and package dependencies for the supported SQL dialects
+description = "SQL drivers plugin (placeholder, not required for production builds)"
+
+// Put plugins into a separate package group
+group = "org.finos.tracdap.plugins"
 
 // Use a different build dir (don't include plugins in the main release package)
 project.buildDir = rootProject.buildDir.path + '/plugins/' + project.name
@@ -33,10 +35,6 @@ repositories {
 apply from: "drivers.gradle"
 apply from: "flyway.gradle"
 
-// Disable publishing to Maven as a JAR
-tasks.withType(PublishToMavenRepository).configureEach { it.enabled = false }
-
-// Add a custom distribution task to put SQL driver JARS into the plugins package
 distributions {
     main {
         contents {
