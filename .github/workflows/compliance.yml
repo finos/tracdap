@@ -65,14 +65,16 @@ jobs:
       - name: OWASP recreate cache
         if: steps.cacheRestore.outputs.cache-hit != 'true'
         env:
-          NVD_DATAFEED: "https://dependency-check.github.io/DependencyCheck_Builder/nvd_cache/"
           NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+          # In case of problems with this job, try enabling / disabling the remote cache
+          # NVD_DATAFEED: "https://dependency-check.github.io/DependencyCheck_Builder/nvd_cache/"
         run: ./gradlew dependencyCheckUpdate
 
       - name: OWASP dependency check
         env:
-          NVD_DATAFEED: "https://dependency-check.github.io/DependencyCheck_Builder/nvd_cache/"
           NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+          # In case of problems with this job, try enabling / disabling the remote cache
+          # NVD_DATAFEED: "https://dependency-check.github.io/DependencyCheck_Builder/nvd_cache/"
         run: ./gradlew dependencyCheckAggregate
 
       - name: NVD save cache (Java Platform)
