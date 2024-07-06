@@ -7,7 +7,7 @@ The TRAC platform components are available to download on the GitHub release pag
 
 * https://github.com/finos/tracdap/releases
 
-You want the tracdap-platform TGZ file, which includes distributions for all the
+You want the tracdap-platform ZIP file, which includes distributions for all the
 platform services as well as supporting tools suitable for deploying in a container
 or on physical or virtual infrastructure. All the packages are platform-agnostic.
 
