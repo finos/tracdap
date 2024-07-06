@@ -94,12 +94,20 @@ versioned deployment folder, because you want to keep them when you install newe
 
 The metadata service requires a JDBC database driver, which must be copied as a JAR file into the
 *plugins* folder of the TRAC installation. To use the H2 embedded database, you can download the H2
-JDBC JAR from Maven Central:
+JDBC JAR from Sonatype Central (use the "Browse" link for the version you want to download):
 
-* https://search.maven.org/artifact/com.h2database/h2
+* https://central.sonatype.com/artifact/com.h2database/h2/versions
 
 If you are behind a corporate firewall, you may need to use a web proxy and/or
 point at a Nexus server hosted inside your network.
+
+.. note::
+
+    H2 introduced a breaking change between H2 version 2.1.214 and 2.2.220. If you have an existing
+    development setup using H2 2.1.214 or earlier, you will need to keep that version of the JDBC
+    driver if you want to keep your local metadata. For a new setup use the latest stable driver as normal.
+    For more details, see
+    `H2 Database - Increase database format version <https://github.com/h2database/h2database/pull/3834>`_.
 
 **VENV for model execution**
 
@@ -134,6 +142,14 @@ make sure to use the right one to create your venv.
 The pip install command will download the TRAC runtime package for Python from PyPi.
 If you are behind a corporate firewall, you may need to use a web proxy and/or
 point at a Nexus server hosted inside your network.
+
+.. note::
+
+    TRAC supports both Pandas 1.X and 2.X. Models written for 1.X might not work with 2.X and vice versa.
+    From TRAC 0.6 onward, new installations default to Pandas 2.X. To change the version of Pandas in your
+    sandbox environment, you can use the pip install command::
+
+        pip install "pandas == 1.5.3"
 
 
 Quick configuration
