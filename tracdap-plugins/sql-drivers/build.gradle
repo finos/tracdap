@@ -33,6 +33,10 @@ repositories {
 apply from: "drivers.gradle"
 apply from: "flyway.gradle"
 
+// Disable publishing to Maven as a JAR
+tasks.withType(PublishToMavenRepository).configureEach { it.enabled = false }
+
+// Add a custom distribution task to put SQL driver JARS into the plugins package
 distributions {
     main {
         contents {
