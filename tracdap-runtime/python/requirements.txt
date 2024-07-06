@@ -38,7 +38,7 @@ requests == 2.32.3
 # We do not support the 0.x series! 1.2 added the new dType for integers which supports nulls
 # NumPy 2.0 is not supported yet, it breaks the ABI and other packages need time to catch up
 
-pandas >= 1.2.0, < 2.2.0
+pandas >= 1.2.0, < 2.3.0
 numpy < 2.0.0
 
 # PySpark - Support the 3.x series
