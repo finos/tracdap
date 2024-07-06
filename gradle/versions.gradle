@@ -46,8 +46,8 @@ ext {
     // SQL (JDBC) drivers
     h2_version = '2.2.224'
     h2_compat_version = '2.1.214'
-    mysql_version = '8.3.0'
-    mariadb_version = '3.3.3'
+    mysql_version = '8.4.0'
+    mariadb_version = '3.4.0'
     postgresql_version = '42.7.3'
     sqlserver_version = '12.6.3.jre11'
     oracle_version = '19.22.0.0'
