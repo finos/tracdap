@@ -110,6 +110,16 @@ class ImportModelTest(unittest.TestCase):
 
     def test_load_local_ok(self):
 
+        self._test_load_local(self.test_scope)
+
+    def test_load_local_long_path_ok(self):
+
+        long_path_scope = "long_" + "A" * 250
+
+        self._test_load_local(long_path_scope)
+
+    def _test_load_local(self, test_scope):
+
         example_repo_url = pathlib.Path(__file__) \
             .parent \
             .joinpath("../../../../../..") \
@@ -130,16 +140,16 @@ class ImportModelTest(unittest.TestCase):
         )
 
         loader = models.ModelLoader(sys_config, self.scratch_dir)
-        loader.create_scope(self.test_scope)
+        loader.create_scope(test_scope)
 
-        model_class = loader.load_model_class(self.test_scope, stub_model_def)
+        model_class = loader.load_model_class(test_scope, stub_model_def)
         model = model_class()
 
         self.assertIsInstance(model_class, api.TracModel.__class__)
         self.assertIsInstance(model, model_class)
         self.assertIsInstance(model, api.TracModel)
 
-        loader.destroy_scope(self.test_scope)
+        loader.destroy_scope(test_scope)
 
     def test_load_git_ok(self):
 
