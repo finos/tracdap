@@ -150,6 +150,16 @@ class ModelRepositoriesTest(unittest.TestCase):
 
     def test_checkout_pypi(self):
 
+        checkout_key = "pypi_short"
+        self._test_checkout_pypi(checkout_key)
+
+    def test_checkout_pypi_long_path(self):
+
+        checkout_key = "pypi_long_" + "A" * 245  # key is 255 chars
+        self._test_checkout_pypi(checkout_key)
+
+    def _test_checkout_pypi(self, checkout_key):
+
         sys_config = config.RuntimeConfig()
         sys_config.repositories["pypi_test"] = config.PluginConfig(
             protocol="pypi",
@@ -169,17 +179,26 @@ class ModelRepositoriesTest(unittest.TestCase):
         repo_mgr = repos.RepositoryManager(sys_config)
         repo = repo_mgr.get_repository("pypi_test")
 
-        checkout_key = "test_checkout_pypi"
-        checkout_subdir = pathlib.Path(checkout_key)
-
-        checkout_dir = self.scratch_dir.joinpath(model_def.repository, checkout_subdir)
-        checkout_dir.mkdir(mode=0o750, parents=True, exist_ok=False)
+        checkout_dir = self.scratch_dir.joinpath(model_def.repository, checkout_key)
+        safe_checkout_dir = util.windows_safe_path(checkout_dir)
+        safe_checkout_dir.mkdir(mode=0o750, parents=True, exist_ok=False)
 
         package_dir = repo.do_checkout(model_def, checkout_dir)
+        safe_package_dir = util.windows_safe_path(package_dir)
 
-        self.assertTrue(package_dir.joinpath("tracdap").exists())
+        self.assertTrue(safe_package_dir.joinpath("tracdap").exists())
 
     def test_checkout_pypi_simple_json(self):
+
+        checkout_key = "pypi_simple_json_short"
+        self._test_checkout_pypi_simple_json(checkout_key)
+
+    def test_checkout_pypi_simple_json_long_path(self):
+
+        checkout_key = "pypi_simple_json_long_" + "A" * 233  # key is 255 chars
+        self._test_checkout_pypi_simple_json(checkout_key)
+
+    def _test_checkout_pypi_simple_json(self, checkout_key):
 
         sys_config = config.RuntimeConfig()
         sys_config.repositories["pypi_test"] = config.PluginConfig(
@@ -201,17 +220,26 @@ class ModelRepositoriesTest(unittest.TestCase):
         repo_mgr = repos.RepositoryManager(sys_config)
         repo = repo_mgr.get_repository("pypi_test")
 
-        checkout_key = "test_checkout_pypi_simple_json"
-        checkout_subdir = pathlib.Path(checkout_key)
-
-        checkout_dir = self.scratch_dir.joinpath(model_def.repository, checkout_subdir)
-        checkout_dir.mkdir(mode=0o750, parents=True, exist_ok=False)
+        checkout_dir = self.scratch_dir.joinpath(model_def.repository, checkout_key)
+        safe_checkout_dir = util.windows_safe_path(checkout_dir)
+        safe_checkout_dir.mkdir(mode=0o750, parents=True, exist_ok=False)
 
         package_dir = repo.do_checkout(model_def, checkout_dir)
+        safe_package_dir = util.windows_safe_path(package_dir)
 
-        self.assertTrue(package_dir.joinpath("tracdap").exists())
+        self.assertTrue(safe_package_dir.joinpath("tracdap").exists())
 
     def test_checkout_pypi_simple_html(self):
+
+        checkout_key = "pypi_simple_html_short"
+        self._test_checkout_pypi_simple_html(checkout_key)
+
+    def test_checkout_pypi_simple_html_long_path(self):
+
+        checkout_key = "pypi_simple_html_long_" + "A" * 233  # key is 255 chars
+        self._test_checkout_pypi_simple_html(checkout_key)
+
+    def _test_checkout_pypi_simple_html(self, checkout_key):
 
         sys_config = config.RuntimeConfig()
         sys_config.repositories["pypi_test"] = config.PluginConfig(
@@ -233,12 +261,11 @@ class ModelRepositoriesTest(unittest.TestCase):
         repo_mgr = repos.RepositoryManager(sys_config)
         repo = repo_mgr.get_repository("pypi_test")
 
-        checkout_key = "test_checkout_pypi_simple_html"
-        checkout_subdir = pathlib.Path(checkout_key)
-
-        checkout_dir = self.scratch_dir.joinpath(model_def.repository, checkout_subdir)
-        checkout_dir.mkdir(mode=0o750, parents=True, exist_ok=False)
+        checkout_dir = self.scratch_dir.joinpath(model_def.repository, checkout_key)
+        safe_checkout_dir = util.windows_safe_path(checkout_dir)
+        safe_checkout_dir.mkdir(mode=0o750, parents=True, exist_ok=False)
 
         package_dir = repo.do_checkout(model_def, checkout_dir)
+        safe_package_dir = util.windows_safe_path(package_dir)
 
-        self.assertTrue(package_dir.joinpath("tracdap").exists())
+        self.assertTrue(safe_package_dir.joinpath("tracdap").exists())
