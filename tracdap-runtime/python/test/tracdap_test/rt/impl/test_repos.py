@@ -89,11 +89,11 @@ class ModelRepositoriesTest(unittest.TestCase):
         repo = repo_mgr.get_repository("local_test")
 
         checkout_dir = self.scratch_dir.joinpath(model_def.repository, checkout_key)
-        safe_checkout_dir = util.windows_safe_path(checkout_dir)
+        safe_checkout_dir = util.windows_unc_path(checkout_dir)
         safe_checkout_dir.mkdir(mode=0o750, parents=True, exist_ok=False)
 
         package_dir = repo.do_checkout(model_def, checkout_dir)
-        safe_package_dir = util.windows_safe_path(package_dir)
+        safe_package_dir = util.windows_unc_path(package_dir)
 
         self.assertTrue(safe_package_dir.joinpath("tutorial/hello_world.py").exists())
 
@@ -135,11 +135,11 @@ class ModelRepositoriesTest(unittest.TestCase):
         repo = repo_mgr.get_repository("git_test")
 
         checkout_dir = self.scratch_dir.joinpath(model_def.repository, checkout_key)
-        safe_checkout_dir = util.windows_safe_path(checkout_dir)
+        safe_checkout_dir = util.windows_unc_path(checkout_dir)
         safe_checkout_dir.mkdir(mode=0o750, parents=True, exist_ok=False)
 
         package_dir = repo.do_checkout(model_def, checkout_dir)
-        safe_package_dir = util.windows_safe_path(package_dir)
+        safe_package_dir = util.windows_unc_path(package_dir)
 
         self.assertTrue(safe_package_dir.joinpath("tutorial/hello_world.py").exists())
 
@@ -184,11 +184,11 @@ class ModelRepositoriesTest(unittest.TestCase):
         repo = repo_mgr.get_repository("git_test")
 
         checkout_dir = self.scratch_dir.joinpath(model_def.repository, checkout_key)
-        safe_checkout_dir = util.windows_safe_path(checkout_dir)
+        safe_checkout_dir = util.windows_unc_path(checkout_dir)
         safe_checkout_dir.mkdir(mode=0o750, parents=True, exist_ok=False)
 
         package_dir = repo.do_checkout(model_def, checkout_dir)
-        safe_package_dir = util.windows_safe_path(package_dir)
+        safe_package_dir = util.windows_unc_path(package_dir)
 
         self.assertTrue(safe_package_dir.joinpath("tutorial/hello_world.py").exists())
 
@@ -227,11 +227,11 @@ class ModelRepositoriesTest(unittest.TestCase):
         repo = repo_mgr.get_repository("pypi_test")
 
         checkout_dir = self.scratch_dir.joinpath(model_def.repository, checkout_key)
-        safe_checkout_dir = util.windows_safe_path(checkout_dir)
+        safe_checkout_dir = util.windows_unc_path(checkout_dir)
         safe_checkout_dir.mkdir(mode=0o750, parents=True, exist_ok=False)
 
         package_dir = repo.do_checkout(model_def, checkout_dir)
-        safe_package_dir = util.windows_safe_path(package_dir)
+        safe_package_dir = util.windows_unc_path(package_dir)
 
         self.assertTrue(safe_package_dir.joinpath("tracdap").exists())
 
@@ -271,11 +271,11 @@ class ModelRepositoriesTest(unittest.TestCase):
         repo = repo_mgr.get_repository("pypi_test")
 
         checkout_dir = self.scratch_dir.joinpath(model_def.repository, checkout_key)
-        safe_checkout_dir = util.windows_safe_path(checkout_dir)
+        safe_checkout_dir = util.windows_unc_path(checkout_dir)
         safe_checkout_dir.mkdir(mode=0o750, parents=True, exist_ok=False)
 
         package_dir = repo.do_checkout(model_def, checkout_dir)
-        safe_package_dir = util.windows_safe_path(package_dir)
+        safe_package_dir = util.windows_unc_path(package_dir)
 
         self.assertTrue(safe_package_dir.joinpath("tracdap").exists())
 
@@ -315,10 +315,10 @@ class ModelRepositoriesTest(unittest.TestCase):
         repo = repo_mgr.get_repository("pypi_test")
 
         checkout_dir = self.scratch_dir.joinpath(model_def.repository, checkout_key)
-        safe_checkout_dir = util.windows_safe_path(checkout_dir)
+        safe_checkout_dir = util.windows_unc_path(checkout_dir)
         safe_checkout_dir.mkdir(mode=0o750, parents=True, exist_ok=False)
 
         package_dir = repo.do_checkout(model_def, checkout_dir)
-        safe_package_dir = util.windows_safe_path(package_dir)
+        safe_package_dir = util.windows_unc_path(package_dir)
 
         self.assertTrue(safe_package_dir.joinpath("tracdap").exists())
