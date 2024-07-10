@@ -194,7 +194,7 @@ class ModelLoader:
 
         try:
 
-            model: _api.TracModel = object.__new__(model_class)
+            model: _api.TracModel = _api.TracModel.__new__(model_class)
             model_class.__init__(model)
 
             attributes = model.define_attributes()
