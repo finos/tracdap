@@ -98,8 +98,9 @@ class PyPiRepository(IModelRepository):
 
         self._log.info(f"Downloaded [{len(content) / 1024:.1f}] KB in [{elapsed.total_seconds():.1f}] seconds")
 
+        safe_checkout_dir = _helpers.windows_unc_path(checkout_dir)
         download_whl = zipfile.ZipFile(io.BytesIO(download_req.content))
-        download_whl.extractall(checkout_dir)
+        download_whl.extractall(safe_checkout_dir)
 
         self._log.info(f"Unpacked [{len(download_whl.filelist)}] files")
         self._log.info(f"PyPI checkout succeeded for {model_def.package} {model_def.version}")

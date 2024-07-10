@@ -18,6 +18,7 @@
 # And we don't want to put them .ext, those are public APIs that need to be maintained
 
 import logging
+import pathlib
 import platform
 import urllib.parse
 import typing as tp
@@ -178,6 +179,16 @@ __IS_WINDOWS = platform.system() == "Windows"
 
 def is_windows():
     return __IS_WINDOWS
+
+
+def windows_unc_path(path: pathlib.Path) -> pathlib.Path:
+
+    # Convert a path to its UNC form on Windows
+
+    if is_windows() and not str(path).startswith("\\\\?\\"):
+        return pathlib.Path("\\\\?\\" + str(path.resolve()))
+    else:
+        return path
 
 
 def logger_for_object(obj: object) -> logging.Logger:

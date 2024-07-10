@@ -93,6 +93,11 @@ class GitRepository(IModelRepository):
 
         self._log.info(f"Checkout mechanism: [native]")
 
+        # Using windows_safe_path() to create UNC paths does not always work with Windows native Git
+        # So, use the regular checkout_dir, and set core.longpaths = true once the repo is created
+        # This will fail if the path for the repo config file exceeds the Windows MAX_PATH length
+        # I.e. checkout_dir/.git/config
+
         git_cli = ["git", "-C", str(checkout_dir)]
 
         git_cmds = [
@@ -169,7 +174,8 @@ class GitRepository(IModelRepository):
 
         self._log.info("=> git init")
 
-        repo = git_repo.Repo.init(str(checkout_dir))
+        safe_checkout_dir = _helpers.windows_unc_path(checkout_dir)
+        repo = git_repo.Repo.init(str(safe_checkout_dir))
         self._apply_config_from_properties(repo)
 
         # Set up origin
