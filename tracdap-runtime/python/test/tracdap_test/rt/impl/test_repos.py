@@ -53,6 +53,50 @@ class ModelRepositoriesTest(unittest.TestCase):
 
         util.try_clean_dir(self.scratch_dir, remove=True)
 
+    def test_checkout_local(self):
+
+        checkout_key = "local_short"
+        self._test_checkout_local(checkout_key)
+
+    def test_checkout_local_long_path(self):
+
+        # Using Python Git on Windows, the checkout dir path is allowed to exceed Windows MAX_PATH
+        # However no individual path segment can be longer than 255 chars
+
+        checkout_key = "local_long_" + "A" * 244
+        self._test_checkout_local(checkout_key)
+
+    def _test_checkout_local(self, checkout_key):
+
+        local_repo_url = pathlib.Path(__file__) \
+            .parent \
+            .joinpath("../../../../../..") \
+            .resolve()
+
+        sys_config = config.RuntimeConfig()
+        sys_config.repositories["local_test"] = config.PluginConfig(
+            protocol="local",
+            properties={"repoUrl": str(local_repo_url)})
+
+        model_def = meta.ModelDefinition(
+            language="python",
+            repository="local_test",
+            entryPoint="tutorial.hello_world.HelloWorldModel",
+            path="examples/models/python/src"
+        )
+
+        repo_mgr = repos.RepositoryManager(sys_config)
+        repo = repo_mgr.get_repository("local_test")
+
+        checkout_dir = self.scratch_dir.joinpath(model_def.repository, checkout_key)
+        safe_checkout_dir = util.windows_safe_path(checkout_dir)
+        safe_checkout_dir.mkdir(mode=0o750, parents=True, exist_ok=False)
+
+        package_dir = repo.do_checkout(model_def, checkout_dir)
+        safe_package_dir = util.windows_safe_path(package_dir)
+
+        self.assertTrue(safe_package_dir.joinpath("tutorial/hello_world.py").exists())
+
     def test_checkout_git_native(self):
 
         checkout_key = "git_native_short"
@@ -69,7 +113,7 @@ class ModelRepositoriesTest(unittest.TestCase):
 
         self._test_checkout_git_native(checkout_key)
 
-    def _test_checkout_git_native(self, checkout_key: str):
+    def _test_checkout_git_native(self, checkout_key):
 
         sys_config = config.RuntimeConfig()
         sys_config.repositories["git_test"] = config.PluginConfig(
@@ -168,6 +212,9 @@ class ModelRepositoriesTest(unittest.TestCase):
                 "username": "pypi_TEST_USER",
                 "password": "pypi_TEST_PASSWORD"})
 
+        # entryPoint does not exist in the package
+        # But we only check out, we don't actually try to load the model
+
         model_def = meta.ModelDefinition(
             language="python",
             repository="pypi_test",
@@ -209,6 +256,9 @@ class ModelRepositoriesTest(unittest.TestCase):
                 "username": "pypi_TEST_USER",
                 "password": "pypi_TEST_PASSWORD"})
 
+        # entryPoint does not exist in the package
+        # But we only check out, we don't actually try to load the model
+
         model_def = meta.ModelDefinition(
             language="python",
             repository="pypi_test",
@@ -249,6 +299,9 @@ class ModelRepositoriesTest(unittest.TestCase):
                 "pipSimpleFormat": "html",
                 "username": "pypi_TEST_USER",
                 "password": "pypi_TEST_PASSWORD"})
+
+        # entryPoint does not exist in the package
+        # But we only check out, we don't actually try to load the model
 
         model_def = meta.ModelDefinition(
             language="python",
