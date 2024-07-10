@@ -52,6 +52,21 @@ class TestShimLoader(unittest.TestCase):
         self.assertEqual(class_.__name__, "ImportTest")
         self.assertIsInstance(instance_, class_)
 
+    def test_resource_import(self):
+
+        with shim.ShimLoader.use_shim(self._shim):
+
+            class_ = shim.ShimLoader.load_class("acme.rockets.abs1", "ImportTest", object)
+
+            module_ = class_.__module__
+            package_ = module_[0: module_.rindex(".")]
+
+            resource_ = shim.ShimLoader.load_resource(package_, "resource.txt")
+
+        content = resource_.decode("utf-8")
+
+        self.assertEqual(content, "Hello world!")
+
     def test_relative_import_1(self):
 
         with shim.ShimLoader.use_shim(self._shim):
@@ -201,6 +216,16 @@ class TestShimLoader(unittest.TestCase):
                 instance_ = class_()
                 self.assertEqual(class_.__name__, "ImportTest")
                 self.assertIsInstance(instance_, class_)
+
+                module_ = class_.__module__
+                package_ = module_[0: module_.rindex(".")]
+
+                with shim.ShimLoader.use_shim(scope):
+                    resource_ = shim.ShimLoader.load_resource(package_, "resource.txt")
+
+                content = resource_.decode("utf-8")
+
+                self.assertEqual(content, "Hello world!")
 
             finally:
                 util.try_clean_dir(pathlib.Path(tmp))
