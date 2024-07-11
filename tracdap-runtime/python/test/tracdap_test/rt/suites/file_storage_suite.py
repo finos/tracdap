@@ -201,7 +201,7 @@ class FileOperationsTestSuite:
         self.assertEqual(_storage.FileType.FILE, stat_result.file_type)
         self.assertEqual(expected_size, stat_result.size)
 
-    def test_stat_long_path(self):
+    def test_stat_file_long_path(self):
 
         # Simple case - stat a file
 
@@ -276,6 +276,19 @@ class FileOperationsTestSuite:
 
         self.assertEqual("some_dir/test_dir", stat_result.storage_path)
         self.assertEqual("test_dir", stat_result.file_name)
+        self.assertEqual(_storage.FileType.DIRECTORY, stat_result.file_type)
+
+        # Size field for directories should always be set to 0
+        self.assertEqual(0, stat_result.size)
+
+    def test_stat_dir_long_path(self):
+
+        self.storage.mkdir("some_dir/" + self.LONG_PATH_DIR, True)
+
+        stat_result = self.storage.stat("some_dir/" + self.LONG_PATH_DIR,)
+
+        self.assertEqual("some_dir/" + self.LONG_PATH_DIR, stat_result.storage_path)
+        self.assertEqual(self.LONG_PATH_DIR, stat_result.file_name)
         self.assertEqual(_storage.FileType.DIRECTORY, stat_result.file_type)
 
         # Size field for directories should always be set to 0

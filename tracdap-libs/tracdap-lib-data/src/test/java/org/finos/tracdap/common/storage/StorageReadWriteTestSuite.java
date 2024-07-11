@@ -70,6 +70,9 @@ public abstract class StorageReadWriteTestSuite {
     protected IFileStorage storage;
     protected IDataContext dataContext;
 
+    // Windows limits individual path segments to 255 chars
+    private static final String LONG_PATH_TXT_FILE = "long_" + "A".repeat(246) + ".txt";
+
 
     // -----------------------------------------------------------------------------------------------------------------
     // Basic round trip
@@ -88,6 +91,19 @@ public abstract class StorageReadWriteTestSuite {
         var haikuBytes = haiku.getBytes(StandardCharsets.UTF_8);
 
         roundTripTest(storagePath, List.of(haikuBytes), storage, dataContext);
+    }
+
+    @Test
+    void roundTrip_long_path() throws Exception {
+
+        var haiku =
+                "The data goes in;\n" +
+                "For a short while it persists,\n" +
+                "then returns unscathed!";
+
+        var haikuBytes = haiku.getBytes(StandardCharsets.UTF_8);
+
+        roundTripTest(LONG_PATH_TXT_FILE, List.of(haikuBytes), storage, dataContext);
     }
 
     @Test
