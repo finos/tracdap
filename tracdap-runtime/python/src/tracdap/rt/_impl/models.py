@@ -44,10 +44,11 @@ class ModelLoader:
         self.__log = _util.logger_for_object(self)
 
         self.__scratch_dir = scratch_dir.joinpath("models")
-        self.__scratch_dir.mkdir(exist_ok=True, parents=False, mode=0o750)
-
         self.__repos = _repos.RepositoryManager(sys_config)
         self.__scopes: tp.Dict[str, ModelLoader._ScopeState] = dict()
+
+        safe_scratch_dir = _util.windows_unc_path(self.__scratch_dir)
+        safe_scratch_dir.mkdir(exist_ok=True, parents=False, mode=0o750)
 
     def create_scope(self, scope: str):
 
@@ -55,10 +56,12 @@ class ModelLoader:
 
             self.__log.info(f"Creating model scope [{scope}]")
 
-            scope_scratch_dir = self.__scratch_dir.joinpath(scope)
-            scope_scratch_dir.mkdir(exist_ok=False, parents=False, mode=0o750)
+            scope_dir = self.__scratch_dir.joinpath(scope)
 
-            scope_state = ModelLoader._ScopeState(scope_scratch_dir)
+            safe_scope_dir = _util.windows_unc_path(scope_dir)
+            safe_scope_dir.mkdir(exist_ok=False, parents=False, mode=0o750)
+
+            scope_state = ModelLoader._ScopeState(scope_dir)
             self.__scopes[scope] = scope_state
 
         except FileExistsError as e:
@@ -152,7 +155,9 @@ class ModelLoader:
         # What gets cached is the checkout, which may contain multiple packages depending on the repo type
 
         else:
-            checkout_dir.mkdir(mode=0o750, parents=True, exist_ok=False)
+            safe_checkout_dir = _util.windows_unc_path(checkout_dir)
+            safe_checkout_dir.mkdir(mode=0o750, parents=True, exist_ok=False)
+
             package_dir = repo.do_checkout(model_def, checkout_dir)
 
             scope_state.code_cache[code_cache_key] = checkout_dir
