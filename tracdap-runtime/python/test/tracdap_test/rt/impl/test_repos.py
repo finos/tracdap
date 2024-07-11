@@ -55,6 +55,22 @@ class ModelRepositoriesTest(unittest.TestCase):
 
     def test_checkout_git_native(self):
 
+        checkout_key = "git_native_short"
+        self._test_checkout_git_native(checkout_key)
+
+    def test_checkout_git_native_long_path(self):
+
+        # Using native Git on Windows, the checkout dir cannot exceed the Windows max path length
+        # Specifically, checkout_dir/.git/config must be reachable, to enable the long paths setting
+        # However, paths for the items inside the repo can (and should) exceed the max path length
+
+        prefix_length = len(str(self.scratch_dir.joinpath("git_test", "git_native_long_")))
+        checkout_key = "git_native_long_" + "A" * (240 - prefix_length)
+
+        self._test_checkout_git_native(checkout_key)
+
+    def _test_checkout_git_native(self, checkout_key):
+
         sys_config = config.RuntimeConfig()
         sys_config.repositories["git_test"] = config.PluginConfig(
             protocol="git",
@@ -74,17 +90,29 @@ class ModelRepositoriesTest(unittest.TestCase):
         repo_mgr = repos.RepositoryManager(sys_config)
         repo = repo_mgr.get_repository("git_test")
 
-        checkout_key = "test_checkout_git"
-        checkout_subdir = pathlib.Path(checkout_key)
-
-        checkout_dir = self.scratch_dir.joinpath(model_def.repository, checkout_subdir)
-        checkout_dir.mkdir(mode=0o750, parents=True, exist_ok=False)
+        checkout_dir = self.scratch_dir.joinpath(model_def.repository, checkout_key)
+        safe_checkout_dir = util.windows_unc_path(checkout_dir)
+        safe_checkout_dir.mkdir(mode=0o750, parents=True, exist_ok=False)
 
         package_dir = repo.do_checkout(model_def, checkout_dir)
+        safe_package_dir = util.windows_unc_path(package_dir)
 
-        self.assertTrue(package_dir.joinpath("tutorial/hello_world.py").exists())
+        self.assertTrue(safe_package_dir.joinpath("tutorial/hello_world.py").exists())
 
     def test_checkout_git_python(self):
+
+        checkout_key = "git_python_short"
+        self._test_checkout_git_python(checkout_key)
+
+    def test_checkout_git_python_long_path(self):
+
+        # Using Python Git on Windows, the checkout dir path is allowed to exceed Windows MAX_PATH
+        # However no individual path segment can be longer than 255 chars
+
+        checkout_key = "git_python_long_" + "A" * 230
+        self._test_checkout_git_python(checkout_key)
+
+    def _test_checkout_git_python(self, checkout_key):
 
         sys_config = config.RuntimeConfig()
         sys_config.repositories["git_test"] = config.PluginConfig(
@@ -111,15 +139,14 @@ class ModelRepositoriesTest(unittest.TestCase):
         repo_mgr = repos.RepositoryManager(sys_config)
         repo = repo_mgr.get_repository("git_test")
 
-        checkout_key = "test_checkout_git"
-        checkout_subdir = pathlib.Path(checkout_key)
-
-        checkout_dir = self.scratch_dir.joinpath(model_def.repository, checkout_subdir)
-        checkout_dir.mkdir(mode=0o750, parents=True, exist_ok=False)
+        checkout_dir = self.scratch_dir.joinpath(model_def.repository, checkout_key)
+        safe_checkout_dir = util.windows_unc_path(checkout_dir)
+        safe_checkout_dir.mkdir(mode=0o750, parents=True, exist_ok=False)
 
         package_dir = repo.do_checkout(model_def, checkout_dir)
+        safe_package_dir = util.windows_unc_path(package_dir)
 
-        self.assertTrue(package_dir.joinpath("tutorial/hello_world.py").exists())
+        self.assertTrue(safe_package_dir.joinpath("tutorial/hello_world.py").exists())
 
     def test_checkout_pypi(self):
 
