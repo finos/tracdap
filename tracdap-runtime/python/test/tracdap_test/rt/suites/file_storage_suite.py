@@ -516,7 +516,7 @@ class FileOperationsTestSuite:
         self.assertTrue(dir_exists)
         self.assertTrue(child_exists)
 
-    def test_mkdir_long_path_ok(self):
+    def test_mkdir_long_path(self):
 
         # Simplest case - create a single directory
 
@@ -639,7 +639,7 @@ class FileOperationsTestSuite:
         exists = self.storage.exists("test_file.txt")
         self.assertFalse(exists)
 
-    def test_rm_long_path_ok(self):
+    def test_rm_long_path(self):
 
         # Simplest case - create one file and delete it
 
@@ -652,7 +652,7 @@ class FileOperationsTestSuite:
         exists = self.storage.exists(self.LONG_PATH_TXT_FILE)
         self.assertFalse(exists)
 
-    def test_rm_in_subdir_ok(self):
+    def test_rm_in_subdir(self):
 
         # Simplest case - create one file and delete it
 
