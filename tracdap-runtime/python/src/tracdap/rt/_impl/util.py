@@ -242,27 +242,25 @@ def get_args(metaclass: type):
 
 def try_clean_dir(dir_path: pathlib.Path, remove: bool = False) -> bool:
 
+    normalized_path = windows_unc_path(dir_path)
+
+    return __try_clean_dir(normalized_path, remove)
+
+
+def __try_clean_dir(normalized_path, remove):
+
     clean_ok = True
-    normalized_path = dir_path.resolve()
 
     for item in normalized_path.iterdir():
 
         if item.is_dir():
-            clean_ok &= try_clean_dir(item, remove=True)
+            clean_ok &= __try_clean_dir(item, remove=True)
 
         else:
             try:
-                # Windows MAX_PATH = 260 characters, including the drive letter and terminating nul character
-                # In Python the path string does not include a nul, so we need to limit to 259 characters
-                if is_windows() and len(str(item)) >= 259 and not str(item).startswith("\\\\?\\"):
-                    unc_item = pathlib.Path("\\\\?\\" + str(item))
-                    unc_item.unlink()
-                    return True
-                else:
-                    item.unlink()
-                    return True
+                item.unlink()
             except Exception as e:  # noqa
-                return False
+                clean_ok = False
 
     if remove:
         try:
@@ -270,6 +268,16 @@ def try_clean_dir(dir_path: pathlib.Path, remove: bool = False) -> bool:
             return clean_ok
         except Exception:  # noqa
             return False
+
+
+def windows_unc_path(path: pathlib.Path) -> pathlib.Path:
+
+    # Convert a path to its UNC form on Windows
+
+    if is_windows() and not str(path).startswith("\\\\?\\"):
+        return pathlib.Path("\\\\?\\" + str(path.resolve()))
+    else:
+        return path
 
 
 def error_details_from_trace(trace: tb.StackSummary):

@@ -169,7 +169,8 @@ class GitRepository(IModelRepository):
 
         self._log.info("=> git init")
 
-        repo = git_repo.Repo.init(str(checkout_dir))
+        safe_checkout_dir = _helpers.windows_unc_path(checkout_dir)
+        repo = git_repo.Repo.init(str(safe_checkout_dir))
         self._apply_config_from_properties(repo)
 
         # Set up origin
