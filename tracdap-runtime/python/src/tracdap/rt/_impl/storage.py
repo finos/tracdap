@@ -214,6 +214,10 @@ class CommonFileStorage(IFileStorage):
         fs_impl = "arrow"
         fs_root = fs.base_path
 
+        # On Windows, sanitise UNC root paths for logging
+        if _util.is_windows() and fs_root.startswith("//?/"):
+            fs_root = fs_root[4:]
+
         # If this is an FSSpec implementation, take the protocol from FSSpec as the FS type
         base_fs = fs.base_fs
         if isinstance(base_fs, pa_fs.PyFileSystem):

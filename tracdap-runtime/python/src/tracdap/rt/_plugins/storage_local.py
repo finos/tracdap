@@ -61,7 +61,9 @@ class LocalStorageProvider(IStorageProvider):
 
     def get_arrow_native(self) -> afs.SubTreeFileSystem:
         root_fs = afs.LocalFileSystem()
-        return afs.SubTreeFileSystem(str(self._root_path), root_fs)
+        # Use a UNC root path on Windows to avoid max path length issues
+        sub_tree_path = _helpers.windows_unc_path(self._root_path)
+        return afs.SubTreeFileSystem(str(sub_tree_path), root_fs)
 
     def get_file_storage(self) -> IFileStorage:
 
@@ -140,10 +142,9 @@ class LocalFileStorage(IFileStorage):
         self._properties = config.properties
         self._options = options  # Not used
 
-        self._root_path = LocalStorageProvider.check_root_path(self._properties, self._log)
-
-    def _get_root(self):
-        return self._root_path
+        # Use a UNC root path on Windows to avoid max path length issues
+        self._raw_root_path = LocalStorageProvider.check_root_path(self._properties, self._log)
+        self._root_path = _helpers.windows_unc_path(self._raw_root_path)
 
     def exists(self, storage_path: str) -> bool:
 
@@ -358,8 +359,12 @@ class LocalFileStorage(IFileStorage):
             if relative_path.is_absolute():
                 raise ex.EStorageValidation(f"Storage path is not relative: {operation_name} [{storage_path}]")
 
-            root_path = self._root_path
-            absolute_path = self._root_path.joinpath(relative_path).resolve(False)
+            # UNC paths on Windows have different behaviour for join / resolve
+            # Work on the raw path, then convert back to UNC afterward
+            # For other OSes, this is a no-op
+
+            root_path = self._raw_root_path
+            absolute_path = self._raw_root_path.joinpath(relative_path).resolve(False)
 
             # is_relative_to only supported in Python 3.9+, we need to support 3.7
             if absolute_path != root_path and root_path not in absolute_path.parents:
@@ -368,7 +373,7 @@ class LocalFileStorage(IFileStorage):
             if absolute_path == root_path and not allow_root_dir:
                 raise ex.EStorageValidation(f"Illegal operation for storage root: {operation_name} [{storage_path}]")
 
-            return absolute_path
+            return _helpers.windows_unc_path(absolute_path)
 
         except ValueError as e:
 

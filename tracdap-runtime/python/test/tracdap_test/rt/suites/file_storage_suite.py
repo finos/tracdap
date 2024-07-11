@@ -55,6 +55,10 @@ class FileOperationsTestSuite:
     assertRaises = unittest.TestCase.assertRaises
     skipTest = unittest.TestCase.skipTest
 
+    # Windows limits individual path segments to 255 chars
+    LONG_PATH_TXT_FILE = "long_" + "A" * 246 + ".txt"
+    LONG_PATH_DIR = "long_" + "A" * 250
+
     def __init__(self):
         self.storage: _storage.IFileStorage = None  # noqa
 
@@ -67,6 +71,16 @@ class FileOperationsTestSuite:
         self.make_small_file("test_file.txt")
 
         file_present = self.storage.exists("test_file.txt")
+        file_not_present = self.storage.exists("other_file.txt")
+
+        self.assertTrue(file_present)
+        self.assertFalse(file_not_present)
+
+    def test_exists_long_path(self):
+
+        self.make_small_file(self.LONG_PATH_TXT_FILE)
+
+        file_present = self.storage.exists(self.LONG_PATH_TXT_FILE)
         file_not_present = self.storage.exists("other_file.txt")
 
         self.assertTrue(file_present)
@@ -127,6 +141,17 @@ class FileOperationsTestSuite:
 
         self.assertEqual(expected_size, size)
 
+    def test_size_long_path(self):
+
+        content = "Content of a certain size\n".encode('utf-8')
+        expected_size = len(content)
+
+        self.make_file(self.LONG_PATH_TXT_FILE, content)
+
+        size = self.storage.size(self.LONG_PATH_TXT_FILE)
+
+        self.assertEqual(expected_size, size)
+
     def test_size_empty_file(self):
 
         self.make_file("test_file.txt", b"")
@@ -173,6 +198,23 @@ class FileOperationsTestSuite:
 
         self.assertEqual("some_dir/test_file.txt", stat_result.storage_path)
         self.assertEqual("test_file.txt", stat_result.file_name)
+        self.assertEqual(_storage.FileType.FILE, stat_result.file_type)
+        self.assertEqual(expected_size, stat_result.size)
+
+    def test_stat_long_path(self):
+
+        # Simple case - stat a file
+
+        content = "Sample content for stat call\n".encode('utf-8')
+        expected_size = len(content)
+
+        self.storage.mkdir("some_dir", False)
+        self.make_file("some_dir/" + self.LONG_PATH_TXT_FILE, content)
+
+        stat_result = self.storage.stat("some_dir/" + self.LONG_PATH_TXT_FILE,)
+
+        self.assertEqual("some_dir/" + self.LONG_PATH_TXT_FILE, stat_result.storage_path)
+        self.assertEqual(self.LONG_PATH_TXT_FILE, stat_result.file_name)
         self.assertEqual(_storage.FileType.FILE, stat_result.file_type)
         self.assertEqual(expected_size, stat_result.size)
 
@@ -347,6 +389,29 @@ class FileOperationsTestSuite:
         self.assertEqual("test_dir/child_2.txt", child2.storage_path)
         self.assertEqual(_storage.FileType.FILE, child2.file_type)
 
+    def test_ls_long_path(self):
+
+        # Simple listing, dir containing one file and one sub dir
+
+        self.storage.mkdir(self.LONG_PATH_DIR, False)
+        self.storage.mkdir(self.LONG_PATH_DIR + "/child_1", False)
+        self.make_small_file(self.LONG_PATH_DIR + "/child_2.txt")
+
+        ls = self.storage.ls(self.LONG_PATH_DIR)
+
+        self.assertEqual(2, len(ls))
+
+        child1 = next(filter(lambda x: x.file_name == "child_1", ls), None)
+        child2 = next(filter(lambda x: x.file_name == "child_2.txt", ls), None)
+
+        self.assertIsNotNone(child1)
+        self.assertEqual(self.LONG_PATH_DIR + "/child_1", child1.storage_path)
+        self.assertEqual(_storage.FileType.DIRECTORY, child1.file_type)
+
+        self.assertIsNotNone(child2)
+        self.assertEqual(self.LONG_PATH_DIR + "/child_2.txt", child2.storage_path)
+        self.assertEqual(_storage.FileType.FILE, child2.file_type)
+
     def test_ls_extensions(self):
 
         # Corner case - dir with an extension, file without extension
@@ -447,6 +512,22 @@ class FileOperationsTestSuite:
 
         dir_exists = self.storage.exists("test_dir")
         child_exists = self.storage.exists("test_dir/child")
+
+        self.assertTrue(dir_exists)
+        self.assertTrue(child_exists)
+
+    def test_mkdir_long_path(self):
+
+        # Simplest case - create a single directory
+
+        self.storage.mkdir(self.LONG_PATH_DIR, False)
+
+        # Creating a single child dir when the parent already exists
+
+        self.storage.mkdir(self.LONG_PATH_DIR + "/child", False)
+
+        dir_exists = self.storage.exists(self.LONG_PATH_DIR)
+        child_exists = self.storage.exists(self.LONG_PATH_DIR + "/child")
 
         self.assertTrue(dir_exists)
         self.assertTrue(child_exists)
@@ -558,7 +639,20 @@ class FileOperationsTestSuite:
         exists = self.storage.exists("test_file.txt")
         self.assertFalse(exists)
 
-    def test_rm_in_subdir_ok(self):
+    def test_rm_long_path(self):
+
+        # Simplest case - create one file and delete it
+
+        self.make_small_file(self.LONG_PATH_TXT_FILE)
+
+        self.storage.rm(self.LONG_PATH_TXT_FILE)
+
+        # File should be gone
+
+        exists = self.storage.exists(self.LONG_PATH_TXT_FILE)
+        self.assertFalse(exists)
+
+    def test_rm_in_subdir(self):
 
         # Simplest case - create one file and delete it
 
@@ -612,6 +706,18 @@ class FileOperationsTestSuite:
         self.storage.rmdir("test_dir")
 
         exists = self.storage.exists("test_dir")
+        self.assertFalse(exists)
+
+    def test_rmdir_long_path(self):
+
+        self.storage.mkdir(self.LONG_PATH_DIR, False)
+
+        exists = self.storage.exists(self.LONG_PATH_DIR,)
+        self.assertTrue(exists)
+
+        self.storage.rmdir(self.LONG_PATH_DIR,)
+
+        exists = self.storage.exists(self.LONG_PATH_DIR)
         self.assertFalse(exists)
 
     def test_rmdir_by_prefix(self):
@@ -734,6 +840,9 @@ class FileReadWriteTestSuite:
     assertRaises = unittest.TestCase.assertRaises
     fail = unittest.TestCase.fail
 
+    # Windows limits individual path segments to 255 chars
+    LONG_PATH_TXT_FILE = "long_" + "A" * 246 + ".txt"
+
     def __init__(self):
         self.storage: _storage.IFileStorage = None  # noqa
     
@@ -744,6 +853,19 @@ class FileReadWriteTestSuite:
     def test_round_trip_basic(self):
 
         storage_path = "haiku.txt"
+
+        haiku = \
+            "The data goes in;\n" + \
+            "For a short while it persists,\n" + \
+            "then returns unscathed!"
+
+        haiku_bytes = haiku.encode('utf-8')
+
+        self.do_round_trip(storage_path, [haiku_bytes], self.storage)
+
+    def test_round_trip_long_path(self):
+
+        storage_path = self.LONG_PATH_TXT_FILE
 
         haiku = \
             "The data goes in;\n" + \

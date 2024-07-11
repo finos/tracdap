@@ -68,6 +68,7 @@ class LocalArrowImplStorageTest(unittest.TestCase, FileOperationsTestSuite, File
     @classmethod
     def tearDownClass(cls) -> None:
 
+        _util.try_clean_dir(pathlib.Path(cls.storage_root.name))
         cls.storage_root.cleanup()
 
 
@@ -105,6 +106,7 @@ class LocalPythonImplStorageTest(unittest.TestCase, FileOperationsTestSuite, Fil
     @classmethod
     def tearDownClass(cls) -> None:
 
+        _util.try_clean_dir(pathlib.Path(cls.storage_root.name))
         cls.storage_root.cleanup()
 
 
