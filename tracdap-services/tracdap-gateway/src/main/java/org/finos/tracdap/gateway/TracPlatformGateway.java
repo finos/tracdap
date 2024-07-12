@@ -24,6 +24,8 @@ import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.common.plugin.PluginManager;
 import org.finos.tracdap.common.service.CommonServiceBase;
 import org.finos.tracdap.config.PlatformConfig;
+import org.finos.tracdap.gateway.builders.RedirectBuilder;
+import org.finos.tracdap.gateway.exec.Redirect;
 import org.finos.tracdap.gateway.exec.Route;
 import org.finos.tracdap.gateway.builders.RouteBuilder;
 import org.finos.tracdap.gateway.routing.Http1Router;
@@ -82,6 +84,7 @@ public class TracPlatformGateway extends CommonServiceBase {
 
         short proxyPort;
         List<Route> routes;
+        List<Redirect> redirects;
 
         try {
             log.info("Preparing gateway config...");
@@ -93,6 +96,7 @@ public class TracPlatformGateway extends CommonServiceBase {
                     .getPort();
 
             routes = new RouteBuilder().buildRoutes(platformConfig);
+            redirects = new RedirectBuilder().buildRedirects(platformConfig);
 
             log.info("Gateway config looks ok");
         }
