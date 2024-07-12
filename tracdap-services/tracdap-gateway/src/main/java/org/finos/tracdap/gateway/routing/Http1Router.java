@@ -17,6 +17,7 @@
 package org.finos.tracdap.gateway.routing;
 
 import org.finos.tracdap.common.exception.EUnexpected;
+import org.finos.tracdap.gateway.exec.Redirect;
 import org.finos.tracdap.gateway.exec.Route;
 import org.finos.tracdap.gateway.proxy.grpc.GrpcProtocol;
 import org.finos.tracdap.gateway.proxy.http.Http1ProxyBuilder;
@@ -56,9 +57,9 @@ public class Http1Router extends CoreRouter {
     private long currentInboundRequest;
     private long currentOutboundRequest;
 
-    public Http1Router(List<Route> routes, int connId) {
+    public Http1Router(List<Route> routes, List<Redirect> redirects, int connId) {
 
-        super(routes, connId, "HTTP/1");
+        super(routes, redirects, connId, "HTTP/1");
 
         this.requests = new HashMap<>();
 
@@ -170,6 +171,24 @@ public class Http1Router extends CoreRouter {
         // This is a normal error, i.e. the client channel can remain open for more requests
 
         var uri = URI.create(req.uri());
+
+        var redirect = lookupRedirect(uri, req.method(), request.requestId);
+
+        if (redirect != null) {
+
+            var protocolVersion = req.protocolVersion();
+            var status = HttpResponseStatus.valueOf(redirect.getConfig().getStatus());
+            var response = new  DefaultFullHttpResponse(protocolVersion, status);
+            response.headers().set(HttpHeaderNames.LOCATION, redirect.getConfig().getTarget());
+
+            ctx.writeAndFlush(response);
+
+            request.status = RequestStatus.COMPLETED;
+            ++currentOutboundRequest;
+
+            return;
+        }
+
         var route = lookupRoute(uri, req.method(), request.requestId);
 
         if (route == null) {

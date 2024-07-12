@@ -16,6 +16,7 @@
 
 package org.finos.tracdap.gateway.routing;
 
+import org.finos.tracdap.gateway.exec.Redirect;
 import org.finos.tracdap.gateway.exec.Route;
 
 import io.netty.bootstrap.Bootstrap;
@@ -47,6 +48,7 @@ abstract class CoreRouter extends ChannelDuplexHandler {
     private final Logger log = LoggerFactory.getLogger(getClass());
 
     protected final List<Route> routes;
+    protected final List<Redirect> redirects;
     protected final int connId;
     protected final String protocol;
 
@@ -57,7 +59,13 @@ abstract class CoreRouter extends ChannelDuplexHandler {
 
     public CoreRouter(List<Route> routes, int connId, String protocol) {
 
+        this(routes, null, connId, protocol);
+    }
+
+    public CoreRouter(List<Route> routes, List<Redirect> redirects, int connId, String protocol) {
+
         this.routes = routes;
+        this.redirects = redirects;
         this.connId = connId;
         this.protocol = protocol;
 
@@ -143,6 +151,28 @@ abstract class CoreRouter extends ChannelDuplexHandler {
 
     protected abstract void reportProxyRouteError(
             ChannelHandlerContext ctx, Throwable error, boolean direction);
+
+
+    protected final Redirect lookupRedirect(URI uri, HttpMethod method, long requestId) {
+
+        if (this.redirects == null)
+            return null;
+
+        for (var redirect : this.redirects) {
+            if (redirect.getMatcher().matches(method, uri)) {
+
+                log.info("conn = {}, req = {}, REDIRECT {} {} -> {} ({})",
+                        connId, requestId,
+                        method, uri,
+                        redirect.getConfig().getTarget(),
+                        redirect.getConfig().getStatus());
+
+                return redirect;
+            }
+        }
+
+        return null;
+    }
 
 
     protected final Route lookupRoute(URI uri, HttpMethod method, long requestId) {

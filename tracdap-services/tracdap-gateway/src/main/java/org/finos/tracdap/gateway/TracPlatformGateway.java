@@ -118,7 +118,7 @@ public class TracPlatformGateway extends CommonServiceBase {
             var jwtProcessor = JwtSetup.createProcessor(platformConfig, configManager);
 
             // Handlers for all support protocols
-            var http1Handler = ProtocolSetup.setup(connId -> new Http1Router(routes, connId));
+            var http1Handler = ProtocolSetup.setup(connId -> new Http1Router(routes, redirects, connId));
             var http2Handler = ProtocolSetup.setup(connId -> new Http2Router(routes));
 
             var webSocketOptions = WebSocketServerProtocolConfig.newBuilder()
