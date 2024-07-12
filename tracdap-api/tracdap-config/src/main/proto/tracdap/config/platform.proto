@@ -95,6 +95,8 @@ message GatewayConfig {
   uint32 idleTimeout = 1;
 
   repeated RouteConfig routes = 2;
+
+  repeated WebServerRedirect redirects = 3;
 }
 
 message RouteConfig {
