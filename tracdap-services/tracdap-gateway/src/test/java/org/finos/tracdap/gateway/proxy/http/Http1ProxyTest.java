@@ -16,6 +16,7 @@
 
 package org.finos.tracdap.gateway.proxy.http;
 
+import io.netty.util.ReferenceCountUtil;
 import org.finos.tracdap.common.startup.StandardArgs;
 import org.finos.tracdap.common.startup.Startup;
 
@@ -236,6 +237,28 @@ public class Http1ProxyTest {
         var response = request.getNow();
 
         Assertions.assertEquals(HttpResponseStatus.GATEWAY_TIMEOUT, response.status());
+    }
+
+    @Test
+    void http1SimpleProxy_gatewayRedirect() throws Exception {
+
+        var client = new Http1Client(HttpScheme.HTTP, LOCALHOST, TEST_GW_PORT);
+        var request = client.getRequest("/");
+        request.await(TEST_TIMEOUT);
+
+        // Should be a successful response with error code 404
+
+        Assertions.assertTrue(request.isDone());
+        Assertions.assertTrue(request.isSuccess());
+
+        var response = request.getNow();
+        var location = response.headers().get(HttpHeaderNames.LOCATION);
+
+        Assertions.assertEquals(HttpResponseStatus.FOUND, response.status());
+        Assertions.assertEquals("/static/docs/", location);
+
+        if (response.content().refCnt() > 0)
+            response.release();
     }
 
 }
