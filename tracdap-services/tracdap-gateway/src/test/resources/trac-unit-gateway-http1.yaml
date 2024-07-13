@@ -87,6 +87,12 @@ gateway:
         port: 8092
         path: /
 
+  redirects:
+
+    - source: /
+      target: /static/docs/
+      status: 302
+
 
 services:
   gateway:
