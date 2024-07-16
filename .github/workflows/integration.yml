@@ -19,8 +19,8 @@ env:
   JAVA_VERSION: "21"
   JAVA_DISTRIBUTION: "zulu"
   PYTHON_VERSION: "3.12"
-  # Node 20 breaks relative imports used in examples for the web API tests
-  NODE_VERSION: "18"
+  # Node 22 breaks relative imports used in examples for web API tests
+  NODE_VERSION: "20"
 
 
 jobs:
@@ -32,8 +32,11 @@ jobs:
 
     steps:
 
+      # fetch-depth = 0 is needed to get tags for version info
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-deptH: 0
 
       - name: Setup - Java
         uses: actions/setup-java@v4
@@ -165,8 +168,11 @@ jobs:
 
     steps:
 
+      # fetch-depth = 0 is needed to get tags for version info
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Java - Setup
         uses: actions/setup-java@v4
