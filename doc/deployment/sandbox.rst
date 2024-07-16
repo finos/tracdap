@@ -98,7 +98,7 @@ in the TRAC plugins package, available with each release on the GitHub releases 
 * https://github.com/finos/tracdap/releases
 
 Just download the plugins package, unzip it, look in *sql-drivers* for the driver you want and copy it
-into the *plugins* folder of the TRAC installation. For a local development the *h2* driver is recommended.
+into the *plugins* folder of the TRAC installation. For local development the *h2* driver is recommended.
 For more information on supported SQL dialects, see the deployment docs for the
 :doc:`metadata store </deployment/metadata_store>`.
 
