@@ -6,6 +6,13 @@ To use a different SQL backend, get the JDBC driver JAR for your chosen database
 *plugins* folder of the metadata service installation. Then edit the main configuration file
 (usually trac-platform.yaml) with the correct settings from below.
 
+.. note::
+
+    A selection of popular database drivers is available in the TRAC plugins package,
+    available with each release on the GitHub releases page:
+
+    * https://github.com/finos/tracdap/releases
+
 Properties for the JDBC datasource are passed directly to the JDBC driver. For example, if you are using
 the SQLSERVER dialect, then *sqlserver.databaseName* will be passed to the driver as the *databaseName*,
 *sqlserver.user* will be passed as *user* and so on. The properties supported by each driver are described
@@ -74,6 +81,13 @@ please `get in touch <https://github.com/finos/tracdap/issues>`_.
           pool.overflow: 5
         secrets:
           mariadb.password: metadb_password
+
+.. note::
+    The MariaDB driver is not available in the TRAC plugins package due to licensing restrictions.
+    However, you can download it from Maven Central:
+
+    * https://central.sonatype.com/artifact/org.mariadb.jdbc/mariadb-java-client/versions
+
 
 **PostgreSQL configuration**
 

@@ -92,8 +92,8 @@ versioned deployment folder, because you want to keep them when you install newe
 
 **Database driver**
 
-The metadata service requires a JDBC database driver. A selection of popular database drivers are
-available in the plugins package, available with each TRAC release on the GitHub releases page:
+The metadata service requires a JDBC database driver. A selection of popular drivers is available
+in the TRAC plugins package, available with each release on the GitHub releases page:
 
 * https://github.com/finos/tracdap/releases
 
