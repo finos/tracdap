@@ -89,7 +89,7 @@ jobs:
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: compliance-reports
+          name: compliance-reports-java
           path: build/compliance/**
 
   python_runtime_compliance:
@@ -146,7 +146,7 @@ jobs:
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: compliance-reports
+          name: compliance-reports-python
           path: build/compliance/**
 
   web_api_compliance:
@@ -220,7 +220,7 @@ jobs:
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: compliance-reports
+          name: compliance-reports-web
           path: build/compliance/**
 
   publish_to_github:
@@ -242,17 +242,29 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Get TRAC d.a.p. version
+      - name: Get TRAC version
         id: tracdap-version
         run: |
           tracdap_version=`dev/version.sh`
           echo "tracdap_version = ${tracdap_version}"
           echo "tracdap_version=${tracdap_version}" >> $GITHUB_OUTPUT
 
-      - name: Fetch copmliance report artifacts
+      - name: Fetch Java compliance report artifacts
         uses: actions/download-artifact@v4
         with:
-          name: compliance-reports
+          name: compliance-reports-java
+          path: tracdap-compliance-reports-${{ steps.tracdap-version.outputs.tracdap_version }}
+
+      - name: Fetch Python compliance report artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: compliance-reports-python
+          path: tracdap-compliance-reports-${{ steps.tracdap-version.outputs.tracdap_version }}
+
+      - name: Fetch web API compliance report artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: compliance-reports-web
           path: tracdap-compliance-reports-${{ steps.tracdap-version.outputs.tracdap_version }}
 
       - name: Build compliance reports tarball
