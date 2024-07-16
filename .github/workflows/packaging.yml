@@ -50,10 +50,11 @@ jobs:
 
     steps:
 
+      # fetch-depth = 0 is needed to get tags for version info
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-tags: true
+          fetch-depth: 0
 
       - name: Set up Java
         uses: actions/setup-java@v4
@@ -152,7 +153,7 @@ jobs:
           mkdir -p ~/.gnupg/
           printf "$GPG_KEY_BASE64" | base64 --decode > ~/.gnupg/keyring.gpg
           ./gradlew \
-            publishToSonatype closeSonatypeStagingRepository \
+            publishToSonatype closeAndReleaseSonatypeStagingRepository \
             -PincludeJavadoc=true \
             -PincludeSources=true \
             -PsonatypeUsername=$MAVEN_USERNAME \
@@ -182,10 +183,11 @@ jobs:
       - name: PIP Upgrade
         run: python -m pip install --upgrade pip
 
+      # fetch-depth = 0 is needed to get tags for version info
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-tags: true
+          fetch-depth: 0
 
       - name: Install build environment dependencies
         run: |
@@ -213,10 +215,11 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
+      # fetch-depth = 0 is needed to get tags for version info
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-tags: true
+          fetch-depth: 0
 
       - name: Install dependencies
         run: |
@@ -261,10 +264,11 @@ jobs:
 
     steps:
 
+      # fetch-depth = 0 is needed to get tags for version info
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-tags: true
+          fetch-depth: 0
 
       - name: Get TRAC version
         id: tracdap-version
@@ -379,10 +383,11 @@ jobs:
 
     steps:
 
+      # fetch-depth = 0 is needed to get tags for version info
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-tags: true
+          fetch-depth: 0
 
       - name: Get TRAC version
         id: tracdap-version

@@ -37,10 +37,11 @@ jobs:
 
     steps:
 
+      # fetch-depth = 0 is needed to get tags for version info
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-tags: true
+          fetch-depth: 0
 
       - name: Set up Java
         uses: actions/setup-java@v4
@@ -98,10 +99,11 @@ jobs:
 
     steps:
 
+      # fetch-depth = 0 is needed to get tags for version info
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-tags: true
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -154,10 +156,11 @@ jobs:
 
     steps:
 
+      # fetch-depth = 0 is needed to get tags for version info
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-tags: true
+          fetch-depth: 0
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -233,10 +236,11 @@ jobs:
 
     steps:
 
+      # fetch-depth = 0 is needed to get tags for version info
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-tags: true
+          fetch-depth: 0
 
       - name: Get TRAC version
         id: tracdap-version
