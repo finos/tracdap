@@ -92,21 +92,21 @@ versioned deployment folder, because you want to keep them when you install newe
 
 **Database driver**
 
-The metadata service requires a JDBC database driver, which must be copied as a JAR file into the
-*plugins* folder of the TRAC installation. To use the H2 embedded database, you can download the H2
-JDBC JAR from Sonatype Central (use the "Browse" link for the version you want to download):
+The metadata service requires a JDBC database driver. A selection of popular drivers is available
+in the TRAC plugins package, available with each release on the GitHub releases page:
 
-* https://central.sonatype.com/artifact/com.h2database/h2/versions
+* https://github.com/finos/tracdap/releases
 
-If you are behind a corporate firewall, you may need to use a web proxy and/or
-point at a Nexus server hosted inside your network.
+Just download the plugins package, unzip it, look in *sql-drivers* for the driver you want and copy it
+into the *plugins* folder of the TRAC installation. For local development the *h2* driver is recommended.
+For more information on supported SQL dialects, see the deployment docs for the
+:doc:`metadata store </deployment/metadata_store>`.
 
 .. note::
 
     H2 introduced a breaking change between H2 version 2.1.214 and 2.2.220. If you have an existing
-    development setup using H2 2.1.214 or earlier, you will need to keep that version of the JDBC
-    driver if you want to keep your local metadata. For a new setup use the latest stable driver as normal.
-    For more details, see
+    development setup and want to keep compatability, the older driver is available in the plugins
+    package called *h2-compat*. For more details, see
     `H2 Database - Increase database format version <https://github.com/h2database/h2database/pull/3834>`_.
 
 **VENV for model execution**
