@@ -24,8 +24,8 @@ on:
 env:
   JAVA_VERSION: "21"
   JAVA_DISTRIBUTION: "zulu"
-  PYTHON_VERSION: "3.11"
-  NODE_VERSION: "18"
+  PYTHON_VERSION: "3.12"
+  NODE_VERSION: "22"
 
 
 jobs:
