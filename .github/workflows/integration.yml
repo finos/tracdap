@@ -19,8 +19,8 @@ env:
   JAVA_VERSION: "21"
   JAVA_DISTRIBUTION: "zulu"
   PYTHON_VERSION: "3.12"
-  # Node 22 breaks relative imports used in examples for web API tests
-  NODE_VERSION: "20"
+  # Node 20 breaks relative imports used in examples for web API tests
+  NODE_VERSION: "18"
 
 
 jobs:
