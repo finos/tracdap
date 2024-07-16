@@ -42,6 +42,18 @@ distributions {
             // Only redistribute drivers with FINOS Category A licenses for now
             // https://community.finos.org/docs/governance/software-projects/license-categories/
 
+            into("h2") {
+                from(configurations["h2RuntimeClasspath"])
+            }
+
+            into("h2-compat") {
+                from(configurations["h2CompatRuntimeClasspath"])
+            }
+
+            into("mysql") {
+                from(configurations["mysqlRuntimeClasspath"])
+            }
+
             into("postgresql") {
                 from(configurations["postgresqlRuntimeClasspath"])
             }
