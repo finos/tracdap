@@ -125,7 +125,7 @@ set CLASSPATH=${classpath.replace(";", "\nset CLASSPATH=%CLASSPATH%;").replace("
 @rem Discover standard plugins
 
 if "%PLUGINS_ENABLED%" == "true" (
-    for %%j in (%PLUGINS_DIR%*.jar) do (
+    for /R %%j in (%PLUGINS_DIR%*.jar) do (
         set CLASSPATH=%CLASSPATH%;%%j
     )
 )
@@ -133,7 +133,7 @@ if "%PLUGINS_ENABLED%" == "true" (
 @rem Discover external plugins
 
 if "%PLUGINS_EXT_ENABLED%" == "true" (
-    for %%j in (%PLUGINS_EXT_DIR%*.jar) do (
+    for /R %%j in (%PLUGINS_EXT_DIR%*.jar) do (
         set CLASSPATH=%CLASSPATH%;%%j
     )
 )
