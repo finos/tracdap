@@ -118,7 +118,7 @@ jobs:
           zip -r tracdap-plugins-${VERSION}.zip tracdap-plugins-${VERSION}/*
 
       - name: Save packages
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: platform_packages
           path: |
@@ -197,7 +197,7 @@ jobs:
         run: python tracdap-runtime/python/build_runtime.py --target codegen dist
 
       - name: Save artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: python_runtime_package
           path: tracdap-runtime/python/build/dist
@@ -244,7 +244,7 @@ jobs:
           npm pack ..
 
       - name: Save artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: web_api_package
           path: tracdap-api/packages/web/dist
