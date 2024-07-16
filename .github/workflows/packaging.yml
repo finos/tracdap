@@ -278,19 +278,19 @@ jobs:
           echo "tracdap_version=${tracdap_version}" >> $GITHUB_OUTPUT
 
       - name: Fetch platform and sandbox packages
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: platform_packages
           path: .
 
       - name: Fetch Python runtime package
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: python_runtime_package
           path: tracdap-api-packages-${{ steps.tracdap-version.outputs.tracdap_version }}/python_runtime_package
 
       - name: Fetch web API package
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: web_api_package
           path: tracdap-api-packages-${{ steps.tracdap-version.outputs.tracdap_version }}/web_api_package
@@ -360,7 +360,7 @@ jobs:
           pip install twine
 
       - name: Fetch Python runtime package
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: python_runtime_package
           path: tracdap_dist/
@@ -401,7 +401,7 @@ jobs:
           echo "tracdap_tag=${tracdap_tag}" >> $GITHUB_OUTPUT
 
       - name: Fetch web API package
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: web_api_package
           path: tracdap_dist/

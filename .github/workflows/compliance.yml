@@ -250,7 +250,7 @@ jobs:
           echo "tracdap_version=${tracdap_version}" >> $GITHUB_OUTPUT
 
       - name: Fetch copmliance report artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: compliance-reports
           path: tracdap-compliance-reports-${{ steps.tracdap-version.outputs.tracdap_version }}
