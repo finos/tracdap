@@ -19,7 +19,8 @@ env:
   JAVA_VERSION: "21"
   JAVA_DISTRIBUTION: "zulu"
   PYTHON_VERSION: "3.12"
-  NODE_VERSION: "22"
+  # Node 22 breaks relative imports used in examples for end-to-end tests
+  NODE_VERSION: "20"
 
 
 jobs:
