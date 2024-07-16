@@ -44,10 +44,12 @@ distributions {
 
             into("h2") {
                 from(configurations["h2RuntimeClasspath"])
+                from("dist/h2")
             }
 
             into("h2-compat") {
                 from(configurations["h2CompatRuntimeClasspath"])
+                from("dist/h2")
             }
 
             into("mysql") {
