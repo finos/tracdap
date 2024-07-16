@@ -54,6 +54,7 @@ distributions {
 
             into("mysql") {
                 from(configurations["mysqlRuntimeClasspath"])
+                from("dist/mysql")
             }
 
             into("postgresql") {
