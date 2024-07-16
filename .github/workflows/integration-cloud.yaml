@@ -53,11 +53,8 @@ jobs:
 
     steps:
 
-      # fetch-depth = 0 is needed to get tags for version info
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Install required packages
         if: ${{ env.INSTALL_SCRIPT != '' }}
@@ -160,11 +157,8 @@ jobs:
 
     steps:
 
-      # fetch-depth = 0 is needed to get tags for version info
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Install required packages
         if: ${{ env.INSTALL_SCRIPT != '' }}

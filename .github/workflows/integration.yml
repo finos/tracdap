@@ -34,8 +34,6 @@ jobs:
 
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Setup - Java
         uses: actions/setup-java@v4
@@ -134,11 +132,8 @@ jobs:
 
     steps:
 
-      # fetch-depth = 0 is needed to get tags for version info
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Set up Java
         uses: actions/setup-java@v4
@@ -170,11 +165,8 @@ jobs:
 
     steps:
 
-      # fetch-depth = 0 is needed to get tags for version info
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Java - Setup
         uses: actions/setup-java@v4
@@ -297,11 +289,8 @@ jobs:
 
     steps:
 
-      # fetch-depth = 0 is needed to get tags for version info
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Set up Java
         uses: actions/setup-java@v4
