@@ -225,6 +225,8 @@ jobs:
 
   publish_to_github:
 
+    if: ${{ github.event_name == 'release' && github.event.action == 'published' }}
+
     runs-on: ubuntu-latest
 
     needs:
@@ -269,7 +271,6 @@ jobs:
         run: zip -r tracdap-compliance-reports-${{ steps.tracdap-version.outputs.tracdap_version }}.zip tracdap-compliance-reports-${{ steps.tracdap-version.outputs.tracdap_version }}/
 
       - name: Publish compliance reports
-        if: ${{ github.event_name == 'release' && github.event.action == 'published' }}
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
