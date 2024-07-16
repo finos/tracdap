@@ -384,15 +384,7 @@ exit /b 0
 :main
 
     set CMD=%1
-    set ARGS=
-    shift
-
-    :arg_loop
-        if "%1"=="" goto arg_loop_done
-        set ARGS=%ARGS% %1
-        shift
-    goto arg_loop
-    :arg_loop_done
+    set ARGS=%*
 
     if not "%CMD%" == "run" (
         @rem If the PID directory is not writable, don't even try to start
@@ -410,10 +402,11 @@ exit /b 0
     )
 
     if "%CMD%" == "run" (
-        echo %ARGS%
-        call :run %ARGS%
+        @rem Trim "run " off the args passed to the main program
+        call :run %ARGS:~4%
     ) else if "%CMD%" == "start" (
-        call :start %ARGS%
+        @rem Trim "start " off the args passed to the main program
+        call :start %ARGS:~6%
     ) else if "%CMD%" == "stop" (
          call :stop
     ) else if "%CMD%" == "restart" (
