@@ -307,7 +307,6 @@ jobs:
         with:
           distribution: ${{ env.JAVA_DISTRIBUTION }}
           java-version: ${{ env.JAVA_VERSION }}
-          cache: gradle
 
       - name: Build
         run: ./gradlew trac-svc-meta:testClasses
