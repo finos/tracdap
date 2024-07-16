@@ -19,7 +19,7 @@
   },
   "type": "module",
   "dependencies": {
-    "apache-arrow": "^10.0.1",
+    "apache-arrow": "^16.0.0",
     "node-fetch": "^3.3.0",
     "tracdap-web-api": "file:../../../tracdap-api/packages/web",
     "ws": "^8.17.1",

@@ -27,7 +27,7 @@ env:
   JAVA_VERSION: "21"
   JAVA_DISTRIBUTION: "zulu"
   PYTHON_VERSION: "3.12"
-  NODE_VERSION: "18"
+  NODE_VERSION: "22"
 
 
 jobs:
@@ -52,12 +52,12 @@ jobs:
 
       # fetch-depth = 0 is needed to get tags for version info
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
       - name: Set up Java
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v4
         with:
           distribution: ${{ env.JAVA_DISTRIBUTION }}
           java-version: ${{ env.JAVA_VERSION }}
@@ -79,7 +79,7 @@ jobs:
             cp -R $MODULE build/dist/tracdap-platform-${VERSION}
           done
           cd build/dist
-          zip -r tracdap-platform-${VERSION}.zip tracdap-platform-${VERSION}/*
+          tar -czvf tracdap-platform-${VERSION}.tgz tracdap-platform-${VERSION}/*
 
       - name: Assemble sandbox package
         run: |
@@ -118,7 +118,7 @@ jobs:
           zip -r tracdap-plugins-${VERSION}.zip tracdap-plugins-${VERSION}/*
 
       - name: Save packages
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: platform_packages
           path: |
@@ -176,7 +176,7 @@ jobs:
     steps:
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
@@ -185,7 +185,7 @@ jobs:
 
       # fetch-depth = 0 is needed to get tags for version info
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -197,7 +197,7 @@ jobs:
         run: python tracdap-runtime/python/build_runtime.py --target codegen dist
 
       - name: Save artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: python_runtime_package
           path: tracdap-runtime/python/build/dist
@@ -211,13 +211,13 @@ jobs:
     steps:
 
       - name: Set up Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
 
       # fetch-depth = 0 is needed to get tags for version info
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -244,7 +244,7 @@ jobs:
           npm pack ..
 
       - name: Save artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: web_api_package
           path: tracdap-api/packages/web/dist
@@ -266,7 +266,7 @@ jobs:
 
       # fetch-depth = 0 is needed to get tags for version info
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -278,65 +278,49 @@ jobs:
           echo "tracdap_version=${tracdap_version}" >> $GITHUB_OUTPUT
 
       - name: Fetch platform and sandbox packages
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: platform_packages
           path: .
 
       - name: Fetch Python runtime package
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: python_runtime_package
           path: tracdap-api-packages-${{ steps.tracdap-version.outputs.tracdap_version }}/python_runtime_package
 
       - name: Fetch web API package
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: web_api_package
           path: tracdap-api-packages-${{ steps.tracdap-version.outputs.tracdap_version }}/web_api_package
 
-      - name: Build API packages tarball
+      - name: Build API packages zip file
         run: zip -r tracdap-api-packages-${{ steps.tracdap-version.outputs.tracdap_version }}.zip tracdap-api-packages-${{ steps.tracdap-version.outputs.tracdap_version }}/
 
       - name: Publish platform package
-        uses: actions/upload-release-asset@v1
         env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ github.event.release.upload_url }}
-          asset_path: tracdap-platform-${{ steps.tracdap-version.outputs.tracdap_version }}.zip
-          asset_name: tracdap-platform-${{ steps.tracdap-version.outputs.tracdap_version }}.zip
-          asset_content_type: application/zip
+        run: gh release upload $RELEASE_TAG tracdap-platform-${{ steps.tracdap-version.outputs.tracdap_version }}.tgz
 
       - name: Publish sandbox package
-        uses: actions/upload-release-asset@v1
         env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ github.event.release.upload_url }}
-          asset_path: tracdap-sandbox-${{ steps.tracdap-version.outputs.tracdap_version }}.zip
-          asset_name: tracdap-sandbox-${{ steps.tracdap-version.outputs.tracdap_version }}.zip
-          asset_content_type: application/zip
+        run: gh release upload $RELEASE_TAG tracdap-sandbox-${{ steps.tracdap-version.outputs.tracdap_version }}.zip
 
       - name: Publish plugins package
-        uses: actions/upload-release-asset@v1
         env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ github.event.release.upload_url }}
-          asset_path: tracdap-plugins-${{ steps.tracdap-version.outputs.tracdap_version }}.zip
-          asset_name: tracdap-plugins-${{ steps.tracdap-version.outputs.tracdap_version }}.zip
-          asset_content_type: application/zip
+        run: gh release upload $RELEASE_TAG tracdap-plugins-${{ steps.tracdap-version.outputs.tracdap_version }}.zip
 
       - name: Publish API packages
-        uses: actions/upload-release-asset@v1
         env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ github.event.release.upload_url }}
-          asset_path: tracdap-api-packages-${{ steps.tracdap-version.outputs.tracdap_version }}.zip
-          asset_name: tracdap-api-packages-${{ steps.tracdap-version.outputs.tracdap_version }}.zip
-          asset_content_type: application/zip
+        run: gh release upload $RELEASE_TAG tracdap-api-packages-${{ steps.tracdap-version.outputs.tracdap_version }}.zip
 
   publish_to_pypi:
 
@@ -350,7 +334,7 @@ jobs:
     steps:
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
@@ -360,7 +344,7 @@ jobs:
           pip install twine
 
       - name: Fetch Python runtime package
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: python_runtime_package
           path: tracdap_dist/
@@ -385,7 +369,7 @@ jobs:
 
       # fetch-depth = 0 is needed to get tags for version info
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -393,15 +377,13 @@ jobs:
         id: tracdap-version
         run: |
           tracdap_version=`dev/version.sh`
-          echo "tracdap_version = ${tracdap_version}"
-          echo "::set-output name=tracdap_version::${tracdap_version}"
-          
           tracdap_tag=`dev/version_tag.sh ${tracdap_version}`
+          echo "tracdap_version = ${tracdap_version}"
           echo "tracdap_tag = ${tracdap_tag}"
           echo "tracdap_tag=${tracdap_tag}" >> $GITHUB_OUTPUT
 
       - name: Fetch web API package
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: web_api_package
           path: tracdap_dist/

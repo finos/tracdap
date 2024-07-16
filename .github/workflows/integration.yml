@@ -19,6 +19,7 @@ env:
   JAVA_VERSION: "21"
   JAVA_DISTRIBUTION: "zulu"
   PYTHON_VERSION: "3.12"
+  # Node 20 breaks relative imports used in examples for web API tests
   NODE_VERSION: "18"
 
 
@@ -31,6 +32,7 @@ jobs:
 
     steps:
 
+      # fetch-depth = 0 is needed to get tags for version info
       - name: Checkout
         uses: actions/checkout@v4
         with:
@@ -133,11 +135,8 @@ jobs:
 
     steps:
 
-      # fetch-depth = 0 is needed to get tags for version info
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Set up Java
         uses: actions/setup-java@v4
@@ -296,18 +295,14 @@ jobs:
 
     steps:
 
-      # fetch-depth = 0 is needed to get tags for version info
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
           distribution: ${{ env.JAVA_DISTRIBUTION }}
           java-version: ${{ env.JAVA_VERSION }}
-          cache: gradle
 
       - name: Build
         run: ./gradlew trac-svc-meta:testClasses

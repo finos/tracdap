@@ -24,8 +24,8 @@ on:
 env:
   JAVA_VERSION: "21"
   JAVA_DISTRIBUTION: "zulu"
-  PYTHON_VERSION: "3.11"
-  NODE_VERSION: "18"
+  PYTHON_VERSION: "3.12"
+  NODE_VERSION: "22"
 
 
 jobs:
@@ -39,12 +39,12 @@ jobs:
 
       # fetch-depth = 0 is needed to get tags for version info
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
       - name: Set up Java
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v4
         with:
           distribution: ${{ env.JAVA_DISTRIBUTION }}
           java-version: ${{ env.JAVA_VERSION }}
@@ -86,10 +86,10 @@ jobs:
 
       # Always save the reports - they are especially needed when the checks have failed!
       - name: Store compliance reports
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: compliance-reports
+          name: compliance-reports-java
           path: build/compliance/**
 
   python_runtime_compliance:
@@ -101,12 +101,12 @@ jobs:
 
       # fetch-depth = 0 is needed to get tags for version info
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
@@ -143,10 +143,10 @@ jobs:
 
       # Always save the reports - they are especially needed when the checks have failed!
       - name: Store compliance reports
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: compliance-reports
+          name: compliance-reports-python
           path: build/compliance/**
 
   web_api_compliance:
@@ -158,12 +158,12 @@ jobs:
 
       # fetch-depth = 0 is needed to get tags for version info
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
       - name: Set up Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -217,10 +217,10 @@ jobs:
 
       # Always save the reports - they are especially needed when the checks have failed!
       - name: Store compliance reports
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: compliance-reports
+          name: compliance-reports-web
           path: build/compliance/**
 
   publish_to_github:
@@ -238,32 +238,40 @@ jobs:
 
       # fetch-depth = 0 is needed to get tags for version info
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Get TRAC d.a.p. version
+      - name: Get TRAC version
         id: tracdap-version
         run: |
           tracdap_version=`dev/version.sh`
           echo "tracdap_version = ${tracdap_version}"
           echo "tracdap_version=${tracdap_version}" >> $GITHUB_OUTPUT
 
-      - name: Fetch copmliance report artifacts
-        uses: actions/download-artifact@v3
+      - name: Fetch Java compliance report artifacts
+        uses: actions/download-artifact@v4
         with:
-          name: compliance-reports
+          name: compliance-reports-java
+          path: tracdap-compliance-reports-${{ steps.tracdap-version.outputs.tracdap_version }}
+
+      - name: Fetch Python compliance report artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: compliance-reports-python
+          path: tracdap-compliance-reports-${{ steps.tracdap-version.outputs.tracdap_version }}
+
+      - name: Fetch web API compliance report artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: compliance-reports-web
           path: tracdap-compliance-reports-${{ steps.tracdap-version.outputs.tracdap_version }}
 
       - name: Build compliance reports tarball
         run: zip -r tracdap-compliance-reports-${{ steps.tracdap-version.outputs.tracdap_version }}.zip tracdap-compliance-reports-${{ steps.tracdap-version.outputs.tracdap_version }}/
 
       - name: Publish compliance reports
-        uses: actions/upload-release-asset@v1
         env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ github.event.release.upload_url }}
-          asset_path: tracdap-compliance-reports-${{ steps.tracdap-version.outputs.tracdap_version }}.zip
-          asset_name: tracdap-compliance-reports-${{ steps.tracdap-version.outputs.tracdap_version }}.zip
-          asset_content_type: application/zip
+        run: gh release upload $RELEASE_TAG tracdap-compliance-reports-${{ steps.tracdap-version.outputs.tracdap_version }}.zip

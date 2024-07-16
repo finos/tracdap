@@ -31,7 +31,7 @@ env:
   JAVA_VERSION: "21"
   JAVA_DISTRIBUTION: "zulu"
   PYTHON_VERSION: "3.12"
-  NODE_VERSION: "18"
+  NODE_VERSION: "22"
 
 
 jobs:
@@ -53,11 +53,8 @@ jobs:
 
     steps:
 
-      # fetch-depth = 0 is needed to get tags for version info
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Install required packages
         if: ${{ env.INSTALL_SCRIPT != '' }}
@@ -83,7 +80,7 @@ jobs:
 
       - name: Authenticate to GCP
         if: ${{ inputs.target == 'gcp' }}
-        uses: google-github-actions/auth@v1
+        uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: projects/158849182108/locations/global/workloadIdentityPools/github/providers/github
           service_account: ${{ secrets.GCP_CI_USER }}
@@ -94,7 +91,7 @@ jobs:
 
       - name: Authenticate to Azure
         if: ${{ inputs.target == 'azure' }}
-        uses: azure/login@v1
+        uses: azure/login@v2
         with:
           client-id: ${{ secrets.AZURE_CI_CLIENT }}
           tenant-id: ${{ secrets.AZURE_CI_TENANT }}
@@ -111,7 +108,6 @@ jobs:
         with:
           distribution: ${{ env.JAVA_DISTRIBUTION }}
           java-version: ${{ env.JAVA_VERSION }}
-          cache: gradle
 
       - name: Build Java
         run: ./gradlew testClasses
@@ -161,11 +157,8 @@ jobs:
 
     steps:
 
-      # fetch-depth = 0 is needed to get tags for version info
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Install required packages
         if: ${{ env.INSTALL_SCRIPT != '' }}
@@ -191,7 +184,7 @@ jobs:
 
       - name: Authenticate to GCP
         if: ${{ inputs.target == 'gcp' }}
-        uses: google-github-actions/auth@v1
+        uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: projects/158849182108/locations/global/workloadIdentityPools/github/providers/github
           service_account: ${{ secrets.GCP_CI_USER }}
@@ -202,7 +195,7 @@ jobs:
 
       - name: Authenticate to Azure
         if: ${{ inputs.target == 'azure' }}
-        uses: azure/login@v1
+        uses: azure/login@v2
         with:
           client-id: ${{ secrets.AZURE_CI_CLIENT }}
           tenant-id: ${{ secrets.AZURE_CI_TENANT }}
