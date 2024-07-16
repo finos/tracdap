@@ -299,44 +299,28 @@ jobs:
         run: zip -r tracdap-api-packages-${{ steps.tracdap-version.outputs.tracdap_version }}.zip tracdap-api-packages-${{ steps.tracdap-version.outputs.tracdap_version }}/
 
       - name: Publish platform package
-        uses: actions/upload-release-asset@v1
         env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ github.event.release.upload_url }}
-          asset_path: tracdap-platform-${{ steps.tracdap-version.outputs.tracdap_version }}.tgz
-          asset_name: tracdap-platform-${{ steps.tracdap-version.outputs.tracdap_version }}.tgz
-          asset_content_type: application/gzip
+        run: gh release upload $RELEASE_TAG tracdap-platform-${{ steps.tracdap-version.outputs.tracdap_version }}.tgz
 
       - name: Publish sandbox package
-        uses: actions/upload-release-asset@v1
         env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ github.event.release.upload_url }}
-          asset_path: tracdap-sandbox-${{ steps.tracdap-version.outputs.tracdap_version }}.zip
-          asset_name: tracdap-sandbox-${{ steps.tracdap-version.outputs.tracdap_version }}.zip
-          asset_content_type: application/zip
+        run: gh release upload $RELEASE_TAG tracdap-sandbox-${{ steps.tracdap-version.outputs.tracdap_version }}.zip
 
       - name: Publish plugins package
-        uses: actions/upload-release-asset@v1
         env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ github.event.release.upload_url }}
-          asset_path: tracdap-plugins-${{ steps.tracdap-version.outputs.tracdap_version }}.zip
-          asset_name: tracdap-plugins-${{ steps.tracdap-version.outputs.tracdap_version }}.zip
-          asset_content_type: application/zip
+        run: gh release upload $RELEASE_TAG tracdap-plugins-${{ steps.tracdap-version.outputs.tracdap_version }}.zip
 
       - name: Publish API packages
-        uses: actions/upload-release-asset@v1
         env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ github.event.release.upload_url }}
-          asset_path: tracdap-api-packages-${{ steps.tracdap-version.outputs.tracdap_version }}.zip
-          asset_name: tracdap-api-packages-${{ steps.tracdap-version.outputs.tracdap_version }}.zip
-          asset_content_type: application/zip
+        run: gh release upload $RELEASE_TAG tracdap-api-packages-${{ steps.tracdap-version.outputs.tracdap_version }}.zip
 
   publish_to_pypi:
 
@@ -393,10 +377,8 @@ jobs:
         id: tracdap-version
         run: |
           tracdap_version=`dev/version.sh`
-          echo "tracdap_version = ${tracdap_version}"
-          echo "::set-output name=tracdap_version::${tracdap_version}"
-          
           tracdap_tag=`dev/version_tag.sh ${tracdap_version}`
+          echo "tracdap_version = ${tracdap_version}"
           echo "tracdap_tag = ${tracdap_tag}"
           echo "tracdap_tag=${tracdap_tag}" >> $GITHUB_OUTPUT
 

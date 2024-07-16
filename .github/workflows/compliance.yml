@@ -271,11 +271,7 @@ jobs:
         run: zip -r tracdap-compliance-reports-${{ steps.tracdap-version.outputs.tracdap_version }}.zip tracdap-compliance-reports-${{ steps.tracdap-version.outputs.tracdap_version }}/
 
       - name: Publish compliance reports
-        uses: actions/upload-release-asset@v1
         env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ github.event.release.upload_url }}
-          asset_path: tracdap-compliance-reports-${{ steps.tracdap-version.outputs.tracdap_version }}.zip
-          asset_name: tracdap-compliance-reports-${{ steps.tracdap-version.outputs.tracdap_version }}.zip
-          asset_content_type: application/zip
+        run: gh release upload $RELEASE_TAG tracdap-compliance-reports-${{ steps.tracdap-version.outputs.tracdap_version }}.zip
