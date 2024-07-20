@@ -72,9 +72,8 @@ repositories:
 
 
 executor:
-  protocol: LOCAL
+  protocol: UNIT_TEST
   properties:
-    venvPath: ${TRAC_EXEC_DIR}/venv
 
 
 jobCache:

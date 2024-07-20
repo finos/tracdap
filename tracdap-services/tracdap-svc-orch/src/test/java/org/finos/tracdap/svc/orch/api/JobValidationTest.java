@@ -57,7 +57,8 @@ public class JobValidationTest {
             .setJobType(JobType.IMPORT_MODEL)
             .setImportModel(ImportModelJob.newBuilder()
                 .setLanguage("python")
-                .setRepository("test_repo")
+                .setRepository("UNIT_TEST_REPO")
+                .setVersion("v1.0.0")
                 .setPath("src/")
                 .setEntryPoint("acme.models.test_model.CoyoteBlaster"));
 
