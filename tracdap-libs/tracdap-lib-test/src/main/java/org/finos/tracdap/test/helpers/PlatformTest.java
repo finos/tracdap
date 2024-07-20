@@ -85,6 +85,7 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
 
     private final boolean runDbDeploy;
     private final boolean manageDataPrefix;
+    private final boolean localExecutor;
 
     private final boolean startMeta;
     private final boolean startData;
@@ -95,7 +96,7 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
 
     private PlatformTest(
             String testConfig, List<String> tenants, String storageFormat,
-            boolean runDbDeploy, boolean manageDataPrefix,
+            boolean runDbDeploy, boolean manageDataPrefix, boolean localExecutor,
             boolean startMeta, boolean startData, boolean startOrch, boolean startGateway) {
 
         this.testConfig = testConfig;
@@ -103,6 +104,7 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         this.storageFormat = storageFormat;
         this.runDbDeploy = runDbDeploy;
         this.manageDataPrefix = manageDataPrefix;
+        this.localExecutor = localExecutor;
         this.startMeta = startMeta;
         this.startData = startData;
         this.startOrch = startOrch;
@@ -122,6 +124,7 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         private String storageFormat = DEFAULT_STORAGE_FORMAT;
         private boolean runDbDeploy = true;  // Run DB deploy by default
         private boolean manageDataPrefix = false;
+        private boolean localExecutor = false;
         private boolean startMeta;
         private boolean startData;
         private boolean startOrch;
@@ -131,6 +134,7 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         public Builder storageFormat(String storageFormat) { this.storageFormat = storageFormat; return this; }
         public Builder runDbDeploy(boolean runDbDeploy) { this.runDbDeploy = runDbDeploy; return this; }
         public Builder manageDataPrefix(boolean manageDataPrefix) { this.manageDataPrefix = manageDataPrefix; return this; }
+        public Builder prepareLocalExecutor(boolean localExecutor) { this.localExecutor = localExecutor; return this; }
         public Builder startMeta() { startMeta = true; return this; }
         public Builder startData() { startData = true; return this; }
         public Builder startOrch() { startOrch = true; return this; }
@@ -141,7 +145,7 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
 
             return new PlatformTest(
                     testConfig, tenants, storageFormat,
-                    runDbDeploy, manageDataPrefix,
+                    runDbDeploy, manageDataPrefix, localExecutor,
                     startMeta, startData, startOrch, startGateway);
         }
     }
@@ -452,7 +456,7 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
             Files.createDirectory(tracDir.resolve("unit_test_storage"));
         }
 
-        if (startOrch) {
+        if (startOrch && localExecutor) {
 
             var venvDir = tracExecDir.resolve("venv").normalize();
 
