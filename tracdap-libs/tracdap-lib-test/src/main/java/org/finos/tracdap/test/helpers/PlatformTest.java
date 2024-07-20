@@ -288,7 +288,7 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         // Git is not available in CI for tests run inside containers
         // So, only look up the current repo if it is needed by the orchestrator
         // To run orchestrator tests in a container, we'd need to pass the repo URL in, e.g. with an env var from CI
-        String currentGitOrigin = startOrch
+        String currentGitOrigin = localExecutor
                 ? getCurrentGitOrigin()
                 : "git_repo_not_configured";
 

@@ -66,9 +66,9 @@ storage:
 
 repositories:
   UNIT_TEST_REPO:
-    protocol: git
+    protocol: LOCAL
     properties:
-      repoUrl: ${CURRENT_GIT_ORIGIN}
+      repoUrl: ${TRAC_LOCAL_REPO}
 
 
 executor:
