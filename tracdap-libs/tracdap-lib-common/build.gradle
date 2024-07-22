@@ -36,6 +36,7 @@ dependencies {
 
     api project(':tracdap-api-metadata')
     api project(':tracdap-api-config')
+    api project(':tracdap-api-services')
 
     // Google Guava - common lib includes helpers to translate to/from equivalent JDK types
     api group: 'com.google.guava', name: 'guava', version: "$guava_version"
@@ -47,6 +48,7 @@ dependencies {
     // gRPC - common lib includes standard wrappers for gRPC stubs and calls
     api group: 'io.grpc', name: 'grpc-api', version: "$grpc_version"
     api group: 'io.grpc', name: 'grpc-stub', version: "$grpc_version"
+    api group: 'io.grpc', name: 'grpc-protobuf', version: "$grpc_version"
 
     // CLI is implemented with Apache Commons CLI
     implementation group: 'commons-cli', name: 'commons-cli', version: "$commons_cli_version"
