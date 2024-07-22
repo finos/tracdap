@@ -17,6 +17,8 @@
 package org.finos.tracdap.common.exception;
 
 
+import org.finos.tracdap.api.TracErrorDetails;
+
 /**
  * A validation failure for version compatibility
  *
@@ -27,6 +29,10 @@ public class EVersionValidation extends EValidation {
 
     public EVersionValidation(String message, Throwable cause) {
         super(message, cause);
+    }
+
+    public EVersionValidation(String message, TracErrorDetails details) {
+        super(message, details);
     }
 
     public EVersionValidation(String message) {

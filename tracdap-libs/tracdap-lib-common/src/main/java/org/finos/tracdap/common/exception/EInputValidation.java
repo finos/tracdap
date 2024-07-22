@@ -17,6 +17,8 @@
 package org.finos.tracdap.common.exception;
 
 
+import org.finos.tracdap.api.TracErrorDetails;
+
 /**
  * A validation error during initial validation of request inputs
  *
@@ -30,6 +32,10 @@ public class EInputValidation extends EValidation {
 
     public EInputValidation(String message, Throwable cause) {
         super(message, cause);
+    }
+
+    public EInputValidation(String message, TracErrorDetails details) {
+        super(message, details);
     }
 
     public EInputValidation(String message) {

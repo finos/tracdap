@@ -17,6 +17,8 @@
 package org.finos.tracdap.common.exception;
 
 
+import org.finos.tracdap.api.TracErrorDetails;
+
 /**
  * Represents a validation error
  *
@@ -30,6 +32,10 @@ public abstract class EValidation extends ETracPublic {
 
     public EValidation(String message, Throwable cause) {
         super(message, cause);
+    }
+
+    public EValidation(String message, TracErrorDetails details) {
+        super(message, details);
     }
 
     public EValidation(String message) {
