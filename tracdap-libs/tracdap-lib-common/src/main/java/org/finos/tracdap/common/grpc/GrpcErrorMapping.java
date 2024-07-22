@@ -16,6 +16,9 @@
 
 package org.finos.tracdap.common.grpc;
 
+import io.grpc.Metadata;
+import io.grpc.protobuf.ProtoUtils;
+import org.finos.tracdap.api.TracErrorDetails;
 import org.finos.tracdap.common.exception.*;
 
 import io.grpc.Status;
@@ -33,11 +36,14 @@ public class GrpcErrorMapping {
 
     private static final Logger log = LoggerFactory.getLogger(GrpcErrorMapping.class);
 
+    private static final Metadata.Key<TracErrorDetails> TRAC_ERROR_DETAILS_KEY =
+            Metadata.Key.of("trac_error_details", ProtoUtils.metadataMarshaller(TracErrorDetails.getDefaultInstance()));
+
     public static StatusRuntimeException processError(Throwable error) {
-        return processErrorToStatus(error).asRuntimeException();
+        return processErrorToStatus(error);
     }
 
-    public static Status processErrorToStatus(Throwable error) {
+    public static StatusRuntimeException processErrorToStatus(Throwable error) {
 
         // Unwrap future/streaming completion errors
         if (error instanceof CompletionException)
@@ -52,7 +58,8 @@ public class GrpcErrorMapping {
             var upstreamError = (StatusException) error;
 
             return upstreamError.getStatus()
-                    .withCause(upstreamError);
+                    .withCause(upstreamError)
+                    .asRuntimeException(upstreamError.getTrailers());
         }
 
         if (error instanceof StatusRuntimeException) {
@@ -60,7 +67,8 @@ public class GrpcErrorMapping {
             var upstreamError = (StatusRuntimeException) error;
 
             return upstreamError.getStatus()
-                    .withCause(upstreamError);
+                    .withCause(upstreamError)
+                    .asRuntimeException(upstreamError.getTrailers());
         }
 
         // Make sure internal errors are always reported as internal and the error description is masked
@@ -69,7 +77,8 @@ public class GrpcErrorMapping {
 
             return Status.fromCode(Status.Code.INTERNAL)
                     .withDescription(Status.INTERNAL.getDescription())
-                    .withCause(error);
+                    .withCause(error)
+                    .asRuntimeException();
         }
 
         // For "public" errors, try to look up an error code mapping
@@ -79,25 +88,36 @@ public class GrpcErrorMapping {
 
             var errorCode = lookupErrorCode(error);
 
-            if (errorCode != null) {
+            if (errorCode == null) {
 
-                // If there is an error code mapping, report the error to back to the client with the mapped error code
-
-                return Status.fromCode(errorCode)
-                        .withDescription(error.getMessage())
-                        .withCause(error);
-            }
-            else {
-
-                // For anything unrecognized, fall back to an internal error
+                // If the error code is not recognized, fall back to an internal error
                 // Public errors should normally be reported to the client/user, so log this as a warning
 
                 log.warn("No gRPC error code mapping is available for the error {}", error.getClass().getSimpleName());
 
                 return Status.fromCode(Status.Code.INTERNAL)
                         .withDescription(Status.INTERNAL.getDescription())
-                        .withCause(error);
+                        .withCause(error)
+                        .asRuntimeException();
             }
+
+            // If there is an error code mapping, report the error to back to the client with the mapped error code
+
+            var status = Status.fromCode(errorCode)
+                    .withDescription(error.getMessage())
+                    .withCause(error);
+
+            var details = ((ETracPublic) error).getDetails();
+
+            if (details != null) {
+
+                var trailers = new Metadata();
+                trailers.put(TRAC_ERROR_DETAILS_KEY, details);
+
+                return status.asRuntimeException(trailers);
+            }
+            else
+                return status.asRuntimeException();
         }
 
         // Any error that is not either a TRAC error or a gRPC error means that the error has not been handled
@@ -108,7 +128,8 @@ public class GrpcErrorMapping {
 
         return Status.fromCode(Status.Code.INTERNAL)
                 .withDescription(Status.INTERNAL.getDescription())
-                .withCause(error);
+                .withCause(error)
+                .asRuntimeException();
     }
 
 

@@ -17,6 +17,7 @@
 package org.finos.tracdap.common.grpc;
 
 import io.grpc.*;
+import org.finos.tracdap.common.exception.ETracPublic;
 
 public class ErrorMappingInterceptor implements ServerInterceptor {
     @Override
@@ -47,8 +48,60 @@ public class ErrorMappingInterceptor implements ServerInterceptor {
             // This will preserve the application stack trace
             else if (status.getCause() != null) {
 
-                var mappedStatus  = GrpcErrorMapping.processErrorToStatus(status.getCause());
+                var mappedError = GrpcErrorMapping.processErrorToStatus(status.getCause());
+                var mappedStatus = mappedError.getStatus();
+
+                if (mappedError.getTrailers() != null) {
+
+                    var mappedTrailers = mappedError.getTrailers();
+                    mappedTrailers.merge(trailers);
+
+                    delegate().close(mappedStatus, mappedTrailers);
+                }
+                else {
+
+                    delegate().close(mappedStatus, trailers);
+                }
+            }
+
+            // For a failure with no cause, create an exception from the status object
+            // The application stack trace will not be preserved, because it is not present in the status object
+            // Typically this happens when the original exception is a gRPC status exception
+            // For better error reporting, application code should avoid raising gRPC status exceptions directly
+            else {
+
+                var mappedError = GrpcErrorMapping.processErrorToStatus(status.asRuntimeException());
+                var mappedStatus = mappedError.getStatus();
+
                 delegate().close(mappedStatus, trailers);
+            }
+        }
+    }
+
+    /*
+
+                // For an OK result, there is no need to apply error mapping
+            if (status.isOk()) {
+                delegate().close(status, trailers);
+            }
+
+            // If the cause of the failure is known, use the cause for error mapping
+            // This will preserve the application stack trace
+            else if (status.getCause() != null) {
+
+                var error = GrpcErrorMapping.processErrorStatus(status);
+                var mappedStatus = error.getStatus();
+                var mappedTrailers = error.getTrailers();
+                mappedTrailers.merge(trailers);
+
+                delegate().close(mappedStatus, mappedTrailers);
+
+                trailers.merge();
+
+//                var mappedStatus  = GrpcErrorMapping.processErrorToStatus(status.getCause());
+//                delegate().close(mappedStatus, trailers);
+//
+//                mappedStatus.asRuntimeException().getTrailers();
             }
 
             // For a failure with no cause, create an exception from the status object
@@ -60,6 +113,8 @@ public class ErrorMappingInterceptor implements ServerInterceptor {
                 var mappedStatus = GrpcErrorMapping.processErrorToStatus(status.asRuntimeException());
                 delegate().close(mappedStatus, trailers);
             }
-        }
-    }
+     */
+
+
+
 }
