@@ -23,11 +23,11 @@ option java_multiple_files = true;
 
 message TracErrorDetails {
 
-  string message = 1;
+  int32 code = 1;
+  string message = 2;
 
-  repeated TracErrorItem items = 2;
+  repeated TracErrorItem items = 3;
 }
-
 
 message TracErrorItem {
 
