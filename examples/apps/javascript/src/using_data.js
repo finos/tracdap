@@ -16,8 +16,8 @@
 
 import {tracdap} from 'tracdap-web-api';
 
-import {searchForSchema} from './metadata_mojo';
-import {loadFromDisk} from './util';
+import {searchForSchema} from './metadata_mojo.js';
+import {loadFromDisk} from './util.js';
 
 // Create the Data API
 const dataTransport = tracdap.setup.transportForTarget(tracdap.api.TracDataApi, "http", "localhost", 8080);

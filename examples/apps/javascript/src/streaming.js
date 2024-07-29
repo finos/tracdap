@@ -26,7 +26,7 @@ const dataApi = new tracdap.api.TracDataApi(dataTransport);
 const LARGE_CSV_FILE = "../../../tracdap-services/tracdap-svc-data/src/test/resources/large_csv_data_100000.csv";
 
 
-async function saveStreamingData(csvStream) {
+export async function saveStreamingData(csvStream) {
 
     // Schema definition for the data we want to save
     // You can also use a pre-loaded schema ID
@@ -105,7 +105,7 @@ async function saveStreamingData(csvStream) {
 }
 
 
-function loadStreamingData(dataId) {
+export function loadStreamingData(dataId) {
 
     // Ask for the dataset in CSV format so we can easily count the rows
     const request = tracdap.api.DataReadRequest.create({
