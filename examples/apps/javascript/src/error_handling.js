@@ -22,7 +22,7 @@ const metaApi = new tracdap.api.TracMetadataApi(metaTransport);
 import {saveStreamingData, loadStreamingData} from './streaming.js';
 import fs from "fs";
 
-async function createInvalidObject() {
+function buildBadRequest() {
 
     // Set up an invalid schema definition
     const schema = tracdap.metadata.SchemaDefinition.create({
@@ -37,7 +37,7 @@ async function createInvalidObject() {
     });
 
     // Set up an invalid write request, with the bad schema and an invalid tag attribute
-    const badRequest = tracdap.api.MetadataWriteRequest.create({
+    return tracdap.api.MetadataWriteRequest.create({
 
         tenant: "ACME_CORP",
         objectType: tracdap.ObjectType.SCHEMA,
@@ -52,32 +52,50 @@ async function createInvalidObject() {
         ]
 
     });
+}
 
-    console.log("Try to create an invalid objects...");
+async function invalidFutureCall() {
+
+    console.log("Try to create an invalid object using futures...");
+
+    const badRequest = buildBadRequest();
 
     // Handle an error in the API call using futures
-    await metaApi.createObject(badRequest)
+    return metaApi.createObject(badRequest)
         .then(_ => {})  // handle response
         .catch(error => {
             // handle error
             console.log("There was a problem creating the object: " + error.message);
             console.log("gRPC status code: " + error.code);
         });
+}
+
+function invalidCallbackCall() {
+
+    console.log("Try to create an invalid object using callbacks...");
+
+    const badRequest = buildBadRequest();
 
     // Handle the same error using callback-style API calls
-    await metaApi.createObject(badRequest, (error, _) => {
+    metaApi.createObject(badRequest, (error, _) => {
         if (error != null) {
             // handle error
             console.log("There was a problem creating the object: " + error.message);
             console.log("gRPC status code: " + error.code);
-        }
-        else {
+        } else {
             // handle response
         }
     });
+}
+
+async function detailedErrorCall() {
+
+    console.log("Try to create an invalid object with detailed error handling...");
+
+    const badRequest = buildBadRequest();
 
     // Handle an error in the API call using futures
-    await metaApi.createObject(badRequest)
+    return metaApi.createObject(badRequest)
         .then(_ => {})  // handle response
         .catch(error => {
             // Get structured error details
@@ -87,7 +105,7 @@ async function createInvalidObject() {
             // Show more detailed information
             details.items.forEach(item => {
                 console.log(item.location + ": " + item.detail + " (" + item.category + ")");
-            })
+            });
         });
 }
 
@@ -137,7 +155,11 @@ export async function main() {
 
     console.log("Error handling examples");
 
-    await createInvalidObject();
+    await invalidFutureCall();
+    invalidCallbackCall();
+
+    await detailedErrorCall();
+
     await badStreamingUpload();
     await badStreamingDownload();
 
