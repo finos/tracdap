@@ -43,9 +43,11 @@
 
     $OUTPUT;
 
-    $root.tracdap.api.TracMetadataApi._serviceName = "tracdap.api.TracMetadataApi";
-    $root.tracdap.api.TracDataApi._serviceName = "tracdap.api.TracDataApi";
-    $root.tracdap.api.TracOrchestratorApi._serviceName = "tracdap.api.TracOrchestratorApi";
+    const tracdap = $root.tracdap;
+
+    tracdap.api.TracMetadataApi._serviceName = "tracdap.api.TracMetadataApi";
+    tracdap.api.TracDataApi._serviceName = "tracdap.api.TracDataApi";
+    tracdap.api.TracOrchestratorApi._serviceName = "tracdap.api.TracOrchestratorApi";
 
     grpc.MethodType.CLIENT_STREAMING = "CLIENT_STREAMING";
     grpc.MethodType.BIDI_STREAMING = "BIDI_STREAMING";
@@ -53,6 +55,8 @@
     const METHOD_TYPE_MAP = $METHOD_TYPE_MAPPING;
 
     const DEFAULT_TRANSPORT = "google"
+
+    const TRAC_ERROR_DETAILS_KEY = "trac-error-details-bin";
 
 
     // Streaming upload cancellation
@@ -421,28 +425,29 @@
             if (!response.ok) {
                 const responseStatus = grpc.StatusCode.UNKNOWN;
                 const responseMessage = `Network error (${response.status} ${response.statusText})`
-                const error = {status: responseStatus, message: responseMessage};
+                const error = {code: responseStatus, message: responseMessage};
                 callback(error, null);
                 return;
             }
 
-            // For failed calls, failed grpc-status code can sometime be in the HTTP headers
-            // In this case return an error straight away, there response will not have a body
-
-            const grpcStatus = response.headers.get("grpc-status");
-            const grpcMessage = response.headers.get("grpc-message");
-
-            if (grpcStatus !== null && grpcStatus !== grpc.StatusCode.OK) {
-                const error = {status: grpcStatus, message: grpcMessage};
-                callback(error, null);
-                return;
+            // For unary calls, grpc-status code can sometimes be in the HTTP headers
+            // If status is non-zero return an error straight away, the response will not have a body
+            if (response.headers.has('grpc-status')) {
+                const grpcStatus = Number.parseInt(response.headers.get("grpc-status"));
+                if (grpcStatus !== grpc.StatusCode.OK) {
+                    const grpcMessage = response.headers.get("grpc-message");
+                    const metadata = this._metadataFromHttpHeaders(response.headers);
+                    const error = {code: grpcStatus, message: grpcMessage, metadata: metadata};
+                    callback(error, null);
+                    return;
+                }
             }
 
             // Response headers look ok, go on to reading the response body
 
             return response.arrayBuffer()
                 .then(body => this._fetchDecode(response, body))
-                .then(body => this._fetchBody(method, body, callback));
+                .then(body => this._fetchComplete(method, body, callback));
         }
 
         TracTransport.prototype._fetchDecode = function(response, body) {
@@ -456,110 +461,75 @@
 
             this._pushLpmQueue(bodyData, lpmQueue);
 
-            const grpcContent = this._pollLpmQueue(lpmQueue);
-            const grpcTrailers = this._pollLpmQueue(lpmQueue);
+            const grpcContent = this._pollLpmQueue(lpmQueue).then(lpm => lpm.message);
+            const grpcTrailers = this._pollLpmQueue(lpmQueue).then(lpm => lpm.message);
 
             // The entire body should be consumed, with one message of content and one of trailers
             if (lpmQueue.length !== 0 || grpcContent === null || !grpcTrailers === null) {
                 throw new Error(`Network error (response contains unexpected data)`);
             }
 
-            const grpcResponse = {}
+            return Promise.all([grpcContent, grpcTrailers]).then(result => {
 
-            grpcContent.then(content => grpcResponse.content = content);
-            grpcTrailers.then(trailers => grpcResponse.trailers = trailers);
+                const content = result[0];
+                const trailers = result[1];
 
-            return Promise.all([grpcContent, grpcTrailers])
-                .then(_ => this._fetchDecode2(response, grpcResponse));
+                // Copy both HTTP headers and LPM trailers into one metadata map
+                const metadata = {};
+                Object.assign(metadata, this._metadataFromHttpHeaders(response.headers));
+                Object.assign(metadata,  this._metadataFromLpmTrailers(trailers));
+
+                // Return headers and content
+                return { metadata: metadata, content: content};
+            });
         }
 
-        TracTransport.prototype._fetchDecode2 = function(response, grpcResponse) {
+        TracTransport.prototype._fetchComplete = function(method, response, callback) {
 
-            // Copy both HTTP headers and LPM trailers into one map
+            this.options.debug && console.log(`TracTransport _fetchComplete, method = [${method.name}]`);
 
-            const headers = {};
-
-            const keys = response.headers.keys();
-
-            for (let header = keys.next(); header.value; header = keys.next()) {
-                headers[header.value] = response.headers.get(header.value);
-            }
-
-            const trailers = new TextDecoder()
-                .decode(grpcResponse.trailers.message)
-                .trim().split(/\r\n/);
-
-            for (let i = 0; i < trailers.length; i++) {
-                const trailer = trailers[i];
-                const sep = trailer.indexOf(":");
-                const key = trailer.substring(0, sep);
-                const value = trailer.substring(sep + 1).trim();
-                headers[key] = decodeURI(value);
-
-                console.log(key + " = " + headers[key]);
-            }
-
-            const filteredHeaders = this._filterResponseHeaders(headers);
-
-            // Return headers and content
-
-            return {
-                headers: filteredHeaders,
-                content: grpcResponse.content.message
-            }
-        }
-
-        TracTransport.prototype._fetchBody = function(method, body, callback) {
-
-            this.options.debug && console.log(`TracTransport _fetchBody, method = [${method.name}]`)
-
-            const headers = body.headers;
-            const content = body.content;
+            const metadata = response.metadata;
+            const content = response.content;
 
             // After a full response, grpc-status should always be present
 
-            if (!("grpc-status" in headers)) {
+            if (!("grpc-status" in metadata)) {
+                // Metadata appears invalid, do not include metadata in error response
                 const responseStatus = grpc.StatusCode.UNKNOWN;
-                const responseMessage = `Network error (response status not available)`
-                const error = { status: responseStatus, message: responseMessage };
+                const responseMessage = "Network error (response status not available)";
+                const error = { code: responseStatus, message: responseMessage };
                 callback(error, null);
                 return;
             }
 
             // If grpc-status != 0, that is always an error
 
-            const grpcStatus = Number.parseInt(headers["grpc-status"]);
-            const grpcMessage = headers["grpc-message"];
+            const grpcStatus = Number.parseInt(metadata["grpc-status"]);
+            const grpcMessage = metadata["grpc-message"];
 
             if (grpcStatus !== grpc.StatusCode.OK) {
-                const error = {status: grpcStatus, message: grpcMessage};
+                const error = {code: grpcStatus, message: grpcMessage, metadata: metadata};
                 callback(error, null);
                 return;
             }
 
-            // Processing response headers updates the session with any new cookies from TRAC
-            // This should only happen for successful requests
+            // This is a hook for processing metadata after a successful call
 
-            this._processResponseMetadata(headers);
+            this._processResponseMetadata(metadata);
 
             // Everything checks out, we can accept the result
 
             callback(null, content);
         }
 
-        TracTransport.prototype._fetchDecodeContent = function(response, body) {
-
-
-        }
-
         TracTransport.prototype._fetchError = function(method, error, callback) {
 
-            this.options.debug && console.log(`TracTransport _fetchDecode, method = [${method.name}]`)
+            this.options.debug && console.log(`TracTransport _fetchError, method = [${method.name}]`)
 
             // An exception occurred processing the call
             // Use UNKNOWN status code with the exception error message
 
-            const errorResponse = {status: grpc.StatusCode.UNKNOWN, message: error.toString()};
+            const errorResponse = {code: grpc.StatusCode.UNKNOWN, message: error.toString()};
             callback(errorResponse, null);
         }
 
@@ -635,7 +605,7 @@
                     // This request is already finished, don't call a handler that would call back to client code
                     // If there is a problem, put it in the console instead
 
-                    if (!event.wasClean)
+                    if (this.options.debug && !event.wasClean)
                         console.log(`Connection did not close cleanly: ${event.reason} (websockets code ${event.code})`)
                 }
 
@@ -669,12 +639,13 @@
         TracTransport.prototype._wsHandlerError = function(event) {
 
             this.options.debug && console.log("TracTransport _wsHandlerError")
+            this.options.debug && console.log(`${event.error}`);
 
             if (this.ws.readyState !== WebSocket.CLOSED)
                 this.ws.close(1002, "close on error");
 
             const status = grpc.StatusCode.UNKNOWN;
-            const message = event.reason;
+            const message = "Network error (WebSockets)";
             this._handlerError(status, message);
         }
 
@@ -802,31 +773,18 @@
                 const lpm = holder.lpm;
 
                 if (lpm.trailers)
-                    this._receiveHeaders(lpm.message)
+                    this._receiveTrailers(lpm.message)
                 else
                     this._receiveMessage(lpm.message);
             }
         }
 
-        TracTransport.prototype._receiveHeaders = function (msg) {
+        TracTransport.prototype._receiveTrailers = function (msg) {
 
             this.options.debug && console.log("TracTransport _receiveHeaders")
 
-            const decoder = new TextDecoder();
-            const headerText = decoder.decode(msg);
-            const headerLines = headerText.trim().split("\r\n")
-
-            const headers = {}
-
-            headerLines.forEach(line => {
-
-                const sep = line.indexOf(":", 1);
-                const key = line.substring(0, sep);
-                headers[key] = line.substring(sep + 1).trim();
-            })
-
-            const filteredHeaders = this._filterResponseHeaders(headers);
-            Object.assign(this.responseMetadata, filteredHeaders);
+            const metadata = this._metadataFromLpmTrailers(msg);
+            Object.assign(this.responseMetadata, metadata);
 
             // The message exchange is always complete when the grpc-status header / trailer is received
             if (GRPC_STATUS_HEADER in this.responseMetadata) {
@@ -860,24 +818,52 @@
         // -------------------------------------------------------------------------------------------------------------
 
 
-        TracTransport.prototype._filterResponseHeaders = function(headers) {
+        TracTransport.prototype._metadataFromHttpHeaders = function(headers) {
 
-            this.options.debug && console.log("TracTransport _filterResponseHeaders")
+            this.options.debug && console.log("TracTransport _metadataFromHttpHeaders");
 
-            const filteredHeaders = {};
+            if (headers === null)
+                return {};
 
-            for (let key in headers) {
+            const metadata = {};
+            const keys = headers.keys();
 
-                if (key.startsWith(":"))
+            for (let key = keys.next(); key.value; key = keys.next()) {
+
+                // Do not include HTTP/2 special headers (e.g. :status etc.)
+                if (key.value.startsWith(":"))
                     continue;
 
-                if (key.toLowerCase() in FILTER_RESPONSE_HEADERS)
+                // Filter out some HTTP headers that should definitely not be included as metadata
+                if (FILTER_RESPONSE_HEADERS.includes(key.value.toLowerCase()))
                     continue;
 
-                filteredHeaders[key] = headers[key];
+                metadata[key.value] = headers.get(key.value);
             }
 
-            return filteredHeaders;
+            return metadata;
+        }
+
+        TracTransport.prototype._metadataFromLpmTrailers = function(message) {
+
+            this.options.debug && console.log("TracTransport _metadataFromLpmTrailers");
+
+            const metadata = {};
+
+            const trailers = new TextDecoder()
+                .decode(message)
+                .trim()
+                .split(/\r\n/);
+
+            for (let i = 0; i < trailers.length; i++) {
+                const trailer = trailers[i];
+                const sep = trailer.indexOf(":");
+                const key = trailer.substring(0, sep);
+                const value = trailer.substring(sep + 1).trim();
+                metadata[key] = decodeURI(value);
+            }
+
+            return metadata;
         }
 
         TracTransport.prototype._processResponseMetadata = function(metadata) {
@@ -912,14 +898,14 @@
 
                 const code = grpcStatus || grpc.StatusCode.UNKNOWN;
                 const message = grpcMessage || "The connection was closed before communication finished";
-                const error = {status: code, message: message, metadata: this.responseMetadata};
+                const error = {code: code, message: message, metadata: this.responseMetadata};
                 this.callback(error, null);
             }
             else if (grpcStatus === null) {
 
                 const code = grpc.StatusCode.UNKNOWN;
                 const message = "The connection was closed before a response was received";
-                const error = {status: code, message: message, metadata: this.responseMetadata};
+                const error = {code: code, message: message, metadata: this.responseMetadata};
                 this.callback(error, null);
             }
             else {
@@ -928,22 +914,21 @@
                 const grpcMessage = this.responseMetadata[GRPC_MESSAGE_HEADER];
 
                 if (grpcStatus !== grpc.StatusCode.OK) {
-                    const error = {status: grpcStatus, message: grpcMessage, metadata: this.responseMetadata}
+                    const error = {code: grpcStatus, message: grpcMessage, metadata: this.responseMetadata}
                     this.callback(error, null);
                 }
 
                 else if (this.response === null && !this.serverStreaming) {
-                    const status = grpc.StatusCode.UNKNOWN;
+                    const code = grpc.StatusCode.UNKNOWN;
                     const message = "The reply from th server had no content and no error message";
-                    const error = {status: status, message: message, metadata: this.responseMetadata}
+                    const error = {code: code, message: message, metadata: this.responseMetadata}
                     this.callback(error, null);
                 }
 
                 // At this point everything checks out
                 else {
 
-                    // Response metadata is only processed for successful calls
-                    // This will update cookies with new session data from TRAC
+                    // This is a hook for processing metadata after a successful call
                     this._processResponseMetadata(this.responseMetadata);
 
                     // Send the final result message
@@ -957,9 +942,9 @@
             this.finished = true;
         }
 
-        TracTransport.prototype._handlerError = function (status, message) {
+        TracTransport.prototype._handlerError = function (code, message) {
 
-            this.options.debug && console.log("TracTransport _handlerError", status, message)
+            this.options.debug && console.log("TracTransport _handlerError", code, message)
 
             if (this.finished) {
                 this.options.debug && console.log("_handlerError called after the method already finished");
@@ -977,7 +962,7 @@
             this.sendQueue = []
             this.rcvQueue = []
 
-            const error = { status: status, message: message }
+            const error = { code: code, message: message }
 
             this.callback(error, null);
         }
@@ -1422,6 +1407,55 @@
             response.content = content;
 
             return response;
+        }
+
+        /**
+         * Get TRAC error details after an error in a TRAC API call
+         *
+         * If error details have been sent back from the platform, those details will be returned.
+         * Otherwise, a basic set of details will be created for the error.
+         *
+         * @function getErrorDetails
+         * @memberof tracdap.utils
+         *
+         * @param {Error} error An error returned from a TRAC API call
+         * @returns {tracdap.api.TracErrorDetails} Detailed information about the given error
+         */
+        utils.getErrorDetails = function(error) {
+
+            if (error.hasOwnProperty("metadata")) {
+                if (error.metadata !== null && TRAC_ERROR_DETAILS_KEY in error.metadata) {
+
+                    try {
+                        const detailsBase64 = error.metadata[TRAC_ERROR_DETAILS_KEY];
+                        const detailsProto = _decodeBase64(detailsBase64);
+
+                        return tracdap.api.TracErrorDetails.decode(detailsProto)
+                    }
+                    catch (e) {
+                        console.warn("Error details could not be decoded, only basic details will be available");
+                        console.warn(e);
+                    }
+                }
+            }
+
+            if (error.hasOwnProperty("code"))
+                return tracdap.api.TracErrorDetails.create({code: error.code, message: error.message});
+
+            return tracdap.api.TracErrorDetails.create({code: grpc.StatusCode.UNKNOWN, message: error.message});
+        }
+
+        function _decodeBase64(base64) {
+
+            // TODO: Universal alternative for base64 decoding
+            const str = atob(base64)
+            const buffer = new Uint8Array(str.length);
+
+            for (let i = 0; i < str.length; i++) {
+                buffer[i] = str.charCodeAt(i);
+            }
+
+            return buffer;
         }
 
         return utils;

@@ -1,4 +1,5 @@
 
+#####################
 Chapter 4 - Streaming
 #####################
 
@@ -199,11 +200,20 @@ utility function to aggregate them into a single
     :linenos:
     :lineno-start: 129
 
-Now everything is ready, the final step is to make an API call
-to start the download stream.
+Now everything is ready, the final step is to make an API call to start
+the download stream. Since we are using stream event processing, we need
+to turn off processing of future results or callbacks by supplying no-op
+handlers, to prevent JavaScript warnings about unhandled results / errors.
 
 .. literalinclude:: ../../../examples/apps/javascript/src/streaming.js
     :language: JavaScript
-    :lines: 144 - 149
+    :lines: 144 - 153
     :linenos:
     :lineno-start: 144
+
+.. note::
+
+    The future / callback style of processing results works for streaming
+    upload calls, because there is only a single response message for the
+    whole operation. Download operations produce a stream of messages, so
+    it is not possible to use a single handler and stream events are needed.

@@ -26,3 +26,10 @@ ALLOWED_LICENSES="${ALLOWED_LICENSES};The Unlicense (Unlicense)"
 # So, we can exclude the package from our license report
 
 IGNORE_LICENSE=certifi
+
+# The aiohappyeyeballs library is now a dependency of aiohttp, which is widely used
+# It is licensed under the Python (PSF-2.0) license
+# However, licensing info is not correctly declared in their Python packaging
+# https://pypi.org/project/aiohappyeyeballs/
+
+IGNORE_LICENSE="${IGNORE_LICENSE} aiohappyeyeballs"

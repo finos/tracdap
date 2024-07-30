@@ -16,7 +16,7 @@
 
 import {tracdap} from 'tracdap-web-api';
 
-import {loadTag} from "./hello_world";
+import {loadTag} from "./hello_world.js";
 
 const metaTransport = tracdap.setup.transportForTarget(tracdap.api.TracMetadataApi, "http", "localhost", 8080);
 const metaApi = new tracdap.api.TracMetadataApi(metaTransport);

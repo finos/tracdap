@@ -26,7 +26,7 @@ const dataApi = new tracdap.api.TracDataApi(dataTransport);
 const LARGE_CSV_FILE = "../../../tracdap-services/tracdap-svc-data/src/test/resources/large_csv_data_100000.csv";
 
 
-async function saveStreamingData(csvStream) {
+export async function saveStreamingData(csvStream) {
 
     // Schema definition for the data we want to save
     // You can also use a pre-loaded schema ID
@@ -105,7 +105,7 @@ async function saveStreamingData(csvStream) {
 }
 
 
-function loadStreamingData(dataId) {
+export async function loadStreamingData(dataId) {
 
     // Ask for the dataset in CSV format so we can easily count the rows
     const request = tracdap.api.DataReadRequest.create({
@@ -142,9 +142,13 @@ function loadStreamingData(dataId) {
         stream.on("error", err => reject(err));
 
         // Make the initial API call to start the download stream
-        // It is not necessary to use a .then() or .catch() block,
-        // because responses are processed on the stream
-        stream.readDataset(request);
+        // Explicitly disable future result processing, we are using stream events instead
+        stream.readDataset(request)
+            .then(_ => {})
+            .catch(_ => {});
+
+        // The equivalent API call using the callback style would be:
+        // stream.readDataset(request, /* no-op callback */ _ => {});
 
     }); // End of streaming operation promise
 }

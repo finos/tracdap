@@ -16,14 +16,28 @@
 
 package org.finos.tracdap.common.exception;
 
+import org.finos.tracdap.api.TracErrorDetails;
 
 public class ETracPublic extends ETrac {
 
+    private final TracErrorDetails details;
+
     public ETracPublic(String message, Throwable cause) {
         super(message, cause);
+        this.details = null;
+    }
+
+    public ETracPublic(String message, TracErrorDetails details) {
+        super(message);
+        this.details = details;;
     }
 
     public ETracPublic(String message) {
         super(message);
+        this.details = null;
+    }
+
+    public final TracErrorDetails getDetails() {
+        return details;
     }
 }

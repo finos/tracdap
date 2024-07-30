@@ -16,9 +16,9 @@
 
 import {tracdap} from 'tracdap-web-api';
 
-import {searchForSchema} from './metadata_mojo';
-import {saveDataToTrac, renderTable} from './using_data';
-import {loadFromDisk} from './util';
+import {searchForSchema} from './metadata_mojo.js';
+import {saveDataToTrac, renderTable} from './using_data.js';
+import {loadFromDisk} from './util.js';
 
 import * as arrow from 'apache-arrow';
 

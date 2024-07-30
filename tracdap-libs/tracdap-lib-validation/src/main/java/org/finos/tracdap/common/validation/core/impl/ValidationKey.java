@@ -24,12 +24,14 @@ public class ValidationKey implements Comparable<ValidationKey> {
 
     private static final String OPAQUE_KEY_TEMPLATE = "%s:%s:%s";
     private static final String DISPLAY_NAME_TEMPLATE = "%s %s";
+    private static final String METHOD_SHORT_NAME_TEMPLATE = "%s()";
     private static final String METHOD_DISPLAY_NAME_TEMPLATE = "%s, %s %s";
 
     private final ValidationType validationType;
     private final Descriptors.Descriptor messageType;
     private final Descriptors.MethodDescriptor method;
     private final String opaqueKey;
+    private final String shortName;
     private final String displayName;
 
     public static ValidationKey forObject(Descriptors.Descriptor messageType) {
@@ -68,12 +70,14 @@ public class ValidationKey implements Comparable<ValidationKey> {
                 contextualPart);
 
         if (method != null) {
+            this.shortName = String.format(METHOD_SHORT_NAME_TEMPLATE, method.getName());
             this.displayName = String.format(METHOD_DISPLAY_NAME_TEMPLATE,
                     method.getName(),
                     messageType.getName(),
                     validationType.name());
         }
         else {
+            this.shortName = messageType.getName();
             this.displayName = String.format(DISPLAY_NAME_TEMPLATE,
                     messageType.getName(),
                     validationType.name());
@@ -110,6 +114,10 @@ public class ValidationKey implements Comparable<ValidationKey> {
 
     public ValidationType validationType() {
         return validationType;
+    }
+
+    public String shortName() {
+        return shortName;
     }
 
     public String displayName() {

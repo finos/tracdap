@@ -1,0 +1,11 @@
+customer_id, customer_type, customer_name, account_open_date
+A36456, PERSON," ""John Longhorn""", 1995-03-24
+A45845, PERSON," ""Henry Richard Arthwaite""", 1982-07-15
+C47834, COMPANY," ""Longhorn & Arthwaite Ltd.""", 1996-05-22
+A53872, PERSON," ""Slartibartfast""", 1981-03-18
+A48642, PERSON," ""James Tiberius Kirk""", 1966-09-08
+C29487, COMPANY," ""ACME Boomers & Bangers Plc.""", 1990-04-08
+G23964, GOVT," ""HM Dept. of silly walks, UK""", 1969-10-05
+A34523, PERSON," ""Lord Voldemort""", 1997-06-26
+A56874, PERSON," ""Homer Simpson""", 1987-04-19
+C34631, COMPANY," ""Tyrell Corp.""", 1982-09-09
