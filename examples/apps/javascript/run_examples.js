@@ -33,7 +33,8 @@ const ALL_EXAMPLES = [
     "metadata_mojo",
     "using_data",
     "arrow",
-    "streaming"
+    "streaming",
+    "error_handling"
 ]
 
 async function runExample(exampleName) {
