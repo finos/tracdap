@@ -35,5 +35,5 @@ message TracErrorDetails {
 message TracErrorItem {
 
   string detail = 1;
-  string location = 2;
+  string fieldPath = 2;
 }

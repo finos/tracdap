@@ -67,7 +67,7 @@ information, this can be accessed by looking at the individual error items:
     :lineno-start: 105
 
 For each item, *item.detail* is a human readable description of the error. For errors related
-to the request (mostly validation errors), *item.location* is the field path for the input field
+to the request (mostly validation errors), *item.fieldPath* is the field path for the input field
 that caused the problem.
 
 

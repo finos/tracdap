@@ -101,7 +101,7 @@ public class ValidationResult {
 
             var errorItem = TracErrorItem.newBuilder()
                     .setDetail(failure.message())
-                    .setLocation(failure.location())
+                    .setFieldPath(failure.location())
                     .build();
 
             details.addItems(errorItem);
