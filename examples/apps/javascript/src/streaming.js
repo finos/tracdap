@@ -142,9 +142,11 @@ export function loadStreamingData(dataId) {
         stream.on("error", err => reject(err));
 
         // Make the initial API call to start the download stream
-        // It is not necessary to use a .then() or .catch() block,
-        // because responses are processed on the stream
-        stream.readDataset(request);
+        // Events are processed in the stream event handlers, so .then() and .catch() are not needed
+        // However, JavaScript will complain if there is an error in the promise / callback that is not handled
+        // A no-op error handler will prevent this warning (only use this when stream.on "error" is implemented)!
+        stream.readDataset(request)
+            .catch(() => {});  // Avoid unhandled or duplicate errors
 
     }); // End of streaming operation promise
 }
