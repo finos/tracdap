@@ -437,7 +437,7 @@
             const grpcMessage = response.headers.get("grpc-message");
 
             if (grpcStatus !== null && grpcStatus !== grpc.StatusCode.OK) {
-                const metadata = this._filterResponseHeaders(response.headers);
+                const metadata = this._metadataFromHttpHeaders(response.headers);
                 const error = {code: grpcStatus, message: grpcMessage, metadata: metadata};
                 callback(error, null);
                 return;
@@ -482,19 +482,9 @@
 
             // Copy both HTTP headers and LPM trailers into one map
 
-            const metadata = this._filterResponseHeaders(response.headers);
-
-            const trailers = new TextDecoder()
-                .decode(grpcResponse.trailers.message)
-                .trim().split(/\r\n/);
-
-            for (let i = 0; i < trailers.length; i++) {
-                const trailer = trailers[i];
-                const sep = trailer.indexOf(":");
-                const key = trailer.substring(0, sep);
-                const value = trailer.substring(sep + 1).trim();
-                metadata[key] = decodeURI(value);
-            }
+            const headers = this._metadataFromHttpHeaders(response.headers);
+            const trailers = this._metadataFromLpmTrailers(grpcResponse.trailers.message);
+            const metadata = {...headers, ...trailers};
 
             // Return headers and content
 
@@ -792,31 +782,18 @@
                 const lpm = holder.lpm;
 
                 if (lpm.trailers)
-                    this._receiveHeaders(lpm.message)
+                    this._receiveTrailers(lpm.message)
                 else
                     this._receiveMessage(lpm.message);
             }
         }
 
-        TracTransport.prototype._receiveHeaders = function (msg) {
+        TracTransport.prototype._receiveTrailers = function (msg) {
 
             this.options.debug && console.log("TracTransport _receiveHeaders")
 
-            const decoder = new TextDecoder();
-            const headerText = decoder.decode(msg);
-            const headerLines = headerText.trim().split("\r\n")
-
-            const headers = {}
-
-            headerLines.forEach(line => {
-
-                const sep = line.indexOf(":", 1);
-                const key = line.substring(0, sep);
-                headers[key] = line.substring(sep + 1).trim();
-            })
-
-            const filteredHeaders = this._filterResponseHeaders(headers);
-            Object.assign(this.responseMetadata, filteredHeaders);
+            const metadata = this._metadataFromLpmTrailers(msg);
+            Object.assign(this.responseMetadata, metadata);
 
             // The message exchange is always complete when the grpc-status header / trailer is received
             if (GRPC_STATUS_HEADER in this.responseMetadata) {
@@ -850,28 +827,50 @@
         // -------------------------------------------------------------------------------------------------------------
 
 
-        TracTransport.prototype._filterResponseHeaders = function(headers) {
+        TracTransport.prototype._metadataFromHttpHeaders = function(headers) {
 
             this.options.debug && console.log("TracTransport _filterResponseHeaders")
 
             if (headers === null)
                 return {};
 
-            const filteredHeaders = {};
+            const metadata = {};
             const keys = headers.keys();
 
             for (let key = keys.next(); key.value; key = keys.next()) {
 
+                // Do not include HTTP/2 special headers (e.g. :status etc.)
                 if (key.value.startsWith(":"))
                     continue;
 
+                // Filter out some HTTP headers that should definitely not be included as metadata
                 if (FILTER_RESPONSE_HEADERS.includes(key.value.toLowerCase()))
                     continue;
 
-                filteredHeaders[key.value] = headers.get(key.value);
+                metadata[key.value] = headers.get(key.value);
             }
 
-            return filteredHeaders;
+            return metadata;
+        }
+
+        TracTransport.prototype._metadataFromLpmTrailers = function(message) {
+
+            const metadata = {};
+
+            const trailers = new TextDecoder()
+                .decode(message)
+                .trim()
+                .split(/\r\n/);
+
+            for (let i = 0; i < trailers.length; i++) {
+                const trailer = trailers[i];
+                const sep = trailer.indexOf(":");
+                const key = trailer.substring(0, sep);
+                const value = trailer.substring(sep + 1).trim();
+                metadata[key] = decodeURI(value);
+            }
+
+            return metadata;
         }
 
         TracTransport.prototype._processResponseMetadata = function(metadata) {
