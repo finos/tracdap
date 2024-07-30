@@ -104,7 +104,7 @@ async function detailedErrorCall() {
             console.log("gRPC status code: " + details.code);
             // Show more detailed information
             details.items.forEach(item => {
-                console.log(item.location + ": " + item.detail + " (" + item.category + ")");
+                console.log(item.location + ": " + item.detail);
             });
         });
 }
