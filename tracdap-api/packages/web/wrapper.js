@@ -605,7 +605,7 @@
                     // This request is already finished, don't call a handler that would call back to client code
                     // If there is a problem, put it in the console instead
 
-                    if (!event.wasClean)
+                    if (this.options.debug && !event.wasClean)
                         console.log(`Connection did not close cleanly: ${event.reason} (websockets code ${event.code})`)
                 }
 
@@ -639,12 +639,13 @@
         TracTransport.prototype._wsHandlerError = function(event) {
 
             this.options.debug && console.log("TracTransport _wsHandlerError")
+            this.options.debug && console.log(`${event.error}`);
 
             if (this.ws.readyState !== WebSocket.CLOSED)
                 this.ws.close(1002, "close on error");
 
             const status = grpc.StatusCode.UNKNOWN;
-            const message = event.reason;
+            const message = "Network error (WebSockets)";
             this._handlerError(status, message);
         }
 
