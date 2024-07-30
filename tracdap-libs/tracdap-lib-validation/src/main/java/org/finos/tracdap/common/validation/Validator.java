@@ -69,14 +69,16 @@ public class Validator {
         if (!result.ok()) {
 
             for (var failure: result.failures())
-                log.error(failure.message());
+                log.error(failure.locationAndMessage());
 
             log.error("VALIDATION FAILED: [{}]", key.displayName());
 
+            var details = result.errorDetails();
+
             switch (ctx.validationType()) {
 
-                case STATIC: throw new EInputValidation(result.failureMessage());
-                case VERSION: throw new EVersionValidation(result.failureMessage());
+                case STATIC: throw new EInputValidation(details.getMessage(), details);
+                case VERSION: throw new EVersionValidation(details.getMessage(), details);
 
                 default:
                     throw new EUnexpected();

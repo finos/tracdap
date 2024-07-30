@@ -22,16 +22,28 @@ public class ValidationFailure {
     private final ValidationLocation location;
     private final String message;
 
-    public ValidationFailure(ValidationLocation location, String message ) {
+    ValidationFailure(ValidationLocation location, String message ) {
         this.location = location;
         this.message = message;
     }
 
-    public String message() {
+    public String locationAndMessage() {
 
         if (location.isRoot())
             return message;
         else
             return location.elementPath() + ": " + message;
+    }
+
+    public String location() {
+        return location.elementPath();
+    }
+
+    public String fieldName() {
+        return location.fieldName();
+    }
+
+    public String message() {
+        return message;
     }
 }
