@@ -34,9 +34,6 @@ message TracErrorDetails {
 
 message TracErrorItem {
 
-  string location = 1;
-  string category = 2;
-  string itemName = 3;
-  string itemDetail = 4;
-
+  string detail = 1;
+  string location = 2;
 }
