@@ -32,4 +32,4 @@ IGNORE_LICENSE=certifi
 # However, licensing info is not correctly declared in their Python packaging
 # https://pypi.org/project/aiohappyeyeballs/
 
-IGNORE_LICENSE="${IGNORE_LICENSE};aiohappyeyeballs"
+IGNORE_LICENSE="${IGNORE_LICENSE} aiohappyeyeballs"
