@@ -23,7 +23,7 @@ The TRAC transport is available as an option in the transport setup:
 
 .. code-block:: javascript
     :linenos:
-    :lineno-start: 158
+    :lineno-start: 19
 
     // Create the Data API
     const transportOptions = {transport: "trac"};
