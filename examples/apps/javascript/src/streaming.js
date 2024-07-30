@@ -105,7 +105,7 @@ export async function saveStreamingData(csvStream) {
 }
 
 
-export function loadStreamingData(dataId) {
+export async function loadStreamingData(dataId) {
 
     // Ask for the dataset in CSV format so we can easily count the rows
     const request = tracdap.api.DataReadRequest.create({

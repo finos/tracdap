@@ -122,8 +122,8 @@ async function badStreamingUpload() {
         .then(_ => {})  // Handle success
         .catch(error => {
             const details = tracdap.utils.getErrorDetails(error);
-            console.log(details.message);
-            details.items.forEach(item => console.log(item.detail))
+            console.log("Upload failed: " + details.message);
+            details.items.forEach(item => console.log(item.detail));
         });
 }
 
@@ -146,8 +146,8 @@ async function badStreamingDownload() {
         .then(_ => {})  // Handle success
         .catch(error => {
             const details = tracdap.utils.getErrorDetails(error);
-            console.log(details.message);
-            details.items.forEach(item => console.log(item.detail))
+            console.log("Download failed: " + details.message);
+            details.items.forEach(item => console.log(item.detail));
         });
 }
 
