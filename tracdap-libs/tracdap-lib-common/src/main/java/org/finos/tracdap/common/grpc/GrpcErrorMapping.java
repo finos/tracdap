@@ -37,7 +37,7 @@ public class GrpcErrorMapping {
     private static final Logger log = LoggerFactory.getLogger(GrpcErrorMapping.class);
 
     private static final Metadata.Key<TracErrorDetails> TRAC_ERROR_DETAILS_KEY =
-            Metadata.Key.of("trac_error_details-bin", ProtoUtils.metadataMarshaller(TracErrorDetails.getDefaultInstance()));
+            Metadata.Key.of("trac-error-details-bin", ProtoUtils.metadataMarshaller(TracErrorDetails.getDefaultInstance()));
 
     public static StatusRuntimeException processError(Throwable error) {
 

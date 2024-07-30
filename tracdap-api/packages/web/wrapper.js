@@ -56,7 +56,7 @@
 
     const DEFAULT_TRANSPORT = "google"
 
-    const TRAC_ERROR_DETAILS_KEY = "trac_error_details-bin";
+    const TRAC_ERROR_DETAILS_KEY = "trac-error-details-bin";
 
 
     // Streaming upload cancellation
