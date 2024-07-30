@@ -142,7 +142,7 @@ export function loadStreamingData(dataId) {
         stream.on("error", err => reject(err));
 
         // Make the initial API call to start the download stream
-        // Explicitly disable processing the result, we are using stream events instead
+        // Explicitly disable future result processing, we are using stream events instead
         stream.readDataset(request)
             .then(_ => {})
             .catch(_ => {});
