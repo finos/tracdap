@@ -430,24 +430,24 @@
                 return;
             }
 
-            // For failed calls, failed grpc-status code can sometime be in the HTTP headers
-            // In this case return an error straight away, there response will not have a body
-
-            const grpcStatus = Number.parseInt(response.headers.get("grpc-status"));
-            const grpcMessage = response.headers.get("grpc-message");
-
-            if (grpcStatus !== null && grpcStatus !== grpc.StatusCode.OK) {
-                const metadata = this._metadataFromHttpHeaders(response.headers);
-                const error = {code: grpcStatus, message: grpcMessage, metadata: metadata};
-                callback(error, null);
-                return;
+            // For unary calls, grpc-status code can sometimes be in the HTTP headers
+            // If status is non-zero return an error straight away, the response will not have a body
+            if (response.headers.has('grpc-status')) {
+                const grpcStatus = Number.parseInt(response.headers.get("grpc-status"));
+                if (grpcStatus !== grpc.StatusCode.OK) {
+                    const grpcMessage = response.headers.get("grpc-message");
+                    const metadata = this._metadataFromHttpHeaders(response.headers);
+                    const error = {code: grpcStatus, message: grpcMessage, metadata: metadata};
+                    callback(error, null);
+                    return;
+                }
             }
 
             // Response headers look ok, go on to reading the response body
 
             return response.arrayBuffer()
                 .then(body => this._fetchDecode(response, body))
-                .then(body => this._fetchBody(method, body, callback));
+                .then(body => this._fetchComplete(method, body, callback));
         }
 
         TracTransport.prototype._fetchDecode = function(response, body) {
@@ -461,42 +461,32 @@
 
             this._pushLpmQueue(bodyData, lpmQueue);
 
-            const grpcContent = this._pollLpmQueue(lpmQueue);
-            const grpcTrailers = this._pollLpmQueue(lpmQueue);
+            const grpcContent = this._pollLpmQueue(lpmQueue).then(lpm => lpm.message);
+            const grpcTrailers = this._pollLpmQueue(lpmQueue).then(lpm => lpm.message);
 
             // The entire body should be consumed, with one message of content and one of trailers
             if (lpmQueue.length !== 0 || grpcContent === null || !grpcTrailers === null) {
                 throw new Error(`Network error (response contains unexpected data)`);
             }
 
-            const grpcResponse = {}
+            return Promise.all([grpcContent, grpcTrailers]).then(result => {
 
-            grpcContent.then(content => grpcResponse.content = content);
-            grpcTrailers.then(trailers => grpcResponse.trailers = trailers);
+                const content = result[0];
+                const trailers = result[1];
 
-            return Promise.all([grpcContent, grpcTrailers])
-                .then(_ => this._fetchDecode2(response, grpcResponse));
+                // Copy both HTTP headers and LPM trailers into one metadata map
+                const metadata = {};
+                Object.assign(metadata, this._metadataFromHttpHeaders(response.headers));
+                Object.assign(metadata,  this._metadataFromLpmTrailers(trailers));
+
+                // Return headers and content
+                return { metadata: metadata, content: content};
+            });
         }
 
-        TracTransport.prototype._fetchDecode2 = function(response, grpcResponse) {
+        TracTransport.prototype._fetchComplete = function(method, response, callback) {
 
-            // Copy both HTTP headers and LPM trailers into one map
-
-            const headers = this._metadataFromHttpHeaders(response.headers);
-            const trailers = this._metadataFromLpmTrailers(grpcResponse.trailers.message);
-            const metadata = {...headers, ...trailers};
-
-            // Return headers and content
-
-            return {
-                metadata: metadata,
-                content: grpcResponse.content.message
-            }
-        }
-
-        TracTransport.prototype._fetchBody = function(method, response, callback) {
-
-            this.options.debug && console.log(`TracTransport _fetchBody, method = [${method.name}]`);
+            this.options.debug && console.log(`TracTransport _fetchComplete, method = [${method.name}]`);
 
             const metadata = response.metadata;
             const content = response.content;
@@ -829,7 +819,7 @@
 
         TracTransport.prototype._metadataFromHttpHeaders = function(headers) {
 
-            this.options.debug && console.log("TracTransport _filterResponseHeaders")
+            this.options.debug && console.log("TracTransport _metadataFromHttpHeaders");
 
             if (headers === null)
                 return {};
@@ -854,6 +844,8 @@
         }
 
         TracTransport.prototype._metadataFromLpmTrailers = function(message) {
+
+            this.options.debug && console.log("TracTransport _metadataFromLpmTrailers");
 
             const metadata = {};
 
