@@ -32,6 +32,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 import java.util.List;
+import java.util.Map;
 
 
 public class JobValidationTest {
@@ -41,6 +42,7 @@ public class JobValidationTest {
 
     private static final byte[] BASIC_CSV_CONTENT = ResourceHelpers.loadResourceAsBytes(SampleData.BASIC_CSV_DATA_RESOURCE);
     private static final byte[] BASIC_CSV_CONTENT_V2 = ResourceHelpers.loadResourceAsBytes(SampleData.BASIC_CSV_DATA_RESOURCE_V2);
+    private static final byte[] ALT_CSV_CONTENT = ResourceHelpers.loadResourceAsBytes(SampleData.ALT_CSV_DATA_RESOURCE);
 
     protected static TrustedMetadataApiGrpc.TrustedMetadataApiBlockingStub metaClient;
     protected static TracDataApiGrpc.TracDataApiBlockingStub dataClient;
@@ -48,6 +50,7 @@ public class JobValidationTest {
 
     protected static TagSelector basicDataSelector;
     protected static TagSelector enrichedDataSelector;
+    protected static TagSelector altDataSelector;
 
     @RegisterExtension
     public static final PlatformTest platform = PlatformTest.forConfig(TRAC_CONFIG_UNIT)
@@ -81,6 +84,14 @@ public class JobValidationTest {
                 List.of(TagUpdate.newBuilder()
                         .setAttrName("data_key")
                         .setValue(MetadataCodec.encodeValue("enriched_data"))
+                        .build()));
+
+        altDataSelector = loadCsvData(
+                SampleData.ALT_TABLE_SCHEMA,
+                ALT_CSV_CONTENT,
+                List.of(TagUpdate.newBuilder()
+                        .setAttrName("data_key")
+                        .setValue(MetadataCodec.encodeValue("alt_data"))
                         .build()));
     }
 
@@ -320,18 +331,313 @@ public class JobValidationTest {
         Assertions.assertEquals(JobStatusCode.VALIDATED, jobStatus.getStatusCode());  // todo: Expect consistency validation failure
     }
 
+    private TagSelector createFlowModel(
+            String entryPoint,
+            Map<String, BasicType> paramTypes,
+            Map<String, SchemaDefinition> inputSchemas,
+            Map<String, SchemaDefinition> outputSchemas,
+            List<TagUpdate> tags) {
+
+        var modelDef = ModelDefinition.newBuilder()
+                .setLanguage("python")
+                .setRepository("UNIT_TEST_REPO")
+                .setVersion("v1.0.0")
+                .setPath("src/")
+                .setEntryPoint(entryPoint);
+
+        for (var param : paramTypes.entrySet()) {
+            modelDef.putParameters(param.getKey(), ModelParameter.newBuilder()
+                    .setParamType(TypeSystem.descriptor(param.getValue()))
+                    .build());
+        }
+
+        for (var input : inputSchemas.entrySet()) {
+            modelDef.putInputs(input.getKey(), ModelInputSchema.newBuilder()
+                    .setSchema(input.getValue())
+                    .build());
+        }
+
+        for (var output : outputSchemas.entrySet()) {
+            modelDef.putOutputs(output.getKey(), ModelOutputSchema.newBuilder()
+                    .setSchema(output.getValue())
+                    .build());
+        }
+
+        var writeRequest = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.MODEL)
+                .setDefinition(ObjectDefinition.newBuilder()
+                        .setObjectType(ObjectType.MODEL)
+                        .setModel(modelDef))
+                .addAllTagUpdates(tags)
+                .build();
+
+        var modelId = metaClient.createObject(writeRequest);
+
+        return MetadataUtil.selectorFor(modelId);
+    }
+
     @Test
     public void runFlow_validateOk() {
-        Assertions.fail("todo");
+
+        var createFlowRequest = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.FLOW)
+                .setDefinition(ObjectDefinition.newBuilder()
+                        .setObjectType(ObjectType.FLOW)
+                        .setFlow(SampleData.SAMPLE_FLOW))
+                .addTagUpdates(TagUpdate.newBuilder()
+                        .setAttrName("testing_key")
+                        .setValue(MetadataCodec.encodeValue("test_flow_ok")))
+                .build();
+
+        var flowId = metaClient.createObject(createFlowRequest);
+        var flowSelector = MetadataUtil.selectorFor(flowId);
+
+        var model1 = createFlowModel(
+                "acme.models.test_model.Model1",
+                Map.of("param_1", BasicType.FLOAT),
+                Map.of("basic_data_input", SampleData.BASIC_TABLE_SCHEMA),
+                Map.of("enriched_basic_data", SampleData.BASIC_TABLE_SCHEMA_V2),
+                List.of());
+
+        var model2 = createFlowModel(
+                "acme.models.test_model.Model2",
+                Map.of("param_2", BasicType.STRING),
+                Map.of("alt_data_input", SampleData.ALT_TABLE_SCHEMA),
+                Map.of("enriched_alt_data", SampleData.ALT_TABLE_SCHEMA),
+                List.of());
+
+        var model3 = createFlowModel(
+                "acme.models.test_model.Model2",
+                Map.of("param_1", BasicType.FLOAT, "param_2", BasicType.STRING),
+                Map.of("enriched_basic_data", SampleData.BASIC_TABLE_SCHEMA_V2, "enriched_alt_data", SampleData.ALT_TABLE_SCHEMA),
+                Map.of("sample_output_data", SampleData.BASIC_TABLE_SCHEMA_V2),
+                List.of());
+
+        var job = JobDefinition.newBuilder()
+                .setJobType(JobType.RUN_FLOW)
+                .setRunFlow(RunFlowJob.newBuilder()
+                .setFlow(flowSelector)
+                .putModels("model_1", model1)
+                .putModels("model_2", model2)
+                .putModels("model_3", model3)
+                .putParameters("param_1", MetadataCodec.encodeValue(11.0))
+                .putParameters("param_2", MetadataCodec.encodeValue("test_value"))
+                .putInputs("basic_data_input", basicDataSelector)
+                .putInputs("alt_data_input", altDataSelector)
+                .addOutputAttrs(TagUpdate.newBuilder()
+                        .setAttrName("testing_key")
+                        .setValue(MetadataCodec.encodeValue("test_flow_ok"))))
+                .build();
+
+        var jobRequest = JobRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setJob(job)
+                .addJobAttrs(TagUpdate.newBuilder()
+                        .setAttrName("testing_key")
+                        .setValue(MetadataCodec.encodeValue("test_flow_ok")))
+                .build();
+
+        var jobStatus = orchClient.validateJob(jobRequest);
+
+        Assertions.assertEquals(JobStatusCode.VALIDATED, jobStatus.getStatusCode());
     }
 
     @Test
     public void runFlow_badInput() {
-        Assertions.fail("todo");
+
+        var createFlowRequest = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.FLOW)
+                .setDefinition(ObjectDefinition.newBuilder()
+                        .setObjectType(ObjectType.FLOW)
+                        .setFlow(SampleData.SAMPLE_FLOW))
+                .addTagUpdates(TagUpdate.newBuilder()
+                        .setAttrName("testing_key")
+                        .setValue(MetadataCodec.encodeValue("test_flow_ok")))
+                .build();
+
+        var flowId = metaClient.createObject(createFlowRequest);
+        var flowSelector = MetadataUtil.selectorFor(flowId);
+
+        var model1 = createFlowModel(
+                "acme.models.test_model.Model1",
+                Map.of("param_1", BasicType.FLOAT),
+                Map.of("basic_data_input", SampleData.BASIC_TABLE_SCHEMA),
+                Map.of("enriched_basic_data", SampleData.BASIC_TABLE_SCHEMA_V2),
+                List.of());
+
+        // Negative object versions for models 2 and 3 should create a bad request validation failure
+        var model2 = model1.toBuilder().setObjectVersion(-1).build();
+        var model3 = model1.toBuilder().setObjectVersion(-2).build();
+
+        var job = JobDefinition.newBuilder()
+                .setJobType(JobType.RUN_FLOW)
+                .setRunFlow(RunFlowJob.newBuilder()
+                        .setFlow(flowSelector)
+                        .putModels("model_1", model1)
+                        .putModels("model_2", model2)
+                        .putModels("model_3", model3)
+                        .putParameters("param_1", MetadataCodec.encodeValue(11.0))
+                        .putParameters("param_2", MetadataCodec.encodeValue("test_value"))
+                        .putInputs("basic_data_input", basicDataSelector)
+                        .putInputs("alt_data_input", altDataSelector)
+                        .addOutputAttrs(TagUpdate.newBuilder()
+                                .setAttrName("testing_key")
+                                .setValue(MetadataCodec.encodeValue("test_flow_ok"))))
+                .build();
+
+        var jobRequest = JobRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setJob(job)
+                .addJobAttrs(TagUpdate.newBuilder()
+                        .setAttrName("testing_key")
+                        .setValue(MetadataCodec.encodeValue("test_flow_ok")))
+                .build();
+
+        var jobStatus = orchClient.validateJob(jobRequest);  // todo expect failure
+
+        Assertions.assertEquals(JobStatusCode.VALIDATED, jobStatus.getStatusCode());
     }
 
     @Test
-    public void runFlow_inconsistent() {
-        Assertions.fail("todo");
+    public void runFlow_inconsistent1() {
+
+        // This test provides the wrong schemas and parameter types into the models
+        // But the flow wiring is correct
+
+        var createFlowRequest = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.FLOW)
+                .setDefinition(ObjectDefinition.newBuilder()
+                        .setObjectType(ObjectType.FLOW)
+                        .setFlow(SampleData.SAMPLE_FLOW))
+                .addTagUpdates(TagUpdate.newBuilder()
+                        .setAttrName("testing_key")
+                        .setValue(MetadataCodec.encodeValue("test_flow_ok")))
+                .build();
+
+        var flowId = metaClient.createObject(createFlowRequest);
+        var flowSelector = MetadataUtil.selectorFor(flowId);
+
+        var model1 = createFlowModel(
+                "acme.models.test_model.Model1",
+                Map.of("param_1", BasicType.FLOAT),
+                Map.of("basic_data_input", SampleData.BASIC_TABLE_SCHEMA_V2),  // Expect enriched data, basic data will have a missing field
+                Map.of("enriched_basic_data", SampleData.BASIC_TABLE_SCHEMA),  // Output basic data, will have a missing field for model 3
+                List.of());
+
+        var model2 = createFlowModel(
+                "acme.models.test_model.Model2",
+                Map.of("param_2", BasicType.STRING),
+                Map.of("alt_data_input", SampleData.BASIC_TABLE_SCHEMA),  // Expect basic data instead of alt data, wrong schema
+                Map.of("enriched_alt_data", SampleData.ALT_TABLE_SCHEMA),
+                List.of());
+
+        var model3 = createFlowModel(
+                "acme.models.test_model.Model2",
+                Map.of("param_1", BasicType.FLOAT, "param_2", BasicType.STRING),
+                Map.of("enriched_basic_data", SampleData.BASIC_TABLE_SCHEMA_V2, "enriched_alt_data", SampleData.ALT_TABLE_SCHEMA),
+                Map.of("sample_output_data", SampleData.BASIC_TABLE_SCHEMA_V2),
+                List.of());
+
+        var job = JobDefinition.newBuilder()
+                .setJobType(JobType.RUN_FLOW)
+                .setRunFlow(RunFlowJob.newBuilder()
+                        .setFlow(flowSelector)
+                        .putModels("model_1", model1)
+                        .putModels("model_2", model2)
+                        .putModels("model_3", model3)
+                        // Use the wrong value types for supplied parameters
+                        .putParameters("param_1", MetadataCodec.encodeValue("test_value"))
+                        .putParameters("param_2", MetadataCodec.encodeValue(11.0))
+                        .putInputs("basic_data_input", basicDataSelector)
+                        .putInputs("alt_data_input", altDataSelector)
+                        .addOutputAttrs(TagUpdate.newBuilder()
+                                .setAttrName("testing_key")
+                                .setValue(MetadataCodec.encodeValue("test_flow_ok"))))
+                .build();
+
+        var jobRequest = JobRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setJob(job)
+                .addJobAttrs(TagUpdate.newBuilder()
+                        .setAttrName("testing_key")
+                        .setValue(MetadataCodec.encodeValue("test_flow_ok")))
+                .build();
+
+        var jobStatus = orchClient.validateJob(jobRequest);
+
+        Assertions.assertEquals(JobStatusCode.VALIDATED, jobStatus.getStatusCode());
+    }
+
+    @Test
+    public void runFlow_inconsistent2() {
+
+        // This test has broken wiring for the flow
+
+        var createFlowRequest = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.FLOW)
+                .setDefinition(ObjectDefinition.newBuilder()
+                        .setObjectType(ObjectType.FLOW)
+                        .setFlow(SampleData.SAMPLE_FLOW))
+                .addTagUpdates(TagUpdate.newBuilder()
+                        .setAttrName("testing_key")
+                        .setValue(MetadataCodec.encodeValue("test_flow_ok")))
+                .build();
+
+        var flowId = metaClient.createObject(createFlowRequest);
+        var flowSelector = MetadataUtil.selectorFor(flowId);
+
+        var model1 = createFlowModel(
+                "acme.models.test_model.Model1",
+                Map.of("param_1", BasicType.FLOAT),
+                Map.of("basic_data_input", SampleData.BASIC_TABLE_SCHEMA),
+                Map.of("enriched_basic_data", SampleData.BASIC_TABLE_SCHEMA_V2),
+                List.of());
+
+        var model2 = createFlowModel(
+                "acme.models.test_model.Model2",
+                Map.of("param_2", BasicType.STRING),
+                Map.of("alt_data_input", SampleData.ALT_TABLE_SCHEMA),
+                Map.of("wrong_output_1", SampleData.ALT_TABLE_SCHEMA),  // Wrong output to wire into model 3
+                List.of());
+
+        var model3 = createFlowModel(
+                "acme.models.test_model.Model2",
+                Map.of("param_1", BasicType.FLOAT, "param_2", BasicType.STRING),
+                Map.of("enriched_basic_data", SampleData.BASIC_TABLE_SCHEMA_V2, "enriched_alt_data", SampleData.ALT_TABLE_SCHEMA),
+                Map.of("wrong_output_2", SampleData.BASIC_TABLE_SCHEMA_V2),  // Wrong output to wire into flow outputs
+                List.of());
+
+        var job = JobDefinition.newBuilder()
+                .setJobType(JobType.RUN_FLOW)
+                .setRunFlow(RunFlowJob.newBuilder()
+                        .setFlow(flowSelector)
+                        .putModels("model_1", model1)
+                        .putModels("model_2", model2)
+                        .putModels("model_3", model3)
+                        .putParameters("param_1", MetadataCodec.encodeValue(11.0))
+                        .putParameters("param_3", MetadataCodec.encodeValue("test_value"))  // Wrong param name, param_2 is missing
+                        .putInputs("basic_data_input", basicDataSelector)
+                        .putInputs("alt_data_input", altDataSelector)
+                        .addOutputAttrs(TagUpdate.newBuilder()
+                                .setAttrName("testing_key")
+                                .setValue(MetadataCodec.encodeValue("test_flow_ok"))))
+                .build();
+
+        var jobRequest = JobRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setJob(job)
+                .addJobAttrs(TagUpdate.newBuilder()
+                        .setAttrName("testing_key")
+                        .setValue(MetadataCodec.encodeValue("test_flow_ok")))
+                .build();
+
+        var jobStatus = orchClient.validateJob(jobRequest);
+
+        Assertions.assertEquals(JobStatusCode.VALIDATED, jobStatus.getStatusCode());
     }
 }
