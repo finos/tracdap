@@ -41,6 +41,7 @@ public class ErrorMappingInterceptor implements ServerInterceptor {
             // For an OK result, there is no need to apply error mapping
             if (status.isOk()) {
                 delegate().close(status, trailers);
+                return;
             }
 
             // If the cause of the failure is known, use the cause for error mapping
