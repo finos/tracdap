@@ -1,0 +1,6 @@
+alt_string_field,  alt_categorical_field,  alt_value_field,  alt_value_2_field,  alt_flag
+product-578,       electronics,            67.2,             4.78,               true
+product-159,       electronics,            83.66,            4.23,               true
+product-254,       pet_supplies,           23.9,             4.99,               false
+product-254-v2,    pet_supplies,           54.3,             4.68,               true
+product-1673,      cookware,               72.4,             3.27,               true
