@@ -124,11 +124,49 @@ public class JobValidationTest {
 
     @Test
     public void importModel_badInput() {
-        Assertions.fail("todo");
+
+        var job = JobDefinition.newBuilder()
+                .setJobType(JobType.IMPORT_MODEL)
+                .setImportModel(ImportModelJob.newBuilder()
+                        .clearLanguage()  // Language cannot be null
+                        .setRepository("UNIT_TEST_REPO")
+                        .setVersion("v1.0.0")
+                        .setPath("src/")
+                        .setEntryPoint("acme.###.test_model.BasicTestModel"));  // Invalid entry point
+
+        var request = JobRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setJob(job)
+                .build();
+
+        var response = orchClient.validateJob(request);  // todo expect throws?
+
+        Assertions.assertEquals(JobStatusCode.VALIDATED, response.getStatusCode());
     }
 
     @Test
-    public void runModel_validateOk() {
+    public void importModel_missingResources() {
+
+        var job = JobDefinition.newBuilder()
+                .setJobType(JobType.IMPORT_MODEL)
+                .setImportModel(ImportModelJob.newBuilder()
+                        .setLanguage("python")
+                        .setRepository("REPO_THAT_IS_NOT_CONFIGURED")  // Repo key is not a known resource
+                        .setVersion("v1.0.0")
+                        .setPath("src/")
+                        .setEntryPoint("acme.models.test_model.BasicTestModel"));
+
+        var request = JobRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setJob(job)
+                .build();
+
+        var response = orchClient.validateJob(request);
+
+        Assertions.assertEquals(JobStatusCode.VALIDATED, response.getStatusCode());  // TODO status?
+    }
+
+    private TagSelector createBasicModel(SchemaDefinition inputSchema, SchemaDefinition outputSchema, List<TagUpdate> tags) {
 
         var modelDef = ModelDefinition.newBuilder()
                 .setLanguage("python")
@@ -140,10 +178,10 @@ public class JobValidationTest {
                         .setParamType(TypeSystem.descriptor(BasicType.FLOAT))
                         .build())
                 .putInputs("basic_input", ModelInputSchema.newBuilder()
-                        .setSchema(SampleData.BASIC_TABLE_SCHEMA)
+                        .setSchema(inputSchema)
                         .build())
                 .putOutputs("enriched_output", ModelOutputSchema.newBuilder()
-                        .setSchema(SampleData.BASIC_TABLE_SCHEMA_V2)
+                        .setSchema(outputSchema)
                         .build())
                 .build();
 
@@ -151,15 +189,28 @@ public class JobValidationTest {
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.MODEL)
                 .setDefinition(ObjectDefinition.newBuilder()
-                .setObjectType(ObjectType.MODEL)
-                .setModel(modelDef))
-                .addTagUpdates(TagUpdate.newBuilder()
-                        .setAttrName("model_key")
-                        .setValue(MetadataCodec.encodeValue("basc_test_model")))
+                        .setObjectType(ObjectType.MODEL)
+                        .setModel(modelDef))
+                .addAllTagUpdates(tags)
                 .build();
 
         var modelId = metaClient.createObject(writeRequest);
-        var modelSelector = MetadataUtil.selectorFor(modelId);
+
+        return MetadataUtil.selectorFor(modelId);
+    }
+
+    @Test
+    public void runModel_validateOk() {
+
+        var modelTags = List.of(TagUpdate.newBuilder()
+                .setAttrName("model_key")
+                .setValue(MetadataCodec.encodeValue("basc_test_model"))
+                .build());
+
+        var modelSelector = createBasicModel(
+                SampleData.BASIC_TABLE_SCHEMA,
+                SampleData.BASIC_TABLE_SCHEMA_V2,
+                modelTags);
 
         var job = JobDefinition.newBuilder()
             .setJobType(JobType.RUN_MODEL)
@@ -179,7 +230,7 @@ public class JobValidationTest {
                 .setJob(job)
                 .addJobAttrs(TagUpdate.newBuilder()
                         .setAttrName("testing_key")
-                        .setValue(MetadataCodec.encodeValue("test_ model_ok")))
+                        .setValue(MetadataCodec.encodeValue("test_model_ok")))
                 .build();
 
         var jobStatus = orchClient.validateJob(jobRequest);
@@ -189,12 +240,84 @@ public class JobValidationTest {
 
     @Test
     public void runModel_badInput() {
-        Assertions.fail("todo");
+
+        var modelTags = List.of(TagUpdate.newBuilder()
+                .setAttrName("model_key")
+                .setValue(MetadataCodec.encodeValue("basic_model_bad_input"))
+                .build());
+
+        var modelSelector = createBasicModel(
+                SampleData.BASIC_TABLE_SCHEMA,
+                SampleData.BASIC_TABLE_SCHEMA_V2,
+                modelTags);
+
+        var badDataSelector = basicDataSelector.toBuilder()
+                .setObjectVersion(-1)
+                .build();
+
+        var job = JobDefinition.newBuilder()
+                .setJobType(JobType.RUN_MODEL)
+                .setRunModel(RunModelJob.newBuilder()
+                .setModel(modelSelector)
+                .putParameters("param_1", Value.newBuilder()
+                        .setFloatValue(11.0)
+                        .build())
+                .putInputs("basic_input", badDataSelector)
+                .addOutputAttrs(TagUpdate.newBuilder()
+                        .setAttrName("testing_key")
+                        .setValue(MetadataCodec.encodeValue("test_model_bad_input"))))
+                .build();
+
+        var jobRequest = JobRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setJob(job)
+                .addJobAttrs(TagUpdate.newBuilder()
+                        .setAttrName("testing_key")
+                        .setValue(MetadataCodec.encodeValue("test_model_bad_input")))
+                .build();
+
+        var jobStatus = orchClient.validateJob(jobRequest);  // todo expect failure
+
+        Assertions.assertEquals(JobStatusCode.VALIDATED, jobStatus.getStatusCode());
     }
 
     @Test
     public void runModel_inconsistent() {
-        Assertions.fail("todo");
+
+        var modelTags = List.of(TagUpdate.newBuilder()
+                .setAttrName("model_key")
+                .setValue(MetadataCodec.encodeValue("basc_test_model"))
+                .build());
+
+        var modelSelector = createBasicModel(
+                SampleData.BASIC_TABLE_SCHEMA_V2,  // Expect enriched data as input
+                SampleData.BASIC_TABLE_SCHEMA,
+                modelTags);
+
+        var job = JobDefinition.newBuilder()
+                .setJobType(JobType.RUN_MODEL)
+                .setRunModel(RunModelJob.newBuilder()
+                .setModel(modelSelector)
+                .putParameters("param_1", Value.newBuilder()
+                        .setStringValue("Not a real number")  // Supply wrong type for param_1
+                        .build())
+                .putInputs("basic_input", basicDataSelector)  // Expects enriched data, basic data is missing one field
+                .addOutputAttrs(TagUpdate.newBuilder()
+                        .setAttrName("testing_key")
+                        .setValue(MetadataCodec.encodeValue("test_model_ok"))))
+                .build();
+
+        var jobRequest = JobRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setJob(job)
+                .addJobAttrs(TagUpdate.newBuilder()
+                        .setAttrName("testing_key")
+                        .setValue(MetadataCodec.encodeValue("test_model_ok")))
+                .build();
+
+        var jobStatus = orchClient.validateJob(jobRequest);
+
+        Assertions.assertEquals(JobStatusCode.VALIDATED, jobStatus.getStatusCode());  // todo: Expect consistency validation failure
     }
 
     @Test
