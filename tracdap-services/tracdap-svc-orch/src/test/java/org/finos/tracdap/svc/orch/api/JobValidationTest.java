@@ -33,6 +33,7 @@ import org.junit.jupiter.api.extension.RegisterExtension;
 
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 
 public class JobValidationTest {
@@ -293,6 +294,49 @@ public class JobValidationTest {
     }
 
     @Test
+    public void runModel_missingResources() {
+
+        var modelTags = List.of(TagUpdate.newBuilder()
+                .setAttrName("model_key")
+                .setValue(MetadataCodec.encodeValue("basc_test_model"))
+                .build());
+
+        var modelSelector = createBasicModel(
+                SampleData.BASIC_TABLE_SCHEMA,
+                SampleData.BASIC_TABLE_SCHEMA_V2,
+                modelTags);
+
+        var missingDataSelector = basicDataSelector.toBuilder()
+                .setObjectId(UUID.randomUUID().toString())
+                .build();
+
+        var job = JobDefinition.newBuilder()
+                .setJobType(JobType.RUN_MODEL)
+                .setRunModel(RunModelJob.newBuilder()
+                .setModel(modelSelector)
+                .putParameters("param_1", Value.newBuilder()
+                        .setFloatValue(11.0)
+                        .build())
+                .putInputs("basic_input", missingDataSelector)
+                .addOutputAttrs(TagUpdate.newBuilder()
+                        .setAttrName("testing_key")
+                        .setValue(MetadataCodec.encodeValue("test_model_ok"))))
+                .build();
+
+        var jobRequest = JobRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setJob(job)
+                .addJobAttrs(TagUpdate.newBuilder()
+                        .setAttrName("testing_key")
+                        .setValue(MetadataCodec.encodeValue("test_model_ok")))
+                .build();
+
+        var jobStatus = orchClient.validateJob(jobRequest);
+
+        Assertions.assertEquals(JobStatusCode.VALIDATED, jobStatus.getStatusCode());
+    }
+
+    @Test
     public void runModel_inconsistent() {
 
         var modelTags = List.of(TagUpdate.newBuilder()
@@ -497,6 +541,64 @@ public class JobValidationTest {
                 .build();
 
         var jobStatus = orchClient.validateJob(jobRequest);  // todo expect failure
+
+        Assertions.assertEquals(JobStatusCode.VALIDATED, jobStatus.getStatusCode());
+    }
+
+    @Test
+    public void runFlow_missingResources() {
+
+        var createFlowRequest = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.FLOW)
+                .setDefinition(ObjectDefinition.newBuilder()
+                        .setObjectType(ObjectType.FLOW)
+                        .setFlow(SampleData.SAMPLE_FLOW))
+                .addTagUpdates(TagUpdate.newBuilder()
+                        .setAttrName("testing_key")
+                        .setValue(MetadataCodec.encodeValue("test_flow_ok")))
+                .build();
+
+        var flowId = metaClient.createObject(createFlowRequest);
+        var flowSelector = MetadataUtil.selectorFor(flowId);
+
+        var model1 = createFlowModel(
+                "acme.models.test_model.Model1",
+                Map.of("param_1", BasicType.FLOAT),
+                Map.of("basic_data_input", SampleData.BASIC_TABLE_SCHEMA),
+                Map.of("enriched_basic_data", SampleData.BASIC_TABLE_SCHEMA_V2),
+                List.of());
+
+        // Select random (missing) object IDs for two models and one input dataset
+        var model2 = model1.toBuilder().setObjectId(UUID.randomUUID().toString()).build();
+        var model3 = model1.toBuilder().setObjectId(UUID.randomUUID().toString()).build();
+        var basicData = basicDataSelector.toBuilder().setObjectId(UUID.randomUUID().toString()).build();
+
+        var job = JobDefinition.newBuilder()
+                .setJobType(JobType.RUN_FLOW)
+                .setRunFlow(RunFlowJob.newBuilder()
+                        .setFlow(flowSelector)
+                        .putModels("model_1", model1)
+                        .putModels("model_2", model2)
+                        .putModels("model_3", model3)
+                        .putParameters("param_1", MetadataCodec.encodeValue(11.0))
+                        .putParameters("param_2", MetadataCodec.encodeValue("test_value"))
+                        .putInputs("basic_data_input", basicData)
+                        .putInputs("alt_data_input", altDataSelector)
+                        .addOutputAttrs(TagUpdate.newBuilder()
+                                .setAttrName("testing_key")
+                                .setValue(MetadataCodec.encodeValue("test_flow_ok"))))
+                .build();
+
+        var jobRequest = JobRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setJob(job)
+                .addJobAttrs(TagUpdate.newBuilder()
+                        .setAttrName("testing_key")
+                        .setValue(MetadataCodec.encodeValue("test_flow_ok")))
+                .build();
+
+        var jobStatus = orchClient.validateJob(jobRequest);
 
         Assertions.assertEquals(JobStatusCode.VALIDATED, jobStatus.getStatusCode());
     }
