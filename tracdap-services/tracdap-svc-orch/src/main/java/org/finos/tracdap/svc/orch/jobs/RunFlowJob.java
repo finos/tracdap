@@ -49,6 +49,7 @@ public class RunFlowJob extends RunModelOrFlow implements IJobLogic {
         resources.add(runFlow.getFlow());
         resources.addAll(runFlow.getInputsMap().values());
         resources.addAll(runFlow.getModelsMap().values());
+        resources.addAll(runFlow.getPriorOutputsMap().values());
 
         return resources;
     }

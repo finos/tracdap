@@ -49,6 +49,7 @@ public class RunModelJob extends RunModelOrFlow implements IJobLogic {
         var resources = new ArrayList<TagSelector>(runModel.getInputsCount() + 1);
         resources.add(runModel.getModel());
         resources.addAll(runModel.getInputsMap().values());
+        resources.addAll(runModel.getPriorOutputsMap().values());
 
         return resources;
     }
