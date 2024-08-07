@@ -17,6 +17,8 @@
 package org.finos.tracdap.svc.orch.api;
 
 import com.google.protobuf.UnsafeByteOperations;
+import io.grpc.Status;
+import io.grpc.StatusRuntimeException;
 import org.finos.tracdap.api.*;
 import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.metadata.MetadataUtil;
@@ -151,9 +153,8 @@ public class JobValidationTest {
                 .setJob(job)
                 .build();
 
-        var response = orchClient.validateJob(request);  // todo expect throws?
-
-        Assertions.assertEquals(JobStatusCode.VALIDATED, response.getStatusCode());
+        var e = Assertions.assertThrows(StatusRuntimeException.class, () -> orchClient.validateJob(request));
+        Assertions.assertEquals(Status.Code.INVALID_ARGUMENT, e.getStatus().getCode());
     }
 
     @Test
@@ -173,9 +174,8 @@ public class JobValidationTest {
                 .setJob(job)
                 .build();
 
-        var response = orchClient.validateJob(request);
-
-        Assertions.assertEquals(JobStatusCode.VALIDATED, response.getStatusCode());  // TODO status?
+        var e = Assertions.assertThrows(StatusRuntimeException.class, () -> orchClient.validateJob(request));
+        Assertions.assertEquals(Status.Code.FAILED_PRECONDITION, e.getStatus().getCode());
     }
 
     private TagSelector createBasicModel(SchemaDefinition inputSchema, SchemaDefinition outputSchema, List<TagUpdate> tags) {
@@ -271,7 +271,7 @@ public class JobValidationTest {
                         .setFloatValue(11.0)
                         .build())
                 .putInputs("basic_input", basicDataSelector)
-                .putOutputs("enriched_output", enrichedDataSelector)
+                .putPriorOutputs("enriched_output", enrichedDataSelector)
                 .addOutputAttrs(TagUpdate.newBuilder()
                         .setAttrName("testing_key")
                         .setValue(MetadataCodec.encodeValue("test_model_ok"))))
@@ -328,9 +328,8 @@ public class JobValidationTest {
                         .setValue(MetadataCodec.encodeValue("test_model_bad_input")))
                 .build();
 
-        var jobStatus = orchClient.validateJob(jobRequest);  // todo expect failure
-
-        Assertions.assertEquals(JobStatusCode.VALIDATED, jobStatus.getStatusCode());
+        var e = Assertions.assertThrows(StatusRuntimeException.class, () -> orchClient.validateJob(jobRequest));
+        Assertions.assertEquals(Status.Code.INVALID_ARGUMENT, e.getStatus().getCode());
     }
 
     @Test
@@ -371,9 +370,8 @@ public class JobValidationTest {
                         .setValue(MetadataCodec.encodeValue("test_model_ok")))
                 .build();
 
-        var jobStatus = orchClient.validateJob(jobRequest);
-
-        Assertions.assertEquals(JobStatusCode.VALIDATED, jobStatus.getStatusCode());
+        var e = Assertions.assertThrows(StatusRuntimeException.class, () -> orchClient.validateJob(jobRequest));
+        Assertions.assertEquals(Status.Code.FAILED_PRECONDITION, e.getStatus().getCode());
     }
 
     @Test
@@ -410,9 +408,8 @@ public class JobValidationTest {
                         .setValue(MetadataCodec.encodeValue("test_model_ok")))
                 .build();
 
-        var jobStatus = orchClient.validateJob(jobRequest);
-
-        Assertions.assertEquals(JobStatusCode.VALIDATED, jobStatus.getStatusCode());  // todo: Expect consistency validation failure
+        var e = Assertions.assertThrows(StatusRuntimeException.class, () -> orchClient.validateJob(jobRequest));
+        Assertions.assertEquals(Status.Code.FAILED_PRECONDITION, e.getStatus().getCode());
     }
 
     private TagSelector createFlowModel(
@@ -648,9 +645,8 @@ public class JobValidationTest {
                         .setValue(MetadataCodec.encodeValue("test_flow_ok")))
                 .build();
 
-        var jobStatus = orchClient.validateJob(jobRequest);  // todo expect failure
-
-        Assertions.assertEquals(JobStatusCode.VALIDATED, jobStatus.getStatusCode());
+        var e = Assertions.assertThrows(StatusRuntimeException.class, () -> orchClient.validateJob(jobRequest));
+        Assertions.assertEquals(Status.Code.INVALID_ARGUMENT, e.getStatus().getCode());
     }
 
     @Test
@@ -706,9 +702,8 @@ public class JobValidationTest {
                         .setValue(MetadataCodec.encodeValue("test_flow_ok")))
                 .build();
 
-        var jobStatus = orchClient.validateJob(jobRequest);
-
-        Assertions.assertEquals(JobStatusCode.VALIDATED, jobStatus.getStatusCode());
+        var e = Assertions.assertThrows(StatusRuntimeException.class, () -> orchClient.validateJob(jobRequest));
+        Assertions.assertEquals(Status.Code.FAILED_PRECONDITION, e.getStatus().getCode());
     }
 
     @Test
@@ -777,9 +772,8 @@ public class JobValidationTest {
                         .setValue(MetadataCodec.encodeValue("test_flow_ok")))
                 .build();
 
-        var jobStatus = orchClient.validateJob(jobRequest);
-
-        Assertions.assertEquals(JobStatusCode.VALIDATED, jobStatus.getStatusCode());
+        var e = Assertions.assertThrows(StatusRuntimeException.class, () -> orchClient.validateJob(jobRequest));
+        Assertions.assertEquals(Status.Code.FAILED_PRECONDITION, e.getStatus().getCode());
     }
 
     @Test
@@ -846,8 +840,7 @@ public class JobValidationTest {
                         .setValue(MetadataCodec.encodeValue("test_flow_ok")))
                 .build();
 
-        var jobStatus = orchClient.validateJob(jobRequest);
-
-        Assertions.assertEquals(JobStatusCode.VALIDATED, jobStatus.getStatusCode());
+        var e = Assertions.assertThrows(StatusRuntimeException.class, () -> orchClient.validateJob(jobRequest));
+        Assertions.assertEquals(Status.Code.FAILED_PRECONDITION, e.getStatus().getCode());
     }
 }
