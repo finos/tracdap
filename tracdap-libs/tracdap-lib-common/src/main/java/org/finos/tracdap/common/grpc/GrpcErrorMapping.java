@@ -185,6 +185,7 @@ public class GrpcErrorMapping {
 
             Map.entry(EInputValidation.class, Status.Code.INVALID_ARGUMENT),
             Map.entry(EVersionValidation.class, Status.Code.FAILED_PRECONDITION),
+            Map.entry(EConsistencyValidation.class, Status.Code.FAILED_PRECONDITION),
 
             Map.entry(ETenantNotFound.class, Status.Code.NOT_FOUND),
 
