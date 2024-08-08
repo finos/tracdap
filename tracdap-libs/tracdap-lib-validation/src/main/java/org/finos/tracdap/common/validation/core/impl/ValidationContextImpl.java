@@ -659,7 +659,7 @@ public class ValidationContextImpl implements ValidationContext {
     @Override public <U> ValidationContext
     applyMapKeys(ValidationFunction.TypedArg<String, U> validator, U arg) {
 
-        return applyMap(validator, String.class, arg, true);
+        return applyMap(validator, String.class, (_x) -> arg, true);
     }
 
     @Override public ValidationContext
@@ -677,11 +677,17 @@ public class ValidationContextImpl implements ValidationContext {
     @Override public <T, U> ValidationContext
     applyMapValues(ValidationFunction.TypedArg<T, U> validator, Class<T> targetClass, U arg) {
 
-        return applyMap(validator, targetClass, arg, false);
+        return applyMap(validator, targetClass, (_x) -> arg, false);
+    }
+
+    @Override public <T, U> ValidationContext
+    applyMapValuesFunc(ValidationFunction.TypedArg<T, U> validator, Class<T> targetClass, Function<String, U> argFunc) {
+
+        return applyMap(validator, targetClass, argFunc, false);
     }
 
     private <T, U> ValidationContext
-    applyMap(ValidationFunction.TypedArg<T, U> validator, Class<T> targetClass, U arg, boolean pushKey) {
+    applyMap(ValidationFunction.TypedArg<T, U> validator, Class<T> targetClass, Function<String, U> argFunc, boolean pushKey) {
 
         var funcName = pushKey ? "[applyMapKeys]" : "[applyMapValues]";
 
@@ -699,23 +705,36 @@ public class ValidationContextImpl implements ValidationContext {
 
             var map = (Map<?, ?>) loc.target();
 
-            for (var key : map.keySet())
+            for (var key : map.keySet()) {
+
+                var arg = argFunc != null ? argFunc.apply(key.toString()) : (U) null;
 
                 resultCtx = (ValidationContextImpl) resultCtx
                         .pushMapEntry(key, pushKey, false)
                         .apply(validator, targetClass, arg)
                         .pop();
+            }
         }
         else {
 
             var mapSize = loc.parent().msg().getRepeatedFieldCount(loc.field());
 
-            for (var i = 0; i < mapSize; i++)
+            for (var i = 0; i < mapSize; i++) {
+
+                U arg = null;
+
+                if (argFunc != null) {
+                    var map = (List<?>) loc.target();
+                    var entry = (MapEntry<?, ?>) map.get(i);
+                    var key = entry.getKey();
+                    arg = argFunc.apply(key.toString());
+                }
 
                 resultCtx = (ValidationContextImpl) resultCtx
                         .pushMapEntry(i, pushKey)
                         .apply(validator, targetClass, arg)
                         .pop();
+            }
         }
 
         return resultCtx;

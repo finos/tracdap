@@ -226,6 +226,7 @@ public interface ValidationContext {
     <T> ValidationContext applyMapValues(ValidationFunction.Basic validator);
     <T> ValidationContext applyMapValues(ValidationFunction.Typed<T> validator, Class<T> targetClass);
     <T, U> ValidationContext applyMapValues(ValidationFunction.TypedArg<T, U> validator, Class<T> targetClass, U arg);
+    <T, U> ValidationContext applyMapValuesFunc(ValidationFunction.TypedArg<T, U> validator, Class<T> targetClass, Function<String, U> argFunc);
 
 
     ValidationType validationType();
