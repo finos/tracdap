@@ -16,11 +16,13 @@
 
 package org.finos.tracdap.common.validation.core;
 
-import com.google.protobuf.Descriptors;
-import com.google.protobuf.Message;
 import org.finos.tracdap.common.validation.core.impl.ValidationContextImpl;
 import org.finos.tracdap.common.validation.core.impl.ValidationFailure;
 import org.finos.tracdap.common.validation.core.impl.ValidationKey;
+import org.finos.tracdap.common.metadata.MetadataBundle;
+
+import com.google.protobuf.Descriptors;
+import com.google.protobuf.Message;
 
 import java.util.*;
 import java.util.function.Function;
@@ -42,6 +44,18 @@ public interface ValidationContext {
 
         return ValidationContextImpl.forVersion(current, prior);
     }
+
+    static ValidationContext forConsistency(Message msg, MetadataBundle resources) {
+
+        return ValidationContextImpl.forConsistency(msg, resources);
+    }
+
+    /**
+     * Get the metadata bundle associated with this validation context
+     *
+     * @return The metadata bundle associated with this validation context
+     */
+    MetadataBundle getMetadataBundle();
 
     /**
      * Push a member field of the current object onto the validation stack

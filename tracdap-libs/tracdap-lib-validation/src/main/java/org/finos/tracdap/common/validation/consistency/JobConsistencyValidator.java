@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Accenture Global Solutions Limited
+ * Copyright 2024 Accenture Global Solutions Limited
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,11 +14,13 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.validation.core;
+package org.finos.tracdap.common.validation.consistency;
 
-public enum ValidationType {
-    STATIC,
-    VERSION,
-    CONSISTENCY,
-    UNDEFINED
+import org.finos.tracdap.common.validation.core.ValidationType;
+import org.finos.tracdap.common.validation.core.Validator;
+
+
+@Validator(type = ValidationType.CONSISTENCY)
+public class JobConsistencyValidator {
+
 }

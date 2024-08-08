@@ -85,12 +85,12 @@ public class ValidationResult {
 
             case VERSION:
                 details.setCode(Status.Code.FAILED_PRECONDITION.value());
-                details.setMessage("Validation failed for version"); // todo
+                details.setMessage("Version compatability check failed for [" + shortName + "}");
                 break;
 
-            case REFERENTIAL:
+            case CONSISTENCY:
                 details.setCode(Status.Code.FAILED_PRECONDITION.value());
-                details.setMessage("Validation failed for referential");
+                details.setMessage("Consistency check failed for [" + shortName + "]");
                 break;
 
             default:

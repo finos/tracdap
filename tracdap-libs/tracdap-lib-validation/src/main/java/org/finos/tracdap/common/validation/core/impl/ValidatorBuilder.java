@@ -21,6 +21,7 @@ import com.google.protobuf.Descriptors;
 import com.google.protobuf.Message;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.validation.api.DataApiValidator;
+import org.finos.tracdap.common.validation.consistency.JobConsistencyValidator;
 import org.finos.tracdap.common.validation.core.ValidationFunction;
 import org.finos.tracdap.common.validation.core.ValidationType;
 import org.finos.tracdap.common.validation.core.Validator;
@@ -47,11 +48,13 @@ public class ValidatorBuilder {
         var apiValidatorPackage = DataApiValidator.class.getPackage();
         var staticValidatorPackage = ObjectIdValidator.class.getPackage();
         var versionValidatorPackage = SchemaVersionValidator.class.getPackage();
+        var consistencyValidatorPackage = JobConsistencyValidator.class.getPackage();
 
         return scanPackages(
                 apiValidatorPackage,
                 staticValidatorPackage,
-                versionValidatorPackage);
+                versionValidatorPackage,
+                consistencyValidatorPackage);
     }
 
     public static Map<ValidationKey, ValidationFunction<?>> scanPackages(Package... packages) {
@@ -151,6 +154,9 @@ public class ValidatorBuilder {
             else if (validationType == ValidationType.VERSION)
                 validator = buildVersionValidator(objectType, method);
 
+            else if (validationType == ValidationType.CONSISTENCY)
+                validator = buildConsistencyValidator(objectType, method);
+
             else
                 throw new EUnexpected();
 
@@ -229,6 +235,28 @@ public class ValidatorBuilder {
             var func = ValidationFunction.makeVersion(validationFunc, objectType);
 
             return Map.entry(key, func);
+        }
+        catch (NoSuchMethodException | InvocationTargetException | IllegalAccessException e) {
+
+            log.error("Failed to set up validation: Descriptor lookup failed", e);
+            throw new EUnexpected(e);
+        }
+    }
+
+    private static Map.Entry<ValidationKey, ValidationFunction<?>> buildConsistencyValidator(
+            Class<?> objectType,
+            Method validationFunc) {
+
+        try {
+
+            var descriptorFunc = objectType.getMethod(GET_DESCRIPTOR_METHOD);
+            var descriptor = (Descriptors.Descriptor) descriptorFunc.invoke(null);
+
+            var key = ValidationKey.forConsistency(descriptor);
+            var func = ValidationFunction.makeTyped(validationFunc, objectType);
+
+            return Map.entry(key, func);
+
         }
         catch (NoSuchMethodException | InvocationTargetException | IllegalAccessException e) {
 

@@ -24,6 +24,7 @@ import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.validation.core.ValidationContext;
 import org.finos.tracdap.common.validation.core.ValidationFunction;
 import org.finos.tracdap.common.validation.core.ValidationType;
+import org.finos.tracdap.common.metadata.MetadataBundle;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -44,15 +45,19 @@ public class ValidationContextImpl implements ValidationContext {
     private final Stack<ValidationLocation> location;
     private final ValidationContextImpl priorCtx;
     private final List<ValidationFailure> failures;
+    private final MetadataBundle bundle;
 
 
-    private ValidationContextImpl(ValidationType validationType, ValidationLocation root, ValidationContextImpl priorCtx) {
+    private ValidationContextImpl(
+            ValidationType validationType, ValidationLocation root,
+            ValidationContextImpl priorCtx, MetadataBundle bundle) {
 
         this.validationType = validationType;
         this.location = new Stack<>();
         this.location.push(root);
 
         this.priorCtx = priorCtx;
+        this.bundle = bundle;
 
         this.failures = new ArrayList<>();
     }
@@ -60,21 +65,32 @@ public class ValidationContextImpl implements ValidationContext {
     public static ValidationContext forMethod(Message msg, Descriptors.MethodDescriptor method) {
 
         var root = new ValidationLocation(null, msg, method, null, null, null);
-        return new ValidationContextImpl(ValidationType.STATIC, root, null);
+        return new ValidationContextImpl(ValidationType.STATIC, root, null, null);
     }
 
     public static ValidationContext forMessage(Message msg) {
 
         var root = new ValidationLocation(null, msg, null, null);
-        return new ValidationContextImpl(ValidationType.STATIC, root, null);
+        return new ValidationContextImpl(ValidationType.STATIC, root, null, null);
     }
 
     public static ValidationContext forVersion(Message current, Message prior) {
 
         var currentRoot = new ValidationLocation(null, current, null, null);
         var priorRoot = new ValidationLocation(null, prior, null, null);
-        var priorCtx = new ValidationContextImpl(ValidationType.VERSION, priorRoot, null);
-        return new ValidationContextImpl(ValidationType.VERSION, currentRoot, priorCtx);
+        var priorCtx = new ValidationContextImpl(ValidationType.VERSION, priorRoot, null, null);
+        return new ValidationContextImpl(ValidationType.VERSION, currentRoot, priorCtx, null);
+    }
+
+    public static ValidationContext forConsistency(Message msg, MetadataBundle resources) {
+
+        var root = new ValidationLocation(null, msg, null, null);
+        return new ValidationContextImpl(ValidationType.CONSISTENCY, root, null, resources);
+    }
+
+    @Override
+    public MetadataBundle getMetadataBundle() {
+        return this.bundle;
     }
 
     @Override
@@ -235,7 +251,7 @@ public class ValidationContextImpl implements ValidationContext {
         return pushMapEntry(key, false, false);
     }
 
-    private ValidationContext pushMapEntry(Object key, boolean pushKey, boolean keyAlreadySeen) {
+    private ValidationContext pushMapEntry(Object key, boolean pushKey, boolean allowIfMissing) {
 
         var methodName = pushKey ? "[pushMapKey]" : "[pushMapValue]";
 
@@ -255,7 +271,7 @@ public class ValidationContextImpl implements ValidationContext {
             // For version validators, allow pushing keys that exist in either the current or prior map
             // For the current ctx, if the key is not present we need to check the prior ctx
             // For the prior ctx, we allow the key if it was already seen in the current ctx
-            if (priorCtx == null && !keyAlreadySeen)
+            if (priorCtx == null && !allowIfMissing)
                 throw new ETracInternal(methodName + " attempted to push a key that is not in the map");
         }
 
