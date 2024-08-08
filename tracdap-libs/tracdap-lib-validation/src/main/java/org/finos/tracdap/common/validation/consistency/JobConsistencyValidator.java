@@ -100,7 +100,7 @@ public class JobConsistencyValidator {
                 .pop();
     }
 
-    @Validator(type = ValidationType.CONSISTENCY)
+    @Validator
     public static ValidationContext runModelJob(RunModelJob job, ValidationContext ctx) {
 
         var resources = ctx.getMetadataBundle();
@@ -140,7 +140,7 @@ public class JobConsistencyValidator {
         return ctx;
     }
 
-    @Validator(type = ValidationType.CONSISTENCY)
+    @Validator
     public static ValidationContext runFlowJob(RunFlowJob job, ValidationContext ctx) {
 
         // TODO: Flow validation
@@ -148,7 +148,7 @@ public class JobConsistencyValidator {
     }
 
 
-    @Validator(type = ValidationType.CONSISTENCY)
+    @Validator
     public static ValidationContext importModelJob(ImportModelJob job, ValidationContext ctx) {
 
         // TODO: Model import validation
@@ -293,7 +293,10 @@ public class JobConsistencyValidator {
                     requiredField.getFieldName()));
         }
 
-        if (requiredField.getNotNull() && !suppliedField.getNotNull()) {
+        // Business keys are implicitly not null if the flag is not specified (currently notNull is optional)
+        var suppliedNNotNull = suppliedField.hasNotNull() ? suppliedField.getNotNull() : suppliedField.getBusinessKey();
+
+        if (requiredField.getNotNull() && !suppliedNNotNull) {
             return ctx.error(String.format(
                     "Field [%s] should not be nullable, but is nullable in the supplied dataset",
                     requiredField.getFieldName()));
