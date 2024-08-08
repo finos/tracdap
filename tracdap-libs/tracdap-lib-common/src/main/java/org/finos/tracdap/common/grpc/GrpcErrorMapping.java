@@ -39,6 +39,8 @@ public class GrpcErrorMapping {
     private static final Metadata.Key<TracErrorDetails> TRAC_ERROR_DETAILS_KEY =
             Metadata.Key.of("trac-error-details-bin", ProtoUtils.metadataMarshaller(TracErrorDetails.getDefaultInstance()));
 
+    private static final String INTERNAL_ERROR_MESSAGE = "Internal server error";
+
     public static StatusRuntimeException processError(Throwable error) {
 
         // Unwrap future/streaming completion errors
@@ -110,10 +112,10 @@ public class GrpcErrorMapping {
 
         if (error instanceof ETracInternal) {
 
-            var trailers = basicErrorTrailers(Status.Code.INTERNAL, Status.INTERNAL.getDescription());
+            var trailers = basicErrorTrailers(Status.Code.INTERNAL, INTERNAL_ERROR_MESSAGE);
 
             return Status.fromCode(Status.Code.INTERNAL)
-                    .withDescription(Status.INTERNAL.getDescription())
+                    .withDescription(INTERNAL_ERROR_MESSAGE)
                     .withCause(error)
                     .asRuntimeException(trailers);
         }
@@ -124,10 +126,10 @@ public class GrpcErrorMapping {
 
         log.error("An unhandled error has reached the top level error handler", error);
 
-        var trailers = basicErrorTrailers(Status.Code.INTERNAL, Status.INTERNAL.getDescription());
+        var trailers = basicErrorTrailers(Status.Code.INTERNAL, INTERNAL_ERROR_MESSAGE);
 
         return Status.fromCode(Status.Code.INTERNAL)
-                .withDescription(Status.INTERNAL.getDescription())
+                .withDescription(INTERNAL_ERROR_MESSAGE)
                 .withCause(error)
                 .asRuntimeException(trailers);
     }
