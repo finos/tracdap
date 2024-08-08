@@ -16,6 +16,8 @@
 
 package org.finos.tracdap.svc.orch.service;
 
+import io.grpc.Status;
+import io.grpc.StatusRuntimeException;
 import org.finos.tracdap.api.JobRequest;
 import org.finos.tracdap.api.JobStatus;
 import org.finos.tracdap.api.MetadataWriteRequest;
@@ -125,22 +127,35 @@ public class JobProcessor {
 
         var newState = jobState.clone();
 
-        // Credentials are not serialized in the cache, they need to be regenerated
-        newState.credentials = internalAuth.createDelegateSession(jobState.owner, DELEGATE_SESSION_TIMEOUT);
+        try {
 
-        // Load in all the resources referenced by the job
-        newState = lifecycle.loadResources(newState);
+            // Credentials are not serialized in the cache, they need to be regenerated
+            newState.credentials = internalAuth.createDelegateSession(jobState.owner, DELEGATE_SESSION_TIMEOUT);
 
-        // Apply any transformations specific to the job type
-        newState = lifecycle.applyTransform(newState);
+            // Load in all the resources referenced by the job
+            newState = lifecycle.loadResources(newState);
 
-        // Semantic validation (job consistency)
-        var resources = new MetadataBundle(newState.resources, newState.resourceMapping);
-        validator.validateConsistency(newState.definition, resources);
+            // Apply any transformations specific to the job type
+            newState = lifecycle.applyTransform(newState);
 
-        newState.tracStatus = JobStatusCode.VALIDATED;
+            // Semantic validation (job consistency)
+            var resources = new MetadataBundle(newState.resources, newState.resourceMapping);
+            validator.validateConsistency(newState.definition, resources);
 
-        return newState;
+            newState.tracStatus = JobStatusCode.VALIDATED;
+
+            return newState;
+        }
+        catch (StatusRuntimeException e) {
+
+            // Special handling for NOT_FOUND errors while querying the metadata service
+            // Treat these as consistency validation errors
+            // A better solution would be to allow partial response for batch load and pass to the validator
+            if (e.getStatus().getCode() == Status.Code.NOT_FOUND)
+                throw new EConsistencyValidation("One or more items used in this job could not be found");
+
+            throw e;
+        }
     }
 
     public JobState saveInitialMetadata(JobState jobState) {
