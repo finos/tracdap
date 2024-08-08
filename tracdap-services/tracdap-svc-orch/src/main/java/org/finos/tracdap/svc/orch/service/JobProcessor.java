@@ -30,6 +30,7 @@ import org.finos.tracdap.common.exec.*;
 import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.metadata.MetadataUtil;
 import org.finos.tracdap.common.validation.Validator;
+import org.finos.tracdap.common.metadata.MetadataBundle;
 import org.finos.tracdap.config.JobResult;
 import org.finos.tracdap.metadata.JobStatusCode;
 
@@ -124,16 +125,18 @@ public class JobProcessor {
 
         var newState = jobState.clone();
 
-        // Credentials are not serialized in the cache
+        // Credentials are not serialized in the cache, they need to be regenerated
         newState.credentials = internalAuth.createDelegateSession(jobState.owner, DELEGATE_SESSION_TIMEOUT);
 
-        newState = lifecycle.applyTransform(newState);
+        // Load in all the resources referenced by the job
         newState = lifecycle.loadResources(newState);
-        newState = lifecycle.allocateResultIds(newState);
-        newState = lifecycle.buildJobConfig(newState);
 
-        // static validate
-        // semantic validate
+        // Apply any transformations specific to the job type
+        newState = lifecycle.applyTransform(newState);
+
+        // Semantic validation (job consistency)
+        var resources = new MetadataBundle(newState.resources, newState.resourceMapping);
+        validator.validateConsistency(newState.definition, resources);
 
         newState.tracStatus = JobStatusCode.VALIDATED;
 
@@ -144,9 +147,17 @@ public class JobProcessor {
 
         var newState = jobState.clone();
 
-        // Credentials are not serialized in the cache
+        // Credentials are not serialized in the cache, they need to be regenerated
         newState.credentials = internalAuth.createDelegateSession(jobState.owner, DELEGATE_SESSION_TIMEOUT);
 
+        // Result IDs are needed in order to generate the job instruction
+        // They are also updated in the job definition that is being created
+        newState = lifecycle.allocateResultIds(newState);
+
+        // Create the job instruction - this is what will go to the executor
+        newState = lifecycle.buildJobConfig(newState);
+
+        // The job definition is ready - write it to the metadata store
         newState = lifecycle.saveInitialMetadata(newState);
 
         newState.tracStatus = JobStatusCode.QUEUED;
@@ -168,7 +179,7 @@ public class JobProcessor {
 
         var newState = jobState.clone();
 
-        // Credentials are not serialized in the cache
+        // Credentials are not serialized in the cache, they need to be regenerated
         newState.credentials = internalAuth.createDelegateSession(jobState.owner, DELEGATE_SESSION_TIMEOUT);
 
         var writeRequest = MetadataWriteRequest.newBuilder()
@@ -381,7 +392,7 @@ public class JobProcessor {
 
         var newState = jobState.clone();
 
-        // Credentials are not serialized in the cache
+        // Credentials are not serialized in the cache, they need to be regenerated
         newState.credentials = internalAuth.createDelegateSession(jobState.owner, DELEGATE_SESSION_TIMEOUT);
 
         // TRAC job status must already be set before calling lifecycle
@@ -441,7 +452,7 @@ public class JobProcessor {
         newState.statusMessage = errorMessage;
         newState.exception = exception;
 
-        // Credentials are not serialized in the cache
+        // Credentials are not serialized in the cache, they need to be regenerated
         newState.credentials = internalAuth.createDelegateSession(jobState.owner, DELEGATE_SESSION_TIMEOUT);
 
         lifecycle.processJobResult(newState);
