@@ -18,6 +18,7 @@ package org.finos.tracdap.svc.orch.service;
 
 import org.finos.tracdap.api.*;
 import org.finos.tracdap.common.exception.EUnexpected;
+import org.finos.tracdap.common.metadata.MetadataBundle;
 import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.metadata.MetadataUtil;
 import org.finos.tracdap.config.JobConfig;
@@ -84,8 +85,9 @@ public class JobProcessorHelpers {
     JobState applyTransform(JobState jobState) {
 
         var logic = JobLogic.forJobType(jobState.jobType);
+        var metadata = new MetadataBundle(jobState.resources, jobState.resourceMapping);
 
-        jobState.definition = logic.applyTransform(jobState.definition, platformConfig);
+        jobState.definition = logic.applyTransform(jobState.definition, metadata, platformConfig);
 
         return jobState;
     }

@@ -19,6 +19,7 @@ package org.finos.tracdap.svc.orch.jobs;
 import org.finos.tracdap.api.MetadataWriteRequest;
 import org.finos.tracdap.common.exception.EExecutorValidation;
 import org.finos.tracdap.common.exception.EUnexpected;
+import org.finos.tracdap.common.metadata.MetadataBundle;
 import org.finos.tracdap.config.JobConfig;
 import org.finos.tracdap.config.JobResult;
 import org.finos.tracdap.config.PlatformConfig;
@@ -35,7 +36,7 @@ import static org.finos.tracdap.common.metadata.MetadataConstants.*;
 public class ImportModelJob implements IJobLogic {
 
     @Override
-    public JobDefinition applyTransform(JobDefinition job, PlatformConfig platformConfig) {
+    public JobDefinition applyTransform(JobDefinition job, MetadataBundle metadata, PlatformConfig platformConfig) {
 
         // Fill in package and packageGroup properties for models using Git repos
 
