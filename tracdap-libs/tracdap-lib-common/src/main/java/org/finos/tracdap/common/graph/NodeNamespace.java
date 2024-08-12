@@ -16,6 +16,8 @@
 
 package org.finos.tracdap.common.graph;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -25,11 +27,11 @@ public class NodeNamespace {
     public static final NodeNamespace ROOT = new NodeNamespace("", /* isRoot = */ true);
 
     private final String name;
-    private final Optional<NodeNamespace> parent;
+    private final NodeNamespace parent;
 
     private NodeNamespace(String name, boolean isRoot) {
         this.name = name;
-        this.parent = isRoot ? Optional.empty() : Optional.of(ROOT);
+        this.parent = isRoot ? null : ROOT;
     }
 
     public NodeNamespace(String name) {
@@ -38,14 +40,14 @@ public class NodeNamespace {
 
     public NodeNamespace(String name, NodeNamespace parent) {
         this.name = name;
-        this.parent = parent != null ? Optional.of(parent) : Optional.of(ROOT);
+        this.parent = parent != null ? parent : ROOT;
     }
 
     public String name() {
         return name;
     }
 
-    public Optional<NodeNamespace> parent() {
+    public NodeNamespace parent() {
         return parent;
     }
 
@@ -60,5 +62,27 @@ public class NodeNamespace {
     @Override
     public int hashCode() {
         return Objects.hash(name, parent);
+    }
+
+    @Override
+    public String toString() {
+        return String.join(", ", components());
+    }
+
+    private List<String> components() {
+        return components(new ArrayList<>());
+    }
+
+    private List<String> components(List<String> components) {
+
+        if (this == ROOT)
+            return List.of("ROOT");
+
+        components.add(this.name);
+
+        if (this.parent == null || this.parent.equals(ROOT))
+            return components;
+        else
+            return parent.components(components);
     }
 }

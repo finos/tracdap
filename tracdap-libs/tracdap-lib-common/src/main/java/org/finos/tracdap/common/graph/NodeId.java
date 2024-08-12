@@ -48,4 +48,9 @@ public final class NodeId {
     public int hashCode() {
         return Objects.hash(name, namespace);
     }
+
+    @Override
+    public String toString() {
+        return String.format("%s / %s", name, namespace);
+    }
 }

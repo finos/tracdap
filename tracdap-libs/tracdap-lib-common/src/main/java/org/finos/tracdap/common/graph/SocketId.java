@@ -49,4 +49,9 @@ public class SocketId {
     public int hashCode() {
         return Objects.hash(nodeId, socket);
     }
+
+    @Override
+    public String toString() {
+        return String.format("%s.%s / %s", nodeId.name(), socket, nodeId.namespace());
+    }
 }
