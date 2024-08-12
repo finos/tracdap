@@ -18,6 +18,7 @@ package org.finos.tracdap.common.validation.consistency;
 
 import org.finos.tracdap.common.exception.ETracInternal;
 import org.finos.tracdap.common.exception.EUnexpected;
+import org.finos.tracdap.common.graph.*;
 import org.finos.tracdap.common.metadata.MetadataBundle;
 import org.finos.tracdap.common.metadata.MetadataUtil;
 import org.finos.tracdap.common.validation.core.ValidationContext;
@@ -28,6 +29,7 @@ import org.finos.tracdap.metadata.*;
 
 import com.google.protobuf.Descriptors;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -143,7 +145,87 @@ public class JobConsistencyValidator {
     @Validator
     public static ValidationContext runFlowJob(RunFlowJob job, ValidationContext ctx) {
 
+        var namespace = NodeNamespace.ROOT;
+        var resources = ctx.getMetadataBundle();
+
+        var builder = new GraphBuilder(namespace, resources);
+        var graph = builder.buildRunFlowJob(job);
+
+        ctx.pushMap(RFJ_MODELS, RunFlowJob::getModelsMap)
+                .apply(JobConsistencyValidator::runFlowModels, Map.class, graph)
+                .pop();
+
+        ctx.pushMap(RFJ_PARAMETERS, RunFlowJob::getParametersMap)
+                .apply(JobConsistencyValidator::runFlowParameters, Map.class, graph)
+                .pop();
+
+
         // TODO: Flow validation
+        return ctx;
+    }
+
+    private static ValidationContext runFlowModels(Map<String, TagSelector> modelSelectors, GraphSection<NodeMetadata> graph, ValidationContext ctx) {
+
+        var processed = new ArrayList<String>(modelSelectors.size());
+
+        for (var node : graph.nodes().values()) {
+            if (node.payload().flowNode().getNodeType() == FlowNodeType.MODEL_NODE) {
+
+                if (!modelSelectors.containsKey(node.nodeId().name())) {
+                    ctx = ctx.error("No model selected for model node [" + node.nodeId().name() + "]");
+                    continue;
+                }
+
+                var metadata = node.payload();
+                var dependencies = node.dependencies();
+
+                processed.add(node.nodeId().name());
+            }
+        }
+
+        for (var modelKey : modelSelectors.keySet()) {
+            if (!processed.contains(modelKey)) {
+                ctx = ctx.pushMapKey(modelKey)
+                        .error("") // todo
+                        .pop();
+            }
+        }
+
+        return ctx;
+    }
+
+    private static ValidationContext runFlowParameters(Map<String, Value> paramValues, GraphSection<NodeMetadata> graph, ValidationContext ctx) {
+
+        var processed = new ArrayList<String>(paramValues.size());
+
+        for (var node : graph.nodes().values()) {
+            if (node.payload().flowNode().getNodeType() == FlowNodeType.PARAMETER_NODE) {
+
+                var paramName = node.nodeId().name();
+                var metadata = node.payload();
+
+                if (!paramValues.containsKey(paramName)) {
+                    ctx = ctx.error("No value supplied for parameter [" + paramName + "]");
+                    continue;
+                }
+
+                ctx = ctx.pushMapValue(paramName)
+                        .applyIf(metadata.modelParameter() == null, (ctx_) -> ctx_.error("Type inference failed for parameter [" + paramName + "]"))
+                        .apply(JobConsistencyValidator::paramMatchesSchema, Value.class, metadata.modelParameter())
+                        .pop();
+
+                processed.add(node.nodeId().name());
+            }
+        }
+
+        for (var paramName : paramValues.keySet()) {
+            if (!processed.contains(paramName)) {
+                ctx = ctx.pushMapKey(paramName)
+                        .error("Unused parameter [" + paramName + "]")
+                        .pop();
+            }
+        }
+
         return ctx;
     }
 
