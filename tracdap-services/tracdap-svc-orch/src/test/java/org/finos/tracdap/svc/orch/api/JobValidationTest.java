@@ -709,7 +709,7 @@ public class JobValidationTest {
     @Test
     public void runFlow_inconsistent1() {
 
-        // This test provides the wrong schemas and parameter types into the models
+        // This test has missing parameters and parameters with the wrong type
         // But the flow wiring is correct
 
         var createFlowRequest = MetadataWriteRequest.newBuilder()
@@ -754,9 +754,10 @@ public class JobValidationTest {
                         .putModels("model_1", model1)
                         .putModels("model_2", model2)
                         .putModels("model_3", model3)
-                        // Use the wrong value types for supplied parameters
+                        // Use the wrong value type for param_1
                         .putParameters("param_1", MetadataCodec.encodeValue("test_value"))
-                        .putParameters("param_2", MetadataCodec.encodeValue(11.0))
+                        // Param 2 missing, unexpected param_3
+                        .putParameters("param_3", MetadataCodec.encodeValue(11.0))
                         .putInputs("basic_data_input", basicDataSelector)
                         .putInputs("alt_data_input", altDataSelector)
                         .addOutputAttrs(TagUpdate.newBuilder()
@@ -778,6 +779,75 @@ public class JobValidationTest {
 
     @Test
     public void runFlow_inconsistent2() {
+
+        // This test provides the wrong schemas for some of the datasets
+        // But the flow wiring is correct
+
+        var createFlowRequest = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.FLOW)
+                .setDefinition(ObjectDefinition.newBuilder()
+                        .setObjectType(ObjectType.FLOW)
+                        .setFlow(SampleData.SAMPLE_FLOW))
+                .addTagUpdates(TagUpdate.newBuilder()
+                        .setAttrName("testing_key")
+                        .setValue(MetadataCodec.encodeValue("test_flow_ok")))
+                .build();
+
+        var flowId = metaClient.createObject(createFlowRequest);
+        var flowSelector = MetadataUtil.selectorFor(flowId);
+
+        var model1 = createFlowModel(
+                "acme.models.test_model.Model1",
+                Map.of("param_1", BasicType.FLOAT),
+                Map.of("basic_data_input", SampleData.BASIC_TABLE_SCHEMA_V2),  // Expect enriched data, basic data will have a missing field
+                Map.of("enriched_basic_data", SampleData.BASIC_TABLE_SCHEMA),  // Output basic data, will have a missing field for model 3
+                List.of());
+
+        var model2 = createFlowModel(
+                "acme.models.test_model.Model2",
+                Map.of("param_2", BasicType.STRING),
+                Map.of("alt_data_input", SampleData.BASIC_TABLE_SCHEMA),  // Expect basic data instead of alt data, wrong schema
+                Map.of("enriched_alt_data", SampleData.ALT_TABLE_SCHEMA),
+                List.of());
+
+        var model3 = createFlowModel(
+                "acme.models.test_model.Model2",
+                Map.of("param_1", BasicType.FLOAT, "param_2", BasicType.STRING),
+                Map.of("enriched_basic_data", SampleData.BASIC_TABLE_SCHEMA_V2, "enriched_alt_data", SampleData.ALT_TABLE_SCHEMA),
+                Map.of("sample_output_data", SampleData.BASIC_TABLE_SCHEMA_V2),
+                List.of());
+
+        var job = JobDefinition.newBuilder()
+                .setJobType(JobType.RUN_FLOW)
+                .setRunFlow(RunFlowJob.newBuilder()
+                        .setFlow(flowSelector)
+                        .putModels("model_1", model1)
+                        .putModels("model_2", model2)
+                        .putModels("model_3", model3)
+                        .putParameters("param_1", MetadataCodec.encodeValue(11.0))
+                        .putParameters("param_2", MetadataCodec.encodeValue("test_value"))
+                        .putInputs("basic_data_input", basicDataSelector)
+                        .putInputs("alt_data_input", altDataSelector)
+                        .addOutputAttrs(TagUpdate.newBuilder()
+                                .setAttrName("testing_key")
+                                .setValue(MetadataCodec.encodeValue("test_flow_ok"))))
+                .build();
+
+        var jobRequest = JobRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setJob(job)
+                .addJobAttrs(TagUpdate.newBuilder()
+                        .setAttrName("testing_key")
+                        .setValue(MetadataCodec.encodeValue("test_flow_ok")))
+                .build();
+
+        var e = Assertions.assertThrows(StatusRuntimeException.class, () -> orchClient.validateJob(jobRequest));
+        Assertions.assertEquals(Status.Code.FAILED_PRECONDITION, e.getStatus().getCode());
+    }
+
+    @Test
+    public void runFlow_inconsistent3() {
 
         // This test has broken wiring for the flow
 
@@ -824,7 +894,7 @@ public class JobValidationTest {
                         .putModels("model_2", model2)
                         .putModels("model_3", model3)
                         .putParameters("param_1", MetadataCodec.encodeValue(11.0))
-                        .putParameters("param_3", MetadataCodec.encodeValue("test_value"))  // Wrong param name, param_2 is missing
+                        .putParameters("param_2", MetadataCodec.encodeValue("test_value"))
                         .putInputs("basic_data_input", basicDataSelector)
                         .putInputs("alt_data_input", altDataSelector)
                         .addOutputAttrs(TagUpdate.newBuilder()
