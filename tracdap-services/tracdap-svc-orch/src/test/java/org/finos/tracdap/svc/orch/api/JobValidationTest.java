@@ -742,7 +742,7 @@ public class JobValidationTest {
 
         var model3 = createFlowModel(
                 "acme.models.test_model.Model2",
-                Map.of("param_1", BasicType.FLOAT, "param_2", BasicType.STRING),
+                Map.of("param_1", BasicType.INTEGER, "param_2", BasicType.STRING),
                 Map.of("enriched_basic_data", SampleData.BASIC_TABLE_SCHEMA_V2, "enriched_alt_data", SampleData.ALT_TABLE_SCHEMA),
                 Map.of("sample_output_data", SampleData.BASIC_TABLE_SCHEMA_V2),
                 List.of());
