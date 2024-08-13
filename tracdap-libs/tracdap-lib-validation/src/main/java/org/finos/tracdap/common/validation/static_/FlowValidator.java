@@ -46,10 +46,12 @@ public class FlowValidator {
 
     private static final Descriptors.Descriptor FLOW_NODE;
     private static final Descriptors.FieldDescriptor FN_NODE_TYPE;
+    private static final Descriptors.FieldDescriptor FN_PARAMETERS;
     private static final Descriptors.FieldDescriptor FN_INPUTS;
     private static final Descriptors.FieldDescriptor FN_OUTPUTS;
     private static final Descriptors.FieldDescriptor FN_NODE_SEARCH;
     private static final Descriptors.FieldDescriptor FN_NODE_ATTRS;
+    private static final Descriptors.FieldDescriptor FN_NODE_PROPS;
     private static final Descriptors.FieldDescriptor FN_LABEL;
 
     private static final Descriptors.Descriptor FLOW_EDGE;
@@ -71,10 +73,12 @@ public class FlowValidator {
 
         FLOW_NODE = FlowNode.getDescriptor();
         FN_NODE_TYPE = field(FLOW_NODE, FlowNode.NODETYPE_FIELD_NUMBER);
+        FN_PARAMETERS = field(FLOW_NODE, FlowNode.PARAMETERS_FIELD_NUMBER);
         FN_INPUTS = field(FLOW_NODE, FlowNode.INPUTS_FIELD_NUMBER);
         FN_OUTPUTS = field(FLOW_NODE, FlowNode.OUTPUTS_FIELD_NUMBER);
         FN_NODE_SEARCH = field(FLOW_NODE, FlowNode.NODESEARCH_FIELD_NUMBER);
         FN_NODE_ATTRS = field(FLOW_NODE, FlowNode.NODEATTRS_FIELD_NUMBER);
+        FN_NODE_PROPS = field(FLOW_NODE, FlowNode.NODEPROPS_FIELD_NUMBER);
         FN_LABEL = field(FLOW_NODE, FlowNode.LABEL_FIELD_NUMBER);
 
         FLOW_EDGE = FlowEdge.getDescriptor();
@@ -106,6 +110,9 @@ public class FlowValidator {
 
         // Only apply consistency checks if all the individual items in the flow are semantically valid
 
+        // TODO: Use Graph and GraphBuilder for flow consistency validation
+        // This would be the same as JobConsistencyValidator and avoid duplication
+
         if (!ctx.failed())
             ctx = ctx.apply(FlowValidator::flowConsistency, FlowDefinition.class);
 
@@ -130,14 +137,33 @@ public class FlowValidator {
                 .apply(CommonValidators::nonZeroEnum, FlowNodeType.class)
                 .pop();
 
+        // Parameters, inputs and outputs are only allowed on model nodes
         var isModelNode = msg.getNodeType() == FlowNodeType.MODEL_NODE;
         var isModelNodeQualifier = String.format("%s == %s", FN_NODE_TYPE.getName(), FlowNodeType.MODEL_NODE.name());
+
+        var isOutputNode = msg.getNodeType() == FlowNodeType.OUTPUT_NODE;
+        var isOutputNodeQualifier = String.format("%s == %s", FN_NODE_TYPE.getName(), FlowNodeType.OUTPUT_NODE.name());
+
+        // Search expressions are not allowed for parameter nodes
+        var notParamNode = msg.getNodeType() == FlowNodeType.PARAMETER_NODE;
+        var notParamNodeQualifier = String.format("%s == %s", FN_NODE_TYPE.getName(), FlowNodeType.PARAMETER_NODE.name());
+
+        var knownSockets = new HashMap<String, String>();
+
+        ctx = ctx.pushRepeated(FN_PARAMETERS)
+                .apply(CommonValidators.onlyIf(isModelNode, isModelNodeQualifier))
+                .applyRepeated(CommonValidators::identifier, String.class)
+                .applyRepeated(CommonValidators::notTracReserved, String.class)
+                .apply(CommonValidators::caseInsensitiveDuplicates)
+                .applyRepeated(CommonValidators.uniqueContextCheck(knownSockets, FN_PARAMETERS.getName()))
+                .pop();
 
         ctx = ctx.pushRepeated(FN_INPUTS)
                 .apply(CommonValidators.ifAndOnlyIf(isModelNode, isModelNodeQualifier))
                 .applyRepeated(CommonValidators::identifier, String.class)
                 .applyRepeated(CommonValidators::notTracReserved, String.class)
                 .apply(CommonValidators::caseInsensitiveDuplicates)
+                .applyRepeated(CommonValidators.uniqueContextCheck(knownSockets, FN_INPUTS.getName()))
                 .pop();
 
         ctx = ctx.pushRepeated(FN_OUTPUTS)
@@ -145,16 +171,23 @@ public class FlowValidator {
                 .applyRepeated(CommonValidators::identifier, String.class)
                 .applyRepeated(CommonValidators::notTracReserved, String.class)
                 .apply(CommonValidators::caseInsensitiveDuplicates)
+                .applyRepeated(CommonValidators.uniqueContextCheck(knownSockets, FN_OUTPUTS.getName()))
                 .pop();
 
         ctx = ctx.push(FN_NODE_SEARCH)
-                .apply(CommonValidators::optional)
+                .apply(CommonValidators.onlyIf(notParamNode, notParamNodeQualifier, true))
                 .apply(SearchValidator::searchExpression, SearchExpression.class)
                 .pop();
 
         ctx = ctx.pushRepeated(FN_NODE_ATTRS)
-                .apply(CommonValidators::optional)
+                .apply(CommonValidators.onlyIf(isOutputNode, isOutputNodeQualifier))
                 .applyRepeated(TagUpdateValidator::tagUpdate, TagUpdate.class)
+                .pop();
+
+        ctx = ctx.pushMap(FN_NODE_PROPS)
+                .applyMapKeys(CommonValidators::identifier)
+                .applyMapKeys(CommonValidators::notTracReserved)
+                .applyMapValues(TypeSystemValidator::value, Value.class)
                 .pop();
 
         ctx = ctx.push(FN_LABEL)
@@ -446,9 +479,8 @@ public class FlowValidator {
                 targetEdges.remove(edge);
 
                 if (targetEdges.isEmpty()) {
-                    var targetNode = reachableNodes.remove(targetNodeName);
+                    var targetNode = remainingNodes.remove(targetNodeName);
                     reachableNodes.put(targetNodeName, targetNode);
-                    remainingNodes.remove(targetNodeName);
                 }
             }
 

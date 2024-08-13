@@ -164,6 +164,21 @@ public class CommonValidators {
             return ctx -> omitted(ctx, negativeQualifier);
     }
 
+    public static ValidationFunction.Basic onlyIf(boolean condition, String qualifier) {
+
+        return onlyIf(condition, qualifier, false);
+    }
+
+    public static ValidationFunction.Basic onlyIf(boolean condition, String qualifier, boolean inverted) {
+
+        var negativeQualifier = (inverted ? "when " : "unless ") + qualifier;
+
+        if (condition)
+            return CommonValidators::optional;
+        else
+            return ctx -> omitted(ctx, negativeQualifier);
+    }
+
     public static <T> ValidationFunction.Typed<T> equalTo(T other, String errorMessage) {
 
         return (value, ctx) -> {
