@@ -34,6 +34,7 @@ import org.finos.tracdap.common.metadata.MetadataUtil;
 import org.finos.tracdap.common.validation.Validator;
 import org.finos.tracdap.common.metadata.MetadataBundle;
 import org.finos.tracdap.config.JobResult;
+import org.finos.tracdap.config.PlatformConfig;
 import org.finos.tracdap.metadata.JobStatusCode;
 
 import org.finos.tracdap.metadata.ObjectType;
@@ -61,6 +62,7 @@ public class JobProcessor {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
+    private final PlatformConfig platformConfig;
     private final TrustedMetadataApiBlockingStub metaClient;
     private final InternalAuthProvider internalAuth;
     private final IBatchExecutor<?> executor;
@@ -71,15 +73,17 @@ public class JobProcessor {
 
 
     public JobProcessor(
+            PlatformConfig platformConfig,
             TrustedMetadataApiBlockingStub metaClient,
             InternalAuthProvider internalAuth,
-            IBatchExecutor<?> executor,
-            JobProcessorHelpers lifecycle) {
+            IBatchExecutor<?> executor) {
 
+        this.platformConfig = platformConfig;
         this.metaClient = metaClient;
         this.internalAuth = internalAuth;
         this.executor = executor;
-        this.lifecycle = lifecycle;
+
+        this.lifecycle = new JobProcessorHelpers(platformConfig, metaClient);
     }
 
     public JobState newJob(JobRequest request) {
@@ -139,8 +143,8 @@ public class JobProcessor {
             newState = lifecycle.applyTransform(newState);
 
             // Semantic validation (job consistency)
-            var resources = new MetadataBundle(newState.resources, newState.resourceMapping);
-            validator.validateConsistency(newState.definition, resources);
+            var metadata = new MetadataBundle(newState.resources, newState.resourceMapping);
+            validator.validateConsistency(newState.definition, metadata, platformConfig);
 
             newState.tracStatus = JobStatusCode.VALIDATED;
 
