@@ -44,8 +44,8 @@ public class GraphBuilder {
     private static final String MODEL_NODE_NAME = "trac_model";
     private static final Map<String, SocketId> NO_DEPENDENCIES = Map.of();
     private static final List<String> NO_OUTPUTS = List.of();
-    private static final List<String> SINGLE_OUTPUT = List.of("");
-    private static final String SINGLE_INPUT = "";
+    private static final List<String> SINGLE_OUTPUT = List.of(SocketId.SINGLE_OUTPUT);
+    private static final String SINGLE_INPUT = SocketId.SINGLE_INPUT;
 
     private final NodeNamespace namespace;
     private final MetadataBundle metadataBundle;

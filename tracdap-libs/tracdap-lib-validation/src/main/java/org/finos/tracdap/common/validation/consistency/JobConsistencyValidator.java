@@ -670,7 +670,7 @@ public class JobConsistencyValidator {
 
     private static ValidationContext outputNode(String outputName, Node<NodeMetadata> node, GraphSection<NodeMetadata> graph, ValidationContext ctx) {
 
-        var sourceSocket = node.dependencies().get(Node.SINGLE_INPUT);
+        var sourceSocket = node.dependencies().get(SocketId.SINGLE_INPUT);
 
         if (sourceSocket == null)
             return ctx.error(String.format("Output [%s] is not connected in the flow", outputName));

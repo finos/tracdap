@@ -21,6 +21,9 @@ import java.util.Objects;
 
 public class SocketId {
 
+    public static final String SINGLE_INPUT = "";
+    public static final String SINGLE_OUTPUT = "";
+
     private final NodeId nodeId;
     private final String socket;
 
