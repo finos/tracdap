@@ -269,6 +269,16 @@ public class FlowValidator {
         for (var outputName : schemaOutputs)
             ctx = ctx.error(String.format("Flow explicit output [%s] does not correspond to an output node", outputName));
 
+        // Any explicitly declared parameters cannot conflict with nodes in the graph
+
+        for (var paramName : flow.getParametersMap().keySet()) {
+            if (flow.containsNodes(paramName)) {
+                var node = flow.getNodesOrThrow(paramName);
+                if (node.getNodeType() == FlowNodeType.PARAMETER_NODE)
+                    ctx = ctx.error(String.format("Flow parameter [%s] conflicts with a node of type [%s]", paramName, node.getNodeType()));
+            }
+        }
+
         return ctx;
     }
 
