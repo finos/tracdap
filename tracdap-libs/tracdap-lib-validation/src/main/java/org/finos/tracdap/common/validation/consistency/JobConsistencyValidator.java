@@ -104,10 +104,24 @@ public class JobConsistencyValidator {
     }
 
     @Validator
+    public static ValidationContext importModelJob(ImportModelJob job, ValidationContext ctx) {
+
+        ctx.push(IMJ_LANGUAGE)
+                .apply(ModelConsistencyValidator::isSupportedLanguage)
+                .pop();
+
+        ctx.push(IMJ_REPOSITORY)
+                .apply(ModelConsistencyValidator::isKnownModelRepo)
+                .pop();
+
+        return ctx;
+    }
+
+    @Validator
     public static ValidationContext runModelJob(RunModelJob job, ValidationContext ctx) {
 
-        var resources = ctx.getMetadataBundle();
-        var modelObj = resources.getResource(job.getModel());
+        var metadata = ctx.getMetadataBundle();
+        var modelObj = metadata.getResource(job.getModel());
 
         if (modelObj == null) {
             var message = "Required metadata is not available for [" + MetadataUtil.objectKey(job.getModel()) + "]";
@@ -262,14 +276,6 @@ public class JobConsistencyValidator {
             }
         }
 
-        return ctx;
-    }
-
-
-    @Validator
-    public static ValidationContext importModelJob(ImportModelJob job, ValidationContext ctx) {
-
-        // TODO: Model import validation
         return ctx;
     }
 

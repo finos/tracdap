@@ -139,9 +139,6 @@ public class JobProcessor {
             // Load in all the resources referenced by the job
             newState = lifecycle.loadResources(newState);
 
-            // Apply any transformations specific to the job type
-            newState = lifecycle.applyTransform(newState);
-
             // Semantic validation (job consistency)
             var metadata = new MetadataBundle(newState.resources, newState.resourceMapping);
             validator.validateConsistency(newState.definition, metadata, platformConfig);
@@ -168,6 +165,9 @@ public class JobProcessor {
 
         // Credentials are not serialized in the cache, they need to be regenerated
         newState.credentials = internalAuth.createDelegateSession(jobState.owner, DELEGATE_SESSION_TIMEOUT);
+
+        // Apply any transformations specific to the job type
+        newState = lifecycle.applyTransform(newState);
 
         // Result IDs are needed in order to generate the job instruction
         // They are also updated in the job definition that is being created
