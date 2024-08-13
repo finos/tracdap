@@ -43,6 +43,10 @@ public class NodeMetadata {
         this.runtimeValue = runtimeValue;
     }
 
+    public NodeMetadata withFlowNode(FlowNode flowNode) {
+        return new NodeMetadata(flowNode, modelParameter, modelInputSchema, modelOutputSchema, runtimeObject, runtimeValue);
+    }
+
     public NodeMetadata withModelParameter(ModelParameter modelParameter) {
         return new NodeMetadata(flowNode, modelParameter, modelInputSchema, modelOutputSchema, runtimeObject, runtimeValue);
     }

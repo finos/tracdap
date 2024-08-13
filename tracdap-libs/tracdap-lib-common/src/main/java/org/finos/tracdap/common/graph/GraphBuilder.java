@@ -331,14 +331,21 @@ public class GraphBuilder {
             if (nodeMetadata.runtimeObjectType() != ObjectType.MODEL)
                 continue;
 
-            var model = nodeMetadata.runtimeObject().getModel();
-            var params = new ArrayList<String>(model.getParametersCount());
-            params.addAll(model.getParametersMap().keySet());
-            params.addAll(nodeMetadata.flowNode().getParametersList());
-
+            var flowNode = nodeMetadata.flowNode().toBuilder();
             var dependencies = new HashMap<>(node.dependencies());
+            var modelDef = nodeMetadata.runtimeObject().getModel();
 
-            for (var paramName : params) {
+            // Look at parameters in the model def
+            // If they are missing, add them to the flow node with dependencies
+            // Also add the flow-level parameter node if that is missing
+
+            for (var paramName : modelDef.getParametersMap().keySet()) {
+
+                // Do not auto-wire parameters that are declared explicitly in the node
+                if (flowNode.getParametersList().contains(paramName))
+                    continue;
+
+                flowNode.addParameters(paramName);
 
                 var paramId = paramIds.computeIfAbsent(paramName, pn -> new NodeId(pn, namespace));
 
@@ -354,7 +361,8 @@ public class GraphBuilder {
                 }
             }
 
-            var updatedNode = new Node<>(node.nodeId(), dependencies, node.outputs(), nodeMetadata);
+            var updatedMetadata = nodeMetadata.withFlowNode(flowNode.build());
+            var updatedNode = new Node<>(node.nodeId(), dependencies, node.outputs(), updatedMetadata);
             nodes.put(node.nodeId(), updatedNode);
         }
 
