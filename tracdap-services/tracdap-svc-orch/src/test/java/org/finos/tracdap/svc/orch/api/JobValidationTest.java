@@ -883,7 +883,7 @@ public class JobValidationTest {
                 "acme.models.test_model.Model2",
                 Map.of("param_1", BasicType.FLOAT, "param_2", BasicType.STRING),
                 Map.of("enriched_basic_data", SampleData.BASIC_TABLE_SCHEMA_V2, "enriched_alt_data", SampleData.ALT_TABLE_SCHEMA),
-                Map.of("wrong_output_2", SampleData.BASIC_TABLE_SCHEMA_V2),  // Wrong output to wire into flow outputs
+                Map.of("sample_output_data", SampleData.ALT_TABLE_SCHEMA),
                 List.of());
 
         var job = JobDefinition.newBuilder()
