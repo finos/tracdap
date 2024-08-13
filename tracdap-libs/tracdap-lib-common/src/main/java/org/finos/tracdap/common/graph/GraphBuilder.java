@@ -21,18 +21,27 @@ import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.metadata.MetadataBundle;
 import org.finos.tracdap.metadata.*;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 
 public class GraphBuilder {
 
+    @FunctionalInterface
+    public interface ErrorHandler {
+        void error(NodeId nodeId, String detail);
+    }
+
+    private static final ErrorHandler DEFAULT_ERROR_HANDLER = new DefaultErrorHandler();
+    private static final Logger log = LoggerFactory.getLogger(GraphBuilder.class);
+
     private static final String MODEL_NODE_NAME = "trac_model";
-    private static final String ROOT_NODE_NAME = "trac_root";
     private static final Map<String, SocketId> NO_DEPENDENCIES = Map.of();
     private static final List<String> NO_OUTPUTS = List.of();
     private static final List<String> SINGLE_OUTPUT = List.of("");
@@ -40,14 +49,20 @@ public class GraphBuilder {
 
     private final NodeNamespace namespace;
     private final MetadataBundle metadataBundle;
+    private final ErrorHandler errorHandler;
 
-    public GraphBuilder(NodeNamespace namespace, MetadataBundle metadataBundle) {
+    public GraphBuilder(NodeNamespace namespace, MetadataBundle metadataBundle, ErrorHandler errorHandler) {
         this.namespace = namespace;
         this.metadataBundle = metadataBundle;
+        this.errorHandler = errorHandler;
+    }
+
+    public GraphBuilder(NodeNamespace namespace, MetadataBundle metadataBundle) {
+        this(namespace, metadataBundle, DEFAULT_ERROR_HANDLER);
     }
 
     public GraphBuilder(NodeNamespace namespace) {
-        this(namespace, null);
+        this(namespace, null, DEFAULT_ERROR_HANDLER);
     }
 
     public GraphSection<NodeMetadata> buildJob(JobDefinition job) {
@@ -79,108 +94,135 @@ public class GraphBuilder {
 
     public GraphSection<NodeMetadata> buildFlow(FlowDefinition flow) {
 
-        // TODO: Refer to flow validator and bring logic into one place
+        // https://en.wikipedia.org/wiki/Topological_sorting#Kahn's_algorithm
 
-        // 1-2-1 mapping of flow nodes to node IDs, all in the same namespace
-        var nodeIds = flow.getNodesMap().keySet().stream()
-                .map(n -> new NodeId(n, namespace))
-                .collect(Collectors.toMap(NodeId::name, Function.identity()));
-
-        var edgesBySource = new HashMap<NodeId, List<FlowEdge>>();
-        var edgesByTarget = new HashMap<NodeId, List<FlowEdge>>();
+        var edgesBySource = new HashMap<String, List<FlowEdge>>();
+        var edgesByTarget = new HashMap<String, List<FlowEdge>>();
+        var edges = new HashMap<SocketId, SocketId>();
 
         for (var edge : flow.getEdgesList()) {
 
-            var sourceId = nodeIds.get(edge.getSource().getNode());
-            var targetId = nodeIds.get(edge.getTarget().getNode());
+            var sourceNode = edge.getSource().getNode();
+            var targetNode = edge.getTarget().getNode();
 
-            if (!edgesBySource.containsKey(sourceId))
-                edgesBySource.put(sourceId, new ArrayList<>());
+            if (!edgesBySource.containsKey(sourceNode))
+                edgesBySource.put(sourceNode, new ArrayList<>());
 
-            if (!edgesByTarget.containsKey(targetId))
-                edgesByTarget.put(targetId, new ArrayList<>());
+            if (!edgesByTarget.containsKey(targetNode))
+                edgesByTarget.put(targetNode, new ArrayList<>());
 
-            edgesBySource.get(sourceId).add(edge);
-            edgesByTarget.get(targetId).add(edge);
+            edgesBySource.get(sourceNode).add(edge);
+            edgesByTarget.get(targetNode).add(edge);
+
+            var sourceSocket = new SocketId(new NodeId(sourceNode, namespace), edge.getSource().getSocket());
+            var targetSocket = new SocketId(new NodeId(targetNode, namespace), edge.getTarget().getSocket());
+            edges.put(targetSocket, sourceSocket);
         }
 
-        var inputs = nodeIds.values().stream()
-                .filter(n -> !edgesByTarget.containsKey(n))
-                .collect(Collectors.toUnmodifiableList());
+        // Initial set of reachable flow nodes is just the input nodes
+        var remainingNodes = new HashMap<>(flow.getNodesMap());
+        var reachableNodes = new HashMap<String, FlowNode>();
 
-        var outputs = nodeIds.values().stream()
-                .filter(n -> !edgesBySource.containsKey(n))
-                .collect(Collectors.toUnmodifiableList());
-
-        // Initial set of reachable nodes - no edge has edge.target == node
-        var reachableNodes = new ArrayList<>(inputs);
-        var nodes = new HashMap<NodeId, Node<NodeMetadata>>();
-
-        while (!reachableNodes.isEmpty()) {
-
-            var nodeId = reachableNodes.remove(reachableNodes.size() - 1);
-            var flowNode = flow.getNodesOrThrow(nodeId.name());
-
-            // Look up strict metadata if it is present in the flow
-            var modelParam = flow.getParametersOrDefault(nodeId.name(), null);
-            var modelInput = flow.getInputsOrDefault(nodeId.name(), null);
-            var modelOutput = flow.getOutputsOrDefault(nodeId.name(), null);
-
-            // Runtime object / value is not part of the flow, these will always be null
-            var nodeMetadata = new NodeMetadata(flowNode, modelParam, modelInput, modelOutput, null, null);
-
-
-            var edges = edgesByTarget.get(nodeId);
-            var dependencies = flowNodeDependencies(flowNode, edges, nodeIds);
-            var results = flowNodeResults(flowNode);
-
-            var node = new Node<>(nodeId, dependencies, results, nodeMetadata);
-            nodes.put(nodeId, node);
-
-            var outboundEdges = edgesBySource.get(nodeId);
-            if (outboundEdges == null)
-                continue;
-
-            for (var edge : outboundEdges) {
-
-                var target = nodeIds.get(edge.getTarget().getNode());
-                var inboundEdges = edgesByTarget.get(target);
-
-                var reachable = inboundEdges.stream()
-                        .map(e -> nodeIds.get(e.getSource().getNode()))
-                        .allMatch(edgesBySource::containsKey);
-
-                if (reachable)
-                    reachableNodes.add(target);
+        for (var node : flow.getNodesMap().entrySet()) {
+            if (node.getValue().getNodeType() == FlowNodeType.INPUT_NODE || node.getValue().getNodeType() == FlowNodeType.PARAMETER_NODE) {
+                reachableNodes.put(node.getKey(), node.getValue());
+                remainingNodes.remove(node.getKey());
             }
         }
 
-        return new GraphSection<>(nodes, inputs, outputs);
+        // Graph nodes to build during traversal
+        var graphNodes = new HashMap<NodeId, Node<NodeMetadata>>();
+
+        while (!reachableNodes.isEmpty()) {
+
+            var nodeKey = reachableNodes.keySet().stream().findAny();
+            var nodeName = nodeKey.get();
+            var flowNode = reachableNodes.remove(nodeName);
+
+            var graphNode = buildFlowNode(flow, edges, nodeName, flowNode);
+            graphNodes.put(graphNode.nodeId(), graphNode);
+
+            var sourceEdges = edgesBySource.remove(nodeName);
+
+            // Some nodes do not feed any other nodes, e.g. output nodes, or if there are errors in the flow
+            if (sourceEdges == null)
+                continue;
+
+            for (var edge : sourceEdges) {
+
+                var targetNodeName = edge.getTarget().getNode();
+                var targetEdges = edgesByTarget.get(targetNodeName);
+                targetEdges.remove(edge);
+
+                if (targetEdges.isEmpty()) {
+                    var targetNode = remainingNodes.remove(targetNodeName);
+                    reachableNodes.put(targetNodeName, targetNode);
+                }
+            }
+        }
+
+        // Once the traversal is complete, add validation errors for any nodes that could not be reached
+
+        for (var node : remainingNodes.keySet()) {
+            var nodeId = new NodeId(node, namespace);
+            var msg = String.format("Flow node [%s] is not reachable (this may indicate a cyclic dependency)", node);
+            errorHandler.error(nodeId, msg);
+        }
+
+        var inputs = graphNodes.values().stream()
+                .filter(n -> n.dependencies().isEmpty())
+                .map(Node::nodeId)
+                .collect(Collectors.toUnmodifiableList());
+
+        var outputs = graphNodes.values().stream()
+                .filter(n -> n.outputs().isEmpty())
+                .map(Node::nodeId)
+                .collect(Collectors.toUnmodifiableList());
+
+        return new GraphSection<>(graphNodes, inputs, outputs);
     }
 
-    private Map<String, SocketId> flowNodeDependencies(FlowNode flowNode, List<FlowEdge> edges, Map<String, NodeId> nodeIds) {
+    private Node<NodeMetadata> buildFlowNode(FlowDefinition flow, Map<SocketId, SocketId> edges, String nodeName, FlowNode flowNode) {
 
-        return Map.of();  // TODO
-    }
+        // Create nodeId in the building namespace
+        var nodeId = new NodeId(nodeName, namespace);
 
-    private List<String> flowNodeResults(FlowNode flowNode) {
+        // Look up strict metadata if it is present in the flow
+        var modelParam = flow.getParametersOrDefault(nodeName, null);
+        var modelInput = flow.getInputsOrDefault(nodeName, null);
+        var modelOutput = flow.getOutputsOrDefault(nodeName, null);
+
+        // Runtime object / value is not part of the flow, these will always be null
+        var nodeMetadata = new NodeMetadata(flowNode, modelParam, modelInput, modelOutput, null, null);
 
         switch (flowNode.getNodeType()) {
 
             case PARAMETER_NODE:
             case INPUT_NODE:
-                return SINGLE_OUTPUT;
+                return new Node<>(nodeId, NO_DEPENDENCIES, SINGLE_OUTPUT, nodeMetadata);
 
             case OUTPUT_NODE:
-                return NO_OUTPUTS;
+                var outputSocket = new SocketId(nodeId, SINGLE_INPUT);
+                var outputSource = edges.get(outputSocket);  // TODO null check
+                var outputDeps = Map.of(SINGLE_INPUT, outputSource);
+                return new Node<>(nodeId, outputDeps, NO_OUTPUTS, nodeMetadata);
 
             case MODEL_NODE:
-                return flowNode.getOutputsList();
+                var modelDeps = flowNode.getInputsList().stream()
+                        .map(input -> new SocketId(nodeId, input))
+                        .map(input -> Map.entry(input.socket(), edges.get(input)))
+                        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+                return new Node<>(nodeId, modelDeps, flowNode.getOutputsList(), nodeMetadata);
 
             default:
-                throw new EUnexpected();  // TODO
+                errorHandler.error(nodeId, String.format("Missing or invalid node type [%s]", flowNode.getNodeType()));
+                return new Node<>(nodeId, NO_DEPENDENCIES, NO_OUTPUTS, nodeMetadata);
         }
+    }
 
+    private Map<String, SocketId> flowNodeDependencies(FlowNode flowNode, List<FlowEdge> edges, Map<String, NodeId> nodeIds) {
+
+        return Map.of();  // TODO
     }
 
     public GraphSection<NodeMetadata> addJobMetadata(GraphSection<NodeMetadata> graph, RunModelJob job) {
@@ -359,7 +401,7 @@ public class GraphBuilder {
             if (nodeMetadata.flowNode().getNodeType() == FlowNodeType.PARAMETER_NODE && nodeMetadata.modelParameter() == null) {
 
                 var targets = dependents.getOrDefault(node.nodeId(), List.of());
-                var parameter = inferParameter(graph, targets);
+                var parameter = inferParameter(node.nodeId(), targets, graph);
                 var inferredMetadata = nodeMetadata.withModelParameter(parameter);
                 var inferredNode = new Node<>(node.nodeId(), node.dependencies(), node.outputs(), inferredMetadata);
 
@@ -369,7 +411,7 @@ public class GraphBuilder {
             if (nodeMetadata.flowNode().getNodeType() == FlowNodeType.INPUT_NODE && nodeMetadata.modelInputSchema() == null) {
 
                 var targets = dependents.getOrDefault(node.nodeId(), List.of());
-                var inputSchema = inferInputSchema(graph, targets);
+                var inputSchema = inferInputSchema(node.nodeId(), targets, graph);
                 var inferredMetadata = nodeMetadata.withModelInputSchema(inputSchema);
                 var inferredNode = new Node<>(node.nodeId(), node.dependencies(), node.outputs(), inferredMetadata);
 
@@ -382,7 +424,7 @@ public class GraphBuilder {
                     continue;
 
                 var source = node.dependencies().values().iterator().next();
-                var outputSchema = inferOutputSchema(graph, source);
+                var outputSchema = inferOutputSchema(source, graph);
                 var inferredMetadata = nodeMetadata.withModelOutputSchema(outputSchema);
                 var inferredNode = new Node<>(node.nodeId(), node.dependencies(), node.outputs(), inferredMetadata);
 
@@ -394,7 +436,7 @@ public class GraphBuilder {
     }
 
 
-    public ModelParameter inferParameter(GraphSection<NodeMetadata> graph, List<SocketId> targets) {
+    private ModelParameter inferParameter(NodeId paramId, List<SocketId> targets, GraphSection<NodeMetadata> graph) {
 
         var targetParams = new ArrayList<Map.Entry<SocketId, ModelParameter>>(targets.size());
 
@@ -413,17 +455,44 @@ public class GraphBuilder {
             }
         }
 
+        // Parameter not used, type cannot be inferred (but is probably not needed)
         if(targetParams.isEmpty())
             return null;
 
+        // Parameter only used once, infer an exact match to the target
         if (targetParams.size() == 1)
             return targetParams.get(0).getValue();
 
-        // TODO
-        return null;
+        var param = targetParams.get(0).getValue().toBuilder();
+        var paramTarget = targetParams.get(0).getKey();
+
+        for (int i = 1; i < targetParams.size(); i++) {
+
+            var nextParam = targetParams.get(i).getValue();
+            var nextParamTarget = targetParams.get(i).getKey();
+
+            // Type differs between targets, then type cannot be inferred
+            if (!nextParam.getParamType().equals(param.getParamType())) {
+
+                var message = String.format("Parameter is ambiguous for [%s]: Types are different for [%s.%s] and [%s.%s]",
+                        paramId.name(),
+                        paramTarget.nodeId().name(), paramTarget.socket(),
+                        nextParamTarget.nodeId().name(), nextParamTarget.socket());
+
+                errorHandler.error(paramId, message);
+
+                return null;
+            }
+
+            // Default value differs between targets, type can still be inferred but default value cannot
+            if (!nextParam.hasDefaultValue() || !nextParam.getDefaultValue().equals(param.getDefaultValue()))
+                param.clearDefaultValue();
+        }
+
+        return param.build();
     }
 
-    public ModelInputSchema inferInputSchema(GraphSection<NodeMetadata> graph, List<SocketId> targets) {
+    private ModelInputSchema inferInputSchema(NodeId inputId, List<SocketId> targets, GraphSection<NodeMetadata> graph) {
 
         var targetInputs = new ArrayList<Map.Entry<SocketId, ModelInputSchema>>(targets.size());
 
@@ -442,20 +511,105 @@ public class GraphBuilder {
             }
         }
 
+        // Input not used, schema cannot be inferred (not needed, although there may be other consistency errors)
         if(targetInputs.isEmpty())
             return null;
 
+        // Input used only once, infer schema is an exact match
         if (targetInputs.size() == 1)
             return targetInputs.get(0).getValue();
 
-        // TODO
-        return null;
+        var schema = targetInputs.get(0).getValue().toBuilder();
+        var schemaTarget = targetInputs.get(0).getKey();
+
+        for (int i = 1; i < targetInputs.size(); i++) {
+
+            var nextSchema = targetInputs.get(i).getValue();
+            var nextSchemaTarget = targetInputs.get(i).getKey();
+
+            schema = combineInputSchema(inputId, schema, nextSchema);
+
+            // If combination is not possible, schema cannot be inferred
+            if (schema == null) {
+
+                var message = String.format("Input is ambiguous for [%s]: Schemas are not compatible for [%s.%s] and [%s.%s]",
+                        inputId.name(),
+                        schemaTarget.nodeId().name(), schemaTarget.socket(),
+                        nextSchemaTarget.nodeId().name(), nextSchemaTarget.socket());
+
+                errorHandler.error(inputId, message);
+
+                return null;
+            }
+        }
+
+        return schema.build();
     }
 
-    public ModelOutputSchema inferOutputSchema(GraphSection<NodeMetadata> graph, SocketId source) {
+    private ModelInputSchema.Builder combineInputSchema(NodeId nodeId, ModelInputSchema.Builder modelInput, ModelInputSchema nextModelInput) {
+
+        var schema = modelInput.getSchema();
+        var nextSchema = nextModelInput.getSchema();
+
+        if (schema.getSchemaType() != SchemaType.TABLE || nextSchema.getSchemaType() != SchemaType.TABLE) {
+            errorHandler.error(nodeId, "Only TABLE schema types are supported");
+            return null;
+        }
+
+        var table = schema.getTable().toBuilder();
+        var nextTable = nextSchema.getTable();
+
+        var fieldsMap = table.getFieldsList().stream()
+                .collect(Collectors.toMap(f -> f.getFieldName().toLowerCase(), f -> f));
+
+        for (var nextField : nextTable.getFieldsList()) {
+
+            var field = fieldsMap.get(nextField.getFieldName().toLowerCase());
+
+            if (field == null) {
+                var nextFieldOrder = table.getFieldsCount();
+                table.addFields(nextField.toBuilder().setFieldOrder(nextFieldOrder));
+            }
+            else {
+                var combinedField = combineFieldSchema(field, nextField);
+                if (combinedField == null)
+                    return null;
+                table.setFields(field.getFieldOrder(), combinedField);
+                fieldsMap.put(nextField.getFieldName().toLowerCase(), combinedField);
+            }
+        }
+
+        var combinedSchema = schema.toBuilder().setTable(table);
+        return modelInput.setSchema(combinedSchema);
+    }
+
+    private FieldSchema combineFieldSchema(FieldSchema field, FieldSchema nextField) {
+
+        // Field types must always match, otherwise they cannot be combined
+        if (field.getFieldType() != nextField.getFieldType())
+            return null;
+
+        // Require categorical flag match - this could be relaxed so we take the stricter condition
+        if (field.getCategorical() != nextField.getCategorical())
+            return null;
+
+        // Require business key flag match - this could be relaxed so we take the stricter condition
+        if (field.getBusinessKey() != nextField.getBusinessKey())
+            return null;
+
+        // For the not null flag, take the stricter condition
+        if (nextField.getNotNull() && ! field.getNotNull())
+            return field.toBuilder().setNotNull(true).build();
+
+        return field;
+    }
+
+
+    private ModelOutputSchema inferOutputSchema(SocketId source, GraphSection<NodeMetadata> graph) {
 
         var sourceNode = graph.nodes().get(source.nodeId());
 
+        // Output not produced, schema cannot be inferred (there will be consistency errors anyway)
         if (sourceNode == null)
             return null;
 
@@ -482,4 +636,15 @@ public class GraphBuilder {
         return null;
     }
 
+    private static class DefaultErrorHandler implements ErrorHandler {
+
+        @Override
+        public void error(NodeId nodeId, String detail) {
+
+            var message = String.format("Inconsistent metadata: %s (%s)", detail, nodeId);
+            GraphBuilder.log.error(message);
+
+            throw new ETracInternal(message);
+        }
+    }
 }

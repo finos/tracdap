@@ -32,6 +32,7 @@ import com.google.protobuf.Descriptors;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.function.BiFunction;
 
 import static org.finos.tracdap.common.validation.core.ValidatorUtils.field;
 
@@ -145,10 +146,10 @@ public class JobConsistencyValidator {
     @Validator
     public static ValidationContext runFlowJob(RunFlowJob job, ValidationContext ctx) {
 
-        var namespace = NodeNamespace.ROOT;
+        var namespace = NodeNamespace.ROOT;  // TODO: Use something meaningful from the request context
         var resources = ctx.getMetadataBundle();
 
-        var builder = new GraphBuilder(namespace, resources);
+        var builder = new GraphBuilder(namespace, resources, graphErrorHandler(ctx));
         var graph = builder.buildRunFlowJob(job);
 
         ctx.pushMap(RFJ_MODELS, RunFlowJob::getModelsMap)
@@ -157,6 +158,10 @@ public class JobConsistencyValidator {
 
         ctx.pushMap(RFJ_PARAMETERS, RunFlowJob::getParametersMap)
                 .apply(JobConsistencyValidator::runFlowParameters, Map.class, graph)
+                .pop();
+
+        ctx.pushMap(RFJ_INPUTS, RunFlowJob::getInputsMap)
+                .apply(JobConsistencyValidator::runFlowInputs, Map.class, graph)
                 .pop();
 
 
@@ -196,32 +201,63 @@ public class JobConsistencyValidator {
 
     private static ValidationContext runFlowParameters(Map<String, Value> paramValues, GraphSection<NodeMetadata> graph, ValidationContext ctx) {
 
-        var processed = new ArrayList<String>(paramValues.size());
+        return runFlowResources(paramValues, graph, FlowNodeType.PARAMETER_NODE, "parameter", JobConsistencyValidator::runFlowParameter, ctx);
+    }
+
+    private static ValidationContext runFlowParameter(Node<NodeMetadata> node, ValidationContext ctx) {
+
+        var paramName = node.nodeId().name();
+        var metadata = node.payload();
+
+        return ctx.pushMapValue(paramName)
+                .applyIf(metadata.modelParameter() == null, (ctx_) -> ctx_.error("Type inference failed for parameter [" + paramName + "]"))
+                .apply(JobConsistencyValidator::paramMatchesSchema, Value.class, metadata.modelParameter())
+                .pop();
+    }
+
+    private static ValidationContext runFlowInputs(Map<String, TagSelector> inputSelectors, GraphSection<NodeMetadata> graph, ValidationContext ctx) {
+
+        return runFlowResources(inputSelectors, graph, FlowNodeType.INPUT_NODE, "input", JobConsistencyValidator::runFlowInput, ctx);
+    }
+
+    private static ValidationContext runFlowInput(Node<NodeMetadata> node, ValidationContext ctx) {
+
+        var inputName = node.nodeId().name();
+        var metadata = node.payload();
+
+        return ctx.pushMapValue(inputName)
+                .applyIf(metadata.modelInputSchema() == null, (ctx_) -> ctx_.error("Type inference failed for input [" + inputName + "]"))
+                .apply(JobConsistencyValidator::inputMatchesSchema, TagSelector.class, metadata.modelInputSchema())
+                .pop();
+    }
+
+    private static <T> ValidationContext runFlowResources(
+            Map<String, T> jobResources, GraphSection<NodeMetadata> graph,
+            FlowNodeType nodeType, String resourceType,
+            BiFunction<Node<NodeMetadata>, ValidationContext, ValidationContext> resourceFunc,
+            ValidationContext ctx) {
+
+        var processed = new ArrayList<String>(jobResources.size());
 
         for (var node : graph.nodes().values()) {
-            if (node.payload().flowNode().getNodeType() == FlowNodeType.PARAMETER_NODE) {
+            if (node.payload().flowNode().getNodeType() == nodeType) {
 
-                var paramName = node.nodeId().name();
-                var metadata = node.payload();
+                var nodeName = node.nodeId().name();
 
-                if (!paramValues.containsKey(paramName)) {
-                    ctx = ctx.error("No value supplied for parameter [" + paramName + "]");
+                if (!jobResources.containsKey(nodeName)) {
+                    ctx = ctx.error(String.format("Missing required %s [%s]", resourceType, nodeName));
                     continue;
                 }
 
-                ctx = ctx.pushMapValue(paramName)
-                        .applyIf(metadata.modelParameter() == null, (ctx_) -> ctx_.error("Type inference failed for parameter [" + paramName + "]"))
-                        .apply(JobConsistencyValidator::paramMatchesSchema, Value.class, metadata.modelParameter())
-                        .pop();
-
+                ctx = resourceFunc.apply(node, ctx);
                 processed.add(node.nodeId().name());
             }
         }
 
-        for (var paramName : paramValues.keySet()) {
-            if (!processed.contains(paramName)) {
-                ctx = ctx.pushMapKey(paramName)
-                        .error("Unused parameter [" + paramName + "]")
+        for (var resourceKey : jobResources.keySet()) {
+            if (!processed.contains(resourceKey)) {
+                ctx = ctx.pushMapKey(resourceKey)
+                        .error(String.format("Unexpected %s [%s]", resourceType, resourceKey))
                         .pop();
             }
         }
@@ -412,5 +448,15 @@ public class JobConsistencyValidator {
 
         // Should never happen - something has gone very wrong with object consistency!
         throw new EUnexpected();
+    }
+
+    private static GraphBuilder.ErrorHandler graphErrorHandler(ValidationContext ctx) {
+
+        return (nodeId, detail) -> graphErrorHandler(nodeId, detail, ctx);
+    }
+
+    private static void graphErrorHandler(NodeId nodeId, String detail, ValidationContext ctx) {
+
+        ctx.error(detail);
     }
 }
