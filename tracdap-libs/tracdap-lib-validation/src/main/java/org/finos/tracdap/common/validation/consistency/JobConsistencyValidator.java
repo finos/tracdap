@@ -136,6 +136,7 @@ public class JobConsistencyValidator {
 
         // Do not validate final outputs at all
         // Consistency check is applied before outputs are populated
+        // Outputs can take whatever schema / type is required
         ctx.pushMap(RMJ_OUTPUTS, RunModelJob::getOutputsMap)
                 .pop();
 
@@ -175,9 +176,12 @@ public class JobConsistencyValidator {
                 .apply(JobConsistencyValidator::runFlowPriorOutputs, Map.class, graph)
                 .pop();
 
-        // Do not validate final outputs at all
-        // Consistency check is applied before outputs are populated
+        // For flows, we need to check graph consistency for the output nodes
+        // I.e. do the supplied models produce the required outputs
+        // There is no check for the concrete output objects
+        // As for runModel, these are allocated later and can take any schema / type needed
         ctx.pushMap(RFJ_OUTPUTS, RunFlowJob::getOutputsMap)
+                .apply(JobConsistencyValidator::runFlowOutputs, Map.class, graph)
                 .pop();
 
         return ctx;
@@ -258,23 +262,44 @@ public class JobConsistencyValidator {
                 .collect(Collectors.toMap(n -> n.nodeId().name(), n -> n));
 
         return alignedMapValidation(
-                "output", JobConsistencyValidator::outputMatchesSchema, true,
+                "prior output", JobConsistencyValidator::outputMatchesSchema, true,
                 priorOutputSelectors, outputNodes, ctx);
     }
 
     private static ValidationContext runModelPriorOutputs(Map<String, TagSelector> priorOutputSelectors, Map<String, ModelOutputSchema> requiredOutputs, ValidationContext ctx) {
 
         return alignedMapValidation(
-                "output", JobConsistencyValidator::outputMatchesSchema, true,
+                "prior output", JobConsistencyValidator::outputMatchesSchema, true,
                 priorOutputSelectors, requiredOutputs, ctx);
+    }
+
+    private static ValidationContext runFlowOutputs(Map<String, TagSelector> outputSelectors, GraphSection<NodeMetadata> graph, ValidationContext ctx) {
+
+        // This is checking graph consistency for flow output nodes
+        // i.e. Do the edges exist and do the supplied model outputs match the output schemas
+
+        // Concrete outputs are allocated post-validation and can take whatever schema / type is required
+        // The only concrete check for outputs occurs if priorOutputs are specified
+
+        var outputNodes = graph.nodes().values().stream()
+                .filter(node -> node.payload().flowNode().getNodeType() == FlowNodeType.OUTPUT_NODE)
+                .collect(Collectors.toList());
+
+        for (var node : outputNodes) {
+            var outputName = node.nodeId().name();
+            ctx = outputNode(outputName, node, graph, ctx);
+        }
+
+        return ctx;
     }
 
 
     // -----------------------------------------------------------------------------------------------------------------
-    //   Individual params, inputs and outputs
+    //   Checks for individual params, inputs and outputs
     // -----------------------------------------------------------------------------------------------------------------
 
 
+    // Param comes from the job definition
     private static ValidationContext paramMatchesSchema(String paramName, Value paramValue, Node<NodeMetadata> paramNode, ValidationContext ctx) {
 
         // Do not attempt to check param type if type inference failed
@@ -284,6 +309,7 @@ public class JobConsistencyValidator {
         return paramMatchesSchema(paramName, paramValue, paramNode.payload().modelParameter(), ctx);
     }
 
+    // Param comes from the job definition
     private static ValidationContext paramMatchesSchema(String paramName, Value paramValue, ModelParameter requiredParam, ValidationContext ctx) {
 
         var paramType = TypeSystem.descriptor(paramValue);
@@ -292,6 +318,7 @@ public class JobConsistencyValidator {
         return paramMatchesType(paramName, paramType, requiredType, ctx);
     }
 
+    // Param comes from upstream node
     private static ValidationContext paramMatchesSchema(String paramName, ModelParameter suppliedParam, ModelParameter requiredParam, ValidationContext ctx) {
 
         var paramType = suppliedParam.getParamType();
@@ -318,6 +345,7 @@ public class JobConsistencyValidator {
         return ctx;
     }
 
+    // Input comes from the job definition
     private static ValidationContext inputMatchesSchema(String inputName, TagSelector inputSelector, Node<NodeMetadata> inputNode, ValidationContext ctx) {
 
         if (inputNode.payload().modelInputSchema() == null)
@@ -327,6 +355,7 @@ public class JobConsistencyValidator {
         return inputMatchesSchema(inputName, inputSelector, inputNode.payload().modelInputSchema(), ctx);
     }
 
+    // Input comes from the job definition
     private static ValidationContext inputMatchesSchema(String inputName, TagSelector inputSelector, ModelInputSchema requiredSchema, ValidationContext ctx) {
 
         var inputObject = ctx.getMetadataBundle().getResource(inputSelector);
@@ -350,16 +379,19 @@ public class JobConsistencyValidator {
         return checkDataSchema(inputObject.getData(), requiredSchema.getSchema(), ctx);
     }
 
+    // Input comes from upstream node
     private static ValidationContext inputMatchesSchema(String inputName, ModelInputSchema inputSchema, ModelInputSchema requiredSchema, ValidationContext ctx) {
 
         return checkDataSchema(inputSchema.getSchema(), requiredSchema.getSchema(), ctx);
     }
 
+    // Input comes from upstream node
     private static ValidationContext inputMatchesSchema(String inputName, ModelOutputSchema outputSchema, ModelInputSchema requiredSchema, ValidationContext ctx) {
 
         return checkDataSchema(outputSchema.getSchema(), requiredSchema.getSchema(), ctx);
     }
 
+    // Output comes from the job definition
     private static ValidationContext outputMatchesSchema(String outputName, TagSelector outputSelector, Node<NodeMetadata> outputNode, ValidationContext ctx) {
 
         if (outputNode.payload().modelOutputSchema() == null)
@@ -368,6 +400,7 @@ public class JobConsistencyValidator {
         return outputMatchesSchema(outputName, outputSelector, outputNode.payload().modelOutputSchema(), ctx);
     }
 
+    // Output comes from the job definition
     private static ValidationContext outputMatchesSchema(String outputName, TagSelector outputSelector, ModelOutputSchema requiredSchema, ValidationContext ctx) {
 
         var outputObject = ctx.getMetadataBundle().getResource(outputSelector);
@@ -389,6 +422,18 @@ public class JobConsistencyValidator {
             return ctx;
 
         return checkDataSchema(outputObject.getData(), requiredSchema.getSchema(), ctx);
+    }
+
+    // Output comes from upstream node
+    private static ValidationContext outputMatchesSchema(String outputName, ModelInputSchema inputSchema, ModelOutputSchema requiredSchema, ValidationContext ctx) {
+
+        return checkDataSchema(inputSchema.getSchema(), requiredSchema.getSchema(), ctx);
+    }
+
+    // Output comes from upstream node
+    private static ValidationContext outputMatchesSchema(String outputName, ModelOutputSchema outputSchema, ModelOutputSchema requiredSchema, ValidationContext ctx) {
+
+        return checkDataSchema(outputSchema.getSchema(), requiredSchema.getSchema(), ctx);
     }
 
     private static ValidationContext checkDataSchema(DataDefinition suppliedData, SchemaDefinition requiredSchema, ValidationContext ctx) {
@@ -492,7 +537,7 @@ public class JobConsistencyValidator {
 
 
     // -----------------------------------------------------------------------------------------------------------------
-    //   Individual flow model nodes
+    //   Graph consistency checks (model and output nodes, tracing upstream)
     // -----------------------------------------------------------------------------------------------------------------
 
 
@@ -623,10 +668,54 @@ public class JobConsistencyValidator {
         }
     }
 
+    private static ValidationContext outputNode(String outputName, Node<NodeMetadata> node, GraphSection<NodeMetadata> graph, ValidationContext ctx) {
+
+        var sourceSocket = node.dependencies().get(Node.SINGLE_INPUT);
+
+        if (sourceSocket == null)
+            return ctx.error(String.format("Output [%s] is not connected in the flow", outputName));
+
+        var modelOutput = node.payload().modelOutputSchema();
+
+        if (modelOutput == null)
+            return ctx.error("Type inference failed for output [" + outputName + "]");
+
+        var sourceNode = graph.nodes().get(sourceSocket.nodeId());
+        var sourceMetadata = sourceNode.payload();
+        var sourceNodeName = sourceSocket.nodeId().name();
+        var sourceNodeType = sourceMetadata.flowNode().getNodeType();
+
+        if (sourceNodeType == FlowNodeType.INPUT_NODE) {
+
+            if (sourceMetadata.modelInputSchema() == null)
+                return ctx.error(String.format("No schema available for connected input [%s]", sourceNodeName));
+
+            return outputMatchesSchema(outputName, sourceMetadata.modelInputSchema(), modelOutput, ctx);
+        }
+        else if (sourceNodeType == FlowNodeType.MODEL_NODE) {
+
+            if (sourceMetadata.runtimeObjectType() != ObjectType.MODEL)
+                return ctx.error(String.format("No metadata available for connected model [%s]", sourceNodeName));
+
+            var sourceModel = sourceMetadata.runtimeObject().getModel();
+
+            if (!sourceModel.containsOutputs(sourceSocket.socket()))
+                return ctx.error(String.format("Connected model [%s] has no output named [%s]", sourceNodeName, sourceSocket.socket()));
+
+            return outputMatchesSchema(outputName, sourceModel.getOutputsOrThrow(sourceSocket.socket()), modelOutput, ctx);
+        }
+        else {
+            return ctx.error(String.format(
+                    "Output [%s] cannot be supplied from [%s] (%s)",
+                    outputName, sourceNodeName, sourceNodeType));
+        }
+    }
+
 
     // -----------------------------------------------------------------------------------------------------------------
     //   Helpers
     // -----------------------------------------------------------------------------------------------------------------
+
 
     private static <T, U> ValidationContext alignedMapValidation(
             String itemType, AlignedMapValidator<T, U> validatorFunc, boolean allowMissing,
