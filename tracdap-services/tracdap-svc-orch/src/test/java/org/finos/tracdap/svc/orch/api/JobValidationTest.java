@@ -729,21 +729,21 @@ public class JobValidationTest {
         var model1 = createFlowModel(
                 "acme.models.test_model.Model1",
                 Map.of("param_1", BasicType.FLOAT),
-                Map.of("basic_data_input", SampleData.BASIC_TABLE_SCHEMA_V2),  // Expect enriched data, basic data will have a missing field
-                Map.of("enriched_basic_data", SampleData.BASIC_TABLE_SCHEMA),  // Output basic data, will have a missing field for model 3
+                Map.of("basic_data_input", SampleData.BASIC_TABLE_SCHEMA),
+                Map.of("enriched_basic_data", SampleData.BASIC_TABLE_SCHEMA_V2),
                 List.of());
 
         var model2 = createFlowModel(
                 "acme.models.test_model.Model2",
                 Map.of("param_2", BasicType.STRING),
-                Map.of("alt_data_input", SampleData.BASIC_TABLE_SCHEMA),  // Expect basic data instead of alt data, wrong schema
-                Map.of("enriched_alt_data", SampleData.ALT_TABLE_SCHEMA),
+                Map.of("alt_data_input", SampleData.ALT_TABLE_SCHEMA),
+                Map.of("enriched_alt_data", SampleData.ALT_TABLE_SCHEMA_V2),
                 List.of());
 
         var model3 = createFlowModel(
                 "acme.models.test_model.Model2",
                 Map.of("param_1", BasicType.INTEGER, "param_2", BasicType.STRING),
-                Map.of("enriched_basic_data", SampleData.BASIC_TABLE_SCHEMA_V2, "enriched_alt_data", SampleData.ALT_TABLE_SCHEMA),
+                Map.of("enriched_basic_data", SampleData.BASIC_TABLE_SCHEMA_V2, "enriched_alt_data", SampleData.ALT_TABLE_SCHEMA_V2),
                 Map.of("sample_output_data", SampleData.BASIC_TABLE_SCHEMA_V2),
                 List.of());
 

@@ -113,6 +113,15 @@ public class SampleData {
                     .setFieldType(BasicType.BOOLEAN)))
             .build();
 
+    public static final SchemaDefinition ALT_TABLE_SCHEMA_V2
+            = ALT_TABLE_SCHEMA.toBuilder()
+            .setTable(ALT_TABLE_SCHEMA.getTable().toBuilder()
+            .addFields(FieldSchema.newBuilder()
+                    .setFieldName("alt_extra_flag")
+                    .setFieldOrder(5)
+                    .setFieldType(BasicType.BOOLEAN)))
+            .build();
+
 
     public static final FlowDefinition SAMPLE_FLOW = FlowDefinition.newBuilder()
             .putNodes("basic_data_input", FlowNode.newBuilder()
