@@ -142,7 +142,7 @@ public class ModelValidator {
                 .applyMapKeys(CommonValidators::identifier)
                 .applyMapKeys(CommonValidators::notTracReserved)
                 .apply(CommonValidators::caseInsensitiveDuplicates)
-                .applyMapKeys(uniqueContextCheck(knownIdentifiers, paramsField.getName()))
+                .applyMapKeys(CommonValidators.uniqueContextCheck(knownIdentifiers, paramsField.getName()))
                 .applyMapValues(ModelValidator::modelParameter, ModelParameter.class)
                 .pop();
 
@@ -150,7 +150,7 @@ public class ModelValidator {
                 .applyMapKeys(CommonValidators::identifier)
                 .applyMapKeys(CommonValidators::notTracReserved)
                 .apply(CommonValidators::caseInsensitiveDuplicates)
-                .applyMapKeys(uniqueContextCheck(knownIdentifiers, inputsField.getName()))
+                .applyMapKeys(CommonValidators.uniqueContextCheck(knownIdentifiers, inputsField.getName()))
                 .applyMapValues(ModelValidator::modelInputSchema, ModelInputSchema.class)
                 .pop();
 
@@ -158,7 +158,7 @@ public class ModelValidator {
                 .applyMapKeys(CommonValidators::identifier)
                 .applyMapKeys(CommonValidators::notTracReserved)
                 .apply(CommonValidators::caseInsensitiveDuplicates)
-                .applyMapKeys(uniqueContextCheck(knownIdentifiers, outputsField.getName()))
+                .applyMapKeys(CommonValidators.uniqueContextCheck(knownIdentifiers, outputsField.getName()))
                 .applyMapValues(ModelValidator::modelOutputSchema, ModelOutputSchema.class)
                 .pop();
 
@@ -248,26 +248,5 @@ public class ModelValidator {
         }
 
         return ctx;
-    }
-
-    private static ValidationFunction.Typed<String> uniqueContextCheck(Map<String, String> knownIdentifiers, String fieldName) {
-
-        return (key, ctx) -> {
-
-            var lowerKey = key.toLowerCase();
-
-            if (knownIdentifiers.containsKey(lowerKey)) {
-
-                var err = String.format(
-                        "[%s] is already defined in [%s]",
-                        key,  knownIdentifiers.get(lowerKey));
-
-                return ctx.error(err);
-            }
-
-            knownIdentifiers.put(lowerKey, fieldName);
-
-            return ctx;
-        };
     }
 }

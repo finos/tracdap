@@ -681,4 +681,25 @@ public class CommonValidators {
             throw new ETracInternal("[caseInsensitiveDuplicates] can only be applied to repeated string fields or maps with string keys");
     }
 
+    public static ValidationFunction.Typed<String> uniqueContextCheck(Map<String, String> knownIdentifiers, String fieldName) {
+
+        return (key, ctx) -> {
+
+            var lowerKey = key.toLowerCase();
+
+            if (knownIdentifiers.containsKey(lowerKey)) {
+
+                var err = String.format(
+                        "[%s] is already defined in [%s]",
+                        key,  knownIdentifiers.get(lowerKey));
+
+                return ctx.error(err);
+            }
+
+            knownIdentifiers.put(lowerKey, fieldName);
+
+            return ctx;
+        };
+    }
+
 }
