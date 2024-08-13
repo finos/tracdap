@@ -345,6 +345,15 @@ public class FlowValidator {
             else if (socket.hasField(FS_SOCKET))
                 ctx.error(String.format("Source node [%s] is an input node, do not specify a [socket]", socket.getNode()));
         }
+
+        else if (node.getNodeType() == FlowNodeType.PARAMETER_NODE) {
+
+            if (ctx.field().equals(FE_TARGET))
+                ctx.error(String.format("Parameter node [%s] cannot be used as a target", socket.getNode()));
+
+            else if (socket.hasField(FS_SOCKET))
+                ctx.error(String.format("Source node [%s] is a parameter node, do not specify a [socket]", socket.getNode()));
+        }
         else {
 
             var inputOrOutput = ctx.field().equals(FE_SOURCE) ? "output" : "input";
@@ -415,6 +424,9 @@ public class FlowValidator {
             var nodeName = nodeEntry.getKey();
             var node = nodeEntry.getValue();
 
+            if (node.getNodeType() == FlowNodeType.PARAMETER_NODE && !usedNodes.contains(nodeName))
+                ctx = ctx.error(String.format("Parameter node [%s] is not used", nodeName));
+
             if (node.getNodeType() == FlowNodeType.INPUT_NODE && !usedNodes.contains(nodeName))
                 ctx = ctx.error(String.format("Input node [%s] is not used", nodeName));
 
@@ -452,8 +464,10 @@ public class FlowValidator {
 
         // Initial set of reachable flow nodes is just the input nodes
         for (var node : remainingNodes.entrySet()) {
-            if (node.getValue().getNodeType() == FlowNodeType.INPUT_NODE)
+            if (node.getValue().getNodeType() == FlowNodeType.PARAMETER_NODE ||
+                node.getValue().getNodeType() == FlowNodeType.INPUT_NODE) {
                 reachableNodes.put(node.getKey(), node.getValue());
+            }
         }
 
         for (var node: reachableNodes.keySet())
@@ -506,6 +520,7 @@ public class FlowValidator {
 
         switch (node.getNodeType()) {
 
+            case PARAMETER_NODE:
             case INPUT_NODE:
                 return List.of();
 
