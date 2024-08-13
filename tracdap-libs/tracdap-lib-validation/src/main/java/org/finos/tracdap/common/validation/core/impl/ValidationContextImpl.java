@@ -25,6 +25,7 @@ import org.finos.tracdap.common.validation.core.ValidationContext;
 import org.finos.tracdap.common.validation.core.ValidationFunction;
 import org.finos.tracdap.common.validation.core.ValidationType;
 import org.finos.tracdap.common.metadata.MetadataBundle;
+import org.finos.tracdap.config.PlatformConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -45,52 +46,68 @@ public class ValidationContextImpl implements ValidationContext {
     private final Stack<ValidationLocation> location;
     private final ValidationContextImpl priorCtx;
     private final List<ValidationFailure> failures;
-    private final MetadataBundle bundle;
+
+    private final MetadataBundle metadata;
+    private final PlatformConfig resources;
 
 
     private ValidationContextImpl(
-            ValidationType validationType, ValidationLocation root,
-            ValidationContextImpl priorCtx, MetadataBundle bundle) {
+            ValidationType validationType, ValidationLocation root, ValidationContextImpl priorCtx,
+            MetadataBundle metadata, PlatformConfig resources) {
 
         this.validationType = validationType;
         this.location = new Stack<>();
         this.location.push(root);
 
         this.priorCtx = priorCtx;
-        this.bundle = bundle;
+        this.metadata = metadata;
+        this.resources = resources;
 
         this.failures = new ArrayList<>();
+    }
+
+    private ValidationContextImpl(
+            ValidationType validationType,
+            ValidationLocation root,
+            ValidationContextImpl priorCtx) {
+
+        this(validationType, root, priorCtx, null, null);
     }
 
     public static ValidationContext forMethod(Message msg, Descriptors.MethodDescriptor method) {
 
         var root = new ValidationLocation(null, msg, method, null, null, null);
-        return new ValidationContextImpl(ValidationType.STATIC, root, null, null);
+        return new ValidationContextImpl(ValidationType.STATIC, root, null);
     }
 
     public static ValidationContext forMessage(Message msg) {
 
         var root = new ValidationLocation(null, msg, null, null);
-        return new ValidationContextImpl(ValidationType.STATIC, root, null, null);
+        return new ValidationContextImpl(ValidationType.STATIC, root, null);
     }
 
     public static ValidationContext forVersion(Message current, Message prior) {
 
         var currentRoot = new ValidationLocation(null, current, null, null);
         var priorRoot = new ValidationLocation(null, prior, null, null);
-        var priorCtx = new ValidationContextImpl(ValidationType.VERSION, priorRoot, null, null);
-        return new ValidationContextImpl(ValidationType.VERSION, currentRoot, priorCtx, null);
+        var priorCtx = new ValidationContextImpl(ValidationType.VERSION, priorRoot, null);
+        return new ValidationContextImpl(ValidationType.VERSION, currentRoot, priorCtx);
     }
 
-    public static ValidationContext forConsistency(Message msg, MetadataBundle resources) {
+    public static ValidationContext forConsistency(Message msg, MetadataBundle metadata, PlatformConfig resources) {
 
         var root = new ValidationLocation(null, msg, null, null);
-        return new ValidationContextImpl(ValidationType.CONSISTENCY, root, null, resources);
+        return new ValidationContextImpl(ValidationType.CONSISTENCY, root, null, metadata, resources);
     }
 
     @Override
     public MetadataBundle getMetadataBundle() {
-        return this.bundle;
+        return this.metadata;
+    }
+
+    @Override
+    public PlatformConfig getResources() {
+        return this.resources;
     }
 
     @Override

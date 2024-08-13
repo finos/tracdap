@@ -23,6 +23,7 @@ import org.finos.tracdap.common.metadata.MetadataBundle;
 
 import com.google.protobuf.Descriptors;
 import com.google.protobuf.Message;
+import org.finos.tracdap.config.PlatformConfig;
 
 import java.util.*;
 import java.util.function.Function;
@@ -45,9 +46,9 @@ public interface ValidationContext {
         return ValidationContextImpl.forVersion(current, prior);
     }
 
-    static ValidationContext forConsistency(Message msg, MetadataBundle resources) {
+    static ValidationContext forConsistency(Message msg, MetadataBundle metadata, PlatformConfig resources) {
 
-        return ValidationContextImpl.forConsistency(msg, resources);
+        return ValidationContextImpl.forConsistency(msg, metadata, resources);
     }
 
     /**
@@ -56,6 +57,15 @@ public interface ValidationContext {
      * @return The metadata bundle associated with this validation context
      */
     MetadataBundle getMetadataBundle();
+
+    /**
+     * Get the resources available in the platform config
+     *
+     * @apiNote This method is likely to change in future when resources are managed via metadata
+     *
+     * @return The resources available in the platform config
+     */
+    PlatformConfig getResources();
 
     /**
      * Push a member field of the current object onto the validation stack

@@ -26,6 +26,7 @@ import org.finos.tracdap.common.validation.core.impl.ValidationResult;
 import com.google.protobuf.Descriptors;
 import com.google.protobuf.Message;
 import org.finos.tracdap.common.metadata.MetadataBundle;
+import org.finos.tracdap.config.PlatformConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -60,9 +61,9 @@ public class Validator {
     }
 
     public <TMsg extends Message>
-    void validateConsistency(TMsg message, MetadataBundle bundle) {
+    void validateConsistency(TMsg message, MetadataBundle metadata, PlatformConfig resources) {
 
-        var ctx = ValidationContext.forConsistency(message, bundle);
+        var ctx = ValidationContext.forConsistency(message, metadata, resources);
         doValidation(ctx);
     }
 
