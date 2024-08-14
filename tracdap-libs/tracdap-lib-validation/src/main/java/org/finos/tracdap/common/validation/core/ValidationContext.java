@@ -60,8 +60,8 @@ public interface ValidationContext {
 
     /**
      * Get the resources available in the platform config
-     *
-     * @apiNote This method is likely to change in future when resources are managed via metadata
+     * <br/>
+     * This method is likely to change in future when resources are managed via metadata.
      *
      * @return The resources available in the platform config
      */
@@ -85,7 +85,7 @@ public interface ValidationContext {
 
     /**
      * Push a repeated member field of the current object onto the validation stack
-     *
+     * <br/>
      * This method pushes a list onto the validation stack, so the target becomes a Java List object.
      * To push individual list items, use pushRepeatedItem() after calling this method.
      *
@@ -96,7 +96,7 @@ public interface ValidationContext {
 
     /**
      * Push an individual list item onto the validation stack
-     *
+     * <br/>
      * Requires that the current target is a repeated field.
      *
      * @param index The index of the list item to push onto the stack (must be within bounds of the list)
@@ -106,9 +106,9 @@ public interface ValidationContext {
 
     /**
      * Push an individual list item onto the validation stack
-     *
+     * <br/>
      * Requires that the current target is a repeated field.
-     *
+     * <br/>
      * This overload allows a prior version of the object to be specified for version comparison.
      * This is helpful for version validators, which need to match current / prior entries in a list.
      *
@@ -120,9 +120,9 @@ public interface ValidationContext {
 
     /**
      * Push an individual list item onto the validation stack
-     *
+     * <br/>
      * Requires that the current target is a repeated field.
-     *
+     * <br/>
      * This overload allows a prior version of the object to be specified for version comparison.
      * This is helpful for version validators, which need to match current / prior entries in a list.
      *
@@ -134,10 +134,10 @@ public interface ValidationContext {
 
     /**
      * Push a map member field of the current object onto the validation stack
-     *
+     * <br/>
      * This method only pushes the map itself onto the stack, the validation target will be a Java Map object.
      * To push individual keys or values, use pushMapKey() or pushMapValue() after calling this method.
-     *
+     * <br/>
      * This method needs a method reference from the parent message class to return Java map object
      * associated with this field (protobuf for Java does not yet provide a generic way of looking up map keys).
      *
@@ -150,7 +150,7 @@ public interface ValidationContext {
 
     /**
      * Push a map member field of the current object onto the validation stack
-     *
+     * <br/>
      * This method will work with applyMapKeys() and applyMapValues(). If you need to look up map items
      * by key or want to call pushMapKey() / pushMapValue() explicitly, use the overload which takes
      * getMapFunc as a parameter (protobuf for Java does not provide a generic way of looking up map keys).
@@ -162,7 +162,7 @@ public interface ValidationContext {
 
     /**
      * Push an individual map key onto the validation stack
-     *
+     * <br/>
      * Requires that the current target is a map field.
      *
      * @param key The map key to push onto the stack
@@ -172,7 +172,7 @@ public interface ValidationContext {
 
     /**
      * Push an individual map value onto the validation stack
-     *
+     * <br/>
      * Requires that the current target is a map field.
      *
      * @param key The key of the map value to push onto the stack
@@ -197,7 +197,7 @@ public interface ValidationContext {
 
     /**
      * Skip the current location in the validation stack
-     *
+     * <br/>
      * Any future calls to apply() at this location or child locations will be ignored.
      * Errors already recorded at this location or child locations are still included in the validation report.
      *
