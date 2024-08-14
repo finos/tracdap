@@ -28,6 +28,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 
@@ -92,15 +93,26 @@ public class GraphBuilder {
         return applyTypeInference(paramsGraph);
     }
 
+    // This is assuming the flow has already been through the FlowDefinition static validator
+    // Ideally that logic should move here and be used in JobConsistencyValidator and FlowConsistencyValidator
+    // More work would be needed to report errors with the correct location in ValidationContext
+
     public GraphSection<NodeMetadata> buildFlow(FlowDefinition flow) {
 
         // https://en.wikipedia.org/wiki/Topological_sorting#Kahn's_algorithm
 
+        var nodeIds = flow.getNodesMap().keySet().stream()
+                .map(node -> new NodeId(node, namespace))
+                .collect(Collectors.toMap(NodeId::name, Function.identity()));
+
         var edgesBySource = new HashMap<String, List<FlowEdge>>();
         var edgesByTarget = new HashMap<String, List<FlowEdge>>();
-        var edges = new HashMap<SocketId, SocketId>();
 
         for (var edge : flow.getEdgesList()) {
+
+            // Do not add edges with invalid connections
+            if (!checkEdgeConnection(edge, flow.getNodesMap()))
+                continue;
 
             var sourceNode = edge.getSource().getNode();
             var targetNode = edge.getTarget().getNode();
@@ -113,10 +125,6 @@ public class GraphBuilder {
 
             edgesBySource.get(sourceNode).add(edge);
             edgesByTarget.get(targetNode).add(edge);
-
-            var sourceSocket = new SocketId(new NodeId(sourceNode, namespace), edge.getSource().getSocket());
-            var targetSocket = new SocketId(new NodeId(targetNode, namespace), edge.getTarget().getSocket());
-            edges.put(targetSocket, sourceSocket);
         }
 
         // Initial set of reachable flow nodes is just the input nodes
@@ -132,17 +140,21 @@ public class GraphBuilder {
 
         // Graph nodes to build during traversal
         var graphNodes = new HashMap<NodeId, Node<NodeMetadata>>();
+        var graphEdges = new HashMap<NodeId, Map<String, SocketId>>();
 
         while (!reachableNodes.isEmpty()) {
 
-            var nodeKey = reachableNodes.keySet().stream().findAny();
-            var nodeName = nodeKey.get();
+            var nextNode = reachableNodes.keySet().stream().findAny();
+            var nodeName = nextNode.get();
             var flowNode = reachableNodes.remove(nodeName);
 
-            var graphNode = buildFlowNode(flow, edges, nodeName, flowNode);
+            var nodeId = nodeIds.get(nodeName);
+            var dependencies = graphEdges.getOrDefault(nodeId, NO_DEPENDENCIES);
+            var graphNode = buildFlowNode(nodeId, dependencies, flowNode, flow);
+
             graphNodes.put(graphNode.nodeId(), graphNode);
 
-            var sourceEdges = edgesBySource.remove(nodeName);
+            var sourceEdges = edgesBySource.get(nodeName);
 
             // Some nodes do not feed any other nodes, e.g. output nodes, or if there are errors in the flow
             if (sourceEdges == null)
@@ -150,10 +162,15 @@ public class GraphBuilder {
 
             for (var edge : sourceEdges) {
 
+                addGraphEdge(graphEdges, edge, nodeIds);
+
                 var targetNodeName = edge.getTarget().getNode();
                 var targetEdges = edgesByTarget.get(targetNodeName);
+
+                // Remove just this one inbound edge from the list of inbound edges
                 targetEdges.remove(edge);
 
+                // Target nodes is reachable when there are no inbound edges left
                 if (targetEdges.isEmpty()) {
                     var targetNode = remainingNodes.remove(targetNodeName);
                     reachableNodes.put(targetNodeName, targetNode);
@@ -182,37 +199,35 @@ public class GraphBuilder {
         return new GraphSection<>(graphNodes, inputs, outputs);
     }
 
-    private Node<NodeMetadata> buildFlowNode(FlowDefinition flow, Map<SocketId, SocketId> edges, String nodeName, FlowNode flowNode) {
-
-        // Create nodeId in the building namespace
-        var nodeId = new NodeId(nodeName, namespace);
+    private Node<NodeMetadata> buildFlowNode(NodeId nodeId, Map<String, SocketId> dependencies, FlowNode flowNode, FlowDefinition flow) {
 
         // Look up strict metadata if it is present in the flow
-        var modelParam = flow.getParametersOrDefault(nodeName, null);
-        var modelInput = flow.getInputsOrDefault(nodeName, null);
-        var modelOutput = flow.getOutputsOrDefault(nodeName, null);
+        var modelParam = flowNode.getNodeType() == FlowNodeType.PARAMETER_NODE ? flow.getParametersOrDefault(nodeId.name(), null) : null;
+        var modelInput = flowNode.getNodeType() == FlowNodeType.INPUT_NODE ? flow.getInputsOrDefault(nodeId.name(), null) : null;
+        var modelOutput = flowNode.getNodeType() == FlowNodeType.OUTPUT_NODE ? flow.getOutputsOrDefault(nodeId.name(), null) : null;
 
         // Runtime object / value is not part of the flow, these will always be null
         var nodeMetadata = new NodeMetadata(flowNode, modelParam, modelInput, modelOutput, null, null);
+
+        // Check and report any unsatisfied dependencies
+        // The dependencies that are present are already validated
+        var missing = missingDependencies(dependencies, flowNode);
+        for (var dependency : missing) {
+            var socketName = dependency.equals(SINGLE_INPUT) ? nodeId.name() : nodeId.name() + "." + dependency;
+            errorHandler.error(nodeId, String.format("Target [%s] is supplied by multiple edges", socketName));
+        }
 
         switch (flowNode.getNodeType()) {
 
             case PARAMETER_NODE:
             case INPUT_NODE:
-                return new Node<>(nodeId, NO_DEPENDENCIES, SINGLE_OUTPUT, nodeMetadata);
+                return new Node<>(nodeId, dependencies, SINGLE_OUTPUT, nodeMetadata);
 
             case OUTPUT_NODE:
-                var outputSocket = new SocketId(nodeId, SINGLE_INPUT);
-                var outputSource = edges.get(outputSocket);  // TODO null check
-                var outputDeps = Map.of(SINGLE_INPUT, outputSource);
-                return new Node<>(nodeId, outputDeps, NO_OUTPUTS, nodeMetadata);
+                return new Node<>(nodeId, dependencies, NO_OUTPUTS, nodeMetadata);
 
             case MODEL_NODE:
-                var modelDeps = flowNode.getInputsList().stream()
-                        .map(input -> new SocketId(nodeId, input))
-                        .map(input -> Map.entry(input.socket(), edges.get(input)))
-                        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-                return new Node<>(nodeId, modelDeps, flowNode.getOutputsList(), nodeMetadata);
+                return new Node<>(nodeId, dependencies, flowNode.getOutputsList(), nodeMetadata);
 
             default:
                 errorHandler.error(nodeId, String.format("Missing or invalid node type [%s]", flowNode.getNodeType()));
@@ -220,9 +235,50 @@ public class GraphBuilder {
         }
     }
 
-    private Map<String, SocketId> flowNodeDependencies(FlowNode flowNode, List<FlowEdge> edges, Map<String, NodeId> nodeIds) {
+    private void addGraphEdge(Map<NodeId, Map<String, SocketId>> graphEdges, FlowEdge flowEdge, Map<String, NodeId> nodeIds) {
 
-        return Map.of();  // TODO
+        var targetNode = nodeIds.get(flowEdge.getTarget().getNode());
+        var targetSocket = flowEdge.getTarget().getSocket();
+
+        // Add a dependency map for the target if it doesn't already exist
+        var targetEdges = graphEdges.computeIfAbsent(targetNode, x -> new HashMap<>());
+
+        if (targetEdges.containsKey(targetSocket)) {
+            var socketName = targetSocket.equals(SINGLE_INPUT) ? targetNode.name() : targetNode.name() + "." + targetSocket;
+            errorHandler.error(targetNode, String.format("Target [%s] is supplied by multiple edges", socketName));
+            return;
+        }
+
+        var sourceNode = nodeIds.get(flowEdge.getSource().getNode());
+        var sourceSocket = new SocketId(sourceNode, flowEdge.getSource().getSocket());
+
+        targetEdges.put(targetSocket, sourceSocket);
+    }
+
+    private List<String> missingDependencies(Map<String, SocketId> dependencies, FlowNode flowNode) {
+
+        if (dependencies.size() == flowNode.getParametersCount() + flowNode.getInputsCount())
+            return NO_OUTPUTS;
+
+        var missing = new ArrayList<String>();
+
+        for (var param : flowNode.getParametersList())
+            if (!dependencies.containsKey(param))
+                missing.add(param);
+
+        for (var input : flowNode.getInputsList())
+            if (!dependencies.containsKey(input))
+                missing.add(input);
+
+        return missing;
+    }
+
+    private boolean checkEdgeConnection(FlowEdge edge, Map<String, FlowNode> nodes) {
+
+        // This check is already handled in FlowValidator
+        // Ideally that logic should move here
+
+        return true;
     }
 
     public GraphSection<NodeMetadata> addJobMetadata(GraphSection<NodeMetadata> graph, RunModelJob job) {
