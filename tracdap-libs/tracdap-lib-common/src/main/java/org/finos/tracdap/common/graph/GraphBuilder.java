@@ -377,6 +377,9 @@ public class GraphBuilder {
 
     public GraphSection<NodeMetadata> autowireFlowParameters(GraphSection<NodeMetadata> graph, FlowDefinition flow, RunFlowJob job) {
 
+        // Check whether this flow is using explicit parameters
+        var flowIsExplicit = flow.getParametersCount() > 0;
+
         var nodes = new HashMap<>(graph.nodes());
         var paramIds = new HashMap<String, NodeId>();
 
@@ -402,6 +405,12 @@ public class GraphBuilder {
                     continue;
 
                 flowNode.addParameters(paramName);
+
+                // For explicit flows, do not try to auto-wire parameters that are not declared
+                if (flowIsExplicit && ! flow.containsParameters(paramName)) {
+                    errorHandler.error(node.nodeId(), String.format("Parameter [%s] is not declared in the flow", paramName));
+                    continue;
+                }
 
                 var paramId = paramIds.computeIfAbsent(paramName, pn -> new NodeId(pn, namespace));
 

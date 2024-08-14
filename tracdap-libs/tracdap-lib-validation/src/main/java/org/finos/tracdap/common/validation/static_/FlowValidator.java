@@ -118,13 +118,16 @@ public class FlowValidator {
 
         // If the flow declares an explicit schema this must be validated as well
         // Parameters, inputs & outputs on a flow have the same structure as a model
-        // Inputs and outputs must match what is declared in the nodes
-
-        if (flow.getInputsCount() > 0 || flow.getOutputsCount() > 0 || flow.getParametersCount() > 0) {
-
+        if (flow.getInputsCount() > 0 || flow.getOutputsCount() > 0 || flow.getParametersCount() > 0)
             ctx = ModelValidator.modelSchema(FD_PARAMETERS, FD_INPUTS, FD_OUTPUTS, ctx);
+
+        // If inputs and outputs are declared, they must match what is declared in the nodes
+        if (flow.getInputsCount() > 0 || flow.getOutputsCount() > 0)
             ctx = ctx.apply(FlowValidator::flowSchemaMatch, FlowDefinition.class);
-        }
+
+        // If parameters are declared, they must not conflict with the flow nodes
+        if (flow.getParametersCount() > 0)
+            ctx = ctx.apply(FlowValidator::flowParametersMatch, FlowDefinition.class);
 
         return ctx;
     }
@@ -269,7 +272,13 @@ public class FlowValidator {
         for (var outputName : schemaOutputs)
             ctx = ctx.error(String.format("Flow explicit output [%s] does not correspond to an output node", outputName));
 
+        return ctx;
+    }
+
+    private static ValidationContext flowParametersMatch(FlowDefinition flow, ValidationContext ctx) {
+
         // Any explicitly declared parameters cannot conflict with nodes in the graph
+        // However, do not check for param nodes as these can still be auto-wired
 
         for (var paramName : flow.getParametersMap().keySet()) {
             if (flow.containsNodes(paramName)) {
