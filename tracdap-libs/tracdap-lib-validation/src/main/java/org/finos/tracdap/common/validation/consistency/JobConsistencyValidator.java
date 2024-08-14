@@ -618,6 +618,9 @@ public class JobConsistencyValidator {
             if (sourceMetadata.modelParameter() == null)
                 return ctx.error(String.format("No type information available for connected parameter [%s]", sourceNodeName));
 
+            // TODO: Support pushing virtual locations onto ctx
+            // Model is a tag selector, parameters[param] does not exist in the message structure
+
             return paramMatchesSchema(paramName, sourceMetadata.modelParameter(), modelParameter, ctx);
         }
         else {
@@ -658,6 +661,9 @@ public class JobConsistencyValidator {
 
             if (!sourceModel.containsOutputs(sourceSocket.socket()))
                 return ctx.error(String.format("Connected model [%s] has no output named [%s]", sourceNodeName, sourceSocket.socket()));
+
+            // TODO: Support pushing virtual locations onto ctx
+            // Model is a tag selector, inputs[input] does not exist in the message structure
 
             return inputMatchesSchema(inputName, sourceModel.getOutputsOrThrow(sourceSocket.socket()), modelInput, ctx);
         }
