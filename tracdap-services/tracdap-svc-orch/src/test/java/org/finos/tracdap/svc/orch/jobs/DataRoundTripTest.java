@@ -99,6 +99,7 @@ public abstract class DataRoundTripTest {
     public final PlatformTest platform = PlatformTest.forConfig(E2E_CONFIG)
             .addTenant(TEST_TENANT)
             .storageFormat(storageFormat())
+            .prepareLocalExecutor(true)
             .startAll()
             .build();
 

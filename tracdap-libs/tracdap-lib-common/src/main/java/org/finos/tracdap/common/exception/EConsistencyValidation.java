@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Accenture Global Solutions Limited
+ * Copyright 2024 Accenture Global Solutions Limited
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,11 +14,21 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.validation.core;
+package org.finos.tracdap.common.exception;
 
-public enum ValidationType {
-    STATIC,
-    VERSION,
-    CONSISTENCY,
-    UNDEFINED
+import org.finos.tracdap.api.TracErrorDetails;
+
+public class EConsistencyValidation extends EValidation {
+
+    public EConsistencyValidation(String message, Throwable cause) {
+        super(message, cause);
+    }
+
+    public EConsistencyValidation(String message, TracErrorDetails details) {
+        super(message, details);
+    }
+
+    public EConsistencyValidation(String message) {
+        super(message);
+    }
 }

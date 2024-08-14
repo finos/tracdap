@@ -16,6 +16,7 @@
 
 package org.finos.tracdap.common.validation;
 
+import org.finos.tracdap.common.exception.EConsistencyValidation;
 import org.finos.tracdap.common.exception.EInputValidation;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.exception.EVersionValidation;
@@ -24,6 +25,8 @@ import org.finos.tracdap.common.validation.core.impl.ValidationResult;
 
 import com.google.protobuf.Descriptors;
 import com.google.protobuf.Message;
+import org.finos.tracdap.common.metadata.MetadataBundle;
+import org.finos.tracdap.config.PlatformConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -57,6 +60,13 @@ public class Validator {
         doValidation(ctx);
     }
 
+    public <TMsg extends Message>
+    void validateConsistency(TMsg message, MetadataBundle metadata, PlatformConfig resources) {
+
+        var ctx = ValidationContext.forConsistency(message, metadata, resources);
+        doValidation(ctx);
+    }
+
     private void doValidation(ValidationContext ctx) {
 
         var key = ctx.key();
@@ -79,6 +89,7 @@ public class Validator {
 
                 case STATIC: throw new EInputValidation(details.getMessage(), details);
                 case VERSION: throw new EVersionValidation(details.getMessage(), details);
+                case CONSISTENCY: throw new EConsistencyValidation(details.getMessage(), details);
 
                 default:
                     throw new EUnexpected();

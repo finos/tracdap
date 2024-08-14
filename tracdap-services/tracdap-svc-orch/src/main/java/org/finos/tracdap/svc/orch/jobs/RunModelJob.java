@@ -18,6 +18,7 @@ package org.finos.tracdap.svc.orch.jobs;
 
 import org.finos.tracdap.api.MetadataWriteRequest;
 import org.finos.tracdap.common.exception.EUnexpected;
+import org.finos.tracdap.common.metadata.MetadataBundle;
 import org.finos.tracdap.common.metadata.MetadataUtil;
 import org.finos.tracdap.config.JobConfig;
 import org.finos.tracdap.config.JobResult;
@@ -32,7 +33,7 @@ import java.util.Map;
 public class RunModelJob extends RunModelOrFlow implements IJobLogic {
 
     @Override
-    public JobDefinition applyTransform(JobDefinition job, PlatformConfig platformConfig) {
+    public JobDefinition applyTransform(JobDefinition job, MetadataBundle metadata, PlatformConfig platformConfig) {
 
         // No transformations currently required
         return job;
@@ -49,6 +50,7 @@ public class RunModelJob extends RunModelOrFlow implements IJobLogic {
         var resources = new ArrayList<TagSelector>(runModel.getInputsCount() + 1);
         resources.add(runModel.getModel());
         resources.addAll(runModel.getInputsMap().values());
+        resources.addAll(runModel.getPriorOutputsMap().values());
 
         return resources;
     }

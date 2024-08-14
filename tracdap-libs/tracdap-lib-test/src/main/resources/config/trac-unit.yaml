@@ -66,15 +66,14 @@ storage:
 
 repositories:
   UNIT_TEST_REPO:
-    protocol: git
+    protocol: LOCAL
     properties:
-      repoUrl: ${CURRENT_GIT_ORIGIN}
+      repoUrl: ${TRAC_LOCAL_REPO}
 
 
 executor:
-  protocol: LOCAL
+  protocol: UNIT_TEST
   properties:
-    venvPath: ${TRAC_EXEC_DIR}/venv
 
 
 jobCache:

@@ -164,6 +164,21 @@ public class CommonValidators {
             return ctx -> omitted(ctx, negativeQualifier);
     }
 
+    public static ValidationFunction.Basic onlyIf(boolean condition, String qualifier) {
+
+        return onlyIf(condition, qualifier, false);
+    }
+
+    public static ValidationFunction.Basic onlyIf(boolean condition, String qualifier, boolean inverted) {
+
+        var negativeQualifier = (inverted ? "when " : "unless ") + qualifier;
+
+        if (condition)
+            return CommonValidators::optional;
+        else
+            return ctx -> omitted(ctx, negativeQualifier);
+    }
+
     public static <T> ValidationFunction.Typed<T> equalTo(T other, String errorMessage) {
 
         return (value, ctx) -> {
@@ -679,6 +694,27 @@ public class CommonValidators {
         }
         else
             throw new ETracInternal("[caseInsensitiveDuplicates] can only be applied to repeated string fields or maps with string keys");
+    }
+
+    public static ValidationFunction.Typed<String> uniqueContextCheck(Map<String, String> knownIdentifiers, String fieldName) {
+
+        return (key, ctx) -> {
+
+            var lowerKey = key.toLowerCase();
+
+            if (knownIdentifiers.containsKey(lowerKey)) {
+
+                var err = String.format(
+                        "[%s] is already defined in [%s]",
+                        key,  knownIdentifiers.get(lowerKey));
+
+                return ctx.error(err);
+            }
+
+            knownIdentifiers.put(lowerKey, fieldName);
+
+            return ctx;
+        };
     }
 
 }

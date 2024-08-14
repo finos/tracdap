@@ -24,6 +24,8 @@ import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.validation.core.ValidationContext;
 import org.finos.tracdap.common.validation.core.ValidationFunction;
 import org.finos.tracdap.common.validation.core.ValidationType;
+import org.finos.tracdap.common.metadata.MetadataBundle;
+import org.finos.tracdap.config.PlatformConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -45,16 +47,31 @@ public class ValidationContextImpl implements ValidationContext {
     private final ValidationContextImpl priorCtx;
     private final List<ValidationFailure> failures;
 
+    private final MetadataBundle metadata;
+    private final PlatformConfig resources;
 
-    private ValidationContextImpl(ValidationType validationType, ValidationLocation root, ValidationContextImpl priorCtx) {
+
+    private ValidationContextImpl(
+            ValidationType validationType, ValidationLocation root, ValidationContextImpl priorCtx,
+            MetadataBundle metadata, PlatformConfig resources) {
 
         this.validationType = validationType;
         this.location = new Stack<>();
         this.location.push(root);
 
         this.priorCtx = priorCtx;
+        this.metadata = metadata;
+        this.resources = resources;
 
         this.failures = new ArrayList<>();
+    }
+
+    private ValidationContextImpl(
+            ValidationType validationType,
+            ValidationLocation root,
+            ValidationContextImpl priorCtx) {
+
+        this(validationType, root, priorCtx, null, null);
     }
 
     public static ValidationContext forMethod(Message msg, Descriptors.MethodDescriptor method) {
@@ -75,6 +92,22 @@ public class ValidationContextImpl implements ValidationContext {
         var priorRoot = new ValidationLocation(null, prior, null, null);
         var priorCtx = new ValidationContextImpl(ValidationType.VERSION, priorRoot, null);
         return new ValidationContextImpl(ValidationType.VERSION, currentRoot, priorCtx);
+    }
+
+    public static ValidationContext forConsistency(Message msg, MetadataBundle metadata, PlatformConfig resources) {
+
+        var root = new ValidationLocation(null, msg, null, null);
+        return new ValidationContextImpl(ValidationType.CONSISTENCY, root, null, metadata, resources);
+    }
+
+    @Override
+    public MetadataBundle getMetadataBundle() {
+        return this.metadata;
+    }
+
+    @Override
+    public PlatformConfig getResources() {
+        return this.resources;
     }
 
     @Override
@@ -235,7 +268,7 @@ public class ValidationContextImpl implements ValidationContext {
         return pushMapEntry(key, false, false);
     }
 
-    private ValidationContext pushMapEntry(Object key, boolean pushKey, boolean keyAlreadySeen) {
+    private ValidationContext pushMapEntry(Object key, boolean pushKey, boolean allowIfMissing) {
 
         var methodName = pushKey ? "[pushMapKey]" : "[pushMapValue]";
 
@@ -255,7 +288,7 @@ public class ValidationContextImpl implements ValidationContext {
             // For version validators, allow pushing keys that exist in either the current or prior map
             // For the current ctx, if the key is not present we need to check the prior ctx
             // For the prior ctx, we allow the key if it was already seen in the current ctx
-            if (priorCtx == null && !keyAlreadySeen)
+            if (priorCtx == null && !allowIfMissing)
                 throw new ETracInternal(methodName + " attempted to push a key that is not in the map");
         }
 
@@ -643,7 +676,7 @@ public class ValidationContextImpl implements ValidationContext {
     @Override public <U> ValidationContext
     applyMapKeys(ValidationFunction.TypedArg<String, U> validator, U arg) {
 
-        return applyMap(validator, String.class, arg, true);
+        return applyMap(validator, String.class, (_x) -> arg, true);
     }
 
     @Override public ValidationContext
@@ -661,11 +694,17 @@ public class ValidationContextImpl implements ValidationContext {
     @Override public <T, U> ValidationContext
     applyMapValues(ValidationFunction.TypedArg<T, U> validator, Class<T> targetClass, U arg) {
 
-        return applyMap(validator, targetClass, arg, false);
+        return applyMap(validator, targetClass, (_x) -> arg, false);
+    }
+
+    @Override public <T, U> ValidationContext
+    applyMapValuesFunc(ValidationFunction.TypedArg<T, U> validator, Class<T> targetClass, Function<String, U> argFunc) {
+
+        return applyMap(validator, targetClass, argFunc, false);
     }
 
     private <T, U> ValidationContext
-    applyMap(ValidationFunction.TypedArg<T, U> validator, Class<T> targetClass, U arg, boolean pushKey) {
+    applyMap(ValidationFunction.TypedArg<T, U> validator, Class<T> targetClass, Function<String, U> argFunc, boolean pushKey) {
 
         var funcName = pushKey ? "[applyMapKeys]" : "[applyMapValues]";
 
@@ -683,23 +722,36 @@ public class ValidationContextImpl implements ValidationContext {
 
             var map = (Map<?, ?>) loc.target();
 
-            for (var key : map.keySet())
+            for (var key : map.keySet()) {
+
+                var arg = argFunc != null ? argFunc.apply(key.toString()) : (U) null;
 
                 resultCtx = (ValidationContextImpl) resultCtx
                         .pushMapEntry(key, pushKey, false)
                         .apply(validator, targetClass, arg)
                         .pop();
+            }
         }
         else {
 
             var mapSize = loc.parent().msg().getRepeatedFieldCount(loc.field());
 
-            for (var i = 0; i < mapSize; i++)
+            for (var i = 0; i < mapSize; i++) {
+
+                U arg = null;
+
+                if (argFunc != null) {
+                    var map = (List<?>) loc.target();
+                    var entry = (MapEntry<?, ?>) map.get(i);
+                    var key = entry.getKey();
+                    arg = argFunc.apply(key.toString());
+                }
 
                 resultCtx = (ValidationContextImpl) resultCtx
                         .pushMapEntry(i, pushKey)
                         .apply(validator, targetClass, arg)
                         .pop();
+            }
         }
 
         return resultCtx;

@@ -16,6 +16,8 @@
 
 package org.finos.tracdap.svc.orch.service;
 
+import io.grpc.Status;
+import io.grpc.StatusRuntimeException;
 import org.finos.tracdap.api.JobRequest;
 import org.finos.tracdap.api.JobStatus;
 import org.finos.tracdap.api.MetadataWriteRequest;
@@ -30,7 +32,9 @@ import org.finos.tracdap.common.exec.*;
 import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.metadata.MetadataUtil;
 import org.finos.tracdap.common.validation.Validator;
+import org.finos.tracdap.common.metadata.MetadataBundle;
 import org.finos.tracdap.config.JobResult;
+import org.finos.tracdap.config.PlatformConfig;
 import org.finos.tracdap.metadata.JobStatusCode;
 
 import org.finos.tracdap.metadata.ObjectType;
@@ -58,6 +62,7 @@ public class JobProcessor {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
+    private final PlatformConfig platformConfig;
     private final TrustedMetadataApiBlockingStub metaClient;
     private final InternalAuthProvider internalAuth;
     private final IBatchExecutor<?> executor;
@@ -68,15 +73,17 @@ public class JobProcessor {
 
 
     public JobProcessor(
+            PlatformConfig platformConfig,
             TrustedMetadataApiBlockingStub metaClient,
             InternalAuthProvider internalAuth,
-            IBatchExecutor<?> executor,
-            JobProcessorHelpers lifecycle) {
+            IBatchExecutor<?> executor) {
 
+        this.platformConfig = platformConfig;
         this.metaClient = metaClient;
         this.internalAuth = internalAuth;
         this.executor = executor;
-        this.lifecycle = lifecycle;
+
+        this.lifecycle = new JobProcessorHelpers(platformConfig, metaClient);
     }
 
     public JobState newJob(JobRequest request) {
@@ -124,29 +131,52 @@ public class JobProcessor {
 
         var newState = jobState.clone();
 
-        // Credentials are not serialized in the cache
-        newState.credentials = internalAuth.createDelegateSession(jobState.owner, DELEGATE_SESSION_TIMEOUT);
+        try {
 
-        newState = lifecycle.applyTransform(newState);
-        newState = lifecycle.loadResources(newState);
-        newState = lifecycle.allocateResultIds(newState);
-        newState = lifecycle.buildJobConfig(newState);
+            // Credentials are not serialized in the cache, they need to be regenerated
+            newState.credentials = internalAuth.createDelegateSession(jobState.owner, DELEGATE_SESSION_TIMEOUT);
 
-        // static validate
-        // semantic validate
+            // Load in all the resources referenced by the job
+            newState = lifecycle.loadResources(newState);
 
-        newState.tracStatus = JobStatusCode.VALIDATED;
+            // Semantic validation (job consistency)
+            var metadata = new MetadataBundle(newState.resources, newState.resourceMapping);
+            validator.validateConsistency(newState.definition, metadata, platformConfig);
 
-        return newState;
+            newState.tracStatus = JobStatusCode.VALIDATED;
+
+            return newState;
+        }
+        catch (StatusRuntimeException e) {
+
+            // Special handling for NOT_FOUND errors while querying the metadata service
+            // Treat these as consistency validation errors
+            // A better solution would be to allow partial response for batch load and pass to the validator
+            if (e.getStatus().getCode() == Status.Code.NOT_FOUND)
+                throw new EConsistencyValidation("One or more items used in this job could not be found");
+
+            throw e;
+        }
     }
 
     public JobState saveInitialMetadata(JobState jobState) {
 
         var newState = jobState.clone();
 
-        // Credentials are not serialized in the cache
+        // Credentials are not serialized in the cache, they need to be regenerated
         newState.credentials = internalAuth.createDelegateSession(jobState.owner, DELEGATE_SESSION_TIMEOUT);
 
+        // Apply any transformations specific to the job type
+        newState = lifecycle.applyTransform(newState);
+
+        // Result IDs are needed in order to generate the job instruction
+        // They are also updated in the job definition that is being created
+        newState = lifecycle.allocateResultIds(newState);
+
+        // Create the job instruction - this is what will go to the executor
+        newState = lifecycle.buildJobConfig(newState);
+
+        // The job definition is ready - write it to the metadata store
         newState = lifecycle.saveInitialMetadata(newState);
 
         newState.tracStatus = JobStatusCode.QUEUED;
@@ -168,7 +198,7 @@ public class JobProcessor {
 
         var newState = jobState.clone();
 
-        // Credentials are not serialized in the cache
+        // Credentials are not serialized in the cache, they need to be regenerated
         newState.credentials = internalAuth.createDelegateSession(jobState.owner, DELEGATE_SESSION_TIMEOUT);
 
         var writeRequest = MetadataWriteRequest.newBuilder()
@@ -381,7 +411,7 @@ public class JobProcessor {
 
         var newState = jobState.clone();
 
-        // Credentials are not serialized in the cache
+        // Credentials are not serialized in the cache, they need to be regenerated
         newState.credentials = internalAuth.createDelegateSession(jobState.owner, DELEGATE_SESSION_TIMEOUT);
 
         // TRAC job status must already be set before calling lifecycle
@@ -441,7 +471,7 @@ public class JobProcessor {
         newState.statusMessage = errorMessage;
         newState.exception = exception;
 
-        // Credentials are not serialized in the cache
+        // Credentials are not serialized in the cache, they need to be regenerated
         newState.credentials = internalAuth.createDelegateSession(jobState.owner, DELEGATE_SESSION_TIMEOUT);
 
         lifecycle.processJobResult(newState);

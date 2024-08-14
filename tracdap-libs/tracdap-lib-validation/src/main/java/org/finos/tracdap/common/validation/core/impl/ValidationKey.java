@@ -51,6 +51,11 @@ public class ValidationKey implements Comparable<ValidationKey> {
         return new ValidationKey(ValidationType.VERSION, messageType, null);
     }
 
+    public static ValidationKey forConsistency(Descriptors.Descriptor messageType) {
+
+        return new ValidationKey(ValidationType.CONSISTENCY, messageType, null);
+    }
+
     public ValidationKey(
             ValidationType validationType,
             Descriptors.Descriptor messageType,

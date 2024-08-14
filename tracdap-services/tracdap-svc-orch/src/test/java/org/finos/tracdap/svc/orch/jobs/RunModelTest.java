@@ -59,6 +59,7 @@ public class RunModelTest {
     @RegisterExtension
     public static final PlatformTest platform = PlatformTest.forConfig(E2E_CONFIG)
             .addTenant(TEST_TENANT)
+            .prepareLocalExecutor(true)
             .startAll()
             .build();
 
