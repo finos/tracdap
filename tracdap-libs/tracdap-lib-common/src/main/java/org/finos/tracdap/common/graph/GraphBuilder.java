@@ -214,7 +214,7 @@ public class GraphBuilder {
         var missing = missingDependencies(dependencies, flowNode);
         for (var dependency : missing) {
             var socketName = dependency.equals(SINGLE_INPUT) ? nodeId.name() : nodeId.name() + "." + dependency;
-            errorHandler.error(nodeId, String.format("Target [%s] is supplied by multiple edges", socketName));
+            errorHandler.error(nodeId, String.format("Target [%s] is not supplied by any edge", socketName));
         }
 
         switch (flowNode.getNodeType()) {
