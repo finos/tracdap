@@ -79,7 +79,6 @@ class TracContextImpl(_api.TracContext):
             self.__data,
             checkout_directory)
 
-
     def get_parameter(self, parameter_name: str) -> tp.Any:
 
         _val.validate_signature(self.get_parameter, parameter_name)
@@ -91,6 +90,31 @@ class TracContextImpl(_api.TracContext):
         value: _meta.Value = self.__parameters[parameter_name]  # noqa
 
         return _types.MetadataCodec.decode_value(value)
+
+    def has_dataset(self, dataset_name: str) -> bool:
+
+        _val.validate_signature(self.has_dataset, dataset_name)
+
+        part_key = _data.DataPartKey.for_root()
+
+        self.__val.check_dataset_name_not_null(dataset_name)
+        self.__val.check_dataset_valid_identifier(dataset_name)
+
+        data_view = self.__data.get(dataset_name)
+
+        if data_view is None:
+            return False
+
+        # If the item exists but is not a dataset, that is still a runtime error
+        # E.g. if this method is called for FILE inputs
+        self.__val.check_context_item_is_dataset(dataset_name)
+
+        part = data_view.parts.get(part_key)
+
+        if part is None or len(part) == 0:
+            return False
+
+        return True
 
     def get_schema(self, dataset_name: str) -> _meta.SchemaDefinition:
 

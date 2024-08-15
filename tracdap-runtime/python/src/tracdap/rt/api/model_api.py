@@ -73,6 +73,28 @@ class TracContext:
         pass
 
     @_abc.abstractmethod
+    def has_dataset(self, dataset_name: str) -> bool:
+
+        """
+        Check whether a dataset is available in the current context
+
+        This method can be used to check whether optional model inputs have been supplied or not.
+        Models should use this method before calling get methods on optional inputs.
+        For inputs not marked as optional, this method will always return true. For outputs,
+        this method will return true after the model calls a put method for the dataset.
+
+        A runtime validation error will be raised if the dataset name is not defined
+        as a model input or output.
+
+        :param dataset_name: The name of the dataset to check
+        :return: True if the dataset exists in the current context, False otherwise
+        :rtype: bool
+        :raises: :py:class:`ERuntimeValidation <tracdap.rt.exceptions.ERuntimeValidation>`
+        """
+
+        pass
+
+    @_abc.abstractmethod
     def get_schema(self, dataset_name: str) -> SchemaDefinition:
 
         """
