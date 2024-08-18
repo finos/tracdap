@@ -713,6 +713,49 @@ public class GraphBuilder {
         return null;
     }
 
+    public FlowDefinition exportFlow(GraphSection<NodeMetadata> graph) {
+
+        var flow = FlowDefinition.newBuilder();
+
+        for (var node : graph.nodes().values()) {
+
+            var nodeName = node.nodeId().name();
+            var metadata = node.payload();
+            var flowNode = metadata.flowNode();
+
+            flow.putNodes(nodeName, flowNode);
+
+            for (var dependency : node.dependencies().entrySet()) {
+
+                var sourceId = dependency.getValue();
+                var source = FlowSocket.newBuilder()
+                        .setNode(sourceId.nodeId().name())
+                        .setSocket(sourceId.socket());
+
+                var target = FlowSocket.newBuilder()
+                        .setNode(nodeName)
+                        .setSocket(dependency.getKey());
+
+                var edge = FlowEdge.newBuilder()
+                        .setSource(source)
+                        .setTarget(target);
+
+                flow.addEdges(edge);
+            }
+
+            if (flowNode.getNodeType() == FlowNodeType.PARAMETER_NODE && metadata.modelParameter() != null)
+                flow.putParameters(nodeName, metadata.modelParameter());
+
+            if (flowNode.getNodeType() == FlowNodeType.INPUT_NODE && metadata.modelInputSchema() != null)
+                flow.putInputs(nodeName, metadata.modelInputSchema());
+
+            if (flowNode.getNodeType() == FlowNodeType.OUTPUT_NODE && metadata.modelOutputSchema() != null)
+                flow.putOutputs(nodeName, metadata.modelOutputSchema());
+        }
+
+        return flow.build();
+    }
+
     private static class DefaultErrorHandler implements ErrorHandler {
 
         @Override
