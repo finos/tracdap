@@ -31,6 +31,7 @@ import org.finos.tracdap.metadata.*;
 import com.google.protobuf.Descriptors;
 
 import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static org.finos.tracdap.common.validation.core.ValidatorUtils.field;
@@ -244,15 +245,31 @@ public class JobConsistencyValidator {
                 .collect(Collectors.toMap(n -> n.nodeId().name(), n -> n));
 
         return alignedMapValidation(
-                "input", JobConsistencyValidator::inputMatchesSchema, false,
+                "input", JobConsistencyValidator::inputMatchesSchema,
+                JobConsistencyValidator::allowOptionalFlowInputs,
                 inputSelectors, inputNodes, ctx);
+    }
+
+    private static boolean allowOptionalFlowInputs(Node<NodeMetadata> node) {
+
+        var inputSchema = node.payload().modelInputSchema();
+
+        // Allow missing inputs if there is an input schema with the optional flag set to true
+        return inputSchema != null && inputSchema.getOptional();
     }
 
     private static ValidationContext runModelInputs(Map<String, TagSelector> inputSelectors, Map<String, ModelInputSchema> requiredInputs, ValidationContext ctx) {
 
         return alignedMapValidation(
-                "input", JobConsistencyValidator::inputMatchesSchema, false,
+                "input", JobConsistencyValidator::inputMatchesSchema,
+                JobConsistencyValidator::allowOptionalModelInputs,
                 inputSelectors, requiredInputs, ctx);
+    }
+
+    private static boolean allowOptionalModelInputs(ModelInputSchema inputSchema) {
+
+        // Allow missing inputs if there is an input schema with the optional flag set to true
+        return inputSchema != null && inputSchema.getOptional();
     }
 
     private static ValidationContext runFlowPriorOutputs(Map<String, TagSelector> priorOutputSelectors, GraphSection<NodeMetadata> graph, ValidationContext ctx) {
@@ -728,6 +745,21 @@ public class JobConsistencyValidator {
             Map<String, T> providedValues, Map<String, U> requiredValues,
             ValidationContext ctx) {
 
+        if (allowMissing)
+            return alignedMapValidation(
+                    itemType, validatorFunc, null,
+                    providedValues, requiredValues, ctx);
+        else
+            return alignedMapValidation(
+                    itemType, validatorFunc, x -> false,
+                    providedValues, requiredValues, ctx);
+    }
+
+    private static <T, U> ValidationContext alignedMapValidation(
+            String itemType, AlignedMapValidator<T, U> validatorFunc, Function<U, Boolean> allowMissingFunc,
+            Map<String, T> providedValues, Map<String, U> requiredValues,
+            ValidationContext ctx) {
+
         for (var provided : providedValues.entrySet()) {
 
             var itemKey = provided.getKey();
@@ -750,10 +782,14 @@ public class JobConsistencyValidator {
             ctx = ctx.pop();
         }
 
-        if (!allowMissing) {
+        if (allowMissingFunc != null) {
             for (var requiredKey : requiredValues.keySet()) {
-                if (!providedValues.containsKey(requiredKey))
-                    ctx = ctx.error(String.format("Missing required %s [%s]", itemType, requiredKey));
+                if (!providedValues.containsKey(requiredKey)) {
+                    var requiredValue = requiredValues.get(requiredKey);
+                    var allowMissing = allowMissingFunc.apply(requiredValue);
+                    if (!allowMissing)
+                        ctx = ctx.error(String.format("Missing required %s [%s]", itemType, requiredKey));
+                }
             }
         }
 
