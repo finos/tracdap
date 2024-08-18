@@ -621,6 +621,10 @@ public class GraphBuilder {
 
     private ModelInputSchema.Builder combineInputSchema(NodeId nodeId, ModelInputSchema.Builder modelInput, ModelInputSchema nextModelInput) {
 
+        // Combining optional and non-optional inputs is allowed, the result is non-optional
+        if (!nextModelInput.getOptional())
+            modelInput.setOptional(false);
+
         var schema = modelInput.getSchema();
         var nextSchema = nextModelInput.getSchema();
 
