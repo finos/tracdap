@@ -31,6 +31,8 @@ public interface IJobLogic {
 
     JobDefinition applyTransform(JobDefinition job, MetadataBundle metadata, PlatformConfig platformConfig);
 
+    MetadataBundle applyMetadataTransform(JobDefinition job, MetadataBundle metadata, PlatformConfig platformConfig);
+
     List<TagSelector> requiredMetadata(JobDefinition job);
 
     List<TagSelector> requiredMetadata(Map<String, ObjectDefinition> newResources);

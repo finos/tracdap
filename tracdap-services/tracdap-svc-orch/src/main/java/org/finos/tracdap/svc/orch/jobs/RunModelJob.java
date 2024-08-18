@@ -40,6 +40,11 @@ public class RunModelJob extends RunModelOrFlow implements IJobLogic {
     }
 
     @Override
+    public MetadataBundle applyMetadataTransform(JobDefinition job, MetadataBundle metadata, PlatformConfig platformConfig) {
+        return metadata;
+    }
+
+    @Override
     public List<TagSelector> requiredMetadata(JobDefinition job) {
 
         if (job.getJobType() != JobType.RUN_MODEL)
