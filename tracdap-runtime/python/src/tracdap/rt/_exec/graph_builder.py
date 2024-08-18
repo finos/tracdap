@@ -488,7 +488,7 @@ class GraphBuilder:
 
         # https://en.wikipedia.org/wiki/Topological_sorting#Kahn's_algorithm
 
-        remaining_nodes = copy.copy(flow_def.nodes)
+        # Group edges by source and target node
         remaining_edges_by_target = {edge.target.node: [] for edge in flow_def.edges}
         remaining_edges_by_source = {edge.source.node: [] for edge in flow_def.edges}
 
@@ -496,15 +496,13 @@ class GraphBuilder:
             remaining_edges_by_target[edge.target.node].append(edge)
             remaining_edges_by_source[edge.source.node].append(edge)
 
-        reachable_nodes = dict()
-
-        # Initial set of reachable flow nodes is just the input nodes
-        for node_name, node in list(remaining_nodes.items()):
-            if node.nodeType == meta.FlowNodeType.INPUT_NODE:
-                reachable_nodes[node_name] = node
-                del remaining_nodes[node_name]
-
+        # Group edges by target socket (only one edge per target in a consistent flow)
         target_edges = {socket_key(edge.target): edge for edge in flow_def.edges}
+
+        # Initially parameters and inputs are reachable, everything else is not
+        def is_input(n): return n[1].nodeType in [meta.FlowNodeType.PARAMETER_NODE, meta.FlowNodeType.INPUT_NODE]
+        reachable_nodes = dict(filter(is_input, flow_def.nodes.items()))
+        remaining_nodes = dict(filter(lambda n: not is_input(n), flow_def.nodes.items()))
 
         # Initial graph section for the flow is empty
         graph_section = GraphSection({}, must_run=explicit_deps)
@@ -559,9 +557,15 @@ class GraphBuilder:
             return NodeId(socket_name, namespace, result_type)
 
         def edge_mapping(node_: str, socket_: str = None, result_type=None):
-            socket = meta.FlowSocket(node_, socket_)
-            edge = target_edges.get(socket_key(socket))  # todo: inconsistent if missing
+            socket = socket_key(meta.FlowSocket(node_, socket_))
+            edge = target_edges.get(socket)
+            # Report missing edges as a job consistency error (this might happen sometimes in dev mode)
+            if edge is None:
+                raise _ex.EJobValidation(f"Inconsistent flow: Socket [{socket}] is not connected")
             return socket_id(edge.source.node, edge.source.socket, result_type)
+
+        if node.nodeType == meta.FlowNodeType.PARAMETER_NODE:
+            return GraphSection({}, inputs={NodeId(node_name, namespace, result_type=meta.Value)})
 
         if node.nodeType == meta.FlowNodeType.INPUT_NODE:
             return GraphSection({}, inputs={NodeId(node_name, namespace, result_type=_data.DataView)})
@@ -573,32 +577,46 @@ class GraphBuilder:
 
         if node.nodeType == meta.FlowNodeType.MODEL_NODE:
 
+            param_mapping = {socket: edge_mapping(node_name, socket, meta.Value) for socket in node.parameters}
+            input_mapping = {socket: edge_mapping(node_name, socket, _data.DataView) for socket in node.inputs}
+            output_mapping = {socket: socket_id(node_name, socket, _data.DataView) for socket in node.outputs}
+
+            push_mapping = {**input_mapping, **param_mapping}
+            pop_mapping = output_mapping
+
             model_selector = flow_job.models.get(node_name)
             model_obj = _util.get_job_resource(model_selector, job_config)
 
-            # TODO: Whether to use flow node or model_obj to build the push mapping?
+            # Missing models in the job config is a job consistency error
+            if model_obj is None or model_obj.objectType != meta.ObjectType.MODEL:
+                raise _ex.EJobValidation(f"No model was provided for flow node [{node_name}]")
 
-            input_mapping_ = {
-                input_name: edge_mapping(node_name, input_name, _data.DataView)
-                for input_name in model_obj.model.inputs
-            }
-
-            param_mapping_ = {
-                param_name: NodeId(param_name, namespace, meta.Value)
-                for param_name in model_obj.model.parameters
-            }
-
-            push_mapping = {**input_mapping_, **param_mapping_}
-
-            pop_mapping = {
-                output_: NodeId(f"{node_name}.{output_}", namespace, _data.DataView)
-                for output_ in model_obj.model.outputs}
+            # Explicit check for model compatibility - report an error now, do not try build_model()
+            cls.check_model_compatibility(model_selector, model_obj.model, node_name, node)
 
             return cls.build_model_or_flow_with_context(
                 job_config, namespace, node_name, model_obj,
                 push_mapping, pop_mapping, explicit_deps)
 
-        raise _ex.ETracInternal()  # TODO: Invalid node type
+        # Invalid / unknown node type
+        raise _ex.EValidationGap(f"Flow node [{node_name}] has invalid node type [{node.nodeType}]")
+
+    @classmethod
+    def check_model_compatibility(
+            cls, model_selector: meta.TagSelector, model_def: meta.ModelDefinition,
+            node_name: str, flow_node: meta.FlowNode):
+
+        model_params = list(sorted(model_def.parameters.keys()))
+        model_inputs = list(sorted(model_def.inputs.keys()))
+        model_outputs = list(sorted(model_def.outputs.keys()))
+
+        node_params = list(sorted(flow_node.parameters))
+        node_inputs = list(sorted(flow_node.inputs))
+        node_outputs = list(sorted(flow_node.outputs))
+
+        if model_params != node_params or model_inputs != node_inputs or model_outputs != node_outputs:
+            model_key = _util.object_key(model_selector)
+            raise _ex.EJobValidation(f"Incompatible model for flow node [{node_name}] (Model: [{model_key}])")
 
     @staticmethod
     def build_context_push(
