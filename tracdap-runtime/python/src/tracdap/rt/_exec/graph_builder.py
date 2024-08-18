@@ -598,8 +598,8 @@ class GraphBuilder:
                 job_config, namespace, node_name, model_obj,
                 push_mapping, pop_mapping, explicit_deps)
 
-        # Invalid / unknown node type
-        raise _ex.EValidationGap(f"Flow node [{node_name}] has invalid node type [{node.nodeType}]")
+        # Missing / invalid node type - should be caught in static validation
+        raise _ex.ETracInternal(f"Flow node [{node_name}] has invalid node type [{node.nodeType}]")
 
     @classmethod
     def check_model_compatibility(
