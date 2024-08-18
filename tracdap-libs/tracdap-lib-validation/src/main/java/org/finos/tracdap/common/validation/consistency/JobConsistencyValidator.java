@@ -378,8 +378,13 @@ public class JobConsistencyValidator {
         var inputObject = ctx.getMetadataBundle().getResource(inputSelector);
 
         if (inputObject == null) {
+
+            // It is fine if an optional input is not supplied
+            if (requiredSchema.getOptional())
+                return ctx;
+
             return ctx.error(String.format(
-                    "Metadata is not available for input [%s] (%s)",
+                    "Metadata is not available for required input [%s] (%s)",
                     inputName, MetadataUtil.objectKey(inputSelector)));
         }
 
@@ -399,11 +404,17 @@ public class JobConsistencyValidator {
     // Input comes from upstream node
     private static ValidationContext inputMatchesSchema(String inputName, ModelInputSchema inputSchema, ModelInputSchema requiredSchema, ValidationContext ctx) {
 
+        if (inputSchema.getOptional() && !requiredSchema.getOptional())
+            ctx.error("Required model input [" + inputName + "] is connected to an optional input");
+
         return checkDataSchema(inputSchema.getSchema(), requiredSchema.getSchema(), ctx);
     }
 
     // Input comes from upstream node
     private static ValidationContext inputMatchesSchema(String inputName, ModelOutputSchema outputSchema, ModelInputSchema requiredSchema, ValidationContext ctx) {
+
+        if (outputSchema.getOptional() && !requiredSchema.getOptional())
+            ctx.error("Required model input [" + inputName + "] is connected to an optional model output");
 
         return checkDataSchema(outputSchema.getSchema(), requiredSchema.getSchema(), ctx);
     }
@@ -423,6 +434,11 @@ public class JobConsistencyValidator {
         var outputObject = ctx.getMetadataBundle().getResource(outputSelector);
 
         if (outputObject == null) {
+
+            // It is fine if an optional output is not supplied
+            if (requiredSchema.getOptional())
+                return ctx;
+
             return ctx.error(String.format(
                     "Metadata is not available for output [%s] (%s)",
                     outputName, MetadataUtil.objectKey(outputSelector)));
@@ -444,11 +460,17 @@ public class JobConsistencyValidator {
     // Output comes from upstream node
     private static ValidationContext outputMatchesSchema(String outputName, ModelInputSchema inputSchema, ModelOutputSchema requiredSchema, ValidationContext ctx) {
 
+        if (inputSchema.getOptional() && !requiredSchema.getOptional())
+            ctx.error("Required output [" + outputName + "] is connected to an optional input");
+
         return checkDataSchema(inputSchema.getSchema(), requiredSchema.getSchema(), ctx);
     }
 
     // Output comes from upstream node
     private static ValidationContext outputMatchesSchema(String outputName, ModelOutputSchema outputSchema, ModelOutputSchema requiredSchema, ValidationContext ctx) {
+
+        if (outputSchema.getOptional() && !requiredSchema.getOptional())
+            ctx.error("Required output [" + outputName + "] is connected to an optional model output");
 
         return checkDataSchema(outputSchema.getSchema(), requiredSchema.getSchema(), ctx);
     }
