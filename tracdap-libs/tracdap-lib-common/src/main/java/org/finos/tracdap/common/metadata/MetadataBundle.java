@@ -16,12 +16,14 @@
 
 package org.finos.tracdap.common.metadata;
 
+import org.finos.tracdap.common.exception.ETracInternal;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.metadata.ObjectDefinition;
 import org.finos.tracdap.metadata.ObjectType;
 import org.finos.tracdap.metadata.TagHeader;
 import org.finos.tracdap.metadata.TagSelector;
 
+import java.util.HashMap;
 import java.util.Map;
 
 
@@ -42,6 +44,14 @@ public class MetadataBundle {
         this.resourceMapping = resourceMapping;
     }
 
+    public Map<String, ObjectDefinition> getResources() {
+        return resources;
+    }
+
+    public Map<String, TagHeader> getResourceMapping() {
+        return resourceMapping;
+    }
+
     public ObjectDefinition getResource(TagSelector selector) {
 
         var selectorKey = MetadataUtil.objectKey(selector);
@@ -58,5 +68,34 @@ public class MetadataBundle {
             throw new EUnexpected();
 
         return object;
+    }
+
+    public MetadataBundle withUpdate(TagSelector selector, ObjectDefinition newObject) {
+
+        var selectorKey = MetadataUtil.objectKey(selector);
+        var updates = Map.of(selectorKey, newObject);
+
+        return this.withUpdates(updates);
+    }
+
+    public MetadataBundle withUpdates(Map<String, ObjectDefinition> updates) {
+
+        var newResources = new HashMap<>(resources);
+
+        for (var update : updates.entrySet()) {
+
+            // Selector mappings are optional, fall back on using the selector key
+            var objectId = resourceMapping.getOrDefault(update.getKey(), NO_MAPPING);
+            var objectKey = objectId == NO_MAPPING
+                    ? update.getKey()
+                    : MetadataUtil.objectKey(objectId);
+
+            if (!resources.containsKey(objectKey))
+                throw new ETracInternal("Attempt to update unknown object: [" + objectKey + "]");
+
+            newResources.put(objectKey, update.getValue());
+        }
+
+        return new MetadataBundle(newResources, resourceMapping);
     }
 }
