@@ -334,10 +334,8 @@ class DevModeTranslator:
         flow_raw_data = flow_parser.load_raw_config(flow_path, flow_path.name)
         flow_def = flow_parser.parse(flow_raw_data, flow_path.name)
 
-        flow_def = cls._autowire_flow(flow_def)
-        flow_def = cls._generate_flow_parameters(flow_def, job_config)
-        flow_def = cls._generate_flow_inputs(flow_def, job_config)
-        flow_def = cls._generate_flow_outputs(flow_def, job_config)
+        flow_def = cls._autowire_flow(flow_def, job_config)
+        flow_def = cls._apply_type_inference(flow_def, job_config)
 
         flow_object = _meta.ObjectDefinition(
             objectType=_meta.ObjectType.FLOW,
@@ -346,16 +344,23 @@ class DevModeTranslator:
         return flow_id, flow_object
 
     @classmethod
-    def _autowire_flow(cls, flow: _meta.FlowDefinition):
+    def _autowire_flow(cls, flow: _meta.FlowDefinition, job_config: _cfg.JobConfig):
+
+        job = job_config.job.runFlow
+        nodes = copy.copy(flow.nodes)
+        edges: tp.Dict[str, _meta.FlowEdge] = dict()
 
         sources: tp.Dict[str, _meta.FlowSocket] = dict()
         duplicates: tp.Dict[str, tp.List[_meta.FlowSocket]] = dict()
-
-        edges: tp.Dict[str, _meta.FlowEdge] = dict()
         errors: tp.Dict[str, str] = dict()
 
         def socket_key(socket: _meta.FlowSocket):
             return f"{socket.node}.{socket.socket}" if socket.socket else socket.node
+
+        # Before starting, add any edges defined explicitly in the flow
+        # These take precedence over auto-wired edges
+        for edge in flow.edges:
+            edges[socket_key(edge.target)] = edge
 
         def add_source(name: str, socket: _meta.FlowSocket):
             if name in duplicates:
@@ -365,6 +370,14 @@ class DevModeTranslator:
                 del sources[name]
             else:
                 sources[name] = socket
+
+        def add_param_to_flow(nodel_node: str, param: str):
+            target = f"{nodel_node}.{param}"
+            if target not in edges and param not in nodes:
+                param_node = _meta.FlowNode(_meta.FlowNodeType.PARAMETER_NODE)
+                nodes[param] = param_node
+                socket = _meta.FlowSocket(param)
+                add_source(param, socket)
 
         def add_edge(target: _meta.FlowSocket):
             target_key = socket_key(target)
@@ -380,23 +393,29 @@ class DevModeTranslator:
                 errors[target_key] = f"Flow target {target_name} is not provided by any node"
 
         for node_name, node in flow.nodes.items():
-            if node.nodeType == _meta.FlowNodeType.INPUT_NODE:
+            if node.nodeType == _meta.FlowNodeType.INPUT_NODE or node.nodeType == _meta.FlowNodeType.PARAMETER_NODE:
                 add_source(node_name, _meta.FlowSocket(node_name))
             if node.nodeType == _meta.FlowNodeType.MODEL_NODE:
                 for model_output in node.outputs:
                     add_source(model_output, _meta.FlowSocket(node_name, model_output))
+                # Generate node param sockets needed by the model
+                if node_name in job.models:
+                    model_selector = job.models[node_name]
+                    model_obj = _util.get_job_resource(model_selector, job_config)
+                    for param_name in model_obj.model.parameters:
+                        add_param_to_flow(node_name, param_name)
+                        if param_name not in node.parameters:
+                            node.parameters.append(param_name)
 
-        # Include any edges defined explicitly in the flow
-        # These take precedence over auto-wired edges
-        for edge in flow.edges:
-            edges[socket_key(edge.target)] = edge
-
-        for node_name, node in flow.nodes.items():
+        # Look at the new set of nodes, which includes any added by auto-wiring
+        for node_name, node in nodes.items():
             if node.nodeType == _meta.FlowNodeType.OUTPUT_NODE:
                 add_edge(_meta.FlowSocket(node_name))
             if node.nodeType == _meta.FlowNodeType.MODEL_NODE:
                 for model_input in node.inputs:
                     add_edge(_meta.FlowSocket(node_name, model_input))
+                for model_param in node.parameters:
+                    add_edge(_meta.FlowSocket(node_name, model_param))
 
         if any(errors):
 
@@ -408,140 +427,149 @@ class DevModeTranslator:
             raise _ex.EConfigParse(err)
 
         autowired_flow = copy.copy(flow)
+        autowired_flow.nodes = nodes
         autowired_flow.edges = list(edges.values())
 
         return autowired_flow
 
     @classmethod
-    def _generate_flow_parameters(cls, flow: _meta.FlowDefinition, job_config: _cfg.JobConfig) -> _meta.FlowDefinition:
+    def _apply_type_inference(cls, flow: _meta.FlowDefinition, job_config: _cfg.JobConfig) -> _meta.FlowDefinition:
 
-        params: tp.Dict[str, _meta.ModelParameter] = dict()
-
-        for node_name, node in flow.nodes.items():
-
-            if node.nodeType != _meta.FlowNodeType.MODEL_NODE:
-                continue
-
-            if node_name not in job_config.job.runFlow.models:
-                err = f"No model supplied for flow model node [{node_name}]"
-                cls._log.error(err)
-                raise _ex.EConfigParse(err)
-
-            model_selector = job_config.job.runFlow.models[node_name]
-            model_obj = _util.get_job_resource(model_selector, job_config)
-
-            for param_name, param in model_obj.model.parameters.items():
-
-                if param_name not in params:
-                    params[param_name] = param
-
-                else:
-                    existing_param = params[param_name]
-
-                    if param.paramType != existing_param.paramType:
-                        err = f"Model parameter [{param_name}] has different types in different models"
-                        cls._log.error(err)
-                        raise _ex.EConfigParse(err)
-
-                    if param.defaultValue != existing_param.defaultValue:
-                        if existing_param.defaultValue is None:
-                            params[param_name] = param
-                        elif param.defaultValue is not None:
-                            warn = f"Model parameter [{param_name}] has different default values in different models" \
-                                 + f" (using [{_types.MetadataCodec.decode_value(existing_param.defaultValue)}])"
-                            cls._log.warning(warn)
-
-        flow.parameters = params
-
-        return flow
-
-    @classmethod
-    def _generate_flow_inputs(cls, flow: _meta.FlowDefinition, job_config: _cfg.JobConfig) -> _meta.FlowDefinition:
-
-        inputs: tp.Dict[str, _meta.ModelInputSchema] = dict()
+        updated_flow = copy.copy(flow)
+        updated_flow.parameters = copy.copy(flow.parameters)
+        updated_flow.inputs = copy.copy(flow.inputs)
+        updated_flow.outputs = copy.copy(flow.outputs)
 
         def socket_key(socket):
             return f"{socket.node}.{socket.socket}" if socket.socket else socket.node
 
         # Build a map of edges by source socket, mapping to all edges flowing from that source
-        edges = {socket_key(edge.source): [] for edge in flow.edges}
+        edges_by_source = {socket_key(edge.source): [] for edge in flow.edges}
+        edges_by_target = {socket_key(edge.target): [] for edge in flow.edges}
         for edge in flow.edges:
-            edges[socket_key(edge.source)].append(edge)
+            edges_by_source[socket_key(edge.source)].append(edge.target)
+            edges_by_target[socket_key(edge.target)].append(edge.source)
 
         for node_name, node in flow.nodes.items():
 
-            if node.nodeType != _meta.FlowNodeType.INPUT_NODE:
-                continue
+            if node.nodeType == _meta.FlowNodeType.PARAMETER_NODE and node_name not in flow.parameters:
+                targets = edges_by_source.get(node_name) or []
+                model_parameter = cls._infer_parameter(node_name, targets, job_config)
+                updated_flow.parameters[node_name] = model_parameter
 
-            input_edges = edges.get(node_name)
+            if node.nodeType == _meta.FlowNodeType.INPUT_NODE and node_name not in flow.inputs:
+                targets = edges_by_source.get(node_name) or []
+                model_input = cls._infer_input_schema(node_name, targets, job_config)
+                updated_flow.inputs[node_name] = model_input
 
-            if not input_edges:
-                err = f"Flow input [{node_name}] is not connected, so the input schema cannot be inferred" \
-                    + f" (either remove the input or connect it to a model)"
-                cls._log.error(err)
-                raise _ex.EConfigParse(err)
+            if node.nodeType == _meta.FlowNodeType.OUTPUT_NODE and node_name not in flow.outputs:
+                sources = edges_by_target.get(node_name) or []
+                model_output = cls._infer_output_schema(node_name, sources, job_config)
+                updated_flow.outputs[node_name] = model_output
 
-            input_schemas = []
-
-            for edge in input_edges:
-
-                target_node = flow.nodes.get(edge.target.node) # or cls._report_error(cls._MISSING_FLOW_NODE, node_name)
-                # cls._require(target_node.nodeType == _meta.FlowNodeType.MODEL_NODE)
-
-                model_selector = job_config.job.runFlow.models.get(edge.target.node)
-                model_obj = _util.get_job_resource(model_selector, job_config)
-                model_input = model_obj.model.inputs[edge.target.socket]
-                input_schemas.append(model_input)
-
-            if len(input_schemas) == 1:
-                inputs[node_name] = input_schemas[0]
-            else:
-                first_schema = input_schemas[0]
-                if all(map(lambda s: s == first_schema, input_schemas[1:])):
-                    inputs[node_name] = first_schema
-                else:
-                    raise _ex.EJobValidation(f"Multiple models use input [{node_name}] but expect different schemas")
-
-        flow.inputs = inputs
-
-        return flow
+        return updated_flow
 
     @classmethod
-    def _generate_flow_outputs(cls, flow: _meta.FlowDefinition, job_config: _cfg.JobConfig) -> _meta.FlowDefinition:
+    def _infer_parameter(
+            cls, param_name: str, targets: tp.List[_meta.FlowSocket],
+            job_config: _cfg.JobConfig) -> _meta.ModelParameter:
 
-        outputs: tp.Dict[str, _meta.ModelOutputSchema] = dict()
+        model_params = []
 
-        def socket_key(socket):
-            return f"{socket.node}.{socket.socket}" if socket.socket else socket.node
+        for target in targets:
 
-        # Build a map of edges by target socket, there can only be one edge per target in a valid flow
-        edges = {socket_key(edge.target): edge for edge in flow.edges}
-
-        for node_name, node in flow.nodes.items():
-
-            if node.nodeType != _meta.FlowNodeType.OUTPUT_NODE:
-                continue
-
-            edge = edges.get(node_name)
-
-            if not edge:
-                err = f"Flow output [{node_name}] is not connected, so the output schema cannot be inferred" \
-                      + f" (either remove the output or connect it to a model)"
-                cls._log.error(err)
-                raise _ex.EConfigParse(err)
-
-            source_node = flow.nodes.get(edge.source.node) # or cls._report_error(cls._MISSING_FLOW_NODE, node_name)
-            # cls._require(target_node.nodeType == _meta.FlowNodeType.MODEL_NODE)
-
-            model_selector = job_config.job.runFlow.models.get(edge.source.node)
+            model_selector = job_config.job.runFlow.models.get(target.node)
             model_obj = _util.get_job_resource(model_selector, job_config)
-            model_output = model_obj.model.outputs[edge.source.socket]
+            model_param = model_obj.model.parameters.get(target.socket)
+            model_params.append(model_param)
 
-            outputs[node_name] = model_output
+        if len(model_params) == 0:
+            err = f"Flow parameter [{param_name}] is not connected to any models, type information cannot be inferred" \
+                  + f" (either remove the parameter or connect it to a model)"
+            cls._log.error(err)
+            raise _ex.EJobValidation(err)
 
-        flow.outputs = outputs
+        if len(model_params) == 1:
+            return model_params[0]
 
-        return flow
+        model_param = model_params[0]
+
+        for i in range(1, len(targets)):
+            next_param = model_params[i]
+            if next_param.paramType != model_param.paramType:
+                err = f"Parameter is ambiguous for [{param_name}]: " + \
+                      f"Types are different for [{cls._socket_key(targets[0])}] and [{cls._socket_key(targets[i])}]"
+                raise _ex.EJobValidation(err)
+            if next_param.defaultValue is None or next_param.defaultValue != model_param.defaultValue:
+                model_param.defaultValue = None
+
+        return model_param
+
+    @classmethod
+    def _infer_input_schema(
+            cls, input_name: str, targets: tp.List[_meta.FlowSocket],
+            job_config: _cfg.JobConfig) -> _meta.ModelInputSchema:
+
+        model_inputs = []
+
+        for target in targets:
+
+            model_selector = job_config.job.runFlow.models.get(target.node)
+            model_obj = _util.get_job_resource(model_selector, job_config)
+            model_input = model_obj.model.inputs.get(target.socket)
+            model_inputs.append(model_input)
+
+        if len(model_inputs) == 0:
+            err = f"Flow input [{input_name}] is not connected to any models, schema cannot be inferred" \
+                  + f" (either remove the input or connect it to a model)"
+            cls._log.error(err)
+            raise _ex.EJobValidation(err)
+
+        if len(model_inputs) == 1:
+            return model_inputs[0]
+
+        model_input = model_inputs[0]
+
+        for i in range(1, len(targets)):
+            next_input = model_inputs[i]
+            # Very strict rules on inputs, they must have the exact same schema
+            # The Java code includes a combineSchema() method which could be used here as well
+            if next_input != model_input:
+                raise _ex.EJobValidation(f"Multiple models use input [{input_name}] but expect different schemas")
+
+        return model_input
+
+    @classmethod
+    def _infer_output_schema(
+            cls, output_name: str, sources: tp.List[_meta.FlowSocket],
+            job_config: _cfg.JobConfig) -> _meta.ModelOutputSchema:
+
+        model_outputs = []
+
+        for source in sources:
+
+            model_selector = job_config.job.runFlow.models.get(source.node)
+            model_obj = _util.get_job_resource(model_selector, job_config)
+            model_input = model_obj.model.inputs.get(source.socket)
+            model_outputs.append(model_input)
+
+        if len(model_outputs) == 0:
+            err = f"Flow output [{output_name}] is not connected to any models, schema cannot be inferred" \
+                  + f" (either remove the output or connect it to a model)"
+            cls._log.error(err)
+            raise _ex.EJobValidation(err)
+
+        if len(model_outputs) > 1:
+            err = f"Flow output [{output_name}] is not to multiple models" \
+                  + f" (only one model can supply one output)"
+            cls._log.error(err)
+            raise _ex.EJobValidation(err)
+
+        return model_outputs[0]
+
+    @classmethod
+    def _socket_key(cls, socket):
+        return f"{socket.node}.{socket.socket}" if socket.socket else socket.node
 
     @classmethod
     def _process_parameters(cls, job_config: _cfg.JobConfig) -> _cfg.JobConfig:
