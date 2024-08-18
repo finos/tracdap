@@ -14,9 +14,6 @@
 
 from __future__ import annotations
 
-import copy
-import dataclasses  # noqa
-
 import tracdap.rt.config as config
 import tracdap.rt.exceptions as _ex
 import tracdap.rt._impl.data as _data  # noqa
@@ -123,12 +120,14 @@ class GraphBuilder:
             job_namespace: NodeNamespace, job_push_id: NodeId) \
             -> GraphSection:
 
+        target_selector = job_config.job.runModel.model
+        target_obj = _util.get_job_resource(target_selector, job_config)
+        target_def = target_obj.model
+        job_def = job_config.job.runModel
+
         return cls.build_calculation_job(
             job_config, result_spec, job_namespace, job_push_id,
-            job_config.job.runModel.model,
-            job_config.job.runModel.parameters,
-            job_config.job.runModel.inputs,
-            job_config.job.runModel.outputs)
+            target_selector, target_def, job_def)
 
     @classmethod
     def build_run_flow_job(
@@ -136,40 +135,53 @@ class GraphBuilder:
             job_namespace: NodeNamespace, job_push_id: NodeId) \
             -> GraphSection:
 
+        target_selector = job_config.job.runFlow.flow
+        target_obj = _util.get_job_resource(target_selector, job_config)
+        target_def = target_obj.flow
+        job_def = job_config.job.runFlow
+
         return cls.build_calculation_job(
             job_config, result_spec, job_namespace, job_push_id,
-            job_config.job.runFlow.flow,
-            job_config.job.runFlow.parameters,
-            job_config.job.runFlow.inputs,
-            job_config.job.runFlow.outputs)
+            target_selector, target_def, job_def)
 
     @classmethod
     def build_calculation_job(
             cls, job_config: config.JobConfig, result_spec: JobResultSpec,
             job_namespace: NodeNamespace, job_push_id: NodeId,
-            target: meta.TagSelector, parameters: tp.Dict[str, meta.Value],
-            inputs: tp.Dict[str, meta.TagSelector], outputs: tp.Dict[str, meta.TagSelector]) \
+            target_selector: meta.TagSelector,
+            target_def: tp.Union[meta.ModelDefinition, meta.FlowDefinition],
+            job_def: tp.Union[meta.RunModelJob, meta.RunFlowJob]) \
             -> GraphSection:
 
         # The main execution graph can run directly in the job context, no need to do a context push
         # since inputs and outputs in this context line up with the top level execution task
 
+        # Required / provided items are the same for RUN_MODEL and RUN_FLOW jobs
+
+        required_params = target_def.parameters
+        required_inputs = target_def.inputs
+        required_outputs = target_def.outputs
+
+        provided_params = job_def.parameters
+        provided_inputs = job_def.inputs
+        provided_outputs = job_def.outputs
+
         params_section = cls.build_job_parameters(
-            job_namespace, parameters,
+            job_namespace, required_params, provided_params,
             explicit_deps=[job_push_id])
 
         input_section = cls.build_job_inputs(
-            job_config, job_namespace, inputs,
+            job_config, job_namespace, required_inputs, provided_inputs,
             explicit_deps=[job_push_id])
 
-        exec_obj = _util.get_job_resource(target, job_config)
+        exec_obj = _util.get_job_resource(target_selector, job_config)
 
         exec_section = cls.build_model_or_flow(
             job_config, job_namespace, exec_obj,
             explicit_deps=[job_push_id])
 
         output_section = cls.build_job_outputs(
-            job_config, job_namespace, outputs,
+            job_config, job_namespace, required_outputs, provided_outputs,
             explicit_deps=[job_push_id])
 
         main_section = cls._join_sections(params_section, input_section, exec_section, output_section)
@@ -190,13 +202,22 @@ class GraphBuilder:
     @classmethod
     def build_job_parameters(
             cls, job_namespace: NodeNamespace,
-            parameters: tp.Dict[str, meta.Value],
+            required_params: tp.Dict[str, meta.ModelParameter],
+            supplied_params: tp.Dict[str, meta.Value],
             explicit_deps: tp.Optional[tp.List[NodeId]] = None) \
             -> GraphSection:
 
         nodes = dict()
 
-        for param_name, param_def in parameters.items():
+        for param_name, param_schema in required_params.items():
+
+            param_def = supplied_params.get(param_name)
+
+            if param_def is None:
+                if param_schema.defaultValue is not None:
+                    param_def = param_schema.defaultValue
+                else:
+                    raise _ex.EJobValidation(f"Missing required parameter: [{param_name}]")
 
             param_id = NodeId(param_name, job_namespace, meta.Value)
             param_node = StaticValueNode(param_id, param_def, explicit_deps=explicit_deps)
@@ -208,7 +229,8 @@ class GraphBuilder:
     @classmethod
     def build_job_inputs(
             cls, job_config: config.JobConfig, job_namespace: NodeNamespace,
-            inputs: tp.Dict[str, meta.TagSelector],
+            required_inputs: tp.Dict[str, meta.ModelInputSchema],
+            supplied_inputs: tp.Dict[str, meta.TagSelector],
             explicit_deps: tp.Optional[tp.List[NodeId]] = None) \
             -> GraphSection:
 
@@ -216,7 +238,18 @@ class GraphBuilder:
         outputs = set()
         must_run = list()
 
-        for input_name, data_selector in inputs.items():
+        for input_name, input_schema in required_inputs.items():
+
+            data_selector = supplied_inputs.get(input_name)
+
+            if data_selector is None:
+                if input_schema.optional:
+                    data_view_id = NodeId.of(input_name, job_namespace, _data.DataView)
+                    nodes[data_view_id] = StaticValueNode(data_view_id, None)
+                    outputs.add(data_view_id)
+                    continue
+                else:
+                    raise _ex.EJobValidation(f"Missing required input: [{input_name}]")
 
             # Build a data spec using metadata from the job config
             # For now we are always loading the root part, snap 0, delta 0
@@ -258,14 +291,23 @@ class GraphBuilder:
     @classmethod
     def build_job_outputs(
             cls, job_config: config.JobConfig, job_namespace: NodeNamespace,
-            outputs: tp.Dict[str, meta.TagSelector],
+            required_outputs: tp.Dict[str, meta.ModelOutputSchema],
+            supplied_outputs: tp.Dict[str, meta.TagSelector],
             explicit_deps: tp.Optional[tp.List[NodeId]] = None) \
             -> GraphSection:
 
         nodes = {}
         inputs = set()
 
-        for output_name, data_selector in outputs.items():
+        for output_name, output_schema in required_outputs.items():
+
+            data_selector = supplied_outputs.get(output_name)
+
+            if data_selector is None:
+                if output_schema.optional:
+                    raise _ex.ETracInternal("Optional outputs not implemented yet")  # TODO
+                else:
+                    raise _ex.EJobValidation(f"Missing required output: [{output_name}]")
 
             # Output data view must already exist in the namespace
             data_view_id = NodeId.of(output_name, job_namespace, _data.DataView)
@@ -458,10 +500,10 @@ class GraphBuilder:
             frozenset(parameter_ids), frozenset(input_ids),
             explicit_deps=explicit_deps, bundle=model_id.namespace)
 
-        module_result_id = NodeId(f"{model_name}:RESULT", namespace)
-        model_result_node = RunModelResultNode(module_result_id, model_id)
+        model_result_id = NodeId(f"{model_name}:RESULT", namespace)
+        model_result_node = RunModelResultNode(model_result_id, model_id)
 
-        nodes = {model_id: model_node, module_result_id: model_result_node}
+        nodes = {model_id: model_node, model_result_id: model_result_node}
 
         # Create nodes for each model output
         # The model node itself outputs a bundle (dictionary of named outputs)
@@ -474,7 +516,7 @@ class GraphBuilder:
             nodes[output_id] = BundleItemNode(output_id, model_id, output_id.name)
 
         # Assemble a graph to include the model and its outputs
-        return GraphSection(nodes, inputs={*parameter_ids, *input_ids}, outputs=output_ids, must_run=[module_result_id])
+        return GraphSection(nodes, inputs={*parameter_ids, *input_ids}, outputs=output_ids, must_run=[model_result_id])
 
     @classmethod
     def build_flow(
