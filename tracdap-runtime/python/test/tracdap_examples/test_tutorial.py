@@ -77,3 +77,18 @@ class TutorialModelsTest(unittest.TestCase):
         sys_config = self.examples_root.joinpath("config/sys_config.yaml")
 
         launch.launch_job(job_config, sys_config, dev_mode=True)
+
+    def test_optional_io(self):
+
+        from tutorial.optional_io import OptionalIOModel  # noqa
+
+        # First invocation supplies the optional input
+        job_config = self.examples_root.joinpath("config/optional_io.yaml")
+        sys_config = self.examples_root.joinpath("config/sys_config.yaml")
+
+        launch.launch_model(OptionalIOModel, job_config, sys_config)
+
+        # Second invocation does not supply the optional input
+        job_config_2 = self.examples_root.joinpath("config/optional_io_2.yaml")
+
+        launch.launch_model(OptionalIOModel, job_config_2, sys_config)
