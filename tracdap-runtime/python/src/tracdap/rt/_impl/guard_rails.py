@@ -258,14 +258,13 @@ class PythonGuardRails:
     @classmethod
     def is_debug(cls):
 
-        get_trace_func = getattr(sys, 'gettrace', None)
+        has_trace = hasattr(sys, 'gettrace') and sys.gettrace() is not None
+        has_breakpoint = sys.breakpointhook.__module__ != "sys"
 
-        if get_trace_func is None:
-            return False
+        if has_trace or has_breakpoint:
+            return True
 
-        else:
-            trace = get_trace_func()
-            return trace is not None
+        return False
 
     @classmethod
     def is_import(cls):
