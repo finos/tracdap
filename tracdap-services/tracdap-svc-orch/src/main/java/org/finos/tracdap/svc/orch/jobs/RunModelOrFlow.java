@@ -18,6 +18,7 @@ package org.finos.tracdap.svc.orch.jobs;
 
 
 import org.finos.tracdap.api.MetadataWriteRequest;
+import org.finos.tracdap.common.exception.EConsistencyValidation;
 import org.finos.tracdap.config.JobConfig;
 import org.finos.tracdap.config.JobResult;
 import org.finos.tracdap.metadata.*;
@@ -128,26 +129,36 @@ public abstract class RunModelOrFlow {
     }
 
     public List<MetadataWriteRequest> buildResultMetadata(
-            String tenant, Map<String, TagSelector> outputs, Map<String, TagSelector> priorOutputs,
-            List<TagUpdate> outputAttrs, Map<String, List<TagUpdate>> perNodeOutputAttrs,
-            JobConfig jobConfig, JobResult jobResult) {
+            String tenant, JobConfig jobConfig, JobResult jobResult,
+            Map<String, ModelOutputSchema> expectedOutputs,
+            Map<String, TagSelector> outputs, Map<String, TagSelector> priorOutputs,
+            List<TagUpdate> outputAttrs, Map<String, List<TagUpdate>> perNodeOutputAttrs) {
 
         var updates = new ArrayList<MetadataWriteRequest>();
 
-        for (var output: outputs.entrySet()) {
+        for (var output: expectedOutputs.entrySet()) {
 
             var outputName = output.getKey();
+            var outputSchema = output.getValue();
 
             // TODO: String constants
 
             var dataIdLookup = outputName + ":DATA";
             var dataId = jobConfig.getResultMappingOrThrow(dataIdLookup);
             var dataKey = MetadataUtil.objectKey(dataId);
-            var dataObj = jobResult.getResultsOrThrow(dataKey);
+
+            if (!jobResult.containsResults(dataKey)) {
+                if (outputSchema.getOptional())
+                    continue;
+                else
+                    throw new EConsistencyValidation(String.format("Missing required output [%s]", outputName));
+            }
 
             var storageIdLookup = outputName + ":STORAGE";
             var storageId = jobConfig.getResultMappingOrThrow(storageIdLookup);
             var storageKey = MetadataUtil.objectKey(storageId);
+
+            var dataObj = jobResult.getResultsOrThrow(dataKey);
             var storageObj = jobResult.getResultsOrThrow(storageKey);
 
             var priorDataSelector = priorOutputs.containsKey(outputName)

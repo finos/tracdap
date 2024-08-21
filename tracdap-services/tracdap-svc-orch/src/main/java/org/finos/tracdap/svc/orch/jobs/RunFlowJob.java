@@ -148,6 +148,11 @@ public class RunFlowJob extends RunModelOrFlow implements IJobLogic {
     public List<MetadataWriteRequest> buildResultMetadata(String tenant, JobConfig jobConfig, JobResult jobResult) {
 
         var runFlow = jobConfig.getJob().getRunFlow();
+
+        var flowKey = MetadataUtil.objectKey(runFlow.getFlow());
+        var flowId = jobConfig.getResourceMappingMap().get(flowKey);
+        var flowDef = jobConfig.getResourcesMap().get(MetadataUtil.objectKey(flowId)).getModel();
+
         var outputFlowNodes = getFlowOutputNodes(
                 jobConfig.getJob().getRunFlow().getFlow(),
                 jobConfig.getResourcesMap(),
@@ -158,8 +163,11 @@ public class RunFlowJob extends RunModelOrFlow implements IJobLogic {
                 .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().getNodeAttrsList()));
 
         return buildResultMetadata(
-                tenant, runFlow.getOutputsMap(), runFlow.getPriorOutputsMap(),
-                runFlow.getOutputAttrsList(), perNodeOutputAttrs,
-                jobConfig, jobResult);
+                tenant, jobConfig, jobResult,
+                flowDef.getOutputsMap(),
+                runFlow.getOutputsMap(),
+                runFlow.getPriorOutputsMap(),
+                runFlow.getOutputAttrsList(),
+                perNodeOutputAttrs);
     }
 }
