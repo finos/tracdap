@@ -14,9 +14,6 @@
 
 from __future__ import annotations
 
-import copy
-import dataclasses  # noqa
-
 import tracdap.rt.config as config
 import tracdap.rt.exceptions as _ex
 import tracdap.rt._impl.data as _data  # noqa
@@ -123,12 +120,14 @@ class GraphBuilder:
             job_namespace: NodeNamespace, job_push_id: NodeId) \
             -> GraphSection:
 
+        target_selector = job_config.job.runModel.model
+        target_obj = _util.get_job_resource(target_selector, job_config)
+        target_def = target_obj.model
+        job_def = job_config.job.runModel
+
         return cls.build_calculation_job(
             job_config, result_spec, job_namespace, job_push_id,
-            job_config.job.runModel.model,
-            job_config.job.runModel.parameters,
-            job_config.job.runModel.inputs,
-            job_config.job.runModel.outputs)
+            target_selector, target_def, job_def)
 
     @classmethod
     def build_run_flow_job(
@@ -136,40 +135,53 @@ class GraphBuilder:
             job_namespace: NodeNamespace, job_push_id: NodeId) \
             -> GraphSection:
 
+        target_selector = job_config.job.runFlow.flow
+        target_obj = _util.get_job_resource(target_selector, job_config)
+        target_def = target_obj.flow
+        job_def = job_config.job.runFlow
+
         return cls.build_calculation_job(
             job_config, result_spec, job_namespace, job_push_id,
-            job_config.job.runFlow.flow,
-            job_config.job.runFlow.parameters,
-            job_config.job.runFlow.inputs,
-            job_config.job.runFlow.outputs)
+            target_selector, target_def, job_def)
 
     @classmethod
     def build_calculation_job(
             cls, job_config: config.JobConfig, result_spec: JobResultSpec,
             job_namespace: NodeNamespace, job_push_id: NodeId,
-            target: meta.TagSelector, parameters: tp.Dict[str, meta.Value],
-            inputs: tp.Dict[str, meta.TagSelector], outputs: tp.Dict[str, meta.TagSelector]) \
+            target_selector: meta.TagSelector,
+            target_def: tp.Union[meta.ModelDefinition, meta.FlowDefinition],
+            job_def: tp.Union[meta.RunModelJob, meta.RunFlowJob]) \
             -> GraphSection:
 
         # The main execution graph can run directly in the job context, no need to do a context push
         # since inputs and outputs in this context line up with the top level execution task
 
+        # Required / provided items are the same for RUN_MODEL and RUN_FLOW jobs
+
+        required_params = target_def.parameters
+        required_inputs = target_def.inputs
+        required_outputs = target_def.outputs
+
+        provided_params = job_def.parameters
+        provided_inputs = job_def.inputs
+        provided_outputs = job_def.outputs
+
         params_section = cls.build_job_parameters(
-            job_namespace, parameters,
+            job_namespace, required_params, provided_params,
             explicit_deps=[job_push_id])
 
         input_section = cls.build_job_inputs(
-            job_config, job_namespace, inputs,
+            job_config, job_namespace, required_inputs, provided_inputs,
             explicit_deps=[job_push_id])
 
-        exec_obj = _util.get_job_resource(target, job_config)
+        exec_obj = _util.get_job_resource(target_selector, job_config)
 
         exec_section = cls.build_model_or_flow(
             job_config, job_namespace, exec_obj,
             explicit_deps=[job_push_id])
 
         output_section = cls.build_job_outputs(
-            job_config, job_namespace, outputs,
+            job_config, job_namespace, required_outputs, provided_outputs,
             explicit_deps=[job_push_id])
 
         main_section = cls._join_sections(params_section, input_section, exec_section, output_section)
@@ -190,13 +202,22 @@ class GraphBuilder:
     @classmethod
     def build_job_parameters(
             cls, job_namespace: NodeNamespace,
-            parameters: tp.Dict[str, meta.Value],
+            required_params: tp.Dict[str, meta.ModelParameter],
+            supplied_params: tp.Dict[str, meta.Value],
             explicit_deps: tp.Optional[tp.List[NodeId]] = None) \
             -> GraphSection:
 
         nodes = dict()
 
-        for param_name, param_def in parameters.items():
+        for param_name, param_schema in required_params.items():
+
+            param_def = supplied_params.get(param_name)
+
+            if param_def is None:
+                if param_schema.defaultValue is not None:
+                    param_def = param_schema.defaultValue
+                else:
+                    raise _ex.EJobValidation(f"Missing required parameter: [{param_name}]")
 
             param_id = NodeId(param_name, job_namespace, meta.Value)
             param_node = StaticValueNode(param_id, param_def, explicit_deps=explicit_deps)
@@ -208,7 +229,8 @@ class GraphBuilder:
     @classmethod
     def build_job_inputs(
             cls, job_config: config.JobConfig, job_namespace: NodeNamespace,
-            inputs: tp.Dict[str, meta.TagSelector],
+            required_inputs: tp.Dict[str, meta.ModelInputSchema],
+            supplied_inputs: tp.Dict[str, meta.TagSelector],
             explicit_deps: tp.Optional[tp.List[NodeId]] = None) \
             -> GraphSection:
 
@@ -216,7 +238,18 @@ class GraphBuilder:
         outputs = set()
         must_run = list()
 
-        for input_name, data_selector in inputs.items():
+        for input_name, input_schema in required_inputs.items():
+
+            data_selector = supplied_inputs.get(input_name)
+
+            if data_selector is None:
+                if input_schema.optional:
+                    data_view_id = NodeId.of(input_name, job_namespace, _data.DataView)
+                    nodes[data_view_id] = StaticValueNode(data_view_id, _data.DataView.create_empty())
+                    outputs.add(data_view_id)
+                    continue
+                else:
+                    raise _ex.EJobValidation(f"Missing required input: [{input_name}]")
 
             # Build a data spec using metadata from the job config
             # For now we are always loading the root part, snap 0, delta 0
@@ -258,14 +291,24 @@ class GraphBuilder:
     @classmethod
     def build_job_outputs(
             cls, job_config: config.JobConfig, job_namespace: NodeNamespace,
-            outputs: tp.Dict[str, meta.TagSelector],
+            required_outputs: tp.Dict[str, meta.ModelOutputSchema],
+            supplied_outputs: tp.Dict[str, meta.TagSelector],
             explicit_deps: tp.Optional[tp.List[NodeId]] = None) \
             -> GraphSection:
 
         nodes = {}
         inputs = set()
 
-        for output_name, data_selector in outputs.items():
+        for output_name, output_schema in required_outputs.items():
+
+            data_selector = supplied_outputs.get(output_name)
+
+            if data_selector is None:
+                if output_schema.optional:
+                    optional_info = "(configuration is required for all optional outputs, in case they are produced)"
+                    raise _ex.EJobValidation(f"Missing optional output: [{output_name}] {optional_info}")
+                else:
+                    raise _ex.EJobValidation(f"Missing required output: [{output_name}]")
 
             # Output data view must already exist in the namespace
             data_view_id = NodeId.of(output_name, job_namespace, _data.DataView)
@@ -323,7 +366,8 @@ class GraphBuilder:
 
             data_result_id = NodeId.of(f"{output_name}:RESULT", job_namespace, ObjectBundle)
             data_result_node = DataResultNode(
-                data_result_id, output_name, data_spec_id, data_save_id,
+                data_result_id, output_name,
+                data_item_id, data_spec_id, data_save_id,
                 output_data_key, output_storage_key)
 
             nodes[data_spec_id] = data_spec_node
@@ -458,10 +502,10 @@ class GraphBuilder:
             frozenset(parameter_ids), frozenset(input_ids),
             explicit_deps=explicit_deps, bundle=model_id.namespace)
 
-        module_result_id = NodeId(f"{model_name}:RESULT", namespace)
-        model_result_node = RunModelResultNode(module_result_id, model_id)
+        model_result_id = NodeId(f"{model_name}:RESULT", namespace)
+        model_result_node = RunModelResultNode(model_result_id, model_id)
 
-        nodes = {model_id: model_node, module_result_id: model_result_node}
+        nodes = {model_id: model_node, model_result_id: model_result_node}
 
         # Create nodes for each model output
         # The model node itself outputs a bundle (dictionary of named outputs)
@@ -474,7 +518,7 @@ class GraphBuilder:
             nodes[output_id] = BundleItemNode(output_id, model_id, output_id.name)
 
         # Assemble a graph to include the model and its outputs
-        return GraphSection(nodes, inputs={*parameter_ids, *input_ids}, outputs=output_ids, must_run=[module_result_id])
+        return GraphSection(nodes, inputs={*parameter_ids, *input_ids}, outputs=output_ids, must_run=[model_result_id])
 
     @classmethod
     def build_flow(
@@ -488,7 +532,7 @@ class GraphBuilder:
 
         # https://en.wikipedia.org/wiki/Topological_sorting#Kahn's_algorithm
 
-        remaining_nodes = copy.copy(flow_def.nodes)
+        # Group edges by source and target node
         remaining_edges_by_target = {edge.target.node: [] for edge in flow_def.edges}
         remaining_edges_by_source = {edge.source.node: [] for edge in flow_def.edges}
 
@@ -496,15 +540,13 @@ class GraphBuilder:
             remaining_edges_by_target[edge.target.node].append(edge)
             remaining_edges_by_source[edge.source.node].append(edge)
 
-        reachable_nodes = dict()
-
-        # Initial set of reachable flow nodes is just the input nodes
-        for node_name, node in list(remaining_nodes.items()):
-            if node.nodeType == meta.FlowNodeType.INPUT_NODE:
-                reachable_nodes[node_name] = node
-                del remaining_nodes[node_name]
-
+        # Group edges by target socket (only one edge per target in a consistent flow)
         target_edges = {socket_key(edge.target): edge for edge in flow_def.edges}
+
+        # Initially parameters and inputs are reachable, everything else is not
+        def is_input(n): return n[1].nodeType in [meta.FlowNodeType.PARAMETER_NODE, meta.FlowNodeType.INPUT_NODE]
+        reachable_nodes = dict(filter(is_input, flow_def.nodes.items()))
+        remaining_nodes = dict(filter(lambda n: not is_input(n), flow_def.nodes.items()))
 
         # Initial graph section for the flow is empty
         graph_section = GraphSection({}, must_run=explicit_deps)
@@ -559,9 +601,15 @@ class GraphBuilder:
             return NodeId(socket_name, namespace, result_type)
 
         def edge_mapping(node_: str, socket_: str = None, result_type=None):
-            socket = meta.FlowSocket(node_, socket_)
-            edge = target_edges.get(socket_key(socket))  # todo: inconsistent if missing
+            socket = socket_key(meta.FlowSocket(node_, socket_))
+            edge = target_edges.get(socket)
+            # Report missing edges as a job consistency error (this might happen sometimes in dev mode)
+            if edge is None:
+                raise _ex.EJobValidation(f"Inconsistent flow: Socket [{socket}] is not connected")
             return socket_id(edge.source.node, edge.source.socket, result_type)
+
+        if node.nodeType == meta.FlowNodeType.PARAMETER_NODE:
+            return GraphSection({}, inputs={NodeId(node_name, namespace, result_type=meta.Value)})
 
         if node.nodeType == meta.FlowNodeType.INPUT_NODE:
             return GraphSection({}, inputs={NodeId(node_name, namespace, result_type=_data.DataView)})
@@ -573,32 +621,46 @@ class GraphBuilder:
 
         if node.nodeType == meta.FlowNodeType.MODEL_NODE:
 
+            param_mapping = {socket: edge_mapping(node_name, socket, meta.Value) for socket in node.parameters}
+            input_mapping = {socket: edge_mapping(node_name, socket, _data.DataView) for socket in node.inputs}
+            output_mapping = {socket: socket_id(node_name, socket, _data.DataView) for socket in node.outputs}
+
+            push_mapping = {**input_mapping, **param_mapping}
+            pop_mapping = output_mapping
+
             model_selector = flow_job.models.get(node_name)
             model_obj = _util.get_job_resource(model_selector, job_config)
 
-            # TODO: Whether to use flow node or model_obj to build the push mapping?
+            # Missing models in the job config is a job consistency error
+            if model_obj is None or model_obj.objectType != meta.ObjectType.MODEL:
+                raise _ex.EJobValidation(f"No model was provided for flow node [{node_name}]")
 
-            input_mapping_ = {
-                input_name: edge_mapping(node_name, input_name, _data.DataView)
-                for input_name in model_obj.model.inputs
-            }
-
-            param_mapping_ = {
-                param_name: NodeId(param_name, namespace, meta.Value)
-                for param_name in model_obj.model.parameters
-            }
-
-            push_mapping = {**input_mapping_, **param_mapping_}
-
-            pop_mapping = {
-                output_: NodeId(f"{node_name}.{output_}", namespace, _data.DataView)
-                for output_ in model_obj.model.outputs}
+            # Explicit check for model compatibility - report an error now, do not try build_model()
+            cls.check_model_compatibility(model_selector, model_obj.model, node_name, node)
 
             return cls.build_model_or_flow_with_context(
                 job_config, namespace, node_name, model_obj,
                 push_mapping, pop_mapping, explicit_deps)
 
-        raise _ex.ETracInternal()  # TODO: Invalid node type
+        # Missing / invalid node type - should be caught in static validation
+        raise _ex.ETracInternal(f"Flow node [{node_name}] has invalid node type [{node.nodeType}]")
+
+    @classmethod
+    def check_model_compatibility(
+            cls, model_selector: meta.TagSelector, model_def: meta.ModelDefinition,
+            node_name: str, flow_node: meta.FlowNode):
+
+        model_params = list(sorted(model_def.parameters.keys()))
+        model_inputs = list(sorted(model_def.inputs.keys()))
+        model_outputs = list(sorted(model_def.outputs.keys()))
+
+        node_params = list(sorted(flow_node.parameters))
+        node_inputs = list(sorted(flow_node.inputs))
+        node_outputs = list(sorted(flow_node.outputs))
+
+        if model_params != node_params or model_inputs != node_inputs or model_outputs != node_outputs:
+            model_key = _util.object_key(model_selector)
+            raise _ex.EJobValidation(f"Incompatible model for flow node [{node_name}] (Model: [{model_key}])")
 
     @staticmethod
     def build_context_push(

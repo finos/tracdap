@@ -147,22 +147,26 @@ class StaticApiImpl(_StaticApiHook):
         return _schemas.SchemaLoader.load_schema(package, schema_file)
 
     def define_input_table(
-            self, *fields: _tp.Union[_meta.FieldSchema, _tp.List[_meta.FieldSchema]], label: _tp.Optional[str] = None) \
+            self, *fields: _tp.Union[_meta.FieldSchema, _tp.List[_meta.FieldSchema]],
+            label: _tp.Optional[str] = None,
+            optional: bool = False) \
             -> _meta.ModelInputSchema:
 
-        _val.validate_signature(self.define_input_table, *fields, label=label)
+        _val.validate_signature(self.define_input_table, *fields, label=label, optional=optional)
 
         schema_def = self.define_schema(*fields, schema_type=_meta.SchemaType.TABLE)
-        return _meta.ModelInputSchema(schema=schema_def, label=label)
+        return _meta.ModelInputSchema(schema=schema_def, label=label, optional=optional)
 
     def define_output_table(
-            self, *fields: _tp.Union[_meta.FieldSchema, _tp.List[_meta.FieldSchema]], label: _tp.Optional[str] = None) \
+            self, *fields: _tp.Union[_meta.FieldSchema, _tp.List[_meta.FieldSchema]],
+            label: _tp.Optional[str] = None,
+            optional: bool = False) \
             -> _meta.ModelOutputSchema:
 
-        _val.validate_signature(self.define_output_table, *fields, label=label)
+        _val.validate_signature(self.define_output_table, *fields, label=label, optional=optional)
 
         schema_def = self.define_schema(*fields, schema_type=_meta.SchemaType.TABLE)
-        return _meta.ModelOutputSchema(schema=schema_def, label=label)
+        return _meta.ModelOutputSchema(schema=schema_def, label=label, optional=optional)
 
     @staticmethod
     def _build_named_dict(

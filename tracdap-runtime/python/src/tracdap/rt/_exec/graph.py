@@ -297,6 +297,7 @@ class DataItemNode(MappingNode[_data.DataItem]):
 class DataResultNode(Node[ObjectBundle]):
 
     output_name: str
+    data_item_id: NodeId[_data.DataItem]
     data_spec_id: NodeId[_data.DataSpec]
     data_save_id: NodeId[type(None)]
 
@@ -306,6 +307,7 @@ class DataResultNode(Node[ObjectBundle]):
     def _node_dependencies(self) -> tp.Dict[NodeId, DependencyType]:
 
         return {
+            self.data_item_id: DependencyType.HARD,
             self.data_spec_id: DependencyType.HARD,
             self.data_save_id: DependencyType.HARD}
 

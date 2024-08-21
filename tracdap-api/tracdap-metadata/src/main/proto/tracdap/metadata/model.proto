@@ -53,6 +53,8 @@ message ModelInputSchema {
     SchemaDefinition schema = 1;
 
     optional string label = 2;
+
+    bool optional = 3;
 }
 
 /**
@@ -72,6 +74,8 @@ message ModelOutputSchema {
     SchemaDefinition schema = 1;
 
     optional string label = 2;
+
+    bool optional = 3;
 }
 
 

@@ -69,6 +69,9 @@ public class RunModelTest {
     static TagHeader modelId;
     static TagHeader outputDataId;
 
+    static TagHeader optionalIoModelId;
+    static TagHeader optionalIoOutputDataId;
+
     @Test @Order(1)
     void loadInputData() throws Exception {
 
@@ -279,6 +282,173 @@ public class RunModelTest {
         var readRequest = DataReadRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setSelector(MetadataUtil.selectorFor(outputDataId))
+                .setFormat("text/csv")
+                .build();
+
+
+        var readResponse = dataClient.readSmallDataset(readRequest);
+
+        var csvText = readResponse.getContent().toString(StandardCharsets.UTF_8);
+        var csvLines = csvText.split("\n");
+
+        var csvHeaders = Arrays.stream(csvLines[0].split(","))
+                .map(String::trim)
+                .collect(Collectors.toList());
+
+        Assertions.assertEquals(List.of("region", "gross_profit"), csvHeaders);
+        Assertions.assertEquals(EXPECTED_REGIONS + 1, csvLines.length);
+    }
+
+    @Test @Order(5)
+    void optionalIO_importModel() throws Exception {
+
+        log.info("Running IMPORT_MODEL job...");
+
+        var metaClient = platform.metaClientBlocking();
+        var orchClient = platform.orchClientBlocking();
+
+        var modelVersion = GitHelpers.getCurrentCommit();
+
+        var importModel = ImportModelJob.newBuilder()
+                .setLanguage("python")
+                .setRepository(useTracRepo())
+                .setPath("examples/models/python/src")
+                .setEntryPoint("tutorial.optional_io.OptionalIOModel")
+                .setVersion(modelVersion)
+                .addModelAttrs(TagUpdate.newBuilder()
+                        .setAttrName("e2e_test_model")
+                        .setValue(MetadataCodec.encodeValue("run_model:optional_io")))
+                .build();
+
+        var jobRequest = JobRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setJob(JobDefinition.newBuilder()
+                        .setJobType(JobType.IMPORT_MODEL)
+                        .setImportModel(importModel))
+                .addJobAttrs(TagUpdate.newBuilder()
+                        .setAttrName("e2e_test_job")
+                        .setValue(MetadataCodec.encodeValue("run_model:optional_io_import_model")))
+                .build();
+
+        var jobStatus = runJob(orchClient, jobRequest);
+        var jobKey = MetadataUtil.objectKey(jobStatus.getJobId());
+
+        Assertions.assertEquals(JobStatusCode.SUCCEEDED, jobStatus.getStatusCode());
+
+        var modelSearch = MetadataSearchRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSearchParams(SearchParameters.newBuilder()
+                .setObjectType(ObjectType.MODEL)
+                .setSearch(SearchExpression.newBuilder()
+                .setTerm(SearchTerm.newBuilder()
+                        .setAttrName("trac_create_job")
+                        .setAttrType(BasicType.STRING)
+                        .setOperator(SearchOperator.EQ)
+                        .setSearchValue(MetadataCodec.encodeValue(jobKey)))))
+                .build();
+
+        var modelSearchResult = metaClient.search(modelSearch);
+
+        Assertions.assertEquals(1, modelSearchResult.getSearchResultCount());
+
+        var searchResult = modelSearchResult.getSearchResult(0);
+        var modelReq = MetadataReadRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSelector(MetadataUtil.selectorFor(searchResult.getHeader()))
+                .build();
+
+        var modelTag = metaClient.readObject(modelReq);
+        var modelDef = modelTag.getDefinition().getModel();
+        var modelAttr = modelTag.getAttrsOrThrow("e2e_test_model");
+
+        Assertions.assertEquals("run_model:optional_io", MetadataCodec.decodeStringValue(modelAttr));
+        Assertions.assertEquals("tutorial.optional_io.OptionalIOModel", modelDef.getEntryPoint());
+        Assertions.assertTrue(modelDef.getInputsMap().containsKey("account_filter"));
+        Assertions.assertTrue(modelDef.getOutputsMap().containsKey("exclusions"));
+
+        optionalIoModelId = modelTag.getHeader();
+    }
+
+    @Test @Order(6)
+    void optionalIO_runModel() {
+
+        var metaClient = platform.metaClientBlocking();
+        var orchClient = platform.orchClientBlocking();
+
+        // Do not set the optional input (i.e. inputs look the same as UsingData model
+        // Customer loans input is the same dataset as the UsingData model
+
+        var runModel = RunModelJob.newBuilder()
+                .setModel(MetadataUtil.selectorFor(optionalIoModelId))
+                .putParameters("eur_usd_rate", MetadataCodec.encodeValue(1.3785))
+                .putParameters("default_weighting", MetadataCodec.encodeValue(1.5))
+                .putParameters("filter_defaults", MetadataCodec.encodeValue(true))
+                .putInputs("customer_loans", MetadataUtil.selectorFor(inputDataId))
+                .addOutputAttrs(TagUpdate.newBuilder()
+                        .setAttrName("e2e_test_data")
+                        .setValue(MetadataCodec.encodeValue("run_model:optional_io_data_output")))
+                .build();
+
+        var jobRequest = JobRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setJob(JobDefinition.newBuilder()
+                        .setJobType(JobType.RUN_MODEL)
+                        .setRunModel(runModel))
+                .addJobAttrs(TagUpdate.newBuilder()
+                        .setAttrName("e2e_test_job")
+                        .setValue(MetadataCodec.encodeValue("run_model:optional_io_run_model")))
+                .build();
+
+        var jobStatus = runJob(orchClient, jobRequest);
+        var jobKey = MetadataUtil.objectKey(jobStatus.getJobId());
+
+        Assertions.assertEquals(JobStatusCode.SUCCEEDED, jobStatus.getStatusCode());
+
+        var dataSearch = MetadataSearchRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSearchParams(SearchParameters.newBuilder()
+                .setObjectType(ObjectType.DATA)
+                .setSearch(SearchExpression.newBuilder()
+                .setTerm(SearchTerm.newBuilder()
+                        .setAttrName("trac_create_job")
+                        .setAttrType(BasicType.STRING)
+                        .setOperator(SearchOperator.EQ)
+                        .setSearchValue(MetadataCodec.encodeValue(jobKey)))))
+                .build();
+
+        var dataSearchResult = metaClient.search(dataSearch);
+
+        // Only one output - optional exclusions output is not returned when account_filter is not supplied
+        Assertions.assertEquals(1, dataSearchResult.getSearchResultCount());
+
+        var searchResult = dataSearchResult.getSearchResult(0);
+        var dataReq = MetadataReadRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSelector(MetadataUtil.selectorFor(searchResult.getHeader()))
+                .build();
+
+        var dataTag = metaClient.readObject(dataReq);
+        var dataDef = dataTag.getDefinition().getData();
+        var outputAttr = dataTag.getAttrsOrThrow("e2e_test_data");
+
+        Assertions.assertEquals("run_model:optional_io_data_output", MetadataCodec.decodeStringValue(outputAttr));
+        Assertions.assertEquals(1, dataDef.getPartsCount());
+
+        optionalIoOutputDataId = dataTag.getHeader();
+    }
+
+    @Test @Order(7)
+    void optionalIO_checkOutputData() {
+
+        log.info("Checking output data...");
+
+        var dataClient = platform.dataClientBlocking();
+
+        var EXPECTED_REGIONS = 5;  // based on the sample dataset
+
+        var readRequest = DataReadRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSelector(MetadataUtil.selectorFor(optionalIoOutputDataId))
                 .setFormat("text/csv")
                 .build();
 

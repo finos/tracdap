@@ -248,6 +248,10 @@ class DataViewFunc(NodeFunction[_data.DataView]):
         root_item = _ctx_lookup(self.node.root_item, ctx)
         root_part_key = _data.DataPartKey.for_root()
 
+        # Map empty item -> emtpy view (for optional inputs not supplied)
+        if root_item.is_empty():
+            return _data.DataView.create_empty()
+
         data_view = _data.DataView.for_trac_schema(self.node.schema)
         data_view = _data.DataMapping.add_item_to_view(data_view, root_part_key, root_item)
 
@@ -262,6 +266,10 @@ class DataItemFunc(NodeFunction[_data.DataItem]):
     def _execute(self, ctx: NodeContext) -> _data.DataItem:
 
         data_view = _ctx_lookup(self.node.data_view_id, ctx)
+
+        # Map empty view -> emtpy item (for optional outputs not supplied)
+        if data_view.is_empty():
+            return _data.DataItem.create_empty()
 
         # TODO: Support selecting data item described by self.node
 
@@ -279,6 +287,12 @@ class DataResultFunc(NodeFunction[ObjectBundle]):
         self.node = node
 
     def _execute(self, ctx: NodeContext) -> ObjectBundle:
+
+        data_item = _ctx_lookup(self.node.data_item_id, ctx)
+
+        # Do not record output metadata for optional outputs that are empty
+        if data_item.is_empty():
+            return {}
 
         data_spec = _ctx_lookup(self.node.data_spec_id, ctx)
 
@@ -451,15 +465,19 @@ class SaveDataFunc(NodeFunction[None], _LoadSaveDataFunc):
 
     def _execute(self, ctx: NodeContext):
 
+        # Item to be saved should exist in the current context
+        data_item = _ctx_lookup(self.node.data_item_id, ctx)
+
+        # Do not save empty outputs (optional outputs that were not produced)
+        if data_item.is_empty():
+            return
+
         # This function assumes that metadata has already been generated as the data_spec
         # i.e. it is already known which incarnation / copy of the data will be created
 
         data_spec = _ctx_lookup(self.node.spec_id, ctx)
         data_copy = self._choose_copy(data_spec.data_item, data_spec.storage_def)
         data_storage = self.storage.get_data_storage(data_copy.storageKey)
-
-        # Item to be saved should exist in the current context
-        data_item = _ctx_lookup(self.node.data_item_id, ctx)
 
         # Current implementation will always put an Arrow table in the data item
         # Empty tables are allowed, so explicitly check if table is None
@@ -567,12 +585,23 @@ class RunModelFunc(NodeFunction[Bundle[_data.DataView]]):
             msg = f"There was an unhandled error in the model: {str(e)}{details}"
             raise _ex.EModelExec(msg) from e
 
-        # The node result is just the model outputs taken from the local context
-        model_outputs: Bundle[_data.DataView] = {
-            name: obj for name, obj in local_ctx.items()
-            if name in self.node.model_def.outputs}
+        # Check required outputs are present and build the results bundle
 
-        return model_outputs
+        results: Bundle[_data.DataView] = dict()
+
+        for output_name, output_schema in model_def.outputs.items():
+
+            result: _data.DataView = local_ctx.get(output_name)
+
+            if result is None or result.is_empty():
+                if not output_schema.optional:
+                    model_name = self.model_class.__name__
+                    raise _ex.ERuntimeValidation(f"Missing required output [{output_name}] from model [{model_name}]")
+
+            if result is not None:
+                results[output_name] = result
+
+        return results
 
 
 # ----------------------------------------------------------------------------------------------------------------------

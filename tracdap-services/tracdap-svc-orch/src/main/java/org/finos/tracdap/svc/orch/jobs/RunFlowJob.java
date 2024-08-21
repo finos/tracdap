@@ -18,6 +18,8 @@ package org.finos.tracdap.svc.orch.jobs;
 
 import org.finos.tracdap.api.MetadataWriteRequest;
 import org.finos.tracdap.common.exception.EUnexpected;
+import org.finos.tracdap.common.graph.GraphBuilder;
+import org.finos.tracdap.common.graph.NodeNamespace;
 import org.finos.tracdap.common.metadata.MetadataBundle;
 import org.finos.tracdap.common.metadata.MetadataUtil;
 import org.finos.tracdap.config.JobConfig;
@@ -36,6 +38,28 @@ public class RunFlowJob extends RunModelOrFlow implements IJobLogic {
 
         // No transformations currently required
         return job;
+    }
+
+    @Override
+    public MetadataBundle applyMetadataTransform(JobDefinition job, MetadataBundle metadata, PlatformConfig platformConfig) {
+
+        // Running the graph builder will apply any required auto-wiring and type inference to the flow
+        // This creates a strictly consistent flow that can be sent to the runtime
+
+        var flowSelector = job.getRunFlow().getFlow();
+
+        var jobNamespace = NodeNamespace.ROOT;
+        var builder = new GraphBuilder(jobNamespace, metadata);
+        var graph = builder.buildJob(job);
+
+        var strictFlow = builder.exportFlow(graph);
+
+        var strictFlowObj = ObjectDefinition.newBuilder()
+                .setObjectType(ObjectType.FLOW)
+                .setFlow(strictFlow)
+                .build();
+
+        return metadata.withUpdate(flowSelector, strictFlowObj);
     }
 
     @Override
@@ -124,6 +148,11 @@ public class RunFlowJob extends RunModelOrFlow implements IJobLogic {
     public List<MetadataWriteRequest> buildResultMetadata(String tenant, JobConfig jobConfig, JobResult jobResult) {
 
         var runFlow = jobConfig.getJob().getRunFlow();
+
+        var flowKey = MetadataUtil.objectKey(runFlow.getFlow());
+        var flowId = jobConfig.getResourceMappingMap().get(flowKey);
+        var flowDef = jobConfig.getResourcesMap().get(MetadataUtil.objectKey(flowId)).getFlow();
+
         var outputFlowNodes = getFlowOutputNodes(
                 jobConfig.getJob().getRunFlow().getFlow(),
                 jobConfig.getResourcesMap(),
@@ -134,8 +163,11 @@ public class RunFlowJob extends RunModelOrFlow implements IJobLogic {
                 .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().getNodeAttrsList()));
 
         return buildResultMetadata(
-                tenant, runFlow.getOutputsMap(), runFlow.getPriorOutputsMap(),
-                runFlow.getOutputAttrsList(), perNodeOutputAttrs,
-                jobConfig, jobResult);
+                tenant, jobConfig, jobResult,
+                flowDef.getOutputsMap(),
+                runFlow.getOutputsMap(),
+                runFlow.getPriorOutputsMap(),
+                runFlow.getOutputAttrsList(),
+                perNodeOutputAttrs);
     }
 }

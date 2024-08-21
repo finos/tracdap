@@ -82,6 +82,11 @@ public class ImportModelJob implements IJobLogic {
     }
 
     @Override
+    public MetadataBundle applyMetadataTransform(JobDefinition job, MetadataBundle metadata, PlatformConfig platformConfig) {
+        return metadata;
+    }
+
+    @Override
     public List<TagSelector> requiredMetadata(JobDefinition job) {
 
         // No extra metadata needed for an import_model job
