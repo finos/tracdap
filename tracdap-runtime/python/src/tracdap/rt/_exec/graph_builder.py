@@ -245,7 +245,7 @@ class GraphBuilder:
             if data_selector is None:
                 if input_schema.optional:
                     data_view_id = NodeId.of(input_name, job_namespace, _data.DataView)
-                    nodes[data_view_id] = StaticValueNode(data_view_id, None)
+                    nodes[data_view_id] = StaticValueNode(data_view_id, _data.DataView.create_empty())
                     outputs.add(data_view_id)
                     continue
                 else:
@@ -305,7 +305,8 @@ class GraphBuilder:
 
             if data_selector is None:
                 if output_schema.optional:
-                    raise _ex.ETracInternal("Optional outputs not implemented yet")  # TODO
+                    optional_info = "(configuration is required for all optional outputs, in case they are produced)"
+                    raise _ex.EJobValidation(f"Missing optional output: [{output_name}] {optional_info}")
                 else:
                     raise _ex.EJobValidation(f"Missing required output: [{output_name}]")
 
@@ -365,7 +366,8 @@ class GraphBuilder:
 
             data_result_id = NodeId.of(f"{output_name}:RESULT", job_namespace, ObjectBundle)
             data_result_node = DataResultNode(
-                data_result_id, output_name, data_spec_id, data_save_id,
+                data_result_id, output_name,
+                data_item_id, data_spec_id, data_save_id,
                 output_data_key, output_storage_key)
 
             nodes[data_spec_id] = data_spec_node
