@@ -35,7 +35,7 @@ const pbjsArgs = [
     "--wrap", "./wrapper.js",
     "--root", "tracdap",
     "--force-number",               // Use native JavaScript numbers for numeric types
-    "--null-defaults",              // Set optional fields to null if they are not present
+    "--null-semantics",             // Make nullability in TS / JSDoc respect optional semantics
     "--path", './build',
     "--out", jsOutFile
 ];
