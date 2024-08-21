@@ -131,12 +131,6 @@ class ModelLoader:
 
     def load_model_class(self, scope: str, model_def: _meta.ModelDefinition) -> _api.TracModel.__class__:
 
-        # Do not try to load other languages as Python code!
-        if model_def.language != "python":
-            err = f"Model language [{model_def.language}] is not supported in the TRAC Python runtime"
-            self.__log.error(err)
-            raise _ex.EModelValidation(err)
-
         checkout_dir = self._get_checkout_dir(scope, model_def)
         scope_state = self.__scopes[scope]
         model_key = f"{model_def.repository}#{model_def.path}#{model_def.version}#{model_def.entryPoint}"
