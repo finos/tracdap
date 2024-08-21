@@ -80,7 +80,7 @@ class TutorialModelsTest(unittest.TestCase):
 
     def test_optional_io(self):
 
-        # First invocation supplies the optional input
+        # First invocation does not supply the optional input
 
         from tutorial.optional_io import OptionalIOModel  # noqa
 
@@ -91,7 +91,7 @@ class TutorialModelsTest(unittest.TestCase):
 
     def test_optional_io_2(self):
 
-        # Second invocation does not supply the optional input
+        # Second invocation supplies the optional input
 
         from tutorial.optional_io import OptionalIOModel  # noqa
 

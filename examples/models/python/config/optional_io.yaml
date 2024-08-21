@@ -9,7 +9,6 @@ job:
 
     inputs:
       customer_loans: "inputs/loan_final313_100.csv"
-      account_filter: "inputs/account_filter.csv"
 
     outputs:
       profit_by_region: "outputs/optional_io/profit_by_region.csv"
