@@ -45,6 +45,8 @@ try:
 
         def connect(self) -> DbApiWrapper.Connection:
 
+            # TODO: Typed properties common function
+
             allowed_props = filter(lambda kv: kv[0] in self.__CONNECT_PROPERTIES, self._properties.items())
             typed_props = map(lambda kv: (kv[0], self.__CONNECT_PROPERTIES[kv[0]](kv[1])), allowed_props)
 
