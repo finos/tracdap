@@ -35,3 +35,25 @@ message JobConfig {
     map<string, metadata.TagHeader> resourceMapping = 4;
     map<string, metadata.TagHeader> resultMapping = 5;
 }
+
+message JobGroup {
+
+    oneof groupDetails {
+        SequentialJobGroup sequential = 1;
+    }
+}
+
+message SequentialJobGroup {
+
+    repeated JobConfig jobs = 1;
+}
+
+message ParallelJobGroup {
+
+    repeated JobConfig jobs = 1;
+}
+
+message FlowJobGroup {
+
+
+}

@@ -10,6 +10,16 @@ storage:
       protocol: LOCAL
       properties:
         rootPath: ../data
+        devMode.layout: file
+        devMode.updates: overwrite
+
+  connections:
+
+    risk_dw:
+      protocol: SQL
+      properties:
+        dialect: sqlite
+        sqlite.database: ../data/sql/risk_dw.db
 
 
 sparkSettings:

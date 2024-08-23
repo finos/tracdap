@@ -42,6 +42,7 @@ enum JobType {
 
   /// Import data into the platform
   IMPORT_DATA = 4;
+  EXPORT_DATA = 5;
 }
 
 /**
@@ -93,7 +94,11 @@ message JobDefinition {
     RunModelJob runModel = 2;
     RunFlowJob runFlow = 3;
     ImportModelJob importModel = 4;
+    ExportDataJob exportData = 6;
   }
+
+  reserved "importData";
+  reserved 5;
 }
 
 /**
@@ -144,4 +149,17 @@ message ImportModelJob {
   string path = 3;
 
   repeated TagUpdate modelAttrs = 6;
+}
+
+message ExportDataJob {
+
+  string targetLocation = 1;
+
+  repeated ExportDataItem exports = 2;
+}
+
+message ExportDataItem {
+
+  TagSelector selector = 1;
+  repeated
 }
