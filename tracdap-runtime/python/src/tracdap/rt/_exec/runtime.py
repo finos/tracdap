@@ -61,7 +61,9 @@ class TracRuntime:
             job_result_format: tp.Optional[str] = None,
             scratch_dir: tp.Union[str, pathlib.Path, None] = None,
             scratch_dir_persist: bool = False,
-            dev_mode: bool = False):
+            dev_mode: bool = False,
+            server_enabled: bool = False,
+            server_port: int = 0):
 
         trac_version = _version.__version__
         python_version = sys.version.replace("\n", "")

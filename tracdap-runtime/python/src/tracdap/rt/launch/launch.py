@@ -126,7 +126,9 @@ def launch_cli():
         job_result_dir=launch_args.job_result_dir,
         job_result_format=launch_args.job_result_format,
         scratch_dir=launch_args.scratch_dir,
-        scratch_dir_persist=launch_args.scratch_dir_persist)
+        scratch_dir_persist=launch_args.scratch_dir_persist,
+        server_enabled=launch_args.server_enabled,
+        server_port=launch_args.server_port)
 
     runtime_instance.pre_start()
 

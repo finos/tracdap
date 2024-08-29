@@ -45,12 +45,18 @@ def cli_args():
     parser.add_argument(
         "--scratch-dir", dest="scratch_dir", type=pathlib.Path, required=False,
         help="Scratch directory for working files" +
-             " (if not supplied the system's temp location will be used)"
-    )
+             " (if not supplied the system's temp location will be used)")
 
     parser.add_argument(
         "--scratch-dir-persist", dest="scratch_dir_persist", default=False, action="store_true",
-        help="Do not clean up the scratch location on exit"
-    )
+        help="Do not clean up the scratch location on exit")
+
+    parser.add_argument(
+        "--server-enabled", dest="server_enabled", default=False, action="store_true",
+        help="Enable the runtime API server")
+
+    parser.add_argument(
+        "--server-port", dest="server_port", type=int, required=False,
+        help="Set the listening port for the runtime API server")
 
     return parser.parse_args()
