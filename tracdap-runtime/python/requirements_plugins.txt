@@ -40,9 +40,9 @@ boto3 == 1.34.93
 
 # GCP client libraries
 
-google-auth == 2.29.0
-google-cloud-core == 2.4.1
-google-cloud-storage == 2.16.0
+google-auth == 2.34.0
+google-api-core == 2.19.2
+google-cloud-storage == 2.18.2
 
 # GCS implementation of FS Spec
 
