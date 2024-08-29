@@ -34,8 +34,9 @@ DEV_MODE_JOB_CONFIG = [
     re.compile(r"job\.run(Model|Flow)\.parameters\.\w+"),
     re.compile(r"job\.run(Model|Flow)\.inputs\.\w+"),
     re.compile(r"job\.run(Model|Flow)\.outputs\.\w+"),
-    re.compile(r"job\.run(Model|Flow)\.models\.\w+"),
-    re.compile(r"job\.run(Model|Flow)\.flow+")]
+    re.compile(r"job\.runModel\.model"),
+    re.compile(r"job\.runFlow\.flow"),
+    re.compile(r"job\.runFlow\.models\.\w+")]
 
 DEV_MODE_SYS_CONFIG = []
 
@@ -83,6 +84,13 @@ class DevModeTranslator:
         if model_class is not None:
 
             model_id, model_obj = cls._generate_model_for_class(model_loader, model_class)
+            job_config = cls._add_job_resource(job_config, model_id, model_obj)
+            job_config.job.runModel.model = _util.selector_for(model_id)
+
+        elif job_config.job.jobType == _meta.JobType.RUN_MODEL and job_config.job.runModel.model is not None:
+
+            model_detail = job_config.job.runModel.model
+            model_id, model_obj = cls._generate_model_for_entry_point(model_loader, model_detail)  # noqa
             job_config = cls._add_job_resource(job_config, model_id, model_obj)
             job_config.job.runModel.model = _util.selector_for(model_id)
 
