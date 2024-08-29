@@ -94,7 +94,7 @@ def generate_from_proto():
         str(sys.executable), str(protoc_ctrl), "python_proto",
         "--proto_path", "tracdap-api/tracdap-metadata/src/main/proto",
         "--proto_path", "tracdap-api/tracdap-config/src/main/proto",
-        "--out", "tracdap-runtime/python/generated/tracdap/rt_gen/domain"]
+        "--out", "tracdap-runtime/python/generated/tracdap/rt_gen/proto"]
 
     domain_proc = subprocess.Popen(domain_cmd, stdout=subprocess.PIPE, cwd=ROOT_PATH, env=os.environ)
     domain_out, domain_err = domain_proc.communicate()
