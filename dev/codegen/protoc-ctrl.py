@@ -18,6 +18,7 @@ import shutil
 import subprocess as sp
 import argparse
 import logging
+import sys
 import tempfile
 
 import protoc
@@ -151,6 +152,13 @@ def build_protoc_args(generator, proto_paths, output_location, packages):
             f"--python_out={output_location}"
         ]
 
+    elif generator == "python_grpc":
+
+        proto_args = [
+            f"--python_out={output_location}",
+            f"--grpc_python_out={output_location}"
+        ]
+
     else:
 
         if generator == "python_runtime":
@@ -187,7 +195,7 @@ def cli_args():
 
     parser.add_argument(
         "generator", type=str, metavar="generator",
-        choices=["python_proto", "python_runtime", "python_doc", "api_doc"],
+        choices=["python_proto", "python_grpc", "python_runtime", "python_doc", "api_doc"],
         help="The documentation targets to build")
 
     parser.add_argument(
@@ -235,9 +243,15 @@ def main():
         # Make sure the output dir exists before running protoc
         pathlib.Path(output_dir).mkdir(parents=True, exist_ok=True)
 
+        if script_args.generator == "python_grpc":
+            protoc_executable = sys.executable
+            protoc_argv = [sys.executable, "-m", "grpc_tools.protoc"] + protoc_argv[1:]
+        else:
+            protoc_executable = protoc.PROTOC_EXE
+
         # Always run protoc from the codegen folder
         # This makes finding the TRAC protoc plugin much easier
-        result = sp.run(executable=protoc.PROTOC_EXE, args=protoc_argv, cwd=SCRIPT_DIR, stdout=sp.PIPE)
+        result = sp.run(executable=protoc_executable, args=protoc_argv, cwd=SCRIPT_DIR, stdout=sp.PIPE)
 
         # We are not piping stdout/stderr
         # Logs and errors  will show up as protoc is running
