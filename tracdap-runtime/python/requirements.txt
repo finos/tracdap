@@ -8,7 +8,7 @@
 
 # Core protobuf support for metadata / config classes
 # This should match the Java Protobuf version, if possible
-protobuf == 4.25.3
+protobuf == 5.27.4
 
 # Core data framework is based on Arrow
 # This should always match the Java Arrow version
