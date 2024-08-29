@@ -1,0 +1,42 @@
+
+syntax = "proto3";
+package tracdap.api.internal;
+
+option java_package = "org.finos.tracdap.api.internal";
+option java_multiple_files = true;
+
+import "tracdap/metadata/object_id.proto";
+import "tracdap/metadata/job.proto";
+import "tracdap/config/result.proto";
+
+import "google/api/annotations.proto";
+
+
+service TracRuntimeApi {
+
+  rpc batchJobStatus(BatchJobStatusRequest) returns (BatchJobStatus) {
+    option (google.api.http) = {
+      get: "/batch-job-status/{jobKey}"
+    };
+  }
+
+  rpc batchJobResult(BatchJobStatusRequest) returns (config.JobResult) {
+    option (google.api.http) = {
+      get: "/batch-job-result/{jobKey}"
+    };
+  }
+}
+
+message BatchJobStatusRequest {
+
+  oneof job {
+    metadata.TagSelector jobSelector = 1;
+    string jobKey = 2;
+  }
+}
+
+message BatchJobStatus {
+
+  metadata.JobStatusCode statusCode = 1;
+  string statusMessage = 2;
+}
