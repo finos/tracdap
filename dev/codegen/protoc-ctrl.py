@@ -12,8 +12,10 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import fileinput
 import pathlib
 import platform
+import re
 import shutil
 import subprocess as sp
 import argparse
@@ -65,58 +67,130 @@ def _copytree(src, dst):
                 shutil.copy2(src_item, dst_item)
 
 
-class ProtoApiExtensions:
+class ProtoCtrlContext:
 
     # Provide some key extension protos from Google to handle web api annotations
     # The googleapis package would have the venv root as its namespace, so we need to copy to a temp dir
 
     def __init__(self):
         self._temp_dir = tempfile.TemporaryDirectory()
-        self.temp_dir_name = ""
+        self.proto_path = pathlib.Path()
+        self.support_path = pathlib.Path()
 
     def __enter__(self):
 
-        self.temp_dir_name = self._temp_dir.__enter__()
+        self._temp_dir.__enter__()
 
-        # Core protos used by the protoc compiler itself
-        protoc_inc_src = pathlib.Path(protoc.PROTOC_INCLUDE_DIR)
-        protoc_inc_dst = pathlib.Path(self.temp_dir_name)
+        temp_dir = pathlib.Path(self._temp_dir.name)
+        proto_dir = temp_dir.joinpath("proto")
+        proto_dir.mkdir()
+        support_dir = temp_dir.joinpath("support")
+        support_dir.mkdir()
 
-        _log.info(f"Copying {protoc_inc_src} -> {protoc_inc_dst}")
-        _copytree(protoc_inc_src, protoc_inc_dst)
+        self.proto_path = proto_dir
+        self.support_path = support_dir
 
-        # Google API protos for annotating web services
-        gapi_src = pathlib.Path(gapi_http_module.__file__).parent
-        gapi_dst = pathlib.Path(self.temp_dir_name).joinpath("google/api")
-
-        _log.info(f"Copying {gapi_src} -> {gapi_dst}")
-        _copytree(gapi_src, gapi_dst)
-
-        return self.temp_dir_name
+        return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self._temp_dir.__exit__(exc_type, exc_val, exc_tb)
 
+    def copy_common_protos(self):
 
-def find_proto_files(proto_paths, ignore_trusted=False):
+        # Core protos used by the protoc compiler itself
+        protoc_inc_src = pathlib.Path(protoc.PROTOC_INCLUDE_DIR)
+        protoc_inc_dst = pathlib.Path(self.support_path)
+
+        _log.info(f"Copying {protoc_inc_src} -> {protoc_inc_dst}")
+        _copytree(protoc_inc_src, protoc_inc_dst)
+
+    def copy_google_api_protos(self):
+
+        # Google API protos for annotating web services
+        gapi_src = pathlib.Path(gapi_http_module.__file__).parent
+        gapi_dst = pathlib.Path(self.support_path).joinpath("google/api")
+
+        _log.info(f"Copying {gapi_src} -> {gapi_dst}")
+        _copytree(gapi_src, gapi_dst)
+
+
+def copy_proto_files(src_proto_path: pathlib.Path, dest_proto_path: pathlib.Path):
+
+    for dir_entry in src_proto_path.iterdir():
+        target = dest_proto_path.joinpath(dir_entry.name)
+        shutil.copytree(dir_entry, target, dirs_exist_ok=True)
+
+
+def relocate_proto_package(proto_path: pathlib.Path, relocate):
+
+    if isinstance(proto_path, str):
+        proto_path = pathlib.Path(proto_path)
+
+    source, target = relocate.split(":")
+
+    # Move source -> temp -> target
+    # Avoid conflicts if target is a sub-package of source
+
+    source_pkg = proto_path.joinpath(source)
+    temp_pkg = proto_path.joinpath("__temp")
+    target_pkg = proto_path.joinpath(target)
+
+    if not target_pkg.parent.exists():
+        target_pkg.parent.mkdir(parents=True)
+
+    shutil.move(source_pkg, temp_pkg)
+    shutil.move(temp_pkg, target_pkg)
+
+    match = re.compile(rf"import \"{source}/", re.MULTILINE)
+    replace = f"import \"{target}/"
+
+    _relocate_proto_imports(target_pkg, match, replace)
+
+
+def _relocate_proto_imports(proto_path: pathlib.Path, match: re.Pattern, replace: str):
+
+    for dir_entry in proto_path.iterdir():
+
+        if dir_entry.name.endswith(".proto"):
+            for line in fileinput.input(dir_entry, inplace=True):
+                print(re.sub(match, replace, line), end="")
+
+        elif dir_entry.is_dir():
+            _relocate_proto_imports(dir_entry, match, replace)
+
+
+def find_proto_files(proto_paths, packages, no_internal=False):
 
     proto_path_list = proto_paths if isinstance(proto_paths, list) else [proto_paths]
+    package_paths = list(map(lambda p: p.replace(".", "/"), packages)) if packages else None
 
     for proto_path in proto_path_list:
 
-        for entry in proto_path.iterdir():
+        path_str = str(proto_path)
 
-            # Do not include trusted (private) parts of the API when generating for API docs
-            if ignore_trusted and "_trusted.proto" in entry.name:
-                continue
+        if "=" in path_str:
+            proto_path_ = pathlib.Path(path_str[path_str.index("=") + 1:])
+        else:
+            proto_path_ = pathlib.Path(path_str)
 
-            if entry.is_file() and entry.name.endswith(".proto"):
-                yield proto_path.joinpath(entry.name)
+        for entry in proto_path_.iterdir():
 
-            elif entry.is_dir():
-                for sub_entry in find_proto_files(proto_path.joinpath(entry.name), ignore_trusted):
+            # Do not include internal parts of the API when generating for API docs
+            if no_internal:
+                if entry.root == "internal":
+                    continue
+                if "_trusted.proto" in entry.name:
+                    continue
+
+            if entry.is_dir():
+                for sub_entry in find_proto_files(proto_path_.joinpath(entry.name), packages, no_internal):
                     yield sub_entry
 
+            else:
+                if packages and not any(map(lambda p: p in str(entry), package_paths)):
+                    continue
+                elif entry.is_file() and entry.name.endswith(".proto"):
+                    yield proto_path_.joinpath(entry.name)
 
 def platform_args(base_args, proto_files):
 
@@ -143,19 +217,19 @@ def build_protoc_args(generator, proto_paths, output_location, packages):
 
     proto_path_args = list(map(lambda pp: f"--proto_path={pp}", proto_paths))
 
-    packages_option = "packages=" + ",".join(map(str, packages)) if packages else ""
+    packages_option = "packages=" + ",".join(packages) if packages else ""
 
     if generator == "python_proto":
 
         proto_args = [
             f"--plugin=python",
-            f"--python_out={output_location}"
+            f"--python_out={output_location}",
+            f"--pyi_out={output_location}"
         ]
 
     elif generator == "python_grpc":
 
         proto_args = [
-            f"--python_out={output_location}",
             f"--grpc_python_out={output_location}"
         ]
 
@@ -207,8 +281,16 @@ def cli_args():
         help="Location where output files will be generated, relative to the repository root")
 
     parser.add_argument(
-        "--package", type=pathlib.Path, action="append", dest="packages",
+        "--package", type=str, action="append", dest="packages",
         help="Filter packages to include in generated output (TRAC generator only, default = generate all packages)")
+
+    parser.add_argument(
+        "--relocate", type=str, required=False, dest="relocate",
+        help="Relocate packages in the generated code (source:dest e.g. tracdap:tracdap.rt._grpc)")
+
+    parser.add_argument(
+        "--no-internal", default=False, action="store_true", dest="no_internal",
+        help="Ignore internal messages and APIs (for producing public-facing APIs and documentation)")
 
     return parser.parse_args()
 
@@ -216,38 +298,43 @@ def cli_args():
 def main():
 
     script_args = cli_args()
-    proto_paths = list(map(lambda pp: ROOT_DIR.joinpath(pp), script_args.proto_paths))
     output_dir = ROOT_DIR.joinpath(script_args.out)
     packages = script_args.packages
 
     # Provide some key extension protos from Google to handle web api annotations
-    with ProtoApiExtensions() as proto_ext_path:
+    with ProtoCtrlContext() as context:
 
-        # Include all available proto paths when generating proto args, so they're available to protoc if referenced
-        all_proto_paths = proto_paths + [proto_ext_path]
-        protoc_args = build_protoc_args(script_args.generator, all_proto_paths, output_dir, packages)
+        context.copy_common_protos()
+        context.copy_google_api_protos()
 
-        if script_args.generator == "api_doc":
-            ignore_trusted_api = True
+        if script_args.relocate:
+            for proto_path in script_args.proto_paths:
+                copy_proto_files(proto_path, context.proto_path)
+            relocate_proto_package(context.proto_path, script_args.relocate)
+            proto_paths = [context.proto_path]
         else:
-            ignore_trusted_api = False
+            proto_paths = [ROOT_DIR.joinpath(pp) for pp in  script_args.proto_paths]
 
         # Only look for files to generate that were explicitly specified
-        protoc_files = list(find_proto_files(proto_paths, ignore_trusted_api))
+        protoc_files = list(find_proto_files(proto_paths, script_args.packages, script_args.no_internal))
 
+        # Now add supporting proto paths (needed during generation)
+        proto_paths.append(context.support_path)
+
+        protoc_args = build_protoc_args(script_args.generator, proto_paths, output_dir, packages)
         protoc_argv = platform_args(protoc_args, protoc_files)
-
-        newline = "\n"
-        _log.info(f"Running protoc: {newline.join(map(str, protoc_argv))}")
-
-        # Make sure the output dir exists before running protoc
-        pathlib.Path(output_dir).mkdir(parents=True, exist_ok=True)
 
         if script_args.generator == "python_grpc":
             protoc_executable = sys.executable
             protoc_argv = [sys.executable, "-m", "grpc_tools.protoc"] + protoc_argv[1:]
         else:
             protoc_executable = protoc.PROTOC_EXE
+
+        newline = "\n"
+        _log.info(f"Running protoc: {newline.join(map(str, protoc_argv))}")
+
+        # Make sure the output dir exists before running protoc
+        pathlib.Path(output_dir).mkdir(parents=True, exist_ok=True)
 
         # Always run protoc from the codegen folder
         # This makes finding the TRAC protoc plugin much easier

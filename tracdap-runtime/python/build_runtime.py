@@ -73,14 +73,19 @@ def copy_license():
         BUILD_PATH.joinpath("LICENSE"))
 
 
-def generate_from_proto():
+def generate_from_proto(unpacked: bool = False):
 
-    generated_dir = SCRIPT_DIR.joinpath("generated")
+    if unpacked:
+        generated_dir = SCRIPT_DIR.joinpath("generated")
+        grpc_relocate = "tracdap:tracdap/rt_gen/grpc/tracdap"
+    else:
+        generated_dir = BUILD_PATH.joinpath("generated")
+        grpc_relocate = "tracdap:tracdap/rt/_impl/grpc/tracdap"
 
     if generated_dir.exists():
         shutil.rmtree(generated_dir)
 
-    generated_dir.mkdir(parents=False, exist_ok=False)
+    generated_dir.mkdir(parents=True, exist_ok=False)
 
     protoc_ctrl = ROOT_PATH.joinpath("dev/codegen/protoc-ctrl.py")
 
@@ -88,13 +93,27 @@ def generate_from_proto():
         str(sys.executable), str(protoc_ctrl), "python_runtime",
         "--proto_path", "tracdap-api/tracdap-metadata/src/main/proto",
         "--proto_path", "tracdap-api/tracdap-config/src/main/proto",
-        "--out", "tracdap-runtime/python/generated/tracdap/rt_gen/domain"]
+        "--out", str(generated_dir) + "/tracdap/rt_gen/domain"]
 
     proto_cmd = [
         str(sys.executable), str(protoc_ctrl), "python_proto",
         "--proto_path", "tracdap-api/tracdap-metadata/src/main/proto",
         "--proto_path", "tracdap-api/tracdap-config/src/main/proto",
-        "--out", "tracdap-runtime/python/generated/tracdap/rt_gen/proto"]
+        "--proto_path", "tracdap-api/tracdap-services/src/main/proto",
+        "--relocate", grpc_relocate,
+        "--package", "tracdap.metadata",
+        "--package", "tracdap.config",
+        "--package", "tracdap.api.internal",
+        "--out", str(generated_dir)]
+
+    grpc_command = [
+        str(sys.executable), str(protoc_ctrl), "python_grpc",
+        "--proto_path", "tracdap-api/tracdap-metadata/src/main/proto",
+        "--proto_path", "tracdap-api/tracdap-config/src/main/proto",
+        "--proto_path", "tracdap-api/tracdap-services/src/main/proto",
+        "--relocate", grpc_relocate,
+        "--package", "tracdap.api.internal",
+        "--out", str(generated_dir)]
 
     domain_proc = subprocess.Popen(domain_cmd, stdout=subprocess.PIPE, cwd=ROOT_PATH, env=os.environ)
     domain_out, domain_err = domain_proc.communicate()
@@ -114,11 +133,35 @@ def generate_from_proto():
     if proto_result != 0:
         raise subprocess.SubprocessError("Failed to generate proto classes from definitions")
 
+    grpc_proc = subprocess.Popen(grpc_command, stdout=subprocess.PIPE, cwd=ROOT_PATH, env=os.environ)
+    grpc_out, grpc_err = grpc_proc.communicate()
+    grpc_result = grpc_proc.wait()
+
+    print(grpc_out.decode("utf-8"))
+
+    if grpc_result != 0:
+        raise subprocess.SubprocessError("Failed to generate gRPC classes from definitions")
+
 
 def move_generated_into_src():
 
     move_generated_package_into_src("src/tracdap/rt/metadata", "generated/tracdap/rt_gen/domain/tracdap/metadata")
     move_generated_package_into_src("src/tracdap/rt/config", "generated/tracdap/rt_gen/domain/tracdap/config")
+    move_generated_package_into_src("src/tracdap/rt/_impl/grpc", "generated/tracdap/rt/_impl/grpc")
+
+    # Update reference to gRPC generated classes in server.py
+
+    for line in fileinput.input(BUILD_PATH.joinpath("src/tracdap/rt/_exec/server.py"), inplace=True):
+        if "rt_gen" in line:
+            print(line.replace("rt_gen.grpc", "rt._impl.grpc"), end="")
+        else:
+            print(line, end='')
+
+    # Remove references to rt_gen package in setup.cfg, since everything is now in place under src/
+
+    for line in fileinput.input(BUILD_PATH.joinpath("setup.cfg"), inplace=True):
+        if "rt_gen" not in line:
+            print(line, end='')
 
 
 def move_generated_package_into_src(src_relative_path, generate_rel_path):
@@ -128,16 +171,10 @@ def move_generated_package_into_src(src_relative_path, generate_rel_path):
     # the main source tree
 
     src_metadata_path = BUILD_PATH.joinpath(src_relative_path)
-    generated_metadata_path = SCRIPT_DIR.joinpath(generate_rel_path)
+    generated_metadata_path = BUILD_PATH.joinpath(generate_rel_path)
 
     shutil.rmtree(src_metadata_path)
     shutil.copytree(generated_metadata_path, src_metadata_path)
-
-    # Remove references to rt_gen package in setup.cfg, since everything is now in place under src/
-
-    for line in fileinput.input(BUILD_PATH.joinpath("setup.cfg"), inplace=True):
-        if "rt_gen" not in line:
-            print(line, end='')
 
 
 def set_trac_version():
@@ -213,6 +250,10 @@ def cli_args():
         nargs="*", required=False,
         help="Patterns for matching integration tests")
 
+    parser.add_argument(
+        "--build-dir", type=pathlib.Path, metavar="build_dir", required=False,
+        help="Specify a build location (defaults to ./build in same directory as this script)")
+
     return parser.parse_args()
 
 
@@ -254,8 +295,13 @@ def main():
 
     args = cli_args()
 
+    # Update BUILD_PATH if it is specified on the command line
+    global BUILD_PATH
+    if args.build_dir is not None:
+        BUILD_PATH = args.build_dir
+
     if "codegen" in args.target:
-        generate_from_proto()
+        generate_from_proto(unpacked=True)
 
     if "test" in args.target:
         run_tests("test/tracdap_test")
@@ -272,9 +318,10 @@ def main():
         reset_build_dir()
         copy_source_files()
         copy_license()
-
-        move_generated_into_src()
         set_trac_version()
+
+        generate_from_proto()
+        move_generated_into_src()
 
         run_pypa_build()
 
