@@ -7,7 +7,7 @@ option java_multiple_files = true;
 
 import "tracdap/metadata/object_id.proto";
 import "tracdap/metadata/job.proto";
-import "tracdap/config/result.proto";
+import "tracdap/metadata/object.proto";
 
 import "google/api/annotations.proto";
 
@@ -20,7 +20,7 @@ service TracRuntimeApi {
     };
   }
 
-  rpc batchJobResult(BatchJobStatusRequest) returns (config.JobResult) {
+  rpc batchJobResult(BatchJobStatusRequest) returns (BatchJobResult) {
     option (google.api.http) = {
       get: "/batch-job-result/{jobKey}"
     };
@@ -39,4 +39,14 @@ message BatchJobStatus {
 
   metadata.JobStatusCode statusCode = 1;
   string statusMessage = 2;
+}
+
+message BatchJobResult {
+
+  metadata.TagHeader jobId = 1;
+
+  metadata.JobStatusCode statusCode = 2;
+  string statusMessage = 3;
+
+  map<string, metadata.ObjectDefinition> results = 4;
 }
