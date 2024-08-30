@@ -92,6 +92,8 @@ class TracRuntime:
         self._scratch_dir_provided = True if scratch_dir is not None else False
         self._scratch_dir_persist = scratch_dir_persist
         self._dev_mode = dev_mode
+        self._server_enabled = server_enabled
+        self._server_port = server_port
 
         # Top level resources
         self._models: tp.Optional[_models.ModelLoader] = None
@@ -101,6 +103,9 @@ class TracRuntime:
         self._system: tp.Optional[_actors.ActorSystem] = None
         self._engine: tp.Optional[_engine.TracEngine] = None
         self._engine_event = threading.Condition()
+
+        # Runtime API server
+        self._server = None
 
         self._jobs: tp.Dict[str, _RuntimeJobInfo] = dict()
 
@@ -177,10 +182,25 @@ class TracRuntime:
 
             self._system.start(wait=wait)
 
+            # If the runtime server has been enabled, start it up
+            if self._server_enabled:
+
+                self._log.info("Starting the runtime API server...")
+
+                # The server module pulls in all the gRPC dependencies, don't import it unless we have to
+                import tracdap.rt._exec.server as _server
+
+                self._server = _server.RuntimeApiServer(self._server_port)
+                self._server.start()
+
         except Exception as e:
             self._handle_startup_error(e)
 
     def stop(self, due_to_error=False):
+
+        if self._server is not None:
+            self._log.info("Stopping the runtime API server...")
+            self._server.stop()
 
         if due_to_error:
             self._log.info("Shutting down the engine in response to an error")
