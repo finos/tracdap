@@ -95,6 +95,8 @@ class TracRuntime:
         self._server_enabled = server_enabled
         self._server_port = server_port
 
+        self._pre_start_complete = False
+
         # Top level resources
         self._models: tp.Optional[_models.ModelLoader] = None
         self._storage: tp.Optional[_storage.StorageManager] = None
@@ -159,12 +161,18 @@ class TracRuntime:
                 config_dir = self._sys_config_path.parent if self._sys_config_path is not None else None
                 self._sys_config = _dev_mode.DevModeTranslator.translate_sys_config(self._sys_config, config_dir)
 
+            self._pre_start_complete = True
+
         except Exception as e:
             self._handle_startup_error(e)
 
     def start(self, wait: bool = False):
 
         try:
+
+            # Ensure pre-start has been run
+            if not self._pre_start_complete:
+                self.pre_start()
 
             self._log.info("Starting the engine...")
 
