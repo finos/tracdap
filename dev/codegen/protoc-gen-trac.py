@@ -71,7 +71,9 @@ class TracPlugin:
             # Build a static type map in a separate first pass
             type_map = generator.build_type_map(self._request.proto_file)
 
-            sorted_files = input_files  # sorted(input_files, key=lambda f: f.package)
+            # Sort files by package, so all the files in a package are processed at once
+            # Required for package aggregation, when a whole package must be output as a single file
+            sorted_files = sorted(input_files, key=lambda f: f.package)
             packages = it.groupby(sorted_files, lambda f: f.package)
 
             for package, files in packages:
