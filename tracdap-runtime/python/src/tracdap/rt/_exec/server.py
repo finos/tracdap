@@ -46,11 +46,11 @@ class RuntimeApiServer(runtime_grpc.TracRuntimeApiServicer):
         status_message = "In progress"
 
         job_status = runtime_pb2.JobStatus(
-            jobId = grpc_codec.encode(job_id),
-            statusCode = grpc_codec.encode(status_code),
-            statusMessage = status_message)
+            jobId=grpc_codec.encode(job_id),
+            statusCode=grpc_codec.encode(status_code),
+            statusMessage=status_message)
 
-        response = runtime_pb2.ListJobsResponse(jobs = [job_status])
+        response = runtime_pb2.ListJobsResponse(jobs=[job_status])
 
         return response
 
@@ -62,7 +62,7 @@ class RuntimeApiServer(runtime_grpc.TracRuntimeApiServicer):
 
     def start(self):
 
-        self.__thread_pool  = futures.ThreadPoolExecutor(
+        self.__thread_pool = futures.ThreadPoolExecutor(
             max_workers=self.__n_workers,
             thread_name_prefix=self.__THREAD_NAME_PREFIX)
 

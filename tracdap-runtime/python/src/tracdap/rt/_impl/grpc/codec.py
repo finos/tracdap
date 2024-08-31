@@ -15,6 +15,7 @@
 import enum
 import typing as tp
 
+
 def encode(obj: tp.Any) -> tp.Any:
 
     # Translate TRAC domain objects into generic dict / list structures
@@ -28,34 +29,16 @@ def encode(obj: tp.Any) -> tp.Any:
         return obj
 
     if isinstance(obj, enum.Enum):
-        return _encode_enum(obj)
+        return obj.value
 
     if isinstance(obj, list):
-        return _encode_list(obj)
+        return list(map(encode, obj))
 
     if isinstance(obj, dict):
-        return _encode_dict(obj)
+        return dict(map(lambda kv: (kv[0], encode(kv[1])), obj.items()))
 
     # Filter classes for TRAC domain objects (sanity check, not a watertight validation)
     if hasattr(obj, "__module__") and "tracdap" in obj.__module__:
-        return _encode_object(obj)
+        return dict(map(lambda kv: (kv[0], encode(kv[1])), obj.__dict__.items()))
 
     raise RuntimeError(f"Cannot encode object of type [{type(obj).__name__}] for gRPC")
-
-def _encode_object(obj: object) -> dict:
-    return dict(map(lambda kv: (kv[0], encode(kv[1])), obj.__dict__.items()))
-
-def _encode_dict(kvs: dict) -> dict:
-    return dict(map(lambda kv: (kv[0], encode(kv[1])), kvs.items()))
-
-def _encode_list(xs: list) -> list:
-    return list(map(encode, xs))
-
-def _encode_enum(x: enum.Enum) -> int:
-    # This is to handle domain object enums, which currently use tuples to provide enum value docs
-    # A better solution would be to set __doc__ on enum values
-    if isinstance(x.value, tuple):
-        return x.value[0]
-    else:
-        return x.value
-

@@ -28,7 +28,6 @@ _ROOT_DIR = pathlib.Path(__file__).parent \
     .resolve()
 
 
-
 class EmbeddedJobsTest(unittest.TestCase):
 
     def setUp(self):
@@ -60,4 +59,4 @@ class EmbeddedJobsTest(unittest.TestCase):
             response: runtime_pb2.ListJobsResponse = client.listJobs(request)
 
             self.assertEqual(1, len(response.jobs))
-            self.assertEqual(meta.JobStatusCode.RUNNING.value[0], response.jobs[0].statusCode)
+            self.assertEqual(meta.JobStatusCode.RUNNING.value, response.jobs[0].statusCode)
