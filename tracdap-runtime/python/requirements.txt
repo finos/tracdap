@@ -14,6 +14,7 @@ protobuf == 5.27.4
 # Optional in the distributed package but required for development
 grpcio == 1.66.1
 grpcio-status == 1.66.1
+grpcio-tools == 1.66.1
 
 # Core data framework is based on Arrow
 # This should always match the Java Arrow version
