@@ -13,6 +13,7 @@
 #  limitations under the License.
 
 import fileinput
+import os
 import pathlib
 import platform
 import re
@@ -45,7 +46,27 @@ logging.basicConfig(format=logging_format, level=logging.INFO)
 _log = logging.getLogger(SCRIPT_NAME)
 
 
+PUBLIC_API_EXCLUSIONS = [
+    re.compile(r"[/\\]internal[/\\]"),
+    re.compile(r"_trusted\.proto$")
+]
+
+
+def is_public_api(path: pathlib.Path):
+
+    return not any(map(lambda excl: excl.match(str(path)), PUBLIC_API_EXCLUSIONS))
+
+
+def is_in_packages(path: pathlib.Path, packages):
+
+    unix_like_path = str(path).replace(os.sep, "/")
+
+    return any(map(lambda pkg: pkg in unix_like_path, packages))
+
+
 def _copytree(src, dst):
+
+    _log.info(f"Copying {src} -> {dst}")
 
     # In shutil.copytree, dir_exists_ok is only available from Python 3.8, but we need Python 3.7
     # Codegen is part of the core build tools so needs to match supported Python versions of the TRAC runtime
@@ -59,6 +80,9 @@ def _copytree(src, dst):
 
         rel_item = src_item.relative_to(src_dir)
         dst_item = dst_dir.joinpath(rel_item)
+
+        if src_item.name == "__pycache__":
+            continue
 
         if src_item.is_dir():
             _copytree(src_item, dst_item)
@@ -101,7 +125,6 @@ class ProtoCtrlContext:
         protoc_inc_src = pathlib.Path(protoc.PROTOC_INCLUDE_DIR)
         protoc_inc_dst = pathlib.Path(self.support_path)
 
-        _log.info(f"Copying {protoc_inc_src} -> {protoc_inc_dst}")
         _copytree(protoc_inc_src, protoc_inc_dst)
 
     def copy_google_api_protos(self):
@@ -110,15 +133,7 @@ class ProtoCtrlContext:
         gapi_src = pathlib.Path(gapi_http_module.__file__).parent
         gapi_dst = pathlib.Path(self.support_path).joinpath("google/api")
 
-        _log.info(f"Copying {gapi_src} -> {gapi_dst}")
         _copytree(gapi_src, gapi_dst)
-
-
-def copy_proto_files(src_proto_path: pathlib.Path, dest_proto_path: pathlib.Path):
-
-    for dir_entry in src_proto_path.iterdir():
-        target = dest_proto_path.joinpath(dir_entry.name)
-        shutil.copytree(dir_entry, target, dirs_exist_ok=True)
 
 
 def relocate_proto_package(proto_path: pathlib.Path, relocate):
@@ -135,11 +150,16 @@ def relocate_proto_package(proto_path: pathlib.Path, relocate):
     temp_pkg = proto_path.joinpath("__temp")
     target_pkg = proto_path.joinpath(target)
 
+    _log.info(f"Moving {source_pkg} -> {target_pkg}")
+
+    shutil.move(source_pkg, temp_pkg)
+
     if not target_pkg.parent.exists():
         target_pkg.parent.mkdir(parents=True)
 
-    shutil.move(source_pkg, temp_pkg)
     shutil.move(temp_pkg, target_pkg)
+
+    _log.info(f"Relocating imports for {source} -> {target}")
 
     match = re.compile(rf"import \"{source}/", re.MULTILINE)
     replace = f"import \"{target}/"
@@ -176,21 +196,18 @@ def find_proto_files(proto_paths, packages, no_internal=False):
         for entry in proto_path_.iterdir():
 
             # Do not include internal parts of the API when generating for API docs
-            if no_internal:
-                if entry.root == "internal":
-                    continue
-                if "_trusted.proto" in entry.name:
-                    continue
+            if no_internal and not is_public_api(entry):
+                print(f"Excluding non-public API: [{entry.name}]")
+                continue
 
             if entry.is_dir():
                 for sub_entry in find_proto_files(proto_path_.joinpath(entry.name), packages, no_internal):
                     yield sub_entry
 
-            else:
-                if packages and not any(map(lambda p: p in str(entry), package_paths)):
-                    continue
-                elif entry.is_file() and entry.name.endswith(".proto"):
+            elif entry.is_file() and entry.name.endswith(".proto"):
+                if packages is None or is_in_packages(entry, package_paths):
                     yield proto_path_.joinpath(entry.name)
+
 
 def platform_args(base_args, proto_files):
 
@@ -309,11 +326,11 @@ def main():
 
         if script_args.relocate:
             for proto_path in script_args.proto_paths:
-                copy_proto_files(proto_path, context.proto_path)
+                _copytree(proto_path, context.proto_path)
             relocate_proto_package(context.proto_path, script_args.relocate)
             proto_paths = [context.proto_path]
         else:
-            proto_paths = [ROOT_DIR.joinpath(pp) for pp in  script_args.proto_paths]
+            proto_paths = [ROOT_DIR.joinpath(pp) for pp in script_args.proto_paths]
 
         # Only look for files to generate that were explicitly specified
         protoc_files = list(find_proto_files(proto_paths, script_args.packages, script_args.no_internal))
