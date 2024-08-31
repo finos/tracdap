@@ -25,9 +25,6 @@ import generator as gen
 
 class TracPlugin:
 
-    # TODO: Pass this in as an option
-    TARGET_PACKAGE = "tracdap.rt"
-
     def __init__(self, pb_request: pb_plugin.CodeGeneratorRequest):
 
         logging_format = f"%(levelname)s %(name)s: %(message)s"
