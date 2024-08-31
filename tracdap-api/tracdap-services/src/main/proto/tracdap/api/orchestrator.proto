@@ -27,7 +27,6 @@ import "tracdap/metadata/tag_update.proto";
 
 // Force dependency ordering - API protos depend on all of metadata
 import "tracdap/metadata/tag.proto";
-import 'tracdap/api/internal/runtime.proto';
 
 import "google/api/annotations.proto";
 
