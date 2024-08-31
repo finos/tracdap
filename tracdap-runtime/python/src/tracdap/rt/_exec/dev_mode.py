@@ -81,26 +81,31 @@ class DevModeTranslator:
         if job_config.job.jobType is None or job_config.job.jobType == _meta.JobType.JOB_TYPE_NOT_SET:
             job_config = cls._process_job_type(job_config)
 
-        if model_class is not None:
+        if job_config.job.jobType == _meta.JobType.RUN_MODEL:
 
-            model_id, model_obj = cls._generate_model_for_class(model_loader, model_class)
-            job_config = cls._add_job_resource(job_config, model_id, model_obj)
-            job_config.job.runModel.model = _util.selector_for(model_id)
+            # If a model class is supplied in code, use that to generate the model def
+            if model_class is not None:
+                model_id, model_obj = cls._generate_model_for_class(model_loader, model_class)
+                job_config = cls._add_job_resource(job_config, model_id, model_obj)
+                job_config.job.runModel.model = _util.selector_for(model_id)
 
-        elif job_config.job.jobType == _meta.JobType.RUN_MODEL and job_config.job.runModel.model is not None:
-
-            model_detail = job_config.job.runModel.model
-            model_id, model_obj = cls._generate_model_for_entry_point(model_loader, model_detail)  # noqa
-            job_config = cls._add_job_resource(job_config, model_id, model_obj)
-            job_config.job.runModel.model = _util.selector_for(model_id)
+            # Otherwise if model specified as a string instead of a selector, apply the translation
+            elif isinstance(job_config.job.runModel.model, str):
+                model_detail = job_config.job.runModel.model
+                model_id, model_obj = cls._generate_model_for_entry_point(model_loader, model_detail)  # noqa
+                job_config = cls._add_job_resource(job_config, model_id, model_obj)
+                job_config.job.runModel.model = _util.selector_for(model_id)
 
         if job_config.job.jobType == _meta.JobType.RUN_FLOW:
 
+            # Process all the models in runFlow.models to see if they need translation
             original_models = job_config.job.runFlow.models.copy()
             for model_key, model_detail in original_models.items():
-                model_id, model_obj = cls._generate_model_for_entry_point(model_loader, model_detail)
-                job_config = cls._add_job_resource(job_config, model_id, model_obj)
-                job_config.job.runFlow.models[model_key] = _util.selector_for(model_id)
+                # Only apply translation if the model is specified as a string instead of a selector
+                if isinstance(model_detail, str):
+                    model_id, model_obj = cls._generate_model_for_entry_point(model_loader, model_detail)
+                    job_config = cls._add_job_resource(job_config, model_id, model_obj)
+                    job_config.job.runFlow.models[model_key] = _util.selector_for(model_id)
 
             flow_id, flow_obj = cls._expand_flow_definition(job_config, config_dir)
             job_config = cls._add_job_resource(job_config, flow_id, flow_obj)
