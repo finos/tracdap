@@ -47,7 +47,7 @@ _log = logging.getLogger(SCRIPT_NAME)
 
 
 PUBLIC_API_EXCLUSIONS = [
-    re.compile(r".*[/\\]internal[/\\]"),
+    re.compile(r".*[/\\]internal$"),
     re.compile(r".*_trusted\.proto$")]
 
 

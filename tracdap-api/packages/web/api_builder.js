@@ -47,8 +47,8 @@ const pbtsArgs = [
 
 const PUBLIC_API_BUILD = true;
 const PUBLIC_API_EXCLUSIONS = [
-    /[/\\]internal$/,
-    /_trusted\.proto$/
+    /.*[/\\]internal$/,
+    /.*_trusted\.proto$/
 ]
 
 function isPublicApi(path) {
