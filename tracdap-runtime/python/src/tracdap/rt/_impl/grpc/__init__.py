@@ -11,8 +11,3 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-
-# Placeholder for generated code in distribution builds
-# Generated code for the gRPC Runtime API server
-
-from tracdap.rt_gen.grpc import *  # noqa

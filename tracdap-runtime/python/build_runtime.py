@@ -147,7 +147,7 @@ def move_generated_into_src():
 
     move_generated_package_into_src("src/tracdap/rt/metadata", "generated/tracdap/rt_gen/domain/tracdap/metadata")
     move_generated_package_into_src("src/tracdap/rt/config", "generated/tracdap/rt_gen/domain/tracdap/config")
-    move_generated_package_into_src("src/tracdap/rt/_impl/grpc", "generated/tracdap/rt/_impl/grpc")
+    move_generated_package_into_src("src/tracdap/rt/_impl/grpc/tracdap", "generated/tracdap/rt/_impl/grpc/tracdap")
 
     # Update reference to gRPC generated classes in server.py
 
@@ -173,7 +173,9 @@ def move_generated_package_into_src(src_relative_path, generate_rel_path):
     src_metadata_path = BUILD_PATH.joinpath(src_relative_path)
     generated_metadata_path = BUILD_PATH.joinpath(generate_rel_path)
 
-    shutil.rmtree(src_metadata_path)
+    if src_metadata_path.exists():
+        shutil.rmtree(src_metadata_path)
+
     shutil.copytree(generated_metadata_path, src_metadata_path)
 
 
