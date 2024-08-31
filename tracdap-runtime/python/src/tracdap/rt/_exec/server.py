@@ -14,8 +14,13 @@
 
 import typing as tp
 import concurrent.futures as futures
+import uuid
+
+import tracdap.rt._impl.grpc.codec as grpc_codec
+import tracdap.rt.metadata as meta
 
 # Imports for gRPC generated code, these are managed by build_runtime.py for distribution
+import tracdap.rt_gen.grpc.tracdap.api.internal.runtime_pb2 as runtime_pb2
 import tracdap.rt_gen.grpc.tracdap.api.internal.runtime_pb2_grpc as runtime_grpc
 import grpc
 
@@ -32,11 +37,28 @@ class RuntimeApiServer(runtime_grpc.TracRuntimeApiServicer):
         self.__server: tp.Optional[grpc.Server] = None
         self.__thread_pool: tp.Optional[futures.ThreadPoolExecutor] = None
 
-    def batchJobStatus(self, request, context: grpc.ServicerContext):
-        return super().batchJobStatus(request, context)
+    def listJobs(self, request, context):
 
-    def batchJobResult(self, request, context):
-        return super().batchJobResult(request, context)
+        # TODO: This is a dummy implementation to start testing server connection
+
+        job_id = meta.TagHeader(meta.ObjectType.JOB, str(uuid.uuid4()), objectVersion=1, tagVersion=1)
+        status_code = meta.JobStatusCode.RUNNING
+        status_message = "In progress"
+
+        job_status = runtime_pb2.JobStatus(
+            jobId = grpc_codec.encode(job_id),
+            statusCode = grpc_codec.encode(status_code),
+            statusMessage = status_message)
+
+        response = runtime_pb2.ListJobsResponse(jobs = [job_status])
+
+        return response
+
+    def getJobStatus(self, request: runtime_pb2.BatchJobStatusRequest, context: grpc.ServicerContext):
+        return super().getJobStatus(request, context)
+
+    def getJobDetails(self, request, context):
+        return super().getJobDetails(request, context)
 
     def start(self):
 
