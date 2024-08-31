@@ -47,15 +47,13 @@ _log = logging.getLogger(SCRIPT_NAME)
 
 
 PUBLIC_API_EXCLUSIONS = [
-    re.compile(r"[/\\]internal[/\\]"),
-    re.compile(r"_trusted\.proto$")
-]
+    re.compile(r".*[/\\]internal[/\\]"),
+    re.compile(r".*_trusted\.proto$")]
 
 
 def is_public_api(path: pathlib.Path):
 
     return not any(map(lambda excl: excl.match(str(path)), PUBLIC_API_EXCLUSIONS))
-
 
 def is_in_packages(path: pathlib.Path, packages):
 
@@ -182,31 +180,39 @@ def _relocate_proto_imports(proto_path: pathlib.Path, match: re.Pattern, replace
 def find_proto_files(proto_paths, packages, no_internal=False):
 
     proto_path_list = proto_paths if isinstance(proto_paths, list) else [proto_paths]
-    package_paths = list(map(lambda p: p.replace(".", "/"), packages)) if packages else None
 
     for proto_path in proto_path_list:
 
-        path_str = str(proto_path)
+        for entry in find_proto_files_in_dir(proto_path, proto_path, packages, no_internal):
+            yield entry
 
-        if "=" in path_str:
-            proto_path_ = pathlib.Path(path_str[path_str.index("=") + 1:])
-        else:
-            proto_path_ = pathlib.Path(path_str)
 
-        for entry in proto_path_.iterdir():
+def find_proto_files_in_dir(proto_path, root_proto_path, packages, no_internal):
 
-            # Do not include internal parts of the API when generating for API docs
-            if no_internal and not is_public_api(entry):
-                print(f"Excluding non-public API: [{entry.name}]")
-                continue
+    package_paths = list(map(lambda p: p.replace(".", "/"), packages)) if packages else None
 
-            if entry.is_dir():
-                for sub_entry in find_proto_files(proto_path_.joinpath(entry.name), packages, no_internal):
-                    yield sub_entry
+    path_str = str(proto_path)
 
-            elif entry.is_file() and entry.name.endswith(".proto"):
-                if packages is None or is_in_packages(entry, package_paths):
-                    yield proto_path_.joinpath(entry.name)
+    if "=" in path_str:
+        proto_path_ = pathlib.Path(path_str[path_str.index("=") + 1:])
+    else:
+        proto_path_ = pathlib.Path(path_str)
+
+    for entry in proto_path_.iterdir():
+
+        # Do not include internal parts of the API when generating for API docs
+        if no_internal and not is_public_api(entry):
+            _log.info(f"Excluding non-public API: [{entry.relative_to(root_proto_path)}]")
+            continue
+
+        if entry.is_dir():
+            sub_path = proto_path_.joinpath(entry.name)
+            for sub_entry in find_proto_files_in_dir(sub_path, root_proto_path, packages, no_internal):
+                yield sub_entry
+
+        elif entry.is_file() and entry.name.endswith(".proto"):
+            if packages is None or is_in_packages(entry, package_paths):
+                yield proto_path_.joinpath(entry.name)
 
 
 def platform_args(base_args, proto_files):
