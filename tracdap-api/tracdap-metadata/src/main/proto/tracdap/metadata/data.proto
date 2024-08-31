@@ -85,11 +85,18 @@ message SchemaDefinition {
 }
 
 
-
-
+/**
+ * Partitioning scheme applied to a dataset
+ */
 enum PartType {
+
+    /// Dataset has a single partition called the root partition (this is the default)
     PART_ROOT = 0;
+
+    /// Partition by range over an ordered variable (not available yet)
     PART_BY_RANGE = 1;
+
+    /// Partition by value over a categorical variable (not available yet)
     PART_BY_VALUE = 2;
 }
 
