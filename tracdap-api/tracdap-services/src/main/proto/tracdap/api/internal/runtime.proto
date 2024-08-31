@@ -11,9 +11,6 @@ import "tracdap/metadata/object.proto";
 
 import "google/api/annotations.proto";
 
-// Force dependency ordering
-import "tracdap/api/orchestrator.proto";
-
 
 service TracRuntimeApi {
 
