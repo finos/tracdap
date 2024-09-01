@@ -20,8 +20,8 @@ Setting up a new project
 
 If you are starting a project from scratch, it's a good idea to follow the standard
 Python conventions for package naming and folder layout. If you are working on an
-existing project or are already familiar with the Python conventions, feel free to
-skip this section.
+existing project or are already familiar with the Python conventions, then you can
+:ref:`skip this section <modelling/tutorial/chapter_1_hello_world:Installing the runtime>`
 
 For this example we will create a project folder called example-project. Typically
 this will be a Git repository. You will also want to create a Python virtual environment
@@ -94,9 +94,9 @@ to be defined in two places. Putting the test code in a separate test folder sto
 in with the code in src/, which is important when it comes to releasing code to production.
 
 TRAC uses a few simple config files to control models during local development, so we have set up a
-config folder to put those in.
+config folder to put those in. The contents of these files is discussed later in the tutorial.
 
-The venv/ folder is where Python puts the virtual environment and stores any project dependencies.
+The venv/ folder is where Python puts any libraries your project uses, including the TRAC runtime library.
 Typically you want to ignore this folder in Git by adding it to the .gitignore file. Your IDE might
 do this automatically, otherwise you can create a file called .gitignore and add this line to it:
 
@@ -121,21 +121,8 @@ dependencies. If you want to target particular versions, you can install them ex
 
     pip install "pandas == 2.1.4"
 
-As an alternative to installing these packages individually, you can create requirements.txt in
-the root of your project folder. This will allow you to keep track of dependencies for you project,
-for example if you want to add other third party libraries.
-
-.. code-block::
-    :caption: requirements.txt
-
-    tracdap-runtime ~= 0.6
-    pandas ~= 2.1.4
-
-To install requirements from a requirements file, use this command:
-
-.. code-block:: shell
-
-    pip install -r requirements.txt
+Alternatively, you can create *requirements.txt* in the root of your project folder and record
+projects requirements there.
 
 .. note::
 
