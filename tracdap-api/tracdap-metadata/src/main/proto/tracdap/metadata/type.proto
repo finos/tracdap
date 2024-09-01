@@ -20,8 +20,6 @@ package tracdap.metadata;
 option java_package = "org.finos.tracdap.metadata";
 option java_multiple_files = true;
 
-import "tracdap/metadata/common.proto";
-
 
 /**
  * Type system for TRAC metadata, APIs and data

@@ -23,6 +23,9 @@ option java_multiple_files = true;
 import "tracdap/metadata/object_id.proto";
 
 
+/**
+ * Describes a file object stored in the TRAC platform
+ */
 message FileDefinition {
 
   string name = 1;

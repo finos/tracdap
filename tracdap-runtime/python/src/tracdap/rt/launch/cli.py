@@ -16,7 +16,7 @@ import argparse
 import pathlib
 
 
-def cli_args():
+def _cli_args():
 
     parser = argparse.ArgumentParser(
         prog="python -m tracdap.rt.launch",
@@ -45,12 +45,10 @@ def cli_args():
     parser.add_argument(
         "--scratch-dir", dest="scratch_dir", type=pathlib.Path, required=False,
         help="Scratch directory for working files" +
-             " (if not supplied the system's temp location will be used)"
-    )
+             " (if not supplied the system's temp location will be used)")
 
     parser.add_argument(
         "--scratch-dir-persist", dest="scratch_dir_persist", default=False, action="store_true",
-        help="Do not clean up the scratch location on exit"
-    )
+        help="Do not clean up the scratch location on exit")
 
     return parser.parse_args()

@@ -20,10 +20,10 @@ package tracdap.api;
 option java_package = "org.finos.tracdap.api";
 option java_multiple_files = true;
 
-// Force dependency ordering - api package depends on metadata package
-import "tracdap/metadata/tag.proto";
 
-
+/**
+ * Detailed error information, available if an API call fails for any reason
+ */
 message TracErrorDetails {
 
   int32 code = 1;
@@ -32,6 +32,11 @@ message TracErrorDetails {
   repeated TracErrorItem items = 3;
 }
 
+/**
+ * Individual error items in a detailed error response
+ *
+ * @see TracErrorDetails
+ */
 message TracErrorItem {
 
   string detail = 1;

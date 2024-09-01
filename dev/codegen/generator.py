@@ -145,7 +145,8 @@ class TracGenerator:
         '{ENUM_VALUES}')
 
     ENUM_VALUE_TEMPLATE = (
-        '{INDENT}{ENUM_VALUE_NAME} = {ENUM_VALUE_NUMBER}, {QUOTED_COMMENT}\n\n')
+        '{INDENT}{ENUM_VALUE_NAME} = {ENUM_VALUE_NUMBER}\n\n'
+        '{DOC_COMMENT}')
 
     DATA_CLASS_TEMPLATE = (
         '{INDENT}@_dc.dataclass\n'
@@ -193,11 +194,11 @@ class TracGenerator:
         '{INDENT}"""\n\n')
 
     ENUM_COMMENT_SINGLE_LINE = \
-        '"""{COMMENT}"""'
+        '{INDENT}"""{COMMENT}"""\n\n'
 
     ENUM_COMMENT_MULTI_LINE = \
-        '"""{COMMENT}\n' \
-        '{INDENT}"""'
+        '{INDENT}"""{COMMENT}\n' \
+        '{INDENT}"""\n\n'
 
     def __init__(self, options: tp.Dict[str, tp.Any] = None):
 
@@ -667,9 +668,9 @@ class TracGenerator:
         # Populate the template
         return self.ENUM_VALUE_TEMPLATE \
             .replace("{INDENT}", self.INDENT_TEMPLATE * ctx.indent) \
-            .replace("{QUOTED_COMMENT}", formatted_comment) \
             .replace("{ENUM_VALUE_NAME}", descriptor.name) \
-            .replace("{ENUM_VALUE_NUMBER}", str(descriptor.number))
+            .replace("{ENUM_VALUE_NUMBER}", str(descriptor.number)) \
+            .replace("{DOC_COMMENT}", formatted_comment)
 
     # Python type hints
 

@@ -45,6 +45,16 @@ const pbtsArgs = [
     jsOutFile
 ]
 
+const PUBLIC_API_BUILD = true;
+const PUBLIC_API_EXCLUSIONS = [
+    /.*[/\\]internal$/,
+    /.*_trusted\.proto$/
+]
+
+function isPublicApi(path) {
+
+    return ! PUBLIC_API_EXCLUSIONS.some(exclusion => exclusion.test(path));
+}
 
 function copyProto() {
 
@@ -57,16 +67,31 @@ function copyProto() {
 
         fs.mkdirSync(dstDir, {recursive: true});
 
-        fs.readdirSync(srcDir).forEach(file => {
-
-            const srcProto = path.join(srcDir, file);
-            const dstProto = path.join(dstDir, file);
-
-            fs.copyFileSync(srcProto, dstProto);
-
-            pbjsArgs.push(pkg + '/' + file);
-        })
+        copyProtoDir(srcDir, dstDir, pkg);
     }
+}
+
+function copyProtoDir(srcDir, dstDir, pkg) {
+
+    fs.readdirSync(srcDir).forEach(file => {
+
+        const srcFile = path.join(srcDir, file);
+        const dstFile = path.join(dstDir, file);
+        const pkgFile = path.join(pkg, file);
+
+        if (PUBLIC_API_BUILD && !isPublicApi(pkgFile)) {
+            console.log(`Excluding non-public API [${pkgFile}]`)
+        }
+        else if (fs.lstatSync(srcFile).isDirectory()) {
+            const childPkg = path.join(pkg, file)
+            fs.mkdirSync(dstFile, {recursive: true});
+            copyProtoDir(srcFile, dstFile, childPkg);
+        }
+        else {
+            fs.copyFileSync(srcFile, dstFile);
+            pbjsArgs.push(pkgFile);
+        }
+    });
 }
 
 function generateJsMapping(mappingDict, valuePrefix, indent) {
@@ -170,7 +195,10 @@ function main() {
 
     copyProto();
 
-    pbjs.main(pbjsArgs, () => {
+    pbjs.main(pbjsArgs, (err, _) => {
+
+        if (err)
+            throw err;
 
         const methodTypes = generateJsMapping(mapping.methodTypes, "", 2);
         const apiMappingDict = {...mapping.enumMapping, ...mapping.basicTypeMapping};
@@ -178,7 +206,10 @@ function main() {
         writeJsSubstitutions(methodTypes, apiMapping);
     });
 
-    pbts.main(pbtsArgs, () => {
+    pbts.main(pbtsArgs, (err, _) => {
+
+        if (err)
+            throw err;
 
         const enumMapping = generateEnumMapping(mapping.enumMapping);
         const basicTypeMapping = generateBasicTypeMapping(mapping.basicTypeMapping);

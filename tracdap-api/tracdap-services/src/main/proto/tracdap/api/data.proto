@@ -20,14 +20,10 @@ package tracdap.api;
 option java_package = "org.finos.tracdap.api";
 option java_multiple_files = true;
 
-import "tracdap/metadata/common.proto";
 import "tracdap/metadata/object_id.proto";
 import "tracdap/metadata/data.proto";
 import "tracdap/metadata/file.proto";
 import "tracdap/metadata/tag_update.proto";
-
-// Force dependency ordering - API protos depend on all of metadata
-import "tracdap/metadata/tag.proto";
 
 import "google/api/annotations.proto";
 
@@ -792,6 +788,9 @@ message FileReadResponse {
 }
 
 
+/**
+ * Request object for an HTTP download
+ */
 message DownloadRequest {
 
   string tenant = 1;
@@ -802,6 +801,9 @@ message DownloadRequest {
 };
 
 
+/**
+ * Response object for an HTTP download
+ */
 message DownloadResponse {
 
   optional string contentType = 1;

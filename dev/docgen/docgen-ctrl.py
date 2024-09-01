@@ -97,7 +97,8 @@ class DocGen:
             "--proto_path", "tracdap-api/tracdap-services/src/main/proto",
             "--proto_path", "tracdap-api/tracdap-metadata/src/main/proto",
             "--out", "build/doc/code/platform_api",
-            "--package", "tracdap"]
+            "--package", "tracdap",
+            "--no-internal"]
 
         self._run_subprocess(codegen_exe, codegen_args)
 

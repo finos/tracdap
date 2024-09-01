@@ -20,17 +20,16 @@ package tracdap.api;
 option java_package = "org.finos.tracdap.api";
 option java_multiple_files = true;
 
-import "tracdap/metadata/common.proto";
 import "tracdap/metadata/object_id.proto";
 import "tracdap/metadata/job.proto";
 import "tracdap/metadata/tag_update.proto";
 
-// Force dependency ordering - API protos depend on all of metadata
-import "tracdap/metadata/tag.proto";
-
 import "google/api/annotations.proto";
 
 
+/**
+ * Public API for submitting, querying and managing jobs in the TRAC platform
+ */
 service TracOrchestratorApi {
 
   rpc validateJob (JobRequest) returns (JobStatus) {
@@ -59,7 +58,9 @@ service TracOrchestratorApi {
   rpc cancelJob (JobStatusRequest) returns (JobStatus);
 }
 
-
+/**
+ * Request to submit (or validate) a new job
+ */
 message JobRequest {
 
   string tenant = 1;
@@ -69,7 +70,9 @@ message JobRequest {
   repeated metadata.TagUpdate jobAttrs = 3;
 }
 
-
+/**
+ * Request to check the status or results of an existing job
+ */
 message JobStatusRequest {
 
   string tenant = 1;
@@ -77,7 +80,9 @@ message JobStatusRequest {
   metadata.TagSelector selector = 2;
 }
 
-
+/**
+ * Provides the status of a new or existing job in the platform
+ */
 message JobStatus {
 
   metadata.TagHeader jobId = 1;

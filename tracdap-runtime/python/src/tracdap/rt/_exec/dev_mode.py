@@ -34,8 +34,9 @@ DEV_MODE_JOB_CONFIG = [
     re.compile(r"job\.run(Model|Flow)\.parameters\.\w+"),
     re.compile(r"job\.run(Model|Flow)\.inputs\.\w+"),
     re.compile(r"job\.run(Model|Flow)\.outputs\.\w+"),
-    re.compile(r"job\.run(Model|Flow)\.models\.\w+"),
-    re.compile(r"job\.run(Model|Flow)\.flow+")]
+    re.compile(r"job\.runModel\.model"),
+    re.compile(r"job\.runFlow\.flow"),
+    re.compile(r"job\.runFlow\.models\.\w+")]
 
 DEV_MODE_SYS_CONFIG = []
 
@@ -71,92 +72,24 @@ class DevModeTranslator:
 
         cls._log.info(f"Applying dev mode config translation to job config")
 
-        model_loader = _models.ModelLoader(sys_config, scratch_dir)
-        model_loader.create_scope("DEV_MODE_TRANSLATION")
-
         if not job_config.jobId:
             job_config = cls._process_job_id(job_config)
 
         if job_config.job.jobType is None or job_config.job.jobType == _meta.JobType.JOB_TYPE_NOT_SET:
             job_config = cls._process_job_type(job_config)
 
-        if model_class is not None:
+        # Load and populate any models provided as a Python class or class name
+        if job_config.job.jobType in [_meta.JobType.RUN_MODEL, _meta.JobType.RUN_FLOW]:
+            job_config = cls._process_models(sys_config, job_config, scratch_dir, model_class)
 
-            model_id, model_obj = cls._generate_model_for_class(model_loader, model_class)
-            job_config = cls._add_job_resource(job_config, model_id, model_obj)
-            job_config.job.runModel.model = _util.selector_for(model_id)
-
+        # Fow flows, load external flow definitions then perform auto-wiring and type inference
         if job_config.job.jobType == _meta.JobType.RUN_FLOW:
+            job_config = cls._process_flow_definition(job_config, config_dir)
 
-            original_models = job_config.job.runFlow.models.copy()
-            for model_key, model_detail in original_models.items():
-                model_id, model_obj = cls._generate_model_for_entry_point(model_loader, model_detail)
-                job_config = cls._add_job_resource(job_config, model_id, model_obj)
-                job_config.job.runFlow.models[model_key] = _util.selector_for(model_id)
-
-            flow_id, flow_obj = cls._expand_flow_definition(job_config, config_dir)
-            job_config = cls._add_job_resource(job_config, flow_id, flow_obj)
-            job_config.job.runFlow.flow = _util.selector_for(flow_id)
-
-        model_loader.destroy_scope("DEV_MODE_TRANSLATION")
-
+        # For run (model|flow) jobs, apply processing to the parameters, inputs and outputs
         if job_config.job.jobType in [_meta.JobType.RUN_MODEL, _meta.JobType.RUN_FLOW]:
             job_config = cls._process_parameters(job_config)
-
-        if job_config.job.jobType not in [_meta.JobType.RUN_MODEL, _meta.JobType.RUN_FLOW]:
-            return job_config
-
-        run_info = job_config.job.runModel \
-            if job_config.job.jobType == _meta.JobType.RUN_MODEL \
-            else job_config.job.runFlow
-
-        original_inputs = run_info.inputs
-        original_outputs = run_info.outputs
-        original_resources = job_config.resources
-
-        translated_inputs = copy.copy(original_inputs)
-        translated_outputs = copy.copy(original_outputs)
-        translated_resources = copy.copy(job_config.resources)
-
-        def process_input_or_output(data_key, data_value, is_input: bool):
-
-            data_id = _util.new_object_id(_meta.ObjectType.DATA)
-            storage_id = _util.new_object_id(_meta.ObjectType.STORAGE)
-
-            if is_input:
-                if job_config.job.jobType == _meta.JobType.RUN_MODEL:
-                    model_def = job_config.resources[_util.object_key(job_config.job.runModel.model)]
-                    schema = model_def.model.inputs[data_key].schema
-                else:
-                    flow_def = job_config.resources[_util.object_key(job_config.job.runFlow.flow)]
-                    schema = flow_def.flow.inputs[data_key].schema
-            else:
-                schema = None
-
-            data_obj, storage_obj = cls._process_job_io(
-                sys_config, data_key, data_value, data_id, storage_id,
-                new_unique_file=not is_input, schema=schema)
-
-            translated_resources[_util.object_key(data_id)] = data_obj
-            translated_resources[_util.object_key(storage_id)] = storage_obj
-
-            if is_input:
-                translated_inputs[data_key] = _util.selector_for(data_id)
-            else:
-                translated_outputs[data_key] = _util.selector_for(data_id)
-
-        for input_key, input_value in original_inputs.items():
-            if not (isinstance(input_value, str) and input_value in original_resources):
-                process_input_or_output(input_key, input_value, is_input=True)
-
-        for output_key, output_value in original_outputs.items():
-            if not (isinstance(output_value, str) and output_value in original_outputs):
-                process_input_or_output(output_key, output_value, is_input=False)
-
-        job_config = copy.copy(job_config)
-        job_config.resources = translated_resources
-        run_info.inputs = translated_inputs
-        run_info.outputs = translated_outputs
+            job_config = cls._process_inputs_and_outputs(sys_config, job_config)
 
         return job_config
 
@@ -269,6 +202,58 @@ class DevModeTranslator:
         return job_config
 
     @classmethod
+    def _process_models(
+            cls,
+            sys_config: _cfg.RuntimeConfig,
+            job_config: _cfg.JobConfig,
+            scratch_dir: pathlib.Path,
+            model_class: tp.Optional[_api.TracModel.__class__]) \
+            -> _cfg.JobConfig:
+
+        model_loader = _models.ModelLoader(sys_config, scratch_dir)
+        model_loader.create_scope("DEV_MODE_TRANSLATION")
+
+        original_config = job_config
+
+        job_config = copy.copy(job_config)
+        job_config.job = copy.copy(job_config.job)
+        job_config.resources = copy.copy(job_config.resources)
+
+        if job_config.job.jobType == _meta.JobType.RUN_MODEL:
+
+            job_config.job.runModel = copy.copy(job_config.job.runModel)
+
+            # If a model class is supplied in code, use that to generate the model def
+            if model_class is not None:
+                model_id, model_obj = cls._generate_model_for_class(model_loader, model_class)
+                job_config = cls._add_job_resource(job_config, model_id, model_obj)
+                job_config.job.runModel.model = _util.selector_for(model_id)
+
+            # Otherwise if model specified as a string instead of a selector, apply the translation
+            elif isinstance(original_config.job.runModel.model, str):
+                model_detail = original_config.job.runModel.model
+                model_id, model_obj = cls._generate_model_for_entry_point(model_loader, model_detail)  # noqa
+                job_config = cls._add_job_resource(job_config, model_id, model_obj)
+                job_config.job.runModel.model = _util.selector_for(model_id)
+
+        if job_config.job.jobType == _meta.JobType.RUN_FLOW:
+
+            job_config.job.runFlow = copy.copy(job_config.job.runFlow)
+            job_config.job.runFlow.models = copy.copy(job_config.job.runFlow.models)
+
+            for model_key, model_detail in original_config.job.runFlow.models.items():
+
+                # Only apply translation if the model is specified as a string instead of a selector
+                if isinstance(model_detail, str):
+                    model_id, model_obj = cls._generate_model_for_entry_point(model_loader, model_detail)
+                    job_config = cls._add_job_resource(job_config, model_id, model_obj)
+                    job_config.job.runFlow.models[model_key] = _util.selector_for(model_id)
+
+        model_loader.destroy_scope("DEV_MODE_TRANSLATION")
+
+        return job_config
+
+    @classmethod
     def _generate_model_for_class(
             cls, model_loader: _models.ModelLoader, model_class: _api.TracModel.__class__) \
             -> (_meta.TagHeader, _meta.ObjectDefinition):
@@ -306,21 +291,24 @@ class DevModeTranslator:
         return model_id, model_object
 
     @classmethod
-    def _expand_flow_definition(
-            cls, job_config: _cfg.JobConfig, config_dir: pathlib.Path) \
-            -> (_meta.TagHeader, _meta.ObjectDefinition):
+    def _process_flow_definition(cls, job_config: _cfg.JobConfig, config_dir: pathlib.Path) -> _cfg.JobConfig:
 
         flow_details = job_config.job.runFlow.flow
 
-        # The full specification for a flow is as a tag selector for a valid job resource
-        # This is still allowed in dev mode, in which case dev mode translation is not applied
+        # Do not apply translation if flow is specified as an object ID / selector (assume full config is supplied)
         if isinstance(flow_details, _meta.TagHeader) or isinstance(flow_details, _meta.TagSelector):
-            flow_obj = _util.get_job_resource(flow_details, job_config, optional=False)
-            return flow_details, flow_obj
+            return job_config
 
         # Otherwise, flow is specified as the path to dev-mode flow definition
         if not isinstance(flow_details, str):
             err = f"Invalid config value for [job.runFlow.flow]: Expected path or tag selector, got [{flow_details}])"
+            cls._log.error(err)
+            raise _ex.EConfigParse(err)
+
+        flow_path = config_dir.joinpath(flow_details) if config_dir is not None else pathlib.Path(flow_details)
+
+        if not flow_path.exists():
+            err = f"Flow definition not available for [{flow_details}]: File not found ({flow_path})"
             cls._log.error(err)
             raise _ex.EConfigParse(err)
 
@@ -329,19 +317,27 @@ class DevModeTranslator:
 
         cls._log.info(f"Generating flow definition for [{flow_details}] with ID = [{flow_key}]")
 
-        flow_path = config_dir.joinpath(flow_details) if config_dir is not None else pathlib.Path(flow_details)
         flow_parser = _cfg_p.ConfigParser(_meta.FlowDefinition)
         flow_raw_data = flow_parser.load_raw_config(flow_path, flow_path.name)
         flow_def = flow_parser.parse(flow_raw_data, flow_path.name)
 
+        # Auto-wiring and inference only applied to externally loaded flows for now
         flow_def = cls._autowire_flow(flow_def, job_config)
         flow_def = cls._apply_type_inference(flow_def, job_config)
 
-        flow_object = _meta.ObjectDefinition(
+        flow_obj = _meta.ObjectDefinition(
             objectType=_meta.ObjectType.FLOW,
             flow=flow_def)
 
-        return flow_id, flow_object
+        job_config = copy.copy(job_config)
+        job_config.job = copy.copy(job_config.job)
+        job_config.job.runFlow = copy.copy(job_config.job.runFlow)
+        job_config.resources = copy.copy(job_config.resources)
+
+        job_config = cls._add_job_resource(job_config, flow_id, flow_obj)
+        job_config.job.runFlow.flow = _util.selector_for(flow_id)
+
+        return job_config
 
     @classmethod
     def _autowire_flow(cls, flow: _meta.FlowDefinition, job_config: _cfg.JobConfig):
@@ -592,19 +588,8 @@ class DevModeTranslator:
         param_specs = model_or_flow.parameters
         param_values = job_details.parameters
 
-        encoded_params = cls._process_parameters_dict(param_specs, param_values)
-
-        job_details = copy.copy(job_details)
-        job_def = copy.copy(job_config.job)
-        job_config = copy.copy(job_config)
-
-        if job_config.job.jobType == _meta.JobType.RUN_MODEL:
-            job_def.runModel = job_details
-        else:
-            job_def.runFlow = job_details
-
-        job_details.parameters = encoded_params
-        job_config.job = job_def
+        # Set encoded params on runModel or runFlow depending on the job type
+        job_details.parameters = cls._process_parameters_dict(param_specs, param_values)
 
         return job_config
 
@@ -638,9 +623,57 @@ class DevModeTranslator:
         return encoded_values
 
     @classmethod
-    def _process_job_io(
-            cls, sys_config, data_key, data_value, data_id, storage_id,
-            new_unique_file=False, schema: tp.Optional[_meta.SchemaDefinition] = None):
+    def _process_inputs_and_outputs(cls, sys_config: _cfg.RuntimeConfig, job_config: _cfg.JobConfig) -> _cfg.JobConfig:
+
+        if job_config.job.jobType == _meta.JobType.RUN_MODEL:
+            job_details = job_config.job.runModel
+            model_obj = _util.get_job_resource(job_details.model, job_config)
+            required_inputs = model_obj.model.inputs
+
+        elif job_config.job.jobType == _meta.JobType.RUN_FLOW:
+            job_details = job_config.job.runFlow
+            flow_obj = _util.get_job_resource(job_details.flow, job_config)
+            required_inputs = flow_obj.flow.inputs
+
+        else:
+            return job_config
+
+        job_inputs = job_details.inputs
+        job_outputs = job_details.outputs
+        job_resources = job_config.resources
+
+        for input_key, input_value in job_inputs.items():
+            if not (isinstance(input_value, str) and input_value in job_resources):
+
+                input_schema = required_inputs[input_key].schema
+
+                input_id = cls._process_input_or_output(
+                    sys_config, input_key, input_value, job_resources,
+                    new_unique_file=False, schema=input_schema)
+
+                job_inputs[input_key] = _util.selector_for(input_id)
+
+        for output_key, output_value in job_outputs.items():
+            if not (isinstance(output_value, str) and output_value in job_resources):
+
+                output_id = cls._process_input_or_output(
+                    sys_config, output_key, output_value, job_resources,
+                    new_unique_file=True, schema=None)
+
+                job_outputs[output_key] = _util.selector_for(output_id)
+
+        return job_config
+
+    @classmethod
+    def _process_input_or_output(
+            cls, sys_config, data_key, data_value,
+            resources: tp.Dict[str, _meta.ObjectDefinition],
+            new_unique_file=False,
+            schema: tp.Optional[_meta.SchemaDefinition] = None) \
+            -> _meta.TagHeader:
+
+        data_id = _util.new_object_id(_meta.ObjectType.DATA)
+        storage_id = _util.new_object_id(_meta.ObjectType.STORAGE)
 
         if isinstance(data_value, str):
             storage_path = data_value
@@ -694,7 +727,10 @@ class DevModeTranslator:
             snap_index=snap_version, delta_index=1, incarnation_index=1,
             schema=schema)
 
-        return data_obj, storage_obj
+        resources[_util.object_key(data_id)] = data_obj
+        resources[_util.object_key(storage_id)] = storage_obj
+
+        return data_id
 
     @staticmethod
     def infer_format(storage_path: str, storage_config: _cfg.StorageConfig):

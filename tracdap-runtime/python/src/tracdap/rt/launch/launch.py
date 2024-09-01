@@ -23,7 +23,7 @@ import tracdap.rt._impl.config_parser as _cparse  # noqa
 import tracdap.rt._impl.util as _util  # noqa
 import tracdap.rt._exec.runtime as _runtime  # noqa
 
-from .cli import cli_args
+from .cli import _cli_args
 
 
 def _resolve_config_file(
@@ -59,7 +59,7 @@ def launch_model(
         sys_config: _tp.Union[str, _pathlib.Path]):
 
     """
-    Launch an individual model component by class (embedded launch)
+    Launch an individual model using its Python class
 
     This launch method launches the supplied model class directly, it must be called
     from the Python codebase containing the model class. The TRAC runtime will launch
@@ -100,6 +100,14 @@ def launch_job(
         sys_config: _tp.Union[str, _pathlib.Path],
         dev_mode: bool = False):
 
+    """
+    Launch a TRAC job using external configuration files
+
+    :param job_config: Path to the job configuration file
+    :param sys_config: Path to the system configuration file
+    :param dev_mode: Whether to launch in dev mode (applies dev mode translation to the job inputs)
+    """
+
     _sys_config = _resolve_config_file(sys_config, None)
     _job_config = _resolve_config_file(job_config, None)
 
@@ -115,7 +123,11 @@ def launch_job(
 
 def launch_cli():
 
-    launch_args = cli_args()
+    """
+    Launch the TRAC runtime using the command line interface
+    """
+
+    launch_args = _cli_args()
 
     _sys_config = _resolve_config_file(launch_args.sys_config, None)
     _job_config = _resolve_config_file(launch_args.job_config, None)

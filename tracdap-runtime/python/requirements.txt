@@ -8,7 +8,13 @@
 
 # Core protobuf support for metadata / config classes
 # This should match the Java Protobuf version, if possible
-protobuf == 4.25.3
+protobuf == 5.27.4
+
+# Support for the gRPC runtime API server
+# Optional in the distributed package but required for development
+grpcio == 1.66.1
+grpcio-status == 1.66.1
+grpcio-tools == 1.66.1
 
 # Core data framework is based on Arrow
 # This should always match the Java Arrow version
