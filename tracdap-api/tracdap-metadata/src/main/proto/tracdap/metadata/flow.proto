@@ -26,15 +26,36 @@ import "tracdap/metadata/search.proto";
 import "tracdap/metadata/tag_update.proto";
 
 
+/**
+ * Specify the type of an individual flow node
+ *
+ * @see FlowNode
+ */
 enum FlowNodeType {
+
   NODE_TYPE_NOT_SET = 0;
+
+  /// Input nodes described inputs to the flow, such as a files or datasets
   INPUT_NODE = 1;
+
+  /// Output nodes describe outputs the flow produces, such as a files or datasets
   OUTPUT_NODE = 2;
+
+  /// Model nodes are placeholders for TRAC models that will be supplied at runtime
   MODEL_NODE = 3;
+
+  /**
+   * Parameter nodes allow explicit mapping of parameters into models
+   * (TRAC can infer parameters by name if they are not defined explicitly)
+   */
   PARAMETER_NODE = 4;
 }
 
-
+/**
+ * Describes an individual node in a flow
+ *
+ * @see FlowDefinition
+ */
 message FlowNode {
 
   FlowNodeType nodeType = 1;
@@ -49,19 +70,44 @@ message FlowNode {
   string label = 6;
 }
 
+/**
+ * A socket is a point of connection for wiring up the edges in a flow
+ *
+ * For parameter, input and output nodes the socket is just the node name and the socket field will be blank.
+ * For models, the node name refers to a model node and the socket is the name of the parameter, input or output
+ * being connected. E.g. these two sockets could be used to connect a flow input to a model, using an edge::
+ *
+ *   flow_input_socket = { "node": "my_input_dataset", socket: "" }
+ *   model_input_socket = { "node": "my_model", "socket": "input_1" }.
+ *
+ * @see FlowEdge
+ */
 message FlowSocket {
 
   string node = 1;
   string socket = 2;
 }
 
+/**
+ * A connection between two nodes in a flow
+ *
+ * @see FlowSocket
+ */
 message FlowEdge {
 
   FlowSocket source = 1;
   FlowSocket target = 2;
 }
 
-
+/**
+ * A flow defines an execution graph as a set of connections between models and data
+ *
+ * A flow describes the shape of the execution graph, it does not fix in advance the set
+ * of models and datasets that will go into it. When a RUN_FLOW job is created, the job
+ * matches the flow with a set of models, inputs, outputs and parameters.
+ *
+ * @see JobDefinition
+ */
 message FlowDefinition {
 
   map<string, FlowNode> nodes = 1;

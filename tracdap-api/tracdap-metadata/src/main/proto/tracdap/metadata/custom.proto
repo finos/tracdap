@@ -21,6 +21,9 @@ option java_package = "org.finos.tracdap.metadata";
 option java_multiple_files = true;
 
 
+/**
+ * Define a custom object that can be stored and managed in the TRAC metadata store
+ */
 message CustomDefinition {
 
   string customSchemaType = 1;

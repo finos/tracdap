@@ -25,30 +25,66 @@ import "tracdap/metadata/object_id.proto";
 import "tracdap/metadata/tag_update.proto";
 
 
+/**
+ * Specify the type of an individual TRAC job
+ */
 enum JobType {
   JOB_TYPE_NOT_SET = 0;
+
+  /// Run a single model, with parameters and inputs
   RUN_MODEL = 1;
+
+  /// Run a flow with all its models, parameters and inputs
   RUN_FLOW = 2;
+
+  /// Import a model into the platform
   IMPORT_MODEL = 3;
+
+  /// Import data into the platform
   IMPORT_DATA = 4;
 }
 
+/**
+ * Indicate the status of a job in the TRAC platform
+ */
 enum JobStatusCode {
 
   JOB_STATUS_CODE_NOT_SET = 0;
+
+  /// The job is being set up
   PREPARING = 1;
+
+  /// The job has passed validation and is ok to run (dry-run operations may return this status)
   VALIDATED = 2;
+
+  /// The job is being set up
   PENDING = 3;
+
+  /// The job is queued in TRAC, waiting for available resources
   QUEUED = 4;
+
+  /// The job has been submitted for execution but has not yet started
   SUBMITTED = 5;
+
+  /// The job is currently running
   RUNNING = 6;
+
+  /// Job execution completed, the platform is cleaning up and validating the outputs
   FINISHING = 7;
+
+  /// The job completed successfully and the results are available
   SUCCEEDED = 8;
+
+  /// The job failed and has been terminated or rejected
   FAILED = 9;
+
+  /// The job was cancelled by a user of the platform
   CANCELLED = 10;
 }
 
-
+/**
+ * Define a job to run on the TRAC platform
+ */
 message JobDefinition {
 
   JobType jobType = 1;
@@ -60,6 +96,9 @@ message JobDefinition {
   }
 }
 
+/**
+ * Specification for a RuN_MODEL job
+ */
 message RunModelJob {
 
   TagSelector model = 1;
@@ -72,6 +111,9 @@ message RunModelJob {
   repeated TagUpdate outputAttrs = 6;
 }
 
+/**
+ * Specification for a RUN_FLOW job
+ */
 message RunFlowJob {
 
   TagSelector flow = 1;
@@ -85,6 +127,9 @@ message RunFlowJob {
   repeated TagUpdate outputAttrs = 7;
 }
 
+/**
+ * Specification for an IMPORT_MODEL job
+ */
 message ImportModelJob {
 
   string language = 1;

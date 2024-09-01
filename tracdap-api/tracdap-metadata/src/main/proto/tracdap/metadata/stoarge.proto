@@ -23,18 +23,45 @@ option java_multiple_files = true;
 import "tracdap/metadata/type.proto";
 
 
+/**
+ * Status of an individual copy of a data storage item
+ *
+ * @see: StorageDefinition
+ * @see: StorageCopy
+ */
 enum CopyStatus {
+
   COPY_STATUS_NOT_SET = 0;
+
+  // The copy of the data item is available in storage to access
   COPY_AVAILABLE = 1;
+
+  // The copy of the data item has been expunged and is no longer available
   COPY_EXPUNGED = 2;
 }
 
+/**
+ * Status of an individual incarnation of a data storage item
+ *
+ * @see: StorageDefinition
+ * @see: StorageIncarnation
+ */
 enum IncarnationStatus {
+
   INCARNATION_STATUS_NOT_SET = 0;
+
+  // The incarnation of the data item has at least one copy available in storage
   INCARNATION_AVAILABLE = 1;
+
+  // This incarnation of the data item is no longer available in storage, all copies have been expunged
   INCARNATION_EXPUNGED = 2;
 }
 
+/**
+ * Define physical storage for an individual copy of a data item
+ *
+ * @see: StorageDefinition
+ */
 message StorageCopy {
 
   string storageKey = 1;
@@ -47,6 +74,11 @@ message StorageCopy {
   map<string, Value> storageOptions = 6;
 }
 
+/**
+ * Define physical storage for an individual incarnation of a data item
+ *
+ * @see: StorageDefinition
+ */
 message StorageIncarnation {
 
   repeated StorageCopy copies = 1;
@@ -56,11 +88,27 @@ message StorageIncarnation {
   IncarnationStatus incarnationStatus = 4;
 }
 
+/**
+ * Define physical storage for an individual data item
+ *
+ * @see: StorageDefinition
+ */
 message StorageItem {
 
   repeated StorageIncarnation incarnations = 1;
 }
 
+/**
+ * Defines the physical storage for a file or dataset object
+ *
+ * Each storage item corresponds to one logical data item, such as a version of
+ * a file or a snapshot of a data partition. Storage for each item is broken down
+ * into incarnations (data that has been expunged and recomputed) and copies
+ * (physical file-level copies for resilience, storage class etc).
+ *
+ * @see: DataDefinition
+ * @see: FileDefinition
+ */
 message StorageDefinition {
 
   map<string, StorageItem> dataItems = 1;
