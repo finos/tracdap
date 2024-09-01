@@ -16,7 +16,7 @@ import argparse
 import pathlib
 
 
-def cli_args():
+def _cli_args():
 
     parser = argparse.ArgumentParser(
         prog="python -m tracdap.rt.launch",
