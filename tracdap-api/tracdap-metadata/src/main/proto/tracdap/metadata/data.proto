@@ -42,7 +42,7 @@ enum SchemaType {
 /**
  * Schema for an individual field in a tabular dataset
  *
- * @see: TableSchema
+ * @see TableSchema
  */
 message FieldSchema {
 

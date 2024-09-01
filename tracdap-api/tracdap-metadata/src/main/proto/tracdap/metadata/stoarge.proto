@@ -26,8 +26,8 @@ import "tracdap/metadata/type.proto";
 /**
  * Status of an individual copy of a data storage item
  *
- * @see: StorageDefinition
- * @see: StorageCopy
+ * @see StorageDefinition
+ * @see StorageCopy
  */
 enum CopyStatus {
 
@@ -43,8 +43,8 @@ enum CopyStatus {
 /**
  * Status of an individual incarnation of a data storage item
  *
- * @see: StorageDefinition
- * @see: StorageIncarnation
+ * @see StorageDefinition
+ * @see StorageIncarnation
  */
 enum IncarnationStatus {
 
@@ -60,7 +60,7 @@ enum IncarnationStatus {
 /**
  * Define physical storage for an individual copy of a data item
  *
- * @see: StorageDefinition
+ * @see StorageDefinition
  */
 message StorageCopy {
 
@@ -77,7 +77,7 @@ message StorageCopy {
 /**
  * Define physical storage for an individual incarnation of a data item
  *
- * @see: StorageDefinition
+ * @see StorageDefinition
  */
 message StorageIncarnation {
 
@@ -91,7 +91,7 @@ message StorageIncarnation {
 /**
  * Define physical storage for an individual data item
  *
- * @see: StorageDefinition
+ * @see StorageDefinition
  */
 message StorageItem {
 
@@ -104,10 +104,10 @@ message StorageItem {
  * Each storage item corresponds to one logical data item, such as a version of
  * a file or a snapshot of a data partition. Storage for each item is broken down
  * into incarnations (data that has been expunged and recomputed) and copies
- * (physical file-level copies for resilience, storage class etc).
+ * (physical file-level copies for resilience, locality etc).
  *
- * @see: DataDefinition
- * @see: FileDefinition
+ * @see DataDefinition
+ * @see FileDefinition
  */
 message StorageDefinition {
 
