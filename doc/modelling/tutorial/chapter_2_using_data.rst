@@ -3,7 +3,7 @@
 Chapter 2 - Using Data
 ######################
 
-This tutorial is based on the *using_data.py* example, which can be found in the
+This tutorial is based on example code which can be found in the
 `TRAC GitHub Repository <https://github.com/finos/tracdap>`_
 under *examples/models/python*.
 
@@ -21,7 +21,7 @@ the top-level class or function as parameters, as shown in this example.
 
 
 .. literalinclude:: ../../../examples/models/python/src/tutorial/using_data.py
-    :caption: examples/models/python/src/tutorial/using_data.py
+    :caption: src/tutorial/using_data.py
     :name: using_data_py_part_1
     :language: python
     :lines: 15-51
@@ -176,7 +176,7 @@ The default bucket is also where output data will be saved. In this example we h
 bucket configured, which is used for both inputs and outputs, so we mark that as the default.
 
 .. literalinclude:: ../../../examples/models/python/config/sys_config.yaml
-    :caption: examples/models/python/config/sys_config.yaml
+    :caption: config/sys_config.yaml
     :name: sys_config.yaml
     :language: yaml
     :lines: 2-12
@@ -193,7 +193,7 @@ operates, data is always accessed from a storage location, with locations define
 The model parameters are also set in the job config, in the same way as the previous tutorial.
 
 .. literalinclude:: ../../../examples/models/python/config/using_data.yaml
-    :caption: examples/models/python/config/using_data.yaml
+    :caption: config/using_data.yaml
     :name: using_data.yaml
     :language: yaml
     :lines: 2-
@@ -202,8 +202,12 @@ These simple config files are enough to run a model locally using sample data in
 Output files will be created when the model runs, if you run the model multiple times outputs
 will be suffixed with a number.
 
-Using schema files
-------------------
+.. seealso::
+    Full source code is available for the
+    `Using Data example on GitHub <https://github.com/finos/tracdap/tree/main/examples/models/python/src/tutorial/using_data.py>`_
+
+Schema files
+------------
 
 For small models like this example defining schemas in code is simple, however for more complex
 models in real-world situations the schemas are often quite large and can be reused across a set
@@ -231,10 +235,14 @@ must be in the source tree with your Python code, in a package with an *__init__
 building your model packages as Python Wheels or Conda packages the schema files must be included as
 part of the build.
 
-Here is an example with part of the tutorials source tree, showing the schema files in a sub-package
-called "schemas"::
+To add the schema files into the example project we can create a sub-package called "tutorial.schemas",
+which would look like this::
 
     examples-project
+    ├── config
+    │   ├── sys_config.yaml
+    │   ├── using_data.yaml
+    │   └── ...
     ├── src
     │   └── tutorial
     │       ├── __init__.py
@@ -253,7 +261,7 @@ called "schemas"::
 Now we can re-write our model to use the new schema files. First we need to import the schemas package:
 
 .. literalinclude:: ../../../examples/models/python/src/tutorial/schema_files.py
-    :caption: examples/models/python/src/tutorial/schema_files.py
+    :caption: src/tutorial/schema_files.py
     :name: using_data_part_9
     :language: python
     :lines: 19
@@ -271,11 +279,11 @@ Then we can load schemas from the schemas package in the
     :linenos:
     :lineno-start: 46
 
-Notice that the :py:meth:`load_schema() <tracdap.rt.api.load_schema>` method is the same
+Notice that the :py:func:`load_schema() <tracdap.rt.api.load_schema>` method is the same
 for input and output schemas, so we need to use
 :py:class:`ModelInputSchema <tracdap.rt.metadata.ModelInputSchema>` and
 :py:class:`ModelOutputSchema <tracdap.rt.metadata.ModelOutputSchema>` explicitly.
 
 .. seealso::
-    The full source code for this example is
-    `available on GitHub <https://github.com/finos/tracdap/tree/main/examples/models/python/src/tutorial/using_data.py>`_
+    Full source code is available for the
+    `Schema Files example on GitHub <https://github.com/finos/tracdap/tree/main/examples/models/python/src/tutorial/schema_files.py>`_

@@ -58,6 +58,5 @@ dataset and TRAC will understand it has been omitted. If an optional output is
 produced then it is subject to all the same validation rules as any other dataset.
 
 .. seealso::
-    The full source code for this example is
-    `available on GitHub <https://github.com/finos/tracdap/tree/main/examples/models/python/src/tutorial/optional_io.py>`_
-
+    Full source code is available for the
+    `Optional IO example on GitHub <https://github.com/finos/tracdap/tree/main/examples/models/python/src/tutorial/schema_files.py>`_
