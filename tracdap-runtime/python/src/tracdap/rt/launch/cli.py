@@ -51,12 +51,4 @@ def cli_args():
         "--scratch-dir-persist", dest="scratch_dir_persist", default=False, action="store_true",
         help="Do not clean up the scratch location on exit")
 
-    parser.add_argument(
-        "--server-enabled", dest="server_enabled", default=False, action="store_true",
-        help="Enable the runtime API server")
-
-    parser.add_argument(
-        "--server-port", dest="server_port", type=int, required=False,
-        help="Set the listening port for the runtime API server")
-
     return parser.parse_args()
