@@ -788,6 +788,9 @@ message FileReadResponse {
 }
 
 
+/**
+ * Request object for an HTTP download
+ */
 message DownloadRequest {
 
   string tenant = 1;
@@ -798,6 +801,9 @@ message DownloadRequest {
 };
 
 
+/**
+ * Response object for an HTTP download
+ */
 message DownloadResponse {
 
   optional string contentType = 1;
