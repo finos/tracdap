@@ -98,21 +98,18 @@ def generate_from_proto(unpacked: bool = False):
     proto_cmd = [
         str(sys.executable), str(protoc_ctrl), "python_proto",
         "--proto_path", "tracdap-api/tracdap-metadata/src/main/proto",
-        "--proto_path", "tracdap-api/tracdap-config/src/main/proto",
         "--proto_path", "tracdap-api/tracdap-services/src/main/proto",
         "--relocate", grpc_relocate,
         "--package", "tracdap.metadata",
-        "--package", "tracdap.config",
-        "--package", "tracdap.api.internal",
+        "--package", "tracdap.api.internal.runtime",
         "--out", str(generated_dir)]
 
     grpc_command = [
         str(sys.executable), str(protoc_ctrl), "python_grpc",
         "--proto_path", "tracdap-api/tracdap-metadata/src/main/proto",
-        "--proto_path", "tracdap-api/tracdap-config/src/main/proto",
         "--proto_path", "tracdap-api/tracdap-services/src/main/proto",
         "--relocate", grpc_relocate,
-        "--package", "tracdap.api.internal",
+        "--package", "tracdap.api.internal.runtime",
         "--out", str(generated_dir)]
 
     domain_proc = subprocess.Popen(domain_cmd, stdout=subprocess.PIPE, cwd=ROOT_PATH, env=os.environ)
