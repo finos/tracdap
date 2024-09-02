@@ -16,7 +16,7 @@
 
 package org.finos.tracdap.svc.orch;
 
-import org.finos.tracdap.api.TrustedMetadataApiGrpc;
+import org.finos.tracdap.api.internal.TrustedMetadataApiGrpc;
 import org.finos.tracdap.common.auth.internal.InternalAuthProvider;
 import org.finos.tracdap.common.auth.internal.JwtSetup;
 import org.finos.tracdap.common.auth.internal.InternalAuthValidator;
@@ -35,7 +35,6 @@ import org.finos.tracdap.config.ServiceConfig;
 import org.finos.tracdap.svc.orch.api.TracOrchestratorApi;
 import org.finos.tracdap.svc.orch.service.JobManager;
 import org.finos.tracdap.svc.orch.service.JobProcessor;
-import org.finos.tracdap.svc.orch.service.JobProcessorHelpers;
 import org.finos.tracdap.svc.orch.service.JobState;
 
 import io.grpc.ManagedChannel;

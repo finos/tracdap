@@ -17,6 +17,7 @@
 package org.finos.tracdap.svc.meta.api;
 
 import org.finos.tracdap.api.*;
+import org.finos.tracdap.api.internal.TrustedMetadataApiGrpc;
 import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.test.helpers.PlatformTest;

@@ -17,7 +17,7 @@
 package org.finos.tracdap.svc.data.service;
 
 
-import org.finos.tracdap.api.TrustedMetadataApiGrpc.TrustedMetadataApiFutureStub;
+import org.finos.tracdap.api.internal.TrustedMetadataApiGrpc.TrustedMetadataApiFutureStub;
 import org.finos.tracdap.common.auth.internal.UserInfo;
 import org.finos.tracdap.common.auth.internal.InternalAuthProvider;
 import org.finos.tracdap.common.async.Futures;

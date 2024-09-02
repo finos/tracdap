@@ -15,9 +15,9 @@
  */
 
 syntax = "proto3";
-package tracdap.api;
+package tracdap.api.internal;
 
-option java_package = "org.finos.tracdap.api";
+option java_package = "org.finos.tracdap.api.internal";
 option java_multiple_files = true;
 
 import "tracdap/metadata/object_id.proto";

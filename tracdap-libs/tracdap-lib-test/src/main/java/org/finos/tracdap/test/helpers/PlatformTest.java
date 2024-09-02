@@ -19,7 +19,7 @@ package org.finos.tracdap.test.helpers;
 import org.finos.tracdap.api.TracDataApiGrpc;
 import org.finos.tracdap.api.TracMetadataApiGrpc;
 import org.finos.tracdap.api.TracOrchestratorApiGrpc;
-import org.finos.tracdap.api.TrustedMetadataApiGrpc;
+import org.finos.tracdap.api.internal.TrustedMetadataApiGrpc;
 import org.finos.tracdap.common.auth.internal.ClientAuthProvider;
 import org.finos.tracdap.common.auth.external.AuthLogic;
 import org.finos.tracdap.common.auth.internal.JwtSetup;

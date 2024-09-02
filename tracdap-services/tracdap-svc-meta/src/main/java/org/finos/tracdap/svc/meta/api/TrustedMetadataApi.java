@@ -18,6 +18,8 @@ package org.finos.tracdap.svc.meta.api;
 
 import com.google.protobuf.Descriptors;
 import org.finos.tracdap.api.*;
+import org.finos.tracdap.api.internal.MetadataTrusted;
+import org.finos.tracdap.api.internal.TrustedMetadataApiGrpc;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.grpc.GrpcServerWrap;
 import org.finos.tracdap.metadata.Tag;
