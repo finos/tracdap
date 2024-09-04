@@ -19,6 +19,7 @@ import dataclasses as dc
 import enum
 import typing as tp
 
+import tracdap.rt.metadata as _meta
 import tracdap.rt.config as _cfg
 import tracdap.rt.exceptions as _ex
 import tracdap.rt._exec.actors as _actors
@@ -28,7 +29,6 @@ import tracdap.rt._impl.models as _models  # noqa
 import tracdap.rt._impl.data as _data  # noqa
 import tracdap.rt._impl.storage as _storage  # noqa
 import tracdap.rt._impl.util as _util  # noqa
-from .actors import Signal
 
 from .graph import NodeId
 
@@ -66,6 +66,18 @@ class _EngineContext:
     failed_nodes: tp.Set[NodeId] = dc.field(default_factory=set)
 
 
+@dc.dataclass
+class _JobState:
+
+    job_id: _meta.TagHeader
+    job_config: _cfg.JobConfig
+
+    actor_id: _actors.ActorId = None
+
+    job_result: _cfg.JobResult = None
+    job_error: Exception = None
+
+
 class TracEngine(_actors.Actor):
 
     """
@@ -88,7 +100,7 @@ class TracEngine(_actors.Actor):
         self._storage = storage
         self._notify_callback = notify_callback
 
-        self._job_actors = dict()
+        self._jobs: tp.Dict[str, _JobState] = dict()
 
     def on_start(self):
 
@@ -98,7 +110,7 @@ class TracEngine(_actors.Actor):
 
         self._log.info("Engine shutdown complete")
 
-    def on_signal(self, signal: Signal) -> tp.Optional[bool]:
+    def on_signal(self, signal: _actors.Signal) -> tp.Optional[bool]:
 
         # Failed signals can propagate from leaf nodes up the actor tree for a job
         # If the failure goes all the way up the tree without being handled, it will reach the engine node
@@ -110,8 +122,8 @@ class TracEngine(_actors.Actor):
             failed_job_key = None
 
             # Look for the job key corresponding to the failed actor
-            for job_key, job_actor in self._job_actors.items():
-                if job_actor == signal.sender:
+            for job_key, job_state in self._jobs.items():
+                if job_state.actor_id == signal.sender:
                     failed_job_key = job_key
 
             # If the job is still live, call job_failed explicitly
@@ -147,19 +159,32 @@ class TracEngine(_actors.Actor):
         job_processor = JobProcessor(job_key, job_config, result_spec,self._models, self._storage)
         job_actor_id = self.actors().spawn(job_processor)
 
-        job_actors = {**self._job_actors, job_key: job_actor_id}
-        self._job_actors = job_actors
+        job_state = _JobState(job_config.jobId, job_config)
+        job_state.actor_id = job_actor_id
+
+        self._jobs[job_key] = job_state
+
+    @_actors.Message
+    def list_jobs(self):
+
+        return list(map(self._get_job_info, self._jobs.keys()))
+
+    @_actors.Message
+    def get_job_details(self, job_key: str):
+
+        return self._get_job_info(job_key, details = True)
 
     @_actors.Message
     def job_succeeded(self, job_key: str, job_result: _cfg.JobResult):
 
         # Ignore duplicate messages from the job processor (can happen in unusual error cases)
-        if job_key not in self._job_actors:
+        if job_key not in self._jobs:
             self._log.warning(f"Ignoring [job_succeeded] message, job [{job_key}] has already completed")
             return
 
         self._log.info(f"Recording job as successful: {job_key}")
 
+        self._jobs[job_key].job_result = job_result
         self._finalize_job(job_key)
 
         if self._notify_callback is not None:
@@ -169,12 +194,13 @@ class TracEngine(_actors.Actor):
     def job_failed(self, job_key: str, error: Exception):
 
         # Ignore duplicate messages from the job processor (can happen in unusual error cases)
-        if job_key not in self._job_actors:
+        if job_key not in self._jobs:
             self._log.warning(f"Ignoring [job_failed] message, job [{job_key}] has already completed")
             return
 
         self._log.error(f"Recording job as failed: {job_key}")
 
+        self._jobs[job_key].job_error = error
         self._finalize_job(job_key)
 
         if self._notify_callback is not None:
@@ -182,10 +208,48 @@ class TracEngine(_actors.Actor):
 
     def _finalize_job(self, job_key: str):
 
-        job_actors = self._job_actors
-        job_actor_id = job_actors.pop(job_key)
-        self.actors().stop(job_actor_id)
-        self._job_actors = job_actors
+        # Stop the actor but keep the job state available for status / results queries
+
+        # In the future, job state will need to be expunged after some period of time
+        # For now each instance of the runtime only processes one job so no need to worry
+
+        job_state = self._jobs.get(job_key)
+        job_actor_id = job_state.actor_id if job_state is not None else None
+
+        if job_actor_id is not None:
+            self.actors().stop(job_actor_id)
+            job_state.actor_id = None
+
+    def _get_job_info(self, job_key: str, details: bool = False) -> _cfg.JobResult:
+
+        job_state = self._jobs.get(job_key)
+
+        # TODO - What error to raise here?
+        if job_state is None:
+            raise _ex.ERuntimeValidation(f"Job [{job_key}] was not found")
+
+        job_result = _cfg.JobResult()
+        job_result.jobId = job_state.job_id
+
+        if job_state.actor_id is not None:
+            job_result.statusCode = _meta.JobStatusCode.RUNNING
+
+        elif job_state.job_result is not None:
+            job_result.statusCode = job_state.job_result.statusCode
+            job_result.statusMessage = job_state.job_result.statusMessage
+            if details:
+                job_result.results = job_state.job_result.results or dict()
+
+        elif job_state.job_error is not None:
+            job_result.statusCode = _meta.JobStatusCode.FAILED
+            job_result.statusMessage = str(job_state.job_error.args[0])
+
+        else:
+            # Alternatively return UNKNOWN status or throw an error here
+            job_result.statusCode = _meta.JobStatusCode.FAILED
+            job_result.statusMessage = "No details available"
+
+        return job_result
 
 
 class JobProcessor(_actors.Actor):
@@ -218,7 +282,7 @@ class JobProcessor(_actors.Actor):
         self._log.info(f"Cleaning up job [{self.job_key}]")
         self._models.destroy_scope(self.job_key)
 
-    def on_signal(self, signal: Signal) -> tp.Optional[bool]:
+    def on_signal(self, signal: _actors.Signal) -> tp.Optional[bool]:
 
         if signal.message == _actors.SignalNames.FAILED and isinstance(signal, _actors.ErrorSignal):
 
