@@ -13,9 +13,7 @@
 #  limitations under the License.
 
 import tracdap.rt.config as _cfg
-import tracdap.rt.ext._guard as _guard
-
-# Dependency back into the main runtime implementation
+import tracdap.rt._impl.guard_rails as _guard  # noqa
 import tracdap.rt._exec.runtime as _rt  # noqa
 
 

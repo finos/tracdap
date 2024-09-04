@@ -19,7 +19,7 @@ import importlib as _il
 
 import tracdap.rt.config as _cfg
 import tracdap.rt.exceptions as _ex
-import tracdap.rt.ext._guard as _guard
+import tracdap.rt._impl.guard_rails as _guard  # noqa
 
 
 class PluginManager:
