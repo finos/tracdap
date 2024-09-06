@@ -13,9 +13,11 @@
 #  limitations under the License.
 
 import pathlib
+import subprocess as sp
 import time
 import unittest
 
+import tracdap.rt.metadata as meta
 import tracdap.rt.config as config
 import tracdap.rt._exec.runtime as runtime # noqa
 import tracdap.rt._impl.util as util  # noqa
@@ -31,12 +33,19 @@ _ROOT_DIR = pathlib.Path(__file__).parent \
 
 class RuntimeApiServerTest(unittest.TestCase):
 
+    RT_ARGS = {
+        "server_enabled": True,
+        "server_port": 10000
+    }
+
+    ADDRESS = f"localhost:{RT_ARGS['server_port']}"
+
     SYS_CONFIG = config.RuntimeConfig(
         repositories={
-            "tutorials": config.PluginConfig(
+            "unit_test_repo": config.PluginConfig(
                 protocol="local",
                 properties={
-                    "repoUrl": str(_ROOT_DIR.joinpath("examples/models/python"))
+                    "repoUrl": str(_ROOT_DIR)
                 })},
         storage=config.StorageConfig())
 
@@ -46,26 +55,13 @@ class RuntimeApiServerTest(unittest.TestCase):
 
     def test_server_start_stop(self):
 
-        rt_args = {
-            "server_enabled": True,
-            "server_port": 10000
-        }
-
-        with runtime.TracRuntime(self.SYS_CONFIG, **rt_args):
+        with runtime.TracRuntime(self.SYS_CONFIG, **self.RT_ARGS):
             pass
 
     def test_list_jobs_empty(self):
 
-        rt_args = {
-            "server_enabled": True,
-            "server_port": 10001
-        }
-
-        with runtime.TracRuntime(self.SYS_CONFIG, **rt_args):
-
-            address = f"localhost:{rt_args['server_port']}"
-
-            with grpc.insecure_channel(address) as channel:
+        with runtime.TracRuntime(self.SYS_CONFIG, **self.RT_ARGS):
+            with grpc.insecure_channel(self.ADDRESS) as channel:
 
                 client = runtime_grpc.TracRuntimeApiStub(channel)
                 request = runtime_pb2.ListJobsRequest()
@@ -73,3 +69,35 @@ class RuntimeApiServerTest(unittest.TestCase):
 
                 self.assertIsInstance(response, runtime_pb2.ListJobsResponse)
                 self.assertEqual(0, len(response.jobs))
+
+    def test_get_job_status(self):
+
+        commit_hash_proc = sp.run(["git", "rev-parse", "HEAD"], stdout=sp.PIPE)
+        commit_hash = commit_hash_proc.stdout.decode('utf-8').strip()
+
+        job_id = util.new_object_id(meta.ObjectType.JOB)
+
+        job_def = meta.JobDefinition(
+            jobType=meta.JobType.IMPORT_MODEL,
+            importModel=meta.ImportModelJob(
+                language="python",
+                repository="unit_test_repo",
+                package="trac-example-models",
+                version=commit_hash,
+                entryPoint="tutorial.using_data.UsingDataModel",
+                path="examples/models/python/src"))
+
+        job_config = config.JobConfig(job_id, job_def)
+
+        with runtime.TracRuntime(self.SYS_CONFIG, **self.RT_ARGS) as rt:
+            with grpc.insecure_channel(self.ADDRESS) as channel:
+
+                rt.submit_job(job_config)
+                rt.wait_for_job(job_id)
+
+                client = runtime_grpc.TracRuntimeApiStub(channel)
+                request = runtime_pb2.BatchJobStatusRequest(jobKey=util.object_key(job_id))
+                response: runtime_pb2.JobStatus = client.getJobStatus(request)
+
+                self.assertEqual(job_id.objectId, response.jobId.objectId)
+                self.assertEqual(meta.JobStatusCode.SUCCEEDED.value, response.statusCode)

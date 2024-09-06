@@ -16,6 +16,7 @@ import asyncio
 import threading
 import typing as tp
 
+import tracdap.rt.config as config
 import tracdap.rt.exceptions as ex
 import tracdap.rt._exec.actors as actors
 import tracdap.rt._impl.grpc.codec as codec  # noqa
@@ -253,7 +254,10 @@ class GetJobStatusRequest(ApiRequest[runtime_pb2.BatchJobStatusRequest, runtime_
         self.actors().send(self._engine_id, "get_job_details", job_key, details=False)
 
     @actors.Message
-    def job_details(self, job_details):
+    def job_details(self, job_details: config.JobResult):
 
-        self._response = runtime_pb2.JobStatus(codec.encode(job_details))
+        # Job status response does not includes the results map
+        delattr(job_details, "results")
+
+        self._response = runtime_pb2.JobStatus(**codec.encode(job_details))
         self._completion.set()
