@@ -13,13 +13,11 @@
 #  limitations under the License.
 
 import asyncio
-import concurrent.futures
 import threading
 import typing as tp
 
 import tracdap.rt.exceptions as ex
 import tracdap.rt._exec.actors as actors
-import tracdap.rt._exec.engine as engine
 import tracdap.rt._impl.grpc.codec as codec  # noqa
 import tracdap.rt._impl.util as util  # noqa
 
@@ -35,89 +33,43 @@ import tracdap.rt_gen.grpc.tracdap.api.internal.runtime_pb2 as runtime_pb2
 import tracdap.rt_gen.grpc.tracdap.api.internal.runtime_pb2_grpc as runtime_grpc
 
 
-class ApiRequest(actors.Actor):
-
-    def __init__(
-            self, method: str, request: _msg.Message,
-            response_type: _msg.Message.__class__,
-            context: grpc.aio.ServicerContext):
-
-        super().__init__()
-
-        self._api_target = actors.ActorId()  # TODO
-
-        self._method = method
-        self._request = request
-        self._response_type = response_type
-        self._context = context
-
-    def on_start(self):
-        self.actors().send(self._api_target, self._method, self._request)
-
-    @actors.Message
-    def api_response(self, response: tp.Any):
-
-        try:
-            response_msg = self._response_type(codec.encode(response))
-            self._context.write(response_msg)
-            self._context.set_code(grpc.StatusCode.OK)
-
-        except Exception:
-            self._context.set_code(grpc.StatusCode.INTERNAL)
-
-
 class RuntimeApiServer:
 
-    __THREAD_POOL_DEFAULT_SIZE = 2
-    __THREAD_NAME_PREFIX = "server-"
-    __DEFAULT_SHUTDOWN_TIMEOUT = 10.0  # seconds
+    # Default timeout values in seconds
+    __DEFAULT_STARTUP_TIMEOUT = 5.0
+    __DEFAULT_SHUTDOWN_TIMEOUT = 10.0
     __DEFAULT_REQUEST_TIMEOUT = 10.0
 
-    def __init__(self, system: actors.ActorSystem, port: int, n_workers: int = None):
+    def __init__(self, system: actors.ActorSystem, port: int):
 
         self.__log = util.logger_for_object(self)
 
         self.__system = system
-        self.__port = port
+        self.__engine_id = system.main_id()
+        self.__agent: tp.Optional[ApiAgent] = None
 
+        self.__port = port
         self.__server: tp.Optional[grpc.aio.Server] = None
         self.__server_thread: tp.Optional[threading.Thread] = None
-        self.__server_signal: tp.Optional[asyncio.Event] = None
         self.__event_loop: tp.Optional[asyncio.AbstractEventLoop] = None
+
+        self.__start_signal: tp.Optional[threading.Event] = None
+        self.__server_signal: tp.Optional[asyncio.Event] = None
 
     def start(self):
 
-        self.__server_thread = threading.Thread(target=self.__server_control, name="api_server", daemon=True)
+        if self.__start_signal is not None:
+            return
+
+        self.__start_signal = threading.Event()
+
+        self.__server_thread = threading.Thread(target=self.__server_main, name="api_server", daemon=True)
         self.__server_thread.start()
 
-    def __server_control(self):
+        self.__agent = ApiAgent()
+        self.__system.spawn_agent(self.__agent)
 
-        self.__server_signal = asyncio.Event()
-
-        self.__event_loop = asyncio.new_event_loop()
-        self.__event_loop.set_default_executor(concurrent.futures.ThreadPoolExecutor(thread_name_prefix="api_server"))
-        self.__event_loop.run_until_complete(self.__server_main())
-        self.__event_loop.close()
-
-    async def __server_main(self):
-
-        socket = f"[::]:{self.__port}"
-
-        self.__server = grpc.aio.server()
-        self.__server.add_insecure_port(socket)
-        runtime_grpc.add_TracRuntimeApiServicer_to_server(self, self.__server)
-        await self.__server.start()
-
-        self.__log.info(f"Runtime API server is up and listening on port [{self.__port}]")
-
-        await asyncio.create_task(self.__server_signal.wait())
-
-        self.__log.info(f"Shutdown signal received, runtime API server is going down...")
-
-        await self.__server.stop(self.__DEFAULT_SHUTDOWN_TIMEOUT)
-        self.__server = None
-
-        self.__log.info("Runtime API server has gone down cleanly")
+        self.__start_signal.wait()   # TODO timeout
 
     def stop(self, shutdown_timeout: float = None):
 
@@ -132,21 +84,176 @@ class RuntimeApiServer:
         if self.__server_thread.is_alive():
             self.__log.warning("Runtime API server did not go down cleanly")
 
+    def __server_main(self):
+
+        self.__server_signal = asyncio.Event()
+
+        self.__event_loop = asyncio.new_event_loop()
+        self.__event_loop.run_until_complete(self.__server_main_async())
+        self.__event_loop.close()
+
+    async def __server_main_async(self):
+
+        server_address = f"[::]:{self.__port}"
+
+        self.__server = grpc.aio.server()
+        self.__server.add_insecure_port(server_address)
+        runtime_grpc.add_TracRuntimeApiServicer_to_server(self, self.__server)
+
+        await self.__server.start()
+        await self.__agent.started()
+
+        self.__start_signal.set()
+
+        self.__log.info(f"Runtime API server is up and listening on port [{self.__port}]")
+
+        await asyncio.create_task(self.__server_signal.wait())
+
+        self.__log.info(f"Shutdown signal received, runtime API server is going down...")
+
+        await self.__server.stop(self.__DEFAULT_SHUTDOWN_TIMEOUT)
+        self.__server = None
+
+        self.__log.info("Runtime API server has gone down cleanly")
+
     async def listJobs(self, request: runtime_pb2.ListJobsRequest, context: grpc.aio.ServicerContext):
 
-        self.__log.info("API Request: listJobs")
+        request_actor = ListJobsRequest(self.__engine_id, request, context)
+        self.__agent.threadsafe().spawn(request_actor)
 
-        return runtime_pb2.ListJobsResponse()
-
-        # request = ApiRequest("list_jobs", request, runtime_pb2.ListJobsResponse, context)
-        # self.__system.send("api_request", request)
+        return await request_actor.complete()
 
     async def getJobStatus(self, request: runtime_pb2.BatchJobStatusRequest, context: grpc.ServicerContext):
 
-        request = ApiRequest("get_job_status", request, runtime_pb2.JobStatus, context)
-        self.__system.send("api_request", request)
+        request_actor = GetJobStatusRequest(self.__engine_id, request, context)
+        self.__agent.threadsafe().spawn(request_actor)
+
+        return await request_actor.complete()
 
     async def getJobDetails(self, request, context):
 
-        request = ApiRequest("get_job_details", request, runtime_pb2.JobStatus, context)
-        self.__system.send("api_request", request)
+        request_actor = GetJobStatusRequest(self.__engine_id, request, context)
+        self.__agent.threadsafe().spawn(request_actor)
+
+        return await request_actor.complete()
+
+
+_T_REQUEST = tp.TypeVar("_T_REQUEST", bound=_msg.Message)
+_T_RESPONSE = tp.TypeVar("_T_RESPONSE", bound=_msg.Message)
+
+
+class ApiAgent(actors.ThreadsafeActor):
+
+    def __init__(self):
+        super().__init__()
+        self.__start_signal = asyncio.Event()
+
+    def on_start(self):
+        self.__start_signal.set()
+
+    async def started(self):
+        await self.__start_signal.wait()
+
+
+class ApiRequest(actors.ThreadsafeActor, tp.Generic[_T_REQUEST, _T_RESPONSE]):
+
+    _log = None
+
+    def __init__(
+            self, engine_id, method: str, request: _T_REQUEST,
+            context: grpc.aio.ServicerContext):
+
+        super().__init__()
+
+        self._engine_id = engine_id
+        self._method = method
+        self._request = request
+        self._response: tp.Optional[_T_RESPONSE] = None
+        self._error: tp.Optional[Exception] = None
+
+        self._context = context
+        self._completion = asyncio.Event()
+
+        self._log.info("API call start: %s()", self._method)
+
+    def on_stop(self):
+
+        if self.state() == actors.ActorState.ERROR:
+            self._error = self.error()
+
+        self._completion.set()
+
+    async def complete(self) -> _T_RESPONSE:
+
+        try:
+            completion_task = asyncio.create_task(self._completion.wait())
+            await asyncio.wait_for(completion_task, 10.0)
+
+            self._log.info("API call succeeded: %s()", self._method)
+
+            if self._error:
+                raise self._error
+            elif self._response:
+                return self._response
+            else:
+                raise ex.EUnexpected()
+
+        except TimeoutError:
+            self._completion.set()
+            self._context.set_code(grpc.StatusCode.DEADLINE_EXCEEDED)
+            self._context.set_details("The TRAC runtime engine did not respond")
+            self._log.error("API call failed: %s() %s", self._method, "The TRAC runtime engine did not respond")
+            raise
+
+        except Exception as e:
+            self._context.set_code(grpc.StatusCode.INTERNAL)
+            self._context.set_details("Internal server error")
+            self._log.error("API call failed: %s() %s", self._method, str(e))
+            self._log.exception(e)
+            raise
+
+        finally:
+            self.threadsafe().stop()
+
+
+ApiRequest._log = util.logger_for_class(ApiRequest)
+
+
+class ListJobsRequest(ApiRequest[runtime_pb2.ListJobsRequest, runtime_pb2.ListJobsResponse]):
+
+    def __init__(self, engine_id, request, context):
+        super().__init__(engine_id, "get_job_list", request, context)
+
+    def on_start(self):
+        self.threadsafe().send(self._engine_id, "get_job_list")
+
+    @actors.Message
+    def job_list(self, job_list):
+
+        self._response = runtime_pb2.ListJobsResponse(jobs=codec.encode(job_list))
+        self._completion.set()
+
+
+class GetJobStatusRequest(ApiRequest[runtime_pb2.BatchJobStatusRequest, runtime_pb2.JobStatus]):
+
+    def __init__(self, engine_id, request, context):
+        super().__init__(engine_id, "get_job_status", request, context)
+
+    def on_start(self):
+
+        if self._request.HasField("jobKey"):
+            job_key = self._request.jobKey
+
+        elif self._request.HasField("jobSelector"):
+            job_key = util.object_key(self._request.jobSelector)
+
+        else:
+            raise ex.EValidation("Bad request: Neither jobKey nor jobSelector is specified")
+
+        self.actors().send(self._engine_id, "get_job_details", job_key, details=False)
+
+    @actors.Message
+    def job_details(self, job_details):
+
+        self._response = runtime_pb2.JobStatus(codec.encode(job_details))
+        self._completion.set()

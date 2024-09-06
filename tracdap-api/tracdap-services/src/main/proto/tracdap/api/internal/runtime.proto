@@ -20,13 +20,13 @@ service TracRuntimeApi {
     };
   }
 
-  rpc getJobStatus(BatchJobStatusRequest) returns (JobStatus) {
+  rpc getJobStatus(jobDetailsRequest) returns (JobStatus) {
     option (google.api.http) = {
       get: "/job-status/{jobKey}"
     };
   }
 
-  rpc getJobDetails(BatchJobStatusRequest) returns (BatchJobResult) {
+  rpc getJobDetails(jobDetailsRequest) returns (BatchJobResult) {
     option (google.api.http) = {
       get: "/job-details/{jobKey}"
     };
@@ -45,7 +45,7 @@ message ListJobsResponse {
 }
 
 
-message BatchJobStatusRequest {
+message jobDetailsRequest {
 
   oneof job {
     metadata.TagSelector jobSelector = 1;
@@ -61,7 +61,7 @@ message JobStatus {
   string statusMessage = 3;
 }
 
-message BatchJobResult {
+message JobDetailsResponse {
 
   metadata.TagHeader jobId = 1;
 
