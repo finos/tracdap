@@ -50,6 +50,7 @@ class RuntimeApiServer(runtime_grpc.TracRuntimeApiServicer):
         self.__agent: tp.Optional[ApiAgent] = None
 
         self.__port = port
+        self.__request_timeout = self.__DEFAULT_REQUEST_TIMEOUT  # Not configurable atm
         self.__server: tp.Optional[grpc.aio.Server] = None
         self.__server_thread: tp.Optional[threading.Thread] = None
         self.__event_loop: tp.Optional[asyncio.AbstractEventLoop] = None
@@ -57,17 +58,21 @@ class RuntimeApiServer(runtime_grpc.TracRuntimeApiServicer):
         self.__start_signal: tp.Optional[threading.Event] = None
         self.__stop_signal: tp.Optional[asyncio.Event] = None
 
-    def start(self):
+    def start(self, startup_timeout: float = None):
 
         if self.__start_signal is not None:
             return
 
-        self.__start_signal = threading.Event()
+        timeout = startup_timeout or self.__DEFAULT_SHUTDOWN_TIMEOUT
 
+        self.__start_signal = threading.Event()
         self.__server_thread = threading.Thread(target=self.__server_main, name="api_server", daemon=True)
         self.__server_thread.start()
 
-        self.__start_signal.wait()   # TODO timeout
+        try:
+            self.__start_signal.wait(timeout)
+        except TimeoutError as e:
+            raise ex.EStartup("Runtime API failed to start") from e
 
     def stop(self, shutdown_timeout: float = None):
 
@@ -121,24 +126,24 @@ class RuntimeApiServer(runtime_grpc.TracRuntimeApiServicer):
 
     async def listJobs(self, request: runtime_pb2.ListJobsRequest, context: grpc.aio.ServicerContext):
 
-        request_actor = ListJobsRequest(self.__engine_id, request, context)
-        self.__agent.threadsafe().spawn(request_actor)
+        request_task = ListJobsRequest(self.__engine_id, request, context)
+        self.__agent.threadsafe().spawn(request_task)
 
-        return await request_actor.complete()
+        return await request_task.complete(self.__request_timeout)
 
     async def getJobStatus(self, request: runtime_pb2.JobInfoRequest, context: grpc.ServicerContext):
 
-        request_actor = GetJobStatusRequest(self.__engine_id, request, context)
-        self.__agent.threadsafe().spawn(request_actor)
+        request_task = GetJobStatusRequest(self.__engine_id, request, context)
+        self.__agent.threadsafe().spawn(request_task)
 
-        return await request_actor.complete()
+        return await request_task.complete(self.__request_timeout)
 
     async def getJobDetails(self, request: runtime_pb2.JobInfoRequest, context: grpc.ServicerContext):
 
-        request_actor = GetJobStatusRequest(self.__engine_id, request, context)
-        self.__agent.threadsafe().spawn(request_actor)
+        request_task = GetJobStatusRequest(self.__engine_id, request, context)
+        self.__agent.threadsafe().spawn(request_task)
 
-        return await request_actor.complete()
+        return await request_task.complete(self.__request_timeout)
 
 
 _T_REQUEST = tp.TypeVar("_T_REQUEST", bound=_msg.Message)
@@ -198,11 +203,11 @@ class ApiRequest(actors.ThreadsafeActor, tp.Generic[_T_REQUEST, _T_RESPONSE]):
 
         self._mark_complete()
 
-    async def complete(self) -> _T_RESPONSE:
+    async def complete(self, request_timeout: float) -> _T_RESPONSE:
 
         try:
             completion_task = asyncio.create_task(self._completion.wait())
-            await asyncio.wait_for(completion_task, 10.0)
+            await asyncio.wait_for(completion_task, request_timeout)
 
             self._log.info("API call succeeded: %s()", self._method)
 
