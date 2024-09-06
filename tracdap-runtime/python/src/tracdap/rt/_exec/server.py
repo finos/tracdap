@@ -67,9 +67,6 @@ class RuntimeApiServer:
         self.__server_thread = threading.Thread(target=self.__server_main, name="api_server", daemon=True)
         self.__server_thread.start()
 
-        self.__agent = ApiAgent()
-        self.__system.spawn_agent(self.__agent)
-
         self.__start_signal.wait()   # TODO timeout
 
     def stop(self, shutdown_timeout: float = None):
@@ -97,6 +94,10 @@ class RuntimeApiServer:
 
         # Asyncio events must be created inside the event loop for Python <= 3.9
         self.__stop_signal = asyncio.Event()
+
+        # Agent using asyncio, so must be created inside the event loop
+        self.__agent = ApiAgent()
+        self.__system.spawn_agent(self.__agent)
 
         self.__server = grpc.aio.server()
         self.__server.add_insecure_port(server_address)
@@ -146,18 +147,25 @@ _T_RESPONSE = tp.TypeVar("_T_RESPONSE", bound=_msg.Message)
 
 class ApiAgent(actors.ThreadsafeActor):
 
+    # API Agent is the parent actor that will be used to spawn API requests
+    # It must be created inside the asyncio event loop
+
     def __init__(self):
         super().__init__()
+        self._event_loop = asyncio.get_event_loop()
         self.__start_signal = asyncio.Event()
 
     def on_start(self):
-        self.__start_signal.set()
+        self._event_loop.call_soon_threadsafe(lambda: self.__start_signal.set())
 
     async def started(self):
         await self.__start_signal.wait()
 
 
 class ApiRequest(actors.ThreadsafeActor, tp.Generic[_T_REQUEST, _T_RESPONSE]):
+
+    # API request is the bridge between asyncio events (gRPC) and actor messages (TRAC runtime engine)
+    # Requests objects must be created inside the asyncio event loop
 
     _log = None
 
