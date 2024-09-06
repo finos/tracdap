@@ -174,16 +174,21 @@ class ApiRequest(actors.ThreadsafeActor, tp.Generic[_T_REQUEST, _T_RESPONSE]):
         self._error: tp.Optional[Exception] = None
 
         self._context = context
+        self._event_loop = asyncio.get_event_loop()
         self._completion = asyncio.Event()
 
         self._log.info("API call start: %s()", self._method)
+
+    def _mark_complete(self):
+
+        self._event_loop.call_soon_threadsafe(lambda: self._completion.set())
 
     def on_stop(self):
 
         if self.state() == actors.ActorState.ERROR:
             self._error = self.error()
 
-        self._completion.set()
+        self._mark_complete()
 
     async def complete(self) -> _T_RESPONSE:
 
@@ -227,13 +232,15 @@ class ListJobsRequest(ApiRequest[runtime_pb2.ListJobsRequest, runtime_pb2.ListJo
         super().__init__(engine_id, "get_job_list", request, context)
 
     def on_start(self):
-        self.threadsafe().send(self._engine_id, "get_job_list")
+        self.actors().send(self._engine_id, "get_job_list")
 
     @actors.Message
     def job_list(self, job_list):
 
-        self._response = runtime_pb2.ListJobsResponse(jobs=codec.encode(job_list))
-        self._completion.set()
+        self._response = runtime_pb2.ListJobsResponse(
+            jobs=codec.encode(job_list))
+
+        self._mark_complete()
 
 
 class GetJobStatusRequest(ApiRequest[runtime_pb2.JobInfoRequest, runtime_pb2.JobStatus]):
@@ -257,8 +264,9 @@ class GetJobStatusRequest(ApiRequest[runtime_pb2.JobInfoRequest, runtime_pb2.Job
     @actors.Message
     def job_details(self, job_details: config.JobResult):
 
-        # Job status response does not includes the results map
-        delattr(job_details, "results")
+        self._response = runtime_pb2.JobStatus(
+            jobId=codec.encode(job_details.jobId),
+            statusCode=codec.encode(job_details.statusCode),
+            statusMessage=codec.encode(job_details.statusMessage))
 
-        self._response = runtime_pb2.JobStatus(**codec.encode(job_details))
-        self._completion.set()
+        self._mark_complete()
