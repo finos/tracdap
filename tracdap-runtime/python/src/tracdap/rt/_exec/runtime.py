@@ -299,7 +299,7 @@ class TracRuntime:
         job_key = _util.object_key(job_config.jobId)
         self._jobs[job_key] = _RuntimeJobInfo()
 
-        self._system.send(
+        self._system.send_main(
             "submit_job", job_config,
             str(self._job_result_dir) if self._job_result_dir else "",
             self._job_result_format if self._job_result_format else "")

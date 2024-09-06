@@ -52,7 +52,7 @@ class ActorSystemTest(unittest.TestCase):
         root = TestActor()
         system = actors.ActorSystem(root)
         system.start()
-        system.send("sample_message", 1)
+        system.send_main("sample_message", 1)
         system.wait_for_shutdown()
 
         self.assertEqual(["on_start", "sample_message", 1, "on_stop"], results)
@@ -218,7 +218,7 @@ class ActorSystemTest(unittest.TestCase):
         root = TestActor()
         system = actors.ActorSystem(root)
         system.start()
-        system.send("sample_message", 1)
+        system.send_main("sample_message", 1)
         system.wait_for_shutdown()
 
         # Actor should receive on_stop after raising the error
@@ -254,7 +254,7 @@ class ActorSystemTest(unittest.TestCase):
         root = TestActor()
         system = actors.ActorSystem(root)
         system.start()
-        system.send("sample_message", 1)
+        system.send_main("sample_message", 1)
         system.wait_for_shutdown()
 
         # Actor should not receive on_stop if on_start fails
@@ -290,7 +290,7 @@ class ActorSystemTest(unittest.TestCase):
         root = TestActor()
         system = actors.ActorSystem(root)
         system.start()
-        system.send("sample_message", 1)
+        system.send_main("sample_message", 1)
         system.wait_for_shutdown()
 
         self.assertEqual(["on_start", "sample_message", 1, "on_stop"], results)

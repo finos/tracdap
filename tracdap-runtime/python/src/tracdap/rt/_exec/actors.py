@@ -180,6 +180,49 @@ class ActorContext:
         return self.__error or self.__node.error
 
 
+class ThreadsafeActor(Actor):
+
+    def __init__(self):
+        super().__init__()
+        self.__threadsafe: tp.Optional[ThreadsafeContext] = None
+
+    def threadsafe(self) -> ThreadsafeContext:
+        return self.__threadsafe
+
+
+class ThreadsafeContext:
+
+    def __init__(self, node: ActorNode):
+        self.__node = node
+        self.__id = node.actor_id
+        self.__parent = node.parent.actor_id if node.parent is not None else None
+
+    def spawn(self, actor: Actor):
+        self.__node.event_loop.post_message(
+            None, lambda _:
+            self.__node.spawn(actor) and None)
+
+    def send(self, target_id: ActorId, message: str, *args, **kwargs):
+        self.__node.event_loop.post_message(
+            None, lambda _:
+            self.__node.send_message(self.__id, target_id, message, args, kwargs))
+
+    def send_parent(self, message: str, *args, **kwargs):
+        self.__node.event_loop.post_message(
+            None, lambda _:
+            self.__node.send_message(self.__id, self.__parent, message, args, kwargs))
+
+    def stop(self):
+        self.__node.event_loop.post_message(
+            None, lambda _:
+            self.__node.send_signal(self.__id, self.__id, SignalNames.STOP))
+
+    def fail(self, error: Exception):
+        self.__node.event_loop.post_message(
+            None, lambda _:
+            self.__node.send_signal(self.__id, self.__id, SignalNames.STOP, error))
+
+
 class EventLoop:
 
     _T_MSG = tp.TypeVar("_T_MSG")
@@ -340,7 +383,7 @@ class ActorNode:
         self.state: ActorState = ActorState.NOT_STARTED
         self.error: tp.Optional[Exception] = None
 
-    def spawn(self, child_actor: Actor):
+    def spawn(self, child_actor: Actor) -> ActorId:
 
         if self._log.isEnabledFor(logging.DEBUG):
             self._log.debug(f"spawn [{self.actor_id}]: [{type(child_actor)}]")
@@ -354,6 +397,11 @@ class ActorNode:
         event_loop = self.system._allocate_event_loop(actor_class)  # noqa
         child_node = ActorNode(child_id, child_actor, self, self.system, event_loop)
         self.children[child_id] = child_node
+
+        # If this is a threadsafe actor, set up the threadsafe context
+        if isinstance(child_actor, ThreadsafeActor):
+            threadsafe = ThreadsafeContext(child_node)
+            child_actor._ThreadsafeActor__threadsafe = threadsafe
 
         child_node.send_signal(self.actor_id, child_id, SignalNames.START)
 
@@ -864,10 +912,16 @@ class ActorSystem:
 
         self.__root_started = threading.Event()
         self.__root_stopped = threading.Event()
+
         self.__root_actor = RootActor(main_actor, self.__root_started, self.__root_stopped)
         self.__root_node = ActorNode(self.ROOT_ID, self.__root_actor, None, self, self.__system_event_loop)
 
     # Public API
+
+    def main_id(self) -> ActorId:
+        if not self.__root_started.is_set():
+            raise EBadActor("System has not started yet")
+        return self.__root_actor.main_id
 
     def start(self, wait=True):
 
@@ -913,12 +967,26 @@ class ActorSystem:
 
         return self.__root_node.error
 
-    def send(self, message: str, *args, **kwargs):
+    def spawn_agent(self, agent: Actor) -> ActorId:
+
+        if not self.__root_started.is_set():
+            raise EBadActor("System has not started yet")
+
+        return self.__root_node.spawn(agent)
+
+    def send_main(self, message: str, *args, **kwargs):
 
         if self.__root_actor.main_id is None:
             raise EBadActor("System has not started yet")
 
-        self.__root_node.send_message("/external", self.__root_actor.main_id, message, args, kwargs)
+        self.__root_node.send_message("/external", self.__root_actor.main_id, message, args, kwargs)  # TODO
+
+    def send(self, actor_id: ActorId, message: str, *args, **kwargs):
+
+        if not self.__root_started.is_set():
+            raise EBadActor("System has not started yet")
+
+        self.__root_node.send_message("/external", actor_id, message, args, kwargs)
 
     def _setup_event_loops(self, thread_pools: tp.Dict[str, int]):
 
