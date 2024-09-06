@@ -24,8 +24,8 @@ import tracdap.rt._impl.util as util  # noqa
 
 # Check whether gRPC is installed before trying to load any of the generated modules
 try:
-    import grpc.aio
-    import google.protobuf.message as _msg
+    import grpc.aio  # noqa
+    import google.protobuf.message as _msg  # noqa
 except ImportError:
     raise ex.EStartup("The runtime API server cannot be enabled because gRPC libraries are not installed")
 
@@ -34,7 +34,7 @@ import tracdap.rt_gen.grpc.tracdap.api.internal.runtime_pb2 as runtime_pb2
 import tracdap.rt_gen.grpc.tracdap.api.internal.runtime_pb2_grpc as runtime_grpc
 
 
-class RuntimeApiServer:
+class RuntimeApiServer(runtime_grpc.TracRuntimeApiServicer):
 
     # Default timeout values in seconds
     __DEFAULT_STARTUP_TIMEOUT = 5.0
