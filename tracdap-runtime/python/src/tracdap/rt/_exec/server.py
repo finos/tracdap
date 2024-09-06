@@ -55,7 +55,7 @@ class RuntimeApiServer:
         self.__event_loop: tp.Optional[asyncio.AbstractEventLoop] = None
 
         self.__start_signal: tp.Optional[threading.Event] = None
-        self.__server_signal: tp.Optional[asyncio.Event] = None
+        self.__stop_signal: tp.Optional[asyncio.Event] = None
 
     def start(self):
 
@@ -79,15 +79,13 @@ class RuntimeApiServer:
 
         timeout = shutdown_timeout or self.__DEFAULT_SHUTDOWN_TIMEOUT
 
-        self.__event_loop.call_soon_threadsafe(lambda: self.__server_signal.set())
+        self.__event_loop.call_soon_threadsafe(lambda: self.__stop_signal.set())
         self.__server_thread.join(timeout)
 
         if self.__server_thread.is_alive():
             self.__log.warning("Runtime API server did not go down cleanly")
 
     def __server_main(self):
-
-        self.__server_signal = asyncio.Event()
 
         self.__event_loop = asyncio.new_event_loop()
         self.__event_loop.run_until_complete(self.__server_main_async())
@@ -96,6 +94,9 @@ class RuntimeApiServer:
     async def __server_main_async(self):
 
         server_address = f"[::]:{self.__port}"
+
+        # Asyncio events must be created inside the event loop for Python <= 3.9
+        self.__stop_signal = asyncio.Event()
 
         self.__server = grpc.aio.server()
         self.__server.add_insecure_port(server_address)
@@ -108,7 +109,7 @@ class RuntimeApiServer:
 
         self.__log.info(f"Runtime API server is up and listening on port [{self.__port}]")
 
-        await asyncio.create_task(self.__server_signal.wait())
+        await asyncio.create_task(self.__stop_signal.wait())
 
         self.__log.info(f"Shutdown signal received, runtime API server is going down...")
 
