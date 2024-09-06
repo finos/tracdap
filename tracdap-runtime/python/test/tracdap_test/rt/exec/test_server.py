@@ -96,7 +96,7 @@ class RuntimeApiServerTest(unittest.TestCase):
                 rt.wait_for_job(job_id)
 
                 client = runtime_grpc.TracRuntimeApiStub(channel)
-                request = runtime_pb2.BatchJobStatusRequest(jobKey=util.object_key(job_id))
+                request = runtime_pb2.JobInfoRequest(jobKey=util.object_key(job_id))
                 response: runtime_pb2.JobStatus = client.getJobStatus(request)
 
                 self.assertEqual(job_id.objectId, response.jobId.objectId)

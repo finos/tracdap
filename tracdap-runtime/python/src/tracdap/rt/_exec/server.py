@@ -124,14 +124,14 @@ class RuntimeApiServer:
 
         return await request_actor.complete()
 
-    async def getJobStatus(self, request: runtime_pb2.BatchJobStatusRequest, context: grpc.ServicerContext):
+    async def getJobStatus(self, request: runtime_pb2.JobInfoRequest, context: grpc.ServicerContext):
 
         request_actor = GetJobStatusRequest(self.__engine_id, request, context)
         self.__agent.threadsafe().spawn(request_actor)
 
         return await request_actor.complete()
 
-    async def getJobDetails(self, request, context):
+    async def getJobDetails(self, request: runtime_pb2.JobInfoRequest, context: grpc.ServicerContext):
 
         request_actor = GetJobStatusRequest(self.__engine_id, request, context)
         self.__agent.threadsafe().spawn(request_actor)
@@ -235,7 +235,7 @@ class ListJobsRequest(ApiRequest[runtime_pb2.ListJobsRequest, runtime_pb2.ListJo
         self._completion.set()
 
 
-class GetJobStatusRequest(ApiRequest[runtime_pb2.BatchJobStatusRequest, runtime_pb2.JobStatus]):
+class GetJobStatusRequest(ApiRequest[runtime_pb2.JobInfoRequest, runtime_pb2.JobStatus]):
 
     def __init__(self, engine_id, request, context):
         super().__init__(engine_id, "get_job_status", request, context)
