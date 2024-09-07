@@ -101,3 +101,18 @@ class RuntimeApiServerTest(unittest.TestCase):
 
                 self.assertEqual(job_id.objectId, response.jobId.objectId)
                 self.assertEqual(meta.JobStatusCode.SUCCEEDED.value, response.statusCode)
+
+    def test_get_job_status_missing(self):
+
+        job_id = util.new_object_id(meta.ObjectType.JOB)
+
+        with runtime.TracRuntime(self.SYS_CONFIG, **self.RT_ARGS) as rt:
+            with grpc.insecure_channel(self.ADDRESS) as channel:
+
+                client = runtime_grpc.TracRuntimeApiStub(channel)
+                request = runtime_pb2.JobInfoRequest(jobKey=util.object_key(job_id))
+
+                with self.assertRaises(grpc.RpcError) as error_ctx:
+                    client.getJobStatus(request)
+
+                self.assertEqual(grpc.StatusCode.NOT_FOUND, error_ctx.exception.code())
