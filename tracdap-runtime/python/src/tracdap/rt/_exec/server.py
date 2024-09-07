@@ -185,6 +185,8 @@ class ApiRequest(actors.ThreadsafeActor, tp.Generic[_T_REQUEST, _T_RESPONSE]):
         self._request = request
         self._response: tp.Optional[_T_RESPONSE] = None
         self._error: tp.Optional[Exception] = None
+        self._grpc_code = grpc.StatusCode.OK
+        self._grpc_message = ""
 
         self._context = context
         self._event_loop = asyncio.get_event_loop()
@@ -206,15 +208,22 @@ class ApiRequest(actors.ThreadsafeActor, tp.Generic[_T_REQUEST, _T_RESPONSE]):
     async def complete(self, request_timeout: float) -> _T_RESPONSE:
 
         try:
+
             completion_task = asyncio.create_task(self._completion.wait())
             await asyncio.wait_for(completion_task, request_timeout)
 
-            self._log.info("API call succeeded: %s()", self._method)
-
             if self._error:
                 raise self._error
-            elif self._response:
+
+            elif self._grpc_code != grpc.StatusCode.OK:
+                self._log.info("API call failed: %s() %s %s", self._method, self._grpc_code.name, self._grpc_message)
+                self._context.set_code(self._grpc_code)
+                self._context.set_details(self._grpc_message)
+
+            elif self._response is not None:
+                self._log.info("API call succeeded: %s()", self._method)
                 return self._response
+
             else:
                 raise ex.EUnexpected()
 
@@ -259,27 +268,30 @@ class ListJobsRequest(ApiRequest[runtime_pb2.ListJobsRequest, runtime_pb2.ListJo
 class GetJobStatusRequest(ApiRequest[runtime_pb2.JobInfoRequest, runtime_pb2.JobStatus]):
 
     def __init__(self, engine_id, request, context):
+
         super().__init__(engine_id, "get_job_status", request, context)
 
-    def on_start(self):
-
-        if self._request.HasField("jobKey"):
-            job_key = self._request.jobKey
-
-        elif self._request.HasField("jobSelector"):
-            job_key = util.object_key(self._request.jobSelector)
-
+        if request.HasField("jobKey"):
+            self._job_key = self._request.jobKey
+        elif request.HasField("jobSelector"):
+            self._job_key = util.object_key(self._request.jobSelector)
         else:
             raise ex.EValidation("Bad request: Neither jobKey nor jobSelector is specified")
 
-        self.actors().send(self._engine_id, "get_job_details", job_key, details=False)
+    def on_start(self):
+        self.actors().send(self._engine_id, "get_job_details", self._job_key, details=False)
 
     @actors.Message
-    def job_details(self, job_details: config.JobResult):
+    def job_details(self, job_details: tp.Optional[config.JobResult]):
 
-        self._response = runtime_pb2.JobStatus(
-            jobId=codec.encode(job_details.jobId),
-            statusCode=codec.encode(job_details.statusCode),
-            statusMessage=codec.encode(job_details.statusMessage))
+        if job_details is None:
+            self._grpc_code = grpc.StatusCode.NOT_FOUND
+            self._grpc_message = f"Job not found: [{self._job_key}]"
+
+        else:
+            self._response = runtime_pb2.JobStatus(
+                jobId=codec.encode(job_details.jobId),
+                statusCode=codec.encode(job_details.statusCode),
+                statusMessage=codec.encode(job_details.statusMessage))
 
         self._mark_complete()

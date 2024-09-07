@@ -222,13 +222,12 @@ class TracEngine(_actors.Actor):
             self.actors().stop(job_actor_id)
             job_state.actor_id = None
 
-    def _get_job_info(self, job_key: str, details: bool = False) -> _cfg.JobResult:
+    def _get_job_info(self, job_key: str, details: bool = False) -> tp.Optional[_cfg.JobResult]:
 
         job_state = self._jobs.get(job_key)
 
-        # TODO - What error to raise here?
         if job_state is None:
-            raise _ex.ERuntimeValidation(f"Job [{job_key}] was not found")
+            return None
 
         job_result = _cfg.JobResult()
         job_result.jobId = job_state.job_id
