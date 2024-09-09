@@ -129,14 +129,6 @@ message RoutingTarget {
   string path = 4;
 }
 
-message ServiceConfig {
-
-  optional bool enabled = 1;
-
-  string alias = 2;
-  uint32 port = 3;
-}
-
 message DeploymentConfig {
 
   DeploymentLayout layout = 1;

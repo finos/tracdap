@@ -31,6 +31,8 @@ message RuntimeConfig {
   map<string, PluginConfig> repositories = 3;
 
   SparkSettings sparkSettings = 5;
+
+  ServiceConfig runtimeApi = 6;
 }
 
 message SparkSettings {

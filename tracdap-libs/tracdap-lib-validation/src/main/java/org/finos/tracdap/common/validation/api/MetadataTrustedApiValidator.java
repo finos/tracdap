@@ -17,6 +17,8 @@
 package org.finos.tracdap.common.validation.api;
 
 import org.finos.tracdap.api.*;
+import org.finos.tracdap.api.internal.MetadataTrusted;
+import org.finos.tracdap.api.internal.TrustedMetadataApiGrpc;
 import org.finos.tracdap.common.validation.core.ValidationContext;
 import org.finos.tracdap.common.validation.core.ValidationType;
 import org.finos.tracdap.common.validation.core.Validator;

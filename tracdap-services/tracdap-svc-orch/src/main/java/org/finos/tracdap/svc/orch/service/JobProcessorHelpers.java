@@ -17,6 +17,7 @@
 package org.finos.tracdap.svc.orch.service;
 
 import org.finos.tracdap.api.*;
+import org.finos.tracdap.api.internal.TrustedMetadataApiGrpc;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.metadata.MetadataBundle;
 import org.finos.tracdap.common.metadata.MetadataCodec;
