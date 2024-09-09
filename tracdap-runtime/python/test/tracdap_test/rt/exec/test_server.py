@@ -14,7 +14,6 @@
 
 import pathlib
 import subprocess as sp
-import time
 import unittest
 
 import tracdap.rt.metadata as meta
@@ -33,14 +32,13 @@ _ROOT_DIR = pathlib.Path(__file__).parent \
 
 class RuntimeApiServerTest(unittest.TestCase):
 
-    RT_ARGS = {
-        "server_enabled": True,
-        "server_port": 10000
-    }
-
-    ADDRESS = f"localhost:{RT_ARGS['server_port']}"
+    UNIT_TEST_API_PORT=10000
+    UNIT_TEST_ADDRESS = f"localhost:{UNIT_TEST_API_PORT}"
 
     SYS_CONFIG = config.RuntimeConfig(
+        runtimeApi=config.ServiceConfig(
+            enabled=True,
+            port=UNIT_TEST_API_PORT),
         repositories={
             "unit_test_repo": config.PluginConfig(
                 protocol="local",
@@ -55,13 +53,13 @@ class RuntimeApiServerTest(unittest.TestCase):
 
     def test_server_start_stop(self):
 
-        with runtime.TracRuntime(self.SYS_CONFIG, **self.RT_ARGS):
+        with runtime.TracRuntime(self.SYS_CONFIG):
             pass
 
     def test_list_jobs_empty(self):
 
-        with runtime.TracRuntime(self.SYS_CONFIG, **self.RT_ARGS):
-            with grpc.insecure_channel(self.ADDRESS) as channel:
+        with runtime.TracRuntime(self.SYS_CONFIG):
+            with grpc.insecure_channel(self.UNIT_TEST_ADDRESS) as channel:
 
                 client = runtime_grpc.TracRuntimeApiStub(channel)
                 request = runtime_pb2.ListJobsRequest()
@@ -89,8 +87,8 @@ class RuntimeApiServerTest(unittest.TestCase):
 
         job_config = config.JobConfig(job_id, job_def)
 
-        with runtime.TracRuntime(self.SYS_CONFIG, **self.RT_ARGS) as rt:
-            with grpc.insecure_channel(self.ADDRESS) as channel:
+        with runtime.TracRuntime(self.SYS_CONFIG) as rt:
+            with grpc.insecure_channel(self.UNIT_TEST_ADDRESS) as channel:
 
                 rt.submit_job(job_config)
                 rt.wait_for_job(job_id)
@@ -106,8 +104,8 @@ class RuntimeApiServerTest(unittest.TestCase):
 
         job_id = util.new_object_id(meta.ObjectType.JOB)
 
-        with runtime.TracRuntime(self.SYS_CONFIG, **self.RT_ARGS) as rt:
-            with grpc.insecure_channel(self.ADDRESS) as channel:
+        with runtime.TracRuntime(self.SYS_CONFIG):
+            with grpc.insecure_channel(self.UNIT_TEST_ADDRESS) as channel:
 
                 client = runtime_grpc.TracRuntimeApiStub(channel)
                 request = runtime_pb2.JobInfoRequest(jobKey=util.object_key(job_id))

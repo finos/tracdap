@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import dataclasses as dc
 import datetime as dt
+import signal
 import threading
 
 import sys
@@ -54,6 +55,8 @@ class TracRuntime:
         _engine.ModelNodeProcessor: "model",
         _engine.DataNodeProcessor: "data"}
 
+    __DEFAULT_API_PORT = 9000
+
     def __init__(
             self,
             sys_config: tp.Union[str, pathlib.Path, _cfg.RuntimeConfig],
@@ -61,9 +64,7 @@ class TracRuntime:
             job_result_format: tp.Optional[str] = None,
             scratch_dir: tp.Union[str, pathlib.Path, None] = None,
             scratch_dir_persist: bool = False,
-            dev_mode: bool = False,
-            server_enabled: bool = False,
-            server_port: int = 0):
+            dev_mode: bool = False):
 
         trac_version = _version.__version__
         python_version = sys.version.replace("\n", "")
@@ -92,10 +93,10 @@ class TracRuntime:
         self._scratch_dir_provided = True if scratch_dir is not None else False
         self._scratch_dir_persist = scratch_dir_persist
         self._dev_mode = dev_mode
-        self._server_enabled = server_enabled
-        self._server_port = server_port
 
         self._pre_start_complete = False
+        self._shutdown_requested = False
+        self._shutdown_event = threading.Condition()
 
         # Top level resources
         self._models: tp.Optional[_models.ModelLoader] = None
@@ -104,9 +105,10 @@ class TracRuntime:
         # The execution engine
         self._system: tp.Optional[_actors.ActorSystem] = None
         self._engine: tp.Optional[_engine.TracEngine] = None
-        self._engine_event = threading.Condition()
 
         # Runtime API server
+        self._server_enabled = False
+        self._server_port = 0
         self._server = None
 
         self._jobs: tp.Dict[str, _RuntimeJobInfo] = dict()
@@ -160,6 +162,14 @@ class TracRuntime:
             if self._dev_mode:
                 config_dir = self._sys_config_path.parent if self._sys_config_path is not None else None
                 self._sys_config = _dev_mode.DevModeTranslator.translate_sys_config(self._sys_config, config_dir)
+
+            # Runtime API server is controlled by the sys config
+
+            if self._sys_config.runtimeApi is not None:
+                api_config = self._sys_config.runtimeApi
+                if api_config.enabled:
+                    self._server_enabled = True
+                    self._server_port = api_config.port or self.__DEFAULT_API_PORT
 
             self._pre_start_complete = True
 
@@ -311,7 +321,7 @@ class TracRuntime:
         if job_key not in self._jobs:
             raise _ex.ETracInternal(f"Attempt to wait for a job that was never started")
 
-        with self._engine_event:
+        with self._shutdown_event:
             while True:
 
                 job_info = self._jobs[job_key]
@@ -324,11 +334,11 @@ class TracRuntime:
 
                 # TODO: Timeout / heartbeat
 
-                self._engine_event.wait(1)
+                self._shutdown_event.wait(1)
 
     def _engine_callback(self, job_key, job_result, job_error):
 
-        with self._engine_event:
+        with self._shutdown_event:
 
             if job_result is not None:
                 self._jobs[job_key].done = True
@@ -339,7 +349,7 @@ class TracRuntime:
             else:
                 pass
 
-            self._engine_event.notify()
+            self._shutdown_event.notify()
 
     # ------------------------------------------------------------------------------------------------------------------
     # Error handling
