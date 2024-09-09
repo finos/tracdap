@@ -70,3 +70,12 @@ message StorageConfig {
   string defaultBucket = 2;
   string defaultFormat = 3;
 }
+
+
+message ServiceConfig {
+
+  optional bool enabled = 1;
+
+  string alias = 2;
+  uint32 port = 3;
+}
