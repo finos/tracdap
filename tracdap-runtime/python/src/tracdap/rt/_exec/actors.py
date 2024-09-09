@@ -25,6 +25,7 @@ import queue
 import time
 
 import tracdap.rt._impl.util as util  # noqa
+import tracdap.rt._impl.validation as _val  # noqa
 import tracdap.rt.exceptions as _ex
 
 
@@ -816,10 +817,12 @@ class ActorNode:
         # Positional arg types
         for pos_param, pos_arg in zip(pos_params, args):
 
-            type_hint = type_hints.get(pos_param.name)
-
             # If no type hint is available, allow anything through
-            if type_hint is not None and not isinstance(pos_arg, type_hint):
+            # Otherwise, reuse the validator logic to type check individual args
+            type_hint = type_hints.get(pos_param.name)
+            type_check = type_hint is None or _val.check_type(type_hint, pos_arg)
+
+            if not type_check:
                 error = f"Invalid message: [{message}] -> {target_id} (wrong parameter type for '{pos_param.name}')"
                 self._log.error(error)
                 raise EBadActor(error)
@@ -828,19 +831,19 @@ class ActorNode:
         for kw_param in kw_params:
 
             kw_arg = kwargs.get(kw_param.name)
-            type_hint = type_hints.get(kw_param.name)
 
             # If param has taken a default value, no type check is needed
             if kw_arg is None:
                 continue
 
-            # If no type hint is available, allow anything through
-            if type_hint is not None and not isinstance(kw_arg, type_hint):
+            # Otherwise use the same type-validation logic as positional args
+            type_hint = type_hints.get(kw_param.name)
+            type_check = type_hint is None or _val.check_type(type_hint, kw_arg)
+
+            if not type_check:
                 error = f"Invalid message: [{message}] -> {target_id} (wrong parameter type for '{kw_param.name}')"
                 self._log.error(error)
                 raise EBadActor(error)
-
-        # TODO: Verify generics for both args and kwargs
 
 
 class RootActor(Actor):
