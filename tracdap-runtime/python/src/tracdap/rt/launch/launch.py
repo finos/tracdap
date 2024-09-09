@@ -130,7 +130,6 @@ def launch_cli():
     launch_args = _cli_args()
 
     _sys_config = _resolve_config_file(launch_args.sys_config, None)
-    _job_config = _resolve_config_file(launch_args.job_config, None)
 
     runtime_instance = _runtime.TracRuntime(
         _sys_config,
@@ -142,8 +141,18 @@ def launch_cli():
 
     runtime_instance.pre_start()
 
-    job = runtime_instance.load_job_config(_job_config)
+    if launch_args.job_config is not None:
+        _job_config = _resolve_config_file(launch_args.job_config, None)
+        job = runtime_instance.load_job_config(_job_config)
+    else:
+        job = None
 
     with runtime_instance as rt:
-        rt.submit_job(job)
-        rt.wait_for_job(job.jobId)
+
+        if job is not None:
+            rt.submit_job(job)
+
+        if rt.is_oneshot():
+            rt.wait_for_job(job.jobId)
+        else:
+            rt.run_until_done()

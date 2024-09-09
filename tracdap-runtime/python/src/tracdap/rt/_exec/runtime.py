@@ -94,9 +94,12 @@ class TracRuntime:
         self._scratch_dir_persist = scratch_dir_persist
         self._dev_mode = dev_mode
 
+        # Runtime control
+        self._runtime_lock = threading.Lock()
+        self._runtime_event = threading.Condition(self._runtime_lock)
         self._pre_start_complete = False
         self._shutdown_requested = False
-        self._shutdown_event = threading.Condition()
+        self._oneshot_job = None
 
         # Top level resources
         self._models: tp.Optional[_models.ModelLoader] = None
@@ -249,6 +252,28 @@ class TracRuntime:
         else:
             self._log.info("TRAC runtime has gone down cleanly")
 
+    def is_oneshot(self):
+        return not self._server_enabled
+
+    def run_until_done(self):
+
+        if self._server_enabled == False and len(self._jobs) == 0:
+            self._log.error("No job config supplied, TRAC runtime will not run")
+            raise _ex.EStartup("No job config supplied")
+
+        signal.signal(signal.SIGTERM, self._request_shutdown)
+        signal.signal(signal.SIGINT, self._request_shutdown)
+
+        with self._runtime_lock:
+            while not self._shutdown_requested:
+                self._runtime_event.wait()
+
+    def _request_shutdown(self, _signum = None, _frame = None):
+
+        with self._runtime_lock:
+            self._shutdown_requested = True
+            self._runtime_event.notify()
+
     def _prepare_scratch_dir(self):
 
         if not self._scratch_dir_provided:
@@ -321,35 +346,34 @@ class TracRuntime:
         if job_key not in self._jobs:
             raise _ex.ETracInternal(f"Attempt to wait for a job that was never started")
 
-        with self._shutdown_event:
-            while True:
+        self._oneshot_job = job_key
 
-                job_info = self._jobs[job_key]
+        self.run_until_done()
 
-                if job_info.error is not None:
-                    raise job_info.error
+        job_info = self._jobs[job_key]
 
-                if job_info.result is not None:
-                    return job_info.result
+        if job_info.error is not None:
+            raise job_info.error
 
-                # TODO: Timeout / heartbeat
+        elif job_info.result is not None:
+            return job_info.result
 
-                self._shutdown_event.wait(1)
+        else:
+            err = f"No result or error information is available for job [{job_key}]"
+            self._log.error(err)
+            raise _ex.ETracInternal(err)
 
     def _engine_callback(self, job_key, job_result, job_error):
 
-        with self._shutdown_event:
+        if job_result is not None:
+            self._jobs[job_key].done = True
+            self._jobs[job_key].result = job_result
+        elif job_error is not None:
+            self._jobs[job_key].done = True
+            self._jobs[job_key].error = job_error
 
-            if job_result is not None:
-                self._jobs[job_key].done = True
-                self._jobs[job_key].result = job_result
-            elif job_error is not None:
-                self._jobs[job_key].done = True
-                self._jobs[job_key].error = job_error
-            else:
-                pass
-
-            self._shutdown_event.notify()
+        if self._oneshot_job == job_key:
+            self._request_shutdown()
 
     # ------------------------------------------------------------------------------------------------------------------
     # Error handling
