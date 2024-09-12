@@ -14,6 +14,7 @@
 
 
 from .model_api import *
+from .data_api import *
 from .static_api import *
 
 # Make metadata classes available to client code when importing the API package
