@@ -51,4 +51,8 @@ def _cli_args():
         "--scratch-dir-persist", dest="scratch_dir_persist", default=False, action="store_true",
         help="Do not clean up the scratch location on exit")
 
+    parser.add_argument(
+        "--plugin-package", dest="plugin_packages", type=str, action="append",
+        help="Do not clean up the scratch location on exit")
+
     return parser.parse_args()

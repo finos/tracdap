@@ -20,6 +20,7 @@ import importlib as _il
 import tracdap.rt.config as _cfg
 import tracdap.rt.exceptions as _ex
 import tracdap.rt._impl.guard_rails as _guard  # noqa
+from tracdap.rt.exceptions import EStartup
 
 
 class PluginManager:
@@ -29,6 +30,8 @@ class PluginManager:
     __log = _log.getLogger(f"{__name__}.PluginManager")
 
     __core_registered = False
+    __3rd_party_registered = list()
+
     __plugins = {}
 
     @classmethod
@@ -40,17 +43,42 @@ class PluginManager:
             return
 
         cls.__log.info("Register core plugins...")
-
-        plugins_package = _il.import_module("tracdap.rt._plugins")
-
-        for module in _pkg.iter_modules(plugins_package.__path__):
-            try:
-                module_name = f"tracdap.rt._plugins.{module.name}"
-                _il.import_module(module_name)
-            except ImportError:
-                pass  # Ignore plugins that fail to load
+        cls.__register_plugin_package("tracdap.rt._plugins")
 
         cls.__core_registered = True
+
+    @classmethod
+    def register_plugin_package(cls, plugin_package_name: str):
+
+        _guard.run_model_guard()
+
+        if plugin_package_name in cls.__3rd_party_registered:
+            return
+
+        if plugin_package_name.startswith("tracdap."):
+            raise EStartup("3rd party plugins cannot be registered from the tracdap namespace")
+
+        cls.__log.info(f"Register plugins from package [{plugin_package_name}]...")
+        cls.__register_plugin_package(plugin_package_name)
+
+        cls.__3rd_party_registered.append(plugin_package_name)
+
+    @classmethod
+    def __register_plugin_package(cls, plugin_package_name: str):
+
+        _guard.run_model_guard()
+
+        plugins_package = _il.import_module(plugin_package_name)
+
+        for module in _pkg.iter_modules(plugins_package.__path__):
+
+            module_name = f"{plugin_package_name}.{module.name}"
+
+            try:
+                _il.import_module(module_name)
+            except ImportError:
+                # It is not a fatal error if some plugins fail to load
+                cls.__log.warning(f"Failed to load plugins from module [{module_name}]")
 
     @classmethod
     def register_plugin(

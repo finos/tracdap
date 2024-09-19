@@ -64,6 +64,7 @@ class TracRuntime:
             job_result_format: tp.Optional[str] = None,
             scratch_dir: tp.Union[str, pathlib.Path, None] = None,
             scratch_dir_persist: bool = False,
+            plugin_packages: tp.List[str] = None,
             dev_mode: bool = False):
 
         trac_version = _version.__version__
@@ -92,6 +93,7 @@ class TracRuntime:
         self._scratch_dir = scratch_dir
         self._scratch_dir_provided = True if scratch_dir is not None else False
         self._scratch_dir_persist = scratch_dir_persist
+        self._plugin_packages = plugin_packages or []
         self._dev_mode = dev_mode
 
         # Runtime control
@@ -141,10 +143,15 @@ class TracRuntime:
 
             self._prepare_scratch_dir()
 
-            # Plugin manager and static API impl are singletons
-            # If these methods are called multiple times, the second and subsequent calls are ignored
+            # Plugin manager, static API and guard rails are singletons
+            # Calling these methods multiple times is safe (e.g. for embedded or testing scenarios)
+            # However, plugins are never un-registered for the lifetime of the processes
 
             _plugins.PluginManager.register_core_plugins()
+
+            for plugin_package in self._plugin_packages:
+                _plugins.PluginManager.register_plugin_package(plugin_package)
+
             _static_api.StaticApiImpl.register_impl()
             _guard.PythonGuardRails.protect_dangerous_functions()
 
