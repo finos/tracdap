@@ -26,11 +26,29 @@ public class ConfigHelpers {
     private static final String BOOLEAN_TRUE = Boolean.TRUE.toString();
     private static final String BOOLEAN_FALSE = Boolean.FALSE.toString();
 
+    public static String readString(String context, Properties properties, String key) {
+        return readString(context, properties, key, true);
+    }
+
+    public static String readString(String context, Properties properties, String key, boolean required) {
+
+        var rawValue = properties.getProperty(key);
+
+        if (rawValue == null || rawValue.isEmpty()) {
+            if (required)
+                throw new EStartup(String.format("Missing required property [%s] for [%s]", key, context));
+            else
+                return null;
+        }
+
+        return rawValue.trim();
+    }
+
     public static boolean optionalBoolean(String context, Properties properties, String key, boolean defaultValue) {
 
         var rawValue = properties.getProperty(key);
 
-        if (rawValue == null || rawValue.trim().equals(""))
+        if (rawValue == null || rawValue.trim().isEmpty())
             return defaultValue;
 
         return checkBoolean(context, key, rawValue);

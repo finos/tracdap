@@ -16,38 +16,36 @@
 
 package org.finos.tracdap.svc.orch.service;
 
-import io.grpc.Status;
-import io.grpc.StatusRuntimeException;
 import org.finos.tracdap.api.JobRequest;
 import org.finos.tracdap.api.JobStatus;
 import org.finos.tracdap.api.MetadataWriteRequest;
+import org.finos.tracdap.api.internal.RuntimeJobStatus;
 import org.finos.tracdap.api.internal.TrustedMetadataApiGrpc.TrustedMetadataApiBlockingStub;
 import org.finos.tracdap.common.auth.internal.AuthHelpers;
 import org.finos.tracdap.common.auth.internal.InternalAuthProvider;
 import org.finos.tracdap.common.cache.CacheEntry;
-import org.finos.tracdap.common.config.ConfigFormat;
-import org.finos.tracdap.common.config.ConfigParser;
 import org.finos.tracdap.common.exception.*;
 import org.finos.tracdap.common.exec.*;
 import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.metadata.MetadataUtil;
 import org.finos.tracdap.common.validation.Validator;
 import org.finos.tracdap.common.metadata.MetadataBundle;
-import org.finos.tracdap.config.JobResult;
 import org.finos.tracdap.config.PlatformConfig;
 import org.finos.tracdap.metadata.JobStatusCode;
-
 import org.finos.tracdap.metadata.ObjectType;
 import org.finos.tracdap.metadata.TagUpdate;
+
+import io.grpc.Status;
+import io.grpc.StatusRuntimeException;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.Serializable;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
 
 import static org.finos.tracdap.common.metadata.MetadataConstants.TRAC_JOB_STATUS_ATTR;
 
@@ -65,7 +63,7 @@ public class JobProcessor {
     private final PlatformConfig platformConfig;
     private final TrustedMetadataApiBlockingStub metaClient;
     private final InternalAuthProvider internalAuth;
-    private final IBatchExecutor<?> executor;
+    private final IJobExecutor<?> executor;
     private final Validator validator = new Validator();
 
     // TODO: Refactor into this class
@@ -76,12 +74,12 @@ public class JobProcessor {
             PlatformConfig platformConfig,
             TrustedMetadataApiBlockingStub metaClient,
             InternalAuthProvider internalAuth,
-            IBatchExecutor<?> executor) {
+            IJobExecutor<?> jobExecutor) {
 
         this.platformConfig = platformConfig;
         this.metaClient = metaClient;
         this.internalAuth = internalAuth;
-        this.executor = executor;
+        this.executor = jobExecutor;
 
         this.lifecycle = new JobProcessorHelpers(platformConfig, metaClient);
     }
@@ -220,80 +218,91 @@ public class JobProcessor {
 
         // TODO: Use a submission ID to avoid clash on repeat
 
-        var jobKey =  jobState.jobKey;
+        var jobExecutor = stronglyTypedExecutor();
 
-        var batchExecutor = stronglyTypedExecutor();
-        var batchState = batchExecutor.createBatch(jobKey);
+        // All jobs are submitted as one-shot for now
+        var executorState = jobExecutor.submitOneshotJob(
+                jobState.jobId,
+                jobState.jobConfig,
+                jobState.sysConfig);
 
-        batchState = batchExecutor.createVolume(jobKey, batchState, "config", ExecutorVolumeType.CONFIG_DIR);
-        batchState = batchExecutor.createVolume(jobKey, batchState, "result", ExecutorVolumeType.RESULT_DIR);
-        batchState = batchExecutor.createVolume(jobKey, batchState, "log", ExecutorVolumeType.RESULT_DIR);
-        batchState = batchExecutor.createVolume(jobKey, batchState, "scratch", ExecutorVolumeType.SCRATCH_DIR);
-
-        // No specialisation is needed to build the job config
-        // This may change in the future, in which case add IJobLogic.buildJobConfig()
-
-        var jobConfigJson = ConfigParser.quoteConfig(jobState.jobConfig, ConfigFormat.JSON);
-        var sysConfigJson = ConfigParser.quoteConfig(jobState.sysConfig, ConfigFormat.JSON);
-        batchState = batchExecutor.writeFile(jobKey, batchState, "config", "job_config.json", jobConfigJson);
-        batchState = batchExecutor.writeFile(jobKey, batchState, "config", "sys_config.json", sysConfigJson);
-
-        var launchCmd = LaunchCmd.trac();
-
-        var launchArgs = List.of(
-                LaunchArg.string("--sys-config"), LaunchArg.path("config", "sys_config.json"),
-                LaunchArg.string("--job-config"), LaunchArg.path("config", "job_config.json"),
-                LaunchArg.string("--job-result-dir"), LaunchArg.path("result", "."),
-                LaunchArg.string("--job-result-format"), LaunchArg.string("json"),
-                LaunchArg.string("--scratch-dir"), LaunchArg.path("scratch", "."));
-
-        batchState = batchExecutor.startBatch(jobKey, batchState, launchCmd, launchArgs);
-
-        log.info("Job has been sent to the executor: [{}]", jobKey);
+        log.info("Job has been sent to the executor: [{}]", jobState.jobKey);
 
         var newState = jobState.clone();
         newState.tracStatus = JobStatusCode.SUBMITTED;
         newState.cacheStatus = CacheStatus.SENT_TO_EXECUTOR;
-        newState.executorStatus = ExecutorJobStatus.STATUS_UNKNOWN;
-        newState.executorState = batchState;
+        newState.executorState = executorState;
+        newState.executorStatus = null;
+        newState.executorResult = null;
 
         return newState;
     }
 
-    public List<ExecutorJobInfo> pollExecutorJobs(List<CacheEntry<JobState>> jobs) {
+    public List<RuntimeJobStatus> pollExecutorJobs(List<CacheEntry<JobState>> jobs) {
 
         // TODO: Handle errors decoding the executor state, in stronglyTypeState()
         // This could happen if e.g. the platform configuration is changed with a new executor
         // Probably the job should be failed and removed from the cache
 
-        var executor = stronglyTypedExecutor();
+        // TODO: Use listJobs() to avoid polling jobs individually
+        // Requires support from all executors, or use a feature flag
 
-        var jobState = jobs.stream()
-                .map(CacheEntry::value)
-                // Only poll jobs that have an executor state
-                .filter(j -> j.executorState != null)
-                .map(j -> Map.entry(j.jobKey, stronglyTypedState(executor, j.executorState)))
-                .collect(Collectors.toList());
+        var jobStatusList = new ArrayList<RuntimeJobStatus>(jobs.size());
 
-        return executor.pollBatches(jobState);
+        var jobExecutor = stronglyTypedExecutor();
+
+        for (var job : jobs) {
+
+            var jobState = job.value();
+
+            if (jobState.executorState != null) {
+
+                // TODO: Errors can relate to the executor or individual jobs
+                // For individual job errors, jobs should be aborted after a number of retries
+
+                var executorState = stronglyTypedState(jobExecutor, jobState.executorState);
+                var jobStatus = jobExecutor.getJobStatus(executorState);
+
+                jobStatusList.add(jobStatus);
+            }
+            else {
+
+                var unknownStatus = RuntimeJobStatus.newBuilder()
+                        .setStatusCode(JobStatusCode.JOB_STATUS_CODE_NOT_SET)
+                        .build();
+
+                jobStatusList.add(unknownStatus);
+            }
+        }
+
+        return jobStatusList;
     }
 
-    public JobState recordJobStatus(JobState jobState, ExecutorJobInfo executorJobInfo) {
+    public JobState recordJobStatus(JobState jobState, RuntimeJobStatus executorStatus) {
 
         var newState = jobState.clone();
-        newState.executorStatus = executorJobInfo.getStatus();
+        newState.executorStatus = executorStatus;
 
-        log.info("Job status received from executor: [{}] {}", newState.jobKey, newState.executorStatus);
+        log.info("Job status received from executor: [{}]", newState.jobKey);
 
-        switch (executorJobInfo.getStatus()) {
+        switch (executorStatus.getStatusCode()) {
+
+            // Initial state, executor has not updated
+
+            case PENDING:
+                return jobState;
 
             // Change to SUBMITTED / RUNNING state is significant, send update to metadata service
 
+            case SUBMITTED:
+            case VALIDATED:
             case QUEUED:
+
                 newState.tracStatus = JobStatusCode.SUBMITTED;
                 newState.cacheStatus = CacheStatus.QUEUED_IN_EXECUTOR;
                 return updateMetadata(newState);
 
+            case PREPARING:
             case RUNNING:
                 newState.tracStatus = JobStatusCode.RUNNING;
                 newState.cacheStatus = CacheStatus.RUNNING_IN_EXECUTOR;
@@ -302,7 +311,7 @@ public class JobProcessor {
             // Completed states will be reported when the job results are fully assembled
             // Do not send metadata updates here for finishing states
 
-            case COMPLETE:
+            case FINISHING:
                 newState.tracStatus = JobStatusCode.FINISHING;
                 newState.cacheStatus = CacheStatus.EXECUTOR_COMPLETE;
                 return newState;
@@ -315,11 +324,11 @@ public class JobProcessor {
             case FAILED:
                 newState.tracStatus = JobStatusCode.FAILED;
                 newState.cacheStatus = CacheStatus.EXECUTOR_FAILED;
-                newState.statusMessage = executorJobInfo.getStatusMessage();
-                newState.errorDetail = executorJobInfo.getErrorDetail();
+                newState.statusMessage = executorStatus.getStatusMessage();
+                newState.errorDetail = executorStatus.getErrorDetail();
 
-                log.error("Execution failed for [{}]: {}", newState.jobKey, executorJobInfo.getStatusMessage());
-                log.error("Error detail for [{}]\n{}", newState.jobKey, executorJobInfo.getErrorDetail());
+                log.error("Execution failed for [{}]: {}", newState.jobKey, executorStatus.getStatusMessage());
+                log.error("Error detail for [{}]\n{}", newState.jobKey, executorStatus.getErrorDetail());
 
                 return newState;
 
@@ -332,7 +341,8 @@ public class JobProcessor {
             // TODO: Can we allow STATUS_UNKNOWN to happen a few times before recording a failure?
             // E.g. to handle intermittent errors talking to the executor
 
-            case STATUS_UNKNOWN:
+            case JOB_STATUS_CODE_NOT_SET:
+            case UNRECOGNIZED:
             default:
 
                 newState.tracStatus = JobStatusCode.FAILED;
@@ -349,8 +359,8 @@ public class JobProcessor {
         // This could happen if e.g. the platform configuration is changed with a new executor
         // Probably the job should be failed and removed from the cache
 
-        var batchExecutor = stronglyTypedExecutor();
-        var batchState = stronglyTypedState(batchExecutor, jobState.executorState);
+        var jobExecutor = stronglyTypedExecutor();
+        var executorState = stronglyTypedState(jobExecutor, jobState.executorState);
 
         if (jobState.executorState == null) {
 
@@ -366,28 +376,25 @@ public class JobProcessor {
 
         try {
 
-            var resultFile = String.format("job_result_%s.json", jobState.jobKey);
-            var resultBytes = batchExecutor.readFile(jobState.jobKey, batchState, "result", resultFile);
-
-            var results = ConfigParser.parseConfig(resultBytes, ConfigFormat.JSON, JobResult.class);
+            var executorResult = jobExecutor.getJobResult(executorState);
 
             // If the validator is extended to cover the config interface,
             // The top level job result could be validated directly
 
-            for (var result : results.getResultsMap().entrySet()) {
+            for (var result : executorResult.getResultsMap().entrySet()) {
 
                 log.info("Validating job result: [{}] item [{}]", jobState.jobKey, result.getKey());
                 validator.validateFixedObject(result.getValue());
             }
 
             var newState = jobState.clone();
-            newState.jobResult = results;
+            newState.executorResult = executorResult;
             newState.tracStatus = JobStatusCode.SUCCEEDED;
             newState.cacheStatus = CacheStatus.RESULTS_RECEIVED;
 
             return newState;
         }
-        catch (EConfigParse | EValidation e) {
+        catch (EValidation e) {
 
             // Parsing and validation failures mean the job has definitely failed
             // Handle these as part of the result processing
@@ -431,29 +438,24 @@ public class JobProcessor {
 
         if (jobState.executorState != null) {
 
-            var batchExecutor = stronglyTypedExecutor();
-            var batchState = stronglyTypedState(batchExecutor, jobState.executorState);
+            var jobExecutor = stronglyTypedExecutor();
+            var executorState = stronglyTypedState(jobExecutor, jobState.executorState);
 
-            batchExecutor.destroyBatch(jobState.jobKey, batchState);
-
-            var newState = jobState.clone();
-            newState.cacheStatus = CacheStatus.READY_TO_REMOVE;
-            newState.executorStatus = ExecutorJobStatus.STATUS_UNKNOWN;
-            newState.executorState = null;
-
-            return newState;
+            jobExecutor.deleteJob(executorState);
         }
         else {
 
-            var newState = jobState.clone();
-            newState.cacheStatus = CacheStatus.READY_TO_REMOVE;
-            newState.executorStatus = ExecutorJobStatus.STATUS_UNKNOWN;
-
             log.warn("Job could not be cleaned up: [{}] Executor state is not available", jobState.jobKey);
             log.warn("There may be an orphaned task in the executor");
-
-            return newState;
         }
+
+        var newState = jobState.clone();
+        newState.cacheStatus = CacheStatus.READY_TO_REMOVE;
+        newState.executorState = null;
+        newState.executorStatus = null;
+        newState.executorResult = null;
+
+        return newState;
     }
 
     public JobState scheduleRemoval(JobState jobState) {
@@ -464,12 +466,11 @@ public class JobProcessor {
         return newState;
     }
 
-    public JobState handleProcessingFailed(JobState jobState, String errorMessage, Exception exception) {
+    public JobState handleProcessingFailed(JobState jobState, String errorMessage) {
 
         var newState = jobState.clone();
         newState.tracStatus = JobStatusCode.FAILED;
         newState.statusMessage = errorMessage;
-        newState.exception = exception;
 
         // Credentials are not serialized in the cache, they need to be regenerated
         newState.credentials = internalAuth.createDelegateSession(jobState.owner, DELEGATE_SESSION_TIMEOUT);
@@ -483,13 +484,13 @@ public class JobProcessor {
 
     @SuppressWarnings("unchecked")
     private <TState extends Serializable>
-    IBatchExecutor<TState> stronglyTypedExecutor() {
-        return (IBatchExecutor<TState>) executor;
+    IJobExecutor<TState> stronglyTypedExecutor() {
+        return (IJobExecutor<TState>) executor;
     }
 
     @SuppressWarnings("unchecked")
     private <TState extends Serializable>
-    TState stronglyTypedState(IBatchExecutor<TState> executor, Object executorState) {
+    TState stronglyTypedState(IJobExecutor<TState> executor, Object executorState) {
 
         var stateClass = executor.stateClass();
 

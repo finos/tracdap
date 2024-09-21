@@ -52,7 +52,7 @@ public class PluginServiceInfo {
     public static final String FORMAT_SERVICE_TYPE = "FORMAT";
 
     /** Standard service types for execution services **/
-    public static final String EXECUTION_SERVICE_TYPE = "EXECUTION";
+    public static final String EXECUTION_SERVICE_TYPE = "EXECUTOR";
 
     /** Standard service types for execution services **/
     public static final String JOB_CACHE_SERVICE_TYPE = "JOB_CACHE";

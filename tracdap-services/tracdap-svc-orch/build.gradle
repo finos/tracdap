@@ -73,7 +73,7 @@ dependencies {
 }
 
 // Add any plugin dependencies enabled at build time
-ext.enableBuildTimePlugins(["config", "exec"])
+ext.enableBuildTimePlugins(["config", "executor"])
 
 
 distributions {

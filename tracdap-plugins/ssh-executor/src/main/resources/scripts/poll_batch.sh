@@ -14,8 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-batch_admin_dir="${TRAC_BATCH_ADMIN_DIR}"
-result_file="${TRAC_RESULT_FILE}"
+batch_admin_dir="${BATCH_ADMIN_DIR}"
 
 pid=`cat "${batch_admin_dir}/pid"`
 echo "pid: ${pid}"
@@ -25,8 +24,8 @@ running=$?
 echo "running: ${running}"
 
 if [ ${running} -ne 0 ]; then
-  if [ -e "${result_file}" ]; then
-    exit_code=0
+  if [ -e "${batch_admin_dir}/exit_code" ]; then
+    exit_code=`cat "${batch_admin_dir}/exit_code"`
   else
     exit_code=1
   fi

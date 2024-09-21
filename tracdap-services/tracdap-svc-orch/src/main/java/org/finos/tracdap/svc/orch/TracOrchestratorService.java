@@ -20,12 +20,13 @@ import org.finos.tracdap.api.internal.TrustedMetadataApiGrpc;
 import org.finos.tracdap.common.auth.internal.InternalAuthProvider;
 import org.finos.tracdap.common.auth.internal.JwtSetup;
 import org.finos.tracdap.common.auth.internal.InternalAuthValidator;
-import org.finos.tracdap.common.cache.IJobCache;
 import org.finos.tracdap.common.cache.IJobCacheManager;
 import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.config.ConfigManager;
+import org.finos.tracdap.common.exec.BatchJobExecutor;
 import org.finos.tracdap.common.exec.IBatchExecutor;
 import org.finos.tracdap.common.exception.EStartup;
+import org.finos.tracdap.common.exec.IJobExecutor;
 import org.finos.tracdap.common.grpc.*;
 import org.finos.tracdap.common.plugin.PluginManager;
 import org.finos.tracdap.common.service.CommonServiceBase;
@@ -41,6 +42,7 @@ import io.grpc.ManagedChannel;
 import io.grpc.Server;
 import io.grpc.netty.NettyChannelBuilder;
 import io.grpc.netty.NettyServerBuilder;
+import io.netty.channel.Channel;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
@@ -50,6 +52,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.io.Serializable;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.concurrent.TimeUnit;
@@ -72,8 +75,8 @@ public class TracOrchestratorService extends CommonServiceBase {
     private Server server;
     private ManagedChannel clientChannel;
 
-    private IBatchExecutor<?> jobExecutor;
-    private IJobCache<JobState> jobCache;
+    private IJobExecutor<?> jobExecutor;
+    private IJobCacheManager jobCacheManager;
     private JobManager jobManager;
 
     public TracOrchestratorService(PluginManager pluginManager, ConfigManager configManager) {
@@ -114,27 +117,31 @@ public class TracOrchestratorService extends CommonServiceBase {
             nettyGroup = new NioEventLoopGroup(2, new DefaultThreadFactory("orch-netty"));
             serviceGroup = new NioEventLoopGroup(CONCURRENT_REQUESTS, new DefaultThreadFactory("orch-svc"));
 
-            var metaClient = prepareMetadataClient(platformConfig, clientChannelType);
+            var clientChannelFactory = new ClientChannelFactory(clientChannelType);
+            var metaClient = prepareMetadataClient(platformConfig, clientChannelFactory);
 
             var jwtProcessor = JwtSetup.createProcessor(platformConfig, configManager);
             var internalAuth = new InternalAuthProvider(jwtProcessor, platformConfig.getAuthentication());
 
-            jobExecutor = pluginManager.createService(
+            var batchExecutor = (IBatchExecutor<? extends Serializable>) pluginManager.createService(
                     IBatchExecutor.class,
                     platformConfig.getExecutor(),
                     configManager);
 
-            var cacheManager = pluginManager.createService(
+            jobExecutor = new BatchJobExecutor<>(batchExecutor);
+
+            jobCacheManager = pluginManager.createService(
                     IJobCacheManager.class,
                     platformConfig.getJobCache(),
                     configManager);
 
-            jobCache = cacheManager.getCache(JOB_CACHE_NAME, JobState.class);
+            var jobCache = jobCacheManager.getCache(JOB_CACHE_NAME, JobState.class);
 
             var jobProcessor = new JobProcessor(platformConfig, metaClient, internalAuth, jobExecutor);
+
             jobManager = new JobManager(platformConfig, jobProcessor, jobCache, serviceGroup);
 
-            jobExecutor.start();
+            jobExecutor.start(clientChannelFactory);
             jobManager.start();
 
             this.server = NettyServerBuilder
@@ -230,28 +237,42 @@ public class TracOrchestratorService extends CommonServiceBase {
     }
 
     private TrustedMetadataApiGrpc.TrustedMetadataApiBlockingStub prepareMetadataClient(
-            PlatformConfig platformConfig,
-            Class<? extends io.netty.channel.Channel> channelType) {
+            PlatformConfig platformConfig, GrpcChannelFactory channelFactory) {
 
         var metadataTarget = RoutingUtils.serviceTarget(platformConfig, ConfigKeys.METADATA_SERVICE_KEY);
 
         log.info("Using metadata service at [{}:{}]",
                 metadataTarget.getHost(), metadataTarget.getPort());
 
-        var clientChannelBuilder = NettyChannelBuilder
-                .forAddress(metadataTarget.getHost(), metadataTarget.getPort())
-                .channelType(channelType)
-                .eventLoopGroup(nettyGroup)
-                .executor(serviceGroup)
-                .usePlaintext();
-
-        clientChannel = clientChannelBuilder.build();
+        clientChannel = channelFactory.createChannel(metadataTarget.getHost(), metadataTarget.getPort());
 
         return TrustedMetadataApiGrpc
                 .newBlockingStub(clientChannel)
                 .withCompression(CompressionClientInterceptor.COMPRESSION_TYPE)
                 .withInterceptors(new CompressionClientInterceptor())
                 .withInterceptors(new LoggingClientInterceptor(TracOrchestratorService.class));
+    }
+
+    private class ClientChannelFactory implements GrpcChannelFactory {
+
+        private final Class<? extends io.netty.channel.Channel> channelType;
+
+        public ClientChannelFactory(Class<? extends Channel> channelType) {
+            this.channelType = channelType;
+        }
+
+        @Override
+        public ManagedChannel createChannel(String host, int port) {
+
+            var clientChannelBuilder = NettyChannelBuilder
+                    .forAddress(host, port)
+                    .channelType(channelType)
+                    .eventLoopGroup(nettyGroup)
+                    .executor(serviceGroup)
+                    .usePlaintext();
+
+            return clientChannelBuilder.build();
+        }
     }
 
     public static void main(String[] args) {

@@ -16,31 +16,25 @@
 
 package org.finos.tracdap.common.exec;
 
-public class ExecutorJobInfo {
+public class BatchStatus {
 
-    private final ExecutorJobStatus status;
+    private final BatchStatusCode statusCode;
     private final String statusMessage;
-    private final String errorDetail;
 
-    public ExecutorJobInfo(ExecutorJobStatus status) {
-        this(status, "", "");
+    public BatchStatus(BatchStatusCode statusCode) {
+        this(statusCode, "");
     }
 
-    public ExecutorJobInfo(ExecutorJobStatus status, String statusMessage, String errorDetail) {
-        this.status = status;
+    public BatchStatus(BatchStatusCode statusCode, String statusMessage) {
+        this.statusCode = statusCode;
         this.statusMessage = statusMessage;
-        this.errorDetail = errorDetail;
     }
 
-    public ExecutorJobStatus getStatus() {
-        return status;
+    public BatchStatusCode getStatusCode() {
+        return statusCode;
     }
 
     public String getStatusMessage() {
         return statusMessage;
-    }
-
-    public String getErrorDetail() {
-        return errorDetail;
     }
 }

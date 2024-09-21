@@ -16,35 +16,48 @@
 
 package org.finos.tracdap.common.exec;
 
+import org.finos.tracdap.config.StorageConfig;
+
 import java.io.Serializable;
-import java.util.List;
-import java.util.Map;
+import java.net.InetSocketAddress;
+import java.util.function.Consumer;
 
 
 public interface IBatchExecutor<TState extends Serializable> {
 
     // Interface for running batch jobs, i.e. a job that runs using one-shot using a one-shot process
 
-    void start();
+    enum Feature {
+        OUTPUT_VOLUMES,
+        EXPOSE_PORT,
+        STORAGE_MAPPING,
+        CANCELLATION
+    }
 
+    void start();
     void stop();
 
-    Class<TState> stateClass();
+    boolean hasFeature(Feature feature);
 
     TState createBatch(String batchKey);
+    TState addVolume(String batchKey, TState batchState, String volumeName, BatchVolumeType volumeType);
+    TState addFile(String batchKey, TState batchState, String volumeName, String fileName, byte[] fileContent);
 
-    void destroyBatch(String batchKey, TState batchState);
+    TState submitBatch(String batchKey, TState batchState, BatchConfig batchConfig);
+    TState cancelBatch(String batchKey, TState batchState);
+    void deleteBatch(String batchKey, TState batchState);
 
-    TState createVolume(String batchKey, TState batchState, String volumeName, ExecutorVolumeType volumeType);
+    BatchStatus getBatchStatus(String batchKey, TState batchState);
 
-    TState writeFile(String batchKey, TState batchState, String volumeName, String fileName, byte[] fileContent);
+    // Optional feature - output volumes
+    boolean hasOutputFile(String batchKey, TState batchState, String volumeName, String fileName);
+    byte[] getOutputFile(String batchKey, TState batchState, String volumeName, String fileName);
 
-    byte[] readFile(String batchKey, TState batchState, String volumeName, String fileName);
+    // Optional feature - expose port
+    InetSocketAddress getBatchAddress(String batchKey, TState batchState);
 
-    TState startBatch(String batchKey, TState batchState, LaunchCmd launchCmd, List<LaunchArg> launchArgs);
-
-    ExecutorJobInfo pollBatch(String batchKey, TState batchState);
-
-    List<ExecutorJobInfo> pollBatches(List<Map.Entry<String, TState>> batches);
-
+    // Optional feature - storage mapping
+    TState configureBatchStorage(
+            String batchKey, TState batchState,
+            StorageConfig storageConfig, Consumer<StorageConfig> storageUpdate);
 }

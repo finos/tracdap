@@ -17,9 +17,10 @@
 package org.finos.tracdap.svc.orch.test;
 
 import org.finos.tracdap.common.exec.*;
+import org.finos.tracdap.config.StorageConfig;
 
-import java.util.List;
-import java.util.Map;
+import java.net.InetSocketAddress;
+import java.util.function.Consumer;
 
 
 public class UnitTestExecutor implements IBatchExecutor<UnitTestExecutorState> {
@@ -35,8 +36,8 @@ public class UnitTestExecutor implements IBatchExecutor<UnitTestExecutorState> {
     }
 
     @Override
-    public Class<UnitTestExecutorState> stateClass() {
-        return null;
+    public boolean hasFeature(Feature feature) {
+        return false;
     }
 
     @Override
@@ -45,37 +46,55 @@ public class UnitTestExecutor implements IBatchExecutor<UnitTestExecutorState> {
     }
 
     @Override
-    public void destroyBatch(String batchKey, UnitTestExecutorState batchState) {
-
-    }
-
-    @Override
-    public UnitTestExecutorState createVolume(String batchKey, UnitTestExecutorState batchState, String volumeName, ExecutorVolumeType volumeType) {
+    public UnitTestExecutorState addVolume(String batchKey, UnitTestExecutorState batchState, String volumeName, BatchVolumeType volumeType) {
         return null;
     }
 
     @Override
-    public UnitTestExecutorState writeFile(String batchKey, UnitTestExecutorState batchState, String volumeName, String fileName, byte[] fileContent) {
+    public UnitTestExecutorState addFile(String batchKey, UnitTestExecutorState batchState, String volumeName, String fileName, byte[] fileContent) {
         return null;
     }
 
     @Override
-    public byte[] readFile(String batchKey, UnitTestExecutorState batchState, String volumeName, String fileName) {
+    public UnitTestExecutorState submitBatch(String batchKey, UnitTestExecutorState batchState, BatchConfig batchConfig) {
+        return null;
+    }
+
+    @Override
+    public UnitTestExecutorState cancelBatch(String batchKey, UnitTestExecutorState batchState) {
+        return null;
+    }
+
+    @Override
+    public void deleteBatch(String batchKey, UnitTestExecutorState batchState) {
+
+    }
+
+    @Override
+    public BatchStatus getBatchStatus(String batchKey, UnitTestExecutorState batchState) {
+        return null;
+    }
+
+    @Override
+    public boolean hasOutputFile(String batchKey, UnitTestExecutorState batchState, String volumeName, String fileName) {
+        return false;
+    }
+
+    @Override
+    public byte[] getOutputFile(String batchKey, UnitTestExecutorState batchState, String volumeName, String fileName) {
         return new byte[0];
     }
 
     @Override
-    public UnitTestExecutorState startBatch(String batchKey, UnitTestExecutorState batchState, LaunchCmd launchCmd, List<LaunchArg> launchArgs) {
+    public InetSocketAddress getBatchAddress(String batchKey, UnitTestExecutorState batchState) {
         return null;
     }
 
     @Override
-    public ExecutorJobInfo pollBatch(String batchKey, UnitTestExecutorState batchState) {
+    public UnitTestExecutorState configureBatchStorage(
+            String batchKey, UnitTestExecutorState batchState,
+            StorageConfig storageConfig, Consumer<StorageConfig> storageUpdate) {
+        
         return null;
-    }
-
-    @Override
-    public List<ExecutorJobInfo> pollBatches(List<Map.Entry<String, UnitTestExecutorState>> batches) {
-        return List.of();
     }
 }

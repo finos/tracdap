@@ -591,6 +591,12 @@ class ActorNode:
         if not self._check_message_target(signal):
             return
 
+        # Do not process signals after the actor has stopped
+        # This is common with e.g. STOP signals that propagate up and down the tree
+
+        if self.state in [ActorState.STOPPED, ActorState.FAILED]:
+            return
+
         # Call the signal receiver function
         # This gives the actor a chance to respond to the signal
 

@@ -18,9 +18,9 @@ package org.finos.tracdap.svc.orch.jobs;
 
 
 import org.finos.tracdap.api.MetadataWriteRequest;
+import org.finos.tracdap.api.internal.RuntimeJobResult;
 import org.finos.tracdap.common.exception.EConsistencyValidation;
 import org.finos.tracdap.config.JobConfig;
-import org.finos.tracdap.config.JobResult;
 import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.metadata.MetadataConstants;
@@ -129,7 +129,7 @@ public abstract class RunModelOrFlow {
     }
 
     public List<MetadataWriteRequest> buildResultMetadata(
-            String tenant, JobConfig jobConfig, JobResult jobResult,
+            String tenant, JobConfig jobConfig, RuntimeJobResult jobResult,
             Map<String, ModelOutputSchema> expectedOutputs,
             Map<String, TagSelector> outputs, Map<String, TagSelector> priorOutputs,
             List<TagUpdate> outputAttrs, Map<String, List<TagUpdate>> perNodeOutputAttrs) {

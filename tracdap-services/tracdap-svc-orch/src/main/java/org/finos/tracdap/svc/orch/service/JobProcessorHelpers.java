@@ -335,7 +335,7 @@ public class JobProcessorHelpers {
         var jobLogic = JobLogic.forJobType(jobState.jobType);
 
         var metaUpdates = jobState.tracStatus == JobStatusCode.SUCCEEDED
-                ? jobLogic.buildResultMetadata(jobState.tenant, jobState.jobConfig, jobState.jobResult)
+                ? jobLogic.buildResultMetadata(jobState.tenant, jobState.jobConfig, jobState.executorResult)
                 : List.<MetadataWriteRequest>of();
 
         var jobUpdate = jobState.tracStatus == JobStatusCode.SUCCEEDED

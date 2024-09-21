@@ -14,38 +14,36 @@ import "google/api/annotations.proto";
 
 service TracRuntimeApi {
 
-  rpc listJobs(ListJobsRequest) returns (ListJobsResponse) {
+  rpc listJobs(RuntimeListJobsRequest) returns (RuntimeListJobsResponse) {
     option (google.api.http) = {
       get: "/list-jobs"
     };
   }
 
-  rpc getJobStatus(JobInfoRequest) returns (JobStatus) {
+  rpc getJobStatus(RuntimeJobInfoRequest) returns (RuntimeJobStatus) {
     option (google.api.http) = {
       get: "/job-status/{jobKey}"
     };
   }
 
-  rpc getJobDetails(JobInfoRequest) returns (JobResult) {
+  rpc getJobResult(RuntimeJobInfoRequest) returns (RuntimeJobResult) {
     option (google.api.http) = {
-      get: "/job-details/{jobKey}"
+      get: "/job-result/{jobKey}"
     };
   }
 }
 
-
-message ListJobsRequest {
+message RuntimeListJobsRequest {
 
   optional uint32 limit = 1;
 }
 
-message ListJobsResponse {
+message RuntimeListJobsResponse {
 
-  repeated JobStatus jobs = 1;
+  repeated RuntimeJobStatus jobs = 1;
 }
 
-
-message JobInfoRequest {
+message RuntimeJobInfoRequest {
 
   oneof job {
     metadata.TagSelector jobSelector = 1;
@@ -53,15 +51,16 @@ message JobInfoRequest {
   }
 }
 
-message JobStatus {
+message RuntimeJobStatus {
 
   metadata.TagHeader jobId = 1;
 
   metadata.JobStatusCode statusCode = 2;
   string statusMessage = 3;
+  string errorDetail = 4;
 }
 
-message JobResult {
+message RuntimeJobResult {
 
   metadata.TagHeader jobId = 1;
 
