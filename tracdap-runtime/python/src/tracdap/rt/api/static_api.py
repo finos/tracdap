@@ -204,9 +204,7 @@ def P(  # noqa
     :rtype: _Named[:py:class:`ModelParameter <tracdap.rt.metadata.ModelParameter>`]
     """
 
-    return define_parameter(
-        param_name, param_type, label,
-        default_value)
+    return define_parameter(param_name, param_type, label, default_value, param_props=param_props)
 
 
 def define_parameters(
