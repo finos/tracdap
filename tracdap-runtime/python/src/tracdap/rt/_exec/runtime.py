@@ -104,6 +104,7 @@ class TracRuntime:
         self._oneshot_job = None
 
         # Top level resources
+        self._config_mgr: tp.Optional[_cparse.ConfigManager] = None
         self._models: tp.Optional[_models.ModelLoader] = None
         self._storage: tp.Optional[_storage.StorageManager] = None
 
@@ -158,11 +159,13 @@ class TracRuntime:
             # Load sys config (or use embedded), config errors are detected before start()
             # Job config can also be checked before start() by using load_job_config()
 
+            self._config_mgr = _cparse.ConfigManager.for_root_config(self._sys_config_path)
+
             if self._sys_config is None:
                 sys_config_dev_mode = _dev_mode.DEV_MODE_SYS_CONFIG if self._dev_mode else None
-                sys_config_parser = _cparse.ConfigParser(_cfg.RuntimeConfig, sys_config_dev_mode)
-                sys_config_raw = sys_config_parser.load_raw_config(self._sys_config_path, config_file_name="system")
-                self._sys_config = sys_config_parser.parse(sys_config_raw, self._sys_config_path)
+                self._sys_config = self._config_mgr.load_root_object(
+                    _cfg.RuntimeConfig, sys_config_dev_mode,
+                    config_file_name="system")
             else:
                 self._log.info("Using embedded system config")
 
@@ -170,8 +173,7 @@ class TracRuntime:
             # I.e. it can be applied to embedded configs
 
             if self._dev_mode:
-                config_dir = self._sys_config_path.parent if self._sys_config_path is not None else None
-                self._sys_config = _dev_mode.DevModeTranslator.translate_sys_config(self._sys_config, config_dir)
+                self._sys_config = _dev_mode.DevModeTranslator.translate_sys_config(self._sys_config, self._config_mgr)
 
             # Runtime API server is controlled by the sys config
 
@@ -318,20 +320,18 @@ class TracRuntime:
 
         if isinstance(job_config, _cfg.JobConfig):
             self._log.info("Using embedded job config")
-            job_config_path = None
 
         else:
-            job_config_path = job_config
             job_config_dev_mode = _dev_mode.DEV_MODE_JOB_CONFIG if self._dev_mode else None
-            job_config_parser = _cparse.ConfigParser(_cfg.JobConfig, job_config_dev_mode)
-            job_config_raw = job_config_parser.load_raw_config(job_config_path, config_file_name="job")
-            job_config = job_config_parser.parse(job_config_raw, job_config_path)
+            job_config = self._config_mgr.load_config_object(
+                job_config, _cfg.JobConfig,
+                job_config_dev_mode,
+                config_file_name="job")
 
         if self._dev_mode:
-            config_dir = job_config_path.parent if job_config_path is not None else None
             job_config = _dev_mode.DevModeTranslator.translate_job_config(
                 self._sys_config, job_config,
-                self._scratch_dir, config_dir,
+                self._scratch_dir, self._config_mgr,
                 model_class)
 
         return job_config
