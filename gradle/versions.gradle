@@ -25,21 +25,21 @@ ext {
     license_check_plugin_version = "2.8"
 
     // Core platform technologies
-    netty_version = '4.1.109.Final'
-    guava_version = '33.1.0-jre'
-    proto_version = '3.25.3'
-    grpc_version = '1.63.0'
-    gapi_version = '2.38.0'
+    netty_version = '4.1.113.Final'
+    guava_version = '33.3.0-jre'
+    proto_version = '4.28.2'
+    grpc_version = '1.68.0'
+    gapi_version = '2.44.0'
 
     // Data technologies
-    arrow_version = '16.0.0'
-    jackson_version = '2.17.0'
-    jackson_databind_version = '2.17.0'
+    arrow_version = '16.1.0'
+    jackson_version = '2.17.2'
+    jackson_databind_version = '2.17.2'
 
     // Util libraries
-    slf4j_version = '2.0.13'
-    log4j_version = '2.23.1'
-    commons_cli_version = "1.7.0"
+    slf4j_version = '2.0.16'
+    log4j_version = '2.24.0'
+    commons_cli_version = "1.9.0"
     auth0_jwt_version = "4.4.0"
 
 
