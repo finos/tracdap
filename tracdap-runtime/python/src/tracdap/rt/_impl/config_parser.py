@@ -45,16 +45,17 @@ class ConfigManager:
     def for_root_config(cls, root_config_file: tp.Union[str, pathlib.Path, None]) -> ConfigManager:
 
         if isinstance(root_config_file, pathlib.Path):
-            root_file_path = root_config_file.resolve()
-            root_dir_path = str(root_file_path.parent)
+            root_file_path = cls._resolve_scheme(root_config_file)
+            root_dir_path = cls._resolve_scheme(root_config_file.parent)
             if root_dir_path[-1] not in ["/", "\\"]:
                 root_dir_path += os.sep
-            root_file_url = _urlp.urlparse(str(root_file_path), scheme="file")
-            root_dir_url = _urlp.urlparse(str(root_dir_path), scheme="file")
+            root_file_url = _urlp.urlparse(root_file_path, scheme="file")
+            root_dir_url = _urlp.urlparse(root_dir_path, scheme="file")
             return ConfigManager(root_dir_url, root_file_url, )
 
         elif isinstance(root_config_file, str):
-            root_file_url = _urlp.urlparse(root_config_file, scheme="file")
+            root_file_with_scheme = cls._resolve_scheme(root_config_file)
+            root_file_url = _urlp.urlparse(root_file_with_scheme, scheme="file")
             root_dir_path = str(pathlib.Path(root_file_url.path).parent)
             if root_dir_path[-1] not in ["/", "\\"]:
                 root_dir_path += os.sep if root_file_url.scheme == "file" else "/"
@@ -70,21 +71,35 @@ class ConfigManager:
     def for_root_dir(cls, root_config_dir: tp.Union[str, pathlib.Path]) -> ConfigManager:
 
         if isinstance(root_config_dir, pathlib.Path):
-            root_dir_path = str(root_config_dir)
+            root_dir_path = cls._resolve_scheme(root_config_dir)
             if root_dir_path[-1] not in ["/", "\\"]:
                 root_dir_path += os.sep
-            root_dir_url = _urlp.urlparse(str(root_dir_path), scheme="file")
+            root_dir_url = _urlp.urlparse(root_dir_path, scheme="file")
             return ConfigManager(root_dir_url, None)
 
         elif isinstance(root_config_dir, str):
-            if root_config_dir[-1] not in ["/", "\\"]:
-                root_config_dir += "/"
-            root_dir_url = _urlp.urlparse(root_config_dir, scheme="file")
+            root_dir_with_scheme = cls._resolve_scheme(root_config_dir)
+            if root_dir_with_scheme[-1] not in ["/", "\\"]:
+                root_dir_with_scheme += "/"
+            root_dir_url = _urlp.urlparse(root_dir_with_scheme, scheme="file")
             return ConfigManager(root_dir_url, None)
 
         # Should never happen since root dir is specified explicitly
         else:
             raise _ex.ETracInternal("Wrong parameter type for root_config_dir")
+
+    @classmethod
+    def _resolve_scheme(cls, raw_url: tp.Union[str, pathlib.Path]) -> str:
+
+        if isinstance(raw_url, pathlib.Path):
+            return "file://" + str(raw_url.resolve())
+
+        # Look for drive letters on Windows - these can be mis-interpreted as URL scheme
+        # If there is a drive letter, explicitly set scheme = file instead
+        if len(raw_url) > 1 and raw_url[1] == ":":
+            return "file://" + raw_url
+        else:
+            return raw_url
 
     def __init__(self, root_dir_url: _urlp.ParseResult, root_file_url: tp.Optional[_urlp.ParseResult]):
         self._log = _util.logger_for_object(self)
