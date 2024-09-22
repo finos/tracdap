@@ -188,9 +188,8 @@ public class FlowValidator {
                 .pop();
 
         ctx = ctx.pushMap(FN_NODE_PROPS)
-                .applyMapKeys(CommonValidators::identifier)
-                .applyMapKeys(CommonValidators::notTracReserved)
-                .applyMapValues(TypeSystemValidator::value, Value.class)
+                .apply(CommonValidators::optional)
+                .apply(CommonValidators::standardProps)
                 .pop();
 
         ctx = ctx.push(FN_LABEL)

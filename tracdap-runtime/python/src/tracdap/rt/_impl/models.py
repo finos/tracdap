@@ -215,12 +215,15 @@ class ModelLoader:
 
             for name, param in model_def.parameters.items():
                 self.__log.info(f"Parameter [{name}] - {param.paramType.basicType.name}")
+                param.paramProps = self._encoded_props(param.paramProps, "parameter", name)
 
             for name, schema in model_def.inputs.items():
                 self.__log.info(f"Input [{name}] - {schema.schema.schemaType.name}")
+                schema.inputProps = self._encoded_props(schema.inputProps, "input", name)
 
             for name, schema in model_def.outputs.items():
                 self.__log.info(f"Output [{name}] - {schema.schema.schemaType.name}")
+                schema.outputProps = self._encoded_props(schema.outputProps, "input", name)
 
             return model_def
 
@@ -231,3 +234,25 @@ class ModelLoader:
 
             self.__log.error(msg, exc_info=True)
             raise _ex.EModelValidation(msg) from e
+
+    @staticmethod
+    def _encoded_props(
+            raw_props: tp.Dict[str, tp.Any],
+            item_type: str, item_name: str) \
+            -> tp.Dict[str, _meta.Value]:
+
+        if raw_props is None:
+            return dict()
+
+        encoded_props = dict()
+
+        for key, raw_value in raw_props.items():
+
+            if raw_value is None:
+                raise _ex.EModelValidation(f"Invalid null property [{key}] for {item_type} [{item_name}]")
+            elif isinstance(raw_value, _meta.Value):
+                encoded_props[key] = raw_value
+            else:
+                encoded_props[key] = _types.MetadataCodec.encode_value(raw_value)
+
+        return encoded_props

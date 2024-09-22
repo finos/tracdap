@@ -80,7 +80,8 @@ class _StaticApiHook:
     @_abc.abstractmethod
     def define_parameter(
             self, param_name: str, param_type: _tp.Union[_meta.TypeDescriptor, _meta.BasicType],
-            label: str, default_value: _tp.Optional[_tp.Any] = None) \
+            label: str, default_value: _tp.Optional[_tp.Any] = None,
+            *, param_props: _tp.Optional[_tp.Dict[str, _tp.Any]] = None) \
             -> _Named[_meta.ModelParameter]:
 
         pass
@@ -121,7 +122,8 @@ class _StaticApiHook:
     def define_input_table(
             self, *fields: _tp.Union[_meta.FieldSchema, _tp.List[_meta.FieldSchema]],
             label: _tp.Optional[str] = None,
-            optional: bool = False) \
+            optional: bool = False,
+            input_props: _tp.Optional[_tp.Dict[str, _tp.Any]] = None) \
             -> _meta.ModelInputSchema:
 
         pass
@@ -130,7 +132,8 @@ class _StaticApiHook:
     def define_output_table(
             self, *fields: _tp.Union[_meta.FieldSchema, _tp.List[_meta.FieldSchema]],
             label: _tp.Optional[str] = None,
-            optional: bool = False) \
+            optional: bool = False,
+            output_props: _tp.Optional[_tp.Dict[str, _tp.Any]] = None) \
             -> _meta.ModelOutputSchema:
 
         pass

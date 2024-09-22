@@ -39,6 +39,7 @@ public class FlowValidatorTest extends BaseValidatorTest {
                 .putNodes("model_1", FlowNode.newBuilder().setNodeType(FlowNodeType.MODEL_NODE)
                     .addInputs("input_1").addInputs("input_2")
                     .addOutputs("output_1")
+                    .putNodeProps("sample_prop", MetadataCodec.encodeValue(2.0))
                     .build())
                 .putNodes("output_1", FlowNode.newBuilder().setNodeType(FlowNodeType.OUTPUT_NODE).build())
 

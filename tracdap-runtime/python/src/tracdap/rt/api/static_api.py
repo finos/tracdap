@@ -14,6 +14,7 @@
 
 from __future__ import annotations
 
+import sys
 import typing as _tp
 import types as _ts
 
@@ -111,7 +112,8 @@ def A(  # noqa
 
 def define_parameter(
         param_name: str, param_type: _tp.Union[TypeDescriptor, BasicType],
-        label: str, default_value: _tp.Optional[_tp.Any] = None) \
+        label: str, default_value: _tp.Optional[_tp.Any] = None,
+        *, param_props: _tp.Optional[_tp.Dict[str, _tp.Any]] = None) \
         -> _Named[ModelParameter]:
 
     """
@@ -128,6 +130,10 @@ def define_parameter(
     the model. TRAC will apply type coercion where possible to ensure the default value matches the parameter type,
     if the default value cannot be coerced to match the parameter type then model validation will fail.
 
+    You can use param_props to associate arbitrary key-value properties with this model parameter.
+    These properties are not used by the TRAC engine, but are stored in the model metadata for
+    the parameter and can be used as needed in 3rd-party applications.
+
     Once defined model parameters can be passed to :py:func:`define_parameters`,
     either as a list or as individual arguments, to create the set of parameters for a model.
 
@@ -135,6 +141,7 @@ def define_parameter(
     :param param_type: The parameter type, expressed in the TRAC type system
     :param label: A descriptive label for the parameter (required)
     :param default_value: A default value to use if no explicit value is supplied (optional)
+    :param param_props: Associate key-value properties with this parameter (not used by the TRAC engine)
     :return: A named model parameter, suitable for passing to :py:func:`define_parameters`
 
     :type param_name: str
@@ -142,11 +149,12 @@ def define_parameter(
                       :py:class:`BasicType <tracdap.rt.metadata.BasicType>`
     :type label: str
     :type default_value: Optional[Any]
+    :type param_props: Optional[Dict[str, Any]]
     :rtype: _Named[:py:class:`ModelParameter <tracdap.rt.metadata.ModelParameter>`]
     """
 
     sa = _StaticApiHook.get_instance()
-    return sa.define_parameter(param_name, param_type, label, default_value)
+    return sa.define_parameter(param_name, param_type, label, default_value, param_props=param_props)
 
 
 def declare_parameter(
@@ -160,6 +168,9 @@ def declare_parameter(
     .. deprecated:: 0.4.4
        Use :py:func:`define_parameter` or :py:func:`P` instead.
 
+    This function is deprecated and will be removed in a future version.
+    Please use :py:func:`define_parameter() <tracdap.rt.api.define_parameter>` instead.
+
     :type param_name: str
     :type param_type: :py:class:`TypeDescriptor <tracdap.rt.metadata.TypeDescriptor>` |
                       :py:class:`BasicType <tracdap.rt.metadata.BasicType>`
@@ -168,6 +179,8 @@ def declare_parameter(
     :rtype: _Named[:py:class:`ModelParameter <tracdap.rt.metadata.ModelParameter>`]
     """
 
+    print("TRAC Warning: declare_parameter() is deprecated, please use define_parameter()", file=sys.stderr)
+
     return define_parameter(param_name, param_type, label, default_value)
 
 
@@ -175,7 +188,8 @@ def P(  # noqa
         param_name: str,
         param_type: _tp.Union[TypeDescriptor, BasicType],
         label: str,
-        default_value: _tp.Optional[_tp.Any] = None) \
+        default_value: _tp.Optional[_tp.Any] = None,
+        *, param_props: _tp.Optional[_tp.Dict[str, _tp.Any]] = None) \
         -> _Named[ModelParameter]:
 
     """
@@ -186,12 +200,11 @@ def P(  # noqa
                       :py:class:`BasicType <tracdap.rt.metadata.BasicType>`
     :type label: str
     :type default_value: Optional[Any]
+    :type param_props: Optional[Dict[str, Any]]
     :rtype: _Named[:py:class:`ModelParameter <tracdap.rt.metadata.ModelParameter>`]
     """
 
-    return declare_parameter(
-        param_name, param_type, label,
-        default_value)
+    return define_parameter(param_name, param_type, label, default_value, param_props=param_props)
 
 
 def define_parameters(
@@ -226,10 +239,15 @@ def declare_parameters(
     .. deprecated:: 0.4.4
        Use :py:func:`define_parameters` instead.
 
+    This function is deprecated and will be removed in a future version.
+    Please use :py:func:`define_parameters() <tracdap.rt.api.define_parameters>` instead.
+
     :type params: _Named[:py:class:`ModelParameter <tracdap.rt.metadata.ModelParameter>`] |
                   List[_Named[:py:class:`ModelParameter <tracdap.rt.metadata.ModelParameter>`]]
     :rtype: Dict[str, :py:class:`ModelParameter <tracdap.rt.metadata.ModelParameter>`]
     """
+
+    print("TRAC Warning: declare_parameters() is deprecated, please use define_parameters()", file=sys.stderr)
 
     return define_parameters(*params)
 
@@ -278,9 +296,9 @@ def define_field(
     :type label: str
     :type business_key: bool
     :type categorical: bool
-    :type not_null: _tp.Optional[bool]
-    :type format_code: _tp.Optional[str]
-    :type field_order: _tp.Optional[int]
+    :type not_null: Optional[bool]
+    :type format_code: Optional[str]
+    :type field_order: Optional[int]
     :rtype: :py:class:`FieldSchema <tracdap.rt.metadata.FieldSchema>`
     """
 
@@ -307,16 +325,21 @@ def declare_field(
     .. deprecated:: 0.4.4
        Use :py:func:`define_field` or :py:func:`F` instead.
 
+    This function is deprecated and will be removed in a future version.
+    Please use :py:func:`define_field() <tracdap.rt.api.define_field>` instead.
+
     :type field_name: str
     :type field_type: :py:class:`BasicType <tracdap.rt.metadata.BasicType>`
     :type label: str
     :type business_key: bool
     :type categorical: bool
-    :type not_null: _tp.Optional[bool]
-    :type format_code: _tp.Optional[str]
-    :type field_order: _tp.Optional[int]
+    :type not_null: Optional[bool]
+    :type format_code: Optional[str]
+    :type field_order: Optional[int]
     :rtype: :py:class:`FieldSchema <tracdap.rt.metadata.FieldSchema>`
     """
+
+    print("TRAC Warning: declare_field() is deprecated, please use define_field()", file=sys.stderr)
 
     return define_field(
         field_name, field_type, label,
@@ -343,9 +366,9 @@ def F(  # noqa
     :type label: str
     :type business_key: bool
     :type categorical: bool
-    :type not_null: _tp.Optional[bool]
-    :type format_code: _tp.Optional[str]
-    :type field_order: _tp.Optional[int]
+    :type not_null: Optional[bool]
+    :type format_code: Optional[str]
+    :type field_order: Optional[int]
     :rtype: :py:class:`FieldSchema <tracdap.rt.metadata.FieldSchema>`
     """
 
@@ -429,7 +452,8 @@ def load_schema(
 def define_input_table(
         *fields: _tp.Union[FieldSchema, _tp.List[FieldSchema]],
         label: _tp.Optional[str] = None,
-        optional: bool = False) \
+        optional: bool = False,
+        input_props: _tp.Optional[_tp.Dict[str, _tp.Any]] = None) \
         -> ModelInputSchema:
 
     """
@@ -438,20 +462,26 @@ def define_input_table(
     Fields can be supplied either as individual arguments to this function or as a list.
     Individual fields should be defined using :py:func:`define_field` or the shorthand alias :py:func:`F`.
 
+    You can use input_props to associate arbitrary key-value properties with this model input.
+    These properties are not used by the TRAC engine, but are stored in the model metadata for
+    the input and can be used as needed in 3rd-party applications.
+
     :param fields: A set of fields to make up a :py:class:`TableSchema <tracdap.rt.metadata.TableSchema>`
     :param label: An optional label (of type str) for a model input schema. Default value: None.
     :param optional: Mark this input as an optional model input
+    :param input_props: Associate key-value properties with this input (not used by the TRAC engine)
     :return: A model input schema, suitable for returning from :py:meth:`TracModel.define_inputs`
 
     :type fields: :py:class:`FieldSchema <tracdap.rt.metadata.FieldSchema>` |
                   List[:py:class:`FieldSchema <tracdap.rt.metadata.FieldSchema>`]
-    :type label: _tp.Optional[str]
+    :type label: Optional[str]
     :type optional: bool
+    :type input_props: Optional[Dict[str, Any]]
     :rtype: :py:class:`ModelInputSchema <tracdap.rt.metadata.ModelInputSchema>`
     """
 
     sa = _StaticApiHook.get_instance()
-    return sa.define_input_table(*fields, label=label, optional=optional)
+    return sa.define_input_table(*fields, label=label, optional=optional, input_props=input_props)
 
 
 def declare_input_table(
@@ -462,10 +492,15 @@ def declare_input_table(
     .. deprecated:: 0.4.4
        Use :py:func:`define_input_table` instead.
 
+    This function is deprecated and will be removed in a future version.
+    Please use :py:func:`define_input_table() <tracdap.rt.api.define_input_table>` instead.
+
     :type fields: :py:class:`FieldSchema <tracdap.rt.metadata.FieldSchema>` |
                   List[:py:class:`FieldSchema <tracdap.rt.metadata.FieldSchema>`]
     :rtype: :py:class:`ModelInputSchema <tracdap.rt.metadata.ModelInputSchema>`
     """
+
+    print("TRAC Warning: declare_input_table() is deprecated, please use define_input_table()", file=sys.stderr)
 
     return define_input_table(*fields)
 
@@ -473,7 +508,8 @@ def declare_input_table(
 def define_output_table(
         *fields: _tp.Union[FieldSchema, _tp.List[FieldSchema]],
         label: _tp.Optional[str] = None,
-        optional: bool = False) \
+        optional: bool = False,
+        output_props: _tp.Optional[_tp.Dict[str, _tp.Any]] = None) \
         -> ModelOutputSchema:
 
     """
@@ -482,20 +518,26 @@ def define_output_table(
     Fields can be supplied either as individual arguments to this function or as a list.
     Individual fields should be defined using :py:func:`define_field` or the shorthand alias :py:func:`F`.
 
+    You can use output_props to associate arbitrary key-value properties with this model output.
+    These properties are not used by the TRAC engine, but are stored in the model metadata for
+    the output and can be used as needed in 3rd-party applications.
+
     :param fields: A set of fields to make up a :py:class:`TableSchema <tracdap.rt.metadata.TableSchema>`
     :param label: An optional label (of type str) for a model output schema. Default value: None.
     :param optional: Mark this output as an optional model output
+    :param output_props: Associate key-value properties with this output (not used by the TRAC engine)
     :return: A model output schema, suitable for returning from :py:meth:`TracModel.define_outputs`
 
     :type fields: :py:class:`FieldSchema <tracdap.rt.metadata.FieldSchema>` |
                   List[:py:class:`FieldSchema <tracdap.rt.metadata.FieldSchema>`]
-    :type label: _tp.Optional[str]
+    :type label: Optional[str]
     :type optional: bool
+    :type output_props: Optional[Dict[str, Any]]
     :rtype: :py:class:`ModelOutputSchema <tracdap.rt.metadata.ModelOutputSchema>`
     """
 
     sa = _StaticApiHook.get_instance()
-    return sa.define_output_table(*fields, label=label, optional=optional)
+    return sa.define_output_table(*fields, label=label, optional=optional, output_props=output_props)
 
 
 def declare_output_table(
@@ -506,9 +548,17 @@ def declare_output_table(
     .. deprecated:: 0.4.4
        Use :py:func:`define_output_table` instead.
 
+    This function is deprecated and will be removed in a future version.
+    Please use :py:func:`define_output_table() <tracdap.rt.api.define_output_table>` instead.
+
+    This function is deprecated and will be removed in a future version.
+    Please use define_output_table() instead.
+
     :type fields: :py:class:`FieldSchema <tracdap.rt.metadata.FieldSchema>` |
                   List[:py:class:`FieldSchema <tracdap.rt.metadata.FieldSchema>`]
     :rtype: :py:class:`ModelOutputSchema <tracdap.rt.metadata.ModelOutputSchema>`
     """
+
+    print("TRAC Warning: declare_output_table() is deprecated, please use define_output_table()", file==sys.stderr)
 
     return define_output_table(*fields)
