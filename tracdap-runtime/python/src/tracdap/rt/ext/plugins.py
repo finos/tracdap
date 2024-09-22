@@ -122,3 +122,16 @@ class PluginManager:
         plugin = plugin_class(config.properties)
 
         return plugin
+
+    @classmethod
+    def load_config_plugin(cls,
+            service_type: _tp.Type[T_SERVICE],
+            config: _cfg.PluginConfig) \
+            -> T_SERVICE:
+
+        # Currently config plugins are loaded the same way as regular plugins
+        # However, regular plugins can be modified to take ConfigManager as an init parameter
+        # This is useful for loading secondary config files needed in particularly plugins
+        # Config plugins can never do this, because the config manager is not yet initialized
+
+        return cls.load_plugin(service_type, config)
