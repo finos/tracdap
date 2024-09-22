@@ -28,14 +28,14 @@ class LocalConfigLoader(IConfigLoader):
         pass
 
     def has_config_file(self, config_url: str) -> bool:
-        if config_url.startswith("file://"):
-            config_url = config_url[7:]
+        if config_url.startswith("file:"):
+            config_url = config_url[5:]
         config_path = pathlib.Path(config_url).resolve()
         return config_path.exists() and config_path.is_file()
 
     def load_config_file(self, config_url: str) -> bytes:
-        if config_url.startswith("file://"):
-            config_url = config_url[7:]
+        if config_url.startswith("file:"):
+            config_url = config_url[5:]
         config_path = pathlib.Path(config_url).resolve()
         return config_path.read_bytes()
 
