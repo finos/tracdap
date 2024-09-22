@@ -31,14 +31,14 @@ class SampleModel(api.TracModel):
 
     def define_parameters(self) -> tp.Dict[str, meta.ModelParameter]:
 
-        return api.declare_parameters(
+        return api.define_parameters(
             api.P("param1", api.INTEGER, label="A first parameter"),
             api.P("param2", api.STRING, label="A second parameter"),
             api.P("param3", api.FLOAT, label="Param 3, test default type coercion", default_value=1))
 
     def define_inputs(self) -> tp.Dict[str, api.ModelInputSchema]:
 
-        input_table_1 = api.declare_input_table(
+        input_table_1 = api.define_input_table(
             api.F("input_field_1", api.STRING, label="Input field 1", business_key=True),
             api.F("input_field_2", api.INTEGER, label="Input field 2"),
             api.F("input_field_3", api.STRING, label="Input field 3", categorical=True),
@@ -48,7 +48,7 @@ class SampleModel(api.TracModel):
 
     def define_outputs(self) -> tp.Dict[str, api.ModelOutputSchema]:
 
-        output_table_1 = api.declare_output_table(
+        output_table_1 = api.define_output_table(
             api.F("output_field_1", api.STRING, label="Output field 1", business_key=True),
             api.F("output_field_2", api.DATE, label="Output field 2"),
             api.F("output_field_3", api.FLOAT, label="Output field 3"))
