@@ -13,4 +13,4 @@
 # limitations under the License.
 
 # Core data plugin supplies core formats and local file storage
-org.finos.tracdap.plugins.exec.ssh.SshExecutorPlugin
+org.finos.tracdap.plugins.ssh.executor.SshExecutorPlugin

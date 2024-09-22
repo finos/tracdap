@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Accenture Global Solutions Limited
+ * Copyright 2024 Accenture Global Solutions Limited
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.plugins.exec.ssh;
+package org.finos.tracdap.plugins.ssh.executor;
 
 import java.io.Serializable;
 import java.util.ArrayList;

@@ -18,10 +18,10 @@ batch_admin_dir="${BATCH_ADMIN_DIR}"
 batch_stdout="${BATCH_STDOUT}"
 batch_stderr="${BATCH_STDERR}"
 
-if [ "${batch_stdout}" -ne "" && "${batch_stderr}" -ne "" ]; then
-  ($@ >"${batch_stdout}" 2>"${batch_stderr}" </dev/null; echo $? > "${batch_admin_dir}/exit_code") &
+if [ -n "${batch_stdout}" ] && [ -n "${batch_stderr}" ]; then
+  ($@ >"${batch_stdout}" 2>"${batch_stderr}" </dev/null && echo 0 > "${batch_admin_dir}/exit_code") &
 else
-  ($@ </dev/null; echo $? > "${batch_admin_dir}/exit_code") &
+  ($@ >/dev/null 2>/dev/null </dev/null && echo 0 > "${batch_admin_dir}/exit_code") &
 fi
 
 pid=$!

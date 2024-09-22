@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Accenture Global Solutions Limited
+ * Copyright 2024 Accenture Global Solutions Limited
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.plugins.exec.ssh;
+package org.finos.tracdap.plugins.ssh.executor;
 
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.exception.*;
@@ -298,17 +298,20 @@ public class SshExecutor implements IBatchExecutor<SshExecutorState> {
             var session = getSession(batchState);
             var command = buildBatchCommand(batchKey, batchState, launchCmd, launchArgs);
 
-            if (!batchState.getVolumes().contains("log"))
-                throw new ETracInternal("Executor log volume has not been configured");
-
             var batchAdminDir = buildVolumePath(batchState, "trac_admin");
 
             String stdOutLog;
             String stdErrLog;
 
             if (batchConfig.isRedirectOutput()) {
-                stdOutLog = buildRemotePath(batchState, "log", "trac_rt_stdout.txt");
-                stdErrLog = buildRemotePath(batchState, "log", "trac_rt_stderr.txt");
+
+                stdOutLog = buildRemotePath(batchState,
+                        batchConfig.getStdOut().getPathVolume(),
+                        batchConfig.getStdOut().getPathArg());
+
+                stdErrLog = buildRemotePath(batchState,
+                        batchConfig.getStdErr().getPathVolume(),
+                        batchConfig.getStdErr().getPathArg());
             }
             else {
                 stdOutLog = "";
