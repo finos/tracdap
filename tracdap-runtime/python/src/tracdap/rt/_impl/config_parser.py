@@ -50,7 +50,7 @@ class ConfigManager:
             if root_dir_path[-1] not in ["/", "\\"]:
                 root_dir_path += os.sep
             root_file_url = _urlp.urlparse(str(root_file_path), scheme="file")
-            root_dir_url = _urlp.urlparse(str(root_dir_path) + os.sep, scheme="file")
+            root_dir_url = _urlp.urlparse(str(root_dir_path), scheme="file")
             return ConfigManager(root_dir_url, root_file_url, )
 
         elif isinstance(root_config_file, str):
@@ -65,6 +65,26 @@ class ConfigManager:
             working_dir_path = str(pathlib.Path.cwd().resolve())
             working_dir_url = _urlp.urlparse(str(working_dir_path), scheme="file")
             return ConfigManager(working_dir_url, None)
+
+    @classmethod
+    def for_root_dir(cls, root_config_dir: tp.Union[str, pathlib.Path]) -> ConfigManager:
+
+        if isinstance(root_config_dir, pathlib.Path):
+            root_dir_path = str(root_config_dir)
+            if root_dir_path[-1] not in ["/", "\\"]:
+                root_dir_path += os.sep
+            root_dir_url = _urlp.urlparse(str(root_dir_path), scheme="file")
+            return ConfigManager(root_dir_url, None)
+
+        elif isinstance(root_config_dir, str):
+            if root_config_dir[-1] not in ["/", "\\"]:
+                root_config_dir += "/"
+            root_dir_url = _urlp.urlparse(root_config_dir, scheme="file")
+            return ConfigManager(root_dir_url, None)
+
+        # Should never happen since root dir is specified explicitly
+        else:
+            raise _ex.ETracInternal("Wrong parameter type for root_config_dir")
 
     def __init__(self, root_dir_url: _urlp.ParseResult, root_file_url: tp.Optional[_urlp.ParseResult]):
         self._log = _util.logger_for_object(self)
@@ -119,7 +139,9 @@ class ConfigManager:
         parser = ConfigParser(config_class, dev_mode_locations)
         return parser.parse(config_dict, config_url)
 
-    def load_config_file(self, config_url: str, config_file_name: tp.Optional[str]) -> bytes:
+    def load_config_file(self,
+            config_url: tp.Union[str, pathlib.Path],
+            config_file_name: tp.Optional[str] = None) -> bytes:
 
         resolved_url = self._resolve_config_file(config_url)
 
@@ -199,7 +221,7 @@ class ConfigManager:
             self._log.error(err)
             raise _ex.EConfigParse(err) from e
 
-        except yaml.parser.ParserError as e:
+        except (yaml.parser.ParserError, yaml.reader.ReaderError) as e:
             err = f"Config file contains invalid YAML ({str(e)})"
             self._log.error(err)
             raise _ex.EConfigParse(err) from e
