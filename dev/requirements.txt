@@ -1,7 +1,7 @@
 # Requirements for all the Python build scripts
 
 # Protoc is required for the codegen scripts which work off the API proto files
-protobuf ~= 5.27.4
+protobuf ~= 5.28.2
 protoc-wheel-0 ~= 25.0
 grpcio-tools ~= 1.66.1
 googleapis-common-protos ~= 1.63
