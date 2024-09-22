@@ -170,8 +170,9 @@ class ConfigManager:
     def _resolve_config_file(self, config_url: tp.Union[str, pathlib.Path]) -> _urlp.ParseResult:
 
         # If the config URL defines a scheme, treat it as absolute
+        # (This also works for Windows paths, C:\ is an absolute path)
         if ":" in str(config_url):
-            absolute_url = config_url
+            absolute_url = str(config_url)
         # If the root URL is a path, resolve using path logic (this allows for config_url to be an absolute path)
         elif self._root_dir_url.scheme == "file":
             absolute_url = str(pathlib.Path(self._root_dir_url.path).joinpath(str(config_url)))
