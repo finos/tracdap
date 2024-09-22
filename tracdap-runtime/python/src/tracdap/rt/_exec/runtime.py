@@ -87,7 +87,7 @@ class TracRuntime:
         self._log.info(f"TRAC D.A.P. Python Runtime {trac_version}")
 
         self._sys_config = sys_config if isinstance(sys_config, _cfg.RuntimeConfig) else None
-        self._sys_config_path = pathlib.Path(sys_config) if not self._sys_config else None
+        self._sys_config_path = sys_config if not self._sys_config else None
         self._job_result_dir = job_result_dir
         self._job_result_format = job_result_format
         self._scratch_dir = scratch_dir
