@@ -92,12 +92,12 @@ class ConfigManager:
     def _resolve_scheme(cls, raw_url: tp.Union[str, pathlib.Path]) -> str:
 
         if isinstance(raw_url, pathlib.Path):
-            return "file://" + str(raw_url.resolve())
+            return "file:" + str(raw_url.resolve())
 
         # Look for drive letters on Windows - these can be mis-interpreted as URL scheme
         # If there is a drive letter, explicitly set scheme = file instead
         if len(raw_url) > 1 and raw_url[1] == ":":
-            return "file://" + raw_url
+            return "file:" + raw_url
         else:
             return raw_url
 
@@ -112,10 +112,10 @@ class ConfigManager:
         else:
             return None
 
-    def load_root_object(self,
-             config_class: type(_T),
-             dev_mode_locations: tp.List[str] = None,
-             config_file_name: tp.Optional[str] = None) -> _T:
+    def load_root_object(
+            self, config_class: type(_T),
+            dev_mode_locations: tp.List[str] = None,
+            config_file_name: tp.Optional[str] = None) -> _T:
 
         # Root config not available normally means you're using embedded config
         # In which case this method should not be called
@@ -136,8 +136,8 @@ class ConfigManager:
         parser = ConfigParser(config_class, dev_mode_locations)
         return parser.parse(config_dict, resolved_url.path)
 
-    def load_config_object(self,
-            config_url: tp.Union[str, pathlib.Path],
+    def load_config_object(
+            self, config_url: tp.Union[str, pathlib.Path],
             config_class: type(_T),
             dev_mode_locations: tp.List[str] = None,
             config_file_name: tp.Optional[str] = None) -> _T:
@@ -154,8 +154,8 @@ class ConfigManager:
         parser = ConfigParser(config_class, dev_mode_locations)
         return parser.parse(config_dict, config_url)
 
-    def load_config_file(self,
-            config_url: tp.Union[str, pathlib.Path],
+    def load_config_file(
+            self, config_url: tp.Union[str, pathlib.Path],
             config_file_name: tp.Optional[str] = None) -> bytes:
 
         resolved_url = self._resolve_config_file(config_url)
@@ -169,9 +169,17 @@ class ConfigManager:
 
     def _resolve_config_file(self, config_url: tp.Union[str, pathlib.Path]) -> _urlp.ParseResult:
 
-        if self._root_dir_url:
-            absolute_url = _urlp.urljoin(self._root_dir_url.geturl(), str(config_url))  # noqa
-            return _urlp.urlparse(absolute_url)
+        if self._root_dir_url.scheme == "file":
+            absolute_url = str(pathlib.Path(self._root_dir_url.path).joinpath(str(config_url)))
+        else:
+            absolute_url = _urlp.urljoin(self._root_dir_url.geturl(), str(config_url))
+
+        # Look for drive letters on Windows - these can be mis-interpreted as URL scheme
+        # If there is a drive letter, explicitly set scheme = file instead
+        if len(absolute_url) > 1 and absolute_url[1] == ":":
+            absolute_url = "file:" + absolute_url
+
+        return _urlp.urlparse(absolute_url, scheme="file")
 
     def _load_config_file(self, resolved_url: _urlp.ParseResult) -> bytes:
 
