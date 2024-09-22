@@ -171,6 +171,23 @@ class MetadataCodec:
             type_desc = _meta.TypeDescriptor(_meta.BasicType.DATE)
             return _meta.Value(type_desc, dateValue=_meta.DateValue(value.isoformat()))
 
+        if isinstance(value, list):
+
+            if len(value) == 0:
+                raise _ex.ETracInternal("Cannot encode an empty list")
+
+            array_raw_type = type(value[0])
+            array_trac_type = TypeMapping.python_to_trac(array_raw_type)
+
+            if any(map(lambda x: type(x) != array_raw_type, value)):
+                raise _ex.ETracInternal("Cannot encode a list with values of different types")
+
+            encoded_items = list(map(lambda x: cls.convert_value(x, array_trac_type), value))
+
+            return _meta.Value(
+                _meta.TypeDescriptor(_meta.BasicType.ARRAY, arrayType=array_trac_type),
+                arrayValue=_meta.ArrayValue(encoded_items))
+
         raise _ex.ETracInternal(f"Value type [{type(value)}] is not supported yet")
 
     @classmethod
