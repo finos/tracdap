@@ -17,13 +17,13 @@
 package org.finos.tracdap.svc.orch.jobs;
 
 import org.finos.tracdap.api.MetadataWriteRequest;
+import org.finos.tracdap.api.internal.RuntimeJobResult;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.graph.GraphBuilder;
 import org.finos.tracdap.common.graph.NodeNamespace;
 import org.finos.tracdap.common.metadata.MetadataBundle;
 import org.finos.tracdap.common.metadata.MetadataUtil;
 import org.finos.tracdap.config.JobConfig;
-import org.finos.tracdap.config.JobResult;
 import org.finos.tracdap.config.PlatformConfig;
 import org.finos.tracdap.metadata.*;
 
@@ -145,7 +145,7 @@ public class RunFlowJob extends RunModelOrFlow implements IJobLogic {
     }
 
     @Override
-    public List<MetadataWriteRequest> buildResultMetadata(String tenant, JobConfig jobConfig, JobResult jobResult) {
+    public List<MetadataWriteRequest> buildResultMetadata(String tenant, JobConfig jobConfig, RuntimeJobResult jobResult) {
 
         var runFlow = jobConfig.getJob().getRunFlow();
 

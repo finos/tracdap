@@ -54,51 +54,47 @@ public abstract class ExecutorBasicTestSuite {
 
             // Set up volumes
 
-            batchState = batchExecutor.createVolume(jobKey, batchState, "config", ExecutorVolumeType.CONFIG_DIR);
-            batchState = batchExecutor.createVolume(jobKey, batchState, "outputs", ExecutorVolumeType.RESULT_DIR);
-
-            // TODO: This should not be required (unless it is made part of the API)
-            batchState = batchExecutor.createVolume(jobKey, batchState, "log", ExecutorVolumeType.RESULT_DIR);
+            batchState = batchExecutor.addVolume(jobKey, batchState, "config", BatchVolumeType.CONFIG_VOLUME);
+            batchState = batchExecutor.addVolume(jobKey, batchState, "outputs", BatchVolumeType.OUTPUT_VOLUME);
 
             // Write a test file into the config volume
 
             var inputBytes = ResourceHelpers.loadResourceAsBytes(LOREM_IPSUM_TEST_RESOURCE, ExecutorBasicTestSuite.class);
-            batchState = batchExecutor.writeFile(jobKey, batchState, "config", "lorem_ipsum.txt", inputBytes);
+            batchState = batchExecutor.addFile(jobKey, batchState, "config", "lorem_ipsum.txt", inputBytes);
 
             // Set up a basic copy command
 
-            LaunchCmd launchCmd;
-            List<LaunchArg> launchArgs;
+            BatchConfig batchConfig;
 
             if (targetIsWindows()) {
-                launchCmd = LaunchCmd.custom("cmd");
-                launchArgs = List.of(
+
+                batchConfig = BatchConfig.forCommand(LaunchCmd.custom("cmd"), List.of(
                         LaunchArg.string("/C"), LaunchArg.string("copy"),
                         LaunchArg.path("config", "lorem_ipsum.txt"),
-                        LaunchArg.path("outputs", "lorem_ipsum_copy.txt"));
+                        LaunchArg.path("outputs", "lorem_ipsum_copy.txt")));
             }
             else {
-                launchCmd = LaunchCmd.custom("cp");
-                launchArgs = List.of(
+
+                batchConfig = BatchConfig.forCommand(LaunchCmd.custom("cp"), List.of(
                         LaunchArg.string("-v"),
                         LaunchArg.path("config", "lorem_ipsum.txt"),
-                        LaunchArg.path("outputs", "lorem_ipsum_copy.txt"));
+                        LaunchArg.path("outputs", "lorem_ipsum_copy.txt")));
             }
 
             // Start the batch
 
-            batchState = batchExecutor.startBatch(jobKey, batchState, launchCmd, launchArgs);
+            batchState = batchExecutor.submitBatch(jobKey, batchState, batchConfig);
 
             TimeUnit.MILLISECONDS.sleep(500);
 
-            var result = batchExecutor.pollBatch(jobKey, batchState);
-            Assertions.assertEquals(ExecutorJobStatus.SUCCEEDED, result.getStatus());
+            var result = batchExecutor.getBatchStatus(jobKey, batchState);
+            Assertions.assertEquals(BatchStatusCode.SUCCEEDED, result.getStatusCode());
 
-            var outputBytes = batchExecutor.readFile(jobKey, batchState, "outputs", "lorem_ipsum_copy.txt");
+            var outputBytes = batchExecutor.getOutputFile(jobKey, batchState, "outputs", "lorem_ipsum_copy.txt");
             Assertions.assertArrayEquals(inputBytes, outputBytes);
         }
         finally {
-            batchExecutor.destroyBatch(jobKey, batchState);
+            batchExecutor.deleteBatch(jobKey, batchState);
         }
     }
 
@@ -116,45 +112,41 @@ public abstract class ExecutorBasicTestSuite {
 
             // Set up volumes
 
-            batchState = batchExecutor.createVolume(jobKey, batchState, "config", ExecutorVolumeType.CONFIG_DIR);
-            batchState = batchExecutor.createVolume(jobKey, batchState, "outputs", ExecutorVolumeType.RESULT_DIR);
-
-            // TODO: This should not be required (unless it is made part of the API)
-            batchState = batchExecutor.createVolume(jobKey, batchState, "log", ExecutorVolumeType.RESULT_DIR);
+            batchState = batchExecutor.addVolume(jobKey, batchState, "config", BatchVolumeType.CONFIG_VOLUME);
+            batchState = batchExecutor.addVolume(jobKey, batchState, "outputs", BatchVolumeType.OUTPUT_VOLUME);
 
             // Do not prepare input file, let it be missing
 
             // Set up a basic copy command
 
-            LaunchCmd launchCmd;
-            List<LaunchArg> launchArgs;
+            BatchConfig batchConfig;
 
             if (targetIsWindows()) {
-                launchCmd = LaunchCmd.custom("cmd");
-                launchArgs = List.of(
+
+                batchConfig = BatchConfig.forCommand(LaunchCmd.custom("cmd"), List.of(
                         LaunchArg.string("/C"), LaunchArg.string("copy"),
                         LaunchArg.path("config", "lorem_ipsum.txt"),
-                        LaunchArg.path("outputs", "lorem_ipsum_copy.txt"));
+                        LaunchArg.path("outputs", "lorem_ipsum_copy.txt")));
             }
             else {
-                launchCmd = LaunchCmd.custom("cp");
-                launchArgs = List.of(
+
+                batchConfig = BatchConfig.forCommand(LaunchCmd.custom("cp"), List.of(
                         LaunchArg.string("-v"),
                         LaunchArg.path("config", "lorem_ipsum.txt"),
-                        LaunchArg.path("outputs", "lorem_ipsum_copy.txt"));
+                        LaunchArg.path("outputs", "lorem_ipsum_copy.txt")));
             }
 
             // Start the batch
 
-            batchState = batchExecutor.startBatch(jobKey, batchState, launchCmd, launchArgs);
+            batchState = batchExecutor.submitBatch(jobKey, batchState, batchConfig);
 
             TimeUnit.MILLISECONDS.sleep(500);
 
-            var result = batchExecutor.pollBatch(jobKey, batchState);
-            Assertions.assertEquals(ExecutorJobStatus.FAILED, result.getStatus());
+            var result = batchExecutor.getBatchStatus(jobKey, batchState);
+            Assertions.assertEquals(BatchStatusCode.FAILED, result.getStatusCode());
         }
         finally {
-            batchExecutor.destroyBatch(jobKey, batchState);
+            batchExecutor.deleteBatch(jobKey, batchState);
         }
     }
 }

@@ -124,23 +124,23 @@ class RuntimeApiServer(runtime_grpc.TracRuntimeApiServicer):
 
         self.__log.info("Runtime API server has gone down cleanly")
 
-    async def listJobs(self, request: runtime_pb2.ListJobsRequest, context: grpc.aio.ServicerContext):
+    async def listJobs(self, request: runtime_pb2.RuntimeListJobsRequest, context: grpc.aio.ServicerContext):
 
         request_task = ListJobsRequest(self.__engine_id, request, context)
         self.__agent.threadsafe().spawn(request_task)
 
         return await request_task.complete(self.__request_timeout)
 
-    async def getJobStatus(self, request: runtime_pb2.JobInfoRequest, context: grpc.ServicerContext):
+    async def getJobStatus(self, request: runtime_pb2.RuntimeJobInfoRequest, context: grpc.ServicerContext):
 
         request_task = GetJobStatusRequest(self.__engine_id, request, context)
         self.__agent.threadsafe().spawn(request_task)
 
         return await request_task.complete(self.__request_timeout)
 
-    async def getJobDetails(self, request: runtime_pb2.JobInfoRequest, context: grpc.ServicerContext):
+    async def getJobResult(self, request: runtime_pb2.RuntimeJobInfoRequest, context: grpc.ServicerContext):
 
-        request_task = GetJobStatusRequest(self.__engine_id, request, context)
+        request_task = GetJobResultRequest(self.__engine_id, request, context)
         self.__agent.threadsafe().spawn(request_task)
 
         return await request_task.complete(self.__request_timeout)
@@ -157,11 +157,23 @@ class ApiAgent(actors.ThreadsafeActor):
 
     def __init__(self):
         super().__init__()
+        self._log = util.logger_for_object(self)
         self._event_loop = asyncio.get_event_loop()
         self.__start_signal = asyncio.Event()
 
     def on_start(self):
         self._event_loop.call_soon_threadsafe(lambda: self.__start_signal.set())
+
+    def on_signal(self, signal: actors.Signal) -> tp.Optional[bool]:
+
+        # Do not allow a failed request to bring down the API server
+        if signal.message == actors.SignalNames.FAILED:
+            error = signal.error if isinstance(signal, actors.ErrorSignal) else None
+            self._log.warning("Unhandled error during API request: " + str(error))
+            self._log.warning("The API agent will continue running")
+            return True
+
+        return False
 
     async def started(self):
         await self.__start_signal.wait()
@@ -248,7 +260,7 @@ class ApiRequest(actors.ThreadsafeActor, tp.Generic[_T_REQUEST, _T_RESPONSE]):
 ApiRequest._log = util.logger_for_class(ApiRequest)
 
 
-class ListJobsRequest(ApiRequest[runtime_pb2.ListJobsRequest, runtime_pb2.ListJobsResponse]):
+class ListJobsRequest(ApiRequest[runtime_pb2.RuntimeListJobsRequest, runtime_pb2.RuntimeListJobsResponse]):
 
     def __init__(self, engine_id, request, context):
         super().__init__(engine_id, "get_job_list", request, context)
@@ -259,13 +271,13 @@ class ListJobsRequest(ApiRequest[runtime_pb2.ListJobsRequest, runtime_pb2.ListJo
     @actors.Message
     def job_list(self, job_list):
 
-        self._response = runtime_pb2.ListJobsResponse(
+        self._response = runtime_pb2.RuntimeListJobsResponse(
             jobs=codec.encode(job_list))
 
         self._mark_complete()
 
 
-class GetJobStatusRequest(ApiRequest[runtime_pb2.JobInfoRequest, runtime_pb2.JobStatus]):
+class GetJobStatusRequest(ApiRequest[runtime_pb2.RuntimeJobInfoRequest, runtime_pb2.RuntimeJobStatus]):
 
     def __init__(self, engine_id, request, context):
 
@@ -289,9 +301,45 @@ class GetJobStatusRequest(ApiRequest[runtime_pb2.JobInfoRequest, runtime_pb2.Job
             self._grpc_message = f"Job not found: [{self._job_key}]"
 
         else:
-            self._response = runtime_pb2.JobStatus(
+            self._response = runtime_pb2.RuntimeJobStatus(
                 jobId=codec.encode(job_details.jobId),
                 statusCode=codec.encode(job_details.statusCode),
                 statusMessage=codec.encode(job_details.statusMessage))
+
+        self._mark_complete()
+
+
+class GetJobResultRequest(ApiRequest[runtime_pb2.RuntimeJobInfoRequest, runtime_pb2.RuntimeJobResult]):
+
+    def __init__(self, engine_id, request, context):
+
+        super().__init__(engine_id, "get_job_result", request, context)
+
+        if request.HasField("jobKey"):
+            self._job_key = self._request.jobKey
+        elif request.HasField("jobSelector"):
+            self._job_key = util.object_key(self._request.jobSelector)
+        else:
+            raise ex.EValidation("Bad request: Neither jobKey nor jobSelector is specified")
+
+    def on_start(self):
+        self.actors().send(self._engine_id, "get_job_details", self._job_key, details=True)
+
+    @actors.Message
+    def job_details(self, job_details: tp.Optional[config.JobResult]):
+
+        if job_details is None:
+            self._grpc_code = grpc.StatusCode.NOT_FOUND
+            self._grpc_message = f"Job not found: [{self._job_key}]"
+
+        else:
+
+            encoded_results = dict((k, codec.encode(v)) for k, v in job_details.results.items())
+
+            self._response = runtime_pb2.RuntimeJobResult(
+                jobId=codec.encode(job_details.jobId),
+                statusCode=codec.encode(job_details.statusCode),
+                statusMessage=codec.encode(job_details.statusMessage),
+                results=encoded_results)
 
         self._mark_complete()

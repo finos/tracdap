@@ -14,11 +14,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-batch_admin_dir="${TRAC_BATCH_ADMIN_DIR}"
-log_out="${TRAC_BATCH_STDOUT}"
-log_err="${TRAC_BATCH_STDERR}"
+batch_admin_dir="${BATCH_ADMIN_DIR}"
+batch_stdout="${BATCH_STDOUT}"
+batch_stderr="${BATCH_STDERR}"
 
-$@ >"${log_out}" 2>"${log_err}" </dev/null &
+if [ -n "${batch_stdout}" ] && [ -n "${batch_stderr}" ]; then
+  ($@ >"${batch_stdout}" 2>"${batch_stderr}" </dev/null && echo 0 > "${batch_admin_dir}/exit_code") &
+else
+  ($@ >/dev/null 2>/dev/null </dev/null && echo 0 > "${batch_admin_dir}/exit_code") &
+fi
 
 pid=$!
 echo $pid > "${batch_admin_dir}/pid"

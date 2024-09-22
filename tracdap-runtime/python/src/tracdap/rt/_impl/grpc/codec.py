@@ -15,6 +15,58 @@
 import enum
 import typing as tp
 
+import tracdap.rt.exceptions as ex
+import tracdap.rt.metadata as metadata
+
+import tracdap.rt_gen.grpc.tracdap.metadata.type_pb2 as type_pb2
+import tracdap.rt_gen.grpc.tracdap.metadata.object_id_pb2 as object_id_pb2
+import tracdap.rt_gen.grpc.tracdap.metadata.object_pb2 as object_pb2
+from tracdap.rt_gen.grpc.tracdap.metadata import model_pb2
+import tracdap.rt_gen.grpc.tracdap.metadata.data_pb2 as data_pb2
+import tracdap.rt_gen.grpc.tracdap.metadata.stoarge_pb2 as storage_pb2
+
+from google.protobuf import message as _message
+
+
+__METADATA_MAPPING = {
+    metadata.TypeDescriptor: type_pb2.TypeDescriptor,
+    metadata.Value: type_pb2.Value,
+    metadata.DecimalValue: type_pb2.DecimalValue,
+    metadata.DateValue: type_pb2.DateValue,
+    metadata.DatetimeValue: type_pb2.DatetimeValue,
+    metadata.ArrayValue: type_pb2.ArrayValue,
+    metadata.MapValue: type_pb2.MapValue,
+    metadata.TagHeader: object_id_pb2.TagHeader,
+    metadata.TagSelector: object_id_pb2.TagSelector,
+    metadata.ObjectDefinition: object_pb2.ObjectDefinition,
+    metadata.ModelDefinition: model_pb2.ModelDefinition,
+    metadata.ModelParameter: model_pb2.ModelParameter,
+    metadata.ModelInputSchema: model_pb2.ModelInputSchema,
+    metadata.ModelOutputSchema: model_pb2.ModelOutputSchema,
+    metadata.SchemaDefinition: data_pb2.SchemaDefinition,
+    metadata.TableSchema: data_pb2.TableSchema,
+    metadata.FieldSchema: data_pb2.FieldSchema,
+    metadata.PartKey: data_pb2.PartKey,
+    metadata.DataDefinition: data_pb2.DataDefinition,
+    metadata.DataDefinition.Part: data_pb2.DataDefinition.Part,
+    metadata.DataDefinition.Snap: data_pb2.DataDefinition.Snap,
+    metadata.DataDefinition.Delta: data_pb2.DataDefinition.Delta,
+    metadata.StorageDefinition: storage_pb2.StorageDefinition,
+    metadata.StorageIncarnation: storage_pb2.StorageIncarnation,
+    metadata.StorageCopy: storage_pb2.StorageCopy,
+    metadata.StorageItem: storage_pb2.StorageItem
+}
+
+
+_T_MSG = tp.TypeVar('_T_MSG', bound=_message.Message)
+
+
+def encode_message(msg_class: _T_MSG.__class__, obj: tp.Any) -> _T_MSG:
+
+    attrs = dict((k, encode(v)) for k, v in obj.__dict__.items())
+
+    return msg_class(**attrs)
+
 
 def encode(obj: tp.Any) -> tp.Any:
 
@@ -35,10 +87,13 @@ def encode(obj: tp.Any) -> tp.Any:
         return list(map(encode, obj))
 
     if isinstance(obj, dict):
-        return dict(map(lambda kv: (kv[0], encode(kv[1])), obj.items()))
+        return dict((k, encode(v)) for k, v in obj.items())
 
-    # Filter classes for TRAC domain objects (sanity check, not a watertight validation)
-    if hasattr(obj, "__module__") and "tracdap" in obj.__module__:
-        return dict(map(lambda kv: (kv[0], encode(kv[1])), obj.__dict__.items()))
+    msg_class = __METADATA_MAPPING.get(type(obj))
 
-    raise RuntimeError(f"Cannot encode object of type [{type(obj).__name__}] for gRPC")
+    if msg_class is None:
+        raise ex.ETracInternal(f"No gRPC metadata mapping is available for type {type(obj).__name__}")
+
+    attrs = dict((k, encode(v)) for k, v in obj.__dict__.items() if v is not None)
+
+    return msg_class(**attrs)

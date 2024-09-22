@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Accenture Global Solutions Limited
+ * Copyright 2024 Accenture Global Solutions Limited
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.plugins.exec.ssh;
+package org.finos.tracdap.plugins.ssh.executor;
 
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.exception.*;
@@ -32,6 +32,7 @@ import org.apache.sshd.scp.client.ScpClient;
 import org.apache.sshd.scp.client.ScpClientCreator;
 import org.apache.sshd.scp.common.helpers.ScpTimestampCommandDetails;
 
+import org.finos.tracdap.config.StorageConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,7 +51,7 @@ import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.regex.Pattern;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 
@@ -68,12 +69,12 @@ public class SshExecutor implements IBatchExecutor<SshExecutorState> {
     private static final String POLL_SCRIPT_NAME = "poll_batch.sh";
     private static final String LAUNCH_SCRIPT = ResourceHelpers.loadResourceAsString("/scripts/launch_batch.sh", SshExecutor.class);
     private static final String POLL_SCRIPT = ResourceHelpers.loadResourceAsString("/scripts/poll_batch.sh", SshExecutor.class);
-    // private static final String POLL_EXECUTOR_COMMAND = "ps -a | grep launch_batch.sh | grep -v \"grep launch_batch.sh\"";
 
     private static final String CREATE_BATCH_DIR_COMMAND = "mkdir -p -m %s \"%s\"";
     private static final String DESTROY_BATCH_PROCESS_COMMAND = "if ps -p %d; then kill -s KILL %d; fi";
     private static final String DESTROY_BATCH_DIR_COMMAND = "rm -r \"%s\"";
     private static final String CREATE_VOLUME_COMMAND = "mkdir -m %s \"%s\"";
+    private static final String TEST_FILE_EXISTS_COMMAND = "if [ -f \"%s\" ]; then echo true; else echo false; fi";
 
     private static final List<PosixFilePermission> DEFAULT_FILE_PERMISSIONS = List.of(
             PosixFilePermission.OWNER_READ,
@@ -90,10 +91,10 @@ public class SshExecutor implements IBatchExecutor<SshExecutorState> {
     private static final String DEFAULT_DIRECTORY_MODE = "750";
 
     private static final List<String> TRAC_CMD_ARGS = List.of("-m", "tracdap.rt.launch");
-    private static final Pattern TRAC_ERROR_LINE = Pattern.compile("tracdap.rt.exceptions.(E\\w+): (.+)");
 
-    private static final String FALLBACK_ERROR_MESSAGE = "Local batch terminated with non-zero exit code [%d]";
-    private static final String FALLBACK_ERROR_DETAIL = "No details available";
+    private static final String BATCH_FAILED_MESSAGE = "SSH batch terminated with non-zero exit code [%d]";
+
+    private static final List<Feature> EXECUTOR_FEATURES = List.of(Feature.OUTPUT_VOLUMES);
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
@@ -171,8 +172,8 @@ public class SshExecutor implements IBatchExecutor<SshExecutorState> {
     }
 
     @Override
-    public Class<SshExecutorState> stateClass() {
-        return SshExecutorState.class;
+    public boolean hasFeature(Feature feature) {
+        return EXECUTOR_FEATURES.contains(feature);
     }
 
     @Override
@@ -199,7 +200,7 @@ public class SshExecutor implements IBatchExecutor<SshExecutorState> {
 
             session.executeRemoteCommand(volumesCmd);
 
-            return new SshExecutorState(remoteHost, remotePort, batchUser,batchDir);
+            return new SshExecutorState(remoteHost, remotePort, batchUser, batchDir);
         }
         catch (IOException e) {
 
@@ -214,13 +215,173 @@ public class SshExecutor implements IBatchExecutor<SshExecutorState> {
     }
 
     @Override
-    public void destroyBatch(String batchKey, SshExecutorState batchState) {
+    public SshExecutorState addVolume(String batchKey, SshExecutorState batchState, String volumeName, BatchVolumeType volumeType) {
+
+        try {
+
+            log.info("SSH EXECUTOR addVolume() [{}, {}]", batchKey, volumeName);
+
+            // TODO: Check existing volumes?
+
+            var session = getSession(batchState);
+            var volumePath = buildVolumePath(batchState, volumeName);
+            var command = String.format(CREATE_VOLUME_COMMAND, DEFAULT_DIRECTORY_MODE, volumePath);
+
+            session.executeRemoteCommand(command);
+
+            return batchState.withVolume(volumeName);
+        }
+        catch (IOException e) {
+
+            var cause = e.getCause() instanceof ServerException ? e.getCause() : e;
+            var message = String.format("Failed to create executor volume [%s]: %s", volumeName, cause.getMessage());
+
+            log.error(message, cause);
+            throw new EExecutorFailure(message, cause);
+        }
+    }
+
+    @Override
+    public SshExecutorState addFile(
+            String batchKey, SshExecutorState batchState,
+            String volumeName, String fileName,
+            byte[] fileContent) {
+
+        log.info("SSH EXECUTOR addFile() [{}, {}, {}]", batchKey, volumeName, fileName);
+
+        return writeFile(
+                batchState, volumeName, fileName, fileContent,
+                DEFAULT_DIRECTORY_PERMISSIONS);
+    }
+
+    private SshExecutorState writeFile(
+            SshExecutorState batchState, String volumeName, String fileName, byte[] fileContent,
+            List<PosixFilePermission> posixPermissions) {
+
+        try {
+
+            var scp = getSessionScp(batchState);
+            var remotePath = buildRemotePath(batchState, volumeName, fileName);
+
+            // Set create, modify and access times all to the upload time
+            var timestampEpoch = Instant.now().getEpochSecond();
+            var timestampCmd = String.format("T%d %d %d", timestampEpoch, timestampEpoch, timestampEpoch);
+            var timestamp = ScpTimestampCommandDetails.parse(timestampCmd);
+
+            scp.upload(fileContent, remotePath, posixPermissions, timestamp);
+
+            // No need to update state object for individual files
+            return batchState;
+        }
+        catch (IOException e) {
+
+            var cause = e.getCause() instanceof ServerException ? e.getCause() : e;
+            var message = String.format("Failed sending file to executor [%s]: %s", fileName, cause.getMessage());
+
+            log.error(message, cause);
+            throw new EExecutorFailure(message, cause);
+        }
+
+        // No need to close scp client, not a closable resource and session stays open
+    }
+
+    @Override
+    public SshExecutorState submitBatch(String batchKey, SshExecutorState batchState, BatchConfig batchConfig) {
+
+        try {
+
+            log.info("SSH EXECUTOR submitBatch() [{}]", batchKey);
+
+            var launchCmd = batchConfig.getLaunchCmd();
+            var launchArgs = batchConfig.getLaunchArgs();
+
+            var session = getSession(batchState);
+            var command = buildBatchCommand(batchKey, batchState, launchCmd, launchArgs);
+
+            var batchAdminDir = buildVolumePath(batchState, "trac_admin");
+
+            String stdOutLog;
+            String stdErrLog;
+
+            if (batchConfig.isRedirectOutput()) {
+
+                stdOutLog = buildRemotePath(batchState,
+                        batchConfig.getStdOut().getPathVolume(),
+                        batchConfig.getStdOut().getPathArg());
+
+                stdErrLog = buildRemotePath(batchState,
+                        batchConfig.getStdErr().getPathVolume(),
+                        batchConfig.getStdErr().getPathArg());
+            }
+            else {
+                stdOutLog = "";
+                stdErrLog = "";
+            }
+
+            // Setting environment variables as part of the command causes issues
+            // Running VAR=value ./script.sh & does not properly background the process
+            // As a work-around, substitute the variables directly into the script before sending
+
+            // It may be possible to use an SSH exec shell and set up env vars that way
+            // Didn't work on first try, but it seems like it should work the way you'd expect...
+
+            var launchScriptContent = LAUNCH_SCRIPT
+                    .replace("${BATCH_ADMIN_DIR}", batchAdminDir)
+                    .replace("${BATCH_STDOUT}", stdOutLog)
+                    .replace("${BATCH_STDERR}", stdErrLog)
+                    .getBytes(StandardCharsets.UTF_8);
+
+            var pollScriptContent = POLL_SCRIPT
+                    .replace("${BATCH_ADMIN_DIR}", batchAdminDir)
+                    .getBytes(StandardCharsets.UTF_8);
+
+            var executePermissions = new ArrayList<>(DEFAULT_FILE_PERMISSIONS);
+            executePermissions.add(PosixFilePermission.OWNER_EXECUTE);
+            executePermissions.add(PosixFilePermission.GROUP_EXECUTE);
+
+            batchState = addVolume(batchKey, batchState, "trac_admin", BatchVolumeType.SCRATCH_VOLUME);
+            writeFile(batchState, "trac_admin", LAUNCH_SCRIPT_NAME, launchScriptContent, executePermissions);
+            writeFile(batchState, "trac_admin", POLL_SCRIPT_NAME, pollScriptContent, executePermissions);
+
+            var launchScript = buildRemotePath(batchState, "trac_admin", LAUNCH_SCRIPT_NAME);
+            String launchCommand = launchScript + " " + command;
+
+            log.info("Launch command: {}", command);
+
+            session.executeRemoteCommand(launchCommand);
+
+            var pidFile = buildRemotePath(batchState, "trac_admin", "pid");
+            var pidCommand = String.format("cat %s", pidFile);
+            var pidText = session.executeRemoteCommand(pidCommand);
+            var pid = tryParseLong(pidText, "Start batch failed, invalid value for [pid]");
+
+            return batchState.withPid(pid);
+        }
+        catch (IOException e) {
+
+            var cause = e.getCause() instanceof ServerException ? e.getCause() : e;
+            var message = String.format("Failed to start executor batch [%s]: %s", batchKey, cause.getMessage());
+
+            log.error(message, cause);
+            throw new EExecutorFailure(message, cause);
+        }
+    }
+
+    @Override
+    public SshExecutorState cancelBatch(String batchKey, SshExecutorState batchState) {
+
+        // This should never be called, the executor does not advertise cancellation in its features
+        throw new ETracInternal("SSH executor does not support batch cancellation");
+    }
+
+    @Override
+    public void deleteBatch(String batchKey, SshExecutorState batchState) {
 
         boolean processDown = false;
 
         try {
 
-            log.info("SSH EXECUTOR destroyBatch() [{}]", batchKey);
+            log.info("SSH EXECUTOR deleteBatch() [{}]", batchKey);
 
             var session = getSession(batchState);
 
@@ -257,183 +418,12 @@ public class SshExecutor implements IBatchExecutor<SshExecutorState> {
     }
 
     @Override
-    public SshExecutorState createVolume(String batchKey, SshExecutorState batchState, String volumeName, ExecutorVolumeType volumeType) {
-
-        try {
-
-            log.info("SSH EXECUTOR createVolume() [{}, {}]", batchKey, volumeName);
-
-            // TODO: Check existing volumes?
-
-            var session = getSession(batchState);
-            var volumePath = buildVolumePath(batchState, volumeName);
-            var command = String.format(CREATE_VOLUME_COMMAND, DEFAULT_DIRECTORY_MODE, volumePath);
-
-            session.executeRemoteCommand(command);
-
-            return batchState.withVolume(volumeName);
-        }
-        catch (IOException e) {
-
-            var cause = e.getCause() instanceof ServerException ? e.getCause() : e;
-            var message = String.format("Failed to create executor volume [%s]: %s", volumeName, cause.getMessage());
-
-            log.error(message, cause);
-            throw new EExecutorFailure(message, cause);
-        }
-    }
-
-    @Override
-    public SshExecutorState writeFile(
-            String batchKey, SshExecutorState batchState,
-            String volumeName, String fileName,
-            byte[] fileContent) {
-
-        return writeFile(
-                batchKey, batchState,
-                volumeName, fileName, fileContent,
-                DEFAULT_DIRECTORY_PERMISSIONS);
-    }
-
-    private SshExecutorState writeFile(
-            String batchKey, SshExecutorState batchState,
-            String volumeName, String fileName,
-            byte[] fileContent, List<PosixFilePermission> posixPermissions) {
-
-        try {
-
-            log.info("SSH EXECUTOR writeFile() [{}, {}, {}]", batchKey, volumeName, fileName);
-
-            var scp = getSessionScp(batchState);
-            var remotePath = buildRemotePath(batchState, volumeName, fileName);
-
-            // Set create, modify and access times all to the upload time
-            var timestampEpoch = Instant.now().getEpochSecond();
-            var timestampCmd = String.format("T%d %d %d", timestampEpoch, timestampEpoch, timestampEpoch);
-            var timestamp = ScpTimestampCommandDetails.parse(timestampCmd);
-
-            scp.upload(fileContent, remotePath, posixPermissions, timestamp);
-
-            // No need to update state object for individual files
-            return batchState;
-        }
-        catch (IOException e) {
-
-            var cause = e.getCause() instanceof ServerException ? e.getCause() : e;
-            var message = String.format("Failed sending file to executor [%s]: %s", fileName, cause.getMessage());
-
-            log.error(message, cause);
-            throw new EExecutorFailure(message, cause);
-        }
-
-        // No need to close scp client, not a closable resource and session stays open
-    }
-
-    @Override
-    public byte[] readFile(String batchKey, SshExecutorState batchState, String volumeName, String fileName) {
-
-        try {
-
-            log.info("SSH EXECUTOR readFile() [{}, {}, {}]", batchKey, volumeName, fileName);
-
-            var scp = getSessionScp(batchState);
-            var remotePath = buildRemotePath(batchState, volumeName, fileName);
-
-            // Perform SCP download
-            return scp.downloadBytes(remotePath);
-        }
-        catch (IOException e) {
-
-            var cause = e.getCause() instanceof ServerException ? e.getCause() : e;
-            var message = String.format("Failed getting file from executor [%s]: %s", fileName, cause.getMessage());
-
-            log.error(message, cause);
-            throw new EExecutorFailure(message, cause);
-        }
-
-        // No need to close scp client, not a closable resource and session stays open
-    }
-
-    @Override
-    public SshExecutorState startBatch(String batchKey, SshExecutorState batchState, LaunchCmd launchCmd, List<LaunchArg> launchArgs) {
-
-        try {
-
-            log.info("SSH EXECUTOR startBatch() [{}]", batchKey);
-
-            var session = getSession(batchState);
-            var command = buildBatchCommand(batchKey, batchState, launchCmd, launchArgs);
-
-            if (!batchState.getVolumes().contains("log"))
-                throw new ETracInternal("Executor log volume has not been configured");
-
-            var executePermissions = new ArrayList<>(DEFAULT_FILE_PERMISSIONS);
-            executePermissions.add(PosixFilePermission.OWNER_EXECUTE);
-            executePermissions.add(PosixFilePermission.GROUP_EXECUTE);
-
-            // Setting environment variables as part of the command causes issues
-            // Running VAR=value ./script.sh & does not properly background the process
-            // As a work-around, substitute the variables directly into the script before sending
-
-            // It may be possible to use an SSH exec shell and set up env vars that way
-            // Didn't work on first try, but it seems like it should work the way you'd expect...
-
-            // TODO: Remove dependencies on particular outputs set in the job args
-
-            var batchAdminDir = buildVolumePath(batchState, "trac_admin");
-            var stdOutLog = buildRemotePath(batchState, "log", "trac_rt_stdout.txt");
-            var stdErrLog = buildRemotePath(batchState, "log", "trac_rt_stderr.txt");
-            var resultFileName = String.format("job_result_%s.json", batchKey);
-            var resultFilePath = buildRemotePath(batchState, "result", resultFileName);
-
-            var launchScriptContent = LAUNCH_SCRIPT
-                    .replace("${TRAC_BATCH_ADMIN_DIR}", batchAdminDir)
-                    .replace("${TRAC_BATCH_STDOUT}", stdOutLog)
-                    .replace("${TRAC_BATCH_STDERR}", stdErrLog)
-                    .getBytes(StandardCharsets.UTF_8);
-
-            var pollScriptContent = POLL_SCRIPT
-                    .replace("${TRAC_BATCH_ADMIN_DIR}", batchAdminDir)
-                    .replace("${TRAC_RESULT_FILE}", resultFilePath)
-                    .getBytes(StandardCharsets.UTF_8);
-
-            batchState = createVolume(batchKey, batchState, "trac_admin", ExecutorVolumeType.SCRATCH_DIR);
-            writeFile(batchKey, batchState, "trac_admin", LAUNCH_SCRIPT_NAME, launchScriptContent, executePermissions);
-            writeFile(batchKey, batchState, "trac_admin", POLL_SCRIPT_NAME, pollScriptContent, executePermissions);
-
-            var launchScript = buildRemotePath(batchState, "trac_admin", LAUNCH_SCRIPT_NAME);
-            String launchCommand = launchScript + " " + command;
-
-            log.info("Launch command: {}", command);
-
-            session.executeRemoteCommand(launchCommand);
-
-            var pidFile = buildRemotePath(batchState, "trac_admin", "pid");
-            var pidCommand = String.format("cat %s", pidFile);
-            var pidText = session.executeRemoteCommand(pidCommand);
-            var pid = tryParseLong(pidText, "Start batch failed, invalid value for [pid]");
-
-            return batchState.withPid(pid);
-        }
-        catch (IOException e) {
-
-            var cause = e.getCause() instanceof ServerException ? e.getCause() : e;
-            var message = String.format("Failed to start executor batch [%s]: %s", batchKey, cause.getMessage());
-
-            log.error(message, cause);
-            throw new EExecutorFailure(message, cause);
-        }
-
-
-    }
-
-    @Override
-    public ExecutorJobInfo pollBatch(String batchKey, SshExecutorState batchState) {
+    public BatchStatus getBatchStatus(String batchKey, SshExecutorState batchState) {
 
         try {
 
             if (log.isTraceEnabled())
-                log.trace("SSH EXECUTOR pollBatch() [{}]", batchKey);
+                log.trace("SSH EXECUTOR getBatchStatus() [{}]", batchKey);
 
             var session = getSession(batchState);
 
@@ -459,27 +449,20 @@ public class SshExecutor implements IBatchExecutor<SshExecutorState> {
             }
 
             if (running == 0)
-                return new ExecutorJobInfo(ExecutorJobStatus.RUNNING);
+                return new BatchStatus(BatchStatusCode.RUNNING);
 
             var exitCode = (int)(long) tryParseLong(pollResponse.get("exit_code"), "Invalid poll response for [exit_code]");
 
             if (exitCode == 0)
-                return new ExecutorJobInfo(ExecutorJobStatus.SUCCEEDED);
+                return new BatchStatus(BatchStatusCode.SUCCEEDED);
 
-            try {
+            // Job has failed - set a generic failure message in the status
+            // Batch executor is generic and only knows about generic processes
+            // The TRAC job executor can try to get more meaningful info from the logs
 
-                var errorBytes = readFile(batchKey, batchState, "log", "trac_rt_stderr.txt");
-                var errorDetail = new String(errorBytes, StandardCharsets.UTF_8);
-                var statusMessage = extractErrorMessage(errorDetail, exitCode);
+            var statusMessage = String.format(BATCH_FAILED_MESSAGE, exitCode);
 
-                return new ExecutorJobInfo(ExecutorJobStatus.FAILED, statusMessage, errorDetail);
-            }
-            catch (EExecutorFailure e) {
-
-                var statusMessage = String.format(FALLBACK_ERROR_MESSAGE, exitCode);
-
-                return new ExecutorJobInfo(ExecutorJobStatus.FAILED, statusMessage, FALLBACK_ERROR_DETAIL);
-            }
+            return new BatchStatus(BatchStatusCode.FAILED, statusMessage);
         }
         catch (IOException e) {
 
@@ -492,29 +475,70 @@ public class SshExecutor implements IBatchExecutor<SshExecutorState> {
     }
 
     @Override
-    public List<ExecutorJobInfo> pollBatches(List<Map.Entry<String, SshExecutorState>> priorStates) {
+    public boolean hasOutputFile(String batchKey, SshExecutorState batchState, String volumeName, String fileName) {
 
-        var results = new ArrayList<ExecutorJobInfo>();
+        try {
 
-        for (var job : priorStates) {
+            log.info("SSH EXECUTOR hasOutputFile() [{}, {}, {}]", batchKey, volumeName, fileName);
 
-            try {
+            var remotePath = buildRemotePath(batchState, volumeName, fileName);
+            var command = String.format(TEST_FILE_EXISTS_COMMAND, remotePath);
 
-                var priorState = job.getValue();
-                var pollResult = pollBatch(job.getKey(), priorState);
+            var session = getSession(batchState);
+            var result = session.executeRemoteCommand(command);
 
-                results.add(pollResult);
-            }
-            catch (Exception e) {
-
-                log.warn("Failed to poll job: [{}] {}", job.getKey(), e.getMessage(), e);
-                results.add(new ExecutorJobInfo(ExecutorJobStatus.STATUS_UNKNOWN));
-            }
+            return result.trim().equals("true");
         }
+        catch (IOException e) {
 
-        return results;
+            var cause = e.getCause() instanceof ServerException ? e.getCause() : e;
+            var message = String.format("Failed getting file from executor [%s]: %s", fileName, cause.getMessage());
+
+            log.error(message, cause);
+            throw new EExecutorFailure(message, cause);
+        }
     }
 
+    @Override
+    public byte[] getOutputFile(String batchKey, SshExecutorState batchState, String volumeName, String fileName) {
+
+        try {
+
+            log.info("SSH EXECUTOR getOutputFile() [{}, {}, {}]", batchKey, volumeName, fileName);
+
+            var scp = getSessionScp(batchState);
+            var remotePath = buildRemotePath(batchState, volumeName, fileName);
+
+            // Perform SCP download
+            return scp.downloadBytes(remotePath);
+        }
+        catch (IOException e) {
+
+            var cause = e.getCause() instanceof ServerException ? e.getCause() : e;
+            var message = String.format("Failed getting file from executor [%s]: %s", fileName, cause.getMessage());
+
+            log.error(message, cause);
+            throw new EExecutorFailure(message, cause);
+        }
+
+        // No need to close scp client, not a closable resource and session stays open
+    }
+
+    @Override
+    public InetSocketAddress getBatchAddress(String batchKey, SshExecutorState batchState) {
+
+        // This should never be called, the executor does not advertise expose_port in its features
+        throw new ETracInternal("SSH executor does not support expose_port");
+    }
+
+    @Override
+    public SshExecutorState configureBatchStorage(
+            String batchKey, SshExecutorState batchState,
+            StorageConfig storageConfig, Consumer<StorageConfig> storageUpdate) {
+
+        // This should never be called, the executor does not advertise storage_mapping in its features
+        throw new ETracInternal("SSH executor does not support storage_mapping");
+    }
 
     private ClientSession allocateSession(String jobKey) throws IOException {
 
@@ -670,8 +694,6 @@ public class SshExecutor implements IBatchExecutor<SshExecutorState> {
 
     private String buildBatchCommand(String batchKey, SshExecutorState batchState, LaunchCmd launchCmd, List<LaunchArg> launchArgs) {
 
-
-
         var processArgs = new ArrayList<String>();
 
         if (launchCmd.isTrac()) {
@@ -680,8 +702,8 @@ public class SshExecutor implements IBatchExecutor<SshExecutorState> {
             processArgs.addAll(TRAC_CMD_ARGS);
         }
         else {
-            processArgs.add(launchCmd.customCommand());
-            launchCmd.customArgs().stream()
+            processArgs.add(launchCmd.command());
+            launchCmd.commandArgs().stream()
                     .map(arg -> decodeLaunchArg(arg, batchState))
                     .forEach(processArgs::add);
         }
@@ -740,29 +762,6 @@ public class SshExecutor implements IBatchExecutor<SshExecutorState> {
         catch (NumberFormatException e) {
             var message = String.format("%s (%s)", errorMessage, e.getMessage());
             throw new EExecutorFailure(message, e);
-        }
-    }
-
-    private String extractErrorMessage(String errorDetail, int exitCode) {
-
-        // TODO: Better way of reporting runtime errors
-
-        var lastLineIndex = errorDetail.stripTrailing().lastIndexOf("\n");
-        var lastLine = errorDetail.substring(lastLineIndex + 1).stripTrailing();
-
-        var tracError = TRAC_ERROR_LINE.matcher(lastLine);
-
-        if (tracError.matches()) {
-
-            var exception = tracError.group(1);
-            var message = tracError.group(2);
-
-            log.error("Runtime error [{}]: {}", exception, message);
-            return message;
-        }
-        else {
-
-            return String.format(FALLBACK_ERROR_MESSAGE, exitCode);
         }
     }
 

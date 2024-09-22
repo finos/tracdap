@@ -85,20 +85,16 @@ project(":secret-tool").projectDir = file("tracdap-tools/secret-tool")
 
 // Plugins
 
-// AWS config plugin still uses AWS v1 API - needs porting to V2
-
-//include 'aws-config'
+include 'sql-drivers'
 include 'aws-storage'
 include 'gcp-config'
 include 'gcp-storage'
 include 'azure-storage'
 include 'ssh-executor'
-include 'sql-drivers'
 
-//project(":aws-config").projectDir = file("tracdap-plugins/aws-config")
+project(":sql-drivers").projectDir = file("tracdap-plugins/sql-drivers")
 project(":aws-storage").projectDir = file("tracdap-plugins/aws-storage")
 project(":gcp-config").projectDir = file("tracdap-plugins/gcp-config")
 project(":gcp-storage").projectDir = file("tracdap-plugins/gcp-storage")
 project(":azure-storage").projectDir = file("tracdap-plugins/azure-storage")
 project(":ssh-executor").projectDir = file("tracdap-plugins/ssh-executor")
-project(":sql-drivers").projectDir = file("tracdap-plugins/sql-drivers")

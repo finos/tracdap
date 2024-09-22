@@ -16,17 +16,18 @@
 
 package org.finos.tracdap.svc.orch.service;
 
-import io.grpc.Status;
-import io.grpc.StatusException;
-import io.grpc.StatusRuntimeException;
+import org.finos.tracdap.api.internal.RuntimeJobStatus;
 import org.finos.tracdap.common.exception.*;
 import org.finos.tracdap.common.cache.CacheEntry;
 import org.finos.tracdap.common.cache.IJobCache;
-import org.finos.tracdap.common.exec.ExecutorJobInfo;
 import org.finos.tracdap.common.metadata.MetadataUtil;
 import org.finos.tracdap.config.PlatformConfig;
 import org.finos.tracdap.config.PluginConfig;
 import org.finos.tracdap.metadata.JobStatusCode;
+
+import io.grpc.Status;
+import io.grpc.StatusException;
+import io.grpc.StatusRuntimeException;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -309,8 +310,9 @@ public class JobManager {
 
                 var job = runningJobs.get(i);
                 var pollResult = pollResults.get(i);
+                var priorStatus = job.value().executorStatus;
 
-                if (pollResult.getStatus() != job.value().executorStatus) {
+                if (priorStatus == null || pollResult.getStatusCode() != priorStatus.getStatusCode()) {
 
                     var operation = getNextOperation(job, pollResult);
                     javaExecutor.submit(() -> processJobOperation(operation));
@@ -434,7 +436,7 @@ public class JobManager {
 
             case CacheStatus.PROCESSING_FAILED:
                 operation.operationName = "handle_processing_failed";
-                operation.operation = state -> processor.handleProcessingFailed(state, state.statusMessage, state.exception);
+                operation.operation = state -> processor.handleProcessingFailed(state, state.statusMessage);
                 operation.timeout = cacheTicketDuration;
                 break;
 
@@ -448,17 +450,16 @@ public class JobManager {
                 log.error("Internal job state error, key = [{}], revision = [{}], cache state = [{}]", key, revision, cacheStatus);
 
                 var message = "Internal job state error";
-                var error = new ETracInternal(message);
 
                 operation.operationName = "handle_processing_failed";
-                operation.operation = state -> processor.handleProcessingFailed(state, message, error);
+                operation.operation = state -> processor.handleProcessingFailed(state, message);
                 operation.timeout = cacheTicketDuration;
         }
 
         return operation;
     }
 
-    private JobOperation getNextOperation(CacheEntry<JobState> cacheEntry, ExecutorJobInfo pollResult) {
+    private JobOperation getNextOperation(CacheEntry<JobState> cacheEntry, RuntimeJobStatus pollResult) {
 
         var operation = new JobOperation();
         operation.jobKey = cacheEntry.key();
@@ -480,10 +481,9 @@ public class JobManager {
                     cacheEntry.key(), cacheEntry.revision(), cacheEntry.status());
 
             var message = "Internal job state error";
-            var error = new ETracInternal(message);
 
             operation.operationName = "handle_processing_failed";
-            operation.operation = state -> processor.handleProcessingFailed(state, message, error);
+            operation.operation = state -> processor.handleProcessingFailed(state, message);
         }
 
         return operation;
@@ -645,7 +645,6 @@ public class JobManager {
 
             newState.cacheStatus = nextErrorState;
             newState.statusMessage = error.getMessage();
-            newState.exception = error;
 
             // Reset retries for cleanup operation
             newState.retries = 0;
@@ -693,7 +692,8 @@ public class JobManager {
             Status.Code.DEADLINE_EXCEEDED);
 
     private static final List<Class<? extends ETrac>> TRAC_CAN_RETRY = List.of(
-            EExecutorUnavailable.class);
+            EExecutorUnavailable.class,
+            EExecutorTemporaryFailure.class);
 
     // States that are not acted on:
     // CacheStatus.SCHEDULED_TO_REMOVE

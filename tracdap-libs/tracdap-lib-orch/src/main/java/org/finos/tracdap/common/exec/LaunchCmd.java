@@ -16,50 +16,48 @@
 
 package org.finos.tracdap.common.exec;
 
-
 import java.util.List;
 
 
 public class LaunchCmd {
 
-    private final boolean isTrac;
+    private static final String TRAC_PYTHON_CMD = "python";
 
-    private final String customCommand;
-    private final List<LaunchArg> customArgs;
+    private static final List<LaunchArg> TRAC_PYTHON_ARGS = List.of(
+            LaunchArg.string("-m"),
+            LaunchArg.string("tracdap.rt.launch"));
+
+    private final boolean isTrac;
+    private final String command;
+    private final List<LaunchArg> commandArgs;
 
     public static LaunchCmd trac() {
-        return new LaunchCmd("cp");
+        return new LaunchCmd(TRAC_PYTHON_CMD, TRAC_PYTHON_ARGS, true);
     }
 
     public static LaunchCmd custom(String command) {
-        return new LaunchCmd(command, List.of());
+        return new LaunchCmd(command, List.of(), false);
     }
 
     public static LaunchCmd custom(String command, List<LaunchArg> args) {
-        return new LaunchCmd(command, args);
+        return new LaunchCmd(command, args, false);
     }
 
-    private LaunchCmd(String cp) {
-        this.isTrac = true;
-        this.customCommand = null;
-        this.customArgs = null;
-    }
-
-    private LaunchCmd(String command, List<LaunchArg> args) {
-        this.isTrac = false;
-        this.customCommand = command;
-        this.customArgs = args;
+    private LaunchCmd(String command, List<LaunchArg> commandArgs, boolean isTrac) {
+        this.isTrac = isTrac;
+        this.command = command;
+        this.commandArgs = commandArgs;
     }
 
     public boolean isTrac() {
         return this.isTrac;
     }
 
-    public String customCommand() {
-        return customCommand;
+    public String command() {
+        return command;
     }
 
-    public List<LaunchArg> customArgs() {
-        return customArgs;
+    public List<LaunchArg> commandArgs() {
+        return commandArgs;
     }
 }

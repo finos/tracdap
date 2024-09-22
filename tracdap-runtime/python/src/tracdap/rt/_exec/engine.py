@@ -912,23 +912,3 @@ class NodeContextImpl(_func.NodeContext):
         for node_id, node in self.__nodes.items():
             if node.complete and not node.error:
                 yield node_id, node.result
-
-_T = tp.TypeVar("_T")
-
-
-class ApiRequest(_actors.Actor, tp.Generic[_T]):
-
-    def __init__(self, engine_id: _actors.ActorId, post_box: _actors.PostBox):
-
-        super().__init__()
-
-        self._engine_id = engine_id
-        self._post_box = post_box
-
-    def on_start(self):
-        self.actors().send(self._engine_id, self._message, self._args)
-
-    @_actors.Message
-    def api_response(self, response: _T):
-        self._post_box.post_message(response)
-        self.actors().stop()

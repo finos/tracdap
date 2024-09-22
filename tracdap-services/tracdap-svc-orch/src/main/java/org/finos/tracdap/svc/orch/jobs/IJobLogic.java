@@ -16,16 +16,16 @@
 
 package org.finos.tracdap.svc.orch.jobs;
 
-
 import org.finos.tracdap.api.MetadataWriteRequest;
+import org.finos.tracdap.api.internal.RuntimeJobResult;
 import org.finos.tracdap.common.metadata.MetadataBundle;
 import org.finos.tracdap.config.JobConfig;
-import org.finos.tracdap.config.JobResult;
 import org.finos.tracdap.config.PlatformConfig;
 import org.finos.tracdap.metadata.*;
 
 import java.util.List;
 import java.util.Map;
+
 
 public interface IJobLogic {
 
@@ -52,5 +52,5 @@ public interface IJobLogic {
             Map<String, ObjectDefinition> resources,
             Map<String, TagHeader> resourceMapping);
 
-    List<MetadataWriteRequest> buildResultMetadata(String tenant, JobConfig jobConfig, JobResult jobResult);
+    List<MetadataWriteRequest> buildResultMetadata(String tenant, JobConfig jobConfig, RuntimeJobResult jobResult);
 }

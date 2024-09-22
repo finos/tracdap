@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Accenture Global Solutions Limited
+ * Copyright 2024 Accenture Global Solutions Limited
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,15 +14,19 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.exec;
+package org.finos.tracdap.common.exception;
 
-public enum ExecutorJobStatus {
 
-    STATUS_UNKNOWN,
-    QUEUED,
-    RUNNING,
-    COMPLETE,
-    SUCCEEDED,
-    FAILED,
-    CANCELLED
+/**
+ * The executor is responding, but reported a failure that may resolve in time
+ */
+public class EExecutorTemporaryFailure extends EExecutor {
+
+    public EExecutorTemporaryFailure(String message, Throwable cause) {
+        super(message, cause);
+    }
+
+    public EExecutorTemporaryFailure(String message) {
+        super(message);
+    }
 }

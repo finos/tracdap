@@ -148,11 +148,17 @@ def move_generated_into_src():
 
     # Update reference to gRPC generated classes in server.py
 
-    for line in fileinput.input(BUILD_PATH.joinpath("src/tracdap/rt/_exec/server.py"), inplace=True):
-        if "rt_gen" in line:
-            print(line.replace("rt_gen.grpc", "rt._impl.grpc"), end="")
-        else:
-            print(line, end='')
+    grpc_src_files = [
+        "src/tracdap/rt/_exec/server.py",
+        "src/tracdap/rt/_impl/grpc/codec.py"
+    ]
+
+    for src_file in grpc_src_files:
+        for line in fileinput.input(BUILD_PATH.joinpath(src_file), inplace=True):
+            if "rt_gen" in line:
+                print(line.replace("rt_gen.grpc", "rt._impl.grpc"), end="")
+            else:
+                print(line, end='')
 
     # Remove references to rt_gen package in setup.cfg, since everything is now in place under src/
 
