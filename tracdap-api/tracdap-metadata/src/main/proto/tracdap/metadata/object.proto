@@ -22,6 +22,7 @@ option java_multiple_files = true;
 option java_outer_classname = "ObjectProtoWrapper";  // Do not create a Java class called "Object"!
 
 import "tracdap/metadata/object_id.proto";
+import "tracdap/metadata/type.proto";
 import "tracdap/metadata/data.proto";
 import "tracdap/metadata/model.proto";
 import "tracdap/metadata/flow.proto";
@@ -76,4 +77,6 @@ message ObjectDefinition {
         StorageDefinition storage = 8;
         SchemaDefinition schema = 9;
     }
+
+    map<string, Value> objectProps = 100;
 }
