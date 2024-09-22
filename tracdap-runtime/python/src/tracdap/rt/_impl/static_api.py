@@ -92,11 +92,9 @@ class StaticApiImpl(_StaticApiHook):
                 msg = f"Default value for parameter [{param_name}] does not match the declared type"
                 raise _ex.EModelValidation(msg) from e
 
-        encoded_props = self._process_props(param_props, "parameter", param_name)
-
         return _Named(param_name, _meta.ModelParameter(
             param_type_descriptor, label, default_value,
-            paramProps=encoded_props))
+            paramProps=param_props))
 
     def define_parameters(
             self, *params: _tp.Union[_Named[_meta.ModelParameter], _tp.List[_Named[_meta.ModelParameter]]]) \
@@ -167,10 +165,7 @@ class StaticApiImpl(_StaticApiHook):
             input_props=input_props)
 
         schema_def = self.define_schema(*fields, schema_type=_meta.SchemaType.TABLE)
-
-        encoded_props = self._process_props(input_props, "input")
-
-        return _meta.ModelInputSchema(schema=schema_def, label=label, optional=optional, inputProps=encoded_props)
+        return _meta.ModelInputSchema(schema=schema_def, label=label, optional=optional, inputProps=input_props)
 
     def define_output_table(
             self, *fields: _tp.Union[_meta.FieldSchema, _tp.List[_meta.FieldSchema]],
@@ -185,10 +180,7 @@ class StaticApiImpl(_StaticApiHook):
             output_props=output_props)
 
         schema_def = self.define_schema(*fields, schema_type=_meta.SchemaType.TABLE)
-
-        encoded_props = self._process_props(output_props, "output")
-
-        return _meta.ModelOutputSchema(schema=schema_def, label=label, optional=optional, outputProps=encoded_props)
+        return _meta.ModelOutputSchema(schema=schema_def, label=label, optional=optional, outputProps=output_props)
 
     @staticmethod
     def _build_named_dict(
@@ -215,27 +207,3 @@ class StaticApiImpl(_StaticApiHook):
                 field.fieldOrder = index
 
         return _meta.TableSchema([*fields_])
-
-    @staticmethod
-    def _process_props(
-            raw_props: _tp.Dict[str, _tp.Any],
-            item_type: str, item_name: _tp.Optional[str] = None) \
-            -> _tp.Dict[str, _meta.Value]:
-
-        if raw_props is None:
-            return dict()
-
-        encoded_props = dict()
-
-        for key, raw_value in raw_props.items():
-
-            if raw_value is None:
-                item_name_suffix = f" [{item_name}]" if item_name is not None else ""
-                raise _ex.EModelValidation(f"Invalid null property [{key}] for {item_type}{item_name_suffix}")
-
-            encoded_value = _type_system.MetadataCodec.encode_value(raw_value)
-            encoded_props[key] = encoded_value
-
-        return encoded_props
-
-
