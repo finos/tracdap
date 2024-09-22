@@ -320,6 +320,9 @@ class _StaticValidator:
             else:
                 cls._check_label(param.label, param_name)
 
+            if param.paramProps is not None:
+                cls._valid_identifiers(param.paramProps.keys(), "entry in param props")
+
     @classmethod
     def _check_inputs_or_outputs(cls, inputs_or_outputs):
 
@@ -339,6 +342,13 @@ class _StaticValidator:
 
             label = input_schema.label
             cls._check_label(label, input_name)
+
+            if isinstance(input_schema, meta.ModelInputSchema):
+                if input_schema.inputProps is not None:
+                    cls._valid_identifiers(input_schema.inputProps.keys(), "entry in input props")
+            else:
+                if input_schema.outputProps is not None:
+                    cls._valid_identifiers(input_schema.outputProps.keys(), "entry in output props")
 
     @classmethod
     def _check_single_field(cls, field: meta.FieldSchema, property_type):
