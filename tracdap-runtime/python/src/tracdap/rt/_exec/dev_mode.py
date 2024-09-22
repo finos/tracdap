@@ -46,7 +46,7 @@ class DevModeTranslator:
     _log: tp.Optional[_util.logging.Logger] = None
 
     @classmethod
-    def translate_sys_config(cls, sys_config: _cfg.RuntimeConfig, config_dir: tp.Optional[pathlib.Path]):
+    def translate_sys_config(cls, sys_config: _cfg.RuntimeConfig, config_mgr: _cfg_p.ConfigManager):
 
         cls._log.info(f"Applying dev mode config translation to system config")
 
@@ -56,7 +56,7 @@ class DevModeTranslator:
             sys_config.storage = _cfg.StorageConfig()
 
         sys_config = cls._add_integrated_repo(sys_config)
-        sys_config = cls._resolve_relative_storage_root(sys_config, config_dir)
+        sys_config = cls._resolve_relative_storage_root(sys_config, config_mgr)
 
         return sys_config
 
@@ -66,7 +66,7 @@ class DevModeTranslator:
             sys_config: _cfg.RuntimeConfig,
             job_config: _cfg.JobConfig,
             scratch_dir: pathlib.Path,
-            config_dir: tp.Optional[pathlib.Path],
+            config_mgr: _cfg_p.ConfigManager,
             model_class: tp.Optional[_api.TracModel.__class__]) \
             -> _cfg.JobConfig:
 
@@ -84,7 +84,7 @@ class DevModeTranslator:
 
         # Fow flows, load external flow definitions then perform auto-wiring and type inference
         if job_config.job.jobType == _meta.JobType.RUN_FLOW:
-            job_config = cls._process_flow_definition(job_config, config_dir)
+            job_config = cls._process_flow_definition(job_config, config_mgr)
 
         # For run (model|flow) jobs, apply processing to the parameters, inputs and outputs
         if job_config.job.jobType in [_meta.JobType.RUN_MODEL, _meta.JobType.RUN_FLOW]:
@@ -109,7 +109,7 @@ class DevModeTranslator:
     @classmethod
     def _resolve_relative_storage_root(
             cls, sys_config: _cfg.RuntimeConfig,
-            sys_config_path: tp.Optional[pathlib.Path]):
+            config_mgr: _cfg_p.ConfigManager):
 
         storage_config = copy.deepcopy(sys_config.storage)
 
@@ -128,6 +128,7 @@ class DevModeTranslator:
 
             cls._log.info(f"Resolving relative path for [{bucket_key}] local storage...")
 
+            sys_config_path = config_mgr.config_dir_path()
             if sys_config_path is not None:
                 absolute_path = sys_config_path.joinpath(root_path).resolve()
                 if absolute_path.exists():
@@ -291,7 +292,7 @@ class DevModeTranslator:
         return model_id, model_object
 
     @classmethod
-    def _process_flow_definition(cls, job_config: _cfg.JobConfig, config_dir: pathlib.Path) -> _cfg.JobConfig:
+    def _process_flow_definition(cls, job_config: _cfg.JobConfig, config_mgr: _cfg_p.ConfigManager) -> _cfg.JobConfig:
 
         flow_details = job_config.job.runFlow.flow
 
@@ -305,21 +306,12 @@ class DevModeTranslator:
             cls._log.error(err)
             raise _ex.EConfigParse(err)
 
-        flow_path = config_dir.joinpath(flow_details) if config_dir is not None else pathlib.Path(flow_details)
-
-        if not flow_path.exists():
-            err = f"Flow definition not available for [{flow_details}]: File not found ({flow_path})"
-            cls._log.error(err)
-            raise _ex.EConfigParse(err)
-
         flow_id = _util.new_object_id(_meta.ObjectType.FLOW)
         flow_key = _util.object_key(flow_id)
 
-        cls._log.info(f"Generating flow definition for [{flow_details}] with ID = [{flow_key}]")
+        cls._log.info(f"Generating flow definition from [{flow_details}] with ID = [{flow_key}]")
 
-        flow_parser = _cfg_p.ConfigParser(_meta.FlowDefinition)
-        flow_raw_data = flow_parser.load_raw_config(flow_path, flow_path.name)
-        flow_def = flow_parser.parse(flow_raw_data, flow_path.name)
+        flow_def = config_mgr.load_config_object(flow_details, _meta.FlowDefinition)
 
         # Auto-wiring and inference only applied to externally loaded flows for now
         flow_def = cls._autowire_flow(flow_def, job_config)

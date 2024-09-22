@@ -14,89 +14,216 @@
 
 from __future__ import annotations
 
-import re
-import typing as tp
+import dataclasses as _dc
 import decimal
 import enum
-import uuid
+import io
 import inspect
-import dataclasses as _dc
+import json
+import os
+import pathlib
+import re
+import typing as tp
+import urllib.parse as _urlp
+import uuid
 
+import tracdap.rt.config as _config
 import tracdap.rt.exceptions as _ex
+import tracdap.rt.ext.plugins as _plugins
+import tracdap.rt.ext.config as _config_ext
 import tracdap.rt._impl.util as _util
 
-import pathlib
-import json
 import yaml
 import yaml.parser
-
 
 _T = tp.TypeVar('_T')
 
 
-class ConfigParser(tp.Generic[_T]):
+class ConfigManager:
 
-    # The metaclass for generic types varies between versions of the typing library
-    # To work around this, detect the correct metaclass by inspecting a generic type variable
-    __generic_metaclass = type(tp.List[object])
+    @classmethod
+    def for_root_config(cls, root_config_file: tp.Union[str, pathlib.Path, None]) -> ConfigManager:
 
-    __primitive_types: tp.Dict[type, callable] = {
-        bool: bool,
-        int: int,
-        float: float,
-        str: str,
-        decimal.Decimal: decimal.Decimal
-        # TODO: Date (requires type system)
-        # TODO: Datetime (requires type system)
-    }
+        if isinstance(root_config_file, pathlib.Path):
+            root_file_path = cls._resolve_scheme(root_config_file)
+            root_dir_path = cls._resolve_scheme(root_config_file.parent)
+            if root_dir_path[-1] not in ["/", "\\"]:
+                root_dir_path += os.sep
+            root_file_url = _urlp.urlparse(root_file_path, scheme="file")
+            root_dir_url = _urlp.urlparse(root_dir_path, scheme="file")
+            return ConfigManager(root_dir_url, root_file_url, )
 
-    def __init__(self, config_class: _T.__class__, dev_mode_locations: tp.List[str] = None):
+        elif isinstance(root_config_file, str):
+            root_file_with_scheme = cls._resolve_scheme(root_config_file)
+            root_file_url = _urlp.urlparse(root_file_with_scheme, scheme="file")
+            root_dir_path = str(pathlib.Path(root_file_url.path).parent)
+            if root_dir_path[-1] not in ["/", "\\"]:
+                root_dir_path += os.sep if root_file_url.scheme == "file" else "/"
+            root_dir_url = _urlp.urlparse(_urlp.urljoin(root_file_url.geturl(), root_dir_path))
+            return ConfigManager(root_dir_url, root_file_url)
+
+        else:
+            working_dir_path = str(pathlib.Path.cwd().resolve())
+            working_dir_url = _urlp.urlparse(str(working_dir_path), scheme="file")
+            return ConfigManager(working_dir_url, None)
+
+    @classmethod
+    def for_root_dir(cls, root_config_dir: tp.Union[str, pathlib.Path]) -> ConfigManager:
+
+        if isinstance(root_config_dir, pathlib.Path):
+            root_dir_path = cls._resolve_scheme(root_config_dir)
+            if root_dir_path[-1] not in ["/", "\\"]:
+                root_dir_path += os.sep
+            root_dir_url = _urlp.urlparse(root_dir_path, scheme="file")
+            return ConfigManager(root_dir_url, None)
+
+        elif isinstance(root_config_dir, str):
+            root_dir_with_scheme = cls._resolve_scheme(root_config_dir)
+            if root_dir_with_scheme[-1] not in ["/", "\\"]:
+                root_dir_with_scheme += "/"
+            root_dir_url = _urlp.urlparse(root_dir_with_scheme, scheme="file")
+            return ConfigManager(root_dir_url, None)
+
+        # Should never happen since root dir is specified explicitly
+        else:
+            raise _ex.ETracInternal("Wrong parameter type for root_config_dir")
+
+    @classmethod
+    def _resolve_scheme(cls, raw_url: tp.Union[str, pathlib.Path]) -> str:
+
+        if isinstance(raw_url, pathlib.Path):
+            return "file:" + str(raw_url.resolve())
+
+        # Look for drive letters on Windows - these can be mis-interpreted as URL scheme
+        # If there is a drive letter, explicitly set scheme = file instead
+        if len(raw_url) > 1 and raw_url[1] == ":":
+            return "file:" + raw_url
+        else:
+            return raw_url
+
+    def __init__(self, root_dir_url: _urlp.ParseResult, root_file_url: tp.Optional[_urlp.ParseResult]):
         self._log = _util.logger_for_object(self)
-        self._config_class = config_class
-        self._dev_mode_locations = dev_mode_locations or []
-        self._errors = []
+        self._root_dir_url = root_dir_url
+        self._root_file_url = root_file_url
 
-    def load_raw_config(self, config_file: tp.Union[str, pathlib.Path], config_file_name: str = None):
+    def config_dir_path(self):
+        if self._root_dir_url.scheme == "file":
+            return pathlib.Path(self._root_dir_url.path).resolve()
+        else:
+            return None
+
+    def load_root_object(
+            self, config_class: type(_T),
+            dev_mode_locations: tp.List[str] = None,
+            config_file_name: tp.Optional[str] = None) -> _T:
+
+        # Root config not available normally means you're using embedded config
+        # In which case this method should not be called
+        if self._root_file_url is None:
+            message = f"Root config file not available"
+            self._log.error(message)
+            raise _ex.EConfigLoad(message)
+
+        resolved_url = self._root_file_url
 
         if config_file_name is not None:
-            self._log.info(f"Loading {config_file_name} config: {str(config_file)}")
+            self._log.info(f"Loading {config_file_name} config: {self._url_to_str(resolved_url)}")
         else:
-            self._log.info(f"Loading config file: {str(config_file)}")
+            self._log.info(f"Loading config file: {self._url_to_str(resolved_url)}")
 
-        # Construct a Path for config_file and make sure the file exists
-        # (For now, config must be on a locally mounted filesystem)
+        config_dict = self._load_config_dict(resolved_url)
 
-        if isinstance(config_file, str):
-            config_path = pathlib.Path(config_file)
+        parser = ConfigParser(config_class, dev_mode_locations)
+        return parser.parse(config_dict, resolved_url.path)
 
-        elif isinstance(config_file, pathlib.Path):
-            config_path = config_file
+    def load_config_object(
+            self, config_url: tp.Union[str, pathlib.Path],
+            config_class: type(_T),
+            dev_mode_locations: tp.List[str] = None,
+            config_file_name: tp.Optional[str] = None) -> _T:
+
+        resolved_url = self._resolve_config_file(config_url)
+
+        if config_file_name is not None:
+            self._log.info(f"Loading {config_file_name} config: {self._url_to_str(resolved_url)}")
+        else:
+            self._log.info(f"Loading config file: {self._url_to_str(resolved_url)}")
+
+        config_dict = self._load_config_dict(resolved_url)
+
+        parser = ConfigParser(config_class, dev_mode_locations)
+        return parser.parse(config_dict, config_url)
+
+    def load_config_file(
+            self, config_url: tp.Union[str, pathlib.Path],
+            config_file_name: tp.Optional[str] = None) -> bytes:
+
+        resolved_url = self._resolve_config_file(config_url)
+
+        if config_file_name is not None:
+            self._log.info(f"Loading {config_file_name} config: {self._url_to_str(resolved_url)}")
+        else:
+            self._log.info(f"Loading config file: {self._url_to_str(resolved_url)}")
+
+        return self._load_config_file(resolved_url)
+
+    def _resolve_config_file(self, config_url: tp.Union[str, pathlib.Path]) -> _urlp.ParseResult:
+
+        # If the config URL defines a scheme, treat it as absolute
+        # (This also works for Windows paths, C:\ is an absolute path)
+        if ":" in str(config_url):
+            absolute_url = str(config_url)
+        # If the root URL is a path, resolve using path logic (this allows for config_url to be an absolute path)
+        elif self._root_dir_url.scheme == "file":
+            absolute_url = str(pathlib.Path(self._root_dir_url.path).joinpath(str(config_url)))
+        # Otherwise resolve relative to the root URL
+        else:
+            absolute_url = _urlp.urljoin(self._root_dir_url.geturl(), str(config_url))
+
+        # Look for drive letters on Windows - these can be mis-interpreted as URL scheme
+        # If there is a drive letter, explicitly set scheme = file instead
+        if len(absolute_url) > 1 and absolute_url[1] == ":":
+            absolute_url = "file:" + absolute_url
+
+        return _urlp.urlparse(absolute_url, scheme="file")
+
+    def _load_config_file(self, resolved_url: _urlp.ParseResult) -> bytes:
+
+        loader = self._get_loader(resolved_url)
+        config_url = self._url_to_str(resolved_url)
+
+        if not loader.has_config_file(config_url):
+            message = f"Config file not found: {config_url}"
+            self._log.error(message)
+            raise _ex.EConfigLoad(message)
+
+        return loader.load_config_file(config_url)
+
+    def _load_config_dict(self, resolved_url: _urlp.ParseResult) -> dict:
+
+        loader = self._get_loader(resolved_url)
+        config_url = self._url_to_str(resolved_url)
+
+        if loader.has_config_dict(config_url):
+            return loader.load_config_dict(config_url)
+
+        elif loader.has_config_file(config_url):
+            config_bytes = loader.load_config_file(config_url)
+            config_path = pathlib.Path(resolved_url.path)
+            return self._parse_config_dict(config_bytes, config_path)
 
         else:
-            config_file_type = type(config_file) if config_file is not None else "None"
-            err = f"Attempt to load an invalid config file, expected a path, got {config_file_type}"
-            self._log.error(err)
-            raise _ex.EConfigLoad(err)
+            message = f"Config file not found: {config_url}"
+            self._log.error(message)
+            raise _ex.EConfigLoad(message)
 
-        if not config_path.exists():
-            msg = f"Config file not found: [{config_file}]"
-            self._log.error(msg)
-            raise _ex.EConfigLoad(msg)
-
-        if not config_path.is_file():
-            msg = f"Config path does not point to a regular file: [{config_file}]"
-            self._log.error(msg)
-            raise _ex.EConfigLoad(msg)
-
-        return self._parse_raw_config(config_path)
-
-    def _parse_raw_config(self, config_path: pathlib.Path):
+    def _parse_config_dict(self, config_bytes: bytes, config_path: pathlib.Path):
 
         # Read in the raw config, use the file extension to decide which format to expect
 
         try:
 
-            with config_path.open('r') as config_stream:
+            with io.BytesIO(config_bytes) as config_stream:
 
                 extension = config_path.suffix.lower()
 
@@ -123,10 +250,53 @@ class ConfigParser(tp.Generic[_T]):
             self._log.error(err)
             raise _ex.EConfigParse(err) from e
 
-        except yaml.parser.ParserError as e:
+        except (yaml.parser.ParserError, yaml.reader.ReaderError) as e:
             err = f"Config file contains invalid YAML ({str(e)})"
             self._log.error(err)
             raise _ex.EConfigParse(err) from e
+
+    def _get_loader(self, resolved_url: _urlp.ParseResult) -> _config_ext.IConfigLoader:
+
+        protocol = resolved_url.scheme
+        loader_config = _config.PluginConfig(protocol)
+
+        if not _plugins.PluginManager.is_plugin_available(_config_ext.IConfigLoader, protocol):
+            message = f"No config loader available for protocol [{protocol}]: {self._url_to_str(resolved_url)}"
+            self._log.error(message)
+            raise _ex.EConfigLoad(message)
+
+        return _plugins.PluginManager.load_config_plugin(_config_ext.IConfigLoader, loader_config)
+
+    @staticmethod
+    def _url_to_str(url: _urlp.ParseResult) -> str:
+
+        if url.scheme == "file" and not url.netloc:
+            return url.path
+        else:
+            return url.geturl()
+
+
+class ConfigParser(tp.Generic[_T]):
+
+    # The metaclass for generic types varies between versions of the typing library
+    # To work around this, detect the correct metaclass by inspecting a generic type variable
+    __generic_metaclass = type(tp.List[object])
+
+    __primitive_types: tp.Dict[type, callable] = {
+        bool: bool,
+        int: int,
+        float: float,
+        str: str,
+        decimal.Decimal: decimal.Decimal
+        # TODO: Date (requires type system)
+        # TODO: Datetime (requires type system)
+    }
+
+    def __init__(self, config_class: _T.__class__, dev_mode_locations: tp.List[str] = None):
+        self._log = _util.logger_for_object(self)
+        self._config_class = config_class
+        self._dev_mode_locations = dev_mode_locations or []
+        self._errors = []
 
     def parse(self, config_dict: dict, config_file: tp.Union[str, pathlib.Path] = None) -> _T:
 

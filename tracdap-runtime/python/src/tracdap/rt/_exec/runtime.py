@@ -64,6 +64,7 @@ class TracRuntime:
             job_result_format: tp.Optional[str] = None,
             scratch_dir: tp.Union[str, pathlib.Path, None] = None,
             scratch_dir_persist: bool = False,
+            plugin_packages: tp.List[str] = None,
             dev_mode: bool = False):
 
         trac_version = _version.__version__
@@ -86,12 +87,13 @@ class TracRuntime:
         self._log.info(f"TRAC D.A.P. Python Runtime {trac_version}")
 
         self._sys_config = sys_config if isinstance(sys_config, _cfg.RuntimeConfig) else None
-        self._sys_config_path = pathlib.Path(sys_config) if not self._sys_config else None
+        self._sys_config_path = sys_config if not self._sys_config else None
         self._job_result_dir = job_result_dir
         self._job_result_format = job_result_format
         self._scratch_dir = scratch_dir
         self._scratch_dir_provided = True if scratch_dir is not None else False
         self._scratch_dir_persist = scratch_dir_persist
+        self._plugin_packages = plugin_packages or []
         self._dev_mode = dev_mode
 
         # Runtime control
@@ -102,6 +104,7 @@ class TracRuntime:
         self._oneshot_job = None
 
         # Top level resources
+        self._config_mgr: tp.Optional[_cparse.ConfigManager] = None
         self._models: tp.Optional[_models.ModelLoader] = None
         self._storage: tp.Optional[_storage.StorageManager] = None
 
@@ -141,21 +144,28 @@ class TracRuntime:
 
             self._prepare_scratch_dir()
 
-            # Plugin manager and static API impl are singletons
-            # If these methods are called multiple times, the second and subsequent calls are ignored
+            # Plugin manager, static API and guard rails are singletons
+            # Calling these methods multiple times is safe (e.g. for embedded or testing scenarios)
+            # However, plugins are never un-registered for the lifetime of the processes
 
             _plugins.PluginManager.register_core_plugins()
+
+            for plugin_package in self._plugin_packages:
+                _plugins.PluginManager.register_plugin_package(plugin_package)
+
             _static_api.StaticApiImpl.register_impl()
             _guard.PythonGuardRails.protect_dangerous_functions()
 
             # Load sys config (or use embedded), config errors are detected before start()
             # Job config can also be checked before start() by using load_job_config()
 
+            self._config_mgr = _cparse.ConfigManager.for_root_config(self._sys_config_path)
+
             if self._sys_config is None:
                 sys_config_dev_mode = _dev_mode.DEV_MODE_SYS_CONFIG if self._dev_mode else None
-                sys_config_parser = _cparse.ConfigParser(_cfg.RuntimeConfig, sys_config_dev_mode)
-                sys_config_raw = sys_config_parser.load_raw_config(self._sys_config_path, config_file_name="system")
-                self._sys_config = sys_config_parser.parse(sys_config_raw, self._sys_config_path)
+                self._sys_config = self._config_mgr.load_root_object(
+                    _cfg.RuntimeConfig, sys_config_dev_mode,
+                    config_file_name="system")
             else:
                 self._log.info("Using embedded system config")
 
@@ -163,8 +173,7 @@ class TracRuntime:
             # I.e. it can be applied to embedded configs
 
             if self._dev_mode:
-                config_dir = self._sys_config_path.parent if self._sys_config_path is not None else None
-                self._sys_config = _dev_mode.DevModeTranslator.translate_sys_config(self._sys_config, config_dir)
+                self._sys_config = _dev_mode.DevModeTranslator.translate_sys_config(self._sys_config, self._config_mgr)
 
             # Runtime API server is controlled by the sys config
 
@@ -311,20 +320,18 @@ class TracRuntime:
 
         if isinstance(job_config, _cfg.JobConfig):
             self._log.info("Using embedded job config")
-            job_config_path = None
 
         else:
-            job_config_path = job_config
             job_config_dev_mode = _dev_mode.DEV_MODE_JOB_CONFIG if self._dev_mode else None
-            job_config_parser = _cparse.ConfigParser(_cfg.JobConfig, job_config_dev_mode)
-            job_config_raw = job_config_parser.load_raw_config(job_config_path, config_file_name="job")
-            job_config = job_config_parser.parse(job_config_raw, job_config_path)
+            job_config = self._config_mgr.load_config_object(
+                job_config, _cfg.JobConfig,
+                job_config_dev_mode,
+                config_file_name="job")
 
         if self._dev_mode:
-            config_dir = job_config_path.parent if job_config_path is not None else None
             job_config = _dev_mode.DevModeTranslator.translate_job_config(
                 self._sys_config, job_config,
-                self._scratch_dir, config_dir,
+                self._scratch_dir, self._config_mgr,
                 model_class)
 
         return job_config

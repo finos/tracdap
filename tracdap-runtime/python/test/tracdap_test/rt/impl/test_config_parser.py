@@ -37,14 +37,15 @@ class ConfigParserTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         util.configure_logging()
+        # Ensure the plugin for local config is loaded
+        import tracdap.rt._plugins.config_local  # noqa
 
     def test_example_sys_config_ok(self):
 
-        parser = cfg_p.ConfigParser(cfg.RuntimeConfig)
+        config_file = PYTHON_EXAMPLES_DIR.joinpath("config/sys_config.yaml").resolve()
+        config_mgr = cfg_p.ConfigManager.for_root_config(config_file)
 
-        raw_config_path = PYTHON_EXAMPLES_DIR.joinpath("config/sys_config.yaml")
-        raw_config = parser.load_raw_config(raw_config_path, "system")
-        sys_config = parser.parse(raw_config, raw_config_path.name)
+        sys_config = config_mgr.load_root_object( cfg.RuntimeConfig, config_file_name="system")
 
         self.assertIsInstance(sys_config, cfg.RuntimeConfig)
 
@@ -52,113 +53,123 @@ class ConfigParserTest(unittest.TestCase):
 
         # Sample job config uses dev mode configuration, so supply DEV_MODE_JOB_CONFIG
 
-        parser = cfg_p.ConfigParser(cfg.JobConfig, dev_mode.DEV_MODE_JOB_CONFIG)
+        config_mgr = cfg_p.ConfigManager.for_root_dir(PYTHON_EXAMPLES_DIR)
 
-        raw_config_path = PYTHON_EXAMPLES_DIR.joinpath("config/using_data.yaml")
-        raw_config = parser.load_raw_config(raw_config_path, "job")
-        job_config = parser.parse(raw_config, raw_config_path.name)
+        job_config = config_mgr.load_config_object(
+            "config/using_data.yaml", cfg.JobConfig,
+            dev_mode_locations=dev_mode.DEV_MODE_JOB_CONFIG,
+            config_file_name="job")
 
         self.assertIsInstance(job_config, cfg.JobConfig)
 
     def test_empty_sys_config_ok(self):
 
-        parser = cfg_p.ConfigParser(cfg.RuntimeConfig)
-
         with tempfile.TemporaryDirectory() as td:
+
+            config_mgr = cfg_p.ConfigManager.for_root_dir(td)
 
             yaml_path = pathlib.Path(td).joinpath("empty.yaml")
             yaml_path.touch()
 
-            raw_config = parser.load_raw_config(yaml_path, "system")
-            sys_config = parser.parse(raw_config, yaml_path.name)
+            sys_config = config_mgr.load_config_object("empty.yaml", cfg.RuntimeConfig, None, "system")
             self.assertIsInstance(sys_config, cfg.RuntimeConfig)
 
             json_path = pathlib.Path(td).joinpath("empty.json")
             json_path.write_text("{}")
 
-            raw_config = parser.load_raw_config(json_path, "system")
-            sys_config = parser.parse(raw_config, json_path.name)
+            sys_config =  config_mgr.load_config_object("empty.json", cfg.RuntimeConfig, None, "system")
             self.assertIsInstance(sys_config, cfg.RuntimeConfig)
 
     def test_empty_job_config_ok(self):
 
-        parser = cfg_p.ConfigParser(cfg.JobConfig)
-
         with tempfile.TemporaryDirectory() as td:
+
+            config_mgr = cfg_p.ConfigManager.for_root_dir(td)
 
             yaml_path = pathlib.Path(td).joinpath("empty.yaml")
             yaml_path.touch()
 
-            raw_config = parser.load_raw_config(yaml_path, "job")
-            job_config = parser.parse(raw_config, yaml_path.name)
+            job_config = config_mgr.load_config_object("empty.yaml", cfg.JobConfig, None, "job")
             self.assertIsInstance(job_config, cfg.JobConfig)
 
             json_path = pathlib.Path(td).joinpath("empty.json")
             json_path.write_text("{}")
 
-            raw_config = parser.load_raw_config(json_path, "job")
-            job_config = parser.parse(raw_config, yaml_path.name)
+            job_config = config_mgr.load_config_object("empty.json", cfg.JobConfig, None, "job")
             self.assertIsInstance(job_config, cfg.JobConfig)
 
     def test_invalid_path(self):
 
-        parser = cfg_p.ConfigParser(cfg.RuntimeConfig)
+        config_mgr = cfg_p.ConfigManager.for_root_dir(PYTHON_EXAMPLES_DIR)
 
-        self.assertRaises(ex.EConfigLoad, lambda: parser.load_raw_config(None))      # noqa
-        self.assertRaises(ex.EConfigLoad, lambda: parser.load_raw_config(object()))  # noqa
-        self.assertRaises(ex.EConfigLoad, lambda: parser.load_raw_config(""))
-        self.assertRaises(ex.EConfigLoad, lambda: parser.load_raw_config("$%^&*--`!"))
-        self.assertRaises(ex.EConfigLoad, lambda: parser.load_raw_config("pigeon://pigeon-svr/lovely-pigeon.pg"))
+        self.assertRaises(ex.EConfigLoad, lambda: config_mgr.load_config_file(None))      # noqa
+        self.assertRaises(ex.EConfigLoad, lambda: config_mgr.load_config_file(object()))  # noqa
+        self.assertRaises(ex.EConfigLoad, lambda: config_mgr.load_config_file(""))
+        self.assertRaises(ex.EConfigLoad, lambda: config_mgr.load_config_file("$%^&*--`!"))
+        self.assertRaises(ex.EConfigLoad, lambda: config_mgr.load_config_file("pigeon://pigeon-svr/lovely-pigeon.pg"))
+
+        # The same error should come for loading objects
+        self.assertRaises(ex.EConfigLoad, lambda: config_mgr.load_config_object("$%^&*--`!", cfg.RuntimeConfig))
 
     def test_config_file_not_found(self):
 
         nonexistent_path = PYTHON_EXAMPLES_DIR.joinpath("nonexistent.yaml")
 
-        parser = cfg_p.ConfigParser(cfg.RuntimeConfig)
-        self.assertRaises(ex.EConfigLoad, lambda: parser.load_raw_config(nonexistent_path))
+        config_mgr = cfg_p.ConfigManager.for_root_dir(PYTHON_EXAMPLES_DIR)
+
+        self.assertRaises(ex.EConfigLoad, lambda: config_mgr.load_config_file(nonexistent_path))
+        self.assertRaises(ex.EConfigLoad, lambda: config_mgr.load_config_object(nonexistent_path, cfg.RuntimeConfig))
 
     def test_config_file_is_a_folder(self):
 
-        parser = cfg_p.ConfigParser(cfg.RuntimeConfig)
-        self.assertRaises(ex.EConfigLoad, lambda: parser.load_raw_config(PYTHON_EXAMPLES_DIR))
+        config_mgr = cfg_p.ConfigManager.for_root_dir(PYTHON_EXAMPLES_DIR)
+
+        self.assertRaises(ex.EConfigLoad, lambda: config_mgr.load_config_file("config"))
+        self.assertRaises(ex.EConfigLoad, lambda: config_mgr.load_config_object("config", cfg.RuntimeConfig))
 
     def test_config_file_garbled(self):
-
-        parser = cfg_p.ConfigParser(cfg.RuntimeConfig)
 
         noise_bytes = 256
         noise = bytearray(random.getrandbits(8) for _ in range(noise_bytes))
 
         with tempfile.TemporaryDirectory() as td:
 
+            config_mgr = cfg_p.ConfigManager.for_root_dir(td)
+
             yaml_path = pathlib.Path(td).joinpath("garbled.yaml")
             yaml_path.write_bytes(noise)
 
-            self.assertRaises(ex.EConfigParse, lambda: parser.load_raw_config(yaml_path))
+            self.assertRaises(ex.EConfigParse, lambda: config_mgr.load_config_object(yaml_path, cfg.RuntimeConfig))
 
             json_path = pathlib.Path(td).joinpath("garbled.json")
             json_path.write_bytes(noise)
 
-            self.assertRaises(ex.EConfigParse, lambda: parser.load_raw_config(json_path))
+            self.assertRaises(ex.EConfigParse, lambda: config_mgr.load_config_object(json_path, cfg.RuntimeConfig))
+
+            # Should not throw if not parsing the contents
+            config_mgr.load_config_file("garbled.yaml")
+            config_mgr.load_config_file("garbled.json")
 
     def test_config_file_wrong_format(self):
 
-        parser = cfg_p.ConfigParser(cfg.RuntimeConfig)
-
         with tempfile.TemporaryDirectory() as td:
+
+            config_mgr = cfg_p.ConfigManager.for_root_dir(td)
 
             # Write YAML into a JSON file
 
             json_path = pathlib.Path(td).joinpath("garbled.json")
             json_path.write_text('foo: bar\n')
 
-            self.assertRaises(ex.EConfigParse, lambda: parser.load_raw_config(json_path))
+            self.assertRaises(ex.EConfigParse, lambda: config_mgr.load_config_object(json_path, cfg.RuntimeConfig))
 
             # Valid YAML can include JSON, so parsing JSON as YAML is not an error!
 
     def test_invalid_config(self):
 
         with tempfile.TemporaryDirectory() as td:
+
+            config_mgr = cfg_p.ConfigManager.for_root_dir(td)
 
             # Config files with unknown config values
 
@@ -168,15 +179,7 @@ class ConfigParserTest(unittest.TestCase):
             json_path = pathlib.Path(td).joinpath("garbled.json")
             json_path.write_text('{ "foo": "bar",\n  "bar": 1}')
 
-            sys_parser = cfg_p.ConfigParser(cfg.RuntimeConfig)
-            job_parser = cfg_p.ConfigParser(cfg.JobConfig)
-
-            sys_yaml_config = sys_parser.load_raw_config(yaml_path)
-            sys_json_config = sys_parser.load_raw_config(json_path)
-            job_yaml_config = job_parser.load_raw_config(yaml_path)
-            job_json_config = job_parser.load_raw_config(json_path)
-
-            self.assertRaises(ex.EConfigParse, lambda: sys_parser.parse(sys_yaml_config))
-            self.assertRaises(ex.EConfigParse, lambda: sys_parser.parse(sys_json_config))
-            self.assertRaises(ex.EConfigParse, lambda: job_parser.parse(job_yaml_config))
-            self.assertRaises(ex.EConfigParse, lambda: job_parser.parse(job_json_config))
+            self.assertRaises(ex.EConfigParse, lambda: config_mgr.load_config_object(yaml_path, cfg.RuntimeConfig))
+            self.assertRaises(ex.EConfigParse, lambda: config_mgr.load_config_object(json_path, cfg.RuntimeConfig))
+            self.assertRaises(ex.EConfigParse, lambda: config_mgr.load_config_object(yaml_path, cfg.JobConfig))
+            self.assertRaises(ex.EConfigParse, lambda: config_mgr.load_config_object(json_path, cfg.JobConfig))

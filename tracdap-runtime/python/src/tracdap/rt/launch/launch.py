@@ -53,10 +53,16 @@ def _resolve_config_file(
         return _pathlib.Path(config_path)
 
 
+def _optional_arg(launch_args: _tp.Dict[str, _tp.Any], arg_name: str) -> _tp.Any:
+
+    return launch_args.get(arg_name, None)
+
+
 def launch_model(
         model_class: _api.TracModel.__class__,
         job_config: _tp.Union[str, _pathlib.Path],
-        sys_config: _tp.Union[str, _pathlib.Path]):
+        sys_config: _tp.Union[str, _pathlib.Path],
+        **launch_args):
 
     """
     Launch an individual model using its Python class
@@ -77,6 +83,7 @@ def launch_model(
     :param model_class: The model class that will be launched
     :param job_config: Path to the job configuration file
     :param sys_config: Path to the system configuration file
+    :param launch_args: Additional keyword args to control behavior of the TRAC runtime (not normally required)
     """
 
     model_file = _inspect.getfile(model_class)
@@ -85,7 +92,10 @@ def launch_model(
     _sys_config = _resolve_config_file(sys_config, model_dir)
     _job_config = _resolve_config_file(job_config, model_dir)
 
-    runtime_instance = _runtime.TracRuntime(_sys_config, dev_mode=True)
+    plugin_package = _optional_arg(launch_args, 'plugin_package')
+    plugin_packages = [plugin_package] if plugin_package else None
+
+    runtime_instance = _runtime.TracRuntime(_sys_config, dev_mode=True, plugin_packages=plugin_packages)
     runtime_instance.pre_start()
 
     job = runtime_instance.load_job_config(_job_config, model_class=model_class)
@@ -98,7 +108,8 @@ def launch_model(
 def launch_job(
         job_config: _tp.Union[str, _pathlib.Path],
         sys_config: _tp.Union[str, _pathlib.Path],
-        dev_mode: bool = False):
+        dev_mode: bool = False,
+        **launch_args):
 
     """
     Launch a TRAC job using external configuration files
@@ -106,12 +117,16 @@ def launch_job(
     :param job_config: Path to the job configuration file
     :param sys_config: Path to the system configuration file
     :param dev_mode: Whether to launch in dev mode (applies dev mode translation to the job inputs)
+    :param launch_args: Additional keyword args to control behavior of the TRAC runtime (not normally required)
     """
 
     _sys_config = _resolve_config_file(sys_config, None)
     _job_config = _resolve_config_file(job_config, None)
 
-    runtime_instance = _runtime.TracRuntime(_sys_config, dev_mode=dev_mode)
+    plugin_package = _optional_arg(launch_args, 'plugin_package')
+    plugin_packages = [plugin_package] if plugin_package else None
+
+    runtime_instance = _runtime.TracRuntime(_sys_config, dev_mode=dev_mode, plugin_packages=plugin_packages)
     runtime_instance.pre_start()
 
     job = runtime_instance.load_job_config(_job_config)
@@ -137,7 +152,8 @@ def launch_cli():
         job_result_dir=launch_args.job_result_dir,
         job_result_format=launch_args.job_result_format,
         scratch_dir=launch_args.scratch_dir,
-        scratch_dir_persist=launch_args.scratch_dir_persist)
+        scratch_dir_persist=launch_args.scratch_dir_persist,
+        plugin_packages=launch_args.plugin_packages)
 
     runtime_instance.pre_start()
 
