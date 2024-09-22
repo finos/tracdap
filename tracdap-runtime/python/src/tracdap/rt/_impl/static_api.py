@@ -71,10 +71,14 @@ class StaticApiImpl(_StaticApiHook):
 
     def define_parameter(
             self, param_name: str, param_type: _tp.Union[_meta.TypeDescriptor, _meta.BasicType],
-            label: str, default_value: _tp.Optional[_tp.Any] = None) \
+            label: str, default_value: _tp.Optional[_tp.Any] = None,
+            *, param_props: _tp.Optional[_tp.Dict[str, _tp.Any]] = None) \
             -> _Named[_meta.ModelParameter]:
 
-        _val.validate_signature(self.define_parameter, param_name, param_type, label, default_value)
+        _val.validate_signature(
+            self.define_parameter,
+            param_name, param_type, label, default_value,
+            param_props=param_props)
 
         if isinstance(param_type, _meta.TypeDescriptor):
             param_type_descriptor = param_type
@@ -88,7 +92,11 @@ class StaticApiImpl(_StaticApiHook):
                 msg = f"Default value for parameter [{param_name}] does not match the declared type"
                 raise _ex.EModelValidation(msg) from e
 
-        return _Named(param_name, _meta.ModelParameter(param_type_descriptor, label, default_value))
+        encoded_props = self._process_props(param_props, "parameter", param_name)
+
+        return _Named(param_name, _meta.ModelParameter(
+            param_type_descriptor, label, default_value,
+            paramProps=encoded_props))
 
     def define_parameters(
             self, *params: _tp.Union[_Named[_meta.ModelParameter], _tp.List[_Named[_meta.ModelParameter]]]) \
@@ -149,24 +157,38 @@ class StaticApiImpl(_StaticApiHook):
     def define_input_table(
             self, *fields: _tp.Union[_meta.FieldSchema, _tp.List[_meta.FieldSchema]],
             label: _tp.Optional[str] = None,
-            optional: bool = False) \
+            optional: bool = False,
+            input_props: _tp.Optional[_tp.Dict[str, _tp.Any]] = None) \
             -> _meta.ModelInputSchema:
 
-        _val.validate_signature(self.define_input_table, *fields, label=label, optional=optional)
+        _val.validate_signature(
+            self.define_input_table, *fields,
+            label=label, optional=optional,
+            input_props=input_props)
 
         schema_def = self.define_schema(*fields, schema_type=_meta.SchemaType.TABLE)
-        return _meta.ModelInputSchema(schema=schema_def, label=label, optional=optional)
+
+        encoded_props = self._process_props(input_props, "input")
+
+        return _meta.ModelInputSchema(schema=schema_def, label=label, optional=optional, inputProps=encoded_props)
 
     def define_output_table(
             self, *fields: _tp.Union[_meta.FieldSchema, _tp.List[_meta.FieldSchema]],
             label: _tp.Optional[str] = None,
-            optional: bool = False) \
+            optional: bool = False,
+            output_props: _tp.Optional[_tp.Dict[str, _tp.Any]] = None) \
             -> _meta.ModelOutputSchema:
 
-        _val.validate_signature(self.define_output_table, *fields, label=label, optional=optional)
+        _val.validate_signature(
+            self.define_output_table, *fields,
+            label=label, optional=optional,
+            output_props=output_props)
 
         schema_def = self.define_schema(*fields, schema_type=_meta.SchemaType.TABLE)
-        return _meta.ModelOutputSchema(schema=schema_def, label=label, optional=optional)
+
+        encoded_props = self._process_props(output_props, "output")
+
+        return _meta.ModelOutputSchema(schema=schema_def, label=label, optional=optional, outputProps=encoded_props)
 
     @staticmethod
     def _build_named_dict(
@@ -193,3 +215,27 @@ class StaticApiImpl(_StaticApiHook):
                 field.fieldOrder = index
 
         return _meta.TableSchema([*fields_])
+
+    @staticmethod
+    def _process_props(
+            raw_props: _tp.Dict[str, _tp.Any],
+            item_type: str, item_name: _tp.Optional[str] = None) \
+            -> _tp.Dict[str, _meta.Value]:
+
+        if raw_props is None:
+            return dict()
+
+        encoded_props = dict()
+
+        for key, raw_value in raw_props.items():
+
+            if raw_value is None:
+                item_name_suffix = f" [{item_name}]" if item_name is not None else ""
+                raise _ex.EModelValidation(f"Invalid null property [{key}] for {item_type}{item_name_suffix}")
+
+            encoded_value = _type_system.MetadataCodec.encode_value(raw_value)
+            encoded_props[key] = encoded_value
+
+        return encoded_props
+
+
