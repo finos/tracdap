@@ -17,7 +17,6 @@
 package org.finos.tracdap.common.validation.static_;
 
 import org.finos.tracdap.common.validation.core.ValidationContext;
-import org.finos.tracdap.common.validation.core.ValidationFunction;
 import org.finos.tracdap.common.validation.core.ValidationType;
 import org.finos.tracdap.common.validation.core.Validator;
 import org.finos.tracdap.metadata.*;
@@ -25,7 +24,6 @@ import org.finos.tracdap.metadata.*;
 import com.google.protobuf.Descriptors;
 
 import java.util.HashMap;
-import java.util.Map;
 
 import static org.finos.tracdap.common.validation.ValidationConstants.MODEL_ENTRY_POINT;
 import static org.finos.tracdap.common.validation.ValidationConstants.MODEL_VERSION;
@@ -49,14 +47,17 @@ public class ModelValidator {
     private static final Descriptors.FieldDescriptor MP_PARAM_TYPE;
     private static final Descriptors.FieldDescriptor MP_LABEL;
     private static final Descriptors.FieldDescriptor MP_DEFAULT_VALUE;
+    private static final Descriptors.FieldDescriptor MP_PARAM_PROPS;
 
     private static final Descriptors.Descriptor MODEL_INPUT_SCHEMA;
     private static final Descriptors.FieldDescriptor MIS_SCHEMA;
     private static final Descriptors.FieldDescriptor MIS_LABEL;
+    private static final Descriptors.FieldDescriptor MIS_INPUT_PROPS;
 
     private static final Descriptors.Descriptor MODEL_OUTPUT_SCHEMA;
     private static final Descriptors.FieldDescriptor MOS_SCHEMA;
     private static final Descriptors.FieldDescriptor MOS_LABEL;
+    private static final Descriptors.FieldDescriptor MOS_OUTPUT_PROPS;
 
     static {
 
@@ -74,14 +75,17 @@ public class ModelValidator {
         MP_PARAM_TYPE = field(MODEL_PARAMETER, ModelParameter.PARAMTYPE_FIELD_NUMBER);
         MP_LABEL = field(MODEL_PARAMETER, ModelParameter.LABEL_FIELD_NUMBER);
         MP_DEFAULT_VALUE = field(MODEL_PARAMETER, ModelParameter.DEFAULTVALUE_FIELD_NUMBER);
+        MP_PARAM_PROPS = field(MODEL_PARAMETER, ModelParameter.PARAMPROPS_FIELD_NUMBER);
 
         MODEL_INPUT_SCHEMA = ModelInputSchema.getDescriptor();
         MIS_SCHEMA = field(MODEL_INPUT_SCHEMA, ModelInputSchema.SCHEMA_FIELD_NUMBER);
         MIS_LABEL = field(MODEL_INPUT_SCHEMA, ModelInputSchema.LABEL_FIELD_NUMBER);
+        MIS_INPUT_PROPS = field(MODEL_INPUT_SCHEMA, ModelInputSchema.INPUTPROPS_FIELD_NUMBER);
 
         MODEL_OUTPUT_SCHEMA = ModelOutputSchema.getDescriptor();
         MOS_SCHEMA = field(MODEL_OUTPUT_SCHEMA, ModelOutputSchema.SCHEMA_FIELD_NUMBER);
         MOS_LABEL = field(MODEL_OUTPUT_SCHEMA, ModelOutputSchema.LABEL_FIELD_NUMBER);
+        MOS_OUTPUT_PROPS = field(MODEL_OUTPUT_SCHEMA, ModelOutputSchema.OUTPUTPROPS_FIELD_NUMBER);
     }
 
     @Validator
@@ -183,6 +187,11 @@ public class ModelValidator {
                 .apply(TypeSystemValidator::valueWithType, Value.class, msg.getParamType())
                 .pop();
 
+        ctx = ctx.pushMap(MP_PARAM_PROPS)
+                .apply(CommonValidators::optional)
+                .apply(CommonValidators::standardProps)
+                .pop();
+
         return ctx;
     }
 
@@ -199,6 +208,11 @@ public class ModelValidator {
                 .apply(CommonValidators::labelLengthLimit)
                 .pop();
 
+        ctx = ctx.pushMap(MIS_INPUT_PROPS)
+                .apply(CommonValidators::optional)
+                .apply(CommonValidators::standardProps)
+                .pop();
+
         return ctx;
     }
 
@@ -213,6 +227,11 @@ public class ModelValidator {
         ctx = ctx.push(MOS_LABEL)
                 .apply(CommonValidators::optional)
                 .apply(CommonValidators::labelLengthLimit)
+                .pop();
+
+        ctx = ctx.pushMap(MOS_OUTPUT_PROPS)
+                .apply(CommonValidators::optional)
+                .apply(CommonValidators::standardProps)
                 .pop();
 
         return ctx;

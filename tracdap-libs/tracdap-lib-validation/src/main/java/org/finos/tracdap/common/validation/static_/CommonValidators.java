@@ -717,4 +717,12 @@ public class CommonValidators {
         };
     }
 
+    public static ValidationContext standardProps(ValidationContext ctx) {
+
+        return ctx
+            .applyMapKeys(CommonValidators::identifier)
+            .applyMapKeys(CommonValidators::notTracReserved)
+            .applyMapValues(TypeSystemValidator::value, Value.class);
+    }
+
 }

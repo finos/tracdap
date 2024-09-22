@@ -45,12 +45,14 @@ public class ObjectValidator {
     private static final Descriptors.Descriptor OBJECT_DEFINITION;
     private static final Descriptors.FieldDescriptor OD_OBJECT_TYPE;
     private static final Descriptors.OneofDescriptor OD_DEFINITION;
+    private static final Descriptors.FieldDescriptor OD_OBJECT_PROPS;
 
     static {
 
         OBJECT_DEFINITION = ObjectDefinition.getDescriptor();
         OD_OBJECT_TYPE = field(OBJECT_DEFINITION, ObjectDefinition.OBJECTTYPE_FIELD_NUMBER);
         OD_DEFINITION = field(OBJECT_DEFINITION, ObjectDefinition.DATA_FIELD_NUMBER).getContainingOneof();
+        OD_OBJECT_PROPS = field(OBJECT_DEFINITION, ObjectDefinition.OBJECTPROPS_FIELD_NUMBER);
     }
 
     @Validator
@@ -65,6 +67,11 @@ public class ObjectValidator {
                 .apply(CommonValidators::required)
                 .apply(ObjectValidator::definitionMatchesType)
                 .applyRegistered()
+                .pop();
+
+        ctx = ctx.pushMap(OD_OBJECT_PROPS)
+                .apply(CommonValidators::optional)
+                .apply(CommonValidators::standardProps)
                 .pop();
 
         return ctx;
