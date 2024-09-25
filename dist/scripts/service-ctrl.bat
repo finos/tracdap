@@ -175,7 +175,7 @@ goto :main
 
         @rem Handle stale PID files - only block startup if the service is really running
         if !errorlevel! neq 0 (
-            echo "Removing stale PID file"
+            echo Removing stale PID file
             del "%PID_FILE%"
         ) else (
             echo Application is already running, try %SCRIPT_CMD% [stop^|kill]
@@ -215,7 +215,7 @@ exit /b %RESULT%
 
         @rem Handle stale PID files - only block startup if the service is really running
         if !errorlevel! neq 0 (
-            echo "Removing stale PID file"
+            echo Removing stale PID file
             del "%PID_FILE%"
         ) else (
             echo Application is already running, try %SCRIPT_CMD% [stop^|kill]
