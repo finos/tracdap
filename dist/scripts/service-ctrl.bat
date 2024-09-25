@@ -42,7 +42,7 @@ for %%A in ("%~dp0.") do set APP_HOME=%%~dpA
 @rem Get the top level config location - use TRAC_CONFIG_DIR to change the default
 if "%TRAC_CONFIG_DIR%" == "" (set CONFIG_DIR=%APP_HOME%etc\\) else (set CONFIG_DIR=%TRAC_CONFIG_DIR%)
 if "%CONFIG_FILE%" == "" (set CONFIG_FILE=%CONFIG_DIR%DEFAULT_CONFIG_FILE>)
-set ENV_FILE=%CONFIG_DIR%env.bat
+if "%ENV_FILE%" == "" (set ENV_FILE=%CONFIG_DIR%env.bat)
 
 @rem Set up the default folder structure (this can be overridden in env.sh if required)
 set PLUGINS_DIR=%APP_HOME%plugins\\

@@ -43,7 +43,7 @@ APP_HOME=\$(cd `dirname \$0` && cd .. && pwd)
 # Get the top level config location - use TRAC_CONFIG_DIR to change the default
 CONFIG_DIR="\${TRAC_CONFIG_DIR:=\${APP_HOME}/etc"
 CONFIG_FILE="\${CONFIG_FILE:=\${CONFIG_DIR}/<DEFAULT_CONFIG_FILE>}"
-ENV_FILE="\${CONFIG_DIR}/env.sh"
+ENV_FILE="\${ENV_FILE:=\${CONFIG_DIR}/env.sh}"
 
 # Set up the default folder structure (this can be overridden in env.sh if required)
 PLUGINS_DIR="\${APP_HOME}/plugins"
