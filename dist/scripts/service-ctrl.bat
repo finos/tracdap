@@ -197,8 +197,19 @@ exit /b %RESULT%
     )
 
     if exist "%PID_FILE%" (
-        echo Application is already running, try %SCRIPT_CMD% [stop^|kill]
-        exit /b 1
+
+        @rem Query WMIC for the PID stored in the PID file
+        for /f "delims=" %%p in (%PID_FILE%) do set PID=%%p
+        wmic process where "processid=!PID!" get processid 2>nul | findstr "!PID!" >nul 2>nul
+
+        @rem Handle stale PID files - only block startup if the service is really running
+        if !errorlevel! neq 0 (
+            echo "Removing stale PID file..."
+            del "%PID_FILE%"
+        ) else (
+            echo Application is already running, try %SCRIPT_CMD% [stop^|kill]
+            exit /b 1
+        )
     )
 
     echo Java location: [%JAVA_CMD%]
