@@ -41,7 +41,7 @@ for %%A in ("%~dp0.") do set APP_HOME=%%~dpA
 
 @rem Set up the top level config location - allow overriding in the environment
 if "%CONFIG_DIR%" == "" (set CONFIG_DIR=%APP_HOME%etc\\)
-if "%CONFIG_FILE%" == "" (set CONFIG_FILE=%CONFIG_DIR%DEFAULT_CONFIG_FILE>)
+if "%CONFIG_FILE%" == "" (set CONFIG_FILE=%CONFIG_DIR%<DEFAULT_CONFIG_FILE>)
 if "%ENV_FILE%" == "" (set ENV_FILE=%CONFIG_DIR%env.bat)
 
 @rem Set up the default folder structure (this can be overridden in env.sh if required)

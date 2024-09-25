@@ -41,7 +41,7 @@
 APP_HOME=\$(cd `dirname \$0` && cd .. && pwd)
 
 # Set up the top level config location - allow overriding in the environment
-CONFIG_DIR="\${CONFIG_DIR:=\${APP_HOME}/etc"
+CONFIG_DIR="\${CONFIG_DIR:=\${APP_HOME}/etc}"
 CONFIG_FILE="\${CONFIG_FILE:=\${CONFIG_DIR}/<DEFAULT_CONFIG_FILE>}"
 ENV_FILE="\${ENV_FILE:=\${CONFIG_DIR}/env.sh}"
 
