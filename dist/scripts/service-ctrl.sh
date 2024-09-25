@@ -193,8 +193,17 @@ run() {
     fi
 
     if [ -f \${PID_FILE} ]; then
-      echo "Application is already running, try \$0 [stop|kill]"
-      exit 255
+
+        PID=`cat "\${PID_FILE}"`
+
+        # Handle stale PID files - only block startup if the service is really running
+        if `ps -p \$PID > /dev/null`; then
+            echo "Application is already running, try \$0 [stop|kill]"
+            exit 255
+        else
+            echo "Removing stale PID file..."
+            rm \${PID_FILE}
+        fi
     fi
 
     echo "Java location: [\${JAVA_CMD}]"
