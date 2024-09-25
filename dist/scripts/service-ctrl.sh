@@ -40,16 +40,17 @@
 # Find the installation folder
 APP_HOME=\$(cd `dirname \$0` && cd .. && pwd)
 
+# Set up the top level config location - allow overriding in the environment
+CONFIG_DIR="\${CONFIG_DIR:=\${APP_HOME}/etc}"
+CONFIG_FILE="\${CONFIG_FILE:=\${CONFIG_DIR}/<DEFAULT_CONFIG_FILE>}"
+ENV_FILE="\${ENV_FILE:=\${CONFIG_DIR}/env.sh}"
+
 # Set up the default folder structure (this can be overridden in env.sh if required)
-CONFIG_DIR="\${APP_HOME}/etc"
 PLUGINS_DIR="\${APP_HOME}/plugins"
 PLUGINS_EXT_DIR="\${APP_HOME}/plugins_ext"
 LOG_DIR="\${APP_HOME}/log"
 RUN_DIR="\${APP_HOME}/run"
 PID_DIR="\${RUN_DIR}"
-
-CONFIG_FILE="\${CONFIG_FILE:=\${APP_HOME}/etc/<DEFAULT_CONFIG_FILE>}"
-ENV_FILE="\${CONFIG_DIR}/env.sh"
 
 PLUGINS_ENABLED="\${PLUGINS_ENABLED:=true}"
 PLUGINS_EXT_ENABLED="\${PLUGINS_EXT_ENABLED:=false}"
@@ -192,8 +193,17 @@ run() {
     fi
 
     if [ -f \${PID_FILE} ]; then
-      echo "Application is already running, try \$0 [stop|kill]"
-      exit 255
+
+        PID=`cat "\${PID_FILE}"`
+
+        # Handle stale PID files - only block startup if the service is really running
+        if `ps -p \$PID > /dev/null`; then
+            echo "Application is already running, try \$0 [stop|kill]"
+            exit 255
+        else
+            echo "Removing stale PID file"
+            rm \${PID_FILE}
+        fi
     fi
 
     echo "Java location: [\${JAVA_CMD}]"
@@ -220,8 +230,17 @@ start() {
     fi
 
     if [ -f \${PID_FILE} ]; then
-      echo "Application is already running, try \$0 [stop|kill]"
-      exit 255
+
+        PID=`cat "\${PID_FILE}"`
+
+        # Handle stale PID files - only block startup if the service is really running
+        if `ps -p \$PID > /dev/null`; then
+            echo "Application is already running, try \$0 [stop|kill]"
+            exit 255
+        else
+            echo "Removing stale PID file"
+            rm \${PID_FILE}
+        fi
     fi
 
     echo "Java location: [\${JAVA_CMD}]"

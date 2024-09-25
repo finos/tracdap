@@ -39,17 +39,17 @@ setlocal EnableDelayedExpansion
 @rem Find the installation folder
 for %%A in ("%~dp0.") do set APP_HOME=%%~dpA
 
+@rem Set up the top level config location - allow overriding in the environment
+if "%CONFIG_DIR%" == "" (set CONFIG_DIR=%APP_HOME%etc\\)
+if "%CONFIG_FILE%" == "" (set CONFIG_FILE=%CONFIG_DIR%<DEFAULT_CONFIG_FILE>)
+if "%ENV_FILE%" == "" (set ENV_FILE=%CONFIG_DIR%env.bat)
 
 @rem Set up the default folder structure (this can be overridden in env.sh if required)
-set CONFIG_DIR=%APP_HOME%etc\\
 set PLUGINS_DIR=%APP_HOME%plugins\\
 set PLUGINS_EXT_DIR=%APP_HOME%plugins_ext\\
 set LOG_DIR=%APP_HOME%log\\
 set RUN_DIR=%APP_HOME%run\\
 set PID_DIR=%RUN_DIR%
-
-if "%CONFIG_FILE%" == "" (set CONFIG_FILE=%APP_HOME%etc\\<DEFAULT_CONFIG_FILE>)
-set ENV_FILE=%CONFIG_DIR%env.bat
 
 if "%PLUGINS_ENABLED%" == "" (set PLUGINS_ENABLED=true)
 if "%PLUGINS_EXT_ENABLED%" == "" (set PLUGINS_EXT_ENABLED=false)
@@ -168,8 +168,19 @@ goto :main
     )
 
     if exist "%PID_FILE%" (
-        echo Application is already running, try %SCRIPT_CMD% [stop^|kill]
-        exit /b 1
+
+        @rem Query WMIC for the PID stored in the PID file
+        for /f "delims=" %%p in (%PID_FILE%) do set PID=%%p
+        wmic process where "processid=!PID!" get processid 2>nul | findstr "!PID!" >nul 2>nul
+
+        @rem Handle stale PID files - only block startup if the service is really running
+        if !errorlevel! neq 0 (
+            echo Removing stale PID file
+            del "%PID_FILE%"
+        ) else (
+            echo Application is already running, try %SCRIPT_CMD% [stop^|kill]
+            exit /b 1
+        )
     )
 
     echo Java location: [%JAVA_CMD%]
@@ -197,8 +208,19 @@ exit /b %RESULT%
     )
 
     if exist "%PID_FILE%" (
-        echo Application is already running, try %SCRIPT_CMD% [stop^|kill]
-        exit /b 1
+
+        @rem Query WMIC for the PID stored in the PID file
+        for /f "delims=" %%p in (%PID_FILE%) do set PID=%%p
+        wmic process where "processid=!PID!" get processid 2>nul | findstr "!PID!" >nul 2>nul
+
+        @rem Handle stale PID files - only block startup if the service is really running
+        if !errorlevel! neq 0 (
+            echo Removing stale PID file
+            del "%PID_FILE%"
+        ) else (
+            echo Application is already running, try %SCRIPT_CMD% [stop^|kill]
+            exit /b 1
+        )
     )
 
     echo Java location: [%JAVA_CMD%]
