@@ -201,7 +201,7 @@ run() {
             echo "Application is already running, try \$0 [stop|kill]"
             exit 255
         else
-            echo "Removing stale PID file..."
+            echo "Removing stale PID file"
             rm \${PID_FILE}
         fi
     fi
@@ -238,7 +238,7 @@ start() {
             echo "Application is already running, try \$0 [stop|kill]"
             exit 255
         else
-            echo "Removing stale PID file..."
+            echo "Removing stale PID file"
             rm \${PID_FILE}
         fi
     fi
