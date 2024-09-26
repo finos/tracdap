@@ -100,13 +100,26 @@ class TracContext:
         """
         Get the schema of a model input or output
 
-        The schema of an input or output can be retrieved and examined at runtime using this method.
-        Inputs must be defined in :py:meth:`TracModel.define_inputs`
-        and outputs in :py:meth:`TracModel.define_outputs`.
-        Input and output names are case-sensitive.
+        Use this method to get the :py:class:`SchemaDefinition <tracdap.rt.metadata.SchemaDefinition>`
+        for any input or output of the current model.
+        For datasets with static schemas, this will be the same schema that was defined in the
+        :py:class:`TracModel <tracdap.rt.api.TracModel>` methods
+        :py:meth:`define_inputs() <tracdap.rt.api.TracModel.define_inputs>` and
+        :py:meth:`define_outputs() <tracdap.rt.api.TracModel.define_outputs>`.
 
-        In the current version of the runtime all model inputs and outputs are defined statically,
-        :py:meth:`get_schema` will return the schema as it was defined.
+        For inputs with dynamic schemas, the schema of the provided input dataset will be returned.
+        For outputs with dynamic schemas the schema must be set by calling
+        :py:meth:`put_schema() <tracdap.rt.api.TracContext.put_schema>`, after which this method
+        will return that schema. Calling :py:meth:`get_schema() <tracdap.rt.api.TracContext.get_schema>`
+        for a dynamic output before the schema is set will result in a runtime validation error.
+
+        For optional inputs, use :py:meth:`has_dataset() <tracdap.rt.api.TracContext.has_dataset>`
+        to check whether the input was provided. Calling :py:meth:`get_schema() <tracdap.rt.api.TracContext.get_schema>`
+        for an optional input that was not provided will always result in a validation error,
+        regardless of whether the input using a static or dynamic schema. For optional outputs
+        :py:meth:`get_schema() <tracdap.rt.api.TracContext.get_schema>` can be called, with the
+        normal proviso that dynamic schemas must first be set by calling
+        :py:meth:`put_schema() <tracdap.rt.api.TracContext.put_schema>`.
 
         Attempting to retrieve the schema for a dataset that is not defined as a model input or output
         will result in a runtime validation error, even if that dataset exists in the job config and
@@ -150,6 +163,35 @@ class TracContext:
         :return: A pandas dataframe containing the data for the named dataset
         :raises: :py:class:`ERuntimeValidation <tracdap.rt.exceptions.ERuntimeValidation>`
         """
+        pass
+
+    @_abc.abstractmethod
+    def put_schema(self, dataset_name: str, schema: SchemaDefinition):
+
+        """
+        Set the schema of a dynamic model output
+
+        For outputs marked as dynamic, a :py:class:`SchemaDefinition <tracdap.rt.metadata.SchemaDefinition>`
+        must be supplied before attempting to save the data. TRAC API functions are available to help with
+        building schemas, such as :py:func:`trac.F() <tracdap.rt.api.F>` to define fields or
+        :py:func:`load_schema() <tracdap.rt.api.load_schema>` to load predefined schemas.
+        Once a schema has been set, it can be retrieved by calling
+        :py:meth:`get_schema() <tracdap.rt.api.TracContext.get_schema>` as normal.
+        If :py:meth:`put_schema() <tracdap.rt.api.TracContext.put_schema>` is called for an optional
+        output the model must also supply data for that output, otherwise TRAC will report a runtime
+        validation error after the model completes.
+
+        Each schema can only be set once and the schema will be validated using the normal
+        validation rules. If validation fails this method will raise
+        :py:class:`ERuntimeValidation <tracdap.rt.exceptions.ERuntimeValidation>`.
+        Attempting to set the schema for a dataset that is not defined as a dynamic model output
+        for the current model will result in a runtime validation error.
+
+        :param dataset_name: The name of the output to set the schema for
+        :param schema: A TRAC schema definition to use for the named output
+        :raises: :py:class:`ERuntimeValidation <tracdap.rt.exceptions.ERuntimeValidation>`
+        """
+
         pass
 
     @_abc.abstractmethod
