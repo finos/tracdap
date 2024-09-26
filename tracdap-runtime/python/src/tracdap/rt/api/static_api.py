@@ -482,7 +482,10 @@ def define_input_table(
     """
 
     sa = _StaticApiHook.get_instance()
-    return sa.define_input_table(*fields, label=label, optional=optional, input_props=input_props)
+
+    return sa.define_input_table(
+        *fields, label=label, optional=optional, dynamic=dynamic,
+        input_props=input_props)
 
 
 def declare_input_table(
@@ -539,7 +542,10 @@ def define_output_table(
     """
 
     sa = _StaticApiHook.get_instance()
-    return sa.define_output_table(*fields, label=label, optional=optional, output_props=output_props)
+
+    return sa.define_output_table(
+        *fields, label=label, optional=optional, dynamic=dynamic,
+        output_props=output_props)
 
 
 def declare_output_table(

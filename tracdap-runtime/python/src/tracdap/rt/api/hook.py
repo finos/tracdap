@@ -121,8 +121,7 @@ class _StaticApiHook:
     @_abc.abstractmethod
     def define_input_table(
             self, *fields: _tp.Union[_meta.FieldSchema, _tp.List[_meta.FieldSchema]],
-            label: _tp.Optional[str] = None,
-            optional: bool = False,
+            label: _tp.Optional[str] = None, optional: bool = False, dynamic: bool = False,
             input_props: _tp.Optional[_tp.Dict[str, _tp.Any]] = None) \
             -> _meta.ModelInputSchema:
 
@@ -131,8 +130,7 @@ class _StaticApiHook:
     @_abc.abstractmethod
     def define_output_table(
             self, *fields: _tp.Union[_meta.FieldSchema, _tp.List[_meta.FieldSchema]],
-            label: _tp.Optional[str] = None,
-            optional: bool = False,
+            label: _tp.Optional[str] = None, optional: bool = False, dynamic: bool = False,
             output_props: _tp.Optional[_tp.Dict[str, _tp.Any]] = None) \
             -> _meta.ModelOutputSchema:
 
