@@ -57,6 +57,7 @@ message ModelInputSchema {
     optional string label = 2;
 
     bool optional = 3;
+    bool dynamic = 5;
 
     map<string, Value> inputProps = 4;
 }
@@ -80,6 +81,7 @@ message ModelOutputSchema {
     optional string label = 2;
 
     bool optional = 3;
+    bool dynamic = 5;
 
     map<string, Value> outputProps = 4;
 }
