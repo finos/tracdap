@@ -334,6 +334,13 @@ class _StaticValidator:
             field_names = list(map(lambda f: f.fieldName, fields))
             property_type = f"field in [{input_name}]"
 
+            if input_schema.dynamic:
+                if len(fields) > 0:
+                    cls._fail(f"Invalid schema for [{input_name}]: Dynamic schemas cannot define individual fields")
+            else:
+                if len(fields) == 0:
+                    cls._fail(f"Invalid schema for [{input_name}]: No fields defined")
+
             cls._valid_identifiers(field_names, property_type)
             cls._case_insensitive_duplicates(field_names, property_type)
 
