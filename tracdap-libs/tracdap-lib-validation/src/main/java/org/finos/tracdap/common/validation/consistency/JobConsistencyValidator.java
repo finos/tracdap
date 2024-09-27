@@ -216,7 +216,7 @@ public class JobConsistencyValidator {
                 .collect(Collectors.toMap(n -> n.nodeId().name(), n -> n));
 
         return alignedMapValidation(
-                "model", (key, selector, node, ctx_) -> modelNode(key, selector, node, graph, ctx_), false,
+                "model", JobConsistencyValidator.modelMatchesFlow(graph), false,
                 modelSelectors, modelNodes, ctx);
     }
 
@@ -314,6 +314,21 @@ public class JobConsistencyValidator {
     // -----------------------------------------------------------------------------------------------------------------
     //   Checks for individual params, inputs and outputs
     // -----------------------------------------------------------------------------------------------------------------
+
+    // Model comes from the job definition
+    private static AlignedMapValidator<TagSelector, Node<NodeMetadata>> modelMatchesFlow(GraphSection<NodeMetadata> graph) {
+
+        return (modelName, modelSelector, modelNode, ctx) -> modelMatchesFlow(modelName, modelSelector, modelNode, graph, ctx);
+    }
+
+    // Model comes from the job definition
+    private static ValidationContext modelMatchesFlow(
+            String modelName, TagSelector modelSelector,
+            Node<NodeMetadata> modelNode, GraphSection<NodeMetadata> graph,
+            ValidationContext ctx) {
+
+        return modelNode(modelName, modelSelector, modelNode, graph, ctx);
+    }
 
 
     // Param comes from the job definition
