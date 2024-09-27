@@ -99,3 +99,14 @@ class TutorialModelsTest(unittest.TestCase):
         sys_config = self.examples_root.joinpath("config/sys_config.yaml")
 
         launch.launch_model(OptionalIOModel, job_config, sys_config)
+
+    def test_dynamic_io(self):
+
+        # First invocation does not supply the optional input
+
+        from tutorial.dynamic_io import DynamicIOModel  # noqa
+
+        job_config = self.examples_root.joinpath("config/dynamic_io.yaml")
+        sys_config = self.examples_root.joinpath("config/sys_config.yaml")
+
+        launch.launch_model(DynamicIOModel, job_config, sys_config)
