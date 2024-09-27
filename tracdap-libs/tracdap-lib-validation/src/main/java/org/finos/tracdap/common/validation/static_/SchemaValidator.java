@@ -74,16 +74,36 @@ public class SchemaValidator {
     @Validator
     public static ValidationContext schema(SchemaDefinition schema, ValidationContext ctx) {
 
+        return schema(schema, false, ctx);
+    }
+
+    public static ValidationContext dynamicSchema(SchemaDefinition schema, ValidationContext ctx) {
+
+        return schema(schema, true, ctx);
+    }
+
+    private static ValidationContext schema(SchemaDefinition schema, boolean dynamic, ValidationContext ctx) {
+
         ctx = ctx.push(SD_SCHEMA_TYPE)
                 .apply(CommonValidators::required)
                 .apply(CommonValidators::recognizedEnum, SchemaType.class)
                 .pop();
 
-        ctx = ctx.pushOneOf(SD_SCHEMA_TYPE_DEFINITION)
-                .apply(CommonValidators::required)
-                .apply(SchemaValidator::schemaMatchesType)
-                .applyRegistered()
-                .pop();
+        ctx = ctx.pushOneOf(SD_SCHEMA_TYPE_DEFINITION);
+
+        ctx.apply(CommonValidators::required);
+        ctx.apply(SchemaValidator::schemaMatchesType);
+
+        // For dynamic schemas, there is a check to make sure the schema is empty
+        // Otherwise, use the regular validation
+
+        if (dynamic) {
+            ctx.applyOneOf(SD_TABLE, SchemaValidator::dynamicTableSchema, TableSchema.class);
+        }
+        else
+            ctx.applyRegistered();
+
+        ctx.pop();
 
         return ctx;
     }
@@ -154,6 +174,13 @@ public class SchemaValidator {
         }
 
         return ctx;
+    }
+
+    public static ValidationContext dynamicTableSchema(TableSchema table, ValidationContext ctx) {
+
+        return ctx.pushRepeated(TS_FIELDS)
+                .apply(CommonValidators::omitted)
+                .pop();
     }
 
     @Validator
