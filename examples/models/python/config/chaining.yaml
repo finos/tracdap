@@ -14,7 +14,7 @@ job:
       currency_data: "inputs/currency_data_sample.csv"
 
     outputs:
-      profit_by_region: "outputs/hello_pandas/profit_by_region.csv"
+      profit_by_region: "outputs/chaining/profit_by_region.csv"
 
     models:
       model_1: tutorial.model_1.FirstModel
