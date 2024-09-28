@@ -31,8 +31,8 @@ import java.util.stream.Collectors;
 @Validator(type = ValidationType.STATIC)
 public class SchemaValidator {
 
-    private static final Map<SchemaDefinition.SchemaTypeDefinitionCase, SchemaType> SCHEMA_TYPE_CASE_MAPPING = Map.ofEntries(
-            Map.entry(SchemaDefinition.SchemaTypeDefinitionCase.TABLE, SchemaType.TABLE));
+    private static final Map<SchemaDefinition.SchemaDetailsCase, SchemaType> SCHEMA_TYPE_CASE_MAPPING = Map.ofEntries(
+            Map.entry(SchemaDefinition.SchemaDetailsCase.TABLE, SchemaType.TABLE));
 
     private static final List<BasicType> ALLOWED_BUSINESS_KEY_TYPES = List.of(
             BasicType.STRING, BasicType.INTEGER, BasicType.DATE);
@@ -41,7 +41,7 @@ public class SchemaValidator {
 
     private static final Descriptors.Descriptor SCHEMA_DEFINITION;
     private static final Descriptors.FieldDescriptor SD_SCHEMA_TYPE;
-    private static final Descriptors.OneofDescriptor SD_SCHEMA_TYPE_DEFINITION;
+    private static final Descriptors.OneofDescriptor SD_SCHEMA_DETAILS;
     private static final Descriptors.FieldDescriptor SD_TABLE;
 
     private static final Descriptors.Descriptor TABLE_SCHEMA;
@@ -58,7 +58,7 @@ public class SchemaValidator {
         SCHEMA_DEFINITION = SchemaDefinition.getDescriptor();
         SD_SCHEMA_TYPE = ValidatorUtils.field(SCHEMA_DEFINITION, SchemaDefinition.SCHEMATYPE_FIELD_NUMBER);
         SD_TABLE = ValidatorUtils.field(SCHEMA_DEFINITION, SchemaDefinition.TABLE_FIELD_NUMBER);
-        SD_SCHEMA_TYPE_DEFINITION = SD_TABLE.getContainingOneof();
+        SD_SCHEMA_DETAILS = SD_TABLE.getContainingOneof();
 
         TABLE_SCHEMA = TableSchema.getDescriptor();
         TS_FIELDS = ValidatorUtils.field(TABLE_SCHEMA, TableSchema.FIELDS_FIELD_NUMBER);
@@ -86,24 +86,27 @@ public class SchemaValidator {
 
         ctx = ctx.push(SD_SCHEMA_TYPE)
                 .apply(CommonValidators::required)
-                .apply(CommonValidators::recognizedEnum, SchemaType.class)
+                .apply(CommonValidators::nonZeroEnum, SchemaType.class)
                 .pop();
 
-        ctx = ctx.pushOneOf(SD_SCHEMA_TYPE_DEFINITION);
-
-        ctx.apply(CommonValidators::required);
-        ctx.apply(SchemaValidator::schemaMatchesType);
-
-        // For dynamic schemas, there is a check to make sure the schema is empty
-        // Otherwise, use the regular validation
-
         if (dynamic) {
-            ctx.applyOneOf(SD_TABLE, SchemaValidator::dynamicTableSchema, TableSchema.class);
-        }
-        else
-            ctx.applyRegistered();
 
-        ctx.pop();
+            // For dynamic schemas, schema details must not be included
+
+            ctx = ctx.pushOneOf(SD_SCHEMA_DETAILS)
+                    .apply(CommonValidators::omitted)
+                    .pop();
+        }
+        else {
+
+            // Otherwise apply the regular validator
+
+            ctx = ctx.pushOneOf(SD_SCHEMA_DETAILS)
+                    .apply(CommonValidators::required)
+                    .apply(SchemaValidator::schemaMatchesType)
+                    .applyRegistered()
+                    .pop();
+        }
 
         return ctx;
     }
@@ -111,10 +114,10 @@ public class SchemaValidator {
     public static ValidationContext schemaMatchesType(ValidationContext ctx) {
 
         var schemaDef = (SchemaDefinition) ctx.parentMsg();
-        var schemaTypeCase = schemaDef.getSchemaTypeDefinitionCase();
+        var schemaDetails = schemaDef.getSchemaDetailsCase();
 
         var schemaType = schemaDef.getSchemaType();
-        var definitionType = SCHEMA_TYPE_CASE_MAPPING.getOrDefault(schemaTypeCase, SchemaType.UNRECOGNIZED);
+        var definitionType = SCHEMA_TYPE_CASE_MAPPING.getOrDefault(schemaDetails, SchemaType.UNRECOGNIZED);
 
         if (schemaType != definitionType) {
 
@@ -174,13 +177,6 @@ public class SchemaValidator {
         }
 
         return ctx;
-    }
-
-    public static ValidationContext dynamicTableSchema(TableSchema table, ValidationContext ctx) {
-
-        return ctx.pushRepeated(TS_FIELDS)
-                .apply(CommonValidators::omitted)
-                .pop();
     }
 
     @Validator
