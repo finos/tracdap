@@ -20,7 +20,6 @@ import org.finos.tracdap.api.*;
 import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.metadata.MetadataUtil;
 import org.finos.tracdap.metadata.*;
-import org.finos.tracdap.metadata.ImportModelJob;
 import org.finos.tracdap.metadata.RunModelJob;
 import org.finos.tracdap.test.helpers.GitHelpers;
 import org.finos.tracdap.test.helpers.PlatformTest;
@@ -68,9 +67,10 @@ public class RunModelTest {
     static TagHeader inputDataId;
     static TagHeader modelId;
     static TagHeader outputDataId;
-
     static TagHeader optionalIoModelId;
     static TagHeader optionalIoOutputDataId;
+    static TagHeader dynamicIoModelId;
+    static TagHeader dynamicIoOutputDataId;
 
     @Test @Order(1)
     void loadInputData() throws Exception {
@@ -86,20 +86,25 @@ public class RunModelTest {
                 .addFields(FieldSchema.newBuilder()
                         .setFieldName("id")
                         .setFieldType(BasicType.STRING)
-                        .setBusinessKey(true))
+                        .setBusinessKey(true)
+                        .setLabel("Customer ID"))
                 .addFields(FieldSchema.newBuilder()
                         .setFieldName("loan_amount")
-                        .setFieldType(BasicType.DECIMAL))
+                        .setFieldType(BasicType.DECIMAL)
+                        .setLabel("Total loan amount"))
                 .addFields(FieldSchema.newBuilder()
                         .setFieldName("loan_condition_cat")
-                        .setFieldType(BasicType.INTEGER))
+                        .setFieldType(BasicType.INTEGER)
+                        .setLabel("Loan condition category code"))
                 .addFields(FieldSchema.newBuilder()
                         .setFieldName("total_pymnt")
-                        .setFieldType(BasicType.DECIMAL))
+                        .setFieldType(BasicType.DECIMAL)
+                        .setLabel("Total payments to date"))
                 .addFields(FieldSchema.newBuilder()
                         .setFieldName("region")
                         .setFieldType(BasicType.STRING)
-                        .setCategorical(true)))
+                        .setCategorical(true)
+                        .setLabel("Customer region")))
                 .build();
 
         var inputPath = platform.tracRepoDir().resolve(INPUT_PATH);
@@ -140,60 +145,27 @@ public class RunModelTest {
 
         log.info("Running IMPORT_MODEL job...");
 
-        var metaClient = platform.metaClientBlocking();
-        var orchClient = platform.orchClientBlocking();
-
         var modelVersion = GitHelpers.getCurrentCommit();
-
-        var importModel = ImportModelJob.newBuilder()
+        var modelStub = ModelDefinition.newBuilder()
                 .setLanguage("python")
                 .setRepository(useTracRepo())
                 .setPath("examples/models/python/src")
                 .setEntryPoint("tutorial.using_data.UsingDataModel")
                 .setVersion(modelVersion)
-                .addModelAttrs(TagUpdate.newBuilder()
+                .build();
+
+        var modelAttrs = List.of(TagUpdate.newBuilder()
                         .setAttrName("e2e_test_model")
-                        .setValue(MetadataCodec.encodeValue("run_model:using_data")))
-                .build();
+                        .setValue(MetadataCodec.encodeValue("run_model:using_data"))
+                        .build());
 
-        var jobRequest = JobRequest.newBuilder()
-                .setTenant(TEST_TENANT)
-                .setJob(JobDefinition.newBuilder()
-                .setJobType(JobType.IMPORT_MODEL)
-                .setImportModel(importModel))
-                .addJobAttrs(TagUpdate.newBuilder()
+        var jobAttrs = List.of(TagUpdate.newBuilder()
                         .setAttrName("e2e_test_job")
-                        .setValue(MetadataCodec.encodeValue("run_model:import_model")))
-                .build();
+                        .setValue(MetadataCodec.encodeValue("run_model:import_model"))
+                        .build());
 
-        var jobStatus = runJob(orchClient, jobRequest);
-        var jobKey = MetadataUtil.objectKey(jobStatus.getJobId());
+        var modelTag = ImportModelTest.doImportModel(platform, TEST_TENANT, modelStub, modelAttrs, jobAttrs);
 
-        Assertions.assertEquals(JobStatusCode.SUCCEEDED, jobStatus.getStatusCode());
-
-        var modelSearch = MetadataSearchRequest.newBuilder()
-                .setTenant(TEST_TENANT)
-                .setSearchParams(SearchParameters.newBuilder()
-                .setObjectType(ObjectType.MODEL)
-                .setSearch(SearchExpression.newBuilder()
-                    .setTerm(SearchTerm.newBuilder()
-                    .setAttrName("trac_create_job")
-                    .setAttrType(BasicType.STRING)
-                    .setOperator(SearchOperator.EQ)
-                    .setSearchValue(MetadataCodec.encodeValue(jobKey)))))
-                .build();
-
-        var modelSearchResult = metaClient.search(modelSearch);
-
-        Assertions.assertEquals(1, modelSearchResult.getSearchResultCount());
-
-        var searchResult = modelSearchResult.getSearchResult(0);
-        var modelReq = MetadataReadRequest.newBuilder()
-                .setTenant(TEST_TENANT)
-                .setSelector(MetadataUtil.selectorFor(searchResult.getHeader()))
-                .build();
-
-        var modelTag = metaClient.readObject(modelReq);
         var modelDef = modelTag.getDefinition().getModel();
         var modelAttr = modelTag.getAttrsOrThrow("e2e_test_model");
 
@@ -304,60 +276,26 @@ public class RunModelTest {
 
         log.info("Running IMPORT_MODEL job...");
 
-        var metaClient = platform.metaClientBlocking();
-        var orchClient = platform.orchClientBlocking();
-
         var modelVersion = GitHelpers.getCurrentCommit();
-
-        var importModel = ImportModelJob.newBuilder()
+        var modelStub = ModelDefinition.newBuilder()
                 .setLanguage("python")
                 .setRepository(useTracRepo())
                 .setPath("examples/models/python/src")
                 .setEntryPoint("tutorial.optional_io.OptionalIOModel")
                 .setVersion(modelVersion)
-                .addModelAttrs(TagUpdate.newBuilder()
+                .build();
+
+        var modelAttrs = List.of(TagUpdate.newBuilder()
                         .setAttrName("e2e_test_model")
-                        .setValue(MetadataCodec.encodeValue("run_model:optional_io")))
-                .build();
+                        .setValue(MetadataCodec.encodeValue("run_model:optional_io"))
+                        .build());
 
-        var jobRequest = JobRequest.newBuilder()
-                .setTenant(TEST_TENANT)
-                .setJob(JobDefinition.newBuilder()
-                        .setJobType(JobType.IMPORT_MODEL)
-                        .setImportModel(importModel))
-                .addJobAttrs(TagUpdate.newBuilder()
+        var jobAttrs = List.of(TagUpdate.newBuilder()
                         .setAttrName("e2e_test_job")
-                        .setValue(MetadataCodec.encodeValue("run_model:optional_io_import_model")))
-                .build();
+                        .setValue(MetadataCodec.encodeValue("run_model:optional_io_import_model"))
+                        .build());
 
-        var jobStatus = runJob(orchClient, jobRequest);
-        var jobKey = MetadataUtil.objectKey(jobStatus.getJobId());
-
-        Assertions.assertEquals(JobStatusCode.SUCCEEDED, jobStatus.getStatusCode());
-
-        var modelSearch = MetadataSearchRequest.newBuilder()
-                .setTenant(TEST_TENANT)
-                .setSearchParams(SearchParameters.newBuilder()
-                .setObjectType(ObjectType.MODEL)
-                .setSearch(SearchExpression.newBuilder()
-                .setTerm(SearchTerm.newBuilder()
-                        .setAttrName("trac_create_job")
-                        .setAttrType(BasicType.STRING)
-                        .setOperator(SearchOperator.EQ)
-                        .setSearchValue(MetadataCodec.encodeValue(jobKey)))))
-                .build();
-
-        var modelSearchResult = metaClient.search(modelSearch);
-
-        Assertions.assertEquals(1, modelSearchResult.getSearchResultCount());
-
-        var searchResult = modelSearchResult.getSearchResult(0);
-        var modelReq = MetadataReadRequest.newBuilder()
-                .setTenant(TEST_TENANT)
-                .setSelector(MetadataUtil.selectorFor(searchResult.getHeader()))
-                .build();
-
-        var modelTag = metaClient.readObject(modelReq);
+        var modelTag = ImportModelTest.doImportModel(platform, TEST_TENANT, modelStub, modelAttrs, jobAttrs);
         var modelDef = modelTag.getDefinition().getModel();
         var modelAttr = modelTag.getAttrsOrThrow("e2e_test_model");
 
@@ -464,6 +402,143 @@ public class RunModelTest {
 
         Assertions.assertEquals(List.of("region", "gross_profit"), csvHeaders);
         Assertions.assertEquals(EXPECTED_REGIONS + 1, csvLines.length);
+    }
+
+    @Test @Order(8)
+    void dynamicIO_importModel() throws Exception {
+
+        log.info("Running IMPORT_MODEL job...");
+
+        var metaClient = platform.metaClientBlocking();
+        var orchClient = platform.orchClientBlocking();
+
+        var modelVersion = GitHelpers.getCurrentCommit();
+        var modelStub = ModelDefinition.newBuilder()
+                .setLanguage("python")
+                .setRepository(useTracRepo())
+                .setPath("examples/models/python/src")
+                .setEntryPoint("tutorial.dynamic_io.DynamicIOModel")
+                .setVersion(modelVersion)
+                .build();
+
+        var modelAttrs = List.of(TagUpdate.newBuilder()
+                        .setAttrName("e2e_test_model")
+                        .setValue(MetadataCodec.encodeValue("run_model:dynamic_io"))
+                        .build());
+
+        var jobAttrs = List.of(TagUpdate.newBuilder()
+                        .setAttrName("e2e_test_job")
+                        .setValue(MetadataCodec.encodeValue("run_model:dynamic_io_import_model"))
+                        .build());
+
+        var modelTag = ImportModelTest.doImportModel(platform, TEST_TENANT, modelStub, modelAttrs, jobAttrs);
+        var modelDef = modelTag.getDefinition().getModel();
+        var modelAttr = modelTag.getAttrsOrThrow("e2e_test_model");
+
+        Assertions.assertEquals("run_model:dynamic_io", MetadataCodec.decodeStringValue(modelAttr));
+        Assertions.assertEquals("tutorial.dynamic_io.DynamicIOModel", modelDef.getEntryPoint());
+        Assertions.assertTrue(modelDef.getInputsMap().containsKey("original_data"));
+        Assertions.assertTrue(modelDef.getOutputsMap().containsKey("filtered_data"));
+
+        dynamicIoModelId = modelTag.getHeader();
+    }
+
+    @Test @Order(9)
+    void dynamicIO_runModel() {
+
+        var metaClient = platform.metaClientBlocking();
+        var orchClient = platform.orchClientBlocking();
+
+        // Do not set the optional input (i.e. inputs look the same as UsingData model
+        // Customer loans input is the same dataset as the UsingData model
+
+        var runModel = RunModelJob.newBuilder()
+                .setModel(MetadataUtil.selectorFor(dynamicIoModelId))
+                .putParameters("filter_column", MetadataCodec.encodeValue("region"))
+                .putParameters("filter_value", MetadataCodec.encodeValue("munster"))
+                .putInputs("original_data", MetadataUtil.selectorFor(inputDataId))
+                .addOutputAttrs(TagUpdate.newBuilder()
+                        .setAttrName("e2e_test_data")
+                        .setValue(MetadataCodec.encodeValue("run_model:dynamic_io_data_output")))
+                .build();
+
+        var jobRequest = JobRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setJob(JobDefinition.newBuilder()
+                        .setJobType(JobType.RUN_MODEL)
+                        .setRunModel(runModel))
+                .addJobAttrs(TagUpdate.newBuilder()
+                        .setAttrName("e2e_test_job")
+                        .setValue(MetadataCodec.encodeValue("run_model:dynamic_io_run_model")))
+                .build();
+
+        var jobStatus = runJob(orchClient, jobRequest);
+        var jobKey = MetadataUtil.objectKey(jobStatus.getJobId());
+
+        Assertions.assertEquals(JobStatusCode.SUCCEEDED, jobStatus.getStatusCode());
+
+        var dataSearch = MetadataSearchRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSearchParams(SearchParameters.newBuilder()
+                        .setObjectType(ObjectType.DATA)
+                        .setSearch(SearchExpression.newBuilder()
+                                .setTerm(SearchTerm.newBuilder()
+                                        .setAttrName("trac_create_job")
+                                        .setAttrType(BasicType.STRING)
+                                        .setOperator(SearchOperator.EQ)
+                                        .setSearchValue(MetadataCodec.encodeValue(jobKey)))))
+                .build();
+
+        var dataSearchResult = metaClient.search(dataSearch);
+
+        // Only one output - optional exclusions output is not returned when account_filter is not supplied
+        Assertions.assertEquals(1, dataSearchResult.getSearchResultCount());
+
+        var searchResult = dataSearchResult.getSearchResult(0);
+        var dataReq = MetadataReadRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSelector(MetadataUtil.selectorFor(searchResult.getHeader()))
+                .build();
+
+        var dataTag = metaClient.readObject(dataReq);
+        var dataDef = dataTag.getDefinition().getData();
+        var outputAttr = dataTag.getAttrsOrThrow("e2e_test_data");
+
+        Assertions.assertEquals("run_model:dynamic_io_data_output", MetadataCodec.decodeStringValue(outputAttr));
+        Assertions.assertEquals(1, dataDef.getPartsCount());
+
+        dynamicIoOutputDataId = dataTag.getHeader();
+    }
+
+    @Test @Order(10)
+    void dynamicIO_checkOutputData() {
+
+        log.info("Checking output data...");
+
+        var dataClient = platform.dataClientBlocking();
+
+        var readRequest = DataReadRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSelector(MetadataUtil.selectorFor(dynamicIoOutputDataId))
+                .setFormat("text/csv")
+                .build();
+
+
+        var readResponse = dataClient.readSmallDataset(readRequest);
+
+        var csvText = readResponse.getContent().toString(StandardCharsets.UTF_8);
+        var csvLines = csvText.split("\n");
+
+        var csvHeaders = Arrays.stream(csvLines[0].split(","))
+                .map(String::trim)
+                .collect(Collectors.toList());
+
+        Assertions.assertEquals(List.of("id","loan_amount","loan_condition_cat","total_pymnt","region"), csvHeaders);
+
+        // Check the dynamic filter was applied successfully
+
+        Assertions.assertTrue(csvText.contains("leinster"));
+        Assertions.assertFalse(csvText.contains("munster"));
     }
 
 }
