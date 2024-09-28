@@ -407,8 +407,9 @@ class StaticValidator:
         if field.categorical and field.fieldType != meta.BasicType.STRING:
             cls._fail(f"Invalid {property_type}: [{field.fieldName}] fieldType {field.fieldType} used as categorical")
 
-        if field.businessKey and not field.notNull:
-            cls._fail(f"Invalid {property_type}: [{field.fieldName}] is a business key but not_null = False")
+        # Do not require notNull = True for business keys here
+        # Instead setting businessKey = True will cause notNull = True to be set during normalization
+        # This agrees with the semantics in platform API and CSV schema loader
 
     @classmethod
     def _valid_identifiers(cls, keys, property_type):
