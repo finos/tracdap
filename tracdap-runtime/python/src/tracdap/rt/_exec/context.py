@@ -12,6 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import copy
 import logging
 import pathlib
 import typing as tp
@@ -32,8 +33,8 @@ import tracdap.rt._impl.validation as _val  # noqa
 class TracContextImpl(_api.TracContext):
 
     """
-    TracContextImpl is the main implementation of the API class TracContext (from trac.rt.api).
-    It provides get/put operations the inputs, outputs and parameters of a model according to the model definition,
+    TracContextImpl is the main implementation of the API class TracContext (from tracdap.rt.api).
+    It provides get/put operations on the inputs, outputs and parameters of a model according to the model definition,
     as well as exposing other information needed by the model at runtime and offering a few utility functions.
 
     An instance of TracContextImpl is constructed by the runtime engine for each model node in the execution graph.
@@ -44,8 +45,8 @@ class TracContextImpl(_api.TracContext):
 
     Optimizations for lazy loading and eager saving require the context to call back into the runtime engine. For lazy
     load, the graph node to prepare an input is injected when the data is requested and the model thread blocks until
-    it is available; for eager save child nodes of individual outputs are triggered when those outputs are produced.
-    In both cases this complexity is hidden from the model, which only sees one thread with synchronous get/put calls.
+    it is available; for eager save outputs are sent to child actors as soon as they are produced. In both cases this
+    complexity is hidden from the model, which only sees one thread with synchronous get/put calls.
 
     :param model_def: Definition object for the model that will run in this context
     :param model_class: Type for the model that will run in this context
@@ -59,8 +60,7 @@ class TracContextImpl(_api.TracContext):
     def __init__(self,
                  model_def: _meta.ModelDefinition,
                  model_class: _api.TracModel.__class__,
-                 local_ctx: tp.Dict[str, _data.DataView],
-                 schemas: tp.Dict[str, _meta.SchemaDefinition],
+                 local_ctx: tp.Dict[str, tp.Any],
                  checkout_directory: pathlib.Path = None):
 
         self.__ctx_log = _util.logger_for_object(self)
@@ -68,26 +68,25 @@ class TracContextImpl(_api.TracContext):
 
         self.__model_def = model_def
         self.__model_class = model_class
-
-        self.__parameters = local_ctx or {}
-        self.__data = local_ctx or {}
-        self.__schemas = schemas
+        self.__local_ctx = local_ctx or {}
 
         self.__val = TracContextValidator(
             self.__ctx_log,
-            self.__parameters,
-            self.__data,
+            self.__model_def,
+            self.__local_ctx,
             checkout_directory)
 
     def get_parameter(self, parameter_name: str) -> tp.Any:
 
         _val.validate_signature(self.get_parameter, parameter_name)
 
-        self.__val.check_param_not_null(parameter_name)
         self.__val.check_param_valid_identifier(parameter_name)
-        self.__val.check_param_exists(parameter_name)
+        self.__val.check_param_defined_in_model(parameter_name)
+        self.__val.check_param_available_in_context(parameter_name)
 
-        value: _meta.Value = self.__parameters[parameter_name]  # noqa
+        value: _meta.Value = self.__local_ctx.get(parameter_name)
+
+        self.__val.check_context_object_type(parameter_name, value, _meta.Value)
 
         return _types.MetadataCodec.decode_value(value)
 
@@ -95,65 +94,67 @@ class TracContextImpl(_api.TracContext):
 
         _val.validate_signature(self.has_dataset, dataset_name)
 
-        part_key = _data.DataPartKey.for_root()
-
-        self.__val.check_dataset_name_not_null(dataset_name)
         self.__val.check_dataset_valid_identifier(dataset_name)
+        self.__val.check_dataset_defined_in_model(dataset_name)
 
-        data_view = self.__data.get(dataset_name)
+        data_view: _data.DataView = self.__local_ctx.get(dataset_name)
 
         if data_view is None:
             return False
 
-        # If the item exists but is not a dataset, that is still a runtime error
-        # E.g. if this method is called for FILE inputs
-        self.__val.check_context_item_is_dataset(dataset_name)
+        self.__val.check_context_object_type(dataset_name, data_view, _data.DataView)
 
-        part = data_view.parts.get(part_key)
-
-        if part is None or len(part) == 0:
-            return False
-
-        return True
+        return not data_view.is_empty()
 
     def get_schema(self, dataset_name: str) -> _meta.SchemaDefinition:
 
         _val.validate_signature(self.get_schema, dataset_name)
 
-        self.__val.check_dataset_name_not_null(dataset_name)
         self.__val.check_dataset_valid_identifier(dataset_name)
+        self.__val.check_dataset_defined_in_model(dataset_name)
+        self.__val.check_dataset_available_in_context(dataset_name)
 
-        # There is no need to look in the data map if the model has defined a static schema
-        if dataset_name in self.__schemas:
-            return self.__schemas[dataset_name]
+        # Check the data view has a well-defined schema even if a static schema exists in the model
+        # This ensures errors are always reported and is consistent with get_pandas_table()
 
-        self.__val.check_context_item_exists(dataset_name)
-        self.__val.check_context_item_is_dataset(dataset_name)
-        self.__val.check_dataset_schema_defined(dataset_name)
+        data_view: _data.DataView = self.__local_ctx.get(dataset_name)
 
-        data_view = self.__data[dataset_name]
+        self.__val.check_context_object_type(dataset_name, data_view, _data.DataView)
+        self.__val.check_dataset_schema_defined(dataset_name, data_view)
 
-        return data_view.trac_schema
+        # If a static schema exists, that takes priority
+
+        static_schema = self.__get_static_schema(self.__model_def, dataset_name)
+
+        # Return deep copies, do not allow model code to change schemas provided by the engine
+
+        if static_schema is not None:
+            return copy.deepcopy(static_schema)
+        else:
+            return copy.deepcopy(data_view.trac_schema)
 
     def get_pandas_table(self, dataset_name: str, use_temporal_objects: tp.Optional[bool] = None) -> pd.DataFrame:
 
         _val.validate_signature(self.get_pandas_table, dataset_name, use_temporal_objects)
 
+        self.__val.check_dataset_valid_identifier(dataset_name)
+        self.__val.check_dataset_defined_in_model(dataset_name)
+        self.__val.check_dataset_available_in_context(dataset_name)
+
+        data_view = self.__local_ctx.get(dataset_name)
         part_key = _data.DataPartKey.for_root()
 
-        self.__val.check_dataset_name_not_null(dataset_name)
-        self.__val.check_dataset_valid_identifier(dataset_name)
-        self.__val.check_context_item_exists(dataset_name)
-        self.__val.check_context_item_is_dataset(dataset_name)
-        self.__val.check_dataset_schema_defined(dataset_name)
-        self.__val.check_dataset_part_present(dataset_name, part_key)
-
-        data_view = self.__data[dataset_name]
+        self.__val.check_context_object_type(dataset_name, data_view, _data.DataView)
+        self.__val.check_dataset_schema_defined(dataset_name, data_view)
+        self.__val.check_dataset_part_present(dataset_name, data_view, part_key)
 
         # If the model defines a static input schema, use that for schema conformance
         # Otherwise, take what is in the incoming dataset (schema is dynamic)
-        if dataset_name in self.__schemas:
-            schema = _data.DataMapping.trac_to_arrow_schema(self.__schemas[dataset_name])
+
+        static_schema = self.__get_static_schema(self.__model_def, dataset_name)
+
+        if static_schema is not None:
+            schema = _data.DataMapping.trac_to_arrow_schema(static_schema)
         else:
             schema = data_view.arrow_schema
 
@@ -162,40 +163,86 @@ class TracContextImpl(_api.TracContext):
 
         return _data.DataMapping.view_to_pandas(data_view, part_key, schema, use_temporal_objects)
 
+    def put_schema(self, dataset_name: str, schema: _meta.SchemaDefinition):
+
+        _val.validate_signature(self.get_schema, dataset_name, schema)
+
+        self.__val.check_dataset_valid_identifier(dataset_name)
+        self.__val.check_dataset_is_dynamic_output(dataset_name)
+        self.__val.check_provided_schema_is_valid(dataset_name, schema)
+
+        data_view = self.__local_ctx.get(dataset_name)
+
+        # If there is a prior view it must contain nothing and will be replaced
+        if data_view is not None:
+            self.__val.check_context_object_type(dataset_name, data_view, _data.DataView)
+            self.__val.check_dataset_schema_not_defined(dataset_name, data_view)
+            self.__val.check_dataset_is_empty(dataset_name, data_view)
+
+        updated_view = _data.DataView.for_trac_schema(schema)
+        self.__local_ctx[dataset_name] = updated_view
+
     def put_pandas_table(self, dataset_name: str, dataset: pd.DataFrame):
 
         _val.validate_signature(self.put_pandas_table, dataset_name, dataset)
 
-        part_key = _data.DataPartKey.for_root()
-
-        self.__val.check_dataset_name_not_null(dataset_name)
         self.__val.check_dataset_valid_identifier(dataset_name)
-        self.__val.check_context_item_exists(dataset_name)
-        self.__val.check_context_item_is_dataset(dataset_name)
-        self.__val.check_dataset_schema_defined(dataset_name)
-        self.__val.check_dataset_part_not_present(dataset_name, part_key)
-        self.__val.check_provided_dataset_not_null(dataset)
+        self.__val.check_dataset_is_model_output(dataset_name)
         self.__val.check_provided_dataset_type(dataset, pd.DataFrame)
 
-        prior_view = self.__data[dataset_name]
+        data_view = self.__local_ctx.get(dataset_name)
+        part_key = _data.DataPartKey.for_root()
+
+        if data_view is not None:
+            self.__val.check_context_object_type(dataset_name, data_view, _data.DataView)
+            self.__val.check_dataset_schema_defined(dataset_name, data_view)
+            self.__val.check_dataset_part_not_present(dataset_name, data_view, part_key)
 
         # If the model defines a static output schema, use that for schema conformance
-        # Otherwise, use the schema in the data view for this output (this could be a dynamic schema)
-        if dataset_name in self.__schemas:
-            schema = _data.DataMapping.trac_to_arrow_schema(self.__schemas[dataset_name])
+        # Otherwise, use the schema in the data view for this output (which could be a dynamic schema)
+        # A dataset cannot be saved if no schema is available (put_schema() must be called first)
+
+        static_schema = self.__get_static_schema(self.__model_def, dataset_name)
+
+        if static_schema is not None:
+            schema = _data.DataMapping.trac_to_arrow_schema(static_schema)
+        elif data_view is not None:
+            schema = data_view.arrow_schema
         else:
-            schema = prior_view.arrow_schema
+            schema = None
 
-        data_item = _data.DataMapping.pandas_to_item(dataset, schema)
-        data_view = _data.DataMapping.add_item_to_view(prior_view, part_key, data_item)
+        # Since validation passed, either data_view has a valid schema or static_schema is not None
 
-        self.__data[dataset_name] = data_view
+        if data_view is None:
+            data_view = _data.DataView.for_trac_schema(static_schema)
+
+        # Data conformance is applied inside these conversion functions
+
+        updated_item = _data.DataMapping.pandas_to_item(dataset, schema)
+        updated_view = _data.DataMapping.add_item_to_view(data_view, part_key, updated_item)
+
+        self.__local_ctx[dataset_name] = updated_view
 
     def log(self) -> logging.Logger:
 
         _val.validate_signature(self.log)
 
         return self.__model_log
+
+    @staticmethod
+    def __get_static_schema(model_def: _meta.ModelDefinition, dataset_name: str):
+
+        input_schema = model_def.inputs.get(dataset_name)
+
+        if input_schema is not None and not input_schema.dynamic:
+            return input_schema.schema
+
+        output_schema = model_def.outputs.get(dataset_name)
+
+        if output_schema is not None and not output_schema.dynamic:
+            return output_schema.schema
+
+        return None
 
 
 class TracContextValidator:
@@ -205,16 +252,16 @@ class TracContextValidator:
 
     def __init__(
             self, log: logging.Logger,
-            parameters: tp.Dict[str, tp.Any],
-            data_ctx: tp.Dict[str, _data.DataView],
+            model_def: _meta.ModelDefinition,
+            local_ctx: tp.Dict[str, tp.Any],
             checkout_directory: pathlib.Path):
 
         self.__log = log
-        self.__parameters = parameters
-        self.__data_ctx = data_ctx
+        self.__model_def = model_def
+        self.__local_ctx = local_ctx
         self.__checkout_directory = checkout_directory
 
-    def _report_error(self, message):
+    def _report_error(self, message, cause: Exception = None):
 
         full_stack = traceback.extract_stack()
         model_stack = _util.filter_model_stack_trace(full_stack, self.__checkout_directory)
@@ -225,79 +272,113 @@ class TracContextValidator:
         self.__log.error(message)
         self.__log.error(f"Model stack trace:\n{model_stack_str}")
 
-        raise _ex.ERuntimeValidation(message)
+        if cause:
+            raise _ex.ERuntimeValidation(message) from cause
+        else:
+            raise _ex.ERuntimeValidation(message)
 
-    def check_param_not_null(self, param_name):
+    def check_param_valid_identifier(self, param_name: str):
 
         if param_name is None:
             self._report_error(f"Parameter name is null")
 
-    def check_param_valid_identifier(self, param_name: str):
-
         if not self.__VALID_IDENTIFIER.match(param_name):
             self._report_error(f"Parameter name {param_name} is not a valid identifier")
 
-    def check_param_exists(self, param_name: str):
+    def check_param_defined_in_model(self, param_name: str):
 
-        if param_name not in self.__parameters:
-            self._report_error(f"Parameter {param_name} is not defined in the current context")
+        if param_name not in self.__model_def.parameters:
+            self._report_error(f"Parameter {param_name} is not defined in the model")
 
-    def check_dataset_name_not_null(self, dataset_name):
+    def check_param_available_in_context(self, param_name: str):
+
+        if param_name not in self.__local_ctx:
+            self._report_error(f"Parameter {param_name} is not available in the current context")
+
+    def check_dataset_valid_identifier(self, dataset_name: str):
 
         if dataset_name is None:
             self._report_error(f"Dataset name is null")
 
-    def check_dataset_valid_identifier(self, dataset_name: str):
-
         if not self.__VALID_IDENTIFIER.match(dataset_name):
             self._report_error(f"Dataset name {dataset_name} is not a valid identifier")
 
-    def check_context_item_exists(self, item_name: str):
+    def check_dataset_defined_in_model(self, dataset_name: str):
 
-        if item_name not in self.__data_ctx:
-            self._report_error(f"The identifier {item_name} is not defined in the current context")
+        if dataset_name not in self.__model_def.inputs and dataset_name not in self.__model_def.outputs:
+            self._report_error(f"Dataset {dataset_name} is not defined in the model")
 
-    def check_context_item_is_dataset(self, item_name: str):
+    def check_dataset_is_model_output(self, dataset_name: str):
 
-        ctx_item = self.__data_ctx[item_name]
+        if dataset_name not in self.__model_def.outputs:
+            self._report_error(f"Dataset {dataset_name} is not defined as a model output")
 
-        if not isinstance(ctx_item, _data.DataView):
-            self._report_error(f"The object referenced by {item_name} is not a dataset in the current context")
+    def check_dataset_is_dynamic_output(self, dataset_name: str):
 
-    def check_dataset_schema_defined(self, dataset_name: str):
+        model_output: _meta.ModelOutputSchema = self.__model_def.outputs.get(dataset_name)
 
-        schema = self.__data_ctx[dataset_name].trac_schema
+        if model_output is None:
+            self._report_error(f"Dataset {dataset_name} is not defined as a model output")
 
-        if schema is None or not schema.table or not schema.table.fields:
+        if not model_output.dynamic:
+            self._report_error(f"Model output {dataset_name} is not a dynamic output")
+
+    def check_dataset_available_in_context(self, item_name: str):
+
+        if item_name not in self.__local_ctx:
+            self._report_error(f"Dataset {item_name} is not available in the current context")
+
+    def check_dataset_schema_defined(self, dataset_name: str, data_view: _data.DataView):
+
+        schema = data_view.trac_schema
+
+        if schema is None or schema.table is None or not schema.table.fields:
             self._report_error(f"Schema not defined for dataset {dataset_name} in the current context")
 
-    def check_dataset_schema_not_defined(self, dataset_name: str):
+    def check_dataset_schema_not_defined(self, dataset_name: str, data_view: _data.DataView):
 
-        schema = self.__data_ctx[dataset_name].trac_schema
+        schema = data_view.trac_schema
 
         if schema is not None and (schema.table or schema.schemaType != _meta.SchemaType.SCHEMA_TYPE_NOT_SET):
             self._report_error(f"Schema already defined for dataset {dataset_name} in the current context")
 
-    def check_dataset_part_present(self, dataset_name: str, part_key: _data.DataPartKey):
+    def check_dataset_part_present(self, dataset_name: str, data_view: _data.DataView, part_key: _data.DataPartKey):
 
-        part = self.__data_ctx[dataset_name].parts.get(part_key)
+        part = data_view.parts.get(part_key) if data_view.parts is not None else None
 
         if part is None or len(part) == 0:
-            self._report_error(f"No data present for dataset {dataset_name} ({part_key}) in the current context")
+            self._report_error(f"No data present for {dataset_name} ({part_key}) in the current context")
 
-    def check_dataset_part_not_present(self, dataset_name: str, part_key: _data.DataPartKey):
+    def check_dataset_part_not_present(self, dataset_name: str, data_view: _data.DataView, part_key: _data.DataPartKey):
 
-        part = self.__data_ctx[dataset_name].parts.get(part_key)
+        part = data_view.parts.get(part_key) if data_view.parts is not None else None
 
         if part is not None and len(part) > 0:
-            self._report_error(f"Data already present for dataset {dataset_name} ({part_key}) in the current context")
+            self._report_error(f"Data already present for {dataset_name} ({part_key}) in the current context")
 
-    def check_provided_dataset_not_null(self, dataset):
+    def check_dataset_is_empty(self, dataset_name: str, data_view: _data.DataView):
+
+        if not data_view.is_empty():
+            self._report_error(f"Dataset {dataset_name} is not empty")
+
+    def check_provided_schema_is_valid(self, dataset_name: str, schema: _meta.SchemaDefinition):
+
+        if schema is None:
+            self._report_error(f"The schema provided for [{dataset_name}] is null")
+
+        if not isinstance(schema, _meta.SchemaDefinition):
+            schema_type_name = self._type_name(type(schema))
+            self._report_error(f"The object provided for [{dataset_name}] is not a schema (got {schema_type_name})")
+
+        try:
+            _val.StaticValidator.quick_validate_schema(schema)
+        except _ex.EModelValidation as e:
+            self._report_error(f"The schema provided for [{dataset_name}] failed validation: {str(e)}", e)
+
+    def check_provided_dataset_type(self, dataset: tp.Any, expected_type: type):
 
         if dataset is None:
             self._report_error(f"Provided dataset is null")
-
-    def check_provided_dataset_type(self, dataset: tp.Any, expected_type: type):
 
         if not isinstance(dataset, expected_type):
 
@@ -306,6 +387,17 @@ class TracContextValidator:
 
             self._report_error(
                 f"Provided dataset is the wrong type" +
+                f" (expected {expected_type_name}, got {actual_type_name})")
+
+    def check_context_object_type(self, item_name: str, item: tp.Any, expected_type: type):
+
+        if not isinstance(item, expected_type):
+
+            expected_type_name = self._type_name(expected_type)
+            actual_type_name = self._type_name(type(item))
+
+            self._report_error(
+                f"The object referenced by [{item_name}] in the current context has the wrong type" +
                 f" (expected {expected_type_name}, got {actual_type_name})")
 
     @staticmethod

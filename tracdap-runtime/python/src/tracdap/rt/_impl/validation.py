@@ -38,7 +38,7 @@ def check_type(expected_type: tp.Type, value: tp.Any) -> bool:
 
 
 def quick_validate_model_def(model_def: meta.ModelDefinition):
-    _StaticValidator.quick_validate_model_def(model_def)
+    StaticValidator.quick_validate_model_def(model_def)
 
 
 class _TypeValidator:
@@ -233,7 +233,7 @@ class _TypeValidator:
         return type_var.__name__
 
 
-class _StaticValidator:
+class StaticValidator:
 
     __identifier_pattern = re.compile("\\A[a-zA-Z_]\\w*\\Z", re.ASCII)
     __reserved_identifier_pattern = re.compile("\\A(_|trac_)", re.ASCII)
@@ -302,6 +302,28 @@ class _StaticValidator:
         cls._check_inputs_or_outputs(model_def.outputs)
 
     @classmethod
+    def quick_validate_schema(cls, schema: meta.SchemaDefinition):
+
+        if schema.schemaType != meta.SchemaType.TABLE:
+            cls._fail(f"Unsupported schema type [{schema.schemaType}]")
+
+        if schema.partType != meta.PartType.PART_ROOT:
+            cls._fail(f"Unsupported partition type [{schema.partType}]")
+
+        if schema.table is None or schema.table.fields is None or len(schema.table.fields) == 0:
+            cls._fail(f"Table schema does not define any fields")
+
+        fields = schema.table.fields
+        field_names = list(map(lambda f: f.fieldName, fields))
+        property_type = f"field"
+
+        cls._valid_identifiers(field_names, property_type)
+        cls._case_insensitive_duplicates(field_names, property_type)
+
+        for field in fields:
+            cls._check_single_field(field, property_type)
+
+    @classmethod
     def _check_label(cls, label, param_name):
         if label is not None:
             if len(label) > cls.__label_length_limit:
@@ -330,9 +352,19 @@ class _StaticValidator:
 
             cls._log.info(f"Checking {input_name}")
 
+            if input_schema.dynamic:
+                if input_schema.schema and input_schema.schema.table:
+                    error = "Dynamic schemas must have schema.table = None"
+                    cls._fail(f"Invalid schema for [{input_name}]: {error}")
+                else:
+                    continue
+
             fields = input_schema.schema.table.fields
             field_names = list(map(lambda f: f.fieldName, fields))
             property_type = f"field in [{input_name}]"
+
+            if len(fields) == 0:
+                cls._fail(f"Invalid schema for [{input_name}]: No fields defined")
 
             cls._valid_identifiers(field_names, property_type)
             cls._case_insensitive_duplicates(field_names, property_type)
@@ -375,8 +407,9 @@ class _StaticValidator:
         if field.categorical and field.fieldType != meta.BasicType.STRING:
             cls._fail(f"Invalid {property_type}: [{field.fieldName}] fieldType {field.fieldType} used as categorical")
 
-        if field.businessKey and not field.notNull:
-            cls._fail(f"Invalid {property_type}: [{field.fieldName}] is a business key but not_null = False")
+        # Do not require notNull = True for business keys here
+        # Instead setting businessKey = True will cause notNull = True to be set during normalization
+        # This agrees with the semantics in platform API and CSV schema loader
 
     @classmethod
     def _valid_identifiers(cls, keys, property_type):

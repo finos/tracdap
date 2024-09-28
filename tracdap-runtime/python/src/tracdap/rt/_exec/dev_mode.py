@@ -313,6 +313,9 @@ class DevModeTranslator:
 
         flow_def = config_mgr.load_config_object(flow_details, _meta.FlowDefinition)
 
+        # Validate models against the flow (this could move to _impl.validation and check prod jobs as well)
+        cls._check_models_for_flow(flow_def, job_config)
+
         # Auto-wiring and inference only applied to externally loaded flows for now
         flow_def = cls._autowire_flow(flow_def, job_config)
         flow_def = cls._apply_type_inference(flow_def, job_config)
@@ -330,6 +333,37 @@ class DevModeTranslator:
         job_config.job.runFlow.flow = _util.selector_for(flow_id)
 
         return job_config
+
+    @classmethod
+    def _check_models_for_flow(cls, flow: _meta.FlowDefinition, job_config: _cfg.JobConfig):
+
+        model_nodes = dict(filter(lambda n: n[1].nodeType == _meta.FlowNodeType.MODEL_NODE, flow.nodes.items()))
+
+        missing_models = list(filter(lambda m: m not in job_config.job.runFlow.models, model_nodes.keys()))
+        extra_models = list(filter(lambda m: m not in model_nodes, job_config.job.runFlow.models.keys()))
+
+        if any(missing_models):
+            error = f"Missing models in job definition: {', '.join(missing_models)}"
+            cls._log.error(error)
+            raise _ex.EJobValidation(error)
+
+        if any (extra_models):
+            error = f"Extra models in job definition: {', '.join(extra_models)}"
+            cls._log.error(error)
+            raise _ex.EJobValidation(error)
+
+        for model_name, model_node in model_nodes.items():
+
+            model_selector = job_config.job.runFlow.models[model_name]
+            model_obj = _util.get_job_resource(model_selector, job_config)
+
+            model_inputs = set(model_obj.model.inputs.keys())
+            model_outputs = set(model_obj.model.outputs.keys())
+
+            if model_inputs != set(model_node.inputs) or model_outputs != set(model_node.outputs):
+                error = f"The model supplied for [{model_name}] does not match the flow definition"
+                cls._log.error(error)
+                raise _ex.EJobValidation(error)
 
     @classmethod
     def _autowire_flow(cls, flow: _meta.FlowDefinition, job_config: _cfg.JobConfig):
@@ -621,11 +655,13 @@ class DevModeTranslator:
             job_details = job_config.job.runModel
             model_obj = _util.get_job_resource(job_details.model, job_config)
             required_inputs = model_obj.model.inputs
+            required_outputs = model_obj.model.outputs
 
         elif job_config.job.jobType == _meta.JobType.RUN_FLOW:
             job_details = job_config.job.runFlow
             flow_obj = _util.get_job_resource(job_details.flow, job_config)
             required_inputs = flow_obj.flow.inputs
+            required_outputs = flow_obj.flow.outputs
 
         else:
             return job_config
@@ -637,7 +673,8 @@ class DevModeTranslator:
         for input_key, input_value in job_inputs.items():
             if not (isinstance(input_value, str) and input_value in job_resources):
 
-                input_schema = required_inputs[input_key].schema
+                model_input = required_inputs[input_key]
+                input_schema = model_input.schema if model_input and not model_input.dynamic else None
 
                 input_id = cls._process_input_or_output(
                     sys_config, input_key, input_value, job_resources,
@@ -648,9 +685,12 @@ class DevModeTranslator:
         for output_key, output_value in job_outputs.items():
             if not (isinstance(output_value, str) and output_value in job_resources):
 
+                model_output= required_outputs[output_key]
+                output_schema = model_output.schema if model_output and not model_output.dynamic else None
+
                 output_id = cls._process_input_or_output(
                     sys_config, output_key, output_value, job_resources,
-                    new_unique_file=True, schema=None)
+                    new_unique_file=True, schema=output_schema)
 
                 job_outputs[output_key] = _util.selector_for(output_id)
 
@@ -768,7 +808,7 @@ class DevModeTranslator:
         if schema is not None:
             data_def.schema = schema
         else:
-            data_def.schema = _meta.SchemaDefinition(schemaType=_meta.SchemaType.TABLE, table=_meta.TableSchema())
+            data_def.schema = None
 
         data_def.storageId = _meta.TagSelector(
             _meta.ObjectType.STORAGE, storage_id.objectId,

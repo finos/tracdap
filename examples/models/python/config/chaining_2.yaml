@@ -1,0 +1,24 @@
+
+job:
+  runFlow:
+
+    flow: ./chaining_flow_2.yaml
+
+    models:
+      dynamic_filter: tutorial.dynamic_io.DynamicIOModel
+      pnl_aggregation: tutorial.optional_io.OptionalIOModel
+
+    parameters:
+      eur_usd_rate: 1.2071
+      default_weighting: 1.5
+      filter_defaults: false
+      filter_column: region
+      filter_value: munster
+
+    inputs:
+      customer_loans: "inputs/loan_final313_100.parquet"
+      account_filter: "inputs/account_filter.csv"
+
+    outputs:
+      profit_by_region: "outputs/chaining_2/profit_by_region.csv"
+      exclusions: "outputs/chaining_2/exclusions.csv"

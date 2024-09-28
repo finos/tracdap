@@ -154,33 +154,49 @@ class StaticApiImpl(_StaticApiHook):
 
     def define_input_table(
             self, *fields: _tp.Union[_meta.FieldSchema, _tp.List[_meta.FieldSchema]],
-            label: _tp.Optional[str] = None,
-            optional: bool = False,
+            label: _tp.Optional[str] = None, optional: bool = False, dynamic: bool = False,
             input_props: _tp.Optional[_tp.Dict[str, _tp.Any]] = None) \
             -> _meta.ModelInputSchema:
 
         _val.validate_signature(
             self.define_input_table, *fields,
-            label=label, optional=optional,
+            label=label, optional=optional, dynamic=dynamic,
             input_props=input_props)
 
-        schema_def = self.define_schema(*fields, schema_type=_meta.SchemaType.TABLE)
-        return _meta.ModelInputSchema(schema=schema_def, label=label, optional=optional, inputProps=input_props)
+        # Do not define details for dynamic schemas
+
+        if dynamic:
+            schema_def = _meta.SchemaDefinition(_meta.SchemaType.TABLE)
+        else:
+            schema_def = self.define_schema(*fields, schema_type=_meta.SchemaType.TABLE)
+
+        return _meta.ModelInputSchema(
+            schema=schema_def, label=label,
+            optional=optional, dynamic=dynamic,
+            inputProps=input_props)
 
     def define_output_table(
             self, *fields: _tp.Union[_meta.FieldSchema, _tp.List[_meta.FieldSchema]],
-            label: _tp.Optional[str] = None,
-            optional: bool = False,
+            label: _tp.Optional[str] = None, optional: bool = False, dynamic: bool = False,
             output_props: _tp.Optional[_tp.Dict[str, _tp.Any]] = None) \
             -> _meta.ModelOutputSchema:
 
         _val.validate_signature(
             self.define_output_table, *fields,
-            label=label, optional=optional,
+            label=label, optional=optional, dynamic=dynamic,
             output_props=output_props)
 
-        schema_def = self.define_schema(*fields, schema_type=_meta.SchemaType.TABLE)
-        return _meta.ModelOutputSchema(schema=schema_def, label=label, optional=optional, outputProps=output_props)
+        # Do not define details for dynamic schemas
+
+        if dynamic:
+            schema_def = _meta.SchemaDefinition(_meta.SchemaType.TABLE)
+        else:
+            schema_def = self.define_schema(*fields, schema_type=_meta.SchemaType.TABLE)
+
+        return _meta.ModelOutputSchema(
+            schema=schema_def, label=label,
+            optional=optional, dynamic=dynamic,
+            outputProps=output_props)
 
     @staticmethod
     def _build_named_dict(

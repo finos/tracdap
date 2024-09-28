@@ -55,6 +55,7 @@ public class RunFlowTest {
 
     private static final String LOANS_INPUT_PATH = "examples/models/python/data/inputs/loan_final313_100_shortform.csv";
     private static final String CURRENCY_INPUT_PATH = "examples/models/python/data/inputs/currency_data_sample.csv";
+    private static final String ACCOUNT_FILTER_INPUT_PATH = "examples/models/python/data/inputs/account_filter.csv";
     public static final String ANALYSIS_TYPE = "analysis_type";
 
     // Only test E2E run model using the local repo
@@ -81,6 +82,14 @@ public class RunFlowTest {
     static TagHeader model1Id;
     static TagHeader model2Id;
     static TagHeader outputDataId;
+
+    static TagHeader flowId2;
+    static TagHeader accountFilterSchemaId;
+    static TagHeader accountFilterDataId;
+    static TagHeader dynamicFilterModelId;
+    static TagHeader pnlAggregationModelId;
+    static TagHeader profitByRegionDataId;
+    static TagHeader exclusionsDataId;
 
     @Test @Order(1)
     void createFlow() {
@@ -159,20 +168,25 @@ public class RunFlowTest {
                         .addFields(FieldSchema.newBuilder()
                                 .setFieldName("id")
                                 .setFieldType(BasicType.STRING)
-                                .setBusinessKey(true))
+                                .setBusinessKey(true)
+                                .setLabel("Customer Id"))
                         .addFields(FieldSchema.newBuilder()
                                 .setFieldName("loan_amount")
-                                .setFieldType(BasicType.DECIMAL))
+                                .setFieldType(BasicType.DECIMAL)
+                                .setLabel("Loan amount"))
                         .addFields(FieldSchema.newBuilder()
                                 .setFieldName("loan_condition_cat")
-                                .setFieldType(BasicType.INTEGER))
+                                .setFieldType(BasicType.INTEGER)
+                                .setLabel("Loan condition category code"))
                         .addFields(FieldSchema.newBuilder()
                                 .setFieldName("total_pymnt")
-                                .setFieldType(BasicType.DECIMAL))
+                                .setFieldType(BasicType.DECIMAL)
+                                .setLabel("Total payment received to date"))
                         .addFields(FieldSchema.newBuilder()
                                 .setFieldName("region")
                                 .setFieldType(BasicType.STRING)
-                                .setCategorical(true))))
+                                .setCategorical(true)
+                                .setLabel("Customer region"))))
                 .build();
 
         var currencySchema = ObjectDefinition.newBuilder()
@@ -454,4 +468,270 @@ public class RunFlowTest {
         Assertions.assertEquals(List.of("region", "gross_profit"), csvHeaders);
         Assertions.assertEquals(EXPECTED_REGIONS + 1, csvLines.length);
     }
+
+    @Test @Order(7)
+    void createFlow2() {
+
+        var metaClient = platform.metaClientBlocking();
+
+        var flowDef = FlowDefinition.newBuilder()
+                .putNodes("customer_loans", FlowNode.newBuilder().setNodeType(FlowNodeType.INPUT_NODE).build())
+                .putNodes("account_filter", FlowNode.newBuilder().setNodeType(FlowNodeType.INPUT_NODE).build())
+                .putNodes("dynamic_filter", FlowNode.newBuilder()
+                        .setNodeType(FlowNodeType.MODEL_NODE)
+                        .addInputs("original_data")
+                        .addOutputs("filtered_data")
+                        .build())
+                .putNodes("pnl_aggregation", FlowNode.newBuilder()
+                        .setNodeType(FlowNodeType.MODEL_NODE)
+                        .addInputs("customer_loans")
+                        .addInputs("account_filter")
+                        .addOutputs("profit_by_region")
+                        .addOutputs("exclusions")
+                        .build())
+                .putNodes("profit_by_region", FlowNode.newBuilder()
+                        .setNodeType(FlowNodeType.OUTPUT_NODE)
+                        .build())
+                .putNodes("exclusions", FlowNode.newBuilder()
+                        .setNodeType(FlowNodeType.OUTPUT_NODE)
+                        .build())
+                .addEdges(FlowEdge.newBuilder()
+                        .setSource(FlowSocket.newBuilder().setNode("customer_loans"))
+                        .setTarget(FlowSocket.newBuilder().setNode("dynamic_filter").setSocket("original_data")))
+                .addEdges(FlowEdge.newBuilder()
+                        .setSource(FlowSocket.newBuilder().setNode("dynamic_filter").setSocket("filtered_data"))
+                        .setTarget(FlowSocket.newBuilder().setNode("pnl_aggregation").setSocket("customer_loans")))
+                .addEdges(FlowEdge.newBuilder()
+                        .setSource(FlowSocket.newBuilder().setNode("account_filter"))
+                        .setTarget(FlowSocket.newBuilder().setNode("pnl_aggregation").setSocket("account_filter")))
+                .addEdges(FlowEdge.newBuilder()
+                        .setSource(FlowSocket.newBuilder().setNode("pnl_aggregation").setSocket("profit_by_region"))
+                        .setTarget(FlowSocket.newBuilder().setNode("profit_by_region")))
+                .addEdges(FlowEdge.newBuilder()
+                        .setSource(FlowSocket.newBuilder().setNode("pnl_aggregation").setSocket("exclusions"))
+                        .setTarget(FlowSocket.newBuilder().setNode("exclusions")))
+                .build();
+
+        var createReq = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.FLOW)
+                .setDefinition(ObjectDefinition.newBuilder().setObjectType(ObjectType.FLOW).setFlow(flowDef))
+                .build();
+
+        flowId2 = metaClient.createObject(createReq);
+    }
+
+    @Test @Order(8)
+    void createSchemas2() {
+
+        var accountFilterSchema = ObjectDefinition.newBuilder()
+                .setObjectType(ObjectType.SCHEMA)
+                .setSchema(SchemaDefinition.newBuilder()
+                .setSchemaType(SchemaType.TABLE)
+                .setTable(TableSchema.newBuilder()
+                .addFields(FieldSchema.newBuilder()
+                        .setFieldName("account_id")
+                        .setFieldType(BasicType.STRING)
+                        .setBusinessKey(true))
+                .addFields(FieldSchema.newBuilder()
+                        .setFieldName("reason")
+                        .setFieldType(BasicType.STRING))))
+                .build();
+
+        var accountFilterSchemaAttrs = List.of(TagUpdate.newBuilder()
+                .setAttrName("e2e_test_schema")
+                .setValue(MetadataCodec.encodeValue("run_flow:account_filter"))
+                .build());
+
+        accountFilterSchemaId = createSchema(accountFilterSchema, accountFilterSchemaAttrs);
+    }
+
+    @Test @Order(9)
+    void loadInputData2() throws Exception {
+
+        log.info("Loading input data...");
+
+        var accountFilterAttrs = List.of(TagUpdate.newBuilder()
+                .setAttrName("e2e_test_dataset")
+                .setValue(MetadataCodec.encodeValue("run_flow:account_filter"))
+                .build());
+
+        accountFilterDataId = loadDataset(accountFilterSchemaId, ACCOUNT_FILTER_INPUT_PATH, accountFilterAttrs);
+    }
+
+    @Test @Order(10)
+    void importModels2() {
+
+        log.info("Running IMPORT_MODEL job...");
+
+        var modelsPath = "examples/models/python/src";
+        var modelsVersion = "main";
+
+        var model1EntryPoint = "tutorial.dynamic_io.DynamicIOModel";
+        var model1Attrs = List.of(TagUpdate.newBuilder()
+                .setAttrName("e2e_test_model")
+                .setValue(MetadataCodec.encodeValue("run_flow:chaining:dynamic_io"))
+                .build());
+        var model1JobAttrs = List.of(TagUpdate.newBuilder()
+                .setAttrName("e2e_test_job")
+                .setValue(MetadataCodec.encodeValue("run_flow:import_model:dynamic_io"))
+                .build());
+
+        var model2EntryPoint = "tutorial.optional_io.OptionalIOModel";
+        var model2Attrs = List.of(TagUpdate.newBuilder()
+                .setAttrName("e2e_test_model")
+                .setValue(MetadataCodec.encodeValue("run_flow:chaining:optional_io"))
+                .build());
+        var model2JobAttrs = List.of(TagUpdate.newBuilder()
+                .setAttrName("e2e_test_job")
+                .setValue(MetadataCodec.encodeValue("run_flow:import_model:optional_io"))
+                .build());
+
+        dynamicFilterModelId = importModel(
+                modelsPath, model1EntryPoint, modelsVersion,
+                model1Attrs, model1JobAttrs);
+
+        pnlAggregationModelId = importModel(
+                modelsPath, model2EntryPoint, modelsVersion,
+                model2Attrs, model2JobAttrs);
+    }
+
+    @Test @Order(11)
+    void runFlow2() {
+
+        var metaClient = platform.metaClientBlocking();
+        var orchClient = platform.orchClientBlocking();
+
+        var runFlow = RunFlowJob.newBuilder()
+                .setFlow(MetadataUtil.selectorFor(flowId2))
+                .putParameters("eur_usd_rate", MetadataCodec.encodeValue(1.2071))
+                .putParameters("default_weighting", MetadataCodec.encodeValue(1.5))
+                .putParameters("filter_defaults", MetadataCodec.encodeValue(false))
+                .putParameters("filter_column", MetadataCodec.encodeValue("region"))
+                .putParameters("filter_value", MetadataCodec.encodeValue("munster"))
+                .putInputs("customer_loans", MetadataUtil.selectorFor(loansDataId))
+                .putInputs("account_filter", MetadataUtil.selectorFor(accountFilterDataId))
+                .putModels("dynamic_filter", MetadataUtil.selectorFor(dynamicFilterModelId))
+                .putModels("pnl_aggregation", MetadataUtil.selectorFor(pnlAggregationModelId))
+                .addOutputAttrs(TagUpdate.newBuilder()
+                        .setAttrName("e2e_test_data")
+                        .setValue(MetadataCodec.encodeValue("run_flow:data_output_2")))
+                .build();
+
+        var jobRequest = JobRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setJob(JobDefinition.newBuilder()
+                        .setJobType(JobType.RUN_FLOW)
+                        .setRunFlow(runFlow))
+                .addJobAttrs(TagUpdate.newBuilder()
+                        .setAttrName("e2e_test_job")
+                        .setValue(MetadataCodec.encodeValue("run_flow:run_flow_2")))
+                .build();
+
+        var jobStatus = runJob(orchClient, jobRequest);
+        var jobKey = MetadataUtil.objectKey(jobStatus.getJobId());
+
+        Assertions.assertEquals(JobStatusCode.SUCCEEDED, jobStatus.getStatusCode());
+
+        var dataSearch = MetadataSearchRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSearchParams(SearchParameters.newBuilder()
+                        .setObjectType(ObjectType.DATA)
+                        .setSearch(SearchExpression.newBuilder()
+                                .setTerm(SearchTerm.newBuilder()
+                                        .setAttrName("trac_create_job")
+                                        .setAttrType(BasicType.STRING)
+                                        .setOperator(SearchOperator.EQ)
+                                        .setSearchValue(MetadataCodec.encodeValue(jobKey)))))
+                .build();
+
+        var dataSearchResult = metaClient.search(dataSearch);
+
+        Assertions.assertEquals(2, dataSearchResult.getSearchResultCount());
+
+        var indexedResult = dataSearchResult.getSearchResultList().stream()
+                .collect(Collectors.toMap(RunFlowTest::getJobOutput, Function.identity()));
+
+        var searchResult = indexedResult.get("profit_by_region");
+        var dataReq = MetadataReadRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSelector(MetadataUtil.selectorFor(searchResult.getHeader()))
+                .build();
+
+        var dataTag = metaClient.readObject(dataReq);
+        var dataDef = dataTag.getDefinition().getData();
+        var outputAttr = dataTag.getAttrsOrThrow("e2e_test_data");
+
+        Assertions.assertEquals("run_flow:data_output_2", MetadataCodec.decodeStringValue(outputAttr));
+        Assertions.assertEquals(1, dataDef.getPartsCount());
+
+        profitByRegionDataId = dataTag.getHeader();
+
+        var searchResult2 = indexedResult.get("exclusions");
+        var dataReq2 = MetadataReadRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSelector(MetadataUtil.selectorFor(searchResult2.getHeader()))
+                .build();
+
+        var dataTag2 = metaClient.readObject(dataReq2);
+        var dataDef2 = dataTag2.getDefinition().getData();
+        var outputAttr2 = dataTag.getAttrsOrThrow("e2e_test_data");
+
+        Assertions.assertEquals("run_flow:data_output_2", MetadataCodec.decodeStringValue(outputAttr2));
+        Assertions.assertEquals(1, dataDef2.getPartsCount());
+
+        exclusionsDataId = dataTag2.getHeader();
+    }
+
+    @Test @Order(12)
+    void checkOutputData2() {
+
+        log.info("Checking output data...");
+
+        var dataClient = platform.dataClientBlocking();
+
+        var readRequest = DataReadRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSelector(MetadataUtil.selectorFor(profitByRegionDataId))
+                .setFormat("text/csv")
+                .build();
+
+        var readResponse = dataClient.readSmallDataset(readRequest);
+
+        var csvText = readResponse.getContent().toString(StandardCharsets.UTF_8);
+        var csvLines = csvText.split("\n");
+
+        var csvHeaders = Arrays.stream(csvLines[0].split(","))
+                .map(String::trim)
+                .collect(Collectors.toList());
+
+        Assertions.assertEquals(List.of("region", "gross_profit"), csvHeaders);
+
+        // Check the dynamic filter was applied successfully
+
+        Assertions.assertTrue(csvText.contains("leinster"));
+        Assertions.assertFalse(csvText.contains("munster"));
+
+        var readRequest2 = DataReadRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSelector(MetadataUtil.selectorFor(exclusionsDataId))
+                .setFormat("text/csv")
+                .build();
+
+        var readResponse2 = dataClient.readSmallDataset(readRequest2);
+
+        var csvText2 = readResponse2.getContent().toString(StandardCharsets.UTF_8);
+        var csvLines2 = csvText2.split("\n");
+
+        var csvHeaders2 = Arrays.stream(csvLines2[0].split(","))
+                .map(String::trim)
+                .collect(Collectors.toList());
+
+        Assertions.assertEquals(List.of("reason", "count"), csvHeaders2);
+
+        // At least one exclusion row after the header
+
+        Assertions.assertTrue(csvLines2.length >= 2);
+    }
+
 }

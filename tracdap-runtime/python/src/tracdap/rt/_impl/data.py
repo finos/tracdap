@@ -80,7 +80,7 @@ class DataView:
         return DataView(trac_schema, arrow_schema, dict())
 
     def is_empty(self) -> bool:
-        return self.parts is None or len(self.parts) == 0
+        return self.parts is None or not any(self.parts.values())
 
     @staticmethod
     def create_empty() -> DataView:
@@ -170,7 +170,27 @@ class DataMapping:
         pa.float16(): pd.Float32Dtype(),
         pa.float32(): pd.Float32Dtype(),
         pa.float64(): pd.Float64Dtype(),
+        pa.string(): pd.StringDtype(),
         pa.utf8(): pd.StringDtype()
+    }
+
+    __ARROW_TO_TRAC_BASIC_TYPE_MAPPING = {
+        pa.bool_(): _meta.BasicType.BOOLEAN,
+        pa.int8(): _meta.BasicType.INTEGER,
+        pa.int16(): _meta.BasicType.INTEGER,
+        pa.int32(): _meta.BasicType.INTEGER,
+        pa.int64():_meta.BasicType.INTEGER,
+        pa.uint8(): _meta.BasicType.INTEGER,
+        pa.uint16(): _meta.BasicType.INTEGER,
+        pa.uint32(): _meta.BasicType.INTEGER,
+        pa.uint64(): _meta.BasicType.INTEGER,
+        pa.float16(): _meta.BasicType.FLOAT,
+        pa.float32(): _meta.BasicType.FLOAT,
+        pa.float64(): _meta.BasicType.FLOAT,
+        pa.string(): _meta.BasicType.STRING,
+        pa.utf8(): _meta.BasicType.STRING,
+        pa.date32(): _meta.BasicType.DATE,
+        pa.date64(): _meta.BasicType.DATE
     }
 
     @staticmethod
@@ -264,6 +284,47 @@ class DataMapping:
         return pa.decimal128(
             cls.__TRAC_DECIMAL_PRECISION,
             cls.__TRAC_DECIMAL_SCALE)
+
+    @classmethod
+    def arrow_to_trac_schema(cls, arrow_schema: pa.Schema) -> _meta.SchemaDefinition:
+
+        trac_fields = list(
+            cls.arrow_to_trac_field(i, arrow_schema.field(i))
+            for (i, f) in enumerate(arrow_schema.names))
+
+        return _meta.SchemaDefinition(
+            schemaType=_meta.SchemaType.TABLE,
+            partType=_meta.PartType.PART_ROOT,
+            table=_meta.TableSchema(trac_fields))
+
+    @classmethod
+    def arrow_to_trac_field(cls, field_index: int, field: pa.Field) -> _meta.FieldSchema:
+
+        field_type = cls.arrow_to_trac_type(field.type)
+        label = field.metadata["label"] if field.metadata and "label" in field.metadata else field.name
+
+        return _meta.FieldSchema(
+            field.name, field_index, field_type,
+            label=label,
+            businessKey=False,
+            notNull=not field.nullable,
+            categorical=False)
+
+    @classmethod
+    def arrow_to_trac_type(cls, arrow_type: pa.DataType) -> _meta.BasicType:
+
+        mapped_basic_type = cls.__ARROW_TO_TRAC_BASIC_TYPE_MAPPING.get(arrow_type)  # noqa
+
+        if mapped_basic_type is not None:
+            return mapped_basic_type
+
+        if pa.types.is_decimal(arrow_type):
+            return _meta.BasicType.DECIMAL
+
+        if pa.types.is_timestamp(arrow_type):
+            return _meta.BasicType.DATETIME
+
+        raise _ex.ETracInternal(f"No data type mapping available for Arrow type [{arrow_type}]")
 
     @classmethod
     def pandas_date_type(cls):

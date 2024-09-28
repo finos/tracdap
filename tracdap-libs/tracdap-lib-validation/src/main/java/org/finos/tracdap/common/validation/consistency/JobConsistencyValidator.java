@@ -216,7 +216,7 @@ public class JobConsistencyValidator {
                 .collect(Collectors.toMap(n -> n.nodeId().name(), n -> n));
 
         return alignedMapValidation(
-                "model", (key, selector, node, ctx_) -> modelNode(key, selector, node, graph, ctx_), false,
+                "model", JobConsistencyValidator.modelMatchesFlow(graph), false,
                 modelSelectors, modelNodes, ctx);
     }
 
@@ -315,6 +315,21 @@ public class JobConsistencyValidator {
     //   Checks for individual params, inputs and outputs
     // -----------------------------------------------------------------------------------------------------------------
 
+    // Model comes from the job definition
+    private static AlignedMapValidator<TagSelector, Node<NodeMetadata>> modelMatchesFlow(GraphSection<NodeMetadata> graph) {
+
+        return (modelName, modelSelector, modelNode, ctx) -> modelMatchesFlow(modelName, modelSelector, modelNode, graph, ctx);
+    }
+
+    // Model comes from the job definition
+    private static ValidationContext modelMatchesFlow(
+            String modelName, TagSelector modelSelector,
+            Node<NodeMetadata> modelNode, GraphSection<NodeMetadata> graph,
+            ValidationContext ctx) {
+
+        return modelNode(modelName, modelSelector, modelNode, graph, ctx);
+    }
+
 
     // Param comes from the job definition
     private static ValidationContext paramMatchesSchema(String paramName, Value paramValue, Node<NodeMetadata> paramNode, ValidationContext ctx) {
@@ -398,7 +413,10 @@ public class JobConsistencyValidator {
         if (ctx.failed())
             return ctx;
 
-        return checkDataSchema(inputObject.getData(), requiredSchema.getSchema(), ctx);
+        if (requiredSchema.getDynamic())
+            return checkDynamicDataSchema(inputObject.getData(), requiredSchema.getSchema(), ctx);
+        else
+            return checkDataSchema(inputObject.getData(), requiredSchema.getSchema(), ctx);
     }
 
     // Input comes from upstream node
@@ -407,7 +425,10 @@ public class JobConsistencyValidator {
         if (inputSchema.getOptional() && !requiredSchema.getOptional())
             ctx.error("Required model input [" + inputName + "] is connected to an optional input");
 
-        return checkDataSchema(inputSchema.getSchema(), requiredSchema.getSchema(), ctx);
+        if (requiredSchema.getDynamic() || inputSchema.getDynamic())
+            return checkDynamicDataSchema(inputSchema.getSchema(), requiredSchema.getSchema(), ctx);
+        else
+            return checkDataSchema(inputSchema.getSchema(), requiredSchema.getSchema(), ctx);
     }
 
     // Input comes from upstream node
@@ -416,7 +437,10 @@ public class JobConsistencyValidator {
         if (outputSchema.getOptional() && !requiredSchema.getOptional())
             ctx.error("Required model input [" + inputName + "] is connected to an optional model output");
 
-        return checkDataSchema(outputSchema.getSchema(), requiredSchema.getSchema(), ctx);
+        if (requiredSchema.getDynamic() || outputSchema.getDynamic())
+            return checkDynamicDataSchema(outputSchema.getSchema(), requiredSchema.getSchema(), ctx);
+        else
+            return checkDataSchema(outputSchema.getSchema(), requiredSchema.getSchema(), ctx);
     }
 
     // Output comes from the job definition
@@ -435,9 +459,9 @@ public class JobConsistencyValidator {
 
         if (outputObject == null) {
 
-            // It is fine if an optional output is not supplied
-            if (requiredSchema.getOptional())
-                return ctx;
+            // No exception for optional outputs, they must still be specified in the job
+            // However for prior outputs, missing prior outputs will be skipped anyway
+            // (A new output dataset will always be created if no prior is specified)
 
             return ctx.error(String.format(
                     "Metadata is not available for output [%s] (%s)",
@@ -454,7 +478,10 @@ public class JobConsistencyValidator {
         if (ctx.failed())
             return ctx;
 
-        return checkDataSchema(outputObject.getData(), requiredSchema.getSchema(), ctx);
+        if (requiredSchema.getDynamic())
+            return checkDynamicDataSchema(outputObject.getData(), requiredSchema.getSchema(), ctx);
+        else
+            return checkDataSchema(outputObject.getData(), requiredSchema.getSchema(), ctx);
     }
 
     // Output comes from upstream node
@@ -463,7 +490,10 @@ public class JobConsistencyValidator {
         if (inputSchema.getOptional() && !requiredSchema.getOptional())
             ctx.error("Required output [" + outputName + "] is connected to an optional input");
 
-        return checkDataSchema(inputSchema.getSchema(), requiredSchema.getSchema(), ctx);
+        if (requiredSchema.getDynamic() || inputSchema.getDynamic())
+            return checkDynamicDataSchema(inputSchema.getSchema(), requiredSchema.getSchema(), ctx);
+        else
+            return checkDataSchema(inputSchema.getSchema(), requiredSchema.getSchema(), ctx);
     }
 
     // Output comes from upstream node
@@ -472,7 +502,10 @@ public class JobConsistencyValidator {
         if (outputSchema.getOptional() && !requiredSchema.getOptional())
             ctx.error("Required output [" + outputName + "] is connected to an optional model output");
 
-        return checkDataSchema(outputSchema.getSchema(), requiredSchema.getSchema(), ctx);
+        if (requiredSchema.getDynamic() || outputSchema.getDynamic())
+            return checkDynamicDataSchema(outputSchema.getSchema(), requiredSchema.getSchema(), ctx);
+        else
+            return checkDataSchema(outputSchema.getSchema(), requiredSchema.getSchema(), ctx);
     }
 
     private static ValidationContext checkDataSchema(DataDefinition suppliedData, SchemaDefinition requiredSchema, ValidationContext ctx) {
@@ -495,6 +528,28 @@ public class JobConsistencyValidator {
             throw new ETracInternal("Schema type " + requiredSchema.getSchemaType() + " is not supported");
 
         return checkTableSchema(suppliedSchema.getTable(), requiredSchema.getTable(), ctx);
+    }
+
+    private static ValidationContext checkDynamicDataSchema(DataDefinition suppliedData, SchemaDefinition requiredSchema, ValidationContext ctx) {
+
+        var suppliedSchema = findSchema(suppliedData, ctx.getMetadataBundle());
+
+        return checkDynamicDataSchema(suppliedSchema, requiredSchema, ctx);
+    }
+
+    private static ValidationContext checkDynamicDataSchema(SchemaDefinition suppliedSchema, SchemaDefinition requiredSchema, ValidationContext ctx) {
+
+        if (suppliedSchema.getSchemaType() != requiredSchema.getSchemaType()) {
+            return ctx.error(String.format(
+                    "The dataset supplied has the wrong schema type (expected [%s], got [%s])",
+                    requiredSchema.getSchemaType(),
+                    suppliedSchema.getSchemaType()));
+        }
+
+        if (requiredSchema.getSchemaType() != SchemaType.TABLE)
+            throw new ETracInternal("Schema type " + requiredSchema.getSchemaType() + " is not supported");
+
+        return ctx;
     }
 
     private static ValidationContext checkTableSchema(TableSchema suppliedSchema, TableSchema requiredSchema, ValidationContext ctx) {

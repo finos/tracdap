@@ -88,7 +88,7 @@ message SchemaDefinition {
     SchemaType schemaType = 1;
     PartType partType = 2;
 
-    oneof schemaTypeDefinition {
+    oneof schemaDetails {
 
         TableSchema table = 3;
     }

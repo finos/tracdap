@@ -67,38 +67,76 @@ public abstract class ImportModelTest {
             .startAll()
             .build();
 
-    private final Logger log = LoggerFactory.getLogger(getClass());
-
+    private static final Logger log = LoggerFactory.getLogger(ImportModelTest.class);
 
     @Test
     void importModel() throws Exception {
 
         log.info("Running IMPORT_MODEL job...");
 
-        var metaClient = platform.metaClientBlocking();
-        var orchClient = platform.orchClientBlocking();
-
         var modelVersion = GitHelpers.getCurrentCommit();
-
-        var importModel = ImportModelJob.newBuilder()
+        var modelStub = ModelDefinition.newBuilder()
                 .setLanguage("python")
                 .setRepository(useTracRepo())
                 .setPath("examples/models/python/src")
                 .setEntryPoint("tutorial.schema_files.SchemaFilesModel")
                 .setVersion(modelVersion)
-                .addModelAttrs(TagUpdate.newBuilder()
+                .build();
+
+        var modelAttrs = List.of(TagUpdate.newBuilder()
                         .setAttrName("e2e_test_model")
-                        .setValue(MetadataCodec.encodeValue("import_model:schema_files")))
+                        .setValue(MetadataCodec.encodeValue("import_model:schema_files"))
+                        .build());
+
+        var jobAttrs = List.of(TagUpdate.newBuilder()
+                .setAttrName("e2e_test_job")
+                .setValue(MetadataCodec.encodeValue("import_model:schema_files"))
+                .build());
+
+        var modelTag = doImportModel(platform, TEST_TENANT, modelStub, modelAttrs, jobAttrs);
+
+        var modelDef = modelTag.getDefinition().getModel();
+        var modelAttr = modelTag.getAttrsOrThrow("e2e_test_model");
+
+        Assertions.assertEquals("import_model:schema_files", MetadataCodec.decodeStringValue(modelAttr));
+        Assertions.assertEquals("tutorial.schema_files.SchemaFilesModel", modelDef.getEntryPoint());
+        Assertions.assertTrue(modelDef.getParametersMap().containsKey("eur_usd_rate"));
+        Assertions.assertTrue(modelDef.getInputsMap().containsKey("customer_loans"));
+        Assertions.assertTrue(modelDef.getOutputsMap().containsKey("profit_by_region"));
+
+        var descriptionAttr = modelTag.getAttrsOrThrow("model_description");
+        var segmentAttr = modelTag.getAttrsOrThrow("business_segment");
+        var classifiersAttr = modelTag.getAttrsOrThrow("classifiers");
+
+        Assertions.assertInstanceOf(String.class, MetadataCodec.decodeValue(descriptionAttr));
+        Assertions.assertEquals("retail_products", MetadataCodec.decodeValue(segmentAttr));
+        Assertions.assertEquals(List.of("loans", "uk", "examples"), MetadataCodec.decodeArrayValue(classifiersAttr));
+    }
+
+    // Let other tests in this suite use this to import models
+
+    public static org.finos.tracdap.metadata.Tag doImportModel(
+            PlatformTest platform, String tenant, ModelDefinition stubModel,
+            List<TagUpdate> modelAttrs, List<TagUpdate> jobAttrs) {
+
+        var metaClient = platform.metaClientBlocking();
+        var orchClient = platform.orchClientBlocking();
+
+        var importModel = ImportModelJob.newBuilder()
+                .setLanguage(stubModel.getLanguage())
+                .setRepository(stubModel.getRepository())
+                .setPath(stubModel.getPath())
+                .setEntryPoint(stubModel.getEntryPoint())
+                .setVersion(stubModel.getVersion())
+                .addAllModelAttrs(modelAttrs)
                 .build();
 
         var jobRequest = JobRequest.newBuilder()
-                .setTenant(TEST_TENANT)
+                .setTenant(tenant)
                 .setJob(JobDefinition.newBuilder()
                         .setJobType(JobType.IMPORT_MODEL)
                         .setImportModel(importModel))
-                .addJobAttrs(TagUpdate.newBuilder()
-                        .setAttrName("e2e_test_job")
-                        .setValue(MetadataCodec.encodeValue("import_model:schema_files")))
+                .addAllJobAttrs(jobAttrs)
                 .build();
 
         // Developer note: This test will fail running locally if the latest commit is not pushed to GitHub
@@ -110,7 +148,7 @@ public abstract class ImportModelTest {
         Assertions.assertEquals(JobStatusCode.SUCCEEDED, jobStatus.getStatusCode());
 
         var modelSearch = MetadataSearchRequest.newBuilder()
-                .setTenant(TEST_TENANT)
+                .setTenant(tenant)
                 .setSearchParams(SearchParameters.newBuilder()
                         .setObjectType(ObjectType.MODEL)
                         .setSearch(SearchExpression.newBuilder()
@@ -131,22 +169,6 @@ public abstract class ImportModelTest {
                 .setSelector(MetadataUtil.selectorFor(searchResult.getHeader()))
                 .build();
 
-        var modelTag = metaClient.readObject(modelReq);
-        var modelDef = modelTag.getDefinition().getModel();
-        var modelAttr = modelTag.getAttrsOrThrow("e2e_test_model");
-
-        Assertions.assertEquals("import_model:schema_files", MetadataCodec.decodeStringValue(modelAttr));
-        Assertions.assertEquals("tutorial.schema_files.SchemaFilesModel", modelDef.getEntryPoint());
-        Assertions.assertTrue(modelDef.getParametersMap().containsKey("eur_usd_rate"));
-        Assertions.assertTrue(modelDef.getInputsMap().containsKey("customer_loans"));
-        Assertions.assertTrue(modelDef.getOutputsMap().containsKey("profit_by_region"));
-
-        var descriptionAttr = modelTag.getAttrsOrThrow("model_description");
-        var segmentAttr = modelTag.getAttrsOrThrow("business_segment");
-        var classifiersAttr = modelTag.getAttrsOrThrow("classifiers");
-
-        Assertions.assertInstanceOf(String.class, MetadataCodec.decodeValue(descriptionAttr));
-        Assertions.assertEquals("retail_products", MetadataCodec.decodeValue(segmentAttr));
-        Assertions.assertEquals(List.of("loans", "uk", "examples"), MetadataCodec.decodeArrayValue(classifiersAttr));
+        return metaClient.readObject(modelReq);
     }
 }

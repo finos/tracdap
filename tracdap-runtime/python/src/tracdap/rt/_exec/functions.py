@@ -252,7 +252,13 @@ class DataViewFunc(NodeFunction[_data.DataView]):
         if root_item.is_empty():
             return _data.DataView.create_empty()
 
-        data_view = _data.DataView.for_trac_schema(self.node.schema)
+        if self.node.schema is not None and len(self.node.schema.table.fields) > 0:
+            trac_schema = self.node.schema
+        else:
+            arrow_schema = root_item.schema
+            trac_schema = _data.DataMapping.arrow_to_trac_schema(arrow_schema)
+
+        data_view = _data.DataView.for_trac_schema(trac_schema)
         data_view = _data.DataMapping.add_item_to_view(data_view, root_part_key, root_item)
 
         return data_view
@@ -544,7 +550,6 @@ class RunModelFunc(NodeFunction[Bundle[_data.DataView]]):
         # Still, if any nodes are missing or have the wrong type TracContextImpl will raise ERuntimeValidation
 
         local_ctx = {}
-        static_schemas = {}
 
         for node_id, node_result in _ctx_iter_items(ctx):
 
@@ -558,22 +563,10 @@ class RunModelFunc(NodeFunction[Bundle[_data.DataView]]):
             if node_id.name in model_def.inputs:
                 input_name = node_id.name
                 local_ctx[input_name] = node_result
-                # At the moment, all model inputs have static schemas
-                static_schemas[input_name] = model_def.inputs[input_name].schema
-
-        # Add empty data views to the local context to hold model outputs
-        # Assuming outputs are all defined with static schemas
-
-        for output_name in model_def.outputs:
-            output_schema = self.node.model_def.outputs[output_name].schema
-            empty_data_view = _data.DataView.for_trac_schema(output_schema)
-            local_ctx[output_name] = empty_data_view
-            # At the moment, all model outputs have static schemas
-            static_schemas[output_name] = output_schema
 
         # Run the model against the mapped local context
 
-        trac_ctx = _ctx.TracContextImpl(self.node.model_def, self.model_class, local_ctx, static_schemas)
+        trac_ctx = _ctx.TracContextImpl(self.node.model_def, self.model_class, local_ctx, self.checkout_directory)
 
         try:
             model = self.model_class()
@@ -594,12 +587,16 @@ class RunModelFunc(NodeFunction[Bundle[_data.DataView]]):
             result: _data.DataView = local_ctx.get(output_name)
 
             if result is None or result.is_empty():
+
                 if not output_schema.optional:
                     model_name = self.model_class.__name__
                     raise _ex.ERuntimeValidation(f"Missing required output [{output_name}] from model [{model_name}]")
 
-            if result is not None:
-                results[output_name] = result
+                # Create a placeholder for optional outputs that were not emitted
+                elif result is None:
+                    result = _data.DataView.create_empty()
+
+            results[output_name] = result
 
         return results
 

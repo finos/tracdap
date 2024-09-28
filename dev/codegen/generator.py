@@ -162,8 +162,10 @@ class TracGenerator:
         '\n\n'
         '{COMMENT}')
 
+    # Putting a type annotation here could be used to change the docs layout
+    # Do not show defaults - these are the proto3 default literals (zero, empty string etc)
     DATA_MEMBER_TEMPLATE_DOCU = (
-        '{INDENT}{MEMBER_NAME} = {MEMBER_DEFAULT}'
+        '{INDENT}{MEMBER_NAME} = None'
         '\n\n'
         '{INDENT}"""\n'
         '{INDENT}{COMMENT}\n\n'
@@ -780,13 +782,16 @@ class TracGenerator:
             else:
                 return "_dc.field(default_factory=list)"
 
-        # Fields in a oneof group are always optional
-        elif field.HasField('oneof_index'):
+        # Fields in a oneof group or marked as proto3 optional are always optional
+        elif field.HasField('oneof_index') or field.proto3_optional:
             return "None"
 
-        # Message fields are always optional and can be set to null
+        # Use a lambda field constructor for default message types
+        # This works for nested types and also gets around issues with dependency ordering
+        # If messages can be ordered by dependency within a file, this could be simplified for non-nested types
         elif field.type == field.Type.TYPE_MESSAGE:
-            return "None"
+            message_type_name = self.python_type_name(package, field.type_name, make_relative=True, alias=True)
+            return f"_dc.field(default_factory=lambda: {message_type_name}())"
 
         # Enum fields are always set to a value (the enum' zero value)
         elif field.type == field.Type.TYPE_ENUM:
@@ -795,8 +800,20 @@ class TracGenerator:
             return f"{enum_type_name}.{enum_type.value[0].name}"
 
         # Assume everything else is a primitive
+        python_type = self.PRIMITIVE_TYPE_MAPPING.get(field.type)
+
+        if python_type is bool:
+            return "False"
+        elif python_type is int:
+            return "0"
+        elif python_type is float:
+            return "0.0"
+        elif python_type is str:
+            return "\"\""
+        elif python_type is bytes:
+            return "b\"\""
         else:
-            return "None"
+            return f"None  # No default available for proto type {field.type}"
 
     # Comments
 
