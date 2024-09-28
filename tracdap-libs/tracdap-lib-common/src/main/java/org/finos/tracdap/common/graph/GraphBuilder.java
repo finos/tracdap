@@ -633,6 +633,17 @@ public class GraphBuilder {
             return null;
         }
 
+        // If next schema is dynamic do not try to merge fields (there will be none)
+        if (nextModelInput.getDynamic())
+            return modelInput;
+
+        // If the current schema is dynamic and the next is static, take the static requirements
+        if (modelInput.getDynamic()) {
+            modelInput.setDynamic(false);
+            modelInput.setSchema(nextSchema);
+            return modelInput;
+        }
+
         var table = schema.getTable().toBuilder();
         var nextTable = nextSchema.getTable();
 
