@@ -24,9 +24,9 @@ the top-level class or function as parameters, as shown in this example.
     :caption: src/tutorial/using_data.py
     :name: using_data_py_part_1
     :language: python
-    :lines: 15-51
+    :lines: 21 - 48
     :linenos:
-    :lineno-start: 15
+    :lineno-start: 21
 
 
 Defining model requirements
@@ -38,9 +38,9 @@ so we can use the same syntax. We'll define the three parameters needed by the m
 .. literalinclude:: ../../../examples/models/python/src/tutorial/using_data.py
     :name: using_data_py_part_2
     :language: python
-    :lines: 52-67
+    :lines: 51-65
     :linenos:
-    :lineno-start: 52
+    :lineno-start: 51
 
 The example model function has one data input, which is a table called *customer_loans*.
 The function :py:func:`define_output_table() <tracdap.rt.api.define_output_table>` in the
@@ -79,9 +79,9 @@ lenient type handling for input files.
 .. literalinclude:: ../../../examples/models/python/src/tutorial/using_data.py
     :name: using_data_py_part_3
     :language: python
-    :lines: 68-78
+    :lines: 67 - 76
     :linenos:
-    :lineno-start: 68
+    :lineno-start: 67
 
 To define the model outputs we can use :py:func:`define_output_table() <tracdap.rt.api.define_output_table>`,
 which is identical to :py:func:`define_input_table() <tracdap.rt.api.define_input_table>` save for the fact it
@@ -93,9 +93,9 @@ Models are free to define multiple outputs if required, but this example only ha
 .. literalinclude:: ../../../examples/models/python/src/tutorial/using_data.py
     :name: using_data_py_part_4
     :language: python
-    :lines: 79-86
+    :lines: 78 - 84
     :linenos:
-    :lineno-start: 79
+    :lineno-start: 78
 
 Now the parameters, inputs and outputs of the model are defined, we can implement the
 :py:meth:`run_model() <tracdap.rt.api.TracModel.run_model>` method.
@@ -115,9 +115,9 @@ schema for this input.
 .. literalinclude:: ../../../examples/models/python/src/tutorial/using_data.py
     :name: using_data_py_part_5
     :language: python
-    :lines: 87-94
+    :lines: 86 - 92
     :linenos:
-    :lineno-start: 87
+    :lineno-start: 86
 
 Once all the inputs and parameters are available, we can call the model function. Since all the inputs
 and parameters are supplied using the correct native types there is no further conversion necessary,
@@ -126,18 +126,19 @@ they can be passed straight into the model code.
 .. literalinclude:: ../../../examples/models/python/src/tutorial/using_data.py
     :name: using_data_py_part_6
     :language: python
-    :lines: 95-98
+    :lines: 94 - 96
     :linenos:
-    :lineno-start: 95
+    :lineno-start: 94
 
 The model code has produced a Pandas dataframe that we want to record as an output. To do this, we can use
 :py:meth:`put_pandas_table() <tracdap.rt.api.TracContext.put_pandas_table>`. The dataframe should match
 exactly with what is defined in the output schema. If any columns are missing or have the wrong data type,
-TRAC will throw an error. When considering data types for outputs TRAC does provide some leniency. For example,
-if a timestamp field is supplied with the wrong precision, or an integer column is supplied in place of decimals,
-TRAC will perform conversions. Any conversion that would result in loss of data (e.g. values outside the allowed
-range) will result in an error. The output dataset passed on to the platform is guaranteed to have the correct
-data types as specified in :py:meth:`define_outputs() <tracdap.rt.api.TracModel.define_outputs>`.
+TRAC will report a runtime validation error. When considering data types for outputs TRAC does provide some
+leniency. For example, if a timestamp field is supplied with the wrong precision, or an integer column is
+supplied in place of decimals, TRAC will perform conversions. Any conversion that would result in loss of
+data (e.g. values outside the allowed range) will result in an error. The output dataset passed on to the
+platform is guaranteed to have the correct data types as specified in
+:py:meth:`define_outputs() <tracdap.rt.api.TracModel.define_outputs>`.
 
 If the column order or casing is wrong, or if there are extra columns, the output will be allowed but a
 warning will appear in the logs. Columns will be reordered and converted to the correct case, any extra
@@ -146,18 +147,18 @@ columns will be dropped.
 .. literalinclude:: ../../../examples/models/python/src/tutorial/using_data.py
     :name: using_data_py_part_7
     :language: python
-    :lines: 99-101
+    :lines: 98
     :linenos:
-    :lineno-start: 90
+    :lineno-start: 98
 
 The model can be launched locally using :py:func:`launch_model() <tracdap.rt.launch.launch_model()>`.
 
 .. literalinclude:: ../../../examples/models/python/src/tutorial/using_data.py
     :name: using_data_py_part_8
     :language: python
-    :lines: 102-
+    :lines: 101-103
     :linenos:
-    :lineno-start: 102
+    :lineno-start: 101
 
 Configure local data
 --------------------
