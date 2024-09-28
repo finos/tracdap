@@ -621,11 +621,13 @@ class DevModeTranslator:
             job_details = job_config.job.runModel
             model_obj = _util.get_job_resource(job_details.model, job_config)
             required_inputs = model_obj.model.inputs
+            required_outputs = model_obj.model.outputs
 
         elif job_config.job.jobType == _meta.JobType.RUN_FLOW:
             job_details = job_config.job.runFlow
             flow_obj = _util.get_job_resource(job_details.flow, job_config)
             required_inputs = flow_obj.flow.inputs
+            required_outputs = flow_obj.flow.outputs
 
         else:
             return job_config
@@ -637,7 +639,8 @@ class DevModeTranslator:
         for input_key, input_value in job_inputs.items():
             if not (isinstance(input_value, str) and input_value in job_resources):
 
-                input_schema = required_inputs[input_key].schema
+                model_input = required_inputs[input_key]
+                input_schema = model_input.schema if model_input and not model_input.dynamic else None
 
                 input_id = cls._process_input_or_output(
                     sys_config, input_key, input_value, job_resources,
@@ -648,9 +651,12 @@ class DevModeTranslator:
         for output_key, output_value in job_outputs.items():
             if not (isinstance(output_value, str) and output_value in job_resources):
 
+                model_output= required_outputs[output_key]
+                output_schema = model_output.schema if model_output and not model_output.dynamic else None
+
                 output_id = cls._process_input_or_output(
                     sys_config, output_key, output_value, job_resources,
-                    new_unique_file=True, schema=None)
+                    new_unique_file=True, schema=output_schema)
 
                 job_outputs[output_key] = _util.selector_for(output_id)
 
@@ -768,7 +774,7 @@ class DevModeTranslator:
         if schema is not None:
             data_def.schema = schema
         else:
-            data_def.schema = _meta.SchemaDefinition(schemaType=_meta.SchemaType.TABLE, table=_meta.TableSchema())
+            data_def.schema = None
 
         data_def.storageId = _meta.TagSelector(
             _meta.ObjectType.STORAGE, storage_id.objectId,
