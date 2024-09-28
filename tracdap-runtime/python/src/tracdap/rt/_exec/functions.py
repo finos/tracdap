@@ -252,7 +252,13 @@ class DataViewFunc(NodeFunction[_data.DataView]):
         if root_item.is_empty():
             return _data.DataView.create_empty()
 
-        data_view = _data.DataView.for_trac_schema(self.node.schema)
+        if self.node.schema is not None and len(self.node.schema.table.fields) > 0:
+            trac_schema = self.node.schema
+        else:
+            arrow_schema = root_item.schema
+            trac_schema = _data.DataMapping.arrow_to_trac_schema(arrow_schema)
+
+        data_view = _data.DataView.for_trac_schema(trac_schema)
         data_view = _data.DataMapping.add_item_to_view(data_view, root_part_key, root_item)
 
         return data_view
