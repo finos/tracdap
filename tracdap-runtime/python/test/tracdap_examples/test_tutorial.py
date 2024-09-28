@@ -71,13 +71,6 @@ class TutorialModelsTest(unittest.TestCase):
 
         launch.launch_model(SchemaFilesModel, job_config, sys_config)
 
-    def test_chaining(self):
-
-        job_config = self.examples_root.joinpath("config/chaining.yaml")
-        sys_config = self.examples_root.joinpath("config/sys_config.yaml")
-
-        launch.launch_job(job_config, sys_config, dev_mode=True)
-
     def test_optional_io(self):
 
         # First invocation does not supply the optional input
@@ -110,3 +103,17 @@ class TutorialModelsTest(unittest.TestCase):
         sys_config = self.examples_root.joinpath("config/sys_config.yaml")
 
         launch.launch_model(DynamicIOModel, job_config, sys_config)
+
+    def test_chaining(self):
+
+        job_config = self.examples_root.joinpath("config/chaining.yaml")
+        sys_config = self.examples_root.joinpath("config/sys_config.yaml")
+
+        launch.launch_job(job_config, sys_config, dev_mode=True)
+
+    def test_chaining_2(self):
+
+        job_config = self.examples_root.joinpath("config/chaining_2.yaml")
+        sys_config = self.examples_root.joinpath("config/sys_config.yaml")
+
+        launch.launch_job(job_config, sys_config, dev_mode=True)

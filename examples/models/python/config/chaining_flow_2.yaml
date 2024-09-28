@@ -1,0 +1,31 @@
+nodes:
+
+  customer_loans:
+    nodeType: "INPUT_NODE"
+
+  account_filter:
+    nodeType: "INPUT_NODE"
+
+  dynamic_filter:
+    nodeType: "MODEL_NODE"
+    inputs: [original_data]
+    outputs: [filtered_data]
+
+  pnl_aggregation:
+    nodeType: "MODEL_NODE"
+    inputs: [customer_loans, account_filter]
+    outputs: [profit_by_region, exclusions]
+
+  profit_by_region:
+    nodeType: "OUTPUT_NODE"
+
+  exclusions:
+    nodeType: "OUTPUT_NODE"
+
+
+edges:
+  - source: { node: customer_loans }
+    target: { node: dynamic_filter, socket: original_data }
+
+  - source: { node: dynamic_filter, socket: filtered_data }
+    target: { node: pnl_aggregation, socket: customer_loans }
