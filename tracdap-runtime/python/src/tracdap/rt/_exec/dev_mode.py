@@ -313,6 +313,9 @@ class DevModeTranslator:
 
         flow_def = config_mgr.load_config_object(flow_details, _meta.FlowDefinition)
 
+        # Validate models against the flow (this could move to _impl.validation and check prod jobs as well)
+        cls._check_models_for_flow(flow_def, job_config)
+
         # Auto-wiring and inference only applied to externally loaded flows for now
         flow_def = cls._autowire_flow(flow_def, job_config)
         flow_def = cls._apply_type_inference(flow_def, job_config)
@@ -330,6 +333,37 @@ class DevModeTranslator:
         job_config.job.runFlow.flow = _util.selector_for(flow_id)
 
         return job_config
+
+    @classmethod
+    def _check_models_for_flow(cls, flow: _meta.FlowDefinition, job_config: _cfg.JobConfig):
+
+        model_nodes = dict(filter(lambda n: n[1].nodeType == _meta.FlowNodeType.MODEL_NODE, flow.nodes.items()))
+
+        missing_models = list(filter(lambda m: m not in job_config.job.runFlow.models, model_nodes.keys()))
+        extra_models = list(filter(lambda m: m not in model_nodes, job_config.job.runFlow.models.keys()))
+
+        if any(missing_models):
+            error = f"Missing models in job definition: {', '.join(missing_models)}"
+            cls._log.error(error)
+            raise _ex.EJobValidation(error)
+
+        if any (extra_models):
+            error = f"Extra models in job definition: {', '.join(extra_models)}"
+            cls._log.error(error)
+            raise _ex.EJobValidation(error)
+
+        for model_name, model_node in model_nodes.items():
+
+            model_selector = job_config.job.runFlow.models[model_name]
+            model_obj = _util.get_job_resource(model_selector, job_config)
+
+            model_inputs = set(model_obj.model.inputs.keys())
+            model_outputs = set(model_obj.model.outputs.keys())
+
+            if model_inputs != set(model_node.inputs) or model_outputs != set(model_node.outputs):
+                error = f"The model supplied for [{model_name}] does not match the flow definition"
+                cls._log.error(error)
+                raise _ex.EJobValidation(error)
 
     @classmethod
     def _autowire_flow(cls, flow: _meta.FlowDefinition, job_config: _cfg.JobConfig):
