@@ -162,8 +162,10 @@ class TracGenerator:
         '\n\n'
         '{COMMENT}')
 
+    # Putting a type annotation here could be used to change the docs layout
+    # Do not show defaults - these are the proto3 default literals (zero, empty string etc)
     DATA_MEMBER_TEMPLATE_DOCU = (
-        '{INDENT}{MEMBER_NAME} = {MEMBER_DEFAULT}'
+        '{INDENT}{MEMBER_NAME} = None'
         '\n\n'
         '{INDENT}"""\n'
         '{INDENT}{COMMENT}\n\n'
