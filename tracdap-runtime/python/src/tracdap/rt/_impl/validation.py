@@ -304,10 +304,10 @@ class StaticValidator:
     @classmethod
     def quick_validate_schema(cls, schema: meta.SchemaDefinition):
 
-        if not schema.schemaType == meta.SchemaType.TABLE:
+        if schema.schemaType != meta.SchemaType.TABLE:
             cls._fail(f"Unsupported schema type [{schema.schemaType}]")
 
-        if not schema.partType == meta.PartType.PART_ROOT:
+        if schema.partType != meta.PartType.PART_ROOT:
             cls._fail(f"Unsupported partition type [{schema.partType}]")
 
         if schema.table is None or schema.table.fields is None or len(schema.table.fields) == 0:
@@ -353,8 +353,9 @@ class StaticValidator:
             cls._log.info(f"Checking {input_name}")
 
             if input_schema.dynamic:
-                if input_schema.schema and input_schema.schema.table and len(input_schema.schema.table.fields) > 0:
-                    cls._fail(f"Invalid schema for [{input_name}]: Dynamic schemas cannot define individual fields")
+                if input_schema.schema and input_schema.schema.table:
+                    error = "Dynamic schemas must have schema.table = None"
+                    cls._fail(f"Invalid schema for [{input_name}]: {error}")
                 else:
                     continue
 

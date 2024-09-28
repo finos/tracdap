@@ -163,7 +163,12 @@ class StaticApiImpl(_StaticApiHook):
             label=label, optional=optional, dynamic=dynamic,
             input_props=input_props)
 
-        schema_def = self.define_schema(*fields, schema_type=_meta.SchemaType.TABLE)
+        # Do not define details for dynamic schemas
+
+        if dynamic:
+            schema_def = _meta.SchemaDefinition(_meta.SchemaType.TABLE)
+        else:
+            schema_def = self.define_schema(*fields, schema_type=_meta.SchemaType.TABLE)
 
         return _meta.ModelInputSchema(
             schema=schema_def, label=label,
@@ -181,7 +186,12 @@ class StaticApiImpl(_StaticApiHook):
             label=label, optional=optional, dynamic=dynamic,
             output_props=output_props)
 
-        schema_def = self.define_schema(*fields, schema_type=_meta.SchemaType.TABLE)
+        # Do not define details for dynamic schemas
+
+        if dynamic:
+            schema_def = _meta.SchemaDefinition(_meta.SchemaType.TABLE)
+        else:
+            schema_def = self.define_schema(*fields, schema_type=_meta.SchemaType.TABLE)
 
         return _meta.ModelOutputSchema(
             schema=schema_def, label=label,
