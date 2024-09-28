@@ -206,11 +206,12 @@ public class ModelValidator {
     @Validator
     public static ValidationContext modelInputSchema(ModelInputSchema msg, ValidationContext ctx) {
 
+        // Dynamic schemas require different validation logic
+
         ctx = ctx.push(MIS_SCHEMA)
                 .apply(CommonValidators::required)
                 .applyIf(!msg.getDynamic(), SchemaValidator::schema, SchemaDefinition.class)
                 .applyIf(msg.getDynamic(), SchemaValidator::dynamicSchema, SchemaDefinition.class)
-                .applyRegistered()
                 .pop();
 
         ctx = ctx.push(MIS_LABEL)
@@ -228,6 +229,8 @@ public class ModelValidator {
 
     @Validator
     public static ValidationContext modelOutputSchema(ModelOutputSchema msg, ValidationContext ctx) {
+
+        // Dynamic schemas require different validation logic
 
         ctx = ctx.push(MOS_SCHEMA)
                 .apply(CommonValidators::required)
