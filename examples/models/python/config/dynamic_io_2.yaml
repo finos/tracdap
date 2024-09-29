@@ -1,0 +1,11 @@
+job:
+  runModel:
+
+    parameters:
+      number_of_rows: 20
+
+    inputs:
+      sample_columns: "inputs/sample_columns.csv"
+
+    outputs:
+      dynamic_data_sample: "outputs/dynamic_io/dynamic_data_sample.csv"

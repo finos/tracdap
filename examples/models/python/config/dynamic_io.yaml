@@ -1,14 +1,9 @@
-
 job:
   runModel:
 
-    parameters:
-      filter_column: region
-      filter_value: ulster
-
     inputs:
       # Dynamic inputs for local jobs need a file format with schema information
-      original_data: "inputs/loan_final313_100.parquet"
+      source_data: "inputs/loan_final313_100.parquet"
 
     outputs:
-      filtered_data: "outputs/dynamic_io/filtered_data.csv"
+      source_data_schema: "outputs/dynamic_io/source_data_schema.csv"
