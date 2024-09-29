@@ -189,6 +189,7 @@ class TracContext:
 
         :param dataset_name: The name of the output to set the schema for
         :param schema: A TRAC schema definition to use for the named output
+        :type schema: :py:class:`SchemaDefinition <tracdap.rt.metadata.SchemaDefinition>`
         :raises: :py:class:`ERuntimeValidation <tracdap.rt.exceptions.ERuntimeValidation>`
         """
 

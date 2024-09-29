@@ -169,7 +169,7 @@ class TracGenerator:
         '\n\n'
         '{INDENT}"""\n'
         '{INDENT}{COMMENT}\n\n'
-        '{INDENT}:type: {MEMBER_TYPE}\n'
+        '{INDENT}:type: {MEMBER_DOC_TYPE}\n'
         '{INDENT}"""\n\n')
 
     SERVICE_CLASS_TEMPLATE = (
@@ -595,6 +595,8 @@ class TracGenerator:
         filtered_loc = self.filter_src_location(ctx.src_locations, ctx.src_loc_code, ctx.src_loc_index)
 
         field_type = self.python_field_type(package, field, message)
+        doc_type = self.python_field_type(package, field, message, is_doc_type=True)
+
         field_default = self.python_default_value(package, field, message, types)
         raw_comment = self.comment_for_current_location(filtered_loc)
 
@@ -609,6 +611,7 @@ class TracGenerator:
             .replace("{INDENT}", self.INDENT_TEMPLATE * ctx.indent) \
             .replace("{MEMBER_NAME}", field.name) \
             .replace("{MEMBER_TYPE}", field_type) \
+            .replace("{MEMBER_DOC_TYPE}", doc_type) \
             .replace("{MEMBER_DEFAULT}", field_default) \
             .replace("{COMMENT}", comment)
 
@@ -679,11 +682,19 @@ class TracGenerator:
     def python_field_type(
             self, package: str,
             field: pb_desc.FieldDescriptorProto,
-            message: pb_desc.DescriptorProto):
+            message: pb_desc.DescriptorProto,
+            is_doc_type: bool = False):
+
+        def format_type_string(type_string):
+            if is_doc_type and (field.type == field.Type.TYPE_MESSAGE or field.type == field.Type.TYPE_ENUM):
+                return f":py:class:`{type_string} <{type_string}>`"
+            else:
+                return type_string
 
         base_type = self.python_base_type(package, field, make_relative=True, alias=True)
 
-        typing_prefix = "_tp." if not self._options.get("doc_format") else ""
+        # Real code needs to qualify the typing module import, docs want a cleaner type name
+        typing_prefix = "" if is_doc_type else  "_tp."
 
         # Repeated fields are either lists or maps - these need special handling
         if field.label == field.Label.LABEL_REPEATED:
@@ -699,25 +710,25 @@ class TracGenerator:
 
                 key_type = self.python_base_type(package, nested_type.field[0], make_relative=True, alias=True)
                 value_type = self.python_base_type(package, nested_type.field[1], make_relative=True, alias=True)
-                return f"{typing_prefix}Dict[{key_type}, {value_type}]"
+                return f"{typing_prefix}Dict[{key_type}, {format_type_string(value_type)}]"
 
             # Otherwise repeated fields are generated as lists
             else:
-                return f"{typing_prefix}List[{base_type}]"
+                return f"{typing_prefix}List[{format_type_string(base_type)}]"
 
         # Fields explicitly marked optional in the proto are, of course, optional!
         elif field.proto3_optional:
-            return f"{typing_prefix}Optional[{base_type}]"
+            return f"{typing_prefix}Optional[{format_type_string(base_type)}]"
 
         # Fields in a oneof group are also optional
         # If no oneof group is set, oneof_index will have default value of 0
         # To check if this field is really set, use HasField()
         elif field.HasField('oneof_index'):
-            return f"{typing_prefix}Optional[{base_type}]"
+            return f"{typing_prefix}Optional[{format_type_string(base_type)}]"
 
         # Everything else should be either a (non-optional) message, an enum or a primitive
         else:
-            return base_type
+            return format_type_string(base_type)
 
     def python_base_type(self, package: str, field: pb_desc.FieldDescriptorProto, make_relative=False, alias=False):
 
