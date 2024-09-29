@@ -33,15 +33,15 @@ class DynamicSchemaInspection(trac.TracModel):
         source_data_schema = trac.define_output_table(
             trac.F("column_name", trac.STRING, label="Column name"),
             trac.F("column_type", trac.STRING, label="TRAC column type"),
-            trac.F("contains_nulls", trac.BOOLEAN, label="Source data contains nulls"),
+            trac.F("contains_nulls", trac.BOOLEAN, label="Whether the source column contains nulls"),
             label="Schema information for the source dataset")
 
         return { "source_data_schema": source_data_schema }
 
     def run_model(self, ctx: trac.TracContext):
 
-        source_schema = ctx.get_schema("source_data")       # TRAC schema for the source data
         source_data = ctx.get_pandas_table("source_data")   # Source data as a regular dataframe
+        source_schema = ctx.get_schema("source_data")       # TRAC schema for the source data
 
         # Get the column names and types discovered by TRAC
         columns = source_schema.table.fields
