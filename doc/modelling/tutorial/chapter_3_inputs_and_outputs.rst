@@ -7,6 +7,7 @@ This tutorial is based on example code which can be found in the
 `TRAC GitHub Repository <https://github.com/finos/tracdap>`_
 under *examples/models/python*.
 
+
 Optional Inputs & Outputs
 -------------------------
 
@@ -59,4 +60,110 @@ produced then it is subject to all the same validation rules as any other datase
 
 .. seealso::
     Full source code is available for the
-    `Optional IO example on GitHub <https://github.com/finos/tracdap/tree/main/examples/models/python/src/tutorial/schema_files.py>`_
+    `Optional IO example on GitHub <https://github.com/finos/tracdap/tree/main/examples/models/python/src/tutorial/optional_io.py>`_
+
+
+Dynamic Inputs & Outputs
+------------------------
+
+Dynamic inputs and outputs allow a model to work with data when the schema is not known
+in advance. This can be useful for working with data from upstream systems or to write
+models that can perform generic tasks such as filtering or data quality reports.
+
+Here are a few examples to demonstrate this capability.
+
+
+Schema Inspection
+^^^^^^^^^^^^^^^^^
+
+This is a very simple example to get some information about the schema of an unknown dataset.
+TRAC records schema information when data is imported, so in practice you don't need to write
+a model
+
+.. literalinclude:: ../../../examples/models/python/src/tutorial/dynamic_io.py
+    :caption: src/tutorial/dynamic_io.py
+    :language: python
+    :name: dynamic_io_schema_inspection_1
+    :lines: 21 - 39
+    :linenos:
+    :lineno-start: 21
+
+The source data is defined as a dynamic input. Notice that there are no fields in the
+schema definition - dynamic inputs or outputs cannot define any fields, doing so will
+result in a validation error.
+
+Since we know what data we want to collect about the incoming dataset, the output schema
+can be defined as normal. This is a common pattern for inspecting generalised data - the
+source schema will be dynamic but the expected output is known.
+
+Now let's see how to use these datasets in the model.
+
+.. literalinclude:: ../../../examples/models/python/src/tutorial/dynamic_io.py
+    :language: python
+    :name: dynamic_io_schema_inspection_2
+    :lines: 41 - 60
+    :linenos:
+    :lineno-start: 41
+
+Configuration (TODO):
+
+.. literalinclude:: ../../../examples/models/python/config/dynamic_io.yaml
+    :caption: config/dynamic_io.yaml
+    :language: yaml
+    :name: dynamic_io_schema_inspection_config
+    :linenos:
+
+
+
+Data Generation
+^^^^^^^^^^^^^^^
+
+TODO
+
+.. literalinclude:: ../../../examples/models/python/src/tutorial/dynamic_io.py
+    :language: python
+    :name: dynamic_io_data_generation_1
+    :lines: 63 - 80
+    :linenos:
+    :lineno-start: 63
+
+TODO
+
+.. literalinclude:: ../../../examples/models/python/src/tutorial/dynamic_io.py
+    :language: python
+    :name: dynamic_io_data_generation_2
+    :lines: 82 - 100
+    :linenos:
+    :lineno-start: 82
+
+TODO
+
+
+Dynamic Filtering
+^^^^^^^^^^^^^^^^^
+
+TODO
+
+.. literalinclude:: ../../../examples/models/python/src/tutorial/dynamic_io.py
+    :language: python
+    :name: dynamic_io_dynamic_filtering_1
+    :lines: 103 - 117
+    :linenos:
+    :lineno-start: 63
+
+TODO
+
+.. literalinclude:: ../../../examples/models/python/src/tutorial/dynamic_io.py
+    :language: python
+    :name: dynamic_io_dynamic_filtering_2
+    :lines: 119 - 130
+    :linenos:
+    :lineno-start: 130
+
+TODO
+
+
+
+.. seealso::
+    Full source code is available for the
+    `Dynamic IO examples on GitHub <https://github.com/finos/tracdap/tree/main/examples/models/python/src/tutorial/dynamic_io.py>`_

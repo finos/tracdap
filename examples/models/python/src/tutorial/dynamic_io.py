@@ -114,14 +114,7 @@ class DynamicDataFilter(trac.TracModel):
 
     def define_outputs(self) -> tp.Dict[str, trac.ModelOutputSchema]:
 
-        filtered_schema = trac.SchemaDefinition(
-            schemaType=trac.SchemaType.TABLE)
-
-        filtered_output = trac.ModelOutputSchema(
-            schema=filtered_schema, dynamic=True,
-            label="Filtered (output) data")
-
-        return { "filtered_data": filtered_output }
+        return { "filtered_data": trac.define_output_table(dynamic=True, label="Filtered (output) data") }
 
     def run_model(self, ctx: trac.TracContext):
 
