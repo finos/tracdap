@@ -167,9 +167,13 @@ class TracContextImpl(_api.TracContext):
 
         _val.validate_signature(self.get_schema, dataset_name, schema)
 
+        # Copy the schema - schema cannot be changed in model code after put_schema
+        # If field ordering is not assigned by the model, assign it here (model code will not see the numbers)
+        schema_copy = self.__assign_field_order(copy.deepcopy(schema))
+
         self.__val.check_dataset_valid_identifier(dataset_name)
         self.__val.check_dataset_is_dynamic_output(dataset_name)
-        self.__val.check_provided_schema_is_valid(dataset_name, schema)
+        self.__val.check_provided_schema_is_valid(dataset_name, schema_copy)
 
         data_view = self.__local_ctx.get(dataset_name)
 
@@ -179,7 +183,7 @@ class TracContextImpl(_api.TracContext):
             self.__val.check_dataset_schema_not_defined(dataset_name, data_view)
             self.__val.check_dataset_is_empty(dataset_name, data_view)
 
-        updated_view = _data.DataView.for_trac_schema(schema)
+        updated_view = _data.DataView.for_trac_schema(schema_copy)
         self.__local_ctx[dataset_name] = updated_view
 
     def put_pandas_table(self, dataset_name: str, dataset: pd.DataFrame):
@@ -209,6 +213,8 @@ class TracContextImpl(_api.TracContext):
         elif data_view is not None:
             schema = data_view.arrow_schema
         else:
+            # No schema available - this validator will raise an error
+            self.__val.check_dataset_schema_defined(dataset_name, data_view)
             schema = None
 
         # Since validation passed, either data_view has a valid schema or static_schema is not None
@@ -243,6 +249,18 @@ class TracContextImpl(_api.TracContext):
             return output_schema.schema
 
         return None
+
+    @staticmethod
+    def __assign_field_order(schema_def: _meta.SchemaDefinition):
+
+        if schema_def is None or schema_def.table is None or schema_def.table.fields is None:
+            return schema_def
+
+        if all(map(lambda f: f.fieldOrder is None, schema_def.table.fields)):
+            for index, field in enumerate(schema_def.table.fields):
+                field.fieldOrder = index
+
+        return schema_def
 
 
 class TracContextValidator:
@@ -330,14 +348,14 @@ class TracContextValidator:
 
     def check_dataset_schema_defined(self, dataset_name: str, data_view: _data.DataView):
 
-        schema = data_view.trac_schema
+        schema = data_view.trac_schema if data_view is not None else None
 
         if schema is None or schema.table is None or not schema.table.fields:
             self._report_error(f"Schema not defined for dataset {dataset_name} in the current context")
 
     def check_dataset_schema_not_defined(self, dataset_name: str, data_view: _data.DataView):
 
-        schema = data_view.trac_schema
+        schema = data_view.trac_schema if data_view is not None else None
 
         if schema is not None and (schema.table or schema.schemaType != _meta.SchemaType.SCHEMA_TYPE_NOT_SET):
             self._report_error(f"Schema already defined for dataset {dataset_name} in the current context")
