@@ -69,10 +69,8 @@ Dynamic Inputs & Outputs
 Dynamic inputs and outputs allow a model to work with data when the schema is not known
 in advance. This allows one model to work with a wide range of data inputs, which can be
 very useful if you have common requirements that need to be satisfied across a large data
-estate. Common examples include scenario generation, post-processing outputs, model
+estate. Common examples include scenario generation, post-processing of model outputs, model
 monitoring and data quality reporting.
-
-These examples include.... TODO
 
 .. tip::
 
@@ -92,8 +90,8 @@ Schema Inspection
 ^^^^^^^^^^^^^^^^^
 
 This example use a dynamic input to get some information about the schema of an unknown dataset.
-You could use this approach to build common reports for a large collection of datasets, because
-the same model can run on ..... TODO
+This approach allows for building common reports that can run on a large collection of datasets
+with varied schemas.
 
 .. note::
     The TRAC metadata store already holds an entry for every dataset on the platform,
