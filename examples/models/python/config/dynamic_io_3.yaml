@@ -1,0 +1,12 @@
+job:
+  runModel:
+
+    parameters:
+      filter_column: region
+      filter_value: ulster
+
+    inputs:
+      original_data: "inputs/loan_final313_100.parquet"
+
+    outputs:
+      filtered_data: "outputs/dynamic_io/filtered_data.csv"

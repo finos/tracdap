@@ -417,7 +417,7 @@ public class RunModelTest {
                 .setLanguage("python")
                 .setRepository(useTracRepo())
                 .setPath("examples/models/python/src")
-                .setEntryPoint("tutorial.dynamic_io.DynamicIOModel")
+                .setEntryPoint("tutorial.dynamic_io.DynamicDataFilter")
                 .setVersion(modelVersion)
                 .build();
 
@@ -436,7 +436,7 @@ public class RunModelTest {
         var modelAttr = modelTag.getAttrsOrThrow("e2e_test_model");
 
         Assertions.assertEquals("run_model:dynamic_io", MetadataCodec.decodeStringValue(modelAttr));
-        Assertions.assertEquals("tutorial.dynamic_io.DynamicIOModel", modelDef.getEntryPoint());
+        Assertions.assertEquals("tutorial.dynamic_io.DynamicDataFilter", modelDef.getEntryPoint());
         Assertions.assertTrue(modelDef.getInputsMap().containsKey("original_data"));
         Assertions.assertTrue(modelDef.getOutputsMap().containsKey("filtered_data"));
 

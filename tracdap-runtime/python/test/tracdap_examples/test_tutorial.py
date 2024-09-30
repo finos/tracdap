@@ -97,12 +97,34 @@ class TutorialModelsTest(unittest.TestCase):
 
         # First invocation does not supply the optional input
 
-        from tutorial.dynamic_io import DynamicIOModel  # noqa
+        from tutorial.dynamic_io import DynamicSchemaInspection  # noqa
 
         job_config = self.examples_root.joinpath("config/dynamic_io.yaml")
         sys_config = self.examples_root.joinpath("config/sys_config.yaml")
 
-        launch.launch_model(DynamicIOModel, job_config, sys_config)
+        launch.launch_model(DynamicSchemaInspection, job_config, sys_config)
+
+    def test_dynamic_io_2(self):
+
+        # First invocation does not supply the optional input
+
+        from tutorial.dynamic_io import DynamicGenerator  # noqa
+
+        job_config = self.examples_root.joinpath("config/dynamic_io_2.yaml")
+        sys_config = self.examples_root.joinpath("config/sys_config.yaml")
+
+        launch.launch_model(DynamicGenerator, job_config, sys_config)
+
+    def test_dynamic_io_3(self):
+
+        # First invocation does not supply the optional input
+
+        from tutorial.dynamic_io import DynamicDataFilter  # noqa
+
+        job_config = self.examples_root.joinpath("config/dynamic_io_3.yaml")
+        sys_config = self.examples_root.joinpath("config/sys_config.yaml")
+
+        launch.launch_model(DynamicDataFilter, job_config, sys_config)
 
     def test_chaining(self):
 

@@ -75,16 +75,20 @@ class DataView:
     parts: tp.Dict[DataPartKey, tp.List[DataItem]]
 
     @staticmethod
+    def create_empty() -> DataView:
+        return DataView(_meta.SchemaDefinition(), pa.schema([]), dict())
+
+    @staticmethod
     def for_trac_schema(trac_schema: _meta.SchemaDefinition):
         arrow_schema = DataMapping.trac_to_arrow_schema(trac_schema)
         return DataView(trac_schema, arrow_schema, dict())
 
+    def with_trac_schema(self, trac_schema: _meta.SchemaDefinition):
+        arrow_schema = DataMapping.trac_to_arrow_schema(trac_schema)
+        return DataView(trac_schema, arrow_schema, self.parts)
+
     def is_empty(self) -> bool:
         return self.parts is None or not any(self.parts.values())
-
-    @staticmethod
-    def create_empty() -> DataView:
-        return DataView(_meta.SchemaDefinition(), pa.schema([]), dict())
 
 
 class _DataInternal:

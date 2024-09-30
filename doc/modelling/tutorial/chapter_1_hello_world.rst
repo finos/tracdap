@@ -266,4 +266,4 @@ Now you should be able to run your model script and see the model output in the 
 
 .. seealso::
     Full source code is available for the
-    `Hello World example on GitHub <https://github.com/finos/tracdap/tree/main/examples/models/python/src/tutorial/schema_files.py>`_
+    `Hello World example on GitHub <https://github.com/finos/tracdap/tree/main/examples/models/python/src/tutorial/hello_world.py>`_

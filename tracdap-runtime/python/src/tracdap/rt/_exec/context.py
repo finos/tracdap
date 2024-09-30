@@ -114,18 +114,16 @@ class TracContextImpl(_api.TracContext):
         self.__val.check_dataset_defined_in_model(dataset_name)
         self.__val.check_dataset_available_in_context(dataset_name)
 
+        static_schema = self.__get_static_schema(self.__model_def, dataset_name)
+        data_view: _data.DataView = self.__local_ctx.get(dataset_name)
+
         # Check the data view has a well-defined schema even if a static schema exists in the model
         # This ensures errors are always reported and is consistent with get_pandas_table()
-
-        data_view: _data.DataView = self.__local_ctx.get(dataset_name)
 
         self.__val.check_context_object_type(dataset_name, data_view, _data.DataView)
         self.__val.check_dataset_schema_defined(dataset_name, data_view)
 
         # If a static schema exists, that takes priority
-
-        static_schema = self.__get_static_schema(self.__model_def, dataset_name)
-
         # Return deep copies, do not allow model code to change schemas provided by the engine
 
         if static_schema is not None:
@@ -141,6 +139,7 @@ class TracContextImpl(_api.TracContext):
         self.__val.check_dataset_defined_in_model(dataset_name)
         self.__val.check_dataset_available_in_context(dataset_name)
 
+        static_schema = self.__get_static_schema(self.__model_def, dataset_name)
         data_view = self.__local_ctx.get(dataset_name)
         part_key = _data.DataPartKey.for_root()
 
@@ -150,8 +149,6 @@ class TracContextImpl(_api.TracContext):
 
         # If the model defines a static input schema, use that for schema conformance
         # Otherwise, take what is in the incoming dataset (schema is dynamic)
-
-        static_schema = self.__get_static_schema(self.__model_def, dataset_name)
 
         if static_schema is not None:
             schema = _data.DataMapping.trac_to_arrow_schema(static_schema)
@@ -167,19 +164,30 @@ class TracContextImpl(_api.TracContext):
 
         _val.validate_signature(self.get_schema, dataset_name, schema)
 
+        # Copy the schema - schema cannot be changed in model code after put_schema
+        # If field ordering is not assigned by the model, assign it here (model code will not see the numbers)
+        schema_copy = self.__assign_field_order(copy.deepcopy(schema))
+
         self.__val.check_dataset_valid_identifier(dataset_name)
         self.__val.check_dataset_is_dynamic_output(dataset_name)
-        self.__val.check_provided_schema_is_valid(dataset_name, schema)
+        self.__val.check_provided_schema_is_valid(dataset_name, schema_copy)
 
+        static_schema = self.__get_static_schema(self.__model_def, dataset_name)
         data_view = self.__local_ctx.get(dataset_name)
 
-        # If there is a prior view it must contain nothing and will be replaced
-        if data_view is not None:
-            self.__val.check_context_object_type(dataset_name, data_view, _data.DataView)
-            self.__val.check_dataset_schema_not_defined(dataset_name, data_view)
-            self.__val.check_dataset_is_empty(dataset_name, data_view)
+        if data_view is None:
+            if static_schema is not None:
+                data_view = _data.DataView.for_trac_schema(static_schema)
+            else:
+                data_view = _data.DataView.create_empty()
 
-        updated_view = _data.DataView.for_trac_schema(schema)
+        # If there is a prior view it must contain nothing and will be replaced
+        self.__val.check_context_object_type(dataset_name, data_view, _data.DataView)
+        self.__val.check_dataset_schema_not_defined(dataset_name, data_view)
+        self.__val.check_dataset_is_empty(dataset_name, data_view)
+
+        updated_view = data_view.with_trac_schema(schema_copy)
+
         self.__local_ctx[dataset_name] = updated_view
 
     def put_pandas_table(self, dataset_name: str, dataset: pd.DataFrame):
@@ -190,31 +198,26 @@ class TracContextImpl(_api.TracContext):
         self.__val.check_dataset_is_model_output(dataset_name)
         self.__val.check_provided_dataset_type(dataset, pd.DataFrame)
 
+        static_schema = self.__get_static_schema(self.__model_def, dataset_name)
         data_view = self.__local_ctx.get(dataset_name)
         part_key = _data.DataPartKey.for_root()
 
-        if data_view is not None:
-            self.__val.check_context_object_type(dataset_name, data_view, _data.DataView)
-            self.__val.check_dataset_schema_defined(dataset_name, data_view)
-            self.__val.check_dataset_part_not_present(dataset_name, data_view, part_key)
+        if data_view is None:
+            if static_schema is not None:
+                data_view = _data.DataView.for_trac_schema(static_schema)
+            else:
+                data_view = _data.DataView.create_empty()
 
-        # If the model defines a static output schema, use that for schema conformance
-        # Otherwise, use the schema in the data view for this output (which could be a dynamic schema)
-        # A dataset cannot be saved if no schema is available (put_schema() must be called first)
+        self.__val.check_context_object_type(dataset_name, data_view, _data.DataView)
+        self.__val.check_dataset_schema_defined(dataset_name, data_view)
+        self.__val.check_dataset_part_not_present(dataset_name, data_view, part_key)
 
-        static_schema = self.__get_static_schema(self.__model_def, dataset_name)
+        # Prefer static schemas for data conformance
 
         if static_schema is not None:
             schema = _data.DataMapping.trac_to_arrow_schema(static_schema)
-        elif data_view is not None:
-            schema = data_view.arrow_schema
         else:
-            schema = None
-
-        # Since validation passed, either data_view has a valid schema or static_schema is not None
-
-        if data_view is None:
-            data_view = _data.DataView.for_trac_schema(static_schema)
+            schema = data_view.arrow_schema
 
         # Data conformance is applied inside these conversion functions
 
@@ -243,6 +246,18 @@ class TracContextImpl(_api.TracContext):
             return output_schema.schema
 
         return None
+
+    @staticmethod
+    def __assign_field_order(schema_def: _meta.SchemaDefinition):
+
+        if schema_def is None or schema_def.table is None or schema_def.table.fields is None:
+            return schema_def
+
+        if all(map(lambda f: f.fieldOrder is None, schema_def.table.fields)):
+            for index, field in enumerate(schema_def.table.fields):
+                field.fieldOrder = index
+
+        return schema_def
 
 
 class TracContextValidator:
@@ -330,14 +345,14 @@ class TracContextValidator:
 
     def check_dataset_schema_defined(self, dataset_name: str, data_view: _data.DataView):
 
-        schema = data_view.trac_schema
+        schema = data_view.trac_schema if data_view is not None else None
 
         if schema is None or schema.table is None or not schema.table.fields:
             self._report_error(f"Schema not defined for dataset {dataset_name} in the current context")
 
     def check_dataset_schema_not_defined(self, dataset_name: str, data_view: _data.DataView):
 
-        schema = data_view.trac_schema
+        schema = data_view.trac_schema if data_view is not None else None
 
         if schema is not None and (schema.table or schema.schemaType != _meta.SchemaType.SCHEMA_TYPE_NOT_SET):
             self._report_error(f"Schema already defined for dataset {dataset_name} in the current context")

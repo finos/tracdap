@@ -5,7 +5,7 @@ job:
     flow: ./chaining_flow_2.yaml
 
     models:
-      dynamic_filter: tutorial.dynamic_io.DynamicIOModel
+      dynamic_filter: tutorial.dynamic_io.DynamicDataFilter
       pnl_aggregation: tutorial.optional_io.OptionalIOModel
 
     parameters:

@@ -567,7 +567,7 @@ public class RunFlowTest {
         var modelsPath = "examples/models/python/src";
         var modelsVersion = "main";
 
-        var model1EntryPoint = "tutorial.dynamic_io.DynamicIOModel";
+        var model1EntryPoint = "tutorial.dynamic_io.DynamicDataFilter";
         var model1Attrs = List.of(TagUpdate.newBuilder()
                 .setAttrName("e2e_test_model")
                 .setValue(MetadataCodec.encodeValue("run_flow:chaining:dynamic_io"))
