@@ -197,30 +197,27 @@ class TracContextImpl(_api.TracContext):
         data_view = self.__local_ctx.get(dataset_name)
         part_key = _data.DataPartKey.for_root()
 
+        static_schema = self.__get_static_schema(self.__model_def, dataset_name)
+
         if data_view is not None:
             self.__val.check_context_object_type(dataset_name, data_view, _data.DataView)
             self.__val.check_dataset_schema_defined(dataset_name, data_view)
             self.__val.check_dataset_part_not_present(dataset_name, data_view, part_key)
 
-        # If the model defines a static output schema, use that for schema conformance
-        # Otherwise, use the schema in the data view for this output (which could be a dynamic schema)
-        # A dataset cannot be saved if no schema is available (put_schema() must be called first)
+        else:
+            if static_schema is not None:
+                data_view = _data.DataView.for_trac_schema(static_schema)
+            else:
+                data_view = _data.DataView.create_empty()
+            # Fail validation for dynamic outputs if put_schema() has not been called
+            self.__val.check_dataset_schema_defined(dataset_name, data_view)
 
-        static_schema = self.__get_static_schema(self.__model_def, dataset_name)
+        # Prefer static schemas for data conformance
 
         if static_schema is not None:
             schema = _data.DataMapping.trac_to_arrow_schema(static_schema)
-        elif data_view is not None:
-            schema = data_view.arrow_schema
         else:
-            # No schema available - this validator will raise an error
-            self.__val.check_dataset_schema_defined(dataset_name, data_view)
-            schema = None
-
-        # Since validation passed, either data_view has a valid schema or static_schema is not None
-
-        if data_view is None:
-            data_view = _data.DataView.for_trac_schema(static_schema)
+            schema = data_view.arrow_schema
 
         # Data conformance is applied inside these conversion functions
 
