@@ -67,10 +67,23 @@ Dynamic Inputs & Outputs
 ------------------------
 
 Dynamic inputs and outputs allow a model to work with data when the schema is not known
-in advance. This can be useful for working with data from upstream systems or to write
-generic models for common tasks such as filtering a dataset or generating data quality reports.
+in advance. This allows one model to work with a wide range of data inputs, which can be
+very useful if you have common requirements that need to be satisfied across a large data
+estate. Common examples include scenario generation, post-processing outputs, model
+monitoring and data quality reporting.
 
-Here are a few examples to demonstrate this capability.
+.. tip::
+
+    Only use dynamic schemas when they are really needed. Static schemas are more robust and
+    allow the platform to make several optimisations that are not possible with dynamic schemas.
+
+.. admonition:: Good to know
+
+    TRAC normally performs schema validation before a job is executed, to make sure the models
+    and data are compatible. When models are defined with dynamic schemas validation is delayed
+    until runtime. This means validation errors will be reported when the job executes, rather
+    than before it starts. For jobs with a mix of static and dynamic schemas TRAC will still
+    validate the static schemas up front, validation is only delayed for the dynamic schemas.
 
 
 Schema Inspection
@@ -214,7 +227,12 @@ Once the schema is set the output can be saved as normal and TRAC will validate 
 Dynamic Filtering
 ^^^^^^^^^^^^^^^^^
 
-TODO
+Lastly, let's see how to use dynamic schemas to create a generic data filtering model. This model
+will exclude records from a dataset, based on some filter criteria passed in as parameters. There
+might be a lot of datasets we want to filter in this way, all with different schemas and we want a
+single filtering model that will work for all of them.
+
+Let's see an example model definition that can help us do that:
 
 .. literalinclude:: ../../../examples/models/python/src/tutorial/dynamic_io.py
     :language: python
@@ -223,7 +241,8 @@ TODO
     :linenos:
     :lineno-start: 63
 
-TODO
+Here both the input and the output are dynamic, and the model is controlled only by the two filter
+parameters. Now let's see the implementation:
 
 .. literalinclude:: ../../../examples/models/python/src/tutorial/dynamic_io.py
     :language: python
@@ -232,8 +251,8 @@ TODO
     :linenos:
     :lineno-start: 130
 
-TODO
-
+The original input schema is used directly as the output schema, so the schema of the input
+and output will be the same.
 
 
 .. seealso::
