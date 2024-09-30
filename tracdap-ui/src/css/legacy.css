@@ -1,0 +1,61 @@
+:root {
+
+    --top-menu-text: #2b2b2b;
+    --top-menu-background: #fff;
+
+    /*The application uses different theme colours that are defined in the config. These colours are used throughout*/
+    /*the css below. However we define some defaults here. */
+    --primary-text: #c8c8c8;
+    --secondary-text: #8d8d93;
+    --tertiary-text: #47474a;
+    --quaternary-text: #2a2a2c;
+    --primary-background: #050505;
+    --secondary-background: #1c1c1e;
+    --tertiary-background: #1c1c1e;
+    --quaternary-background: #2a2a2c;
+    --danger: #dc3545;
+    /*The alert success color*/
+    --success: #155724;
+    --info: #17a2b8;
+    --info-dark: "#117a8b";
+    --info-light: "#31d2f2";
+    /*Links are the info alert bootstrap colors*/
+    /*#117a8b #0dcaf0 #31d2f2 #25cff2*/
+    --link-color: #117a8b;
+    --link-hover-color: #055160;
+
+    --primary-text: #000;
+    --secondary-text: #919195;
+    --tertiary-text: #C0C0C2;
+    --quaternary-text: #dcdcdd;
+    --primary-background: #fff;
+    --secondary-background: #F1F1F1;
+    --tertiary-background: #ced4da;
+    --quaternary-background: #9CA5A8;
+    --danger: #dc3545;
+    /*The alert success color*/
+    --success: #155724;
+
+    --table-striped-bg: #fafafa;
+    --border-color: #e6eaee;
+}
+
+.highcharts-model-box, .highcharts-data-box {
+    cursor: pointer;
+}
+
+.highcharts-data-box:hover > rect {
+    fill: var(--info-dark);
+}
+
+.highcharts-model-box:hover > rect {
+    fill: var(--primary-text);
+}
+
+/*box-shadow: 0 20px 25px -15px rgba(0, 0, 0, 0.7);*/
+.highcharts-model-box .selected, .highcharts-data-box .selected {
+    -webkit-filter: drop-shadow(0 0 3px rgba(0, 0, 0, 0.7));
+    filter: drop-shadow(0 0 3px rgba(0, 0, 0, 0.7));
+    /* Similar syntax to box-shadow */
+
+}
