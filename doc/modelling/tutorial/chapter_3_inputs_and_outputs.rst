@@ -163,7 +163,11 @@ the model will tell you about its schema.
 Data Generation
 ^^^^^^^^^^^^^^^
 
-TODO
+Another use for dynamic schemas is to generate datasets based on some criteria. In this example
+the model receives one input which is a list of columns, and produces a output dataset which contains
+those columns. Depending on the input that is supplied, the schema of the output will be different.
+
+Let's see how to define this model:
 
 .. literalinclude:: ../../../examples/models/python/src/tutorial/dynamic_io.py
     :language: python
@@ -172,7 +176,10 @@ TODO
     :linenos:
     :lineno-start: 63
 
-TODO
+In real life more parameters would often be needed to control the generated data, e.g. range limits
+or distribution parameters, but for this simple example those are not needed.
+
+Now let's look at the model code:
 
 .. literalinclude:: ../../../examples/models/python/src/tutorial/dynamic_io.py
     :language: python
@@ -181,8 +188,28 @@ TODO
     :linenos:
     :lineno-start: 82
 
-TODO
+The model creates a :py:class:`SchemaDefinition <tracdap.rt.metadata.SchemaDefinition>` and adds a
+:py:class:`FieldSchema <tracdap.rt.metadata.FieldSchema>` for each column. The same helper functions
+that are available for defining static schemas can be used to build dynamic schemas, in this example
+we use :py:func:`trac.F() <tracdap.rt.api.F>` to define each field. You can also load schemas from
+schema files using :py:func:`load_schema() <tracdap.rt.api.load_schema>`, then make changes to those
+schemas in code and use the result as your dynamic output schema.
 
+The model creates a data dictionary with some generated values for each column, so the output dataset
+will match the generated schema. Before saving the dataset, the model calls
+:py:meth:`put_schema() <tracdap.rt.api.TracContext.put_schema>` which sets the schema for a dynamic
+output. Trying to save a dynamic output before its schema is set will cause a runtime validation error.
+Only dynamic outputs can have their schema set in this way and each schema can only be set once.
+If the model is updating an existing dataset, the schema must be compatible. The schema will be validated
+as part of the call to :py:meth:`put_schema() <tracdap.rt.api.TracContext.put_schema>`.
+
+.. note::
+    Calling :py:meth:`put_schema() <tracdap.rt.api.TracContext.put_schema>` creates a copy of
+    the TRAC schema object. Any changes made to the schema after it is saved will noo be picked
+    up by TRAC. Calling :py:meth:`get_schema() <tracdap.rt.api.TracContext.get_schema>` after
+    a schema has been set will always return the schema as it was saved.
+
+Once the schema is set the output can be saved as normal and TRAC will validate against the new schema.
 
 Dynamic Filtering
 ^^^^^^^^^^^^^^^^^
