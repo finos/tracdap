@@ -72,6 +72,8 @@ very useful if you have common requirements that need to be satisfied across a l
 estate. Common examples include scenario generation, post-processing outputs, model
 monitoring and data quality reporting.
 
+These examples include.... TODO
+
 .. tip::
 
     Only use dynamic schemas when they are really needed. Static schemas are more robust and
@@ -91,7 +93,7 @@ Schema Inspection
 
 This example use a dynamic input to get some information about the schema of an unknown dataset.
 You could use this approach to build common reports for a large collection of datasets, because
-the same model can run on .....
+the same model can run on ..... TODO
 
 .. note::
     The TRAC metadata store already holds an entry for every dataset on the platform,
