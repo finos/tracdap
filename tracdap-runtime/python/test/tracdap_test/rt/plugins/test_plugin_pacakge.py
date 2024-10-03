@@ -120,3 +120,11 @@ class ConfigParserTest(unittest.TestCase):
         launch.launch_job(
             "test-ext:sys_config_HuX-7", "test-ext:sys_config_HuX-7",
             dev_mode=True, plugin_package="tracdap_test.rt.plugins.test_ext")
+
+    def test_launch_cli(self):
+
+        launch.launch.launch_cli([
+            "--sys-config", "test-ext:sys_config_HuX-7",
+            "--job-config", "test-ext_2:job_config_B1-9",
+            "--plugin-package", "tracdap_test.rt.plugins.test_ext",
+            "--dev-mode"])
