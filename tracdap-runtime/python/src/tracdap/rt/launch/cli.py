@@ -16,7 +16,7 @@ import argparse
 import pathlib
 
 
-def _cli_args():
+def _cli_args(programmatic_args = None):
 
     parser = argparse.ArgumentParser(
         prog="python -m tracdap.rt.launch",
@@ -55,4 +55,7 @@ def _cli_args():
         "--plugin-package", dest="plugin_packages", type=str, action="append",
         help="Do not clean up the scratch location on exit")
 
-    return parser.parse_args()
+    if programmatic_args:
+        return parser.parse_args(programmatic_args)
+    else:
+        return parser.parse_args()

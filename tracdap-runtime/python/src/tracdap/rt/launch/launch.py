@@ -136,13 +136,21 @@ def launch_job(
         rt.wait_for_job(job.jobId)
 
 
-def launch_cli():
+def launch_cli(programmatic_args: _tp.Optional[_tp.List[str]] = None):
 
     """
     Launch the TRAC runtime using the command line interface
+
+    CLI arguments are read from the process command line by default. To pass CLI args
+    explicitly, provide the list of arguments using the programmatic_args parameter.
+
+    :param programmatic_args: Optional parameter to pass CLI args explicitly in code
     """
 
-    launch_args = _cli_args()
+    if programmatic_args:
+        launch_args = _cli_args(programmatic_args)
+    else:
+        launch_args = _cli_args()
 
     _sys_config = _resolve_config_file(launch_args.sys_config, None)
 
