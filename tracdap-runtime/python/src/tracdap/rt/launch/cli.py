@@ -23,11 +23,11 @@ def _cli_args(programmatic_args = None):
         description="TRAC D.A.P. Runtime for Python")
 
     parser.add_argument(
-        "--sys-config", dest="sys_config", type=pathlib.Path, required=True,
+        "--sys-config", dest="sys_config", type=str, required=True,
         help="Path to the system configuration file for the TRAC runtime")
 
     parser.add_argument(
-        "--job-config", dest="job_config", type=pathlib.Path, required=True,
+        "--job-config", dest="job_config", type=str, required=True,
         help="Path to the job configuration for the job to be executed")
 
     parser.add_argument(
