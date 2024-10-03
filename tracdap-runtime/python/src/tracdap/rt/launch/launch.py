@@ -29,7 +29,15 @@ from .cli import _cli_args
 def _resolve_config_file(
         config_path: _tp.Union[str, _pathlib.Path],
         model_dir: _tp.Optional[_pathlib.Path] = None) \
-        -> _pathlib.Path:
+        -> _tp.Union[_pathlib.Path, str]:
+
+    # If the config path is a URL, do not convert it into a path
+    if isinstance(config_path, str):
+        scheme_sep = config_path.find(":")
+        # Single letter scheme is a Windows file path (C:\...)
+        scheme = scheme = config_path[:scheme_sep] if scheme_sep > 1 else "file"
+        if scheme != "file":
+            return config_path
 
     if _pathlib.Path(config_path).is_absolute():
         return config_path
