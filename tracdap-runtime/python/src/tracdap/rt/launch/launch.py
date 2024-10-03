@@ -29,7 +29,15 @@ from .cli import _cli_args
 def _resolve_config_file(
         config_path: _tp.Union[str, _pathlib.Path],
         model_dir: _tp.Optional[_pathlib.Path] = None) \
-        -> _pathlib.Path:
+        -> _tp.Union[_pathlib.Path, str]:
+
+    # If the config path is a URL, do not convert it into a path
+    if isinstance(config_path, str):
+        scheme_sep = config_path.find(":")
+        # Single letter scheme is a Windows file path (C:\...)
+        scheme = scheme = config_path[:scheme_sep] if scheme_sep > 1 else "file"
+        if scheme != "file":
+            return config_path
 
     if _pathlib.Path(config_path).is_absolute():
         return config_path
@@ -136,13 +144,21 @@ def launch_job(
         rt.wait_for_job(job.jobId)
 
 
-def launch_cli():
+def launch_cli(programmatic_args: _tp.Optional[_tp.List[str]] = None):
 
     """
     Launch the TRAC runtime using the command line interface
+
+    CLI arguments are read from the process command line by default. To pass CLI args
+    explicitly, provide the list of arguments using the programmatic_args parameter.
+
+    :param programmatic_args: Optional parameter to pass CLI args explicitly in code
     """
 
-    launch_args = _cli_args()
+    if programmatic_args:
+        launch_args = _cli_args(programmatic_args)
+    else:
+        launch_args = _cli_args()
 
     _sys_config = _resolve_config_file(launch_args.sys_config, None)
 

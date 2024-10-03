@@ -16,18 +16,18 @@ import argparse
 import pathlib
 
 
-def _cli_args():
+def _cli_args(programmatic_args = None):
 
     parser = argparse.ArgumentParser(
         prog="python -m tracdap.rt.launch",
         description="TRAC D.A.P. Runtime for Python")
 
     parser.add_argument(
-        "--sys-config", dest="sys_config", type=pathlib.Path, required=True,
+        "--sys-config", dest="sys_config", type=str, required=True,
         help="Path to the system configuration file for the TRAC runtime")
 
     parser.add_argument(
-        "--job-config", dest="job_config", type=pathlib.Path, required=True,
+        "--job-config", dest="job_config", type=str, required=True,
         help="Path to the job configuration for the job to be executed")
 
     parser.add_argument(
@@ -55,4 +55,7 @@ def _cli_args():
         "--plugin-package", dest="plugin_packages", type=str, action="append",
         help="Do not clean up the scratch location on exit")
 
-    return parser.parse_args()
+    if programmatic_args:
+        return parser.parse_args(programmatic_args)
+    else:
+        return parser.parse_args()
