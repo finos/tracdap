@@ -121,7 +121,7 @@ class ConfigParserTest(unittest.TestCase):
             ext_loader.TestExtModel, "test-ext:job_config_A1-6", "test-ext_2:sys_config_HuX-7",
             plugin_package="tracdap_test.rt.plugins.test_ext"))
 
-        self.assertRaises(ex.EStartup, lambda: launch.launch_model(
+        self.assertRaises(ex.EConfigLoad, lambda: launch.launch_model(
             ext_loader.TestExtModel, "test-ext_2:job_config_A1-6", "test-ext:sys_config_HuX-7",
             plugin_package="tracdap_test.rt.plugins.test_ext"))
 
@@ -131,7 +131,7 @@ class ConfigParserTest(unittest.TestCase):
             ext_loader.TestExtModel, "test-ext:job_config_A1-6", "test-ext:sys_config_unknown",
             plugin_package="tracdap_test.rt.plugins.test_ext"))
 
-        self.assertRaises(ex.EStartup, lambda: launch.launch_model(
+        self.assertRaises(ex.EConfigLoad, lambda: launch.launch_model(
             ext_loader.TestExtModel, "test-ext:job_config_unknown", "test-ext:sys_config_HuX-7",
             plugin_package="tracdap_test.rt.plugins.test_ext"))
 
@@ -147,7 +147,7 @@ class ConfigParserTest(unittest.TestCase):
             "test-ext:job_config_A1-6", "test-ext_2:sys_config_HuX-7",
             dev_mode=True, plugin_package="tracdap_test.rt.plugins.test_ext"))
 
-        self.assertRaises(ex.EStartup, lambda: launch.launch_job(
+        self.assertRaises(ex.EConfigLoad, lambda: launch.launch_job(
             "test-ext_2:job_config_A1-6", "test-ext:sys_config_HuX-7",
             dev_mode=True, plugin_package="tracdap_test.rt.plugins.test_ext"))
 
@@ -157,7 +157,7 @@ class ConfigParserTest(unittest.TestCase):
             "test-ext:job_config_A1-6", "test-ext:sys_config_unknown",
             dev_mode=True, plugin_package="tracdap_test.rt.plugins.test_ext"))
 
-        self.assertRaises(ex.EStartup, lambda: launch.launch_job(
+        self.assertRaises(ex.EConfigLoad, lambda: launch.launch_job(
             "test-ext:job_config_unknown", "test-ext:sys_config_HuX-7",
             dev_mode=True, plugin_package="tracdap_test.rt.plugins.test_ext"))
 
@@ -177,7 +177,7 @@ class ConfigParserTest(unittest.TestCase):
             "--plugin-package", "tracdap_test.rt.plugins.test_ext",
             "--dev-mode"]))
 
-        self.assertRaises(ex.EStartup, lambda: launch.launch.launch_cli([
+        self.assertRaises(ex.EConfigLoad, lambda: launch.launch.launch_cli([
             "--sys-config", "test-ext:sys_config_HuX-7",
             "--job-config", "test-ext_2:job_config_A1-6",
             "--plugin-package", "tracdap_test.rt.plugins.test_ext",
@@ -191,7 +191,7 @@ class ConfigParserTest(unittest.TestCase):
             "--plugin-package", "tracdap_test.rt.plugins.test_ext",
             "--dev-mode"]))
 
-        self.assertRaises(ex.EStartup, lambda: launch.launch.launch_cli([
+        self.assertRaises(ex.EConfigLoad, lambda: launch.launch.launch_cli([
             "--sys-config", "test-ext:sys_config_HuX-7",
             "--job-config", "test-ext:job_config_unknown",
             "--plugin-package", "tracdap_test.rt.plugins.test_ext",
