@@ -18,8 +18,11 @@ import subprocess as sp
 
 import tracdap.rt.config as cfg
 import tracdap.rt.exceptions as ex
+import tracdap.rt.launch as launch
 import tracdap.rt._exec.runtime as runtime
 import tracdap.rt._impl.util as util
+
+import tracdap_test.rt.plugins.test_ext.test_ext_config_loader as ext_loader
 
 
 class ConfigParserTest(unittest.TestCase):
@@ -105,3 +108,15 @@ class ConfigParserTest(unittest.TestCase):
 
         # Load a config object with the wrong protocol
         self.assertRaises(ex.EConfigLoad, lambda: trac_runtime.load_job_config("test-ext_2:job_config_B1-9"))
+
+    def test_launch_model(self):
+
+        launch.launch_model(
+            ext_loader.TestExtModel, "test-ext:sys_config_HuX-7", "test-ext:sys_config_HuX-7",
+            plugin_package="tracdap_test.rt.plugins.test_ext")
+
+    def test_launch_job(self):
+
+        launch.launch_job(
+            "test-ext:sys_config_HuX-7", "test-ext:sys_config_HuX-7",
+            dev_mode=True, plugin_package="tracdap_test.rt.plugins.test_ext")
