@@ -26,6 +26,7 @@ import "tracdap/metadata/object.proto";
 import "tracdap/metadata/tag.proto";
 import "tracdap/metadata/tag_update.proto";
 import "tracdap/metadata/search.proto";
+import "tracdap/metadata/resource.proto";
 
 import "google/api/annotations.proto";
 
@@ -113,6 +114,18 @@ service TracMetadataApi {
     rpc listTenants(ListTenantsRequest) returns (ListTenantsResponse) {
         option (google.api.http) = {
             get: "/trac/list-tenants"
+        };
+    }
+
+    rpc listResources(ListResourcesRequest) returns (ListResourcesResponse) {
+        option (google.api.http) = {
+            get: "/{tenant}/list-resources/{resourceType}"
+        };
+    }
+
+    rpc resourceInfo(ResourceInfoRequest) returns (ResourceInfoResponse) {
+        option (google.api.http) = {
+            get: "/{tenant}/resource-info/{resourceType}/{resourceKey}"
         };
     }
 
@@ -455,6 +468,33 @@ message ListTenantsResponse {
 
     /** A list of TenantInfo objects, one for each tenant the current user has access to. **/
     repeated metadata.TenantInfo tenants = 1;
+}
+
+
+message ListResourcesRequest {
+
+    string tenant = 1;
+    metadata.ResourceType resourceType = 2;
+}
+
+message ListResourcesResponse {
+
+    repeated ResourceInfoResponse resources = 1;
+}
+
+message ResourceInfoRequest {
+
+    string tenant = 1;
+    metadata.ResourceType resourceType = 2;
+    string resourceKey = 3;
+}
+
+message ResourceInfoResponse {
+
+    metadata.ResourceType resourceType = 1;
+    string resourceKey = 2;
+    string protocol = 3;
+    map<string, string> properties = 4;
 }
 
 
