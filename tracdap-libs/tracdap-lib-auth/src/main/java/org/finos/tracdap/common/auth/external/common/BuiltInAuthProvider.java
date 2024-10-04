@@ -19,7 +19,6 @@ package org.finos.tracdap.common.auth.external.common;
 import org.finos.tracdap.common.auth.external.*;
 import org.finos.tracdap.common.auth.internal.UserInfo;
 import org.finos.tracdap.common.config.ConfigManager;
-import org.finos.tracdap.common.exception.EResourceNotFound;
 import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.common.util.ResourceHelpers;
 
@@ -31,6 +30,7 @@ import org.slf4j.LoggerFactory;
 
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.util.MissingResourceException;
 import java.util.Properties;
 
 
@@ -195,7 +195,7 @@ public class BuiltInAuthProvider implements IAuthProvider {
 
             return AuthResult.OTHER_RESPONSE(response);
         }
-        catch (IllegalArgumentException | EResourceNotFound e) {
+        catch (IllegalArgumentException | MissingResourceException e) {
             return redirectToLogin(request);
         }
     }
