@@ -16,10 +16,15 @@
 
 package org.finos.tracdap.svc.meta.services;
 
+import org.finos.tracdap.api.ListResourcesResponse;
 import org.finos.tracdap.api.ListTenantsResponse;
 import org.finos.tracdap.api.PlatformInfoResponse;
+import org.finos.tracdap.api.ResourceInfoResponse;
+import org.finos.tracdap.common.exception.EResourceNotFound;
 import org.finos.tracdap.common.util.VersionInfo;
 import org.finos.tracdap.config.PlatformConfig;
+import org.finos.tracdap.config.PluginConfig;
+import org.finos.tracdap.metadata.ResourceType;
 import org.finos.tracdap.metadata.TagSelector;
 import org.finos.tracdap.metadata.ObjectType;
 import org.finos.tracdap.metadata.Tag;
@@ -72,6 +77,61 @@ public class MetadataReadService {
         return ListTenantsResponse.newBuilder()
             .addAllTenants(tenantInfoList)
             .build();
+    }
+
+    public ListResourcesResponse listResources(ResourceType resourceType) {
+
+        var response = ListResourcesResponse.newBuilder();
+
+        if (resourceType == ResourceType.STORAGE_RESOURCE) {
+            for (var storageEntry : config.getStorage().getBucketsMap().entrySet()) {
+                response.addResources(buildResourceInfo(resourceType, storageEntry.getKey(), storageEntry.getValue()));
+            }
+        }
+        else if (resourceType == ResourceType.MODEL_REPOSITORY) {
+            for (var repoEntry : config.getRepositoriesMap().entrySet()) {
+                response.addResources(buildResourceInfo(resourceType, repoEntry.getKey(), repoEntry.getValue()));
+            }
+        }
+        else {
+            throw new EResourceNotFound("Unknown resource type: " + resourceType);  // TODO: Error message
+        }
+
+        return response.build();
+    }
+
+    public ResourceInfoResponse resourceInfo(ResourceType resourceType, String resourceKey) {
+
+        PluginConfig pluginConfig;
+
+        if (resourceType == ResourceType.STORAGE_RESOURCE) {
+            if (!this.config.getStorage().containsBuckets(resourceKey))
+                throw new EResourceNotFound("");  // TODO: Error message
+            else
+                pluginConfig = this.config.getStorage().getBucketsOrThrow(resourceKey);
+        }
+        else if (resourceType == ResourceType.MODEL_REPOSITORY) {
+            if (!this.config.containsRepositories(resourceKey))
+                throw new EResourceNotFound("");  // TODO: Error message
+            else
+                pluginConfig = this.config.getRepositoriesOrThrow(resourceKey);
+        }
+        else {
+            throw new EResourceNotFound("");  // TODO: Error message
+        }
+
+        return buildResourceInfo(resourceType, resourceKey, pluginConfig).build();
+    }
+
+    private ResourceInfoResponse.Builder buildResourceInfo(
+            ResourceType resourceType, String resourceKey,
+            PluginConfig pluginConfig) {
+
+        return ResourceInfoResponse.newBuilder()
+                .setResourceType(resourceType)
+                .setResourceKey(resourceKey)
+                .setProtocol(pluginConfig.getProtocol())
+                .putAllProperties(pluginConfig.getPublicPropertiesMap());
     }
 
     public Tag readObject(String tenant, TagSelector selector) {

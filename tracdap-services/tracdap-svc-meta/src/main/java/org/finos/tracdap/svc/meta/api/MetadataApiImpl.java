@@ -77,6 +77,16 @@ public class MetadataApiImpl {
         return readService.listTenants();
     }
 
+    ListResourcesResponse listResources(ListResourcesRequest request) {
+
+        return readService.listResources(request.getResourceType());
+    }
+
+    ResourceInfoResponse resourceInfo(ResourceInfoRequest request) {
+
+        return readService.resourceInfo(request.getResourceType(), request.getResourceKey());
+    }
+
     TagHeader createObject(MetadataWriteRequest request) {
 
         validateRequest(CREATE_OBJECT_METHOD, request);
