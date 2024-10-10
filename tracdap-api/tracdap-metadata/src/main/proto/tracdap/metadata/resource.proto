@@ -24,13 +24,12 @@ import "tracdap/metadata/object_id.proto";
 import "tracdap/metadata/object.proto";
 
 
+
 enum ResourceType {
 
   RESOURCE_TYPE_NOT_SET = 0;
 
-  STORAGE_RESOURCE = 1;
+  MODEL_REPOSITORY = 1;
 
-  MODEL_REPOSITORY = 2;
-
-  EXECUTOR = 3;
+  INTERNAL_STORAGE = 2;
 }

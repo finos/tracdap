@@ -109,29 +109,6 @@ abstract class InfoAndResourcesTest {
     }
 
     @Test
-    void listResources_storage() {
-
-        var request = ListResourcesRequest.newBuilder()
-                .setTenant(TEST_TENANT)
-                .setResourceType(ResourceType.STORAGE_RESOURCE)
-                .build();
-
-        var response = readApi.listResources(request);
-        var storageResources = response.getResourcesList();
-
-        Assertions.assertEquals(2, storageResources.size());
-
-        var unitTestRepo = storageResources.stream()
-                .filter(resource -> resource.getResourceKey().equals("UNIT_TEST_STORAGE"))
-                .findFirst();
-
-        Assertions.assertTrue(unitTestRepo.isPresent());
-        Assertions.assertEquals(ResourceType.STORAGE_RESOURCE, unitTestRepo.get().getResourceType());
-        Assertions.assertEquals("LOCAL", unitTestRepo.get().getProtocol());
-        Assertions.assertEquals("storage_value_1", unitTestRepo.get().getPropertiesOrThrow("unit_test_property"));
-    }
-
-    @Test
     void listResources_repo() {
 
         var request = ListResourcesRequest.newBuilder()
@@ -155,11 +132,34 @@ abstract class InfoAndResourcesTest {
     }
 
     @Test
+    void listResources_internalStorage() {
+
+        var request = ListResourcesRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setResourceType(ResourceType.INTERNAL_STORAGE)
+                .build();
+
+        var response = readApi.listResources(request);
+        var storageResources = response.getResourcesList();
+
+        Assertions.assertEquals(2, storageResources.size());
+
+        var unitTestRepo = storageResources.stream()
+                .filter(resource -> resource.getResourceKey().equals("UNIT_TEST_STORAGE"))
+                .findFirst();
+
+        Assertions.assertTrue(unitTestRepo.isPresent());
+        Assertions.assertEquals(ResourceType.INTERNAL_STORAGE, unitTestRepo.get().getResourceType());
+        Assertions.assertEquals("LOCAL", unitTestRepo.get().getProtocol());
+        Assertions.assertEquals("storage_value_1", unitTestRepo.get().getPropertiesOrThrow("unit_test_property"));
+    }
+
+    @Test
     void listResources_unknownTenant() {
 
         var request = ListResourcesRequest.newBuilder()
                 .setTenant("UNKNOWN_TENANT")
-                .setResourceType(ResourceType.STORAGE_RESOURCE)
+                .setResourceType(ResourceType.MODEL_REPOSITORY)
                 .build();
 
         var e = Assertions.assertThrows(StatusRuntimeException.class, () -> readApi.listResources(request));
@@ -171,7 +171,7 @@ abstract class InfoAndResourcesTest {
 
         var request = ListResourcesRequest.newBuilder()
                 .setTenant("$$$INVALID")
-                .setResourceType(ResourceType.STORAGE_RESOURCE)
+                .setResourceType(ResourceType.MODEL_REPOSITORY)
                 .build();
 
         var e = Assertions.assertThrows(StatusRuntimeException.class, () -> readApi.listResources(request));
@@ -187,52 +187,6 @@ abstract class InfoAndResourcesTest {
                 .build();
 
         var e = Assertions.assertThrows(StatusRuntimeException.class, () -> readApi.listResources(request));
-        Assertions.assertEquals(Status.Code.INVALID_ARGUMENT, e.getStatus().getCode());
-    }
-
-    @Test
-    void getResource_storageOk() {
-
-        var request = ResourceInfoRequest.newBuilder()
-                .setTenant(TEST_TENANT)
-                .setResourceType(ResourceType.STORAGE_RESOURCE)
-                .setResourceKey("UNIT_TEST_STORAGE")
-                .build();
-
-        var response = readApi.resourceInfo(request);
-
-        Assertions.assertEquals(ResourceType.STORAGE_RESOURCE, response.getResourceType());
-        Assertions.assertEquals("UNIT_TEST_STORAGE", response.getResourceKey());
-        Assertions.assertEquals("LOCAL", response.getProtocol());
-        Assertions.assertTrue(response.containsProperties("unit_test_property"));
-        Assertions.assertTrue(response.containsProperties("unit-test.property"));
-        Assertions.assertEquals("storage_value_1", response.getPropertiesOrThrow("unit_test_property"));
-        Assertions.assertEquals("storage-value.1", response.getPropertiesOrThrow("unit-test.property"));
-    }
-
-    @Test
-    void getResource_storageUnknownKey() {
-
-        var request = ResourceInfoRequest.newBuilder()
-                .setTenant(TEST_TENANT)
-                .setResourceType(ResourceType.STORAGE_RESOURCE)
-                .setResourceKey("UNKNOWN_STORAGE")
-                .build();
-
-        var e = Assertions.assertThrows(StatusRuntimeException.class, () -> readApi.resourceInfo(request));
-        Assertions.assertEquals(Status.Code.NOT_FOUND, e.getStatus().getCode());
-    }
-
-    @Test
-    void getResource_storageInvalidKey() {
-
-        var request = ResourceInfoRequest.newBuilder()
-                .setTenant(TEST_TENANT)
-                .setResourceType(ResourceType.STORAGE_RESOURCE)
-                .setResourceKey("$$$-INVALID")
-                .build();
-
-        var e = Assertions.assertThrows(StatusRuntimeException.class, () -> readApi.resourceInfo(request));
         Assertions.assertEquals(Status.Code.INVALID_ARGUMENT, e.getStatus().getCode());
     }
 
@@ -275,6 +229,52 @@ abstract class InfoAndResourcesTest {
         var request = ResourceInfoRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setResourceType(ResourceType.MODEL_REPOSITORY)
+                .setResourceKey("$$$-INVALID")
+                .build();
+
+        var e = Assertions.assertThrows(StatusRuntimeException.class, () -> readApi.resourceInfo(request));
+        Assertions.assertEquals(Status.Code.INVALID_ARGUMENT, e.getStatus().getCode());
+    }
+
+    @Test
+    void getResource_internalStorageOk() {
+
+        var request = ResourceInfoRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setResourceType(ResourceType.INTERNAL_STORAGE)
+                .setResourceKey("UNIT_TEST_STORAGE")
+                .build();
+
+        var response = readApi.resourceInfo(request);
+
+        Assertions.assertEquals(ResourceType.INTERNAL_STORAGE, response.getResourceType());
+        Assertions.assertEquals("UNIT_TEST_STORAGE", response.getResourceKey());
+        Assertions.assertEquals("LOCAL", response.getProtocol());
+        Assertions.assertTrue(response.containsProperties("unit_test_property"));
+        Assertions.assertTrue(response.containsProperties("unit-test.property"));
+        Assertions.assertEquals("storage_value_1", response.getPropertiesOrThrow("unit_test_property"));
+        Assertions.assertEquals("storage-value.1", response.getPropertiesOrThrow("unit-test.property"));
+    }
+
+    @Test
+    void getResource_internalStorageUnknownKey() {
+
+        var request = ResourceInfoRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setResourceType(ResourceType.INTERNAL_STORAGE)
+                .setResourceKey("UNKNOWN_STORAGE")
+                .build();
+
+        var e = Assertions.assertThrows(StatusRuntimeException.class, () -> readApi.resourceInfo(request));
+        Assertions.assertEquals(Status.Code.NOT_FOUND, e.getStatus().getCode());
+    }
+
+    @Test
+    void getResource_internalStorageInvalidKey() {
+
+        var request = ResourceInfoRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setResourceType(ResourceType.INTERNAL_STORAGE)
                 .setResourceKey("$$$-INVALID")
                 .build();
 

@@ -91,14 +91,14 @@ public class MetadataReadService {
 
         var response = ListResourcesResponse.newBuilder();
 
-        if (resourceType == ResourceType.STORAGE_RESOURCE) {
-            for (var storageEntry : config.getStorage().getBucketsMap().entrySet()) {
-                response.addResources(buildResourceInfo(resourceType, storageEntry.getKey(), storageEntry.getValue()));
-            }
-        }
-        else if (resourceType == ResourceType.MODEL_REPOSITORY) {
+        if (resourceType == ResourceType.MODEL_REPOSITORY) {
             for (var repoEntry : config.getRepositoriesMap().entrySet()) {
                 response.addResources(buildResourceInfo(resourceType, repoEntry.getKey(), repoEntry.getValue()));
+            }
+        }
+        else if (resourceType == ResourceType.INTERNAL_STORAGE) {
+            for (var storageEntry : config.getStorage().getBucketsMap().entrySet()) {
+                response.addResources(buildResourceInfo(resourceType, storageEntry.getKey(), storageEntry.getValue()));
             }
         }
         else {
@@ -117,17 +117,7 @@ public class MetadataReadService {
 
         PluginConfig pluginConfig;
 
-        if (resourceType == ResourceType.STORAGE_RESOURCE) {
-
-            if (!this.config.getStorage().containsBuckets(resourceKey)) {
-                var message = String.format("Storage resource not found: [%s]", resourceKey);
-                log.error(message);
-                throw new EResourceNotFound(message);
-            }
-
-            pluginConfig = this.config.getStorage().getBucketsOrThrow(resourceKey);
-        }
-        else if (resourceType == ResourceType.MODEL_REPOSITORY) {
+        if (resourceType == ResourceType.MODEL_REPOSITORY) {
 
             if (!this.config.containsRepositories(resourceKey)){
                 var message = String.format("Model repository not found: [%s]", resourceKey);
@@ -136,6 +126,16 @@ public class MetadataReadService {
             }
 
             pluginConfig = this.config.getRepositoriesOrThrow(resourceKey);
+        }
+        else if (resourceType == ResourceType.INTERNAL_STORAGE) {
+
+            if (!this.config.getStorage().containsBuckets(resourceKey)) {
+                var message = String.format("Storage location not found: [%s]", resourceKey);
+                log.error(message);
+                throw new EResourceNotFound(message);
+            }
+
+            pluginConfig = this.config.getStorage().getBucketsOrThrow(resourceKey);
         }
         else {
 
