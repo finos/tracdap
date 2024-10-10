@@ -47,6 +47,27 @@ public class EventLoopRegister {
         elg.forEach(el -> el.submit(() -> registerEventLoop(el)));
     }
 
+    private void registerEventLoop(EventExecutor executor) {
+
+        if (executor instanceof EventLoop) {
+            var threadId = getThreadId(Thread.currentThread());
+            register.put(threadId, (EventLoop) executor);
+        }
+    }
+
+    private static long getThreadId(Thread thread) {
+
+        // Invoke the method that was found for GET_THREAD_ID
+        // Errors are not expected
+
+        try {
+            return (long) GET_THREAD_ID.invoke(thread);
+        }
+        catch (InvocationTargetException | IllegalAccessException e) {
+            throw new EUnexpected(e);
+        }
+    }
+
     @SuppressWarnings("all")
     private static Method getThreadIdMethod() {
 
@@ -81,19 +102,6 @@ public class EventLoopRegister {
         }
     }
 
-    private static long getThreadId(Thread thread) {
-
-        // Invoke the method that was found for GET_THREAD_ID
-        // Errors are not expected
-
-        try {
-            return (long) GET_THREAD_ID.invoke(thread);
-        }
-        catch (InvocationTargetException | IllegalAccessException e) {
-            throw new EUnexpected(e);
-        }
-    }
-
     public EventLoop currentEventLoop(boolean strict) {
 
         var threadId = getThreadId(Thread.currentThread());
@@ -113,30 +121,84 @@ public class EventLoopRegister {
         return new EventLoopInterceptor();
     }
 
-    private void registerEventLoop(EventExecutor executor) {
-
-        if (executor instanceof EventLoop) {
-            var threadId = getThreadId(Thread.currentThread());
-            register.put(threadId, (EventLoop) executor);
-        }
-    }
-
     private class EventLoopInterceptor implements ClientInterceptor {
 
         @Override public <ReqT, RespT>
         ClientCall<ReqT, RespT> interceptCall(
                 MethodDescriptor<ReqT, RespT> method,
-                CallOptions callOptions,
+                CallOptions options,
                 Channel channel) {
 
             // Enforce strict requirement on the event loop
             // Client interceptor is used when the data service makes calls to other TRAC services
             // Those calls must come back on the same EL, so processing is not split across ELs
 
-            var el = currentEventLoop(/* strict = */ true);
-            var options = callOptions.withExecutor(el);
+            var eventLoop = currentEventLoop(/* strict = */ true);
+            var nextCall = channel.newCall(method, options);
 
-            return channel.newCall(method, options);
+            return new EventLoopCall<>(eventLoop, nextCall);
+        }
+    }
+
+    private static class EventLoopCall< ReqT, RespT> extends ForwardingClientCall.SimpleForwardingClientCall< ReqT, RespT > {
+
+        private final EventLoop eventLoop;
+
+        public EventLoopCall(EventLoop eventLoop, ClientCall<ReqT, RespT> delegate) {
+            super(delegate);
+            this.eventLoop = eventLoop;
+        }
+
+        @Override
+        public void start(Listener<RespT> responseListener, Metadata headers) {
+            var listener = new EventLoopListener<>(eventLoop, responseListener);
+            delegate().start(listener, headers);
+        }
+    }
+
+    private static class EventLoopListener<RespT> extends ForwardingClientCallListener.SimpleForwardingClientCallListener<RespT> {
+
+        private final EventLoop eventLoop;
+
+        public EventLoopListener(EventLoop eventLoop, ClientCall.Listener<RespT> delegate) {
+            super(delegate);
+            this.eventLoop = eventLoop;
+        }
+
+        @Override
+        public void onMessage(RespT message) {
+
+            if (eventLoop.inEventLoop())
+                delegate().onMessage(message);
+            else
+                eventLoop.execute(() -> delegate().onMessage(message));
+        }
+
+        @Override
+        public void onHeaders(Metadata headers) {
+
+            if (eventLoop.inEventLoop())
+                delegate().onHeaders(headers);
+            else
+                eventLoop.execute(() -> delegate().onHeaders(headers));
+        }
+
+        @Override
+        public void onClose(Status status, Metadata trailers) {
+
+            if (eventLoop.inEventLoop())
+                delegate().onClose(status, trailers);
+            else
+                eventLoop.execute(() -> delegate().onClose(status, trailers));
+        }
+
+        @Override
+        public void onReady() {
+
+            if (eventLoop.inEventLoop())
+                delegate().onReady();
+            else
+                eventLoop.execute(() -> delegate().onReady());
         }
     }
 }

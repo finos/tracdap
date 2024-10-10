@@ -233,14 +233,15 @@ public class TracDataService extends CommonServiceBase {
                 .forAddress(metadataTarget.getHost(), metadataTarget.getPort())
                 .channelType(channelType)
                 .eventLoopGroup(serviceGroup)
+                .directExecutor()
                 .usePlaintext()
                 .build();
 
         return TrustedMetadataApiGrpc.newFutureStub(clientChannel)
+                .withInterceptors(eventLoopRegister.clientInterceptor())
                 .withCompression(CompressionClientInterceptor.COMPRESSION_TYPE)
                 .withInterceptors(new CompressionClientInterceptor())
-                .withInterceptors(new LoggingClientInterceptor(TracDataService.class))
-                .withInterceptors(eventLoopRegister.clientInterceptor());
+                .withInterceptors(new LoggingClientInterceptor(TracDataService.class));
     }
 
     @Override
