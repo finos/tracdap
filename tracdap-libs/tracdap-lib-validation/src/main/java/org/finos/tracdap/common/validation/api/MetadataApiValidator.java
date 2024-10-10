@@ -73,6 +73,15 @@ public class MetadataApiValidator {
     private static final Descriptors.FieldDescriptor MGR_OBJECT_VERSION;
     private static final Descriptors.FieldDescriptor MGR_TAG_VERSION;
 
+    private static final Descriptors.Descriptor LIST_RESOURCES_REQUEST;
+    private static final Descriptors.FieldDescriptor LRR_TENANT;
+    private static final Descriptors.FieldDescriptor LRR_RESOURCE_TYPE;
+
+    private static final Descriptors.Descriptor RESOURCE_INFO_REQUEST;
+    private static final Descriptors.FieldDescriptor RIR_TENANT;
+    private static final Descriptors.FieldDescriptor RIR_RESOURCE_TYPE;
+    private static final Descriptors.FieldDescriptor RIR_RESOURCE_KEY;
+
     static {
 
         METADATA_WRITE_REQUEST = MetadataWriteRequest.getDescriptor();
@@ -108,6 +117,15 @@ public class MetadataApiValidator {
         MGR_OBJECT_ID = field(METADATA_GET_REQUEST, MetadataGetRequest.OBJECTID_FIELD_NUMBER);
         MGR_OBJECT_VERSION = field(METADATA_GET_REQUEST, MetadataGetRequest.OBJECTVERSION_FIELD_NUMBER);
         MGR_TAG_VERSION = field(METADATA_GET_REQUEST, MetadataGetRequest.TAGVERSION_FIELD_NUMBER);
+
+        LIST_RESOURCES_REQUEST = ListResourcesRequest.getDescriptor();
+        LRR_TENANT = field(LIST_RESOURCES_REQUEST, ListResourcesRequest.TENANT_FIELD_NUMBER);
+        LRR_RESOURCE_TYPE = field(LIST_RESOURCES_REQUEST, ListResourcesRequest.RESOURCETYPE_FIELD_NUMBER);
+
+        RESOURCE_INFO_REQUEST = ResourceInfoRequest.getDescriptor();
+        RIR_TENANT = field(RESOURCE_INFO_REQUEST, ResourceInfoRequest.TENANT_FIELD_NUMBER);
+        RIR_RESOURCE_TYPE = field(RESOURCE_INFO_REQUEST, ResourceInfoRequest.RESOURCETYPE_FIELD_NUMBER);
+        RIR_RESOURCE_KEY = field(RESOURCE_INFO_REQUEST, ResourceInfoRequest.RESOURCEKEY_FIELD_NUMBER);
     }
 
     @Validator(method = "createObject")
@@ -475,6 +493,57 @@ public class MetadataApiValidator {
 
             return ctx.error(err);
         }
+
+        return ctx;
+    }
+
+    @Validator(method = "platformInfo")
+    public static ValidationContext platformInfo(PlatformInfoRequest msg, ValidationContext ctx) {
+
+        // Platform info request has no data fields
+        return ctx;
+    }
+
+    @Validator(method = "listTenants")
+    public static ValidationContext listTenants(ListTenantsRequest msg, ValidationContext ctx) {
+
+        // List tenants request has no data fields
+        return ctx;
+    }
+
+    @Validator(method = "listResources")
+    public static ValidationContext listResources(ListResourcesRequest msg, ValidationContext ctx) {
+
+        ctx = ctx.push(LRR_TENANT)
+                .apply(CommonValidators::required)
+                .apply(CommonValidators::identifier)
+                .pop();
+
+        ctx = ctx.push(LRR_RESOURCE_TYPE)
+                .apply(CommonValidators::required)
+                .apply(CommonValidators::nonZeroEnum, ResourceType.class)
+                .pop();
+
+        return ctx;
+    }
+
+    @Validator(method = "resourceInfo")
+    public static ValidationContext resourceInfo(ResourceInfoRequest msg, ValidationContext ctx) {
+
+        ctx = ctx.push(RIR_TENANT)
+                .apply(CommonValidators::required)
+                .apply(CommonValidators::identifier)
+                .pop();
+
+        ctx = ctx.push(RIR_RESOURCE_TYPE)
+                .apply(CommonValidators::required)
+                .apply(CommonValidators::nonZeroEnum, ResourceType.class)
+                .pop();
+
+        ctx = ctx.push(RIR_RESOURCE_KEY)
+                .apply(CommonValidators::required)
+                .apply(CommonValidators::identifier)
+                .pop();
 
         return ctx;
     }

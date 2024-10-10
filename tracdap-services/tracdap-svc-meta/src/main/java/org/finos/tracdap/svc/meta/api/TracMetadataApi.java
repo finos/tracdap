@@ -35,6 +35,11 @@ public class TracMetadataApi extends TracMetadataApiGrpc.TracMetadataApiImplBase
     private static final String SERVICE_NAME = TracMetadataApiGrpc.SERVICE_NAME.substring(TracMetadataApiGrpc.SERVICE_NAME.lastIndexOf(".") + 1);
     private static final Descriptors.ServiceDescriptor TRAC_METADATA_SERVICE = Metadata.getDescriptor().findServiceByName(SERVICE_NAME);
 
+    static final MethodDescriptor<PlatformInfoRequest, PlatformInfoResponse> PLATFORM_INFO_METHOD = TracMetadataApiGrpc.getPlatformInfoMethod();
+    static final MethodDescriptor<ListTenantsRequest, ListTenantsResponse> LIST_TENANTS_METHOD = TracMetadataApiGrpc.getListTenantsMethod();
+    static final MethodDescriptor<ListResourcesRequest, ListResourcesResponse> LIST_RESOURCES_METHOD = TracMetadataApiGrpc.getListResourcesMethod();
+    static final MethodDescriptor<ResourceInfoRequest, ResourceInfoResponse> RESOURCE_INFO_METHOD = TracMetadataApiGrpc.getResourceInfoMethod();
+
     static final MethodDescriptor<MetadataWriteRequest, TagHeader> CREATE_OBJECT_METHOD = TracMetadataApiGrpc.getCreateObjectMethod();
     static final MethodDescriptor<MetadataWriteRequest, TagHeader> UPDATE_OBJECT_METHOD = TracMetadataApiGrpc.getUpdateObjectMethod();
     static final MethodDescriptor<MetadataWriteRequest, TagHeader> UPDATE_TAG_METHOD = TracMetadataApiGrpc.getUpdateTagMethod();

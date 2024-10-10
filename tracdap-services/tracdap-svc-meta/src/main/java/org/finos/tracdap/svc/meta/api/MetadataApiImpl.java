@@ -69,22 +69,30 @@ public class MetadataApiImpl {
 
     PlatformInfoResponse platformInfo(PlatformInfoRequest request) {
 
+        validateRequest(PLATFORM_INFO_METHOD, request);
+
         return readService.platformInfo();
     }
 
     ListTenantsResponse listTenants(ListTenantsRequest request) {
+
+        validateRequest(LIST_TENANTS_METHOD, request);
 
         return readService.listTenants();
     }
 
     ListResourcesResponse listResources(ListResourcesRequest request) {
 
-        return readService.listResources(request.getResourceType());
+        validateRequest(LIST_RESOURCES_METHOD, request);
+
+        return readService.listResources(request.getTenant(), request.getResourceType());
     }
 
     ResourceInfoResponse resourceInfo(ResourceInfoRequest request) {
 
-        return readService.resourceInfo(request.getResourceType(), request.getResourceKey());
+        validateRequest(RESOURCE_INFO_METHOD, request);
+
+        return readService.resourceInfo(request.getTenant(), request.getResourceType(), request.getResourceKey());
     }
 
     TagHeader createObject(MetadataWriteRequest request) {
