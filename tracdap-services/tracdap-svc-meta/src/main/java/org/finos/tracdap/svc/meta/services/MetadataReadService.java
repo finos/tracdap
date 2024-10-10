@@ -21,6 +21,7 @@ import org.finos.tracdap.api.ListTenantsResponse;
 import org.finos.tracdap.api.PlatformInfoResponse;
 import org.finos.tracdap.api.ResourceInfoResponse;
 import org.finos.tracdap.common.exception.EResourceNotFound;
+import org.finos.tracdap.common.exception.ETenantNotFound;
 import org.finos.tracdap.common.util.VersionInfo;
 import org.finos.tracdap.config.PlatformConfig;
 import org.finos.tracdap.config.PluginConfig;
@@ -30,6 +31,8 @@ import org.finos.tracdap.metadata.ObjectType;
 import org.finos.tracdap.metadata.Tag;
 import org.finos.tracdap.svc.meta.TracMetadataService;
 import org.finos.tracdap.svc.meta.dal.IMetadataDal;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.List;
 import java.util.UUID;
@@ -38,6 +41,8 @@ import java.util.UUID;
 public class MetadataReadService {
 
     private static final String ENVIRONMENT_NOT_SET = "ENVIRONMENT_NOT_SET";
+
+    private final Logger log = LoggerFactory.getLogger(getClass());
 
     private final IMetadataDal dal;
     private final PlatformConfig config;
@@ -79,7 +84,10 @@ public class MetadataReadService {
             .build();
     }
 
-    public ListResourcesResponse listResources(ResourceType resourceType) {
+    public ListResourcesResponse listResources(String tenantCode, ResourceType resourceType) {
+
+        // Explicit check is required because resources currently come from platform config
+        checkTenantExists(tenantCode);
 
         var response = ListResourcesResponse.newBuilder();
 
@@ -94,33 +102,61 @@ public class MetadataReadService {
             }
         }
         else {
-            throw new EResourceNotFound("Unknown resource type: " + resourceType);  // TODO: Error message
+            var message = String.format("Unknown resource type: ['%s]'", resourceType.name());
+            log.error(message);
+            throw new EResourceNotFound(message);
         }
 
         return response.build();
     }
 
-    public ResourceInfoResponse resourceInfo(ResourceType resourceType, String resourceKey) {
+    public ResourceInfoResponse resourceInfo(String tenantCode, ResourceType resourceType, String resourceKey) {
+
+        // Explicit check is required because resources currently come from platform config
+        checkTenantExists(tenantCode);
 
         PluginConfig pluginConfig;
 
         if (resourceType == ResourceType.STORAGE_RESOURCE) {
-            if (!this.config.getStorage().containsBuckets(resourceKey))
-                throw new EResourceNotFound("");  // TODO: Error message
-            else
-                pluginConfig = this.config.getStorage().getBucketsOrThrow(resourceKey);
+
+            if (!this.config.getStorage().containsBuckets(resourceKey)) {
+                var message = String.format("Storage resource not found: [%s]", resourceKey);
+                log.error(message);
+                throw new EResourceNotFound(message);
+            }
+
+            pluginConfig = this.config.getStorage().getBucketsOrThrow(resourceKey);
         }
         else if (resourceType == ResourceType.MODEL_REPOSITORY) {
-            if (!this.config.containsRepositories(resourceKey))
-                throw new EResourceNotFound("");  // TODO: Error message
-            else
-                pluginConfig = this.config.getRepositoriesOrThrow(resourceKey);
+
+            if (!this.config.containsRepositories(resourceKey)){
+                var message = String.format("Model repository not found: [%s]", resourceKey);
+                log.error(message);
+                throw new EResourceNotFound(message);
+            }
+
+            pluginConfig = this.config.getRepositoriesOrThrow(resourceKey);
         }
         else {
-            throw new EResourceNotFound("");  // TODO: Error message
+
+            var message = String.format("Unknown resource type: ['%s]'", resourceType.name());
+            log.error(message);
+            throw new EResourceNotFound(message);
         }
 
         return buildResourceInfo(resourceType, resourceKey, pluginConfig).build();
+    }
+
+    private void checkTenantExists(String tenantCode) {
+
+        var tenants = dal.listTenants();
+
+        var requiredTenant = tenants.stream()
+                .filter(tenant -> tenant.getTenantCode().equals(tenantCode))
+                .findFirst();
+
+        if (requiredTenant.isEmpty())
+            throw new ETenantNotFound("Tenant not found: [" + tenantCode + "]");
     }
 
     private ResourceInfoResponse.Builder buildResourceInfo(
