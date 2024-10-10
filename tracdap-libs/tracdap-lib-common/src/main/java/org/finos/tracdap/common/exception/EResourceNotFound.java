@@ -16,8 +16,8 @@
 
 package org.finos.tracdap.common.exception;
 
-/** Resource not found when loading from config (e.g. default config files, db scripts etc.) */
-public class EResourceNotFound extends ETracInternal {
+/** Resource not found when requested from the API (e.g. request for unknown storage, repos etc.) */
+public class EResourceNotFound extends ETracPublic {
 
     public EResourceNotFound(String message, Throwable cause) {
         super(message, cause);

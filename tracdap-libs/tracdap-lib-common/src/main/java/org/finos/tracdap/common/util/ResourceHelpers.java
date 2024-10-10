@@ -17,10 +17,10 @@
 package org.finos.tracdap.common.util;
 
 import com.google.protobuf.ByteString;
-import org.finos.tracdap.common.exception.EResourceNotFound;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.MissingResourceException;
 
 
 public class ResourceHelpers {
@@ -57,7 +57,7 @@ public class ResourceHelpers {
             return stream.readAllBytes();
         }
         catch (IOException e) {
-            throw new EResourceNotFound(e.getMessage(), e);
+            throw new MissingResourceException(e.getMessage(), clazz.getName(), resourcePath);
         }
     }
 }

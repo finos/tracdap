@@ -41,7 +41,11 @@ class FormatManager:
     def get_data_format(cls, format_code: str, format_options: tp.Dict[str, tp.Any]) -> IDataFormat:
 
         try:
-            config = _cfg.PluginConfig(format_code, format_options)
+
+            config = _cfg.PluginConfig(
+                protocol=format_code,
+                properties=format_options)
+
             return plugins.PluginManager.load_plugin(IDataFormat, config)
 
         except _ex.EPluginNotAvailable as e:
