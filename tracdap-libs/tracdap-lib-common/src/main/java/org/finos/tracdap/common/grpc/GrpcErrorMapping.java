@@ -190,6 +190,7 @@ public class GrpcErrorMapping {
             Map.entry(EConsistencyValidation.class, Status.Code.FAILED_PRECONDITION),
 
             Map.entry(ETenantNotFound.class, Status.Code.NOT_FOUND),
+            Map.entry(EResourceNotFound.class, Status.Code.NOT_FOUND),
 
             Map.entry(EMetadataNotFound.class, Status.Code.NOT_FOUND),
             Map.entry(EMetadataDuplicate.class, Status.Code.ALREADY_EXISTS),
