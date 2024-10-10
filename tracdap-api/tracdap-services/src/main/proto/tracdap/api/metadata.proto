@@ -117,12 +117,58 @@ service TracMetadataApi {
         };
     }
 
+    /**
+     * Get a list of infrastructure resources of a given type.
+     *
+     * For a given tenant and resource type, obtain a list of all the resources
+     * accessible to the client. Client must have sufficient permissions within the
+     * tenant to make this call and the list returned will be restricted by the
+     * permissions of the logged in user. The returned list includes all the same
+     * information that can be obtained by calling resourceInfo(), so there is no
+     * need to make a second API call.
+     *
+     * As an example, calling listResources() for resource type MODEL_REPOSITORY would
+     * provide a list of repositories that are accessible to the current user to
+     * import models from. The resource key of the selected repository can be used in an
+     * IMPORT_MODEL job as the repository key.
+     *
+     * Error conditions include permission denied, invalid request, unknown tenant and
+     * unknown resource type.
+     *
+     * @see tracdap.metadata.ResourceType
+     */
     rpc listResources(ListResourcesRequest) returns (ListResourcesResponse) {
         option (google.api.http) = {
             get: "/{tenant}/list-resources/{resourceType}"
         };
     }
 
+    /**
+     * Get information about a specific infrastructure resource.
+     *
+     * Use this method to get the public properties associated with a specific
+     * infrastructure resource, if you already know the resource type and key.
+     * Client must have sufficient permissions within the tenant to make this
+     * call and the result will only be returned if the user has permission to
+     * access the specified resource.
+     *
+     * This method is intended to allow integrations between client applications
+     * and infrastructure resources. For example, if a model repository or data
+     * location is available in TRAC as a resource, client applications can allow
+     * users to browse or interact with those resources either by directing them to
+     * an external URL or by making API calls to an external service. The resource
+     * must be configured with the necessary public properties to make this work.
+     * Typically the protocol and address of a resource can be public properties
+     * but the user must supply their own credentials, which will be different
+     * from the system credentials used by the TRAC platform. It is likely that
+     * some resources available in the platform will not be accessible to all users,
+     * and some resources accessible to a user will not be available on the platform.
+     *
+     * Error conditions include permission denied, invalid request, unknown tenant,
+     * unknown resource type and resource not found.
+     *
+     * @see tracdap.metadata.ResourceType
+     */
     rpc resourceInfo(ResourceInfoRequest) returns (ResourceInfoResponse) {
         option (google.api.http) = {
             get: "/{tenant}/resource-info/{resourceType}/{resourceKey}"
@@ -433,13 +479,13 @@ message PlatformInfoRequest {
  */
 message PlatformInfoResponse {
 
-    /** Version string for the version of TRAC currently deployed in the platform. **/
+    /// Version string for the version of TRAC currently deployed in the platform.
     string tracVersion = 1;
 
-    /** Name of the current TRAC environment. */
+    /// Name of the current TRAC environment.
     string environment = 2;
 
-    /** Flag indicating whether the current environment is a production environment or not. **/
+    /// Flag indicating whether the current environment is a production environment or not.
     bool production = 3;
 
     /**
@@ -466,34 +512,84 @@ message ListTenantsRequest {
  */
 message ListTenantsResponse {
 
-    /** A list of TenantInfo objects, one for each tenant the current user has access to. **/
+    /// A list of TenantInfo objects, one for each tenant the current user has access to.
     repeated metadata.TenantInfo tenants = 1;
 }
 
 
+/**
+ * Request object for the listResources() API call.
+ *
+ * @see TracMetadataApi.listResources
+ * @see tracdap.metadata.ResourceType
+ */
 message ListResourcesRequest {
 
+    /// Tenant code for the requested operation, always required.
     string tenant = 1;
+
+    /// The type of resource to list.
     metadata.ResourceType resourceType = 2;
 }
 
+/**
+ * Response object for the listResources() API call.
+ *
+ * @see TracMetadataApi.listResources
+ */
 message ListResourcesResponse {
 
+    /// List of resource info objects for accessible resources of the requested type.
     repeated ResourceInfoResponse resources = 1;
 }
 
+/**
+ * Request object for a resourceInfo() API call.
+ *
+ * @see TracMetadataApi.resourceInfo
+ * @see tracdap.metadata.ResourceType
+ */
 message ResourceInfoRequest {
 
+    /// Tenant code for the requested operation, always required.
     string tenant = 1;
+
+    /// The type of resource to get information for.
     metadata.ResourceType resourceType = 2;
+
+    /// Resource key of the resource to get information for.
     string resourceKey = 3;
 }
 
+/**
+ * Response object for a resourceInfo() API call.
+ *
+ * @see TracMetadataApi.resourceInfo
+ */
 message ResourceInfoResponse {
 
+    /// The type of selected resource.
     metadata.ResourceType resourceType = 1;
+
+    /// Resource key of the selected resource.
     string resourceKey = 2;
+
+    /**
+     * Protocol of the selected resource.
+     *
+     * Resource protocols correspond to TRAC technology plugins. For example, a storage resource
+     * might have protocol LOCAL or S3, and would accordingly require the LOCAL or S3 storage
+     * plugin to be installed.
+     */
     string protocol = 3;
+
+    /**
+     * Public properties of the selected resource.
+     *
+     * These properties are set in the resource configuration. Certain resource types require
+     * certain properties depending on the protocol, however additional arbitrary properties
+     * can be added to support client applications.
+     */
     map<string, string> properties = 4;
 }
 

@@ -24,12 +24,20 @@ import "tracdap/metadata/object_id.proto";
 import "tracdap/metadata/object.proto";
 
 
-
+/**
+ * Enumeration of infrastructure resources that can be added to a tenant
+ */
 enum ResourceType {
 
   RESOURCE_TYPE_NOT_SET = 0;
 
+  /// Model repository, which can be a source or binary repository
   MODEL_REPOSITORY = 1;
 
+  /// Storage location for data held internally by the TRAC platform
   INTERNAL_STORAGE = 2;
+
+  // Storage location for upstream / downstream integration points (not available yet in the resource API)
+  reserved "EXTERNAL_STORAGE";
+  reserved 3;
 }
