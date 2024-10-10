@@ -23,10 +23,7 @@ import org.finos.tracdap.common.util.VersionInfo;
 import org.finos.tracdap.metadata.ResourceType;
 import org.finos.tracdap.svc.meta.TracMetadataService;
 import org.finos.tracdap.test.helpers.PlatformTest;
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Tag;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 import static org.finos.tracdap.test.meta.TestData.TEST_TENANT;
@@ -54,7 +51,10 @@ abstract class InfoAndResourcesTest {
         }
     }
 
-    // Include this test case for integration against different database backends
+    // For now, do not run this test for integration against the metadb backend databases
+    // Currently resources come from config, so there is no integration point
+    // When resources move to being managed as metadata objects, this will need to be enabled
+    @Disabled
     @Tag("integration")
     @Tag("int-metadb")
     static class IntegrationTest extends InfoAndResourcesTest {
