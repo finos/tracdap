@@ -90,40 +90,6 @@ abstract class MetadataReadApiTest {
         }
     }
 
-    @Test
-    void platformInfo() {
-
-        var platformInfo = readApi.platformInfo(PlatformInfoRequest.newBuilder().build());
-
-        System.out.println("Running TRAC D.A.P. version " + platformInfo.getTracVersion());
-
-        var expectedVersion = VersionInfo.getComponentVersion(TracMetadataService.class);
-        Assertions.assertEquals(expectedVersion, platformInfo.getTracVersion());
-
-        // Environment settings are set up for this test in test-unit.yaml in the -list-test resources folder
-        // For integration tests, config files are in the .github folder under config
-
-        Assertions.assertEquals("TEST_ENVIRONMENT", platformInfo.getEnvironment());
-        Assertions.assertFalse(platformInfo.getProduction());
-        Assertions.assertTrue(platformInfo.containsDeploymentInfo("region"));
-        Assertions.assertEquals("UK", platformInfo.getDeploymentInfoOrThrow("region"));
-    }
-
-    @Test
-    void listTenants() {
-
-        var tenantsResponse = readApi.listTenants(ListTenantsRequest.newBuilder().build());
-        var tenants = tenantsResponse.getTenantsList();
-
-        Assertions.assertEquals(1, tenants.size());
-        Assertions.assertEquals(TEST_TENANT, tenants.get(0).getTenantCode());
-
-        // Default description set up in org.finos.tracdap.test.helpers.PlatformTest
-        // Also for integration tests, in the integration.yml workflow for GitHub actions
-        var expectedDescription = "Test tenant [" + TEST_TENANT + "]";
-        Assertions.assertEquals(expectedDescription, tenants.get(0).getDescription());
-    }
-
     @ParameterizedTest
     @EnumSource(value = ObjectType.class, mode = EnumSource.Mode.EXCLUDE,
                 names = {"OBJECT_TYPE_NOT_SET", "UNRECOGNIZED"})
