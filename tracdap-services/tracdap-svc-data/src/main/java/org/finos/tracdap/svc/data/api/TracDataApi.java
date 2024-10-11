@@ -18,6 +18,7 @@ package org.finos.tracdap.svc.data.api;
 
 import org.finos.tracdap.api.*;
 import org.finos.tracdap.api.Data;
+import org.finos.tracdap.common.async.EventLoopRegister;
 import org.finos.tracdap.common.auth.internal.AuthHelpers;
 import org.finos.tracdap.common.data.DataContext;
 import org.finos.tracdap.common.data.IDataContext;
@@ -26,7 +27,6 @@ import org.finos.tracdap.common.data.pipeline.GrpcUploadSource;
 import org.finos.tracdap.common.util.LoggingHelpers;
 import org.finos.tracdap.common.validation.Validator;
 import org.finos.tracdap.metadata.*;
-import org.finos.tracdap.svc.data.EventLoopRegister;
 import org.finos.tracdap.svc.data.service.DataService;
 import org.finos.tracdap.svc.data.service.FileService;
 
