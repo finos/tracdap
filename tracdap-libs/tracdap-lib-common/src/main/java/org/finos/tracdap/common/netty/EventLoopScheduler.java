@@ -19,25 +19,40 @@ package org.finos.tracdap.common.netty;
 import io.netty.util.concurrent.DefaultEventExecutorChooserFactory;
 import io.netty.util.concurrent.EventExecutor;
 import io.netty.util.concurrent.EventExecutorChooserFactory;
+import org.finos.tracdap.common.exception.ETracInternal;
 
 
-public class EventLoopSelector implements EventExecutorChooserFactory {
+public class EventLoopScheduler implements EventExecutorChooserFactory {
+
+    public static EventExecutorChooserFactory roundRobin() {
+        return DefaultEventExecutorChooserFactory.INSTANCE;
+    }
+
+    public static EventExecutorChooserFactory preferLoopAffinity() {
+        return new EventLoopScheduler(/* fallbackFactory = */ roundRobin());
+    }
+
+    public static EventExecutorChooserFactory requireLoopAffinity() {
+        return new EventLoopScheduler(/* fallbackFactory = */ null);
+    }
 
     private final EventExecutorChooserFactory fallbackFactory;
 
-    public EventLoopSelector() {
-        fallbackFactory = DefaultEventExecutorChooserFactory.INSTANCE;
+    private EventLoopScheduler(EventExecutorChooserFactory fallbackFactory) {
+        this.fallbackFactory = fallbackFactory;
     }
 
     @Override
     public EventExecutorChooserFactory.EventExecutorChooser newChooser(EventExecutor[] eventExecutors) {
 
-        var fallback = fallbackFactory.newChooser(eventExecutors);
+        var fallback = fallbackFactory != null
+                ? fallbackFactory.newChooser(eventExecutors)
+                : null;
 
         return new Chooser(eventExecutors, fallback);
     }
 
-    public static class Chooser implements EventExecutorChooserFactory.EventExecutorChooser {
+    private static class Chooser implements EventExecutorChooserFactory.EventExecutorChooser {
 
         private final EventExecutor[] eventExecutors;
         private final EventExecutorChooser fallback;
@@ -54,7 +69,10 @@ public class EventLoopSelector implements EventExecutorChooserFactory {
                 if (eventExecutor.inEventLoop())
                     return eventExecutor;
 
-            return fallback.next();
+            if (fallback != null)
+                return fallback.next();
+
+            throw new ETracInternal("The current operation is running outside the registered event loop group");
         }
     }
 }
