@@ -28,6 +28,7 @@ import org.finos.tracdap.common.exec.IBatchExecutor;
 import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.common.exec.IJobExecutor;
 import org.finos.tracdap.common.grpc.*;
+import org.finos.tracdap.common.netty.NettyHelpers;
 import org.finos.tracdap.common.plugin.PluginManager;
 import org.finos.tracdap.common.service.CommonServiceBase;
 import org.finos.tracdap.common.util.RoutingUtils;
@@ -55,6 +56,7 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 
@@ -69,8 +71,8 @@ public class TracOrchestratorService extends CommonServiceBase {
     private final ConfigManager configManager;
 
     private EventLoopGroup bossGroup;
-    private EventLoopGroup nettyGroup;
-    private EventLoopGroup serviceGroup;
+    private EventLoopGroup workerGroup;
+    private ThreadPoolExecutor workerThreads;
 
     private Server server;
     private ManagedChannel clientChannel;
@@ -114,8 +116,8 @@ public class TracOrchestratorService extends CommonServiceBase {
             var clientChannelType = NioSocketChannel.class;
 
             bossGroup = new NioEventLoopGroup(1, new DefaultThreadFactory("orch-boss"));
-            nettyGroup = new NioEventLoopGroup(2, new DefaultThreadFactory("orch-netty"));
-            serviceGroup = new NioEventLoopGroup(CONCURRENT_REQUESTS, new DefaultThreadFactory("orch-svc"));
+            workerGroup = new NioEventLoopGroup(2, new DefaultThreadFactory("orch-el"));
+            workerThreads = NettyHelpers.threadPoolExecutor("orch-svc", CONCURRENT_REQUESTS, CONCURRENT_REQUESTS);
 
             var clientChannelFactory = new ClientChannelFactory(clientChannelType);
             var metaClient = prepareMetadataClient(platformConfig, clientChannelFactory);
@@ -139,7 +141,7 @@ public class TracOrchestratorService extends CommonServiceBase {
 
             var jobProcessor = new JobProcessor(platformConfig, metaClient, internalAuth, jobExecutor);
 
-            jobManager = new JobManager(platformConfig, jobProcessor, jobCache, serviceGroup);
+            jobManager = new JobManager(platformConfig, jobProcessor, jobCache, workerGroup);
 
             jobExecutor.start(clientChannelFactory);
             jobManager.start();
@@ -150,8 +152,8 @@ public class TracOrchestratorService extends CommonServiceBase {
                     // Netty config
                     .channelType(channelType)
                     .bossEventLoopGroup(bossGroup)
-                    .workerEventLoopGroup(nettyGroup)
-                    .executor(serviceGroup)
+                    .workerEventLoopGroup(workerGroup)
+                    .executor(workerThreads)
 
                     // Interceptor order: Last added is executed first
                     // But note, on close it is the other way round, because the stack is unwinding
@@ -207,14 +209,14 @@ public class TracOrchestratorService extends CommonServiceBase {
 
         var serviceThreadsDown = shutdownResource("Service thread pool", deadline, remaining -> {
 
-            serviceGroup.shutdownGracefully(0, remaining.toMillis(), TimeUnit.MILLISECONDS);
-            return serviceGroup.awaitTermination(remaining.toMillis(), TimeUnit.MILLISECONDS);
+            workerThreads.shutdown();
+            return workerThreads.awaitTermination(remaining.toMillis(), TimeUnit.MILLISECONDS);
         });
 
         var nettyDown = shutdownResource("Netty thread pool", deadline, remaining -> {
 
-            nettyGroup.shutdownGracefully(0, remaining.toMillis(), TimeUnit.MILLISECONDS);
-            return nettyGroup.awaitTermination(remaining.toMillis(), TimeUnit.MILLISECONDS);
+            workerGroup.shutdownGracefully(0, remaining.toMillis(), TimeUnit.MILLISECONDS);
+            return workerGroup.awaitTermination(remaining.toMillis(), TimeUnit.MILLISECONDS);
         });
 
         var bossDown = shutdownResource("Boss thread pool", deadline, remaining -> {
@@ -246,6 +248,9 @@ public class TracOrchestratorService extends CommonServiceBase {
 
         clientChannel = channelFactory.createChannel(metadataTarget.getHost(), metadataTarget.getPort());
 
+        // No need to set up event loop interceptor or scheduler on the channel
+        // Blocking calls will return to the calling thread
+
         return TrustedMetadataApiGrpc
                 .newBlockingStub(clientChannel)
                 .withCompression(CompressionClientInterceptor.COMPRESSION_TYPE)
@@ -267,8 +272,8 @@ public class TracOrchestratorService extends CommonServiceBase {
             var clientChannelBuilder = NettyChannelBuilder
                     .forAddress(host, port)
                     .channelType(channelType)
-                    .eventLoopGroup(nettyGroup)
-                    .executor(serviceGroup)
+                    .eventLoopGroup(workerGroup)
+                    .executor(workerThreads)
                     .usePlaintext();
 
             return clientChannelBuilder.build();

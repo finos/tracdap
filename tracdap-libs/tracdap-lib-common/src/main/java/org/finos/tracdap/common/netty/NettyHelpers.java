@@ -47,12 +47,12 @@ public class NettyHelpers {
     }
 
     public static ThreadPoolExecutor threadPoolExecutor(String threadPoolName, int minSize, int maxSize) {
-        return threadPoolExecutor(threadPoolName, minSize, maxSize, DEFAULT_THREAD_POOL_IDLE_LIMIT.toMillis());
+        return threadPoolExecutor(threadPoolName, minSize, maxSize, maxSize, DEFAULT_THREAD_POOL_IDLE_LIMIT.toMillis());
     }
 
-    public static ThreadPoolExecutor threadPoolExecutor(String threadPoolName, int minSize, int maxSize, long idleMs) {
+    public static ThreadPoolExecutor threadPoolExecutor(String threadPoolName, int minSize, int maxSize, int overflowSize, long idleMs) {
         var threadFactory = threadFactory(threadPoolName);
-        var workQueue = new ArrayBlockingQueue<Runnable>(maxSize);  // Double up max pool size with the work queue
+        var workQueue = new ArrayBlockingQueue<Runnable>(overflowSize);  // Double up max pool size with the work queue
         return new ThreadPoolExecutor(
                 minSize, maxSize, idleMs, TimeUnit.MILLISECONDS,
                 workQueue, threadFactory);
