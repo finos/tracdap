@@ -16,9 +16,12 @@
 
 package org.finos.tracdap.common.netty;
 
+import io.netty.channel.DefaultSelectStrategyFactory;
+import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.util.concurrent.EventExecutorChooserFactory;
 import io.netty.util.concurrent.ThreadPerTaskExecutor;
 
+import java.nio.channels.spi.SelectorProvider;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
 import java.util.concurrent.*;
@@ -55,5 +58,11 @@ public class NettyHelpers {
                 workQueue, threadFactory);
     }
 
+    public static NioEventLoopGroup nioEventLoopGroup(Executor executor, EventExecutorChooserFactory scheduler, int nThreads) {
 
+        return new NioEventLoopGroup(
+                nThreads, executor, scheduler,
+                SelectorProvider.provider(),
+                DefaultSelectStrategyFactory.INSTANCE);
+    }
 }

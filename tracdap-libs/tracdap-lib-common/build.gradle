@@ -43,6 +43,7 @@ dependencies {
 
     // Netty common package - for building Netty helpers, package has limited dependencies
     api group: 'io.netty', name: 'netty-common', version: "$netty_version"
+    api group: 'io.netty', name: 'netty-transport', version: "$netty_version"
 
     // Core protobuf for Java
     api group: 'com.google.protobuf', name: 'protobuf-java', version: "$proto_version"

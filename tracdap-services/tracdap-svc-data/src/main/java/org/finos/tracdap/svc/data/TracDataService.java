@@ -44,9 +44,7 @@ import org.finos.tracdap.svc.data.service.FileService;
 import io.grpc.*;
 import io.grpc.netty.NettyChannelBuilder;
 import io.grpc.netty.NettyServerBuilder;
-import io.netty.channel.DefaultSelectStrategyFactory;
 import io.netty.channel.EventLoopGroup;
-import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import org.apache.arrow.memory.RootAllocator;
@@ -56,7 +54,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.nio.channels.spi.SelectorProvider;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.concurrent.ExecutorService;
@@ -139,18 +136,14 @@ public class TracDataService extends CommonServiceBase {
             var bossExecutor = NettyHelpers.eventLoopExecutor("data-boss");
             var bossScheduler = EventLoopScheduler.roundRobin();
 
-            bossGroup = new NioEventLoopGroup(
-                    bossThreadCount, bossExecutor, bossScheduler,
-                    SelectorProvider.provider(), DefaultSelectStrategyFactory.INSTANCE);
+            bossGroup = NettyHelpers.nioEventLoopGroup(bossExecutor, bossScheduler, bossThreadCount);
 
             var serviceCoresAvailable= Runtime.getRuntime().availableProcessors() - 1;
             var serviceThreadCount = Math.max(Math.min(serviceCoresAvailable, MAX_SERVICE_CORES), MIN_SERVICE_CORES);
             var serviceExecutor = NettyHelpers.eventLoopExecutor("data-svc");
             var serviceScheduler = EventLoopScheduler.preferLoopAffinity(offloadTracking);
 
-            serviceGroup = new NioEventLoopGroup(
-                    serviceThreadCount, serviceExecutor, serviceScheduler,
-                    SelectorProvider.provider(), DefaultSelectStrategyFactory.INSTANCE);
+            serviceGroup = NettyHelpers.nioEventLoopGroup(serviceExecutor, serviceScheduler, serviceThreadCount);
 
             var baseOffloadExecutor = NettyHelpers.threadPoolExecutor("data-offload");
             offloadExecutor = offloadTracking.wrappExecutorService(baseOffloadExecutor);
