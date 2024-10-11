@@ -100,7 +100,8 @@ public class EventLoopScheduler implements EventExecutorChooserFactory {
         @Override
         public EventExecutor next() {
 
-            log.info("Choosing executor from thread: [{}]", Thread.currentThread().getName());
+            if (log.isDebugEnabled())
+                log.debug("Choosing executor from thread: [{}]", Thread.currentThread().getName());
 
             var callingEventLoop = resolver.callingEvnetLoop(false);
 
