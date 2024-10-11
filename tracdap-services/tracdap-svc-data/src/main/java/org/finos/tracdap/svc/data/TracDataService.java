@@ -17,8 +17,8 @@
 package org.finos.tracdap.svc.data;
 
 import org.finos.tracdap.api.internal.TrustedMetadataApiGrpc;
-import org.finos.tracdap.common.async.EventLoopInterceptor;
-import org.finos.tracdap.common.async.EventLoopRegister;
+import org.finos.tracdap.common.netty.EventLoopInterceptor;
+import org.finos.tracdap.common.netty.EventLoopRegister;
 import org.finos.tracdap.common.auth.internal.InternalAuthProvider;
 import org.finos.tracdap.common.auth.internal.JwtSetup;
 import org.finos.tracdap.common.auth.internal.InternalAuthValidator;

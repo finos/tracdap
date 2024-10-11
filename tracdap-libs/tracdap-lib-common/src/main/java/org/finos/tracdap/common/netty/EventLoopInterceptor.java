@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.async;
+package org.finos.tracdap.common.netty;
 
 import io.grpc.*;
 import io.netty.util.concurrent.OrderedEventExecutor;

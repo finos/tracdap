@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.async;
+package org.finos.tracdap.common.netty;
 
 import io.netty.channel.EventLoop;
 import io.netty.channel.EventLoopGroup;

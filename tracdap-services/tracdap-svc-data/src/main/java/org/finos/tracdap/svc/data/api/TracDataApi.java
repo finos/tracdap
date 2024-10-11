@@ -18,7 +18,7 @@ package org.finos.tracdap.svc.data.api;
 
 import org.finos.tracdap.api.*;
 import org.finos.tracdap.api.Data;
-import org.finos.tracdap.common.async.EventLoopRegister;
+import org.finos.tracdap.common.netty.EventLoopRegister;
 import org.finos.tracdap.common.auth.internal.AuthHelpers;
 import org.finos.tracdap.common.data.DataContext;
 import org.finos.tracdap.common.data.IDataContext;
