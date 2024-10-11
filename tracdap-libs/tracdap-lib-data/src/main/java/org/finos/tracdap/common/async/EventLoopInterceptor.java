@@ -17,7 +17,7 @@
 package org.finos.tracdap.common.async;
 
 import io.grpc.*;
-import io.netty.channel.EventLoop;
+import io.netty.util.concurrent.OrderedEventExecutor;
 
 
 public class EventLoopInterceptor implements ClientInterceptor {
@@ -46,9 +46,9 @@ public class EventLoopInterceptor implements ClientInterceptor {
 
     private static class EventLoopCall< ReqT, RespT> extends ForwardingClientCall.SimpleForwardingClientCall< ReqT, RespT > {
 
-        private final EventLoop eventLoop;
+        private final OrderedEventExecutor eventLoop;
 
-        public EventLoopCall(EventLoop eventLoop, ClientCall<ReqT, RespT> delegate) {
+        public EventLoopCall(OrderedEventExecutor eventLoop, ClientCall<ReqT, RespT> delegate) {
             super(delegate);
             this.eventLoop = eventLoop;
         }
@@ -62,9 +62,9 @@ public class EventLoopInterceptor implements ClientInterceptor {
 
     private static class EventLoopListener<RespT> extends ForwardingClientCallListener.SimpleForwardingClientCallListener<RespT> {
 
-        private final EventLoop eventLoop;
+        private final OrderedEventExecutor eventLoop;
 
-        public EventLoopListener(EventLoop eventLoop, ClientCall.Listener<RespT> delegate) {
+        public EventLoopListener(OrderedEventExecutor eventLoop, ClientCall.Listener<RespT> delegate) {
             super(delegate);
             this.eventLoop = eventLoop;
         }

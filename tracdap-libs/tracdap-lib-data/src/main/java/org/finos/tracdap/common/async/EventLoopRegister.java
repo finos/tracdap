@@ -19,8 +19,12 @@ package org.finos.tracdap.common.async;
 import io.netty.channel.EventLoop;
 import io.netty.channel.EventLoopGroup;
 import io.netty.util.concurrent.EventExecutor;
+import io.netty.util.concurrent.EventExecutorGroup;
+import io.netty.util.concurrent.OrderedEventExecutor;
 import org.finos.tracdap.common.exception.ETracInternal;
 import org.finos.tracdap.common.exception.EUnexpected;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -35,12 +39,11 @@ public class EventLoopRegister {
 
     private static final Method GET_THREAD_ID = getThreadIdMethod();
 
-    private final EventLoopGroup elg;
-    private final Map<Long, EventLoop> register;
+    private final Logger log = LoggerFactory.getLogger(getClass());
+    private final Map<Long, OrderedEventExecutor> register;
 
-    public EventLoopRegister(EventLoopGroup elg) {
+    public EventLoopRegister(EventExecutorGroup elg) {
 
-        this.elg = elg;
         this.register = new ConcurrentHashMap<>();
 
         elg.forEach(el -> el.submit(() -> registerEventLoop(el)));
@@ -48,9 +51,9 @@ public class EventLoopRegister {
 
     private void registerEventLoop(EventExecutor executor) {
 
-        if (executor instanceof EventLoop) {
+        if (executor instanceof OrderedEventExecutor) {
             var threadId = getThreadId(Thread.currentThread());
-            register.put(threadId, (EventLoop) executor);
+            register.put(threadId, (OrderedEventExecutor) executor);
         }
     }
 
@@ -101,7 +104,7 @@ public class EventLoopRegister {
         }
     }
 
-    public EventLoop currentEventLoop(boolean strict) {
+    public OrderedEventExecutor currentEventLoop(boolean strict) {
 
         var threadId = getThreadId(Thread.currentThread());
         var el = register.get(threadId);
@@ -109,9 +112,12 @@ public class EventLoopRegister {
         if (el != null)
             return el;
 
-        if (!strict)
-            return elg.next();
-
-        throw new ETracInternal("The current operation is running outside the registered event loop group");
+        if (strict) {
+            var message = "The current operation is running outside the registered event loop group";
+            log.error(message);
+            throw new ETracInternal(message);
+        }
+        else
+            return null;
     }
 }
