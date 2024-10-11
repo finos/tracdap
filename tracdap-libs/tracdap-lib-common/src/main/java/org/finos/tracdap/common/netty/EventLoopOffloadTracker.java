@@ -75,7 +75,8 @@ public class EventLoopOffloadTracker {
 
         @Override
         public void execute(@Nonnull Runnable command) {
-            baseExecutor.execute(() -> offloadTask(Thread.currentThread(), command));
+            var currentThread = Thread.currentThread();
+            baseExecutor.execute(() -> offloadTask(currentThread, command));
         }
     }
 
@@ -114,7 +115,8 @@ public class EventLoopOffloadTracker {
 
         @Override
         public void execute(@Nonnull Runnable command) {
-            baseExecutor.execute(() -> offloadTask(Thread.currentThread(), command));
+            var currentThread = Thread.currentThread();
+            baseExecutor.execute(() -> offloadTask(currentThread, command));
         }
     }
 }
