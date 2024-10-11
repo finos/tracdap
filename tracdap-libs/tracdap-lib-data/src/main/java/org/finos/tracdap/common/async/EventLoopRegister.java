@@ -16,7 +16,6 @@
 
 package org.finos.tracdap.common.async;
 
-import io.grpc.*;
 import io.netty.channel.EventLoop;
 import io.netty.channel.EventLoopGroup;
 import io.netty.util.concurrent.EventExecutor;
@@ -114,91 +113,5 @@ public class EventLoopRegister {
             return elg.next();
 
         throw new ETracInternal("The current operation is running outside the registered event loop group");
-    }
-
-    public ClientInterceptor clientInterceptor() {
-
-        return new EventLoopInterceptor();
-    }
-
-    private class EventLoopInterceptor implements ClientInterceptor {
-
-        @Override public <ReqT, RespT>
-        ClientCall<ReqT, RespT> interceptCall(
-                MethodDescriptor<ReqT, RespT> method,
-                CallOptions options,
-                Channel channel) {
-
-            // Enforce strict requirement on the event loop
-            // Client interceptor is used when the data service makes calls to other TRAC services
-            // Those calls must come back on the same EL, so processing is not split across ELs
-
-            var eventLoop = currentEventLoop(/* strict = */ true);
-            var nextCall = channel.newCall(method, options);
-
-            return new EventLoopCall<>(eventLoop, nextCall);
-        }
-    }
-
-    private static class EventLoopCall< ReqT, RespT> extends ForwardingClientCall.SimpleForwardingClientCall< ReqT, RespT > {
-
-        private final EventLoop eventLoop;
-
-        public EventLoopCall(EventLoop eventLoop, ClientCall<ReqT, RespT> delegate) {
-            super(delegate);
-            this.eventLoop = eventLoop;
-        }
-
-        @Override
-        public void start(Listener<RespT> responseListener, Metadata headers) {
-            var listener = new EventLoopListener<>(eventLoop, responseListener);
-            delegate().start(listener, headers);
-        }
-    }
-
-    private static class EventLoopListener<RespT> extends ForwardingClientCallListener.SimpleForwardingClientCallListener<RespT> {
-
-        private final EventLoop eventLoop;
-
-        public EventLoopListener(EventLoop eventLoop, ClientCall.Listener<RespT> delegate) {
-            super(delegate);
-            this.eventLoop = eventLoop;
-        }
-
-        @Override
-        public void onMessage(RespT message) {
-
-            if (eventLoop.inEventLoop())
-                delegate().onMessage(message);
-            else
-                eventLoop.execute(() -> delegate().onMessage(message));
-        }
-
-        @Override
-        public void onHeaders(Metadata headers) {
-
-            if (eventLoop.inEventLoop())
-                delegate().onHeaders(headers);
-            else
-                eventLoop.execute(() -> delegate().onHeaders(headers));
-        }
-
-        @Override
-        public void onClose(Status status, Metadata trailers) {
-
-            if (eventLoop.inEventLoop())
-                delegate().onClose(status, trailers);
-            else
-                eventLoop.execute(() -> delegate().onClose(status, trailers));
-        }
-
-        @Override
-        public void onReady() {
-
-            if (eventLoop.inEventLoop())
-                delegate().onReady();
-            else
-                eventLoop.execute(() -> delegate().onReady());
-        }
     }
 }
