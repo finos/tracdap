@@ -65,6 +65,9 @@ import java.util.concurrent.TimeUnit;
 
 public class TracDataService extends CommonServiceBase {
 
+    private static final int MAX_SERVICE_CORES = 12;
+    private static final int MIN_SERVICE_CORES = 2;
+
     private final Logger log = LoggerFactory.getLogger(getClass());
 
     private final PluginManager pluginManager;
@@ -140,7 +143,8 @@ public class TracDataService extends CommonServiceBase {
                     bossThreadCount, bossExecutor, bossScheduler,
                     SelectorProvider.provider(), DefaultSelectStrategyFactory.INSTANCE);
 
-            var serviceThreadCount = 4;  // Math.max(Runtime.getRuntime().availableProcessors() - 1, 2);
+            var serviceCoresAvailable= Runtime.getRuntime().availableProcessors() - 1;
+            var serviceThreadCount = Math.max(Math.min(serviceCoresAvailable, MAX_SERVICE_CORES), MIN_SERVICE_CORES);
             var serviceExecutor = NettyHelpers.eventLoopExecutor("data-svc");
             var serviceScheduler = EventLoopScheduler.preferLoopAffinity(offloadTracking);
 

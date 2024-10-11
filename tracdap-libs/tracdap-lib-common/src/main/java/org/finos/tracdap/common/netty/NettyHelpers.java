@@ -16,6 +16,7 @@
 
 package org.finos.tracdap.common.netty;
 
+import io.netty.util.concurrent.EventExecutorChooserFactory;
 import io.netty.util.concurrent.ThreadPerTaskExecutor;
 
 import java.time.Duration;
@@ -53,4 +54,6 @@ public class NettyHelpers {
                 minSize, maxSize, idleMs, TimeUnit.MILLISECONDS,
                 workQueue, threadFactory);
     }
+
+
 }
