@@ -181,7 +181,7 @@ public class EventLoopResolver {
         if (includeOffloadMapping && offloadTracker != null) {
             var callingThread = offloadTracker.offloadCallingThread();
             if (callingThread != null) {
-                var callingEventLoop = register.get(callingThread.getId());
+                var callingEventLoop = register.get(getThreadId(callingThread));
                 if (callingEventLoop != null)
                     return callingEventLoop;;
             }
