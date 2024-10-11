@@ -140,14 +140,14 @@ public class TracPlatformGateway extends CommonServiceBase {
                     webSocketsHandler);
 
             var bossThreadCount = 1;
-            var bossExecutor = NettyHelpers.eventLoopExecutor("gateway-boss");
+            var bossExecutor = NettyHelpers.eventLoopExecutor("gw-boss");
             var bossScheduler = EventLoopScheduler.roundRobin();
 
             bossGroup = NettyHelpers.nioEventLoopGroup(bossExecutor, bossScheduler, bossThreadCount);
 
             var serviceCoresAvailable= Runtime.getRuntime().availableProcessors() - 1;
             var serviceThreadCount = Math.max(Math.min(serviceCoresAvailable, MAX_SERVICE_CORES), MIN_SERVICE_CORES);
-            var serviceExecutor = NettyHelpers.eventLoopExecutor("gateway-svc");
+            var serviceExecutor = NettyHelpers.eventLoopExecutor("gw-svc");
             var serviceScheduler = EventLoopScheduler.preferLoopAffinity();
 
             workerGroup = NettyHelpers.nioEventLoopGroup(serviceExecutor, serviceScheduler, serviceThreadCount);
