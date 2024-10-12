@@ -13,13 +13,12 @@ storage:
         devMode.layout: file
         devMode.updates: overwrite
 
-  connections:
+  external:
 
-    risk_dw:
-      protocol: SQL
+    staging_data:
+      protocol: LOCAL
       properties:
-        dialect: sqlite
-        sqlite.database: ../data/sql/risk_dw.db
+        rootPath: ../data/inputs/staging
 
 
 sparkSettings:
