@@ -535,11 +535,17 @@ class ImportModelFunc(NodeFunction[meta.ObjectDefinition]):
 
 class RunModelFunc(NodeFunction[Bundle[_data.DataView]]):
 
-    def __init__(self, node: RunModelNode, model_class: _api.TracModel.__class__, checkout_directory: pathlib.Path):
+    def __init__(
+            self, node: RunModelNode,
+            model_class: _api.TracModel.__class__,
+            checkout_directory: pathlib.Path,
+            storage_manager: _storage.StorageManager):
+
         super().__init__()
         self.node = node
         self.model_class = model_class
         self.checkout_directory = checkout_directory
+        self.storage_manager = storage_manager
 
     def _execute(self, ctx: NodeContext) -> Bundle[_data.DataView]:
 
@@ -566,7 +572,18 @@ class RunModelFunc(NodeFunction[Bundle[_data.DataView]]):
 
         # Run the model against the mapped local context
 
-        trac_ctx = _ctx.TracContextImpl(self.node.model_def, self.model_class, local_ctx, self.checkout_directory)
+        if model_def.modelType in [meta.ModelType.DATA_IMPORT_MODEL, meta.ModelType.DATA_EXPORT_MODEL]:
+            # Only provide access to the storage manager if the graph node says it should be available
+            storage_manager = self.storage_manager if self.node.external_storage else None
+            trac_ctx = _ctx.TracDataContextImpl(
+                self.node.model_def, self.model_class,
+                local_ctx, self.checkout_directory,
+                storage_manager)
+
+        else:
+            trac_ctx = _ctx.TracContextImpl(
+                self.node.model_def, self.model_class,
+                local_ctx, self.checkout_directory)
 
         try:
             model = self.model_class()
@@ -655,12 +672,13 @@ class FunctionResolver:
 
     def resolve_run_model_node(self, node: RunModelNode) -> NodeFunction:
 
-        model_class = self._models.load_model_class(node.model_scope, node.model_def)
-        checkout_directory = self._models.model_load_checkout_directory(node.model_scope, node.model_def)
-
         # TODO: Verify model_class against model_def
 
-        return RunModelFunc(node, model_class, checkout_directory)
+        model_class = self._models.load_model_class(node.model_scope, node.model_def)
+        checkout_directory = self._models.model_load_checkout_directory(node.model_scope, node.model_def)
+        storage_manager = self._storage if node.external_storage else None
+
+        return RunModelFunc(node, model_class, checkout_directory, storage_manager)
 
     __basic_node_mapping: tp.Dict[Node.__class__, NodeFunction.__class__] = {
 

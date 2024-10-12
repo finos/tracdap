@@ -22,12 +22,15 @@ import traceback
 import pandas as pd
 
 import tracdap.rt.api as _api
+import tracdap.rt.api.experimental as _eapi
 import tracdap.rt.metadata as _meta
 import tracdap.rt.exceptions as _ex
 import tracdap.rt._impl.type_system as _types  # noqa
 import tracdap.rt._impl.data as _data  # noqa
+import tracdap.rt._impl.storage as _storage  # noqa
 import tracdap.rt._impl.util as _util  # noqa
 import tracdap.rt._impl.validation as _val  # noqa
+from tracdap.rt.api.experimental import TracDataStorage, TracFileStorage
 
 
 class TracContextImpl(_api.TracContext):
@@ -258,6 +261,26 @@ class TracContextImpl(_api.TracContext):
                 field.fieldOrder = index
 
         return schema_def
+
+
+class TracDataContextImpl(TracContextImpl, _eapi.TracDataContext):
+
+    def __init__(
+            self, model_def: _meta.ModelDefinition, model_class: _api.TracModel.__class__,
+            local_ctx: tp.Dict[str, tp.Any], checkout_directory: pathlib.Path = None,
+            storage_manager: _storage.StorageManager = None):
+
+        super().__init__(model_def, model_class, local_ctx, checkout_directory)
+
+        self.__storage_manager = storage_manager
+
+    def get_file_storage(self, storage_key: str) -> TracFileStorage:
+
+        # TODO: Quick result for testing, should be api.TracFileStorage not ext.IFileStorage
+        return self.__storage_manager.get_file_storage(storage_key)
+
+    def get_data_storage(self, storage_key: str) -> TracDataStorage:
+        raise _ex.ETracInternal("Not implemented yet")
 
 
 class TracContextValidator:
