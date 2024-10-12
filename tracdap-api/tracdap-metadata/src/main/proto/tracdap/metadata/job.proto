@@ -94,11 +94,9 @@ message JobDefinition {
     RunModelJob runModel = 2;
     RunFlowJob runFlow = 3;
     ImportModelJob importModel = 4;
+    ImportDataJob importData = 5;
     ExportDataJob exportData = 6;
   }
-
-  reserved "importData";
-  reserved 5;
 }
 
 /**
@@ -151,6 +149,18 @@ message ImportModelJob {
   repeated TagUpdate modelAttrs = 6;
 }
 
+message ImportDataJob {
+
+  TagSelector model = 1;
+
+  map<string, Value> parameters = 2;
+  map<string, TagSelector> inputs = 3;
+  map<string, TagSelector> outputs = 4;
+  map<string, TagSelector> priorOutputs = 5;
+
+  repeated TagUpdate outputAttrs = 6;
+}
+
 message ExportDataJob {
 
   string targetLocation = 1;
@@ -161,5 +171,4 @@ message ExportDataJob {
 message ExportDataItem {
 
   TagSelector selector = 1;
-  repeated
 }
