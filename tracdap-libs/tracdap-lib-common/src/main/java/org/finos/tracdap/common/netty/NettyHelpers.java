@@ -50,12 +50,28 @@ public class NettyHelpers {
         return threadPoolExecutor(threadPoolName, minSize, maxSize, maxSize, DEFAULT_THREAD_POOL_IDLE_LIMIT.toMillis());
     }
 
+    public static ThreadPoolExecutor threadPoolExecutor(String threadPoolName, int minSize, int maxSize, int overflowSize) {
+        return threadPoolExecutor(threadPoolName, minSize, maxSize, overflowSize, DEFAULT_THREAD_POOL_IDLE_LIMIT.toMillis());
+    }
+
     public static ThreadPoolExecutor threadPoolExecutor(String threadPoolName, int minSize, int maxSize, int overflowSize, long idleMs) {
         var threadFactory = threadFactory(threadPoolName);
         var workQueue = new ArrayBlockingQueue<Runnable>(overflowSize);  // Double up max pool size with the work queue
         return new ThreadPoolExecutor(
                 minSize, maxSize, idleMs, TimeUnit.MILLISECONDS,
                 workQueue, threadFactory);
+    }
+
+    public static ScheduledThreadPoolExecutor scheduledPoolExecutor(String threadPoolName, int minSize, int maxSize) {
+        return scheduledPoolExecutor(threadPoolName, minSize, maxSize, DEFAULT_THREAD_POOL_IDLE_LIMIT.toMillis());
+    }
+
+    public static ScheduledThreadPoolExecutor scheduledPoolExecutor(String threadPoolName, int minSize, int maxSize, long idleMs) {
+        var threadFactory = threadFactory(threadPoolName);
+        var executor = new ScheduledThreadPoolExecutor(minSize, threadFactory);
+        executor.setMaximumPoolSize(maxSize);
+        executor.setKeepAliveTime(idleMs, TimeUnit.MILLISECONDS);
+        return executor;
     }
 
     public static NioEventLoopGroup nioEventLoopGroup(Executor executor, EventExecutorChooserFactory scheduler, int nThreads) {

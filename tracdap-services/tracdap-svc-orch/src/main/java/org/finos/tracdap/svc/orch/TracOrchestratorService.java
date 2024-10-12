@@ -56,14 +56,15 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 
 public class TracOrchestratorService extends CommonServiceBase {
 
     private static final String JOB_CACHE_NAME = "TRAC_JOB_STATE";
-    private static final int CONCURRENT_REQUESTS = 30;
+    private static final int MIN_THREAD_POOL_SIZE = 5;
+    private static final int MAX_THREAD_POOL_SIZE = 30;
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
@@ -72,7 +73,7 @@ public class TracOrchestratorService extends CommonServiceBase {
 
     private EventLoopGroup bossGroup;
     private EventLoopGroup workerGroup;
-    private ThreadPoolExecutor workerThreads;
+    private ScheduledThreadPoolExecutor workerThreads;
 
     private Server server;
     private ManagedChannel clientChannel;
@@ -117,7 +118,7 @@ public class TracOrchestratorService extends CommonServiceBase {
 
             bossGroup = new NioEventLoopGroup(1, new DefaultThreadFactory("orch-boss"));
             workerGroup = new NioEventLoopGroup(2, new DefaultThreadFactory("orch-el"));
-            workerThreads = NettyHelpers.threadPoolExecutor("orch-svc", CONCURRENT_REQUESTS, CONCURRENT_REQUESTS);
+            workerThreads = NettyHelpers.scheduledPoolExecutor("orch-svc", MIN_THREAD_POOL_SIZE, MAX_THREAD_POOL_SIZE);
 
             var clientChannelFactory = new ClientChannelFactory(clientChannelType);
             var metaClient = prepareMetadataClient(platformConfig, clientChannelFactory);
@@ -141,7 +142,7 @@ public class TracOrchestratorService extends CommonServiceBase {
 
             var jobProcessor = new JobProcessor(platformConfig, metaClient, internalAuth, jobExecutor);
 
-            jobManager = new JobManager(platformConfig, jobProcessor, jobCache, workerGroup);
+            jobManager = new JobManager(platformConfig, jobProcessor, jobCache, workerThreads);
 
             jobExecutor.start(clientChannelFactory);
             jobManager.start();
