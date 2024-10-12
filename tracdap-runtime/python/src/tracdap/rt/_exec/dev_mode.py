@@ -12,8 +12,6 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from __future__ import annotations
-
 import re
 import typing as tp
 import copy
@@ -31,12 +29,12 @@ import tracdap.rt._impl.util as _util  # noqa
 
 
 DEV_MODE_JOB_CONFIG = [
-    re.compile(r"job\.run(Model|Flow)\.parameters\.\w+"),
-    re.compile(r"job\.run(Model|Flow)\.inputs\.\w+"),
-    re.compile(r"job\.run(Model|Flow)\.outputs\.\w+"),
-    re.compile(r"job\.runModel\.model"),
-    re.compile(r"job\.runFlow\.flow"),
-    re.compile(r"job\.runFlow\.models\.\w+")]
+    re.compile(r"job\.\w+\.parameters\.\w+"),
+    re.compile(r"job\.\w+\.inputs\.\w+"),
+    re.compile(r"job\.\w+\.outputs\.\w+"),
+    re.compile(r"job\.\w+\.models\.\w+"),
+    re.compile(r"job\.\w+\.model"),
+    re.compile(r"job\.\w+\.flow")]
 
 DEV_MODE_SYS_CONFIG = []
 
@@ -56,7 +54,7 @@ class DevModeTranslator:
             sys_config.storage = _cfg.StorageConfig()
 
         sys_config = cls._add_integrated_repo(sys_config)
-        sys_config = cls._resolve_relative_storage_root(sys_config, config_mgr)
+        sys_config = cls._process_storage(sys_config, config_mgr)
 
         return sys_config
 
@@ -72,24 +70,23 @@ class DevModeTranslator:
 
         cls._log.info(f"Applying dev mode config translation to job config")
 
-        if not job_config.jobId:
+        # Protobuf semantics for a blank jobId should be an object, but objectId will be an empty string
+        if not job_config.jobId or not job_config.jobId.objectId:
             job_config = cls._process_job_id(job_config)
 
         if job_config.job.jobType is None or job_config.job.jobType == _meta.JobType.JOB_TYPE_NOT_SET:
             job_config = cls._process_job_type(job_config)
 
         # Load and populate any models provided as a Python class or class name
-        if job_config.job.jobType in [_meta.JobType.RUN_MODEL, _meta.JobType.RUN_FLOW]:
-            job_config = cls._process_models(sys_config, job_config, scratch_dir, model_class)
+        job_config = cls._process_models(sys_config, job_config, scratch_dir, model_class)
 
         # Fow flows, load external flow definitions then perform auto-wiring and type inference
         if job_config.job.jobType == _meta.JobType.RUN_FLOW:
             job_config = cls._process_flow_definition(job_config, config_mgr)
 
-        # For run (model|flow) jobs, apply processing to the parameters, inputs and outputs
-        if job_config.job.jobType in [_meta.JobType.RUN_MODEL, _meta.JobType.RUN_FLOW]:
-            job_config = cls._process_parameters(job_config)
-            job_config = cls._process_inputs_and_outputs(sys_config, job_config)
+        # Apply processing to the parameters, inputs and outputs
+        job_config = cls._process_parameters(job_config)
+        job_config = cls._process_inputs_and_outputs(sys_config, job_config)
 
         return job_config
 
@@ -107,51 +104,60 @@ class DevModeTranslator:
         return sys_config
 
     @classmethod
-    def _resolve_relative_storage_root(
+    def _process_storage(
             cls, sys_config: _cfg.RuntimeConfig,
             config_mgr: _cfg_p.ConfigManager):
 
         storage_config = copy.deepcopy(sys_config.storage)
 
         for bucket_key, bucket_config in storage_config.buckets.items():
+            storage_config.buckets[bucket_key] = cls._resolve_storage_location(
+                bucket_key, bucket_config, config_mgr)
 
-            if bucket_config.protocol != "LOCAL":
-                continue
-
-            if "rootPath" not in bucket_config.properties:
-                continue
-
-            root_path = pathlib.Path(bucket_config.properties["rootPath"])
-
-            if root_path.is_absolute():
-                continue
-
-            cls._log.info(f"Resolving relative path for [{bucket_key}] local storage...")
-
-            sys_config_path = config_mgr.config_dir_path()
-            if sys_config_path is not None:
-                absolute_path = sys_config_path.joinpath(root_path).resolve()
-                if absolute_path.exists():
-                    cls._log.info(f"Resolved [{root_path}] -> [{absolute_path}]")
-                    bucket_config.properties["rootPath"] = str(absolute_path)
-                    continue
-
-            cwd = pathlib.Path.cwd()
-            absolute_path = cwd.joinpath(root_path).resolve()
-
-            if absolute_path.exists():
-                cls._log.info(f"Resolved [{root_path}] -> [{absolute_path}]")
-                bucket_config.properties["rootPath"] = str(absolute_path)
-                continue
-
-            msg = f"Failed to resolve relative storage path [{root_path}]"
-            cls._log.error(msg)
-            raise _ex.EConfigParse(msg)
+        for bucket_key, bucket_config in storage_config.external.items():
+            storage_config.buckets[bucket_key] = cls._resolve_storage_location(
+                bucket_key, bucket_config, config_mgr)
 
         sys_config = copy.copy(sys_config)
         sys_config.storage = storage_config
 
         return sys_config
+
+    @classmethod
+    def _resolve_storage_location(cls, bucket_key, bucket_config, config_mgr: _cfg_p.ConfigManager):
+
+        if bucket_config.protocol != "LOCAL":
+            return bucket_config
+
+        if "rootPath" not in bucket_config.properties:
+            return bucket_config
+
+        root_path = pathlib.Path(bucket_config.properties["rootPath"])
+
+        if root_path.is_absolute():
+            return bucket_config
+
+        cls._log.info(f"Resolving relative path for [{bucket_key}] local storage...")
+
+        sys_config_path = config_mgr.config_dir_path()
+        if sys_config_path is not None:
+            absolute_path = sys_config_path.joinpath(root_path).resolve()
+            if absolute_path.exists():
+                cls._log.info(f"Resolved [{root_path}] -> [{absolute_path}]")
+                bucket_config.properties["rootPath"] = str(absolute_path)
+                return bucket_config
+
+        cwd = pathlib.Path.cwd()
+        absolute_path = cwd.joinpath(root_path).resolve()
+
+        if absolute_path.exists():
+            cls._log.info(f"Resolved [{root_path}] -> [{absolute_path}]")
+            bucket_config.properties["rootPath"] = str(absolute_path)
+            return bucket_config
+
+        msg = f"Failed to resolve relative storage path [{root_path}]"
+        cls._log.error(msg)
+        raise _ex.EConfigParse(msg)
 
     @classmethod
     def _add_job_resource(
@@ -188,6 +194,12 @@ class DevModeTranslator:
         elif job_config.job.importModel is not None:
             job_type = _meta.JobType.IMPORT_MODEL
 
+        elif job_config.job.importData is not None:
+            job_type = _meta.JobType.IMPORT_DATA
+
+        elif job_config.job.exportData is not None:
+            job_type = _meta.JobType.EXPORT_DATA
+
         else:
             cls._log.error("Could not infer job type")
             raise _ex.EConfigParse("Could not infer job type")
@@ -203,6 +215,26 @@ class DevModeTranslator:
         return job_config
 
     @classmethod
+    def _get_job_detail(cls, job_config: _cfg.JobConfig):
+
+        if job_config.job.jobType == _meta.JobType.RUN_MODEL:
+            return job_config.job.runModel
+
+        if job_config.job.jobType == _meta.JobType.RUN_FLOW:
+            return job_config.job.runFlow
+
+        if job_config.job.jobType == _meta.JobType.IMPORT_MODEL:
+            return job_config.job.importModel
+
+        if job_config.job.jobType == _meta.JobType.IMPORT_DATA:
+            return job_config.job.importData
+
+        if job_config.job.jobType == _meta.JobType.EXPORT_DATA:
+            return job_config.job.exportData
+
+        raise _ex.EConfigParse(f"Could not get job details for job type [{job_config.job.jobType}]")
+
+    @classmethod
     def _process_models(
             cls,
             sys_config: _cfg.RuntimeConfig,
@@ -214,41 +246,39 @@ class DevModeTranslator:
         model_loader = _models.ModelLoader(sys_config, scratch_dir)
         model_loader.create_scope("DEV_MODE_TRANSLATION")
 
-        original_config = job_config
+        # This processing works on the assumption that job details follow a convention for addressing models
+        # Jobs requiring a single model have a field called "model"
+        # Jobs requiring multiple models have a field called "models@, which is a dict
 
-        job_config = copy.copy(job_config)
-        job_config.job = copy.copy(job_config.job)
-        job_config.resources = copy.copy(job_config.resources)
+        job_detail = cls._get_job_detail(job_config)
 
-        if job_config.job.jobType == _meta.JobType.RUN_MODEL:
+        # If a model class is supplied in code, use that to generate the model def
+        if model_class is not None:
 
-            job_config.job.runModel = copy.copy(job_config.job.runModel)
+            # Passing a model class via launch_model() is only supported for job types with a single model
+            if not hasattr(job_detail, "model"):
+                raise _ex.EJobValidation(f"Job type [{job_config.job.jobType}] cannot be launched using launch_model()")
 
-            # If a model class is supplied in code, use that to generate the model def
-            if model_class is not None:
-                model_id, model_obj = cls._generate_model_for_class(model_loader, model_class)
+            model_id, model_obj = cls._generate_model_for_class(model_loader, model_class)
+            job_detail.model = _util.selector_for(model_id)
+            job_config = cls._add_job_resource(job_config, model_id, model_obj)
+
+        # Otherwise look for models specified as a single string, and take that as the entry point
+        else:
+
+            # Jobs with a single model
+            if hasattr(job_detail, "model") and isinstance(job_detail.model, str):
+                model_id, model_obj = cls._generate_model_for_entry_point(model_loader, job_detail.model)  # noqa
+                job_detail.model = _util.selector_for(model_id)
                 job_config = cls._add_job_resource(job_config, model_id, model_obj)
-                job_config.job.runModel.model = _util.selector_for(model_id)
 
-            # Otherwise if model specified as a string instead of a selector, apply the translation
-            elif isinstance(original_config.job.runModel.model, str):
-                model_detail = original_config.job.runModel.model
-                model_id, model_obj = cls._generate_model_for_entry_point(model_loader, model_detail)  # noqa
-                job_config = cls._add_job_resource(job_config, model_id, model_obj)
-                job_config.job.runModel.model = _util.selector_for(model_id)
-
-        if job_config.job.jobType == _meta.JobType.RUN_FLOW:
-
-            job_config.job.runFlow = copy.copy(job_config.job.runFlow)
-            job_config.job.runFlow.models = copy.copy(job_config.job.runFlow.models)
-
-            for model_key, model_detail in original_config.job.runFlow.models.items():
-
-                # Only apply translation if the model is specified as a string instead of a selector
-                if isinstance(model_detail, str):
-                    model_id, model_obj = cls._generate_model_for_entry_point(model_loader, model_detail)
-                    job_config = cls._add_job_resource(job_config, model_id, model_obj)
-                    job_config.job.runFlow.models[model_key] = _util.selector_for(model_id)
+            # Jobs with multiple modlels
+            elif hasattr(job_detail, "models") and isinstance(job_detail.models, dict):
+                for model_key, model_detail in job_detail.models.items():
+                    if isinstance(model_detail, str):
+                        model_id, model_obj = cls._generate_model_for_entry_point(model_loader, model_detail)
+                        job_detail.models[model_key] = _util.selector_for(model_id)
+                        job_config = cls._add_job_resource(job_config, model_id, model_obj)
 
         model_loader.destroy_scope("DEV_MODE_TRANSLATION")
 
@@ -596,35 +626,34 @@ class DevModeTranslator:
     @classmethod
     def _process_parameters(cls, job_config: _cfg.JobConfig) -> _cfg.JobConfig:
 
-        if job_config.job.jobType == _meta.JobType.RUN_MODEL:
+        # This relies on convention for naming properties across similar job types
 
-            job_details = job_config.job.runModel
-            model_key = _util.object_key(job_details.model)
+        job_detail = cls._get_job_detail(job_config)
+
+        if hasattr(job_detail, "model"):
+            model_key = _util.object_key(job_detail.model)
             model_or_flow = job_config.resources[model_key].model
-
-        elif job_config.job.jobType == _meta.JobType.RUN_FLOW:
-
-            job_details = job_config.job.runFlow
-            flow_key = _util.object_key(job_details.flow)
+        elif hasattr(job_detail, "flow"):
+            flow_key = _util.object_key(job_detail.flow)
             model_or_flow = job_config.resources[flow_key].flow
-
         else:
-            raise _ex.EUnexpected()
+            model_or_flow = None
 
-        param_specs = model_or_flow.parameters
-        param_values = job_details.parameters
+        if model_or_flow is not None:
 
-        # Set encoded params on runModel or runFlow depending on the job type
-        job_details.parameters = cls._process_parameters_dict(param_specs, param_values)
+            param_specs = model_or_flow.parameters
+            raw_values = job_detail.parameters
+
+            job_detail.parameters = cls._process_parameters_dict(param_specs, raw_values)
 
         return job_config
 
     @classmethod
     def _process_parameters_dict(
             cls, param_specs: tp.Dict[str, _meta.ModelParameter],
-            param_values: tp.Dict[str, _meta.Value]) -> tp.Dict[str, _meta.Value]:
+            raw_values: tp.Dict[str, _meta.Value]) -> tp.Dict[str, _meta.Value]:
 
-        unknown_params = list(filter(lambda p: p not in param_specs, param_values))
+        unknown_params = list(filter(lambda p: p not in param_specs, raw_values))
 
         if any(unknown_params):
             msg = f"Unknown parameters cannot be translated: [{', '.join(unknown_params)}]"
@@ -633,7 +662,7 @@ class DevModeTranslator:
 
         encoded_values = dict()
 
-        for p_name, p_value in param_values.items():
+        for p_name, p_value in raw_values.items():
 
             if isinstance(p_value, _meta.Value):
                 encoded_values[p_name] = p_value
@@ -651,23 +680,23 @@ class DevModeTranslator:
     @classmethod
     def _process_inputs_and_outputs(cls, sys_config: _cfg.RuntimeConfig, job_config: _cfg.JobConfig) -> _cfg.JobConfig:
 
-        if job_config.job.jobType == _meta.JobType.RUN_MODEL:
-            job_details = job_config.job.runModel
-            model_obj = _util.get_job_resource(job_details.model, job_config)
+        job_detail = cls._get_job_detail(job_config)
+
+        if hasattr(job_detail, "model"):
+            model_obj = _util.get_job_resource(job_detail.model, job_config)
             required_inputs = model_obj.model.inputs
             required_outputs = model_obj.model.outputs
 
-        elif job_config.job.jobType == _meta.JobType.RUN_FLOW:
-            job_details = job_config.job.runFlow
-            flow_obj = _util.get_job_resource(job_details.flow, job_config)
+        elif hasattr(job_detail, "flow"):
+            flow_obj = _util.get_job_resource(job_detail.flow, job_config)
             required_inputs = flow_obj.flow.inputs
             required_outputs = flow_obj.flow.outputs
 
         else:
             return job_config
 
-        job_inputs = job_details.inputs
-        job_outputs = job_details.outputs
+        job_inputs = job_detail.inputs
+        job_outputs = job_detail.outputs
         job_resources = job_config.resources
 
         for input_key, input_value in job_inputs.items():
