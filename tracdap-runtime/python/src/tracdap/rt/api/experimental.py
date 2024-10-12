@@ -14,10 +14,11 @@
 
 import abc as _abc
 import dataclasses as _dc
+import datetime as _dt
 import enum as _enum
 import typing as _tp
 
-from .model_api import *
+from tracdap.rt.api import *
 
 
 class FileType(_enum.Enum):
@@ -140,11 +141,8 @@ class TracDataImport(TracModel):
     def define_inputs(self) -> _tp.Dict[str, ModelInputSchema]:
         return dict()
 
-    def run_model(self, ctx:TracContext):
-        pass
-
     @_abc.abstractmethod
-    def run_import(self, ctx: TracDataContext):
+    def run_model(self, ctx: TracDataContext):
         pass
 
 
@@ -153,9 +151,6 @@ class TracDataExport(TracModel):
     def define_outputs(self) -> _tp.Dict[str, ModelOutputSchema]:
         return dict()
 
-    def run_model(self, ctx:TracContext):
-        pass
-
     @_abc.abstractmethod
-    def run_export(self, ctx: TracDataContext):
+    def run_model(self, ctx: TracDataContext):
         pass
