@@ -24,6 +24,16 @@ import "tracdap/metadata/type.proto";
 import "tracdap/metadata/data.proto";
 
 
+enum ModelType {
+
+    STANDARD_MODEL = 0;
+
+    DATA_IMPORT_MODEL = 1;
+
+    DATA_EXPORT_MODEL = 2;
+}
+
+
 /**
  * Describes an individual parameter of a model
  */
@@ -92,16 +102,15 @@ message ModelOutputSchema {
  */
 message ModelDefinition {
 
+    ModelType modelType = 13;
+
     string language = 1;
     string repository = 2;
-
     optional string packageGroup = 10;
     string package = 11;
     string version = 6;
-
-    string entryPoint = 5;
-
     optional string path = 3;
+    string entryPoint = 5;
 
     map<string, ModelParameter> parameters = 7;
     map<string, ModelInputSchema> inputs = 8;
