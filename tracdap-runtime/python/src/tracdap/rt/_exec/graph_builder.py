@@ -42,6 +42,9 @@ class GraphBuilder:
         if job_config.job.jobType == meta.JobType.RUN_FLOW:
             return cls.build_standard_job(job_config, result_spec, cls.build_run_flow_job)
 
+        if job_config.job.jobType == meta.JobType.IMPORT_DATA:
+            return cls.build_standard_job(job_config, result_spec, cls.build_import_data_job)
+
         raise _ex.EConfigParse(f"Job type [{job_config.job.jobType}] is not supported yet")
 
     @classmethod
@@ -113,6 +116,24 @@ class GraphBuilder:
             explicit_deps=[job_push_id, *main_section.must_run])
 
         return cls._join_sections(main_section, result_section)
+
+    @classmethod
+    def build_import_data_job(
+            cls, job_config: config.JobConfig, result_spec: JobResultSpec,
+            job_namespace: NodeNamespace, job_push_id: NodeId) \
+            -> GraphSection:
+
+        # TODO: This is processed as a regular calculation job for now
+        # That might be ok, but is worth reviewing
+
+        target_selector = job_config.job.importData.model
+        target_obj = _util.get_job_resource(target_selector, job_config)
+        target_def = target_obj.model
+        job_def = job_config.job.importData
+
+        return cls.build_calculation_job(
+            job_config, result_spec, job_namespace, job_push_id,
+            target_selector, target_def, job_def)
 
     @classmethod
     def build_run_model_job(
@@ -485,6 +506,12 @@ class GraphBuilder:
         input_ids = set(map(data_id, model_def.inputs))
         output_ids = set(map(data_id, model_def.outputs))
 
+        # Check whether this model needs access to external storage locations
+        if model_def.modelType in [meta.ModelType.DATA_IMPORT_MODEL, meta.ModelType.DATA_EXPORT_MODEL]:
+            external_storage = True
+        else:
+            external_storage = False
+
         # Create the model node
         # Always add the prior graph root ID as a dependency
         # This is to ensure dependencies are still pulled in for models with no inputs!
@@ -500,7 +527,8 @@ class GraphBuilder:
         model_node = RunModelNode(
             model_id, model_scope, model_def,
             frozenset(parameter_ids), frozenset(input_ids),
-            explicit_deps=explicit_deps, bundle=model_id.namespace)
+            explicit_deps=explicit_deps, bundle=model_id.namespace,
+            external_storage=external_storage)
 
         model_result_id = NodeId(f"{model_name}:RESULT", namespace)
         model_result_node = RunModelResultNode(model_result_id, model_id)

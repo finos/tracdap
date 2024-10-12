@@ -354,6 +354,7 @@ class RunModelNode(Node[Bundle[_data.DataView]]):
     model_def: meta.ModelDefinition
     parameter_ids: tp.FrozenSet[NodeId]
     input_ids: tp.FrozenSet[NodeId]
+    external_storage: bool = False
 
     def _node_dependencies(self) -> tp.Dict[NodeId, DependencyType]:
         return {dep_id: DependencyType.HARD for dep_id in [*self.parameter_ids, *self.input_ids]}
