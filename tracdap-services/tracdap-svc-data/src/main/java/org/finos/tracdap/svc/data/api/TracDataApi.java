@@ -18,6 +18,7 @@ package org.finos.tracdap.svc.data.api;
 
 import org.finos.tracdap.api.*;
 import org.finos.tracdap.api.Data;
+import org.finos.tracdap.common.netty.EventLoopResolver;
 import org.finos.tracdap.common.auth.internal.AuthHelpers;
 import org.finos.tracdap.common.data.DataContext;
 import org.finos.tracdap.common.data.IDataContext;
@@ -26,7 +27,6 @@ import org.finos.tracdap.common.data.pipeline.GrpcUploadSource;
 import org.finos.tracdap.common.util.LoggingHelpers;
 import org.finos.tracdap.common.validation.Validator;
 import org.finos.tracdap.metadata.*;
-import org.finos.tracdap.svc.data.EventLoopRegister;
 import org.finos.tracdap.svc.data.service.DataService;
 import org.finos.tracdap.svc.data.service.FileService;
 
@@ -70,7 +70,7 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
     private final FileService fileService;
     private final Validator validator;
 
-    private final EventLoopRegister eventLoops;
+    private final EventLoopResolver eventLoopResolver;
     private final BufferAllocator rootAllocator;
 
     private final AtomicLong nextReqId;
@@ -80,11 +80,11 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
 
     public TracDataApi(
             DataService dataRwService, FileService fileService,
-            EventLoopRegister eventLoops, BufferAllocator allocator) {
+            EventLoopResolver eventLoopResolver, BufferAllocator allocator) {
 
         this.dataRwService = dataRwService;
         this.fileService = fileService;
-        this.eventLoops = eventLoops;
+        this.eventLoopResolver = eventLoopResolver;
         this.rootAllocator = allocator;
 
         this.validator = new Validator();
@@ -378,7 +378,7 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
         // All processing for the request must happen on the EL originally assigned to the request
 
         var requestId = String.format("REQ-%d", nextReqId.incrementAndGet());
-        var eventLoop = eventLoops.currentEventLoop(/* strict = */ true);
+        var eventLoop = eventLoopResolver.currentEventLoop(/* strict = */ true);
         var allocator = rootAllocator.newChildAllocator(requestId, reqInitAllocation, reqMaxAllocation);
 
         log.info("OPEN data context for [{}]", requestId);

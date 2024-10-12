@@ -21,6 +21,8 @@ import org.finos.tracdap.common.auth.internal.JwtSetup;
 import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.exception.EStartup;
+import org.finos.tracdap.common.netty.EventLoopScheduler;
+import org.finos.tracdap.common.netty.NettyHelpers;
 import org.finos.tracdap.common.plugin.PluginManager;
 import org.finos.tracdap.common.service.CommonServiceBase;
 import org.finos.tracdap.config.PlatformConfig;
@@ -35,10 +37,8 @@ import org.finos.tracdap.gateway.routing.WebSocketsRouter;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.EventLoopGroup;
-import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.codec.http.websocketx.WebSocketServerProtocolConfig;
-import io.netty.util.concurrent.DefaultThreadFactory;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -61,6 +61,9 @@ public class TracPlatformGateway extends CommonServiceBase {
      * The expectation is that a unit of work will be dedicated to gateway when more of the core platform
      * components are complete.
      */
+
+    private static final int MAX_SERVICE_CORES = 6;
+    private static final int MIN_SERVICE_CORES = 2;
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
@@ -136,10 +139,18 @@ public class TracPlatformGateway extends CommonServiceBase {
                     http1Handler, http2Handler,
                     webSocketsHandler);
 
-            // TODO: Review configuration of thread pools and channel options
+            var bossThreadCount = 1;
+            var bossExecutor = NettyHelpers.eventLoopExecutor("gw-boss");
+            var bossScheduler = EventLoopScheduler.roundRobin();
 
-            bossGroup = new NioEventLoopGroup(2, new DefaultThreadFactory("boss"));
-            workerGroup = new NioEventLoopGroup(6, new DefaultThreadFactory("worker"));
+            bossGroup = NettyHelpers.nioEventLoopGroup(bossExecutor, bossScheduler, bossThreadCount);
+
+            var serviceCoresAvailable= Runtime.getRuntime().availableProcessors() - 1;
+            var serviceThreadCount = Math.max(Math.min(serviceCoresAvailable, MAX_SERVICE_CORES), MIN_SERVICE_CORES);
+            var serviceExecutor = NettyHelpers.eventLoopExecutor("gw-svc");
+            var serviceScheduler = EventLoopScheduler.preferLoopAffinity();
+
+            workerGroup = NettyHelpers.nioEventLoopGroup(serviceExecutor, serviceScheduler, serviceThreadCount);
 
             var bootstrap = new ServerBootstrap()
                     .group(bossGroup, workerGroup)

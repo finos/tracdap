@@ -24,6 +24,7 @@ import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.common.grpc.CompressionServerInterceptor;
 import org.finos.tracdap.common.grpc.ErrorMappingInterceptor;
 import org.finos.tracdap.common.grpc.LoggingServerInterceptor;
+import org.finos.tracdap.common.netty.NettyHelpers;
 import org.finos.tracdap.common.plugin.PluginManager;
 import org.finos.tracdap.common.service.CommonServiceBase;
 import org.finos.tracdap.common.util.InterfaceLogging;
@@ -33,7 +34,6 @@ import org.finos.tracdap.svc.meta.services.MetadataReadService;
 import org.finos.tracdap.svc.meta.services.MetadataSearchService;
 import org.finos.tracdap.svc.meta.services.MetadataWriteService;
 
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
 
@@ -44,6 +44,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.time.Duration;
+import java.time.temporal.ChronoUnit;
 import java.util.Properties;
 import java.util.concurrent.*;
 
@@ -127,6 +128,9 @@ public class TracMetadataService extends CommonServiceBase {
             // But note, on close it is the other way round, because the stack is unwinding
             // We want error mapping at the bottom of the stack, so it unwinds before logging
 
+            // This setup is thread-per-request using a thread pool executor
+            // Underlying Netty pools / ELs are managed automatically by gRPC for now
+
             this.server = ServerBuilder
                     .forPort(servicePort)
                     .intercept(new ErrorMappingInterceptor())
@@ -177,9 +181,7 @@ public class TracMetadataService extends CommonServiceBase {
         // A small number of headroom threads might be useful for admin tasks to avoid starvation
         // Although, to actually do anything useful with that prioritization would be needed
 
-        var HEADROOM_THREADS = 1;
-        var HEADROOM_THREADS_TIMEOUT = 60;
-        var HEADROOM_THREADS_TIMEOUT_UNIT = TimeUnit.SECONDS;
+        var IDLE_THREAD_TIMEOUT = Duration.of(60, ChronoUnit.SECONDS);
 
         try {
 
@@ -189,17 +191,9 @@ public class TracMetadataService extends CommonServiceBase {
             var poolSize = readConfigInt(properties, POOL_SIZE_KEY, DEFAULT_POOL_SIZE);
             var overflowSize = readConfigInt(properties, POOL_OVERFLOW_KEY, DEFAULT_OVERFLOW_SIZE);
 
-            var threadFactory = new ThreadFactoryBuilder()
-                    .setNameFormat("worker-%d")
-                    .setPriority(Thread.NORM_PRIORITY)
-                    .build();
-
-            var overflowQueue = new ArrayBlockingQueue<Runnable>(overflowSize);
-
-            var executor = new ThreadPoolExecutor(
-                    poolSize, poolSize + HEADROOM_THREADS,
-                    HEADROOM_THREADS_TIMEOUT, HEADROOM_THREADS_TIMEOUT_UNIT,
-                    overflowQueue, threadFactory);
+            var executor = NettyHelpers.threadPoolExecutor(
+                    "meta-svc", poolSize, poolSize, overflowSize,
+                    IDLE_THREAD_TIMEOUT.toMillis());
 
             executor.prestartAllCoreThreads();
             executor.allowCoreThreadTimeOut(false);

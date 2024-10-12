@@ -110,6 +110,12 @@ public class TracOrchestratorService extends CommonServiceBase {
 
         try {
 
+            // TODO: Setup of the server / channels / ELs needs review
+            // Orch svc puts application work on an executor, low level setup is probably not required
+            // The main worker executor could be e.q. a scheduled thread pool
+            // E.g. meta svc uses high level ServerBuilder with just one worker pool
+            // Orch framework still needs a channel factory to connect to instances of TRAC runtime
+
             var channelType = NioServerSocketChannel.class;
             var clientChannelType = NioSocketChannel.class;
 
@@ -224,7 +230,7 @@ public class TracOrchestratorService extends CommonServiceBase {
         });
 
         if (serverDown && clientDown && executorDown && jobMonitorDown &&
-            serviceThreadsDown && nettyDown && bossDown)
+                serviceThreadsDown && nettyDown && bossDown)
             return 0;
 
         if (!serverDown)

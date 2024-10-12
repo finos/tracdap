@@ -16,11 +16,11 @@
 
 package org.finos.tracdap.webserver;
 
-
 import org.finos.tracdap.common.auth.internal.JwtSetup;
 import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.exception.EStartup;
+import org.finos.tracdap.common.netty.NettyHelpers;
 import org.finos.tracdap.common.plugin.PluginManager;
 import org.finos.tracdap.common.service.CommonServiceBase;
 import org.finos.tracdap.common.storage.IFileStorage;
@@ -33,7 +33,6 @@ import io.netty.channel.ChannelOption;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
-import io.netty.util.concurrent.DefaultThreadFactory;
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.memory.RootAllocator;
 import org.apache.arrow.memory.netty.NettyAllocationManager;
@@ -101,8 +100,11 @@ public class TracWebServer extends CommonServiceBase {
 
         // TODO: Review configuration of thread pools and channel options
 
-        bossGroup = new NioEventLoopGroup(2, new DefaultThreadFactory("boss"));
-        workerGroup = new NioEventLoopGroup(6, new DefaultThreadFactory("worker"));
+        var bossFactory = NettyHelpers.threadFactory("webs-boss");
+        var workerFactory = NettyHelpers.threadFactory("web-svc");
+
+        bossGroup = new NioEventLoopGroup(2, bossFactory);
+        workerGroup = new NioEventLoopGroup(6, workerFactory);
 
         // JWT processor is responsible for signing and validating auth tokens
         var jwtValidator = JwtSetup.createValidator(platformConfig, configManager);
