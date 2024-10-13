@@ -512,6 +512,7 @@ class GraphProcessor(_actors.Actor):
             for dep in deps:
                 GraphLogger.log_dependency_add(node_id, dep.node_id)
                 engine_node.dependencies[dep.node_id] = dep.dependency_type
+            new_graph.nodes[node_id] = engine_node
 
         self.graph = new_graph
 
