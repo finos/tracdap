@@ -582,6 +582,7 @@ class RunModelFunc(NodeFunction[Bundle[_data.DataView]]):
         # Still, if any nodes are missing or have the wrong type TracContextImpl will raise ERuntimeValidation
 
         local_ctx = {}
+        dynamic_outputs = []
 
         for node_id, node_result in _ctx_iter_items(ctx):
 
@@ -602,9 +603,8 @@ class RunModelFunc(NodeFunction[Bundle[_data.DataView]]):
             # Only provide access to the storage manager if the graph node says it should be available
             storage_manager = self.storage_manager if self.node.external_storage else None
             trac_ctx = _ctx.TracDataContextImpl(
-                self.node.model_def, self.model_class,
-                local_ctx, self.checkout_directory,
-                storage_manager)
+                self.node.model_def, self.model_class, local_ctx, dynamic_outputs,
+                self.checkout_directory, storage_manager)
 
         else:
             trac_ctx = _ctx.TracContextImpl(
@@ -623,7 +623,10 @@ class RunModelFunc(NodeFunction[Bundle[_data.DataView]]):
 
         # Check required outputs are present and build the results bundle
 
+        model_name = self.model_class.__name__
         results: Bundle[_data.DataView] = dict()
+        new_nodes = dict()
+        new_deps = dict()
 
         for output_name, output_schema in model_def.outputs.items():
 
@@ -632,7 +635,6 @@ class RunModelFunc(NodeFunction[Bundle[_data.DataView]]):
             if result is None or result.is_empty():
 
                 if not output_schema.optional:
-                    model_name = self.model_class.__name__
                     raise _ex.ERuntimeValidation(f"Missing required output [{output_name}] from model [{model_name}]")
 
                 # Create a placeholder for optional outputs that were not emitted
@@ -640,6 +642,22 @@ class RunModelFunc(NodeFunction[Bundle[_data.DataView]]):
                     result = _data.DataView.create_empty()
 
             results[output_name] = result
+
+        for output_name in dynamic_outputs:
+
+            result: _data.DataView = local_ctx.get(output_name)
+
+            if result is None or result.is_empty():
+                raise _ex.ERuntimeValidation(f"No data provided for [{output_name}] from model [{model_name}]")
+
+            results[output_name] = result
+
+            result_node_id = NodeId.of(output_name, self.node.id.namespace, _data.DataView)
+            result_node = BundleItemNode(result_node_id, self.node.id, output_name)
+
+            new_nodes[result_node_id] = result_node
+
+        self.node_callback.send_graph_updates(new_nodes, new_deps)
 
         return results
 

@@ -71,11 +71,13 @@ class TracContextImpl(_api.TracContext):
         self.__model_def = model_def
         self.__model_class = model_class
         self.__local_ctx = local_ctx or {}
+        self.__dynamic_outputs = []  # Not used for standard models
 
         self.__val = TracContextValidator(
             self.__ctx_log,
             self.__model_def,
             self.__local_ctx,
+            self.__dynamic_outputs,
             checkout_directory)
 
     def get_parameter(self, parameter_name: str) -> tp.Any:
@@ -266,19 +268,26 @@ class TracDataContextImpl(TracContextImpl, _eapi.TracDataContext):
 
     def __init__(
             self, model_def: _meta.ModelDefinition, model_class: _api.TracModel.__class__,
-            local_ctx: tp.Dict[str, tp.Any], checkout_directory: pathlib.Path = None,
+            local_ctx: tp.Dict[str, tp.Any], dynamic_outputs: tp.List[str],
+            checkout_directory: pathlib.Path = None,
             storage_manager: _storage.StorageManager = None):
 
         super().__init__(model_def, model_class, local_ctx, checkout_directory)
 
         self.__model_def = model_def
+        self.__local_ctx = local_ctx
+        self.__dynamic_outputs = dynamic_outputs
         self.__storage_manager = storage_manager
+
+        self.__val = self._TracContextImpl__val  # noqa
+        self.__val._TracContextValidator__dynamic_outputs = self.__dynamic_outputs
 
     def get_file_storage(self, storage_key: str) -> _eapi.TracFileStorage:
 
-        # Check whether the request storage is available
-        if not self.__storage_manager.has_file_storage(storage_key, external=True):
-            raise _ex.ERuntimeValidation(f"File storage not available for storage key [{storage_key}]")
+        _val.validate_signature(self.get_file_storage, storage_key)
+
+        self.__val.check_storage_valid_identifier(storage_key)
+        self.__val.check_external_file_storage_exists(storage_key, self.__storage_manager)
 
         # Underlying storage impl from the storage manager
         storage_impl = self.__storage_manager.get_file_storage(storage_key, external=True)
@@ -292,18 +301,35 @@ class TracDataContextImpl(TracContextImpl, _eapi.TracDataContext):
     def get_data_storage(self, storage_key: str) -> None:
         raise _ex.ERuntimeValidation("Data storage API not available yet")
 
-    def add_data_import(self, dataset_key: str):
-        raise RuntimeError("Not implemented yet")
+    def add_data_import(self, dataset_name: str):
 
-    def set_source_metadata(self, dataset_key: str, storage_key: str, source_info: _eapi.FileStat):
-        raise RuntimeError("Not implemented yet")
+        _val.validate_signature(self.add_data_import, dataset_name)
 
-    def set_attribute(self, dataset_key: str, attribute_name: str, value: tp.Any):
-        raise RuntimeError("Not implemented yet")
+        self.__val.check_dataset_valid_identifier(dataset_name)
+        self.__val.check_dataset_not_defined_in_model(dataset_name)
+        self.__val.check_dataset_not_available_in_context(dataset_name)
 
-    def set_schema(self, dataset_key: str, schema: _meta.SchemaDefinition):
-        # TODO: Set schema should become the primary
-        self.put_schema(dataset_key, schema)
+        self.__local_ctx[dataset_name] = _data.DataView.create_empty()
+        self.__dynamic_outputs.append(dataset_name)
+
+    def set_source_metadata(self, dataset_name: str, storage_key: str, source_info: _eapi.FileStat):
+
+        _val.validate_signature(self.add_data_import, dataset_name, storage_key, source_info)
+
+        pass  # Not implemented yet, only required when imports are sent back to the platform
+
+    def set_attribute(self, dataset_name: str, attribute_name: str, value: tp.Any):
+
+        _val.validate_signature(self.add_data_import, dataset_name, attribute_name, value)
+
+        pass  # Not implemented yet, only required when imports are sent back to the platform
+
+    def set_schema(self, dataset_name: str, schema: _meta.SchemaDefinition):
+
+        _val.validate_signature(self.set_schema, dataset_name, schema)
+
+        # Forward to existing method (these should be swapped round)
+        self.put_schema(dataset_name, schema)
 
 
 class TracFileStorageImpl(_eapi.TracFileStorage):
@@ -362,11 +388,13 @@ class TracContextValidator:
             self, log: logging.Logger,
             model_def: _meta.ModelDefinition,
             local_ctx: tp.Dict[str, tp.Any],
+            dynamic_outputs: tp.List[str],
             checkout_directory: pathlib.Path):
 
         self.__log = log
         self.__model_def = model_def
         self.__local_ctx = local_ctx
+        self.__dynamic_outputs = dynamic_outputs
         self.__checkout_directory = checkout_directory
 
     def _report_error(self, message, cause: Exception = None):
@@ -411,6 +439,14 @@ class TracContextValidator:
         if not self.__VALID_IDENTIFIER.match(dataset_name):
             self._report_error(f"Dataset name {dataset_name} is not a valid identifier")
 
+    def check_dataset_not_defined_in_model(self, dataset_name: str):
+
+        if dataset_name  in self.__model_def.inputs or dataset_name in self.__model_def.outputs:
+            self._report_error(f"Dataset {dataset_name} is already defined in the model")
+
+        if dataset_name  in self.__model_def.parameters:
+            self._report_error(f"Dataset name {dataset_name} is already in use as a model parameter")
+
     def check_dataset_defined_in_model(self, dataset_name: str):
 
         if dataset_name not in self.__model_def.inputs and dataset_name not in self.__model_def.outputs:
@@ -418,23 +454,29 @@ class TracContextValidator:
 
     def check_dataset_is_model_output(self, dataset_name: str):
 
-        if dataset_name not in self.__model_def.outputs:
+        if dataset_name not in self.__model_def.outputs and dataset_name not in self.__dynamic_outputs:
             self._report_error(f"Dataset {dataset_name} is not defined as a model output")
 
     def check_dataset_is_dynamic_output(self, dataset_name: str):
 
         model_output: _meta.ModelOutputSchema = self.__model_def.outputs.get(dataset_name)
+        dynamic_output = dataset_name in self.__dynamic_outputs
 
-        if model_output is None:
+        if model_output is None and not dynamic_output:
             self._report_error(f"Dataset {dataset_name} is not defined as a model output")
 
-        if not model_output.dynamic:
+        if model_output and not model_output.dynamic:
             self._report_error(f"Model output {dataset_name} is not a dynamic output")
 
     def check_dataset_available_in_context(self, item_name: str):
 
         if item_name not in self.__local_ctx:
             self._report_error(f"Dataset {item_name} is not available in the current context")
+
+    def check_dataset_not_available_in_context(self, item_name: str):
+
+        if item_name in self.__local_ctx:
+            self._report_error(f"Dataset {item_name} already exists in the current context")
 
     def check_dataset_schema_defined(self, dataset_name: str, data_view: _data.DataView):
 
@@ -507,6 +549,19 @@ class TracContextValidator:
             self._report_error(
                 f"The object referenced by [{item_name}] in the current context has the wrong type" +
                 f" (expected {expected_type_name}, got {actual_type_name})")
+
+    def check_storage_valid_identifier(self, storage_key):
+
+        if storage_key is None:
+            self._report_error(f"Storage key is null")
+
+        if not self.__VALID_IDENTIFIER.match(storage_key):
+            self._report_error(f"Storage key {storage_key} is not a valid identifier")
+
+    def check_external_file_storage_exists(self, storage_key, storage_manager: _storage.StorageManager):
+
+        if not storage_manager.has_file_storage(storage_key, external=True):
+            self._report_error(f"File storage not available for storage key [{storage_key}]")
 
     @staticmethod
     def _type_name(type_: type):

@@ -95,7 +95,7 @@ class BulkDataImport(trac.TracDataImport):
             "storage_path": file.storage_path,
             "file_name": file.file_name,
             "size": file.size,
-            "mtime": file.mtime
+            "mtime": file.mtime.replace(tzinfo=None)  # TODO: Time zone support
         }
 
     @staticmethod
