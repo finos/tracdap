@@ -115,7 +115,7 @@ class DevModeTranslator:
                 bucket_key, bucket_config, config_mgr)
 
         for bucket_key, bucket_config in storage_config.external.items():
-            storage_config.buckets[bucket_key] = cls._resolve_storage_location(
+            storage_config.external[bucket_key] = cls._resolve_storage_location(
                 bucket_key, bucket_config, config_mgr)
 
         sys_config = copy.copy(sys_config)
