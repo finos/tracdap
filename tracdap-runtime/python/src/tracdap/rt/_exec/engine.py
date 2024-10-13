@@ -12,8 +12,6 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from __future__ import annotations
-
 import copy as cp
 import dataclasses as dc
 import enum
@@ -272,12 +270,13 @@ class JobProcessor(_actors.Actor):
         self.result_spec = result_spec
         self._models = models
         self._storage = storage
+        self._resolver = _func.FunctionResolver(models, storage)
         self._log = _util.logger_for_object(self)
 
     def on_start(self):
         self._log.info(f"Starting job [{self.job_key}]")
         self._models.create_scope(self.job_key)
-        self.actors().spawn(GraphBuilder(self.job_config, self.result_spec, self._models, self._storage))
+        self.actors().spawn(GraphBuilder(self.job_config, self.result_spec, self._resolver))
 
     def on_stop(self):
         self._log.info(f"Cleaning up job [{self.job_key}]")
@@ -305,7 +304,7 @@ class JobProcessor(_actors.Actor):
 
     @_actors.Message
     def job_graph(self, graph: _EngineContext, root_id: NodeId):
-        self.actors().spawn(GraphProcessor(graph, root_id))
+        self.actors().spawn(GraphProcessor(graph, root_id, self._resolver))
         self.actors().stop(self.actors().sender)
 
     @_actors.Message
@@ -331,15 +330,14 @@ class GraphBuilder(_actors.Actor):
     def __init__(
             self, job_config: _cfg.JobConfig,
             result_spec: _graph.JobResultSpec,
-            models: _models.ModelLoader,
-            storage: _storage.StorageManager):
+            resolver: _func.FunctionResolver):
 
         super().__init__()
         self.job_config = job_config
         self.result_spec = result_spec
         self.graph: tp.Optional[_EngineContext] = None
 
-        self._resolver = _func.FunctionResolver(models, storage)
+        self._resolver = resolver
         self._log = _util.logger_for_object(self)
 
     def on_start(self):
@@ -378,11 +376,12 @@ class GraphProcessor(_actors.Actor):
     Once all running nodes are stopped, an error is reported to the parent
     """
 
-    def __init__(self, graph: _EngineContext, root_id: NodeId):
+    def __init__(self, graph: _EngineContext, root_id: NodeId, resolver: _func.FunctionResolver):
         super().__init__()
         self.graph = graph
         self.root_id = root_id
         self.processors: tp.Dict[NodeId, _actors.ActorId] = dict()
+        self._resolver = resolver
         self._log = _util.logger_for_object(self)
 
     def on_start(self):
@@ -462,6 +461,61 @@ class GraphProcessor(_actors.Actor):
 
         # Job may have completed due to error propagation
         self.check_job_status(do_submit=False)
+
+    @_actors.Message
+    def update_graph(
+            self, requestor_id: NodeId,
+            new_nodes: tp.Dict[NodeId, _graph.Node],
+            new_deps: tp.Dict[NodeId, tp.List[_graph.Dependency]]):
+
+        new_graph = cp.copy(self.graph)
+        new_graph.nodes = cp.copy(new_graph.nodes)
+
+        # Attempt to insert a duplicate node is always an error
+        node_collision = list(filter(lambda nid: nid in self.graph.nodes, new_nodes))
+
+        # Only allow adding deps to pending nodes for now (adding deps to active nodes will require more work)
+        dep_collision = list(filter(lambda nid: nid not in self.graph.pending_nodes, new_deps))
+
+        dep_invalid = list(filter(
+            lambda dds: any(filter(lambda dd: dd.node_id not in new_nodes, dds)),
+            new_deps.values()))
+
+        if any(node_collision) or any(dep_collision) or any(dep_invalid):
+
+            self._log.error(f"Node collision during graph update (requested by {requestor_id})")
+            self._log.error(f"Duplicate node IDs: {node_collision or 'None'}")
+            self._log.error(f"Dependency updates for dead nodes: {dep_collision or 'None'}")
+            self._log.error(f"Dependencies added for existing nodes: {dep_invalid or 'None'}")
+
+            # Set an error on the node, and wait for it to complete normally
+            # The error will be picked up when the result is recorded
+            # If dependencies are added for an active node, more signalling will be needed
+            requestor = cp.copy(new_graph.nodes[requestor_id])
+            requestor.error = _ex.ETracInternal("Node collision during graph update")
+            new_graph.nodes[requestor_id] = requestor
+
+            return
+
+        new_graph.pending_nodes = cp.copy(new_graph.pending_nodes)
+
+        for node_id, node in new_nodes.items():
+            GraphLogger.log_node_add(node)
+            node_func = self._resolver.resolve_node(node)
+            new_node = _EngineNode(node, {}, function=node_func)
+            new_graph.nodes[node_id] = new_node
+            new_graph.pending_nodes.add(node_id)
+
+        for node_id, deps in new_deps.items():
+            engine_node = cp.copy(new_graph.nodes[node_id])
+            engine_node.dependencies = cp.copy(engine_node.dependencies)
+            for dep in deps:
+                GraphLogger.log_dependency_add(node_id, dep.node_id)
+                engine_node.dependencies[dep.node_id] = dep.dependency_type
+
+        self.graph = new_graph
+
+        self.actors().send(self.actors().id, "submit_viable_nodes")
 
     @classmethod
     def _is_required_node(cls, node: _EngineNode, graph: _EngineContext):
@@ -654,8 +708,15 @@ class NodeProcessor(_actors.Actor):
 
             NodeLogger.log_node_start(self.node)
 
+            # Context contains only node states available when the context is set up
             ctx = NodeContextImpl(self.graph.nodes)
-            result = self.node.function(ctx)
+
+            # Callback remains valid because it only lives inside the call stack for this message
+            callback = NodeCallbackImpl(self.actors(), self.node_id)
+
+            # Execute the node function
+            result = self.node.function(ctx, callback)
+
             self._check_result_type(result)
 
             NodeLogger.log_node_succeeded(self.node)
@@ -728,6 +789,37 @@ class DataNodeProcessor(NodeProcessor):
 
     def __init__(self, graph: _EngineContext, node_id: NodeId, node: _EngineNode):
         super().__init__(graph, node_id, node)
+
+
+class GraphLogger:
+
+    """
+    Log the activity of the GraphProcessor
+    """
+
+    _log = _util.logger_for_class(GraphProcessor)
+
+    @classmethod
+    def log_node_add(cls, node: _graph.Node):
+
+        node_name = node.id.name
+        namespace = node.id.namespace
+
+        cls._log.info(f"ADD {cls._func_type(node)} [{node_name}] / {namespace}")
+
+    @classmethod
+    def log_dependency_add(cls, node_id: NodeId, dep_id: NodeId):
+
+        if node_id.namespace == dep_id.namespace:
+            cls._log.info(f"ADD DEPENDENCY [{node_id.name}] -> [{dep_id.name}] / {node_id.namespace}")
+        else:
+            cls._log.info(f"ADD DEPENDENCY [{node_id.name}] / {node_id.namespace} -> [{dep_id.name}] / {dep_id.namespace}")
+
+    @classmethod
+    def _func_type(cls, node: _graph.Node):
+
+        func_type = type(node)
+        return func_type.__name__[:-4]
 
 
 class NodeLogger:
@@ -912,3 +1004,21 @@ class NodeContextImpl(_func.NodeContext):
         for node_id, node in self.__nodes.items():
             if node.complete and not node.error:
                 yield node_id, node.result
+
+
+class NodeCallbackImpl(_func.NodeCallback):
+
+    """
+    Callback impl is passed to node functions so they can call into the engine
+    It is only valid as long as the node function runs inside the call stack of a single message
+    """
+
+    def __init__(self, actor_ctx: _actors.ActorContext, node_id: NodeId):
+        self.__actor_ctx = actor_ctx
+        self.__node_id = node_id
+
+    def send_graph_updates(
+            self, new_nodes: tp.Dict[NodeId, _graph.Node],
+            new_deps: tp.Dict[NodeId, tp.List[_graph.Dependency]]):
+
+        self.__actor_ctx.send_parent("update_graph", self.__node_id, new_nodes, new_deps)

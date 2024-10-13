@@ -12,8 +12,6 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from __future__ import annotations
-
 import pathlib
 import typing as tp
 import dataclasses as dc
@@ -38,7 +36,7 @@ class NodeNamespace:
         return cls.__ROOT
 
     name: str
-    parent: tp.Optional[NodeNamespace] = dc.field(default_factory=lambda: NodeNamespace.root())
+    parent: "tp.Optional[NodeNamespace]" = dc.field(default_factory=lambda: NodeNamespace.root())
 
     def __str__(self):
         if self is self.__ROOT:
@@ -62,7 +60,7 @@ class NodeNamespace:
 class NodeId(tp.Generic[_T]):
 
     @staticmethod
-    def of(name: str, namespace: NodeNamespace, result_type: tp.Type[_T]) -> NodeId[_T]:
+    def of(name: str, namespace: NodeNamespace, result_type: tp.Type[_T]) -> "NodeId[_T]":
         return NodeId(name, namespace, result_type)
 
     name: str
@@ -83,14 +81,21 @@ class DependencyType:
     immediate: bool = True
     tolerant: bool = False
 
-    HARD: tp.ClassVar[DependencyType]
-    TOLERANT: tp.ClassVar[DependencyType]
+    HARD: "tp.ClassVar[DependencyType]"
+    TOLERANT: "tp.ClassVar[DependencyType]"
 
 
 DependencyType.HARD = DependencyType(immediate=True, tolerant=False)
 DependencyType.SOFT = DependencyType(immediate=False, tolerant=True)
 DependencyType.TOLERANT = DependencyType(immediate=True, tolerant=True)
 DependencyType.DELAYED = DependencyType(immediate=False, tolerant=False)
+
+
+@dc.dataclass(frozen=True)
+class Dependency:
+
+    node_id: NodeId
+    dependency_type: DependencyType
 
 
 @dc.dataclass(frozen=True)

@@ -59,6 +59,13 @@ class NodeContext:
         pass
 
 
+class NodeCallback:
+
+    @abc.abstractmethod
+    def send_graph_updates(self, new_nodes: tp.Dict[NodeId, Node], new_deps: tp.Dict[NodeId, tp.List[Dependency]]):
+        pass
+
+
 # Helper functions to access the node context (in case the NodeContext interface needs to change)
 
 def _ctx_lookup(node_id: NodeId[_T], ctx: NodeContext) -> _T:
@@ -89,8 +96,15 @@ class NodeFunction(tp.Generic[_T]):
         :py:class:`NodeContext <NodeContext>`
     """
 
-    def __call__(self, ctx: NodeContext) -> _T:
-        return self._execute(ctx)
+    def __init__(self):
+        self.node_callback: tp.Optional[NodeCallback] = None
+
+    def __call__(self, ctx: NodeContext, callback: NodeCallback = None) -> _T:
+        try:
+            self.node_callback = callback
+            return self._execute(ctx)
+        finally:
+            self.node_callback = None
 
     @abc.abstractmethod
     def _execute(self, ctx: NodeContext) -> _T:
@@ -105,6 +119,7 @@ class NodeFunction(tp.Generic[_T]):
 class NoopFunc(NodeFunction[None]):
 
     def __init__(self, node: NoopNode):
+        super().__init__()
         self.node = node
 
     def _execute(self, _: NodeContext) -> None:
@@ -114,6 +129,7 @@ class NoopFunc(NodeFunction[None]):
 class StaticValueFunc(NodeFunction[_T]):
 
     def __init__(self, node: StaticValueNode[_T]):
+        super().__init__()
         self.node = node
 
     def _execute(self, ctx: NodeContext) -> _T:
@@ -123,6 +139,7 @@ class StaticValueFunc(NodeFunction[_T]):
 class IdentityFunc(NodeFunction[_T]):
 
     def __init__(self, node: IdentityNode[_T]):
+        super().__init__()
         self.node = node
 
     def _execute(self, ctx: NodeContext) -> _T:
@@ -138,6 +155,7 @@ class _ContextPushPopFunc(NodeFunction[Bundle[tp.Any]], abc.ABC):
     _POP = False
 
     def __init__(self, node: tp.Union[ContextPushNode, ContextPopNode], direction: bool):
+        super().__init__()
         self.node = node
         self.direction = direction
 
@@ -176,6 +194,7 @@ class ContextPopFunc(_ContextPushPopFunc):
 class KeyedItemFunc(NodeFunction[_T]):
 
     def __init__(self, node: KeyedItemNode[_T]):
+        super().__init__()
         self.node = node
 
     def _execute(self, ctx: NodeContext) -> _T:
@@ -187,6 +206,7 @@ class KeyedItemFunc(NodeFunction[_T]):
 class BuildJobResultFunc(NodeFunction[_config.JobResult]):
 
     def __init__(self, node: BuildJobResultNode):
+        super().__init__()
         self.node = node
 
     def _execute(self, ctx: NodeContext) -> _config.JobResult:
@@ -211,6 +231,7 @@ class BuildJobResultFunc(NodeFunction[_config.JobResult]):
 class SaveJobResultFunc(NodeFunction[None]):
 
     def __init__(self, node: SaveJobResultNode):
+        super().__init__()
         self.node = node
 
     def _execute(self, ctx: NodeContext) -> None:
@@ -241,6 +262,7 @@ class SaveJobResultFunc(NodeFunction[None]):
 class DataViewFunc(NodeFunction[_data.DataView]):
 
     def __init__(self, node: DataViewNode):
+        super().__init__()
         self.node = node
 
     def _execute(self, ctx: NodeContext) -> _data.DataView:
@@ -267,6 +289,7 @@ class DataViewFunc(NodeFunction[_data.DataView]):
 class DataItemFunc(NodeFunction[_data.DataItem]):
 
     def __init__(self, node: DataItemNode):
+        super().__init__()
         self.node = node
 
     def _execute(self, ctx: NodeContext) -> _data.DataItem:
@@ -290,6 +313,7 @@ class DataItemFunc(NodeFunction[_data.DataItem]):
 class DataResultFunc(NodeFunction[ObjectBundle]):
 
     def __init__(self, node: DataResultNode):
+        super().__init__()
         self.node = node
 
     def _execute(self, ctx: NodeContext) -> ObjectBundle:
@@ -324,6 +348,7 @@ class DynamicDataSpecFunc(NodeFunction[_data.DataSpec]):
     RANDOM.seed()
 
     def __init__(self, node: DynamicDataSpecNode, storage: _storage.StorageManager):
+        super().__init__()
         self.node = node
         self.storage = storage
 
@@ -434,7 +459,7 @@ class _LoadSaveDataFunc(abc.ABC):
         return copy_
 
 
-class LoadDataFunc(NodeFunction[_data.DataItem], _LoadSaveDataFunc):
+class LoadDataFunc( _LoadSaveDataFunc, NodeFunction[_data.DataItem],):
 
     def __init__(self, node: LoadDataNode, storage: _storage.StorageManager):
         super().__init__(storage)
@@ -463,7 +488,7 @@ class LoadDataFunc(NodeFunction[_data.DataItem], _LoadSaveDataFunc):
         return _data.DataItem(table.schema, table)
 
 
-class SaveDataFunc(NodeFunction[None], _LoadSaveDataFunc):
+class SaveDataFunc(_LoadSaveDataFunc, NodeFunction[None]):
 
     def __init__(self, node: SaveDataNode, storage: _storage.StorageManager):
         super().__init__(storage)
@@ -518,6 +543,7 @@ def _model_def_for_import(import_details: meta.ImportModelJob):
 class ImportModelFunc(NodeFunction[meta.ObjectDefinition]):
 
     def __init__(self, node: ImportModelNode, models: _models.ModelLoader):
+        super().__init__()
         self.node = node
         self._models = models
 
