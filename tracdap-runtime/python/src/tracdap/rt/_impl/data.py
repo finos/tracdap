@@ -23,6 +23,7 @@ import platform
 import pyarrow as pa
 import pyarrow.compute as pc
 import pandas as pd
+import pandas  # noqa
 
 import tracdap.rt.metadata as _meta
 import tracdap.rt.exceptions as _ex
@@ -467,6 +468,11 @@ class DataMapping:
         else:
             df_types = df.dtypes.filter(column_filter) if column_filter else df.dtypes
             return DataConformance.conform_to_schema(table, schema, df_types)
+
+    @classmethod
+    def pandas_to_arrow_schema(cls, df:pd.DataFrame) -> pa.Schema:
+
+        return pa.Schema.from_pandas(df, preserve_index=False)
 
 
 class DataConformance:
