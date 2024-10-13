@@ -170,6 +170,17 @@ class GraphSection:
     must_run: tp.List[NodeId] = dc.field(default_factory=list)
 
 
+Bundle: tp.Generic[_T] = tp.Dict[str, _T]
+ObjectBundle = Bundle[meta.ObjectDefinition]
+
+
+@dc.dataclass(frozen=True)
+class JobOutputs:
+
+    objects: tp.Dict[str, NodeId[meta.ObjectDefinition]] = dc.field(default_factory=dict)
+    bundles: tp.List[NodeId[ObjectBundle]] = dc.field(default_factory=list)
+
+
 # TODO: Where does this go?
 @dc.dataclass(frozen=True)
 class JobResultSpec:
@@ -182,10 +193,6 @@ class JobResultSpec:
 # ----------------------------------------------------------------------------------------------------------------------
 #  NODE DEFINITIONS
 # ----------------------------------------------------------------------------------------------------------------------
-
-
-Bundle: tp.Generic[_T] = tp.Dict[str, _T]
-ObjectBundle = Bundle[meta.ObjectDefinition]
 
 
 @_node_type
@@ -375,15 +382,27 @@ class RunModelResultNode(Node[None]):
 
 
 @_node_type
+class RuntimeOutputsNode(Node[JobOutputs]):
+
+    outputs: JobOutputs
+
+    def _node_dependencies(self) -> tp.Dict[NodeId, DependencyType]:
+        dep_ids = [*self.outputs.bundles, *self.outputs.objects.values()]
+        return {node_id: DependencyType.HARD for node_id in dep_ids}
+
+
+@_node_type
 class BuildJobResultNode(Node[cfg.JobResult]):
 
     job_id: meta.TagHeader
 
-    objects: tp.Dict[str, NodeId[meta.ObjectDefinition]] = dc.field(default_factory=dict)
-    bundles: tp.List[NodeId[ObjectBundle]] = dc.field(default_factory=list)
+    outputs: JobOutputs
+    runtime_outputs: tp.Optional[NodeId[JobOutputs]] = None
 
     def _node_dependencies(self) -> tp.Dict[NodeId, DependencyType]:
-        dep_ids = [*self.bundles, *self.objects.values()]
+        dep_ids = [*self.outputs.bundles, *self.outputs.objects.values()]
+        if self.runtime_outputs is not None:
+            dep_ids.append(self.runtime_outputs)
         return {node_id: DependencyType.HARD for node_id in dep_ids}
 
 

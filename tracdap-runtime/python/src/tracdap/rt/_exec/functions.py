@@ -18,11 +18,13 @@ import datetime
 import abc
 import random
 import dataclasses as dc  # noqa
+from telnetlib import NOOPT
 
 import tracdap.rt.api as _api
 import tracdap.rt.config as _config
 import tracdap.rt.exceptions as _ex
 import tracdap.rt._exec.context as _ctx
+import tracdap.rt._exec.graph_builder as _graph
 import tracdap.rt._impl.config_parser as _cfg_p  # noqa
 import tracdap.rt._impl.type_system as _types  # noqa
 import tracdap.rt._impl.data as _data  # noqa
@@ -203,6 +205,16 @@ class KeyedItemFunc(NodeFunction[_T]):
         return src_item
 
 
+class RuntimeOutputsFunc(NodeFunction[JobOutputs]):
+
+    def __init__(self, node: RuntimeOutputsNode):
+        super().__init__()
+        self.node = node
+
+    def _execute(self, ctx: NodeContext) -> JobOutputs:
+        return self.node.outputs
+
+
 class BuildJobResultFunc(NodeFunction[_config.JobResult]):
 
     def __init__(self, node: BuildJobResultNode):
@@ -217,13 +229,25 @@ class BuildJobResultFunc(NodeFunction[_config.JobResult]):
 
         # TODO: Handle individual failed results
 
-        for obj_id, node_id in self.node.objects.items():
+        for obj_id, node_id in self.node.outputs.objects.items():
             obj_def = _ctx_lookup(node_id, ctx)
             job_result.results[obj_id] = obj_def
 
-        for bundle_id in self.node.bundles:
+        for bundle_id in self.node.outputs.bundles:
             bundle = _ctx_lookup(bundle_id, ctx)
             job_result.results.update(bundle.items())
+
+        if self.node.runtime_outputs is not None:
+
+            runtime_outputs = _ctx_lookup(self.node.runtime_outputs, ctx)
+
+            for obj_id, node_id in runtime_outputs.objects.items():
+                obj_def = _ctx_lookup(node_id, ctx)
+                job_result.results[obj_id] = obj_def
+
+            for bundle_id in runtime_outputs.bundles:
+                bundle = _ctx_lookup(bundle_id, ctx)
+                job_result.results.update(bundle.items())
 
         return job_result
 
@@ -643,21 +667,29 @@ class RunModelFunc(NodeFunction[Bundle[_data.DataView]]):
 
             results[output_name] = result
 
-        for output_name in dynamic_outputs:
+        if dynamic_outputs:
 
-            result: _data.DataView = local_ctx.get(output_name)
+            for output_name in dynamic_outputs:
 
-            if result is None or result.is_empty():
-                raise _ex.ERuntimeValidation(f"No data provided for [{output_name}] from model [{model_name}]")
+                result: _data.DataView = local_ctx.get(output_name)
 
-            results[output_name] = result
+                if result is None or result.is_empty():
+                    raise _ex.ERuntimeValidation(f"No data provided for [{output_name}] from model [{model_name}]")
 
-            result_node_id = NodeId.of(output_name, self.node.id.namespace, _data.DataView)
-            result_node = BundleItemNode(result_node_id, self.node.id, output_name)
+                results[output_name] = result
 
-            new_nodes[result_node_id] = result_node
+                result_node_id = NodeId.of(output_name, self.node.id.namespace, _data.DataView)
+                result_node = BundleItemNode(result_node_id, self.node.id, output_name)
 
-        self.node_callback.send_graph_updates(new_nodes, new_deps)
+                new_nodes[result_node_id] = result_node
+
+            output_section = _graph.GraphBuilder.build_runtime_outputs(dynamic_outputs, self.node.id.namespace)
+            new_nodes.update(output_section.nodes)
+
+            ctx_id = NodeId.of("trac_build_result", self.node.id.namespace, result_type=None)
+            new_deps[ctx_id] = list(_graph.Dependency(nid, _graph.DependencyType.HARD) for nid in output_section.outputs)
+
+            self.node_callback.send_graph_updates(new_nodes, new_deps)
 
         return results
 
@@ -736,6 +768,7 @@ class FunctionResolver:
         SaveJobResultNode: SaveJobResultFunc,
         DataResultNode: DataResultFunc,
         StaticValueNode: StaticValueFunc,
+        RuntimeOutputsNode: RuntimeOutputsFunc,
         BundleItemNode: NoopFunc,
         NoopNode: NoopFunc,
         RunModelResultNode: NoopFunc

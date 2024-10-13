@@ -400,6 +400,65 @@ class GraphBuilder:
         return GraphSection(nodes, inputs=inputs)
 
     @classmethod
+    def build_runtime_outputs(cls, output_names: tp.List[str], job_namespace: NodeNamespace):
+
+        # TODO: Factor out common logic with regular job outputs (including static / dynamic)
+
+        nodes = {}
+        inputs = set()
+        outputs = list()
+
+        for output_name in output_names:
+
+            # Output data view must already exist in the namespace
+            data_view_id = NodeId.of(output_name, job_namespace, _data.DataView)
+            data_spec_id = NodeId.of(f"{output_name}:SPEC", job_namespace, _data.DataSpec)
+
+            data_key = output_name + ":DATA"
+            data_id = _util.new_object_id(meta.ObjectType.DATA)
+            storage_key = output_name + ":STORAGE"
+            storage_id = _util.new_object_id(meta.ObjectType.STORAGE)
+
+            data_spec_node = DynamicDataSpecNode(
+                data_spec_id, data_view_id,
+                data_id, storage_id,
+                prior_data_spec=None)
+
+            output_data_key = _util.object_key(data_id)
+            output_storage_key = _util.object_key(storage_id)
+
+            # Map one data item from each view, since outputs are single part/delta
+            data_item_id = NodeId(f"{output_name}:ITEM", job_namespace, _data.DataItem)
+            data_item_node = DataItemNode(data_item_id, data_view_id)
+
+            # Create a physical save operation for the data item
+            data_save_id = NodeId.of(f"{output_name}:SAVE", job_namespace, None)
+            data_save_node = SaveDataNode(data_save_id, data_spec_id, data_item_id)
+
+            data_result_id = NodeId.of(f"{output_name}:RESULT", job_namespace, ObjectBundle)
+            data_result_node = DataResultNode(
+                data_result_id, output_name,
+                data_item_id, data_spec_id, data_save_id,
+                output_data_key, output_storage_key)
+
+            nodes[data_spec_id] = data_spec_node
+            nodes[data_item_id] = data_item_node
+            nodes[data_save_id] = data_save_node
+            nodes[data_result_id] = data_result_node
+
+            # Job-level data view is an input to the save operation
+            inputs.add(data_view_id)
+            outputs.append(data_result_id)
+
+        runtime_outputs = JobOutputs(bundles=outputs)
+        runtime_outputs_id = NodeId.of("trac_runtime_outputs", job_namespace, JobOutputs)
+        runtime_outputs_node = RuntimeOutputsNode(runtime_outputs_id, runtime_outputs)
+
+        nodes[runtime_outputs_id] = runtime_outputs_node
+
+        return GraphSection(nodes, inputs=inputs, outputs={runtime_outputs_id})
+
+    @classmethod
     def build_job_results(
             cls, job_config: cfg.JobConfig, job_namespace: NodeNamespace, result_spec: JobResultSpec,
             objects: tp.Dict[str, NodeId[meta.ObjectDefinition]] = None,
@@ -415,7 +474,8 @@ class GraphBuilder:
 
             build_result_node = BuildJobResultNode(
                 build_result_id, job_config.jobId,
-                objects=objects, explicit_deps=explicit_deps)
+                outputs = JobOutputs(objects=objects),
+                explicit_deps=explicit_deps)
 
         elif bundles is not None:
 
@@ -423,7 +483,8 @@ class GraphBuilder:
 
             build_result_node = BuildJobResultNode(
                 build_result_id, job_config.jobId,
-                bundles=bundles, explicit_deps=explicit_deps)
+                outputs = JobOutputs(bundles=bundles),
+                explicit_deps=explicit_deps)
 
         else:
             raise _ex.EUnexpected()
