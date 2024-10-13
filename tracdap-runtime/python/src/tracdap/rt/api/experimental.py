@@ -19,6 +19,17 @@ import enum as _enum
 import typing as _tp
 
 from tracdap.rt.api import *
+from .hook import _StaticApiHook
+
+
+def init_static():
+    import tracdap.rt._impl.static_api as _static_impl  # noqa
+    _static_impl.StaticApiImpl.register_impl()
+
+
+def infer_schema(dataset: _tp.Any) -> SchemaDefinition:
+    sa = _StaticApiHook.get_instance()
+    return sa.infer_schema(dataset)
 
 
 class FileType(_enum.Enum):
@@ -46,6 +57,10 @@ class FileStat:
 
 
 class TracFileStorage:
+
+    @_abc.abstractmethod
+    def get_storage_key(self) -> str:
+        pass
 
     @_abc.abstractmethod
     def exists(self, storage_path: str) -> bool:
@@ -103,36 +118,31 @@ class TracFileStorage:
             stream.write(data)
 
 
-class TracDataStorage:
-
-    @_abc.abstractmethod
-    def has_table(self, table_name: str):
-        pass
-
-    @_abc.abstractmethod
-    def clear_table(self, table_name: str):
-        pass
-
-    def write_table(self, table_name: str, table_data: _tp.Any, create_if_missing: bool = False):
-        pass
-
-    def append_table(self, table_name: str, table_data: _tp.Any):
-        pass
-
 
 class TracDataContext(TracContext):
 
     @_abc.abstractmethod
-    def do_something(self):
-        pass
-
-    def get_metadata(self, item: str, tag_name: str) -> _tp.Any:
-        pass
-
-    def get_data_storage(self, storage_key: str) -> TracDataStorage:
-        pass
-
     def get_file_storage(self, storage_key: str) -> TracFileStorage:
+        pass
+
+    @_abc.abstractmethod
+    def get_data_storage(self, storage_key: str) -> None:
+        pass
+
+    @_abc.abstractmethod
+    def add_data_import(self, dataset_key: str):
+        pass
+
+    @_abc.abstractmethod
+    def set_source_metadata(self, dataset_key: str, storage_key: str, source_info: FileStat):
+        pass
+
+    @_abc.abstractmethod
+    def set_attribute(self, dataset_key: str, attribute_name: str, value: _tp.Any):
+        pass
+
+    @_abc.abstractmethod
+    def set_schema(self, dataset_key: str, schema: SchemaDefinition):
         pass
 
 
