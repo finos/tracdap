@@ -30,7 +30,6 @@ import tracdap.rt._impl.data as _data  # noqa
 import tracdap.rt._impl.storage as _storage  # noqa
 import tracdap.rt._impl.util as _util  # noqa
 import tracdap.rt._impl.validation as _val  # noqa
-from tracdap.rt.api.experimental import TracDataStorage, TracFileStorage
 
 
 class TracContextImpl(_api.TracContext):
@@ -272,15 +271,86 @@ class TracDataContextImpl(TracContextImpl, _eapi.TracDataContext):
 
         super().__init__(model_def, model_class, local_ctx, checkout_directory)
 
+        self.__model_def = model_def
         self.__storage_manager = storage_manager
 
-    def get_file_storage(self, storage_key: str) -> TracFileStorage:
+    def get_file_storage(self, storage_key: str) -> _eapi.TracFileStorage:
 
-        # TODO: Quick result for testing, should be api.TracFileStorage not ext.IFileStorage
-        return self.__storage_manager.get_file_storage(storage_key)
+        # Check whether the request storage is available
+        if not self.__storage_manager.has_file_storage(storage_key, external=True):
+            raise _ex.ERuntimeValidation(f"File storage not available for storage key [{storage_key}]")
 
-    def get_data_storage(self, storage_key: str) -> TracDataStorage:
-        raise _ex.ETracInternal("Not implemented yet")
+        # Underlying storage impl from the storage manager
+        storage_impl = self.__storage_manager.get_file_storage(storage_key, external=True)
+
+        # Only export jobs have write access, everything else is read-only
+        readonly = False if self.__model_def.modelType == _meta.ModelType.DATA_EXPORT_MODEL else True
+
+        # API wrapper to enforce basic protection and sanity checks over the raw storage impl
+        return TracFileStorageImpl(storage_key, storage_impl, readonly=readonly)
+
+    def get_data_storage(self, storage_key: str) -> None:
+        raise _ex.ERuntimeValidation("Data storage API not available yet")
+
+    def add_data_import(self, dataset_key: str):
+        raise RuntimeError("Not implemented yet")
+
+    def set_source_metadata(self, dataset_key: str, storage_key: str, source_info: _eapi.FileStat):
+        raise RuntimeError("Not implemented yet")
+
+    def set_attribute(self, dataset_key: str, attribute_name: str, value: tp.Any):
+        raise RuntimeError("Not implemented yet")
+
+    def set_schema(self, dataset_key: str, schema: _meta.SchemaDefinition):
+        # TODO: Set schema should become the primary
+        self.put_schema(dataset_key, schema)
+
+
+class TracFileStorageImpl(_eapi.TracFileStorage):
+
+    def __init__(self, storage_key: str, storage_impl: _storage.IFileStorage, readonly: bool):
+        self.__storage_key = storage_key
+        self.__exists = lambda sp: storage_impl.exists(sp)
+        self.__size = lambda sp: storage_impl.size(sp)
+        self.__stat = lambda sp: storage_impl.stat(sp)
+        self.__ls = lambda sp, rec: storage_impl.ls(sp, rec)
+        self.__read_byte_stream = lambda sp: storage_impl.read_byte_stream(sp)
+        self.__mkdir = None if readonly else lambda sp, rec: storage_impl.mkdir(sp, rec)
+        self.__rm = None if readonly else lambda sp: storage_impl.rm(sp)
+        self.__rmdir = None if readonly else lambda sp: storage_impl.rmdir(sp)
+        self.__write_byte_stream = None if readonly else lambda sp: storage_impl.write_byte_stream(sp)
+
+    def get_storage_key(self) -> str:
+        return self.__storage_key
+
+    def exists(self, storage_path: str) -> bool:
+        return self.__exists(storage_path)
+
+    def size(self, storage_path: str) -> int:
+        return self.__size(storage_path)
+
+    def stat(self, storage_path: str) -> _eapi.FileStat:
+        stat = self.__stat(storage_path)
+        return _eapi.FileStat(**stat.__dict__)
+
+    def ls(self, storage_path: str, recursive: bool = False) -> tp.List[_eapi.FileStat]:
+        listing = self.__ls(storage_path, recursive)
+        return list(_eapi.FileStat(**stat.__dict__) for stat in listing)
+
+    def mkdir(self, storage_path: str, recursive: bool = False):
+        self.__mkdir(storage_path, recursive)
+
+    def rm(self, storage_path: str):
+        self.__rm(storage_path)
+
+    def rmdir(self, storage_path: str):
+        self.__rmdir(storage_path)
+
+    def read_byte_stream(self, storage_path: str) -> tp.ContextManager[tp.BinaryIO]:
+        return self.__read_byte_stream(storage_path)
+
+    def write_byte_stream(self, storage_path: str) -> tp.ContextManager[tp.BinaryIO]:
+        return self.__write_byte_stream(storage_path)
 
 
 class TracContextValidator:
