@@ -113,10 +113,8 @@ message ModelDefinition {
     optional string packageGroup = 10;
     string package = 11;
     string version = 6;
-    optional string path = 3;
     string entryPoint = 5;
-
-    ModelType modelType = 13;
+    optional string path = 3;
 
     map<string, ModelParameter> parameters = 7;
     map<string, ModelInputSchema> inputs = 8;
@@ -126,4 +124,6 @@ message ModelDefinition {
      * Static attributes defined in model code
      */
     map<string, Value> staticAttributes = 12;
+
+    ModelType modelType = 13;
 }
