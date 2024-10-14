@@ -63,6 +63,7 @@ class TracContextImpl(_api.TracContext):
                  model_def: _meta.ModelDefinition,
                  model_class: _api.TracModel.__class__,
                  local_ctx: tp.Dict[str, tp.Any],
+                 dynamic_outputs: tp.List[str] = None,
                  checkout_directory: pathlib.Path = None):
 
         self.__ctx_log = _util.logger_for_object(self)
@@ -71,7 +72,7 @@ class TracContextImpl(_api.TracContext):
         self.__model_def = model_def
         self.__model_class = model_class
         self.__local_ctx = local_ctx or {}
-        self.__dynamic_outputs = []  # Not used for standard models
+        self.__dynamic_outputs = dynamic_outputs or []
 
         self.__val = TracContextValidator(
             self.__ctx_log,
@@ -272,7 +273,7 @@ class TracDataContextImpl(TracContextImpl, _eapi.TracDataContext):
             storage_map: tp.Dict[str, tp.Union[_eapi.TracFileStorage]],
             checkout_directory: pathlib.Path = None):
 
-        super().__init__(model_def, model_class, local_ctx, checkout_directory)
+        super().__init__(model_def, model_class, local_ctx, dynamic_outputs, checkout_directory)
 
         self.__model_def = model_def
         self.__local_ctx = local_ctx
@@ -281,7 +282,6 @@ class TracDataContextImpl(TracContextImpl, _eapi.TracDataContext):
         self.__checkout_directory = checkout_directory
 
         self.__val = self._TracContextImpl__val  # noqa
-        self.__val._TracContextValidator__dynamic_outputs = self.__dynamic_outputs
 
     def get_file_storage(self, storage_key: str) -> _eapi.TracFileStorage:
 
