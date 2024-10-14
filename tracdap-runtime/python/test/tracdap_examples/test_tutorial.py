@@ -148,3 +148,12 @@ class TutorialModelsTest(unittest.TestCase):
         sys_config = self.examples_root.joinpath("config/sys_config.yaml")
 
         launch.launch_model(BulkDataImport, job_config, sys_config, dev_mode=True)
+
+    def test_data_export(self):
+
+        from tutorial.data_export import DataExportExample  # noqa
+
+        job_config = self.examples_root.joinpath("config/data_export.yaml")
+        sys_config = self.examples_root.joinpath("config/sys_config.yaml")
+
+        launch.launch_model(DataExportExample, job_config, sys_config, dev_mode=True)
