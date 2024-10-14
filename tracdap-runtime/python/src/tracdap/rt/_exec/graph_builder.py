@@ -558,6 +558,8 @@ class GraphBuilder:
             explicit_deps: tp.Optional[tp.List[NodeId]] = None) \
             -> GraphSection:
 
+        cls.check_model_type(job_config, model_def)
+
         def param_id(node_name):
             return NodeId(node_name, namespace, meta.Value)
 
@@ -730,6 +732,7 @@ class GraphBuilder:
 
             # Explicit check for model compatibility - report an error now, do not try build_model()
             cls.check_model_compatibility(model_selector, model_obj.model, node_name, node)
+            cls.check_model_type(job_config, model_obj.model)
 
             return cls.build_model_or_flow_with_context(
                 job_config, namespace, node_name, model_obj,
@@ -740,8 +743,8 @@ class GraphBuilder:
 
     @classmethod
     def check_model_compatibility(
-            cls, model_selector: meta.TagSelector, model_def: meta.ModelDefinition,
-            node_name: str, flow_node: meta.FlowNode):
+            cls, model_selector: meta.TagSelector,
+            model_def: meta.ModelDefinition, node_name: str, flow_node: meta.FlowNode):
 
         model_params = list(sorted(model_def.parameters.keys()))
         model_inputs = list(sorted(model_def.inputs.keys()))
@@ -754,6 +757,21 @@ class GraphBuilder:
         if model_params != node_params or model_inputs != node_inputs or model_outputs != node_outputs:
             model_key = _util.object_key(model_selector)
             raise _ex.EJobValidation(f"Incompatible model for flow node [{node_name}] (Model: [{model_key}])")
+
+    @classmethod
+    def check_model_type(cls, job_config: config.JobConfig, model_def: meta.ModelDefinition):
+
+        if job_config.job.jobType == meta.JobType.IMPORT_DATA:
+            allowed_model_types = [meta.ModelType.DATA_IMPORT_MODEL]
+        elif job_config.job.jobType == meta.JobType.EXPORT_DATA:
+            allowed_model_types = [meta.ModelType.DATA_EXPORT_MODEL]
+        else:
+            allowed_model_types = [meta.ModelType.STANDARD_MODEL]
+
+        if model_def.modelType not in allowed_model_types:
+            job_type = job_config.job.jobType.name
+            model_type = model_def.modelType.name
+            raise _ex.EJobValidation(f"Job type [{job_type}] cannot use model type [{model_type}]")
 
     @staticmethod
     def build_context_push(
