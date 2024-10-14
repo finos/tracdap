@@ -634,7 +634,8 @@ class RunModelFunc(NodeFunction[Bundle[_data.DataView]]):
         else:
             trac_ctx = _ctx.TracContextImpl(
                 self.node.model_def, self.model_class,
-                local_ctx, self.checkout_directory)
+                local_ctx, dynamic_outputs,
+                self.checkout_directory)
 
         try:
             model = self.model_class()
