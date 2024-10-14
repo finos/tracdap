@@ -158,17 +158,24 @@ message ImportDataJob {
   map<string, TagSelector> outputs = 4;
   map<string, TagSelector> priorOutputs = 5;
 
-  repeated TagUpdate outputAttrs = 6;
+  repeated string storageAccess = 6;
+  map<string, TagSelector> imports = 7;
+
+  repeated TagUpdate outputAttrs = 8;
+  repeated TagUpdate importAttrs = 9;
 }
 
 message ExportDataJob {
 
   string targetLocation = 1;
 
-  repeated ExportDataItem exports = 2;
-}
+  map<string, Value> parameters = 2;
+  map<string, TagSelector> inputs = 3;
+  map<string, TagSelector> outputs = 4;
+  map<string, TagSelector> priorOutputs = 5;
 
-message ExportDataItem {
+  repeated string storageAccess = 6;
+  map<string, TagSelector> exports = 7;
 
-  TagSelector selector = 1;
+  repeated TagUpdate outputAttrs = 8;
 }
