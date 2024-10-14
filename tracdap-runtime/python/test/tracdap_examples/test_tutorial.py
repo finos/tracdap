@@ -151,6 +151,9 @@ class TutorialModelsTest(unittest.TestCase):
 
     def test_data_export(self):
 
+        # The export job needs the outputs of the using data example
+        self.test_using_data()
+
         from tutorial.data_export import DataExportExample  # noqa
 
         job_config = self.examples_root.joinpath("config/data_export.yaml")
