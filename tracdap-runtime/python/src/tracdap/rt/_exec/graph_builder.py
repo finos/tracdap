@@ -40,8 +40,8 @@ class GraphBuilder:
         if job_config.job.jobType == meta.JobType.RUN_FLOW:
             return cls.build_standard_job(job_config, result_spec, cls.build_run_flow_job)
 
-        if job_config.job.jobType == meta.JobType.IMPORT_DATA:
-            return cls.build_standard_job(job_config, result_spec, cls.build_import_data_job)
+        if job_config.job.jobType in [meta.JobType.IMPORT_DATA, meta.JobType.EXPORT_DATA]:
+            return cls.build_standard_job(job_config, result_spec, cls.build_import_export_data_job)
 
         raise _ex.EConfigParse(f"Job type [{job_config.job.jobType}] is not supported yet")
 
@@ -116,18 +116,22 @@ class GraphBuilder:
         return cls._join_sections(main_section, result_section)
 
     @classmethod
-    def build_import_data_job(
+    def build_import_export_data_job(
             cls, job_config: config.JobConfig, result_spec: JobResultSpec,
             job_namespace: NodeNamespace, job_push_id: NodeId) \
             -> GraphSection:
 
-        # TODO: This is processed as a regular calculation job for now
+        # TODO: These are processed as regular calculation jobs for now
         # That might be ok, but is worth reviewing
 
-        target_selector = job_config.job.importData.model
+        if job_config.job.jobType == meta.JobType.IMPORT_DATA:
+            job_def = job_config.job.importData
+        else:
+            job_def = job_config.job.exportData
+
+        target_selector = job_def.model
         target_obj = _util.get_job_resource(target_selector, job_config)
         target_def = target_obj.model
-        job_def = job_config.job.importData
 
         return cls.build_calculation_job(
             job_config, result_spec, job_namespace, job_push_id,

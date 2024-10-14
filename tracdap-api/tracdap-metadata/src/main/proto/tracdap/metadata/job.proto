@@ -167,7 +167,7 @@ message ImportDataJob {
 
 message ExportDataJob {
 
-  string targetLocation = 1;
+  TagSelector model = 1;
 
   map<string, Value> parameters = 2;
   map<string, TagSelector> inputs = 3;

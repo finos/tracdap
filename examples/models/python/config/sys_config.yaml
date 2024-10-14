@@ -20,6 +20,11 @@ storage:
       properties:
         rootPath: ../data/inputs/staging
 
+    exported_data:
+      protocol: LOCAL
+      properties:
+        rootPath: ../data/exports
+
 
 sparkSettings:
 

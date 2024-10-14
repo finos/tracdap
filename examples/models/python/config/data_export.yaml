@@ -1,0 +1,13 @@
+
+job:
+  exportData:
+
+    parameters:
+      storage_key: exported_data
+      export_comment: "Exporting some example data"
+
+    inputs:
+      profit_by_region: outputs/using_data/profit_by_region.csv
+
+    storageAccess:
+      - exported_data
