@@ -539,7 +539,7 @@ class GraphBuilder:
             -> GraphSection:
 
         if model_or_flow.objectType == meta.ObjectType.MODEL:
-            return cls.build_model(namespace, model_or_flow.model, explicit_deps)
+            return cls.build_model(job_config, namespace, model_or_flow.model, explicit_deps)
 
         elif model_or_flow.objectType == meta.ObjectType.FLOW:
             return cls.build_flow(job_config, namespace, model_or_flow.flow)
@@ -549,7 +549,7 @@ class GraphBuilder:
 
     @classmethod
     def build_model(
-            cls, namespace: NodeNamespace,
+            cls, job_config: config.JobConfig, namespace: NodeNamespace,
             model_def: meta.ModelDefinition,
             explicit_deps: tp.Optional[tp.List[NodeId]] = None) \
             -> GraphSection:
@@ -565,11 +565,13 @@ class GraphBuilder:
         input_ids = set(map(data_id, model_def.inputs))
         output_ids = set(map(data_id, model_def.outputs))
 
-        # Check whether this model needs access to external storage locations
-        if model_def.modelType in [meta.ModelType.DATA_IMPORT_MODEL, meta.ModelType.DATA_EXPORT_MODEL]:
-            external_storage = True
+        # Set up storage access for import / export data jobs
+        if job_config.job.jobType == meta.JobType.IMPORT_DATA:
+            storage_access = job_config.job.importData.storageAccess
+        elif job_config.job.jobType == meta.JobType.EXPORT_DATA:
+            storage_access = job_config.job.exportData.storageAccess
         else:
-            external_storage = False
+            storage_access = None
 
         # Create the model node
         # Always add the prior graph root ID as a dependency
@@ -587,7 +589,7 @@ class GraphBuilder:
             model_id, model_scope, model_def,
             frozenset(parameter_ids), frozenset(input_ids),
             explicit_deps=explicit_deps, bundle=model_id.namespace,
-            external_storage=external_storage)
+            storage_access=storage_access)
 
         model_result_id = NodeId(f"{model_name}:RESULT", namespace)
         model_result_node = RunModelResultNode(model_result_id, model_id)

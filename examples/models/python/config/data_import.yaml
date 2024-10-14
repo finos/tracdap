@@ -8,3 +8,6 @@ job:
 
     outputs:
       import_log: outputs/data_import/import_log.csv
+
+    storageAccess:
+      - staging_data

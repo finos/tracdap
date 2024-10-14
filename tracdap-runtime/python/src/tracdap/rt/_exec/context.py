@@ -269,16 +269,16 @@ class TracDataContextImpl(TracContextImpl, _eapi.TracDataContext):
     def __init__(
             self, model_def: _meta.ModelDefinition, model_class: _api.TracModel.__class__,
             local_ctx: tp.Dict[str, tp.Any], dynamic_outputs: tp.List[str],
-            checkout_directory: pathlib.Path = None,
-            storage_manager: _storage.StorageManager = None):
+            storage_map: tp.Dict[str, tp.Union[_eapi.TracFileStorage]],
+            checkout_directory: pathlib.Path = None):
 
         super().__init__(model_def, model_class, local_ctx, checkout_directory)
 
         self.__model_def = model_def
         self.__local_ctx = local_ctx
         self.__dynamic_outputs = dynamic_outputs
+        self.__storage_map = storage_map
         self.__checkout_directory = checkout_directory
-        self.__storage_manager = storage_manager
 
         self.__val = self._TracContextImpl__val  # noqa
         self.__val._TracContextValidator__dynamic_outputs = self.__dynamic_outputs
@@ -288,16 +288,10 @@ class TracDataContextImpl(TracContextImpl, _eapi.TracDataContext):
         _val.validate_signature(self.get_file_storage, storage_key)
 
         self.__val.check_storage_valid_identifier(storage_key)
-        self.__val.check_external_file_storage_exists(storage_key, self.__storage_manager)
+        self.__val.check_storage_available(self.__storage_map, storage_key)
+        self.__val.check_storage_type(self.__storage_map, storage_key, _eapi.TracFileStorage)
 
-        # Underlying storage impl from the storage manager
-        storage_impl = self.__storage_manager.get_file_storage(storage_key, external=True)
-
-        # Only export jobs have write access, everything else is read-only
-        readonly = False if self.__model_def.modelType == _meta.ModelType.DATA_EXPORT_MODEL else True
-
-        # API wrapper to enforce basic protection and sanity checks over the raw storage impl
-        return TracFileStorageImpl(storage_key, storage_impl, readonly, self.__checkout_directory)
+        return self.__storage_map[storage_key]
 
     def get_data_storage(self, storage_key: str) -> None:
         raise _ex.ERuntimeValidation("Data storage API not available yet")
@@ -335,7 +329,7 @@ class TracDataContextImpl(TracContextImpl, _eapi.TracDataContext):
 
 class TracFileStorageImpl(_eapi.TracFileStorage):
 
-    def __init__(self, storage_key: str, storage_impl: _storage.IFileStorage, readonly: bool, checkout_directory):
+    def __init__(self, storage_key: str, storage_impl: _storage.IFileStorage, write_access: bool, checkout_directory):
 
         self.__storage_key = storage_key
 
@@ -344,10 +338,17 @@ class TracFileStorageImpl(_eapi.TracFileStorage):
         self.__stat = lambda sp: storage_impl.stat(sp)
         self.__ls = lambda sp, rec: storage_impl.ls(sp, rec)
         self.__read_byte_stream = lambda sp: storage_impl.read_byte_stream(sp)
-        self.__mkdir = None if readonly else lambda sp, rec: storage_impl.mkdir(sp, rec)
-        self.__rm = None if readonly else lambda sp: storage_impl.rm(sp)
-        self.__rmdir = None if readonly else lambda sp: storage_impl.rmdir(sp)
-        self.__write_byte_stream = None if readonly else lambda sp: storage_impl.write_byte_stream(sp)
+
+        if write_access:
+            self.__mkdir = lambda sp, rec: storage_impl.mkdir(sp, rec)
+            self.__rm = lambda sp: storage_impl.rm(sp)
+            self.__rmdir = lambda sp: storage_impl.rmdir(sp)
+            self.__write_byte_stream = lambda sp: storage_impl.write_byte_stream(sp)
+        else:
+            self.__mkdir = None
+            self.__rm = None
+            self.__rmdir = None
+            self.__write_byte_stream = None
 
         self.__log = _util.logger_for_object(self)
         self.__val = TracStorageValidator(self.__log, checkout_directory, self.__storage_key)
@@ -652,10 +653,24 @@ class TracContextValidator(TracContextErrorReporter):
         if not self.__VALID_IDENTIFIER.match(storage_key):
             self._report_error(f"Storage key {storage_key} is not a valid identifier")
 
-    def check_external_file_storage_exists(self, storage_key, storage_manager: _storage.StorageManager):
+    def check_storage_available(self, storage_map: tp.Dict, storage_key: str):
 
-        if not storage_manager.has_file_storage(storage_key, external=True):
-            self._report_error(f"File storage not available for storage key [{storage_key}]")
+        storage_instance = storage_map.get(storage_key)
+
+        if storage_instance is None:
+            self._report_error(f"Storage not available for storage key [{storage_key}]")
+
+    def check_storage_type(
+            self, storage_map: tp.Dict, storage_key: str,
+            storage_type: tp.Union[_eapi.TracFileStorage.__class__]):
+
+        storage_instance = storage_map.get(storage_key)
+
+        if not isinstance(storage_instance, storage_type):
+            if storage_type == _eapi.TracFileStorage:
+                self._report_error(f"Storage key [{storage_key}] refers to data storage, not file storage")
+            else:
+                self._report_error(f"Storage key [{storage_key}] refers to file storage, not data storage")
 
     @staticmethod
     def _type_name(type_: type):

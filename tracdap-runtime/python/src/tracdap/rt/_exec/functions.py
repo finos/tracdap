@@ -18,7 +18,6 @@ import datetime
 import abc
 import random
 import dataclasses as dc  # noqa
-from telnetlib import NOOPT
 
 import tracdap.rt.api as _api
 import tracdap.rt.config as _config
@@ -609,27 +608,28 @@ class RunModelFunc(NodeFunction[Bundle[_data.DataView]]):
         dynamic_outputs = []
 
         for node_id, node_result in _ctx_iter_items(ctx):
+            if node_id.namespace == self.node.id.namespace:
+                if node_id.name in model_def.parameters or node_id.name in model_def.inputs:
+                    local_ctx[node_id.name] = node_result
 
-            if node_id.namespace != self.node.id.namespace:
-                continue
+        # Set up access to external storage if required
 
-            if node_id.name in model_def.parameters:
-                param_name = node_id.name
-                local_ctx[param_name] = node_result
+        storage_map = {}
+        write_access = True if self.node.model_def.modelType == meta.ModelType.DATA_EXPORT_MODEL else True
 
-            if node_id.name in model_def.inputs:
-                input_name = node_id.name
-                local_ctx[input_name] = node_result
+        for storage_key in self.node.storage_access:
+            if self.storage_manager.has_file_storage(storage_key, external=True):
+                storage_impl = self.storage_manager.get_file_storage(storage_key, external=True)
+                storage = _ctx.TracFileStorageImpl(storage_key, storage_impl, write_access, self.checkout_directory)
+                storage_map[storage_key] = storage
 
         # Run the model against the mapped local context
 
         if model_def.modelType in [meta.ModelType.DATA_IMPORT_MODEL, meta.ModelType.DATA_EXPORT_MODEL]:
-            # Only provide access to the storage manager if the graph node says it should be available
-            storage_manager = self.storage_manager if self.node.external_storage else None
             trac_ctx = _ctx.TracDataContextImpl(
-                self.node.model_def, self.model_class, local_ctx, dynamic_outputs,
-                self.checkout_directory, storage_manager)
-
+                self.node.model_def, self.model_class,
+                local_ctx, dynamic_outputs, storage_map,
+                self.checkout_directory)
         else:
             trac_ctx = _ctx.TracContextImpl(
                 self.node.model_def, self.model_class,
@@ -714,6 +714,10 @@ class FunctionResolver:
         :py:class:`NodeFunction <NodeFunction>`
     """
 
+    # TODO: Validate consistency for resource keys
+    # Storage key should be validated for load data, save data and run model with storage access
+    # Repository key should be validated for import model (and explicitly for run model)
+
     __ResolveFunc = tp.Callable[['FunctionResolver', Node[_T]], NodeFunction[_T]]
 
     def __init__(self, models: _models.ModelLoader, storage: _storage.StorageManager):
@@ -752,7 +756,7 @@ class FunctionResolver:
 
         model_class = self._models.load_model_class(node.model_scope, node.model_def)
         checkout_directory = self._models.model_load_checkout_directory(node.model_scope, node.model_def)
-        storage_manager = self._storage if node.external_storage else None
+        storage_manager = self._storage if node.storage_access else None
 
         return RunModelFunc(node, model_class, checkout_directory, storage_manager)
 
