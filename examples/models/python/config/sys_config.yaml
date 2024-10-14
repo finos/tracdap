@@ -10,8 +10,6 @@ storage:
       protocol: LOCAL
       properties:
         rootPath: ../data
-        devMode.layout: file
-        devMode.updates: overwrite
 
   external:
 
