@@ -16,6 +16,7 @@ import typing as tp
 import tracdap.rt.api.experimental as trac
 
 import pandas as pd
+import pytz
 
 
 class BulkDataImport(trac.TracDataImport):
@@ -90,13 +91,17 @@ class BulkDataImport(trac.TracDataImport):
 
             ctx.put_pandas_table(dataset_key, dataset)
 
+        # Store modified time as un-zoned timestamp in UTC
+        utc_mtime = file.mtime \
+            .astimezone(pytz.UTC) \
+            .replace(tzinfo=None)
+
         # Log entry for this file
         return {
             "storage_path": file.storage_path,
             "file_name": file.file_name,
             "size": file.size,
-            "mtime": file.mtime.replace(tzinfo=None)  # TODO: Time zone support
-        }
+            "mtime": utc_mtime}
 
     @staticmethod
     def remove_extension(filename):
