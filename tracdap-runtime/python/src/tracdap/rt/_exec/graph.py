@@ -366,7 +366,7 @@ class RunModelNode(Node[Bundle[_data.DataView]]):
     model_def: meta.ModelDefinition
     parameter_ids: tp.FrozenSet[NodeId]
     input_ids: tp.FrozenSet[NodeId]
-    storage_access: tp.List[str] = dc.field(default_factory=list)
+    storage_access: tp.Optional[tp.List[str]] = None
 
     def _node_dependencies(self) -> tp.Dict[NodeId, DependencyType]:
         return {dep_id: DependencyType.HARD for dep_id in [*self.parameter_ids, *self.input_ids]}

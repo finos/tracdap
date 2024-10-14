@@ -615,13 +615,14 @@ class RunModelFunc(NodeFunction[Bundle[_data.DataView]]):
         # Set up access to external storage if required
 
         storage_map = {}
-        write_access = True if self.node.model_def.modelType == meta.ModelType.DATA_EXPORT_MODEL else True
 
-        for storage_key in self.node.storage_access:
-            if self.storage_manager.has_file_storage(storage_key, external=True):
-                storage_impl = self.storage_manager.get_file_storage(storage_key, external=True)
-                storage = _ctx.TracFileStorageImpl(storage_key, storage_impl, write_access, self.checkout_directory)
-                storage_map[storage_key] = storage
+        if self.node.storage_access:
+            write_access = True if self.node.model_def.modelType == meta.ModelType.DATA_EXPORT_MODEL else True
+            for storage_key in self.node.storage_access:
+                if self.storage_manager.has_file_storage(storage_key, external=True):
+                    storage_impl = self.storage_manager.get_file_storage(storage_key, external=True)
+                    storage = _ctx.TracFileStorageImpl(storage_key, storage_impl, write_access, self.checkout_directory)
+                    storage_map[storage_key] = storage
 
         # Run the model against the mapped local context
 
