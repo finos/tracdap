@@ -473,9 +473,17 @@ class StorageValidator:
         return storage_path is None or len(storage_path.strip()) == 0
 
     @classmethod
-    def storage_path_invalid_chars(cls, storage_path: str):
+    def storage_path_invalid(cls, storage_path: str):
 
-        return cls.__ILLEGAL_PATH_CHARS.match(storage_path)
+        if cls.__ILLEGAL_PATH_CHARS.match(storage_path):
+            return True
+
+        try:
+            # Make sure the path can be interpreted as a path
+            pathlib.Path(storage_path)
+            return False
+        except ValueError:
+            return True
 
     @classmethod
     def storage_path_not_relative(cls, storage_path: str):

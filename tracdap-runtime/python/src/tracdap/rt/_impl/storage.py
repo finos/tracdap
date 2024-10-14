@@ -608,7 +608,7 @@ class CommonFileStorage(IFileStorage):
             if _val.StorageValidator.storage_path_is_empty(storage_path):
                 raise self._explicit_error(self.ExplicitError.STORAGE_PATH_NULL_OR_BLANK, operation_name, storage_path)
 
-            if _val.StorageValidator.storage_path_invalid_chars(storage_path):
+            if _val.StorageValidator.storage_path_invalid(storage_path):
                 raise self._explicit_error(self.ExplicitError.STORAGE_PATH_INVALID, operation_name, storage_path)
 
             if _val.StorageValidator.storage_path_not_relative(storage_path):

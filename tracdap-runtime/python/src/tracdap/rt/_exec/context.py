@@ -684,7 +684,7 @@ class TracStorageValidator(TracContextErrorReporter):
         if _val.StorageValidator.storage_path_is_empty(storage_path):
             self._report_error(f"Storage path is None or empty")
 
-        if _val.StorageValidator.storage_path_invalid_chars(storage_path):
+        if _val.StorageValidator.storage_path_invalid(storage_path):
             self._report_error(f"Storage path [{storage_path}] contains invalid characters")
 
         if _val.StorageValidator.storage_path_not_relative(storage_path):
