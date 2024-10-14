@@ -16,6 +16,7 @@ import inspect
 import logging
 import re
 import typing as tp
+import pathlib
 
 import tracdap.rt.metadata as meta
 import tracdap.rt.exceptions as ex
@@ -458,3 +459,46 @@ class StaticValidator:
     def _fail(cls, message: str):
         cls._log.error(message)
         raise ex.EModelValidation(message)
+
+
+class StorageValidator:
+
+    __ILLEGAL_PATH_CHARS_WINDOWS = re.compile(r".*[\x00<>:\"\'|?*].*")
+    __ILLEGAL_PATH_CHARS_POSIX = re.compile(r".*[\x00<>:\"\'|?*\\].*")
+    __ILLEGAL_PATH_CHARS = __ILLEGAL_PATH_CHARS_WINDOWS if util.is_windows() else __ILLEGAL_PATH_CHARS_POSIX
+
+    @classmethod
+    def storage_path_is_empty(cls, storage_path: str):
+
+        return storage_path is None or len(storage_path.strip()) == 0
+
+    @classmethod
+    def storage_path_invalid_chars(cls, storage_path: str):
+
+        return cls.__ILLEGAL_PATH_CHARS.match(storage_path)
+
+    @classmethod
+    def storage_path_not_relative(cls, storage_path: str):
+
+        relative_path = pathlib.Path(storage_path)
+        return relative_path.is_absolute()
+
+    @classmethod
+    def storage_path_outside_root(cls, storage_path: str):
+
+        # is_relative_to only supported in Python 3.9+, we need to support 3.8
+
+        root_path = pathlib.Path("C:\\root") if util.is_windows() else pathlib.Path("/root")
+        relative_path = pathlib.Path(storage_path)
+        absolute_path = root_path.joinpath(relative_path).resolve(False)
+
+        return root_path != absolute_path and root_path not in absolute_path.parents
+
+    @classmethod
+    def storage_path_is_root(cls, storage_path: str):
+
+        root_path = pathlib.Path("C:\\root") if util.is_windows() else pathlib.Path("/root")
+        relative_path = pathlib.Path(storage_path)
+        absolute_path = root_path.joinpath(relative_path).resolve(False)
+
+        return root_path == absolute_path

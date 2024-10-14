@@ -30,6 +30,7 @@ import tracdap.rt.exceptions as _ex
 import tracdap.rt.ext.plugins as plugins
 import tracdap.rt._impl.data as _data
 import tracdap.rt._impl.util as _util
+import tracdap.rt._impl.validation as _val
 
 # Import storage interfaces
 from tracdap.rt.ext.storage import *
@@ -604,29 +605,27 @@ class CommonFileStorage(IFileStorage):
 
         try:
 
-            if storage_path is None or len(storage_path.strip()) == 0:
+            if _val.StorageValidator.storage_path_is_empty(storage_path):
                 raise self._explicit_error(self.ExplicitError.STORAGE_PATH_NULL_OR_BLANK, operation_name, storage_path)
 
-            if self._ILLEGAL_PATH_CHARS.match(storage_path):
+            if _val.StorageValidator.storage_path_invalid_chars(storage_path):
                 raise self._explicit_error(self.ExplicitError.STORAGE_PATH_INVALID, operation_name, storage_path)
-    
-            relative_path = pathlib.Path(storage_path)
-    
-            if relative_path.is_absolute():
+
+            if _val.StorageValidator.storage_path_not_relative(storage_path):
                 raise self._explicit_error(self.ExplicitError.STORAGE_PATH_NOT_RELATIVE, operation_name, storage_path)
 
+            if _val.StorageValidator.storage_path_outside_root(storage_path):
+                raise self._explicit_error(self.ExplicitError.STORAGE_PATH_OUTSIDE_ROOT, operation_name, storage_path)
+
+            if not allow_root_dir and _val.StorageValidator.storage_path_is_root(storage_path):
+                raise self._explicit_error(self.ExplicitError.STORAGE_PATH_IS_ROOT, operation_name, storage_path)
+
             root_path = pathlib.Path("C:\\root") if _util.is_windows() else pathlib.Path("/root")
+            relative_path = pathlib.Path(storage_path)
             absolute_path = root_path.joinpath(relative_path).resolve(False)
 
             if absolute_path == root_path:
-                if not allow_root_dir:
-                    raise self._explicit_error(self.ExplicitError.STORAGE_PATH_IS_ROOT, operation_name, storage_path)
-                else:
-                    return ""
-
-            # is_relative_to only supported in Python 3.9+, we need to support 3.7
-            if root_path not in absolute_path.parents:
-                raise self._explicit_error(self.ExplicitError.STORAGE_PATH_OUTSIDE_ROOT, operation_name, storage_path)
+                return ""
             else:
                 return absolute_path.relative_to(root_path).as_posix()
 
@@ -655,10 +654,6 @@ class CommonFileStorage(IFileStorage):
         err = err_type(message)
 
         return err
-
-    _ILLEGAL_PATH_CHARS_WINDOWS = re.compile(r".*[\x00<>:\"\'|?*].*")
-    _ILLEGAL_PATH_CHARS_POSIX = re.compile(r".*[\x00<>:\"\'|?*\\].*")
-    _ILLEGAL_PATH_CHARS = _ILLEGAL_PATH_CHARS_WINDOWS if _util.is_windows() else _ILLEGAL_PATH_CHARS_POSIX
 
     class ExplicitError(enum.Enum):
     
