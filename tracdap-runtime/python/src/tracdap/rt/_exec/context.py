@@ -71,8 +71,8 @@ class TracContextImpl(_api.TracContext):
 
         self.__model_def = model_def
         self.__model_class = model_class
-        self.__local_ctx = local_ctx or {}
-        self.__dynamic_outputs = dynamic_outputs or []
+        self.__local_ctx = local_ctx if local_ctx is not None else {}
+        self.__dynamic_outputs = dynamic_outputs if dynamic_outputs is not None else []
 
         self.__val = TracContextValidator(
             self.__ctx_log,
