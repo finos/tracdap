@@ -108,8 +108,6 @@ message ModelOutputSchema {
  */
 message ModelDefinition {
 
-    ModelType modelType = 13;
-
     string language = 1;
     string repository = 2;
     optional string packageGroup = 10;
@@ -117,6 +115,8 @@ message ModelDefinition {
     string version = 6;
     optional string path = 3;
     string entryPoint = 5;
+
+    ModelType modelType = 13;
 
     map<string, ModelParameter> parameters = 7;
     map<string, ModelInputSchema> inputs = 8;
