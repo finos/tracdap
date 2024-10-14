@@ -42,6 +42,9 @@ enum JobType {
 
   /// Import data into the platform
   IMPORT_DATA = 4;
+
+  /// Export data to external locations
+  EXPORT_DATA = 5;
 }
 
 /**
@@ -93,6 +96,8 @@ message JobDefinition {
     RunModelJob runModel = 2;
     RunFlowJob runFlow = 3;
     ImportModelJob importModel = 4;
+    ImportDataJob importData = 5;
+    ExportDataJob exportData = 6;
   }
 }
 
@@ -144,4 +149,41 @@ message ImportModelJob {
   string path = 3;
 
   repeated TagUpdate modelAttrs = 6;
+}
+
+/**
+ * Specification for an IMPORT_DATA job
+ */
+message ImportDataJob {
+
+  TagSelector model = 1;
+
+  map<string, Value> parameters = 2;
+  map<string, TagSelector> inputs = 3;
+  map<string, TagSelector> outputs = 4;
+  map<string, TagSelector> priorOutputs = 5;
+
+  repeated string storageAccess = 6;
+  map<string, TagSelector> imports = 7;
+
+  repeated TagUpdate outputAttrs = 8;
+  repeated TagUpdate importAttrs = 9;
+}
+
+/**
+ * Specification for an EXPORT_DATA job
+ */
+message ExportDataJob {
+
+  TagSelector model = 1;
+
+  map<string, Value> parameters = 2;
+  map<string, TagSelector> inputs = 3;
+  map<string, TagSelector> outputs = 4;
+  map<string, TagSelector> priorOutputs = 5;
+
+  repeated string storageAccess = 6;
+  map<string, TagSelector> exports = 7;
+
+  repeated TagUpdate outputAttrs = 8;
 }

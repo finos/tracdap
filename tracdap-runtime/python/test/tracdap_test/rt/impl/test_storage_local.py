@@ -111,7 +111,7 @@ class LocalPythonImplStorageTest(unittest.TestCase, FileOperationsTestSuite, Fil
 
 
 # ----------------------------------------------------------------------------------------------------------------------
-# DATA STORAGE
+# DATA STORAGE - Using local file storage
 # ----------------------------------------------------------------------------------------------------------------------
 
 

@@ -135,13 +135,15 @@ class DocGen:
             "tracdap/rt/launch/",
             "tracdap/rt/exceptions.py"]
 
+        api_exclude = ["experimental.py"]
+
         for module in api_modules:
 
             src_module = runtime_src.joinpath(module)
             tgt_module = doc_src.joinpath(module)
 
             if src_module.is_dir():
-                self._flatten_package(src_module, tgt_module)
+                self._flatten_package(src_module, tgt_module, api_exclude)
             else:
                 self._cp(src_module, tgt_module)
 
@@ -249,7 +251,7 @@ class DocGen:
         if target_dir.exists():
             shutil.rmtree(target_dir)
 
-    def _flatten_package(self, src_package: pathlib.Path, tgt_package: pathlib.Path):
+    def _flatten_package(self, src_package: pathlib.Path, tgt_package: pathlib.Path, exclude_modules = None):
 
         target_package_init = tgt_package.joinpath("__init__.py")
 
@@ -264,6 +266,9 @@ class DocGen:
 
             # Skip __init__, __main__ and other special modules
             if module.name.startswith("__"):
+                continue
+
+            if exclude_modules and module.name in exclude_modules:
                 continue
 
             module_content = module.read_text()

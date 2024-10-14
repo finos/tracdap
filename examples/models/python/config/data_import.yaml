@@ -1,0 +1,13 @@
+
+job:
+  importData:
+
+    parameters:
+      storage_key: staging_data
+      business_date: "2024-11-01"
+
+    outputs:
+      import_log: outputs/data_import/import_log.csv
+
+    storageAccess:
+      - staging_data

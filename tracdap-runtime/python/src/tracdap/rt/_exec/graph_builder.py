@@ -12,8 +12,6 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from __future__ import annotations
-
 import tracdap.rt.config as config
 import tracdap.rt.exceptions as _ex
 import tracdap.rt._impl.data as _data  # noqa
@@ -41,6 +39,9 @@ class GraphBuilder:
 
         if job_config.job.jobType == meta.JobType.RUN_FLOW:
             return cls.build_standard_job(job_config, result_spec, cls.build_run_flow_job)
+
+        if job_config.job.jobType in [meta.JobType.IMPORT_DATA, meta.JobType.EXPORT_DATA]:
+            return cls.build_standard_job(job_config, result_spec, cls.build_import_export_data_job)
 
         raise _ex.EConfigParse(f"Job type [{job_config.job.jobType}] is not supported yet")
 
@@ -113,6 +114,28 @@ class GraphBuilder:
             explicit_deps=[job_push_id, *main_section.must_run])
 
         return cls._join_sections(main_section, result_section)
+
+    @classmethod
+    def build_import_export_data_job(
+            cls, job_config: config.JobConfig, result_spec: JobResultSpec,
+            job_namespace: NodeNamespace, job_push_id: NodeId) \
+            -> GraphSection:
+
+        # TODO: These are processed as regular calculation jobs for now
+        # That might be ok, but is worth reviewing
+
+        if job_config.job.jobType == meta.JobType.IMPORT_DATA:
+            job_def = job_config.job.importData
+        else:
+            job_def = job_config.job.exportData
+
+        target_selector = job_def.model
+        target_obj = _util.get_job_resource(target_selector, job_config)
+        target_def = target_obj.model
+
+        return cls.build_calculation_job(
+            job_config, result_spec, job_namespace, job_push_id,
+            target_selector, target_def, job_def)
 
     @classmethod
     def build_run_model_job(
@@ -381,6 +404,65 @@ class GraphBuilder:
         return GraphSection(nodes, inputs=inputs)
 
     @classmethod
+    def build_runtime_outputs(cls, output_names: tp.List[str], job_namespace: NodeNamespace):
+
+        # TODO: Factor out common logic with regular job outputs (including static / dynamic)
+
+        nodes = {}
+        inputs = set()
+        outputs = list()
+
+        for output_name in output_names:
+
+            # Output data view must already exist in the namespace
+            data_view_id = NodeId.of(output_name, job_namespace, _data.DataView)
+            data_spec_id = NodeId.of(f"{output_name}:SPEC", job_namespace, _data.DataSpec)
+
+            data_key = output_name + ":DATA"
+            data_id = _util.new_object_id(meta.ObjectType.DATA)
+            storage_key = output_name + ":STORAGE"
+            storage_id = _util.new_object_id(meta.ObjectType.STORAGE)
+
+            data_spec_node = DynamicDataSpecNode(
+                data_spec_id, data_view_id,
+                data_id, storage_id,
+                prior_data_spec=None)
+
+            output_data_key = _util.object_key(data_id)
+            output_storage_key = _util.object_key(storage_id)
+
+            # Map one data item from each view, since outputs are single part/delta
+            data_item_id = NodeId(f"{output_name}:ITEM", job_namespace, _data.DataItem)
+            data_item_node = DataItemNode(data_item_id, data_view_id)
+
+            # Create a physical save operation for the data item
+            data_save_id = NodeId.of(f"{output_name}:SAVE", job_namespace, None)
+            data_save_node = SaveDataNode(data_save_id, data_spec_id, data_item_id)
+
+            data_result_id = NodeId.of(f"{output_name}:RESULT", job_namespace, ObjectBundle)
+            data_result_node = DataResultNode(
+                data_result_id, output_name,
+                data_item_id, data_spec_id, data_save_id,
+                output_data_key, output_storage_key)
+
+            nodes[data_spec_id] = data_spec_node
+            nodes[data_item_id] = data_item_node
+            nodes[data_save_id] = data_save_node
+            nodes[data_result_id] = data_result_node
+
+            # Job-level data view is an input to the save operation
+            inputs.add(data_view_id)
+            outputs.append(data_result_id)
+
+        runtime_outputs = JobOutputs(bundles=outputs)
+        runtime_outputs_id = NodeId.of("trac_runtime_outputs", job_namespace, JobOutputs)
+        runtime_outputs_node = RuntimeOutputsNode(runtime_outputs_id, runtime_outputs)
+
+        nodes[runtime_outputs_id] = runtime_outputs_node
+
+        return GraphSection(nodes, inputs=inputs, outputs={runtime_outputs_id})
+
+    @classmethod
     def build_job_results(
             cls, job_config: cfg.JobConfig, job_namespace: NodeNamespace, result_spec: JobResultSpec,
             objects: tp.Dict[str, NodeId[meta.ObjectDefinition]] = None,
@@ -396,7 +478,8 @@ class GraphBuilder:
 
             build_result_node = BuildJobResultNode(
                 build_result_id, job_config.jobId,
-                objects=objects, explicit_deps=explicit_deps)
+                outputs = JobOutputs(objects=objects),
+                explicit_deps=explicit_deps)
 
         elif bundles is not None:
 
@@ -404,7 +487,8 @@ class GraphBuilder:
 
             build_result_node = BuildJobResultNode(
                 build_result_id, job_config.jobId,
-                bundles=bundles, explicit_deps=explicit_deps)
+                outputs = JobOutputs(bundles=bundles),
+                explicit_deps=explicit_deps)
 
         else:
             raise _ex.EUnexpected()
@@ -459,7 +543,7 @@ class GraphBuilder:
             -> GraphSection:
 
         if model_or_flow.objectType == meta.ObjectType.MODEL:
-            return cls.build_model(namespace, model_or_flow.model, explicit_deps)
+            return cls.build_model(job_config, namespace, model_or_flow.model, explicit_deps)
 
         elif model_or_flow.objectType == meta.ObjectType.FLOW:
             return cls.build_flow(job_config, namespace, model_or_flow.flow)
@@ -469,10 +553,12 @@ class GraphBuilder:
 
     @classmethod
     def build_model(
-            cls, namespace: NodeNamespace,
+            cls, job_config: config.JobConfig, namespace: NodeNamespace,
             model_def: meta.ModelDefinition,
             explicit_deps: tp.Optional[tp.List[NodeId]] = None) \
             -> GraphSection:
+
+        cls.check_model_type(job_config, model_def)
 
         def param_id(node_name):
             return NodeId(node_name, namespace, meta.Value)
@@ -484,6 +570,14 @@ class GraphBuilder:
         parameter_ids = set(map(param_id, model_def.parameters))
         input_ids = set(map(data_id, model_def.inputs))
         output_ids = set(map(data_id, model_def.outputs))
+
+        # Set up storage access for import / export data jobs
+        if job_config.job.jobType == meta.JobType.IMPORT_DATA:
+            storage_access = job_config.job.importData.storageAccess
+        elif job_config.job.jobType == meta.JobType.EXPORT_DATA:
+            storage_access = job_config.job.exportData.storageAccess
+        else:
+            storage_access = None
 
         # Create the model node
         # Always add the prior graph root ID as a dependency
@@ -500,7 +594,8 @@ class GraphBuilder:
         model_node = RunModelNode(
             model_id, model_scope, model_def,
             frozenset(parameter_ids), frozenset(input_ids),
-            explicit_deps=explicit_deps, bundle=model_id.namespace)
+            explicit_deps=explicit_deps, bundle=model_id.namespace,
+            storage_access=storage_access)
 
         model_result_id = NodeId(f"{model_name}:RESULT", namespace)
         model_result_node = RunModelResultNode(model_result_id, model_id)
@@ -637,6 +732,7 @@ class GraphBuilder:
 
             # Explicit check for model compatibility - report an error now, do not try build_model()
             cls.check_model_compatibility(model_selector, model_obj.model, node_name, node)
+            cls.check_model_type(job_config, model_obj.model)
 
             return cls.build_model_or_flow_with_context(
                 job_config, namespace, node_name, model_obj,
@@ -647,8 +743,8 @@ class GraphBuilder:
 
     @classmethod
     def check_model_compatibility(
-            cls, model_selector: meta.TagSelector, model_def: meta.ModelDefinition,
-            node_name: str, flow_node: meta.FlowNode):
+            cls, model_selector: meta.TagSelector,
+            model_def: meta.ModelDefinition, node_name: str, flow_node: meta.FlowNode):
 
         model_params = list(sorted(model_def.parameters.keys()))
         model_inputs = list(sorted(model_def.inputs.keys()))
@@ -661,6 +757,21 @@ class GraphBuilder:
         if model_params != node_params or model_inputs != node_inputs or model_outputs != node_outputs:
             model_key = _util.object_key(model_selector)
             raise _ex.EJobValidation(f"Incompatible model for flow node [{node_name}] (Model: [{model_key}])")
+
+    @classmethod
+    def check_model_type(cls, job_config: config.JobConfig, model_def: meta.ModelDefinition):
+
+        if job_config.job.jobType == meta.JobType.IMPORT_DATA:
+            allowed_model_types = [meta.ModelType.DATA_IMPORT_MODEL]
+        elif job_config.job.jobType == meta.JobType.EXPORT_DATA:
+            allowed_model_types = [meta.ModelType.DATA_EXPORT_MODEL]
+        else:
+            allowed_model_types = [meta.ModelType.STANDARD_MODEL]
+
+        if model_def.modelType not in allowed_model_types:
+            job_type = job_config.job.jobType.name
+            model_type = model_def.modelType.name
+            raise _ex.EJobValidation(f"Job type [{job_type}] cannot use model type [{model_type}]")
 
     @staticmethod
     def build_context_push(

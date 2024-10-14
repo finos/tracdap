@@ -19,6 +19,7 @@ import pathlib
 import copy
 
 import tracdap.rt.api as _api
+import tracdap.rt.api.experimental as _eapi
 import tracdap.rt.metadata as _meta
 import tracdap.rt.config as _cfg
 import tracdap.rt.exceptions as _ex
@@ -207,6 +208,13 @@ class ModelLoader:
             model_def.parameters = parameters
             model_def.inputs = inputs
             model_def.outputs = outputs
+
+            if isinstance(model, _eapi.TracDataImport):
+                model_def.modelType = _meta.ModelType.DATA_IMPORT_MODEL
+            elif isinstance(model, _eapi.TracDataExport):
+                model_def.modelType = _meta.ModelType.DATA_EXPORT_MODEL
+            else:
+                model_def.modelType = _meta.ModelType.STANDARD_MODEL
 
             _val.quick_validate_model_def(model_def)
 

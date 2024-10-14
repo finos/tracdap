@@ -66,7 +66,9 @@ message AuthenticationConfig {
 
 message StorageConfig {
 
+  // TODO: Rename "buckets" as "internal" for 0.7
   map<string, PluginConfig> buckets = 1;
+  map<string, PluginConfig> external = 4;
 
   string defaultBucket = 2;
   string defaultFormat = 3;

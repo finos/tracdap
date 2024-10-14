@@ -30,6 +30,7 @@ import tracdap.rt.exceptions as _ex
 import tracdap.rt.ext.plugins as plugins
 import tracdap.rt._impl.data as _data
 import tracdap.rt._impl.util as _util
+import tracdap.rt._impl.validation as _val
 
 # Import storage interfaces
 from tracdap.rt.ext.storage import *
@@ -77,9 +78,16 @@ class StorageManager:
         self.__log = _util.logger_for_object(self)
         self.__file_storage: tp.Dict[str, IFileStorage] = dict()
         self.__data_storage: tp.Dict[str, IDataStorage] = dict()
+        self.__external: tp.List[str] = list()
         self.__settings = sys_config.storage
 
         for storage_key, storage_config in sys_config.storage.buckets.items():
+            self.create_storage(storage_key, storage_config)
+
+        for storage_key, storage_config in sys_config.storage.external.items():
+            if storage_key in self.__file_storage or storage_key in self.__data_storage:
+                raise _ex.EConfig(f"Storage key [{storage_key}] is defined as both internal and external storage")
+            self.__external.append(storage_key)
             self.create_storage(storage_key, storage_config)
 
     def default_storage_key(self):
@@ -151,26 +159,32 @@ class StorageManager:
         self.__file_storage[storage_key] = file_storage
         self.__data_storage[storage_key] = data_storage
 
-    def has_file_storage(self, storage_key: str) -> bool:
+    def has_file_storage(self, storage_key: str, external: bool = False) -> bool:
+
+        if external ^ (storage_key in self.__external):
+            return False
 
         return storage_key in self.__file_storage
 
-    def get_file_storage(self, storage_key: str) -> IFileStorage:
+    def get_file_storage(self, storage_key: str, external: bool = False) -> IFileStorage:
 
-        if not self.has_file_storage(storage_key):
+        if not self.has_file_storage(storage_key, external):
             err = f"File storage is not configured for storage key [{storage_key}]"
             self.__log.error(err)
             raise _ex.EStorageConfig(err)
 
         return self.__file_storage[storage_key]
 
-    def has_data_storage(self, storage_key: str) -> bool:
+    def has_data_storage(self, storage_key: str, external: bool = False) -> bool:
+
+        if external ^ (storage_key in self.__external):
+            return False
 
         return storage_key in self.__data_storage
 
-    def get_data_storage(self, storage_key: str) -> IDataStorage:
+    def get_data_storage(self, storage_key: str, external: bool = False) -> IDataStorage:
 
-        if not self.has_data_storage(storage_key):
+        if not self.has_data_storage(storage_key, external):
             err = f"Data storage is not configured for storage key [{storage_key}]"
             self.__log.error(err)
             raise _ex.EStorageConfig(err)
@@ -591,29 +605,27 @@ class CommonFileStorage(IFileStorage):
 
         try:
 
-            if storage_path is None or len(storage_path.strip()) == 0:
+            if _val.StorageValidator.storage_path_is_empty(storage_path):
                 raise self._explicit_error(self.ExplicitError.STORAGE_PATH_NULL_OR_BLANK, operation_name, storage_path)
 
-            if self._ILLEGAL_PATH_CHARS.match(storage_path):
+            if _val.StorageValidator.storage_path_invalid(storage_path):
                 raise self._explicit_error(self.ExplicitError.STORAGE_PATH_INVALID, operation_name, storage_path)
-    
-            relative_path = pathlib.Path(storage_path)
-    
-            if relative_path.is_absolute():
+
+            if _val.StorageValidator.storage_path_not_relative(storage_path):
                 raise self._explicit_error(self.ExplicitError.STORAGE_PATH_NOT_RELATIVE, operation_name, storage_path)
 
+            if _val.StorageValidator.storage_path_outside_root(storage_path):
+                raise self._explicit_error(self.ExplicitError.STORAGE_PATH_OUTSIDE_ROOT, operation_name, storage_path)
+
+            if not allow_root_dir and _val.StorageValidator.storage_path_is_root(storage_path):
+                raise self._explicit_error(self.ExplicitError.STORAGE_PATH_IS_ROOT, operation_name, storage_path)
+
             root_path = pathlib.Path("C:\\root") if _util.is_windows() else pathlib.Path("/root")
+            relative_path = pathlib.Path(storage_path)
             absolute_path = root_path.joinpath(relative_path).resolve(False)
 
             if absolute_path == root_path:
-                if not allow_root_dir:
-                    raise self._explicit_error(self.ExplicitError.STORAGE_PATH_IS_ROOT, operation_name, storage_path)
-                else:
-                    return ""
-
-            # is_relative_to only supported in Python 3.9+, we need to support 3.7
-            if root_path not in absolute_path.parents:
-                raise self._explicit_error(self.ExplicitError.STORAGE_PATH_OUTSIDE_ROOT, operation_name, storage_path)
+                return ""
             else:
                 return absolute_path.relative_to(root_path).as_posix()
 
@@ -642,10 +654,6 @@ class CommonFileStorage(IFileStorage):
         err = err_type(message)
 
         return err
-
-    _ILLEGAL_PATH_CHARS_WINDOWS = re.compile(r".*[\x00<>:\"\'|?*].*")
-    _ILLEGAL_PATH_CHARS_POSIX = re.compile(r".*[\x00<>:\"\'|?*\\].*")
-    _ILLEGAL_PATH_CHARS = _ILLEGAL_PATH_CHARS_WINDOWS if _util.is_windows() else _ILLEGAL_PATH_CHARS_POSIX
 
     class ExplicitError(enum.Enum):
     

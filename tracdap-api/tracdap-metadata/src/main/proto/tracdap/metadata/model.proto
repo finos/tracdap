@@ -25,6 +25,22 @@ import "tracdap/metadata/data.proto";
 
 
 /**
+ * Identify specialized model types for specific tasks
+ */
+enum ModelType {
+
+    /// A regular model with parameters, inputs and outputs (this is the default)
+    STANDARD_MODEL = 0;
+
+    /// A model with read access to external storage for importing data
+    DATA_IMPORT_MODEL = 1;
+
+    /// A model with write access to external storage for exporting data
+    DATA_EXPORT_MODEL = 2;
+}
+
+
+/**
  * Describes an individual parameter of a model
  */
 message ModelParameter {
@@ -94,13 +110,10 @@ message ModelDefinition {
 
     string language = 1;
     string repository = 2;
-
     optional string packageGroup = 10;
     string package = 11;
     string version = 6;
-
     string entryPoint = 5;
-
     optional string path = 3;
 
     map<string, ModelParameter> parameters = 7;
@@ -111,4 +124,6 @@ message ModelDefinition {
      * Static attributes defined in model code
      */
     map<string, Value> staticAttributes = 12;
+
+    ModelType modelType = 13;
 }

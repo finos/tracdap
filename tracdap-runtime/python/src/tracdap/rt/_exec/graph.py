@@ -12,8 +12,6 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from __future__ import annotations
-
 import pathlib
 import typing as tp
 import dataclasses as dc
@@ -38,7 +36,7 @@ class NodeNamespace:
         return cls.__ROOT
 
     name: str
-    parent: tp.Optional[NodeNamespace] = dc.field(default_factory=lambda: NodeNamespace.root())
+    parent: "tp.Optional[NodeNamespace]" = dc.field(default_factory=lambda: NodeNamespace.root())
 
     def __str__(self):
         if self is self.__ROOT:
@@ -62,7 +60,7 @@ class NodeNamespace:
 class NodeId(tp.Generic[_T]):
 
     @staticmethod
-    def of(name: str, namespace: NodeNamespace, result_type: tp.Type[_T]) -> NodeId[_T]:
+    def of(name: str, namespace: NodeNamespace, result_type: tp.Type[_T]) -> "NodeId[_T]":
         return NodeId(name, namespace, result_type)
 
     name: str
@@ -83,14 +81,21 @@ class DependencyType:
     immediate: bool = True
     tolerant: bool = False
 
-    HARD: tp.ClassVar[DependencyType]
-    TOLERANT: tp.ClassVar[DependencyType]
+    HARD: "tp.ClassVar[DependencyType]"
+    TOLERANT: "tp.ClassVar[DependencyType]"
 
 
 DependencyType.HARD = DependencyType(immediate=True, tolerant=False)
 DependencyType.SOFT = DependencyType(immediate=False, tolerant=True)
 DependencyType.TOLERANT = DependencyType(immediate=True, tolerant=True)
 DependencyType.DELAYED = DependencyType(immediate=False, tolerant=False)
+
+
+@dc.dataclass(frozen=True)
+class Dependency:
+
+    node_id: NodeId
+    dependency_type: DependencyType
 
 
 @dc.dataclass(frozen=True)
@@ -165,6 +170,17 @@ class GraphSection:
     must_run: tp.List[NodeId] = dc.field(default_factory=list)
 
 
+Bundle: tp.Generic[_T] = tp.Dict[str, _T]
+ObjectBundle = Bundle[meta.ObjectDefinition]
+
+
+@dc.dataclass(frozen=True)
+class JobOutputs:
+
+    objects: tp.Dict[str, NodeId[meta.ObjectDefinition]] = dc.field(default_factory=dict)
+    bundles: tp.List[NodeId[ObjectBundle]] = dc.field(default_factory=list)
+
+
 # TODO: Where does this go?
 @dc.dataclass(frozen=True)
 class JobResultSpec:
@@ -177,10 +193,6 @@ class JobResultSpec:
 # ----------------------------------------------------------------------------------------------------------------------
 #  NODE DEFINITIONS
 # ----------------------------------------------------------------------------------------------------------------------
-
-
-Bundle: tp.Generic[_T] = tp.Dict[str, _T]
-ObjectBundle = Bundle[meta.ObjectDefinition]
 
 
 @_node_type
@@ -354,6 +366,7 @@ class RunModelNode(Node[Bundle[_data.DataView]]):
     model_def: meta.ModelDefinition
     parameter_ids: tp.FrozenSet[NodeId]
     input_ids: tp.FrozenSet[NodeId]
+    storage_access: tp.Optional[tp.List[str]] = None
 
     def _node_dependencies(self) -> tp.Dict[NodeId, DependencyType]:
         return {dep_id: DependencyType.HARD for dep_id in [*self.parameter_ids, *self.input_ids]}
@@ -369,15 +382,27 @@ class RunModelResultNode(Node[None]):
 
 
 @_node_type
+class RuntimeOutputsNode(Node[JobOutputs]):
+
+    outputs: JobOutputs
+
+    def _node_dependencies(self) -> tp.Dict[NodeId, DependencyType]:
+        dep_ids = [*self.outputs.bundles, *self.outputs.objects.values()]
+        return {node_id: DependencyType.HARD for node_id in dep_ids}
+
+
+@_node_type
 class BuildJobResultNode(Node[cfg.JobResult]):
 
     job_id: meta.TagHeader
 
-    objects: tp.Dict[str, NodeId[meta.ObjectDefinition]] = dc.field(default_factory=dict)
-    bundles: tp.List[NodeId[ObjectBundle]] = dc.field(default_factory=list)
+    outputs: JobOutputs
+    runtime_outputs: tp.Optional[NodeId[JobOutputs]] = None
 
     def _node_dependencies(self) -> tp.Dict[NodeId, DependencyType]:
-        dep_ids = [*self.bundles, *self.objects.values()]
+        dep_ids = [*self.outputs.bundles, *self.outputs.objects.values()]
+        if self.runtime_outputs is not None:
+            dep_ids.append(self.runtime_outputs)
         return {node_id: DependencyType.HARD for node_id in dep_ids}
 
 

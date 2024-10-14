@@ -119,6 +119,10 @@ class _StaticApiHook:
         pass
 
     @_abc.abstractmethod
+    def infer_schema(self, dataset: _tp.Any) -> _meta.SchemaDefinition:
+        pass
+
+    @_abc.abstractmethod
     def define_input_table(
             self, *fields: _tp.Union[_meta.FieldSchema, _tp.List[_meta.FieldSchema]],
             label: _tp.Optional[str] = None, optional: bool = False, dynamic: bool = False,

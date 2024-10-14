@@ -139,3 +139,24 @@ class TutorialModelsTest(unittest.TestCase):
         sys_config = self.examples_root.joinpath("config/sys_config.yaml")
 
         launch.launch_job(job_config, sys_config, dev_mode=True)
+
+    def test_data_import(self):
+
+        from tutorial.data_import import BulkDataImport  # noqa
+
+        job_config = self.examples_root.joinpath("config/data_import.yaml")
+        sys_config = self.examples_root.joinpath("config/sys_config.yaml")
+
+        launch.launch_model(BulkDataImport, job_config, sys_config, dev_mode=True)
+
+    def test_data_export(self):
+
+        # The export job needs the outputs of the using data example
+        self.test_using_data()
+
+        from tutorial.data_export import DataExportExample  # noqa
+
+        job_config = self.examples_root.joinpath("config/data_export.yaml")
+        sys_config = self.examples_root.joinpath("config/sys_config.yaml")
+
+        launch.launch_model(DataExportExample, job_config, sys_config, dev_mode=True)

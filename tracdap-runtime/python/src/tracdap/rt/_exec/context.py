@@ -22,10 +22,12 @@ import traceback
 import pandas as pd
 
 import tracdap.rt.api as _api
+import tracdap.rt.api.experimental as _eapi
 import tracdap.rt.metadata as _meta
 import tracdap.rt.exceptions as _ex
 import tracdap.rt._impl.type_system as _types  # noqa
 import tracdap.rt._impl.data as _data  # noqa
+import tracdap.rt._impl.storage as _storage  # noqa
 import tracdap.rt._impl.util as _util  # noqa
 import tracdap.rt._impl.validation as _val  # noqa
 
@@ -61,6 +63,7 @@ class TracContextImpl(_api.TracContext):
                  model_def: _meta.ModelDefinition,
                  model_class: _api.TracModel.__class__,
                  local_ctx: tp.Dict[str, tp.Any],
+                 dynamic_outputs: tp.List[str] = None,
                  checkout_directory: pathlib.Path = None):
 
         self.__ctx_log = _util.logger_for_object(self)
@@ -68,12 +71,14 @@ class TracContextImpl(_api.TracContext):
 
         self.__model_def = model_def
         self.__model_class = model_class
-        self.__local_ctx = local_ctx or {}
+        self.__local_ctx = local_ctx if local_ctx is not None else {}
+        self.__dynamic_outputs = dynamic_outputs if dynamic_outputs is not None else []
 
         self.__val = TracContextValidator(
             self.__ctx_log,
             self.__model_def,
             self.__local_ctx,
+            self.__dynamic_outputs,
             checkout_directory)
 
     def get_parameter(self, parameter_name: str) -> tp.Any:
@@ -260,20 +265,212 @@ class TracContextImpl(_api.TracContext):
         return schema_def
 
 
-class TracContextValidator:
-
-    __VALID_IDENTIFIER = re.compile("^[a-zA-Z_]\\w*$",)
-    __RESERVED_IDENTIFIER = re.compile("^(trac_|_)\\w*")
+class TracDataContextImpl(TracContextImpl, _eapi.TracDataContext):
 
     def __init__(
-            self, log: logging.Logger,
-            model_def: _meta.ModelDefinition,
-            local_ctx: tp.Dict[str, tp.Any],
-            checkout_directory: pathlib.Path):
+            self, model_def: _meta.ModelDefinition, model_class: _api.TracModel.__class__,
+            local_ctx: tp.Dict[str, tp.Any], dynamic_outputs: tp.List[str],
+            storage_map: tp.Dict[str, tp.Union[_eapi.TracFileStorage]],
+            checkout_directory: pathlib.Path = None):
 
-        self.__log = log
+        super().__init__(model_def, model_class, local_ctx, dynamic_outputs, checkout_directory)
+
         self.__model_def = model_def
         self.__local_ctx = local_ctx
+        self.__dynamic_outputs = dynamic_outputs
+        self.__storage_map = storage_map
+        self.__checkout_directory = checkout_directory
+
+        self.__val = self._TracContextImpl__val  # noqa
+
+    def get_file_storage(self, storage_key: str) -> _eapi.TracFileStorage:
+
+        _val.validate_signature(self.get_file_storage, storage_key)
+
+        self.__val.check_storage_valid_identifier(storage_key)
+        self.__val.check_storage_available(self.__storage_map, storage_key)
+        self.__val.check_storage_type(self.__storage_map, storage_key, _eapi.TracFileStorage)
+
+        return self.__storage_map[storage_key]
+
+    def get_data_storage(self, storage_key: str) -> None:
+        raise _ex.ERuntimeValidation("Data storage API not available yet")
+
+    def add_data_import(self, dataset_name: str):
+
+        _val.validate_signature(self.add_data_import, dataset_name)
+
+        self.__val.check_dataset_valid_identifier(dataset_name)
+        self.__val.check_dataset_not_defined_in_model(dataset_name)
+        self.__val.check_dataset_not_available_in_context(dataset_name)
+
+        self.__local_ctx[dataset_name] = _data.DataView.create_empty()
+        self.__dynamic_outputs.append(dataset_name)
+
+    def set_source_metadata(self, dataset_name: str, storage_key: str, source_info: _eapi.FileStat):
+
+        _val.validate_signature(self.add_data_import, dataset_name, storage_key, source_info)
+
+        pass  # Not implemented yet, only required when imports are sent back to the platform
+
+    def set_attribute(self, dataset_name: str, attribute_name: str, value: tp.Any):
+
+        _val.validate_signature(self.add_data_import, dataset_name, attribute_name, value)
+
+        pass  # Not implemented yet, only required when imports are sent back to the platform
+
+    def set_schema(self, dataset_name: str, schema: _meta.SchemaDefinition):
+
+        _val.validate_signature(self.set_schema, dataset_name, schema)
+
+        # Forward to existing method (these should be swapped round)
+        self.put_schema(dataset_name, schema)
+
+
+class TracFileStorageImpl(_eapi.TracFileStorage):
+
+    def __init__(self, storage_key: str, storage_impl: _storage.IFileStorage, write_access: bool, checkout_directory):
+
+        self.__storage_key = storage_key
+
+        self.__exists = lambda sp: storage_impl.exists(sp)
+        self.__size = lambda sp: storage_impl.size(sp)
+        self.__stat = lambda sp: storage_impl.stat(sp)
+        self.__ls = lambda sp, rec: storage_impl.ls(sp, rec)
+        self.__read_byte_stream = lambda sp: storage_impl.read_byte_stream(sp)
+
+        if write_access:
+            self.__mkdir = lambda sp, rec: storage_impl.mkdir(sp, rec)
+            self.__rm = lambda sp: storage_impl.rm(sp)
+            self.__rmdir = lambda sp: storage_impl.rmdir(sp)
+            self.__write_byte_stream = lambda sp: storage_impl.write_byte_stream(sp)
+        else:
+            self.__mkdir = None
+            self.__rm = None
+            self.__rmdir = None
+            self.__write_byte_stream = None
+
+        self.__log = _util.logger_for_object(self)
+        self.__val = TracStorageValidator(self.__log, checkout_directory, self.__storage_key)
+
+    def get_storage_key(self) -> str:
+
+        _val.validate_signature(self.get_storage_key)
+
+        return self.__storage_key
+
+    def exists(self, storage_path: str) -> bool:
+
+        _val.validate_signature(self.exists, storage_path)
+
+        self.__val.check_operation_available(self.exists, self.__exists)
+        self.__val.check_storage_path_is_valid(storage_path)
+
+        return self.__exists(storage_path)
+
+    def size(self, storage_path: str) -> int:
+
+        _val.validate_signature(self.size, storage_path)
+
+        self.__val.check_operation_available(self.size, self.__size)
+        self.__val.check_storage_path_is_valid(storage_path)
+
+        return self.__size(storage_path)
+
+    def stat(self, storage_path: str) -> _eapi.FileStat:
+
+        _val.validate_signature(self.stat, storage_path)
+
+        self.__val.check_operation_available(self.stat, self.__stat)
+        self.__val.check_storage_path_is_valid(storage_path)
+
+        stat = self.__stat(storage_path)
+        return _eapi.FileStat(**stat.__dict__)
+
+    def ls(self, storage_path: str, recursive: bool = False) -> tp.List[_eapi.FileStat]:
+
+        _val.validate_signature(self.ls, storage_path, recursive)
+
+        self.__val.check_operation_available(self.ls, self.__ls)
+        self.__val.check_storage_path_is_valid(storage_path)
+
+        listing = self.__ls(storage_path, recursive)
+        return list(_eapi.FileStat(**stat.__dict__) for stat in listing)
+
+    def mkdir(self, storage_path: str, recursive: bool = False):
+
+        _val.validate_signature(self.mkdir, storage_path, recursive)
+
+        self.__val.check_operation_available(self.mkdir, self.__mkdir)
+        self.__val.check_storage_path_is_valid(storage_path)
+        self.__val.check_storage_path_is_not_root(storage_path)
+
+        self.__mkdir(storage_path, recursive)
+
+    def rm(self, storage_path: str):
+
+        _val.validate_signature(self.rm, storage_path)
+
+        self.__val.check_operation_available(self.rm, self.__rm)
+        self.__val.check_storage_path_is_valid(storage_path)
+        self.__val.check_storage_path_is_not_root(storage_path)
+
+        self.__rm(storage_path)
+
+    def rmdir(self, storage_path: str):
+
+        _val.validate_signature(self.rmdir, storage_path)
+
+        self.__val.check_operation_available(self.rmdir, self.__rmdir)
+        self.__val.check_storage_path_is_valid(storage_path)
+        self.__val.check_storage_path_is_not_root(storage_path)
+
+        self.__rmdir(storage_path)
+
+    def read_byte_stream(self, storage_path: str) -> tp.ContextManager[tp.BinaryIO]:
+
+        _val.validate_signature(self.read_byte_stream, storage_path)
+
+        self.__val.check_operation_available(self.read_byte_stream, self.__read_byte_stream)
+        self.__val.check_storage_path_is_valid(storage_path)
+
+        return self.__read_byte_stream(storage_path)
+
+    def read_bytes(self, storage_path: str) -> bytes:
+
+        _val.validate_signature(self.read_bytes, storage_path)
+
+        self.__val.check_operation_available(self.read_bytes, self.__read_byte_stream)
+        self.__val.check_storage_path_is_valid(storage_path)
+
+        return super().read_bytes(storage_path)
+
+    def write_byte_stream(self, storage_path: str) -> tp.ContextManager[tp.BinaryIO]:
+
+        _val.validate_signature(self.write_byte_stream, storage_path)
+
+        self.__val.check_operation_available(self.write_byte_stream, self.__write_byte_stream)
+        self.__val.check_storage_path_is_valid(storage_path)
+        self.__val.check_storage_path_is_not_root(storage_path)
+
+        return self.__write_byte_stream(storage_path)
+
+    def write_bytes(self, storage_path: str, data: bytes):
+
+        _val.validate_signature(self.write_bytes, storage_path)
+
+        self.__val.check_operation_available(self.write_bytes, self.__write_byte_stream)
+        self.__val.check_storage_path_is_valid(storage_path)
+        self.__val.check_storage_path_is_not_root(storage_path)
+
+        super().write_bytes(storage_path, data)
+
+
+class TracContextErrorReporter:
+
+    def __init__(self, log: logging.Logger, checkout_directory: pathlib.Path):
+
+        self.__log = log
         self.__checkout_directory = checkout_directory
 
     def _report_error(self, message, cause: Exception = None):
@@ -291,6 +488,25 @@ class TracContextValidator:
             raise _ex.ERuntimeValidation(message) from cause
         else:
             raise _ex.ERuntimeValidation(message)
+
+
+class TracContextValidator(TracContextErrorReporter):
+
+    __VALID_IDENTIFIER = re.compile("^[a-zA-Z_]\\w*$",)
+    __RESERVED_IDENTIFIER = re.compile("^(trac_|_)\\w*")
+
+    def __init__(
+            self, log: logging.Logger,
+            model_def: _meta.ModelDefinition,
+            local_ctx: tp.Dict[str, tp.Any],
+            dynamic_outputs: tp.List[str],
+            checkout_directory: pathlib.Path):
+
+        super().__init__(log, checkout_directory)
+
+        self.__model_def = model_def
+        self.__local_ctx = local_ctx
+        self.__dynamic_outputs = dynamic_outputs
 
     def check_param_valid_identifier(self, param_name: str):
 
@@ -318,6 +534,14 @@ class TracContextValidator:
         if not self.__VALID_IDENTIFIER.match(dataset_name):
             self._report_error(f"Dataset name {dataset_name} is not a valid identifier")
 
+    def check_dataset_not_defined_in_model(self, dataset_name: str):
+
+        if dataset_name  in self.__model_def.inputs or dataset_name in self.__model_def.outputs:
+            self._report_error(f"Dataset {dataset_name} is already defined in the model")
+
+        if dataset_name  in self.__model_def.parameters:
+            self._report_error(f"Dataset name {dataset_name} is already in use as a model parameter")
+
     def check_dataset_defined_in_model(self, dataset_name: str):
 
         if dataset_name not in self.__model_def.inputs and dataset_name not in self.__model_def.outputs:
@@ -325,23 +549,29 @@ class TracContextValidator:
 
     def check_dataset_is_model_output(self, dataset_name: str):
 
-        if dataset_name not in self.__model_def.outputs:
+        if dataset_name not in self.__model_def.outputs and dataset_name not in self.__dynamic_outputs:
             self._report_error(f"Dataset {dataset_name} is not defined as a model output")
 
     def check_dataset_is_dynamic_output(self, dataset_name: str):
 
         model_output: _meta.ModelOutputSchema = self.__model_def.outputs.get(dataset_name)
+        dynamic_output = dataset_name in self.__dynamic_outputs
 
-        if model_output is None:
+        if model_output is None and not dynamic_output:
             self._report_error(f"Dataset {dataset_name} is not defined as a model output")
 
-        if not model_output.dynamic:
+        if model_output and not model_output.dynamic:
             self._report_error(f"Model output {dataset_name} is not a dynamic output")
 
     def check_dataset_available_in_context(self, item_name: str):
 
         if item_name not in self.__local_ctx:
             self._report_error(f"Dataset {item_name} is not available in the current context")
+
+    def check_dataset_not_available_in_context(self, item_name: str):
+
+        if item_name in self.__local_ctx:
+            self._report_error(f"Dataset {item_name} already exists in the current context")
 
     def check_dataset_schema_defined(self, dataset_name: str, data_view: _data.DataView):
 
@@ -415,6 +645,33 @@ class TracContextValidator:
                 f"The object referenced by [{item_name}] in the current context has the wrong type" +
                 f" (expected {expected_type_name}, got {actual_type_name})")
 
+    def check_storage_valid_identifier(self, storage_key):
+
+        if storage_key is None:
+            self._report_error(f"Storage key is null")
+
+        if not self.__VALID_IDENTIFIER.match(storage_key):
+            self._report_error(f"Storage key {storage_key} is not a valid identifier")
+
+    def check_storage_available(self, storage_map: tp.Dict, storage_key: str):
+
+        storage_instance = storage_map.get(storage_key)
+
+        if storage_instance is None:
+            self._report_error(f"Storage not available for storage key [{storage_key}]")
+
+    def check_storage_type(
+            self, storage_map: tp.Dict, storage_key: str,
+            storage_type: tp.Union[_eapi.TracFileStorage.__class__]):
+
+        storage_instance = storage_map.get(storage_key)
+
+        if not isinstance(storage_instance, storage_type):
+            if storage_type == _eapi.TracFileStorage:
+                self._report_error(f"Storage key [{storage_key}] refers to data storage, not file storage")
+            else:
+                self._report_error(f"Storage key [{storage_key}] refers to file storage, not data storage")
+
     @staticmethod
     def _type_name(type_: type):
 
@@ -424,3 +681,34 @@ class TracContextValidator:
             return type_.__qualname__
 
         return module + '.' + type_.__name__
+
+
+class TracStorageValidator(TracContextErrorReporter):
+
+    def __init__(self, log, checkout_directory, storage_key):
+        super().__init__(log, checkout_directory)
+        self.__storage_key = storage_key
+
+    def check_operation_available(self, public_func: tp.Callable, impl_func: tp.Callable):
+
+        if impl_func is None:
+            self._report_error(f"Operation [{public_func.__name__}] is not available for storage [{self.__storage_key}]")
+
+    def check_storage_path_is_valid(self, storage_path: str):
+
+        if _val.StorageValidator.storage_path_is_empty(storage_path):
+            self._report_error(f"Storage path is None or empty")
+
+        if _val.StorageValidator.storage_path_invalid(storage_path):
+            self._report_error(f"Storage path [{storage_path}] contains invalid characters")
+
+        if _val.StorageValidator.storage_path_not_relative(storage_path):
+            self._report_error(f"Storage path [{storage_path}] is not a relative path")
+
+        if _val.StorageValidator.storage_path_outside_root(storage_path):
+            self._report_error(f"Storage path [{storage_path}] is outside the storage root")
+
+    def check_storage_path_is_not_root(self, storage_path: str):
+
+        if _val.StorageValidator.storage_path_is_empty(storage_path):
+            self._report_error(f"Storage path [{storage_path}] is not allowed")

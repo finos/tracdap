@@ -36,6 +36,9 @@
 /tracdap-runtime/python/*.egg-info
 
 /examples/models/python/data/outputs/**
+/examples/models/python/data/data/**
+/examples/models/python/data/exports/**
+!/examples/models/python/data/exports/.keep
 /examples/apps/javascript/node_modules/**
 
 .DS_Store

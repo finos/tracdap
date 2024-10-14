@@ -23,6 +23,7 @@ import tracdap.rt.api as _api
 import tracdap.rt.config as _config
 import tracdap.rt.exceptions as _ex
 import tracdap.rt._exec.context as _ctx
+import tracdap.rt._exec.graph_builder as _graph
 import tracdap.rt._impl.config_parser as _cfg_p  # noqa
 import tracdap.rt._impl.type_system as _types  # noqa
 import tracdap.rt._impl.data as _data  # noqa
@@ -59,6 +60,13 @@ class NodeContext:
         pass
 
 
+class NodeCallback:
+
+    @abc.abstractmethod
+    def send_graph_updates(self, new_nodes: tp.Dict[NodeId, Node], new_deps: tp.Dict[NodeId, tp.List[Dependency]]):
+        pass
+
+
 # Helper functions to access the node context (in case the NodeContext interface needs to change)
 
 def _ctx_lookup(node_id: NodeId[_T], ctx: NodeContext) -> _T:
@@ -89,8 +97,15 @@ class NodeFunction(tp.Generic[_T]):
         :py:class:`NodeContext <NodeContext>`
     """
 
-    def __call__(self, ctx: NodeContext) -> _T:
-        return self._execute(ctx)
+    def __init__(self):
+        self.node_callback: tp.Optional[NodeCallback] = None
+
+    def __call__(self, ctx: NodeContext, callback: NodeCallback = None) -> _T:
+        try:
+            self.node_callback = callback
+            return self._execute(ctx)
+        finally:
+            self.node_callback = None
 
     @abc.abstractmethod
     def _execute(self, ctx: NodeContext) -> _T:
@@ -105,6 +120,7 @@ class NodeFunction(tp.Generic[_T]):
 class NoopFunc(NodeFunction[None]):
 
     def __init__(self, node: NoopNode):
+        super().__init__()
         self.node = node
 
     def _execute(self, _: NodeContext) -> None:
@@ -114,6 +130,7 @@ class NoopFunc(NodeFunction[None]):
 class StaticValueFunc(NodeFunction[_T]):
 
     def __init__(self, node: StaticValueNode[_T]):
+        super().__init__()
         self.node = node
 
     def _execute(self, ctx: NodeContext) -> _T:
@@ -123,6 +140,7 @@ class StaticValueFunc(NodeFunction[_T]):
 class IdentityFunc(NodeFunction[_T]):
 
     def __init__(self, node: IdentityNode[_T]):
+        super().__init__()
         self.node = node
 
     def _execute(self, ctx: NodeContext) -> _T:
@@ -138,6 +156,7 @@ class _ContextPushPopFunc(NodeFunction[Bundle[tp.Any]], abc.ABC):
     _POP = False
 
     def __init__(self, node: tp.Union[ContextPushNode, ContextPopNode], direction: bool):
+        super().__init__()
         self.node = node
         self.direction = direction
 
@@ -176,6 +195,7 @@ class ContextPopFunc(_ContextPushPopFunc):
 class KeyedItemFunc(NodeFunction[_T]):
 
     def __init__(self, node: KeyedItemNode[_T]):
+        super().__init__()
         self.node = node
 
     def _execute(self, ctx: NodeContext) -> _T:
@@ -184,9 +204,20 @@ class KeyedItemFunc(NodeFunction[_T]):
         return src_item
 
 
+class RuntimeOutputsFunc(NodeFunction[JobOutputs]):
+
+    def __init__(self, node: RuntimeOutputsNode):
+        super().__init__()
+        self.node = node
+
+    def _execute(self, ctx: NodeContext) -> JobOutputs:
+        return self.node.outputs
+
+
 class BuildJobResultFunc(NodeFunction[_config.JobResult]):
 
     def __init__(self, node: BuildJobResultNode):
+        super().__init__()
         self.node = node
 
     def _execute(self, ctx: NodeContext) -> _config.JobResult:
@@ -197,13 +228,25 @@ class BuildJobResultFunc(NodeFunction[_config.JobResult]):
 
         # TODO: Handle individual failed results
 
-        for obj_id, node_id in self.node.objects.items():
+        for obj_id, node_id in self.node.outputs.objects.items():
             obj_def = _ctx_lookup(node_id, ctx)
             job_result.results[obj_id] = obj_def
 
-        for bundle_id in self.node.bundles:
+        for bundle_id in self.node.outputs.bundles:
             bundle = _ctx_lookup(bundle_id, ctx)
             job_result.results.update(bundle.items())
+
+        if self.node.runtime_outputs is not None:
+
+            runtime_outputs = _ctx_lookup(self.node.runtime_outputs, ctx)
+
+            for obj_id, node_id in runtime_outputs.objects.items():
+                obj_def = _ctx_lookup(node_id, ctx)
+                job_result.results[obj_id] = obj_def
+
+            for bundle_id in runtime_outputs.bundles:
+                bundle = _ctx_lookup(bundle_id, ctx)
+                job_result.results.update(bundle.items())
 
         return job_result
 
@@ -211,6 +254,7 @@ class BuildJobResultFunc(NodeFunction[_config.JobResult]):
 class SaveJobResultFunc(NodeFunction[None]):
 
     def __init__(self, node: SaveJobResultNode):
+        super().__init__()
         self.node = node
 
     def _execute(self, ctx: NodeContext) -> None:
@@ -241,6 +285,7 @@ class SaveJobResultFunc(NodeFunction[None]):
 class DataViewFunc(NodeFunction[_data.DataView]):
 
     def __init__(self, node: DataViewNode):
+        super().__init__()
         self.node = node
 
     def _execute(self, ctx: NodeContext) -> _data.DataView:
@@ -267,6 +312,7 @@ class DataViewFunc(NodeFunction[_data.DataView]):
 class DataItemFunc(NodeFunction[_data.DataItem]):
 
     def __init__(self, node: DataItemNode):
+        super().__init__()
         self.node = node
 
     def _execute(self, ctx: NodeContext) -> _data.DataItem:
@@ -290,6 +336,7 @@ class DataItemFunc(NodeFunction[_data.DataItem]):
 class DataResultFunc(NodeFunction[ObjectBundle]):
 
     def __init__(self, node: DataResultNode):
+        super().__init__()
         self.node = node
 
     def _execute(self, ctx: NodeContext) -> ObjectBundle:
@@ -324,6 +371,7 @@ class DynamicDataSpecFunc(NodeFunction[_data.DataSpec]):
     RANDOM.seed()
 
     def __init__(self, node: DynamicDataSpecNode, storage: _storage.StorageManager):
+        super().__init__()
         self.node = node
         self.storage = storage
 
@@ -434,7 +482,7 @@ class _LoadSaveDataFunc(abc.ABC):
         return copy_
 
 
-class LoadDataFunc(NodeFunction[_data.DataItem], _LoadSaveDataFunc):
+class LoadDataFunc( _LoadSaveDataFunc, NodeFunction[_data.DataItem],):
 
     def __init__(self, node: LoadDataNode, storage: _storage.StorageManager):
         super().__init__(storage)
@@ -463,7 +511,7 @@ class LoadDataFunc(NodeFunction[_data.DataItem], _LoadSaveDataFunc):
         return _data.DataItem(table.schema, table)
 
 
-class SaveDataFunc(NodeFunction[None], _LoadSaveDataFunc):
+class SaveDataFunc(_LoadSaveDataFunc, NodeFunction[None]):
 
     def __init__(self, node: SaveDataNode, storage: _storage.StorageManager):
         super().__init__(storage)
@@ -518,6 +566,7 @@ def _model_def_for_import(import_details: meta.ImportModelJob):
 class ImportModelFunc(NodeFunction[meta.ObjectDefinition]):
 
     def __init__(self, node: ImportModelNode, models: _models.ModelLoader):
+        super().__init__()
         self.node = node
         self._models = models
 
@@ -535,11 +584,17 @@ class ImportModelFunc(NodeFunction[meta.ObjectDefinition]):
 
 class RunModelFunc(NodeFunction[Bundle[_data.DataView]]):
 
-    def __init__(self, node: RunModelNode, model_class: _api.TracModel.__class__, checkout_directory: pathlib.Path):
+    def __init__(
+            self, node: RunModelNode,
+            model_class: _api.TracModel.__class__,
+            checkout_directory: pathlib.Path,
+            storage_manager: _storage.StorageManager):
+
         super().__init__()
         self.node = node
         self.model_class = model_class
         self.checkout_directory = checkout_directory
+        self.storage_manager = storage_manager
 
     def _execute(self, ctx: NodeContext) -> Bundle[_data.DataView]:
 
@@ -550,23 +605,37 @@ class RunModelFunc(NodeFunction[Bundle[_data.DataView]]):
         # Still, if any nodes are missing or have the wrong type TracContextImpl will raise ERuntimeValidation
 
         local_ctx = {}
+        dynamic_outputs = []
 
         for node_id, node_result in _ctx_iter_items(ctx):
+            if node_id.namespace == self.node.id.namespace:
+                if node_id.name in model_def.parameters or node_id.name in model_def.inputs:
+                    local_ctx[node_id.name] = node_result
 
-            if node_id.namespace != self.node.id.namespace:
-                continue
+        # Set up access to external storage if required
 
-            if node_id.name in model_def.parameters:
-                param_name = node_id.name
-                local_ctx[param_name] = node_result
+        storage_map = {}
 
-            if node_id.name in model_def.inputs:
-                input_name = node_id.name
-                local_ctx[input_name] = node_result
+        if self.node.storage_access:
+            write_access = True if self.node.model_def.modelType == meta.ModelType.DATA_EXPORT_MODEL else False
+            for storage_key in self.node.storage_access:
+                if self.storage_manager.has_file_storage(storage_key, external=True):
+                    storage_impl = self.storage_manager.get_file_storage(storage_key, external=True)
+                    storage = _ctx.TracFileStorageImpl(storage_key, storage_impl, write_access, self.checkout_directory)
+                    storage_map[storage_key] = storage
 
         # Run the model against the mapped local context
 
-        trac_ctx = _ctx.TracContextImpl(self.node.model_def, self.model_class, local_ctx, self.checkout_directory)
+        if model_def.modelType in [meta.ModelType.DATA_IMPORT_MODEL, meta.ModelType.DATA_EXPORT_MODEL]:
+            trac_ctx = _ctx.TracDataContextImpl(
+                self.node.model_def, self.model_class,
+                local_ctx, dynamic_outputs, storage_map,
+                self.checkout_directory)
+        else:
+            trac_ctx = _ctx.TracContextImpl(
+                self.node.model_def, self.model_class,
+                local_ctx, dynamic_outputs,
+                self.checkout_directory)
 
         try:
             model = self.model_class()
@@ -580,7 +649,10 @@ class RunModelFunc(NodeFunction[Bundle[_data.DataView]]):
 
         # Check required outputs are present and build the results bundle
 
+        model_name = self.model_class.__name__
         results: Bundle[_data.DataView] = dict()
+        new_nodes = dict()
+        new_deps = dict()
 
         for output_name, output_schema in model_def.outputs.items():
 
@@ -589,7 +661,6 @@ class RunModelFunc(NodeFunction[Bundle[_data.DataView]]):
             if result is None or result.is_empty():
 
                 if not output_schema.optional:
-                    model_name = self.model_class.__name__
                     raise _ex.ERuntimeValidation(f"Missing required output [{output_name}] from model [{model_name}]")
 
                 # Create a placeholder for optional outputs that were not emitted
@@ -597,6 +668,30 @@ class RunModelFunc(NodeFunction[Bundle[_data.DataView]]):
                     result = _data.DataView.create_empty()
 
             results[output_name] = result
+
+        if dynamic_outputs:
+
+            for output_name in dynamic_outputs:
+
+                result: _data.DataView = local_ctx.get(output_name)
+
+                if result is None or result.is_empty():
+                    raise _ex.ERuntimeValidation(f"No data provided for [{output_name}] from model [{model_name}]")
+
+                results[output_name] = result
+
+                result_node_id = NodeId.of(output_name, self.node.id.namespace, _data.DataView)
+                result_node = BundleItemNode(result_node_id, self.node.id, output_name)
+
+                new_nodes[result_node_id] = result_node
+
+            output_section = _graph.GraphBuilder.build_runtime_outputs(dynamic_outputs, self.node.id.namespace)
+            new_nodes.update(output_section.nodes)
+
+            ctx_id = NodeId.of("trac_build_result", self.node.id.namespace, result_type=None)
+            new_deps[ctx_id] = list(_graph.Dependency(nid, _graph.DependencyType.HARD) for nid in output_section.outputs)
+
+            self.node_callback.send_graph_updates(new_nodes, new_deps)
 
         return results
 
@@ -620,6 +715,14 @@ class FunctionResolver:
         :py:class:`Node <tracdap.rt.exec.graph.Node>`,
         :py:class:`NodeFunction <NodeFunction>`
     """
+
+    # TODO: Validate consistency for resource keys
+    # Storage key should be validated for load data, save data and run model with storage access
+    # Repository key should be validated for import model (and explicitly for run model)
+
+    # Currently jobs with missing resources will fail at runtime, with a suitable error
+    # The resolver is called during graph building
+    # Putting the check here will raise a consistency error before the job starts processing
 
     __ResolveFunc = tp.Callable[['FunctionResolver', Node[_T]], NodeFunction[_T]]
 
@@ -655,12 +758,13 @@ class FunctionResolver:
 
     def resolve_run_model_node(self, node: RunModelNode) -> NodeFunction:
 
-        model_class = self._models.load_model_class(node.model_scope, node.model_def)
-        checkout_directory = self._models.model_load_checkout_directory(node.model_scope, node.model_def)
-
         # TODO: Verify model_class against model_def
 
-        return RunModelFunc(node, model_class, checkout_directory)
+        model_class = self._models.load_model_class(node.model_scope, node.model_def)
+        checkout_directory = self._models.model_load_checkout_directory(node.model_scope, node.model_def)
+        storage_manager = self._storage if node.storage_access else None
+
+        return RunModelFunc(node, model_class, checkout_directory, storage_manager)
 
     __basic_node_mapping: tp.Dict[Node.__class__, NodeFunction.__class__] = {
 
@@ -674,6 +778,7 @@ class FunctionResolver:
         SaveJobResultNode: SaveJobResultFunc,
         DataResultNode: DataResultFunc,
         StaticValueNode: StaticValueFunc,
+        RuntimeOutputsNode: RuntimeOutputsFunc,
         BundleItemNode: NoopFunc,
         NoopNode: NoopFunc,
         RunModelResultNode: NoopFunc
