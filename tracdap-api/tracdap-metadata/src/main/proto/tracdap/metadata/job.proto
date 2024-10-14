@@ -42,6 +42,8 @@ enum JobType {
 
   /// Import data into the platform
   IMPORT_DATA = 4;
+
+  /// Export data to external locations
   EXPORT_DATA = 5;
 }
 
@@ -149,6 +151,9 @@ message ImportModelJob {
   repeated TagUpdate modelAttrs = 6;
 }
 
+/**
+ * Specification for an IMPORT_DATA job
+ */
 message ImportDataJob {
 
   TagSelector model = 1;
@@ -165,6 +170,9 @@ message ImportDataJob {
   repeated TagUpdate importAttrs = 9;
 }
 
+/**
+ * Specification for an EXPORT_DATA job
+ */
 message ExportDataJob {
 
   TagSelector model = 1;
