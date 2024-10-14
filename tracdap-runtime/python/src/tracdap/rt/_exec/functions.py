@@ -718,6 +718,10 @@ class FunctionResolver:
     # Storage key should be validated for load data, save data and run model with storage access
     # Repository key should be validated for import model (and explicitly for run model)
 
+    # Currently jobs with missing resources will fail at runtime, with a suitable error
+    # The resolver is called during graph building
+    # Putting the check here will raise a consistency error before the job starts processing
+
     __ResolveFunc = tp.Callable[['FunctionResolver', Node[_T]], NodeFunction[_T]]
 
     def __init__(self, models: _models.ModelLoader, storage: _storage.StorageManager):
