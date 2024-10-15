@@ -12,8 +12,6 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from __future__ import annotations
-
 import dataclasses as dc
 import typing as tp
 import datetime as dt
@@ -22,8 +20,16 @@ import platform
 
 import pyarrow as pa
 import pyarrow.compute as pc
-import pandas as pd
-import pandas  # noqa
+
+try:
+    import pandas  # noqa
+except ModuleNotFoundError:
+    pandas = None
+
+try:
+    import polars  # noqa
+except ModuleNotFoundError:
+    polars = None
 
 import tracdap.rt.metadata as _meta
 import tracdap.rt.exceptions as _ex
@@ -43,7 +49,7 @@ class DataSpec:
 class DataPartKey:
 
     @classmethod
-    def for_root(cls) -> DataPartKey:
+    def for_root(cls) -> "DataPartKey":
         return DataPartKey(opaque_key='part_root')
 
     opaque_key: str
@@ -56,14 +62,14 @@ class DataItem:
     table: tp.Optional[pa.Table] = None
     batches: tp.Optional[tp.List[pa.RecordBatch]] = None
 
-    pandas: tp.Optional[pd.DataFrame] = None
+    pandas: "tp.Optional[pandas.DataFrame]" = None
     pyspark: tp.Any = None
 
     def is_empty(self) -> bool:
         return self.table is None and (self.batches is None or len(self.batches) == 0)
 
     @staticmethod
-    def create_empty() -> DataItem:
+    def create_empty() -> "DataItem":
         return DataItem(pa.schema([]))
 
 
@@ -76,7 +82,7 @@ class DataView:
     parts: tp.Dict[DataPartKey, tp.List[DataItem]]
 
     @staticmethod
-    def create_empty() -> DataView:
+    def create_empty() -> "DataView":
         return DataView(_meta.SchemaDefinition(), pa.schema([]), dict())
 
     @staticmethod
@@ -126,14 +132,14 @@ class DataMapping:
     }
 
     # Check the Pandas dtypes for handling floats are available before setting up the type mapping
-    __PANDAS_VERSION_ELEMENTS = pd.__version__.split(".")
+    __PANDAS_VERSION_ELEMENTS = pandas.__version__.split(".")
     __PANDAS_MAJOR_VERSION = int(__PANDAS_VERSION_ELEMENTS[0])
     __PANDAS_MINOR_VERSION = int(__PANDAS_VERSION_ELEMENTS[1])
 
     if __PANDAS_MAJOR_VERSION == 2:
 
-        __PANDAS_DATE_TYPE = pd.to_datetime([dt.date(2000, 1, 1)]).as_unit(__TRAC_TIMESTAMP_UNIT).dtype
-        __PANDAS_DATETIME_TYPE = pd.to_datetime([dt.datetime(2000, 1, 1, 0, 0, 0)]).as_unit(__TRAC_TIMESTAMP_UNIT).dtype
+        __PANDAS_DATE_TYPE = pandas.to_datetime([dt.date(2000, 1, 1)]).as_unit(__TRAC_TIMESTAMP_UNIT).dtype
+        __PANDAS_DATETIME_TYPE = pandas.to_datetime([dt.datetime(2000, 1, 1, 0, 0, 0)]).as_unit(__TRAC_TIMESTAMP_UNIT).dtype
 
         @classmethod
         def __pandas_datetime_type(cls, tz, unit):
@@ -141,42 +147,42 @@ class DataMapping:
                 return cls.__PANDAS_DATETIME_TYPE
             _unit = unit if unit is not None else cls.__TRAC_TIMESTAMP_UNIT
             if tz is None:
-                return pd.to_datetime([dt.datetime(2000, 1, 1, 0, 0, 0)]).as_unit(_unit).dtype
+                return pandas.to_datetime([dt.datetime(2000, 1, 1, 0, 0, 0)]).as_unit(_unit).dtype
             else:
-                return pd.DatetimeTZDtype(tz=tz, unit=_unit)
+                return pandas.DatetimeTZDtype(tz=tz, unit=_unit)
 
-    # Minimum supported version for Pandas is 1.2, when pd.Float64Dtype was introduced
+    # Minimum supported version for Pandas is 1.2, when pandas.Float64Dtype was introduced
     elif __PANDAS_MAJOR_VERSION == 1 and __PANDAS_MINOR_VERSION >= 2:
 
-        __PANDAS_DATE_TYPE = pd.to_datetime([dt.date(2000, 1, 1)]).dtype
-        __PANDAS_DATETIME_TYPE = pd.to_datetime([dt.datetime(2000, 1, 1, 0, 0, 0)]).dtype
+        __PANDAS_DATE_TYPE = pandas.to_datetime([dt.date(2000, 1, 1)]).dtype
+        __PANDAS_DATETIME_TYPE = pandas.to_datetime([dt.datetime(2000, 1, 1, 0, 0, 0)]).dtype
 
         @classmethod
         def __pandas_datetime_type(cls, tz, unit):  # noqa
             if tz is None:
                 return cls.__PANDAS_DATETIME_TYPE
             else:
-                return pd.DatetimeTZDtype(tz=tz)
+                return pandas.DatetimeTZDtype(tz=tz)
 
     else:
-        raise _ex.EStartup(f"Pandas version not supported: [{pd.__version__}]")
+        raise _ex.EStartup(f"Pandas version not supported: [{pandas.__version__}]")
 
     # Only partial mapping is possible, decimal and temporal dtypes cannot be mapped this way
     __ARROW_TO_PANDAS_TYPE_MAPPING = {
-        pa.bool_(): pd.BooleanDtype(),
-        pa.int8(): pd.Int8Dtype(),
-        pa.int16(): pd.Int16Dtype(),
-        pa.int32(): pd.Int32Dtype(),
-        pa.int64(): pd.Int64Dtype(),
-        pa.uint8(): pd.UInt8Dtype(),
-        pa.uint16(): pd.UInt16Dtype(),
-        pa.uint32(): pd.UInt32Dtype(),
-        pa.uint64(): pd.UInt64Dtype(),
-        pa.float16(): pd.Float32Dtype(),
-        pa.float32(): pd.Float32Dtype(),
-        pa.float64(): pd.Float64Dtype(),
-        pa.string(): pd.StringDtype(),
-        pa.utf8(): pd.StringDtype()
+        pa.bool_(): pandas.BooleanDtype(),
+        pa.int8(): pandas.Int8Dtype(),
+        pa.int16(): pandas.Int16Dtype(),
+        pa.int32(): pandas.Int32Dtype(),
+        pa.int64(): pandas.Int64Dtype(),
+        pa.uint8(): pandas.UInt8Dtype(),
+        pa.uint16(): pandas.UInt16Dtype(),
+        pa.uint32(): pandas.UInt32Dtype(),
+        pa.uint64(): pandas.UInt64Dtype(),
+        pa.float16(): pandas.Float32Dtype(),
+        pa.float32(): pandas.Float32Dtype(),
+        pa.float64(): pandas.Float64Dtype(),
+        pa.string(): pandas.StringDtype(),
+        pa.utf8(): pandas.StringDtype()
     }
 
     __ARROW_TO_TRAC_BASIC_TYPE_MAPPING = {
@@ -341,16 +347,29 @@ class DataMapping:
 
     @classmethod
     def view_to_pandas(
-            cls, view: DataView, part: DataPartKey, schema: tp.Optional[pa.Schema],
-            temporal_objects_flag: bool) -> pd.DataFrame:
+            cls, view:  DataView,  part: DataPartKey, schema: tp.Optional[pa.Schema],
+            temporal_objects_flag: bool) -> "pandas.DataFrame":
 
         table = cls.view_to_arrow(view, part)
         return cls.arrow_to_pandas(table, schema, temporal_objects_flag)
 
     @classmethod
-    def pandas_to_item(cls, df: pd.DataFrame, schema: tp.Optional[pa.Schema]) -> DataItem:
+    def view_to_polars(
+            cls, view:  DataView, part: DataPartKey, schema: tp.Optional[pa.Schema]):
+
+        table = cls.view_to_arrow(view, part)
+        return cls.arrow_to_polars(table, schema)
+
+    @classmethod
+    def pandas_to_item(cls, df: "pandas.DataFrame", schema: tp.Optional[pa.Schema]) -> DataItem:
 
         table = cls.pandas_to_arrow(df, schema)
+        return DataItem(table.schema, table)
+
+    @classmethod
+    def polars_to_item(cls, df: "polars.DataFrame", schema: tp.Optional[pa.Schema]) -> DataItem:
+
+        table = cls.polars_to_arrow(df, schema)
         return DataItem(table.schema, table)
 
     @classmethod
@@ -402,7 +421,7 @@ class DataMapping:
     @classmethod
     def arrow_to_pandas(
             cls, table: pa.Table, schema: tp.Optional[pa.Schema] = None,
-            temporal_objects_flag: bool = False) -> pd.DataFrame:
+            temporal_objects_flag: bool = False) -> "pandas.DataFrame":
 
         if schema is not None:
             table = DataConformance.conform_to_schema(table, schema, warn_extra_columns=False)
@@ -427,7 +446,18 @@ class DataMapping:
             split_blocks=True)  # noqa
 
     @classmethod
-    def pandas_to_arrow(cls, df: pd.DataFrame, schema: tp.Optional[pa.Schema] = None) -> pa.Table:
+    def arrow_to_polars(
+            cls, table: pa.Table, schema: tp.Optional[pa.Schema] = None) -> "polars.DataFrame":
+
+        if schema is not None:
+            table = DataConformance.conform_to_schema(table, schema, warn_extra_columns=False)
+        else:
+            DataConformance.check_duplicate_fields(table.schema.names, False)
+
+        return polars.from_arrow(table)
+
+    @classmethod
+    def pandas_to_arrow(cls, df: "pandas.DataFrame", schema: tp.Optional[pa.Schema] = None) -> pa.Table:
 
         # Converting pandas -> arrow needs care to ensure type coercion is applied correctly
         # Calling Table.from_pandas with the supplied schema will very often reject data
@@ -470,9 +500,28 @@ class DataMapping:
             return DataConformance.conform_to_schema(table, schema, df_types)
 
     @classmethod
-    def pandas_to_arrow_schema(cls, df:pd.DataFrame) -> pa.Schema:
+    def pandas_to_arrow_schema(cls, df: "pandas.DataFrame") -> pa.Schema:
 
-        return pa.Schema.from_pandas(df, preserve_index=False)
+        return pa.Schema.from_pandas(df, preserve_index=False)  # noqa
+
+    @classmethod
+    def polars_to_arrow(cls, df: "polars.DataFrame", schema: tp.Optional[pa.Schema] = None) -> pa.Table:
+
+        column_filter = DataConformance.column_filter(df.columns, schema)
+
+        filtered_df = df.select(polars.col(*column_filter)) if column_filter else df
+        table = filtered_df.to_arrow()
+
+        if schema is None:
+            DataConformance.check_duplicate_fields(table.schema.names, False)
+            return table
+        else:
+            return DataConformance.conform_to_schema(table, schema, None)
+
+    @classmethod
+    def polars_to_arrow_schema(cls, df: "polars.DataFrame") -> pa.Schema:
+
+        return df.top_k(1).to_arrow().schema
 
 
 class DataConformance:
@@ -790,21 +839,32 @@ class DataConformance:
     @classmethod
     def _coerce_string(cls, vector: pa.Array, field: pa.Field) -> pa.Array:
 
-        if pa.types.is_string(field.type):
-            if pa.types.is_string(vector.type):
-                return vector
+        try:
 
-        if pa.types.is_large_string(field.type):
-            if pa.types.is_large_string(vector.type):
-                return vector
-            # Allow up-casting string -> large_string
-            if pa.types.is_string(vector.type):
-                return pc.cast(vector, field.type)
+            if pa.types.is_string(field.type):
+                if pa.types.is_string(vector.type):
+                    return vector
+                # Try to down-cast large string -> string, will raise ArrowInvalid if data does not fit
+                if pa.types.is_large_string(vector.type):
+                    return pc.cast(vector, field.type, safe=True)
 
-        error_message = cls._format_error(cls.__E_WRONG_DATA_TYPE, vector, field)
-        cls.__log.error(error_message)
+            if pa.types.is_large_string(field.type):
+                if pa.types.is_large_string(vector.type):
+                    return vector
+                # Allow up-casting string -> large_string
+                if pa.types.is_string(vector.type):
+                    return pc.cast(vector, field.type)
 
-        raise _ex.EDataConformance(error_message)
+            error_message = cls._format_error(cls.__E_WRONG_DATA_TYPE, vector, field)
+            cls.__log.error(error_message)
+            raise _ex.EDataConformance(error_message)
+
+        except pa.ArrowInvalid as e:
+
+            error_message = cls._format_error(cls.__E_DATA_LOSS_DID_OCCUR, vector, field, e)
+            cls.__log.error(error_message)
+            raise _ex.EDataConformance(error_message) from e
+
 
     @classmethod
     def _coerce_date(cls, vector: pa.Array, field: pa.Field, pandas_type=None) -> pa.Array:
@@ -822,7 +882,7 @@ class DataConformance:
         # For Pandas 2.x dates are still np.datetime64 but can be in s, ms, us or ns
         # This conversion will not apply to dates held in Pandas using the Python date object types
         if pandas_type is not None:
-            if pa.types.is_timestamp(vector.type) and pd.api.types.is_datetime64_any_dtype(pandas_type):
+            if pa.types.is_timestamp(vector.type) and pandas.api.types.is_datetime64_any_dtype(pandas_type):
                 return pc.cast(vector, field.type)
 
         error_message = cls._format_error(cls.__E_WRONG_DATA_TYPE, vector, field)
