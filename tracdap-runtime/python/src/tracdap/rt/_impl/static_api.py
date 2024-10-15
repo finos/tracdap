@@ -155,16 +155,18 @@ class StaticApiImpl(_StaticApiHook):
 
     def infer_schema(self, dataset: _tp.Any) -> _meta.SchemaDefinition:
 
-        if _data.pandas is not None and isinstance(dataset, _data.pandas.DataFrame):
-
+        if _data.pandas and isinstance(dataset, _data.pandas.DataFrame):
             arrow_schema = _data.DataMapping.pandas_to_arrow_schema(dataset)
-            trac_schema = _data.DataMapping.arrow_to_trac_schema(arrow_schema)
 
-            return trac_schema
+        elif _data.polars and isinstance(dataset, _data.polars.DataFrame):
+            arrow_schema = _data.DataMapping.polars_to_arrow_schema(dataset)
 
-        dataset_type = f"{type(dataset).__module__}.{type(dataset).__name__}"
-        message = f"Schema inference is not available for dataset type [{dataset_type}]"
-        raise _ex.ERuntimeValidation(message)
+        else:
+            dataset_type = f"{type(dataset).__module__}.{type(dataset).__name__}"
+            message = f"Schema inference is not available for dataset type [{dataset_type}]"
+            raise _ex.ERuntimeValidation(message)
+
+        return _data.DataMapping.arrow_to_trac_schema(arrow_schema)
 
     def define_input_table(
             self, *fields: _tp.Union[_meta.FieldSchema, _tp.List[_meta.FieldSchema]],
