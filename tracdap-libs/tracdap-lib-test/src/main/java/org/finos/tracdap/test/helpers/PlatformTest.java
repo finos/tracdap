@@ -492,6 +492,7 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
 
                 var pipPB = new ProcessBuilder();
                 pipPB.command(pythonExe, "-m", "pip", "install", tracRtWhl.get().toString());
+                pipPB.command(pythonExe, "-m", "pip", "install", "polars");  // For testing Polars round trip
                 pipPB.environment().put(VENV_ENV_VAR, venvPath.toString());
 
                 var pipP = pipPB.start();
