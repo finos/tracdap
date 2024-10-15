@@ -490,9 +490,9 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
                 if (tracRtWhl.isEmpty())
                     throw new RuntimeException("Could not find TRAC runtime wheel");
 
+                // Include optional packages needed for end-to-end testing
                 var pipPB = new ProcessBuilder();
-                pipPB.command(pythonExe, "-m", "pip", "install", tracRtWhl.get().toString());
-                pipPB.command(pythonExe, "-m", "pip", "install", "polars");  // For testing Polars round trip
+                pipPB.command(pythonExe, "-m", "pip", "install", tracRtWhl.get().toString(), "polars");
                 pipPB.environment().put(VENV_ENV_VAR, venvPath.toString());
 
                 var pipP = pipPB.start();
