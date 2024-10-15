@@ -972,10 +972,11 @@ class DataConformanceTest(unittest.TestCase):
         conformed = _data.DataConformance.conform_to_schema(table, schema)
         self.assertEqual(schema, conformed.schema)
 
-        # large utf8 -> utf8 is not allowed
+        # large utf8 -> utf8 is allowed so long as the data fits
         schema = pa.schema([str1])
         table = pa.Table.from_pydict({"f": ["hello", "world"]}, pa.schema([str2]))  # noqa
-        self.assertRaises(_ex.EDataConformance, lambda: _data.DataConformance.conform_to_schema(table, schema))
+        conformed = _data.DataConformance.conform_to_schema(table, schema)
+        self.assertEqual(schema, conformed.schema)
 
     def test_string_wrong_type(self):
 
