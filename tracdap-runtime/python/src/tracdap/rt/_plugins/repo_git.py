@@ -38,7 +38,7 @@ class GitRepository(IModelRepository):
 
     REPO_URL_KEY = "repoUrl"
     NATIVE_GIT_KEY = "nativeGit"
-    NATIVE_GIT_DEFAULT = True
+    NATIVE_GIT_DEFAULT = False
 
     GIT_TIMEOUT_SECONDS = 30
 
