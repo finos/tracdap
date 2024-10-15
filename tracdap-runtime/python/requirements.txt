@@ -47,6 +47,10 @@ requests == 2.32.3
 pandas >= 1.2.0, < 2.3.0
 numpy < 2.0.0
 
+# Polars is an optional dependency - support the 1.x series
+
+polars >= 1.0.0
+
 # PySpark - Support the 3.x series
 
 pyspark >= 3.0.0, < 3.6.0

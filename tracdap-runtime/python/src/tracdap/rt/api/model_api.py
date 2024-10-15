@@ -12,8 +12,6 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from __future__ import annotations
-
 import abc as _abc
 import typing as _tp
 import logging as _logging
@@ -22,8 +20,18 @@ import logging as _logging
 # This significantly improves type hinting, inline documentation and auto-complete in JetBrains IDEs
 from tracdap.rt.metadata import *  # DOCGEN_REMOVE
 
+
 if _tp.TYPE_CHECKING:
-    import pandas
+
+    try:
+        import pandas
+    except ModuleNotFoundError:
+        pass
+
+    try:
+        import polars
+    except ModuleNotFoundError:
+        pass
 
 
 class TracContext:
@@ -134,7 +142,8 @@ class TracContext:
         pass
 
     @_abc.abstractmethod
-    def get_pandas_table(self, dataset_name: str, use_temporal_objects: _tp.Optional[bool] = None) -> pandas.DataFrame:
+    def get_pandas_table(self, dataset_name: str, use_temporal_objects: _tp.Optional[bool] = None) \
+            -> "pandas.DataFrame":
 
         """
         Get the data for a model input or output as a Pandas dataframe
@@ -163,6 +172,22 @@ class TracContext:
         :return: A pandas dataframe containing the data for the named dataset
         :raises: :py:class:`ERuntimeValidation <tracdap.rt.exceptions.ERuntimeValidation>`
         """
+        pass
+
+    @_abc.abstractmethod
+    def get_polars_table(self, dataset_name: str) -> "polars.DataFrame":
+
+        """
+        Get the data for a model input or output as a Polars dataframe
+
+        This method has equivalent semantics to :py:meth:`get_pandas_table`, but returns
+        a Polars dataframe.
+
+        :param dataset_name: The name of the model input or output to get data for
+        :return: A polars dataframe containing the data for the named dataset
+        :raises: :py:class:`ERuntimeValidation <tracdap.rt.exceptions.ERuntimeValidation>`
+        """
+
         pass
 
     @_abc.abstractmethod
@@ -196,7 +221,7 @@ class TracContext:
         pass
 
     @_abc.abstractmethod
-    def put_pandas_table(self, dataset_name: str, dataset: pandas.DataFrame):
+    def put_pandas_table(self, dataset_name: str, dataset: "pandas.DataFrame"):
 
         """
         Save the data for a model output as a Pandas dataframe
@@ -217,7 +242,24 @@ class TracContext:
         :param dataset_name: The name of the model output to save data for
         :param dataset: A pandas dataframe containing the data for the named dataset
         :raises: :py:class:`ERuntimeValidation <tracdap.rt.exceptions.ERuntimeValidation>`,
-                 :py:class:`EDataValidation <tracdap.rt.exceptions.EDataValidation>`
+                 :py:class:`EDataConformance <tracdap.rt.exceptions.EDataConformance>`
+        """
+
+        pass
+
+    @_abc.abstractmethod
+    def put_polars_table(self, dataset_name: str, dataset: "polars.DataFrame"):
+
+        """
+        Save the data for a model output as a Polars dataframe
+
+        This method has equivalent semantics to :py:meth:`put_pandas_table`, but accepts
+        a Polars dataframe.
+
+        :param dataset_name: The name of the model output to save data for
+        :param dataset: A polars dataframe containing the data for the named dataset
+        :raises: :py:class:`ERuntimeValidation <tracdap.rt.exceptions.ERuntimeValidation>`,
+                 :py:class:`EDataConformance <tracdap.rt.exceptions.EDataConformance>`
         """
 
         pass

@@ -160,3 +160,12 @@ class TutorialModelsTest(unittest.TestCase):
         sys_config = self.examples_root.joinpath("config/sys_config.yaml")
 
         launch.launch_model(DataExportExample, job_config, sys_config, dev_mode=True)
+
+    def test_using_polars(self):
+
+        from tutorial.using_polars import UsingPolarsModel  # noqa
+
+        job_config = self.examples_root.joinpath("config/using_data.yaml")
+        sys_config = self.examples_root.joinpath("config/sys_config.yaml")
+
+        launch.launch_model(UsingPolarsModel, job_config, sys_config, dev_mode=True)

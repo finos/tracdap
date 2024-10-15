@@ -19,8 +19,6 @@ import typing as tp
 import re
 import traceback
 
-import pandas as pd
-
 import tracdap.rt.api as _api
 import tracdap.rt.api.experimental as _eapi
 import tracdap.rt.metadata as _meta
@@ -136,9 +134,44 @@ class TracContextImpl(_api.TracContext):
         else:
             return copy.deepcopy(data_view.trac_schema)
 
-    def get_pandas_table(self, dataset_name: str, use_temporal_objects: tp.Optional[bool] = None) -> pd.DataFrame:
+    def get_table(self, dataset_name: str, framework, **kwargs) -> _eapi._DATA_FRAMEWORK:  # noqa
 
+        # Support the experimental API data framework syntax
+
+        if framework == _eapi.PANDAS:
+            return self.get_pandas_table(dataset_name, **kwargs)
+        elif framework == _eapi.POLARS:
+            return self.get_polars_table(dataset_name)
+        else:
+            raise _ex.ERuntimeValidation(f"Unsupported data framework [{framework}]")
+
+    def get_pandas_table(self, dataset_name: str, use_temporal_objects: tp.Optional[bool] = None) \
+            -> "_data.pandas.DataFrame":
+
+        _val.require_package("pandas", _data.pandas)
         _val.validate_signature(self.get_pandas_table, dataset_name, use_temporal_objects)
+
+        data_view, schema = self.__get_data_view(dataset_name)
+        part_key = _data.DataPartKey.for_root()
+
+        if use_temporal_objects is None:
+            use_temporal_objects = self.__DEFAULT_TEMPORAL_OBJECTS
+
+        return _data.DataMapping.view_to_pandas(data_view, part_key, schema, use_temporal_objects)
+
+    def get_polars_table(self, dataset_name: str) -> "_data.polars.DataFrame":
+
+        _val.require_package("polars", _data.polars)
+        _val.validate_signature(self.get_polars_table, dataset_name)
+
+        data_view, schema = self.__get_data_view(dataset_name)
+        part_key = _data.DataPartKey.for_root()
+
+        return _data.DataMapping.view_to_polars(data_view, part_key, schema)
+
+    def __get_data_view(self, dataset_name: str):
+
+        _val.validate_signature(self.__get_data_view, dataset_name)
 
         self.__val.check_dataset_valid_identifier(dataset_name)
         self.__val.check_dataset_defined_in_model(dataset_name)
@@ -160,10 +193,7 @@ class TracContextImpl(_api.TracContext):
         else:
             schema = data_view.arrow_schema
 
-        if use_temporal_objects is None:
-            use_temporal_objects = self.__DEFAULT_TEMPORAL_OBJECTS
-
-        return _data.DataMapping.view_to_pandas(data_view, part_key, schema, use_temporal_objects)
+        return data_view, schema
 
     def put_schema(self, dataset_name: str, schema: _meta.SchemaDefinition):
 
@@ -195,17 +225,57 @@ class TracContextImpl(_api.TracContext):
 
         self.__local_ctx[dataset_name] = updated_view
 
-    def put_pandas_table(self, dataset_name: str, dataset: pd.DataFrame):
+    def put_table(self, dataset_name: str, dataset: _eapi._DATA_FRAMEWORK, **kwargs):  # noqa
 
+        # Support the experimental API data framework syntax
+
+        if _data.pandas and isinstance(dataset, _data.pandas.DataFrame):
+            self.put_pandas_table(dataset_name, dataset)
+        elif _data.polars and isinstance(dataset, _data.polars.DataFrame):
+            self.put_polars_table(dataset_name, dataset)
+        else:
+            raise _ex.ERuntimeValidation(f"Unsupported data framework[{type(dataset)}]")
+
+    def put_pandas_table(self, dataset_name: str, dataset: "_data.pandas.DataFrame"):
+
+        _val.require_package("pandas", _data.pandas)
         _val.validate_signature(self.put_pandas_table, dataset_name, dataset)
+
+        part_key = _data.DataPartKey.for_root()
+        data_view, schema = self.__put_data_view(dataset_name, part_key, dataset, _data.pandas.DataFrame)
+
+        # Data conformance is applied inside these conversion functions
+
+        updated_item = _data.DataMapping.pandas_to_item(dataset, schema)
+        updated_view = _data.DataMapping.add_item_to_view(data_view, part_key, updated_item)
+
+        self.__local_ctx[dataset_name] = updated_view
+
+    def put_polars_table(self, dataset_name: str, dataset: "_data.polars.DataFrame"):
+
+        _val.require_package("polars", _data.polars)
+        _val.validate_signature(self.put_polars_table, dataset_name, dataset)
+
+        part_key = _data.DataPartKey.for_root()
+        data_view, schema = self.__put_data_view(dataset_name, part_key, dataset, _data.polars.DataFrame)
+
+        # Data conformance is applied inside these conversion functions
+
+        updated_item = _data.DataMapping.polars_to_item(dataset, schema)
+        updated_view = _data.DataMapping.add_item_to_view(data_view, part_key, updated_item)
+
+        self.__local_ctx[dataset_name] = updated_view
+
+    def __put_data_view(self, dataset_name: str, part_key: _data.DataPartKey, dataset: tp.Any, framework: type):
+
+        _val.validate_signature(self.__put_data_view, dataset_name, part_key, dataset, framework)
 
         self.__val.check_dataset_valid_identifier(dataset_name)
         self.__val.check_dataset_is_model_output(dataset_name)
-        self.__val.check_provided_dataset_type(dataset, pd.DataFrame)
+        self.__val.check_provided_dataset_type(dataset, framework)
 
         static_schema = self.__get_static_schema(self.__model_def, dataset_name)
         data_view = self.__local_ctx.get(dataset_name)
-        part_key = _data.DataPartKey.for_root()
 
         if data_view is None:
             if static_schema is not None:
@@ -224,12 +294,7 @@ class TracContextImpl(_api.TracContext):
         else:
             schema = data_view.arrow_schema
 
-        # Data conformance is applied inside these conversion functions
-
-        updated_item = _data.DataMapping.pandas_to_item(dataset, schema)
-        updated_view = _data.DataMapping.add_item_to_view(data_view, part_key, updated_item)
-
-        self.__local_ctx[dataset_name] = updated_view
+        return data_view, schema
 
     def log(self) -> logging.Logger:
 

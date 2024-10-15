@@ -84,13 +84,22 @@ public abstract class DataRoundTripTest {
 
 
     protected abstract String storageFormat();
+    protected abstract String dataFramework();
+
 
     public static class CsvFormatTest extends DataRoundTripTest {
         protected String storageFormat() { return "CSV"; }
+        protected String dataFramework() { return "pandas"; }
     }
 
     public static class ArrowFormatTest extends DataRoundTripTest {
         protected String storageFormat() { return "ARROW_FILE"; }
+        protected String dataFramework() { return "pandas"; }
+    }
+
+    public static class PolarsTest extends DataRoundTripTest {
+        protected String storageFormat() { return "ARROW_FILE"; }
+        protected String dataFramework() { return "polars"; }
     }
 
     private final Logger log = LoggerFactory.getLogger(getClass());
@@ -177,7 +186,7 @@ public abstract class DataRoundTripTest {
         var schema = ArrowSchema.tracToArrow(SampleData.BASIC_TABLE_SCHEMA);
         var data = SampleData.generateBasicData(ALLOCATOR);
 
-        doRoundTrip(schema, data, "basicData");
+        doRoundTrip(schema, data, "basicData", dataFramework());
     }
 
     @Test
@@ -198,7 +207,7 @@ public abstract class DataRoundTripTest {
             Assertions.assertNull(vector.getObject(0));
         }
 
-        doRoundTrip(schema, data, "nullDataItems");
+        doRoundTrip(schema, data, "nullDataItems", dataFramework());
     }
 
     @Test
@@ -215,7 +224,7 @@ public abstract class DataRoundTripTest {
             Assertions.assertEquals(vector.getValueCount(), vector.getNullCount());
         }
 
-        doRoundTrip(schema, data, "nullDataItems");
+        doRoundTrip(schema, data, "nullDataItems", dataFramework());
     }
 
     @Test
@@ -224,7 +233,7 @@ public abstract class DataRoundTripTest {
         var schema = ArrowSchema.tracToArrow(SampleData.BASIC_TABLE_SCHEMA);
         var data = SampleData.convertData(schema, Map.of(), 0, ALLOCATOR);
 
-        doRoundTrip(schema, data, "emptyTable");
+        doRoundTrip(schema, data, "emptyTable", dataFramework());
     }
 
     @Test
@@ -336,17 +345,17 @@ public abstract class DataRoundTripTest {
         var schema = ArrowSchema.tracToArrow(SampleData.BASIC_TABLE_SCHEMA);
         var data = SampleData.convertData(schema, javaData, edgeCases.size(), ALLOCATOR);
 
-        doRoundTrip(schema, data, "edgeCase:" + fieldName);
+        doRoundTrip(schema, data, "edgeCase:" + fieldName, dataFramework());
     }
 
-    void doRoundTrip(Schema schema, VectorSchemaRoot inputData, String testName) throws Exception {
+    void doRoundTrip(Schema schema, VectorSchemaRoot inputData, String testName, String dataFramework) throws Exception {
 
         VectorSchemaRoot outputData = null;
 
         try {
 
             var inputDataId = saveInputData(schema, inputData, testName);
-            var outputDataId = runModel(inputDataId, testName);
+            var outputDataId = runModel(inputDataId, testName, dataFramework);
             outputData = loadOutputData(outputDataId);
 
             Assertions.assertEquals(inputData.getSchema(), outputData.getSchema());
@@ -408,14 +417,14 @@ public abstract class DataRoundTripTest {
         return dataClient.createSmallDataset(writeRequest);
     }
 
-    TagHeader runModel(TagHeader inputDataId, String testName) {
+    TagHeader runModel(TagHeader inputDataId, String testName, String dataFramework) {
 
         var metaClient = platform.metaClientBlocking();
         var orchClient = platform.orchClientBlocking();
 
         var runModel = RunModelJob.newBuilder()
                 .setModel(MetadataUtil.selectorFor(modelId))
-                .putParameters("use_spark", MetadataCodec.encodeValue(false))
+                .putParameters("data_framework", MetadataCodec.encodeValue(dataFramework))
                 .putInputs("round_trip_input", MetadataUtil.selectorFor(inputDataId))
                 .addOutputAttrs(TagUpdate.newBuilder()
                 .setAttrName("round_trip_dataset")

@@ -15,6 +15,7 @@
 import inspect
 import logging
 import re
+import types
 import typing as tp
 import pathlib
 
@@ -24,6 +25,11 @@ import tracdap.rt._impl.util as util
 
 # _Named placeholder type from API hook is needed for API type checking
 from tracdap.rt.api.hook import _Named  # noqa
+
+
+def require_package(module_name: str, module_obj: types.ModuleType):
+    if module_obj is None:
+        raise ex.ERuntimeValidation(f"Optional package [{module_name}] is not installed")
 
 
 def validate_signature(method: tp.Callable, *args, **kwargs):
@@ -63,15 +69,19 @@ class _TypeValidator:
             signature = inspect.signature(method)
             cls.__method_cache[method.__name__] = signature
 
+        hints = tp.get_type_hints(method)
+
         positional_index = 0
 
         for param_name, param in signature.parameters.items():
+
+            param_type = hints.get(param_name)
 
             values = cls._select_arg(method.__name__, param, positional_index, *args, **kwargs)
             positional_index += len(values)
 
             for value in values:
-                cls._validate_arg(method.__name__, param, value)
+                cls._validate_arg(method.__name__, param_name, param_type, value)
 
     @classmethod
     def validate_return_type(cls, method: tp.Callable, value: tp.Any):
@@ -147,14 +157,18 @@ class _TypeValidator:
         raise ex.EUnexpected("Invalid method signature in runtime API (this is a bug)")
 
     @classmethod
-    def _validate_arg(cls, method_name: str, parameter: inspect.Parameter, value: tp.Any):
+    def _validate_arg(cls, method_name: str, param_name: str, param_type: tp.Type, value: tp.Any):
 
-        if not cls._validate_type(parameter.annotation, value):
+        if not cls._validate_type(param_type, value):
 
-            expected_type = cls._type_name(parameter.annotation)
+            expected_type = cls._type_name(param_type)
             actual_type = cls._type_name(type(value)) if value is not None else str(None)
 
-            err = f"Invalid API call [{method_name}()]: Wrong type for [{parameter.name}]" \
+            if expected_type == actual_type:
+                expected_type = cls._type_name(param_type, qualified=True)
+                actual_type = cls._type_name(type(value), qualified=True)
+
+            err = f"Invalid API call [{method_name}()]: Wrong type for [{param_name}]" \
                   + f" (expected [{expected_type}], got [{actual_type}])"
 
             cls._log.error(err)
@@ -211,7 +225,7 @@ class _TypeValidator:
         return isinstance(value, expected_type)
 
     @classmethod
-    def _type_name(cls, type_var: tp.Type) -> str:
+    def _type_name(cls, type_var: tp.Type, qualified: bool = False) -> str:
 
         if isinstance(type_var, cls.__generic_metaclass):
 
@@ -231,7 +245,10 @@ class _TypeValidator:
 
             raise ex.ETracInternal(f"Validation of [{origin.__name__}] generic parameters is not supported yet")
 
-        return type_var.__name__
+        if qualified:
+            return f"{type_var.__module__}.{type_var.__name__}"
+        else:
+            return type_var.__name__
 
 
 class StaticValidator:

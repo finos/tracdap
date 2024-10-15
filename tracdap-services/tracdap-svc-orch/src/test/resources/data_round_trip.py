@@ -31,7 +31,7 @@ class DataRoundTripModel(trac.TracModel):
     def define_parameters(self) -> tp.Dict[str, trac.ModelParameter]:
 
         return trac.define_parameters(
-            trac.P("use_spark", trac.BasicType.BOOLEAN, default_value=False, label="Use Spark for round trip testing"))
+            trac.P("data_framework", trac.BasicType.STRING, default_value="pandas", label="The data framework to test with"))
 
     def define_inputs(self) -> tp.Dict[str, trac.ModelInputSchema]:
 
@@ -47,12 +47,19 @@ class DataRoundTripModel(trac.TracModel):
 
     def run_model(self, ctx: trac.TracContext):
 
-        use_spark = ctx.get_parameter("use_spark")
+        data_framework = ctx.get_parameter("data_framework")
 
-        if use_spark:
+        if data_framework == "pandas":
+            round_trip_input = ctx.get_pandas_table("round_trip_input")
+            ctx.put_pandas_table("round_trip_output", round_trip_input)
+
+        elif data_framework == "polars":
+            round_trip_input = ctx.get_polars_table("round_trip_input")
+            ctx.put_polars_table("round_trip_output", round_trip_input)
+
+        elif data_framework == "spark":
             round_trip_input = ctx.get_spark_table("round_trip_input")
             ctx.put_spark_table("round_trip_output", round_trip_input)
 
         else:
-            round_trip_input = ctx.get_pandas_table("round_trip_input")
-            ctx.put_pandas_table("round_trip_output", round_trip_input)
+            raise RuntimeError(f"Unsupported data framework: [{data_framework}]")
