@@ -134,6 +134,17 @@ class TracContextImpl(_api.TracContext):
         else:
             return copy.deepcopy(data_view.trac_schema)
 
+    def get_table(self, dataset_name: str, framework, **kwargs) -> _eapi._DATA_FRAMEWORK:  # noqa
+
+        # Support the experimental API data framework syntax
+
+        if framework == _eapi.PANDAS:
+            return self.get_pandas_table(dataset_name, **kwargs)
+        elif framework == _eapi.POLARS:
+            return self.get_polars_table(dataset_name)
+        else:
+            raise _ex.ERuntimeValidation(f"Unsupported data framework [{framework}]")
+
     def get_pandas_table(self, dataset_name: str, use_temporal_objects: tp.Optional[bool] = None) \
             -> "_data.pandas.DataFrame":
 
@@ -213,6 +224,17 @@ class TracContextImpl(_api.TracContext):
         updated_view = data_view.with_trac_schema(schema_copy)
 
         self.__local_ctx[dataset_name] = updated_view
+
+    def put_table(self, dataset_name: str, dataset: _eapi._DATA_FRAMEWORK, **kwargs):  # noqa
+
+        # Support the experimental API data framework syntax
+
+        if _data.pandas and isinstance(dataset, _data.pandas.DataFrame):
+            self.put_pandas_table(dataset_name, dataset)
+        elif _data.polars and isinstance(dataset, _data.polars.DataFrame):
+            self.put_polars_table(dataset_name, dataset)
+        else:
+            raise _ex.ERuntimeValidation(f"Unsupported data framework[{type(dataset)}]")
 
     def put_pandas_table(self, dataset_name: str, dataset: "_data.pandas.DataFrame"):
 
