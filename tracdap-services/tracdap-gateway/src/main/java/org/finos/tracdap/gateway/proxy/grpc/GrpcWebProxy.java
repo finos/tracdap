@@ -16,6 +16,7 @@
 
 package org.finos.tracdap.gateway.proxy.grpc;
 
+import io.netty.util.ReferenceCountUtil;
 import org.finos.tracdap.common.exception.EUnexpected;
 
 import io.netty.buffer.ByteBuf;
@@ -27,6 +28,7 @@ import io.netty.handler.codec.http2.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nonnull;
 import java.util.regex.Pattern;
 
 
@@ -48,82 +50,88 @@ public class GrpcWebProxy extends Http2ChannelDuplexHandler {
     @Override
     public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) {
 
-        // gRPC proxy layer expects all messages to be HTTP/2 frames
-        if (!(msg instanceof Http2Frame))
-            throw new EUnexpected();
+        try {
 
-        var frame = (Http2Frame) msg;
+            // gRPC proxy layer expects all messages to be HTTP/2 frames
+            if (!(msg instanceof Http2Frame))
+                throw new EUnexpected();
 
-        if (frame instanceof Http2HeadersFrame) {
+            var frame = (Http2Frame) msg;
 
-            var grpcWebFrame = (Http2HeadersFrame) frame;
-            var grpcFrame = translateRequestHeaders(grpcWebFrame);
+            if (frame instanceof Http2HeadersFrame) {
 
-            ctx.write(grpcFrame, promise);
+                var grpcWebFrame = (Http2HeadersFrame) frame;
+                var grpcFrame = translateRequestHeaders(grpcWebFrame);
 
-            // Stream ID is not available until the first frame is written to the HTTP/2 codec
-            promise.addListener(f -> log.info("conn = {}, stream = {}, TRANSLATE gRPC-Web {}",
-                    connId, grpcWebFrame.stream().id(), grpcFrame.headers().get(":path")));
+                ctx.write(grpcFrame, promise);
+
+                // Stream ID is not available until the first frame is written to the HTTP/2 codec
+                promise.addListener(f -> log.info("conn = {}, stream = {}, TRANSLATE gRPC-Web {}",
+                        connId, grpcWebFrame.stream().id(), grpcFrame.headers().get(":path")));
+            }
+            else if (frame instanceof Http2DataFrame) {
+
+                var grpcWebFrame = (Http2DataFrame) frame;
+                var grpcFrame = isWebTextProtocol
+                        ? decodeWebTextFrame(grpcWebFrame)
+                        : grpcWebFrame.retain();
+
+                ctx.write(grpcFrame, promise);
+            }
+            else {
+
+                // gRPC proxy layer does not interact with control frames (settings/ping/goaway/etc)
+                // Most likely there shouldn't be any of these at this layer anyway
+
+                log.warn("conn = {}, Unexpected HTTP/2 request frame ({}) in gRPC-web proxy layer", connId, frame.name());
+                ctx.write(msg, promise);
+            }
         }
-        else if (frame instanceof Http2DataFrame) {
-
-            var grpcWebFrame = (Http2DataFrame) frame;
-            var grpcFrame = isWebTextProtocol
-                ? decodeWebTextFrame(grpcWebFrame)
-                : grpcWebFrame.retain();
-
-            ctx.write(grpcFrame, promise);
-
-            // The original frame is no longer needed and can be released
-            grpcWebFrame.release();
-        }
-        else {
-
-            // gRPC proxy layer does not interact with control frames (settings/ping/goaway/etc)
-            // Most likely there shouldn't be any of these at this layer anyway
-
-            log.warn("conn = {}, Unexpected HTTP/2 request frame ({}) in gRPC-web proxy layer", connId, frame.name());
-            ctx.write(msg, promise);
+        finally {
+            ReferenceCountUtil.release(msg);
         }
     }
 
     @Override
-    public void channelRead(ChannelHandlerContext ctx, Object msg) {
+    public void channelRead(@Nonnull ChannelHandlerContext ctx, @Nonnull Object msg) {
 
-        // gRPC proxy layer expects all messages to be HTTP/2 frames
-        if (!(msg instanceof Http2Frame))
-            throw new EUnexpected();
+        try {
 
-        var frame = (Http2Frame) msg;
+            // gRPC proxy layer expects all messages to be HTTP/2 frames
+            if (!(msg instanceof Http2Frame))
+                throw new EUnexpected();
 
-        if (frame instanceof Http2HeadersFrame) {
+            var frame = (Http2Frame) msg;
 
-            var grpcFrame = (Http2HeadersFrame) frame;
-            var grpcWebFrame = grpcFrame.headers().contains(":status")
-                    ? translateResponseHeaders(grpcFrame)
-                    : translateResponseTrailers(grpcFrame, ctx.alloc());
+            if (frame instanceof Http2HeadersFrame) {
 
-            ctx.fireChannelRead(grpcWebFrame);
+                var grpcFrame = (Http2HeadersFrame) frame;
+                var grpcWebFrame = grpcFrame.headers().contains(":status")
+                        ? translateResponseHeaders(grpcFrame)
+                        : translateResponseTrailers(grpcFrame, ctx.alloc());
+
+                ctx.fireChannelRead(grpcWebFrame);
+            }
+            else if (frame instanceof Http2DataFrame) {
+
+                var grpcFrame = (Http2DataFrame) frame;
+                var grpcWebFrame = isWebTextProtocol
+                        ? encodeWebTextFrame(grpcFrame)
+                        : grpcFrame.retain();
+
+                ctx.fireChannelRead(grpcWebFrame);
+            }
+            else {
+
+                // gRPC proxy layer does not interact with control frames (settings/ping/goaway/etc)
+                // Most likely there shouldn't be any of these at this layer anyway
+
+                log.warn("Unexpected HTTP/2 response frame ({}) in gRPC-web proxy layer", frame.name());
+                // ctx.fireChannelRead(frame);
+            }
         }
-        else if (frame instanceof Http2DataFrame) {
-
-            var grpcFrame = (Http2DataFrame) frame;
-            var grpcWebFrame = isWebTextProtocol
-                    ? encodeWebTextFrame(grpcFrame)
-                    : grpcFrame.retain();
-
-            ctx.fireChannelRead(grpcWebFrame);
-
-            // The original frame is no longer needed and can be released
-            grpcFrame.release();
-        }
-        else {
-
-            // gRPC proxy layer does not interact with control frames (settings/ping/goaway/etc)
-            // Most likely there shouldn't be any of these at this layer anyway
-
-            log.warn("Unexpected HTTP/2 response frame ({}) in gRPC-web proxy layer", frame.name());
-            // ctx.fireChannelRead(frame);
+        finally {
+            ReferenceCountUtil.release(msg);
         }
     }
 

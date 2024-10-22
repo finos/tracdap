@@ -31,6 +31,7 @@ public class NettyHelpers {
 
     public static int DEFAULT_MIN_THREAD_POOL_SIZE = 0;
     public static int DEFAULT_MAX_THREAD_POOL_SIZE = 10;
+    public static int DEFAULT_THREAD_POOL_QUEUE_SIZE = 50;
     public static Duration DEFAULT_THREAD_POOL_IDLE_LIMIT = Duration.of(30, ChronoUnit.SECONDS);
 
     public static ThreadFactory threadFactory(String threadPoolName) {
@@ -47,7 +48,7 @@ public class NettyHelpers {
     }
 
     public static ThreadPoolExecutor threadPoolExecutor(String threadPoolName, int minSize, int maxSize) {
-        return threadPoolExecutor(threadPoolName, minSize, maxSize, maxSize);
+        return threadPoolExecutor(threadPoolName, minSize, maxSize, DEFAULT_THREAD_POOL_QUEUE_SIZE);
     }
 
     public static ThreadPoolExecutor threadPoolExecutor(String threadPoolName, int minSize, int maxSize, int overflowSize) {
@@ -55,11 +56,14 @@ public class NettyHelpers {
     }
 
     public static ThreadPoolExecutor threadPoolExecutor(String threadPoolName, int minSize, int maxSize, int overflowSize, long idleMs) {
+
         var threadFactory = threadFactory(threadPoolName);
-        var workQueue = new ArrayBlockingQueue<Runnable>(overflowSize);  // Double up max pool size with the work queue
+        var workQueue = new ArrayBlockingQueue<Runnable>(overflowSize);
+        var rejectHandler = new ThreadPoolRejectionHandler(threadPoolName);
+
         return new ThreadPoolExecutor(
                 minSize, maxSize, idleMs, TimeUnit.MILLISECONDS,
-                workQueue, threadFactory);
+                workQueue, threadFactory, rejectHandler);
     }
 
     public static NioEventLoopGroup nioEventLoopGroup(Executor executor, EventExecutorChooserFactory scheduler, int nThreads) {

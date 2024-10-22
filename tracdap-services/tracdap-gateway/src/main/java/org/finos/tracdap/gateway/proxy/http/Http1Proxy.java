@@ -16,6 +16,7 @@
 
 package org.finos.tracdap.gateway.proxy.http;
 
+import io.netty.util.ReferenceCountUtil;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.config.RouteConfig;
 
@@ -24,6 +25,7 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPromise;
 import io.netty.handler.codec.http.*;
 
+import javax.annotation.Nonnull;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.List;
@@ -61,37 +63,49 @@ public class Http1Proxy extends ChannelDuplexHandler {
     @Override
     public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) {
 
-        if (msg instanceof HttpRequest) {
+        try {
 
-            var sourceRequest = (HttpRequest) msg;
-            var targetRequest = proxyRequest(sourceRequest);
+            if (msg instanceof HttpRequest) {
 
-            ctx.write(targetRequest, promise);
+                var sourceRequest = (HttpRequest) msg;
+                var targetRequest = proxyRequest(sourceRequest);
+
+                ctx.write(targetRequest, promise);
+            }
+            else if (msg instanceof HttpContent) {
+
+                ctx.write(((HttpContent) msg).retain(), promise);
+            }
+            else
+                throw new EUnexpected();
         }
-        else if (msg instanceof HttpContent) {
-
-            ctx.write(msg, promise);
+        finally {
+            ReferenceCountUtil.release(msg);
         }
-        else
-            throw new EUnexpected();
     }
 
     @Override
-    public void channelRead(ChannelHandlerContext ctx, Object msg) {
+    public void channelRead(@Nonnull ChannelHandlerContext ctx, @Nonnull Object msg) {
 
-        if (msg instanceof HttpResponse) {
+        try {
 
-            var serverResponse = (HttpResponse) msg;
-            var proxyResponse = proxyResponse(serverResponse);
+            if (msg instanceof HttpResponse) {
 
-            ctx.fireChannelRead(proxyResponse);
+                var serverResponse = (HttpResponse) msg;
+                var proxyResponse = proxyResponse(serverResponse);
+
+                ctx.fireChannelRead(proxyResponse);
+            }
+            else if (msg instanceof HttpContent) {
+
+                ctx.fireChannelRead(((HttpContent) msg).retain());
+            }
+            else
+                throw new EUnexpected();
         }
-        else if (msg instanceof HttpContent) {
-
-            ctx.fireChannelRead(msg);
+        finally {
+            ReferenceCountUtil.release(msg);
         }
-        else
-            throw new EUnexpected();
     }
 
     // No-op proxy translation to get things working
@@ -120,12 +134,13 @@ public class Http1Proxy extends ChannelDuplexHandler {
         if (sourceRequest instanceof FullHttpRequest) {
 
             var fullRequest = (FullHttpRequest) sourceRequest;
+            var fullContent = fullRequest.content().retain();
 
             return new DefaultFullHttpRequest(
                     sourceRequest.protocolVersion(),
                     sourceRequest.method(),
                     targetPath,
-                    fullRequest.content(),
+                    fullContent,
                     targetHeaders,
                     fullRequest.trailingHeaders());
         }
@@ -154,11 +169,12 @@ public class Http1Proxy extends ChannelDuplexHandler {
         if (serverResponse instanceof FullHttpResponse) {
 
             var fullResponse = (FullHttpResponse) serverResponse;
+            var fullContent = fullResponse.content().retain();
 
             return new DefaultFullHttpResponse(
                     fullResponse.protocolVersion(),
                     fullResponse.status(),
-                    fullResponse.content(),
+                    fullContent,
                     proxyHeaders,
                     fullResponse.trailingHeaders());
         }
