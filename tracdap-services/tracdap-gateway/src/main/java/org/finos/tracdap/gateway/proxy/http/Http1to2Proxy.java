@@ -155,17 +155,15 @@ public class Http1to2Proxy extends Http2ChannelDuplexHandler {
 
             var MAX_DATA_SIZE = 16 * 1024;
 
-            contentBuf.retain();
-
             while (contentBuf.readableBytes() > MAX_DATA_SIZE) {
 
-                var slice = contentBuf.readSlice(MAX_DATA_SIZE);
+                var slice = contentBuf.readRetainedSlice(MAX_DATA_SIZE);
                 var frame = new DefaultHttp2DataFrame(slice).stream(stream);
                 frames.add(frame);
             }
 
             var endStreamFlag = (http1 instanceof LastHttpContent);
-            var slice = contentBuf.readSlice(contentBuf.readableBytes());
+            var slice = contentBuf.readRetainedSlice(contentBuf.readableBytes());
 
             var padding = 256 - (slice.readableBytes() % 256) % 256;
 
