@@ -48,7 +48,7 @@ metadata:
       h2.pass: trac
       h2.schema: public
       pool.size: 10
-      pool.overflow: 5
+      pool.overflow: 50
 
 
 storage:
