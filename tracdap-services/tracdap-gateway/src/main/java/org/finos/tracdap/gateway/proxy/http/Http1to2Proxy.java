@@ -16,6 +16,7 @@
 
 package org.finos.tracdap.gateway.proxy.http;
 
+import io.netty.util.ReferenceCountUtil;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.config.RouteConfig;
 import io.netty.channel.ChannelHandlerContext;
@@ -58,30 +59,42 @@ public class Http1to2Proxy extends Http2ChannelDuplexHandler {
     @Override
     public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) throws Exception {
 
-        if (msg instanceof HttpRequest)
-            newSeqStream(promise);
+        try {
 
-        var frames = translateRequestFrames(msg);
-        var notLastFrame = frames.subList(0, frames.size() - 1);
-        var lastFrame = frames.get(frames.size() - 1);
+            if (msg instanceof HttpRequest)
+                newSeqStream(promise);
 
-        for (var frame : notLastFrame)
-            ctx.write(frame);
+            var frames = translateRequestFrames(msg);
+            var notLastFrame = frames.subList(0, frames.size() - 1);
+            var lastFrame = frames.get(frames.size() - 1);
 
-        ctx.write(lastFrame, promise);
+            for (var frame : notLastFrame)
+                ctx.write(frame);
+
+            ctx.write(lastFrame, promise);
+        }
+        finally {
+            ReferenceCountUtil.release(msg);
+        }
     }
 
     @Override
     public void channelRead(@Nonnull ChannelHandlerContext ctx, @Nonnull Object msg) throws Exception {
 
-        if (!(msg instanceof Http2Frame))
-            throw new EUnexpected();
+        try {
 
-        var frame = (Http2Frame) msg;
-        var httpObjs = translateResponseFrame(frame);
+            if (!(msg instanceof Http2Frame))
+                throw new EUnexpected();
 
-        for (var httpObj : httpObjs)
-            ctx.fireChannelRead(httpObj);
+            var frame = (Http2Frame) msg;
+            var httpObjs = translateResponseFrame(frame);
+
+            for (var httpObj : httpObjs)
+                ctx.fireChannelRead(httpObj);
+        }
+        finally {
+            ReferenceCountUtil.release(msg);
+        }
     }
 
     private void newSeqStream(ChannelPromise promise) {
@@ -214,12 +227,12 @@ public class Http1to2Proxy extends Http2ChannelDuplexHandler {
 
     private List<HttpObject> translateResponseData(Http2DataFrame dataFrame) {
 
-        dataFrame.content().retain();
+        var content = dataFrame.content().retain();
 
         if (dataFrame.isEndStream())
-            return List.of(new DefaultLastHttpContent(dataFrame.content()));
+            return List.of(new DefaultLastHttpContent(content));
         else
-            return List.of(new DefaultHttpContent(dataFrame.content()));
+            return List.of(new DefaultHttpContent(content));
     }
 
 }
