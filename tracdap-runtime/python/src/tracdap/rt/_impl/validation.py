@@ -70,6 +70,7 @@ class _TypeValidator:
             cls.__method_cache[method.__name__] = signature
 
         hints = tp.get_type_hints(method)
+        named_params = list(signature.parameters.keys())
 
         positional_index = 0
 
@@ -77,7 +78,7 @@ class _TypeValidator:
 
             param_type = hints.get(param_name)
 
-            values = cls._select_arg(method.__name__, param, positional_index, *args, **kwargs)
+            values = cls._select_arg(method.__name__, param, positional_index, named_params, *args, **kwargs)
             positional_index += len(values)
 
             for value in values:
@@ -107,7 +108,7 @@ class _TypeValidator:
 
     @classmethod
     def _select_arg(
-            cls, method_name: str, parameter: inspect.Parameter, positional_index,
+            cls, method_name: str, parameter: inspect.Parameter, positional_index, named_params,
             *args, **kwargs) -> tp.List[tp.Any]:
 
         if parameter.kind == inspect.Parameter.POSITIONAL_ONLY:
@@ -152,7 +153,7 @@ class _TypeValidator:
 
         if parameter.kind == inspect.Parameter.VAR_KEYWORD:
 
-            raise ex.ETracInternal("Validation of VAR_KEYWORD params is not supported yet")
+            return [arg for kw, arg in kwargs.items() if kw not in named_params]
 
         raise ex.EUnexpected("Invalid method signature in runtime API (this is a bug)")
 
@@ -215,6 +216,9 @@ class _TypeValidator:
                 return isinstance(value, dict) and \
                     all(map(lambda k: cls._validate_type(key_type, k), value.keys())) and \
                     all(map(lambda v: cls._validate_type(value_type, v), value.values()))
+
+            if origin.__module__.startswith("tracdap.rt.api."):
+                return isinstance(value, origin)
 
             raise ex.ETracInternal(f"Validation of [{origin.__name__}] generic parameters is not supported yet")
 
