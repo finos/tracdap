@@ -134,7 +134,7 @@ class TracContextImpl(_api.TracContext):
         else:
             return copy.deepcopy(data_view.trac_schema)
 
-    def get_table(self, dataset_name: str, framework, **kwargs) -> _eapi._DATA_FRAMEWORK:  # noqa
+    def get_table(self, dataset_name: str, framework: _eapi.DataFramework[_eapi.DATA_API], **kwargs) -> _eapi.DATA_API:
 
         # Support the experimental API data framework syntax
 
@@ -225,7 +225,7 @@ class TracContextImpl(_api.TracContext):
 
         self.__local_ctx[dataset_name] = updated_view
 
-    def put_table(self, dataset_name: str, dataset: _eapi._DATA_FRAMEWORK, **kwargs):  # noqa
+    def put_table(self, dataset_name: str, dataset: _eapi.DATA_API, **kwargs):  # noqa
 
         # Support the experimental API data framework syntax
 
