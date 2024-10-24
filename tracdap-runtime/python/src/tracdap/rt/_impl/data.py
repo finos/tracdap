@@ -333,10 +333,11 @@ class DataMapping:
 
 
 T_DATA_API = tp.TypeVar("T_DATA_API")
-T_DATA_INTERNAL = tp.TypeVar("T_DATA_INTERNAL")
+T_INTERNAL_DATA = tp.TypeVar("T_INTERNAL_DATA")
+T_INTERNAL_SCHEMA = tp.TypeVar("T_INTERNAL_SCHEMA")
 
 
-class DataConverter(tp.Generic[T_DATA_API, T_DATA_INTERNAL]):
+class DataConverter(tp.Generic[T_DATA_API, T_INTERNAL_DATA, T_INTERNAL_SCHEMA]):
 
     # Available per-framework args, to enable framework-specific type-checking in public APIs
     # These should (for a purist point of view) be in the individual converter classes
@@ -364,28 +365,31 @@ class DataConverter(tp.Generic[T_DATA_API, T_DATA_INTERNAL]):
         return cls.__FRAMEWORK_ARGS.get(framework) or {}
 
     @classmethod
-    def for_framework(cls, framework: _api.DataFramework[_api.DATA_API], **framework_args) -> "DataConverter[_api.DATA_API, pa.Table]":
+    def for_framework(cls, framework: _api.DataFramework[_api.DATA_API], **framework_args) -> "DataConverter[_api.DATA_API, pa.Table, pa.Schema]":
 
         if framework == _api.PANDAS:
             if pandas is not None:
-                return PandasArrowConverter(**framework_args)
+                return PandasArrowConverter(framework, **framework_args)
             else:
                 raise _ex.EPluginNotAvailable(f"Optional package [{framework}] is not installed")
 
         if framework == _api.POLARS:
             if polars is not None:
-                return PolarsArrowConverter()
+                return PolarsArrowConverter(framework)
             else:
                 raise _ex.EPluginNotAvailable(f"Optional package [{framework}] is not installed")
 
         raise _ex.EPluginNotAvailable(f"Data framework [{framework}] is not recognized")
 
+    def __init__(self, framework: _api.DataFramework[T_DATA_API]):
+        self.framework = framework
+
     @abc.abstractmethod
-    def from_internal(self, dataset: T_DATA_INTERNAL, column_filter: tp.Optional[tp.List[str]] = None) -> T_DATA_API:
+    def from_internal(self, dataset: T_INTERNAL_DATA, schema: tp.Optional[T_INTERNAL_SCHEMA] = None) -> T_DATA_API:
         pass
 
     @abc.abstractmethod
-    def to_internal(self, dataset: T_DATA_API, column_filter: tp.Optional[tp.List[str]] = None) -> T_DATA_INTERNAL:
+    def to_internal(self, dataset: T_DATA_API, schema: tp.Optional[T_INTERNAL_SCHEMA] = None) -> T_INTERNAL_DATA:
         pass
 
     @abc.abstractmethod
@@ -393,7 +397,7 @@ class DataConverter(tp.Generic[T_DATA_API, T_DATA_INTERNAL]):
         pass
 
 
-class PandasArrowConverter(DataConverter[pandas.DataFrame, pa.Table]):
+class PandasArrowConverter(DataConverter[pandas.DataFrame, pa.Table, pa.Schema]):
 
     # Check the Pandas dtypes for handling floats are available before setting up the type mapping
     __PANDAS_VERSION_ELEMENTS = pandas.__version__.split(".")
@@ -461,18 +465,22 @@ class PandasArrowConverter(DataConverter[pandas.DataFrame, pa.Table]):
     def pandas_datetime_type(cls, tz=None, unit=None):
         return cls.__pandas_datetime_type(tz, unit)
 
-    def __init__(self, use_temporal_objects: tp.Optional[bool] = None):
+    def __init__(self, framework: _api.DataFramework[T_DATA_API], use_temporal_objects: tp.Optional[bool] = None):
+        super().__init__(framework)
         if use_temporal_objects is None:
             self.__temporal_objects_flag = self.__DEFAULT_TEMPORAL_OBJECTS
         else:
             self.__temporal_objects_flag = use_temporal_objects
 
-    def from_internal(self, table: pa.Table, column_filter: tp.Optional[tp.List[str]] = None) -> pandas.DataFrame:
+    def from_internal(self, table: pa.Table, schema: tp.Optional[pa.Schema] = None) -> pandas.DataFrame:
 
-        filtered_table = table.select(column_filter) if column_filter else table
+        if schema is not None:
+            table = DataConformance.conform_to_schema(table, schema, warn_extra_columns=False)
+        else:
+            DataConformance.check_duplicate_fields(table.schema.names, False)
 
-        # Use Arrow's built-in function to convert to Pandas
-        return filtered_table.to_pandas(
+            # Use Arrow's built-in function to convert to Pandas
+        return table.to_pandas(
 
             # Mapping for arrow -> pandas types for core types
             types_mapper=self.__ARROW_TO_PANDAS_TYPE_MAPPING.get,
@@ -488,7 +496,7 @@ class PandasArrowConverter(DataConverter[pandas.DataFrame, pa.Table]):
             # This is a significant performance win for very wide datasets
             split_blocks=True)  # noqa
 
-    def to_internal(self, df: pandas.DataFrame, column_filter: tp.Optional[tp.List[str]] = None) -> pa.Table:
+    def to_internal(self, df: pandas.DataFrame, schema: tp.Optional[pa.Schema] = None) -> pa.Table:
 
         # Converting pandas -> arrow needs care to ensure type coercion is applied correctly
         # Calling Table.from_pandas with the supplied schema will very often reject data
@@ -498,9 +506,11 @@ class PandasArrowConverter(DataConverter[pandas.DataFrame, pa.Table]):
         # As an optimisation, the column filter means columns will not be converted if they are not needed
         # E.g. if a model outputs lots of undeclared columns, there is no need to convert them
 
+        column_filter = DataConformance.column_filter(df.columns, schema)  # noqa
+
         if len(df) > 0:
 
-            return pa.Table.from_pandas(df, columns=column_filter, preserve_index=False)  # noqa
+            table = pa.Table.from_pandas(df, columns=column_filter, preserve_index=False)  # noqa
 
         # Special case handling for converting an empty dataframe
         # These must flow through the pipe with valid schemas, like any other dataset
@@ -511,7 +521,22 @@ class PandasArrowConverter(DataConverter[pandas.DataFrame, pa.Table]):
             empty_df = df.filter(column_filter) if column_filter else df
             empty_schema = pa.Schema.from_pandas(empty_df, preserve_index=False)  # noqa
 
-            return pa.Table.from_batches(list(), empty_schema)  # noqa
+            table = pa.Table.from_batches(list(), empty_schema)  # noqa
+
+        # If there is no explict schema, give back the table exactly as it was received from Pandas
+        # There could be an option here to infer and coerce for TRAC standard types
+        # E.g. unsigned int 32 -> signed int 64, TRAC standard integer type
+
+        if schema is None:
+            DataConformance.check_duplicate_fields(table.schema.names, False)
+            return table
+
+        # If a schema has been supplied, apply data conformance
+        # If column filtering has been applied, we also need to filter the pandas dtypes used for hinting
+
+        else:
+            df_types = df.dtypes.filter(column_filter) if column_filter else df.dtypes
+            return DataConformance.conform_to_schema(table, schema, df_types)
 
     def infer_schema(self, dataset: pandas.DataFrame) -> _meta.SchemaDefinition:
 
@@ -519,20 +544,32 @@ class PandasArrowConverter(DataConverter[pandas.DataFrame, pa.Table]):
         return DataMapping.arrow_to_trac_schema(arrow_schema)
 
 
-class PolarsArrowConverter(DataConverter[polars.DataFrame, pa.Table]):
+class PolarsArrowConverter(DataConverter[polars.DataFrame, pa.Table, pa.Schema]):
 
-    def __init__(self):
-        pass
+    def __init__(self, framework: _api.DataFramework[T_DATA_API]):
+        super().__init__(framework)
 
-    def from_internal(self, table: pa.Table, column_filter: tp.Optional[tp.List[str]] = None) -> polars.DataFrame:
+    def from_internal(self, table: pa.Table, schema: tp.Optional[pa.Schema] = None) -> polars.DataFrame:
 
-        filtered_table = table.select(column_filter) if column_filter else table
-        return polars.from_arrow(filtered_table)
+        if schema is not None:
+            table = DataConformance.conform_to_schema(table, schema, warn_extra_columns=False)
+        else:
+            DataConformance.check_duplicate_fields(table.schema.names, False)
 
-    def to_internal(self, df: polars.DataFrame, column_filter: tp.Optional[tp.List[str]] = None,) -> pa.Table:
+        return polars.from_arrow(table)
+
+    def to_internal(self, df: polars.DataFrame, schema: tp.Optional[pa.Schema] = None,) -> pa.Table:
+
+        column_filter = DataConformance.column_filter(df.columns, schema)
 
         filtered_df = df.select(polars.col(*column_filter)) if column_filter else df
-        return filtered_df.to_arrow()
+        table = filtered_df.to_arrow()
+
+        if schema is None:
+            DataConformance.check_duplicate_fields(table.schema.names, False)
+            return table
+        else:
+            return DataConformance.conform_to_schema(table, schema, None)
 
     def infer_schema(self, dataset: T_DATA_API) -> _meta.SchemaDefinition:
 
@@ -565,16 +602,6 @@ class DataConformance:
     __E_TIMEZONE_DOES_NOT_MATCH = \
         "Field [{field_name}] cannot be converted from {vector_type} to {field_type}, " + \
         "source and target have different time zones"
-
-    @classmethod
-    def apply_conformance(
-            cls, table:  pa.Table, schema: tp.Optional[pa.Schema],
-            pandas_types=None, warn_extra_columns=True) -> pa.Table:
-
-        if schema is not None:
-            return DataConformance.conform_to_schema(table, schema, pandas_types, warn_extra_columns)
-        else:
-            return DataConformance.check_duplicate_fields(table.schema.names, False)
 
     @classmethod
     def column_filter(cls, columns: tp.List[str], schema: tp.Optional[pa.Schema]) -> tp.Optional[tp.List[str]]:

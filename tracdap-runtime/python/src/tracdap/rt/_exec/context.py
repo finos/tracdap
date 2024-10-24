@@ -160,10 +160,10 @@ class TracContextImpl(_api.TracContext):
         else:
             schema = data_view.arrow_schema
 
-        raw_table = _data.DataMapping.view_to_arrow(data_view, part_key)
-        table = _data.DataConformance.conform_to_schema(raw_table, schema)
+        table = _data.DataMapping.view_to_arrow(data_view, part_key)
 
-        return converter.from_internal(table, schema.names)
+        # Data conformance is applied automatically inside the converter, if schema != None
+        return converter.from_internal(table, schema)
 
     def get_pandas_table(self, dataset_name: str, use_temporal_objects: tp.Optional[bool] = None) \
             -> "_data.pandas.DataFrame":
@@ -244,8 +244,8 @@ class TracContextImpl(_api.TracContext):
         else:
             schema = data_view.arrow_schema
 
-        raw_table = converter.to_internal(dataset, schema.names)
-        table = _data.DataConformance.conform_to_schema(raw_table, schema)
+        # Data conformance is applied automatically inside the converter, if schema != None
+        table = converter.to_internal(dataset, schema)
         item = _data.DataItem(schema, table)
 
         updated_view = _data.DataMapping.add_item_to_view(data_view, part_key, item)
