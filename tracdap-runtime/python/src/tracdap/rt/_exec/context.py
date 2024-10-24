@@ -497,6 +497,9 @@ class TracFileStorageImpl(_eapi.TracFileStorage):
 
 class TracContextErrorReporter:
 
+    _VALID_IDENTIFIER = re.compile("^[a-zA-Z_]\\w*$",)
+    _RESERVED_IDENTIFIER = re.compile("^(trac_|_)\\w*")
+
     def __init__(self, log: logging.Logger, checkout_directory: pathlib.Path):
 
         self.__log = log
