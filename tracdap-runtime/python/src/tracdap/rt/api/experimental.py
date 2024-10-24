@@ -88,7 +88,7 @@ def init_static():
     _static_impl.StaticApiImpl.register_impl()
 
 
-def infer_schema(dataset: _tp.Any) -> SchemaDefinition:
+def infer_schema(dataset: DATA_API) -> SchemaDefinition:
     sa = _StaticApiHook.get_instance()
     return sa.infer_schema(dataset)
 
