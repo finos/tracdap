@@ -331,6 +331,34 @@ class DataMapping:
 
         raise _ex.ETracInternal(f"Data item does not contain any usable data")
 
+    @classmethod
+    def arrow_to_pandas(
+            cls, table: pa.Table,
+            schema: tp.Optional[pa.Schema] = None,
+            temporal_objects_flag: bool = False) -> "pandas.DataFrame":
+
+        # This is a legacy internal method and should be removed
+        # DataMapping is no longer responsible for individual data APIs
+
+        # Maintained temporarily for compatibility with existing deployments
+
+        converter = PandasArrowConverter(_api.PANDAS, use_temporal_objects=temporal_objects_flag)
+        return converter.from_internal(table, schema)
+
+    @classmethod
+    def pandas_to_arrow(
+            cls, df: "pandas.DataFrame",
+            schema: tp.Optional[pa.Schema] = None) -> pa.Table:
+
+        # This is a legacy internal method and should be removed
+        # DataMapping is no longer responsible for individual data APIs
+
+        # Maintained temporarily for compatibility with existing deployments
+
+        converter = PandasArrowConverter(_api.PANDAS)
+        return converter.to_internal(df, schema)
+
+
 
 T_DATA_API = tp.TypeVar("T_DATA_API")
 T_INTERNAL_DATA = tp.TypeVar("T_INTERNAL_DATA")
