@@ -44,6 +44,10 @@ def check_type(expected_type: tp.Type, value: tp.Any) -> bool:
     return _TypeValidator.check_type(expected_type, value)
 
 
+def type_name(type_: tp.Type, qualified: bool) -> str:
+    return _TypeValidator._type_name(type_, qualified)  # noqa
+
+
 def quick_validate_model_def(model_def: meta.ModelDefinition):
     StaticValidator.quick_validate_model_def(model_def)
 
@@ -274,7 +278,10 @@ class _TypeValidator:
                 return f"Named[{named_type}]"
 
             if origin is tp.Union:
-                return "|".join(map(cls._type_name, args))
+                if len(args) == 2 and args[1] == type(None):
+                    return f"Optional[{cls._type_name(args[0])}]"
+                else:
+                    return "|".join(map(cls._type_name, args))
 
             if origin is list:
                 list_type = cls._type_name(args[0])
