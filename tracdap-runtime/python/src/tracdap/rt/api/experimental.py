@@ -23,8 +23,6 @@ from .hook import _StaticApiHook
 
 
 _PROTOCOL = _tp.TypeVar('_PROTOCOL')
-DATA_API = _tp.TypeVar('DATA_API')
-
 
 @_dc.dataclass(frozen=True)
 class _Protocol(_tp.Generic[_PROTOCOL]):
@@ -36,39 +34,40 @@ class _Protocol(_tp.Generic[_PROTOCOL]):
         return self.protocol_name
 
 
+def __pandas_api_type() -> "_tp.Type[pandas.DataFrame]":
+    try:
+        import pandas
+        return pandas.DataFrame
+    except ModuleNotFoundError:
+        return None  # noqa
+
+def __polars_api_type() -> "_tp.Type[polars.DataFrame]":
+    try:
+        import polars
+        return polars.DataFrame
+    except ModuleNotFoundError:
+        return None  # noqa
+
+DATA_API = _tp.TypeVar('DATA_API', __pandas_api_type(), __polars_api_type())
+
 class DataFramework(_Protocol[DATA_API]):
 
     def __init__(self, protocol_name: str, api_type: _tp.Type[DATA_API]):
         super().__init__(protocol_name, api_type)
 
-    PANDAS: "DataFramework[DATA_API]"
-    POLARS: "DataFramework[DATA_API]"
+    @classmethod
+    def pandas(cls) -> "DataFramework[pandas.DataFrame]":
+        return DataFramework("pandas", DATA_API.__constraints__[0])
 
+    @classmethod
+    def polars(cls) -> "DataFramework[polars.DataFrame]":
+        return DataFramework("polars", DATA_API.__constraints__[1])
 
-if _tp.TYPE_CHECKING:
+PANDAS = DataFramework.pandas()
+"""Data framework constant for the Pandas data library"""
 
-    if pandas:
-        DataFramework.PANDAS = DataFramework('pandas', pandas.DataFrame)
-        """The original Python dataframe library, most widely used"""
-    else:
-        DataFramework.PANDAS = DataFramework('pandas', None)
-        """Pandas data framework is not installed"""
-
-    if polars:
-        DataFramework.POLARS = DataFramework('polars', polars.DataFrame)
-        """A modern, fast and simple alternative to Pandas"""
-    else:
-        DataFramework.POLARS = DataFramework('polars', None)
-        """Polars data framework is not installed"""
-
-else:
-
-    DataFramework.PANDAS = DataFramework('pandas', None)
-    DataFramework.POLARS = DataFramework('polars', None)
-
-
-PANDAS = DataFramework.PANDAS
-POLARS = DataFramework.POLARS
+POLARS = DataFramework.polars()
+"""Data framework constant for the Polars data library"""
 
 
 class TracContext(TracContext):
