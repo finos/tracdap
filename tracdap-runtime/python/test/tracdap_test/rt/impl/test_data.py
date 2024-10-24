@@ -28,7 +28,17 @@ import tracdap.rt._impl.data as _data  # noqa
 import tracdap.rt._impl.util as _util  # noqa
 
 
-class DataMappingTest(unittest.TestCase):
+class DataConverterSuite:
+
+    assertEqual = unittest.TestCase.assertEqual
+    assertListEqual = unittest.TestCase.assertListEqual
+    assertTrue = unittest.TestCase.assertTrue
+    assertFalse = unittest.TestCase.assertFalse
+    assertIsNotNone = unittest.TestCase.assertIsNotNone
+    assertRaises = unittest.TestCase.assertRaises
+    skipTest = unittest.TestCase.skipTest
+
+    converter: _data.DataConverter
 
     TRAC_SCHEMA = _meta.SchemaDefinition(
         _meta.SchemaType.TABLE,
@@ -44,11 +54,11 @@ class DataMappingTest(unittest.TestCase):
         ]))
 
     @classmethod
-    def setUpClass(cls):
+    def setUpClass(cls):  # noqa
         _util.configure_logging()
 
-    @staticmethod
-    def sample_data():
+    @classmethod
+    def sample_data(cls):
 
         return {
             "boolean_field": [True, False, True, False],
@@ -86,8 +96,8 @@ class DataMappingTest(unittest.TestCase):
         sample_data = self.sample_data()
 
         table = pa.Table.from_pydict(sample_data, sample_schema)  # noqa
-        df = _data.DataMapping.arrow_to_pandas(table)
-        rt = _data.DataMapping.pandas_to_arrow(df, self.sample_schema())
+        df = self.converter.from_internal(table)
+        rt = self.converter.to_internal(df, self.sample_schema())
 
         self.assertEqual(sample_schema, rt.schema)
         self.assertEqual(table, rt)
@@ -101,8 +111,8 @@ class DataMappingTest(unittest.TestCase):
             values[0] = None
 
         table = pa.Table.from_pydict(sample_data, sample_schema)  # noqa
-        df = _data.DataMapping.arrow_to_pandas(table)
-        rt = _data.DataMapping.pandas_to_arrow(df, self.sample_schema())
+        df = self.converter.from_internal(table)
+        rt = self.converter.to_internal(df, self.sample_schema())
 
         self.assertEqual(sample_schema, rt.schema)
         self.assertEqual(table, rt)
@@ -115,36 +125,6 @@ class DataMappingTest(unittest.TestCase):
         sample_schema = _data.DataMapping.trac_to_arrow_schema(trac_schema)
         self.assertFalse(sample_schema.field("integer_field").nullable)
 
-    def test_pandas_dtypes(self):
-
-        sample_schema = self.sample_schema()
-        sample_data = self.sample_data()
-
-        table = pa.Table.from_pydict(sample_data, sample_schema)  # noqa
-        df = _data.DataMapping.arrow_to_pandas(table)
-
-        expect_dtypes = [
-
-            pd.BooleanDtype(),
-            pd.Int64Dtype(),
-
-            # Pandas float dtype is only available from Pandas 1.2 onward, fallback is original NumPy float dtype
-            pd.Float64Dtype() if "Float64Dtype" in pd.__dict__ else pd.api.types.pandas_dtype(float),
-
-            # No special Dtype for decimals, these will just show up as objects
-            pd.api.types.pandas_dtype(object),
-
-            # Strings have a dedicated dtype!
-            pd.StringDtype(),
-
-            # Date/time types being converted as NumPy native (datetime64[ns])
-            _data.DataMapping.pandas_date_type(),
-            _data.DataMapping.pandas_datetime_type()]
-
-        # .astype("datetime64[ms]") coming through in Pandas 2
-
-        self.assertListEqual(expect_dtypes, df.dtypes.to_list())
-
     def test_edge_cases_integer(self):
 
         schema = self.one_field_schema(_meta.BasicType.INTEGER)
@@ -154,8 +134,8 @@ class DataMappingTest(unittest.TestCase):
             -sys.maxsize - 1
         ]}, schema)
 
-        df = _data.DataMapping.arrow_to_pandas(table)
-        rt = _data.DataMapping.pandas_to_arrow(df, schema)
+        df = self.converter.from_internal(table)
+        rt = self.converter.to_internal(df, schema)
 
         self.assertEqual(schema, rt.schema)
         self.assertEqual(table, rt)
@@ -176,8 +156,8 @@ class DataMappingTest(unittest.TestCase):
             -math.inf
         ]}, schema)
 
-        df = _data.DataMapping.arrow_to_pandas(table)
-        rt = _data.DataMapping.pandas_to_arrow(df, schema)
+        df = self.converter.from_internal(table)
+        rt = self.converter.to_internal(df, schema)
 
         self.assertEqual(schema, rt.schema)
         self.assertEqual(table, rt)
@@ -191,8 +171,8 @@ class DataMappingTest(unittest.TestCase):
         schema = self.one_field_schema(_meta.BasicType.FLOAT)
         table = pa.Table.from_pydict({"float_field": [math.nan]}, schema)  # noqa
 
-        df = _data.DataMapping.arrow_to_pandas(table)
-        rt = _data.DataMapping.pandas_to_arrow(df, schema)
+        df = self.converter.from_internal(table)
+        rt = self.converter.to_internal(df, schema)
 
         self.assertEqual(schema, rt.schema)
 
@@ -215,8 +195,8 @@ class DataMappingTest(unittest.TestCase):
             decimal.Decimal(-1.0) / decimal.Decimal(1.0).shift(12)
         ]}, schema)
 
-        df = _data.DataMapping.arrow_to_pandas(table)
-        rt = _data.DataMapping.pandas_to_arrow(df, schema)
+        df = self.converter.from_internal(table)
+        rt = self.converter.to_internal(df, schema)
 
         self.assertEqual(schema, rt.schema)
         self.assertEqual(table, rt)
@@ -231,8 +211,8 @@ class DataMappingTest(unittest.TestCase):
             "𝜌 = ∑ 𝑃𝜓 | 𝜓 ⟩ ⟨ 𝜓 |"
         ]}, schema)
 
-        df = _data.DataMapping.arrow_to_pandas(table)
-        rt = _data.DataMapping.pandas_to_arrow(df, schema)
+        df = self.converter.from_internal(table)
+        rt = self.converter.to_internal(df, schema)
 
         self.assertEqual(schema, rt.schema)
         self.assertEqual(table, rt)
@@ -251,8 +231,8 @@ class DataMappingTest(unittest.TestCase):
             min_pandas_date
         ]}, schema)
 
-        df = _data.DataMapping.arrow_to_pandas(table)
-        rt = _data.DataMapping.pandas_to_arrow(df, schema)
+        df = self.converter.from_internal(table)
+        rt = self.converter.to_internal(df, schema)
 
         self.assertEqual(schema, rt.schema)
         self.assertEqual(table, rt)
@@ -276,47 +256,11 @@ class DataMappingTest(unittest.TestCase):
             min_pandas_datetime
         ]}, schema)
 
-        df = _data.DataMapping.arrow_to_pandas(table)
-        rt = _data.DataMapping.pandas_to_arrow(df, schema)
+        df = self.converter.from_internal(table)
+        rt = self.converter.to_internal(df, schema)
 
         self.assertEqual(schema, rt.schema)
         self.assertEqual(table, rt)
-
-    def test_pandas_date(self):
-
-        df = pd.DataFrame({"date_field": [pd.Timestamp(1970, 1, 1)]})
-
-        schema = self.one_field_schema(_meta.BasicType.DATE)
-        table = _data.DataMapping.pandas_to_arrow(df, schema)
-
-        self.assertEqual(schema, table.schema)
-
-    def test_pandas_datetime(self):
-
-        df = pd.DataFrame({"datetime_field": [pd.Timestamp(1970, 1, 1, 12, 30, 0)]})
-
-        schema = self.one_field_schema(_meta.BasicType.DATETIME)
-        table = _data.DataMapping.pandas_to_arrow(df, schema)
-
-        self.assertEqual(schema, table.schema)
-
-    def test_python_date(self):
-
-        df = pd.DataFrame({"date_field": [dt.date(1970, 1, 1)]})
-
-        schema = self.one_field_schema(_meta.BasicType.DATE)
-        table = _data.DataMapping.pandas_to_arrow(df, schema)
-
-        self.assertEqual(schema, table.schema)
-
-    def test_python_datetime(self):
-
-        df = pd.DataFrame({"datetime_field": [dt.datetime(1970, 1, 1, 12, 30, 0)]})
-
-        schema = self.one_field_schema(_meta.BasicType.DATETIME)
-        table = _data.DataMapping.pandas_to_arrow(df, schema)
-
-        self.assertEqual(schema, table.schema)
 
     def test_time_zone_mapping(self):
 
@@ -332,20 +276,22 @@ class DataMappingTest(unittest.TestCase):
 
             schema = pa.schema([sample_type])
             table = pa.Table.from_pydict({"f": [sample_val]}, schema)  # noqa
-            df = _data.DataMapping.arrow_to_pandas(table)
-            rt = _data.DataMapping.pandas_to_arrow(df, schema)
+            df = self.converter.from_internal(table)
+            rt = self.converter.to_internal(df, schema)
 
             self.assertEqual(schema, rt.schema)
             self.assertEqual(table, rt)
 
             # Also check TZ shows up correctly in the Pandas dtype
 
-            if sample_type[1].tz:
-                expected_dtype = _data.DataMapping.pandas_datetime_type(tz=sample_type[1].tz)
-            else:
-                expected_dtype = _data.DataMapping.pandas_datetime_type()
+            if self.converter.framework.protocol_name == "pandas":
 
-            self.assertListEqual([expected_dtype], df.dtypes.to_list())
+                if sample_type[1].tz:
+                    expected_dtype = _data.PandasArrowConverter.pandas_datetime_type(tz=sample_type[1].tz)
+                else:
+                    expected_dtype = _data.PandasArrowConverter.pandas_datetime_type()
+
+                self.assertListEqual([expected_dtype], df.dtypes.to_list())
 
         # Fail all time zone conversions for now
         # I.e., insist time zones match exactly and any conversion is defined in model code
@@ -357,6 +303,100 @@ class DataMappingTest(unittest.TestCase):
         do_test(epoch_europe_london, ts_europe_london)
 
 
+class PandasDataConverterTest(unittest.TestCase, DataConverterSuite):
+
+    framework = _data.DataConverter.get_framework(_data.pandas.DataFrame())
+    converter = _data.PandasArrowConverter(framework)
+
+    def test_pandas_dtypes(self):
+
+        if self.converter.framework.protocol_name != "pandas":
+            self.skipTest("Test only applies to Pandas")
+
+        sample_schema = self.sample_schema()
+        sample_data = self.sample_data()
+
+        table = pa.Table.from_pydict(sample_data, sample_schema)  # noqa
+        df = self.converter.from_internal(table)
+
+        expect_dtypes = [
+
+            pd.BooleanDtype(),
+            pd.Int64Dtype(),
+
+            # Pandas float dtype is only available from Pandas 1.2 onward, fallback is original NumPy float dtype
+            pd.Float64Dtype() if "Float64Dtype" in pd.__dict__ else pd.api.types.pandas_dtype(float),
+
+            # No special Dtype for decimals, these will just show up as objects
+            pd.api.types.pandas_dtype(object),
+
+            # Strings have a dedicated dtype!
+            pd.StringDtype(),
+
+            # Date/time types being converted as NumPy native (datetime64[ns])
+            _data.PandasArrowConverter.pandas_date_type(),
+            _data.PandasArrowConverter.pandas_datetime_type()]
+
+        # .astype("datetime64[ms]") coming through in Pandas 2
+
+        self.assertListEqual(expect_dtypes, df.dtypes.to_list())
+
+    # Special tests for Pandas date / time handling
+
+    def test_pandas_date(self):
+
+        temporal_converter = _data.PandasArrowConverter(self.framework, use_temporal_objects=False)
+
+        df = pd.DataFrame({"date_field": [pd.Timestamp(1970, 1, 1)]})
+
+        schema = self.one_field_schema(_meta.BasicType.DATE)
+        table = temporal_converter.to_internal(df, schema)
+
+        self.assertEqual(schema, table.schema)
+
+    def test_pandas_datetime(self):
+
+        temporal_converter = _data.PandasArrowConverter(self.framework, use_temporal_objects=False)
+
+        df = pd.DataFrame({"datetime_field": [pd.Timestamp(1970, 1, 1, 12, 30, 0)]})
+
+        schema = self.one_field_schema(_meta.BasicType.DATETIME)
+        table = temporal_converter.to_internal(df, schema)
+
+        self.assertEqual(schema, table.schema)
+
+    def test_python_date(self):
+
+        temporal_converter = _data.PandasArrowConverter(self.framework, use_temporal_objects=True)
+
+        df = pd.DataFrame({"date_field": [dt.date(1970, 1, 1)]})
+
+        schema = self.one_field_schema(_meta.BasicType.DATE)
+        table = temporal_converter.to_internal(df, schema)
+
+        self.assertEqual(schema, table.schema)
+
+    def test_python_datetime(self):
+
+        temporal_converter = _data.PandasArrowConverter(self.framework, use_temporal_objects=True)
+
+        df = pd.DataFrame({"datetime_field": [dt.datetime(1970, 1, 1, 12, 30, 0)]})
+
+        schema = self.one_field_schema(_meta.BasicType.DATETIME)
+        table = temporal_converter.to_internal(df, schema)
+
+        self.assertEqual(schema, table.schema)
+
+
+class PolarsDataConverterTest(unittest.TestCase, DataConverterSuite):
+
+    framework = _data.DataConverter.get_framework(_data.polars.DataFrame())
+    converter = _data.PolarsArrowConverter(framework)
+
+
+
+
+
 class DataConformanceTest(unittest.TestCase):
 
     @classmethod
@@ -365,8 +405,8 @@ class DataConformanceTest(unittest.TestCase):
 
     def test_fields_exact_match(self):
 
-        schema = DataMappingTest.sample_schema()
-        table = pa.Table.from_pydict(DataMappingTest.sample_data(), DataMappingTest.sample_schema())  # noqa
+        schema = DataConverterSuite.sample_schema()
+        table = pa.Table.from_pydict(DataConverterSuite.sample_data(), DataConverterSuite.sample_schema())  # noqa
         conformed = _data.DataConformance.conform_to_schema(table, schema)
 
         self.assertEqual(schema, table.schema)
@@ -374,7 +414,7 @@ class DataConformanceTest(unittest.TestCase):
 
     def test_fields_missing(self):
         
-        schema = DataMappingTest.sample_schema()
+        schema = DataConverterSuite.sample_schema()
 
         table = pa.Table.from_pydict(  # noqa
             {"boolean_field": [True, False, True, False]},  # noqa
@@ -384,7 +424,7 @@ class DataConformanceTest(unittest.TestCase):
 
     def test_fields_missing_near_match(self):
 
-        schema = DataMappingTest.one_field_schema(_meta.BasicType.BOOLEAN)
+        schema = DataConverterSuite.one_field_schema(_meta.BasicType.BOOLEAN)
 
         table = pa.Table.from_pydict(  # noqa
             {"boolean_field_": [True, False, True, False]},  # noqa
@@ -394,15 +434,15 @@ class DataConformanceTest(unittest.TestCase):
 
     def test_fields_extra_dropped(self):
 
-        sample_schema = DataMappingTest.sample_schema()
+        sample_schema = DataConverterSuite.sample_schema()
         sample_schema = pa.schema([
             ("integer_field_2", pa.int64()),
             *zip(sample_schema.names, sample_schema.types)])
 
-        sample_data = DataMappingTest.sample_data()
+        sample_data = DataConverterSuite.sample_data()
         sample_data["integer_field_2"] = sample_data["integer_field"]
 
-        schema = DataMappingTest.sample_schema()
+        schema = DataConverterSuite.sample_schema()
         table = pa.Table.from_pydict(sample_data, sample_schema)  # noqa
         conformed = _data.DataConformance.conform_to_schema(table, schema)
 
@@ -411,7 +451,7 @@ class DataConformanceTest(unittest.TestCase):
 
     def test_fields_case_insensitive_match(self):
 
-        schema = DataMappingTest.one_field_schema(_meta.BasicType.BOOLEAN)
+        schema = DataConverterSuite.one_field_schema(_meta.BasicType.BOOLEAN)
 
         table = pa.Table.from_pydict(  # noqa
             {"BOOLeaN_fIEld": [True, False, True, False]},  # noqa
@@ -424,11 +464,11 @@ class DataConformanceTest(unittest.TestCase):
 
     def test_fields_ordering(self):
 
-        sample_schema = DataMappingTest.sample_schema()
+        sample_schema = DataConverterSuite.sample_schema()
         sample_schema = pa.schema(reversed(list(zip(sample_schema.names, sample_schema.types))))
 
-        schema = DataMappingTest.sample_schema()
-        table = pa.Table.from_pydict(DataMappingTest.sample_data(), sample_schema)  # noqa
+        schema = DataConverterSuite.sample_schema()
+        table = pa.Table.from_pydict(DataConverterSuite.sample_data(), sample_schema)  # noqa
         conformed = _data.DataConformance.conform_to_schema(table, schema)
 
         self.assertNotEqual(schema, table.schema)
@@ -436,49 +476,49 @@ class DataConformanceTest(unittest.TestCase):
 
     def test_fields_duplicate_in_schema(self):
 
-        schema = DataMappingTest.sample_schema()
+        schema = DataConverterSuite.sample_schema()
         schema = pa.schema([
             *zip(schema.names, schema.types),
             ("integer_field", pa.int64())])
 
-        table = pa.Table.from_pydict(DataMappingTest.sample_data(), DataMappingTest.sample_schema())  # noqa
+        table = pa.Table.from_pydict(DataConverterSuite.sample_data(), DataConverterSuite.sample_schema())  # noqa
 
         self.assertRaises(_ex.EDataConformance, lambda: _data.DataConformance.conform_to_schema(table, schema))
 
     def test_fields_duplicate_in_schema_case_insensitive(self):
 
-        schema = DataMappingTest.sample_schema()
+        schema = DataConverterSuite.sample_schema()
         schema = pa.schema([
             *zip(schema.names, schema.types),
             ("inTEGer_fiEld", pa.int64())])
 
-        table = pa.Table.from_pydict(DataMappingTest.sample_data(), DataMappingTest.sample_schema())  # noqa
+        table = pa.Table.from_pydict(DataConverterSuite.sample_data(), DataConverterSuite.sample_schema())  # noqa
 
         self.assertRaises(_ex.EDataConformance, lambda: _data.DataConformance.conform_to_schema(table, schema))
 
     def test_fields_duplicate_in_data(self):
 
-        sample_schema = DataMappingTest.sample_schema()
+        sample_schema = DataConverterSuite.sample_schema()
         sample_schema = pa.schema([
             *zip(sample_schema.names, sample_schema.types),
             ("integer_field", pa.int64())])
 
-        schema = DataMappingTest.sample_schema()
-        table = pa.Table.from_pydict(DataMappingTest.sample_data(), sample_schema)  # noqa
+        schema = DataConverterSuite.sample_schema()
+        table = pa.Table.from_pydict(DataConverterSuite.sample_data(), sample_schema)  # noqa
 
         self.assertRaises(_ex.EDataConformance, lambda: _data.DataConformance.conform_to_schema(table, schema))
 
     def test_fields_duplicate_in_data_case_insensitive(self):
 
-        sample_schema = DataMappingTest.sample_schema()
+        sample_schema = DataConverterSuite.sample_schema()
         sample_schema = pa.schema([
             *zip(sample_schema.names, sample_schema.types),
             ("iNTEgeR_FieLd", pa.int64())])
 
-        sample_data = DataMappingTest.sample_data()
+        sample_data = DataConverterSuite.sample_data()
         sample_data["iNTEgeR_FieLd"] = sample_data["integer_field"]
 
-        schema = DataMappingTest.sample_schema()
+        schema = DataConverterSuite.sample_schema()
         table = pa.Table.from_pydict(sample_data, sample_schema)  # noqa
 
         self.assertRaises(_ex.EDataConformance, lambda: _data.DataConformance.conform_to_schema(table, schema))
@@ -511,7 +551,7 @@ class DataConformanceTest(unittest.TestCase):
                 dt.datetime(2000, 1, 3, 2, 2, 2), dt.datetime(2000, 1, 4, 3, 3, 3)]
         }
 
-        schema = DataMappingTest.sample_schema()
+        schema = DataConverterSuite.sample_schema()
         table = pa.Table.from_pydict(sample_data, sample_schema)  # noqa
         conformed = _data.DataConformance.conform_to_schema(table, schema)
 
@@ -520,13 +560,13 @@ class DataConformanceTest(unittest.TestCase):
 
     def test_not_null_constraint(self):
 
-        trac_schema = copy.deepcopy(DataMappingTest.TRAC_SCHEMA)
+        trac_schema = copy.deepcopy(DataConverterSuite.TRAC_SCHEMA)
         trac_schema.table.fields[1].notNull = True  # noqa
 
         sample_schema = _data.DataMapping.trac_to_arrow_schema(trac_schema)
 
         # Null value in the boolean field should be fine
-        sample_data = DataMappingTest.sample_data()
+        sample_data = DataConverterSuite.sample_data()
         sample_data["boolean_field"][0] = None  # noqa
 
         table = pa.Table.from_pydict(sample_data, sample_schema)  # noqa
@@ -541,7 +581,7 @@ class DataConformanceTest(unittest.TestCase):
 
     def test_boolean_same_type(self):
 
-        schema = DataMappingTest.one_field_schema(_meta.BasicType.BOOLEAN)
+        schema = DataConverterSuite.one_field_schema(_meta.BasicType.BOOLEAN)
         table = pa.Table.from_pydict({"boolean_field": [True, False, True, False]}, pa.schema([("boolean_field", pa.bool_())]))  # noqa
 
         conformed = _data.DataConformance.conform_to_schema(table, schema)
@@ -551,7 +591,7 @@ class DataConformanceTest(unittest.TestCase):
 
     def test_boolean_wrong_type(self):
 
-        schema = DataMappingTest.one_field_schema(_meta.BasicType.BOOLEAN)
+        schema = DataConverterSuite.one_field_schema(_meta.BasicType.BOOLEAN)
 
         table = pa.Table.from_pydict({"boolean_field": [1.0, 2.0, 3.0, 4.0]})  # noqa
         self.assertRaises(_ex.EDataConformance, lambda: _data.DataConformance.conform_to_schema(table, schema))
@@ -562,7 +602,7 @@ class DataConformanceTest(unittest.TestCase):
 
     def test_integer_same_type(self):
 
-        schema = DataMappingTest.one_field_schema(_meta.BasicType.INTEGER)
+        schema = DataConverterSuite.one_field_schema(_meta.BasicType.INTEGER)
         table = pa.Table.from_pydict({"integer_field": [1, 2, 3, 4]})  # noqa
 
         conformed = _data.DataConformance.conform_to_schema(table, schema)
@@ -1038,15 +1078,16 @@ class DataConformanceTest(unittest.TestCase):
         d64 = ("f", pa.date64())
 
         df = pd.DataFrame({"f": pd.to_datetime([dt.date(2001, 1, 1)])})
+        converter = _data.DataConverter.for_dataset(df)
 
         # Conform should be applied inside DataMapping, allowing for conversion of NumPy native dates datetime64[ns]
 
         schema = pa.schema([d32])
-        conformed = _data.DataMapping.pandas_to_arrow(df, schema)
+        conformed = converter.to_internal(df, schema)
         self.assertEqual(schema, conformed.schema)
 
         schema = pa.schema([d64])
-        conformed = _data.DataMapping.pandas_to_arrow(df, schema)
+        conformed = converter.to_internal(df, schema)
         self.assertEqual(schema, conformed.schema)
 
     def test_date_wrong_type(self):
@@ -1213,13 +1254,14 @@ class DataConformanceTest(unittest.TestCase):
     def test_timestamp_from_pandas(self):
 
         df = pd.DataFrame({"f": pd.to_datetime([dt.datetime(2001, 1, 1, 3, 15, 23, 500000)])})
+        converter = _data.DataConverter.for_dataset(df)
 
         def do_test(target_type):
 
             # Conform should be applied inside DataMapping, allowing for conversion of NumPy native dates datetime64[ns]
 
             schema = pa.schema([target_type])
-            conformed = _data.DataMapping.pandas_to_arrow(df, schema)
+            conformed = converter.to_internal(df, schema)
             self.assertEqual(schema, conformed.schema)
 
         ts1 = ("f", pa.timestamp("s"))

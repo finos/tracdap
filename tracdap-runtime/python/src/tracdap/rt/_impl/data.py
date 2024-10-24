@@ -381,6 +381,11 @@ class DataConverter(tp.Generic[T_DATA_API, T_INTERNAL_DATA, T_INTERNAL_SCHEMA]):
 
         raise _ex.EPluginNotAvailable(f"Data framework [{framework}] is not recognized")
 
+    @classmethod
+    def for_dataset(cls, dataset: _api.DATA_API) -> "DataConverter[_api.DATA_API, pa.Table, pa.Schema]":
+
+        return cls.for_framework(cls.get_framework(dataset))
+
     def __init__(self, framework: _api.DataFramework[T_DATA_API]):
         self.framework = framework
 
