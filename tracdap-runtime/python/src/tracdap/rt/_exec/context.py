@@ -524,9 +524,6 @@ class TracContextErrorReporter:
 
 class TracContextValidator(TracContextErrorReporter):
 
-    __VALID_IDENTIFIER = re.compile("^[a-zA-Z_]\\w*$",)
-    __RESERVED_IDENTIFIER = re.compile("^(trac_|_)\\w*")
-
     def __init__(
             self, log: logging.Logger,
             model_def: _meta.ModelDefinition,
