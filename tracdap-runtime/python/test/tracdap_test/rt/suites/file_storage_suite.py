@@ -30,7 +30,7 @@ _util.configure_logging()
 # For testing, alias to secrets.token_bytes if it is not available (available since 3.6)
 if "randbytes" not in random.__dict__:
     import secrets
-    random.__dict__["randbytes"] = secrets.token_bytes
+    setattr(random, "randbytes", secrets.token_bytes)
 
 
 class FileOperationsTestSuite:
@@ -1089,10 +1089,6 @@ class FileReadWriteTestSuite:
     # That means all handles/streams/locks are closed and for write operation partially written files are removed
     # It is difficult to verify this using the abstracted storage API!
     # These tests look for common symptoms of resource leaks that may catch some common errors
-    #
-    # Error states in the streams are checked directly by mocking/spying on the Java Flow API
-    # E.g. Illegal state and cancellation exceptions are checked explicitly
-    # This is different from the functional tests, which unwrap stream state errors to look for EStorage errors
     #
     # Using the storage API it is not possible to simulate errors that occur in the storage back end
     # E.g. loss of connection to a storage service or disk full during a write operation

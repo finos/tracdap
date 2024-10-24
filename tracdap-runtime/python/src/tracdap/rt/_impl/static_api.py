@@ -15,6 +15,7 @@
 import typing as _tp
 import types as _ts
 
+import tracdap.rt.api.experimental as _api
 import tracdap.rt.metadata as _meta
 import tracdap.rt.exceptions as _ex
 import tracdap.rt._impl.data as _data
@@ -153,20 +154,14 @@ class StaticApiImpl(_StaticApiHook):
 
         return _schemas.SchemaLoader.load_schema(package, schema_file)
 
-    def infer_schema(self, dataset: _tp.Any) -> _meta.SchemaDefinition:
+    def infer_schema(self, dataset: _api.DATA_API) -> _meta.SchemaDefinition:
 
-        if _data.pandas and isinstance(dataset, _data.pandas.DataFrame):
-            arrow_schema = _data.DataMapping.pandas_to_arrow_schema(dataset)
+        _val.validate_signature(self.infer_schema, dataset)
 
-        elif _data.polars and isinstance(dataset, _data.polars.DataFrame):
-            arrow_schema = _data.DataMapping.polars_to_arrow_schema(dataset)
+        framework = _data.DataConverter.get_framework(dataset)
+        converter = _data.DataConverter.for_framework(framework)
 
-        else:
-            dataset_type = f"{type(dataset).__module__}.{type(dataset).__name__}"
-            message = f"Schema inference is not available for dataset type [{dataset_type}]"
-            raise _ex.ERuntimeValidation(message)
-
-        return _data.DataMapping.arrow_to_trac_schema(arrow_schema)
+        return converter.infer_schema(dataset)
 
     def define_input_table(
             self, *fields: _tp.Union[_meta.FieldSchema, _tp.List[_meta.FieldSchema]],

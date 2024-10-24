@@ -44,8 +44,19 @@ def check_type(expected_type: tp.Type, value: tp.Any) -> bool:
     return _TypeValidator.check_type(expected_type, value)
 
 
+def type_name(type_: tp.Type, qualified: bool) -> str:
+    return _TypeValidator._type_name(type_, qualified)  # noqa
+
+
 def quick_validate_model_def(model_def: meta.ModelDefinition):
     StaticValidator.quick_validate_model_def(model_def)
+
+
+T_SKIP_VAL = tp.TypeVar("T_SKIP_VAL")
+
+class SkipValidation(tp.Generic[T_SKIP_VAL]):
+    def __init__(self, skip_type: tp.Type[T_SKIP_VAL]):
+        self.skip_type = skip_type
 
 
 class _TypeValidator:
@@ -56,28 +67,28 @@ class _TypeValidator:
 
     # Cache method signatures to avoid inspection on every call
     # Inspecting a function signature can take ~ half a second in Python 3.7
-    __method_cache: tp.Dict[str, inspect.Signature] = dict()
+    __method_cache: tp.Dict[str, tp.Tuple[inspect.Signature, tp.Any]] = dict()
 
     _log: logging.Logger = util.logger_for_namespace(__name__)
 
     @classmethod
     def validate_signature(cls, method: tp.Callable, *args, **kwargs):
 
-        if method.__name__ in cls.__method_cache:
-            signature = cls.__method_cache[method.__name__]
+        if method.__qualname__ in cls.__method_cache:
+            signature, hints = cls.__method_cache[method.__qualname__]
         else:
             signature = inspect.signature(method)
-            cls.__method_cache[method.__name__] = signature
+            hints = tp.get_type_hints(method)
+            cls.__method_cache[method.__qualname__] = signature, hints
 
-        hints = tp.get_type_hints(method)
-
+        named_params = list(signature.parameters.keys())
         positional_index = 0
 
         for param_name, param in signature.parameters.items():
 
             param_type = hints.get(param_name)
 
-            values = cls._select_arg(method.__name__, param, positional_index, *args, **kwargs)
+            values = cls._select_arg(method.__name__, param, positional_index, named_params, *args, **kwargs)
             positional_index += len(values)
 
             for value in values:
@@ -86,11 +97,12 @@ class _TypeValidator:
     @classmethod
     def validate_return_type(cls, method: tp.Callable, value: tp.Any):
 
-        if method.__name__ in cls.__method_cache:
-            signature = cls.__method_cache[method.__name__]
+        if method.__qualname__ in cls.__method_cache:
+            signature, hints = cls.__method_cache[method.__qualname__]
         else:
             signature = inspect.signature(method)
-            cls.__method_cache[method.__name__] = signature
+            hints = tp.get_type_hints(method)
+            cls.__method_cache[method.__qualname__] = signature, hints
 
         correct_type = cls._validate_type(signature.return_annotation, value)
 
@@ -107,7 +119,7 @@ class _TypeValidator:
 
     @classmethod
     def _select_arg(
-            cls, method_name: str, parameter: inspect.Parameter, positional_index,
+            cls, method_name: str, parameter: inspect.Parameter, positional_index, named_params,
             *args, **kwargs) -> tp.List[tp.Any]:
 
         if parameter.kind == inspect.Parameter.POSITIONAL_ONLY:
@@ -152,7 +164,7 @@ class _TypeValidator:
 
         if parameter.kind == inspect.Parameter.VAR_KEYWORD:
 
-            raise ex.ETracInternal("Validation of VAR_KEYWORD params is not supported yet")
+            return [arg for kw, arg in kwargs.items() if kw not in named_params]
 
         raise ex.EUnexpected("Invalid method signature in runtime API (this is a bug)")
 
@@ -179,6 +191,12 @@ class _TypeValidator:
 
         if expected_type == tp.Any:
             return True
+
+        # Sometimes we need to validate a partial set of arguments
+        # Explicitly passing a SkipValidation value allows for this
+        if isinstance(value, SkipValidation):
+            if value.skip_type == expected_type:
+                return True
 
         if isinstance(expected_type, cls.__generic_metaclass):
 
@@ -216,7 +234,30 @@ class _TypeValidator:
                     all(map(lambda k: cls._validate_type(key_type, k), value.keys())) and \
                     all(map(lambda v: cls._validate_type(value_type, v), value.values()))
 
+            if origin.__module__.startswith("tracdap.rt.api."):
+                return isinstance(value, origin)
+
             raise ex.ETracInternal(f"Validation of [{origin.__name__}] generic parameters is not supported yet")
+
+        # Support for generic type variables
+        if isinstance(expected_type, tp.TypeVar):
+
+            # If there are any constraints or a bound, those must be honoured
+
+            constraints =  util.get_constraints(expected_type)
+            bound = util.get_bound(expected_type)
+
+            if constraints:
+                if not any(map(lambda c: type(value) == c, constraints)):
+                    return False
+
+            if bound:
+                if not isinstance(value, bound):
+                    return False
+
+            # So long as constraints / bound are ok, any type matches a generic type var
+            return True
+
 
         # Validate everything else as a concrete type
 
@@ -237,7 +278,10 @@ class _TypeValidator:
                 return f"Named[{named_type}]"
 
             if origin is tp.Union:
-                return "|".join(map(cls._type_name, args))
+                if len(args) == 2 and args[1] == type(None):
+                    return f"Optional[{cls._type_name(args[0])}]"
+                else:
+                    return "|".join(map(cls._type_name, args))
 
             if origin is list:
                 list_type = cls._type_name(args[0])

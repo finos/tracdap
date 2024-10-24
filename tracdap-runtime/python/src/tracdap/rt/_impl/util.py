@@ -262,6 +262,16 @@ def get_args(metaclass: type):
         return None
 
 
+def get_constraints(metaclass: tp.TypeVar):
+
+    return metaclass.__constraints__ or None
+
+
+def get_bound(metaclass: tp.TypeVar):
+
+    return metaclass.__bound__ or None
+
+
 def try_clean_dir(dir_path: pathlib.Path, remove: bool = False) -> bool:
 
     normalized_path = windows_unc_path(dir_path)

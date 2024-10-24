@@ -22,56 +22,63 @@ from tracdap.rt.api import *
 from .hook import _StaticApiHook
 
 
-_DATA_FRAMEWORK = _tp.TypeVar('_DATA_FRAMEWORK')
+_PROTOCOL = _tp.TypeVar('_PROTOCOL')
 
+@_dc.dataclass(frozen=True)
+class _Protocol(_tp.Generic[_PROTOCOL]):
 
-class _DataFramework(_tp.Generic[_DATA_FRAMEWORK]):
-
-    PANDAS: "_DataFramework"
-    POLARS: "_DataFramework"
-
-    def __init__(self, framework_name, framework_type: _DATA_FRAMEWORK):
-        self.__framework_name = framework_name
-        self.__framework_type = framework_type
+    protocol_name: str
+    api_type: _tp.Type[_PROTOCOL]
 
     def __str__(self):
-        return self.__framework_name
+        return self.protocol_name
 
 
-if _tp.TYPE_CHECKING:
+def __pandas_api_type() -> "_tp.Type[pandas.DataFrame]":
+    try:
+        import pandas
+        return pandas.DataFrame
+    except ModuleNotFoundError:
+        return None  # noqa
 
-    if pandas:
-        _DataFramework.PANDAS = _DataFramework('pandas', pandas.DataFrame)
-        """The original Python dataframe library, most widely used"""
-    else:
-        _DataFramework.PANDAS = _DataFramework('pandas', None)
-        """Pandas data framework is not installed"""
+def __polars_api_type() -> "_tp.Type[polars.DataFrame]":
+    try:
+        import polars
+        return polars.DataFrame
+    except ModuleNotFoundError:
+        return None  # noqa
 
-    if polars:
-        _DataFramework.POLARS = _DataFramework('polars', polars.DataFrame)
-        """A modern, fast and simple alternative to Pandas"""
-    else:
-        _DataFramework.POLARS = _DataFramework('polars', None)
-        """Polars data framework is not installed"""
+DATA_API = _tp.TypeVar('DATA_API', __pandas_api_type(), __polars_api_type())
 
-else:
+class DataFramework(_Protocol[DATA_API]):
 
-    _DataFramework.PANDAS = _DataFramework('pandas', None)
-    _DataFramework.POLARS = _DataFramework('polars', None)
+    def __init__(self, protocol_name: str, api_type: _tp.Type[DATA_API]):
+        super().__init__(protocol_name, api_type)
 
-PANDAS = _DataFramework.PANDAS
-POLARS = _DataFramework.POLARS
+    @classmethod
+    def pandas(cls) -> "DataFramework[pandas.DataFrame]":
+        return DataFramework("pandas", DATA_API.__constraints__[0])
+
+    @classmethod
+    def polars(cls) -> "DataFramework[polars.DataFrame]":
+        return DataFramework("polars", DATA_API.__constraints__[1])
+
+PANDAS = DataFramework.pandas()
+"""Data framework constant for the Pandas data library"""
+
+POLARS = DataFramework.polars()
+"""Data framework constant for the Polars data library"""
 
 
 class TracContext(TracContext):
 
     @_abc.abstractmethod
-    def get_table(self, dataset_name: str, framework: _DataFramework[_DATA_FRAMEWORK]) -> _DATA_FRAMEWORK:
+    def get_table(self, dataset_name: str, framework: DataFramework[DATA_API]) -> DATA_API:
 
         pass
 
     @_abc.abstractmethod
-    def put_table(self, dataset_name: str, dataset: _DATA_FRAMEWORK):
+    def put_table(self, dataset_name: str, dataset: DATA_API):
 
         pass
 
@@ -81,7 +88,7 @@ def init_static():
     _static_impl.StaticApiImpl.register_impl()
 
 
-def infer_schema(dataset: _tp.Any) -> SchemaDefinition:
+def infer_schema(dataset: DATA_API) -> SchemaDefinition:
     sa = _StaticApiHook.get_instance()
     return sa.infer_schema(dataset)
 
