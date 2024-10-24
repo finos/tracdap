@@ -340,7 +340,7 @@ class DataConverter(tp.Generic[T_DATA_API, T_DATA_INTERNAL]):
 
     # Available per-framework args, to enable framework-specific type-checking in public APIs
     # These should (for a purist point of view) be in the individual converter classes
-    # For now there are only a few converters and they are all defined here, so this is OK
+    # For now there are only a few converters, they are all defined here so this is OK
     __FRAMEWORK_ARGS = {
         _api.PANDAS: {"use_temporal_objects": tp.Optional[bool]},
         _api.POLARS: {}
@@ -678,7 +678,7 @@ class DataConformance:
         # Columns not defined in the schema will not be included in the conformed output
         if warn_extra_columns and table.num_columns > len(schema.types):
 
-            schema_columns = set(map(str.lower, schema.names))
+            schema_columns = set(map(lambda c: c.lower(), schema.names))
             extra_columns = [
                 f"[{col}]"
                 for col in table.schema.names
