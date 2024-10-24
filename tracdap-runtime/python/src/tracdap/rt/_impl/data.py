@@ -350,10 +350,10 @@ class DataConverter(tp.Generic[T_DATA_API, T_INTERNAL_DATA, T_INTERNAL_SCHEMA]):
     @classmethod
     def get_framework(cls, dataset: _api.DATA_API) -> _api.DataFramework[_api.DATA_API]:
 
-        if pandas and isinstance(dataset, pandas.DataFrame):
+        if pandas is not None and isinstance(dataset, pandas.DataFrame):
             return _api.PANDAS
 
-        if polars and isinstance(dataset, polars.DataFrame):
+        if polars is not None and isinstance(dataset, polars.DataFrame):
             return _api.POLARS
 
         data_api_type = f"{type(dataset).__module__}.{type(dataset).__name__}"
@@ -402,184 +402,190 @@ class DataConverter(tp.Generic[T_DATA_API, T_INTERNAL_DATA, T_INTERNAL_SCHEMA]):
         pass
 
 
-class PandasArrowConverter(DataConverter[pandas.DataFrame, pa.Table, pa.Schema]):
+# Data frameworks are optional, do not blow up the module just because one framework is unavailable!
+if pandas is not None:
 
-    # Check the Pandas dtypes for handling floats are available before setting up the type mapping
-    __PANDAS_VERSION_ELEMENTS = pandas.__version__.split(".")
-    __PANDAS_MAJOR_VERSION = int(__PANDAS_VERSION_ELEMENTS[0])
-    __PANDAS_MINOR_VERSION = int(__PANDAS_VERSION_ELEMENTS[1])
+    class PandasArrowConverter(DataConverter[pandas.DataFrame, pa.Table, pa.Schema]):
 
-    if __PANDAS_MAJOR_VERSION == 2:
+        # Check the Pandas dtypes for handling floats are available before setting up the type mapping
+        __PANDAS_VERSION_ELEMENTS = pandas.__version__.split(".")
+        __PANDAS_MAJOR_VERSION = int(__PANDAS_VERSION_ELEMENTS[0])
+        __PANDAS_MINOR_VERSION = int(__PANDAS_VERSION_ELEMENTS[1])
 
-        __PANDAS_DATE_TYPE = pandas.to_datetime([dt.date(2000, 1, 1)]).as_unit(DataMapping.DEFAULT_TIMESTAMP_UNIT).dtype
-        __PANDAS_DATETIME_TYPE = pandas.to_datetime([dt.datetime(2000, 1, 1, 0, 0, 0)]).as_unit(DataMapping.DEFAULT_TIMESTAMP_UNIT).dtype
+        if __PANDAS_MAJOR_VERSION == 2:
 
+            __PANDAS_DATE_TYPE = pandas.to_datetime([dt.date(2000, 1, 1)]).as_unit(DataMapping.DEFAULT_TIMESTAMP_UNIT).dtype
+            __PANDAS_DATETIME_TYPE = pandas.to_datetime([dt.datetime(2000, 1, 1, 0, 0, 0)]).as_unit(DataMapping.DEFAULT_TIMESTAMP_UNIT).dtype
+
+            @classmethod
+            def __pandas_datetime_type(cls, tz, unit):
+                if tz is None and unit is None:
+                    return cls.__PANDAS_DATETIME_TYPE
+                _unit = unit if unit is not None else DataMapping.DEFAULT_TIMESTAMP_UNIT
+                if tz is None:
+                    return pandas.to_datetime([dt.datetime(2000, 1, 1, 0, 0, 0)]).as_unit(_unit).dtype
+                else:
+                    return pandas.DatetimeTZDtype(tz=tz, unit=_unit)
+
+        # Minimum supported version for Pandas is 1.2, when pandas.Float64Dtype was introduced
+        elif __PANDAS_MAJOR_VERSION == 1 and __PANDAS_MINOR_VERSION >= 2:
+
+            __PANDAS_DATE_TYPE = pandas.to_datetime([dt.date(2000, 1, 1)]).dtype
+            __PANDAS_DATETIME_TYPE = pandas.to_datetime([dt.datetime(2000, 1, 1, 0, 0, 0)]).dtype
+
+            @classmethod
+            def __pandas_datetime_type(cls, tz, unit):  # noqa
+                if tz is None:
+                    return cls.__PANDAS_DATETIME_TYPE
+                else:
+                    return pandas.DatetimeTZDtype(tz=tz)
+
+        else:
+            raise _ex.EStartup(f"Pandas version not supported: [{pandas.__version__}]")
+
+        # Only partial mapping is possible, decimal and temporal dtypes cannot be mapped this way
+        __ARROW_TO_PANDAS_TYPE_MAPPING = {
+            pa.bool_(): pandas.BooleanDtype(),
+            pa.int8(): pandas.Int8Dtype(),
+            pa.int16(): pandas.Int16Dtype(),
+            pa.int32(): pandas.Int32Dtype(),
+            pa.int64(): pandas.Int64Dtype(),
+            pa.uint8(): pandas.UInt8Dtype(),
+            pa.uint16(): pandas.UInt16Dtype(),
+            pa.uint32(): pandas.UInt32Dtype(),
+            pa.uint64(): pandas.UInt64Dtype(),
+            pa.float16(): pandas.Float32Dtype(),
+            pa.float32(): pandas.Float32Dtype(),
+            pa.float64(): pandas.Float64Dtype(),
+            pa.string(): pandas.StringDtype(),
+            pa.utf8(): pandas.StringDtype()
+        }
+
+        __DEFAULT_TEMPORAL_OBJECTS = False
+
+        # Expose date type for testing
         @classmethod
-        def __pandas_datetime_type(cls, tz, unit):
-            if tz is None and unit is None:
-                return cls.__PANDAS_DATETIME_TYPE
-            _unit = unit if unit is not None else DataMapping.DEFAULT_TIMESTAMP_UNIT
-            if tz is None:
-                return pandas.to_datetime([dt.datetime(2000, 1, 1, 0, 0, 0)]).as_unit(_unit).dtype
-            else:
-                return pandas.DatetimeTZDtype(tz=tz, unit=_unit)
+        def pandas_date_type(cls):
+            return cls.__PANDAS_DATE_TYPE
 
-    # Minimum supported version for Pandas is 1.2, when pandas.Float64Dtype was introduced
-    elif __PANDAS_MAJOR_VERSION == 1 and __PANDAS_MINOR_VERSION >= 2:
-
-        __PANDAS_DATE_TYPE = pandas.to_datetime([dt.date(2000, 1, 1)]).dtype
-        __PANDAS_DATETIME_TYPE = pandas.to_datetime([dt.datetime(2000, 1, 1, 0, 0, 0)]).dtype
-
+        # Expose datetime type for testing
         @classmethod
-        def __pandas_datetime_type(cls, tz, unit):  # noqa
-            if tz is None:
-                return cls.__PANDAS_DATETIME_TYPE
+        def pandas_datetime_type(cls, tz=None, unit=None):
+            return cls.__pandas_datetime_type(tz, unit)
+
+        def __init__(self, framework: _api.DataFramework[T_DATA_API], use_temporal_objects: tp.Optional[bool] = None):
+            super().__init__(framework)
+            if use_temporal_objects is None:
+                self.__temporal_objects_flag = self.__DEFAULT_TEMPORAL_OBJECTS
             else:
-                return pandas.DatetimeTZDtype(tz=tz)
+                self.__temporal_objects_flag = use_temporal_objects
 
-    else:
-        raise _ex.EStartup(f"Pandas version not supported: [{pandas.__version__}]")
+        def from_internal(self, table: pa.Table, schema: tp.Optional[pa.Schema] = None) -> pandas.DataFrame:
 
-    # Only partial mapping is possible, decimal and temporal dtypes cannot be mapped this way
-    __ARROW_TO_PANDAS_TYPE_MAPPING = {
-        pa.bool_(): pandas.BooleanDtype(),
-        pa.int8(): pandas.Int8Dtype(),
-        pa.int16(): pandas.Int16Dtype(),
-        pa.int32(): pandas.Int32Dtype(),
-        pa.int64(): pandas.Int64Dtype(),
-        pa.uint8(): pandas.UInt8Dtype(),
-        pa.uint16(): pandas.UInt16Dtype(),
-        pa.uint32(): pandas.UInt32Dtype(),
-        pa.uint64(): pandas.UInt64Dtype(),
-        pa.float16(): pandas.Float32Dtype(),
-        pa.float32(): pandas.Float32Dtype(),
-        pa.float64(): pandas.Float64Dtype(),
-        pa.string(): pandas.StringDtype(),
-        pa.utf8(): pandas.StringDtype()
-    }
+            if schema is not None:
+                table = DataConformance.conform_to_schema(table, schema, warn_extra_columns=False)
+            else:
+                DataConformance.check_duplicate_fields(table.schema.names, False)
 
-    __DEFAULT_TEMPORAL_OBJECTS = False
+                # Use Arrow's built-in function to convert to Pandas
+            return table.to_pandas(
 
-    # Expose date type for testing
-    @classmethod
-    def pandas_date_type(cls):
-        return cls.__PANDAS_DATE_TYPE
+                # Mapping for arrow -> pandas types for core types
+                types_mapper=self.__ARROW_TO_PANDAS_TYPE_MAPPING.get,
 
-    # Expose datetime type for testing
-    @classmethod
-    def pandas_datetime_type(cls, tz=None, unit=None):
-        return cls.__pandas_datetime_type(tz, unit)
+                # Use Python objects for dates and times if temporal_objects_flag is set
+                date_as_object=self.__temporal_objects_flag,  # noqa
+                timestamp_as_object=self.__temporal_objects_flag,  # noqa
 
-    def __init__(self, framework: _api.DataFramework[T_DATA_API], use_temporal_objects: tp.Optional[bool] = None):
-        super().__init__(framework)
-        if use_temporal_objects is None:
-            self.__temporal_objects_flag = self.__DEFAULT_TEMPORAL_OBJECTS
-        else:
-            self.__temporal_objects_flag = use_temporal_objects
+                # Do not bring any Arrow metadata into Pandas dataframe
+                ignore_metadata=True,  # noqa
 
-    def from_internal(self, table: pa.Table, schema: tp.Optional[pa.Schema] = None) -> pandas.DataFrame:
+                # Do not consolidate memory across columns when preparing the Pandas vectors
+                # This is a significant performance win for very wide datasets
+                split_blocks=True)  # noqa
 
-        if schema is not None:
-            table = DataConformance.conform_to_schema(table, schema, warn_extra_columns=False)
-        else:
-            DataConformance.check_duplicate_fields(table.schema.names, False)
+        def to_internal(self, df: pandas.DataFrame, schema: tp.Optional[pa.Schema] = None) -> pa.Table:
 
-            # Use Arrow's built-in function to convert to Pandas
-        return table.to_pandas(
+            # Converting pandas -> arrow needs care to ensure type coercion is applied correctly
+            # Calling Table.from_pandas with the supplied schema will very often reject data
+            # Instead, we convert the dataframe as-is and then apply type conversion in a second step
+            # This allows us to apply specific coercion rules for each data type
 
-            # Mapping for arrow -> pandas types for core types
-            types_mapper=self.__ARROW_TO_PANDAS_TYPE_MAPPING.get,
+            # As an optimisation, the column filter means columns will not be converted if they are not needed
+            # E.g. if a model outputs lots of undeclared columns, there is no need to convert them
 
-            # Use Python objects for dates and times if temporal_objects_flag is set
-            date_as_object=self.__temporal_objects_flag,  # noqa
-            timestamp_as_object=self.__temporal_objects_flag,  # noqa
+            column_filter = DataConformance.column_filter(df.columns, schema)  # noqa
 
-            # Do not bring any Arrow metadata into Pandas dataframe
-            ignore_metadata=True,  # noqa
+            if len(df) > 0:
 
-            # Do not consolidate memory across columns when preparing the Pandas vectors
-            # This is a significant performance win for very wide datasets
-            split_blocks=True)  # noqa
+                table = pa.Table.from_pandas(df, columns=column_filter, preserve_index=False)  # noqa
 
-    def to_internal(self, df: pandas.DataFrame, schema: tp.Optional[pa.Schema] = None) -> pa.Table:
+            # Special case handling for converting an empty dataframe
+            # These must flow through the pipe with valid schemas, like any other dataset
+            # Type coercion and column filtering happen in conform_to_schema, if a schema has been supplied
 
-        # Converting pandas -> arrow needs care to ensure type coercion is applied correctly
-        # Calling Table.from_pandas with the supplied schema will very often reject data
-        # Instead, we convert the dataframe as-is and then apply type conversion in a second step
-        # This allows us to apply specific coercion rules for each data type
+            else:
 
-        # As an optimisation, the column filter means columns will not be converted if they are not needed
-        # E.g. if a model outputs lots of undeclared columns, there is no need to convert them
+                empty_df = df.filter(column_filter) if column_filter else df
+                empty_schema = pa.Schema.from_pandas(empty_df, preserve_index=False)  # noqa
 
-        column_filter = DataConformance.column_filter(df.columns, schema)  # noqa
+                table = pa.Table.from_batches(list(), empty_schema)  # noqa
 
-        if len(df) > 0:
+            # If there is no explict schema, give back the table exactly as it was received from Pandas
+            # There could be an option here to infer and coerce for TRAC standard types
+            # E.g. unsigned int 32 -> signed int 64, TRAC standard integer type
 
-            table = pa.Table.from_pandas(df, columns=column_filter, preserve_index=False)  # noqa
+            if schema is None:
+                DataConformance.check_duplicate_fields(table.schema.names, False)
+                return table
 
-        # Special case handling for converting an empty dataframe
-        # These must flow through the pipe with valid schemas, like any other dataset
-        # Type coercion and column filtering happen in conform_to_schema, if a schema has been supplied
+            # If a schema has been supplied, apply data conformance
+            # If column filtering has been applied, we also need to filter the pandas dtypes used for hinting
 
-        else:
+            else:
+                df_types = df.dtypes.filter(column_filter) if column_filter else df.dtypes
+                return DataConformance.conform_to_schema(table, schema, df_types)
 
-            empty_df = df.filter(column_filter) if column_filter else df
-            empty_schema = pa.Schema.from_pandas(empty_df, preserve_index=False)  # noqa
+        def infer_schema(self, dataset: pandas.DataFrame) -> _meta.SchemaDefinition:
 
-            table = pa.Table.from_batches(list(), empty_schema)  # noqa
-
-        # If there is no explict schema, give back the table exactly as it was received from Pandas
-        # There could be an option here to infer and coerce for TRAC standard types
-        # E.g. unsigned int 32 -> signed int 64, TRAC standard integer type
-
-        if schema is None:
-            DataConformance.check_duplicate_fields(table.schema.names, False)
-            return table
-
-        # If a schema has been supplied, apply data conformance
-        # If column filtering has been applied, we also need to filter the pandas dtypes used for hinting
-
-        else:
-            df_types = df.dtypes.filter(column_filter) if column_filter else df.dtypes
-            return DataConformance.conform_to_schema(table, schema, df_types)
-
-    def infer_schema(self, dataset: pandas.DataFrame) -> _meta.SchemaDefinition:
-
-        arrow_schema = pa.Schema.from_pandas(dataset, preserve_index=False)  # noqa
-        return DataMapping.arrow_to_trac_schema(arrow_schema)
+            arrow_schema = pa.Schema.from_pandas(dataset, preserve_index=False)  # noqa
+            return DataMapping.arrow_to_trac_schema(arrow_schema)
 
 
-class PolarsArrowConverter(DataConverter[polars.DataFrame, pa.Table, pa.Schema]):
+# Data frameworks are optional, do not blow up the module just because one framework is unavailable!
+if polars is not None:
 
-    def __init__(self, framework: _api.DataFramework[T_DATA_API]):
-        super().__init__(framework)
+    class PolarsArrowConverter(DataConverter[polars.DataFrame, pa.Table, pa.Schema]):
 
-    def from_internal(self, table: pa.Table, schema: tp.Optional[pa.Schema] = None) -> polars.DataFrame:
+        def __init__(self, framework: _api.DataFramework[T_DATA_API]):
+            super().__init__(framework)
 
-        if schema is not None:
-            table = DataConformance.conform_to_schema(table, schema, warn_extra_columns=False)
-        else:
-            DataConformance.check_duplicate_fields(table.schema.names, False)
+        def from_internal(self, table: pa.Table, schema: tp.Optional[pa.Schema] = None) -> polars.DataFrame:
 
-        return polars.from_arrow(table)
+            if schema is not None:
+                table = DataConformance.conform_to_schema(table, schema, warn_extra_columns=False)
+            else:
+                DataConformance.check_duplicate_fields(table.schema.names, False)
 
-    def to_internal(self, df: polars.DataFrame, schema: tp.Optional[pa.Schema] = None,) -> pa.Table:
+            return polars.from_arrow(table)
 
-        column_filter = DataConformance.column_filter(df.columns, schema)
+        def to_internal(self, df: polars.DataFrame, schema: tp.Optional[pa.Schema] = None,) -> pa.Table:
 
-        filtered_df = df.select(polars.col(*column_filter)) if column_filter else df
-        table = filtered_df.to_arrow()
+            column_filter = DataConformance.column_filter(df.columns, schema)
 
-        if schema is None:
-            DataConformance.check_duplicate_fields(table.schema.names, False)
-            return table
-        else:
-            return DataConformance.conform_to_schema(table, schema, None)
+            filtered_df = df.select(polars.col(*column_filter)) if column_filter else df
+            table = filtered_df.to_arrow()
 
-    def infer_schema(self, dataset: T_DATA_API) -> _meta.SchemaDefinition:
+            if schema is None:
+                DataConformance.check_duplicate_fields(table.schema.names, False)
+                return table
+            else:
+                return DataConformance.conform_to_schema(table, schema, None)
 
-        arrow_schema = dataset.top_k(1).to_arrow().schema
-        return DataMapping.arrow_to_trac_schema(arrow_schema)
+        def infer_schema(self, dataset: T_DATA_API) -> _meta.SchemaDefinition:
+
+            arrow_schema = dataset.top_k(1).to_arrow().schema
+            return DataMapping.arrow_to_trac_schema(arrow_schema)
 
 
 class DataConformance:
