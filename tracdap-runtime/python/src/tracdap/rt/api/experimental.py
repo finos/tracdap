@@ -179,6 +179,32 @@ class TracFileStorage:
             stream.write(data)
 
 
+class TracDataStorage(_tp.Generic[DATA_API]):
+
+    @_abc.abstractmethod
+    def has_table(self, table_name: str) -> bool:
+        pass
+
+    @_abc.abstractmethod
+    def list_tables(self) -> _tp.List[str]:
+        pass
+
+    @_abc.abstractmethod
+    def create_table(self, table_name: str, schema: SchemaDefinition):
+        pass
+
+    @_abc.abstractmethod
+    def read_table(self, table_name: str) -> DATA_API:
+        pass
+
+    @_abc.abstractmethod
+    def write_table(self, table_name: str, dataset: DATA_API):
+        pass
+
+    @_abc.abstractmethod
+    def native_read_query(self, query: str, **parameters) -> DATA_API:
+        pass
+
 
 class TracDataContext(TracContext):
 
@@ -187,7 +213,7 @@ class TracDataContext(TracContext):
         pass
 
     @_abc.abstractmethod
-    def get_data_storage(self, storage_key: str) -> None:
+    def get_data_storage(self, storage_key: str, framework: DataFramework[DATA_API], **framework_args) -> TracDataStorage[DATA_API]:
         pass
 
     @_abc.abstractmethod
