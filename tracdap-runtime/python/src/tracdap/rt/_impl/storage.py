@@ -32,8 +32,8 @@ import tracdap.rt._impl.data as _data
 import tracdap.rt._impl.util as _util
 import tracdap.rt._impl.validation as _val
 
-# Import storage interfaces
-from tracdap.rt.ext.storage import *
+# Import storage interfaces (using the internal version, it has extra bits that are not public)
+from tracdap.rt._impl.ext.storage import *
 
 
 class FormatManager:
