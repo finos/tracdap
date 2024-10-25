@@ -13,7 +13,6 @@
 #  limitations under the License.
 
 import logging
-import typing as tp
 import unittest
 import decimal
 import datetime
@@ -27,62 +26,7 @@ import tracdap.rt._impl.data as _data  # noqa
 
 from tracdap.rt._exec.context import TracContextImpl  # noqa
 
-
-class _TestModel(_api.TracModel):
-
-    def define_parameters(self) -> tp.Dict[str, _api.ModelParameter]:
-
-        return _api.define_parameters(
-
-            _api.P("boolean_param", _api.BasicType.BOOLEAN,
-                   label="A boolean param",
-                   default_value=False),
-
-            _api.P("integer_param", _api.BasicType.INTEGER,
-                   label="An integer param",
-                   default_value=1),
-
-            _api.P("float_param", _api.BasicType.FLOAT,
-                   label="A float param",
-                   default_value=1.0),
-
-            _api.P("decimal_param", _api.BasicType.DECIMAL,
-                   label="A decimal param",
-                   default_value=1.0),
-
-            _api.P("string_param", _api.BasicType.STRING,
-                   label="A string param",
-                   default_value="hello"),
-
-            _api.P("date_param", _api.BasicType.DATE,
-                   label="A date param",
-                   default_value="2000-01-01"),  # type coercion string -> date
-
-            _api.P("datetime_param", _api.BasicType.DATETIME,
-                   label="A datetime param",
-                   default_value=datetime.datetime.now()))  # Using Python datetime values also works
-
-    def define_inputs(self) -> tp.Dict[str, _api.ModelInputSchema]:
-
-        customer_loans = _api.define_input_table(
-            _api.F("id", _api.BasicType.STRING, label="Customer account ID", business_key=True),
-            _api.F("loan_amount", _api.BasicType.DECIMAL, label="Principal loan amount", format_code="CCY:EUR"),
-            _api.F("total_pymnt", _api.BasicType.DECIMAL, label="Total amount repaid", format_code="CCY:EUR"),
-            _api.F("region", _api.BasicType.STRING, label="Customer home region", categorical=True),
-            _api.F("loan_condition_cat", _api.BasicType.INTEGER, label="Loan condition category", categorical=True))
-
-        return {"customer_loans": customer_loans}
-
-    def define_outputs(self) -> tp.Dict[str, _api.ModelOutputSchema]:
-
-        profit_by_region = _api.define_output_table(
-            _api.F("region", _api.BasicType.STRING, label="Customer home region", categorical=True),
-            _api.F("gross_profit", _api.BasicType.DECIMAL, label="Total gross profit", format_code="CCY:USD"))
-
-        return {"profit_by_region": profit_by_region}
-
-    def run_model(self, ctx: _api.TracContext):
-        pass
+import tracdap_test.resources.test_models as test_models
 
 
 _api_hook.StaticApiImpl.register_impl()
@@ -90,11 +34,11 @@ _test_model_def = _api.ModelDefinition(
 
     language="python",
     repository="trac_integrated",
-    entryPoint=f"{_TestModel.__module__}.{_TestModel.__name__}",
+    entryPoint=f"{test_models.TestModel.__module__}.{test_models.TestModel.__name__}",
 
-    parameters=_TestModel().define_parameters(),
-    inputs=_TestModel().define_inputs(),
-    outputs=_TestModel().define_outputs())
+    parameters=test_models.TestModel().define_parameters(),
+    inputs=test_models.TestModel().define_inputs(),
+    outputs=test_models.TestModel().define_outputs())
 
 
 class TracContextTest(unittest.TestCase):
@@ -166,7 +110,7 @@ class TracContextTest(unittest.TestCase):
 
         local_ctx = {**params, **data}
 
-        self.ctx = TracContextImpl(_test_model_def, _TestModel, local_ctx)
+        self.ctx = TracContextImpl(_test_model_def, test_models.TestModel, local_ctx)
 
     # Getting params
 
