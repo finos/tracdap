@@ -12,46 +12,46 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import abc
-import typing as tp
+import abc as _abc
+import typing as _tp
 
 from tracdap.rt.ext.storage import *  # noqa
 
 
-T_DATA = tp.TypeVar("T_DATA")
-T_SCHEMA = tp.TypeVar("T_SCHEMA")
+T_DATA = _tp.TypeVar("T_DATA")
+T_SCHEMA = _tp.TypeVar("T_SCHEMA")
 
 
-class IDataStorageBase(tp.Generic[T_DATA, T_SCHEMA], abc.ABC):
+class IDataStorageBase(_tp.Generic[T_DATA, T_SCHEMA], _abc.ABC):
 
-    @abc.abstractmethod
-    def data_type(self) -> tp.Type[T_DATA]:
+    @_abc.abstractmethod
+    def data_type(self) -> _tp.Type[T_DATA]:
         pass
 
-    @abc.abstractmethod
-    def schema_type(self) -> tp.Type[T_SCHEMA]:
+    @_abc.abstractmethod
+    def schema_type(self) -> _tp.Type[T_SCHEMA]:
         pass
 
-    @abc.abstractmethod
+    @_abc.abstractmethod
     def has_table(self, table_name: str) -> bool:
         pass
 
-    @abc.abstractmethod
-    def list_tables(self) -> tp.List[str]:
+    @_abc.abstractmethod
+    def list_tables(self) -> _tp.List[str]:
         pass
 
-    @abc.abstractmethod
+    @_abc.abstractmethod
     def create_table(self, table_name: str, schema: T_SCHEMA):
         pass
 
-    @abc.abstractmethod
+    @_abc.abstractmethod
     def read_table(self, table_name: str) -> T_DATA:
         pass
 
-    @abc.abstractmethod
+    @_abc.abstractmethod
     def write_table(self, table_name: str, records: T_DATA):
         pass
 
-    @abc.abstractmethod
+    @_abc.abstractmethod
     def native_read_query(self, query: str, **parameters) -> T_DATA:
         pass
