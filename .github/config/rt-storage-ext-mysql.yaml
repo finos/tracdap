@@ -7,7 +7,7 @@ storage:
     data_integration:
       protocol: SQL
       properties:
-        dialect: MARIADB
+        dialect: MYSQL
         driver.python: alchemy
         alchemy.url: mysql+pymysql://metadb:3306/trac
         alchemy.username: trac_admin
