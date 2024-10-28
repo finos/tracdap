@@ -101,3 +101,75 @@ jobs:
           name: junit-test-results
           path: build/modules/*/reports/**
           retention-days: 7
+
+  int-storage--python:
+
+    name: int-storage-python-${{ inputs.dialect }}
+
+    env:
+      BUILD_sql_${{ inputs.dialect }}: true
+      TRAC_RT_SYS_CONFIG: ".github/config/rt-storage-ext-${{ inputs.dialect }}.yaml"
+
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    container:
+      image: ubuntu:latest
+
+    services:
+
+      metadb:
+
+        image: ${{ inputs.db_image }}
+        ports:
+          - ${{ inputs.db_port }}:${{ inputs.db_port }}
+        options: ${{ inputs.db_options }}
+
+        # DB container needs various env vars defined in the matrix
+        env: ${{ fromJson( inputs.matrix ) }}
+
+    steps:
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Pre-process config
+        env: ${{ fromJson( inputs.matrix ) }}
+        run: |
+          sed -i "/\$\{DB_SECRET\}/, /${DB_SECRET}/p" ${TRAC_RT_SYS_CONFIG}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Upgrade PIP
+        run: |
+          python -m venv ./venv
+          . ./venv/bin/activate
+          python -m pip install --upgrade pip
+
+      # Filter plugin dependencies, only install for the plugin being tested
+      # This prevents dependency issues in one plugin affecting all the others
+      - name: Select plugin dependencies
+        run: |
+          cd tracdap-runtime/python
+          sed -n '/BEGIN_PLUGIN sql/, /END_PLUGIN sql/p' requirements_plugins.txt > requirements_selected.txt
+
+      - name: Install dependencies
+        run: |
+          . ./venv/bin/activate
+          cd tracdap-runtime/python
+          pip install -r requirements.txt
+          pip install -r requirements_selected.txt
+
+      - name: Protoc code generation
+        run: |
+          . ./venv/bin/activate
+          python tracdap-runtime/python/build_runtime.py --target codegen
+
+      - name: Integration tests
+        env: ${{ vars }}
+        run: |
+          . ./venv/bin/activate
+          python tracdap-runtime/python/build_runtime.py --target integration --pattern int_storage_sql*.py
