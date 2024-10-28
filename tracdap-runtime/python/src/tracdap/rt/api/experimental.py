@@ -235,7 +235,7 @@ class TracDataContext(TracContext):
         pass
 
     @_abc.abstractmethod
-    def set_source_metadata(self, dataset_key: str, storage_key: str, source_info: FileStat):
+    def set_source_metadata(self, dataset_key: str, storage_key: str, source_info: _tp.Union[FileStat, str]):
         pass
 
     @_abc.abstractmethod

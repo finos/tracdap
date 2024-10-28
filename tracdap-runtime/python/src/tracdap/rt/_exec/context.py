@@ -354,15 +354,30 @@ class TracDataContextImpl(TracContextImpl, _eapi.TracDataContext):
         self.__local_ctx[dataset_name] = _data.DataView.create_empty()
         self.__dynamic_outputs.append(dataset_name)
 
-    def set_source_metadata(self, dataset_name: str, storage_key: str, source_info: _eapi.FileStat):
+    def set_source_metadata(self, dataset_name: str, storage_key: str, source_info: tp.Union[_eapi.FileStat, str]):
 
-        _val.validate_signature(self.add_data_import, dataset_name, storage_key, source_info)
+        _val.validate_signature(self.set_source_metadata, dataset_name, storage_key, source_info)
+
+        self.__val.check_dataset_valid_identifier(dataset_name)
+        self.__val.check_dataset_available_in_context(dataset_name)
+        self.__val.check_storage_valid_identifier(storage_key)
+        self.__val.check_storage_available(self.__storage_map, storage_key)
+
+        storage = self.__storage_map[storage_key]
+
+        if isinstance(storage, _eapi.TracFileStorage):
+            if not isinstance(source_info, _eapi.FileStat):
+                self.__val.report_public_error(f"Expected storage_info to be a FileStat, [{storage_key}] refers to file storage")
+
+        if isinstance(storage, _eapi.TracDataStorage):
+            if not isinstance(source_info, str):
+                self.__val.report_public_error(f"Expected storage_info to be a table name, [{storage_key}] refers to dadta storage")
 
         pass  # Not implemented yet, only required when imports are sent back to the platform
 
     def set_attribute(self, dataset_name: str, attribute_name: str, value: tp.Any):
 
-        _val.validate_signature(self.add_data_import, dataset_name, attribute_name, value)
+        _val.validate_signature(self.set_attribute, dataset_name, attribute_name, value)
 
         pass  # Not implemented yet, only required when imports are sent back to the platform
 
