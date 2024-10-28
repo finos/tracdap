@@ -154,7 +154,6 @@ class TracRuntime:
                 _plugins.PluginManager.register_plugin_package(plugin_package)
 
             _static_api.StaticApiImpl.register_impl()
-            _guard.PythonGuardRails.protect_dangerous_functions()
 
             # Load sys config (or use embedded), config errors are detected before start()
             # Job config can also be checked before start() by using load_job_config()
@@ -200,6 +199,11 @@ class TracRuntime:
 
             self._models = _models.ModelLoader(self._sys_config, self._scratch_dir)
             self._storage = _storage.StorageManager(self._sys_config)
+
+            # Enable protection after the initial setup of the runtime is complete
+            # Storage plugins in particular are likely to tigger protected imports
+            # Once the runtime is up, no more plugins should be loaded
+            _guard.PythonGuardRails.protect_dangerous_functions()
 
             self._engine = _engine.TracEngine(
                 self._sys_config, self._models, self._storage,
