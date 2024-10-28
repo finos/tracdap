@@ -339,7 +339,7 @@ class TracDataContextImpl(TracContextImpl, _eapi.TracDataContext):
         # Create a shallow copy of the storage impl with a converter for the requested data framework
         # At some point we will need a storage factory class, bc the internal data API can also be different
         storage = copy.copy(storage)
-        storage._TracDataContextImpl__converter = converter
+        storage._TracDataStorageImpl__converter = converter
 
         return storage
 
@@ -525,7 +525,7 @@ class TracDataStorageImpl(_eapi.TracDataStorage[_eapi.DATA_API]):
 
         self.__has_table = lambda tn: storage_impl.has_table(tn)
         self.__list_tables = lambda: storage_impl.list_tables()
-        self.__read_table = lambda tn, s: storage_impl.read_table(tn, s)
+        self.__read_table = lambda tn: storage_impl.read_table(tn)
         self.__native_read_query = lambda q, ps: storage_impl.native_read_query(q, **ps)
 
         if write_access:
@@ -577,17 +577,16 @@ class TracDataStorageImpl(_eapi.TracDataStorage[_eapi.DATA_API]):
         except _ex.EStorageRequest as e:
             self.__val.report_public_error(e)
 
-    def read_table(self, table_name: str, schema: tp.Optional[_api.SchemaDefinition] = None) -> _eapi.DATA_API:
+    def read_table(self, table_name: str) -> _eapi.DATA_API:
 
-        _val.validate_signature(self.read_table, table_name, schema)
+        _val.validate_signature(self.read_table, table_name)
 
         self.__val.check_operation_available(self.read_table, self.__read_table)
         self.__val.check_table_name_is_valid(table_name)
         self.__val.check_table_name_not_reserved(table_name)
 
         try:
-            arrow_schema = _data.DataMapping.trac_to_arrow_schema(schema)
-            raw_data = self.__read_table(table_name, arrow_schema)
+            raw_data = self.__read_table(table_name)
             return self.__converter.from_internal(raw_data)
 
         except _ex.EStorageRequest as e:
@@ -600,6 +599,7 @@ class TracDataStorageImpl(_eapi.TracDataStorage[_eapi.DATA_API]):
         self.__val.check_operation_available(self.native_read_query, self.__native_read_query)
 
         # TODO: validate query and parameters
+        # Some validation is performed by the impl
 
         try:
             raw_data = self.__native_read_query(query, **parameters)

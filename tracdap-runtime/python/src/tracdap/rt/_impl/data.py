@@ -414,6 +414,10 @@ class DataConverter(tp.Generic[T_DATA_API, T_INTERNAL_DATA, T_INTERNAL_SCHEMA]):
 
         return cls.for_framework(cls.get_framework(dataset))
 
+    @classmethod
+    def noop(cls) -> "DataConverter[T_INTERNAL_DATA, T_INTERNAL_DATA, T_INTERNAL_SCHEMA]":
+        return NoopConverter()
+
     def __init__(self, framework: _api.DataFramework[T_DATA_API]):
         self.framework = framework
 
@@ -428,6 +432,21 @@ class DataConverter(tp.Generic[T_DATA_API, T_INTERNAL_DATA, T_INTERNAL_SCHEMA]):
     @abc.abstractmethod
     def infer_schema(self, dataset: T_DATA_API) -> _meta.SchemaDefinition:
         pass
+
+
+class NoopConverter(DataConverter[T_INTERNAL_DATA, T_INTERNAL_DATA, T_INTERNAL_SCHEMA]):
+
+    def __init__(self):
+        super().__init__(_api.DataFramework("internal", None))  # noqa
+
+    def from_internal(self, dataset: T_INTERNAL_DATA, schema: tp.Optional[T_INTERNAL_SCHEMA] = None) -> T_DATA_API:
+        return dataset
+
+    def to_internal(self, dataset: T_DATA_API, schema: tp.Optional[T_INTERNAL_SCHEMA] = None) -> T_INTERNAL_DATA:
+        return dataset
+
+    def infer_schema(self, dataset: T_DATA_API) -> _meta.SchemaDefinition:
+        raise _ex.EUnexpected()  # A real converter should be selected before use
 
 
 # Data frameworks are optional, do not blow up the module just because one framework is unavailable!
