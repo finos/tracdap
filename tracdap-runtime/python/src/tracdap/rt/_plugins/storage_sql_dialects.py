@@ -30,7 +30,7 @@ class MySqlDialect(ISqlDialect):
     def arrow_to_sql_type(self, arrow_type: pa.DataType) -> str:
 
         if pa.types.is_boolean(arrow_type):
-            return "bit"
+            return "boolean"
 
         if pa.types.is_integer(arrow_type):
             return "bigint"
