@@ -185,7 +185,6 @@ jobs:
           python tracdap-runtime/python/build_runtime.py --target codegen
 
       - name: Integration tests
-        env: ${{ vars }}
         run: |
           . ./venv/bin/activate
           python tracdap-runtime/python/build_runtime.py --target integration --pattern int_storage_sql*.py
