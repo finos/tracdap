@@ -11,4 +11,4 @@ storage:
         driver.python: alchemy
         alchemy.url: postgresql+pg8000://metadb:5432/trac
         alchemy.username: trac_admin
-        alchemy.password: ${DB_SECRET}
+        alchemy.password: DB_SECRET

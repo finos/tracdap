@@ -136,7 +136,7 @@ jobs:
       - name: Pre-process config
         env: ${{ fromJson( inputs.matrix ) }}
         run: |
-          sed -i "/\$\{DB_SECRET\}/, /${DB_SECRET}/p" ${TRAC_RT_SYS_CONFIG}
+          sed -i "s#DB_SECRET#${DB_SECRET}#" ${TRAC_RT_SYS_CONFIG}
 
       - name: Set up Python
         uses: actions/setup-python@v5
