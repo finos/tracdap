@@ -120,6 +120,7 @@ class SqlDataStorage(IDataStorageBase[pa.Table, pa.Schema]):
 
             with self._connection() as conn, self._cursor(conn) as cur:
                 cur.execute(create_stmt, [])
+                conn.commit()  # Some drivers / dialects (Postgres) require commit for create table
 
     def read_table(self, table_name: str) -> pa.Table:
 
@@ -160,8 +161,6 @@ class SqlDataStorage(IDataStorageBase[pa.Table, pa.Schema]):
             insert_stmt = f"insert into {table_name}({insert_fields}) values ({insert_markers})"  # noqa
 
             with self._connection() as conn:
-
-
 
                 # Use execute many to perform a batch write
                 with self._cursor(conn) as cur:
@@ -229,8 +228,8 @@ plugins.PluginManager.register_plugin(IStorageProvider, SqlStorageProvider, ["SQ
 
 try:
 
-    import sqlalchemy as sqla
-    import sqlalchemy.exc as sqla_exc
+    import sqlalchemy as sqla  # noqa
+    import sqlalchemy.exc as sqla_exc  # noqa
 
     class SqlAlchemyDriver(ISqlDriver):
 
