@@ -109,7 +109,7 @@ class DbApiWrapper:
         def fetchone(self) -> _tp.Tuple:
             pass
 
-        def fetchmany(self, size: int = arraysize) -> _tp.List[_tp.Tuple]:
+        def fetchmany(self, size: int = arraysize) -> _tp.Sequence[_tp.Tuple]:
             pass
 
         def close(self):

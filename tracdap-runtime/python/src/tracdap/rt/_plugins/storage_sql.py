@@ -143,26 +143,27 @@ class SqlDataStorage(IDataStorageBase[pa.Table, pa.Schema]):
             with self._connection() as conn, self._cursor(conn) as cur:
 
                 cur.execute(query, parameters)
+                sql_batch = cur.fetchmany()
 
                 # Read queries should always return a result set, even if it is empty
                 if not cur.description or cur.rowcount < 0:
                     raise ex.EStorage(f"Query did not return a result set: {query}")
 
-                result_schema = self._decode_sql_schema(cur.description)
-
+                arrow_schema = self._decode_sql_schema(cur.description)
                 arrow_batches: tp.List[pa.RecordBatch] = []
-                sql_batch = cur.fetchmany()
 
                 while len(sql_batch) > 0:
 
-                    arrow_batch = self._decode_sql_batch(result_schema, sql_batch)
+                    arrow_batch = self._decode_sql_batch(arrow_schema, sql_batch)
                     arrow_batches.append(arrow_batch)
 
-                    result_schema = arrow_batch.schema
+                    # Sometimes the schema is not fully defined up front (because cur.description is not sufficient)
+                    # If type information has been inferred from the batch, update the schema accordingly
+                    arrow_schema = arrow_batch.schema
 
                     sql_batch = cur.fetchmany()
 
-                return pa.Table.from_batches(arrow_batches, result_schema)  # noqa
+                return pa.Table.from_batches(arrow_batches, arrow_schema)  # noqa
 
     def write_table(self, table_name: str, table: pa.Table):
 
@@ -360,18 +361,29 @@ try:
             @property
             def description(self):
 
-                if self.__result is not None and self.__result.cursor is not None and self.__result.returns_rows:
+                # Prefer description from the underlying cursor if available
+                if self.__result.cursor is not None and self.__result.cursor.description:
                     return self.__result.cursor.description
-                else:
+
+                if not self.__result.returns_rows:
                     return None
+
+                # SQL Alchemy sometimes closes the cursor and the description is lost
+                # Fall back on using the Result API to generate a description with field names only
+
+                def name_only_field_desc(field_name):
+                    return field_name, None, None, None, None, None, None
+
+                return list(map(name_only_field_desc, self.__result.keys()))
 
             @property
             def rowcount(self) -> int:
 
-                if self.__result is not None and self.__result.cursor is not None:
+                # Prefer the value from the underlying cursor if it is available
+                if self.__result.cursor is not None:
                     return self.__result.cursor.rowcount
-                else:
-                    return -1
+
+                return self.__result.rowcount  # noqa
 
             def execute(self, statement: str, parameters: tp.Union[tp.Dict, tp.Sequence]):
 
@@ -386,9 +398,10 @@ try:
 
             def fetchone(self) -> tp.Tuple:
 
-                return self.__result.fetchone().tuple()
+                row = self.__result.fetchone()
+                return row.tuple() if row is not None else None
 
-            def fetchmany(self, size: int = arraysize) -> tp.List[tp.Tuple]:
+            def fetchmany(self, size: int = arraysize) -> tp.Sequence[tp.Tuple]:
 
                 sqla_rows = self.__result.fetchmany(self.arraysize)
                 return list(map(sqla.Row.tuple, sqla_rows))  # noqa
