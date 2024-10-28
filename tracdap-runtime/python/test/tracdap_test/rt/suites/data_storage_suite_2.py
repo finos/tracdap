@@ -399,51 +399,51 @@ class DataStorageSuite2:
 
         self.skipTest("Primary key mapping is not supported yet")
 
-    def test_native_query_ok(self):
+    def test_native_read_query_ok(self):
 
         original_schema = self.sample_schema()
         original_data = self.sample_data()
 
-        self.storage.create_table("test_native_query_ok", original_schema)
-        self.storage.write_table("test_native_query_ok", original_data)
+        self.storage.create_table("test_native_read_query_ok", original_schema)
+        self.storage.write_table("test_native_read_query_ok", original_data)
 
-        query = "select * from test_native_query_ok where integer_field >= :cutoff"  # noqa
+        query = "select * from test_native_read_query_ok where integer_field >= :cutoff"  # noqa
         result = self.storage.native_read_query(query, cutoff=3)
 
         self.assertEqual(original_data.schema, result.schema)
         self.assertEqual(2, len(result))
 
-    def test_native_query_missing_table(self):
+    def test_native_read_query_missing_table(self):
 
-        query = "select * from test_native_query_missing_table where integer_field >= :cutoff"  # noqa
-
-        self.assertRaises(
-            _ex.EStorageRequest, lambda:
-            self.storage.native_read_query(query, cutoff=3))
-
-    def test_native_query_bad_query(self):
-
-        original_schema = self.sample_schema()
-        original_data = self.sample_data()
-
-        self.storage.create_table("test_native_query_bad_query", original_schema)
-        self.storage.write_table("test_native_query_bad_query", original_data)
-
-        query = "select * wombat from test_native_query_bad_query where integer_field >= :cutoff"  # noqa
+        query = "select * from test_native_read_query_missing_table where integer_field >= :cutoff"  # noqa
 
         self.assertRaises(
             _ex.EStorageRequest, lambda:
             self.storage.native_read_query(query, cutoff=3))
 
-    def test_native_query_bad_parameters(self):
+    def test_native_read_query_bad_query(self):
 
         original_schema = self.sample_schema()
         original_data = self.sample_data()
 
-        self.storage.create_table("test_native_query_bad_parameters", original_schema)
-        self.storage.write_table("test_native_query_bad_parameters", original_data)
+        self.storage.create_table("test_native_read_query_bad_query", original_schema)
+        self.storage.write_table("test_native_read_query_bad_query", original_data)
 
-        query = "select * from test_native_query_bad_parameters where integer_field >= :cutoff"  # noqa
+        query = "select * wombat from test_native_read_query_bad_query where integer_field >= :cutoff"  # noqa
+
+        self.assertRaises(
+            _ex.EStorageRequest, lambda:
+            self.storage.native_read_query(query, cutoff=3))
+
+    def test_native_read_query_bad_parameters(self):
+
+        original_schema = self.sample_schema()
+        original_data = self.sample_data()
+
+        self.storage.create_table("test_native_read_query_bad_parameters", original_schema)
+        self.storage.write_table("test_native_read_query_bad_parameters", original_data)
+
+        query = "select * from test_native_read_query_bad_parameters where integer_field >= :cutoff"  # noqa
 
         self.assertRaises(
             _ex.EStorageRequest, lambda:
@@ -456,16 +456,63 @@ class DataStorageSuite2:
                 _ex.EStorageRequest, lambda:
                 self.storage.native_read_query(query, cutoff="wombat"))
 
-    def test_native_query_no_data(self):
+    def test_native_read_query_no_data(self):
 
         original_schema = self.sample_schema()
         original_data = self.sample_data()
 
-        self.storage.create_table("test_native_query_no_data", original_schema)
-        self.storage.write_table("test_native_query_no_data", original_data)
+        self.storage.create_table("test_native_read_query_no_data", original_schema)
+        self.storage.write_table("test_native_read_query_no_data", original_data)
 
-        query = "select * from test_native_query_no_data where integer_field >= :cutoff"  # noqa
+        query = "select * from test_native_read_query_no_data where integer_field >= :cutoff"  # noqa
         result = self.storage.native_read_query(query, cutoff=100)
 
         self.assertEqual(original_data.column_names, result.column_names)
         self.assertEqual(0, len(result))
+
+    def test_native_read_query_write_not_allowed(self):
+
+        table_name = "test_native_read_query_write_not_allowed"
+
+        original_schema = self.one_field_schema(_meta.INTEGER)
+        original_data = pa.Table.from_pydict({"integer_field": [1, 2, 3, 4, 5]}, original_schema)
+
+        self.storage.create_table(table_name, original_schema)
+        self.storage.write_table(table_name, original_data)
+
+        write_queries = [
+            f"insert into {table_name} (integer_field) values (6)",  # noqa
+            f"insert into {table_name} (integer_field) select integer_field from {table_name}",  # noqa
+            f"update {table_name} set integer_field = 7 where integer_field == 1",  # noqa
+            f"delete from {table_name} where integer_field == 2",  # noqa
+
+            f"merge {table_name} as target\n" +
+            f"   using {table_name} as source\n" +
+            f"   on (target.integer_field = source.integer_field)\n" +
+            f"   when matched then update\n" +
+            f"   set target.integer_field = source.integer_field + 1"
+        ]
+
+        for query in write_queries:
+            self.assertRaises(_ex.EStorageRequest, lambda: self.storage.native_read_query(query))
+
+    def test_native_read_query_ddl_not_allowed(self):
+
+        table_name = "test_native_read_query_ddl_not_allowed"
+
+        original_schema = self.one_field_schema(_meta.INTEGER)
+        original_data = pa.Table.from_pydict({"integer_field": [1, 2, 3, 4, 5]}, original_schema)
+
+        self.storage.create_table(table_name, original_schema)
+        self.storage.write_table(table_name, original_data)
+
+        write_queries = [
+            f"create table dodgy_table (integer_field integer)",  # noqa
+            f"create table dodgy_table_2 (integer_field integer) as select * from {table_name}",  # noqa
+            f"alter table {table_name} add column integer_field_2 integer",  # noqa
+            f"drop table {table_name}",
+            f"grant all on {table_name} to joe"
+        ]
+
+        for query in write_queries:
+            self.assertRaises(_ex.EStorageRequest, lambda: self.storage.native_read_query(query))
