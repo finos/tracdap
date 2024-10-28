@@ -84,13 +84,27 @@ class TracContext(TracContext):
 
 
 def init_static():
+    """Ensure TRAC's static model API is available to use (for static definitions at module or class scope)"""
     import tracdap.rt._impl.static_api as _static_impl  # noqa
     _static_impl.StaticApiImpl.register_impl()
 
 
 def infer_schema(dataset: DATA_API) -> SchemaDefinition:
+    """Infer the full TRAC schema of an existing dataset"""
     sa = _StaticApiHook.get_instance()
     return sa.infer_schema(dataset)
+
+
+def array_type(item_type: BasicType) -> TypeDescriptor:
+    """Build a type descriptor for an ARRAY type"""
+    sa = _StaticApiHook.get_instance()
+    return sa.array_type(item_type)
+
+
+def map_type(entry_type: BasicType) -> TypeDescriptor:
+    """Build a type descriptor for a MAP type"""
+    sa = _StaticApiHook.get_instance()
+    return sa.map_type(entry_type)
 
 
 class FileType(_enum.Enum):

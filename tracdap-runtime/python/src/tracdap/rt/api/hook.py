@@ -62,6 +62,16 @@ class _StaticApiHook:
         return cls.__static_api_hook
 
     @_abc.abstractmethod
+    def array_type(self, item_type: _meta.BasicType) -> _meta.TypeDescriptor:
+
+        pass
+
+    @_abc.abstractmethod
+    def map_type(self, entry_type: _meta.BasicType) -> _meta.TypeDescriptor:
+
+        pass
+
+    @_abc.abstractmethod
     def define_attributes(
             self, *attrs: _tp.Union[_meta.TagUpdate, _tp.List[_meta.TagUpdate]]) \
             -> _tp.List[_meta.TagUpdate]:

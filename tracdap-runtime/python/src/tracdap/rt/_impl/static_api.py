@@ -38,6 +38,24 @@ class StaticApiImpl(_StaticApiHook):
         if not _StaticApiHook._is_registered():
             _StaticApiHook._register(StaticApiImpl())
 
+    def array_type(self, item_type: _meta.BasicType) -> _meta.TypeDescriptor:
+
+        _val.validate_signature(self.array_type, item_type)
+
+        if not _val.is_primitive_type(item_type):
+            raise _ex.EModelValidation(f"Arrays can only contain primitive types, [{item_type}] is not primitive")
+
+        return _meta.TypeDescriptor(_meta.BasicType.ARRAY, arrayType=_meta.TypeDescriptor(item_type))
+
+    def map_type(self, entry_type: _meta.BasicType) -> _meta.TypeDescriptor:
+
+        _val.validate_signature(self.map_type, entry_type)
+
+        if not _val.is_primitive_type(entry_type):
+            raise _ex.EModelValidation(f"Maps can only contain primitive types, [{entry_type}] is not primitive")
+
+        return _meta.TypeDescriptor(_meta.BasicType.MAP, arrayType=_meta.TypeDescriptor(entry_type))
+
     def define_attribute(
             self, attr_name: str, attr_value: _tp.Any,
             attr_type: _tp.Optional[_meta.BasicType] = None,
