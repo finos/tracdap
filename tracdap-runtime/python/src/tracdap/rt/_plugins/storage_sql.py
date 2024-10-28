@@ -34,7 +34,7 @@ import tracdap.rt._impl.data as _data
 class SqlDataStorage(IDataStorageBase[pa.Table, pa.Schema]):
 
     DIALECT_PROPERTY = "dialect"
-    DRIVER_PROPERTY = "python.driver"
+    DRIVER_PROPERTY = "driver.python"
 
     def __init__(self, properties: tp.Dict[str, str], options: dict = None):
 
@@ -42,22 +42,22 @@ class SqlDataStorage(IDataStorageBase[pa.Table, pa.Schema]):
         self._properties = properties
 
         dialect_name = _helpers.get_plugin_property(self._properties, self.DIALECT_PROPERTY)
-        driver_name = _helpers.get_plugin_property(self._properties, self.DRIVER_PROPERTY)
 
         if dialect_name is None:
             raise ex.EConfigLoad(f"Missing required property [{self.DIALECT_PROPERTY}]")
 
-        if driver_name is None:
-            raise ex.EConfigLoad(f"Missing required property [{self.DRIVER_PROPERTY}]")
-
         if not plugins.PluginManager.is_plugin_available(ISqlDialect, dialect_name.lower()):
             raise ex.EPluginNotAvailable(f"SQL dialect [{dialect_name}] is not supported")
+
+        driver_name = _helpers.get_plugin_property(self._properties, self.DRIVER_PROPERTY)
+        if driver_name is None:
+            driver_name = dialect_name
 
         if not plugins.PluginManager.is_plugin_available(ISqlDriver, driver_name):
             raise ex.EPluginNotAvailable(f"SQL driver [{driver_name}] is not available")
 
-        driver_props = self._driver_props()
-        driver_cfg = cfg.PluginConfig(protocol=driver_name, properties=driver_props)
+        driver_props = self._driver_props(driver_name)
+        driver_cfg = cfg.PluginConfig(protocol=driver_name.lower(), properties=driver_props)
         dialect_cfg = cfg.PluginConfig(protocol=dialect_name.lower(), properties={})
 
         self._log.info(f"Loading SQL driver [{driver_name}] for dialect [{dialect_name}]")
@@ -69,12 +69,10 @@ class SqlDataStorage(IDataStorageBase[pa.Table, pa.Schema]):
         with self._connection():
             pass
 
-    def _driver_props(self) -> tp.Dict[str, str]:
+    def _driver_props(self, driver_name: str) -> tp.Dict[str, str]:
 
         driver_props = dict()
-
-        driver = self._properties.get(self.DRIVER_PROPERTY)
-        driver_filter = f"python.{driver}."
+        driver_filter = f"{driver_name}."
 
         for key, value in self._properties.items():
             if key.startswith(driver_filter):

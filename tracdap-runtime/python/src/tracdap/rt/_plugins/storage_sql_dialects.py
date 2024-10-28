@@ -14,6 +14,7 @@
 
 import contextlib
 import typing as tp
+import urllib.parse as urlp
 
 import pyarrow as pa
 
@@ -21,6 +22,7 @@ import tracdap.rt.exceptions as ex
 import tracdap.rt.ext.plugins as plugins
 
 from tracdap.rt._impl.ext.sql import *  # noqa
+from . import _helpers
 
 
 class MySqlDialect(ISqlDialect):
@@ -139,13 +141,24 @@ try:
 
         def __init__(self, properties: tp.Dict[str, str]):
 
-            url = properties.get('url')
+            self._log = _helpers.logger_for_object(self)
 
-            if url is None or url.strip() == '':
+            raw_url = properties.get('url')
+
+            if raw_url is None or raw_url.strip() == '':
                 raise ex.EConfigLoad("Missing required property [url] for SQL driver [alchemy]")
 
+            url = urlp.urlparse(raw_url)
+            credentials = _helpers.get_http_credentials(url, properties)
+            url = _helpers.apply_http_credentials(url, credentials)
+
+            filtered_keys = ["url", "username", "password", "token"]
+            filtered_props = dict(kv for kv in properties.items() if kv[0] not in filtered_keys)
+
+            self._log.info("Connecting: %s", _helpers.log_safe_url(url))
+
             try:
-                self.__engine = sqla.create_engine(**properties)
+                self.__engine = sqla.create_engine(url.geturl(), **filtered_props)
             except ModuleNotFoundError as e:
                 raise ex.EPluginNotAvailable("SQL driver is not available: " + str(e)) from e
 
