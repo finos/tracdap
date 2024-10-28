@@ -89,7 +89,7 @@ class PostgresqlDialect(AnsiStandardDialect):
         return super().arrow_to_sql_type(arrow_type)
 
 
-class SqlServerDialect(ISqlDialect):
+class SqlServerDialect(AnsiStandardDialect):
 
     def __init__(self, properties: tp.Dict[str, str]):
         self._properties = properties
