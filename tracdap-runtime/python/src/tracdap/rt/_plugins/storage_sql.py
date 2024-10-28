@@ -112,11 +112,11 @@ class SqlDataStorage(IDataStorageBase[pa.Table, pa.Schema]):
 
             def type_decl(field: pa.Field):
                 sql_type = self._dialect.arrow_to_sql_type(field.type)
-                null_qualifier = "NULL" if field.nullable else "NOT NULL"
-                return f"{field.name} {sql_type} {null_qualifier}"
+                null_qualifier = " NULL" if field.nullable else " NOT NULL"
+                return f"{field.name} {sql_type}{null_qualifier}"
 
             create_fields = map(lambda i: type_decl(schema.field(i)), range(len(schema.names)))
-            create_stmt = f"create table {table_name} (\n" + ",\n".join(create_fields) + "\n)"
+            create_stmt = f"create table {table_name} (" + ", ".join(create_fields) + ")"
 
             with self._connection() as conn, self._cursor(conn) as cur:
                 cur.execute(create_stmt, [])
@@ -136,7 +136,8 @@ class SqlDataStorage(IDataStorageBase[pa.Table, pa.Schema]):
 
                 cur.execute(query, parameters)
 
-                result_schema = self._driver.get_result_schema(cur)
+                result_description = cur.description
+                result_schema = self._decode_sql_schema(result_description)
 
                 arrow_batches: tp.List[pa.RecordBatch] = []
                 sql_batch = cur.fetchmany()
@@ -173,6 +174,22 @@ class SqlDataStorage(IDataStorageBase[pa.Table, pa.Schema]):
                         pass
 
                 conn.commit()
+
+    @staticmethod
+    def _decode_sql_schema(description: tp.List[tp.Tuple]):
+
+        # TODO: Infer Python / Arrow type using DB API type code
+        # These codes are db-specific so decoding would probably be on a best effort basis
+        # However the information is public for many popular db engines
+        # The current logic can be kept as a fallback (set type info on reading first non-null value)
+
+        def _decode_sql_field(field_desc: tp.Tuple):
+            field_name, type_code, _, _, precision, scale, null_ok = field_desc
+            return pa.field(field_name, pa.null(), null_ok)
+
+        fields = map(_decode_sql_field, description)
+
+        return pa.schema(fields)
 
     def _decode_sql_batch(self, schema: pa.Schema, sql_batch: tp.List[tp.Tuple]) -> pa.RecordBatch:
 
@@ -275,13 +292,6 @@ try:
                 inspection = sqla.inspect(conn)
                 return inspection.get_table_names()
 
-        def get_result_schema(self, cursor: "DbApiWrapper.Cursor") -> tp.List[tp.Tuple[str, pa.DataType]]:
-
-            if not isinstance(cursor, self.CursorWrapper):
-                raise ex.EUnexpected()
-
-            return cursor._get_result_schema()  # noqa
-
         def encode_sql_value(self, py_value: tp.Any) -> tp.Any:
 
             return py_value
@@ -336,6 +346,11 @@ try:
 
                 self.__result = self.__conn.execute(sqla.text(statement), parameters)
 
+            @property
+            def description(self):
+
+                return self.__result.cursor.description
+
             def fetchone(self) -> tp.Tuple:
 
                 return self.__result.fetchone().tuple()
@@ -344,13 +359,6 @@ try:
 
                 sqla_rows = self.__result.fetchmany(self.arraysize)
                 return list(map(sqla.Row.tuple, sqla_rows))  # noqa
-
-            def _get_result_schema(self) -> pa.Schema:
-
-                column_names = self.__result.keys()
-                fields = list(map(lambda c: pa.field(c, pa.null(), nullable=True), column_names))
-
-                return pa.schema(fields)
 
             def close(self):
 

@@ -47,10 +47,6 @@ class ISqlDriver:
         pass
 
     @_abc.abstractmethod
-    def get_result_schema(self, cursor: "DbApiWrapper.Cursor") -> _pa.Schema:
-        pass
-
-    @_abc.abstractmethod
     def error_handling(self) -> _cm.contextmanager:
         pass
 
@@ -95,6 +91,10 @@ class DbApiWrapper:
     class Cursor(_tp.Protocol):
 
         arraysize: int = 1
+
+        @property
+        def description(self) -> tuple:
+            pass
 
         def execute(self, operation: str, parameters: _tp.Union[_tp.Dict, _tp.Sequence]):
             pass
