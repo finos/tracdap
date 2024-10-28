@@ -112,6 +112,43 @@ class BulkDataImport(trac.TracDataImport):
             return filename
 
 
+class SelectiveDataImport(trac.TracDataImport):
+
+    def define_parameters(self) -> tp.Dict[str, trac.ModelParameter]:
+
+        return trac.define_parameters(
+            trac.P("storage_key", trac.STRING, "TRAC external storage key"),
+            trac.P("table_names", trac.array_type(trac.STRING), "List of tables to import"))
+
+    def define_outputs(self) -> tp.Dict[str, trac.ModelOutputSchema]:
+
+        # No pre-defined outputs
+        return dict()
+
+    def run_model(self, ctx: trac.TracDataContext):
+
+        storage_key = ctx.get_parameter("storage_key")
+        storage = ctx.get_data_storage(storage_key, trac.PANDAS)
+
+        table_names = ctx.get_parameter("table_names")
+
+        for table_name in table_names:
+
+            if storage.has_table(table_name):
+
+                table = storage.read_table(table_name)
+                schema = trac.infer_schema(table)
+
+                ctx.add_data_import(table_name)
+                ctx.set_source_metadata(table_name, storage_key, table_name)
+                ctx.set_schema(table_name, schema)
+
+                ctx.put_table(table_name, table)
+
+            else:
+
+                ctx.log().warning(f"Requested table [{table_name}] not found in storage [{storage_key}]")
+
 if __name__ == "__main__":
     import tracdap.rt.launch as launch
     launch.launch_model(BulkDataImport, "config/data_import.yaml", "config/sys_config.yaml")
