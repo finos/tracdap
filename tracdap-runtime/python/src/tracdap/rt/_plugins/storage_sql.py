@@ -37,6 +37,10 @@ class SqlDataStorage(IDataStorageBase[pa.Table, pa.Schema]):
     DIALECT_PROPERTY = "dialect"
     DRIVER_PROPERTY = "driver.python"
 
+    __DQL_KEYWORDS = ["select"]
+    __DML_KEYWORDS = ["insert", "update", "delete", "merge"]
+    __DDL_KEYWORDS = ["create", "alter", "drop", "grant"]
+
     def __init__(self, properties: tp.Dict[str, str]):
 
         self._log = _helpers.logger_for_object(self)
@@ -130,14 +134,21 @@ class SqlDataStorage(IDataStorageBase[pa.Table, pa.Schema]):
 
     def native_read_query(self, query: str, **parameters) -> pa.Table:
 
+        # Real restrictions are enforced in deployment, by permissions granted to service accounts
+        # This is a sanity check to catch common errors before sending a query to the backend
+        self._check_read_query(query)
+
         with self._driver.error_handling():
 
             with self._connection() as conn, self._cursor(conn) as cur:
 
                 cur.execute(query, parameters)
 
-                result_description = cur.description
-                result_schema = self._decode_sql_schema(result_description)
+                # Read queries should always return a result set, even if it is empty
+                if not cur.description or cur.rowcount < 0:
+                    raise ex.EStorage(f"Query did not return a result set: {query}")
+
+                result_schema = self._decode_sql_schema(cur.description)
 
                 arrow_batches: tp.List[pa.RecordBatch] = []
                 sql_batch = cur.fetchmany()
@@ -151,7 +162,7 @@ class SqlDataStorage(IDataStorageBase[pa.Table, pa.Schema]):
 
                     sql_batch = cur.fetchmany()
 
-            return pa.Table.from_batches(arrow_batches, result_schema)  # noqa
+                return pa.Table.from_batches(arrow_batches, result_schema)  # noqa
 
     def write_table(self, table_name: str, table: pa.Table):
 
@@ -174,6 +185,17 @@ class SqlDataStorage(IDataStorageBase[pa.Table, pa.Schema]):
                         pass
 
                 conn.commit()
+
+    def _check_read_query(self, query):
+
+        if not any(map(lambda keyword: keyword in query.lower(), self.__DQL_KEYWORDS)):
+            raise ex.EStorageRequest(f"Query is not a read query: {query}")
+
+        if any(map(lambda keyword: keyword in query.lower(), self.__DML_KEYWORDS)):
+            raise ex.EStorageRequest(f"Query is not a read query: {query}")
+
+        if any(map(lambda keyword: keyword in query.lower(), self.__DDL_KEYWORDS)):
+            raise ex.EStorageRequest(f"Query is not a read query: {query}")
 
     @staticmethod
     def _decode_sql_schema(description: tp.List[tp.Tuple]):
@@ -335,6 +357,22 @@ try:
                 self.__conn = conn
                 self.__result: tp.Optional[sqla.CursorResult] = None
 
+            @property
+            def description(self):
+
+                if self.__result is not None and self.__result.cursor is not None and self.__result.returns_rows:
+                    return self.__result.cursor.description
+                else:
+                    return None
+
+            @property
+            def rowcount(self) -> int:
+
+                if self.__result is not None and self.__result.cursor is not None:
+                    return self.__result.cursor.rowcount
+                else:
+                    return -1
+
             def execute(self, statement: str, parameters: tp.Union[tp.Dict, tp.Sequence]):
 
                 self.__result = self.__conn.execute(sqla.text(statement), parameters)
@@ -345,11 +383,6 @@ try:
                     parameters = list(parameters)
 
                 self.__result = self.__conn.execute(sqla.text(statement), parameters)
-
-            @property
-            def description(self):
-
-                return self.__result.cursor.description
 
             def fetchone(self) -> tp.Tuple:
 

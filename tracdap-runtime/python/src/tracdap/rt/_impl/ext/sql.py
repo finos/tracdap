@@ -96,6 +96,10 @@ class DbApiWrapper:
         def description(self) -> tuple:
             pass
 
+        @property
+        def rowcount(self) -> int:
+            pass
+
         def execute(self, operation: str, parameters: _tp.Union[_tp.Dict, _tp.Sequence]):
             pass
 
