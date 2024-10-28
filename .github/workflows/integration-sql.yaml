@@ -130,6 +130,22 @@ jobs:
 
     steps:
 
+      # https://learn.microsoft.com/en-us/sql/connect/odbc/linux-mac/installing-the-microsoft-odbc-driver-for-sql-server
+      - name: Install ODBC (if required)
+        if: ${{ inputs.dialect == 'sqlserver' }}
+        run: |
+          
+          apt-get update
+          apt-get install -y curl gpg lsb-release
+          
+          LSB_RELEASE=`lsb_release -rs`
+          curl "https://packages.microsoft.com/keys/microsoft.asc" | gpg --dearmor -o /usr/share/keyrings/microsoft-prod.gpg
+          curl "https://packages.microsoft.com/config/ubuntu/${LSB_RELEASE}/prod.list" | tee /etc/apt/sources.list.d/mssql-release.list
+          
+          apt-get update
+          ACCEPT_EULA=Y apt-get install -y msodbcsql18
+          ACCEPT_EULA=Y apt-get install -y mssql-tools18
+
       - name: Checkout
         uses: actions/checkout@v4
 
