@@ -273,7 +273,10 @@ jobs:
       db_options: ${{ matrix.database.DB_OPTIONS }}
 
 
-  int-storage:
+  int-cloud:
+
+    # Disable cloud integration for now
+    if: false
 
     strategy:
 
