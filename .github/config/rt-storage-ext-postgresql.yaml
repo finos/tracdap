@@ -7,7 +7,7 @@ storage:
     data_integration:
       protocol: SQL
       properties:
-        dialect: MYSQL
+        dialect: POSTGRESQL
         driver.python: alchemy
         alchemy.url: postgresql+pg8000://metadb:5432/trac
         alchemy.username: trac_admin
