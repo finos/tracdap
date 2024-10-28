@@ -251,8 +251,8 @@ class DataStorageSuite2:
 
     def test_edge_cases_float_nan(self):
 
-        if self.backend in ["mysql"]:
-            self.skipTest("Nan is not supported with this backend")
+        if self.backend in ["mysql", "postgresql"]:
+            self.skipTest(f"Nan is not supported with backend [{self.backend}]")
 
         # For NaN, a special test that checks math.isnan on the round-trip result
         # Because math.nan != math.nan
