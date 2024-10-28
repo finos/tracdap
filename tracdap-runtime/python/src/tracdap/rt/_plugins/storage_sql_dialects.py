@@ -12,9 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import contextlib
 import typing as tp
-import urllib.parse as urlp
 
 import pyarrow as pa
 
@@ -22,7 +20,6 @@ import tracdap.rt.exceptions as ex
 import tracdap.rt.ext.plugins as plugins
 
 from tracdap.rt._impl.ext.sql import *  # noqa
-from . import _helpers
 
 
 class MySqlDialect(ISqlDialect):
@@ -131,139 +128,3 @@ plugins.PluginManager.register_plugin(ISqlDialect, MySqlDialect, ["mysql"])
 plugins.PluginManager.register_plugin(ISqlDialect, MariaDbDialect, ["mariadb"])
 plugins.PluginManager.register_plugin(ISqlDialect, PostgresqlDialect, ["postgresql"])
 plugins.PluginManager.register_plugin(ISqlDialect, SqlServerDialect, ["sqlserver"])
-
-
-try:
-    import sqlalchemy as sqla
-    import sqlalchemy.exc as sqla_exc
-
-    class AlchemySqlDriver(ISqlDriver):
-
-        def __init__(self, properties: tp.Dict[str, str]):
-
-            self._log = _helpers.logger_for_object(self)
-
-            raw_url = properties.get('url')
-
-            if raw_url is None or raw_url.strip() == '':
-                raise ex.EConfigLoad("Missing required property [url] for SQL driver [alchemy]")
-
-            url = urlp.urlparse(raw_url)
-            credentials = _helpers.get_http_credentials(url, properties)
-            url = _helpers.apply_http_credentials(url, credentials)
-
-            filtered_keys = ["url", "username", "password", "token"]
-            filtered_props = dict(kv for kv in properties.items() if kv[0] not in filtered_keys)
-
-            self._log.info("Connecting: %s", _helpers.log_safe_url(url))
-
-            try:
-                self.__engine = sqla.create_engine(url.geturl(), **filtered_props)
-            except ModuleNotFoundError as e:
-                raise ex.EPluginNotAvailable("SQL driver is not available: " + str(e)) from e
-
-        def param_style(self) -> "DbApiWrapper.ParamStyle":
-            return DbApiWrapper.ParamStyle.NAMED
-
-        def connect(self, **kwargs) -> "DbApiWrapper.Connection":
-
-            return AlchemySqlDriver.ConnectionWrapper(self.__engine.connect())
-
-        def has_table(self, table_name: str):
-
-            with self.__engine.connect() as conn:
-                inspection = sqla.inspect(conn)
-                return inspection.has_table(table_name)
-
-        def list_tables(self):
-
-            with self.__engine.connect() as conn:
-                inspection = sqla.inspect(conn)
-                return inspection.get_table_names()
-
-        def get_result_schema(self, cursor: "DbApiWrapper.Cursor") -> tp.List[tp.Tuple[str, pa.DataType]]:
-
-            if not isinstance(cursor, self.CursorWrapper):
-                raise ex.EUnexpected()
-
-            return cursor._get_result_schema()  # noqa
-
-        def encode_sql_value(self, py_value: tp.Any) -> tp.Any:
-
-            return py_value
-
-        def decode_sql_value(self, sql_value: tp.Any, python_type: tp.Type) -> tp.Any:
-
-            return sql_value
-
-        @contextlib.contextmanager
-        def error_handling(self) -> contextlib.contextmanager:
-
-            try:
-                yield
-            except (sqla_exc.OperationalError, sqla_exc.ProgrammingError, sqla_exc.StatementError) as e:
-                raise ex.EStorageRequest(*e.args) from e
-            except sqla_exc.SQLAlchemyError as e:
-                raise ex.EStorage() from e
-
-        class ConnectionWrapper(DbApiWrapper.Connection):
-
-            def __init__(self, conn: sqla.Connection):
-                self.__conn = conn
-
-            def close(self):
-                self.__conn.close()
-
-            def commit(self):
-                self.__conn.commit()
-
-            def rollback(self):
-                self.__conn.rollback()
-
-            def cursor(self) -> "DbApiWrapper.Cursor":
-                return AlchemySqlDriver.CursorWrapper(self.__conn)
-
-        class CursorWrapper(DbApiWrapper.Cursor):
-
-            arraysize: int = 1000
-
-            def __init__(self, conn: sqla.Connection):
-                self.__conn = conn
-                self.__result: tp.Optional[sqla.CursorResult] = None
-
-            def execute(self, statement: str, parameters: tp.Union[tp.Dict, tp.Sequence]):
-
-                self.__result = self.__conn.execute(sqla.text(statement), parameters)
-
-            def executemany(self, statement: str, parameters: tp.Iterable[tp.Union[tp.Dict, tp.Sequence]]):
-
-                if not isinstance(parameters, tp.List):
-                    parameters = list(parameters)
-
-                self.__result = self.__conn.execute(sqla.text(statement), parameters)
-
-            def fetchone(self) -> tp.Tuple:
-
-                return self.__result.fetchone().tuple()
-
-            def fetchmany(self, size: int = arraysize) -> tp.List[tp.Tuple]:
-
-                sqla_rows = self.__result.fetchmany(self.arraysize)
-                return list(map(sqla.Row.tuple, sqla_rows))  # noqa
-
-            def _get_result_schema(self) -> pa.Schema:
-
-                column_names = self.__result.keys()
-                fields = list(map(lambda c: pa.field(c, pa.null(), nullable=True), column_names))
-
-                return pa.schema(fields)
-
-            def close(self):
-
-                if self.__result is not None:
-                    self.__result.close()
-
-    plugins.PluginManager.register_plugin(ISqlDriver, AlchemySqlDriver, ["alchemy"])
-
-except ModuleNotFoundError:
-    pass

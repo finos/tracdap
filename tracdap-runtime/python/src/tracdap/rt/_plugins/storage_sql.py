@@ -14,6 +14,7 @@
 
 import contextlib
 import typing as tp
+import urllib.parse as urlp
 
 import pyarrow as pa
 
@@ -36,7 +37,7 @@ class SqlDataStorage(IDataStorageBase[pa.Table, pa.Schema]):
     DIALECT_PROPERTY = "dialect"
     DRIVER_PROPERTY = "driver.python"
 
-    def __init__(self, properties: tp.Dict[str, str], options: dict = None):
+    def __init__(self, properties: tp.Dict[str, str]):
 
         self._log = _helpers.logger_for_object(self)
         self._properties = properties
@@ -51,7 +52,7 @@ class SqlDataStorage(IDataStorageBase[pa.Table, pa.Schema]):
 
         driver_name = _helpers.get_plugin_property(self._properties, self.DRIVER_PROPERTY)
         if driver_name is None:
-            driver_name = dialect_name
+            driver_name = dialect_name.lower()
 
         if not plugins.PluginManager.is_plugin_available(ISqlDriver, driver_name):
             raise ex.EPluginNotAvailable(f"SQL driver [{driver_name}] is not available")
@@ -122,7 +123,7 @@ class SqlDataStorage(IDataStorageBase[pa.Table, pa.Schema]):
 
     def read_table(self, table_name: str) -> pa.Table:
 
-        select_stmt = f"select * from {table_name}"
+        select_stmt = f"select * from {table_name}"  # noqa
 
         return self.native_read_query(select_stmt)
 
@@ -156,7 +157,7 @@ class SqlDataStorage(IDataStorageBase[pa.Table, pa.Schema]):
 
             insert_fields = ", ".join(table.schema.names)
             insert_markers = ", ".join(f":{name}" for name in table.schema.names)
-            insert_stmt = f"insert into {table_name}({insert_fields}) values ({insert_markers})"
+            insert_stmt = f"insert into {table_name}({insert_fields}) values ({insert_markers})"  # noqa
 
             with self._connection() as conn:
 
@@ -224,3 +225,140 @@ class SqlStorageProvider(IStorageProvider):
 
 # Register with the plugin manager
 plugins.PluginManager.register_plugin(IStorageProvider, SqlStorageProvider, ["SQL"])
+
+
+try:
+
+    import sqlalchemy as sqla
+    import sqlalchemy.exc as sqla_exc
+
+    class SqlAlchemyDriver(ISqlDriver):
+
+        def __init__(self, properties: tp.Dict[str, str]):
+
+            self._log = _helpers.logger_for_object(self)
+
+            raw_url = properties.get('url')
+
+            if raw_url is None or raw_url.strip() == '':
+                raise ex.EConfigLoad("Missing required property [url] for SQL driver [alchemy]")
+
+            url = urlp.urlparse(raw_url)
+            credentials = _helpers.get_http_credentials(url, properties)
+            url = _helpers.apply_http_credentials(url, credentials)
+
+            filtered_keys = ["url", "username", "password", "token"]
+            filtered_props = dict(kv for kv in properties.items() if kv[0] not in filtered_keys)
+
+            self._log.info("Connecting: %s", _helpers.log_safe_url(url))
+
+            try:
+                self.__engine = sqla.create_engine(url.geturl(), **filtered_props)
+            except ModuleNotFoundError as e:
+                raise ex.EPluginNotAvailable("SQL driver is not available: " + str(e)) from e
+
+        def param_style(self) -> "DbApiWrapper.ParamStyle":
+            return DbApiWrapper.ParamStyle.NAMED
+
+        def connect(self, **kwargs) -> "DbApiWrapper.Connection":
+
+            return SqlAlchemyDriver.ConnectionWrapper(self.__engine.connect())
+
+        def has_table(self, table_name: str):
+
+            with self.__engine.connect() as conn:
+                inspection = sqla.inspect(conn)
+                return inspection.has_table(table_name)
+
+        def list_tables(self):
+
+            with self.__engine.connect() as conn:
+                inspection = sqla.inspect(conn)
+                return inspection.get_table_names()
+
+        def get_result_schema(self, cursor: "DbApiWrapper.Cursor") -> tp.List[tp.Tuple[str, pa.DataType]]:
+
+            if not isinstance(cursor, self.CursorWrapper):
+                raise ex.EUnexpected()
+
+            return cursor._get_result_schema()  # noqa
+
+        def encode_sql_value(self, py_value: tp.Any) -> tp.Any:
+
+            return py_value
+
+        def decode_sql_value(self, sql_value: tp.Any, python_type: tp.Type) -> tp.Any:
+
+            return sql_value
+
+        @contextlib.contextmanager
+        def error_handling(self) -> contextlib.contextmanager:
+
+            try:
+                yield
+            except (sqla_exc.OperationalError, sqla_exc.ProgrammingError, sqla_exc.StatementError) as e:
+                raise ex.EStorageRequest(*e.args) from e
+            except sqla_exc.SQLAlchemyError as e:
+                raise ex.EStorage() from e
+
+        class ConnectionWrapper(DbApiWrapper.Connection):
+
+            def __init__(self, conn: sqla.Connection):
+                self.__conn = conn
+
+            def close(self):
+                self.__conn.close()
+
+            def commit(self):
+                self.__conn.commit()
+
+            def rollback(self):
+                self.__conn.rollback()
+
+            def cursor(self) -> "DbApiWrapper.Cursor":
+                return SqlAlchemyDriver.CursorWrapper(self.__conn)
+
+        class CursorWrapper(DbApiWrapper.Cursor):
+
+            arraysize: int = 1000
+
+            def __init__(self, conn: sqla.Connection):
+                self.__conn = conn
+                self.__result: tp.Optional[sqla.CursorResult] = None
+
+            def execute(self, statement: str, parameters: tp.Union[tp.Dict, tp.Sequence]):
+
+                self.__result = self.__conn.execute(sqla.text(statement), parameters)
+
+            def executemany(self, statement: str, parameters: tp.Iterable[tp.Union[tp.Dict, tp.Sequence]]):
+
+                if not isinstance(parameters, tp.List):
+                    parameters = list(parameters)
+
+                self.__result = self.__conn.execute(sqla.text(statement), parameters)
+
+            def fetchone(self) -> tp.Tuple:
+
+                return self.__result.fetchone().tuple()
+
+            def fetchmany(self, size: int = arraysize) -> tp.List[tp.Tuple]:
+
+                sqla_rows = self.__result.fetchmany(self.arraysize)
+                return list(map(sqla.Row.tuple, sqla_rows))  # noqa
+
+            def _get_result_schema(self) -> pa.Schema:
+
+                column_names = self.__result.keys()
+                fields = list(map(lambda c: pa.field(c, pa.null(), nullable=True), column_names))
+
+                return pa.schema(fields)
+
+            def close(self):
+
+                if self.__result is not None:
+                    self.__result.close()
+
+    plugins.PluginManager.register_plugin(ISqlDriver, SqlAlchemyDriver, ["alchemy"])
+
+except ModuleNotFoundError:
+    pass
