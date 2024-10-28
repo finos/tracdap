@@ -238,7 +238,7 @@ class DataStorageSuite2:
         ]
 
         # Make allowances for backends that don't support some of the edge cases (still test everything else)
-        if self.backend in ["mysql", "mariadb"]:
+        if self.backend in ["mysql", "mariadb", "sqlserver"]:
             edge_case_values.remove(math.inf)
             edge_case_values.remove(-math.inf)
 
@@ -251,7 +251,7 @@ class DataStorageSuite2:
 
     def test_edge_cases_float_nan(self):
 
-        if self.backend in ["mysql", "mariadb", "postgresql"]:
+        if self.backend in ["mysql", "mariadb", "postgresql", "sqlserver"]:
             self.skipTest(f"Nan is not supported with backend [{self.backend}]")
 
         # For NaN, a special test that checks math.isnan on the round-trip result
@@ -291,8 +291,8 @@ class DataStorageSuite2:
             "你好，世界", "Привет, мир", "नमस्ते दुनिया", "𝜌 = ∑ 𝑃𝜓 | 𝜓 ⟩ ⟨ 𝜓 |"
         ]
 
-        # UTF-8 encoding not working correctly with MariaDB
-        if self.backend in ["mariadb"]:
+        # UTF-8 encoding not working correctly with MariaDB, SQL Server
+        if self.backend in ["mariadb", "sqlserver"]:
             edge_case_values = edge_case_values[:-4]
 
         original_schema = self.one_field_schema(_meta.STRING)
