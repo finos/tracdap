@@ -22,50 +22,8 @@ import tracdap.rt.ext.plugins as plugins
 from tracdap.rt._impl.ext.sql import *  # noqa
 
 
-class MySqlDialect(ISqlDialect):
 
-    def __init__(self, properties: tp.Dict[str, str]):
-        self._properties = properties
-
-    def arrow_to_sql_type(self, arrow_type: pa.DataType) -> str:
-
-        if pa.types.is_boolean(arrow_type):
-            return "boolean"
-
-        if pa.types.is_integer(arrow_type):
-            return "bigint"
-
-        if pa.types.is_floating(arrow_type):
-            return "double"
-
-        if pa.types.is_decimal(arrow_type):
-            return "decimal (31, 10)"
-
-        if pa.types.is_string(arrow_type):
-            return "varchar(8192)"
-
-        if pa.types.is_date(arrow_type):
-            return "date"
-
-        if pa.types.is_timestamp(arrow_type):
-            return "timestamp (6)"
-
-        raise ex.ETracInternal(f"Unsupported data type [{str(arrow_type)}] in SQL dialect [{self.__class__.__name__}]")
-
-
-class MariaDbDialect(MySqlDialect):
-
-    def __init__(self, properties: tp.Dict[str, str]):
-        super().__init__(properties)
-
-    # Inherit MySQL implementation
-    pass
-
-
-class PostgresqlDialect(ISqlDialect):
-
-    def __init__(self, properties: tp.Dict[str, str]):
-        self._properties = properties
+class AnsiStandardDialect(ISqlDialect):
 
     def arrow_to_sql_type(self, arrow_type: pa.DataType) -> str:
 
@@ -82,7 +40,7 @@ class PostgresqlDialect(ISqlDialect):
             return "decimal (31, 10)"
 
         if pa.types.is_string(arrow_type):
-            return "varchar"
+            return "varchar(4096)"
 
         if pa.types.is_date(arrow_type):
             return "date"
@@ -91,6 +49,44 @@ class PostgresqlDialect(ISqlDialect):
             return "timestamp (6)"
 
         raise ex.ETracInternal(f"Unsupported data type [{str(arrow_type)}] in SQL dialect [{self.__class__.__name__}]")
+
+
+class MySqlDialect(AnsiStandardDialect):
+
+    def __init__(self, properties: tp.Dict[str, str]):
+        self._properties = properties
+
+    def arrow_to_sql_type(self, arrow_type: pa.DataType) -> str:
+
+        if pa.types.is_floating(arrow_type):
+            return "double"
+
+        if pa.types.is_string(arrow_type):
+            return "varchar(8192)"
+
+        return super().arrow_to_sql_type(arrow_type)
+
+
+class MariaDbDialect(MySqlDialect):
+
+    def __init__(self, properties: tp.Dict[str, str]):
+        super().__init__(properties)
+
+    # Inherit MySQL implementation
+    pass
+
+
+class PostgresqlDialect(AnsiStandardDialect):
+
+    def __init__(self, properties: tp.Dict[str, str]):
+        self._properties = properties
+
+    def arrow_to_sql_type(self, arrow_type: pa.DataType) -> str:
+
+        if pa.types.is_string(arrow_type):
+            return "varchar"
+
+        return super().arrow_to_sql_type(arrow_type)
 
 
 class SqlServerDialect(ISqlDialect):
@@ -103,25 +99,16 @@ class SqlServerDialect(ISqlDialect):
         if pa.types.is_boolean(arrow_type):
             return "bit"
 
-        if pa.types.is_integer(arrow_type):
-            return "bigint"
-
         if pa.types.is_floating(arrow_type):
             return "float(53)"
-
-        if pa.types.is_decimal(arrow_type):
-            return "decimal (31, 10)"
 
         if pa.types.is_string(arrow_type):
             return "varchar(8000)"
 
-        if pa.types.is_date(arrow_type):
-            return "date"
-
         if pa.types.is_timestamp(arrow_type):
             return "datetime2"
 
-        raise ex.ETracInternal(f"Unsupported data type [{str(arrow_type)}] in SQL dialect [{self.__class__.__name__}]")
+        return super().arrow_to_sql_type(arrow_type)
 
 
 plugins.PluginManager.register_plugin(ISqlDialect, MySqlDialect, ["mysql"])
