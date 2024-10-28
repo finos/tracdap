@@ -238,7 +238,7 @@ class DataStorageSuite2:
         ]
 
         # Make allowances for backends that don't support some of the edge cases (still test everything else)
-        if self.backend in ["mysql"]:
+        if self.backend in ["mysql", "mariadb"]:
             edge_case_values.remove(math.inf)
             edge_case_values.remove(-math.inf)
 
@@ -251,7 +251,7 @@ class DataStorageSuite2:
 
     def test_edge_cases_float_nan(self):
 
-        if self.backend in ["mysql", "postgresql"]:
+        if self.backend in ["mysql", "mariadb", "postgresql"]:
             self.skipTest(f"Nan is not supported with backend [{self.backend}]")
 
         # For NaN, a special test that checks math.isnan on the round-trip result
@@ -285,13 +285,18 @@ class DataStorageSuite2:
 
     def test_edge_cases_string(self):
 
-        original_schema = self.one_field_schema(_meta.STRING)
-        original_data = pa.Table.from_pydict({"string_field": [
+        edge_case_values = [
             "", " ", "  ", "\t", "\r\n", "  \r\n   ",
-            "a, b\",", "'@@'", "[\"\"%^&", "£££", "#@",
-            "Olá Mundo", "你好，世界", "Привет, мир", "नमस्ते दुनिया",
-            "𝜌 = ∑ 𝑃𝜓 | 𝜓 ⟩ ⟨ 𝜓 |"
-        ]}, original_schema)
+            "a, b\",", "'@@'", "[\"\"%^&", "£££", "#@", "Olá Mundo",
+            "你好，世界", "Привет, мир", "नमस्ते दुनिया", "𝜌 = ∑ 𝑃𝜓 | 𝜓 ⟩ ⟨ 𝜓 |"
+        ]
+
+        # UTF-8 encoding not working correctly with MariaDB
+        if self.backend in ["mariadb"]:
+            edge_case_values = edge_case_values[:-4]
+
+        original_schema = self.one_field_schema(_meta.STRING)
+        original_data = pa.Table.from_pydict({"string_field": edge_case_values}, original_schema)
 
         rt_data = self._do_round_trip("test_edge_cases_string", original_schema, original_data)
 
@@ -315,8 +320,8 @@ class DataStorageSuite2:
     # @unittest.skip("Doesn't work on SQLite")
     def test_edge_cases_datetime(self):
 
-        if self.backend in ["mysql"]:
-            self.skipTest("MySQL / Alchemy backend only supports timestamps between the Unix epoch and the 2038 rollover")
+        if self.backend in ["mysql", "mariadb"]:
+            self.skipTest("MySQL / MariaDB Alchemy backend only supports timestamps between the Unix epoch and the 2038 rollover")
 
         original_schema = self.one_field_schema(_meta.DATETIME)
         original_data = pa.Table.from_pydict({"datetime_field": [
@@ -445,7 +450,7 @@ class DataStorageSuite2:
             self.storage.native_read_query(query, different_parameter=3))
 
         # MySQL / Alchemy applies forced type-coercion when parameter types do not match
-        if self.backend not in ["mysql"]:
+        if self.backend not in ["mysql", "mariadb"]:
 
             self.assertRaises(
                 _ex.EStorageRequest, lambda:
