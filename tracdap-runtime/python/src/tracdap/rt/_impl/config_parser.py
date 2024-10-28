@@ -341,10 +341,17 @@ class ConfigParser(tp.Generic[_T]):
 
             if isinstance(raw_value, tp.Dict):
                 return self._parse_simple_class(location, raw_value, annotation)
-            elif self._is_dev_mode_location(location) and type(raw_value) in ConfigParser.__primitive_types:
-                return self._parse_primitive(location, raw_value, type(raw_value))
-            else:
-                return self._error(location, f"Expected type {annotation.__name__}, got '{str(raw_value)}'")
+
+            if self._is_dev_mode_location(location):
+                if type(raw_value) in ConfigParser.__primitive_types:
+                    return self._parse_primitive(location, raw_value, type(raw_value))
+                if isinstance(raw_value, list):
+                    if len(raw_value) == 0:
+                        return []
+                    list_type = type(raw_value[0])
+                    return list(map(lambda x: self._parse_primitive(location, x, list_type), raw_value))
+
+            return self._error(location, f"Expected type {annotation.__name__}, got '{str(raw_value)}'")
 
         if isinstance(annotation, self.__generic_metaclass):
             return self._parse_generic_class(location, raw_value, annotation)  # noqa
