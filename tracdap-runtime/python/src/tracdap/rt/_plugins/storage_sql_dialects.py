@@ -42,7 +42,7 @@ class MySqlDialect(ISqlDialect):
             return "decimal (31, 10)"
 
         if pa.types.is_string(arrow_type):
-            return "varchar(16383)"
+            return "varchar(8192)"
 
         if pa.types.is_date(arrow_type):
             return "date"
