@@ -48,6 +48,7 @@ _test_import_def = trac.ModelDefinition(
     outputs=test_models.TestImportModel().define_outputs())
 
 
+@unittest.skip("No backend available for unit testing, integration tests use the storage test suite")
 class TestDataImportExport(unittest.TestCase):
 
     TEST_STORAGE_KEY = "test_data_storage"
@@ -134,7 +135,6 @@ class TestDataImportExport(unittest.TestCase):
         test_storage_config = _cfg.PluginConfig(
             protocol="SQL",
             properties={
-                "trac_beta_sql_storage": True,
                 "dialect": "sqlite",
                 "sqlite.database": db_url,
                 "sqlite.uri": "true"
