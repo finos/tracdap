@@ -510,7 +510,7 @@ class DataStorageSuite2:
             f"create table dodgy_table (integer_field integer)",  # noqa
             f"create table dodgy_table_2 (integer_field integer) as select * from {table_name}",  # noqa
             f"alter table {table_name} add column integer_field_2 integer",  # noqa
-            f"drop table {table_name}",
+            f"drop table {table_name}",  # noqa
             f"grant all on {table_name} to joe"
         ]
 
