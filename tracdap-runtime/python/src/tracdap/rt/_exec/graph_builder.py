@@ -54,7 +54,7 @@ class GraphBuilder:
         if job_def.jobType in [meta.JobType.IMPORT_DATA, meta.JobType.EXPORT_DATA]:
             return self.build_standard_job(job_def, self.build_import_export_data_job)
 
-        raise _ex.EConfigParse(f"Job type [{job_def.jobType}] is not supported yet")
+        raise _ex.EJobValidation(f"Job type [{job_def.jobType}] is not supported yet")
 
     def build_standard_job(self, job_def: meta.JobDefinition, build_func: __JOB_BUILD_FUNC):
 
@@ -538,7 +538,7 @@ class GraphBuilder:
             return self.build_flow(namespace, job_def, model_or_flow.flow)
 
         else:
-            raise _ex.EConfigParse("Invalid job config given to the execution engine")
+            raise _ex.EJobValidation("Invalid job config given to the execution engine")
 
     def build_model(
             self, namespace: NodeNamespace,
@@ -727,8 +727,7 @@ class GraphBuilder:
                 push_mapping, pop_mapping,
                 explicit_deps)
 
-        # Missing / invalid node type - should be caught in static validation
-        raise _ex.ETracInternal(f"Flow node [{node_name}] has invalid node type [{node.nodeType}]")
+        raise _ex.EJobValidation(f"Flow node [{node_name}] has invalid node type [{node.nodeType}]")
 
     @classmethod
     def check_model_compatibility(
