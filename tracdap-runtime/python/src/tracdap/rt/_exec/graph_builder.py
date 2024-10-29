@@ -40,21 +40,45 @@ class GraphBuilder:
         self._job_key = _util.object_key(job_config.jobId)
         self._job_namespace = NodeNamespace(self._job_key)
 
+        self._errors = []
+
     def build_job(self, job_def: meta.JobDefinition,) -> Graph:
 
-        if job_def.jobType == meta.JobType.IMPORT_MODEL:
-            return self.build_standard_job(job_def, self.build_import_model_job)
+        try:
 
-        if job_def.jobType == meta.JobType.RUN_MODEL:
-            return self.build_standard_job(job_def, self.build_run_model_job)
+            if job_def.jobType == meta.JobType.IMPORT_MODEL:
+                return self.build_standard_job(job_def, self.build_import_model_job)
 
-        if job_def.jobType == meta.JobType.RUN_FLOW:
-            return self.build_standard_job(job_def, self.build_run_flow_job)
+            if job_def.jobType == meta.JobType.RUN_MODEL:
+                return self.build_standard_job(job_def, self.build_run_model_job)
 
-        if job_def.jobType in [meta.JobType.IMPORT_DATA, meta.JobType.EXPORT_DATA]:
-            return self.build_standard_job(job_def, self.build_import_export_data_job)
+            if job_def.jobType == meta.JobType.RUN_FLOW:
+                return self.build_standard_job(job_def, self.build_run_flow_job)
 
-        raise _ex.EJobValidation(f"Job type [{job_def.jobType}] is not supported yet")
+            if job_def.jobType in [meta.JobType.IMPORT_DATA, meta.JobType.EXPORT_DATA]:
+                return self.build_standard_job(job_def, self.build_import_export_data_job)
+
+            self._error(_ex.EJobValidation(f"Job type [{job_def.jobType.name}] is not supported yet"))
+
+        except Exception as e:
+
+            # If there are recorded, errors, assume unhandled exceptions are a result of those
+            # Only report the recorded errors, to reduce noise
+            if any(self._errors):
+                pass
+
+            # If no errors are recorded, an exception here would be a bug
+            raise _ex.ETracInternal(f"Unexpected error preparing the job execution graph") from e
+
+        finally:
+
+            if any(self._errors):
+
+                if len(self._errors) == 1:
+                    raise self._errors[0]
+                else:
+                    err_text = "\n".join(map(str, self._errors))
+                    raise _ex.EJobValidation("Invalid job configuration\n" + err_text)
 
     def build_standard_job(self, job_def: meta.JobDefinition, build_func: __JOB_BUILD_FUNC):
 
@@ -230,7 +254,8 @@ class GraphBuilder:
                 if param_schema.defaultValue is not None:
                     param_def = param_schema.defaultValue
                 else:
-                    raise _ex.EJobValidation(f"Missing required parameter: [{param_name}]")
+                    self._error(_ex.EJobValidation(f"Missing required parameter: [{param_name}]"))
+                    continue
 
             param_id = NodeId(param_name, self._job_namespace, meta.Value)
             param_node = StaticValueNode(param_id, param_def, explicit_deps=explicit_deps)
@@ -261,7 +286,8 @@ class GraphBuilder:
                     outputs.add(data_view_id)
                     continue
                 else:
-                    raise _ex.EJobValidation(f"Missing required input: [{input_name}]")
+                    self._error(_ex.EJobValidation(f"Missing required input: [{input_name}]"))
+                    continue
 
             # Build a data spec using metadata from the job config
             # For now we are always loading the root part, snap 0, delta 0
@@ -317,9 +343,11 @@ class GraphBuilder:
             if data_selector is None:
                 if output_schema.optional:
                     optional_info = "(configuration is required for all optional outputs, in case they are produced)"
-                    raise _ex.EJobValidation(f"Missing optional output: [{output_name}] {optional_info}")
+                    self._error(_ex.EJobValidation(f"Missing optional output: [{output_name}] {optional_info}"))
+                    continue
                 else:
-                    raise _ex.EJobValidation(f"Missing required output: [{output_name}]")
+                    self._error(_ex.EJobValidation(f"Missing required output: [{output_name}]"))
+                    continue
 
             # Output data view must already exist in the namespace
             data_view_id = NodeId.of(output_name, self._job_namespace, _data.DataView)
@@ -538,7 +566,8 @@ class GraphBuilder:
             return self.build_flow(namespace, job_def, model_or_flow.flow)
 
         else:
-            raise _ex.EJobValidation("Invalid job config given to the execution engine")
+            message = f"Invalid job config, expected model or flow, got [{model_or_flow.objectType}]"
+            self._error(_ex.EJobValidation(message))
 
     def build_model(
             self, namespace: NodeNamespace,
@@ -687,7 +716,7 @@ class GraphBuilder:
             edge = target_edges.get(socket)
             # Report missing edges as a job consistency error (this might happen sometimes in dev mode)
             if edge is None:
-                raise _ex.EJobValidation(f"Inconsistent flow: Socket [{socket}] is not connected")
+                self._error(_ex.EJobValidation(f"Inconsistent flow: Socket [{socket}] is not connected"))
             return socket_id(edge.source.node, edge.source.socket, result_type)
 
         if node.nodeType == meta.FlowNodeType.PARAMETER_NODE:
@@ -715,7 +744,7 @@ class GraphBuilder:
 
             # Missing models in the job config is a job consistency error
             if model_obj is None or model_obj.objectType != meta.ObjectType.MODEL:
-                raise _ex.EJobValidation(f"No model was provided for flow node [{node_name}]")
+                self._error(_ex.EJobValidation(f"No model was provided for flow node [{node_name}]"))
 
             # Explicit check for model compatibility - report an error now, do not try build_model()
             self.check_model_compatibility(model_selector, model_obj.model, node_name, node)
@@ -727,11 +756,10 @@ class GraphBuilder:
                 push_mapping, pop_mapping,
                 explicit_deps)
 
-        raise _ex.EJobValidation(f"Flow node [{node_name}] has invalid node type [{node.nodeType}]")
+        self._error(_ex.EJobValidation(f"Flow node [{node_name}] has invalid node type [{node.nodeType}]"))
 
-    @classmethod
     def check_model_compatibility(
-            cls, model_selector: meta.TagSelector,
+            self, model_selector: meta.TagSelector,
             model_def: meta.ModelDefinition, node_name: str, flow_node: meta.FlowNode):
 
         model_params = list(sorted(model_def.parameters.keys()))
@@ -744,10 +772,9 @@ class GraphBuilder:
 
         if model_params != node_params or model_inputs != node_inputs or model_outputs != node_outputs:
             model_key = _util.object_key(model_selector)
-            raise _ex.EJobValidation(f"Incompatible model for flow node [{node_name}] (Model: [{model_key}])")
+            self._error(_ex.EJobValidation(f"Incompatible model for flow node [{node_name}] (Model: [{model_key}])"))
 
-    @classmethod
-    def check_model_type(cls, job_def: meta.JobDefinition, model_def: meta.ModelDefinition):
+    def check_model_type(self, job_def: meta.JobDefinition, model_def: meta.ModelDefinition):
 
         if job_def.jobType == meta.JobType.IMPORT_DATA:
             allowed_model_types = [meta.ModelType.DATA_IMPORT_MODEL]
@@ -759,7 +786,7 @@ class GraphBuilder:
         if model_def.modelType not in allowed_model_types:
             job_type = job_def.jobType.name
             model_type = model_def.modelType.name
-            raise _ex.EJobValidation(f"Job type [{job_type}] cannot use model type [{model_type}]")
+            self._error(_ex.EJobValidation(f"Job type [{job_type}] cannot use model type [{model_type}]"))
 
     @staticmethod
     def build_context_push(
@@ -821,8 +848,7 @@ class GraphBuilder:
             outputs={*pop_mapping.values()},
             must_run=[pop_id])
 
-    @classmethod
-    def _join_sections(cls, *sections: GraphSection, allow_partial_inputs: bool = False):
+    def _join_sections(self, *sections: GraphSection, allow_partial_inputs: bool = False):
 
         n_sections = len(sections)
         first_section = sections[0]
@@ -844,7 +870,7 @@ class GraphBuilder:
                 if allow_partial_inputs:
                     inputs.update(requirements_not_met)
                 else:
-                    cls._invalid_graph_error(requirements_not_met)
+                    self._invalid_graph_error(requirements_not_met)
 
             nodes.update(current_section.nodes)
 
@@ -853,13 +879,12 @@ class GraphBuilder:
 
         return GraphSection(nodes, inputs, last_section.outputs, must_run)
 
-    @classmethod
-    def _invalid_graph_error(cls, missing_dependencies: tp.Iterable[NodeId]):
+    def _invalid_graph_error(self, missing_dependencies: tp.Iterable[NodeId]):
 
-        missing_ids = ", ".join(map(cls._missing_item_display_name, missing_dependencies))
-        message = f"Invalid job config: The execution graph has unsatisfied dependencies: [{missing_ids}]"
+        missing_ids = ", ".join(map(self._missing_item_display_name, missing_dependencies))
+        message = f"The execution graph has unsatisfied dependencies: [{missing_ids}]"
 
-        raise _ex.EJobValidation(message)
+        self._error(_ex.EJobValidation(message))
 
     @classmethod
     def _missing_item_display_name(cls, node_id: NodeId):
@@ -874,3 +899,7 @@ class GraphBuilder:
             return node_id.name
         else:
             return f"{node_id.name} / {', '.join(components[:-1])}"
+
+    def _error(self, error: Exception):
+
+        self._errors.append(error)
