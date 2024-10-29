@@ -345,8 +345,10 @@ class GraphBuilder(_actors.Actor):
         self._log.info("Building execution graph")
 
         # TODO: Get sys config, or find a way to pass storage settings
-        graph_data = _graph.GraphBuilder.build_job(self.job_config, self.result_spec)
-        graph_nodes = {node_id: _EngineNode(node, {}) for node_id, node in graph_data.nodes.items()}
+        graph_builder = _graph.GraphBuilder(self.job_config, self.result_spec)
+        graph_spec = graph_builder.build_job(self.job_config.job)
+
+        graph_nodes = {node_id: _EngineNode(node, {}) for node_id, node in graph_spec.nodes.items()}
         graph = _EngineContext(graph_nodes, pending_nodes=set(graph_nodes.keys()))
 
         self._log.info("Resolving graph nodes to executable code")
@@ -355,7 +357,7 @@ class GraphBuilder(_actors.Actor):
             node.function = self._resolver.resolve_node(node.node)
 
         self.graph = graph
-        self.actors().send_parent("job_graph", self.graph, graph_data.root_id)
+        self.actors().send_parent("job_graph", self.graph, graph_spec.root_id)
 
     @_actors.Message
     def get_execution_graph(self):

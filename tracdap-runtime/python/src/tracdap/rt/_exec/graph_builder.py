@@ -22,75 +22,76 @@ from .graph import *
 
 class GraphBuilder:
 
-    __JOB_BUILD_FUNC = tp.Callable[
-        [config.JobConfig, JobResultSpec, NodeNamespace, NodeId],
-        GraphSection]
+    __JOB_DETAILS = tp.TypeVar(
+        "__JOB_DETAILS",
+        meta.RunModelJob,
+        meta.RunFlowJob,
+        meta.ImportModelJob,
+        meta.ImportDataJob,
+        meta.ExportDataJob)
 
-    @classmethod
-    def build_job(
-            cls, job_config: config.JobConfig,
-            result_spec: JobResultSpec) -> Graph:
+    __JOB_BUILD_FUNC = tp.Callable[[meta.JobDefinition, NodeId], GraphSection]
 
-        if job_config.job.jobType == meta.JobType.IMPORT_MODEL:
-            return cls.build_standard_job(job_config, result_spec, cls.build_import_model_job)
+    def __init__(self, job_config: config.JobConfig, result_spec: JobResultSpec):
 
-        if job_config.job.jobType == meta.JobType.RUN_MODEL:
-            return cls.build_standard_job(job_config, result_spec, cls.build_run_model_job)
+        self._job_config = job_config
+        self._result_spec = result_spec
 
-        if job_config.job.jobType == meta.JobType.RUN_FLOW:
-            return cls.build_standard_job(job_config, result_spec, cls.build_run_flow_job)
+        self._job_key = _util.object_key(job_config.jobId)
+        self._job_namespace = NodeNamespace(self._job_key)
 
-        if job_config.job.jobType in [meta.JobType.IMPORT_DATA, meta.JobType.EXPORT_DATA]:
-            return cls.build_standard_job(job_config, result_spec, cls.build_import_export_data_job)
+    def build_job(self, job_def: meta.JobDefinition,) -> Graph:
 
-        raise _ex.EConfigParse(f"Job type [{job_config.job.jobType}] is not supported yet")
+        if job_def.jobType == meta.JobType.IMPORT_MODEL:
+            return self.build_standard_job(job_def, self.build_import_model_job)
 
-    @classmethod
-    def build_standard_job(
-            cls, job_config: config.JobConfig, result_spec: JobResultSpec,
-            build_func: __JOB_BUILD_FUNC):
+        if job_def.jobType == meta.JobType.RUN_MODEL:
+            return self.build_standard_job(job_def, self.build_run_model_job)
+
+        if job_def.jobType == meta.JobType.RUN_FLOW:
+            return self.build_standard_job(job_def, self.build_run_flow_job)
+
+        if job_def.jobType in [meta.JobType.IMPORT_DATA, meta.JobType.EXPORT_DATA]:
+            return self.build_standard_job(job_def, self.build_import_export_data_job)
+
+        raise _ex.EConfigParse(f"Job type [{job_def.jobType}] is not supported yet")
+
+    def build_standard_job(self, job_def: meta.JobDefinition, build_func: __JOB_BUILD_FUNC):
 
         # Set up the job context
 
-        job_key = _util.object_key(job_config.jobId)
-        job_namespace = NodeNamespace(job_key)
-
-        push_id = NodeId("trac_job_push", job_namespace, Bundle[tp.Any])
-        push_node = ContextPushNode(push_id, job_namespace)
+        push_id = NodeId("trac_job_push", self._job_namespace, Bundle[tp.Any])
+        push_node = ContextPushNode(push_id, self._job_namespace)
         push_section = GraphSection({push_id: push_node}, must_run=[push_id])
 
         # Build the execution graphs for the main job and results recording
 
-        main_section = build_func(job_config, result_spec, job_namespace, push_id)
-        main_result_id = NodeId.of("trac_build_result", job_namespace, config.JobResult)
+        main_section = build_func(job_def, push_id)
+        main_result_id = NodeId.of("trac_build_result", self._job_namespace, config.JobResult)
 
         # Clean up the job context
 
-        global_result_id = NodeId.of(job_key, NodeNamespace.root(), config.JobResult)
+        global_result_id = NodeId.of(self._job_key, NodeNamespace.root(), config.JobResult)
 
-        pop_id = NodeId("trac_job_pop", job_namespace, Bundle[tp.Any])
+        pop_id = NodeId("trac_job_pop", self._job_namespace, Bundle[tp.Any])
         pop_mapping = {main_result_id: global_result_id}
 
         pop_node = ContextPopNode(
-            pop_id, job_namespace, pop_mapping,
+            pop_id, self._job_namespace, pop_mapping,
             explicit_deps=main_section.must_run,
             bundle=NodeNamespace.root())
 
-        global_result_node = BundleItemNode(global_result_id, pop_id, job_key)
+        global_result_node = BundleItemNode(global_result_id, pop_id, self._job_key)
 
         pop_section = GraphSection({
             pop_id: pop_node,
             global_result_id: global_result_node})
 
-        job = cls._join_sections(push_section, main_section, pop_section)
+        job = self._join_sections(push_section, main_section, pop_section)
 
         return Graph(job.nodes, global_result_id)
 
-    @classmethod
-    def build_import_model_job(
-            cls, job_config: config.JobConfig, result_spec: JobResultSpec,
-            job_namespace: NodeNamespace, job_push_id: NodeId) \
-            -> GraphSection:
+    def build_import_model_job(self, job_def: meta.JobDefinition, job_push_id: NodeId) -> GraphSection:
 
         # Main section: run the model import
 
@@ -98,82 +99,72 @@ class GraphBuilder:
         new_model_id = _util.new_object_id(meta.ObjectType.MODEL)
         new_model_key = _util.object_key(new_model_id)
 
-        model_scope = _util.object_key(job_config.jobId)
-        import_details = job_config.job.importModel
+        model_scope = self._job_key
+        import_details = job_def.importModel
 
-        import_id = NodeId.of("trac_import_model", job_namespace, meta.ObjectDefinition)
+        import_id = NodeId.of("trac_import_model", self._job_namespace, meta.ObjectDefinition)
         import_node = ImportModelNode(import_id, model_scope, import_details, explicit_deps=[job_push_id])
 
         main_section = GraphSection(nodes={import_id: import_node})
 
         # Build job-level metadata outputs
 
-        result_section = cls.build_job_results(
-            job_config, job_namespace, result_spec,
+        result_section = self.build_job_results(
             objects={new_model_key: import_id},
             explicit_deps=[job_push_id, *main_section.must_run])
 
-        return cls._join_sections(main_section, result_section)
+        return self._join_sections(main_section, result_section)
 
-    @classmethod
-    def build_import_export_data_job(
-            cls, job_config: config.JobConfig, result_spec: JobResultSpec,
-            job_namespace: NodeNamespace, job_push_id: NodeId) \
-            -> GraphSection:
+    def build_import_export_data_job(self, job_def: meta.JobDefinition, job_push_id: NodeId) -> GraphSection:
 
         # TODO: These are processed as regular calculation jobs for now
         # That might be ok, but is worth reviewing
 
-        if job_config.job.jobType == meta.JobType.IMPORT_DATA:
-            job_def = job_config.job.importData
+        if job_def.jobType == meta.JobType.IMPORT_DATA:
+            job_details = job_def.importData
         else:
-            job_def = job_config.job.exportData
+            job_details = job_def.exportData
 
-        target_selector = job_def.model
-        target_obj = _util.get_job_resource(target_selector, job_config)
+        target_selector = job_details.model
+        target_obj = _util.get_job_resource(target_selector, self._job_config)
         target_def = target_obj.model
 
-        return cls.build_calculation_job(
-            job_config, result_spec, job_namespace, job_push_id,
-            target_selector, target_def, job_def)
+        return self.build_calculation_job(
+            job_def, job_push_id,
+            target_selector, target_def,
+            job_details)
 
-    @classmethod
-    def build_run_model_job(
-            cls, job_config: config.JobConfig, result_spec: JobResultSpec,
-            job_namespace: NodeNamespace, job_push_id: NodeId) \
-            -> GraphSection:
+    def build_run_model_job(self, job_def: meta.JobDefinition, job_push_id: NodeId) -> GraphSection:
 
-        target_selector = job_config.job.runModel.model
-        target_obj = _util.get_job_resource(target_selector, job_config)
+        job_details = job_def.runModel
+
+        target_selector = job_details.model
+        target_obj = _util.get_job_resource(target_selector, self._job_config)
         target_def = target_obj.model
-        job_def = job_config.job.runModel
 
-        return cls.build_calculation_job(
-            job_config, result_spec, job_namespace, job_push_id,
-            target_selector, target_def, job_def)
+        return self.build_calculation_job(
+            job_def, job_push_id,
+            target_selector, target_def,
+            job_details)
 
-    @classmethod
-    def build_run_flow_job(
-            cls, job_config: config.JobConfig, result_spec: JobResultSpec,
-            job_namespace: NodeNamespace, job_push_id: NodeId) \
-            -> GraphSection:
+    def build_run_flow_job(self, job_def: meta.JobDefinition, job_push_id: NodeId) -> GraphSection:
 
-        target_selector = job_config.job.runFlow.flow
-        target_obj = _util.get_job_resource(target_selector, job_config)
+        job_details = job_def.runFlow
+
+        target_selector = job_details.flow
+        target_obj = _util.get_job_resource(target_selector, self._job_config)
         target_def = target_obj.flow
-        job_def = job_config.job.runFlow
 
-        return cls.build_calculation_job(
-            job_config, result_spec, job_namespace, job_push_id,
-            target_selector, target_def, job_def)
+        return self.build_calculation_job(
+            job_def, job_push_id,
+            target_selector, target_def,
+            job_details)
 
-    @classmethod
     def build_calculation_job(
-            cls, job_config: config.JobConfig, result_spec: JobResultSpec,
-            job_namespace: NodeNamespace, job_push_id: NodeId,
+            self, job_def: meta.JobDefinition, job_push_id: NodeId,
             target_selector: meta.TagSelector,
             target_def: tp.Union[meta.ModelDefinition, meta.FlowDefinition],
-            job_def: tp.Union[meta.RunModelJob, meta.RunFlowJob]) \
+            job_details: __JOB_DETAILS) \
             -> GraphSection:
 
         # The main execution graph can run directly in the job context, no need to do a context push
@@ -185,29 +176,30 @@ class GraphBuilder:
         required_inputs = target_def.inputs
         required_outputs = target_def.outputs
 
-        provided_params = job_def.parameters
-        provided_inputs = job_def.inputs
-        provided_outputs = job_def.outputs
+        provided_params = job_details.parameters
+        provided_inputs = job_details.inputs
+        provided_outputs = job_details.outputs
 
-        params_section = cls.build_job_parameters(
-            job_namespace, required_params, provided_params,
+        params_section = self.build_job_parameters(
+            required_params, provided_params,
             explicit_deps=[job_push_id])
 
-        input_section = cls.build_job_inputs(
-            job_config, job_namespace, required_inputs, provided_inputs,
+        input_section = self.build_job_inputs(
+            required_inputs, provided_inputs,
             explicit_deps=[job_push_id])
 
-        exec_obj = _util.get_job_resource(target_selector, job_config)
+        exec_namespace = self._job_namespace
+        exec_obj = _util.get_job_resource(target_selector, self._job_config)
 
-        exec_section = cls.build_model_or_flow(
-            job_config, job_namespace, exec_obj,
+        exec_section = self.build_model_or_flow(
+            exec_namespace, job_def, exec_obj,
             explicit_deps=[job_push_id])
 
-        output_section = cls.build_job_outputs(
-            job_config, job_namespace, required_outputs, provided_outputs,
+        output_section = self.build_job_outputs(
+            required_outputs, provided_outputs,
             explicit_deps=[job_push_id])
 
-        main_section = cls._join_sections(params_section, input_section, exec_section, output_section)
+        main_section = self._join_sections(params_section, input_section, exec_section, output_section)
 
         # Build job-level metadata outputs
 
@@ -215,16 +207,14 @@ class GraphBuilder:
             nid for nid, n in main_section.nodes.items()
             if isinstance(n, DataResultNode))
 
-        result_section = cls.build_job_results(
-            job_config, job_namespace,
-            result_spec, bundles=data_result_ids,
+        result_section = self.build_job_results(
+            bundles=data_result_ids,
             explicit_deps=[job_push_id, *main_section.must_run])
 
-        return cls._join_sections(main_section, result_section)
+        return self._join_sections(main_section, result_section)
 
-    @classmethod
     def build_job_parameters(
-            cls, job_namespace: NodeNamespace,
+            self,
             required_params: tp.Dict[str, meta.ModelParameter],
             supplied_params: tp.Dict[str, meta.Value],
             explicit_deps: tp.Optional[tp.List[NodeId]] = None) \
@@ -242,16 +232,15 @@ class GraphBuilder:
                 else:
                     raise _ex.EJobValidation(f"Missing required parameter: [{param_name}]")
 
-            param_id = NodeId(param_name, job_namespace, meta.Value)
+            param_id = NodeId(param_name, self._job_namespace, meta.Value)
             param_node = StaticValueNode(param_id, param_def, explicit_deps=explicit_deps)
 
             nodes[param_id] = param_node
 
         return GraphSection(nodes, outputs=set(nodes.keys()), must_run=list(nodes.keys()))
 
-    @classmethod
     def build_job_inputs(
-            cls, job_config: config.JobConfig, job_namespace: NodeNamespace,
+            self,
             required_inputs: tp.Dict[str, meta.ModelInputSchema],
             supplied_inputs: tp.Dict[str, meta.TagSelector],
             explicit_deps: tp.Optional[tp.List[NodeId]] = None) \
@@ -267,7 +256,7 @@ class GraphBuilder:
 
             if data_selector is None:
                 if input_schema.optional:
-                    data_view_id = NodeId.of(input_name, job_namespace, _data.DataView)
+                    data_view_id = NodeId.of(input_name, self._job_namespace, _data.DataView)
                     nodes[data_view_id] = StaticValueNode(data_view_id, _data.DataView.create_empty())
                     outputs.add(data_view_id)
                     continue
@@ -276,11 +265,11 @@ class GraphBuilder:
 
             # Build a data spec using metadata from the job config
             # For now we are always loading the root part, snap 0, delta 0
-            data_def = _util.get_job_resource(data_selector, job_config).data
-            storage_def = _util.get_job_resource(data_def.storageId, job_config).storage
+            data_def = _util.get_job_resource(data_selector, self._job_config).data
+            storage_def = _util.get_job_resource(data_def.storageId, self._job_config).storage
 
             if data_def.schemaId:
-                schema_def = _util.get_job_resource(data_def.schemaId, job_config).schema
+                schema_def = _util.get_job_resource(data_def.schemaId, self._job_config).schema
             else:
                 schema_def = data_def.schema
 
@@ -289,16 +278,16 @@ class GraphBuilder:
             data_spec = _data.DataSpec(data_item, data_def, storage_def, schema_def)
 
             # Data spec node is static, using the assembled data spec
-            data_spec_id = NodeId.of(f"{input_name}:SPEC", job_namespace, _data.DataSpec)
+            data_spec_id = NodeId.of(f"{input_name}:SPEC", self._job_namespace, _data.DataSpec)
             data_spec_node = StaticValueNode(data_spec_id, data_spec, explicit_deps=explicit_deps)
 
             # Physical load of data items from disk
             # Currently one item per input, since inputs are single part/delta
-            data_load_id = NodeId.of(f"{input_name}:LOAD", job_namespace, _data.DataItem)
+            data_load_id = NodeId.of(f"{input_name}:LOAD", self._job_namespace, _data.DataItem)
             data_load_node = LoadDataNode(data_load_id, data_spec_id, explicit_deps=explicit_deps)
 
             # Input views assembled by mapping one root part to each view
-            data_view_id = NodeId.of(input_name, job_namespace, _data.DataView)
+            data_view_id = NodeId.of(input_name, self._job_namespace, _data.DataView)
             data_view_node = DataViewNode(data_view_id, schema_def, data_load_id)
 
             nodes[data_spec_id] = data_spec_node
@@ -311,9 +300,8 @@ class GraphBuilder:
 
         return GraphSection(nodes, outputs=outputs, must_run=must_run)
 
-    @classmethod
     def build_job_outputs(
-            cls, job_config: config.JobConfig, job_namespace: NodeNamespace,
+            self,
             required_outputs: tp.Dict[str, meta.ModelOutputSchema],
             supplied_outputs: tp.Dict[str, meta.TagSelector],
             explicit_deps: tp.Optional[tp.List[NodeId]] = None) \
@@ -334,20 +322,20 @@ class GraphBuilder:
                     raise _ex.EJobValidation(f"Missing required output: [{output_name}]")
 
             # Output data view must already exist in the namespace
-            data_view_id = NodeId.of(output_name, job_namespace, _data.DataView)
-            data_spec_id = NodeId.of(f"{output_name}:SPEC", job_namespace, _data.DataSpec)
+            data_view_id = NodeId.of(output_name, self._job_namespace, _data.DataView)
+            data_spec_id = NodeId.of(f"{output_name}:SPEC", self._job_namespace, _data.DataSpec)
 
-            data_obj = _util.get_job_resource(data_selector, job_config, optional=True)
+            data_obj = _util.get_job_resource(data_selector, self._job_config, optional=True)
 
             if data_obj is not None:
 
                 # If data def for the output has been built in advance, use a static data spec
 
                 data_def = data_obj.data
-                storage_def = _util.get_job_resource(data_def.storageId, job_config).storage
+                storage_def = _util.get_job_resource(data_def.storageId, self._job_config).storage
 
                 if data_def.schemaId:
-                    schema_def = _util.get_job_resource(data_def.schemaId, job_config).schema
+                    schema_def = _util.get_job_resource(data_def.schemaId, self._job_config).schema
                 else:
                     schema_def = data_def.schema
 
@@ -366,28 +354,28 @@ class GraphBuilder:
                 # Dynamic data def will always use an embedded schema (this is no ID for an external schema)
 
                 data_key = output_name + ":DATA"
-                data_id = job_config.resultMapping[data_key]
+                data_id = self._job_config.resultMapping[data_key]
                 storage_key = output_name + ":STORAGE"
-                storage_id = job_config.resultMapping[storage_key]
+                storage_id = self._job_config.resultMapping[storage_key]
 
                 data_spec_node = DynamicDataSpecNode(
-                        data_spec_id, data_view_id,
-                        data_id, storage_id,
-                        prior_data_spec=None,
-                        explicit_deps=explicit_deps)
+                    data_spec_id, data_view_id,
+                    data_id, storage_id,
+                    prior_data_spec=None,
+                    explicit_deps=explicit_deps)
 
                 output_data_key = _util.object_key(data_id)
                 output_storage_key = _util.object_key(storage_id)
 
             # Map one data item from each view, since outputs are single part/delta
-            data_item_id = NodeId(f"{output_name}:ITEM", job_namespace, _data.DataItem)
+            data_item_id = NodeId(f"{output_name}:ITEM", self._job_namespace, _data.DataItem)
             data_item_node = DataItemNode(data_item_id, data_view_id)
 
             # Create a physical save operation for the data item
-            data_save_id = NodeId.of(f"{output_name}:SAVE", job_namespace, None)
+            data_save_id = NodeId.of(f"{output_name}:SAVE", self._job_namespace, None)
             data_save_node = SaveDataNode(data_save_id, data_spec_id, data_item_id)
 
-            data_result_id = NodeId.of(f"{output_name}:RESULT", job_namespace, ObjectBundle)
+            data_result_id = NodeId.of(f"{output_name}:RESULT", self._job_namespace, ObjectBundle)
             data_result_node = DataResultNode(
                 data_result_id, output_name,
                 data_item_id, data_spec_id, data_save_id,
@@ -404,7 +392,10 @@ class GraphBuilder:
         return GraphSection(nodes, inputs=inputs)
 
     @classmethod
-    def build_runtime_outputs(cls, output_names: tp.List[str], job_namespace: NodeNamespace):
+    def build_runtime_outputs(cls, job_namespace: NodeNamespace, output_names: tp.List[str]):
+
+        # This method is called dynamically during job execution
+        # So it cannot use stateful information like self._job_config or self._job_namespace
 
         # TODO: Factor out common logic with regular job outputs (including static / dynamic)
 
@@ -462,22 +453,21 @@ class GraphBuilder:
 
         return GraphSection(nodes, inputs=inputs, outputs={runtime_outputs_id})
 
-    @classmethod
     def build_job_results(
-            cls, job_config: cfg.JobConfig, job_namespace: NodeNamespace, result_spec: JobResultSpec,
+            self,
             objects: tp.Dict[str, NodeId[meta.ObjectDefinition]] = None,
             bundles: tp.List[NodeId[ObjectBundle]] = None,
             explicit_deps: tp.Optional[tp.List[NodeId]] = None) \
             -> GraphSection:
 
-        build_result_id = NodeId.of("trac_build_result", job_namespace, cfg.JobResult)
+        build_result_id = NodeId.of("trac_build_result", self._job_namespace, cfg.JobResult)
 
         if objects is not None:
 
             results_inputs = set(objects.values())
 
             build_result_node = BuildJobResultNode(
-                build_result_id, job_config.jobId,
+                build_result_id, self._job_config.jobId,
                 outputs = JobOutputs(objects=objects),
                 explicit_deps=explicit_deps)
 
@@ -486,17 +476,17 @@ class GraphBuilder:
             results_inputs = set(bundles)
 
             build_result_node = BuildJobResultNode(
-                build_result_id, job_config.jobId,
+                build_result_id, self._job_config.jobId,
                 outputs = JobOutputs(bundles=bundles),
                 explicit_deps=explicit_deps)
 
         else:
             raise _ex.EUnexpected()
 
-        save_result_id = NodeId("trac_save_result", job_namespace)
-        save_result_node = SaveJobResultNode(save_result_id, build_result_id, result_spec)
+        save_result_id = NodeId("trac_save_result", self._job_namespace)
+        save_result_node = SaveJobResultNode(save_result_id, build_result_id, self._result_spec)
 
-        if result_spec.save_result:
+        if self._result_spec.save_result:
             result_nodes = {build_result_id: build_result_node, save_result_id: save_result_node}
             job_result_id = save_result_id
         else:
@@ -505,10 +495,9 @@ class GraphBuilder:
 
         return GraphSection(result_nodes, inputs=results_inputs, must_run=[job_result_id])
 
-    @classmethod
     def build_model_or_flow_with_context(
-            cls, job_config: config.JobConfig, namespace: NodeNamespace,
-            model_or_flow_name: str, model_or_flow: meta.ObjectDefinition,
+            self, namespace: NodeNamespace, model_or_flow_name: str,
+            job_def: meta.JobDefinition, model_or_flow: meta.ObjectDefinition,
             input_mapping: tp.Dict[str, NodeId], output_mapping: tp.Dict[str, NodeId],
             explicit_deps: tp.Optional[tp.List[NodeId]] = None) \
             -> GraphSection:
@@ -521,44 +510,44 @@ class GraphBuilder:
         # Execute in the sub-context by doing PUSH, EXEC, POP
         # Note that POP node must be in the sub namespace too
 
-        push_section = cls.build_context_push(
+        push_section = self.build_context_push(
             sub_namespace, input_mapping,
             explicit_deps)
 
-        exec_section = cls.build_model_or_flow(
-            job_config, sub_namespace, model_or_flow,
+        exec_section = self.build_model_or_flow(
+            sub_namespace, job_def, model_or_flow,
             explicit_deps=push_section.must_run)
 
-        pop_section = cls.build_context_pop(
+        pop_section = self.build_context_pop(
             sub_namespace, output_mapping,
             explicit_deps=exec_section.must_run)
 
-        return cls._join_sections(push_section, exec_section, pop_section)
+        return self._join_sections(push_section, exec_section, pop_section)
 
-    @classmethod
     def build_model_or_flow(
-            cls, job_config: config.JobConfig, namespace: NodeNamespace,
+            self, namespace: NodeNamespace,
+            job_def: meta.JobDefinition,
             model_or_flow: meta.ObjectDefinition,
             explicit_deps: tp.Optional[tp.List[NodeId]] = None) \
             -> GraphSection:
 
         if model_or_flow.objectType == meta.ObjectType.MODEL:
-            return cls.build_model(job_config, namespace, model_or_flow.model, explicit_deps)
+            return self.build_model(namespace, job_def, model_or_flow.model, explicit_deps)
 
         elif model_or_flow.objectType == meta.ObjectType.FLOW:
-            return cls.build_flow(job_config, namespace, model_or_flow.flow)
+            return self.build_flow(namespace, job_def, model_or_flow.flow)
 
         else:
             raise _ex.EConfigParse("Invalid job config given to the execution engine")
 
-    @classmethod
     def build_model(
-            cls, job_config: config.JobConfig, namespace: NodeNamespace,
+            self, namespace: NodeNamespace,
+            job_def: meta.JobDefinition,
             model_def: meta.ModelDefinition,
             explicit_deps: tp.Optional[tp.List[NodeId]] = None) \
             -> GraphSection:
 
-        cls.check_model_type(job_config, model_def)
+        self.check_model_type(job_def, model_def)
 
         def param_id(node_name):
             return NodeId(node_name, namespace, meta.Value)
@@ -572,10 +561,10 @@ class GraphBuilder:
         output_ids = set(map(data_id, model_def.outputs))
 
         # Set up storage access for import / export data jobs
-        if job_config.job.jobType == meta.JobType.IMPORT_DATA:
-            storage_access = job_config.job.importData.storageAccess
-        elif job_config.job.jobType == meta.JobType.EXPORT_DATA:
-            storage_access = job_config.job.exportData.storageAccess
+        if job_def.jobType == meta.JobType.IMPORT_DATA:
+            storage_access = job_def.importData.storageAccess
+        elif job_def.jobType == meta.JobType.EXPORT_DATA:
+            storage_access = job_def.exportData.storageAccess
         else:
             storage_access = None
 
@@ -615,9 +604,9 @@ class GraphBuilder:
         # Assemble a graph to include the model and its outputs
         return GraphSection(nodes, inputs={*parameter_ids, *input_ids}, outputs=output_ids, must_run=[model_result_id])
 
-    @classmethod
     def build_flow(
-            cls, job_config: config.JobConfig, namespace: NodeNamespace,
+            self, namespace: NodeNamespace,
+            job_def: meta.JobDefinition,
             flow_def: meta.FlowDefinition,
             explicit_deps: tp.Optional[tp.List[NodeId]] = None) \
             -> GraphSection:
@@ -650,11 +639,11 @@ class GraphBuilder:
 
             node_name, node = reachable_nodes.popitem()
 
-            sub_section = cls.build_flow_node(
-                job_config, namespace, target_edges,
+            sub_section = self.build_flow_node(
+                namespace, job_def, target_edges,
                 node_name, node, explicit_deps)
 
-            graph_section = cls._join_sections(graph_section, sub_section, allow_partial_inputs=True)
+            graph_section = self._join_sections(graph_section, sub_section, allow_partial_inputs=True)
 
             if node.nodeType != meta.FlowNodeType.OUTPUT_NODE:
 
@@ -674,19 +663,17 @@ class GraphBuilder:
             missing_targets = [edge.target for node in remaining_edges_by_target.values() for edge in node]
             missing_target_names = [f"{t.node}.{t.socket}" if t.socket else t.node for t in missing_targets]
             missing_nodes = list(map(lambda n: NodeId(n, namespace), missing_target_names))
-            cls._invalid_graph_error(missing_nodes)
+            self._invalid_graph_error(missing_nodes)
 
         return graph_section
 
-    @classmethod
     def build_flow_node(
-            cls, job_config: config.JobConfig, namespace: NodeNamespace,
+            self, namespace: NodeNamespace,
+            job_def: meta.JobDefinition,
             target_edges: tp.Dict[meta.FlowSocket, meta.FlowEdge],
             node_name: str, node: meta.FlowNode,
             explicit_deps: tp.Optional[tp.List[NodeId]] = None) \
             -> GraphSection:
-
-        flow_job = job_config.job.runFlow
 
         def socket_key(socket):
             return f"{socket.node}.{socket.socket}" if socket.socket else socket.node
@@ -723,20 +710,22 @@ class GraphBuilder:
             push_mapping = {**input_mapping, **param_mapping}
             pop_mapping = output_mapping
 
-            model_selector = flow_job.models.get(node_name)
-            model_obj = _util.get_job_resource(model_selector, job_config)
+            model_selector = job_def.runFlow.models.get(node_name)
+            model_obj = _util.get_job_resource(model_selector, self._job_config)
 
             # Missing models in the job config is a job consistency error
             if model_obj is None or model_obj.objectType != meta.ObjectType.MODEL:
                 raise _ex.EJobValidation(f"No model was provided for flow node [{node_name}]")
 
             # Explicit check for model compatibility - report an error now, do not try build_model()
-            cls.check_model_compatibility(model_selector, model_obj.model, node_name, node)
-            cls.check_model_type(job_config, model_obj.model)
+            self.check_model_compatibility(model_selector, model_obj.model, node_name, node)
+            self.check_model_type(job_def, model_obj.model)
 
-            return cls.build_model_or_flow_with_context(
-                job_config, namespace, node_name, model_obj,
-                push_mapping, pop_mapping, explicit_deps)
+            return self.build_model_or_flow_with_context(
+                namespace, node_name,
+                job_def, model_obj,
+                push_mapping, pop_mapping,
+                explicit_deps)
 
         # Missing / invalid node type - should be caught in static validation
         raise _ex.ETracInternal(f"Flow node [{node_name}] has invalid node type [{node.nodeType}]")
@@ -759,17 +748,17 @@ class GraphBuilder:
             raise _ex.EJobValidation(f"Incompatible model for flow node [{node_name}] (Model: [{model_key}])")
 
     @classmethod
-    def check_model_type(cls, job_config: config.JobConfig, model_def: meta.ModelDefinition):
+    def check_model_type(cls, job_def: meta.JobDefinition, model_def: meta.ModelDefinition):
 
-        if job_config.job.jobType == meta.JobType.IMPORT_DATA:
+        if job_def.jobType == meta.JobType.IMPORT_DATA:
             allowed_model_types = [meta.ModelType.DATA_IMPORT_MODEL]
-        elif job_config.job.jobType == meta.JobType.EXPORT_DATA:
+        elif job_def.jobType == meta.JobType.EXPORT_DATA:
             allowed_model_types = [meta.ModelType.DATA_EXPORT_MODEL]
         else:
             allowed_model_types = [meta.ModelType.STANDARD_MODEL]
 
         if model_def.modelType not in allowed_model_types:
-            job_type = job_config.job.jobType.name
+            job_type = job_def.jobType.name
             model_type = model_def.modelType.name
             raise _ex.EJobValidation(f"Job type [{job_type}] cannot use model type [{model_type}]")
 
