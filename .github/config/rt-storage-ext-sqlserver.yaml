@@ -1,0 +1,14 @@
+
+
+storage:
+
+  external:
+
+    data_integration:
+      protocol: SQL
+      properties:
+        dialect: SQLSERVER
+        driver.python: alchemy
+        alchemy.url: mssql+pyodbc://metadb:1433/master?driver=ODBC+Driver+18+for+SQL+Server&TrustServerCertificate=yes
+        alchemy.username: sa
+        alchemy.password: DB_SECRET

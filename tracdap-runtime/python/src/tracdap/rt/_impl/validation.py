@@ -52,6 +52,10 @@ def quick_validate_model_def(model_def: meta.ModelDefinition):
     StaticValidator.quick_validate_model_def(model_def)
 
 
+def is_primitive_type(basic_type: meta.BasicType) -> bool:
+    return StaticValidator.is_primitive_type(basic_type)
+
+
 T_SKIP_VAL = tp.TypeVar("T_SKIP_VAL")
 
 class SkipValidation(tp.Generic[T_SKIP_VAL]):
@@ -317,6 +321,11 @@ class StaticValidator:
         meta.BasicType.DATE]
 
     _log: logging.Logger = util.logger_for_namespace(__name__)
+
+    @classmethod
+    def is_primitive_type(cls, basic_type: meta.BasicType) -> bool:
+
+        return basic_type in cls.__PRIMITIVE_TYPES
 
     @classmethod
     def quick_validate_model_def(cls, model_def: meta.ModelDefinition):

@@ -623,6 +623,17 @@ class RunModelFunc(NodeFunction[Bundle[_data.DataView]]):
                     storage_impl = self.storage_manager.get_file_storage(storage_key, external=True)
                     storage = _ctx.TracFileStorageImpl(storage_key, storage_impl, write_access, self.checkout_directory)
                     storage_map[storage_key] = storage
+                elif self.storage_manager.has_data_storage(storage_key, external=True):
+                    storage_impl = self.storage_manager.get_data_storage(storage_key, external=True)
+                    # This is a work-around until the storage extension API can be updated / unified
+                    if not isinstance(storage_impl, _storage.IDataStorageBase):
+                        raise _ex.EStorageConfig(f"External storage for [{storage_key}] is using the legacy storage framework]")
+                    converter = _data.DataConverter.noop()
+                    storage = _ctx.TracDataStorageImpl(storage_key, storage_impl, converter, write_access, self.checkout_directory)
+                    storage_map[storage_key] = storage
+                else:
+                    raise _ex.EStorageConfig(f"External storage is not available: [{storage_key}]")
+
 
         # Run the model against the mapped local context
 

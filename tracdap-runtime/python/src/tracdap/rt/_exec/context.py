@@ -132,7 +132,7 @@ class TracContextImpl(_api.TracContext):
         else:
             return copy.deepcopy(data_view.trac_schema)
 
-    def get_table(self, dataset_name: str, framework: _eapi.DataFramework[_eapi.DATA_API], **framework_args) -> _eapi.DATA_API:  # noqa
+    def get_table(self, dataset_name: str, framework: _eapi.DataFramework[_eapi.DATA_API], **framework_args) -> _eapi.DATA_API:
 
         _val.validate_signature(self.get_table, dataset_name, framework)
         _val.require_package(framework.protocol_name, framework.api_type)
@@ -165,8 +165,7 @@ class TracContextImpl(_api.TracContext):
         # Data conformance is applied automatically inside the converter, if schema != None
         return converter.from_internal(table, schema)
 
-    def get_pandas_table(self, dataset_name: str, use_temporal_objects: tp.Optional[bool] = None) \
-            -> "_data.pandas.DataFrame":
+    def get_pandas_table(self, dataset_name: str, use_temporal_objects: tp.Optional[bool] = None)  -> "_data.pandas.DataFrame":
 
         return self.get_table(dataset_name, _eapi.PANDAS, use_temporal_objects=use_temporal_objects)
 
@@ -299,7 +298,7 @@ class TracDataContextImpl(TracContextImpl, _eapi.TracDataContext):
     def __init__(
             self, model_def: _meta.ModelDefinition, model_class: _api.TracModel.__class__,
             local_ctx: tp.Dict[str, tp.Any], dynamic_outputs: tp.List[str],
-            storage_map: tp.Dict[str, tp.Union[_eapi.TracFileStorage]],
+            storage_map: tp.Dict[str, tp.Union[_eapi.TracFileStorage, _eapi.TracDataStorage]],
             checkout_directory: pathlib.Path = None):
 
         super().__init__(model_def, model_class, local_ctx, dynamic_outputs, checkout_directory)
@@ -322,8 +321,27 @@ class TracDataContextImpl(TracContextImpl, _eapi.TracDataContext):
 
         return self.__storage_map[storage_key]
 
-    def get_data_storage(self, storage_key: str) -> None:
-        raise _ex.ERuntimeValidation("Data storage API not available yet")
+    def get_data_storage(
+            self, storage_key: str,
+            framework: _eapi.DataFramework[_eapi.DATA_API],
+            **framework_args) -> _eapi.TracDataStorage[_eapi.DATA_API]:
+
+        _val.validate_signature(self.get_file_storage, storage_key)
+
+        self.__val.check_storage_valid_identifier(storage_key)
+        self.__val.check_storage_available(self.__storage_map, storage_key)
+        self.__val.check_storage_type(self.__storage_map, storage_key, _eapi.TracDataStorage)
+        self.__val.check_data_framework_args(framework, framework_args)
+
+        storage = self.__storage_map[storage_key]
+        converter = _data.DataConverter.for_framework(framework, **framework_args)
+
+        # Create a shallow copy of the storage impl with a converter for the requested data framework
+        # At some point we will need a storage factory class, bc the internal data API can also be different
+        storage = copy.copy(storage)
+        storage._TracDataStorageImpl__converter = converter
+
+        return storage
 
     def add_data_import(self, dataset_name: str):
 
@@ -336,15 +354,30 @@ class TracDataContextImpl(TracContextImpl, _eapi.TracDataContext):
         self.__local_ctx[dataset_name] = _data.DataView.create_empty()
         self.__dynamic_outputs.append(dataset_name)
 
-    def set_source_metadata(self, dataset_name: str, storage_key: str, source_info: _eapi.FileStat):
+    def set_source_metadata(self, dataset_name: str, storage_key: str, source_info: tp.Union[_eapi.FileStat, str]):
 
-        _val.validate_signature(self.add_data_import, dataset_name, storage_key, source_info)
+        _val.validate_signature(self.set_source_metadata, dataset_name, storage_key, source_info)
+
+        self.__val.check_dataset_valid_identifier(dataset_name)
+        self.__val.check_dataset_available_in_context(dataset_name)
+        self.__val.check_storage_valid_identifier(storage_key)
+        self.__val.check_storage_available(self.__storage_map, storage_key)
+
+        storage = self.__storage_map[storage_key]
+
+        if isinstance(storage, _eapi.TracFileStorage):
+            if not isinstance(source_info, _eapi.FileStat):
+                self.__val.report_public_error(f"Expected storage_info to be a FileStat, [{storage_key}] refers to file storage")
+
+        if isinstance(storage, _eapi.TracDataStorage):
+            if not isinstance(source_info, str):
+                self.__val.report_public_error(f"Expected storage_info to be a table name, [{storage_key}] refers to dadta storage")
 
         pass  # Not implemented yet, only required when imports are sent back to the platform
 
     def set_attribute(self, dataset_name: str, attribute_name: str, value: tp.Any):
 
-        _val.validate_signature(self.add_data_import, dataset_name, attribute_name, value)
+        _val.validate_signature(self.set_attribute, dataset_name, attribute_name, value)
 
         pass  # Not implemented yet, only required when imports are sent back to the platform
 
@@ -495,6 +528,118 @@ class TracFileStorageImpl(_eapi.TracFileStorage):
         super().write_bytes(storage_path, data)
 
 
+class TracDataStorageImpl(_eapi.TracDataStorage[_eapi.DATA_API]):
+
+    def __init__(
+            self, storage_key: str, storage_impl: _storage.IDataStorageBase[_data.T_INTERNAL_DATA, _data.T_INTERNAL_SCHEMA],
+            data_converter: _data.DataConverter[_eapi.DATA_API, _data.T_INTERNAL_DATA, _data.T_INTERNAL_SCHEMA],
+            write_access: bool, checkout_directory):
+
+        self.__storage_key = storage_key
+        self.__converter = data_converter
+
+        self.__has_table = lambda tn: storage_impl.has_table(tn)
+        self.__list_tables = lambda: storage_impl.list_tables()
+        self.__read_table = lambda tn: storage_impl.read_table(tn)
+        self.__native_read_query = lambda q, ps: storage_impl.native_read_query(q, **ps)
+
+        if write_access:
+            self.__create_table = lambda tn, s: storage_impl.create_table(tn, s)
+            self.__write_table = lambda tn, ds: storage_impl.write_table(tn, ds)
+        else:
+            self.__create_table = None
+            self.__write_table = None
+
+        self.__log = _util.logger_for_object(self)
+        self.__val = TracStorageValidator(self.__log, checkout_directory, self.__storage_key)
+
+    def has_table(self, table_name: str) -> bool:
+
+        _val.validate_signature(self.has_table, table_name)
+
+        self.__val.check_operation_available(self.has_table, self.__has_table)
+        self.__val.check_table_name_is_valid(table_name)
+        self.__val.check_storage_path_is_valid(table_name)
+
+        try:
+            return self.__has_table(table_name)
+        except _ex.EStorageRequest as e:
+            self.__val.report_public_error(e)
+
+    def list_tables(self) -> tp.List[str]:
+
+        _val.validate_signature(self.list_tables)
+
+        self.__val.check_operation_available(self.list_tables, self.__list_tables)
+
+        try:
+            return self.__list_tables()
+        except _ex.EStorageRequest as e:
+            self.__val.report_public_error(e)
+
+    def create_table(self, table_name: str, schema: _api.SchemaDefinition):
+
+        _val.validate_signature(self.create_table, table_name, schema)
+
+        self.__val.check_operation_available(self.create_table, self.__create_table)
+        self.__val.check_table_name_is_valid(table_name)
+        self.__val.check_storage_path_is_valid(table_name)
+
+        arrow_schema = _data.DataMapping.trac_to_arrow_schema(schema)
+
+        try:
+            self.__create_table(table_name, arrow_schema)
+        except _ex.EStorageRequest as e:
+            self.__val.report_public_error(e)
+
+    def read_table(self, table_name: str) -> _eapi.DATA_API:
+
+        _val.validate_signature(self.read_table, table_name)
+
+        self.__val.check_operation_available(self.read_table, self.__read_table)
+        self.__val.check_table_name_is_valid(table_name)
+        self.__val.check_table_name_not_reserved(table_name)
+
+        try:
+            raw_data = self.__read_table(table_name)
+            return self.__converter.from_internal(raw_data)
+
+        except _ex.EStorageRequest as e:
+            self.__val.report_public_error(e)
+
+    def native_read_query(self, query: str, **parameters) -> _eapi.DATA_API:
+
+        _val.validate_signature(self.native_read_query, query, **parameters)
+
+        self.__val.check_operation_available(self.native_read_query, self.__native_read_query)
+
+        # TODO: validate query and parameters
+        # Some validation is performed by the impl
+
+        try:
+            raw_data = self.__native_read_query(query, **parameters)
+            return self.__converter.from_internal(raw_data)
+
+        except _ex.EStorageRequest as e:
+            self.__val.report_public_error(e)
+
+    def write_table(self, table_name: str, dataset: _eapi.DATA_API):
+
+        _val.validate_signature(self.write_table, table_name, dataset)
+
+        self.__val.check_operation_available(self.read_table, self.__read_table)
+        self.__val.check_table_name_is_valid(table_name)
+        self.__val.check_table_name_not_reserved(table_name)
+        self.__val.check_provided_dataset_type(dataset, self.__converter.framework.api_type)
+
+        try:
+            raw_data = self.__converter.to_internal(dataset)
+            self.__write_table(table_name, raw_data)
+
+        except _ex.EStorageRequest as e:
+            self.__val.report_public_error(e)
+
+
 class TracContextErrorReporter:
 
     _VALID_IDENTIFIER = re.compile("^[a-zA-Z_]\\w*$",)
@@ -504,6 +649,10 @@ class TracContextErrorReporter:
 
         self.__log = log
         self.__checkout_directory = checkout_directory
+
+    def report_public_error(self, exception: Exception):
+
+        self._report_error(str(exception), exception)
 
     def _report_error(self, message, cause: Exception = None):
 
@@ -520,6 +669,16 @@ class TracContextErrorReporter:
             raise _ex.ERuntimeValidation(message) from cause
         else:
             raise _ex.ERuntimeValidation(message)
+
+    @staticmethod
+    def _type_name(type_: type):
+
+        module = type_.__module__
+
+        if module is None or module == str.__class__.__module__ or module == tp.__name__:
+            return _val.type_name(type_, False)
+        else:
+            return _val.type_name(type_, True)
 
 
 class TracContextValidator(TracContextErrorReporter):
@@ -728,16 +887,6 @@ class TracContextValidator(TracContextErrorReporter):
             else:
                 self._report_error(f"Storage key [{storage_key}] refers to file storage, not data storage")
 
-    @staticmethod
-    def _type_name(type_: type):
-
-        module = type_.__module__
-
-        if module is None or module == str.__class__.__module__ or module == tp.__name__:
-            return _val.type_name(type_, False)
-        else:
-            return _val.type_name(type_, True)
-
 
 class TracStorageValidator(TracContextErrorReporter):
 
@@ -768,3 +917,30 @@ class TracStorageValidator(TracContextErrorReporter):
 
         if _val.StorageValidator.storage_path_is_empty(storage_path):
             self._report_error(f"Storage path [{storage_path}] is not allowed")
+
+    def check_table_name_is_valid(self, table_name: str):
+
+        if table_name is None:
+            self._report_error(f"Table name is null")
+
+        if not self._VALID_IDENTIFIER.match(table_name):
+            self._report_error(f"Table name {table_name} is not a valid identifier")
+
+    def check_table_name_not_reserved(self, table_name: str):
+
+        if self._RESERVED_IDENTIFIER.match(table_name):
+            self._report_error(f"Table name {table_name} is a reserved identifier")
+
+    def check_provided_dataset_type(self, dataset: tp.Any, expected_type: type):
+
+        if dataset is None:
+            self._report_error(f"Provided dataset is null")
+
+        if not isinstance(dataset, expected_type):
+
+            expected_type_name = self._type_name(expected_type)
+            actual_type_name = self._type_name(type(dataset))
+
+            self._report_error(
+                f"Provided dataset is the wrong type" +
+                f" (expected {expected_type_name}, got {actual_type_name})")

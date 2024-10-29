@@ -84,13 +84,27 @@ class TracContext(TracContext):
 
 
 def init_static():
+    """Ensure TRAC's static model API is available to use (for static definitions at module or class scope)"""
     import tracdap.rt._impl.static_api as _static_impl  # noqa
     _static_impl.StaticApiImpl.register_impl()
 
 
 def infer_schema(dataset: DATA_API) -> SchemaDefinition:
+    """Infer the full TRAC schema of an existing dataset"""
     sa = _StaticApiHook.get_instance()
     return sa.infer_schema(dataset)
+
+
+def array_type(item_type: BasicType) -> TypeDescriptor:
+    """Build a type descriptor for an ARRAY type"""
+    sa = _StaticApiHook.get_instance()
+    return sa.array_type(item_type)
+
+
+def map_type(entry_type: BasicType) -> TypeDescriptor:
+    """Build a type descriptor for a MAP type"""
+    sa = _StaticApiHook.get_instance()
+    return sa.map_type(entry_type)
 
 
 class FileType(_enum.Enum):
@@ -179,6 +193,32 @@ class TracFileStorage:
             stream.write(data)
 
 
+class TracDataStorage(_tp.Generic[DATA_API]):
+
+    @_abc.abstractmethod
+    def has_table(self, table_name: str) -> bool:
+        pass
+
+    @_abc.abstractmethod
+    def list_tables(self) -> _tp.List[str]:
+        pass
+
+    @_abc.abstractmethod
+    def create_table(self, table_name: str, schema: SchemaDefinition):
+        pass
+
+    @_abc.abstractmethod
+    def read_table(self, table_name: str) -> DATA_API:
+        pass
+
+    @_abc.abstractmethod
+    def write_table(self, table_name: str, dataset: DATA_API):
+        pass
+
+    @_abc.abstractmethod
+    def native_read_query(self, query: str, **parameters) -> DATA_API:
+        pass
+
 
 class TracDataContext(TracContext):
 
@@ -187,7 +227,7 @@ class TracDataContext(TracContext):
         pass
 
     @_abc.abstractmethod
-    def get_data_storage(self, storage_key: str) -> None:
+    def get_data_storage(self, storage_key: str, framework: DataFramework[DATA_API], **framework_args) -> TracDataStorage[DATA_API]:
         pass
 
     @_abc.abstractmethod
@@ -195,7 +235,7 @@ class TracDataContext(TracContext):
         pass
 
     @_abc.abstractmethod
-    def set_source_metadata(self, dataset_key: str, storage_key: str, source_info: FileStat):
+    def set_source_metadata(self, dataset_key: str, storage_key: str, source_info: _tp.Union[FileStat, str]):
         pass
 
     @_abc.abstractmethod

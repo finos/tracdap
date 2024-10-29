@@ -78,3 +78,23 @@ aiohttp >= 3.9.5
 anyio >= 4.4.0
 
 # END_PLUGIN azure
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+# SQL
+# ----------------------------------------------------------------------------------------------------------------------
+
+# BEGIN_PLUGIN sql
+
+# Alchemy is an optional dependency, enabled by installing tracdap-runtime[sql]
+
+sqlalchemy >= 2.0.0, < 2.1.0
+
+# These drivers are used for CI, they are not shipped, nor are they dependencies even for tracdap-runtime[sql]
+# Users / distributors are free to use other drivers, according to their own license terms
+
+pymysql >= 1.0, < 2.0
+pg8000 >= 1.0, < 2.0
+pyodbc >= 5.0, < 6.0
+
+# END_PLUGIN sql
