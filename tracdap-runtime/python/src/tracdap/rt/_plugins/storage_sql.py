@@ -146,7 +146,7 @@ class SqlDataStorage(IDataStorageBase[pa.Table, pa.Schema]):
                 sql_batch = cur.fetchmany()
 
                 # Read queries should always return a result set, even if it is empty
-                if not cur.description or cur.rowcount < 0:
+                if not cur.description:
                     raise ex.EStorage(f"Query did not return a result set: {query}")
 
                 arrow_schema = self._decode_sql_schema(cur.description)
