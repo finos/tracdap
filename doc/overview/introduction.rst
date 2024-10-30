@@ -3,7 +3,7 @@ Introduction to TRAC
 ====================
 
 TRAC is a new type of analytics solution designed to work with cloud and big data technologies
-to solve the challenge of managing complex and highly governed models across their lifecycle
+to solve the challenge of managing complex and highly governed models across their lifecycle,
 for multiple personas.
 
 .. image:: ../_images/overview_personas.png
