@@ -42,6 +42,14 @@ class GraphBuilder:
 
         self._errors = []
 
+    def _child_builder(self, job_id: meta.TagHeader) -> "GraphBuilder":
+
+        builder = GraphBuilder(self._job_config, JobResultSpec(save_result=False))
+        builder._job_key = _util.object_key(job_id)
+        builder._job_namespace = NodeNamespace(builder._job_key)
+
+        return builder
+
     def build_job(self, job_def: meta.JobDefinition,) -> Graph:
 
         try:
@@ -57,6 +65,9 @@ class GraphBuilder:
 
             if job_def.jobType in [meta.JobType.IMPORT_DATA, meta.JobType.EXPORT_DATA]:
                 return self.build_standard_job(job_def, self.build_import_export_data_job)
+
+            if job_def.jobType == meta.JobType.JOB_GROUP:
+                return self.build_standard_job(job_def, self.build_job_group)
 
             self._error(_ex.EJobValidation(f"Job type [{job_def.jobType.name}] is not supported yet"))
 
@@ -91,7 +102,7 @@ class GraphBuilder:
         # Build the execution graphs for the main job and results recording
 
         main_section = build_func(job_def, push_id)
-        main_result_id = NodeId.of("trac_build_result", self._job_namespace, config.JobResult)
+        main_result_id = NodeId.of("trac_job_result", self._job_namespace, config.JobResult)
 
         # Clean up the job context
 
@@ -183,6 +194,76 @@ class GraphBuilder:
             job_def, job_push_id,
             target_selector, target_def,
             job_details)
+
+    def build_job_group(self, job_def: meta.JobDefinition, job_push_id: NodeId) -> GraphSection:
+
+        job_group = job_def.jobGroup
+
+        if job_group.jobGroupType == meta.JobGroupType.SEQUENTIAL_JOB_GROUP:
+            return self.build_sequential_job_group(job_group, job_push_id)
+
+        if job_group.jobGroupType == meta.JobGroupType.PARALLEL_JOB_GROUP:
+            return self.build_parallel_job_group(job_group, job_push_id)
+
+        else:
+            self._error(_ex.EJobValidation(f"Job group type [{job_group.jobGroupType.name}] is not supported yet"))
+            return GraphSection(dict(), inputs={job_push_id})
+
+    def build_sequential_job_group(self, job_group: meta.JobGroup, job_push_id: NodeId) -> GraphSection:
+
+        nodes = dict()
+        prior_id = job_push_id
+
+        for child_def in job_group.sequential.jobs:
+
+            child_node = self.build_child_job(child_def, explicit_deps=[prior_id])
+            nodes[child_node.id] = child_node
+
+            prior_id = child_node.id
+
+        # No real results from job groups yet (they cannot be executed from the platform)
+        job_result =  cfg.JobResult()
+        result_id = NodeId.of("trac_job_result", self._job_namespace, cfg.JobResult)
+        result_node = StaticValueNode(result_id, job_result, explicit_deps=[prior_id])
+        nodes[result_id] = result_node
+
+        return GraphSection(nodes, inputs={job_push_id}, outputs={result_id})
+
+    def build_parallel_job_group(self, job_group: meta.JobGroup, job_push_id: NodeId) -> GraphSection:
+
+        nodes = dict()
+        parallel_ids = [job_push_id]
+
+        for child_def in job_group.parallel.jobs:
+
+            child_node = self.build_child_job(child_def, explicit_deps=[job_push_id])
+            nodes[child_node.id] = child_node
+
+            parallel_ids.append(child_node.id)
+
+        # No real results from job groups yet (they cannot be executed from the platform)
+        job_result =  cfg.JobResult()
+        result_id = NodeId.of("trac_job_result", self._job_namespace, cfg.JobResult)
+        result_node = StaticValueNode(result_id, job_result, explicit_deps=parallel_ids)
+        nodes[result_id] = result_node
+
+        return GraphSection(nodes, inputs={job_push_id}, outputs={result_id})
+
+    def build_child_job(self, child_job_def: meta.JobDefinition, explicit_deps) -> Node[config.JobResult]:
+
+        child_job_id = _util.new_object_id(meta.ObjectType.JOB)
+
+        child_builder = self._child_builder(child_job_id)
+        child_graph = child_builder.build_job(child_job_def)
+
+        child_node_name = _util.object_key(child_job_id)
+        child_node_id = NodeId.of(child_node_name, self._job_namespace, cfg.JobResult)
+
+        child_node = ChildJobNode(
+            child_node_id, child_job_id, child_job_def,
+            child_graph, explicit_deps)
+
+        return child_node
 
     def build_calculation_job(
             self, job_def: meta.JobDefinition, job_push_id: NodeId,
@@ -488,7 +569,7 @@ class GraphBuilder:
             explicit_deps: tp.Optional[tp.List[NodeId]] = None) \
             -> GraphSection:
 
-        build_result_id = NodeId.of("trac_build_result", self._job_namespace, cfg.JobResult)
+        build_result_id = NodeId.of("trac_job_result", self._job_namespace, cfg.JobResult)
 
         if objects is not None:
 
@@ -511,10 +592,9 @@ class GraphBuilder:
         else:
             raise _ex.EUnexpected()
 
-        save_result_id = NodeId("trac_save_result", self._job_namespace)
-        save_result_node = SaveJobResultNode(save_result_id, build_result_id, self._result_spec)
-
         if self._result_spec.save_result:
+            save_result_id = NodeId("trac_save_result", self._job_namespace)
+            save_result_node = SaveJobResultNode(save_result_id, build_result_id, self._result_spec)
             result_nodes = {build_result_id: build_result_node, save_result_id: save_result_node}
             job_result_id = save_result_id
         else:

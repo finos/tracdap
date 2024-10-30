@@ -19,7 +19,7 @@ import dataclasses as dc
 import tracdap.rt._impl.data as _data  # noqa
 import tracdap.rt.metadata as meta
 import tracdap.rt.config as cfg
-
+from tracdap.rt_gen.domain.tracdap.config import JobResult
 
 _T = tp.TypeVar('_T')
 
@@ -414,3 +414,12 @@ class SaveJobResultNode(Node[None]):
 
     def _node_dependencies(self) -> tp.Dict[NodeId, DependencyType]:
         return {self.job_result_id: DependencyType.HARD}
+
+
+@_node_type
+class ChildJobNode(Node[cfg.JobResult]):
+
+    job_id: meta.TagHeader
+    job_def: meta.JobDefinition
+
+    graph: Graph
