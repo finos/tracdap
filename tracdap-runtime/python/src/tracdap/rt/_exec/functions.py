@@ -715,7 +715,7 @@ class ChildJobFunction(NodeFunction[None]):
 
     def _execute(self, ctx: NodeContext):
         # This node should never execute, the engine intercepts child job nodes and provides special handling
-        raise _ex.ETracInternal("Child job was not processed correctly(this is a bug)")
+        raise _ex.ETracInternal("Child job was not processed correctly (this is a bug)")
 
 
 

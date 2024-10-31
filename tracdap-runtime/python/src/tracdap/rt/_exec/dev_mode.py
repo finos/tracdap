@@ -199,7 +199,7 @@ class DevModeTranslator:
 
         job_group = job_def.jobGroup
 
-        if job_group.jobGroupType is None or job_group.jobGroupType == _meta.JobGroupType.EMPTY_JOB_GROUP:
+        if job_group.jobGroupType is None or job_group.jobGroupType == _meta.JobGroupType.JOB_GROUP_TYPE_NOT_SET:
             job_group = self._process_job_group_type(job_group)
 
         group_details = self._get_job_group_detail(job_group)

@@ -20,6 +20,7 @@ import tracdap.rt._impl.data as _data  # noqa
 import tracdap.rt.metadata as meta
 import tracdap.rt.config as cfg
 
+
 _T = tp.TypeVar('_T')
 
 

@@ -197,7 +197,7 @@ message ExportDataJob {
  * Specify the group type for a JOB_GROUP job
  */
 enum JobGroupType {
-  EMPTY_JOB_GROUP = 0;
+  JOB_GROUP_TYPE_NOT_SET = 0;
   SEQUENTIAL_JOB_GROUP = 1;
   PARALLEL_JOB_GROUP = 2;
 }
