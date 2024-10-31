@@ -19,7 +19,6 @@ import dataclasses as dc
 import tracdap.rt._impl.data as _data  # noqa
 import tracdap.rt.metadata as meta
 import tracdap.rt.config as cfg
-from tracdap.rt_gen.domain.tracdap.config import JobResult
 
 _T = tp.TypeVar('_T')
 
