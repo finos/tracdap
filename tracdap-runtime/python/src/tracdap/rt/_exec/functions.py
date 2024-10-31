@@ -696,7 +696,7 @@ class RunModelFunc(NodeFunction[Bundle[_data.DataView]]):
 
                 new_nodes[result_node_id] = result_node
 
-            output_section = _graph.GraphBuilder.build_runtime_outputs(self.node.id.namespace, dynamic_outputs)
+            output_section = _graph.GraphBuilder.build_runtime_outputs(dynamic_outputs, self.node.id.namespace)
             new_nodes.update(output_section.nodes)
 
             ctx_id = NodeId.of("trac_job_result", self.node.id.namespace, result_type=None)

@@ -501,7 +501,7 @@ class GraphBuilder:
         return GraphSection(nodes, inputs=inputs)
 
     @classmethod
-    def build_runtime_outputs(cls, job_namespace: NodeNamespace, output_names: tp.List[str]):
+    def build_runtime_outputs(cls, output_names: tp.List[str], job_namespace: NodeNamespace):
 
         # This method is called dynamically during job execution
         # So it cannot use stateful information like self._job_config or self._job_namespace
