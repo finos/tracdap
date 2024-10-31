@@ -169,3 +169,10 @@ class TutorialModelsTest(unittest.TestCase):
         sys_config = self.examples_root.joinpath("config/sys_config.yaml")
 
         launch.launch_model(UsingPolarsModel, job_config, sys_config, dev_mode=True)
+
+    def test_group_import_process_export(self):
+
+        job_config = self.examples_root.joinpath("config/job_group.yaml")
+        sys_config = self.examples_root.joinpath("config/sys_config.yaml")
+
+        launch.launch_job(job_config, sys_config, dev_mode=True)
