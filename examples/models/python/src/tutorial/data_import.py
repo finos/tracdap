@@ -18,6 +18,8 @@ import tracdap.rt.api.experimental as trac
 import pandas as pd
 import pytz
 
+import tutorial.schemas as schemas
+
 
 class BulkDataImport(trac.TracDataImport):
 
@@ -148,6 +150,34 @@ class SelectiveDataImport(trac.TracDataImport):
             else:
 
                 ctx.log().warning(f"Requested table [{table_name}] not found in storage [{storage_key}]")
+
+
+class SimpleDataImport(trac.TracDataImport):
+
+    def define_parameters(self) -> tp.Dict[str, trac.ModelParameter]:
+
+        return trac.define_parameters(
+            trac.P("storage_key", trac.STRING, "TRAC external storage key"),
+            trac.P("source_file", trac.STRING, "Path of the source data file in external storage"))
+
+    def define_outputs(self) -> tp.Dict[str, trac.ModelOutputSchema]:
+
+        customer_loans = trac.load_schema(schemas, "customer_loans.csv")
+
+        return {"customer_loans": trac.ModelOutputSchema(customer_loans)}
+
+    def run_model(self, ctx: trac.TracDataContext):
+
+        storage_key = ctx.get_parameter("storage_key")
+        storage = ctx.get_file_storage(storage_key)
+
+        storage_file = ctx.get_parameter("source_file")
+
+        with storage.read_byte_stream(storage_file) as file_stream:
+
+            dataset = pd.read_parquet(file_stream)
+            ctx.put_pandas_table("customer_loans", dataset)
+
 
 if __name__ == "__main__":
     import tracdap.rt.launch as launch
