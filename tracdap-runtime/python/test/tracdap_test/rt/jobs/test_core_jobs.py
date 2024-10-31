@@ -97,8 +97,8 @@ class CoreJobsTest(unittest.TestCase):
             scratch_dir = pathlib.Path(tmpdir)
 
             # Let dev mode translator sort out the data / storage definitions
-            job_config = dev_mode.DevModeTranslator.translate_job_config(
-                self.sys_config, job_config, scratch_dir, None, None)
+            translator = dev_mode.DevModeTranslator(self.sys_config, None, scratch_dir)  # No config mgr
+            job_config = translator.translate_job_config(job_config)
 
             trac_runtime = runtime.TracRuntime(
                 self.sys_config,
@@ -120,8 +120,8 @@ class CoreJobsTest(unittest.TestCase):
             scratch_dir = pathlib.Path(tmpdir)
 
             # Let dev mode translator sort out the data / storage definitions
-            job_config = dev_mode.DevModeTranslator.translate_job_config(
-                self.sys_config, job_config, scratch_dir, None, None)
+            translator = dev_mode.DevModeTranslator(self.sys_config, None, scratch_dir)  # No config mgr
+            job_config = translator.translate_job_config(job_config)
 
             # Make the input dataset use an external schema
 
