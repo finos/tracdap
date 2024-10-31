@@ -414,3 +414,12 @@ class SaveJobResultNode(Node[None]):
 
     def _node_dependencies(self) -> tp.Dict[NodeId, DependencyType]:
         return {self.job_result_id: DependencyType.HARD}
+
+
+@_node_type
+class ChildJobNode(Node[cfg.JobResult]):
+
+    job_id: meta.TagHeader
+    job_def: meta.JobDefinition
+
+    graph: Graph

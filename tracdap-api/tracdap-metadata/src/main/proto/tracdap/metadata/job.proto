@@ -45,6 +45,9 @@ enum JobType {
 
   /// Export data to external locations
   EXPORT_DATA = 5;
+
+  /// A job built from a collection of other jobs
+  JOB_GROUP = 6;
 }
 
 /**
@@ -98,6 +101,7 @@ message JobDefinition {
     ImportModelJob importModel = 4;
     ImportDataJob importData = 5;
     ExportDataJob exportData = 6;
+    JobGroup jobGroup = 7;
   }
 }
 
@@ -187,3 +191,44 @@ message ExportDataJob {
 
   repeated TagUpdate outputAttrs = 8;
 }
+
+
+/**
+ * Specify the group type for a JOB_GROUP job
+ */
+enum JobGroupType {
+  JOB_GROUP_TYPE_NOT_SET = 0;
+  SEQUENTIAL_JOB_GROUP = 1;
+  PARALLEL_JOB_GROUP = 2;
+}
+
+/**
+ * Specification for a JOB_GROUP job, which runs a collection of other jobs
+ */
+message JobGroup {
+
+  JobGroupType jobGroupType = 1;
+
+  oneof jobGroupDetails {
+    SequentialJobGroup sequential = 2;
+    ParallelJobGroup parallel = 3;
+  }
+}
+
+/**
+ * A job group where each job runs in sequence
+ */
+message SequentialJobGroup {
+
+  repeated JobDefinition jobs = 1;
+}
+
+/**
+ * A job group where all jobs runs in parallel
+ */
+message ParallelJobGroup {
+
+  repeated JobDefinition jobs = 1;
+}
+
+

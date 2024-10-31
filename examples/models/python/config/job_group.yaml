@@ -1,0 +1,49 @@
+
+
+job:
+  jobGroup:
+    sequential:
+      jobs:
+
+        - importData:
+
+            model: tutorial.data_import.SimpleDataImport
+
+            parameters:
+              storage_key: staging_data
+              source_file: sample_data.parquet
+
+            outputs:
+              customer_loans: primary/data_import/customer_loans.csv
+
+            storageAccess:
+              - staging_data
+
+        - runModel:
+
+            model: tutorial.using_data.UsingDataModel
+
+            parameters:
+              eur_usd_rate: 1.2071
+              default_weighting: 1.5
+              filter_defaults: false
+
+            inputs:
+              customer_loans: primary/data_import/customer_loans.csv
+
+            outputs:
+              profit_by_region: generated/using_data/profit_by_region.csv
+
+        - exportData:
+
+            model: tutorial.data_export.DataExportExample
+
+            parameters:
+              storage_key: exported_data
+              export_comment: "Exporting some example data"
+
+            inputs:
+              profit_by_region: generated/using_data/profit_by_region.csv
+
+            storageAccess:
+              - exported_data

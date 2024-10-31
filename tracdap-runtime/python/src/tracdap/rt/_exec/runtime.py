@@ -333,10 +333,8 @@ class TracRuntime:
                 config_file_name="job")
 
         if self._dev_mode:
-            job_config = _dev_mode.DevModeTranslator.translate_job_config(
-                self._sys_config, job_config,
-                self._scratch_dir, self._config_mgr,
-                model_class)
+            translator = _dev_mode.DevModeTranslator(self._sys_config, self._config_mgr, self._scratch_dir)
+            job_config = translator.translate_job_config(job_config, model_class)
 
         return job_config
 

@@ -699,12 +699,24 @@ class RunModelFunc(NodeFunction[Bundle[_data.DataView]]):
             output_section = _graph.GraphBuilder.build_runtime_outputs(dynamic_outputs, self.node.id.namespace)
             new_nodes.update(output_section.nodes)
 
-            ctx_id = NodeId.of("trac_build_result", self.node.id.namespace, result_type=None)
+            ctx_id = NodeId.of("trac_job_result", self.node.id.namespace, result_type=None)
             new_deps[ctx_id] = list(_graph.Dependency(nid, _graph.DependencyType.HARD) for nid in output_section.outputs)
 
             self.node_callback.send_graph_updates(new_nodes, new_deps)
 
         return results
+
+
+class ChildJobFunction(NodeFunction[None]):
+
+    def __init__(self, node: ChildJobNode):
+        super().__init__()
+        self.node = node
+
+    def _execute(self, ctx: NodeContext):
+        # This node should never execute, the engine intercepts child job nodes and provides special handling
+        raise _ex.ETracInternal("Child job was not processed correctly (this is a bug)")
+
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -790,6 +802,7 @@ class FunctionResolver:
         DataResultNode: DataResultFunc,
         StaticValueNode: StaticValueFunc,
         RuntimeOutputsNode: RuntimeOutputsFunc,
+        ChildJobNode: ChildJobFunction,
         BundleItemNode: NoopFunc,
         NoopNode: NoopFunc,
         RunModelResultNode: NoopFunc
