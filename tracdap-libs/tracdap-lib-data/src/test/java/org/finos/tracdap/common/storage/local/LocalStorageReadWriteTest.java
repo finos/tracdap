@@ -22,6 +22,7 @@ import org.apache.arrow.memory.RootAllocator;
 import org.finos.tracdap.common.data.DataContext;
 import org.finos.tracdap.common.storage.StorageReadWriteTestSuite;
 import org.finos.tracdap.common.storage.IStorageManager;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -32,17 +33,28 @@ import java.util.Properties;
 public class LocalStorageReadWriteTest extends StorageReadWriteTestSuite {
 
     @TempDir
-    Path storageDir;
+    static Path storageDir;
 
-    @BeforeEach
-    void setupStorage() {
+    static LocalFileStorage storageInstance;
+    static DataContext contextInstance;
+
+    @BeforeAll
+    static void setupStorage() {
+
 
         var storageProps = new Properties();
         storageProps.put(IStorageManager.PROP_STORAGE_KEY, "TEST_STORAGE");
         storageProps.put(LocalFileStorage.CONFIG_ROOT_PATH, storageDir.toString());
-        storage = new LocalFileStorage("TEST_STORAGE", storageProps);
+        storageInstance = new LocalFileStorage("TEST_STORAGE", storageProps);
 
-        var executor = new DefaultEventExecutor(new DefaultThreadFactory("t-events"));
-        dataContext = new DataContext(executor, new RootAllocator());
+        var elExecutor = new DefaultEventExecutor(new DefaultThreadFactory("t-events"));
+        contextInstance = new DataContext(elExecutor, new RootAllocator());
+    }
+
+    @BeforeEach
+    void useStorageInstance() {
+
+        storage = storageInstance;
+        dataContext = contextInstance;
     }
 }

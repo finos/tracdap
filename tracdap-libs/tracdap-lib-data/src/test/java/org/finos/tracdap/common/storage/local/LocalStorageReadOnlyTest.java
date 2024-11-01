@@ -24,6 +24,7 @@ import org.finos.tracdap.common.storage.CommonFileStorage;
 import org.finos.tracdap.common.storage.IStorageManager;
 import org.finos.tracdap.common.storage.StorageReadOnlyTestSuite;
 
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -33,20 +34,35 @@ import java.util.Properties;
 
 public class LocalStorageReadOnlyTest extends StorageReadOnlyTestSuite {
 
-    @BeforeEach
-    void setupStorage(@TempDir Path storageDir) {
+    @TempDir
+    static Path storageDir;
+
+    static LocalFileStorage rwStorageInstance;
+    static LocalFileStorage roStorageInstance;
+    static DataContext contextInstance;
+
+    @BeforeAll
+    static void setupStorage() {
 
         var rwProps = new Properties();
         rwProps.put(IStorageManager.PROP_STORAGE_KEY, "TEST_STORAGE_NOT_WRITABLE");
         rwProps.put(LocalFileStorage.CONFIG_ROOT_PATH, storageDir.toString());
-        rwStorage = new LocalFileStorage("TEST_LOCAL_RW_STORAGE", rwProps);
+        rwStorageInstance = new LocalFileStorage("TEST_LOCAL_RW_STORAGE", rwProps);
 
         var roProps = new Properties();
         roProps.putAll(rwProps);
         roProps.put(CommonFileStorage.READ_ONLY_CONFIG_KEY, "true");
-        roStorage = new LocalFileStorage("TEST_LOCAL_RO_STORAGE", roProps);
+        roStorageInstance = new LocalFileStorage("TEST_LOCAL_RO_STORAGE", roProps);
 
-        var executor = new DefaultEventExecutor(new DefaultThreadFactory("t-events"));
-        dataContext = new DataContext(executor, new RootAllocator());
+        var elExecutor = new DefaultEventExecutor(new DefaultThreadFactory("t-events"));
+        contextInstance = new DataContext(elExecutor, new RootAllocator());
+    }
+
+    @BeforeEach
+    void useStorageInstance() {
+
+        rwStorage = rwStorageInstance;
+        roStorage = roStorageInstance;
+        dataContext = contextInstance;
     }
 }
