@@ -91,6 +91,7 @@ public class GcpStorageReadOnlyTest extends StorageReadOnlyTestSuite {
     @BeforeEach
     void setup() {
 
+        dataContext = testCtx;
         rwStorage = testRwStorage;
         roStorage = testRoStorage;
     }

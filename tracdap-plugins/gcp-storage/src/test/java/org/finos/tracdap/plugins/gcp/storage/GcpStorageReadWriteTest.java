@@ -82,8 +82,8 @@ public class GcpStorageReadWriteTest extends StorageReadWriteTestSuite {
         testStorage.start(elg);
     }
 
-    @AfterEach
-    void tearDown() {
+    @BeforeEach
+    void setup() {
 
         dataContext = testCtx;
         storage = testStorage;
