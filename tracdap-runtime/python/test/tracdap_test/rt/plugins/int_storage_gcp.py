@@ -43,16 +43,16 @@ class GcsArrowStorageTest(unittest.TestCase, FileOperationsTestSuite, FileReadWr
     def setUpClass(cls) -> None:
 
         suite_properties = cls._properties_from_env()
-        suite_config = cfg.PluginConfig(protocol="GCS", properties=suite_properties)
+        suite_storage_config = cfg.PluginConfig(protocol="GCS", properties=suite_properties)
 
-        cls.suite_storage = cls._storage_from_config(suite_config, "tracdap_ci_storage_setup")
+        cls.suite_storage = cls._storage_from_config(suite_storage_config, "tracdap_ci_storage_setup")
         cls.suite_storage.mkdir(cls.suite_storage_prefix)
 
         test_properties = cls._properties_from_env()
         test_properties["prefix"] = cls.suite_storage_prefix
-        test_config = cfg.PluginConfig(protocol="GCS", properties=test_properties)
+        test_storage_config = cfg.PluginConfig(protocol="GCS", properties=test_properties)
 
-        cls.storage = cls._storage_from_config(test_config, "tracdap_ci_storage")
+        cls.storage = cls._storage_from_config(test_storage_config, "tracdap_ci_storage")
 
     @classmethod
     def tearDownClass(cls) -> None:

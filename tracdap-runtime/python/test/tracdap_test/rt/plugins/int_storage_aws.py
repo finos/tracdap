@@ -31,35 +31,22 @@ class S3ArrowStorageTest(unittest.TestCase, FileOperationsTestSuite, FileReadWri
 
     suite_storage_prefix = f"runtime_storage_test_suite_{uuid.uuid4()}"
     suite_storage: storage.IFileStorage
-    test_number: int
 
     @classmethod
     def setUpClass(cls) -> None:
 
-        properties = cls._properties_from_env()
+        suite_properties = cls._properties_from_env()
+        suite_storage_config = cfg.PluginConfig(protocol="S3", properties=suite_properties)
 
-        suite_storage_config = cfg.PluginConfig(protocol="S3", properties=properties)
-
-        cls.suite_storage = cls._storage_from_config(suite_storage_config, "tracdap_ci_storage")
+        cls.suite_storage = cls._storage_from_config(suite_storage_config, "tracdap_ci_storage_setup")
         cls.suite_storage.mkdir(cls.suite_storage_prefix)
-        cls.test_number = 0
 
-    def setUp(self):
+        test_properties = cls._properties_from_env()
+        test_properties["arrowNativeFs"] = "true"
+        test_properties["prefix"] = cls.suite_storage_prefix
+        test_storage_config = cfg.PluginConfig(protocol="S3", properties=test_properties)
 
-        test_name = f"test_aws_{self.test_number}"
-        test_dir = f"{self.suite_storage_prefix}/{test_name}"
-
-        self.suite_storage.mkdir(test_dir)
-
-        self.__class__.test_number += 1
-
-        properties = self._properties_from_env()
-        properties["arrowNativeFs"] = "true"
-        properties["prefix"] = test_dir
-
-        test_storage_config = cfg.PluginConfig(protocol="S3", properties=properties)
-
-        self.storage = self._storage_from_config(test_storage_config, test_name)
+        cls.storage = cls._storage_from_config(test_storage_config, "tracdap_ci_storage")
 
     @classmethod
     def tearDownClass(cls) -> None:
