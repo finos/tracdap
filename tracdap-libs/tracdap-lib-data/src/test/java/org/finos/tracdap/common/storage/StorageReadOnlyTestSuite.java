@@ -47,11 +47,11 @@ public abstract class StorageReadOnlyTestSuite {
     @Test
     void testMkdir_readOnly() throws Exception {
 
-        var dir = roStorage.mkdir("test_dir", false, dataContext);
+        var dir = roStorage.mkdir("testMkdir_readOnly", false, dataContext);
         waitFor(TEST_TIMEOUT, dir);
         Assertions.assertThrows(EStorageAccess.class, () -> getResultOf(dir));
 
-        var dirPresent = roStorage.exists("test_dir", dataContext);
+        var dirPresent = roStorage.exists("testMkdir_readOnly", dataContext);
         waitFor(TEST_TIMEOUT, dirPresent);
         Assertions.assertFalse(getResultOf(dirPresent));
     }
@@ -63,11 +63,11 @@ public abstract class StorageReadOnlyTestSuite {
         // The file is created independently of the storage, because the storage is assumed to be read only
         // and the file cannot be created in it.
 
-        var prepare = makeSmallFile("test_file.txt", rwStorage, dataContext);
+        var prepare = makeSmallFile("testRm_readOnly.txt", rwStorage, dataContext);
         waitFor(TEST_TIMEOUT, prepare);
         getResultOf(prepare);
 
-        var created = roStorage.exists("test_file.txt", dataContext);
+        var created = roStorage.exists("testRm_readOnly.txt", dataContext);
         waitFor(TEST_TIMEOUT, created);
         Assertions.assertTrue(getResultOf(created));
 
@@ -77,7 +77,7 @@ public abstract class StorageReadOnlyTestSuite {
 
         // File should not be gone
 
-        var exists = roStorage.exists("test_file.txt", dataContext);
+        var exists = roStorage.exists("testRm_readOnly.txt", dataContext);
         waitFor(TEST_TIMEOUT, exists);
         Assertions.assertTrue(getResultOf(exists));
     }
@@ -89,21 +89,21 @@ public abstract class StorageReadOnlyTestSuite {
         // The file is created independently of the storage, because the storage is assumed to be read only
         // and the file cannot be created in it.
 
-        var prepare = rwStorage.mkdir("test_dir", false, dataContext);
+        var prepare = rwStorage.mkdir("testRmdir_readOnly", false, dataContext);
         waitFor(TEST_TIMEOUT, prepare);
         getResultOf(prepare);
 
-        var created = roStorage.exists("test_dir", dataContext);
+        var created = roStorage.exists("testRmdir_readOnly", dataContext);
         waitFor(TEST_TIMEOUT, created);
         Assertions.assertTrue(getResultOf(created));
 
-        var rmdir = roStorage.rmdir("test_dir", dataContext);
+        var rmdir = roStorage.rmdir("testRmdir_readOnly", dataContext);
         waitFor(TEST_TIMEOUT, rmdir);
         Assertions.assertThrows(EStorageAccess.class, () -> getResultOf(rmdir));
 
         // Dir should not be gone
 
-        var exists = roStorage.exists("test_dir", dataContext);
+        var exists = roStorage.exists("testRmdir_readOnly", dataContext);
         waitFor(TEST_TIMEOUT, exists);
         Assertions.assertTrue(getResultOf(exists));
     }
@@ -111,7 +111,7 @@ public abstract class StorageReadOnlyTestSuite {
     @Test
     void testWriter_readOnly() {
 
-        var storagePath = "any_file.txt";
+        var storagePath = "testWriter_readOnly.txt";
 
         var writeSignal = new CompletableFuture<Long>();
         var writer = roStorage.writer(storagePath, writeSignal, dataContext);
