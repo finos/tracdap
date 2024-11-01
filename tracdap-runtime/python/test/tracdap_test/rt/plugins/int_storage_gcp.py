@@ -42,10 +42,10 @@ class GcsArrowStorageTest(unittest.TestCase, FileOperationsTestSuite, FileReadWr
     @classmethod
     def setUpClass(cls) -> None:
 
-        setup_properties = cls._properties_from_env()
-        setup_config = cfg.PluginConfig(protocol="GCS", properties=setup_properties)
+        suite_properties = cls._properties_from_env()
+        suite_config = cfg.PluginConfig(protocol="GCS", properties=suite_properties)
 
-        cls.suite_storage = cls._storage_from_config(setup_config, "tracdap_ci_storage_setup")
+        cls.suite_storage = cls._storage_from_config(suite_config, "tracdap_ci_storage_setup")
         cls.suite_storage.mkdir(cls.suite_storage_prefix)
 
         test_properties = cls._properties_from_env()
@@ -93,34 +93,21 @@ class GcsFsspecStorageTest(unittest.TestCase, FileOperationsTestSuite, FileReadW
 
     suite_storage_prefix = f"runtime_storage_test_suite_{uuid.uuid4()}"
     suite_storage: storage.IFileStorage
-    test_number: int
 
     @classmethod
     def setUpClass(cls) -> None:
 
-        properties = cls._properties_from_env()
+        suite_properties = cls._properties_from_env()
+        suite_config = cfg.PluginConfig(protocol="GCS", properties=suite_properties)
 
-        suite_storage_config = cfg.PluginConfig(protocol="GCS", properties=properties)
-
-        cls.suite_storage = cls._storage_from_config(suite_storage_config, "tracdap_ci_storage")
+        cls.suite_storage = cls._storage_from_config(suite_config, "tracdap_ci_storage_setup")
         cls.suite_storage.mkdir(cls.suite_storage_prefix)
-        cls.test_number = 0
 
-    def setUp(self):
+        test_properties = cls._properties_from_env()
+        test_properties["prefix"] = cls.suite_storage_prefix
+        test_config = cfg.PluginConfig(protocol="GCS", properties=test_properties)
 
-        test_name = f"test_gcp_{self.test_number}"
-        test_dir = f"{self.suite_storage_prefix}/{test_name}"
-
-        self.suite_storage.mkdir(test_dir)
-
-        self.__class__.test_number += 1
-
-        properties = self._properties_from_env()
-        properties["prefix"] = test_dir
-
-        test_storage_config = cfg.PluginConfig(protocol="GCS", properties=properties)
-
-        self.storage = self._storage_from_config(test_storage_config, test_name)
+        cls.storage = cls._storage_from_config(test_config, "tracdap_ci_storage")
 
     @classmethod
     def tearDownClass(cls) -> None:
