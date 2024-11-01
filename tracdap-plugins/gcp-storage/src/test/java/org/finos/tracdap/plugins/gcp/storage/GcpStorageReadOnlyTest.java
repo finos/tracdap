@@ -41,7 +41,7 @@ import static org.finos.tracdap.test.concurrent.ConcurrentTestHelpers.waitFor;
 @Tag("gcp-platform")
 public class GcpStorageReadOnlyTest extends StorageReadOnlyTestSuite {
 
-    static Duration SETUP_TIMEOUT = Duration.of(5, ChronoUnit.SECONDS);
+    static Duration SETUP_TIMEOUT = Duration.of(10, ChronoUnit.SECONDS);
 
     static Properties storageProps;
     static String testSuiteDir;
@@ -49,18 +49,17 @@ public class GcpStorageReadOnlyTest extends StorageReadOnlyTestSuite {
     static EventLoopGroup elg;
     static BufferAllocator allocator;
 
-    static DataContext setupCtx;
-    static GcsObjectStorage setupStorage;
-
-    static int testNumber;
+    static DataContext setupCtx, testCtx;
+    static GcsObjectStorage setupStorage, testRwStorage, testRoStorage;
 
     @BeforeAll
     static void setupStorage() throws Exception {
 
+        storageProps = GcsStorageEnvProps.readStorageEnvProps();
+
         var timestamp = DateTimeFormatter.ISO_INSTANT.format(Instant.now()).replace(':', '.');
         var random = new Random().nextLong();
 
-        storageProps = GcsStorageEnvProps.readStorageEnvProps();
         testSuiteDir = String.format(
                 "platform_storage_ops_test_suite_%s_0x%h/",
                 timestamp, random);
@@ -73,55 +72,43 @@ public class GcpStorageReadOnlyTest extends StorageReadOnlyTestSuite {
         setupStorage.start(elg);
 
         var mkdir = setupStorage.mkdir(testSuiteDir, true, setupCtx);
-        waitFor(Duration.ofSeconds(10), mkdir);
-        resultOf(mkdir);
-    }
-
-    @BeforeEach
-    void setup() throws Exception {
-
-        var testDir = String.format("%stest_%d", testSuiteDir, ++testNumber);
-
-        var mkdir = setupStorage.mkdir(testDir, false, setupCtx);
         waitFor(SETUP_TIMEOUT, mkdir);
         resultOf(mkdir);
 
-        storageProps.put(GcsObjectStorage.PREFIX_PROPERTY, testDir);
-        rwStorage = new GcsObjectStorage("TEST_" + testNumber + "_RW", storageProps);
-        rwStorage.start(elg);
+        storageProps.put(GcsObjectStorage.PREFIX_PROPERTY, testSuiteDir);
 
         var roProps = new Properties();
         roProps.putAll(storageProps);
         roProps.put(CommonFileStorage.READ_ONLY_CONFIG_KEY, "true");
 
-        roStorage = new GcsObjectStorage("TEST_" + testNumber + "_RO", roProps);
-        roStorage.start(elg);
-
-        dataContext = new DataContext(elg.next(), allocator);
+        testCtx = new DataContext(elg.next(), allocator);
+        testRwStorage = new GcsObjectStorage("TEST_STORAGE_RW", storageProps);
+        testRwStorage.start(elg);
+        testRoStorage = new GcsObjectStorage("TEST_STORAGE_RO", roProps);
+        testRoStorage.start(elg);
     }
 
-    @AfterEach
-    void tearDown() {
+    @BeforeEach
+    void setup() {
 
-        rwStorage.stop();
-        rwStorage = null;
-
-        roStorage.stop();
-        roStorage = null;
+        rwStorage = testRwStorage;
+        roStorage = testRoStorage;
     }
 
     @AfterAll
     static void tearDownStorage() throws Exception {
+
+        testRoStorage.stop();
+        testRwStorage.stop();
 
         var rm = setupStorage.rmdir(testSuiteDir, setupCtx);
         waitFor(Duration.ofSeconds(10), rm);
         resultOf(rm);
 
         setupStorage.stop();
-        setupStorage = null;
 
         elg.shutdownGracefully();
-        elg = null;
+        allocator.close();
     }
 }
 
