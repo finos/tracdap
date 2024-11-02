@@ -18,12 +18,14 @@ package org.finos.tracdap.common.storage.local;
 
 import io.netty.util.concurrent.DefaultEventExecutor;
 import io.netty.util.concurrent.DefaultThreadFactory;
+import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.memory.RootAllocator;
 import org.finos.tracdap.common.data.DataContext;
 import org.finos.tracdap.common.storage.CommonFileStorage;
 import org.finos.tracdap.common.storage.IStorageManager;
 import org.finos.tracdap.common.storage.StorageReadOnlyTestSuite;
 
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.io.TempDir;
@@ -36,6 +38,8 @@ public class LocalStorageReadOnlyTest extends StorageReadOnlyTestSuite {
 
     @TempDir
     static Path storageDir;
+
+    static BufferAllocator allocator;
 
     static LocalFileStorage rwStorageInstance;
     static LocalFileStorage roStorageInstance;
@@ -54,8 +58,10 @@ public class LocalStorageReadOnlyTest extends StorageReadOnlyTestSuite {
         roProps.put(CommonFileStorage.READ_ONLY_CONFIG_KEY, "true");
         roStorageInstance = new LocalFileStorage("TEST_LOCAL_RO_STORAGE", roProps);
 
+        allocator = new RootAllocator();
+
         var elExecutor = new DefaultEventExecutor(new DefaultThreadFactory("t-events"));
-        contextInstance = new DataContext(elExecutor, new RootAllocator());
+        contextInstance = new DataContext(elExecutor, allocator);
     }
 
     @BeforeEach
@@ -64,5 +70,13 @@ public class LocalStorageReadOnlyTest extends StorageReadOnlyTestSuite {
         rwStorage = rwStorageInstance;
         roStorage = roStorageInstance;
         dataContext = contextInstance;
+    }
+
+    @AfterAll
+    static void tearDownStorage() {
+
+        roStorageInstance.close();
+        rwStorageInstance.close();
+        allocator.close();
     }
 }

@@ -16,6 +16,7 @@
 
 package org.finos.tracdap.common.storage.local;
 
+import org.apache.arrow.memory.BufferAllocator;
 import org.finos.tracdap.common.data.DataContext;
 import org.finos.tracdap.common.storage.IStorageManager;
 import org.finos.tracdap.common.storage.StorageOperationsTestSuite;
@@ -24,6 +25,7 @@ import io.netty.util.concurrent.DefaultEventExecutor;
 import io.netty.util.concurrent.DefaultThreadFactory;
 import org.apache.arrow.memory.RootAllocator;
 
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.io.TempDir;
@@ -37,6 +39,8 @@ public class LocalStorageOperationsTest extends StorageOperationsTestSuite {
     @TempDir
     static Path storageDir;
 
+    static BufferAllocator allocator;
+
     static LocalFileStorage storageInstance;
     static DataContext contextInstance;
 
@@ -49,8 +53,10 @@ public class LocalStorageOperationsTest extends StorageOperationsTestSuite {
         storageProps.put(LocalFileStorage.CONFIG_ROOT_PATH, storageDir.toString());
         storageInstance = new LocalFileStorage("TEST_STORAGE", storageProps);
 
+        allocator = new RootAllocator();
+
         var elExecutor = new DefaultEventExecutor(new DefaultThreadFactory("t-events"));
-        contextInstance = new DataContext(elExecutor, new RootAllocator());
+        contextInstance = new DataContext(elExecutor, allocator);
     }
 
     @BeforeEach
@@ -58,5 +64,12 @@ public class LocalStorageOperationsTest extends StorageOperationsTestSuite {
 
         storage = storageInstance;
         dataContext = contextInstance;
+    }
+
+    @AfterAll
+    static void tearDownStorage() {
+
+        storageInstance.close();
+        allocator.close();
     }
 }
