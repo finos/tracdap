@@ -42,7 +42,7 @@ import static org.finos.tracdap.test.concurrent.ConcurrentTestHelpers.waitFor;
 @Tag("aws-platform")
 public class S3StorageOperationsTest extends StorageOperationsTestSuite {
 
-    static Duration SETUP_TIMEOUT = Duration.of(5, ChronoUnit.SECONDS);
+    static Duration SETUP_TIMEOUT = Duration.of(10, ChronoUnit.SECONDS);
 
     static Properties storageProps;
     static String testSuiteDir;
@@ -50,8 +50,8 @@ public class S3StorageOperationsTest extends StorageOperationsTestSuite {
     static EventLoopGroup elg;
     static BufferAllocator allocator;
 
-    static DataContext setupCtx;
-    static S3ObjectStorage setupStorage;
+    static DataContext setupCtx, testCtx;
+    static S3ObjectStorage setupStorage, testStorage;
 
     static int testNumber;
 
@@ -74,44 +74,34 @@ public class S3StorageOperationsTest extends StorageOperationsTestSuite {
         setupStorage.start(elg);
 
         var mkdir = setupStorage.mkdir(testSuiteDir, true, setupCtx);
-        waitFor(Duration.ofSeconds(10), mkdir);
-        resultOf(mkdir);
-    }
-
-    @BeforeEach
-    void setup() throws Exception {
-
-        var testDir = String.format("%stest_%d", testSuiteDir, ++testNumber);
-
-        var mkdir = setupStorage.mkdir(testDir, false, setupCtx);
         waitFor(SETUP_TIMEOUT, mkdir);
         resultOf(mkdir);
 
-        storageProps.put(S3ObjectStorage.PREFIX_PROPERTY, testDir);
-        storage = new S3ObjectStorage("TEST_" + testNumber, storageProps);
-        storage.start(elg);
+        storageProps.put(S3ObjectStorage.PREFIX_PROPERTY, testSuiteDir);
+        testStorage = new S3ObjectStorage("TEST_" + testNumber, storageProps);
+        testStorage.start(elg);
 
-        dataContext = new DataContext(elg.next(), allocator);
+        testCtx = new DataContext(elg.next(), allocator);
     }
 
-    @AfterEach
-    void tearDown() {
+    @BeforeEach
+    void setup() {
 
-        storage.stop();
-        storage = null;
+        storage = testStorage;
     }
 
     @AfterAll
     static void tearDownStorage() throws Exception {
+
+        testStorage.stop();
 
         var rm = setupStorage.rmdir(testSuiteDir, setupCtx);
         waitFor(Duration.ofSeconds(10), rm);
         resultOf(rm);
 
         setupStorage.stop();
-        setupStorage = null;
 
         elg.shutdownGracefully();
-        elg = null;
+        allocator.close();
     }
 }
