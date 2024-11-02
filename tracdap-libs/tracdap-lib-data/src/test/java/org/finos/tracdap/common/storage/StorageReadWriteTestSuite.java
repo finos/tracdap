@@ -280,32 +280,27 @@ public abstract class StorageReadWriteTestSuite {
         var exists1Result = getResultOf(exists1);
         Assertions.assertTrue(exists1Result);
 
-        var content = Bytes.copyToBuffer(
-                "Some content".getBytes(StandardCharsets.UTF_8),
-                dataContext.arrowAllocator());
+        var content = "Some content".getBytes(StandardCharsets.UTF_8);
+        var contentStream = Stream
+                .of(content)
+                .map(chunk -> Bytes.copyToBuffer(chunk, dataContext.arrowAllocator()));
 
-        var contentStream = Flows.publish(Stream.of(content));
         var writeSignal = new CompletableFuture<Long>();
         var writer = storage.writer(storagePath, writeSignal, dataContext);
-        contentStream.subscribe(writer);
-
-        waitFor(TEST_TIMEOUT, writeSignal);
-
-        var exists = storage.exists(storagePath, dataContext);
-        waitFor(TEST_TIMEOUT, exists);
-
-        Assertions.assertTrue(getResultOf(exists));
-
-        var contentStream2 = Flows.publish(Stream.of(content));
-        var writeSignal2 = new CompletableFuture<Long>();
-        var writer2 = storage.writer(storagePath, writeSignal2, dataContext);
 
         Assertions.assertThrows(EStorageRequest.class, () -> {
 
-            contentStream2.subscribe(writer2);
-            waitFor(TEST_TIMEOUT, writeSignal2);
-            getResultOf(writeSignal2);
+            Flows.publish(contentStream).subscribe(writer);
+            waitFor(TEST_TIMEOUT, writeSignal);
+            getResultOf(writeSignal);
         });
+
+        // Dir should still exist after write failure
+
+        var stat = storage.stat(storagePath, dataContext);
+        waitFor(TEST_TIMEOUT, stat);
+
+        Assertions.assertEquals(FileType.DIRECTORY, getResultOf(stat).fileType);
     }
 
     @Test
