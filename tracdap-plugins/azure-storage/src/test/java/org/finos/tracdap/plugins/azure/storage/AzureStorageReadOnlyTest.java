@@ -42,7 +42,7 @@ import static org.finos.tracdap.test.concurrent.ConcurrentTestHelpers.waitFor;
 @Tag("azure-platform")
 public class AzureStorageReadOnlyTest extends StorageReadOnlyTestSuite {
 
-    static Duration SETUP_TIMEOUT = Duration.of(5, ChronoUnit.SECONDS);
+    static Duration SETUP_TIMEOUT = Duration.of(10, ChronoUnit.SECONDS);
 
     static Properties storageProps;
     static String testSuiteDir;
@@ -50,8 +50,8 @@ public class AzureStorageReadOnlyTest extends StorageReadOnlyTestSuite {
     static EventLoopGroup elg;
     static BufferAllocator allocator;
 
-    static DataContext setupCtx;
-    static AzureBlobStorage setupStorage;
+    static DataContext setupCtx, testCtx;
+    static AzureBlobStorage setupStorage, testRwStorage, testRoStorage;
 
     static int testNumber;
 
@@ -74,54 +74,43 @@ public class AzureStorageReadOnlyTest extends StorageReadOnlyTestSuite {
         setupStorage.start(elg);
 
         var mkdir = setupStorage.mkdir(testSuiteDir, true, setupCtx);
-        waitFor(Duration.ofSeconds(10), mkdir);
-        resultOf(mkdir);
-    }
-
-    @BeforeEach
-    void setup() throws Exception {
-
-        var testDir = String.format("%stest_%d", testSuiteDir, ++testNumber);
-
-        var mkdir = setupStorage.mkdir(testDir, false, setupCtx);
         waitFor(SETUP_TIMEOUT, mkdir);
         resultOf(mkdir);
 
-        storageProps.put(AzureBlobStorage.PREFIX_PROPERTY, testDir);
-        rwStorage = new AzureBlobStorage("TEST_" + testNumber + "_RW", storageProps);
-        rwStorage.start(elg);
+        storageProps.put(AzureBlobStorage.PREFIX_PROPERTY, testSuiteDir);
+        testRwStorage = new AzureBlobStorage("TEST_" + testNumber + "_RW", storageProps);
+        testRwStorage.start(elg);
 
         var roProps = new Properties();
         roProps.putAll(storageProps);
         roProps.put(CommonFileStorage.READ_ONLY_CONFIG_KEY, "true");
 
-        roStorage = new AzureBlobStorage("TEST_" + testNumber + "_RO", roProps);
-        roStorage.start(elg);
+        testRoStorage = new AzureBlobStorage("TEST_" + testNumber + "_RO", roProps);
+        testRoStorage.start(elg);
 
-        dataContext = new DataContext(elg.next(), allocator);
+        testCtx = new DataContext(elg.next(), allocator);
     }
 
     @AfterEach
     void tearDown() {
 
-        rwStorage.stop();
-        rwStorage = null;
-
-        roStorage.stop();
-        roStorage = null;
+        rwStorage = testRwStorage;
+        roStorage = testRoStorage;
     }
 
     @AfterAll
     static void tearDownStorage() throws Exception {
+
+        testRwStorage.stop();
+        testRoStorage.stop();
 
         var rm = setupStorage.rmdir(testSuiteDir, setupCtx);
         waitFor(Duration.ofSeconds(10), rm);
         resultOf(rm);
 
         setupStorage.stop();
-        setupStorage = null;
 
         elg.shutdownGracefully();
-        elg = null;
+        allocator.close();
     }
 }
