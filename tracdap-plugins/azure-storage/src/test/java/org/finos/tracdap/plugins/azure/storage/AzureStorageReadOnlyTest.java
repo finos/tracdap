@@ -91,8 +91,8 @@ public class AzureStorageReadOnlyTest extends StorageReadOnlyTestSuite {
         testCtx = new DataContext(elg.next(), allocator);
     }
 
-    @AfterEach
-    void tearDown() {
+    @BeforeEach
+    void setup() {
 
         rwStorage = testRwStorage;
         roStorage = testRoStorage;
