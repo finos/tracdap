@@ -89,7 +89,7 @@ public class S3StorageReadWriteTest extends StorageReadWriteTestSuite {
     void setup() {
 
         storage = testStorage;
-        dataContext = setupCtx;
+        dataContext = testCtx;
     }
 
     @AfterAll

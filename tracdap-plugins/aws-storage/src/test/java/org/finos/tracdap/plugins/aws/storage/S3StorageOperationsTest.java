@@ -88,6 +88,7 @@ public class S3StorageOperationsTest extends StorageOperationsTestSuite {
     void setup() {
 
         storage = testStorage;
+        dataContext = testCtx;
     }
 
     @AfterAll

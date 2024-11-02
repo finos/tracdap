@@ -87,6 +87,7 @@ public class AzureStorageReadWriteTest extends StorageReadWriteTestSuite {
     void setup() {
 
         storage = testStorage;
+        dataContext = testCtx;
     }
 
     @AfterAll

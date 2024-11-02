@@ -83,10 +83,11 @@ public class AzureStorageOperationsTest extends StorageOperationsTestSuite {
         testCtx = new DataContext(elg.next(), allocator);
     }
 
-    @AfterEach
-    void tearDown() {
+    @BeforeEach
+    void setup() {
 
         storage = testStorage;
+        dataContext = testCtx;
     }
 
     @AfterAll

@@ -96,6 +96,7 @@ public class AzureStorageReadOnlyTest extends StorageReadOnlyTestSuite {
 
         rwStorage = testRwStorage;
         roStorage = testRoStorage;
+        dataContext = testCtx;
     }
 
     @AfterAll

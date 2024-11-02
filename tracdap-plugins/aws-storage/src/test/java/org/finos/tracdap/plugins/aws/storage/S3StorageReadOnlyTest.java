@@ -97,6 +97,7 @@ public class S3StorageReadOnlyTest extends StorageReadOnlyTestSuite {
 
         rwStorage = rwTestStorage;
         roStorage = roTestStorage;
+        dataContext = testCtx;
     }
 
     @AfterAll
