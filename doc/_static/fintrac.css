@@ -61,6 +61,16 @@ code {
     font-weight: bolder;
 }
 
+pre {
+    background-color: #1D3D59 !important;
+    color: #EEEEEE;
+}
+
+pre > span.linenos {
+    color: #BBBBBB;
+    margin-right: 10px;
+}
+
 /* Main buttons (light & dark) */
 
 .btn-primary:hover,
