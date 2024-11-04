@@ -61,6 +61,14 @@ code {
     font-weight: bolder;
 }
 
+/* Do not use bold for code links in the page nav menu */
+
+nav code {
+    font-weight: normal;
+}
+
+/* Pre-formatted code blocks are the same in dark and light mode */
+
 pre {
     background-color: #1D3D59 !important;
     color: #EEEEEE;
@@ -212,7 +220,6 @@ body.theme-dark .input-group-text.bg-white {
 
 body.theme-dark code {
     color: #A3C4D9;
-    font-weight: bolder;
 }
 
 /* Dark mode - Tables */
