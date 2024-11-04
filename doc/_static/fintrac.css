@@ -129,6 +129,21 @@ a.reference:not(:disabled):not(.disabled).active,
 }
 
 
+/* Sphinx Design Elements */
+
+.sd-card-header {
+    background-color: #F8F8F8;
+}
+
+.sd-card-body {
+
+}
+
+.sd-card-footer {
+
+}
+
+
 /* Dark mode - background */
 
 body.theme-dark {
@@ -253,4 +268,19 @@ body.theme-dark .toc .toctree-expand:hover {
 
 body.theme-dark .toc .current > a {
     color: #D9815E;
+}
+
+
+/* Dark Mode - Sphinx Design Elements */
+
+body.theme-dark .sd-card-header {
+    background-color: #343434;
+}
+
+body.theme-dark .sd-card-body {
+    background-color: #2E2E2E;
+}
+
+body.theme-dark .sd-card-footer {
+    background-color: #2E2E2E;
 }

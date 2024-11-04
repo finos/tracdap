@@ -21,10 +21,7 @@ TRAC Data & Analytics Platform
     :gutter: 3
 
     .. grid-item-card::
-        :class-header: sd-bg-light sd-pt-0 sd-pb-1
-        :class-body: sd-py-0
-        :class-footer: sd-border-0 sd-pt-0 sd-pb-3
-        :shadow: md
+        :class-footer: sd-border-0
 
         **Learn about TRAC**
         ^^^^^^^^^^^^^^^^^^^^
@@ -40,10 +37,7 @@ TRAC Data & Analytics Platform
             Platform overview
 
     .. grid-item-card::
-        :class-header: sd-bg-light sd-pt-0 sd-pb-1
-        :class-body: sd-py-0
-        :class-footer: sd-border-0 sd-pt-0 sd-pb-3
-        :shadow: md
+        :class-footer: sd-border-0
 
         **Build and run models**
         ^^^^^^^^^^^^^^^^^^^^^^^^
@@ -59,10 +53,7 @@ TRAC Data & Analytics Platform
             Modelling
 
     .. grid-item-card::
-        :class-header: sd-bg-light sd-pt-0 sd-pb-1
-        :class-body: sd-py-0
-        :class-footer: sd-border-0 sd-pt-0 sd-pb-3
-        :shadow: md
+        :class-footer: sd-border-0
 
         **Build applications and workflows**
         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -80,10 +71,7 @@ TRAC Data & Analytics Platform
             App development
 
     .. grid-item-card::
-        :class-header: sd-bg-light sd-pt-0 sd-pb-1
-        :class-body: sd-py-0
-        :class-footer: sd-border-0 sd-pt-0 sd-pb-3
-        :shadow: md
+        :class-footer: sd-border-0
 
 
         **Deploy and manage the platform**
