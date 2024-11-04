@@ -24,6 +24,12 @@ img.align-center {
     display: block;
 }
 
+/* Allow hiding the TOC tree without affecting global navigation */
+
+.toc-hidden {
+    display: none;
+}
+
 /* Main header & footer color */
 
 body {
