@@ -17,17 +17,6 @@ TRAC Data & Analytics Platform
     If you have particular questions or issues, please raise a ticket on our
     `issue tracker <https://github.com/finos/tracdap/issues>`_.
 
-
-.. toctree::
-    :hidden:
-
-    overview/index
-    modelling/index
-    app_dev/index
-    deployment/index
-    reference/index
-
-
 .. grid:: 1 2 2 2
     :gutter: 3
 
@@ -110,6 +99,17 @@ TRAC Data & Analytics Platform
             :expand:
 
             Deployment
+
+
+.. toctree::
+    :class: toc-hidden
+    :maxdepth: 1
+
+    overview/index
+    modelling/index
+    app_dev/index
+    deployment/index
+    reference/index
 
 
 .. rubric:: Can't find what you're looking for?

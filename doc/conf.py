@@ -83,12 +83,12 @@ extensions = [
     'autoapi.extension',
     
     'sphinx_design',
-    'sphinxcontrib.fulltoc',
-    'cloud_sptheme.ext.relbar_links'
+    "sphinx_wagtail_theme"
 
 ]
 
-autosectionlabel_prefix_document = True
+
+# Auto API configuration
 
 autoapi_dirs = [
     '../build/doc/code/platform_api',
@@ -109,15 +109,27 @@ autodoc_typehints = 'description'
 autoapi_member_order = 'groupwise'
 autoapi_add_toctree_entry = False
 
-# Add any paths that contain templates here, relative to this directory.
-templates_path = ['_templates']
 
-# List of patterns, relative to source directory, that match files and
-# directories to ignore when looking for source files.
-# This pattern also affects html_static_path and html_extra_path.
-exclude_patterns = [
-    '_templates'
+# Content generation
+
+header_links = [
+    "GitHub|https://github.com/finos/tracdap",
+    "fintrac.co.uk|https://fintrac.co.uk/"
 ]
+
+footer_links = [
+    "Website|https://fintrac.co.uk/",
+    "Contact|https://fintrac.co.uk/contact",
+    "Legal|https://fintrac.co.uk/legal",
+]
+
+autosectionlabel_prefix_document = True
+
+rst_prolog = """
+.. meta::
+   :theme-color: #1D3D59
+"""
+
 
 
 # -- Options for HTML output -------------------------------------------------
@@ -125,27 +137,24 @@ exclude_patterns = [
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 
-html_theme = 'cloud'
+html_theme = "sphinx_wagtail_theme"
+html_css_files = ["fintrac.css"]
 
-master_doc = 'index'
-index_doc = 'index'
+html_theme_options = dict(
+    project_name = f"TRAC D.A.P. Documentation (Version {version})",
+    logo = "fintrac_logo.svg",
+    logo_alt = "finTRAC Logo",
+    logo_height = 59,
+    logo_url = "/",
+    logo_width = 45,
 
-relbar_links = [("index", "home")]
+    github_url = None,
+    header_links = ",".join(header_links),
+    footer_links = ",".join(footer_links)
+)
 
-html_theme_options = {
-    'max_width': '80%',
-    'externalrefs': False
-}
+html_copy_source = False
+html_show_sourcelink = False
 
-html_sidebars = {'**': ['globaltoc.html', 'searchbox.html']}
-
-html_show_sphinx = False
-
-html_context = {
-    'shorttitle': short_title
-}
-
-# Add any paths that contain custom static files (such as style sheets) here,
-# relative to this directory. They are copied after the builtin static files,
-# so a file named "default.css" will overwrite the builtin "default.css".
-# html_static_path = ['_static']
+html_favicon = "_static/fintrac_favicon.ico"
+html_static_path = ["_static"]
