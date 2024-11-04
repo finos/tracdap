@@ -84,10 +84,37 @@ public class TestData {
             case CUSTOM: return nextCustomDef(definition);
             case STORAGE: return nextStorageDef(definition);
             case SCHEMA: return nextSchemaDef(definition);
+            case FILE: return nextFileDef(definition);
 
             case FLOW:
             case JOB:
-            case FILE:
+
+                return definition;
+
+            default:
+                throw new RuntimeException("No second version available in dummy data for object type " + objectType.name());
+        }
+    }
+
+    public static ObjectDefinition dummyBadVersionForType(ObjectDefinition definition) {
+
+        // Not all object types have semantics defined for versioning
+        // It is sometimes helpful to create versions anyway for testing
+        // E.g. to test that version increments are rejected for objects that don't support versioning!
+
+        var objectType = definition.getObjectType();
+
+        switch (objectType) {
+
+            case DATA: return nextBadDataDef(definition);
+            case MODEL: return nextBadModelDef(definition);
+            case CUSTOM: return nextBadCustomDef(definition);
+            case STORAGE: return nextBadStorageDef(definition);
+            case SCHEMA: return nextBadSchemaDef(definition);
+            case FILE: return nextBadFileDef(definition);
+
+            case FLOW:
+            case JOB:
 
                 return definition;
 
@@ -185,6 +212,16 @@ public class TestData {
                 .build();
     }
 
+    public static ObjectDefinition nextBadDataDef(ObjectDefinition origDef) {
+
+        var newSchema = changeBadSchemaField(origDef.getData().getSchema());
+
+        return origDef.toBuilder()
+                .setData(origDef.getData().toBuilder()
+                .setSchema(newSchema))
+                .build();
+    }
+
     public static ObjectDefinition dummySchemaDef() {
 
         var dataDef = dummyDataDef();
@@ -202,6 +239,13 @@ public class TestData {
                 .build();
     }
 
+    public static ObjectDefinition nextBadSchemaDef(ObjectDefinition origDef) {
+
+        return origDef.toBuilder()
+                .setSchema(changeBadSchemaField(origDef.getSchema()))
+                .build();
+    }
+
     private static SchemaDefinition addFieldToSchema(SchemaDefinition origSchema) {
 
         var fieldName = "extra_field_" + (origSchema.getTable().getFieldsCount() + 1);
@@ -216,6 +260,19 @@ public class TestData {
 
         return origSchema.toBuilder()
                 .setTable(newTableSchema)
+                .build();
+    }
+
+    private static SchemaDefinition changeBadSchemaField(SchemaDefinition origSchema) {
+
+        var originalField = origSchema.getTable().getFields(0);
+        var newField = originalField.toBuilder()
+                .setFieldType(BasicType.DATE)
+                .build();
+
+        return origSchema.toBuilder()
+                .setTable(origSchema.getTable().toBuilder()
+                .setFields(0, newField))
                 .build();
     }
 
@@ -265,6 +322,26 @@ public class TestData {
             .build();
     }
 
+    public static ObjectDefinition nextBadStorageDef(ObjectDefinition definition) {
+
+        var originalItem = definition.getStorage().getDataItemsOrThrow("dummy_item");
+        var originalCopy = originalItem.getIncarnations(0).getCopies(0);
+
+        var newCopy = originalCopy.toBuilder()
+                .setStorageFormat("PARQUET")
+                .build();
+
+        var newItem = originalItem.toBuilder()
+                .setIncarnations(0, originalItem.getIncarnations(0).toBuilder()
+                .setCopies(0, newCopy))
+                .build();
+
+        return definition.toBuilder()
+                .setStorage(definition.getStorage().toBuilder()
+                .putDataItems("dummy_item", newItem))
+                .build();
+    }
+
     public static ObjectDefinition dummyModelDef() {
 
         return ObjectDefinition.newBuilder()
@@ -312,6 +389,15 @@ public class TestData {
                 .setModel(origDef.getModel()
                 .toBuilder()
                 .putParameters("param3", ModelParameter.newBuilder().setParamType(TypeSystem.descriptor(BasicType.DATE)).build()))
+                .build();
+    }
+
+    public static ObjectDefinition nextBadModelDef(ObjectDefinition origDef) {
+
+        return origDef.toBuilder()
+                .setModel(origDef.getModel()
+                .toBuilder()
+                .setPath("altered/layout/src"))
                 .build();
     }
 
@@ -374,6 +460,27 @@ public class TestData {
                 .build();
     }
 
+    public static ObjectDefinition nextFileDef(ObjectDefinition origDef) {
+
+        return origDef.toBuilder()
+                .setFile(origDef.getFile().toBuilder()
+                .setName("magic_template_v2_updated")  // File names are likely to be changed with suffixes etc
+                .setSize(87533)
+                .setDataItem("file/FILE_ID/version-2"))
+                .build();
+    }
+
+    public static ObjectDefinition nextBadFileDef(ObjectDefinition origDef) {
+
+        return origDef.toBuilder()
+                .setFile(origDef.getFile().toBuilder()
+                .setExtension("txt")
+                .setMimeType("text/plain")
+                .setSize(87533)
+                .setDataItem("file/FILE_ID/version-2"))
+                .build();
+    }
+
     public static ObjectDefinition dummyCustomDef() {
 
         var jsonReportDef = "{ reportType: 'magic', mainGraph: { content: 'more_magic' } }";
@@ -382,7 +489,7 @@ public class TestData {
                 .setObjectType(ObjectType.CUSTOM)
                 .setCustom(CustomDefinition.newBuilder()
                 .setCustomSchemaType("REPORT")
-                .setCustomSchemaVersion(2)
+                .setCustomSchemaVersion(1)
                 .setCustomData(ByteString.copyFromUtf8(jsonReportDef)))
                 .build();
     }
@@ -395,7 +502,17 @@ public class TestData {
         return origDef.toBuilder()
                 .setCustom(origDef.getCustom()
                 .toBuilder()
+                .setCustomSchemaVersion(2)
                 .setCustomData(ByteString.copyFromUtf8(jsonReportDef)))
+                .build();
+    }
+
+    public static ObjectDefinition nextBadCustomDef(ObjectDefinition origDef) {
+
+        return origDef.toBuilder()
+                .setCustom(origDef.getCustom()
+                .toBuilder()
+                .setCustomSchemaType("DASHBOARD"))
                 .build();
     }
 

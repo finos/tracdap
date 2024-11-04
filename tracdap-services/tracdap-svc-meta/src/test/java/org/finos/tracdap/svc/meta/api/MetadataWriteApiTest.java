@@ -595,25 +595,71 @@ abstract class MetadataWriteApiTest {
     // Versioned types, as listed in MetadataConstants.VERSIONED_OBJECT_TYPES
     @ParameterizedTest
     @EnumSource(value = ObjectType.class, mode = EnumSource.Mode.INCLUDE,
-                names = {"DATA", "FILE", "STORAGE", "SCHEMA", "CUSTOM"})
+                names = {"DATA", "FILE", "STORAGE", "SCHEMA", "CUSTOM", "MODEL", "FLOW"})
     void updateObject_trustedTypesOk(ObjectType objectType) {
 
         updateObject_ok(objectType, request -> trustedApi.updateObject(request));
     }
 
+    @ParameterizedTest
+    @EnumSource(value = ObjectType.class, mode = EnumSource.Mode.INCLUDE,
+            names = {"DATA", "FILE", "STORAGE", "SCHEMA", "CUSTOM", "MODEL"})
+    void updateObject_trustedTypesBadVersion(ObjectType objectType) {
+
+        // FLOW has no versioning constraints, so not included in the bad versions test
+
+        var v1SavedTag = updateObject_prepareV1(objectType);
+        var v1Selector = selectorForTag(v1SavedTag);
+
+        var v2Obj = TestData.dummyBadVersionForType(v1SavedTag.getDefinition());
+
+        var v2WriteRequest = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(objectType)
+                .setPriorVersion(v1Selector)
+                .setDefinition(v2Obj)
+                .build();
+
+        var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.updateObject(v2WriteRequest));
+        assertEquals(Status.Code.FAILED_PRECONDITION, error.getStatus().getCode());
+    }
+
     // Versioned types that are also publicly writable
     @ParameterizedTest
     @EnumSource(value = ObjectType.class, mode = EnumSource.Mode.INCLUDE,
-                names = {"SCHEMA", "CUSTOM"})
+                names = {"SCHEMA", "CUSTOM", "FLOW"})
     void updateObject_publicTypesOk(ObjectType objectType) {
 
         updateObject_ok(objectType, request -> publicApi.updateObject(request));
     }
 
+    @ParameterizedTest
+    @EnumSource(value = ObjectType.class, mode = EnumSource.Mode.INCLUDE,
+            names = {"SCHEMA", "CUSTOM"})
+    void updateObject_publicTypesBadVersion(ObjectType objectType) {
+
+        // FLOW has no versioning constraints, so not included in the bad versions test
+
+        var v1SavedTag = updateObject_prepareV1(objectType);
+        var v1Selector = selectorForTag(v1SavedTag);
+
+        var v2Obj = TestData.dummyBadVersionForType(v1SavedTag.getDefinition());
+
+        var v2WriteRequest = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(objectType)
+                .setPriorVersion(v1Selector)
+                .setDefinition(v2Obj)
+                .build();
+
+        var error = assertThrows(StatusRuntimeException.class, () -> publicApi.updateObject(v2WriteRequest));
+        assertEquals(Status.Code.FAILED_PRECONDITION, error.getStatus().getCode());
+    }
+
     // Versioned types that are not publicly writable
     @ParameterizedTest
     @EnumSource(value = ObjectType.class, mode = EnumSource.Mode.INCLUDE,
-                names = {"DATA", "FILE", "STORAGE"})
+                names = {"DATA", "FILE", "STORAGE", "MODEL"})
     void updateObject_publicTypesNotAllowed(ObjectType objectType) {
 
         var v1SavedTag = updateObject_prepareV1(objectType);
@@ -635,7 +681,9 @@ abstract class MetadataWriteApiTest {
     // Object types not included in MetadataConstants.VERSIONED_OBJECT_TYPES
     @ParameterizedTest
     @EnumSource(value = ObjectType.class, mode = EnumSource.Mode.EXCLUDE,
-                names = {"OBJECT_TYPE_NOT_SET", "UNRECOGNIZED", "DATA", "FILE", "STORAGE", "SCHEMA", "CUSTOM"})
+                names = {"OBJECT_TYPE_NOT_SET", "UNRECOGNIZED",
+                        "DATA", "FILE", "STORAGE", "SCHEMA", "CUSTOM",
+                        "MODEL", "FLOW"})
     void updateObject_versionsNotSupported(ObjectType objectType) {
 
         var v1SavedTag = updateObject_prepareV1(objectType);
@@ -756,6 +804,11 @@ abstract class MetadataWriteApiTest {
                 .build();
 
         return readApi.readObject(v1MetadataReadRequest);
+    }
+
+    @Test
+    void updateObject_badVersionIncrememnt() {
+
     }
 
     // For the remaining corner and error cases around versions, we use the CUSTOM object type
