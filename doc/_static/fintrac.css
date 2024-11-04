@@ -54,6 +54,13 @@ div.rst-content h6 {
     text-transform: uppercase;
 }
 
+/* Code - matches default link color */
+
+code {
+    color: #296189;
+    font-weight: bolder;
+}
+
 /* Main buttons (light & dark) */
 
 .btn-primary:hover,
@@ -189,6 +196,13 @@ body.theme-dark .input-group-text.bg-white {
     background-color: #1D3D59 !important;
     border-color: #3B668C;
     color: #CCCCCC;
+}
+
+/* Dark mode - Code - matches default link color */
+
+body.theme-dark code {
+    color: #A3C4D9;
+    font-weight: bolder;
 }
 
 /* Dark mode - Tables */
