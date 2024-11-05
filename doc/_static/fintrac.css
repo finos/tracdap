@@ -57,7 +57,7 @@ div.rst-content h6 {
 /* Code - matches default link color */
 
 code {
-    color: #296189;
+    color: #3B668C;
     font-weight: bolder;
 }
 
@@ -100,7 +100,7 @@ a,
 a.reference,
 .btn-link,
 .nav-link {
-    color: #296189;
+    color: #3B668C;
     text-decoration-color: #D9815E;
 }
 
@@ -142,7 +142,7 @@ a.reference:not(:disabled):not(.disabled).active,
 }
 
 .toc .toctree-expand {
-    color: #296189 !important;
+    color: #3B668C !important;
 }
 
 .toc .toctree-expand:hover {
@@ -166,6 +166,17 @@ a.reference:not(:disabled):not(.disabled).active,
 
 .sd-card-footer {
 
+}
+
+.sd-btn-outline-primary {
+    color: #3B668C !important;
+    border-color: #3B668C !important;
+    font-weight: bolder;
+}
+
+.sd-btn-outline-primary:hover{
+    color: #FFFFFF !important;
+    background-color: #3B668C !important;
 }
 
 
@@ -314,4 +325,14 @@ body.theme-dark .sd-card-body {
 
 body.theme-dark .sd-card-footer {
     background-color: #2E2E2E;
+}
+
+body.theme-dark .sd-btn-outline-primary {
+    color: #A3C4D9 !important;
+    border-color: #A3C4D9 !important;
+}
+
+body.theme-dark .sd-btn-outline-primary:hover{
+    color: #A3C4D9 !important;
+    background-color: #A3C4D9 !important;
 }
