@@ -138,11 +138,11 @@ rst_prolog = """
 # a list of builtin themes.
 
 html_theme = "sphinx_wagtail_theme"
-html_css_files = ["fintrac.css"]
+html_css_files = ["tracdap.css"]
 
 html_theme_options = dict(
     project_name = f"TRAC D.A.P. Documentation (Version {version})",
-    logo = "fintrac_logo.svg",
+    logo = "tracdap_logo.svg",
     logo_alt = "finTRAC Logo",
     logo_height = 59,
     logo_url = "/",
@@ -156,5 +156,5 @@ html_theme_options = dict(
 html_copy_source = False
 html_show_sourcelink = False
 
-html_favicon = "_static/fintrac_favicon.ico"
+html_favicon = "_static/tracdap_favicon.ico"
 html_static_path = ["_static"]
