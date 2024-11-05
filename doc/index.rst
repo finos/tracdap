@@ -1,18 +1,21 @@
 
 ##############################
-TRAC Data & Analytics Platform
+TRAC: The Modern Model Platform
 ##############################
 
-.. centered::
-    *A next-generation data and analytics platform for use in highly regulated environments*
-	
+TRAC is a universal model orchestration solution designed for the most complex, critical and highly-governed
+use cases.
+
+The core platform services - i.e. TRAC Data & Analytics Platform (or TRAC D.A.P.) - are maintained by
+`finTRAC Limited <https://www.fintrac.co.uk>`_ in association with the `finos Foundation <https://www.finos.org>`_
+under the `Apache Software License version 2.0 <https://www.apache.org/licenses/LICENSE-2.0>`_.
+
+This documentation site focuses on how to deploy the TRAC D.A.P. services and build both models and
+applications which leverage those services. Commercially supported deployments of TRAC are separately available from `finTRAC Limited <https://www.fintrac.co.uk>`_.
+
 
 .. note::
-    We are building the documentation for TRAC in parallel with the open source version of the
-    platform, both are in active deveopment. This documentaiton is presented in the hope that
-    it will be useful before it is complete!
-
-    You can see the current development status and roadmap for the platform on the
+   You can see the current development status of TRAC D.A.P. and a roadmap for the platform on the
     `roadmap page <https://github.com/finos/tracdap/wiki/Development-Roadmap>`_.
     If you have particular questions or issues, please raise a ticket on our
     `issue tracker <https://github.com/finos/tracdap/issues>`_.
@@ -26,7 +29,7 @@ TRAC Data & Analytics Platform
         **Learn about TRAC**
         ^^^^^^^^^^^^^^^^^^^^
 
-        Learn about the TRAC platform, starting with the metadata model.
+        Learn about the TRAC, the metadata model, virtual deployment framework and the TRAC Guarantee.
 
         +++
         .. button-ref:: overview/introduction
@@ -42,7 +45,7 @@ TRAC Data & Analytics Platform
         **Build and run models**
         ^^^^^^^^^^^^^^^^^^^^^^^^
 
-        Use the TRAC runtime APIs to build portable, self-documenting models.
+        Use the TRAC runtime APIs to build portable, self-describing models.
 
         +++
         .. button-ref:: modelling/index
@@ -74,10 +77,10 @@ TRAC Data & Analytics Platform
         :class-footer: sd-border-0
 
 
-        **Deploy and manage the platform**
+        **Deploy and manage TRAC D.A.P.**
         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-        Everything to do with deployment, configuration and technology integration,
+        Explore deployment, configuration and integration,
         for dev-ops engineers and systems administrators.
 
         +++

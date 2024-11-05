@@ -87,7 +87,7 @@ extensions = [
     "sphinx_wagtail_theme"
 
 ]
-
+exclusions = ['unused']
 
 # Auto API configuration
 
