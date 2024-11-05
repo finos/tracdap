@@ -42,7 +42,7 @@ import static org.finos.tracdap.test.concurrent.ConcurrentTestHelpers.waitFor;
 @Tag("aws-platform")
 public class S3StorageReadOnlyTest extends StorageReadOnlyTestSuite {
 
-    static Duration SETUP_TIMEOUT = Duration.of(5, ChronoUnit.SECONDS);
+    static Duration SETUP_TIMEOUT = Duration.of(10, ChronoUnit.SECONDS);
 
     static Properties storageProps;
     static String testSuiteDir;
@@ -50,8 +50,8 @@ public class S3StorageReadOnlyTest extends StorageReadOnlyTestSuite {
     static EventLoopGroup elg;
     static BufferAllocator allocator;
 
-    static S3ObjectStorage setupStorage;
-    static DataContext setupCtx;
+    static S3ObjectStorage setupStorage, rwTestStorage, roTestStorage;
+    static DataContext setupCtx, testCtx;
 
     static int testNumber;
 
@@ -75,54 +75,44 @@ public class S3StorageReadOnlyTest extends StorageReadOnlyTestSuite {
         setupStorage.start(elg);
 
         var mkdir = setupStorage.mkdir(testSuiteDir, true, setupCtx);
-        waitFor(Duration.ofSeconds(10), mkdir);
-        resultOf(mkdir);
-    }
-
-    @BeforeEach
-    void setup() throws Exception {
-
-        var testDir = String.format("%stest_%d", testSuiteDir, ++testNumber);
-
-        var mkdir = setupStorage.mkdir(testDir, false, setupCtx);
         waitFor(SETUP_TIMEOUT, mkdir);
         resultOf(mkdir);
 
-        storageProps.put(S3ObjectStorage.PREFIX_PROPERTY, testDir);
-        rwStorage = new S3ObjectStorage("TEST_" + testNumber + "_RW", storageProps);
-        rwStorage.start(elg);
+        storageProps.put(S3ObjectStorage.PREFIX_PROPERTY, testSuiteDir);
+        rwTestStorage = new S3ObjectStorage("TEST_" + testNumber + "_RW", storageProps);
+        rwTestStorage.start(elg);
 
         var roProps = new Properties();
         roProps.putAll(storageProps);
         roProps.put(CommonFileStorage.READ_ONLY_CONFIG_KEY, "true");
 
-        roStorage = new S3ObjectStorage("TEST_" + testNumber + "_RO", roProps);
-        roStorage.start(elg);
+        roTestStorage = new S3ObjectStorage("TEST_" + testNumber + "_RO", roProps);
+        roTestStorage.start(elg);
 
-        dataContext = new DataContext(elg.next(), allocator);
+        testCtx = new DataContext(elg.next(), allocator);
     }
 
-    @AfterEach
-    void tearDown() {
+    @BeforeEach
+    void setup() {
 
-        rwStorage.stop();
-        rwStorage = null;
-
-        roStorage.stop();
-        roStorage = null;
+        rwStorage = rwTestStorage;
+        roStorage = roTestStorage;
+        dataContext = testCtx;
     }
 
     @AfterAll
     static void tearDownStorage() throws Exception {
+
+        roTestStorage.stop();
+        rwTestStorage.stop();
 
         var rm = setupStorage.rmdir(testSuiteDir, setupCtx);
         waitFor(Duration.ofSeconds(10), rm);
         resultOf(rm);
 
         setupStorage.stop();
-        setupStorage = null;
 
         elg.shutdownGracefully();
-        elg = null;
+        allocator.close();
     }
 }

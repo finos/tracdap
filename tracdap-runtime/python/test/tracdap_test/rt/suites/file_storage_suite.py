@@ -56,8 +56,14 @@ class FileOperationsTestSuite:
     skipTest = unittest.TestCase.skipTest
 
     # Windows limits individual path segments to 255 chars
-    LONG_PATH_TXT_FILE = "long_" + "A" * 246 + ".txt"
-    LONG_PATH_DIR = "long_" + "A" * 250
+
+    @classmethod
+    def make_long_path(cls, prefix, suffix):
+        return prefix + "A" * (255 - len(prefix) - len(suffix)) + suffix
+
+    @classmethod
+    def make_long_dir_path(cls, prefix):
+        return prefix + "A" * (255 - len(prefix))
 
     def __init__(self):
         self.storage: _storage.IFileStorage = None  # noqa
@@ -68,48 +74,48 @@ class FileOperationsTestSuite:
 
     def test_exists_file(self):
 
-        self.make_small_file("test_file.txt")
+        self.make_small_file("test_exists_file.txt")
 
-        file_present = self.storage.exists("test_file.txt")
-        file_not_present = self.storage.exists("other_file.txt")
+        file_present = self.storage.exists("test_exists_file.txt")
+        file_not_present = self.storage.exists("test_exists_file_other.txt")
 
         self.assertTrue(file_present)
         self.assertFalse(file_not_present)
 
     def test_exists_long_path(self):
 
-        self.make_small_file(self.LONG_PATH_TXT_FILE)
+        long_path = self.make_long_path("test_exists_long_path", ".txt")
 
-        file_present = self.storage.exists(self.LONG_PATH_TXT_FILE)
-        file_not_present = self.storage.exists("other_file.txt")
+        self.make_small_file(long_path)
+
+        file_present = self.storage.exists(long_path)
 
         self.assertTrue(file_present)
-        self.assertFalse(file_not_present)
 
     def test_exists_empty_file(self):
 
-        self.make_file("test_file.txt", b"")
+        self.make_file("test_exists_empty_file.txt", b"")
 
-        empty_file_exist = self.storage.exists("test_file.txt")
+        empty_file_exist = self.storage.exists("test_exists_empty_file.txt")
 
         self.assertTrue(empty_file_exist)
 
     def test_exists_dir(self):
 
-        self.storage.mkdir("test_dir", False)
+        self.storage.mkdir("test_exists_dir", False)
 
-        dir_present = self.storage.exists("test_dir")
-        dir_not_present = self.storage.exists("other_dir")
+        dir_present = self.storage.exists("test_exists_dir")
+        dir_not_present = self.storage.exists("test_exists_dir_other")
 
         self.assertTrue(dir_present)
         self.assertFalse(dir_not_present)
 
     def test_exists_parent_dir(self):
 
-        self.storage.mkdir("parent_dir/child_dir", True)
+        self.storage.mkdir("test_exists_parent_dir/child_dir", True)
 
-        dir_present = self.storage.exists("parent_dir")
-        dir_not_present = self.storage.exists("other_dir")
+        dir_present = self.storage.exists("test_exists_parent_dir")
+        dir_not_present = self.storage.exists("test_exists_parent_dir_other")
 
         self.assertTrue(dir_present)
         self.assertFalse(dir_not_present)
@@ -135,40 +141,42 @@ class FileOperationsTestSuite:
         content = "Content of a certain size\n".encode('utf-8')
         expected_size = len(content)
 
-        self.make_file("test_file.txt", content)
+        self.make_file("test_size_ok.txt", content)
 
-        size = self.storage.size("test_file.txt")
+        size = self.storage.size("test_size_ok.txt")
 
         self.assertEqual(expected_size, size)
 
     def test_size_long_path(self):
 
+        long_path = self.make_long_path("test_size_long_path", ".txt")
+
         content = "Content of a certain size\n".encode('utf-8')
         expected_size = len(content)
 
-        self.make_file(self.LONG_PATH_TXT_FILE, content)
+        self.make_file(long_path, content)
 
-        size = self.storage.size(self.LONG_PATH_TXT_FILE)
+        size = self.storage.size(long_path)
 
         self.assertEqual(expected_size, size)
 
     def test_size_empty_file(self):
 
-        self.make_file("test_file.txt", b"")
+        self.make_file("test_size_empty_file.txt", b"")
 
-        size = self.storage.size("test_file.txt")
+        size = self.storage.size("test_size_empty_file.txt")
 
         self.assertEqual(0, size)
 
     def test_size_dir(self):
 
-        self.storage.mkdir("test_dir", False)
+        self.storage.mkdir("test_size_dir", False)
 
-        self.assertRaises(_ex.EStorageRequest, lambda: self.storage.size("test_dir"))
+        self.assertRaises(_ex.EStorageRequest, lambda: self.storage.size("test_size_dir"))
 
     def test_size_missing(self):
 
-        self.assertRaises(_ex.EStorageRequest, lambda: self.storage.size("missing_file.txt"))
+        self.assertRaises(_ex.EStorageRequest, lambda: self.storage.size("test_size_missing.txt"))
 
     def test_size_storage_root(self):
 
@@ -191,12 +199,12 @@ class FileOperationsTestSuite:
         content = "Sample content for stat call\n".encode('utf-8')
         expected_size = len(content)
 
-        self.storage.mkdir("some_dir", False)
-        self.make_file("some_dir/test_file.txt", content)
+        self.storage.mkdir("test_stat_file_ok", False)
+        self.make_file("test_stat_file_ok/test_file.txt", content)
 
-        stat_result = self.storage.stat("some_dir/test_file.txt")
+        stat_result = self.storage.stat("test_stat_file_ok/test_file.txt")
 
-        self.assertEqual("some_dir/test_file.txt", stat_result.storage_path)
+        self.assertEqual("test_stat_file_ok/test_file.txt", stat_result.storage_path)
         self.assertEqual("test_file.txt", stat_result.file_name)
         self.assertEqual(_storage.FileType.FILE, stat_result.file_type)
         self.assertEqual(expected_size, stat_result.size)
@@ -205,16 +213,18 @@ class FileOperationsTestSuite:
 
         # Simple case - stat a file
 
+        long_path = self.make_long_path("test_stat_file_long_path", ".txt")
+
         content = "Sample content for stat call\n".encode('utf-8')
         expected_size = len(content)
 
-        self.storage.mkdir("some_dir", False)
-        self.make_file("some_dir/" + self.LONG_PATH_TXT_FILE, content)
+        self.storage.mkdir("test_stat_file_long_path", False)
+        self.make_file("test_stat_file_long_path/" + long_path, content)
 
-        stat_result = self.storage.stat("some_dir/" + self.LONG_PATH_TXT_FILE,)
+        stat_result = self.storage.stat("test_stat_file_long_path/" + long_path,)
 
-        self.assertEqual("some_dir/" + self.LONG_PATH_TXT_FILE, stat_result.storage_path)
-        self.assertEqual(self.LONG_PATH_TXT_FILE, stat_result.file_name)
+        self.assertEqual("test_stat_file_long_path/" + long_path, stat_result.storage_path)
+        self.assertEqual(long_path, stat_result.file_name)
         self.assertEqual(_storage.FileType.FILE, stat_result.file_type)
         self.assertEqual(expected_size, stat_result.size)
 
@@ -226,9 +236,9 @@ class FileOperationsTestSuite:
         test_start = dt.datetime.now(dt.timezone.utc)
         time.sleep(1.0)  # Let time elapse before/after the test calls
 
-        self.make_small_file("test_file.txt")
+        self.make_small_file("test_stat_file_mtime.txt")
 
-        stat_result = self.storage.stat("test_file.txt")
+        stat_result = self.storage.stat("test_stat_file_mtime.txt")
 
         time.sleep(1.0)  # Let time elapse before/after the test calls
         test_finish = dt.datetime.now(dt.timezone.utc)
@@ -253,14 +263,14 @@ class FileOperationsTestSuite:
 
         # On FAT32, atime is limited to an access date, i.e. one-day resolution
 
-        self.make_small_file("test_file.txt")
+        self.make_small_file("test_stat_file_atime.txt")
 
         test_start = dt.datetime.now(dt.timezone.utc)
         time.sleep(0.01)  # Let time elapse before/after the test calls
 
-        self.storage.read_bytes("test_file.txt")
+        self.storage.read_bytes("test_stat_file_atime.txt")
 
-        stat_result = self.storage.stat("test_file.txt")
+        stat_result = self.storage.stat("test_stat_file_atime.txt")
 
         time.sleep(0.01)  # Let time elapse before/after the test calls
         test_finish = dt.datetime.now(dt.timezone.utc)
@@ -270,11 +280,11 @@ class FileOperationsTestSuite:
 
     def test_stat_dir_ok(self):
 
-        self.storage.mkdir("some_dir/test_dir", True)
+        self.storage.mkdir("test_stat_dir_ok/test_dir", True)
 
-        stat_result = self.storage.stat("some_dir/test_dir")
+        stat_result = self.storage.stat("test_stat_dir_ok/test_dir")
 
-        self.assertEqual("some_dir/test_dir", stat_result.storage_path)
+        self.assertEqual("test_stat_dir_ok/test_dir", stat_result.storage_path)
         self.assertEqual("test_dir", stat_result.file_name)
         self.assertEqual(_storage.FileType.DIRECTORY, stat_result.file_type)
 
@@ -283,12 +293,14 @@ class FileOperationsTestSuite:
 
     def test_stat_dir_long_path(self):
 
-        self.storage.mkdir("some_dir/" + self.LONG_PATH_DIR, True)
+        long_path = self.make_long_dir_path("test_stat_dir_long_path")
 
-        stat_result = self.storage.stat("some_dir/" + self.LONG_PATH_DIR,)
+        self.storage.mkdir("test_stat_dir_long_path/" + long_path, True)
 
-        self.assertEqual("some_dir/" + self.LONG_PATH_DIR, stat_result.storage_path)
-        self.assertEqual(self.LONG_PATH_DIR, stat_result.file_name)
+        stat_result = self.storage.stat("test_stat_dir_long_path/" + long_path,)
+
+        self.assertEqual("test_stat_dir_long_path/" + long_path, stat_result.storage_path)
+        self.assertEqual(long_path, stat_result.file_name)
         self.assertEqual(_storage.FileType.DIRECTORY, stat_result.file_type)
 
         # Size field for directories should always be set to 0
@@ -296,12 +308,12 @@ class FileOperationsTestSuite:
 
     def test_stat_dir_implicit_ok(self):
 
-        self.storage.mkdir("some_dir/test_dir", True)
+        self.storage.mkdir("test_stat_dir_implicit_ok/test_dir", True)
 
-        stat_result = self.storage.stat("some_dir")
+        stat_result = self.storage.stat("test_stat_dir_implicit_ok")
 
-        self.assertEqual("some_dir", stat_result.storage_path)
-        self.assertEqual("some_dir", stat_result.file_name)
+        self.assertEqual("test_stat_dir_implicit_ok", stat_result.storage_path)
+        self.assertEqual("test_stat_dir_implicit_ok", stat_result.file_name)
         self.assertEqual(_storage.FileType.DIRECTORY, stat_result.file_type)
 
         # Size field for directories should always be set to 0
@@ -312,16 +324,16 @@ class FileOperationsTestSuite:
         # mtime and atime for dirs is unlikely to be supported in cloud storage buckets
         # So, all of these fields are optional in stat responses for directories
 
-        self.storage.mkdir("some_dir/test_dir", True)
+        self.storage.mkdir("test_stat_dir_mtime/test_dir", True)
 
         # "Modify" the directory by adding a file to it
 
         test_start = dt.datetime.now(dt.timezone.utc)
         time.sleep(0.01)  # Let time elapse before/after the test calls
 
-        self.make_small_file("some_dir/test_dir/a_file.txt")
+        self.make_small_file("test_stat_dir_mtime/test_dir/a_file.txt")
 
-        stat_result = self.storage.stat("some_dir/test_dir")
+        stat_result = self.storage.stat("test_stat_dir_mtime/test_dir")
 
         time.sleep(0.01)  # Let time elapse before/after the test calls
         test_finish = dt.datetime.now(dt.timezone.utc)
@@ -338,17 +350,17 @@ class FileOperationsTestSuite:
         # mtime and atime for dirs is unlikely to be supported in cloud storage buckets
         # So, all of these fields are optional in stat responses for directories
 
-        self.storage.mkdir("some_dir/test_dir", True)
-        self.make_small_file("some_dir/test_dir/a_file.txt")
+        self.storage.mkdir("test_stat_dir_atime/test_dir", True)
+        self.make_small_file("test_stat_dir_atime/test_dir/a_file.txt")
 
         # Access the directory by running "ls" on it
 
         test_start = dt.datetime.now(dt.timezone.utc)
         time.sleep(0.01)  # Let time elapse before/after the test calls
 
-        self.storage.ls("some_dir/test_dir")
+        self.storage.ls("test_stat_dir_atime/test_dir")
 
-        stat_result = self.storage.stat("some_dir/test_dir")
+        stat_result = self.storage.stat("test_stat_dir_atime/test_dir")
 
         time.sleep(0.01)  # Let time elapse before/after the test calls
         test_finish = dt.datetime.now(dt.timezone.utc)
@@ -383,11 +395,11 @@ class FileOperationsTestSuite:
 
         # Simple listing, dir containing one file and one sub dir
 
-        self.storage.mkdir("test_dir", False)
-        self.storage.mkdir("test_dir/child_1", False)
-        self.make_small_file("test_dir/child_2.txt")
+        self.storage.mkdir("test_ls_ok", False)
+        self.storage.mkdir("test_ls_ok/child_1", False)
+        self.make_small_file("test_ls_ok/child_2.txt")
 
-        ls = self.storage.ls("test_dir")
+        ls = self.storage.ls("test_ls_ok")
 
         self.assertEqual(2, len(ls))
 
@@ -395,22 +407,24 @@ class FileOperationsTestSuite:
         child2 = next(filter(lambda x: x.file_name == "child_2.txt", ls), None)
 
         self.assertIsNotNone(child1)
-        self.assertEqual("test_dir/child_1", child1.storage_path)
+        self.assertEqual("test_ls_ok/child_1", child1.storage_path)
         self.assertEqual(_storage.FileType.DIRECTORY, child1.file_type)
 
         self.assertIsNotNone(child2)
-        self.assertEqual("test_dir/child_2.txt", child2.storage_path)
+        self.assertEqual("test_ls_ok/child_2.txt", child2.storage_path)
         self.assertEqual(_storage.FileType.FILE, child2.file_type)
 
     def test_ls_long_path(self):
 
         # Simple listing, dir containing one file and one sub dir
 
-        self.storage.mkdir(self.LONG_PATH_DIR, False)
-        self.storage.mkdir(self.LONG_PATH_DIR + "/child_1", False)
-        self.make_small_file(self.LONG_PATH_DIR + "/child_2.txt")
+        long_path = self.make_long_dir_path("test_ls_long_path")
 
-        ls = self.storage.ls(self.LONG_PATH_DIR)
+        self.storage.mkdir(long_path, False)
+        self.storage.mkdir(long_path+ "/child_1", False)
+        self.make_small_file(long_path + "/child_2.txt")
+
+        ls = self.storage.ls(long_path)
 
         self.assertEqual(2, len(ls))
 
@@ -418,22 +432,22 @@ class FileOperationsTestSuite:
         child2 = next(filter(lambda x: x.file_name == "child_2.txt", ls), None)
 
         self.assertIsNotNone(child1)
-        self.assertEqual(self.LONG_PATH_DIR + "/child_1", child1.storage_path)
+        self.assertEqual(long_path + "/child_1", child1.storage_path)
         self.assertEqual(_storage.FileType.DIRECTORY, child1.file_type)
 
         self.assertIsNotNone(child2)
-        self.assertEqual(self.LONG_PATH_DIR + "/child_2.txt", child2.storage_path)
+        self.assertEqual(long_path + "/child_2.txt", child2.storage_path)
         self.assertEqual(_storage.FileType.FILE, child2.file_type)
 
     def test_ls_extensions(self):
 
         # Corner case - dir with an extension, file without extension
 
-        self.storage.mkdir("ls_extensions", False)
-        self.storage.mkdir("ls_extensions/child_1.dat", False)
-        self.make_small_file("ls_extensions/child_2_file")
+        self.storage.mkdir("test_ls_extensions", False)
+        self.storage.mkdir("test_ls_extensions/child_1.dat", False)
+        self.make_small_file("test_ls_extensions/child_2_file")
 
-        ls = self.storage.ls("ls_extensions")
+        ls = self.storage.ls("test_ls_extensions")
 
         self.assertEqual(2, len(ls))
 
@@ -441,22 +455,22 @@ class FileOperationsTestSuite:
         child2 = next(filter(lambda x: x.file_name == "child_2_file", ls), None)
 
         self.assertIsNotNone(child1)
-        self.assertEqual("ls_extensions/child_1.dat", child1.storage_path)
+        self.assertEqual("test_ls_extensions/child_1.dat", child1.storage_path)
         self.assertEqual(_storage.FileType.DIRECTORY, child1.file_type)
 
         self.assertIsNotNone(child2)
-        self.assertEqual("ls_extensions/child_2_file", child2.storage_path)
+        self.assertEqual("test_ls_extensions/child_2_file", child2.storage_path)
         self.assertEqual(_storage.FileType.FILE, child2.file_type)
 
     def test_ls_trailing_slash(self):
 
         # Storage path should be accepted with or without trailing slash
 
-        self.storage.mkdir("ls_trailing_slash", False)
-        self.make_small_file("ls_trailing_slash/some_file.txt")
+        self.storage.mkdir("test_ls_trailing_slash", False)
+        self.make_small_file("test_ls_trailing_slash/some_file.txt")
 
-        ls1 = self.storage.ls("ls_trailing_slash")
-        ls2 = self.storage.ls("ls_trailing_slash/")
+        ls1 = self.storage.ls("test_ls_trailing_slash")
+        ls2 = self.storage.ls("test_ls_trailing_slash/")
 
         self.assertEqual(1, len(ls1))
         self.assertEqual(1, len(ls2))
@@ -465,39 +479,39 @@ class FileOperationsTestSuite:
 
         # Ls is one operation that is allowed on the storage root!
 
-        self.storage.mkdir("test_dir", False)
-        self.make_small_file("test_file.txt")
+        self.storage.mkdir("test_ls_storage_root_allowed_dir", False)
+        self.make_small_file("test_ls_storage_root_allowed_file.txt")
 
         ls = self.storage.ls(".")
 
         self.assertTrue(len(ls) >= 2)
 
-        child1 = next(filter(lambda x: x.file_name == "test_dir", ls), None)
-        child2 = next(filter(lambda x: x.file_name == "test_file.txt", ls), None)
+        child1 = next(filter(lambda x: x.file_name == "test_ls_storage_root_allowed_dir", ls), None)
+        child2 = next(filter(lambda x: x.file_name == "test_ls_storage_root_allowed_file.txt", ls), None)
 
         self.assertIsNotNone(child1)
-        self.assertEqual("test_dir", child1.storage_path)
+        self.assertEqual("test_ls_storage_root_allowed_dir", child1.storage_path)
         self.assertEqual(_storage.FileType.DIRECTORY, child1.file_type)
 
         self.assertIsNotNone(child2)
-        self.assertEqual("test_file.txt", child2.storage_path)
+        self.assertEqual("test_ls_storage_root_allowed_file.txt", child2.storage_path)
         self.assertEqual(_storage.FileType.FILE, child2.file_type)
 
     def test_ls_file(self):
 
         # Calling LS on a file returns a list of just that one file
 
-        self.make_small_file("test_file")
+        self.make_small_file("test_ls_file")
 
-        ls = self.storage.ls("test_file")
+        ls = self.storage.ls("test_ls_file")
 
         self.assertEqual(1, len(ls))
 
         stat = ls[0]
 
         self.assertEqual(_storage.FileType.FILE, stat.file_type)
-        self.assertEqual("test_file", stat.file_name)
-        self.assertEqual("test_file", stat.storage_path)
+        self.assertEqual("test_ls_file", stat.file_name)
+        self.assertEqual("test_ls_file", stat.storage_path)
 
     def test_ls_missing(self):
 
@@ -517,30 +531,32 @@ class FileOperationsTestSuite:
 
         # Simplest case - create a single directory
 
-        self.storage.mkdir("test_dir", False)
+        self.storage.mkdir("test_mkdir_ok", False)
 
         # Creating a single child dir when the parent already exists
 
-        self.storage.mkdir("test_dir/child", False)
+        self.storage.mkdir("test_mkdir_ok/child", False)
 
-        dir_exists = self.storage.exists("test_dir")
-        child_exists = self.storage.exists("test_dir/child")
+        dir_exists = self.storage.exists("test_mkdir_ok")
+        child_exists = self.storage.exists("test_mkdir_ok/child")
 
         self.assertTrue(dir_exists)
         self.assertTrue(child_exists)
 
     def test_mkdir_long_path(self):
 
+        long_path = self.make_long_dir_path("test_mkdir_long_path")
+
         # Simplest case - create a single directory
 
-        self.storage.mkdir(self.LONG_PATH_DIR, False)
+        self.storage.mkdir(long_path, False)
 
         # Creating a single child dir when the parent already exists
 
-        self.storage.mkdir(self.LONG_PATH_DIR + "/child", False)
+        self.storage.mkdir(long_path + "/child", False)
 
-        dir_exists = self.storage.exists(self.LONG_PATH_DIR)
-        child_exists = self.storage.exists(self.LONG_PATH_DIR + "/child")
+        dir_exists = self.storage.exists(long_path)
+        child_exists = self.storage.exists(long_path + "/child")
 
         self.assertTrue(dir_exists)
         self.assertTrue(child_exists)
@@ -549,33 +565,33 @@ class FileOperationsTestSuite:
 
         # It is not an error to call mkdir on an existing directory
 
-        self.storage.mkdir("test_dir", False)
+        self.storage.mkdir("test_mkdir_dir_exists", False)
 
-        dir_exists_1 = self.storage.exists("test_dir")
+        dir_exists_1 = self.storage.exists("test_mkdir_dir_exists")
         self.assertTrue(dir_exists_1)
 
-        self.storage.mkdir("test_dir", False)
+        self.storage.mkdir("test_mkdir_dir_exists", False)
 
-        dir_exists_2 = self.storage.exists("test_dir")
+        dir_exists_2 = self.storage.exists("test_mkdir_dir_exists")
         self.assertTrue(dir_exists_2)
 
     def test_mkdir_file_exists(self):
 
         # mkdir should always fail if requested dir already exists and is a file
 
-        self.make_small_file("test_dir")
+        self.make_small_file("test_mkdir_file_exists")
 
-        self.assertRaises(_ex.EStorageRequest, lambda: self.storage.mkdir("test_dir", False))
+        self.assertRaises(_ex.EStorageRequest, lambda: self.storage.mkdir("test_mkdir_file_exists", False))
 
     def test_mkdir_missing_parent(self):
 
         # With recursive = false, mkdir with a missing parent should fail
         # Neither parent nor child dir should be created
 
-        self.assertRaises(_ex.EStorageRequest, lambda: self.storage.mkdir("test_dir/child", False))
+        self.assertRaises(_ex.EStorageRequest, lambda: self.storage.mkdir("test_mkdir_missing_parent/child", False))
 
-        dir_exists = self.storage.exists("test_dir")
-        child_exists = self.storage.exists("test_dir/child")
+        dir_exists = self.storage.exists("test_mkdir_missing_parent")
+        child_exists = self.storage.exists("test_mkdir_missing_parent/child")
 
         self.assertFalse(dir_exists)
         self.assertFalse(child_exists)
@@ -584,10 +600,10 @@ class FileOperationsTestSuite:
 
         # mkdir, recursive = true, create parent and child dir in a single call
 
-        self.storage.mkdir("test_dir/child", True)
+        self.storage.mkdir("test_mkdir_recursive_ok/child", True)
 
-        dir_exists = self.storage.exists("test_dir")
-        child_exists = self.storage.exists("test_dir/child")
+        dir_exists = self.storage.exists("test_mkdir_recursive_ok")
+        child_exists = self.storage.exists("test_mkdir_recursive_ok/child")
 
         self.assertTrue(dir_exists)
         self.assertTrue(child_exists)
@@ -596,12 +612,12 @@ class FileOperationsTestSuite:
 
         # mkdir, when recursive = true it is not an error if the target dir already exists
 
-        self.storage.mkdir("test_dir/child", True)
+        self.storage.mkdir("test_mkdir_recursive_dir_exists/child", True)
 
-        self.storage.mkdir("test_dir/child", True)
+        self.storage.mkdir("test_mkdir_recursive_dir_exists/child", True)
 
-        dir_exists = self.storage.exists("test_dir")
-        child_exists = self.storage.exists("test_dir/child")
+        dir_exists = self.storage.exists("test_mkdir_recursive_dir_exists")
+        child_exists = self.storage.exists("test_mkdir_recursive_dir_exists/child")
 
         self.assertTrue(dir_exists)
         self.assertTrue(child_exists)
@@ -610,10 +626,10 @@ class FileOperationsTestSuite:
 
         # mkdir should always fail if requested dir already exists and is a file
 
-        self.storage.mkdir("test_dir", False)
-        self.make_small_file("test_dir/child")
+        self.storage.mkdir("test_mkdir_recursive_file_exists", False)
+        self.make_small_file("test_mkdir_recursive_file_exists/child")
 
-        self.assertRaises(_ex.EStorageRequest, lambda: self.storage.mkdir("test_dir/child", True))
+        self.assertRaises(_ex.EStorageRequest, lambda: self.storage.mkdir("test_mkdir_recursive_file_exists/child", True))
 
     def test_mkdir_bad_paths(self):
 
@@ -627,10 +643,10 @@ class FileOperationsTestSuite:
 
     def test_mkdir_unicode(self):
 
-        self.storage.mkdir("你好/你好", True)
+        self.storage.mkdir("test_mkdir_unicode/你好/你好", True)
 
-        dir_exists = self.storage.exists("你好")
-        child_exists = self.storage.exists("你好/你好")
+        dir_exists = self.storage.exists("test_mkdir_unicode/你好")
+        child_exists = self.storage.exists("test_mkdir_unicode/你好/你好")
 
         self.assertTrue(dir_exists)
         self.assertTrue(child_exists)
@@ -643,59 +659,61 @@ class FileOperationsTestSuite:
 
         # Simplest case - create one file and delete it
 
-        self.make_small_file("test_file.txt")
+        self.make_small_file("test_rm_ok.txt")
 
-        self.storage.rm("test_file.txt")
+        self.storage.rm("test_rm_ok.txt")
 
         # File should be gone
 
-        exists = self.storage.exists("test_file.txt")
+        exists = self.storage.exists("test_rm_ok.txt")
         self.assertFalse(exists)
 
     def test_rm_long_path(self):
 
+        long_path = self.make_long_path("test_rm_long_path", ".txt")
+
         # Simplest case - create one file and delete it
 
-        self.make_small_file(self.LONG_PATH_TXT_FILE)
+        self.make_small_file(long_path)
 
-        self.storage.rm(self.LONG_PATH_TXT_FILE)
+        self.storage.rm(long_path)
 
         # File should be gone
 
-        exists = self.storage.exists(self.LONG_PATH_TXT_FILE)
+        exists = self.storage.exists(long_path)
         self.assertFalse(exists)
 
     def test_rm_in_subdir(self):
 
         # Simplest case - create one file and delete it
 
-        self.make_small_file("sub_dir/test_file.txt")
+        self.make_small_file("test_rm_in_subdir/test_file.txt")
 
-        self.storage.rm("sub_dir/test_file.txt")
+        self.storage.rm("test_rm_in_subdir/test_file.txt")
 
         # File should be gone
 
-        exists = self.storage.exists("sub_dir/test_file.txt")
+        exists = self.storage.exists("test_rm_in_subdir/test_file.txt")
         self.assertFalse(exists)
 
     def test_rm_on_dir(self):
 
         # Calling rm on a directory is a bad request, even if the dir is empty
 
-        self.storage.mkdir("test_dir")
+        self.storage.mkdir("test_rm_on_dir")
 
-        self.assertRaises(_ex.EStorageRequest, lambda: self.storage.rm("test_dir"))
+        self.assertRaises(_ex.EStorageRequest, lambda: self.storage.rm("test_rm_on_dir"))
 
         # Dir should still exist because rm has failed
 
-        exists = self.storage.exists("test_dir")
+        exists = self.storage.exists("test_rm_on_dir")
         self.assertTrue(exists)
 
     def test_rm_missing(self):
 
         # Try to delete a path that does not exist
 
-        self.assertRaises(_ex.EStorageRequest, lambda: self.storage.rm("missing_path.dat"))
+        self.assertRaises(_ex.EStorageRequest, lambda: self.storage.rm("test_rm_missing.dat"))
 
     def test_rm_bad_paths(self):
 
@@ -711,38 +729,40 @@ class FileOperationsTestSuite:
 
     def test_rmdir_ok(self):
 
-        self.storage.mkdir("test_dir", False)
+        self.storage.mkdir("test_rmdir_ok", False)
 
-        exists = self.storage.exists("test_dir")
+        exists = self.storage.exists("test_rmdir_ok")
         self.assertTrue(exists)
 
-        self.storage.rmdir("test_dir")
+        self.storage.rmdir("test_rmdir_ok")
 
-        exists = self.storage.exists("test_dir")
+        exists = self.storage.exists("test_rmdir_ok")
         self.assertFalse(exists)
 
     def test_rmdir_long_path(self):
 
-        self.storage.mkdir(self.LONG_PATH_DIR, False)
+        long_path = self.make_long_dir_path("test_rmdir_long_path")
 
-        exists = self.storage.exists(self.LONG_PATH_DIR,)
+        self.storage.mkdir(long_path, False)
+
+        exists = self.storage.exists(long_path,)
         self.assertTrue(exists)
 
-        self.storage.rmdir(self.LONG_PATH_DIR,)
+        self.storage.rmdir(long_path,)
 
-        exists = self.storage.exists(self.LONG_PATH_DIR)
+        exists = self.storage.exists(long_path)
         self.assertFalse(exists)
 
     def test_rmdir_by_prefix(self):
 
-        self.storage.mkdir("test_dir/sub_dir", True)
+        self.storage.mkdir("test_rmdir_by_prefix/sub_dir", True)
 
-        exists = self.storage.exists("test_dir")
+        exists = self.storage.exists("test_rmdir_by_prefix")
         self.assertTrue(exists)
 
-        self.storage.rmdir("test_dir")
+        self.storage.rmdir("test_rmdir_by_prefix")
 
-        exists = self.storage.exists("test_dir")
+        exists = self.storage.exists("test_rmdir_by_prefix")
         self.assertFalse(exists)
 
     def test_rmdir_with_content(self):
@@ -750,18 +770,18 @@ class FileOperationsTestSuite:
         # Delete one whole dir tree
         # Sibling dir tree should be unaffected
 
-        self.storage.mkdir("test_dir/child_1", True)
-        self.storage.mkdir("test_dir/child_1/sub")
-        self.make_small_file("test_dir/child_1/file_a.txt")
-        self.make_small_file("test_dir/child_1/file_b.txt")
-        self.storage.mkdir("test_dir/child_2", True)
-        self.make_small_file("test_dir/child_2/file_a.txt")
+        self.storage.mkdir("test_rmdir_with_content/child_1", True)
+        self.storage.mkdir("test_rmdir_with_content/child_1/sub")
+        self.make_small_file("test_rmdir_with_content/child_1/file_a.txt")
+        self.make_small_file("test_rmdir_with_content/child_1/file_b.txt")
+        self.storage.mkdir("test_rmdir_with_content/child_2", True)
+        self.make_small_file("test_rmdir_with_content/child_2/file_a.txt")
 
-        self.storage.rmdir("test_dir/child_1")
+        self.storage.rmdir("test_rmdir_with_content/child_1")
 
-        exists1 = self.storage.exists("test_dir/child_1")
-        exists2 = self.storage.exists("test_dir/child_2")
-        size2a = self.storage.size("test_dir/child_2/file_a.txt")
+        exists1 = self.storage.exists("test_rmdir_with_content/child_1")
+        exists2 = self.storage.exists("test_rmdir_with_content/child_2")
+        size2a = self.storage.size("test_rmdir_with_content/child_2/file_a.txt")
 
         self.assertFalse(exists1)
         self.assertTrue(exists2)
@@ -771,20 +791,20 @@ class FileOperationsTestSuite:
 
         # Calling rmdir on a file is a bad request
 
-        self.make_small_file("test_file.txt")
+        self.make_small_file("test_rmdir_on_file.txt")
 
-        self.assertRaises(_ex.EStorageRequest, lambda: self.storage.rmdir("test_file.txt"))
+        self.assertRaises(_ex.EStorageRequest, lambda: self.storage.rmdir("test_rmdir_on_file.txt"))
 
         # File should still exist because rm has failed
 
-        exists = self.storage.exists("test_file.txt")
+        exists = self.storage.exists("test_rmdir_on_file.txt")
         self.assertTrue(exists)
 
     def test_rmdir_missing(self):
 
         # Try to delete a path that does not exist
 
-        self.assertRaises(_ex.EStorageRequest, lambda: self.storage.rmdir("missing_path"))
+        self.assertRaises(_ex.EStorageRequest, lambda: self.storage.rmdir("test_rmdir_missing"))
 
     def test_rmdir_bad_paths(self):
 
@@ -854,7 +874,10 @@ class FileReadWriteTestSuite:
     fail = unittest.TestCase.fail
 
     # Windows limits individual path segments to 255 chars
-    LONG_PATH_TXT_FILE = "long_" + "A" * 246 + ".txt"
+
+    @classmethod
+    def make_long_path(cls, prefix, suffix):
+        return prefix + "A" * (255 - len(prefix) - len(suffix)) + suffix
 
     def __init__(self):
         self.storage: _storage.IFileStorage = None  # noqa
@@ -865,7 +888,7 @@ class FileReadWriteTestSuite:
 
     def test_round_trip_basic(self):
 
-        storage_path = "haiku.txt"
+        storage_path = "test_round_trip_basic.txt"
 
         haiku = \
             "The data goes in;\n" + \
@@ -878,7 +901,7 @@ class FileReadWriteTestSuite:
 
     def test_round_trip_long_path(self):
 
-        storage_path = self.LONG_PATH_TXT_FILE
+        storage_path = self.make_long_path("test_round_trip_long_path", ".txt")
 
         haiku = \
             "The data goes in;\n" + \
@@ -891,7 +914,7 @@ class FileReadWriteTestSuite:
 
     def test_round_trip_large(self):
 
-        storage_path = "test_file.dat"
+        storage_path = "test_round_trip_large.dat"
 
         # One 10 M chunk
         bytes_ = random.randbytes(10 * 1024 * 1024)
@@ -900,7 +923,7 @@ class FileReadWriteTestSuite:
 
     def test_round_trip_heterogeneous(self):
 
-        storage_path = "test_file.dat"
+        storage_path = "test_round_trip_heterogeneous.dat"
 
         # Selection of different size chunks
         bytes_ = [
@@ -916,7 +939,7 @@ class FileReadWriteTestSuite:
 
     def test_round_trip_empty(self):
 
-        storage_path = "test_file.dat"
+        storage_path = "test_round_trip_empty.dat"
         empty_bytes = bytes()
 
         self.do_round_trip(storage_path, [empty_bytes], self.storage)
@@ -929,7 +952,7 @@ class FileReadWriteTestSuite:
             "白毛浮绿水，\n" + \
             "红掌拨清波"
 
-        storage_path = "咏鹅.txt"
+        storage_path = "test_round_trip_unicode/咏鹅.txt"
         storage_bytes = an_ode_to_the_goose.encode('utf-8')
 
         self.do_round_trip(storage_path, [storage_bytes], self.storage)
@@ -959,18 +982,18 @@ class FileReadWriteTestSuite:
         # Writing a file will always create the parent dir if it doesn't already exist
         # This is in line with cloud bucket semantics
 
-        storage_path = "missing_dir/some_file.txt"
+        storage_path = "test_write_missing_dir/some_file.txt"
         content = "Some content".encode('utf-8')
 
         self.storage.write_bytes(storage_path, content)
 
-        dir_exists = self.storage.exists("missing_dir")
+        dir_exists = self.storage.exists("test_write_missing_dir")
         file_exists = self.storage.exists(storage_path)
 
         self.assertTrue(dir_exists)
         self.assertTrue(file_exists)
 
-        dir_stat = self.storage.stat("missing_dir")
+        dir_stat = self.storage.stat("test_write_missing_dir")
         file_stat = self.storage.stat(storage_path)
 
         self.assertEqual(_storage.FileType.DIRECTORY, dir_stat.file_type)
@@ -981,7 +1004,7 @@ class FileReadWriteTestSuite:
         # Writing a file always overwrites any existing content
         # This is in line with cloud bucket semantics
 
-        storage_path = "some_file.txt"
+        storage_path = "test_write_file_already_exists.txt"
         content = "Some content that is longer than what will be written later".encode('utf-8')
 
         def write_to_path(path_, content_):
@@ -1005,7 +1028,7 @@ class FileReadWriteTestSuite:
         # File storage should not allow a file to be written if a dir exists with the same name
         # TRAC prohibits this even though it is allowed in pure bucket semantics
 
-        storage_path = "some_file.txt"
+        storage_path = "test_write_dir_already_exists.txt"
 
         self.storage.mkdir(storage_path)
 
@@ -1044,13 +1067,13 @@ class FileReadWriteTestSuite:
 
     def test_read_missing(self):
 
-        storage_path = "missing_file.txt"
+        storage_path = "test_read_missing.txt"
 
         self.assertRaises(_ex.EStorageRequest, lambda: self.storage.read_byte_stream(storage_path))
 
     def test_read_dir(self):
 
-        storage_path = "not_a_file/"
+        storage_path = "test_read_dir/"
 
         self.storage.mkdir(storage_path)
 
@@ -1102,7 +1125,7 @@ class FileReadWriteTestSuite:
 
     def test_write_error_immediately(self):
 
-        storage_path = "test_file.dat"
+        storage_path = "test_write_error_immediately.dat"
 
         def attempt_write():
             with self.storage.write_byte_stream(storage_path):
@@ -1118,7 +1141,7 @@ class FileReadWriteTestSuite:
 
     def test_write_error_after_chunk(self):
 
-        storage_path = "test_file.dat"
+        storage_path = "test_write_error_after_chunk.dat"
         first_chunk = "Some content\n".encode('utf-8')
 
         def attempt_write():
@@ -1136,7 +1159,7 @@ class FileReadWriteTestSuite:
 
     def test_write_error_then_retry(self):
 
-        storage_path = "test_file.dat"
+        storage_path = "test_write_error_then_retry.dat"
         chunk_size = 10000
         chunk = random.randbytes(chunk_size)
 
@@ -1167,7 +1190,7 @@ class FileReadWriteTestSuite:
 
         # Allow two read streams to be opened concurrently to the same file
 
-        storage_path = "some_file.txt"
+        storage_path = "test_read_concurrent_streams.txt"
         content = "Some content".encode('utf-8')
 
         self.storage.write_bytes(storage_path, content)
@@ -1182,7 +1205,7 @@ class FileReadWriteTestSuite:
 
     def test_read_delete_while_open(self):
 
-        storage_path = "some_file.txt"
+        storage_path = "test_read_delete_while_open.txt"
         content = random.randbytes(64 * 1024)
 
         self.storage.write_bytes(storage_path, content)
@@ -1218,7 +1241,7 @@ class FileReadWriteTestSuite:
 
     def test_read_cancel_immediately(self):
 
-        storage_path = "some_file.txt"
+        storage_path = "test_read_cancel_immediately.txt"
         content = "Some content".encode('utf-8')
 
         self.storage.write_bytes(storage_path, content)
@@ -1235,7 +1258,7 @@ class FileReadWriteTestSuite:
 
         # Create a file big enough that it can't be read in a single chunk
 
-        storage_path = "some_file.txt"
+        storage_path = "test_read_cancel_and_retry.txt"
         content = random.randbytes(10000)
 
         self.storage.write_bytes(storage_path, content)
@@ -1263,7 +1286,7 @@ class FileReadWriteTestSuite:
 
     def test_read_cancel_and_delete(self):
 
-        storage_path = "some_file.txt"
+        storage_path = "test_read_cancel_and_delete.txt"
         content = "Some content".encode('utf-8')
 
         self.storage.write_bytes(storage_path, content)

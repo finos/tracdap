@@ -41,7 +41,7 @@ import static org.finos.tracdap.test.concurrent.ConcurrentTestHelpers.waitFor;
 @Tag("azure-platform")
 public class AzureStorageReadWriteTest extends StorageReadWriteTestSuite {
 
-    static Duration SETUP_TIMEOUT = Duration.of(5, ChronoUnit.SECONDS);
+    static Duration SETUP_TIMEOUT = Duration.of(10, ChronoUnit.SECONDS);
 
     static Properties storageProps;
     static String testSuiteDir;
@@ -49,8 +49,8 @@ public class AzureStorageReadWriteTest extends StorageReadWriteTestSuite {
     static EventLoopGroup elg;
     static BufferAllocator allocator;
 
-    static DataContext setupCtx;
-    static AzureBlobStorage setupStorage;
+    static DataContext setupCtx, testCtx;
+    static AzureBlobStorage setupStorage, testStorage;
 
     static int testNumber;
 
@@ -73,44 +73,35 @@ public class AzureStorageReadWriteTest extends StorageReadWriteTestSuite {
         setupStorage.start(elg);
 
         var mkdir = setupStorage.mkdir(testSuiteDir, true, setupCtx);
-        waitFor(Duration.ofSeconds(10), mkdir);
-        resultOf(mkdir);
-    }
-
-    @BeforeEach
-    void setup() throws Exception {
-
-        var testDir = String.format("%stest_%d", testSuiteDir, ++testNumber);
-
-        var mkdir = setupStorage.mkdir(testDir, false, setupCtx);
         waitFor(SETUP_TIMEOUT, mkdir);
         resultOf(mkdir);
 
-        storageProps.put(AzureBlobStorage.PREFIX_PROPERTY, testDir);
-        storage = new AzureBlobStorage("TEST_" + testNumber, storageProps);
-        storage.start(elg);
+        storageProps.put(AzureBlobStorage.PREFIX_PROPERTY, testSuiteDir);
+        testStorage = new AzureBlobStorage("TEST_" + testNumber, storageProps);
+        testStorage.start(elg);
 
-        dataContext = new DataContext(elg.next(), allocator);
+        testCtx = new DataContext(elg.next(), allocator);
     }
 
-    @AfterEach
-    void tearDown() {
+    @BeforeEach
+    void setup() {
 
-        storage.stop();
-        storage = null;
+        storage = testStorage;
+        dataContext = testCtx;
     }
 
     @AfterAll
     static void tearDownStorage() throws Exception {
+
+        testStorage.stop();
 
         var rm = setupStorage.rmdir(testSuiteDir, setupCtx);
         waitFor(Duration.ofSeconds(10), rm);
         resultOf(rm);
 
         setupStorage.stop();
-        setupStorage = null;
 
         elg.shutdownGracefully();
-        elg = null;
+        allocator.close();
     }
 }

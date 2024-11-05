@@ -81,7 +81,7 @@ public abstract class StorageReadWriteTestSuite {
     @Test
     void roundTrip_basic() throws Exception {
 
-        var storagePath = "haiku.txt";
+        var storagePath = "roundTrip_basic.txt";
 
         var haiku =
                 "The data goes in;\n" +
@@ -109,7 +109,7 @@ public abstract class StorageReadWriteTestSuite {
     @Test
     void roundTrip_large() throws Exception {
 
-        var storagePath = "test_file.dat";
+        var storagePath = "roundTrip_large.dat";
 
         var bytes = new byte[10 * 1024 * 1024];  // One 10 M chunk
 
@@ -124,7 +124,7 @@ public abstract class StorageReadWriteTestSuite {
     @Test
     void roundTrip_heterogeneous() throws Exception {
 
-        var storagePath = "test_file.dat";
+        var storagePath = "roundTrip_heterogeneous.dat";
 
         var bytes = List.of(  // Selection of different size chunks
                 new byte[3],
@@ -145,7 +145,7 @@ public abstract class StorageReadWriteTestSuite {
     @Test
     void roundTrip_empty() throws Exception {
 
-        var storagePath = "test_file.dat";
+        var storagePath = "roundTrip_empty.dat";
         var emptyBytes = new byte[0];
 
         StorageReadWriteTestSuite.roundTripTest(
@@ -230,7 +230,7 @@ public abstract class StorageReadWriteTestSuite {
         // Basic test without creating the parent dir first
         // Should be automatically created by the writer
 
-        var storagePath = "parent_dir/haiku.txt";
+        var storagePath = "testWrite_missingDir/haiku.txt";
 
         var haiku =
                 "The data goes in;\n" +
@@ -248,7 +248,7 @@ public abstract class StorageReadWriteTestSuite {
         //  Writing a file always overwrites any existing content
         // This is in line with cloud bucket semantics
 
-        var storagePath = "some_file.txt";
+        var storagePath = "testWrite_fileAlreadyExists.txt";
 
         var prepare = makeSmallFile(storagePath, storage, dataContext);
         waitFor(TEST_TIMEOUT, prepare);
@@ -270,7 +270,7 @@ public abstract class StorageReadWriteTestSuite {
         // File storage should not allow a file to be written if a dir exists with the same name
         // TRAC prohibits this even though it is allowed in pure bucket semantics
 
-        var storagePath = "some_file.txt";
+        var storagePath = "testWrite_dirAlreadyExists.txt";
 
         var prepare = storage.mkdir(storagePath, false, dataContext);
         waitFor(TEST_TIMEOUT, prepare);
@@ -280,32 +280,27 @@ public abstract class StorageReadWriteTestSuite {
         var exists1Result = getResultOf(exists1);
         Assertions.assertTrue(exists1Result);
 
-        var content = Bytes.copyToBuffer(
-                "Some content".getBytes(StandardCharsets.UTF_8),
-                dataContext.arrowAllocator());
+        var content = "Some content".getBytes(StandardCharsets.UTF_8);
+        var contentStream = Stream
+                .of(content)
+                .map(chunk -> Bytes.copyToBuffer(chunk, dataContext.arrowAllocator()));
 
-        var contentStream = Flows.publish(Stream.of(content));
         var writeSignal = new CompletableFuture<Long>();
         var writer = storage.writer(storagePath, writeSignal, dataContext);
-        contentStream.subscribe(writer);
-
-        waitFor(TEST_TIMEOUT, writeSignal);
-
-        var exists = storage.exists(storagePath, dataContext);
-        waitFor(TEST_TIMEOUT, exists);
-
-        Assertions.assertTrue(getResultOf(exists));
-
-        var contentStream2 = Flows.publish(Stream.of(content));
-        var writeSignal2 = new CompletableFuture<Long>();
-        var writer2 = storage.writer(storagePath, writeSignal2, dataContext);
 
         Assertions.assertThrows(EStorageRequest.class, () -> {
 
-            contentStream2.subscribe(writer2);
-            waitFor(TEST_TIMEOUT, writeSignal2);
-            getResultOf(writeSignal2);
+            Flows.publish(contentStream).subscribe(writer);
+            waitFor(TEST_TIMEOUT, writeSignal);
+            getResultOf(writeSignal);
         });
+
+        // Dir should still exist after write failure
+
+        var stat = storage.stat(storagePath, dataContext);
+        waitFor(TEST_TIMEOUT, stat);
+
+        Assertions.assertEquals(FileType.DIRECTORY, getResultOf(stat).fileType);
     }
 
     @Test
@@ -346,7 +341,7 @@ public abstract class StorageReadWriteTestSuite {
     @Test
     void testWrite_outsideRoot() {
 
-        var storagePath = "../any_file.txt";
+        var storagePath = "../testWrite_outsideRoot.txt";
 
         var writeSignal = new CompletableFuture<Long>();
 
@@ -357,7 +352,7 @@ public abstract class StorageReadWriteTestSuite {
     @Test
     void testRead_missing() {
 
-        var storagePath = "missing_file.txt";
+        var storagePath = "testRead_missing.txt";
 
         var reader = storage.reader(storagePath, dataContext);
         var result = new ArrayList<ArrowBuf>();
@@ -409,7 +404,7 @@ public abstract class StorageReadWriteTestSuite {
     @Test
     void testRead_outsideRoot() {
 
-        var storagePath = "../some_file.txt";
+        var storagePath = "../testRead_outsideRoot.txt";
 
         Assertions.assertThrows(EValidationGap.class, () ->
                 storage.reader(storagePath, dataContext));
@@ -445,7 +440,7 @@ public abstract class StorageReadWriteTestSuite {
         // Writer takes ownership of chunks when it receives them
         // This test makes sure they are being released after they have been written
 
-        var storagePath = "test_file.dat";
+        var storagePath = "testWrite_chunksReleased.dat";
 
         var bytes = List.of(
                 new byte[3],
@@ -482,16 +477,16 @@ public abstract class StorageReadWriteTestSuite {
 
         // Set up a dir in storage
 
-        var mkdir = storage.mkdir("some_dir", false, dataContext);
+        var mkdir = storage.mkdir("testWrite_subscribeNever", false, dataContext);
         waitFor(TEST_TIMEOUT, mkdir);
 
-        var dirExists = storage.exists("some_dir", dataContext);
+        var dirExists = storage.exists("testWrite_subscribeNever", dataContext);
         waitFor(TEST_TIMEOUT, dirExists);
         Assertions.assertTrue(getResultOf(dirExists));
 
         // Prepare a writer to write a file inside the new dir
 
-        var storagePath = "some_dir/some_file.txt";
+        var storagePath = "testWrite_subscribeNever/some_file.txt";
         var writeSignal = new CompletableFuture<Long>();
         storage.writer(storagePath, writeSignal, dataContext);
 
@@ -507,7 +502,7 @@ public abstract class StorageReadWriteTestSuite {
     @Test
     void testWrite_subscribeTwice() throws Exception {
 
-        var storagePath = "test_file.dat";
+        var storagePath = "testWrite_subscribeTwice.dat";
 
         var bytes = new byte[10000];
         new Random().nextBytes(bytes);
@@ -543,7 +538,7 @@ public abstract class StorageReadWriteTestSuite {
     @Test
     void testWrite_errorImmediately() throws Exception {
 
-        var storagePath = "test_file.dat";
+        var storagePath = "testWrite_errorImmediately.dat";
 
         var writerSignal = new CompletableFuture<Long>();
         var writer = storage.writer(storagePath, writerSignal, dataContext);
@@ -590,7 +585,7 @@ public abstract class StorageReadWriteTestSuite {
     @Test
     void testWrite_errorAfterChunk() throws Exception {
 
-        var storagePath = "test_file.dat";
+        var storagePath = "testWrite_errorAfterChunk.dat";
 
         var bytes0 = new byte[10000];
         new Random().nextBytes(bytes0);
@@ -646,7 +641,7 @@ public abstract class StorageReadWriteTestSuite {
     @Test
     void testWrite_errorThenRetry() throws Exception {
 
-        var storagePath = "test_file.dat";
+        var storagePath = "testWrite_errorThenRetry.dat";
         var dataSize = 10000;
 
         var bytes = new byte[dataSize];
@@ -704,7 +699,7 @@ public abstract class StorageReadWriteTestSuite {
 
         try {
 
-            var storagePath = "some_file.dat";
+            var storagePath = "testRead_requestUpfront.dat";
 
             // Create a file big enough that it needs many chunks to read
 
@@ -770,7 +765,7 @@ public abstract class StorageReadWriteTestSuite {
     @Test
     void testRead_subscribeLate() throws Exception {
 
-        var storagePath = "some_file.txt";
+        var storagePath = "testRead_subscribeLate.txt";
         var writeSignal = makeSmallFile(storagePath, storage, dataContext);
         waitFor(TEST_TIMEOUT, writeSignal);
 
@@ -800,7 +795,7 @@ public abstract class StorageReadWriteTestSuite {
     @Test
     void testRead_subscribeTwice() throws Exception {
 
-        var storagePath = "some_file.txt";
+        var storagePath = "testRead_subscribeTwice.txt";
         var writeSignal = makeSmallFile(storagePath, storage, dataContext);
         waitFor(TEST_TIMEOUT, writeSignal);
 
@@ -847,7 +842,7 @@ public abstract class StorageReadWriteTestSuite {
     @Test
     void testRead_cancelImmediately() {
 
-        var storagePath = "some_file.txt";
+        var storagePath = "testRead_cancelImmediately.txt";
         var writeSignal = makeSmallFile(storagePath, storage, dataContext);
         waitFor(TEST_TIMEOUT, writeSignal);
 
@@ -882,7 +877,7 @@ public abstract class StorageReadWriteTestSuite {
     @Test
     void testRead_cancelAndRetry() throws Exception {
 
-        var storagePath = "some_file.dat";
+        var storagePath = "testRead_cancelAndRetry.dat";
 
         // Create a file big enough that it can't be read in a single chunk
 
@@ -949,7 +944,7 @@ public abstract class StorageReadWriteTestSuite {
     @Test
     void testRead_cancelAndDelete() throws Exception {
 
-        var storagePath = "some_file.dat";
+        var storagePath = "testRead_cancelAndDelete.dat";
 
         // Create a file big enough that it can't be read in a single chunk
 

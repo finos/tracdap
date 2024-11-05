@@ -37,25 +37,16 @@ _plugins.PluginManager.register_core_plugins()
 class LocalArrowImplStorageTest(unittest.TestCase, FileOperationsTestSuite, FileReadWriteTestSuite):
 
     storage_root: tempfile.TemporaryDirectory
-    test_number: int
 
     @classmethod
     def setUpClass(cls) -> None:
 
         cls.storage_root = tempfile.TemporaryDirectory()
-        cls.test_number = 0
-
-    def setUp(self):
-
-        test_dir = pathlib.Path(self.storage_root.name).joinpath(f"test_{self.test_number}")
-        test_dir.mkdir()
-
-        self.__class__.test_number += 1
 
         test_storage_config = _cfg.PluginConfig(
             protocol="LOCAL",
             properties={
-                "rootPath": str(test_dir),
+                "rootPath": cls.storage_root.name,
                 "runtimeFs": "arrow"})
 
         sys_config = _cfg.RuntimeConfig()
@@ -63,7 +54,8 @@ class LocalArrowImplStorageTest(unittest.TestCase, FileOperationsTestSuite, File
         sys_config.storage.buckets["test_bucket"] = test_storage_config
 
         manager = _storage.StorageManager(sys_config)
-        self.storage = manager.get_file_storage("test_bucket")
+
+        cls.storage = manager.get_file_storage("test_bucket")
 
     @classmethod
     def tearDownClass(cls) -> None:
@@ -75,25 +67,16 @@ class LocalArrowImplStorageTest(unittest.TestCase, FileOperationsTestSuite, File
 class LocalPythonImplStorageTest(unittest.TestCase, FileOperationsTestSuite, FileReadWriteTestSuite):
 
     storage_root: tempfile.TemporaryDirectory
-    test_number: int
 
     @classmethod
     def setUpClass(cls) -> None:
 
         cls.storage_root = tempfile.TemporaryDirectory()
-        cls.test_number = 0
-
-    def setUp(self):
-
-        test_dir = pathlib.Path(self.storage_root.name).joinpath(f"test_{self.test_number}")
-        test_dir.mkdir()
-
-        self.__class__.test_number += 1
 
         test_storage_config = _cfg.PluginConfig(
             protocol="LOCAL",
             properties={
-                "rootPath": str(test_dir),
+                "rootPath": cls.storage_root.name,
                 "runtimeFs": "python"})
 
         sys_config = _cfg.RuntimeConfig()
@@ -101,7 +84,7 @@ class LocalPythonImplStorageTest(unittest.TestCase, FileOperationsTestSuite, Fil
         sys_config.storage.buckets["test_bucket"] = test_storage_config
 
         manager = _storage.StorageManager(sys_config)
-        self.storage = manager.get_file_storage("test_bucket")
+        cls.storage = manager.get_file_storage("test_bucket")
 
     @classmethod
     def tearDownClass(cls) -> None:

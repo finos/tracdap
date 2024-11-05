@@ -63,8 +63,14 @@ public abstract class StorageOperationsTestSuite {
     protected IDataContext dataContext;
 
     // Windows limits individual path segments to 255 chars
-    private static final String LONG_PATH_TXT_FILE = "long_" + "A".repeat(246) + ".txt";
-    private static final String LONG_PATH_DIR = "long_" + "A".repeat(250);
+
+    private static String makeLongPath(String prefix, String suffix) {
+        return prefix + "A".repeat(255 - prefix.length() - suffix.length()) + suffix;
+    }
+
+    private static String makeLongDirPath(String prefix) {
+        return prefix + "A".repeat(255 - prefix.length());
+    }
 
 
     // -----------------------------------------------------------------------------------------------------------------
@@ -74,11 +80,11 @@ public abstract class StorageOperationsTestSuite {
     @Test
     void testExists_file() throws Exception {
 
-        var prepare = makeSmallFile("test_file.txt", storage, dataContext);
+        var prepare = makeSmallFile("testExists_file.txt", storage, dataContext);
         waitFor(TEST_TIMEOUT, prepare);
 
-        var filePresent = storage.exists("test_file.txt", dataContext);
-        var fileNotPresent = storage.exists("other_file.txt", dataContext);
+        var filePresent = storage.exists("testExists_file.txt", dataContext);
+        var fileNotPresent = storage.exists("testExists_file_other.txt", dataContext);
 
         waitFor(TEST_TIMEOUT, filePresent, fileNotPresent);
 
@@ -89,26 +95,26 @@ public abstract class StorageOperationsTestSuite {
     @Test
     void testExists_longPath() throws Exception {
 
-        var prepare = makeSmallFile(LONG_PATH_TXT_FILE, storage, dataContext);
+        var longPath = makeLongPath("testExists_longPath", ".txt");
+
+        var prepare = makeSmallFile(longPath, storage, dataContext);
         waitFor(TEST_TIMEOUT, prepare);
 
-        var filePresent = storage.exists(LONG_PATH_TXT_FILE, dataContext);
-        var fileNotPresent = storage.exists("other_file.txt", dataContext);
+        var filePresent = storage.exists(longPath, dataContext);
 
-        waitFor(TEST_TIMEOUT, filePresent, fileNotPresent);
+        waitFor(TEST_TIMEOUT, filePresent);
 
         Assertions.assertTrue(getResultOf(filePresent));
-        Assertions.assertFalse(getResultOf(fileNotPresent));
     }
 
     @Test
     void testExists_emptyFile() throws Exception {
 
         var empty = dataContext.arrowAllocator().getEmpty();
-        var prepare = makeFile("test_file.txt", empty, storage, dataContext);
+        var prepare = makeFile("testExists_emptyFile.txt", empty, storage, dataContext);
         waitFor(TEST_TIMEOUT, prepare);
 
-        var emptyFileExist = storage.exists("test_file.txt", dataContext);
+        var emptyFileExist = storage.exists("testExists_emptyFile.txt", dataContext);
 
         waitFor(TEST_TIMEOUT, emptyFileExist);
 
@@ -119,11 +125,11 @@ public abstract class StorageOperationsTestSuite {
     @Test
     void testExists_dir() throws Exception {
 
-        var prepare = storage.mkdir("test_dir", false, dataContext);
+        var prepare = storage.mkdir("testExists_dir", false, dataContext);
         waitFor(TEST_TIMEOUT, prepare);
 
-        var dirPresent = storage.exists("test_dir", dataContext);
-        var dirNotPresent = storage.exists("other_dir", dataContext);
+        var dirPresent = storage.exists("testExists_dir", dataContext);
+        var dirNotPresent = storage.exists("testExists_dir_other", dataContext);
 
         waitFor(TEST_TIMEOUT, dirPresent, dirNotPresent);
 
@@ -134,11 +140,11 @@ public abstract class StorageOperationsTestSuite {
     @Test
     void testExists_parentDir() throws Exception {
 
-        var prepare = storage.mkdir("parent_dir/child_dir", true, dataContext);
+        var prepare = storage.mkdir("testExists_parentDir/child_dir", true, dataContext);
         waitFor(TEST_TIMEOUT, prepare);
 
-        var dirPresent = storage.exists("parent_dir", dataContext);
-        var dirNotPresent = storage.exists("other_dir", dataContext);
+        var dirPresent = storage.exists("testExists_parentDir", dataContext);
+        var dirNotPresent = storage.exists("testExists_parentDir_other", dataContext);
 
         waitFor(TEST_TIMEOUT, dirPresent, dirNotPresent);
 
@@ -176,10 +182,10 @@ public abstract class StorageOperationsTestSuite {
         var content = Bytes.copyToBuffer(bytes, dataContext.arrowAllocator());
 
         var expectedSize = content.readableBytes();
-        var prepare = makeFile("test_file.txt", content, storage, dataContext);
+        var prepare = makeFile("testSize_ok.txt", content, storage, dataContext);
         waitFor(TEST_TIMEOUT, prepare);
 
-        var size = storage.size("test_file.txt", dataContext);
+        var size = storage.size("testSize_ok.txt", dataContext);
 
         waitFor(TEST_TIMEOUT, size);
 
@@ -189,14 +195,16 @@ public abstract class StorageOperationsTestSuite {
     @Test
     void testSize_longPath() throws Exception {
 
+        var longPath = makeLongPath("testSize_longPath", ".txt");
+
         var bytes = "Content of a certain size\n".getBytes(StandardCharsets.UTF_8);
         var content = Bytes.copyToBuffer(bytes, dataContext.arrowAllocator());
 
         var expectedSize = content.readableBytes();
-        var prepare = makeFile(LONG_PATH_TXT_FILE, content, storage, dataContext);
+        var prepare = makeFile(longPath, content, storage, dataContext);
         waitFor(TEST_TIMEOUT, prepare);
 
-        var size = storage.size(LONG_PATH_TXT_FILE, dataContext);
+        var size = storage.size(longPath, dataContext);
 
         waitFor(TEST_TIMEOUT, size);
 
@@ -207,10 +215,10 @@ public abstract class StorageOperationsTestSuite {
     void testSize_emptyFile() throws Exception {
 
         var empty = dataContext.arrowAllocator().getEmpty();
-        var prepare = makeFile("test_file.txt", empty, storage, dataContext);
+        var prepare = makeFile("testSize_emptyFile.txt", empty, storage, dataContext);
         waitFor(TEST_TIMEOUT, prepare);
 
-        var size =  storage.size("test_file.txt", dataContext);
+        var size =  storage.size("testSize_emptyFile.txt", dataContext);
 
         waitFor(TEST_TIMEOUT, size);
 
@@ -220,10 +228,10 @@ public abstract class StorageOperationsTestSuite {
     @Test
     void testSize_dir() {
 
-        var prepare = storage.mkdir("test_dir", false, dataContext);
+        var prepare = storage.mkdir("testSize_dir", false, dataContext);
         waitFor(TEST_TIMEOUT, prepare);
 
-        var size = storage.size("test_dir", dataContext);
+        var size = storage.size("testSize_dir", dataContext);
 
         waitFor(TEST_TIMEOUT, size);
 
@@ -233,7 +241,7 @@ public abstract class StorageOperationsTestSuite {
     @Test
     void testSize_missing() {
 
-        var size = storage.size("missing_file.txt", dataContext);
+        var size = storage.size("testSize_missing.txt", dataContext);
 
         waitFor(TEST_TIMEOUT, size);
 
@@ -274,16 +282,16 @@ public abstract class StorageOperationsTestSuite {
         var expectedSize = content.readableBytes();
         var prepare = storage
                 .mkdir("some_dir", false, dataContext)
-                .thenCompose(x -> makeFile("some_dir/test_file.txt", content, storage, dataContext));
+                .thenCompose(x -> makeFile("testStat_fileOk/test_file.txt", content, storage, dataContext));
 
         waitFor(TEST_TIMEOUT, prepare);
 
-        var stat = storage.stat("some_dir/test_file.txt", dataContext);
+        var stat = storage.stat("testStat_fileOk/test_file.txt", dataContext);
         waitFor(TEST_TIMEOUT, stat);
 
         var statResult = getResultOf(stat);
 
-        Assertions.assertEquals("some_dir/test_file.txt", statResult.storagePath);
+        Assertions.assertEquals("testStat_fileOk/test_file.txt", statResult.storagePath);
         Assertions.assertEquals("test_file.txt", statResult.fileName);
         Assertions.assertEquals(FileType.FILE, statResult.fileType);
         Assertions.assertEquals(expectedSize, statResult.size);
@@ -292,6 +300,8 @@ public abstract class StorageOperationsTestSuite {
     @Test
     void testStat_fileLongPath() throws Exception {
 
+        var longPath = makeLongPath("testStat_fileLongPath", ".txt");
+
         // Simple case - stat a file
 
         var bytes = "Sample content for stat call\n".getBytes(StandardCharsets.UTF_8);
@@ -299,18 +309,18 @@ public abstract class StorageOperationsTestSuite {
 
         var expectedSize = content.readableBytes();
         var prepare = storage
-                .mkdir("some_dir", false, dataContext)
-                .thenCompose(x -> makeFile("some_dir/" + LONG_PATH_TXT_FILE, content, storage, dataContext));
+                .mkdir("testStat_fileLongPath", false, dataContext)
+                .thenCompose(x -> makeFile("testStat_fileLongPath/" + longPath, content, storage, dataContext));
 
         waitFor(TEST_TIMEOUT, prepare);
 
-        var stat = storage.stat("some_dir/" + LONG_PATH_TXT_FILE, dataContext);
+        var stat = storage.stat("testStat_fileLongPath/" + longPath, dataContext);
         waitFor(TEST_TIMEOUT, stat);
 
         var statResult = getResultOf(stat);
 
-        Assertions.assertEquals("some_dir/" + LONG_PATH_TXT_FILE, statResult.storagePath);
-        Assertions.assertEquals(LONG_PATH_TXT_FILE, statResult.fileName);
+        Assertions.assertEquals("testStat_fileLongPath/" + longPath, statResult.storagePath);
+        Assertions.assertEquals(longPath, statResult.fileName);
         Assertions.assertEquals(FileType.FILE, statResult.fileType);
         Assertions.assertEquals(expectedSize, statResult.size);
     }
@@ -324,10 +334,10 @@ public abstract class StorageOperationsTestSuite {
         var testStart = Instant.now();
         Thread.sleep(1000);  // Let time elapse before/after the test calls
 
-        var prepare = makeSmallFile("test_file.txt", storage, dataContext);
+        var prepare = makeSmallFile("testStat_fileMTime.txt", storage, dataContext);
         waitFor(TEST_TIMEOUT, prepare);
 
-        var stat = storage.stat("test_file.txt", dataContext);
+        var stat = storage.stat("testStat_fileMTime.txt", dataContext);
         waitFor(TEST_TIMEOUT, stat);
 
         Thread.sleep(1000);  // Let time elapse before/after the test calls
@@ -357,20 +367,20 @@ public abstract class StorageOperationsTestSuite {
 
         // On FAT32, atime is limited to an access date, i.e. one-day resolution
 
-        var prepare = makeSmallFile("test_file.txt", storage, dataContext);
+        var prepare = makeSmallFile("testStat_fileATime.txt", storage, dataContext);
         waitFor(TEST_TIMEOUT, prepare);
 
         var testStart = Instant.now();
         Thread.sleep(10);  // Let time elapse before/after the test calls
 
         var readData =
-                storage.size("test_file.txt", dataContext).thenCompose(size ->
-                storage.readChunk("test_file.txt", 0, (int)(long) size, dataContext));
+                storage.size("testStat_fileATime.txt", dataContext).thenCompose(size ->
+                storage.readChunk("testStat_fileATime.txt", 0, (int)(long) size, dataContext));
 
         waitFor(TEST_TIMEOUT, readData);
         readData.toCompletableFuture().get().close();
 
-        var stat = storage.stat("test_file.txt", dataContext);
+        var stat = storage.stat("testStat_fileATime.txt", dataContext);
         waitFor(TEST_TIMEOUT, stat);
 
         Thread.sleep(10);  // Let time elapse before/after the test calls
@@ -385,15 +395,15 @@ public abstract class StorageOperationsTestSuite {
     @Test
     void testStat_dirOk() throws Exception {
 
-        var prepare = storage.mkdir("some_dir/test_dir", true, dataContext);
+        var prepare = storage.mkdir("testStat_dirOk/test_dir", true, dataContext);
         waitFor(TEST_TIMEOUT, prepare);
 
-        var stat = storage.stat("some_dir/test_dir", dataContext);
+        var stat = storage.stat("testStat_dirOk/test_dir", dataContext);
         waitFor(TEST_TIMEOUT, stat);
 
         var statResult = getResultOf(stat);
 
-        Assertions.assertEquals("some_dir/test_dir", statResult.storagePath);
+        Assertions.assertEquals("testStat_dirOk/test_dir", statResult.storagePath);
         Assertions.assertEquals("test_dir", statResult.fileName);
         Assertions.assertEquals(FileType.DIRECTORY, statResult.fileType);
 
@@ -404,16 +414,18 @@ public abstract class StorageOperationsTestSuite {
     @Test
     void testStat_dirLongPath() throws Exception {
 
-        var prepare = storage.mkdir("some_dir/" + LONG_PATH_DIR, true, dataContext);
+        var longDir = makeLongDirPath("testStat_dirLongPath");
+
+        var prepare = storage.mkdir("testStat_dirLongPath/" + longDir, true, dataContext);
         waitFor(TEST_TIMEOUT, prepare);
 
-        var stat = storage.stat("some_dir/" + LONG_PATH_DIR, dataContext);
+        var stat = storage.stat("testStat_dirLongPath/" + longDir, dataContext);
         waitFor(TEST_TIMEOUT, stat);
 
         var statResult = getResultOf(stat);
 
-        Assertions.assertEquals("some_dir/" + LONG_PATH_DIR, statResult.storagePath);
-        Assertions.assertEquals(LONG_PATH_DIR, statResult.fileName);
+        Assertions.assertEquals("testStat_dirLongPath/" + longDir, statResult.storagePath);
+        Assertions.assertEquals(longDir, statResult.fileName);
         Assertions.assertEquals(FileType.DIRECTORY, statResult.fileType);
 
         // Size field for directories should always be set to 0
@@ -423,16 +435,16 @@ public abstract class StorageOperationsTestSuite {
     @Test
     void testStat_dirImplicitOk() throws Exception {
 
-        var prepare = storage.mkdir("some_dir/test_dir", true, dataContext);
+        var prepare = storage.mkdir("testStat_dirImplicitOk/test_dir", true, dataContext);
         waitFor(TEST_TIMEOUT, prepare);
 
-        var stat = storage.stat("some_dir", dataContext);
+        var stat = storage.stat("testStat_dirImplicitOk", dataContext);
         waitFor(TEST_TIMEOUT, stat);
 
         var statResult = getResultOf(stat);
 
-        Assertions.assertEquals("some_dir", statResult.storagePath);
-        Assertions.assertEquals("some_dir", statResult.fileName);
+        Assertions.assertEquals("testStat_dirImplicitOk", statResult.storagePath);
+        Assertions.assertEquals("testStat_dirImplicitOk", statResult.fileName);
         Assertions.assertEquals(FileType.DIRECTORY, statResult.fileType);
 
         // Size field for directories should always be set to 0
@@ -445,7 +457,7 @@ public abstract class StorageOperationsTestSuite {
         // mtime and atime for dirs is unlikely to be supported in cloud storage buckets
         // So, all of these fields are optional in stat responses for directories
 
-        var prepare1 = storage.mkdir("some_dir/test_dir", true, dataContext);
+        var prepare1 = storage.mkdir("testStat_dirMTime/test_dir", true, dataContext);
         waitFor(TEST_TIMEOUT, prepare1);
 
         // "Modify" the directory by adding a file to it
@@ -453,10 +465,10 @@ public abstract class StorageOperationsTestSuite {
         var testStart = Instant.now();
         Thread.sleep(10);  // Let time elapse before/after the test calls
 
-        var prepare2 = makeSmallFile("some_dir/test_dir/a_file.txt", storage, dataContext);
+        var prepare2 = makeSmallFile("testStat_dirMTime/test_dir/a_file.txt", storage, dataContext);
         waitFor(TEST_TIMEOUT, prepare2);
 
-        var stat = storage.stat("some_dir/test_dir", dataContext);
+        var stat = storage.stat("testStat_dirMTime/test_dir", dataContext);
         waitFor(TEST_TIMEOUT, stat);
 
         Thread.sleep(10);  // Let time elapse before/after the test calls
@@ -478,8 +490,8 @@ public abstract class StorageOperationsTestSuite {
         // So, all of these fields are optional in stat responses for directories
 
         var prepare1 = storage
-                .mkdir("some_dir/test_dir", true, dataContext)
-                .thenCompose(x -> makeSmallFile("some_dir/test_dir/a_file.txt", storage, dataContext));
+                .mkdir("testStat_dirATime/test_dir", true, dataContext)
+                .thenCompose(x -> makeSmallFile("testStat_dirATime/test_dir/a_file.txt", storage, dataContext));
         waitFor(TEST_TIMEOUT, prepare1);
 
         // Access the directory by running "ls" on it
@@ -487,10 +499,10 @@ public abstract class StorageOperationsTestSuite {
         var testStart = Instant.now();
         Thread.sleep(10);  // Let time elapse before/after the test calls
 
-        var prepare2 = storage.ls("some_dir/test_dir", dataContext);
+        var prepare2 = storage.ls("testStat_dirATime/test_dir", dataContext);
         waitFor(TEST_TIMEOUT, prepare2);
 
-        var stat = storage.stat("some_dir/test_dir", dataContext);
+        var stat = storage.stat("testStat_dirATime/test_dir", dataContext);
         waitFor(TEST_TIMEOUT, stat);
 
         Thread.sleep(10);  // Let time elapse before/after the test calls
@@ -521,7 +533,7 @@ public abstract class StorageOperationsTestSuite {
     @Test
     void testStat_missing() {
 
-        var stat = storage.stat("does_not_exist.dat", dataContext);
+        var stat = storage.stat("testStat_missing.dat", dataContext);
         waitFor(TEST_TIMEOUT, stat);
 
         Assertions.assertThrows(EStorageRequest.class, () -> getResultOf(stat));
@@ -543,12 +555,12 @@ public abstract class StorageOperationsTestSuite {
 
         // Simple listing, dir containing one file and one sub dir
 
-        var prepare = storage.mkdir("test_dir", false, dataContext)
-                .thenCompose(x -> storage.mkdir("test_dir/child_1", false, dataContext))
-                .thenCompose(x -> makeSmallFile("test_dir/child_2.txt", storage, dataContext));
+        var prepare = storage.mkdir("testLs_ok", false, dataContext)
+                .thenCompose(x -> storage.mkdir("testLs_ok/child_1", false, dataContext))
+                .thenCompose(x -> makeSmallFile("testLs_ok/child_2.txt", storage, dataContext));
         waitFor(TEST_TIMEOUT, prepare);
 
-        var ls = storage.ls("test_dir", dataContext);
+        var ls = storage.ls("testLs_ok", dataContext);
         waitFor(TEST_TIMEOUT, ls);
 
         var listing = getResultOf(ls);
@@ -559,25 +571,27 @@ public abstract class StorageOperationsTestSuite {
         var child2 = listing.stream().filter(e -> e.fileName.equals("child_2.txt")).findFirst();
 
         Assertions.assertTrue(child1.isPresent());
-        Assertions.assertEquals("test_dir/child_1", child1.get().storagePath);
+        Assertions.assertEquals("testLs_ok/child_1", child1.get().storagePath);
         Assertions.assertEquals(FileType.DIRECTORY, child1.get().fileType);
 
         Assertions.assertTrue(child2.isPresent());
-        Assertions.assertEquals("test_dir/child_2.txt", child2.get().storagePath);
+        Assertions.assertEquals("testLs_ok/child_2.txt", child2.get().storagePath);
         Assertions.assertEquals(FileType.FILE, child2.get().fileType);
     }
 
     @Test
     void testLs_longPath() throws Exception {
 
+        var longPath = makeLongDirPath("testLs_longPath");
+
         // Simple listing, dir containing one file and one sub dir
 
-        var prepare = storage.mkdir(LONG_PATH_DIR, false, dataContext)
-                .thenCompose(x -> storage.mkdir(LONG_PATH_DIR + "/child_1", false, dataContext))
-                .thenCompose(x -> makeSmallFile(LONG_PATH_DIR + "/child_2.txt", storage, dataContext));
+        var prepare = storage.mkdir(longPath, false, dataContext)
+                .thenCompose(x -> storage.mkdir(longPath + "/child_1", false, dataContext))
+                .thenCompose(x -> makeSmallFile(longPath + "/child_2.txt", storage, dataContext));
         waitFor(TEST_TIMEOUT, prepare);
 
-        var ls = storage.ls(LONG_PATH_DIR, dataContext);
+        var ls = storage.ls(longPath, dataContext);
         waitFor(TEST_TIMEOUT, ls);
 
         var listing = getResultOf(ls);
@@ -588,11 +602,11 @@ public abstract class StorageOperationsTestSuite {
         var child2 = listing.stream().filter(e -> e.fileName.equals("child_2.txt")).findFirst();
 
         Assertions.assertTrue(child1.isPresent());
-        Assertions.assertEquals(LONG_PATH_DIR + "/child_1", child1.get().storagePath);
+        Assertions.assertEquals(longPath + "/child_1", child1.get().storagePath);
         Assertions.assertEquals(FileType.DIRECTORY, child1.get().fileType);
 
         Assertions.assertTrue(child2.isPresent());
-        Assertions.assertEquals(LONG_PATH_DIR + "/child_2.txt", child2.get().storagePath);
+        Assertions.assertEquals(longPath + "/child_2.txt", child2.get().storagePath);
         Assertions.assertEquals(FileType.FILE, child2.get().fileType);
     }
 
@@ -602,12 +616,12 @@ public abstract class StorageOperationsTestSuite {
         // Corner case - dir with an extension, file without extension
 
 
-        var prepare = storage.mkdir("ls_extensions", false, dataContext)
-                .thenCompose(x -> storage.mkdir("ls_extensions/child_1.dat", false, dataContext))
-                .thenCompose(x -> makeSmallFile("ls_extensions/child_2_file", storage, dataContext));
+        var prepare = storage.mkdir("testLs_extensions", false, dataContext)
+                .thenCompose(x -> storage.mkdir("testLs_extensions/child_1.dat", false, dataContext))
+                .thenCompose(x -> makeSmallFile("testLs_extensions/child_2_file", storage, dataContext));
         waitFor(TEST_TIMEOUT, prepare);
 
-        var ls = storage.ls("ls_extensions", dataContext);
+        var ls = storage.ls("testLs_extensions", dataContext);
         waitFor(TEST_TIMEOUT, ls);
 
         var listing = getResultOf(ls);
@@ -618,11 +632,11 @@ public abstract class StorageOperationsTestSuite {
         var child2 = listing.stream().filter(e -> e.fileName.equals("child_2_file")).findFirst();
 
         Assertions.assertTrue(child1.isPresent());
-        Assertions.assertEquals("ls_extensions/child_1.dat", child1.get().storagePath);
+        Assertions.assertEquals("testLs_extensions/child_1.dat", child1.get().storagePath);
         Assertions.assertEquals(FileType.DIRECTORY, child1.get().fileType);
 
         Assertions.assertTrue(child2.isPresent());
-        Assertions.assertEquals("ls_extensions/child_2_file", child2.get().storagePath);
+        Assertions.assertEquals("testLs_extensions/child_2_file", child2.get().storagePath);
         Assertions.assertEquals(FileType.FILE, child2.get().fileType);
     }
 
@@ -631,12 +645,12 @@ public abstract class StorageOperationsTestSuite {
 
         // Storage path should be accepted with or without trailing slash
 
-        var prepare = storage.mkdir("ls_trailing_slash", false, dataContext)
-                .thenCompose(x -> makeSmallFile("ls_trailing_slash/some_file.txt", storage, dataContext));
+        var prepare = storage.mkdir("testLs_trailingSlash", false, dataContext)
+                .thenCompose(x -> makeSmallFile("testLs_trailingSlash/some_file.txt", storage, dataContext));
         waitFor(TEST_TIMEOUT, prepare);
 
-        var ls1 = storage.ls("ls_trailing_slash", dataContext);
-        var ls2 = storage.ls("ls_trailing_slash/", dataContext);
+        var ls1 = storage.ls("testLs_trailingSlash", dataContext);
+        var ls2 = storage.ls("testLs_trailingSlash/", dataContext);
         waitFor(TEST_TIMEOUT, ls1, ls2);
 
         var listing1 = getResultOf(ls1);
@@ -651,8 +665,8 @@ public abstract class StorageOperationsTestSuite {
 
         // Ls is one operation that is allowed on the storage root!
 
-        var prepare = storage.mkdir("test_dir", false, dataContext)
-                .thenCompose(x -> makeSmallFile("test_file.txt", storage, dataContext));
+        var prepare = storage.mkdir("testLs_storageRootAllowed", false, dataContext)
+                .thenCompose(x -> makeSmallFile("testLs_storageRootAllowed_file.txt", storage, dataContext));
         waitFor(TEST_TIMEOUT, prepare);
 
         var ls = storage.ls(".", dataContext);
@@ -662,15 +676,15 @@ public abstract class StorageOperationsTestSuite {
 
         Assertions.assertTrue(listing.size() >= 2);
 
-        var child1 = listing.stream().filter(e -> e.fileName.equals("test_dir")).findFirst();
-        var child2 = listing.stream().filter(e -> e.fileName.equals("test_file.txt")).findFirst();
+        var child1 = listing.stream().filter(e -> e.fileName.equals("testLs_storageRootAllowed")).findFirst();
+        var child2 = listing.stream().filter(e -> e.fileName.equals("testLs_storageRootAllowed_file.txt")).findFirst();
 
         Assertions.assertTrue(child1.isPresent());
-        Assertions.assertEquals("test_dir", child1.get().storagePath);
+        Assertions.assertEquals("testLs_storageRootAllowed", child1.get().storagePath);
         Assertions.assertEquals(FileType.DIRECTORY, child1.get().fileType);
 
         Assertions.assertTrue(child2.isPresent());
-        Assertions.assertEquals("test_file.txt", child2.get().storagePath);
+        Assertions.assertEquals("testLs_storageRootAllowed_file.txt", child2.get().storagePath);
         Assertions.assertEquals(FileType.FILE, child2.get().fileType);
     }
 
@@ -679,10 +693,10 @@ public abstract class StorageOperationsTestSuite {
 
         // Attempt to call ls on a file is an error
 
-        var prepare = makeSmallFile("test_file", storage, dataContext);
+        var prepare = makeSmallFile("testLs_file", storage, dataContext);
         waitFor(TEST_TIMEOUT, prepare);
 
-        var ls = storage.ls("test_file", dataContext);
+        var ls = storage.ls("testLs_file", dataContext);
         waitFor(TEST_TIMEOUT, ls);
 
         var fileLs = getResultOf(ls);
@@ -692,8 +706,8 @@ public abstract class StorageOperationsTestSuite {
         var stat = fileLs.get(0);
 
         Assertions.assertEquals(FileType.FILE, stat.fileType);
-        Assertions.assertEquals("test_file", stat.fileName);
-        Assertions.assertEquals("test_file", stat.storagePath);
+        Assertions.assertEquals("testLs_file", stat.fileName);
+        Assertions.assertEquals("testLs_file", stat.storagePath);
     }
 
     @Test
@@ -701,7 +715,7 @@ public abstract class StorageOperationsTestSuite {
 
         // Ls on a missing path is an error condition
 
-        var ls = storage.ls("dir_does_not_exist/", dataContext);
+        var ls = storage.ls("testLs_missing/", dataContext);
         waitFor(TEST_TIMEOUT, ls);
 
         Assertions.assertThrows(EStorageRequest.class, () -> getResultOf(ls));
@@ -723,20 +737,20 @@ public abstract class StorageOperationsTestSuite {
 
         // Simplest case - create a single directory
 
-        var mkdir = storage.mkdir("test_dir", false, dataContext);
+        var mkdir = storage.mkdir("testMkdir_ok", false, dataContext);
         waitFor(TEST_TIMEOUT, mkdir);
 
         Assertions.assertDoesNotThrow(() -> getResultOf(mkdir));
 
         // Creating a single child dir when the parent already exists
 
-        var childDir = storage.mkdir("test_dir/child", false, dataContext);
+        var childDir = storage.mkdir("testMkdir_ok/child", false, dataContext);
         waitFor(TEST_TIMEOUT, childDir);
 
         Assertions.assertDoesNotThrow(() -> getResultOf(childDir));
 
-        var dirExists = storage.exists("test_dir", dataContext);
-        var childExists = storage.exists("test_dir/child", dataContext);
+        var dirExists = storage.exists("testMkdir_ok", dataContext);
+        var childExists = storage.exists("testMkdir_ok/child", dataContext);
         waitFor(TEST_TIMEOUT, dirExists, childExists);
 
         Assertions.assertTrue(getResultOf(dirExists));
@@ -746,22 +760,24 @@ public abstract class StorageOperationsTestSuite {
     @Test
     void testMkdir_longPath() throws Exception {
 
+        var longPath = makeLongDirPath("testMkdir_longPath");
+
         // Simplest case - create a single directory
 
-        var mkdir = storage.mkdir(LONG_PATH_DIR, false, dataContext);
+        var mkdir = storage.mkdir(longPath, false, dataContext);
         waitFor(TEST_TIMEOUT, mkdir);
 
         Assertions.assertDoesNotThrow(() -> getResultOf(mkdir));
 
         // Creating a single child dir when the parent already exists
 
-        var childDir = storage.mkdir(LONG_PATH_DIR + "/child", false, dataContext);
+        var childDir = storage.mkdir(longPath + "/child", false, dataContext);
         waitFor(TEST_TIMEOUT, childDir);
 
         Assertions.assertDoesNotThrow(() -> getResultOf(childDir));
 
-        var dirExists = storage.exists(LONG_PATH_DIR, dataContext);
-        var childExists = storage.exists(LONG_PATH_DIR + "/child", dataContext);
+        var dirExists = storage.exists(longPath, dataContext);
+        var childExists = storage.exists(longPath + "/child", dataContext);
         waitFor(TEST_TIMEOUT, dirExists, childExists);
 
         Assertions.assertTrue(getResultOf(dirExists));
@@ -773,19 +789,19 @@ public abstract class StorageOperationsTestSuite {
 
         // It is not an error to call mkdir on an existing directory
 
-        var prepare = storage.mkdir("test_dir", false, dataContext);
+        var prepare = storage.mkdir("testMkdir_dirExists", false, dataContext);
         waitFor(TEST_TIMEOUT, prepare);
 
-        var exists1 = storage.exists("test_dir", dataContext);
+        var exists1 = storage.exists("testMkdir_dirExists", dataContext);
         waitFor(TEST_TIMEOUT, exists1);
         var exists1Result = getResultOf(exists1);
 
         Assertions.assertTrue(exists1Result);
 
-        var mkdir = storage.mkdir("test_dir", false, dataContext);
+        var mkdir = storage.mkdir("testMkdir_dirExists", false, dataContext);
         waitFor(TEST_TIMEOUT, mkdir);
 
-        var exists2 = storage.exists("test_dir", dataContext);
+        var exists2 = storage.exists("testMkdir_dirExists", dataContext);
         waitFor(TEST_TIMEOUT, exists2);
         var exists2Result = getResultOf(exists2);
 
@@ -797,10 +813,10 @@ public abstract class StorageOperationsTestSuite {
 
         // mkdir should always fail if requested dir already exists and is a file
 
-        var prepare = makeSmallFile("test_dir", storage, dataContext);
+        var prepare = makeSmallFile("testMkdir_fileExists", storage, dataContext);
         waitFor(TEST_TIMEOUT, prepare);
 
-        var mkdir = storage.mkdir("test_dir", false, dataContext);
+        var mkdir = storage.mkdir("testMkdir_fileExists", false, dataContext);
         waitFor(TEST_TIMEOUT, mkdir);
 
         Assertions.assertThrows(EStorageRequest.class, () -> getResultOf(mkdir));
@@ -812,13 +828,13 @@ public abstract class StorageOperationsTestSuite {
         // With recursive = false, mkdir with a missing parent should fail
         // Neither parent nor child dir should be created
 
-        var childDir = storage.mkdir("test_dir/child", false, dataContext);
+        var childDir = storage.mkdir("testMkdir_missingParent/child", false, dataContext);
         waitFor(TEST_TIMEOUT, childDir);
 
         Assertions.assertThrows(EStorageRequest.class, () -> getResultOf(childDir));
 
-        var dirExists = storage.exists("test_dir", dataContext);
-        var childExists = storage.exists("test_dir/child", dataContext);
+        var dirExists = storage.exists("testMkdir_missingParent", dataContext);
+        var childExists = storage.exists("testMkdir_missingParent/child", dataContext);
         waitFor(TEST_TIMEOUT, dirExists, childExists);
 
         Assertions.assertFalse(getResultOf(dirExists));
@@ -830,13 +846,13 @@ public abstract class StorageOperationsTestSuite {
 
         // mkdir, recursive = true, create parent and child dir in a single call
 
-        var mkdir = storage.mkdir("test_dir/child", true, dataContext);
+        var mkdir = storage.mkdir("testMkdir_recursiveOk/child", true, dataContext);
         waitFor(TEST_TIMEOUT, mkdir);
 
         Assertions.assertDoesNotThrow(() -> getResultOf(mkdir));
 
-        var dirExists = storage.exists("test_dir", dataContext);
-        var childExists = storage.exists("test_dir/child", dataContext);
+        var dirExists = storage.exists("testMkdir_recursiveOk", dataContext);
+        var childExists = storage.exists("testMkdir_recursiveOk/child", dataContext);
         waitFor(TEST_TIMEOUT, dirExists, childExists);
 
         Assertions.assertTrue(getResultOf(dirExists));
@@ -848,16 +864,16 @@ public abstract class StorageOperationsTestSuite {
 
         // mkdir, when recursive = true it is not an error if the target dir already exists
 
-        var prepare = storage.mkdir("test_dir/child", true, dataContext);
+        var prepare = storage.mkdir("testMkdir_recursiveDirExists/child", true, dataContext);
         waitFor(TEST_TIMEOUT, prepare);
 
-        var mkdir = storage.mkdir("test_dir/child", true, dataContext);
+        var mkdir = storage.mkdir("testMkdir_recursiveDirExists/child", true, dataContext);
         waitFor(TEST_TIMEOUT, mkdir);
 
         Assertions.assertDoesNotThrow(() -> getResultOf(mkdir));
 
-        var dirExists = storage.exists("test_dir", dataContext);
-        var childExists = storage.exists("test_dir/child", dataContext);
+        var dirExists = storage.exists("testMkdir_recursiveDirExists", dataContext);
+        var childExists = storage.exists("testMkdir_recursiveDirExists/child", dataContext);
         waitFor(TEST_TIMEOUT, dirExists, childExists);
 
         Assertions.assertTrue(getResultOf(dirExists));
@@ -870,12 +886,12 @@ public abstract class StorageOperationsTestSuite {
         // mkdir should always fail if requested dir already exists and is a file
 
         var prepare = storage
-                .mkdir("test_dir", false, dataContext)
-                .thenCompose(x -> makeSmallFile("test_dir/child", storage, dataContext));
+                .mkdir("testMkdir_recursiveFileExists", false, dataContext)
+                .thenCompose(x -> makeSmallFile("testMkdir_recursiveFileExists/child", storage, dataContext));
 
         waitFor(TEST_TIMEOUT, prepare);
 
-        var mkdir = storage.mkdir("test_dir/child", false, dataContext);
+        var mkdir = storage.mkdir("testMkdir_recursiveFileExists/child", false, dataContext);
         waitFor(TEST_TIMEOUT, mkdir);
 
         Assertions.assertThrows(EStorageRequest.class, () -> getResultOf(mkdir));
@@ -898,13 +914,13 @@ public abstract class StorageOperationsTestSuite {
     @Test
     void testMkdir_unicode() throws Exception {
 
-        var mkdir = storage.mkdir("你好/你好", true, dataContext);
+        var mkdir = storage.mkdir("testMkdir_unicode/你好/你好", true, dataContext);
         waitFor(TEST_TIMEOUT, mkdir);
 
         Assertions.assertDoesNotThrow(() -> getResultOf(mkdir));
 
-        var dirExists = storage.exists("你好", dataContext);
-        var childExists = storage.exists("你好/你好", dataContext);
+        var dirExists = storage.exists("testMkdir_unicode/你好", dataContext);
+        var childExists = storage.exists("testMkdir_unicode/你好/你好", dataContext);
         waitFor(TEST_TIMEOUT, dirExists, childExists);
 
         Assertions.assertTrue(getResultOf(dirExists));
@@ -921,21 +937,21 @@ public abstract class StorageOperationsTestSuite {
 
         // Simplest case - create one file and delete it
 
-        var prepare = makeSmallFile("test_file.txt", storage, dataContext);
+        var prepare = makeSmallFile("testRm_ok.txt", storage, dataContext);
         waitFor(TEST_TIMEOUT, prepare);
 
-        var exists1 = storage.exists("test_file.txt", dataContext);
+        var exists1 = storage.exists("testRm_ok.txt", dataContext);
         waitFor(TEST_TIMEOUT, exists1);
         Assertions.assertTrue(getResultOf(exists1));
 
-        var rm = storage.rm("test_file.txt", dataContext);
+        var rm = storage.rm("testRm_ok.txt", dataContext);
         waitFor(TEST_TIMEOUT, rm);
 
         Assertions.assertDoesNotThrow(() -> getResultOf(rm));
 
         // File should be gone
 
-        var exists2 = storage.exists("test_file.txt", dataContext);
+        var exists2 = storage.exists("testRm_ok.txt", dataContext);
         waitFor(TEST_TIMEOUT, exists2);
         Assertions.assertFalse(getResultOf(exists2));
     }
@@ -943,23 +959,25 @@ public abstract class StorageOperationsTestSuite {
     @Test
     void testRm_longPath() throws Exception {
 
+        var longPath = makeLongPath("testRm_longPath", ".txt");
+
         // Simplest case - create one file and delete it
 
-        var prepare = makeSmallFile(LONG_PATH_TXT_FILE, storage, dataContext);
+        var prepare = makeSmallFile(longPath, storage, dataContext);
         waitFor(TEST_TIMEOUT, prepare);
 
-        var exists1 = storage.exists(LONG_PATH_TXT_FILE, dataContext);
+        var exists1 = storage.exists(longPath, dataContext);
         waitFor(TEST_TIMEOUT, exists1);
         Assertions.assertTrue(getResultOf(exists1));
 
-        var rm = storage.rm(LONG_PATH_TXT_FILE, dataContext);
+        var rm = storage.rm(longPath, dataContext);
         waitFor(TEST_TIMEOUT, rm);
 
         Assertions.assertDoesNotThrow(() -> getResultOf(rm));
 
         // File should be gone
 
-        var exists2 = storage.exists(LONG_PATH_TXT_FILE, dataContext);
+        var exists2 = storage.exists(longPath, dataContext);
         waitFor(TEST_TIMEOUT, exists2);
         Assertions.assertFalse(getResultOf(exists2));
     }
@@ -969,17 +987,17 @@ public abstract class StorageOperationsTestSuite {
 
         // Simplest case - create one file and delete it
 
-        var prepare = makeSmallFile("sub_dir/test_file.txt", storage, dataContext);
+        var prepare = makeSmallFile("testRm_inSubdirOk/test_file.txt", storage, dataContext);
         waitFor(TEST_TIMEOUT, prepare);
 
-        var rm = storage.rm("sub_dir/test_file.txt", dataContext);
+        var rm = storage.rm("testRm_inSubdirOk/test_file.txt", dataContext);
         waitFor(TEST_TIMEOUT, rm);
 
         Assertions.assertDoesNotThrow(() -> getResultOf(rm));
 
         // File should be gone
 
-        var exists = storage.exists("sub_dir/test_file.txt", dataContext);
+        var exists = storage.exists("testRm_inSubdirOk/test_file.txt", dataContext);
         waitFor(TEST_TIMEOUT, exists);
         Assertions.assertFalse(getResultOf(exists));
     }
@@ -989,17 +1007,17 @@ public abstract class StorageOperationsTestSuite {
 
         // Calling rm on a directory is a bad request, even if the dir is empty
 
-        var prepare = storage.mkdir("test_dir", false, dataContext);
+        var prepare = storage.mkdir("testRm_onDir", false, dataContext);
         waitFor(TEST_TIMEOUT, prepare);
 
-        var rm = storage.rm("test_dir", dataContext);
+        var rm = storage.rm("testRm_onDir", dataContext);
         waitFor(TEST_TIMEOUT, rm);
 
         Assertions.assertThrows(EStorageRequest.class, () -> getResultOf(rm));
 
         // Dir should still exist because rm has failed
 
-        var exists = storage.exists("test_dir", dataContext);
+        var exists = storage.exists("testRm_onDir", dataContext);
         waitFor(TEST_TIMEOUT, exists);
         Assertions.assertTrue(getResultOf(exists));
     }
@@ -1009,7 +1027,7 @@ public abstract class StorageOperationsTestSuite {
 
         // Try to delete a path that does not exist
 
-        var rm = storage.rm("missing_path.dat", dataContext);
+        var rm = storage.rm("testRm_missing.dat", dataContext);
         waitFor(TEST_TIMEOUT, rm);
 
         Assertions.assertThrows(EStorageRequest.class, () -> getResultOf(rm));
@@ -1035,18 +1053,18 @@ public abstract class StorageOperationsTestSuite {
     @Test
     void testRmdir_ok() throws Exception {
 
-        var prepare = storage.mkdir("test_dir", false, dataContext);
+        var prepare = storage.mkdir("testRmdir_ok", false, dataContext);
         waitFor(TEST_TIMEOUT, prepare);
 
-        var exists1 = storage.exists("test_dir", dataContext);
+        var exists1 = storage.exists("testRmdir_ok", dataContext);
         waitFor(TEST_TIMEOUT, exists1);
         Assertions.assertTrue(getResultOf(exists1));
 
-        var rmdir = storage.rmdir("test_dir", dataContext);
+        var rmdir = storage.rmdir("testRmdir_ok", dataContext);
         waitFor(TEST_TIMEOUT, rmdir);
         Assertions.assertDoesNotThrow(() -> getResultOf(rmdir));
 
-        var exists2 = storage.exists("test_dir", dataContext);
+        var exists2 = storage.exists("testRmdir_ok", dataContext);
         waitFor(TEST_TIMEOUT, exists2);
         Assertions.assertFalse(getResultOf(exists2));
     }
@@ -1054,18 +1072,20 @@ public abstract class StorageOperationsTestSuite {
     @Test
     void testRmdir_longPath() throws Exception {
 
-        var prepare = storage.mkdir(LONG_PATH_DIR, false, dataContext);
+        var longPath = makeLongDirPath("testRmdir_longPath");
+
+        var prepare = storage.mkdir(longPath, false, dataContext);
         waitFor(TEST_TIMEOUT, prepare);
 
-        var exists1 = storage.exists(LONG_PATH_DIR, dataContext);
+        var exists1 = storage.exists(longPath, dataContext);
         waitFor(TEST_TIMEOUT, exists1);
         Assertions.assertTrue(getResultOf(exists1));
 
-        var rmdir = storage.rmdir(LONG_PATH_DIR, dataContext);
+        var rmdir = storage.rmdir(longPath, dataContext);
         waitFor(TEST_TIMEOUT, rmdir);
         Assertions.assertDoesNotThrow(() -> getResultOf(rmdir));
 
-        var exists2 = storage.exists(LONG_PATH_DIR, dataContext);
+        var exists2 = storage.exists(longPath, dataContext);
         waitFor(TEST_TIMEOUT, exists2);
         Assertions.assertFalse(getResultOf(exists2));
     }
@@ -1073,18 +1093,18 @@ public abstract class StorageOperationsTestSuite {
     @Test
     void testRmdir_byPrefix() throws Exception {
 
-        var prepare = storage.mkdir("test_dir/sub_dir", true, dataContext);
+        var prepare = storage.mkdir("testRmdir_byPrefix/sub_dir", true, dataContext);
         waitFor(TEST_TIMEOUT, prepare);
 
-        var exists1 = storage.exists("test_dir", dataContext);
+        var exists1 = storage.exists("testRmdir_byPrefix", dataContext);
         waitFor(TEST_TIMEOUT, exists1);
         Assertions.assertTrue(getResultOf(exists1));
 
-        var rmdir = storage.rmdir("test_dir", dataContext);
+        var rmdir = storage.rmdir("testRmdir_byPrefix", dataContext);
         waitFor(TEST_TIMEOUT, rmdir);
         Assertions.assertDoesNotThrow(() -> getResultOf(rmdir));
 
-        var exists2 = storage.exists("test_dir", dataContext);
+        var exists2 = storage.exists("testRmdir_byPrefix", dataContext);
         waitFor(TEST_TIMEOUT, exists2);
         Assertions.assertFalse(getResultOf(exists2));
     }
@@ -1096,22 +1116,22 @@ public abstract class StorageOperationsTestSuite {
         // Sibling dir tree should be unaffected
 
         var prepare = storage
-                .mkdir("test_dir/child_1", true, dataContext)
-                .thenCompose(x -> storage.mkdir("test_dir/child_1/sub", false, dataContext))
-                .thenCompose(x -> makeSmallFile("test_dir/child_1/file_a.txt", storage, dataContext))
-                .thenCompose(x -> makeSmallFile("test_dir/child_1/file_b.txt", storage, dataContext))
-                .thenCompose(x -> storage.mkdir("test_dir/child_2", true, dataContext))
-                .thenCompose(x -> makeSmallFile("test_dir/child_2/file_a.txt", storage, dataContext));
+                .mkdir("testRmdir_withContent/child_1", true, dataContext)
+                .thenCompose(x -> storage.mkdir("testRmdir_withContent/child_1/sub", false, dataContext))
+                .thenCompose(x -> makeSmallFile("testRmdir_withContent/child_1/file_a.txt", storage, dataContext))
+                .thenCompose(x -> makeSmallFile("testRmdir_withContent/child_1/file_b.txt", storage, dataContext))
+                .thenCompose(x -> storage.mkdir("testRmdir_withContent/child_2", true, dataContext))
+                .thenCompose(x -> makeSmallFile("testRmdir_withContent/child_2/file_a.txt", storage, dataContext));
 
         waitFor(TEST_TIMEOUT.multipliedBy(2), prepare);  // Allow extra time for multiple operations
 
-        var rmdir = storage.rmdir("test_dir/child_1", dataContext);
+        var rmdir = storage.rmdir("testRmdir_withContent/child_1", dataContext);
         waitFor(TEST_TIMEOUT, rmdir);
         Assertions.assertDoesNotThrow(() -> getResultOf(rmdir));
 
-        var exists1 = storage.exists("test_dir/child_1", dataContext);
-        var exists2 = storage.exists("test_dir/child_2", dataContext);
-        var size2a = storage.size("test_dir/child_2/file_a.txt", dataContext);
+        var exists1 = storage.exists("testRmdir_withContent/child_1", dataContext);
+        var exists2 = storage.exists("testRmdir_withContent/child_2", dataContext);
+        var size2a = storage.size("testRmdir_withContent/child_2/file_a.txt", dataContext);
         waitFor(TEST_TIMEOUT, exists1, exists2, size2a);
 
         Assertions.assertFalse(getResultOf(exists1));
@@ -1124,16 +1144,16 @@ public abstract class StorageOperationsTestSuite {
 
         // Calling rmdir on a file is a bad request
 
-        var prepare = makeSmallFile("test_file.txt", storage, dataContext);
+        var prepare = makeSmallFile("testRmdir_onFile.txt", storage, dataContext);
         waitFor(TEST_TIMEOUT, prepare);
 
-        var rmdir = storage.rmdir("test_file.txt", dataContext);
+        var rmdir = storage.rmdir("testRmdir_onFile.txt", dataContext);
         waitFor(TEST_TIMEOUT, rmdir);
         Assertions.assertThrows(EStorageRequest.class, () -> getResultOf(rmdir));
 
         // File should still exist because rm has failed
 
-        var exists = storage.exists("test_file.txt", dataContext);
+        var exists = storage.exists("testRmdir_onFile.txt", dataContext);
         waitFor(TEST_TIMEOUT, exists);
         Assertions.assertTrue(getResultOf(exists));
     }
@@ -1143,7 +1163,7 @@ public abstract class StorageOperationsTestSuite {
 
         // Try to delete a path that does not exist
 
-        var rmdir = storage.rmdir("missing_path", dataContext);
+        var rmdir = storage.rmdir("testRmdir_Missing", dataContext);
         waitFor(TEST_TIMEOUT, rmdir);
         Assertions.assertThrows(EStorageRequest.class, () -> getResultOf(rmdir));
     }
@@ -1174,12 +1194,12 @@ public abstract class StorageOperationsTestSuite {
         random.nextBytes(bytes);
 
         var content = Bytes.copyToBuffer(bytes, dataContext.arrowAllocator());
-        var prepare = makeFile("test_file.dat", content, storage, dataContext);
+        var prepare = makeFile("testReadChunk_ok.dat", content, storage, dataContext);
 
         waitFor(TEST_TIMEOUT, prepare);
         getResultOf(prepare);
 
-        var readChunk = storage.readChunk("test_file.dat", 4096, 4096, dataContext);
+        var readChunk = storage.readChunk("testReadChunk_ok.dat", 4096, 4096, dataContext);
         waitFor(TEST_TIMEOUT, readChunk);
 
         try (var chunk = getResultOf(readChunk)) {
@@ -1201,12 +1221,12 @@ public abstract class StorageOperationsTestSuite {
         random.nextBytes(bytes);
 
         var content = Bytes.copyToBuffer(bytes, dataContext.arrowAllocator());
-        var prepare = makeFile("test_file.dat", content, storage, dataContext);
+        var prepare = makeFile("testReadChunk_first.dat", content, storage, dataContext);
 
         waitFor(TEST_TIMEOUT, prepare);
         getResultOf(prepare);
 
-        var readChunk = storage.readChunk("test_file.dat", 0, 4096, dataContext);
+        var readChunk = storage.readChunk("testReadChunk_first.dat", 0, 4096, dataContext);
         waitFor(TEST_TIMEOUT, readChunk);
 
         try (var chunk = getResultOf(readChunk)) {
@@ -1228,12 +1248,12 @@ public abstract class StorageOperationsTestSuite {
         random.nextBytes(bytes);
 
         var content = Bytes.copyToBuffer(bytes, dataContext.arrowAllocator());
-        var prepare = makeFile("test_file.dat", content, storage, dataContext);
+        var prepare = makeFile("testReadChunk_last.dat", content, storage, dataContext);
 
         waitFor(TEST_TIMEOUT, prepare);
         getResultOf(prepare);
 
-        var readChunk = storage.readChunk("test_file.dat", 8192, 2048, dataContext);
+        var readChunk = storage.readChunk("testReadChunk_last.dat", 8192, 2048, dataContext);
         waitFor(TEST_TIMEOUT, readChunk);
 
         try (var chunk = getResultOf(readChunk)) {
@@ -1255,12 +1275,12 @@ public abstract class StorageOperationsTestSuite {
         random.nextBytes(bytes);
 
         var content = Bytes.copyToBuffer(bytes, dataContext.arrowAllocator());
-        var prepare = makeFile("test_file.dat", content, storage, dataContext);
+        var prepare = makeFile("testReadChunk_all.dat", content, storage, dataContext);
 
         waitFor(TEST_TIMEOUT, prepare);
         getResultOf(prepare);
 
-        var readChunk = storage.readChunk("test_file.dat", 0, 10240, dataContext);
+        var readChunk = storage.readChunk("testReadChunk_all.dat", 0, 10240, dataContext);
         waitFor(TEST_TIMEOUT, readChunk);
 
         try (var chunk = getResultOf(readChunk)) {
@@ -1282,17 +1302,17 @@ public abstract class StorageOperationsTestSuite {
         random.nextBytes(bytes);
 
         var content = Bytes.copyToBuffer(bytes, dataContext.arrowAllocator());
-        var prepare = makeFile("test_file.dat", content, storage, dataContext);
+        var prepare = makeFile("testReadChunk_badSize.dat", content, storage, dataContext);
 
         waitFor(TEST_TIMEOUT, prepare);
         getResultOf(prepare);
 
-        var readChunk = storage.readChunk("test_file.dat", 1024, 10240, dataContext);
+        var readChunk = storage.readChunk("testReadChunk_badSize.dat", 1024, 10240, dataContext);
         waitFor(TEST_TIMEOUT, readChunk);
 
         Assertions.assertThrows(EStorageRequest.class, () -> getResultOf(readChunk));
 
-        var readChunk2 = storage.readChunk("test_file.dat", 10241, 1024, dataContext);
+        var readChunk2 = storage.readChunk("testReadChunk_badSize.dat", 10241, 1024, dataContext);
         waitFor(TEST_TIMEOUT, readChunk2);
 
         Assertions.assertThrows(EStorageRequest.class, () -> getResultOf(readChunk2));
@@ -1303,11 +1323,11 @@ public abstract class StorageOperationsTestSuite {
 
         // Calling readChunk on a directory is a storage error
 
-        var prepare = storage.mkdir("test_file.dat", false, dataContext);
+        var prepare = storage.mkdir("testReadChunk_onDir.dat", false, dataContext);
         waitFor(TEST_TIMEOUT, prepare);
         getResultOf(prepare);
 
-        var readChunk = storage.readChunk("test_file.dat", 0, 1024, dataContext);
+        var readChunk = storage.readChunk("testReadChunk_onDir.dat", 0, 1024, dataContext);
         waitFor(TEST_TIMEOUT, readChunk);
 
         Assertions.assertThrows(EStorageRequest.class, () -> getResultOf(readChunk));
@@ -1318,7 +1338,7 @@ public abstract class StorageOperationsTestSuite {
 
         // Calling readChunk on a missing file is a storage error
 
-        var readChunk = storage.readChunk("missing_file.dat", 0, 1024, dataContext);
+        var readChunk = storage.readChunk("testReadChunk_missing.dat", 0, 1024, dataContext);
         waitFor(TEST_TIMEOUT, readChunk);
         Assertions.assertThrows(EStorageRequest.class, () -> getResultOf(readChunk));
     }
@@ -1332,26 +1352,26 @@ public abstract class StorageOperationsTestSuite {
         random.nextBytes(bytes);
 
         var content = Bytes.copyToBuffer(bytes, dataContext.arrowAllocator());
-        var prepare = makeFile("test_file.dat", content, storage, dataContext);
+        var prepare = makeFile("testReadChunk_invalidParams.dat", content, storage, dataContext);
 
         waitFor(TEST_TIMEOUT, prepare);
         getResultOf(prepare);
 
         // Zero size (empty chunk)
 
-        var readChunk = storage.readChunk("test_file.dat", 1024, 0, dataContext);
+        var readChunk = storage.readChunk("testReadChunk_invalidParams.dat", 1024, 0, dataContext);
         waitFor(TEST_TIMEOUT, readChunk);
         Assertions.assertThrows(EValidationGap.class, () -> getResultOf(readChunk));
 
         // Negative size
 
-        var readChunk3 = storage.readChunk("test_file.dat", 0, -1024, dataContext);
+        var readChunk3 = storage.readChunk("testReadChunk_invalidParams.dat", 0, -1024, dataContext);
         waitFor(TEST_TIMEOUT, readChunk3);
         Assertions.assertThrows(EValidationGap.class, () -> getResultOf(readChunk3));
 
         // Negative offset
 
-        var readChunk2 = storage.readChunk("test_file.dat", -1, 1024, dataContext);
+        var readChunk2 = storage.readChunk("testReadChunk_invalidParams.dat", -1, 1024, dataContext);
         waitFor(TEST_TIMEOUT, readChunk2);
         Assertions.assertThrows(EValidationGap.class, () -> getResultOf(readChunk2));
     }
