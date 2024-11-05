@@ -17,25 +17,11 @@ TRAC Data & Analytics Platform
     If you have particular questions or issues, please raise a ticket on our
     `issue tracker <https://github.com/finos/tracdap/issues>`_.
 
-
-.. toctree::
-    :hidden:
-
-    overview/index
-    modelling/index
-    app_dev/index
-    deployment/index
-    reference/index
-
-
 .. grid:: 1 2 2 2
     :gutter: 3
 
     .. grid-item-card::
-        :class-header: sd-bg-light sd-pt-0 sd-pb-1
-        :class-body: sd-py-0
-        :class-footer: sd-border-0 sd-pt-0 sd-pb-3
-        :shadow: md
+        :class-footer: sd-border-0
 
         **Learn about TRAC**
         ^^^^^^^^^^^^^^^^^^^^
@@ -51,10 +37,7 @@ TRAC Data & Analytics Platform
             Platform overview
 
     .. grid-item-card::
-        :class-header: sd-bg-light sd-pt-0 sd-pb-1
-        :class-body: sd-py-0
-        :class-footer: sd-border-0 sd-pt-0 sd-pb-3
-        :shadow: md
+        :class-footer: sd-border-0
 
         **Build and run models**
         ^^^^^^^^^^^^^^^^^^^^^^^^
@@ -70,10 +53,7 @@ TRAC Data & Analytics Platform
             Modelling
 
     .. grid-item-card::
-        :class-header: sd-bg-light sd-pt-0 sd-pb-1
-        :class-body: sd-py-0
-        :class-footer: sd-border-0 sd-pt-0 sd-pb-3
-        :shadow: md
+        :class-footer: sd-border-0
 
         **Build applications and workflows**
         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -91,10 +71,7 @@ TRAC Data & Analytics Platform
             App development
 
     .. grid-item-card::
-        :class-header: sd-bg-light sd-pt-0 sd-pb-1
-        :class-body: sd-py-0
-        :class-footer: sd-border-0 sd-pt-0 sd-pb-3
-        :shadow: md
+        :class-footer: sd-border-0
 
 
         **Deploy and manage the platform**
@@ -110,6 +87,17 @@ TRAC Data & Analytics Platform
             :expand:
 
             Deployment
+
+
+.. toctree::
+    :class: toc-hidden
+    :maxdepth: 1
+
+    overview/index
+    modelling/index
+    app_dev/index
+    deployment/index
+    reference/index
 
 
 .. rubric:: Can't find what you're looking for?

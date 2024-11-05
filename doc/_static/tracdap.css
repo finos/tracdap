@@ -1,0 +1,338 @@
+
+
+/* Stick the footer to the bottom of the page */
+
+html {
+    position: relative;
+    min-height: 100%;
+}
+
+body {
+    margin: 0 0 120px;
+}
+
+footer {
+    overflow: hidden;
+    position: absolute;
+    height: 120px;
+    bottom: 0;
+}
+
+img.align-center {
+    margin-left: auto;
+    margin-right: auto;
+    display: block;
+}
+
+/* Allow hiding the TOC tree without affecting global navigation */
+
+.toc-hidden {
+    display: none;
+}
+
+/* Main header & footer color */
+
+body {
+    background-color: #FFFFFF;
+}
+
+.bg-primary {
+    background-color: #1D3D59 !important;
+}
+
+/* Main headings (light & dark) */
+
+div.rst-content h1,
+div.rst-content h2,
+div.rst-content h3,
+div.rst-content h4,
+div.rst-content h5,
+div.rst-content h6 {
+
+    color: #D9815E;
+    font-weight: normal;
+    text-transform: uppercase;
+}
+
+/* Code - matches default link color */
+
+code {
+    color: #3B668C;
+    font-weight: bolder;
+}
+
+/* Do not use bold for code links in the page nav menu */
+
+nav code {
+    font-weight: normal;
+}
+
+/* Pre-formatted code blocks are the same in dark and light mode */
+
+pre {
+    background-color: #1D3D59 !important;
+    color: #EEEEEE;
+}
+
+pre > span.linenos {
+    color: #BBBBBB;
+    margin-right: 10px;
+}
+
+/* Main buttons (light & dark) */
+
+.btn-primary:hover,
+.btn-primary:focus, 
+.btn-primary:focus-within,
+.btn-primary:not(:disabled):not(.disabled):active, 
+.btn-primary:not(:disabled):not(.disabled).active  {
+    background-color: #1D3D59;
+    border-color: #1D3D59 !important;
+}
+
+*:focus {
+    outline: 2.5px solid #A3C4DA !important;
+}
+
+/* light mode - Links */
+
+a,
+a.reference,
+.btn-link,
+.nav-link {
+    color: #3B668C;
+    text-decoration-color: #D9815E;
+}
+
+a:focus, 
+a.reference:focus-within,
+a.reference:focus, 
+a:focus-within,
+.btn-link:focus, 
+.btn-link:focus-within,
+.nav-link:focus,
+.nav-link:focus-within {
+    color: #D9815E;
+    text-decoration-color: #D9815E;
+    border: none !important;
+    outline: none !important;
+}
+
+a:hover,
+a.reference:hover,
+.btn-link:hover,
+.nav-link:hover {
+    color: #D9815E;
+    text-decoration-color: #EFAD87;
+    text-decoration-thickness: 2px;
+}
+
+a:not(:disabled):not(.disabled):active, 
+a:not(:disabled):not(.disabled).active,
+a.reference:not(:disabled):not(.disabled):active, 
+a.reference:not(:disabled):not(.disabled).active,
+.btn-link:not(:disabled):not(.disabled):active, 
+.btn-link:not(:disabled):not(.disabled).active,
+.nav-link:not(:disabled):not(.disabled):active, 
+.nav-link:not(:disabled):not(.disabled).active  {
+    color: #CF7744 !important;
+    text-decoration-color: #D9815E;
+    border: none !important;
+    outline: none !important;
+}
+
+.toc .toctree-expand {
+    color: #3B668C !important;
+}
+
+.toc .toctree-expand:hover {
+    color: #D9815E !important;
+}
+
+.toc .current > a {
+    color: #D9815E;
+}
+
+
+/* Sphinx Design Elements */
+
+.sd-card-header {
+    background-color: #F8F8F8;
+}
+
+.sd-card-body {
+
+}
+
+.sd-card-footer {
+
+}
+
+.sd-btn-outline-primary {
+    color: #3B668C !important;
+    border-color: #3B668C !important;
+    font-weight: bolder;
+}
+
+.sd-btn-outline-primary:hover{
+    color: #FFFFFF !important;
+    background-color: #3B668C !important;
+}
+
+
+/* Dark mode - background */
+
+body.theme-dark {
+    background-color: #2A2A2A;
+}
+
+body.theme-dark hr, 
+body.theme-dark .border, 
+body.theme-dark .with-border, 
+body.theme-dark .border-top, 
+body.theme-dark .border-right, 
+body.theme-dark .sidebar-container, 
+body.theme-dark .border-bottom, 
+body.theme-dark .border-left, 
+body.theme-dark .search li {
+    border-color: #3A3A3A !important;
+}
+
+body.theme-dark .bg-primary {
+    background-color: #1D3D59 !important;
+}
+
+/* Dark mode - Search and light / dark buttons */
+
+body.theme-dark .btn-light {
+    background-color: #1D3D59;
+    border-color: #3B668C;
+    color: #CCCCCC;
+}
+
+body.theme-dark .btn-light:hover, 
+body.theme-dark .btn-light:focus,
+body.theme-dark .btn-light:focus-within, 
+body.theme-dark .btn-light:not(:disabled):not(.disabled):active, 
+body.theme-dark .btn-light:not(:disabled):not(.disabled).active {
+    background-color: #3B668C;
+    color: #CCCCCC;
+}
+
+body.theme-dark .form-control,
+body.theme-dark .input-group-text,
+body.theme-dark .input-group-text.bg-white {
+    background-color: #1D3D59 !important;
+    border-color: #3B668C;
+    color: #CCCCCC;
+}
+
+/* Dark mode - Code - matches default link color */
+
+body.theme-dark code {
+    color: #A3C4D9;
+}
+
+/* Dark mode - Tables */
+
+.table-dark, 
+body.theme-dark table.docutils:not(.field-list) {
+    background-color: #1D3D59;
+    color: #EAEAEA;
+}
+
+.table-dark th, 
+body.theme-dark table.docutils:not(.field-list) th, 
+.table-dark td, body.theme-dark table.docutils:not(.field-list) td, 
+.table-dark thead th {
+    border-color: #3B668C;
+}
+
+/* Dark mode - Links */
+
+body.theme-dark a,
+body.theme-dark a.reference,
+body.theme-dark .btn-link,
+body.theme-dark .nav-link {
+    /* color: #8eb3c9; */
+    color: #A3C4D9;
+    text-decoration-color: #D9815E;
+}
+
+body.theme-dark a:focus, 
+body.theme-dark a:focus-within,
+body.theme-dark a.reference:focus, 
+body.theme-dark a.reference:focus-within,
+body.theme-dark .btn-link:focus, 
+body.theme-dark .btn-link:focus-within,
+body.theme-dark .nav-link:focus, 
+body.theme-dark .nav-link:focus-within  {
+    color: #D9815E !important;
+    text-decoration-color: #D9815E;
+    text-decoration-thickness: 2px;
+    border: none !important;
+    outline: none !important;
+}
+
+body.theme-dark a:hover,
+body.theme-dark a.reference:hover,
+body.theme-dark .btn-link:hover,
+body.theme-dark .nav-link:hover {
+    color: #D9815E;
+    text-decoration-color: #cf6b44;
+    text-decoration-thickness: 2px;
+    border: none !important;
+    outline: none !important;
+}
+
+body.theme-dark a:not(:disabled):not(.disabled):active, 
+body.theme-dark a:not(:disabled):not(.disabled).active,
+body.theme-dark a.reference:not(:disabled):not(.disabled):active, 
+body.theme-dark a.reference:not(:disabled):not(.disabled).active,
+body.theme-dark .btn-link:not(:disabled):not(.disabled):active, 
+body.theme-dark .btn-link:not(:disabled):not(.disabled).active,
+body.theme-dark .nav-link:not(:disabled):not(.disabled):active, 
+body.theme-dark .nav-link:not(:disabled):not(.disabled).active   {
+    color: #EFAD87;
+    text-decoration-color: #cf6b44;
+    border: none;
+}
+
+body.theme-dark .toc .toctree-expand {
+    color: #A3C4D9 !important;
+    /* Matches the background border color */
+    background-color: #3A3A3A;
+}
+
+body.theme-dark .toc .toctree-expand:hover {
+    color: #D9815E !important;
+}
+
+body.theme-dark .toc .current > a {
+    color: #D9815E;
+}
+
+
+/* Dark Mode - Sphinx Design Elements */
+
+body.theme-dark .sd-card-header {
+    background-color: #343434;
+}
+
+body.theme-dark .sd-card-body {
+    background-color: #2E2E2E;
+}
+
+body.theme-dark .sd-card-footer {
+    background-color: #2E2E2E;
+}
+
+body.theme-dark .sd-btn-outline-primary {
+    color: #A3C4D9 !important;
+    border-color: #A3C4D9 !important;
+}
+
+body.theme-dark .sd-btn-outline-primary:hover{
+    color: #A3C4D9 !important;
+    background-color: #A3C4D9 !important;
+}
