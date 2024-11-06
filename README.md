@@ -1,27 +1,25 @@
 # ![TRAC Data & Analytics Platform](doc/_images/tracdap_horizontal_400.png)
 
-*A next-generation data and analytics platform for use in highly regulated environments*
+*The modern model platform for complex, critical models and calculations.*
 
 [![FINOS - Incubating](https://cdn.jsdelivr.net/gh/finos/contrib-toolbox@master/images/badge-incubating.svg)](https://finosfoundation.atlassian.net/wiki/display/FINOS/Incubating)
 
-TRAC D.A.P. brings a step change in performance, insight, flexibility and control 
-compared to conventional analytics platforms. By redrawing the boundary
-between business and technology, modellers and business users are given easy
-access to modern, open source tools that can execute at scale, while technology
-integrations and operational concerns are cleanly separated and consolidated
-across use cases.
+TRAC is a universal model orchestration solution designed for the most complex, critical 
+and highly-governed use cases. It combines your existing data and compute infrastructure,
+model development environments and the repository of versioned code, to create a single ecosystem 
+in which to build and deploy models, orchestrate complex workflows and run analytics.
 
-At the core of a platform, a flexible metadata model allows data and models to
-be catalogued, plugged together and shared across the business. Using the
-principal of immutability, TRAC allows new data structures and model pipelines
-to be created, updated and executed at any time without change risk to production
-workflows, guaranteeing total repeatability, audit and control (TRAC).
+TRAC is designed to break the trade-off that has traditionally been required, between flexible 
+(but uncontrolled) analytics solutions and highly controlled (but inflexible) production platforms.
+It offers best of both worlds, power, control and analytical flexibility.
 
+The core platform services - i.e. TRAC Data & Analytics Platform (or TRAC D.A.P.) - are maintained by
+`finTRAC Limited <https://www.fintrac.co.uk>`_ in association with the `finos Foundation <https://www.finos.org>`_
+under the `Apache Software License version 2.0 <https://www.apache.org/licenses/LICENSE-2.0>`_.
 
 ## Documentation and Packages
 
-Documentation for the TRAC platform is available on our website at
-[tracdap.finos.org](https://tracdap.finos.org).
+Documentation for the TRAC D.A.P platform is available on our website at [tracdap.finos.org](https://tracdap.finos.org).
 
 The following packages are available:
 
@@ -31,6 +29,7 @@ The following packages are available:
 | [Web API package](https://www.npmjs.com/package/@finos/tracdap-web-api)  | Build client apps in JavaScript or TypeScript using the TRAC platform APIs                            |
 | [Platform releases](https://github.com/finos/tracdap/releases)           | Packages for the platform services and a standalone sandbox are published with each release on GitHub |
 
+Commercially supported deployments of TRAC are separately available from `finTRAC Limited <https://www.fintrac.co.uk>`_.
 
 ## Development Status
 

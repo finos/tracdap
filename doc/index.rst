@@ -11,7 +11,8 @@ The core platform services - i.e. TRAC Data & Analytics Platform (or TRAC D.A.P.
 under the `Apache Software License version 2.0 <https://www.apache.org/licenses/LICENSE-2.0>`_.
 
 This documentation site focuses on how to deploy the TRAC D.A.P. services and build both models and
-applications which leverage those services. Commercially supported deployments of TRAC are separately available from `finTRAC Limited <https://www.fintrac.co.uk>`_.
+applications which leverage those services. Commercially supported deployments of TRAC are separately
+available from `finTRAC Limited <https://www.fintrac.co.uk>`_.
 
 
 .. note::
