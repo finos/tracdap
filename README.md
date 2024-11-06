@@ -10,8 +10,8 @@ model development environments and the repository of versioned code, to create a
 in which to build and deploy models, orchestrate complex workflows and run analytics.
 
 TRAC is designed to break the trade-off that has traditionally been required, between flexible 
-(but uncontrolled) analytics solutions and highly controlled (but inflexible) production platforms.
-It offers best of both worlds, power, control and analytical flexibility.
+(but uncontrolled) analytics solutions and highly controlled (but inflexible) production model 
+platforms. It offers best of both worlds, power, control and analytical flexibility.
 
 The core platform services - i.e. TRAC Data & Analytics Platform (or TRAC D.A.P.) - are maintained by
 `finTRAC Limited <https://www.fintrac.co.uk>`_ in association with the `finos Foundation <https://www.finos.org>`_
