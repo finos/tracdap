@@ -4,7 +4,7 @@
 
 [![FINOS - Incubating](https://cdn.jsdelivr.net/gh/finos/contrib-toolbox@master/images/badge-incubating.svg)](https://finosfoundation.atlassian.net/wiki/display/FINOS/Incubating)
 
-TRAC is a universal model orchestration solution designed for the most complex, critical 
+TRAC is a universal model orchestration solution which is designed for the most complex, critical 
 and highly-governed use cases. It combines your existing data and compute infrastructure,
 model development environments and the repository of versioned code, to create a single ecosystem 
 in which to build and deploy models, orchestrate complex workflows and run analytics.
