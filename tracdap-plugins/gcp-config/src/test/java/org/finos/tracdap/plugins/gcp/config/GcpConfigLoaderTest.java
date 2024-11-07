@@ -38,7 +38,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 @Tag("int-config")
 class GcpConfigLoaderTest {
 
-    private static final String BUCKET_NAME = "accenture-trac-test";
+    private static final String BUCKET_NAME = "tracdap-ci-config-loader-test";
     private static final String FILE_NAME = "test-config.properties";
     private static final String TEST_CONTENT = "trac-test = true";
 

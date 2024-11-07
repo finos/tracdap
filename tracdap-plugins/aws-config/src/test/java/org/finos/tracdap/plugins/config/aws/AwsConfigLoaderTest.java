@@ -34,7 +34,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 @Tag("int-aws")
 class AwsConfigLoaderTest {
 
-    private static String BUCKET_NAME = "accenture-trac-test";
+    private static String BUCKET_NAME = "tracdap-ci-config-loader-test";
     private static String FILE_NAME = "test-config.properties";
     private static String TEST_CONTENT = "trac-test = true";
 
