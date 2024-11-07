@@ -54,8 +54,8 @@ if ON_RTD:
 # -- Project information -----------------------------------------------------
 
 project = 'TRAC D.A.P.'
-copyright = '2022, Accenture'  # noqa
-author = 'Martin Traverse'
+copyright = '2024, finTRAC Limited'  # noqa
+author = 'finTRAC Limited'
 
 # ReadTheDocs does not fetch tags by default and we need them to get version information
 # Only needed in the root config
