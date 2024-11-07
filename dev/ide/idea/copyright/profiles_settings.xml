@@ -1,5 +1,5 @@
 <component name="CopyrightManager">
-  <settings default="Accenture / Apache">
+  <settings default="FINOS CLA Licensed">
     <LanguageOptions name="SQL">
       <option name="fileTypeOverride" value="3" />
       <option name="block" value="false" />
