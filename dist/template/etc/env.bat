@@ -1,8 +1,9 @@
-@rem Copyright 2022 Accenture Global Solutions Limited
-@rem
-@rem Licensed under the Apache License, Version 2.0 (the "License");
-@rem you may not use this file except in compliance with the License.
-@rem You may obtain a copy of the License at
+@rem Licensed to the Fintech Open Source Foundation (FINOS) under one or
+@rem more contributor license agreements. See the NOTICE file distributed
+@rem with this work for additional information regarding copyright ownership.
+@rem FINOS licenses this file to you under the Apache License, Version 2.0
+@rem (the "License"); you may not use this file except in compliance with the
+@rem License. You may obtain a copy of the License at
 @rem
 @rem     http://www.apache.org/licenses/LICENSE-2.0
 @rem
