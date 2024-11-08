@@ -67,9 +67,10 @@ enum BasicType {
      * The available precision and scale may vary between languages / platforms.
      *
      * For metadata attributes, TRAC provides the following guarantees on precision:
-     *      precision >= 31
-     *      scale >= 10
-     *      precision - scale >= 21
+     *
+     * * precision >= 31
+     * * scale >= 10
+     * * precision - scale >= 21
      */
     DECIMAL = 5;
 
