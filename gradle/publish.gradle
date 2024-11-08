@@ -38,9 +38,9 @@ def publishModule(Project project) {
                     developers {
                         developer {
                             name = 'Martin Traverse'
-                            email = 'martin.traverse@accenture.com'
-                            organization = 'Accenture'
-                            organizationUrl = 'https://accenture.com'
+                            email = 'martin@fintrac.co.uk'
+                            organization = 'finTRAC Limited'
+                            organizationUrl = 'https://fintrac.co.uk/'
                         }
                     }
                 }

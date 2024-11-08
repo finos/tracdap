@@ -1,10 +1,11 @@
 @echo off >nul
 
-REM Copyright 2020 Accenture Global Solutions Limited
-REM
-REM Licensed under the Apache License, Version 2.0 (the "License");
-REM you may not use this file except in compliance with the License.
-REM You may obtain a copy of the License at
+REM Licensed to the Fintech Open Source Foundation (FINOS) under one or
+REM more contributor license agreements. See the NOTICE file distributed
+REM with this work for additional information regarding copyright ownership.
+REM FINOS licenses this file to you under the Apache License, Version 2.0
+REM (the "License"); you may not use this file except in compliance with the
+REM License. You may obtain a copy of the License at
 REM
 REM     http://www.apache.org/licenses/LICENSE-2.0
 REM

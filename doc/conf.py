@@ -1,8 +1,9 @@
-#  Copyright 2021 Accenture Global Solutions Limited
-#
-#  Licensed under the Apache License, Version 2.0 (the "License");
-#  you may not use this file except in compliance with the License.
-#  You may obtain a copy of the License at
+#  Licensed to the Fintech Open Source Foundation (FINOS) under one or
+#  more contributor license agreements. See the NOTICE file distributed
+#  with this work for additional information regarding copyright ownership.
+#  FINOS licenses this file to you under the Apache License, Version 2.0
+#  (the "License"); you may not use this file except in compliance with the
+#  License. You may obtain a copy of the License at
 #
 #      http://www.apache.org/licenses/LICENSE-2.0
 #
@@ -53,8 +54,8 @@ if ON_RTD:
 # -- Project information -----------------------------------------------------
 
 project = 'TRAC D.A.P.'
-copyright = '2022, Accenture'  # noqa
-author = 'Martin Traverse'
+copyright = '2024, finTRAC Limited'  # noqa
+author = 'finTRAC Limited'
 
 # ReadTheDocs does not fetch tags by default and we need them to get version information
 # Only needed in the root config
