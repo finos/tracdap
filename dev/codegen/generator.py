@@ -166,11 +166,10 @@ class TracGenerator:
     # Putting a type annotation here could be used to change the docs layout
     # Do not show defaults - these are the proto3 default literals (zero, empty string etc)
     DATA_MEMBER_TEMPLATE_DOCU = (
-        '{INDENT}{MEMBER_NAME} = None'
+        '{INDENT}{MEMBER_NAME}: {MEMBER_TYPE} = _dc.field()'
         '\n\n'
         '{INDENT}"""\n'
         '{INDENT}{COMMENT}\n\n'
-        '{INDENT}:type: {MEMBER_DOC_TYPE}\n'
         '{INDENT}"""\n\n')
 
     SERVICE_CLASS_TEMPLATE = (
@@ -455,7 +454,7 @@ class TracGenerator:
 
                     target_package = self._options["target_package"] \
                         if "target_package" in self._options \
-                        else "trac"
+                        else "tracdap"
 
                     sub_package = import_package.replace("tracdap.", "")
                     qualified_package = target_package + "." + sub_package
@@ -684,15 +683,16 @@ class TracGenerator:
             self, package: str,
             field: pb_desc.FieldDescriptorProto,
             message: pb_desc.DescriptorProto,
-            is_doc_type: bool = False):
+            is_doc_type: bool = False) -> str:
 
-        def format_type_string(type_string):
+        def format_type_string(type_string, qualified_type_string):
             if is_doc_type and (field.type == field.Type.TYPE_MESSAGE or field.type == field.Type.TYPE_ENUM):
-                return f":py:class:`{type_string} <{type_string}>`"
+                return f":py:class:`{type_string} <{qualified_type_string}>`"
             else:
                 return type_string
 
         base_type = self.python_base_type(package, field, make_relative=True, alias=True)
+        qualified_type = self.python_base_type(package, field, make_relative=False, alias=True)
 
         # Real code needs to qualify the typing module import, docs want a cleaner type name
         typing_prefix = "" if is_doc_type else  "_tp."
@@ -711,25 +711,26 @@ class TracGenerator:
 
                 key_type = self.python_base_type(package, nested_type.field[0], make_relative=True, alias=True)
                 value_type = self.python_base_type(package, nested_type.field[1], make_relative=True, alias=True)
-                return f"{typing_prefix}Dict[{key_type}, {format_type_string(value_type)}]"
+                qualified_value_type = self.python_base_type(package, nested_type.field[1], make_relative=False, alias=True)
+                return f"{typing_prefix}Dict[{key_type}, {format_type_string(value_type, qualified_value_type)}]"
 
             # Otherwise repeated fields are generated as lists
             else:
-                return f"{typing_prefix}List[{format_type_string(base_type)}]"
+                return f"{typing_prefix}List[{format_type_string(base_type, qualified_type)}]"
 
         # Fields explicitly marked optional in the proto are, of course, optional!
         elif field.proto3_optional:
-            return f"{typing_prefix}Optional[{format_type_string(base_type)}]"
+            return f"{typing_prefix}Optional[{format_type_string(base_type, qualified_type)}]"
 
         # Fields in a oneof group are also optional
         # If no oneof group is set, oneof_index will have default value of 0
         # To check if this field is really set, use HasField()
         elif field.HasField('oneof_index'):
-            return f"{typing_prefix}Optional[{format_type_string(base_type)}]"
+            return f"{typing_prefix}Optional[{format_type_string(base_type, qualified_type)}]"
 
         # Everything else should be either a (non-optional) message, an enum or a primitive
         else:
-            return format_type_string(base_type)
+            return format_type_string(base_type, qualified_type)
 
     def python_base_type(self, package: str, field: pb_desc.FieldDescriptorProto, make_relative=False, alias=False):
 
@@ -748,8 +749,7 @@ class TracGenerator:
             "Unknown type in protobuf field descriptor: field = {}, type code = {}"
             .format(field.name, field.type))
 
-    @staticmethod
-    def python_type_name(package: str, proto_type_name: str, make_relative=False, alias=False):
+    def python_type_name(self, package: str, proto_type_name: str, make_relative=False, alias=False):
 
         type_name = proto_type_name[1:] if proto_type_name.startswith(".") else proto_type_name
 
@@ -761,7 +761,13 @@ class TracGenerator:
         # E.g.: trac.metadata in the API becomes trac.rt.metadata (domain objects) or trac.rt.proto.metadata (proto)
         # Then import trac.rt.metadata as metadata
         if alias and type_name.startswith("tracdap."):
-            type_name = type_name[len("tracdap."):]
+
+            target_package = self._options["target_package"] \
+                if "target_package" in self._options \
+                else "tracdap"
+
+            type_name = type_name.replace("tracdap.", f"{target_package}.")
+
 
         # We are using deferred annotations, with from __future__ import annotations
         # Type names no longer need to be quoted!
