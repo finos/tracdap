@@ -167,8 +167,8 @@ class EDataCorruption(EData):
     structure of the binary data stream and will be detected if that data stream cannot be
     understood.
 
-    Data corruption does not include data constraints, such as non-null or range constraints,
-    which are reported as EDataConstraint.
+    Data corruption does not include errors relating to data constraints, such as non-null
+    or range constraints, which are reported as :py:class:`EDataConformance`.
     """
 
     pass
