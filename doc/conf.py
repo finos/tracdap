@@ -32,23 +32,40 @@ ROOT_DIR = pathlib.Path(__file__) \
 
 DOCGEN_SCRIPT = str(ROOT_DIR.joinpath("dev/docgen/docgen-ctrl.py"))
 
+# Modules to document as a single package (do not report contents of submodules)
+FLATTEN_MODULES = ["tracdap.rt.api", "tracdap.rt.metadata", 'tracdap.rt.launch']
+
 
 # Running on RTD, Sphinx build for the root docs is the main entry point
 # So, we need to call back into docgen to build all the other parts of the documentation
 
-if ON_RTD:
+def setup(sphinx):
 
-    def build_dependencies():
+    if ON_RTD:
+        sphinx.connect('config-inited', config_init_hook)
 
-        docgen.main_codegen()
-        docgen.python_runtime_codegen()
+    sphinx.connect("autoapi-skip-member", skip_fattened_modules)
 
-    def config_init_hook(app, config):  # noqa
 
-        build_dependencies()
+def config_init_hook(app, config):  # noqa
 
-    def setup(app):
-        app.connect('config-inited', config_init_hook)
+    build_dependencies()
+
+
+def build_dependencies():
+
+    docgen.main_codegen()
+    docgen.python_runtime_codegen()
+
+
+def skip_fattened_modules(app, what, name, obj, skip, options):
+
+    if what == "module":
+        for flat_module in FLATTEN_MODULES:
+            if name.startswith(flat_module):
+                skip = True
+
+    return skip
 
 
 # -- Project information -----------------------------------------------------
@@ -80,14 +97,17 @@ extensions = [
     'sphinx.ext.autosectionlabel',
     'sphinx.ext.autodoc',
     'sphinx.ext.autosummary',
-    'sphinx.ext.napoleon',
     'autoapi.extension',
     
     'sphinx_design',
     "sphinx_wagtail_theme"
-
 ]
-exclusions = ['unused']
+
+# Custom templates are being used for autoapi
+templates_path = ["_templates"]
+
+# Directories that should not be built into the TOC tree
+exclude_patterns = ["_templates", "unused"]
 
 # Auto API configuration
 
@@ -99,16 +119,18 @@ autoapi_dirs = [
 autoapi_options = [
     'members',
     'undoc-members',
-    # 'private-members',
     'show-inheritance',
     'show-module-summary',
-    'special-members',
     'imported-members'
 ]
 
-autodoc_typehints = 'description'
-autoapi_member_order = 'groupwise'
 autoapi_add_toctree_entry = False
+autoapi_member_order = "groupwise"
+autoapi_own_page_level = "class"
+autoapi_template_dir = "_templates/autoapi"
+
+autodoc_typehints = 'description'
+autodoc_typehints_format = "short"
 
 
 # Content generation
