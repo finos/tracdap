@@ -126,17 +126,15 @@ class DocGen:
 
         # Set up the tracdap.rt package
         self._mkdir(doc_src.joinpath("tracdap"))
-        self._touch(doc_src.joinpath("tracdap/__init__.py"))
         self._mkdir(doc_src.joinpath("tracdap/rt"))
-        self._touch(doc_src.joinpath("tracdap/rt/__init__.py"))
 
         # Copy only API packages / modules from the runtime library
         api_modules = [
+            "tracdap/rt/__init__.py",
+            "tracdap/rt/_version.py",
             "tracdap/rt/api/",
             "tracdap/rt/launch/",
             "tracdap/rt/exceptions.py"]
-
-        api_exclude = ["experimental.py"]
 
         for module in api_modules:
 
@@ -144,20 +142,28 @@ class DocGen:
             tgt_module = doc_src.joinpath(module)
 
             if src_module.is_dir():
-                self._flatten_package(src_module, tgt_module, api_exclude)
+                self._cp_tree(src_module, tgt_module)
             else:
                 self._cp(src_module, tgt_module)
-
-        # Note: DOCGEN_REMOVE is not strictly necessary for the trac.rt.api package after flattening
 
         # We include the runtime metadata classes at global scope in the api package for convenience
         # Having them show up in both places in the docs is confusing (for users, and the autoapi tool)!
         # So, remove those imports from the API package before running Sphinx
+
+        # This can probably be improved by setting __all__ instead
+
         self._log.info("* fix docgen imports")
 
-        for line in fileinput.input(doc_src.joinpath('tracdap/rt/api/__init__.py'), inplace=True):
-            if "DOCGEN_REMOVE" not in line:
-                print(line, end="")
+        fix_import_modules = [
+            'tracdap/rt/api/__init__.py',
+            'tracdap/rt/api/model_api.py',
+            'tracdap/rt/api/static_api.py',
+        ]
+
+        for module in fix_import_modules:
+            for line in fileinput.input(doc_src.joinpath(module), inplace=True):
+                if "DOCGEN_REMOVE" not in line:
+                    print(line, end="")
 
         # We also want the runtime metadata
         # There is a separate mechanism for generating this and getting it into the library for packaging
@@ -251,33 +257,6 @@ class DocGen:
 
         if target_dir.exists():
             shutil.rmtree(target_dir)
-
-    def _flatten_package(self, src_package: pathlib.Path, tgt_package: pathlib.Path, exclude_modules = None):
-
-        target_package_init = tgt_package.joinpath("__init__.py")
-
-        self._mkdir(tgt_package)
-        self._touch(target_package_init)
-
-        for module in src_package.iterdir():
-
-            if module.is_dir():
-                self._log.warning(f"Flatting sub-packages not supported, skipping {module}")
-                continue
-
-            # Skip __init__, __main__ and other special modules
-            if module.name.startswith("__"):
-                continue
-
-            if exclude_modules and module.name in exclude_modules:
-                continue
-
-            module_content = module.read_text()
-
-            with open(target_package_init, "at") as target_stream:
-                target_stream.write(module_content)
-                target_stream.write("\n")
-                target_stream.flush()
 
     def _run_subprocess(self, sp_exe, sp_args, use_venv=True, capture_output=False):
 
