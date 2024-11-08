@@ -1,11 +1,11 @@
 
-API Reference
-=============
+Reference
+=========
 
 
 .. toctree::
-    :maxdepth: 3
+    :maxdepth: 1
 
-    Metadata Listing </autoapi/tracdap/metadata/index>
-    Platform API </autoapi/tracdap/api/index>
-    Model API (Python) </autoapi/tracdap/rt/index>
+    Model API (Python) <./model_api_python>
+    Platform API (JavaScript) <./platform_api_javascript>
+    Metadata Listing <./metadata_listing>
