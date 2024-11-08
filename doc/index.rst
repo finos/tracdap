@@ -1,7 +1,7 @@
 
-##############################
+###############################
 TRAC: The Modern Model Platform
-##############################
+###############################
 
 TRAC is a universal model orchestration solution designed for the most complex, critical and highly-governed
 use cases.

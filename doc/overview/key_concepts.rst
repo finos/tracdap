@@ -2,7 +2,7 @@ Key concepts
 
 
 Metadata Model
-====================
+==============
 
 TRAC is built around a structural metadata model which catalogues and describes everything on the platform. The model consists of three layers:
 
@@ -17,7 +17,7 @@ TRAC is built around a structural metadata model which catalogues and describes 
 
     * - **TRACEABLE ACTIONS**
       - Traceable actions are actions that create objects, such as running jobs or data imports. Read-only
-    actions such as querying data or metadata searches are not recorded in the metadata model.
+        actions such as querying data or metadata searches are not recorded in the metadata model.
 
 
 Metadata records are maintained using an immutable, time-indexed version history, with "updates" being performed
@@ -60,19 +60,19 @@ All model orchestration use-cases involve four primary object types. The TRAC me
       - The metadata record varies by job type but will record objects which were uses in the process.
 
 
-.. |icon-data| image:: ../../_images/icons/icon_data.png
+.. |icon-data| image:: ../_images/icon_data.png
    :width: 66px
    :height: 66px
 
-.. |icon-model| image:: ../../_images/icons/icon_model.png
+.. |icon-model| image:: ../_images/icon_model.png
    :width: 66px
    :height: 66px
 
-.. |icon-flow| image:: ../../images/icons/icon_flow.png
+.. |icon-flow| image:: ../_images/icon_flow.png
    :width: 66px
    :height: 66px
 
-.. |icon-job| image:: ../../images/icons/icon_job.png
+.. |icon-job| image:: ../_images/icon_job.png
    :width: 66px
    :height: 66px
 
@@ -82,7 +82,8 @@ All model orchestration use-cases involve four primary object types. The TRAC me
 
 
 Virtual Deployment
-----------
+------------------
+
 TRAC uses a ‘virtual model deployment' approach in which all model code resides in an external repository
 until it is needed for a calculation, so th virtual deployment is therefore crystalised at runtime. There are three main steps involved in the virtual deployment approach.
 
@@ -117,7 +118,7 @@ schema function.
       - The schema of the output data which the model generates.
 
 .. note::
-    See :ref:`modelling` for more details on the TRAC Model API how to build TRAC-ready models.
+    See :doc:`/modelling/index` for more details on how to build TRAC-ready models.
 
 
 The existence of a properly declared model schema is confirmed when importing a model onto TRAC using
@@ -127,7 +128,7 @@ that the model code generates outputs which are consistent with the declared sch
 
 
 TRAC Guarantee
-____________
+______________
 
 A central feature of the platform is the control environment it creates, which is built on immutabilty and repeatabiltiy. This is embodied by three things:
 
@@ -149,15 +150,15 @@ A central feature of the platform is the control environment it creates, which i
       - Every version of every object (model, data, flow) remains permanently available to use and there is
         no possibility of accidental loss or damage to deployed assets, so there is no change risk.
 
-.. |icon-audit| image:: ../../images/icons/icon_audit.png
+.. |icon-audit| image:: ../_images/icon_audit.png
    :width: 66px
    :height: 66px
 
-.. |icon-repeat| image:: ../../images/icons/icon_repeat.png
+.. |icon-repeat| image:: ../_images/icon_repeat.png
    :width: 66px
    :height: 66px
 
-.. |icon-persist| image:: ../../images/icons/icon_persist.png
+.. |icon-persist| image:: ../_images/icon_persist.png
    :width: 66px
    :height: 66px
 
@@ -166,7 +167,7 @@ A central feature of the platform is the control environment it creates, which i
 
 
 Some other useful features
-____________
+__________________________
 
     -   **Automated governance documentation** - The metadata is designed to br easily understood by
         both humans and machines and is fully controlled and searchable. Standard report formats can be
