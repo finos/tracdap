@@ -33,7 +33,8 @@ ROOT_DIR = pathlib.Path(__file__) \
 DOCGEN_SCRIPT = str(ROOT_DIR.joinpath("dev/docgen/docgen-ctrl.py"))
 
 # Modules to document as a single package (do not report contents of submodules)
-FLATTEN_MODULES = ["tracdap.rt.api", "tracdap.rt.metadata", 'tracdap.rt.launch']
+# Note tracdap.rt.metadata is already flat-packed during code gen, so do not flatten again here
+FLATTEN_MODULES = ["tracdap.rt.api", 'tracdap.rt.launch']
 
 
 # Running on RTD, Sphinx build for the root docs is the main entry point

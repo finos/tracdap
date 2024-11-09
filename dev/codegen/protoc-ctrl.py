@@ -265,11 +265,11 @@ def build_protoc_args(generator, proto_paths, output_location, packages):
 
         elif generator == "python_doc":
 
-            options = "--trac_opt=target_package=tracdap.rt;doc_format"
+            options = "--trac_opt=target_package=tracdap.rt;doc_format;flat_pack"
 
         elif generator == "api_doc":
 
-            options = "--trac_opt=flat_pack;doc_format"
+            options = "--trac_opt=doc_format;flat_pack"
 
         else:
 

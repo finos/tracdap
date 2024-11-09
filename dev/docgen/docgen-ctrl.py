@@ -175,7 +175,7 @@ class DocGen:
             "--out", "build/doc/code/runtime_python"]
 
         self._run_subprocess(codegen_exe, codegen_args)
-        self._mv(doc_src.joinpath('tracdap/metadata'), doc_src.joinpath('tracdap/rt/metadata'))
+        self._mv(doc_src.joinpath('tracdap/metadata.py'), doc_src.joinpath('tracdap/rt/metadata.py'))
 
     def get_version_and_release(self):
 
