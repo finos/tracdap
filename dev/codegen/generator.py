@@ -702,8 +702,10 @@ class TracGenerator:
         if field.label == field.Label.LABEL_REPEATED:
 
             # Look to see if the base type is a nested type defined in the same message as the field
+            # The nested type name is just the inner class, so strip the outer class name from base_type
+            nested_type_name = base_type[base_type.rfind(".") + 1:]
             nested_type = next(filter(
-                lambda nt: base_type == f"{nt.name}",
+                lambda nt: nested_type_name == f"{nt.name}",
                 message.nested_type),
                 None)
 
