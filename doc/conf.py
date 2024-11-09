@@ -12,12 +12,14 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-
+import fileinput
 import pathlib
 import subprocess as sp
 import os
 
 import importlib.util
+import sys
+
 docgen_spec = importlib.util.spec_from_file_location("docgen", "../dev/docgen/docgen-ctrl.py")
 docgen_module = importlib.util.module_from_spec(docgen_spec)
 docgen_spec.loader.exec_module(docgen_module)
@@ -46,6 +48,7 @@ def setup(sphinx):
         sphinx.connect('config-inited', config_init_hook)
 
     sphinx.connect("autoapi-skip-member", skip_fattened_modules)
+    sphinx.connect("build-finished", fix_module_references)
 
 
 def config_init_hook(app, config):  # noqa
@@ -67,6 +70,30 @@ def skip_fattened_modules(app, what, name, obj, skip, options):
                 skip = True
 
     return skip
+
+
+def fix_module_references(sphinx, exception):
+
+    if exception:
+        return
+
+    print("* Applying post-build fixes", file=sys.stderr)
+
+    # Sphinx struggles with type resolution when the same type exists in different namespaces
+    # The current doc build works for all the types except this one, which is nested and refers to an outer scope
+    # No more nested types will be added to the metadata model!
+    # If possible, the existing nested types should be migrated to a flat structure
+
+    rt_data_part_page = pathlib.Path(sphinx.outdir).joinpath("autoapi/tracdap/rt/metadata/DataDefinition.Part.html")
+
+    rt_data_part_match = 'href="../../metadata/PartKey.html#tracdap.metadata.PartKey" title="tracdap.metadata.PartKey"'
+    rt_data_part_fixed = 'href="PartKey.html#tracdap.rt.metadata.PartKey" title="tracdap.rt.metadata.PartKey"'
+
+    for line in fileinput.input(rt_data_part_page, inplace=True):
+        if rt_data_part_match in line:
+            print(line.replace(rt_data_part_match, rt_data_part_fixed), end="")
+        else:
+            print(line, end="")
 
 
 # -- Project information -----------------------------------------------------
