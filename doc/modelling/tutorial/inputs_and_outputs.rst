@@ -23,9 +23,9 @@ Here is an example of defining an optional input, using schemas read from schema
     :caption: src/tutorial/optional_io.py
     :language: python
     :name: optional_io_part_1
-    :lines: 38 - 48
+    :lines: 39 - 49
     :linenos:
-    :lineno-start: 38
+    :lineno-start: 39
 
 Schemas defined in code can also be marked as optional, let's use that approach to define an
 optional output:
@@ -33,9 +33,9 @@ optional output:
 .. literalinclude:: ../../../examples/models/python/src/tutorial/optional_io.py
     :language: python
     :name: optional_io_part_2
-    :lines: 50 - 66
+    :lines: 51 - 67
     :linenos:
-    :lineno-start: 50
+    :lineno-start: 51
 
 Now let's see how to use optional inputs and outputs in :py:meth:`run_model() <tracdap.rt.api.TracModel.run_model>`.
 Since the input is optional we will need to check if it is available before we can use it.
@@ -47,9 +47,9 @@ dataset with some stats on the filtered accounts. Here is what that looks like:
 .. literalinclude:: ../../../examples/models/python/src/tutorial/optional_io.py
     :language: python
     :name: optional_io_part_3
-    :lines: 76 - 85
+    :lines: 77 - 86
     :linenos:
-    :lineno-start: 76
+    :lineno-start: 77
 
 In this example the optional output is only produced when the optional input is
 supplied - that is not a requirement and the model can decide whether to
@@ -106,9 +106,9 @@ some basic information about the schema and content:
     :caption: src/tutorial/dynamic_io.py
     :language: python
     :name: dynamic_io_schema_inspection_1
-    :lines: 21 - 39
+    :lines: 22 - 40
     :linenos:
-    :lineno-start: 21
+    :lineno-start: 22
 
 The source data is defined as a dynamic input. Notice that there are no fields in the
 schema definition - dynamic inputs or outputs cannot define any fields, doing so will
@@ -122,9 +122,9 @@ Now let's see how to use these datasets in the model.
 .. literalinclude:: ../../../examples/models/python/src/tutorial/dynamic_io.py
     :language: python
     :name: dynamic_io_schema_inspection_2
-    :lines: 41 - 60
+    :lines: 42 - 61
     :linenos:
-    :lineno-start: 41
+    :lineno-start: 42
 
 The model gets the source dataset as normal, but it also gets the schema of the dataset using
 :py:meth:`get_schema() <tracdap.rt.api.TracContext.get_schema>` which returns aTRAC
@@ -185,9 +185,9 @@ Let's see how to define this model:
 .. literalinclude:: ../../../examples/models/python/src/tutorial/dynamic_io.py
     :language: python
     :name: dynamic_io_data_generation_1
-    :lines: 63 - 80
+    :lines: 64 - 81
     :linenos:
-    :lineno-start: 63
+    :lineno-start: 64
 
 In real life more parameters would often be needed to control the generated data, e.g. range limits
 or distribution parameters, but for this simple example those are not needed.
@@ -197,9 +197,9 @@ Now let's look at the model code:
 .. literalinclude:: ../../../examples/models/python/src/tutorial/dynamic_io.py
     :language: python
     :name: dynamic_io_data_generation_2
-    :lines: 82 - 100
+    :lines: 83 - 101
     :linenos:
-    :lineno-start: 82
+    :lineno-start: 83
 
 The model creates a :py:class:`SchemaDefinition <tracdap.rt.metadata.SchemaDefinition>` and adds a
 :py:class:`FieldSchema <tracdap.rt.metadata.FieldSchema>` for each column. The same helper functions
@@ -218,7 +218,7 @@ as part of the call to :py:meth:`put_schema() <tracdap.rt.api.TracContext.put_sc
 
 .. note::
     Calling :py:meth:`put_schema() <tracdap.rt.api.TracContext.put_schema>` creates a copy of
-    the TRAC schema object. Any changes made to the schema after it is saved will noo be picked
+    the TRAC schema object. Any changes made to the schema after it is saved will not be picked
     up by TRAC. Calling :py:meth:`get_schema() <tracdap.rt.api.TracContext.get_schema>` after
     a schema has been set will always return the schema as it was saved.
 
@@ -237,9 +237,9 @@ Let's see an example model definition that can help us do that:
 .. literalinclude:: ../../../examples/models/python/src/tutorial/dynamic_io.py
     :language: python
     :name: dynamic_io_dynamic_filtering_1
-    :lines: 103 - 117
+    :lines: 104 - 118
     :linenos:
-    :lineno-start: 63
+    :lineno-start: 104
 
 Here both the input and the output are dynamic, and the model is controlled only by the two filter
 parameters. Now let's see the implementation:
@@ -247,9 +247,9 @@ parameters. Now let's see the implementation:
 .. literalinclude:: ../../../examples/models/python/src/tutorial/dynamic_io.py
     :language: python
     :name: dynamic_io_dynamic_filtering_2
-    :lines: 119 - 130
+    :lines: 120 - 131
     :linenos:
-    :lineno-start: 130
+    :lineno-start: 120
 
 The original input schema is used directly as the output schema, so the schema of the input
 and output will be the same.

@@ -143,9 +143,9 @@ for running code in TRAC, both on the platform and using the local development s
     :caption: src/tutorial/hello_world.py
     :name: hello_world_py_part_1
     :language: python
-    :lines: 15 - 20
+    :lines: 16 - 20
     :linenos:
-    :lineno-start: 15
+    :lineno-start: 16
 
 The model can define any parameters it is going to need. In this example there is only a
 single parameter so it can be declared in code (more complex models may wish to manage
@@ -155,9 +155,9 @@ are defined in the correct format.
 .. literalinclude:: ../../../examples/models/python/src/tutorial/hello_world.py
     :name: hello_world_py_part_2
     :language: python
-    :lines: 21 - 27
+    :lines: 22 - 27
     :linenos:
-    :lineno-start: 21
+    :lineno-start: 22
 
 The model can also define inputs and outputs. In this case since all we are going to do
 is write a message in the log, no inputs and outputs are needed. Still, these methods are
@@ -166,9 +166,9 @@ required in order for the model to be valid.
 .. literalinclude:: ../../../examples/models/python/src/tutorial/hello_world.py
     :name: hello_world_py_part_3
     :language: python
-    :lines: 28 - 33
+    :lines: 29 - 33
     :linenos:
-    :lineno-start: 28
+    :lineno-start: 29
 
 To write the model logic, implement the :py:meth:`run_model() <tracdap.rt.api.TracModel.run_model>` method.
 When :py:meth:`run_model() <tracdap.rt.api.TracModel.run_model>` is called it receives a
@@ -178,9 +178,9 @@ TRAC platform.
 .. literalinclude:: ../../../examples/models/python/src/tutorial/hello_world.py
     :name: hello_world_py_part_4
     :language: python
-    :lines: 34 - 40
+    :lines: 35 - 40
     :linenos:
-    :lineno-start: 34
+    :lineno-start: 35
 
 There are two useful features of :py:class:`TracContext <tracdap.rt.api.TracContext>`
 that can be seen in this example:
@@ -191,7 +191,7 @@ that can be seen in this example:
         datasets. Log outputs are available even if a job fails so they can be used for debugging.
 
     *   :py:meth:`get_parameter() <tracdap.rt.api.TracContext.get_parameter>` allows models to access any
-        parameters defined in the :py:meth:`define_parameters()<tracdap.rt.api.TracModel.define_parameters>`
+        parameters defined in the :py:meth:`define_parameters() <tracdap.rt.api.TracModel.define_parameters>`
         method. They are returned as native Python objects, so integers use the Python integer type,
         date and time values use the Python datetime classes and so on.
 
@@ -243,9 +243,9 @@ this, but the model will fail to deploy)!
     :caption: src/tutorial/hello_world.py
     :name: hello_world_py_launch
     :language: python
-    :lines: 42-
+    :lines: 43-
     :linenos:
-    :lineno-start: 42
+    :lineno-start: 43
 
 Paths for the system and job config files are resolved in the following order:
 
