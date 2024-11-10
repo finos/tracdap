@@ -69,18 +69,19 @@ def _optional_arg(launch_args: _tp.Dict[str, _tp.Any], arg_name: str) -> _tp.Any
 
 def launch_model(
         model_class: _api.TracModel.__class__,
-        job_config: _tp.Union[str, _pathlib.Path],
-        sys_config: _tp.Union[str, _pathlib.Path],
+        job_config: _tp.Union[_pathlib.Path, str],
+        sys_config: _tp.Union[_pathlib.Path, str],
         **launch_args):
 
     """
     Launch an individual model using its Python class
 
-    This launch method launches the supplied model class directly, it must be called
+    This function launches the supplied model class directly, it must be called
     from the Python codebase containing the model class. The TRAC runtime will launch
-    within the current Python process, job target and model repositories are configured
-    automatically and dev mode will be enabled. This method is mainly useful for launching
-    development and debugging runs.
+    in dev mode and execute the model inside the current Python process, a minimal
+    job definition and set of local resources will be configured automatically.
+    This method is useful for launching models during local development
+    for debugging and testing.
 
     To resolve the paths of the job and system config files, paths are tried in the
     following order:
@@ -92,7 +93,11 @@ def launch_model(
     :param model_class: The model class that will be launched
     :param job_config: Path to the job configuration file
     :param sys_config: Path to the system configuration file
-    :param launch_args: Additional keyword args to control behavior of the TRAC runtime (not normally required)
+    :param launch_args: Additional arguments to control behavior of the TRAC runtime (not normally required)
+
+    :type model_class: :py:class:`TracModel.__class__ <tracdap.rt.api.TracModel>`
+    :type job_config: pathlib.Path | str
+    :type sys_config: pathlib.Path | str
     """
 
     model_file = _inspect.getfile(model_class)
@@ -115,18 +120,35 @@ def launch_model(
 
 
 def launch_job(
-        job_config: _tp.Union[str, _pathlib.Path],
-        sys_config: _tp.Union[str, _pathlib.Path],
+        job_config: _tp.Union[_pathlib.Path, str],
+        sys_config: _tp.Union[_pathlib.Path, str],
         dev_mode: bool = False,
         **launch_args):
 
     """
     Launch a TRAC job using external configuration files
 
+    This function launches the job definition supplied in the job_config file,
+    which must contain enough information to describe the job along with any
+    models and other resources that it needs. It allows for running more complex
+    job types such as :py:class:`JobType.RUN_FLOW <tracdap.rt.metadata.JobType>`
+    and can be used for local development by setting dev_mode = True. If the job
+    depends on external resources, those must be specified in the sys_config file.
+
+    To resolve the paths of the job and system config files, paths are tried in the
+    following order:
+
+    1. If an absolute path is supplied, this takes priority
+    2. Resolve relative to the current working directory
+
     :param job_config: Path to the job configuration file
     :param sys_config: Path to the system configuration file
     :param dev_mode: Whether to launch in dev mode (applies dev mode translation to the job inputs)
-    :param launch_args: Additional keyword args to control behavior of the TRAC runtime (not normally required)
+    :param launch_args: Additional arguments to control behavior of the TRAC runtime (not normally required)
+
+    :type job_config: pathlib.Path | str
+    :type sys_config: pathlib.Path | str
+    :type dev_mode: bool
     """
 
     _sys_config = _resolve_config_file(sys_config, None)
