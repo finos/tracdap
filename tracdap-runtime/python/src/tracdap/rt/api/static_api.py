@@ -178,6 +178,8 @@ def declare_parameter(
     :type label: str
     :type default_value: Optional[Any]
     :rtype: _Named[:py:class:`ModelParameter <tracdap.rt.metadata.ModelParameter>`]
+
+    :display: False
     """
 
     print("TRAC Warning: declare_parameter() is deprecated, please use define_parameter()", file=sys.stderr)
@@ -246,6 +248,8 @@ def declare_parameters(
     :type params: _Named[:py:class:`ModelParameter <tracdap.rt.metadata.ModelParameter>`] |
                   List[_Named[:py:class:`ModelParameter <tracdap.rt.metadata.ModelParameter>`]]
     :rtype: Dict[str, :py:class:`ModelParameter <tracdap.rt.metadata.ModelParameter>`]
+
+    :display: False
     """
 
     print("TRAC Warning: declare_parameters() is deprecated, please use define_parameters()", file=sys.stderr)
@@ -338,6 +342,8 @@ def declare_field(
     :type format_code: Optional[str]
     :type field_order: Optional[int]
     :rtype: :py:class:`FieldSchema <tracdap.rt.metadata.FieldSchema>`
+
+    :display: False
     """
 
     print("TRAC Warning: declare_field() is deprecated, please use define_field()", file=sys.stderr)
@@ -503,6 +509,8 @@ def declare_input_table(
     :type fields: :py:class:`FieldSchema <tracdap.rt.metadata.FieldSchema>` |
                   List[:py:class:`FieldSchema <tracdap.rt.metadata.FieldSchema>`]
     :rtype: :py:class:`ModelInputSchema <tracdap.rt.metadata.ModelInputSchema>`
+
+    :display: False
     """
 
     print("TRAC Warning: declare_input_table() is deprecated, please use define_input_table()", file=sys.stderr)
@@ -566,6 +574,8 @@ def declare_output_table(
     :type fields: :py:class:`FieldSchema <tracdap.rt.metadata.FieldSchema>` |
                   List[:py:class:`FieldSchema <tracdap.rt.metadata.FieldSchema>`]
     :rtype: :py:class:`ModelOutputSchema <tracdap.rt.metadata.ModelOutputSchema>`
+
+    :display: False
     """
 
     print("TRAC Warning: declare_output_table() is deprecated, please use define_output_table()", file==sys.stderr)

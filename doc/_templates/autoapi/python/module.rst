@@ -107,7 +107,9 @@ Functions
 .. autoapisummary::
 
                   {% for function in visible_functions %}
+                  {% if ":display: False" not in function.docstring %}
    {{ function.id }}
+                  {% endif %}
                   {% endfor %}
                {% endif %}
 
