@@ -21,7 +21,7 @@ Setting up a new project
 If you are starting a project from scratch, it's a good idea to follow the standard
 Python conventions for package naming and folder layout. If you are working on an
 existing project or are already familiar with the Python conventions, then you can
-:ref:`skip this section <modelling/tutorial/chapter_1_hello_world:Installing the runtime>`
+:ref:`skip this section <modelling/tutorial/hello_world:Installing the runtime>`
 
 For this example we will create a project folder called example-project. Typically
 this will be a Git repository. You will also want to create a Python virtual environment

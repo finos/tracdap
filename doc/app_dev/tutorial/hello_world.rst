@@ -25,7 +25,7 @@ Setting up a dev environment
 ----------------------------
 
 The easiest way to get a local development instance of TRAC is to clone the
-`TRAC d.a.p. GitHub Repository <https://github.com/finos/tracdap>`_
+`TRAC GitHub Repository <https://github.com/finos/tracdap>`_
 and follow the instructions in the main
 `README <https://github.com/finos/tracdap#readme>`_
 file.

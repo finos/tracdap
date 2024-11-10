@@ -65,7 +65,7 @@ With TRAC D.A.P. you can build and run production-ready models right on your des
 All you need is an IDE, Python  and the tracdap-runtime Python package.
 TRAC D.A.P. requires Python 3.8 or later.
 
-The [modelling tutorial](https://tracdap.finos.org/en/stable/modelling/tutorial/chapter_1_hello_world.html)
+The [modelling tutorial](https://tracdap.finos.org/en/stable/modelling/tutorial/hello_world.html)
 shows you how to get set up and write your first models. You can write models locally using
 an IDE or notebook, once the model is working t can be loaded to the platform without modification.
 TRAC D.A.P. will validate the model and ensure it behaves the same on-platform as it does locally.

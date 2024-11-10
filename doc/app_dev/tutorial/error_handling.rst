@@ -75,7 +75,7 @@ Errors in streaming calls
 -------------------------
 
 .. seealso::
-    See :doc:`./chapter_4_streaming` for more details on the streaming data API.
+    See :doc:`./streaming` for more details on the streaming data API.
 
 **Errors in upload streams**
 
@@ -126,7 +126,7 @@ to no-op functions to avoid unhandled or duplicate events.
 
 **Using promises for streaming operations**
 
-In :doc:`./chapter_4_streaming`, the streaming operations are wrapped up into promises and errors are
+In :doc:`./streaming`, the streaming operations are wrapped up into promises and errors are
 passed directly to the promise *resolve()* method. Once the operation is wrapped up into a promise,
 errors can be processed using a regular ``.catch()``.
 
