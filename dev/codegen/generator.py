@@ -939,14 +939,20 @@ class TracGenerator:
 
         # Convert @see for methods into .. seealso:: :meth:
         translated_comment = re.sub(
-            r"@see ((?:\w+\.)*)(\w+\.)(\w+)\(\)",
-            ".. seealso::\\n" + next_indent + ":meth:`\\2\\3 <\\1\\2\\3>`",
+            r"@see ((?:\w+\.)*)(\w+\.)?(\w+)\(\)",
+            ".. seealso::\\n" + next_indent + ":py:meth:`\\2\\3() <\\1\\2\\3>`",
+            translated_comment, flags=re.IGNORECASE)
+
+        # Convert @see for classes into .. seealso:: :class:
+        translated_comment = re.sub(
+            r"@see ((?:\w+\.)*)(\w+)\.([A-Z][A-Z_]*)",
+            ".. seealso::\\n" + next_indent + ":py:class:`\\2.\\3 <\\1\\2>`",
             translated_comment, flags=re.IGNORECASE)
 
         # Convert @see for classes into .. seealso:: :class:
         translated_comment = re.sub(
             r"@see ((?:\w+\.)*)(\w+)",
-            ".. seealso::\\n" + next_indent + ":class:`\\2 <\\1\\2>`",
+            ".. seealso::\\n" + next_indent + ":py:class:`\\2 <\\1\\2>`",
             translated_comment, flags=re.IGNORECASE)
 
         # Group multiple seealso statements into a single block
