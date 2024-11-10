@@ -14,6 +14,11 @@
 #  limitations under the License.
 
 
+"""
+Error types raised by the TRAC runtime
+"""
+
+
 class ETrac(Exception):
 
     """

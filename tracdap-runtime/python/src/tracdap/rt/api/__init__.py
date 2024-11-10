@@ -13,6 +13,9 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+"""
+TRAC model API for Python
+"""
 
 from .model_api import *
 from .static_api import *
