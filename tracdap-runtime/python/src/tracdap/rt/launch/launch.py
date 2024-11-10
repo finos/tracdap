@@ -96,8 +96,8 @@ def launch_model(
     :param launch_args: Additional arguments to control behavior of the TRAC runtime (not normally required)
 
     :type model_class: :py:class:`TracModel.__class__ <tracdap.rt.api.TracModel>`
-    :type job_config: pathlib.Path | str
-    :type sys_config: pathlib.Path | str
+    :type job_config: :py:class:`pathlib.Path` | str
+    :type sys_config: :py:class:`pathlib.Path` | str
     """
 
     model_file = _inspect.getfile(model_class)
@@ -146,8 +146,8 @@ def launch_job(
     :param dev_mode: Whether to launch in dev mode (applies dev mode translation to the job inputs)
     :param launch_args: Additional arguments to control behavior of the TRAC runtime (not normally required)
 
-    :type job_config: pathlib.Path | str
-    :type sys_config: pathlib.Path | str
+    :type job_config: :py:class:`pathlib.Path` | str
+    :type sys_config: :py:class:`pathlib.Path` | str
     :type dev_mode: bool
     """
 

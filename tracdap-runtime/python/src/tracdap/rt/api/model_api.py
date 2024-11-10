@@ -98,7 +98,6 @@ class TracContext(metaclass=_abc.ABCMeta):
         :param dataset_name: The name of the dataset to check
         :return: True if the dataset exists in the current context, False otherwise
         :type dataset_name: str
-        :rtype: bool
         :raises: :py:class:`ERuntimeValidation <tracdap.rt.exceptions.ERuntimeValidation>`
         """
 
@@ -173,7 +172,7 @@ class TracContext(metaclass=_abc.ABCMeta):
         :return: A pandas dataframe containing the data for the named dataset
         :type dataset_name: str
         :type use_temporal_objects: bool | None
-        :rtype: pandas.DataFrame
+        :rtype: :py:class:`pandas.DataFrame`
         :raises: :py:class:`ERuntimeValidation <tracdap.rt.exceptions.ERuntimeValidation>`
         """
         pass
@@ -189,7 +188,7 @@ class TracContext(metaclass=_abc.ABCMeta):
         :param dataset_name: The name of the model input or output to get data for
         :return: A polars dataframe containing the data for the named dataset
         :type dataset_name: str
-        :rtype: polars.DataFrame
+        :rtype: :py:class:`polars.DataFrame`
         :raises: :py:class:`ERuntimeValidation <tracdap.rt.exceptions.ERuntimeValidation>`
         """
 
@@ -259,7 +258,7 @@ class TracContext(metaclass=_abc.ABCMeta):
         :param dataset_name: The name of the model output to save data for
         :param dataset: A pandas dataframe containing the data for the named dataset
         :type dataset_name: str
-        :type dataset: pandas.Dataframe
+        :type dataset: :py:class:`pandas.Dataframe`
         :raises: :py:class:`ERuntimeValidation <tracdap.rt.exceptions.ERuntimeValidation>`,
                  :py:class:`EDataConformance <tracdap.rt.exceptions.EDataConformance>`
         """
@@ -277,7 +276,7 @@ class TracContext(metaclass=_abc.ABCMeta):
         :param dataset_name: The name of the model output to save data for
         :param dataset: A polars dataframe containing the data for the named dataset
         :type dataset_name: str
-        :type dataset: polars.DataFrame
+        :type dataset: :py:class:`polars.DataFrame`
         :raises: :py:class:`ERuntimeValidation <tracdap.rt.exceptions.ERuntimeValidation>`,
                  :py:class:`EDataConformance <tracdap.rt.exceptions.EDataConformance>`
         """
