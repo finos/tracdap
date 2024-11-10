@@ -22,10 +22,24 @@ from .static_api import *
 from tracdap.rt.metadata import *  # noqa DOCGEN_REMOVE
 
 # Map basic types into the root of the API package
+
 BOOLEAN = BasicType.BOOLEAN
+"""Synonym for the :py:class:`BasicType <tracdap.rt.metadata.BasicType>` of BOOLEAN"""
+
 INTEGER = BasicType.INTEGER
+"""Synonym for the :py:class:`BasicType <tracdap.rt.metadata.BasicType>` of INTEGER"""
+
 FLOAT = BasicType.FLOAT
+"""Synonym for the :py:class:`BasicType <tracdap.rt.metadata.BasicType>` of FLOAT"""
+
 DECIMAL = BasicType.DECIMAL
+"""Synonym for the :py:class:`BasicType <tracdap.rt.metadata.BasicType>` of DECIMAL"""
+
 STRING = BasicType.STRING
+"""Synonym for the :py:class:`BasicType <tracdap.rt.metadata.BasicType>` of STRING"""
+
 DATE = BasicType.DATE
+"""Synonym for the :py:class:`BasicType <tracdap.rt.metadata.BasicType>` of DATE"""
+
 DATETIME = BasicType.DATETIME
+"""Synonym for the :py:class:`BasicType <tracdap.rt.metadata.BasicType>` of DATETIME"""
