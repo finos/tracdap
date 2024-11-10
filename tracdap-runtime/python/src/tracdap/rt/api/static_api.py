@@ -407,7 +407,7 @@ def define_schema(
     them into a :py:class:`SchemaDefinition <tracdap.rt.metadata.SchemaDefinition>`.
 
     A schema type can be specified explicitly using the schema_type parameter, currently only
-    :py:class:`SchemaType.TABLE <tracdap.rt.metadata.SchemaType>` is supported and this
+    :py:attr:`TABLE <tracdap.rt.metadata.SchemaType.TABLE>` is supported and this
     is also the default.
 
     .. note::
@@ -447,7 +447,7 @@ def load_schema(
 
     Field ordering is assigned by the order the fields are listed in the CSV file.
     A schema type can be specified explicitly using the schema_type parameter, currently only
-    :py:class:`SchemaType.TABLE <tracdap.rt.metadata.SchemaType>` is supported and this
+    :py:attr:`TABLE <tracdap.rt.metadata.SchemaType.TABLE>` is supported and this
     is also the default.
 
     .. note::

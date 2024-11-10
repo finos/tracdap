@@ -27,22 +27,22 @@ from tracdap.rt.metadata import *  # noqa DOCGEN_REMOVE
 # Map basic types into the root of the API package
 
 BOOLEAN = BasicType.BOOLEAN
-"""Synonym for the :py:class:`BasicType <tracdap.rt.metadata.BasicType>` of BOOLEAN"""
+"""Synonym for :py:attr:`BasicType.BOOLEAN <tracdap.rt.metadata.BasicType.BOOLEAN>`"""
 
 INTEGER = BasicType.INTEGER
-"""Synonym for the :py:class:`BasicType <tracdap.rt.metadata.BasicType>` of INTEGER"""
+"""Synonym for :py:attr:`BasicType.INTEGER <tracdap.rt.metadata.BasicType.INTEGER>`"""
 
 FLOAT = BasicType.FLOAT
-"""Synonym for the :py:class:`BasicType <tracdap.rt.metadata.BasicType>` of FLOAT"""
+"""Synonym for :py:attr:`BasicType.FLOAT <tracdap.rt.metadata.BasicType.FLOAT>`"""
 
 DECIMAL = BasicType.DECIMAL
-"""Synonym for the :py:class:`BasicType <tracdap.rt.metadata.BasicType>` of DECIMAL"""
+"""Synonym for :py:attr:`BasicType.DECIMAL <tracdap.rt.metadata.BasicType.DECIMAL>`"""
 
 STRING = BasicType.STRING
-"""Synonym for the :py:class:`BasicType <tracdap.rt.metadata.BasicType>` of STRING"""
+"""Synonym for :py:attr:`BasicType.STRING <tracdap.rt.metadata.BasicType.STRING>`"""
 
 DATE = BasicType.DATE
-"""Synonym for the :py:class:`BasicType <tracdap.rt.metadata.BasicType>` of DATE"""
+"""Synonym for :py:attr:`BasicType.DATE <tracdap.rt.metadata.BasicType.DATE>`"""
 
 DATETIME = BasicType.DATETIME
-"""Synonym for the :py:class:`BasicType <tracdap.rt.metadata.BasicType>` of DATETIME"""
+"""Synonym for :py:attr:`BasicType.DATETIME <tracdap.rt.metadata.BasicType.DATETIME>`"""
