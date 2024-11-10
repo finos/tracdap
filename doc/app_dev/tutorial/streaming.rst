@@ -23,7 +23,7 @@ The TRAC transport is available as an option in the transport setup:
 
 .. code-block:: javascript
     :linenos:
-    :lineno-start: 19
+    :lineno-start: 20
 
     // Create the Data API
     const transportOptions = {transport: "trac"};
@@ -34,9 +34,9 @@ Or to run outside a browser:
 
 .. literalinclude:: ../../../examples/apps/javascript/src/streaming.js
     :language: JavaScript
-    :lines: 19 - 23
+    :lines: 20 - 24
     :linenos:
-    :lineno-start: 19
+    :lineno-start: 20
 
 The options for the *transport* parameter are *trac* or *google*, the default is *google*. It is fine
 to use the *trac* transport for the data service and *google* transport for everything else,
@@ -61,18 +61,18 @@ except that the content can be empty.
 
 .. literalinclude:: ../../../examples/apps/javascript/src/streaming.js
     :language: JavaScript
-    :lines: 49 - 63
+    :lines: 50 - 64
     :linenos:
-    :lineno-start: 49
+    :lineno-start: 50
 
 Now let's create the streaming source. The example code uses the *fs* module from Node.js
 to create an input stream, then passes the stream into the upload function:
 
 .. literalinclude:: ../../../examples/apps/javascript/src/streaming.js
     :language: JavaScript
-    :lines: 156
+    :lines: 161 - 162
     :linenos:
-    :lineno-start: 156
+    :lineno-start: 161
 
 In a browser application, your source is most likely to be an HTML file input control.
 The file input control supports streaming using the
@@ -82,11 +82,12 @@ TRAC provides a utility function to create an event stream, using a web Readable
 
 .. code-block:: javascript
     :linenos:
-    :lineno-start: 156
+    :lineno-start: 161
 
         const csvInput = document.getElementById("input_id");
         const csvFile = csvInput.files[0];
         const csvStream = tracdap.utils.streamToEmitter(csvFile.stream());
+        const dataId = await saveStreamingData(csvStream);
 
 .. note::
 
@@ -105,9 +106,9 @@ in a single stream.
 
 .. literalinclude:: ../../../examples/apps/javascript/src/streaming.js
     :language: JavaScript
-    :lines: 64 - 73
+    :lines: 65 - 74
     :linenos:
-    :lineno-start: 64
+    :lineno-start: 65
 
 After creating the stream, start by sending the initial message.
 This will start the streaming upload operation.
@@ -116,9 +117,9 @@ so we can use this to complete the promise.
 
 .. literalinclude:: ../../../examples/apps/javascript/src/streaming.js
     :language: JavaScript
-    :lines: 74 - 80
+    :lines: 75 - 81
     :linenos:
-    :lineno-start: 74
+    :lineno-start: 75
 
 Now the upload stream is open, we need to relay data from the source stream.
 To do this we can handle the "data" event on the source stream which supplies
@@ -128,9 +129,9 @@ The "end" event signals that the source stream is complete.
 
 .. literalinclude:: ../../../examples/apps/javascript/src/streaming.js
     :language: JavaScript
-    :lines: 81 - 94
+    :lines: 82 - 95
     :linenos:
-    :lineno-start: 81
+    :lineno-start: 82
 
 The last thing is to handle any errors that occur on the source stream.
 These are different from errors in the upload stream, which were handled earlier by *.catch(reject)*.
@@ -142,9 +143,9 @@ Instead we want to reject the promise explicitly, to pass on the error informati
 
 .. literalinclude:: ../../../examples/apps/javascript/src/streaming.js
     :language: JavaScript
-    :lines: 95 - 104
+    :lines: 96 - 105
     :linenos:
-    :lineno-start: 95
+    :lineno-start: 96
 
 Streaming download
 ------------------
@@ -166,9 +167,9 @@ This is exactly the same as the request used to call
 
 .. literalinclude:: ../../../examples/apps/javascript/src/streaming.js
     :language: JavaScript
-    :lines: 110 - 116
+    :lines: 111 - 117
     :linenos:
-    :lineno-start: 110
+    :lineno-start: 111
 
 Since we are going to collect the response data into a single message,
 we can set up the streaming operation as a promise just like the upload operation.
@@ -177,9 +178,9 @@ If there are any errors during the operation, the promise will be rejected.
 
 .. literalinclude:: ../../../examples/apps/javascript/src/streaming.js
     :language: JavaScript
-    :lines: 118 - 127
+    :lines: 123 - 128
     :linenos:
-    :lineno-start: 118
+    :lineno-start: 123
 
 The next step is to set up event handlers for the download stream.
 There are three events to process: "data", "end" and "error".
@@ -196,9 +197,9 @@ utility function to aggregate them into a single
 
 .. literalinclude:: ../../../examples/apps/javascript/src/streaming.js
     :language: JavaScript
-    :lines: 129 - 142
+    :lines: 130 - 143
     :linenos:
-    :lineno-start: 129
+    :lineno-start: 130
 
 Now everything is ready, the final step is to make an API call to start
 the download stream. Since we are using stream event processing, we need
@@ -207,9 +208,9 @@ handlers, to prevent JavaScript warnings about unhandled results / errors.
 
 .. literalinclude:: ../../../examples/apps/javascript/src/streaming.js
     :language: JavaScript
-    :lines: 144 - 153
+    :lines: 145 - 154
     :linenos:
-    :lineno-start: 144
+    :lineno-start: 145
 
 .. note::
 

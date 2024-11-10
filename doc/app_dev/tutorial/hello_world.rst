@@ -66,16 +66,16 @@ Start by importing the TRAC API package:
 
 .. literalinclude:: ../../../examples/apps/javascript/src/hello_world.js
     :language: JavaScript
-    :lines: 17 - 17
+    :lines: 18 - 18
     :linenos:
-    :lineno-start: 17
+    :lineno-start: 18
 
 We need two things to create the TRAC connection, an RPC transport and an instance of the
 TRAC API class. You can use tracdap.setup to create an RPC transport that works in the browser.
 
 .. code-block:: javascript
     :linenos:
-    :lineno-start: 19
+    :lineno-start: 20
 
     // Use tracdap.setup to create an RPC transport pointed at your TRAC server
     // The browser RPC connector will send all requests to the page origin server
@@ -89,9 +89,9 @@ In this example we only need the metadata API.
 
 .. literalinclude:: ../../../examples/apps/javascript/src/hello_world.js
     :language: JavaScript
-    :lines: 23 - 24
+    :lines: 24 - 25
     :linenos:
-    :lineno-start: 23
+    :lineno-start: 24
 
 
 Running outside a browser
@@ -102,7 +102,7 @@ In this case, you'll need to create an RPC connector pointed at the address of y
 
 .. literalinclude:: ../../../examples/apps/javascript/src/hello_world.js
     :language: JavaScript
-    :lines: 19, 21
+    :lines: 20, 22
 
 You'll also need to supply the global XMLHttpRequest object, which is not normally available outside a
 browser environment. The example code sets this up in the run_examples.js host script, using the 'xhr2'
@@ -110,7 +110,7 @@ package available on NPM:
 
 .. literalinclude:: ../../../examples/apps/javascript/run_examples.js
     :language: JavaScript
-    :lines: 18 - 20
+    :lines: 19 - 21
 
 
 Creating and saving objects
@@ -126,9 +126,9 @@ in code.
 
 .. literalinclude:: ../../../examples/apps/javascript/src/hello_world.js
     :language: JavaScript
-    :lines: 27 - 57
+    :lines: 28 - 58
     :linenos:
-    :lineno-start: 27
+    :lineno-start: 28
 
 The web API package provides structured classes for every type and enum in the ``tracdap.metadata``
 package. A ``.create()`` method is available for every type, which provides auto-complete and
@@ -144,9 +144,9 @@ Request objects from the ``tracdap.api`` package can be created the same way met
 
 .. literalinclude:: ../../../examples/apps/javascript/src/hello_world.js
     :language: JavaScript
-    :lines: 59 - 75
+    :lines: 60 - 76
     :linenos:
-    :lineno-start: 59
+    :lineno-start: 60
 
 There are several things to call out here. TRAC is a multi-tenant platform and every API
 request includes a tenant code. By default resources are separated between tenants, so
@@ -169,11 +169,11 @@ to send our request to the TRAC metadata service.
 
 .. literalinclude:: ../../../examples/apps/javascript/src/hello_world.js
     :language: JavaScript
-    :lines: 77 - 84
+    :lines: 78 - 85
     :linenos:
-    :lineno-start: 77
+    :lineno-start: 78
 
-The :meth:`createObject()<tracdap.api.TracMetadataApi.createObject>` method returns the ID of
+The :meth:`createObject() <tracdap.api.TracMetadataApi.createObject>` method returns the ID of
 the newly created schema as a :class:`TagHeader<tracdap.metadata.TagHeader>`, which includes the
 object type, ID, version and timestamps.
 
@@ -199,9 +199,9 @@ We can do this using a :class:`MetadataReadRequest<tracdap.api.MetadataReadReque
 
 .. literalinclude:: ../../../examples/apps/javascript/src/hello_world.js
     :language: JavaScript
-    :lines: 86 - 92
+    :lines: 87 - 93
     :linenos:
-    :lineno-start: 86
+    :lineno-start: 87
 
 All that is needed is the tenant code and a :class:`TagSelector<tracdap.metadata.TagSelector>`.
 Tag selectors allow different versions of an object or tag to be selected according to various
@@ -213,9 +213,9 @@ Finally we use :meth:`readObject()<tracdap.api.TracMetadataApi.readObject>` to s
 
 .. literalinclude:: ../../../examples/apps/javascript/src/hello_world.js
     :language: JavaScript
-    :lines: 94
+    :lines: 95
     :linenos:
-    :lineno-start: 94
+    :lineno-start: 95
 
 The :meth:`readObject()<tracdap.api.TracMetadataApi.readObject>`
 method returns a :class:`Tag<tracdap.metadata.Tag>`,
@@ -234,9 +234,9 @@ a console or IDE. In this example we just create the schema and then load it bac
 
 .. literalinclude:: ../../../examples/apps/javascript/src/hello_world.js
     :language: JavaScript
-    :lines: 96 -
+    :lines: 97 -
     :linenos:
-    :lineno-start: 96
+    :lineno-start: 97
 
 The last call to ``JSON.stringify()`` will provide a human-readable representation of the
 TRAC object, that can be useful for debugging.

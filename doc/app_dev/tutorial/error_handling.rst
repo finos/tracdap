@@ -18,9 +18,9 @@ with a validation error. Here is what that looks like using futures:
 
 .. literalinclude:: ../../../examples/apps/javascript/src/error_handling.js
     :language: JavaScript
-    :lines: 63 - 70
+    :lines: 64 - 71
     :linenos:
-    :lineno-start: 63
+    :lineno-start: 64
 
 The *error.message* property contains a short human-readable description of the error.
 You can also access the gRPC status code using the *error.code* property. Both of these
@@ -36,9 +36,9 @@ Exactly the same error handling capability is available using callbacks:
 
 .. literalinclude:: ../../../examples/apps/javascript/src/error_handling.js
     :language: JavaScript
-    :lines: 79 - 88
+    :lines: 80 - 89
     :linenos:
-    :lineno-start: 79
+    :lineno-start: 80
 
 
 TRAC Error Details
@@ -51,9 +51,9 @@ TRAC has a means to provide this information.
 
 .. literalinclude:: ../../../examples/apps/javascript/src/error_handling.js
     :language: JavaScript
-    :lines: 97 - 104
+    :lines: 98 - 105
     :linenos:
-    :lineno-start: 97
+    :lineno-start: 98
 
 Use ``getErrorDetails()`` to get a :class:`TracErrorDetails<tracdap.api.TracErrorDetails>`
 object. The *details.message* and *details.code* properties are the same as for basic
@@ -62,9 +62,9 @@ information, this can be accessed by looking at the individual error items:
 
 .. literalinclude:: ../../../examples/apps/javascript/src/error_handling.js
     :language: JavaScript
-    :lines: 105 - 108
+    :lines: 106 - 109
     :linenos:
-    :lineno-start: 105
+    :lineno-start: 106
 
 For each item, *item.detail* is a human readable description of the error. For errors related
 to the request (mostly validation errors), *item.fieldPath* is the field path for the input field
@@ -136,6 +136,6 @@ details of the stream event processing:
 
 .. literalinclude:: ../../../examples/apps/javascript/src/error_handling.js
     :language: JavaScript
-    :lines: 145 - 151
+    :lines: 146 - 152
     :linenos:
-    :lineno-start: 145
+    :lineno-start: 146
