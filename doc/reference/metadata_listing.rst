@@ -19,4 +19,4 @@ Included Modules
     :widths: 30 70
 
     * - :py:mod:`tracdap.metadata`
-      - The TRAC metadata model, made available as JavaScript objects
+      - Catalogue of the TRAC metadata model
