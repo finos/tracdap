@@ -12,6 +12,7 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+
 import fileinput
 import pathlib
 import subprocess as sp
@@ -158,7 +159,6 @@ autoapi_own_page_level = "class"
 autoapi_template_dir = "_templates/autoapi"
 
 autodoc_typehints = 'description'
-autodoc_typehints_format = "short"
 
 
 # Content generation
