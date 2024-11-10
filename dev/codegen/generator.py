@@ -943,21 +943,21 @@ class TracGenerator:
             ".. seealso::\\n" + next_indent + ":py:meth:`\\2\\3() <\\1\\2\\3>`",
             translated_comment, flags=re.IGNORECASE)
 
-        # Convert @see for classes into .. seealso:: :class:
+        # Convert @see for constants into .. seealso:: :attr: (assumes capitalization)
         translated_comment = re.sub(
-            r"@see ((?:\w+\.)*)(\w+)\.([A-Z][A-Z_]*)",
-            ".. seealso::\\n" + next_indent + ":py:class:`\\2.\\3 <\\1\\2>`",
-            translated_comment, flags=re.IGNORECASE)
+            r"@see ((?:\w+\.)*)(\w+\.)([A-Z][A-Z_]*)($|\s)",
+            ".. seealso::\\n" + next_indent + ":py:attr:`\\2\\3 <\\1\\2\\3>`\\4",
+            translated_comment)
 
-        # Convert @see for classes into .. seealso:: :class:
+        # Convert @see for everything else into .. seealso:: :obj:
         translated_comment = re.sub(
             r"@see ((?:\w+\.)*)(\w+)",
-            ".. seealso::\\n" + next_indent + ":py:class:`\\2 <\\1\\2>`",
+            ".. seealso::\\n" + next_indent + ":py:obj:`\\2 <\\1\\2>`",
             translated_comment, flags=re.IGNORECASE)
 
         # Group multiple seealso statements into a single block
         translated_comment = re.sub(
-            r"(:class:.*)\n\s*\.\. seealso::\n", "\\1,\n",
+            r"(:py:\w+:.*)\n\s*\.\. seealso::\n", "\\1,\n",
             translated_comment, flags=re.IGNORECASE)
 
         if translated_comment.strip() == "":
