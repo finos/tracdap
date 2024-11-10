@@ -27,29 +27,30 @@ from .hook import _Named
 from tracdap.rt.metadata import *  # DOCGEN_REMOVE
 
 
-def define_attributes(*attrs: _tp.Union[TagUpdate, _tp.List[TagUpdate]]) -> _tp.List[TagUpdate]:
+def define_attributes(*attributes: _tp.Union[TagUpdate, _tp.List[TagUpdate]]) -> _tp.List[TagUpdate]:
 
     """
-    Defined a set of attributes to catalogue and describe a model
+    Define a set of attributes to catalogue and describe a model
 
     .. note::
         This is an experimental API that is not yet stabilised, expect changes in future versions of TRAC
 
-    Attributes can be supplied either as individual arguments to this function or as a list.
-    In either case, each attribute should be defined using :py:func:`define_attribute`
-    (or :py:func:`trac.A <tracdap.rt.api.A>`).
+    Model attributes can be defined using :py:func:`define_attribute` or the shorthand alias :py:func:`A`.
+    This function takes a number of model attributes, either as individual arguments or as a list,
+    and arranges them in the format required by
+    :py:meth:`TracModel.define_attributes() <tracdap.rt.api.TracModel.define_attributes>`.
 
-    :param attrs: The attributes that will be defined, either as individual arguments or as a list
+    :param attributes: The attributes that will be defined, either as individual arguments or as a list
     :return: A set of model attributes, in the correct format to return from
-             :py:meth:`TracModel.define_attributes`
+             :py:meth:`TracModel.define_attributes() <tracdap.rt.api.TracModel.define_attributes>`
 
-    :type attrs: :py:class:`TagUpdate <tracdap.rt.metadata.TagUpdate>` |
+    :type attributes: :py:class:`TagUpdate <tracdap.rt.metadata.TagUpdate>` |
                   List[:py:class:`TagUpdate <tracdap.rt.metadata.TagUpdate>`]
     :rtype: List[:py:class:`TagUpdate <tracdap.rt.metadata.TagUpdate>`]
     """
 
     sa = _StaticApiHook.get_instance()
-    return sa.define_attributes(*attrs)
+    return sa.define_attributes(*attributes)
 
 
 def define_attribute(
@@ -64,23 +65,23 @@ def define_attribute(
     .. note::
         This is an experimental API that is not yet stabilised, expect changes in future versions of TRAC
 
-    Model attributes can be defined using this method (or :py:func:`trac.A <A>`).
-    The attr_name and attr_value are always required to define an attribute.
-    attr_type is always required for multivalued attributes but is optional otherwise.
-    The categorical flag can be applied to STRING attributes if required.
+    Model attributes can be defined using this function or the shorthand alias :py:func:`A`.
+    A name and value are always required to define an attribute.
+    Attribute type is required for multivalued attributes but is optional otherwise.
+    The categorical flag can be applied to STRING attributes to mark them as categorical.
 
-    Once defined attributes can be passed to :py:func:`define_attributes`,
-    either as a list or as individual arguments, to create the set of attributes for a model.
+    Model attributes can be passed to :py:func:`define_attributes`,
+    either as individual arguments or as a list, to create the set of attributes for a model.
 
     :param attr_name: The attribute name
     :param attr_value: The attribute value (as a raw Python value)
     :param attr_type: The TRAC type for this attribute (optional, except for multivalued attributes)
     :param categorical: A flag to indicate whether this attribute is categorical
-    :return: An attribute for the model, ready for loading into the TRAC platform
+    :return: A model attribute, in the format understood by the TRAC platform
 
     :type attr_name: str
     :type attr_value: Any
-    :type attr_type: Optional[:py:class:`BasicType <tracdap.rt.metadata.BasicType>`]
+    :type attr_type: :py:class:`BasicType <tracdap.rt.metadata.BasicType>` | None
     :type categorical: bool
     :rtype: :py:class:`TagUpdate <tracdap.rt.metadata.TagUpdate>`
     """
@@ -103,7 +104,7 @@ def A(  # noqa
 
     :type attr_name: str
     :type attr_value: Any
-    :type attr_type: Optional[:py:class:`BasicType <tracdap.rt.metadata.BasicType>`]
+    :type attr_type: :py:class:`BasicType <tracdap.rt.metadata.BasicType>` | None
     :type categorical: bool
     :rtype: :py:class:`TagUpdate <tracdap.rt.metadata.TagUpdate>`
     """
@@ -112,7 +113,7 @@ def A(  # noqa
 
 
 def define_parameter(
-        param_name: str, param_type: _tp.Union[TypeDescriptor, BasicType],
+        param_name: str, param_type: _tp.Union[BasicType, TypeDescriptor],
         label: str, default_value: _tp.Optional[_tp.Any] = None,
         *, param_props: _tp.Optional[_tp.Dict[str, _tp.Any]] = None) \
         -> _Named[ModelParameter]:
@@ -120,23 +121,25 @@ def define_parameter(
     """
     Define an individual model parameter
 
-    Individual model parameters can be defined using this method (or :py:func:`trac.P<P>`).
-    The name, type and label are required fields to define a parameter. Name is used as the identifier
-    to work with the parameter in code, e.g. when calling :py:meth:`get_parameter` or defining parameters
-    in a job config.
+    Model parameters can be defined using this method or the shorthand alias :py:func:`P`.
+    Name, type and label are always required to define a parameter. The parameter name
+    is used to set up parameters in a job and to access parameter values at runtime using
+    :py:meth:`TracContext.get_parameter() <tracdap.rt.api.TracContext.get_parameter>`.
 
-    If a default value is specified, the model parameter becomes optional. It is ok to omit optional parameters
-    when running models or setting up jobs, in which case the default value will be used. If no default is
-    specified then the model parameter becomes mandatory, a value must always be supplied in order to execute
-    the model. TRAC will apply type coercion where possible to ensure the default value matches the parameter type,
-    if the default value cannot be coerced to match the parameter type then model validation will fail.
+    Use the label property to add a descriptive label to a model parameter. If a default value
+    is specified, the model parameter becomes optional. It is ok to omit optional parameters
+    when running models or setting up jobs, in which case the default value will be used.
+    If no default is specified then the model parameter becomes mandatory, a value must always
+    be supplied in order to execute the model. TRAC will apply type coercion where possible to
+    ensure the default value matches the parameter type, if the default value cannot be coerced
+    to match the parameter type then model validation will fail.
 
     You can use param_props to associate arbitrary key-value properties with this model parameter.
     These properties are not used by the TRAC engine, but are stored in the model metadata for
     the parameter and can be used as needed in 3rd-party applications.
 
-    Once defined model parameters can be passed to :py:func:`define_parameters`,
-    either as a list or as individual arguments, to create the set of parameters for a model.
+    Model parameters can be passed to :py:func:`define_parameters`,
+    either as individual arguments or as a list, to create the set of parameters for a model.
 
     :param param_name: The parameter name, used to identify the parameter in code (must be a valid identifier)
     :param param_type: The parameter type, expressed in the TRAC type system
@@ -146,11 +149,12 @@ def define_parameter(
     :return: A named model parameter, suitable for passing to :py:func:`define_parameters`
 
     :type param_name: str
-    :type param_type: :py:class:`TypeDescriptor <tracdap.rt.metadata.TypeDescriptor>` |
-                      :py:class:`BasicType <tracdap.rt.metadata.BasicType>`
+    :type param_type: :py:class:`BasicType <tracdap.rt.metadata.BasicType>` |
+                      :py:class:`TypeDescriptor <tracdap.rt.metadata.TypeDescriptor>`
+
     :type label: str
-    :type default_value: Optional[Any]
-    :type param_props: Optional[Dict[str, Any]]
+    :type default_value: Any | None
+    :type param_props: Dict[str, Any] | None
     :rtype: _Named[:py:class:`ModelParameter <tracdap.rt.metadata.ModelParameter>`]
     """
 
@@ -160,7 +164,7 @@ def define_parameter(
 
 def declare_parameter(
         param_name: str,
-        param_type: _tp.Union[TypeDescriptor, BasicType],
+        param_type: _tp.Union[BasicType, TypeDescriptor],
         label: str,
         default_value: _tp.Optional[_tp.Any] = None) \
         -> _Named[ModelParameter]:
@@ -173,10 +177,11 @@ def declare_parameter(
     Please use :py:func:`define_parameter() <tracdap.rt.api.define_parameter>` instead.
 
     :type param_name: str
-    :type param_type: :py:class:`TypeDescriptor <tracdap.rt.metadata.TypeDescriptor>` |
-                      :py:class:`BasicType <tracdap.rt.metadata.BasicType>`
+    :type param_type: :py:class:`BasicType <tracdap.rt.metadata.BasicType>` |
+                      :py:class:`TypeDescriptor <tracdap.rt.metadata.TypeDescriptor>`
+
     :type label: str
-    :type default_value: Optional[Any]
+    :type default_value: Any | None
     :rtype: _Named[:py:class:`ModelParameter <tracdap.rt.metadata.ModelParameter>`]
 
     :display: False
@@ -189,7 +194,7 @@ def declare_parameter(
 
 def P(  # noqa
         param_name: str,
-        param_type: _tp.Union[TypeDescriptor, BasicType],
+        param_type: _tp.Union[BasicType, TypeDescriptor],
         label: str,
         default_value: _tp.Optional[_tp.Any] = None,
         *, param_props: _tp.Optional[_tp.Dict[str, _tp.Any]] = None) \
@@ -199,11 +204,12 @@ def P(  # noqa
     Shorthand alias for :py:func:`define_parameter`
 
     :type param_name: str
-    :type param_type: :py:class:`TypeDescriptor <tracdap.rt.metadata.TypeDescriptor>` |
-                      :py:class:`BasicType <tracdap.rt.metadata.BasicType>`
+    :type param_type: :py:class:`BasicType <tracdap.rt.metadata.BasicType>` |
+                      :py:class:`TypeDescriptor <tracdap.rt.metadata.TypeDescriptor>`
     :type label: str
-    :type default_value: Optional[Any]
-    :type param_props: Optional[Dict[str, Any]]
+    :type default_value: Any | None
+    :type param_props: Dict[str, Any] | None
+
     :rtype: _Named[:py:class:`ModelParameter <tracdap.rt.metadata.ModelParameter>`]
     """
 
@@ -211,27 +217,28 @@ def P(  # noqa
 
 
 def define_parameters(
-        *params: _tp.Union[_Named[ModelParameter], _tp.List[_Named[ModelParameter]]]) \
+        *parameters: _tp.Union[_Named[ModelParameter], _tp.List[_Named[ModelParameter]]]) \
         -> _tp.Dict[str, ModelParameter]:
 
     """
-    Defined all the parameters used by a model
+    Defined the set of parameters used by a model
 
-    Parameters can be supplied either as individual arguments to this function or as a list.
-    In either case, each parameter should be defined using :py:func:`define_parameter`
-    (or :py:func:`trac.P <tracdap.rt.api.P>`).
+    Model parameters can be defined using :py:func:`define_parameter` or the shorthand alias :py:func:`P`.
+    This function takes a number of parameters, either as individual arguments or as a list,
+    and arranges them in the format required by
+    :py:meth:`TracModel.define_parameters() <tracdap.rt.api.TracModel.define_parameters>`
 
-    :param params: The parameters that will be defined, either as individual arguments or as a list
+    :param parameters: The parameters that will be defined, either as individual arguments or as a list
     :return: A set of model parameters, in the correct format to return from
-             :py:meth:`TracModel.define_parameters`
+             :py:meth:`TracModel.define_parameters() <tracdap.rt.api.TracModel.define_parameters>`
 
-    :type params: _Named[:py:class:`ModelParameter <tracdap.rt.metadata.ModelParameter>`] |
+    :type parameters: _Named[:py:class:`ModelParameter <tracdap.rt.metadata.ModelParameter>`] |
                   List[_Named[:py:class:`ModelParameter <tracdap.rt.metadata.ModelParameter>`]]
     :rtype: Dict[str, :py:class:`ModelParameter <tracdap.rt.metadata.ModelParameter>`]
     """
 
     sa = _StaticApiHook.get_instance()
-    return sa.define_parameters(*params)
+    return sa.define_parameters(*parameters)
 
 
 def declare_parameters(
@@ -240,7 +247,7 @@ def declare_parameters(
 
     """
     .. deprecated:: 0.4.4
-       Use :py:func:`define_parameters` instead.
+       Use :py:func:`define_parameters` instead
 
     This function is deprecated and will be removed in a future version.
     Please use :py:func:`define_parameters() <tracdap.rt.api.define_parameters>` instead.
@@ -269,22 +276,24 @@ def define_field(
         -> FieldSchema:
 
     """
-    Define the schema for an individual field, which can be used in a model input or output schema.
+    Define an individual field for use in a schema
 
-    Individual fields in a dataset can be defined using this method or the shorthand alias :py:func:`F`.
+    Individual fields in a schema can be defined using this method or the shorthand alias :py:func:`F`.
     The name, type and label of a field are always required.
     The business_key and categorical flags are false by default.
     The not_null flag is false by default unless the field is a business key, in which case it is true by default.
     Explicitly specifying not_null=False for a business key will cause a validation error.
     Format code is optional.
 
-    If no field ordering is supplied, fields will automatically be assigned a contiguous ordering starting at 0.
-    In this case care must be taken when creating an updated version of a model, that the order of existing
-    fields is not disturbed. Adding fields to the end of a list is always safe.
-    If field orders are specified explicitly, they must form a contiguous ordering starting at 0.
+    So long as field order is not specified for any field in a schema, field ordering will
+    be assigned automatically. If field orders are specified explicitly, the fields in a schema
+    must have a contiguous ordering starting at 0. When updating a model it is good practice
+    to leave existing fields in order and add any new fields to the end of the list.
 
-    Once defined field schemas can be passed to :py:func:`define_input_table` or :py:func:`define_output_table`,
-    either as a list or as individual arguments, to create the full schema for an input or output.
+    Schema fields can be passed to :py:func:`define_schema`, either as individual arguments or as a list,
+    to create a :py:class:`SchemaDefinition <tracdap.rt.metadata.SchemaDefinition>`. To define the
+    inputs or outputs of a :py:class:`TracModel <tracdap.rt.api.TracModel>`, fields can also be
+    passed directly to :py:func:`define_input_table` or :py:func:`define_output_table`.
 
     :param field_name: The field's name, used as the field identifier in code and queries (must be a valid identifier)
     :param field_type: The data type of the field, only primitive types are allowed
@@ -301,9 +310,9 @@ def define_field(
     :type label: str
     :type business_key: bool
     :type categorical: bool
-    :type not_null: Optional[bool]
-    :type format_code: Optional[str]
-    :type field_order: Optional[int]
+    :type not_null: bool | None
+    :type format_code: str | None
+    :type field_order: int | None
     :rtype: :py:class:`FieldSchema <tracdap.rt.metadata.FieldSchema>`
     """
 
@@ -338,9 +347,9 @@ def declare_field(
     :type label: str
     :type business_key: bool
     :type categorical: bool
-    :type not_null: Optional[bool]
-    :type format_code: Optional[str]
-    :type field_order: Optional[int]
+    :type not_null: bool | None
+    :type format_code: str | None
+    :type field_order: int | None
     :rtype: :py:class:`FieldSchema <tracdap.rt.metadata.FieldSchema>`
 
     :display: False
@@ -373,9 +382,9 @@ def F(  # noqa
     :type label: str
     :type business_key: bool
     :type categorical: bool
-    :type not_null: Optional[bool]
-    :type format_code: Optional[str]
-    :type field_order: Optional[int]
+    :type not_null: bool | None
+    :type format_code: str | None
+    :type field_order: int | None
     :rtype: :py:class:`FieldSchema <tracdap.rt.metadata.FieldSchema>`
     """
 
@@ -391,21 +400,23 @@ def define_schema(
         -> SchemaDefinition:
 
     """
-    Create a :py:class:`SchemaDefinition <tracdap.rt.metadata.SchemaDefinition>` from a list of fields.
+    Create a :py:class:`SchemaDefinition <tracdap.rt.metadata.SchemaDefinition>` from a list of fields
 
-    Fields can be supplied either as individual arguments to this function or as a list.
-    Individual fields should be defined using :py:func:`define_field` or the shorthand alias :py:func:`F`.
-    Schema type can be specified using the schema_type parameter, currently only TABLE schemas are supported.
+    Individual fields can be defined using :py:func:`define_field` or the shorthand alias :py:func:`F`.
+    This function takes a number of fields, either as individual arguments or as a list, and arranges
+    them into a :py:class:`SchemaDefinition <tracdap.rt.metadata.SchemaDefinition>`.
 
-    Model inputs and outputs must be specified as :py:class:`ModelInputSchema <tracdap.rt.metadata.ModelInputSchema>`
-    and :py:class:`ModelOutputSchema <tracdap.rt.metadata.ModelOutputSchema>` respectively. The input/output schema
-    classes both require a schema definition than can be created with this method. Alternatively, you can use
-    :py:func:`define_input_table` or :py:func:`define_output_table` to create the input/output schema classes directly.
+    A schema type can be specified explicitly using the schema_type parameter, currently only
+    :py:class:`SchemaType.TABLE <tracdap.rt.metadata.SchemaType>` is supported and this
+    is also the default.
 
+    .. note::
+       To define the inputs or outputs of a :py:class:`TracModel <tracdap.rt.api.TracModel>`,
+       use :py:func:`define_input_table` or :py:func:`define_output_table` instead.
 
     :param fields: The list of fields to include in the schema
     :param schema_type: The type of schema to create (currently only TABLE schemas are supported)
-    :return: A schema definition built from the supplied fields and schema type
+    :return: A schema definition built from the supplied fields
 
     :type fields: :py:class:`FieldSchema <tracdap.rt.metadata.FieldSchema>` |
                   List[:py:class:`FieldSchema <tracdap.rt.metadata.FieldSchema>`]
@@ -423,7 +434,7 @@ def load_schema(
         -> SchemaDefinition:
 
     """
-    load a :py:class:`SchemaDefinition <tracdap.rt.metadata.SchemaDefinition>` from a CSV file or package resource.
+    Load a :py:class:`SchemaDefinition <tracdap.rt.metadata.SchemaDefinition>` from a CSV file in the model package
 
     The schema CSV file must contain the following columns:
 
@@ -434,12 +445,16 @@ def load_schema(
     * categorical (boolean, optional)
     * format_code (string, optional)
 
-    Field order is taken from the order in which the fields are listed.
-    Schema type can be specified using the schema_type parameter, currently only TABLE schemas are supported.
+    Field ordering is assigned by the order the fields are listed in the CSV file.
+    A schema type can be specified explicitly using the schema_type parameter, currently only
+    :py:class:`SchemaType.TABLE <tracdap.rt.metadata.SchemaType>` is supported and this
+    is also the default.
 
-    Model inputs and outputs must be specified as :py:class:`ModelInputSchema <tracdap.rt.metadata.ModelInputSchema>`
-    and :py:class:`ModelOutputSchema <tracdap.rt.metadata.ModelOutputSchema>` respectively. The input/output schema
-    classes both require a schema definition than can be created with this method.
+    .. note::
+       To define the inputs or outputs of a :py:class:`TracModel <tracdap.rt.api.TracModel>`,
+       a schema can be loaded with this function and used to construct a
+       :py:class:`ModelInputSchema <tracdap.rt.metadata.ModelInputSchema>` or
+       :py:class:`ModelOutputSchema <tracdap.rt.metadata.ModelOutputSchema>`.
 
     :param package: Package (or package name) in the model repository that contains the schema file
     :param schema_file: Name of the schema file to load, which must be in the specified package
@@ -463,10 +478,19 @@ def define_input_table(
         -> ModelInputSchema:
 
     """
-    Define a model input with a table schema.
+    Define a model input with a table schema
 
-    Fields can be supplied either as individual arguments to this function or as a list.
-    Individual fields should be defined using :py:func:`define_field` or the shorthand alias :py:func:`F`.
+    Individual fields can be defined using :py:func:`define_field` or the shorthand alias :py:func:`F`.
+    This function takes a number of fields, either as individual arguments or as a list, and uses them
+    to create a :py:class:`ModelInputSchema <tracdap.rt.metadata.ModelInputSchema>`.
+
+    Use the label property to add a descriptive label to a model input. Inputs can be marked as
+    optional in which case they are not required when running a job, use
+    :py:meth:`TracContext.has_dataset() <tracdap.rt.api.TracContext.has_dataset>` to determine
+    whether an optional input has been provided. Inputs can be marked as dynamic in which
+    case the schema is not defined until the model runs, use
+    :py:meth:`TracContext.get_schema() <tracdap.rt.api.TracContext.get_schema>` to get the schema
+    of a dynamic input.
 
     You can use input_props to associate arbitrary key-value properties with this model input.
     These properties are not used by the TRAC engine, but are stored in the model metadata for
@@ -481,10 +505,10 @@ def define_input_table(
 
     :type fields: :py:class:`FieldSchema <tracdap.rt.metadata.FieldSchema>` |
                   List[:py:class:`FieldSchema <tracdap.rt.metadata.FieldSchema>`]
-    :type label: Optional[str]
+    :type label: str | None
     :type optional: bool
     :type dynamic: bool
-    :type input_props: Optional[Dict[str, Any]]
+    :type input_props: Dict[str, Any] | None
     :rtype: :py:class:`ModelInputSchema <tracdap.rt.metadata.ModelInputSchema>`
     """
 
@@ -525,10 +549,17 @@ def define_output_table(
         -> ModelOutputSchema:
 
     """
-    Define a model output with a table schema.
+    Define a model output with a table schema
 
-    Fields can be supplied either as individual arguments to this function or as a list.
-    Individual fields should be defined using :py:func:`define_field` or the shorthand alias :py:func:`F`.
+    Individual fields can be defined using :py:func:`define_field` or the shorthand alias :py:func:`F`.
+    This function takes a number of fields, either as individual arguments or as a list, and uses them
+    to create a :py:class:`ModelOutputSchema <tracdap.rt.metadata.ModelOutputSchema>`.
+
+    Use the label property to add a descriptive label to a model output. Outputs can be marked as
+    optional, a model can decide not to provide an optional output without causing an error.
+    Outputs can be marked as dynamic in which case the schema is not defined until the model runs, use
+    :py:meth:`TracContext.put_schema() <tracdap.rt.api.TracContext.put_schema>` to set the schema
+    of a dynamic output before saving it.
 
     You can use output_props to associate arbitrary key-value properties with this model output.
     These properties are not used by the TRAC engine, but are stored in the model metadata for
@@ -543,10 +574,10 @@ def define_output_table(
 
     :type fields: :py:class:`FieldSchema <tracdap.rt.metadata.FieldSchema>` |
                   List[:py:class:`FieldSchema <tracdap.rt.metadata.FieldSchema>`]
-    :type label: Optional[str]
+    :type label: str | None
     :type optional: bool
     :type dynamic: bool
-    :type output_props: Optional[Dict[str, Any]]
+    :type output_props: Dict[str, Any] | None
     :rtype: :py:class:`ModelOutputSchema <tracdap.rt.metadata.ModelOutputSchema>`
     """
 

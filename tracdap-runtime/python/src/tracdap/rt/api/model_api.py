@@ -38,7 +38,7 @@ if _tp.TYPE_CHECKING:
 class TracContext(metaclass=_abc.ABCMeta):
 
     """
-    Interface that allows model components to interact with the platform at runtime.
+    Interface that allows model components to interact with the platform at runtime
 
     TRAC supplies every model with a context when the model is run. The context allows
     models to access parameters, inputs, outputs and schemas, as well as other resources
@@ -303,7 +303,7 @@ class TracContext(metaclass=_abc.ABCMeta):
 class TracModel(metaclass=_abc.ABCMeta):
 
     """
-    Base class that model components inherit from to be recognised by the platform.
+    Base class that model components inherit from to be recognised by the platform
 
     The modelling API is designed to be as simple and un-opinionated as possible.
     Models inherit from :py:class:`TracModel` and implement the :py:meth:`run_model()` method to provide their
