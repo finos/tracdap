@@ -192,7 +192,7 @@ html_theme = "sphinx_wagtail_theme"
 html_css_files = ["tracdap.css"]
 
 html_theme_options = dict(
-    project_name = f"TRAC D.A.P. Documentation (Version {version})",
+    project_name = f"TRAC D.A.P. Documentation (Version {release})",
     logo = "tracdap_logo.svg",
     logo_alt = "TRAC D.A.P. Logo",
     logo_height = 59,
