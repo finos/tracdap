@@ -35,7 +35,7 @@ if _tp.TYPE_CHECKING:
         pass
 
 
-class TracContext:
+class TracContext(metaclass=_abc.ABCMeta):
 
     """
     Interface that allows model components to interact with the platform at runtime.
@@ -62,7 +62,6 @@ class TracContext:
     .. seealso:: :py:class:`TracModel <tracdap.rt.api.TracModel>`
     """
 
-    @_abc.abstractmethod
     def get_parameter(self, parameter_name: str) -> _tp.Any:
 
         """
@@ -77,12 +76,12 @@ class TracContext:
 
         :param parameter_name: The name of the parameter to get
         :return: The parameter value, as a native Python data type
+        :type parameter_name: str
         :raises: :py:class:`ERuntimeValidation <tracdap.rt.exceptions.ERuntimeValidation>`
         """
 
         pass
 
-    @_abc.abstractmethod
     def has_dataset(self, dataset_name: str) -> bool:
 
         """
@@ -98,13 +97,13 @@ class TracContext:
 
         :param dataset_name: The name of the dataset to check
         :return: True if the dataset exists in the current context, False otherwise
+        :type dataset_name: str
         :rtype: bool
         :raises: :py:class:`ERuntimeValidation <tracdap.rt.exceptions.ERuntimeValidation>`
         """
 
         pass
 
-    @_abc.abstractmethod
     def get_schema(self, dataset_name: str) -> SchemaDefinition:
 
         """
@@ -136,13 +135,13 @@ class TracContext:
 
         :param dataset_name: The name of the input or output to get the schema for
         :return: The schema definition for the named dataset
+        :type dataset_name: str
         :rtype: :py:class:`SchemaDefinition <tracdap.rt.metadata.SchemaDefinition>`
         :raises: :py:class:`ERuntimeValidation <tracdap.rt.exceptions.ERuntimeValidation>`
         """
 
         pass
 
-    @_abc.abstractmethod
     def get_pandas_table(self, dataset_name: str, use_temporal_objects: _tp.Optional[bool] = None) \
             -> "pandas.DataFrame":
 
@@ -172,11 +171,13 @@ class TracContext:
         :param dataset_name: The name of the model input or output to get data for
         :param use_temporal_objects: Use Python objects for date/time fields instead of the NumPy *datetime64* type
         :return: A pandas dataframe containing the data for the named dataset
+        :type dataset_name: str
+        :type use_temporal_objects: bool | None
+        :rtype: pandas.DataFrame
         :raises: :py:class:`ERuntimeValidation <tracdap.rt.exceptions.ERuntimeValidation>`
         """
         pass
 
-    @_abc.abstractmethod
     def get_polars_table(self, dataset_name: str) -> "polars.DataFrame":
 
         """
@@ -187,12 +188,13 @@ class TracContext:
 
         :param dataset_name: The name of the model input or output to get data for
         :return: A polars dataframe containing the data for the named dataset
+        :type dataset_name: str
+        :rtype: polars.DataFrame
         :raises: :py:class:`ERuntimeValidation <tracdap.rt.exceptions.ERuntimeValidation>`
         """
 
         pass
 
-    @_abc.abstractmethod
     def put_schema(self, dataset_name: str, schema: SchemaDefinition):
 
         """
@@ -222,13 +224,13 @@ class TracContext:
 
         :param dataset_name: The name of the output to set the schema for
         :param schema: A TRAC schema definition to use for the named output
+        :type dataset_name: str
         :type schema: :py:class:`SchemaDefinition <tracdap.rt.metadata.SchemaDefinition>`
         :raises: :py:class:`ERuntimeValidation <tracdap.rt.exceptions.ERuntimeValidation>`
         """
 
         pass
 
-    @_abc.abstractmethod
     def put_pandas_table(self, dataset_name: str, dataset: "pandas.DataFrame"):
 
         """
@@ -256,13 +258,14 @@ class TracContext:
 
         :param dataset_name: The name of the model output to save data for
         :param dataset: A pandas dataframe containing the data for the named dataset
+        :type dataset_name: str
+        :type dataset: pandas.Dataframe
         :raises: :py:class:`ERuntimeValidation <tracdap.rt.exceptions.ERuntimeValidation>`,
                  :py:class:`EDataConformance <tracdap.rt.exceptions.EDataConformance>`
         """
 
         pass
 
-    @_abc.abstractmethod
     def put_polars_table(self, dataset_name: str, dataset: "polars.DataFrame"):
 
         """
@@ -273,13 +276,14 @@ class TracContext:
 
         :param dataset_name: The name of the model output to save data for
         :param dataset: A polars dataframe containing the data for the named dataset
+        :type dataset_name: str
+        :type dataset: polars.DataFrame
         :raises: :py:class:`ERuntimeValidation <tracdap.rt.exceptions.ERuntimeValidation>`,
                  :py:class:`EDataConformance <tracdap.rt.exceptions.EDataConformance>`
         """
 
         pass
 
-    @_abc.abstractmethod
     def log(self) -> _logging.Logger:
 
         """
@@ -290,25 +294,24 @@ class TracContext:
         through the regular TRAC data and metadata APIs.
 
         :return: A Python logger that can be used for writing model logs
+        :rtype: :py:class:`logging.Logger`
         """
 
         pass
 
 
-class TracModel:
+class TracModel(metaclass=_abc.ABCMeta):
 
     """
     Base class that model components inherit from to be recognised by the platform.
 
     The modelling API is designed to be as simple and un-opinionated as possible.
-    Models inherit from :py:class:`TracModel` and implement the :py:meth:`run_model` method to provide their
-    model logic. :py:meth:`run_model` has one parameter, a :class:`TracContext` object which is supplied to
+    Models inherit from :py:class:`TracModel` and implement the :py:meth:`run_model()` method to provide their
+    model logic. :py:meth:`run_model()` has one parameter, a :class:`TracContext` object which is supplied to
     the model at runtime, allowing it to access parameters, inputs and outputs.
 
     Models must also as a minimum implement three methods to define the model schema,
-    :py:meth:`define_parameters()<TracModel.define_parameters>`,
-    :py:meth:`define_inputs()<TracModel.define_inputs>` and
-    :py:meth:`define_outputs()<TracModel.define_outputs>`.
+    :py:meth:`define_parameters()`, :py:meth:`define_inputs()` and :py:meth:`define_outputs()`.
     The parameters, inputs and outputs that are defined will be available in the context at runtime.
     The :py:mod:`tracdap.rt.api` package includes a number of helper functions to implement these methods in
     a clear and robust way.
@@ -437,6 +440,7 @@ class TracModel:
 
         :param ctx: A context use to access model inputs, outputs and parameters
                     and communicate with the TRAC platform
+        :type ctx: :py:class:`TracContext <tracdap.rt.api.TracContext>`
         """
 
         pass
