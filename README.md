@@ -45,16 +45,15 @@ https://github.com/finos/tracdap/actions/workflows/packaging.yml)
 https://tracdap.finos.org/en/stable/?badge=stable)
 
 
-The current release series (0.4.x) is intended for model development and prototyping.
-It provides an end-to-end workflow to build and run individual models in a local
-environment. It also provides the platform APIs needed to build client applications
-such as web tools or system client system integrations.
+The current release series (0.7) contains the core capabilities needed to build and run models,
+both for local development and in a hosted environment. It also contains the platform services
+and APIs needed to build client applications and system-to-system integrations.
 
-The TRAC metadata structures and API calls are mostly complete. Metadata compatibility
-is ensured within a release series starting from version 0.4.0 - the 0.4.x series
-will be compatible with 0.4.0 but changes may be introduced in 0.5.0. The metadata
-model will continue to stabilise before eventually being frozen for version 1.0.0,
-after which it may be added to but no fields will be removed or changed.
+Metadata compatibility is guaranteed within each release series (e.g. 0.7.x). Minor changes may
+occur between release series, mostly for internal structures and removal of deprecated APIs.
+The metadata model will be frozen at version 1.0 after which it may be added to but no fields
+will be removed or change. Configuration formats are subject to change between versions and
+extension (plugin) APIs should be considered internal for the time being.
 
 For more information see the
 [development roadmap](https://github.com/finos/tracdap/wiki/Development-Roadmap).
