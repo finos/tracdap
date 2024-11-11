@@ -14,8 +14,8 @@ TRAC is designed to break the trade-off that has traditionally been required, be
 platforms. It offers best of both worlds, power, control and analytical flexibility.
 
 The core platform services - i.e. TRAC Data & Analytics Platform (or TRAC D.A.P.) - are maintained by
-`finTRAC Limited <https://www.fintrac.co.uk>`_ in association with the `finos Foundation <https://www.finos.org>`_
-under the `Apache Software License version 2.0 <https://www.apache.org/licenses/LICENSE-2.0>`_.
+[finTRAC Limited](https://www.fintrac.co.uk) in association with the [FINOS Foundation](https://www.finos.org)
+under the [Apache Software License version 2.0](https://www.apache.org/licenses/LICENSE-2.0).
 
 ## Documentation and Packages
 
