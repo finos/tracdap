@@ -47,7 +47,9 @@ public class MetadataConstants {
             ObjectType.SCHEMA,
             ObjectType.FILE,
             ObjectType.STORAGE,
-            ObjectType.CUSTOM);
+            ObjectType.CUSTOM,
+            ObjectType.MODEL,
+            ObjectType.FLOW);
 
     // Valid identifiers are made up of alphanumeric characters, numbers and the underscore, not starting with a number
     // Use \\A - \\Z to match the whole input

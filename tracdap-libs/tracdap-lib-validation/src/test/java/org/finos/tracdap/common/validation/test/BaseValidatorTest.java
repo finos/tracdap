@@ -19,6 +19,7 @@ package org.finos.tracdap.common.validation.test;
 
 import com.google.protobuf.Message;
 import org.finos.tracdap.common.exception.EInputValidation;
+import org.finos.tracdap.common.exception.EVersionValidation;
 import org.finos.tracdap.common.validation.Validator;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -45,5 +46,21 @@ public class BaseValidatorTest {
         Assertions.assertThrows(EInputValidation.class,
                 () -> validator.validateFixedObject(msg),
                 "Validation passed for an invalid message");
+    }
+
+    protected static <TMsg extends Message>
+    void expectValidVersion(TMsg current, TMsg prior) {
+
+        Assertions.assertDoesNotThrow(
+                () -> validator.validateVersion(current, prior),
+                "Versioning validation failed for a valid version update");
+    }
+
+    protected static <TMsg extends Message>
+    void expectInvalidVersion(TMsg current, TMsg prior) {
+
+        Assertions.assertThrows(EVersionValidation.class,
+                () -> validator.validateVersion(current, prior),
+                "Versioning validation passed for an invalid version update");
     }
 }
