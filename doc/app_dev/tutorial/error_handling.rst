@@ -1,7 +1,7 @@
 
-##########################
+**************************
 Chapter 5 - Error Handling
-##########################
+**************************
 
 This tutorial is based on the *error_handling.js* example, which can be found in the
 `TRAC GitHub Repository <https://github.com/finos/tracdap>`_
@@ -18,9 +18,10 @@ with a validation error. Here is what that looks like using futures:
 
 .. literalinclude:: ../../../examples/apps/javascript/src/error_handling.js
     :language: JavaScript
-    :lines: 63 - 70
+    :class: container
+    :lines: 64 - 71
     :linenos:
-    :lineno-start: 63
+    :lineno-start: 64
 
 The *error.message* property contains a short human-readable description of the error.
 You can also access the gRPC status code using the *error.code* property. Both of these
@@ -36,9 +37,10 @@ Exactly the same error handling capability is available using callbacks:
 
 .. literalinclude:: ../../../examples/apps/javascript/src/error_handling.js
     :language: JavaScript
-    :lines: 79 - 88
+    :class: container
+    :lines: 80 - 89
     :linenos:
-    :lineno-start: 79
+    :lineno-start: 80
 
 
 TRAC Error Details
@@ -51,9 +53,10 @@ TRAC has a means to provide this information.
 
 .. literalinclude:: ../../../examples/apps/javascript/src/error_handling.js
     :language: JavaScript
-    :lines: 97 - 104
+    :class: container
+    :lines: 98 - 105
     :linenos:
-    :lineno-start: 97
+    :lineno-start: 98
 
 Use ``getErrorDetails()`` to get a :class:`TracErrorDetails<tracdap.api.TracErrorDetails>`
 object. The *details.message* and *details.code* properties are the same as for basic
@@ -62,9 +65,10 @@ information, this can be accessed by looking at the individual error items:
 
 .. literalinclude:: ../../../examples/apps/javascript/src/error_handling.js
     :language: JavaScript
-    :lines: 105 - 108
+    :class: container
+    :lines: 106 - 109
     :linenos:
-    :lineno-start: 105
+    :lineno-start: 106
 
 For each item, *item.detail* is a human readable description of the error. For errors related
 to the request (mostly validation errors), *item.fieldPath* is the field path for the input field
@@ -75,7 +79,7 @@ Errors in streaming calls
 -------------------------
 
 .. seealso::
-    See :doc:`./chapter_4_streaming` for more details on the streaming data API.
+    See :doc:`./streaming` for more details on the streaming data API.
 
 **Errors in upload streams**
 
@@ -83,6 +87,7 @@ With upload streams, the client sends a series of messages to the server and rec
 or error in response. The error handler can be attached when you send the first message to the stream:
 
 .. code-block:: javascript
+    :class: container
 
     stream.createDataset(request0)
         .then(_ => {...})  // Handle upload success
@@ -108,6 +113,7 @@ Because errors are processed using stream events, the futures / callback handler
 to no-op functions to avoid unhandled or duplicate events.
 
 .. code-block:: javascript
+    :class: container
 
     // Handle the download stream
     stream.on("data", msg => {...});
@@ -126,7 +132,7 @@ to no-op functions to avoid unhandled or duplicate events.
 
 **Using promises for streaming operations**
 
-In :doc:`./chapter_4_streaming`, the streaming operations are wrapped up into promises and errors are
+In :doc:`./streaming`, the streaming operations are wrapped up into promises and errors are
 passed directly to the promise *resolve()* method. Once the operation is wrapped up into a promise,
 errors can be processed using a regular ``.catch()``.
 
@@ -136,6 +142,7 @@ details of the stream event processing:
 
 .. literalinclude:: ../../../examples/apps/javascript/src/error_handling.js
     :language: JavaScript
-    :lines: 145 - 151
+    :class: container
+    :lines: 146 - 152
     :linenos:
-    :lineno-start: 145
+    :lineno-start: 146

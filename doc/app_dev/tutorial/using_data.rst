@@ -1,7 +1,7 @@
 
-######################
+**********************
 Chapter 3 - Using Data
-######################
+**********************
 
 This tutorial is based on the *using_data.js* example, which can be found in the
 `TRAC GitHub Repository <https://github.com/finos/tracdap>`_
@@ -15,8 +15,9 @@ In order to use the data API, we will need an RPC transport and an instance of t
 Here is how to set them up for a browser-based app:
 
 .. code-block:: JavaScript
+    :class: container
     :linenos:
-    :lineno-start: 22
+    :lineno-start: 23
 
     // Create the Data API
     const dataTransport = tracdap.setup.transportForBrowser(tracdap.api.TracDataApi);
@@ -26,9 +27,10 @@ For a Node.js or standalone environment, create a connector pointing at your TRA
 
 .. literalinclude:: ../../../examples/apps/javascript/src/using_data.js
     :language: JavaScript
-    :lines: 22 - 24
+    :class: container
+    :lines: 23 - 25
     :linenos:
-    :lineno-start: 22
+    :lineno-start: 23
 
 
 Saving data from files
@@ -50,9 +52,10 @@ Once both schema and data are available, we can create a
 
 .. literalinclude:: ../../../examples/apps/javascript/src/using_data.js
     :language: JavaScript
-    :lines: 27 - 43
+    :class: container
+    :lines: 28 - 44
     :linenos:
-    :lineno-start: 27
+    :lineno-start: 28
 
 Here, ``schemaId`` is the :class:`TagHeader<tracdap.metadata.TagHeader>`
 (or :class:`TagSelector<tracdap.metadata.TagSelector>`) for a schema created earlier.
@@ -69,9 +72,10 @@ Now the data API can be used to send the new dataset to the platform:
 
 .. literalinclude:: ../../../examples/apps/javascript/src/using_data.js
     :language: JavaScript
-    :lines: 45 - 51
+    :class: container
+    :lines: 46 - 52
     :linenos:
-    :lineno-start: 45
+    :lineno-start: 46
 
 Here we used :meth:`createSmallDataset()<tracdap.api.TracDataApi.createSmallDataset>`, which
 assumes the content of the dataset is small enough to be sent as a single blob in the ``content``
@@ -86,6 +90,7 @@ object type, ID, version and timestamps. In this example we used the promise for
 the equivalent call using a callback would be:
 
 .. code-block:: JavaScript
+    :class: container
 
     dataApi.createSmallDataset(request, (err, dataId) => {
 
@@ -101,9 +106,10 @@ To do this we use a :class:`DataReadRequest<tracdap.api.DataReadRequest>`.
 
 .. literalinclude:: ../../../examples/apps/javascript/src/using_data.js
     :language: JavaScript
-    :lines: 53 - 62
+    :class: container
+    :lines: 54 - 63
     :linenos:
-    :lineno-start: 53
+    :lineno-start: 54
 
 As well as supplying a selector for the dataset (in this case the ``dataId`` created earlier), we use the
 ``format`` field to say what format the data should come back in, which must be a MIME type
@@ -113,9 +119,10 @@ Now let's send the request to the data API:
 
 .. literalinclude:: ../../../examples/apps/javascript/src/using_data.js
     :language: JavaScript
-    :lines: 64 - 72
+    :class: container
+    :lines: 65 - 73
     :linenos:
-    :lineno-start: 64
+    :lineno-start: 65
 
 Again, by using :meth:`readSmallDataset()<tracdap.api.TracDataApi.readSmallDataset>` we are assuming
 that the content of the dataset can fit as single blob in one response message. For relatively small
@@ -135,9 +142,10 @@ decoded dataset like this:
 
 .. literalinclude:: ../../../examples/apps/javascript/src/using_data.js
     :language: JavaScript
-    :lines: 74 - 84
+    :class: container
+    :lines: 75 - 85
     :linenos:
-    :lineno-start: 74
+    :lineno-start: 75
 
 Here rows are looked up by index, for columns we must find the field name for the column and then
 do a dictionary lookup.
@@ -152,17 +160,19 @@ back. To encode the data using JSON:
 
 .. literalinclude:: ../../../examples/apps/javascript/src/using_data.js
     :language: JavaScript
-    :lines: 135 - 139
+    :class: container
+    :lines: 136 - 140
     :linenos:
-    :lineno-start: 135
+    :lineno-start: 136
 
 Now we need to create a :class:`DataWriteRequest<tracdap.api.DataWriteRequest>` for the update:
 
 .. literalinclude:: ../../../examples/apps/javascript/src/using_data.js
     :language: JavaScript
-    :lines: 141 - 158
+    :class: container
+    :lines: 142 - 159
     :linenos:
-    :lineno-start: 141
+    :lineno-start: 142
 
 Since we are updating an existing dataset, the ``priorVersion`` field must be used to specify the original
 object ID. This works the same way as for metadata updates: only the latest version of a dataset can be updated.
@@ -181,9 +191,10 @@ To send the update to the platform, we use :meth:`updateSmallDataset()<tracdap.a
 
 .. literalinclude:: ../../../examples/apps/javascript/src/using_data.js
     :language: JavaScript
-    :lines: 160 - 166
+    :class: container
+    :lines: 161 - 167
     :linenos:
-    :lineno-start: 160
+    :lineno-start: 161
 
 
 Again we are assuming that the content of the dataset can be sent as single blob in one message.

@@ -35,7 +35,7 @@ if _tp.TYPE_CHECKING:
         pass
 
 
-class TracContext:
+class TracContext(metaclass=_abc.ABCMeta):
 
     """
     Interface that allows model components to interact with the platform at runtime
@@ -59,33 +59,33 @@ class TracContext:
     All the context API methods are validated at runtime and will raise ERuntimeValidation if a model
     tries to access an unknown identifier or perform some other invalid operation.
 
-    .. seealso:: :py:class:`TracModel`
+    .. seealso:: :py:class:`TracModel <tracdap.rt.api.TracModel>`
     """
 
-    @_abc.abstractmethod
     def get_parameter(self, parameter_name: str) -> _tp.Any:
 
         """
-        Get the value of a model parameter
+        Get the value of a model parameter.
 
-        Model parameters defined in :py:meth:`TracModel.define_parameters` can be retrieved at runtime
-        by this method. Values are returned as native Python types. Parameter names are case-sensitive.
+        Model parameters defined using :py:meth:`define_parameters() <tracdap.rt.api.TracModel.define_parameters>`
+        can be retrieved at runtime by this method. Values are returned as native Python types. Parameter names
+        are case-sensitive.
 
         Attempting to retrieve parameters not defined by the model will result in a runtime validation
         error, even if those parameters are supplied in the job config and used by other models.
 
         :param parameter_name: The name of the parameter to get
         :return: The parameter value, as a native Python data type
+        :type parameter_name: str
         :raises: :py:class:`ERuntimeValidation <tracdap.rt.exceptions.ERuntimeValidation>`
         """
 
         pass
 
-    @_abc.abstractmethod
     def has_dataset(self, dataset_name: str) -> bool:
 
         """
-        Check whether a dataset is available in the current context
+        Check whether a dataset is available in the current context.
 
         This method can be used to check whether optional model inputs have been supplied or not.
         Models should use this method before calling get methods on optional inputs.
@@ -97,22 +97,20 @@ class TracContext:
 
         :param dataset_name: The name of the dataset to check
         :return: True if the dataset exists in the current context, False otherwise
-        :rtype: bool
+        :type dataset_name: str
         :raises: :py:class:`ERuntimeValidation <tracdap.rt.exceptions.ERuntimeValidation>`
         """
 
         pass
 
-    @_abc.abstractmethod
     def get_schema(self, dataset_name: str) -> SchemaDefinition:
 
         """
-        Get the schema of a model input or output
+        Get the schema of a model input or output.
 
         Use this method to get the :py:class:`SchemaDefinition <tracdap.rt.metadata.SchemaDefinition>`
         for any input or output of the current model.
-        For datasets with static schemas, this will be the same schema that was defined in the
-        :py:class:`TracModel <tracdap.rt.api.TracModel>` methods
+        For datasets with static schemas, these will be the same schemas that were defined using
         :py:meth:`define_inputs() <tracdap.rt.api.TracModel.define_inputs>` and
         :py:meth:`define_outputs() <tracdap.rt.api.TracModel.define_outputs>`.
 
@@ -125,9 +123,9 @@ class TracContext:
         For optional inputs, use :py:meth:`has_dataset() <tracdap.rt.api.TracContext.has_dataset>`
         to check whether the input was provided. Calling :py:meth:`get_schema() <tracdap.rt.api.TracContext.get_schema>`
         for an optional input that was not provided will always result in a validation error,
-        regardless of whether the input using a static or dynamic schema. For optional outputs
-        :py:meth:`get_schema() <tracdap.rt.api.TracContext.get_schema>` can be called, with the
-        normal proviso that dynamic schemas must first be set by calling
+        regardless of whether the input has a static or dynamic schema. For optional outputs
+        :py:meth:`get_schema() <tracdap.rt.api.TracContext.get_schema>` can be called, however if an
+        output is both optional and dynamic then the schema must first be set by calling
         :py:meth:`put_schema() <tracdap.rt.api.TracContext.put_schema>`.
 
         Attempting to retrieve the schema for a dataset that is not defined as a model input or output
@@ -136,165 +134,183 @@ class TracContext:
 
         :param dataset_name: The name of the input or output to get the schema for
         :return: The schema definition for the named dataset
+        :type dataset_name: str
         :rtype: :py:class:`SchemaDefinition <tracdap.rt.metadata.SchemaDefinition>`
         :raises: :py:class:`ERuntimeValidation <tracdap.rt.exceptions.ERuntimeValidation>`
         """
 
         pass
 
-    @_abc.abstractmethod
     def get_pandas_table(self, dataset_name: str, use_temporal_objects: _tp.Optional[bool] = None) \
             -> "pandas.DataFrame":
 
         """
-        Get the data for a model input or output as a Pandas dataframe
+        Get the data for a model input or output as a Pandas dataframe.
 
-        The data for both inputs and outputs can be retrieved as a Pandas dataframe using this method.
-        Inputs must be defined in :py:meth:`TracModel.define_inputs`
-        and outputs in :py:meth:`TracModel.define_outputs`.
-        Input and output names are case-sensitive.
+        Model inputs can be accessed as Pandas dataframes using this method.
+        The TRAC runtime will handle fetching data from storage and apply any necessary
+        format conversions (to improve performance, data may be preloaded).
+        Only defined inputs can be accessed, use
+        :py:meth:`define_inputs() <tracdap.rt.api.TracModel.define_inputs>`
+        to define the inputs of a model. Input names are case-sensitive.
 
-        The TRAC runtime will handle loading the data and assembling it into a Pandas dataframe.
-        This may happen before the model runs or when a dataset is requested. Models should take
-        care not to request very large datasets as Pandas tables, doing so is likely to cause a
-        memory overflow. Use :py:meth:`get_spark_table` instead to work with big data.
+        Model inputs are always available and can be accessed at any time inside
+        :py:meth:`run_model() <tracdap.rt.api.TracModel.run_model>`.
+        Model outputs can also be retrieved using this method, however they are
+        only available after they have been saved using
+        :py:meth:`put_pandas_table() <tracdap.rt.api.TracContext.put_pandas_table>`
+        (or another put method). Calling this method will simply return the
+        saved dataset.
 
-        Model inputs are always available and can be queried by this method. Outputs are only available
-        after they have been saved to the context using :py:meth:`put_pandas_table` (or another
-        put_XXX_table method). Attempting to retrieve an output before it has been saved will cause a
-        runtime validation error.
-
-        Attempting to retrieve a dataset that is not defined as a model input or output will result
-        in a runtime validation error, even if that dataset exists in the job config and is used by
-        other models.
+        Attempting to retrieve a dataset that is not defined as a model input or
+        output will result in a runtime validation error, even if that dataset
+        exists in the job config and is used by other models. Attempting to retrieve
+        an output before it has been saved will also cause a validation error.
 
         :param dataset_name: The name of the model input or output to get data for
         :param use_temporal_objects: Use Python objects for date/time fields instead of the NumPy *datetime64* type
         :return: A pandas dataframe containing the data for the named dataset
+        :type dataset_name: str
+        :type use_temporal_objects: bool | None
+        :rtype: :py:class:`pandas.DataFrame`
         :raises: :py:class:`ERuntimeValidation <tracdap.rt.exceptions.ERuntimeValidation>`
         """
         pass
 
-    @_abc.abstractmethod
     def get_polars_table(self, dataset_name: str) -> "polars.DataFrame":
 
         """
-        Get the data for a model input or output as a Polars dataframe
+        Get the data for a model input or output as a Polars dataframe.
 
         This method has equivalent semantics to :py:meth:`get_pandas_table`, but returns
         a Polars dataframe.
 
         :param dataset_name: The name of the model input or output to get data for
         :return: A polars dataframe containing the data for the named dataset
+        :type dataset_name: str
+        :rtype: :py:class:`polars.DataFrame`
         :raises: :py:class:`ERuntimeValidation <tracdap.rt.exceptions.ERuntimeValidation>`
         """
 
         pass
 
-    @_abc.abstractmethod
     def put_schema(self, dataset_name: str, schema: SchemaDefinition):
 
         """
-        Set the schema of a dynamic model output
+        Set the schema of a dynamic model output.
 
-        For outputs marked as dynamic, a :py:class:`SchemaDefinition <tracdap.rt.metadata.SchemaDefinition>`
-        must be supplied before attempting to save the data. TRAC API functions are available to help with
-        building schemas, such as :py:func:`trac.F() <tracdap.rt.api.F>` to define fields or
+        For outputs marked as dynamic in :py:meth:`define_outputs() <tracdap.rt.api.TracModel.define_outputs>`,
+        a :py:class:`SchemaDefinition <tracdap.rt.metadata.SchemaDefinition>` must be supplied using this
+        method before attempting to save the data. Once a schema has been set, it can be retrieved by calling
+        :py:meth:`get_schema() <tracdap.rt.api.TracContext.get_schema>` and data can be saved using
+        :py:meth:`put_pandas_table() <tracdap.rt.api.TracContext.put_pandas_table>` or another put method.
+
+        TRAC API functions are available to help with building schemas, such as
+        :py:func:`trac.F() <tracdap.rt.api.F>` to define individual fields or
         :py:func:`load_schema() <tracdap.rt.api.load_schema>` to load predefined schemas.
-        Once a schema has been set, it can be retrieved by calling
-        :py:meth:`get_schema() <tracdap.rt.api.TracContext.get_schema>` as normal.
-        If :py:meth:`put_schema() <tracdap.rt.api.TracContext.put_schema>` is called for an optional
-        output the model must also supply data for that output, otherwise TRAC will report a runtime
-        validation error after the model completes.
+        See the :py:mod:`tracdap.rt.api` package for a full list of functions that can be used
+        to build and manipulate schemas.
 
         Each schema can only be set once and the schema will be validated using the normal
-        validation rules. If validation fails this method will raise
-        :py:class:`ERuntimeValidation <tracdap.rt.exceptions.ERuntimeValidation>`.
+        validation rules. If :py:meth:`put_schema() <tracdap.rt.api.TracContext.put_schema>` is called for
+        an optional output the model must supply data for that output, otherwise TRAC will report a
+        validation error after the model completes.
+
         Attempting to set the schema for a dataset that is not defined as a dynamic model output
-        for the current model will result in a runtime validation error.
+        for the current model will result in a runtime validation error. Supplying a schema that
+        fails validation will also result in a validation error.
+
 
         :param dataset_name: The name of the output to set the schema for
         :param schema: A TRAC schema definition to use for the named output
+        :type dataset_name: str
         :type schema: :py:class:`SchemaDefinition <tracdap.rt.metadata.SchemaDefinition>`
         :raises: :py:class:`ERuntimeValidation <tracdap.rt.exceptions.ERuntimeValidation>`
         """
 
         pass
 
-    @_abc.abstractmethod
     def put_pandas_table(self, dataset_name: str, dataset: "pandas.DataFrame"):
 
         """
-        Save the data for a model output as a Pandas dataframe
+        Save the data for a model output as a Pandas dataframe.
 
-        The data for model outputs can be saved as a Pandas dataframe using this method.
-        Outputs must be defined in :py:meth:`TracModel.define_outputs`.
-        Output names are case-sensitive.
+        Model outputs can then be saved as Pandas dataframes using this method.
+        The TRAC runtime will validate the supplied data and send it to storage,
+        applying any necessary format conversions. Only defined outputs can be
+        saved, use :py:meth:`define_outputs() <tracdap.rt.api.TracModel.define_outputs>`
+        to define the outputs of a model. Output names are case-sensitive. Once
+        an output has been saved it can be retrieved by calling
+        :py:meth:`get_pandas_table() <tracdap.rt.api.TracContext.get_pandas_table>`
+        (or another get method).
 
-        The supplied data must match the schema of the named output. Missing fields or fields
-        of the wrong type will result in a data validation error. Extra fields will be discarded
-        with a warning. The schema of an output dataset can be checked using :py:meth:`get_schema`.
+        Each model output can only be saved once and the supplied data must match the schema of
+        the named output. Missing fields or fields of the wrong type will result in a data
+        conformance error. Extra fields will be discarded with a warning. The schema of an output
+        dataset can be checked using :py:meth:`get_schema() <tracdap.rt.api.TracContext.get_schema>`.
+        For dynamic outputs, the schema must first be set using
+        :py:meth:`put_schema() <tracdap.rt.api.TracContext.put_schema>`
 
-        Each model output can only be saved once. Attempting to save the same output twice will
-        cause a runtime validation error. Once an output has been saved, it can be retrieved by
-        calling :py:meth:`get_pandas_table` (or another get_XXX_table method). Attempting to save
-        a dataset that is not defined as a model output will also cause a runtime validation error.
+        Attempting to save a dataset that is not defined as a model output will cause a runtime
+        validation error. Attempting to save an output twice, or save a dynamic output before its
+        schema is set will also cause a validation error.
 
         :param dataset_name: The name of the model output to save data for
         :param dataset: A pandas dataframe containing the data for the named dataset
+        :type dataset_name: str
+        :type dataset: :py:class:`pandas.Dataframe`
         :raises: :py:class:`ERuntimeValidation <tracdap.rt.exceptions.ERuntimeValidation>`,
                  :py:class:`EDataConformance <tracdap.rt.exceptions.EDataConformance>`
         """
 
         pass
 
-    @_abc.abstractmethod
     def put_polars_table(self, dataset_name: str, dataset: "polars.DataFrame"):
 
         """
-        Save the data for a model output as a Polars dataframe
+        Save the data for a model output as a Polars dataframe.
 
         This method has equivalent semantics to :py:meth:`put_pandas_table`, but accepts
         a Polars dataframe.
 
         :param dataset_name: The name of the model output to save data for
         :param dataset: A polars dataframe containing the data for the named dataset
+        :type dataset_name: str
+        :type dataset: :py:class:`polars.DataFrame`
         :raises: :py:class:`ERuntimeValidation <tracdap.rt.exceptions.ERuntimeValidation>`,
                  :py:class:`EDataConformance <tracdap.rt.exceptions.EDataConformance>`
         """
 
         pass
 
-    @_abc.abstractmethod
     def log(self) -> _logging.Logger:
 
         """
-        Get a Python logger that can be used for writing model logs
+        Get a Python logger that can be used for writing model logs.
 
         Logs written to this logger are recorded by TRAC. When models are run on the platform,
         these logs are assembled and saved with the job outputs as a dataset, that can be queried
         through the regular TRAC data and metadata APIs.
 
         :return: A Python logger that can be used for writing model logs
+        :rtype: :py:class:`logging.Logger`
         """
 
         pass
 
 
-class TracModel:
+class TracModel(metaclass=_abc.ABCMeta):
 
     """
     Base class that model components inherit from to be recognised by the platform
 
     The modelling API is designed to be as simple and un-opinionated as possible.
-    Models inherit from :py:class:`TracModel` and implement the :py:meth:`run_model` method to provide their
-    model logic. :py:meth:`run_model` has one parameter, a :class:`TracContext` object which is supplied to
+    Models inherit from :py:class:`TracModel` and implement the :py:meth:`run_model()` method to provide their
+    model logic. :py:meth:`run_model()` has one parameter, a :class:`TracContext` object which is supplied to
     the model at runtime, allowing it to access parameters, inputs and outputs.
 
     Models must also as a minimum implement three methods to define the model schema,
-    :py:meth:`define_parameters()<TracModel.define_parameters>`,
-    :py:meth:`define_inputs()<TracModel.define_inputs>` and
-    :py:meth:`define_outputs()<TracModel.define_outputs>`.
+    :py:meth:`define_parameters()`, :py:meth:`define_inputs()` and :py:meth:`define_outputs()`.
     The parameters, inputs and outputs that are defined will be available in the context at runtime.
     The :py:mod:`tracdap.rt.api` package includes a number of helper functions to implement these methods in
     a clear and robust way.
@@ -312,13 +328,13 @@ class TracModel:
 
     Models should also avoid making system calls, or using the Python builtins exec() or eval().
 
-    .. seealso:: :py:class:`TracContext`
+    .. seealso:: :py:class:`TracContext <tracdap.rt.api.TracContext>`
     """
 
     def define_attributes(self) -> _tp.Dict[str, Value]:  # noqa
 
         """
-        Define attributes that will be associated with the model when it is loaded into the TRAC platform
+        Define attributes that will be associated with the model when it is loaded into the TRAC platform.
 
         .. note::
             This is an experimental API that is not yet stabilised, expect changes in future versions of TRAC
@@ -343,7 +359,7 @@ class TracModel:
     def define_parameters(self) -> _tp.Dict[str, ModelParameter]:
 
         """
-        Define parameters that will be available to the model at runtime
+        Define parameters that will be available to the model at runtime.
 
         Implement this method to define the model's parameters, every parameter that the
         model uses must be defined. Models may choose to ignore some parameters,
@@ -364,7 +380,7 @@ class TracModel:
     def define_inputs(self) -> _tp.Dict[str, ModelInputSchema]:
 
         """
-        Define data inputs that will be available to the model at runtime
+        Define data inputs that will be available to the model at runtime.
 
         Implement this method to define the model's inputs, every data input that the
         model uses must be defined. Models may choose to ignore some inputs,
@@ -385,7 +401,7 @@ class TracModel:
     def define_outputs(self) -> _tp.Dict[str, ModelOutputSchema]:
 
         """
-        Define data outputs that will be produced by the model at runtime
+        Define data outputs that will be produced by the model at runtime.
 
         Implement this method to define the model's outputs, every data output that the
         model produces must be defined and every output that is defined must be
@@ -407,20 +423,23 @@ class TracModel:
     def run_model(self, ctx: TracContext):
 
         """
-        Entry point for running model code
+        Entry point for running model code.
 
-        Implement this method to provide the model logic. A :py:class:`TracContext` is provided
+        Implement this method to provide the model logic. A
+        :py:class:`TracContext <tracdap.rt.api.TracContext>` is provided
         at runtime, which makes parameters and inputs available and provides a means to save outputs.
         All the outputs defined in :py:meth:`define_outputs` must be saved before this method returns,
         otherwise a runtime validation error will be raised.
 
         Model code can raise exceptions, either in a controlled way by detecting error conditions and raising
         errors explicitly, or in an uncontrolled way as a result of bugs in the model code. Exceptions may also
-        originate inside libraries the model code is using. If an exception escapes from :py:meth`run_model`
+        originate inside libraries the model code is using. If an exception escapes from
+        :py:meth:`run_model() <tracdap.rt.api.TracModel.run_model>`
         TRAC will mark the model as failed, the job that contains the model will also fail.
 
         :param ctx: A context use to access model inputs, outputs and parameters
                     and communicate with the TRAC platform
+        :type ctx: :py:class:`TracContext <tracdap.rt.api.TracContext>`
         """
 
         pass

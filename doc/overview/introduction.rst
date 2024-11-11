@@ -1,5 +1,5 @@
 Introduction
-====================
+============
 
 TRAC is a universal model orchestration solution that combines your existing data and compute infrastructure,
 model development environments and the repository of versioned code, to create a single ecosystem in
@@ -43,10 +43,10 @@ control and transparency plus analytical flexibility, in a single solution.
 
 
 TRAC Metadata Model
-====================
+===================
 
 Structural Model
-~~~~~~
+----------------
 
 TRAC is built around a structural metadata model which catalogues, describes and controls almost everything that happens on the platform. The model consists of two layers.
 
@@ -63,7 +63,8 @@ TRAC is built around a structural metadata model which catalogues, describes and
         edited by users.
 
 Primary Object Types
-~~~~~~~~
+--------------------
+
 All model orchestration and analytics use cases can be understood in reference to four primary object types. They are not the
 the only types of object on TRAC but they are the most common and important.
 
@@ -112,7 +113,7 @@ the only types of object on TRAC but they are the most common and important.
 
 
 Versioning
-~~~~~~~~
+----------
 
 Metadata records are maintained using an immutable, time-indexed version history, with "updates" being
 performed by creating a new version of the object or tag. TRAC metadata therefore provides a fully
@@ -125,10 +126,11 @@ areas owned by TRAC with controlled write access for primary data.
 
 
 Virtual Deployment Framework
-====================
+============================
 
 Self-describing Models
-~~~~~~~~
+----------------------
+
 Models can be imported and used with zero code modifications or platform-level interventions, so long as
 the model code contains a custom function which declares the model's schema to the platform. A model schema
 consists of:
@@ -141,7 +143,7 @@ consists of:
 
 
 Model Deployment Process
-~~~~~~~~
+------------------------
 
 TRAC uses a 'virtual' model deployment framework, in which model code remains in an external repository
 and is accessed at runtime. There are three main processes involved in this framework and TRAC performs
@@ -180,7 +182,7 @@ will run on the platform.
 
 
 TRAC Guarantee
-====================
+==============
 
 TRAC offers a unique control environment which is characterised by three guarantees.
 
@@ -227,7 +229,7 @@ TRAC offers a unique control environment which is characterised by three guarant
 
 
 Experimentation & Analytics
-====================
+===========================
 
 In addition to supporting highly-controlled (or 'production') model execution processes, TRAC also provide two main ways to
 construct 'experimental' model runs.

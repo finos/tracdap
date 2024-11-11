@@ -1,7 +1,7 @@
 
-#########################
+*************************
 Chapter 2 - Metadata Mojo
-#########################
+*************************
 
 This tutorial is based on the *metadata_mojo.js* example, which can be found in the
 `TRAC GitHub Repository <https://github.com/finos/tracdap>`_
@@ -30,9 +30,10 @@ Let's create a request for this search:
 
 .. literalinclude:: ../../../examples/apps/javascript/src/metadata_mojo.js
     :language: JavaScript
-    :lines: 27 - 42
+    :class: container
+    :lines: 28 - 43
     :linenos:
-    :lineno-start: 27
+    :lineno-start: 28
 
 In the :class:`SearchParameters<tracdap.metadata.SearchParameters>` we set the type of object to search
 for, and provide a search expression containing a single search term.
@@ -42,9 +43,10 @@ To execute the search we use the :meth:`search()<tracdap.api.TracMetadataApi.sea
 
 .. literalinclude:: ../../../examples/apps/javascript/src/metadata_mojo.js
     :language: JavaScript
-    :lines: 47 - 60
+    :class: container
+    :lines: 48 - 61
     :linenos:
-    :lineno-start: 47
+    :lineno-start: 48
 
 This method returns a search result, which is a list of tags without their definition bodies.
 In a real-world scenario, the list might be displayed in a search grid with the attributes as
@@ -65,18 +67,20 @@ Here is a simple example, starting with expression for the single term from the 
 
 .. literalinclude:: ../../../examples/apps/javascript/src/metadata_mojo.js
     :language: JavaScript
-    :lines: 62 - 71
+    :class: container
+    :lines: 63 - 72
     :linenos:
-    :lineno-start: 62
+    :lineno-start: 63
 
 Now a second expression, we want to know if the business division attribute
 is one of the business divisions we are interested in:
 
 .. literalinclude:: ../../../examples/apps/javascript/src/metadata_mojo.js
     :language: JavaScript
-    :lines: 71 - 86
+    :class: container
+    :lines: 74 - 87
     :linenos:
-    :lineno-start: 71
+    :lineno-start: 74
 
 See the documentation for :class:`SearchOperator<tracdap.metadata.SearchOperator>` for the
 list of all available search operators.
@@ -85,9 +89,10 @@ Now let's create a logical expression, which combines the two previous expressio
 
 .. literalinclude:: ../../../examples/apps/javascript/src/metadata_mojo.js
     :language: JavaScript
-    :lines: 88 - 96
+    :class: container
+    :lines: 89 - 97
     :linenos:
-    :lineno-start: 71
+    :lineno-start: 89
 
 Any number of expressions can be added to the ``AND`` clause without nesting, since ``AND`` is
 an associative operation. The ``OR`` operator works the same way. If you want to combine ``AND``
@@ -102,9 +107,10 @@ to call the :meth:`search()<tracdap.api.TracMetadataApi.search>` method of the
 
 .. literalinclude:: ../../../examples/apps/javascript/src/metadata_mojo.js
     :language: JavaScript
-    :lines: 98 - 108
+    :class: container
+    :lines: 99 - 109
     :linenos:
-    :lineno-start: 98
+    :lineno-start: 99
 
 
 More Mojo

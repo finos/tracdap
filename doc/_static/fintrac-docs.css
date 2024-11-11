@@ -54,6 +54,13 @@ div.rst-content h6 {
     text-transform: uppercase;
 }
 
+div.rst-content [id^=tracdap-] > h1,
+div.rst-content [id^=module-tracdap] > h1,
+span.code h1 {
+    text-transform: none;
+}
+
+
 /* Code - matches default link color */
 
 code {
@@ -78,6 +85,19 @@ pre > span.linenos {
     color: #BBBBBB;
     margin-right: 10px;
 }
+
+dt.sig {
+    background-color: #A3C4D9;
+}
+
+dl dt.sig {
+    margin: 1rem 0;
+    padding: 1rem;
+    box-shadow: 0 2px 4px 0 rgba(0,0,0,.2);
+    border-radius: .25rem;
+    overflow: hidden;
+}
+
 
 /* Main buttons (light & dark) */
 
@@ -237,8 +257,16 @@ body.theme-dark code {
 
 .table-dark, 
 body.theme-dark table.docutils:not(.field-list) {
-    background-color: #1D3D59;
     color: #EAEAEA;
+    background-color: #1D3D59;
+}
+
+.table .thead-dark th,
+table.docutils:not(.field-list) .thead-dark th,
+body.theme-dark table.docutils:not(.field-list) thead th {
+    color: #EAEAEA;
+    background-color: #2A577D;
+    border-color: #3B668C;
 }
 
 .table-dark th, 
@@ -312,6 +340,10 @@ body.theme-dark .toc .current > a {
     color: #D9815E;
 }
 
+
+body.theme-dark dt.sig {
+    background-color: #1D3D59;
+}
 
 /* Dark Mode - Sphinx Design Elements */
 

@@ -1,7 +1,7 @@
 
-#######################
+***********************
 Chapter 1 - Hello World
-#######################
+***********************
 
 This tutorial is based on example code which can be found in the
 `TRAC GitHub Repository <https://github.com/finos/tracdap>`_
@@ -21,7 +21,7 @@ Setting up a new project
 If you are starting a project from scratch, it's a good idea to follow the standard
 Python conventions for package naming and folder layout. If you are working on an
 existing project or are already familiar with the Python conventions, then you can
-:ref:`skip this section <modelling/tutorial/chapter_1_hello_world:Installing the runtime>`
+:ref:`skip this section <modelling/tutorial/hello_world:Installing the runtime>`
 
 For this example we will create a project folder called example-project. Typically
 this will be a Git repository. You will also want to create a Python virtual environment
@@ -34,6 +34,7 @@ command line using these commands:
         :sync: platform_windows
 
         .. code-block:: batch
+            :class: container
 
             mkdir example-project
             cd example-project
@@ -45,6 +46,7 @@ command line using these commands:
         :sync: platform_linux
 
         .. code-block:: shell
+            :class: container
 
             mkdir example-project
             cd example-project
@@ -56,7 +58,10 @@ For this tutorial we want a single Python package that we will call "tutorial". 
 Python source code goes in a folder called either "src" or the name of your project - we will
 use "src". We are going to need some config files, those should be outside the source folder.
 We will also need a folder for tests and a few other common project files.  Here is a very
-standard example of what that looks like::
+standard example of what that looks like:
+
+.. code-block::
+    :class: container
 
     examples-project
     ├── config
@@ -101,6 +106,7 @@ Typically you want to ignore this folder in Git by adding it to the .gitignore f
 do this automatically, otherwise you can create a file called .gitignore and add this line to it:
 
 .. code-block::
+    :class: container
 
     venv/**
 
@@ -112,12 +118,18 @@ GitHub the contents of this file will be displayed on the home page for your rep
 Installing the runtime
 ----------------------
 
-The TRAC runtime package can be installed directly from PyPI::
+The TRAC runtime package can be installed directly from PyPI:
+
+.. code-block::
+    :class: container
 
     pip install tracdap-runtime
 
 The TRAC runtime depends on Pandas and PySpark, so these libraries will be pulled in as
-dependencies. If you want to target particular versions, you can install them explicitly::
+dependencies. If you want to target particular versions, you can install them explicitly:
+
+.. code-block::
+    :class: container
 
     pip install "pandas == 2.1.4"
 
@@ -128,7 +140,10 @@ projects requirements there.
 
     TRAC supports both Pandas 1.X and 2.X. Models written for 1.X might not work with 2.X and vice versa.
     From TRAC 0.6 onward, new installations default to Pandas 2.X. To change the version of Pandas in your
-    sandbox environment, you can use the pip install command::
+    sandbox environment, you can use the pip install command:
+
+    .. code-block::
+        :class: container
 
         pip install "pandas == 1.5.3"
 
@@ -143,9 +158,9 @@ for running code in TRAC, both on the platform and using the local development s
     :caption: src/tutorial/hello_world.py
     :name: hello_world_py_part_1
     :language: python
-    :lines: 15 - 20
+    :lines: 16 - 20
     :linenos:
-    :lineno-start: 15
+    :lineno-start: 16
 
 The model can define any parameters it is going to need. In this example there is only a
 single parameter so it can be declared in code (more complex models may wish to manage
@@ -155,9 +170,10 @@ are defined in the correct format.
 .. literalinclude:: ../../../examples/models/python/src/tutorial/hello_world.py
     :name: hello_world_py_part_2
     :language: python
-    :lines: 21 - 27
+    :class: container
+    :lines: 22 - 27
     :linenos:
-    :lineno-start: 21
+    :lineno-start: 22
 
 The model can also define inputs and outputs. In this case since all we are going to do
 is write a message in the log, no inputs and outputs are needed. Still, these methods are
@@ -166,9 +182,10 @@ required in order for the model to be valid.
 .. literalinclude:: ../../../examples/models/python/src/tutorial/hello_world.py
     :name: hello_world_py_part_3
     :language: python
-    :lines: 28 - 33
+    :class: container
+    :lines: 29 - 33
     :linenos:
-    :lineno-start: 28
+    :lineno-start: 29
 
 To write the model logic, implement the :py:meth:`run_model() <tracdap.rt.api.TracModel.run_model>` method.
 When :py:meth:`run_model() <tracdap.rt.api.TracModel.run_model>` is called it receives a
@@ -178,9 +195,10 @@ TRAC platform.
 .. literalinclude:: ../../../examples/models/python/src/tutorial/hello_world.py
     :name: hello_world_py_part_4
     :language: python
-    :lines: 34 - 40
+    :class: container
+    :lines: 35 - 40
     :linenos:
-    :lineno-start: 34
+    :lineno-start: 35
 
 There are two useful features of :py:class:`TracContext <tracdap.rt.api.TracContext>`
 that can be seen in this example:
@@ -191,7 +209,7 @@ that can be seen in this example:
         datasets. Log outputs are available even if a job fails so they can be used for debugging.
 
     *   :py:meth:`get_parameter() <tracdap.rt.api.TracContext.get_parameter>` allows models to access any
-        parameters defined in the :py:meth:`define_parameters()<tracdap.rt.api.TracModel.define_parameters>`
+        parameters defined in the :py:meth:`define_parameters() <tracdap.rt.api.TracModel.define_parameters>`
         method. They are returned as native Python objects, so integers use the Python integer type,
         date and time values use the Python datetime classes and so on.
 
@@ -243,9 +261,9 @@ this, but the model will fail to deploy)!
     :caption: src/tutorial/hello_world.py
     :name: hello_world_py_launch
     :language: python
-    :lines: 42-
+    :lines: 43-
     :linenos:
-    :lineno-start: 42
+    :lineno-start: 43
 
 Paths for the system and job config files are resolved in the following order:
 
@@ -257,6 +275,7 @@ Now you should be able to run your model script and see the model output in the 
 
 .. code-block:: text
     :name: hello_world_log_output
+    :class: container
 
     2022-05-31 12:19:36,104 [engine] INFO tracdap.rt.exec.engine.NodeProcessor - START RunModel [HelloWorldModel] / JOB-92df0bd5-50bd-4885-bc7a-3d4d95029360-v1
     2022-05-31 12:19:36,104 [engine] INFO __main__.HelloWorldModel - Hello world model is running

@@ -13,11 +13,14 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import fileinput
 import pathlib
 import subprocess as sp
 import os
 
 import importlib.util
+import sys
+
 docgen_spec = importlib.util.spec_from_file_location("docgen", "../dev/docgen/docgen-ctrl.py")
 docgen_module = importlib.util.module_from_spec(docgen_spec)
 docgen_spec.loader.exec_module(docgen_module)
@@ -32,23 +35,66 @@ ROOT_DIR = pathlib.Path(__file__) \
 
 DOCGEN_SCRIPT = str(ROOT_DIR.joinpath("dev/docgen/docgen-ctrl.py"))
 
+# Modules to document as a single package (do not report contents of submodules)
+# Note tracdap.rt.metadata is already flat-packed during code gen, so do not flatten again here
+FLATTEN_MODULES = ["tracdap.rt.api", 'tracdap.rt.launch']
+
 
 # Running on RTD, Sphinx build for the root docs is the main entry point
 # So, we need to call back into docgen to build all the other parts of the documentation
 
-if ON_RTD:
+def setup(sphinx):
 
-    def build_dependencies():
+    if ON_RTD:
+        sphinx.connect('config-inited', config_init_hook)
 
-        docgen.main_codegen()
-        docgen.python_runtime_codegen()
+    sphinx.connect("autoapi-skip-member", skip_fattened_modules)
+    sphinx.connect("build-finished", fix_module_references)
 
-    def config_init_hook(app, config):  # noqa
 
-        build_dependencies()
+def config_init_hook(app, config):  # noqa
 
-    def setup(app):
-        app.connect('config-inited', config_init_hook)
+    build_dependencies()
+
+
+def build_dependencies():
+
+    docgen.main_codegen()
+    docgen.python_runtime_codegen()
+
+
+def skip_fattened_modules(app, what, name, obj, skip, options):
+
+    if what == "module":
+        for flat_module in FLATTEN_MODULES:
+            if name.startswith(flat_module):
+                skip = True
+
+    return skip
+
+
+def fix_module_references(sphinx, exception):
+
+    if exception:
+        return
+
+    print("* Applying post-build fixes", file=sys.stderr)
+
+    # Sphinx struggles with type resolution when the same type exists in different namespaces
+    # The current doc build works for all the types except this one, which is nested and refers to an outer scope
+    # No more nested types will be added to the metadata model!
+    # If possible, the existing nested types should be migrated to a flat structure
+
+    rt_data_part_page = pathlib.Path(sphinx.outdir).joinpath("autoapi/tracdap/rt/metadata/DataDefinition.Part.html")
+
+    rt_data_part_match = 'href="../../metadata/PartKey.html#tracdap.metadata.PartKey" title="tracdap.metadata.PartKey"'
+    rt_data_part_fixed = 'href="PartKey.html#tracdap.rt.metadata.PartKey" title="tracdap.rt.metadata.PartKey"'
+
+    for line in fileinput.input(rt_data_part_page, inplace=True):
+        if rt_data_part_match in line:
+            print(line.replace(rt_data_part_match, rt_data_part_fixed), end="")
+        else:
+            print(line, end="")
 
 
 # -- Project information -----------------------------------------------------
@@ -80,14 +126,17 @@ extensions = [
     'sphinx.ext.autosectionlabel',
     'sphinx.ext.autodoc',
     'sphinx.ext.autosummary',
-    'sphinx.ext.napoleon',
     'autoapi.extension',
     
     'sphinx_design',
     "sphinx_wagtail_theme"
-
 ]
-exclusions = ['unused']
+
+# Custom templates are being used for autoapi
+templates_path = ["_templates"]
+
+# Directories that should not be built into the TOC tree
+exclude_patterns = ["_templates", "unused"]
 
 # Auto API configuration
 
@@ -99,16 +148,17 @@ autoapi_dirs = [
 autoapi_options = [
     'members',
     'undoc-members',
-    # 'private-members',
     'show-inheritance',
     'show-module-summary',
-    'special-members',
     'imported-members'
 ]
 
-autodoc_typehints = 'description'
-autoapi_member_order = 'groupwise'
 autoapi_add_toctree_entry = False
+autoapi_member_order = "groupwise"
+autoapi_own_page_level = "class"
+autoapi_template_dir = "_templates/autoapi"
+
+autodoc_typehints = 'description'
 
 
 # Content generation
@@ -139,10 +189,10 @@ rst_prolog = """
 # a list of builtin themes.
 
 html_theme = "sphinx_wagtail_theme"
-html_css_files = ["tracdap.css"]
+html_css_files = ["fintrac-docs.css"]
 
 html_theme_options = dict(
-    project_name = f"TRAC D.A.P. Documentation (Version {version})",
+    project_name = f"TRAC D.A.P. Documentation (Version {release})",
     logo = "tracdap_logo.svg",
     logo_alt = "TRAC D.A.P. Logo",
     logo_height = 59,

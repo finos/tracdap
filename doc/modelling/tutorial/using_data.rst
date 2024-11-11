@@ -1,7 +1,7 @@
 
-######################
+**********************
 Chapter 2 - Using Data
-######################
+**********************
 
 This tutorial is based on example code which can be found in the
 `TRAC GitHub Repository <https://github.com/finos/tracdap>`_
@@ -24,9 +24,9 @@ the top-level class or function as parameters, as shown in this example.
     :caption: src/tutorial/using_data.py
     :name: using_data_py_part_1
     :language: python
-    :lines: 21 - 48
+    :lines: 22 - 49
     :linenos:
-    :lineno-start: 21
+    :lineno-start: 22
 
 
 Defining model requirements
@@ -38,9 +38,10 @@ so we can use the same syntax. We'll define the three parameters needed by the m
 .. literalinclude:: ../../../examples/models/python/src/tutorial/using_data.py
     :name: using_data_py_part_2
     :language: python
-    :lines: 51-65
+    :class: container
+    :lines: 52-66
     :linenos:
-    :lineno-start: 51
+    :lineno-start: 52
 
 The example model function has one data input, which is a table called *customer_loans*.
 The function :py:func:`define_output_table() <tracdap.rt.api.define_output_table>` in the
@@ -79,9 +80,10 @@ lenient type handling for input files.
 .. literalinclude:: ../../../examples/models/python/src/tutorial/using_data.py
     :name: using_data_py_part_3
     :language: python
-    :lines: 67 - 76
+    :class: container
+    :lines: 68 - 77
     :linenos:
-    :lineno-start: 67
+    :lineno-start: 68
 
 To define the model outputs we can use :py:func:`define_output_table() <tracdap.rt.api.define_output_table>`,
 which is identical to :py:func:`define_input_table() <tracdap.rt.api.define_input_table>` save for the fact it
@@ -93,9 +95,10 @@ Models are free to define multiple outputs if required, but this example only ha
 .. literalinclude:: ../../../examples/models/python/src/tutorial/using_data.py
     :name: using_data_py_part_4
     :language: python
-    :lines: 78 - 84
+    :class: container
+    :lines: 79 - 85
     :linenos:
-    :lineno-start: 78
+    :lineno-start: 79
 
 Now the parameters, inputs and outputs of the model are defined, we can implement the
 :py:meth:`run_model() <tracdap.rt.api.TracModel.run_model>` method.
@@ -115,9 +118,10 @@ schema for this input.
 .. literalinclude:: ../../../examples/models/python/src/tutorial/using_data.py
     :name: using_data_py_part_5
     :language: python
-    :lines: 86 - 92
+    :class: container
+    :lines: 87 - 93
     :linenos:
-    :lineno-start: 86
+    :lineno-start: 87
 
 Once all the inputs and parameters are available, we can call the model function. Since all the inputs
 and parameters are supplied using the correct native types there is no further conversion necessary,
@@ -126,9 +130,10 @@ they can be passed straight into the model code.
 .. literalinclude:: ../../../examples/models/python/src/tutorial/using_data.py
     :name: using_data_py_part_6
     :language: python
-    :lines: 94 - 96
+    :class: container
+    :lines: 95 - 97
     :linenos:
-    :lineno-start: 94
+    :lineno-start: 95
 
 The model code has produced a Pandas dataframe that we want to record as an output. To do this, we can use
 :py:meth:`put_pandas_table() <tracdap.rt.api.TracContext.put_pandas_table>`. The dataframe should match
@@ -147,18 +152,20 @@ columns will be dropped.
 .. literalinclude:: ../../../examples/models/python/src/tutorial/using_data.py
     :name: using_data_py_part_7
     :language: python
-    :lines: 98
+    :class: container
+    :lines: 99
     :linenos:
-    :lineno-start: 98
+    :lineno-start: 99
 
 The model can be launched locally using :py:func:`launch_model() <tracdap.rt.launch.launch_model()>`.
 
 .. literalinclude:: ../../../examples/models/python/src/tutorial/using_data.py
     :name: using_data_py_part_8
     :language: python
-    :lines: 101-103
+    :class: container
+    :lines: 102-104
     :linenos:
-    :lineno-start: 101
+    :lineno-start: 102
 
 Configure local data
 --------------------
@@ -237,7 +244,10 @@ building your model packages as Python Wheels or Conda packages the schema files
 part of the build.
 
 To add the schema files into the example project we can create a sub-package called "tutorial.schemas",
-which would look like this::
+which would look like this:
+
+.. code-block::
+    :class: container
 
     examples-project
     ├── config
@@ -265,9 +275,9 @@ Now we can re-write our model to use the new schema files. First we need to impo
     :caption: src/tutorial/schema_files.py
     :name: using_data_part_9
     :language: python
-    :lines: 19
+    :lines: 20
     :linenos:
-    :lineno-start: 19
+    :lineno-start: 20
 
 Then we can load schemas from the schemas package in the
 :py:meth:`define_inputs() <tracdap.rt.api.TracModel.define_inputs>` and
@@ -276,9 +286,10 @@ Then we can load schemas from the schemas package in the
 .. literalinclude:: ../../../examples/models/python/src/tutorial/schema_files.py
     :name: using_data_part_10
     :language: python
-    :lines: 46 - 56
+    :class: container
+    :lines: 47 - 57
     :linenos:
-    :lineno-start: 46
+    :lineno-start: 47
 
 Notice that the :py:func:`load_schema() <tracdap.rt.api.load_schema>` method is the same
 for input and output schemas, so we need to use

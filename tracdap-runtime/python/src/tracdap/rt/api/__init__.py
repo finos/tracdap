@@ -13,6 +13,9 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+"""
+TRAC model API for Python
+"""
 
 from .model_api import *
 from .static_api import *
@@ -22,10 +25,24 @@ from .static_api import *
 from tracdap.rt.metadata import *  # noqa DOCGEN_REMOVE
 
 # Map basic types into the root of the API package
+
 BOOLEAN = BasicType.BOOLEAN
+"""Synonym for :py:attr:`BasicType.BOOLEAN <tracdap.rt.metadata.BasicType.BOOLEAN>`"""
+
 INTEGER = BasicType.INTEGER
+"""Synonym for :py:attr:`BasicType.INTEGER <tracdap.rt.metadata.BasicType.INTEGER>`"""
+
 FLOAT = BasicType.FLOAT
+"""Synonym for :py:attr:`BasicType.FLOAT <tracdap.rt.metadata.BasicType.FLOAT>`"""
+
 DECIMAL = BasicType.DECIMAL
+"""Synonym for :py:attr:`BasicType.DECIMAL <tracdap.rt.metadata.BasicType.DECIMAL>`"""
+
 STRING = BasicType.STRING
+"""Synonym for :py:attr:`BasicType.STRING <tracdap.rt.metadata.BasicType.STRING>`"""
+
 DATE = BasicType.DATE
+"""Synonym for :py:attr:`BasicType.DATE <tracdap.rt.metadata.BasicType.DATE>`"""
+
 DATETIME = BasicType.DATETIME
+"""Synonym for :py:attr:`BasicType.DATETIME <tracdap.rt.metadata.BasicType.DATETIME>`"""

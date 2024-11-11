@@ -402,7 +402,7 @@ service TracMetadataApi {
      * objects as RESTFUL resources. For gRPC clients it is recommended to use
      * readObject instead and supply a TagSelector.
      *
-     * @see readObject
+     * @see readObject()
      *
      * To use this call, supply a tenant code, object type, ID, object version
      * and tag version. The call will return a tag for the exact object version
@@ -425,7 +425,7 @@ service TracMetadataApi {
      * objects as RESTFUL resources. For gRPC clients it is recommended to use
      * readObject instead and supply a TagSelector.
      *
-     * @see readObject
+     * @see readObject()
      *
      * To use this call, supply a tenant code, object type and ID. The call will
      * return the latest version of the object with its latest tag, including
@@ -447,7 +447,7 @@ service TracMetadataApi {
      * objects as RESTFUL resources. For gRPC clients it is recommended to use
      * readObject instead and supply a TagSelector.
      *
-     * @see readObject
+     * @see readObject()
      *
      * To use this call, supply a tenant code, object type, ID and version. The
       * call will return the latest tag for the specified version of the object,
