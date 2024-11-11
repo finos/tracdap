@@ -38,6 +38,7 @@ so we can use the same syntax. We'll define the three parameters needed by the m
 .. literalinclude:: ../../../examples/models/python/src/tutorial/using_data.py
     :name: using_data_py_part_2
     :language: python
+    :class: container
     :lines: 52-66
     :linenos:
     :lineno-start: 52
@@ -79,6 +80,7 @@ lenient type handling for input files.
 .. literalinclude:: ../../../examples/models/python/src/tutorial/using_data.py
     :name: using_data_py_part_3
     :language: python
+    :class: container
     :lines: 68 - 77
     :linenos:
     :lineno-start: 68
@@ -93,6 +95,7 @@ Models are free to define multiple outputs if required, but this example only ha
 .. literalinclude:: ../../../examples/models/python/src/tutorial/using_data.py
     :name: using_data_py_part_4
     :language: python
+    :class: container
     :lines: 79 - 85
     :linenos:
     :lineno-start: 79
@@ -115,6 +118,7 @@ schema for this input.
 .. literalinclude:: ../../../examples/models/python/src/tutorial/using_data.py
     :name: using_data_py_part_5
     :language: python
+    :class: container
     :lines: 87 - 93
     :linenos:
     :lineno-start: 87
@@ -126,6 +130,7 @@ they can be passed straight into the model code.
 .. literalinclude:: ../../../examples/models/python/src/tutorial/using_data.py
     :name: using_data_py_part_6
     :language: python
+    :class: container
     :lines: 95 - 97
     :linenos:
     :lineno-start: 95
@@ -147,6 +152,7 @@ columns will be dropped.
 .. literalinclude:: ../../../examples/models/python/src/tutorial/using_data.py
     :name: using_data_py_part_7
     :language: python
+    :class: container
     :lines: 99
     :linenos:
     :lineno-start: 99
@@ -156,6 +162,7 @@ The model can be launched locally using :py:func:`launch_model() <tracdap.rt.lau
 .. literalinclude:: ../../../examples/models/python/src/tutorial/using_data.py
     :name: using_data_py_part_8
     :language: python
+    :class: container
     :lines: 102-104
     :linenos:
     :lineno-start: 102
@@ -237,7 +244,10 @@ building your model packages as Python Wheels or Conda packages the schema files
 part of the build.
 
 To add the schema files into the example project we can create a sub-package called "tutorial.schemas",
-which would look like this::
+which would look like this:
+
+.. code-block::
+    :class: container
 
     examples-project
     ├── config
@@ -276,6 +286,7 @@ Then we can load schemas from the schemas package in the
 .. literalinclude:: ../../../examples/models/python/src/tutorial/schema_files.py
     :name: using_data_part_10
     :language: python
+    :class: container
     :lines: 47 - 57
     :linenos:
     :lineno-start: 47

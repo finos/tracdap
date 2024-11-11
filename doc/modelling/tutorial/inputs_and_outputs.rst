@@ -21,8 +21,8 @@ Here is an example of defining an optional input, using schemas read from schema
 
 .. literalinclude:: ../../../examples/models/python/src/tutorial/optional_io.py
     :caption: src/tutorial/optional_io.py
-    :language: python
     :name: optional_io_part_1
+    :language: python
     :lines: 39 - 49
     :linenos:
     :lineno-start: 39
@@ -31,8 +31,9 @@ Schemas defined in code can also be marked as optional, let's use that approach 
 optional output:
 
 .. literalinclude:: ../../../examples/models/python/src/tutorial/optional_io.py
-    :language: python
     :name: optional_io_part_2
+    :language: python
+    :class: container
     :lines: 51 - 67
     :linenos:
     :lineno-start: 51
@@ -45,8 +46,9 @@ some filtering to the customer accounts list, then produce the optional output
 dataset with some stats on the filtered accounts. Here is what that looks like:
 
 .. literalinclude:: ../../../examples/models/python/src/tutorial/optional_io.py
-    :language: python
     :name: optional_io_part_3
+    :language: python
+    :class: container
     :lines: 77 - 86
     :linenos:
     :lineno-start: 77
@@ -104,8 +106,8 @@ some basic information about the schema and content:
 
 .. literalinclude:: ../../../examples/models/python/src/tutorial/dynamic_io.py
     :caption: src/tutorial/dynamic_io.py
-    :language: python
     :name: dynamic_io_schema_inspection_1
+    :language: python
     :lines: 22 - 40
     :linenos:
     :lineno-start: 22
@@ -120,8 +122,9 @@ output is known.
 Now let's see how to use these datasets in the model.
 
 .. literalinclude:: ../../../examples/models/python/src/tutorial/dynamic_io.py
-    :language: python
     :name: dynamic_io_schema_inspection_2
+    :language: python
+    :class: container
     :lines: 42 - 61
     :linenos:
     :lineno-start: 42
@@ -135,7 +138,10 @@ a simple null check on all the columns and produce the output as a normal Pandas
 
 You can use the information held in the schema to look for columns with particular attributes
 to decide how to process each column. Here are some examples of matching columns based on
-type, nullability and the categorical flag::
+type, nullability and the categorical flag:
+
+.. code-block::
+    :class: container
 
     float_columns = [col.fieldName for col in columns if col.fieldType == trac.FLOAT]
     nullable_columns = [col.fieldName for col in columns if col.notNull != True]
@@ -161,9 +167,9 @@ A small sample data file is included with the tutorial, but you can use any Parq
 the model will tell you about its schema.
 
 .. literalinclude:: ../../../examples/models/python/config/dynamic_io.yaml
+    :name: dynamic_io_schema_inspection_config
     :caption: config/dynamic_io.yaml
     :language: yaml
-    :name: dynamic_io_schema_inspection_config
     :linenos:
 
 .. note::
@@ -183,8 +189,9 @@ those columns. Depending on the input that is supplied, the schema of the output
 Let's see how to define this model:
 
 .. literalinclude:: ../../../examples/models/python/src/tutorial/dynamic_io.py
-    :language: python
     :name: dynamic_io_data_generation_1
+    :language: python
+    :class: container
     :lines: 64 - 81
     :linenos:
     :lineno-start: 64
@@ -195,8 +202,9 @@ or distribution parameters, but for this simple example those are not needed.
 Now let's look at the model code:
 
 .. literalinclude:: ../../../examples/models/python/src/tutorial/dynamic_io.py
-    :language: python
     :name: dynamic_io_data_generation_2
+    :language: python
+    :class: container
     :lines: 83 - 101
     :linenos:
     :lineno-start: 83
@@ -235,8 +243,9 @@ single filtering model that will work for all of them.
 Let's see an example model definition that can help us do that:
 
 .. literalinclude:: ../../../examples/models/python/src/tutorial/dynamic_io.py
-    :language: python
     :name: dynamic_io_dynamic_filtering_1
+    :language: python
+    :class: container
     :lines: 104 - 118
     :linenos:
     :lineno-start: 104
@@ -245,8 +254,9 @@ Here both the input and the output are dynamic, and the model is controlled only
 parameters. Now let's see the implementation:
 
 .. literalinclude:: ../../../examples/models/python/src/tutorial/dynamic_io.py
-    :language: python
     :name: dynamic_io_dynamic_filtering_2
+    :language: python
+    :class: container
     :lines: 120 - 131
     :linenos:
     :lineno-start: 120

@@ -34,6 +34,7 @@ command line using these commands:
         :sync: platform_windows
 
         .. code-block:: batch
+            :class: container
 
             mkdir example-project
             cd example-project
@@ -45,6 +46,7 @@ command line using these commands:
         :sync: platform_linux
 
         .. code-block:: shell
+            :class: container
 
             mkdir example-project
             cd example-project
@@ -56,7 +58,10 @@ For this tutorial we want a single Python package that we will call "tutorial". 
 Python source code goes in a folder called either "src" or the name of your project - we will
 use "src". We are going to need some config files, those should be outside the source folder.
 We will also need a folder for tests and a few other common project files.  Here is a very
-standard example of what that looks like::
+standard example of what that looks like:
+
+.. code-block::
+    :class: container
 
     examples-project
     ├── config
@@ -101,6 +106,7 @@ Typically you want to ignore this folder in Git by adding it to the .gitignore f
 do this automatically, otherwise you can create a file called .gitignore and add this line to it:
 
 .. code-block::
+    :class: container
 
     venv/**
 
@@ -112,12 +118,18 @@ GitHub the contents of this file will be displayed on the home page for your rep
 Installing the runtime
 ----------------------
 
-The TRAC runtime package can be installed directly from PyPI::
+The TRAC runtime package can be installed directly from PyPI:
+
+.. code-block::
+    :class: container
 
     pip install tracdap-runtime
 
 The TRAC runtime depends on Pandas and PySpark, so these libraries will be pulled in as
-dependencies. If you want to target particular versions, you can install them explicitly::
+dependencies. If you want to target particular versions, you can install them explicitly:
+
+.. code-block::
+    :class: container
 
     pip install "pandas == 2.1.4"
 
@@ -128,7 +140,10 @@ projects requirements there.
 
     TRAC supports both Pandas 1.X and 2.X. Models written for 1.X might not work with 2.X and vice versa.
     From TRAC 0.6 onward, new installations default to Pandas 2.X. To change the version of Pandas in your
-    sandbox environment, you can use the pip install command::
+    sandbox environment, you can use the pip install command:
+
+    .. code-block::
+        :class: container
 
         pip install "pandas == 1.5.3"
 
@@ -155,6 +170,7 @@ are defined in the correct format.
 .. literalinclude:: ../../../examples/models/python/src/tutorial/hello_world.py
     :name: hello_world_py_part_2
     :language: python
+    :class: container
     :lines: 22 - 27
     :linenos:
     :lineno-start: 22
@@ -166,6 +182,7 @@ required in order for the model to be valid.
 .. literalinclude:: ../../../examples/models/python/src/tutorial/hello_world.py
     :name: hello_world_py_part_3
     :language: python
+    :class: container
     :lines: 29 - 33
     :linenos:
     :lineno-start: 29
@@ -178,6 +195,7 @@ TRAC platform.
 .. literalinclude:: ../../../examples/models/python/src/tutorial/hello_world.py
     :name: hello_world_py_part_4
     :language: python
+    :class: container
     :lines: 35 - 40
     :linenos:
     :lineno-start: 35
@@ -257,6 +275,7 @@ Now you should be able to run your model script and see the model output in the 
 
 .. code-block:: text
     :name: hello_world_log_output
+    :class: container
 
     2022-05-31 12:19:36,104 [engine] INFO tracdap.rt.exec.engine.NodeProcessor - START RunModel [HelloWorldModel] / JOB-92df0bd5-50bd-4885-bc7a-3d4d95029360-v1
     2022-05-31 12:19:36,104 [engine] INFO __main__.HelloWorldModel - Hello world model is running
