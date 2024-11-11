@@ -1,7 +1,7 @@
 
-#########################
+*************************
 Chapter 2 - Metadata Mojo
-#########################
+*************************
 
 This tutorial is based on the *metadata_mojo.js* example, which can be found in the
 `TRAC GitHub Repository <https://github.com/finos/tracdap>`_

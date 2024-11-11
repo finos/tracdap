@@ -1,7 +1,7 @@
 
-#######################
+***********************
 Chapter 1 - Hello World
-#######################
+***********************
 
 This tutorial is based on example code which can be found in the
 `TRAC GitHub Repository <https://github.com/finos/tracdap>`_

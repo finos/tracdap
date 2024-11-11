@@ -1,7 +1,7 @@
 
-##########################
+**************************
 Chapter 5 - Error Handling
-##########################
+**************************
 
 This tutorial is based on the *error_handling.js* example, which can be found in the
 `TRAC GitHub Repository <https://github.com/finos/tracdap>`_

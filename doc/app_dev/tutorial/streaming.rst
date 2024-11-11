@@ -1,7 +1,7 @@
 
-#####################
+*********************
 Chapter 4 - Streaming
-#####################
+*********************
 
 This tutorial is based on the *streaming.js* example, which can be found in the
 `TRAC GitHub Repository <https://github.com/finos/tracdap>`_

@@ -1,7 +1,7 @@
 
-#######################
+***********************
 Chapter 1 - Hello World
-#######################
+***********************
 
 This tutorial is based on the *hello_world.js* example, which can be found in the
 `TRAC GitHub Repository <https://github.com/finos/tracdap>`_

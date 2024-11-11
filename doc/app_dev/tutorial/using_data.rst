@@ -1,7 +1,7 @@
 
-######################
+**********************
 Chapter 3 - Using Data
-######################
+**********************
 
 This tutorial is based on the *using_data.js* example, which can be found in the
 `TRAC GitHub Repository <https://github.com/finos/tracdap>`_
