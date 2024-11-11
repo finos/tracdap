@@ -189,7 +189,7 @@ rst_prolog = """
 # a list of builtin themes.
 
 html_theme = "sphinx_wagtail_theme"
-html_css_files = ["tracdap.css"]
+html_css_files = ["fintrac-docs.css"]
 
 html_theme_options = dict(
     project_name = f"TRAC D.A.P. Documentation (Version {release})",
