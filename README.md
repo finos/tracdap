@@ -4,8 +4,8 @@
 
 [![FINOS - Incubating](https://cdn.jsdelivr.net/gh/finos/contrib-toolbox@master/images/badge-incubating.svg)](https://finosfoundation.atlassian.net/wiki/display/FINOS/Incubating)
 
-TRAC is a universal model orchestration solution which is designed for the most complex, critical 
-and highly-governed use cases. It combines your existing data and compute infrastructure,
+TRAC is a universal model orchestration solution for managing the most complex, critical
+and highly governed workflows. It combines your existing data and compute infrastructure,
 model development environments and the repository of versioned code, to create a single ecosystem 
 in which to build and deploy models, orchestrate complex workflows and run analytics.
 
@@ -13,9 +13,9 @@ TRAC is designed to break the trade-off that has traditionally been required, be
 (but uncontrolled) analytics solutions and highly controlled (but inflexible) production model 
 platforms. It offers best of both worlds, power, control and analytical flexibility.
 
-The core platform services - i.e. TRAC Data & Analytics Platform (or TRAC D.A.P.) - are maintained by
-[finTRAC Limited](https://www.fintrac.co.uk) in association with the [FINOS Foundation](https://www.finos.org)
-under the [Apache Software License version 2.0](https://www.apache.org/licenses/LICENSE-2.0).
+TRAC D.A.P. is the open-source data & analytics toolkit which provides the core capabilities of TRAC.
+It is available to download and use for free under the
+[Apache License, Version 2.0](https://www.apache.org/licenses/LICENSE-2.0>).
 
 ## Documentation and Packages
 
