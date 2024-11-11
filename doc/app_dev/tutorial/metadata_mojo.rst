@@ -30,6 +30,7 @@ Let's create a request for this search:
 
 .. literalinclude:: ../../../examples/apps/javascript/src/metadata_mojo.js
     :language: JavaScript
+    :class: container
     :lines: 28 - 43
     :linenos:
     :lineno-start: 28
@@ -42,6 +43,7 @@ To execute the search we use the :meth:`search()<tracdap.api.TracMetadataApi.sea
 
 .. literalinclude:: ../../../examples/apps/javascript/src/metadata_mojo.js
     :language: JavaScript
+    :class: container
     :lines: 48 - 61
     :linenos:
     :lineno-start: 48
@@ -65,6 +67,7 @@ Here is a simple example, starting with expression for the single term from the 
 
 .. literalinclude:: ../../../examples/apps/javascript/src/metadata_mojo.js
     :language: JavaScript
+    :class: container
     :lines: 63 - 72
     :linenos:
     :lineno-start: 63
@@ -74,6 +77,7 @@ is one of the business divisions we are interested in:
 
 .. literalinclude:: ../../../examples/apps/javascript/src/metadata_mojo.js
     :language: JavaScript
+    :class: container
     :lines: 74 - 87
     :linenos:
     :lineno-start: 74
@@ -85,6 +89,7 @@ Now let's create a logical expression, which combines the two previous expressio
 
 .. literalinclude:: ../../../examples/apps/javascript/src/metadata_mojo.js
     :language: JavaScript
+    :class: container
     :lines: 89 - 97
     :linenos:
     :lineno-start: 89
@@ -102,6 +107,7 @@ to call the :meth:`search()<tracdap.api.TracMetadataApi.search>` method of the
 
 .. literalinclude:: ../../../examples/apps/javascript/src/metadata_mojo.js
     :language: JavaScript
+    :class: container
     :lines: 99 - 109
     :linenos:
     :lineno-start: 99

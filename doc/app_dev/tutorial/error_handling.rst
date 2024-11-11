@@ -18,6 +18,7 @@ with a validation error. Here is what that looks like using futures:
 
 .. literalinclude:: ../../../examples/apps/javascript/src/error_handling.js
     :language: JavaScript
+    :class: container
     :lines: 64 - 71
     :linenos:
     :lineno-start: 64
@@ -36,6 +37,7 @@ Exactly the same error handling capability is available using callbacks:
 
 .. literalinclude:: ../../../examples/apps/javascript/src/error_handling.js
     :language: JavaScript
+    :class: container
     :lines: 80 - 89
     :linenos:
     :lineno-start: 80
@@ -51,6 +53,7 @@ TRAC has a means to provide this information.
 
 .. literalinclude:: ../../../examples/apps/javascript/src/error_handling.js
     :language: JavaScript
+    :class: container
     :lines: 98 - 105
     :linenos:
     :lineno-start: 98
@@ -62,6 +65,7 @@ information, this can be accessed by looking at the individual error items:
 
 .. literalinclude:: ../../../examples/apps/javascript/src/error_handling.js
     :language: JavaScript
+    :class: container
     :lines: 106 - 109
     :linenos:
     :lineno-start: 106
@@ -83,6 +87,7 @@ With upload streams, the client sends a series of messages to the server and rec
 or error in response. The error handler can be attached when you send the first message to the stream:
 
 .. code-block:: javascript
+    :class: container
 
     stream.createDataset(request0)
         .then(_ => {...})  // Handle upload success
@@ -108,6 +113,7 @@ Because errors are processed using stream events, the futures / callback handler
 to no-op functions to avoid unhandled or duplicate events.
 
 .. code-block:: javascript
+    :class: container
 
     // Handle the download stream
     stream.on("data", msg => {...});
@@ -136,6 +142,7 @@ details of the stream event processing:
 
 .. literalinclude:: ../../../examples/apps/javascript/src/error_handling.js
     :language: JavaScript
+    :class: container
     :lines: 146 - 152
     :linenos:
     :lineno-start: 146

@@ -15,6 +15,7 @@ In order to use the data API, we will need an RPC transport and an instance of t
 Here is how to set them up for a browser-based app:
 
 .. code-block:: JavaScript
+    :class: container
     :linenos:
     :lineno-start: 23
 
@@ -26,6 +27,7 @@ For a Node.js or standalone environment, create a connector pointing at your TRA
 
 .. literalinclude:: ../../../examples/apps/javascript/src/using_data.js
     :language: JavaScript
+    :class: container
     :lines: 23 - 25
     :linenos:
     :lineno-start: 23
@@ -50,6 +52,7 @@ Once both schema and data are available, we can create a
 
 .. literalinclude:: ../../../examples/apps/javascript/src/using_data.js
     :language: JavaScript
+    :class: container
     :lines: 28 - 44
     :linenos:
     :lineno-start: 28
@@ -69,6 +72,7 @@ Now the data API can be used to send the new dataset to the platform:
 
 .. literalinclude:: ../../../examples/apps/javascript/src/using_data.js
     :language: JavaScript
+    :class: container
     :lines: 46 - 52
     :linenos:
     :lineno-start: 46
@@ -86,6 +90,7 @@ object type, ID, version and timestamps. In this example we used the promise for
 the equivalent call using a callback would be:
 
 .. code-block:: JavaScript
+    :class: container
 
     dataApi.createSmallDataset(request, (err, dataId) => {
 
@@ -101,6 +106,7 @@ To do this we use a :class:`DataReadRequest<tracdap.api.DataReadRequest>`.
 
 .. literalinclude:: ../../../examples/apps/javascript/src/using_data.js
     :language: JavaScript
+    :class: container
     :lines: 54 - 63
     :linenos:
     :lineno-start: 54
@@ -113,6 +119,7 @@ Now let's send the request to the data API:
 
 .. literalinclude:: ../../../examples/apps/javascript/src/using_data.js
     :language: JavaScript
+    :class: container
     :lines: 65 - 73
     :linenos:
     :lineno-start: 65
@@ -135,6 +142,7 @@ decoded dataset like this:
 
 .. literalinclude:: ../../../examples/apps/javascript/src/using_data.js
     :language: JavaScript
+    :class: container
     :lines: 75 - 85
     :linenos:
     :lineno-start: 75
@@ -152,6 +160,7 @@ back. To encode the data using JSON:
 
 .. literalinclude:: ../../../examples/apps/javascript/src/using_data.js
     :language: JavaScript
+    :class: container
     :lines: 136 - 140
     :linenos:
     :lineno-start: 136
@@ -160,6 +169,7 @@ Now we need to create a :class:`DataWriteRequest<tracdap.api.DataWriteRequest>` 
 
 .. literalinclude:: ../../../examples/apps/javascript/src/using_data.js
     :language: JavaScript
+    :class: container
     :lines: 142 - 159
     :linenos:
     :lineno-start: 142
@@ -181,6 +191,7 @@ To send the update to the platform, we use :meth:`updateSmallDataset()<tracdap.a
 
 .. literalinclude:: ../../../examples/apps/javascript/src/using_data.js
     :language: JavaScript
+    :class: container
     :lines: 161 - 167
     :linenos:
     :lineno-start: 161

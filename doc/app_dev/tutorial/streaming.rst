@@ -22,6 +22,7 @@ and downloads, using a web sockets implementation based on the work by Improbabl
 The TRAC transport is available as an option in the transport setup:
 
 .. code-block:: javascript
+    :class: container
     :linenos:
     :lineno-start: 20
 
@@ -34,6 +35,7 @@ Or to run outside a browser:
 
 .. literalinclude:: ../../../examples/apps/javascript/src/streaming.js
     :language: JavaScript
+    :class: container
     :lines: 20 - 24
     :linenos:
     :lineno-start: 20
@@ -61,6 +63,7 @@ except that the content can be empty.
 
 .. literalinclude:: ../../../examples/apps/javascript/src/streaming.js
     :language: JavaScript
+    :class: container
     :lines: 50 - 64
     :linenos:
     :lineno-start: 50
@@ -70,6 +73,7 @@ to create an input stream, then passes the stream into the upload function:
 
 .. literalinclude:: ../../../examples/apps/javascript/src/streaming.js
     :language: JavaScript
+    :class: container
     :lines: 161 - 162
     :linenos:
     :lineno-start: 161
@@ -81,6 +85,7 @@ which is different from the event streams used in Node.js and Protobuf.js.
 TRAC provides a utility function to create an event stream, using a web ReadableStream as the source.
 
 .. code-block:: javascript
+    :class: container
     :linenos:
     :lineno-start: 161
 
@@ -106,6 +111,7 @@ in a single stream.
 
 .. literalinclude:: ../../../examples/apps/javascript/src/streaming.js
     :language: JavaScript
+    :class: container
     :lines: 65 - 74
     :linenos:
     :lineno-start: 65
@@ -117,6 +123,7 @@ so we can use this to complete the promise.
 
 .. literalinclude:: ../../../examples/apps/javascript/src/streaming.js
     :language: JavaScript
+    :class: container
     :lines: 75 - 81
     :linenos:
     :lineno-start: 75
@@ -129,6 +136,7 @@ The "end" event signals that the source stream is complete.
 
 .. literalinclude:: ../../../examples/apps/javascript/src/streaming.js
     :language: JavaScript
+    :class: container
     :lines: 82 - 95
     :linenos:
     :lineno-start: 82
@@ -143,6 +151,7 @@ Instead we want to reject the promise explicitly, to pass on the error informati
 
 .. literalinclude:: ../../../examples/apps/javascript/src/streaming.js
     :language: JavaScript
+    :class: container
     :lines: 96 - 105
     :linenos:
     :lineno-start: 96
@@ -167,6 +176,7 @@ This is exactly the same as the request used to call
 
 .. literalinclude:: ../../../examples/apps/javascript/src/streaming.js
     :language: JavaScript
+    :class: container
     :lines: 111 - 117
     :linenos:
     :lineno-start: 111
@@ -178,6 +188,7 @@ If there are any errors during the operation, the promise will be rejected.
 
 .. literalinclude:: ../../../examples/apps/javascript/src/streaming.js
     :language: JavaScript
+    :class: container
     :lines: 123 - 128
     :linenos:
     :lineno-start: 123
@@ -197,6 +208,7 @@ utility function to aggregate them into a single
 
 .. literalinclude:: ../../../examples/apps/javascript/src/streaming.js
     :language: JavaScript
+    :class: container
     :lines: 130 - 143
     :linenos:
     :lineno-start: 130
@@ -208,6 +220,7 @@ handlers, to prevent JavaScript warnings about unhandled results / errors.
 
 .. literalinclude:: ../../../examples/apps/javascript/src/streaming.js
     :language: JavaScript
+    :class: container
     :lines: 145 - 154
     :linenos:
     :lineno-start: 145

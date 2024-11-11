@@ -12,7 +12,10 @@ Installing the API
 ------------------
 
 The easiest way to build web client applications for TRAC is using the web API package,
-It is available to install with NPM::
+It is available to install with NPM:
+
+.. code-block::
+    :class: container
 
     npm install --save tracdap-web-api
 
@@ -66,6 +69,7 @@ Start by importing the TRAC API package:
 
 .. literalinclude:: ../../../examples/apps/javascript/src/hello_world.js
     :language: JavaScript
+    :class: container
     :lines: 18 - 18
     :linenos:
     :lineno-start: 18
@@ -74,6 +78,7 @@ We need two things to create the TRAC connection, an RPC transport and an instan
 TRAC API class. You can use tracdap.setup to create an RPC transport that works in the browser.
 
 .. code-block:: javascript
+    :class: container
     :linenos:
     :lineno-start: 20
 
@@ -89,6 +94,7 @@ In this example we only need the metadata API.
 
 .. literalinclude:: ../../../examples/apps/javascript/src/hello_world.js
     :language: JavaScript
+    :class: container
     :lines: 24 - 25
     :linenos:
     :lineno-start: 24
@@ -102,6 +108,7 @@ In this case, you'll need to create an RPC connector pointed at the address of y
 
 .. literalinclude:: ../../../examples/apps/javascript/src/hello_world.js
     :language: JavaScript
+    :class: container
     :lines: 20, 22
 
 You'll also need to supply the global XMLHttpRequest object, which is not normally available outside a
@@ -110,6 +117,7 @@ package available on NPM:
 
 .. literalinclude:: ../../../examples/apps/javascript/run_examples.js
     :language: JavaScript
+    :class: container
     :lines: 19 - 21
 
 
@@ -126,6 +134,7 @@ in code.
 
 .. literalinclude:: ../../../examples/apps/javascript/src/hello_world.js
     :language: JavaScript
+    :class: container
     :lines: 28 - 58
     :linenos:
     :lineno-start: 28
@@ -144,6 +153,7 @@ Request objects from the ``tracdap.api`` package can be created the same way met
 
 .. literalinclude:: ../../../examples/apps/javascript/src/hello_world.js
     :language: JavaScript
+    :class: container
     :lines: 60 - 76
     :linenos:
     :lineno-start: 60
@@ -169,6 +179,7 @@ to send our request to the TRAC metadata service.
 
 .. literalinclude:: ../../../examples/apps/javascript/src/hello_world.js
     :language: JavaScript
+    :class: container
     :lines: 78 - 85
     :linenos:
     :lineno-start: 78
@@ -182,6 +193,7 @@ This example uses the future form, which allows chaining of ``.then()``, ``.catc
 ``.finally()`` blocks. The equivalent call using a callback would be:
 
 .. code-block:: JavaScript
+    :class: container
 
     metaApi.createObject(request, (err, header) => {
 
@@ -199,6 +211,7 @@ We can do this using a :class:`MetadataReadRequest<tracdap.api.MetadataReadReque
 
 .. literalinclude:: ../../../examples/apps/javascript/src/hello_world.js
     :language: JavaScript
+    :class: container
     :lines: 87 - 93
     :linenos:
     :lineno-start: 87
@@ -213,6 +226,7 @@ Finally we use :meth:`readObject()<tracdap.api.TracMetadataApi.readObject>` to s
 
 .. literalinclude:: ../../../examples/apps/javascript/src/hello_world.js
     :language: JavaScript
+    :class: container
     :lines: 95
     :linenos:
     :lineno-start: 95
@@ -234,6 +248,7 @@ a console or IDE. In this example we just create the schema and then load it bac
 
 .. literalinclude:: ../../../examples/apps/javascript/src/hello_world.js
     :language: JavaScript
+    :class: container
     :lines: 97 -
     :linenos:
     :lineno-start: 97
