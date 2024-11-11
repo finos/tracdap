@@ -26,16 +26,19 @@
 
    {% set show_obj_args = False %}
 
-.. py:{{ obj.type }}:: {% if is_own_page %}{{ obj.id }}{% else %}{{ obj.short_name }}{% endif %}{% if show_obj_args %}({{ obj.args }}){% endif %}
+   {% if is_own_page %}
+.. py:currentmodule::  {{ obj.id.replace('.' + obj.name, '') }}
+
+   {% endif %}
+
+.. py:{{ obj.type }}:: {% if is_own_page %}{{ obj.name }}{% else %}{{ obj.short_name }}{% endif %}{% if show_obj_args %}({{ obj.args }}){% endif %}
+
+   :canonical: {{ obj.id }}
 
    {% for (args, return_annotation) in obj.overloads %}
       {{ " " * (obj.type | length) }}   {{ obj.short_name }}{% if args %}({{ args }}){% endif %}
 
    {% endfor %}
-
-   {% if is_own_page %}
-   .. py:currentmodule::  {{ obj.id.replace('.' + obj.name, '') }}
-   {% endif %}
 
    {% if obj.bases %}
       {% if "show-inheritance" in autoapi_options %}
