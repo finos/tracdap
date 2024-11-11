@@ -29,7 +29,7 @@ The following packages are available:
 | [Web API package](https://www.npmjs.com/package/@finos/tracdap-web-api)  | Build client apps in JavaScript or TypeScript using the TRAC platform APIs                            |
 | [Platform releases](https://github.com/finos/tracdap/releases)           | Packages for the platform services and a standalone sandbox are published with each release on GitHub |
 
-Commercially supported deployments of TRAC are separately available from `finTRAC Limited <https://www.fintrac.co.uk>`_.
+Commercially supported deployments of TRAC are separately available from [finTRAC Limited](https://www.fintrac.co.uk).
 
 ## Development Status
 
