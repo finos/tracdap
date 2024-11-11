@@ -257,8 +257,16 @@ body.theme-dark code {
 
 .table-dark, 
 body.theme-dark table.docutils:not(.field-list) {
-    background-color: #1D3D59;
     color: #EAEAEA;
+    background-color: #1D3D59;
+}
+
+.table .thead-dark th,
+table.docutils:not(.field-list) .thead-dark th,
+body.theme-dark table.docutils:not(.field-list) thead th {
+    color: #EAEAEA;
+    background-color: #2A577D;
+    border-color: #3B668C;
 }
 
 .table-dark th, 
