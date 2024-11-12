@@ -17,7 +17,7 @@ TRAC D.A.P. is the open-source data & analytics toolkit which provides the core 
 It is maintained by [finTRAC Limited](https://fintrac.co.uk/)
 in association with [FINOS](https://www.finos.org/)
 and is available to download and use for free under the
-[Apache License, Version 2.0](https://www.apache.org/licenses/LICENSE-2.0>).
+[Apache License, Version 2.0](https://www.apache.org/licenses/LICENSE-2.0).
 
 ## Documentation and Packages
 
