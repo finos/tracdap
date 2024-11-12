@@ -17,11 +17,11 @@ TRAC D.A.P. is the open-source data & analytics toolkit which provides the core 
 It is maintained by [finTRAC Limited](https://fintrac.co.uk/)
 in association with [FINOS](https://www.finos.org/)
 and is available to download and use for free under the
-[Apache License, Version 2.0](https://www.apache.org/licenses/LICENSE-2.0>).
+[Apache License, Version 2.0](https://www.apache.org/licenses/LICENSE-2.0).
 
 ## Documentation and Packages
 
-Documentation for the TRAC D.A.P platform is available on our website at [tracdap.finos.org](https://tracdap.finos.org).
+Documentation for TRAC D.A.P. is available at [tracdap.finos.org](https://tracdap.finos.org).
 
 The following packages are available:
 
@@ -31,7 +31,7 @@ The following packages are available:
 | [Web API package](https://www.npmjs.com/package/@finos/tracdap-web-api)  | Build client apps in JavaScript or TypeScript using the TRAC platform APIs                            |
 | [Platform releases](https://github.com/finos/tracdap/releases)           | Packages for the platform services and a standalone sandbox are published with each release on GitHub |
 
-Commercially supported deployments of TRAC are separately available from [finTRAC Limited](https://www.fintrac.co.uk).
+Commercially supported deployments of TRAC are available separately from [finTRAC Limited](https://www.fintrac.co.uk).
 
 ## Development Status
 
