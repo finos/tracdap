@@ -1,4 +1,4 @@
-# ![TRAC Data & Analytics Platform](doc/_images/tracdap_horizontal_400.png)
+# ![TRAC: The modern model platform](doc/_images/tracmmp_horizontal_400.png)
 
 *The modern model platform for complex, critical models and calculations.*
 
