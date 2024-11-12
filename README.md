@@ -1,11 +1,11 @@
-# ![TRAC Data & Analytics Platform](doc/_images/tracdap_horizontal_400.png)
+# ![TRAC: The modern model platform](doc/_images/tracmmp_horizontal_400.png)
 
 *The modern model platform for complex, critical models and calculations.*
 
 [![FINOS - Incubating](https://cdn.jsdelivr.net/gh/finos/contrib-toolbox@master/images/badge-incubating.svg)](https://finosfoundation.atlassian.net/wiki/display/FINOS/Incubating)
 
-TRAC is a universal model orchestration solution which is designed for the most complex, critical 
-and highly-governed use cases. It combines your existing data and compute infrastructure,
+TRAC is a universal model orchestration solution for managing the most complex, critical
+and highly governed workflows. It combines your existing data and compute infrastructure,
 model development environments and the repository of versioned code, to create a single ecosystem 
 in which to build and deploy models, orchestrate complex workflows and run analytics.
 
@@ -13,9 +13,11 @@ TRAC is designed to break the trade-off that has traditionally been required, be
 (but uncontrolled) analytics solutions and highly controlled (but inflexible) production model 
 platforms. It offers best of both worlds, power, control and analytical flexibility.
 
-The core platform services - i.e. TRAC Data & Analytics Platform (or TRAC D.A.P.) - are maintained by
-[finTRAC Limited](https://www.fintrac.co.uk) in association with the [FINOS Foundation](https://www.finos.org)
-under the [Apache Software License version 2.0](https://www.apache.org/licenses/LICENSE-2.0).
+TRAC D.A.P. is the open-source data & analytics toolkit which provides the core capabilities of TRAC.
+It is maintained by [finTRAC Limited](https://fintrac.co.uk/)
+in association with [FINOS](https://www.finos.org/)
+and is available to download and use for free under the
+[Apache License, Version 2.0](https://www.apache.org/licenses/LICENSE-2.0>).
 
 ## Documentation and Packages
 
@@ -29,7 +31,7 @@ The following packages are available:
 | [Web API package](https://www.npmjs.com/package/@finos/tracdap-web-api)  | Build client apps in JavaScript or TypeScript using the TRAC platform APIs                            |
 | [Platform releases](https://github.com/finos/tracdap/releases)           | Packages for the platform services and a standalone sandbox are published with each release on GitHub |
 
-Commercially supported deployments of TRAC are separately available from `finTRAC Limited <https://www.fintrac.co.uk>`_.
+Commercially supported deployments of TRAC are separately available from [finTRAC Limited](https://www.fintrac.co.uk).
 
 ## Development Status
 
@@ -45,16 +47,15 @@ https://github.com/finos/tracdap/actions/workflows/packaging.yml)
 https://tracdap.finos.org/en/stable/?badge=stable)
 
 
-The current release series (0.4.x) is intended for model development and prototyping.
-It provides an end-to-end workflow to build and run individual models in a local
-environment. It also provides the platform APIs needed to build client applications
-such as web tools or system client system integrations.
+The current release series (0.7) contains the core capabilities needed to build and run models,
+both for local development and in a hosted environment. It also contains the platform services
+and APIs needed to build client applications and system-to-system integrations.
 
-The TRAC metadata structures and API calls are mostly complete. Metadata compatibility
-is ensured within a release series starting from version 0.4.0 - the 0.4.x series
-will be compatible with 0.4.0 but changes may be introduced in 0.5.0. The metadata
-model will continue to stabilise before eventually being frozen for version 1.0.0,
-after which it may be added to but no fields will be removed or changed.
+Metadata compatibility is guaranteed within each release series (e.g. 0.7.x). Minor changes may
+occur between release series, mostly for internal structures and removal of deprecated APIs.
+The metadata model will be frozen at version 1.0 after which it may be added to but no fields
+will be removed or change. Configuration formats are subject to change between versions and
+extension (plugin) APIs should be considered internal for the time being.
 
 For more information see the
 [development roadmap](https://github.com/finos/tracdap/wiki/Development-Roadmap).

@@ -3,23 +3,24 @@
 TRAC: The Modern Model Platform
 ###############################
 
-TRAC is a universal model orchestration solution designed for the most complex, critical and highly-governed
-use cases.
+TRAC is a universal model orchestration solution for managing the most complex, critical and highly governed workflows.
 
-The core platform services - i.e. TRAC Data & Analytics Platform (or TRAC D.A.P.) - are maintained by
-`finTRAC Limited <https://www.fintrac.co.uk>`_ in association with the `finos Foundation <https://www.finos.org>`_
-under the `Apache Software License version 2.0 <https://www.apache.org/licenses/LICENSE-2.0>`_.
+TRAC D.A.P. is the open-source data & analytics toolkit which provides the core capabilities of TRAC.
+It is maintained by `finTRAC Limited <https://fintrac.co.uk/>`_
+in association with `FINOS <https://www.finos.org/>`_
+and is available to download and use for free under the
+`Apache License, Version 2.0 <https://www.apache.org/licenses/LICENSE-2.0>`_.
 
-This documentation site focuses on how to deploy the TRAC D.A.P. services and build both models and
-applications which leverage those services. Commercially supported deployments of TRAC are separately
-available from `finTRAC Limited <https://www.fintrac.co.uk>`_.
-
+This documentation describes how to build models and client applications using the TRAC D.A.P. toolkit.
+Commercially supported deployments of the TRAC platform are available separately from
+`finTRAC Limited <https://www.fintrac.co.uk>`_.
 
 .. note::
-   You can see the current development status of TRAC D.A.P. and a roadmap for the platform on the
+    You can see the current development status of TRAC D.A.P. and a roadmap for the platform on the
     `roadmap page <https://github.com/finos/tracdap/wiki/Development-Roadmap>`_.
     If you have particular questions or issues, please raise a ticket on our
     `issue tracker <https://github.com/finos/tracdap/issues>`_.
+
 
 .. grid:: 1 2 2 2
     :gutter: 3
