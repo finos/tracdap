@@ -6,7 +6,9 @@ TRAC: The Modern Model Platform
 TRAC is a universal model orchestration solution for managing the most complex, critical and highly governed workflows.
 
 TRAC D.A.P. is the open-source data & analytics toolkit which provides the core capabilities of TRAC.
-It is available to download and use for free under the
+It is maintained by `finTRAC Limited <https://fintrac.co.uk/>`_
+in association with `FINOS <https://www.finos.org/>`_
+and is available to download and use for free under the
 `Apache License, Version 2.0 <https://www.apache.org/licenses/LICENSE-2.0>`_.
 
 This documentation describes how to build models and client applications using the TRAC D.A.P. toolkit.

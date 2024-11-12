@@ -14,7 +14,9 @@ TRAC is designed to break the trade-off that has traditionally been required, be
 platforms. It offers best of both worlds, power, control and analytical flexibility.
 
 TRAC D.A.P. is the open-source data & analytics toolkit which provides the core capabilities of TRAC.
-It is available to download and use for free under the
+It is maintained by [finTRAC Limited](https://fintrac.co.uk/)
+in association with [FINOS](https://www.finos.org/)
+and is available to download and use for free under the
 [Apache License, Version 2.0](https://www.apache.org/licenses/LICENSE-2.0>).
 
 ## Documentation and Packages
