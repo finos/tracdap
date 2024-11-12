@@ -21,7 +21,7 @@ and is available to download and use for free under the
 
 ## Documentation and Packages
 
-Documentation for TRAC D.A.P is available at [tracdap.finos.org](https://tracdap.finos.org).
+Documentation for TRAC D.A.P. is available at [tracdap.finos.org](https://tracdap.finos.org).
 
 The following packages are available:
 
