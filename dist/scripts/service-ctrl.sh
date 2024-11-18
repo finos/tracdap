@@ -198,7 +198,7 @@ run() {
         PID=`cat "\${PID_FILE}"`
 
         # Handle stale PID files - only block startup if the service is really running
-        if `ps -p \$PID > /dev/null`; then
+        if `ps -p \$PID | grep \$APPLICATION_CLASS > /dev/null`; then
             echo "Application is already running, try \$0 [stop|kill]"
             exit 255
         else
@@ -235,7 +235,7 @@ start() {
         PID=`cat "\${PID_FILE}"`
 
         # Handle stale PID files - only block startup if the service is really running
-        if `ps -p \$PID > /dev/null`; then
+        if `ps -p \$PID | grep \$APPLICATION_CLASS > /dev/null`; then
             echo "Application is already running, try \$0 [stop|kill]"
             exit 255
         else
