@@ -20,7 +20,7 @@ package org.finos.tracdap.svc.data.api;
 import org.finos.tracdap.api.*;
 import org.finos.tracdap.api.Data;
 import org.finos.tracdap.common.netty.EventLoopResolver;
-import org.finos.tracdap.common.auth.internal.AuthHelpers;
+import org.finos.tracdap.common.auth.internal.GrpcAuthHelpers;
 import org.finos.tracdap.common.data.DataContext;
 import org.finos.tracdap.common.data.IDataContext;
 import org.finos.tracdap.common.data.pipeline.GrpcDownloadSink;
@@ -104,7 +104,7 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
     public StreamObserver<DataWriteRequest> createDataset(StreamObserver<TagHeader> responseObserver) {
 
         var dataContext = prepareDataContext();
-        var userInfo = AuthHelpers.currentUser();
+        var userInfo = GrpcAuthHelpers.currentUser();
 
         var upload = new GrpcUploadSource<>(DataWriteRequest.class, responseObserver);
         upload.whenComplete(() -> closeDataContext(dataContext));
@@ -136,7 +136,7 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
     public StreamObserver<DataWriteRequest> updateDataset(StreamObserver<TagHeader> responseObserver) {
 
         var dataContext = prepareDataContext();
-        var userInfo = AuthHelpers.currentUser();
+        var userInfo = GrpcAuthHelpers.currentUser();
 
         var upload = new GrpcUploadSource<>(DataWriteRequest.class, responseObserver);
         upload.whenComplete(() -> closeDataContext(dataContext));
@@ -182,7 +182,7 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
             boolean streamingMode) {
 
         var dataContext = prepareDataContext();
-        var userInfo = AuthHelpers.currentUser();
+        var userInfo = GrpcAuthHelpers.currentUser();
 
         var download = new GrpcDownloadSink<>(responseObserver, DataReadResponse::newBuilder, streamingMode);
         download.whenComplete(() -> closeDataContext(dataContext));
@@ -200,7 +200,7 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
     public StreamObserver<FileWriteRequest> createFile(StreamObserver<TagHeader> responseObserver) {
 
         var dataContext = prepareDataContext();
-        var userInfo = AuthHelpers.currentUser();
+        var userInfo = GrpcAuthHelpers.currentUser();
 
         var upload = new GrpcUploadSource<>(FileWriteRequest.class, responseObserver);
         upload.whenComplete(() -> closeDataContext(dataContext));
@@ -238,7 +238,7 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
     public StreamObserver<FileWriteRequest> updateFile(StreamObserver<TagHeader> responseObserver) {
 
         var dataContext = prepareDataContext();
-        var userInfo = AuthHelpers.currentUser();
+        var userInfo = GrpcAuthHelpers.currentUser();
 
         var upload = new GrpcUploadSource<>(FileWriteRequest.class, responseObserver);
         upload.whenComplete(() -> closeDataContext(dataContext));
@@ -292,7 +292,7 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
             GrpcDownloadSink<FileReadResponse, FileReadResponse.Builder> download) {
 
         var dataContext = prepareDataContext();
-        var userInfo = AuthHelpers.currentUser();
+        var userInfo = GrpcAuthHelpers.currentUser();
 
         download.whenComplete(() -> closeDataContext(dataContext));
 
@@ -343,7 +343,7 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
             GrpcDownloadSink<DownloadResponse, DownloadResponse.Builder> download) {
 
         var dataContext = prepareDataContext();
-        var userInfo = AuthHelpers.currentUser();
+        var userInfo = GrpcAuthHelpers.currentUser();
 
         download.whenComplete(() -> closeDataContext(dataContext));
 

@@ -20,7 +20,7 @@ package org.finos.tracdap.common.auth.internal;
 import org.finos.tracdap.common.exception.EAuthorization;
 
 
-public class AuthHelpers {
+public class GrpcAuthHelpers {
 
     public static UserInfo currentAuthUser() {
 
@@ -39,12 +39,7 @@ public class AuthHelpers {
         if (delegate != null)
             return delegate;
 
-        var authUser = AuthConstants.TRAC_AUTH_USER_KEY.get();
-
-        if (authUser != null)
-            return authUser;
-
-        throw new EAuthorization("User details are not available");
+        return currentAuthUser();
     }
 
     public static String printCurrentUser() {

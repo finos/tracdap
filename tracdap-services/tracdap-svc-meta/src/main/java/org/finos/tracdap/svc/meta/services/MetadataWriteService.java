@@ -21,7 +21,7 @@ import org.finos.tracdap.api.MetadataWriteBatchRequest;
 import org.finos.tracdap.api.MetadataWriteBatchResponse;
 import org.finos.tracdap.api.MetadataWriteRequest;
 import org.finos.tracdap.metadata.*;
-import org.finos.tracdap.common.auth.internal.AuthHelpers;
+import org.finos.tracdap.common.auth.internal.GrpcAuthHelpers;
 import org.finos.tracdap.common.auth.internal.UserInfo;
 import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.metadata.MetadataConstants;
@@ -61,7 +61,7 @@ public class MetadataWriteService {
 
     public TagHeader createPreallocatedObject(String tenant, MetadataWriteRequest request) {
 
-        var userInfo = AuthHelpers.currentUser();
+        var userInfo = GrpcAuthHelpers.currentUser();
         var timestamp = Instant.now().atOffset(ZoneOffset.UTC);
 
         var preallocatedObjects = processPreallocatedObjects(List.of(request), userInfo, timestamp);
@@ -73,7 +73,7 @@ public class MetadataWriteService {
 
     public TagHeader createObject(String tenant, MetadataWriteRequest request) {
 
-        var userInfo = AuthHelpers.currentUser();
+        var userInfo = GrpcAuthHelpers.currentUser();
         var timestamp = Instant.now().atOffset(ZoneOffset.UTC);
 
         var newObjects = processNewObjects(List.of(request), userInfo, timestamp);
@@ -85,7 +85,7 @@ public class MetadataWriteService {
 
     public TagHeader updateObject(String tenant, MetadataWriteRequest request) {
 
-        var userInfo = AuthHelpers.currentUser();
+        var userInfo = GrpcAuthHelpers.currentUser();
         var timestamp = Instant.now().atOffset(ZoneOffset.UTC);
 
         var newVersions = processNewVersions(tenant, List.of(request), userInfo, timestamp);
@@ -97,7 +97,7 @@ public class MetadataWriteService {
 
     public TagHeader updateTag(String tenant, MetadataWriteRequest request) {
 
-        var userInfo = AuthHelpers.currentUser();
+        var userInfo = GrpcAuthHelpers.currentUser();
         var timestamp = Instant.now().atOffset(ZoneOffset.UTC);
 
         var newTags = processNewTags(tenant, List.of(request), userInfo, timestamp);
@@ -111,7 +111,7 @@ public class MetadataWriteService {
 
         var tenant = request.getTenant();
 
-        var userInfo = AuthHelpers.currentUser();
+        var userInfo = GrpcAuthHelpers.currentUser();
         var timestamp = Instant.now().atOffset(ZoneOffset.UTC);
 
         var preallocatedIds = processPreallocatedIds(request.getPreallocateIdsList());

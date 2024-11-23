@@ -112,12 +112,12 @@ public class GrpcAuthValidator implements ServerInterceptor {
         if (authConfig.getDisableSigning()) {
             log.warn("AUTHENTICATE: {}() [{}] SUCCEEDED WITHOUT VALIDATION",
                     call.getMethodDescriptor().getBareMethodName(),
-                    AuthHelpers.printCurrentUser(userInfo, delegate));
+                    GrpcAuthHelpers.printCurrentUser(userInfo, delegate));
         }
         else {
             log.info("AUTHENTICATE: {}() [{}] SUCCEEDED",
                     call.getMethodDescriptor().getBareMethodName(),
-                    AuthHelpers.printCurrentUser(userInfo, delegate));
+                    GrpcAuthHelpers.printCurrentUser(userInfo, delegate));
         }
 
         // Auth complete, put details into the current call context

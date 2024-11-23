@@ -18,7 +18,7 @@
 package org.finos.tracdap.common.grpc;
 
 import io.grpc.*;
-import org.finos.tracdap.common.auth.internal.AuthHelpers;
+import org.finos.tracdap.common.auth.internal.GrpcAuthHelpers;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -41,13 +41,13 @@ public class LoggingServerInterceptor implements ServerInterceptor {
 
             log.info("API CALL START: {}() [{}]",
                     method.getBareMethodName(),
-                    AuthHelpers.printCurrentUser());
+                    GrpcAuthHelpers.printCurrentUser());
         }
         else {
 
             log.info("API CALL START: {}() [{}] ({})",
                     method.getBareMethodName(),
-                    AuthHelpers.printCurrentUser(),
+                    GrpcAuthHelpers.printCurrentUser(),
                     method.getType());
         }
 
