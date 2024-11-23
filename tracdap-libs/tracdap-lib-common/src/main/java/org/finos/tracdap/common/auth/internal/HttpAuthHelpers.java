@@ -19,6 +19,7 @@ package org.finos.tracdap.common.auth.internal;
 
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaders;
+import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.cookie.Cookie;
 import io.netty.handler.codec.http.cookie.ServerCookieDecoder;
 import io.netty.handler.codec.http2.Http2Headers;
@@ -57,6 +58,38 @@ public class HttpAuthHelpers {
             return rawToken.substring(AuthConstants.BEARER_PREFIX.length());
         else
             return rawToken;
+    }
+
+    public static boolean isBrowserRequest(HttpRequest request) {
+
+        return ! isApiRequest(request);
+    }
+
+    public static boolean isApiRequest(HttpRequest request) {
+
+        var headers = request.headers();
+
+        if (!headers.contains(HttpHeaderNames.CONTENT_TYPE))
+            return false;
+
+        var contentType = headers.get(HttpHeaderNames.CONTENT_TYPE);
+
+        return contentType.startsWith("application/") && !contentType.equals("application/x-www-form-urlencoded");
+    }
+
+    public static boolean isBrowserRequest(Http2Headers headers) {
+
+        return ! isApiRequest(headers);
+    }
+
+    public static boolean isApiRequest(Http2Headers headers) {
+
+        if (!headers.contains(HttpHeaderNames.CONTENT_TYPE))
+            return false;
+
+        var contentType = headers.get(HttpHeaderNames.CONTENT_TYPE).toString();
+
+        return contentType.startsWith("application/") && !contentType.equals("application/x-www-form-urlencoded");
     }
 
     private static String findRawAuthToken(HttpHeaders headers) {

@@ -17,10 +17,10 @@
 
 package org.finos.tracdap.gateway;
 
-import org.finos.tracdap.common.auth.external.Http1AuthHandler;
-import org.finos.tracdap.common.auth.external.IAuthProvider;
-import org.finos.tracdap.common.auth.internal.JwtProcessor;
+import org.finos.tracdap.config.PlatformConfig;
 import org.finos.tracdap.config.AuthenticationConfig;
+import org.finos.tracdap.common.auth.internal.JwtValidator;
+import org.finos.tracdap.gateway.auth.Http1AuthHandler;
 
 import io.netty.channel.*;
 import io.netty.channel.socket.SocketChannel;
@@ -32,7 +32,6 @@ import io.netty.handler.timeout.IdleStateHandler;
 import io.netty.util.AsciiString;
 import io.netty.util.ReferenceCountUtil;
 
-import org.finos.tracdap.config.PlatformConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -65,8 +64,7 @@ public class ProtocolNegotiator extends ChannelInitializer<SocketChannel> {
 
     private final AuthenticationConfig authCConfig;
     private final int idleTimeout;
-    private final IAuthProvider authProvider;
-    private final JwtProcessor jwtProcessor;
+    private final JwtValidator jwtValidator;
 
     private final ProtocolSetup<?> http1Handler;
     private final ProtocolSetup<?> http2Handler;
@@ -75,7 +73,7 @@ public class ProtocolNegotiator extends ChannelInitializer<SocketChannel> {
     private final AtomicInteger connId = new AtomicInteger();
 
     public ProtocolNegotiator(
-            PlatformConfig config, IAuthProvider authProvider, JwtProcessor jwtProcessor,
+            PlatformConfig config, JwtValidator jwtValidator,
             ProtocolSetup<?> http1Handler, ProtocolSetup<?> http2Handler,
             ProtocolSetup<WebSocketServerProtocolConfig> webSocketsHandler) {
 
@@ -85,9 +83,7 @@ public class ProtocolNegotiator extends ChannelInitializer<SocketChannel> {
                 ? config.getGateway().getIdleTimeout()
                 : DEFAULT_TIMEOUT;
 
-        this.authProvider = authProvider;
-        this.jwtProcessor = jwtProcessor;
-
+        this.jwtValidator = jwtValidator;
         this.http1Handler = http1Handler;
         this.http2Handler = http2Handler;
         this.webSocketsHandler = webSocketsHandler;
@@ -263,25 +259,18 @@ public class ProtocolNegotiator extends ChannelInitializer<SocketChannel> {
 
             log.info("Selected protocol: {} {}", remoteSocket, protocol);
 
+            // Auth handler goes at the front of the pipeline (HTTP codec is already installed)
+            // This is a regular HTTP auth, modified to redirect browsers to the auth service on failure
+            pipeline.addAfter(HTTP_1_INITIALIZER, HTTP_1_AUTH, new Http1AuthHandler(authCConfig, jwtValidator));
+
             // Keep alive handler will close connections not marked as keep-alive when a request is complete
-            pipeline.addAfter(HTTP_1_INITIALIZER, HTTP_1_KEEPALIVE, new HttpServerKeepAliveHandler());
+            pipeline.addAfter(HTTP_1_AUTH, HTTP_1_KEEPALIVE, new HttpServerKeepAliveHandler());
 
             // For connections that are kept alive, we need to handle timeouts
             // This idle state handler will trigger idle events after the configured timeout
             // The CoreRouter class is responsible for handling the idle events
             var idleHandler = new IdleStateHandler(MAX_TIMEOUT, MAX_TIMEOUT, idleTimeout, TimeUnit.SECONDS);
             pipeline.addAfter(HTTP_1_KEEPALIVE, CLIENT_TIMEOUT, idleHandler);
-
-            // auth processor asks for two auth providers, a browse-based one and an api-based one
-            // Currently we are only passing in a browser-based provider
-            // E.g. this can redirect the user to federated auth services
-            // Different approaches are needed for system-to-system auth
-
-            var authHandler = new Http1AuthHandler(
-                    authCConfig, conn,
-                    jwtProcessor, authProvider);
-
-            pipeline.addAfter(CLIENT_TIMEOUT, HTTP_1_AUTH, authHandler);
 
             // The main HTTP/1 handler
             pipeline.addLast(http1Handler.create(conn));
@@ -360,23 +349,21 @@ public class ProtocolNegotiator extends ChannelInitializer<SocketChannel> {
 
             pipeline.addAfter(WS_INITIALIZER, HTTP_1_CODEC, new HttpServerCodec());
 
+            // Auth handler goes immediately after the HTTP codec
+            // Since WS piggybacks on HTTP/1, use the HTTP/1 auth handler
+            pipeline.addAfter(HTTP_1_CODEC, HTTP_1_AUTH, new Http1AuthHandler(authCConfig, jwtValidator));
+
             // WebSockets connections also need to use idle handler
             // E.g. buggy client code might forget to send the EOS signal or close the connection
             // The CoreRouter class is responsible for handling the idle events
             var idleHandler = new IdleStateHandler(MAX_TIMEOUT, MAX_TIMEOUT, idleTimeout, TimeUnit.SECONDS);
-            pipeline.addAfter(HTTP_1_CODEC, CLIENT_TIMEOUT, idleHandler);
-
-            var authHandler = new Http1AuthHandler(
-                    authCConfig, conn,
-                    jwtProcessor, authProvider);
-
-            pipeline.addAfter(CLIENT_TIMEOUT, HTTP_1_AUTH, authHandler);
+            pipeline.addAfter(HTTP_1_AUTH, CLIENT_TIMEOUT, idleHandler);
 
 
             // Do not include compression codec at the WS level
             // Compression happens at the gRPC level for individual message blocks
             // Those message flow through different hops and protocols, including WS and HTTP/2
-            // Compressing / uncompressing on each hop is particularly inefficient since the payload is compressed
+            // Compressing / decompressing on each hop is particularly inefficient since the payload is compressed
             // Quick testing shows a roughly 10% performance gain in Chrome from removing WS-level compression
 
 
@@ -392,7 +379,7 @@ public class ProtocolNegotiator extends ChannelInitializer<SocketChannel> {
                     .handleCloseFrames(false)
                     .build();
 
-            pipeline.addAfter(HTTP_1_AUTH, WS_FRAME_CODEC, new WebSocketServerProtocolHandler(wsConfig));
+            pipeline.addAfter(CLIENT_TIMEOUT, WS_FRAME_CODEC, new WebSocketServerProtocolHandler(wsConfig));
 
             // Add the main handler - this should be the WebTransportRouter when the full service is running
             pipeline.addLast(webSocketsHandler.create(connId.getAndIncrement()));

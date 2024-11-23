@@ -17,7 +17,8 @@
 
 package org.finos.tracdap.gateway;
 
-import org.finos.tracdap.common.auth.external.IAuthProvider;
+import org.finos.tracdap.common.exception.EUnexpected;
+import org.finos.tracdap.config.PlatformConfig;
 import org.finos.tracdap.common.auth.internal.JwtSetup;
 import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.config.ConfigManager;
@@ -26,7 +27,6 @@ import org.finos.tracdap.common.netty.EventLoopScheduler;
 import org.finos.tracdap.common.netty.NettyHelpers;
 import org.finos.tracdap.common.plugin.PluginManager;
 import org.finos.tracdap.common.service.CommonServiceBase;
-import org.finos.tracdap.config.PlatformConfig;
 import org.finos.tracdap.gateway.builders.RedirectBuilder;
 import org.finos.tracdap.gateway.exec.Redirect;
 import org.finos.tracdap.gateway.exec.Route;
@@ -68,18 +68,18 @@ public class TracPlatformGateway extends CommonServiceBase {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
-    private final PluginManager pluginManager;
     private final ConfigManager configManager;
-
     private PlatformConfig platformConfig;
 
     private EventLoopGroup bossGroup = null;
     private EventLoopGroup workerGroup = null;
 
-
     public TracPlatformGateway(PluginManager pluginManager, ConfigManager configManager) {
 
-        this.pluginManager = pluginManager;
+        // Plugins not currently needed in the gateway (this is a good thing)!
+        if (pluginManager == null)
+            throw new EUnexpected();
+
         this.configManager = configManager;
     }
 
@@ -115,11 +115,8 @@ public class TracPlatformGateway extends CommonServiceBase {
 
             log.info("Starting the gateway server on port {}...", proxyPort);
 
-            var authProviderConfig = platformConfig.getAuthentication().getProvider();
-            var authProvider = pluginManager.createService(IAuthProvider.class, authProviderConfig, configManager);
-
-            // JWT processor is responsible for signing and validating auth tokens
-            var jwtProcessor = JwtSetup.createProcessor(platformConfig, configManager);
+            // JWT validator is responsible for checking auth tokens on inbound requests
+            var jwtValidator = JwtSetup.createValidator(platformConfig, configManager);
 
             // Handlers for all support protocols
             var http1Handler = ProtocolSetup.setup(connId -> new Http1Router(routes, redirects, connId));
@@ -136,7 +133,7 @@ public class TracPlatformGateway extends CommonServiceBase {
 
             // The protocol negotiator is the top level initializer for new inbound connections
             var protocolNegotiator = new ProtocolNegotiator(
-                    platformConfig, authProvider, jwtProcessor,
+                    platformConfig, jwtValidator,
                     http1Handler, http2Handler,
                     webSocketsHandler);
 
