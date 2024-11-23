@@ -17,24 +17,22 @@
 
 package org.finos.tracdap.gateway;
 
-import io.netty.channel.ChannelDuplexHandler;
-import io.netty.channel.ChannelPromise;
-import io.netty.handler.codec.http.websocketx.TextWebSocketFrame;
-import io.netty.handler.codec.http.websocketx.WebSocketServerProtocolConfig;
-import org.finos.tracdap.common.auth.external.*;
 import org.finos.tracdap.common.auth.internal.JwtSetup;
-import org.finos.tracdap.common.auth.internal.UserInfo;
 import org.finos.tracdap.config.AuthenticationConfig;
 import org.finos.tracdap.config.PlatformConfig;
 import org.finos.tracdap.config.PlatformInfo;
 
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.buffer.Unpooled;
+import io.netty.channel.ChannelDuplexHandler;
+import io.netty.channel.ChannelPromise;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.codec.http.*;
+import io.netty.handler.codec.http.websocketx.TextWebSocketFrame;
+import io.netty.handler.codec.http.websocketx.WebSocketServerProtocolConfig;
 import io.netty.handler.codec.http2.*;
 import io.netty.util.concurrent.DefaultThreadFactory;
 
@@ -84,15 +82,14 @@ public class ProtocolNegotiatorTest {
                         .setProduction(false))
                 .build();
 
-        var authProvider = new DummyAuthProvider();
-        var jwtProcessor = JwtSetup.createProcessor(
+        var jwtValidator = JwtSetup.createValidator(
                 gatewayConfig.getAuthentication(),
                 gatewayConfig.getPlatformInfo(),
                 null);
 
         // The protocol negotiator is the top level initializer for new inbound connections
         var protocolNegotiator = new ProtocolNegotiator(
-                gatewayConfig, authProvider, jwtProcessor,
+                gatewayConfig, jwtValidator,
                 http1, http2, webSockets);
 
         bossGroup = new NioEventLoopGroup(2, new DefaultThreadFactory("boss"));
@@ -304,29 +301,6 @@ public class ProtocolNegotiatorTest {
             }
 
             super.write(ctx, msg, promise);
-        }
-    }
-
-    private static class DummyAuthProvider implements IAuthProvider {
-
-        @Override
-        public AuthResult attemptAuth(AuthRequest authRequest) {
-
-            var user = new UserInfo();
-            user.setUserId("test_user");
-            user.setDisplayName("Test User");
-
-            return AuthResult.AUTHORIZED(user);
-        }
-
-        @Override
-        public boolean postAuthMatch(String method, String uri) {
-            return false;
-        }
-
-        @Override
-        public AuthResponse postAuth(AuthRequest authRequest, UserInfo userInfo) {
-            return null;
         }
     }
 }
