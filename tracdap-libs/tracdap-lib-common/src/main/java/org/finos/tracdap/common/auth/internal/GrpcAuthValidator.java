@@ -26,17 +26,17 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class InternalAuthValidator implements ServerInterceptor {
+public class GrpcAuthValidator implements ServerInterceptor {
 
     private static final String AUTH_DISABLED_USER_ID = "no_auth";
     private static final String AUTH_DISABLED_USER_NAME = "Authentication Disabled";
 
-    private static final Logger log = LoggerFactory.getLogger(InternalAuthValidator.class);
+    private static final Logger log = LoggerFactory.getLogger(GrpcAuthValidator.class);
 
     private final AuthenticationConfig authConfig;
     private final JwtValidator jwt;
 
-    public InternalAuthValidator(AuthenticationConfig authConfig, JwtValidator jwt) {
+    public GrpcAuthValidator(AuthenticationConfig authConfig, JwtValidator jwt) {
 
         if (jwt == null && !authConfig.getDisableAuth()) {
             throw new EStartup("Token validator is not available");
