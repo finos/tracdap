@@ -23,6 +23,8 @@ import io.grpc.Metadata;
 
 public class AuthConstants {
 
+    public static final String BEARER_PREFIX = "bearer ";
+
     public static final String TRAC_AUTH_TOKEN = "trac_auth_token";
     public static final String TRAC_AUTH_USER = "trac_auth_user";
     public static final String TRAC_DELEGATE = "trac_delegate";
