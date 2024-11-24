@@ -18,6 +18,7 @@
 package org.finos.tracdap.common.auth.internal;
 
 import io.netty.handler.codec.http.*;
+import io.netty.handler.codec.http.websocketx.WebSocketFrame;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.util.LoggingHelpers;
 import org.finos.tracdap.config.AuthenticationConfig;
@@ -98,7 +99,7 @@ public class Http1AuthValidator extends ChannelInboundHandlerAdapter {
                     ctx.close();
                 }
             }
-            else if (msg instanceof HttpObject) {
+            else if (msg instanceof HttpObject || msg instanceof WebSocketFrame) {
 
                 // For other message types that are not new requests,
                 // Refer to the authentication status of the most recent request message
