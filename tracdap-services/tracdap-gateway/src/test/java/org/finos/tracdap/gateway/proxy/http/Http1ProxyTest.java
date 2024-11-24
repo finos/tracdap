@@ -17,7 +17,6 @@
 
 package org.finos.tracdap.gateway.proxy.http;
 
-import io.netty.util.ReferenceCountUtil;
 import org.finos.tracdap.common.startup.StandardArgs;
 import org.finos.tracdap.common.startup.Startup;
 
