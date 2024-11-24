@@ -15,8 +15,6 @@
 
 config:
   logging: trac-logging.xml
-  secret.type: PKCS12
-  secret.url: trac-unit.pfx
 
 
 platformInfo:
@@ -27,15 +25,7 @@ platformInfo:
 
 
 authentication:
-
-  jwtIssuer: http://localhost/
-  jwtExpiry: 7200
-
-  provider:
-    protocol: guest
-    properties:
-      userId: guest
-      userName: Guest User
+  disableAuth: true
 
 
 metadata:
