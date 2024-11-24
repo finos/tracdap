@@ -22,7 +22,6 @@ import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.config.AuthenticationConfig;
-import org.finos.tracdap.config.GatewayConfig;
 import org.finos.tracdap.config.PlatformConfig;
 import org.finos.tracdap.config.PlatformInfo;
 
@@ -57,7 +56,7 @@ public class JwtSetup {
             return createProcessor(authConfig, platformInfo, keyPair);
         }
         else {
-            return createProcessor(authConfig, platformInfo, (KeyPair) null);
+            return createProcessor(authConfig, platformInfo, null);
         }
     }
 
