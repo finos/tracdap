@@ -143,6 +143,7 @@ public class ProtocolNegotiatorTest {
         var response = client.send(request, HttpResponse.BodyHandlers.ofString());
 
         Assertions.assertEquals(200, response.statusCode());
+        Assertions.assertEquals(HttpClient.Version.HTTP_1_1, response.version());
         Assertions.assertEquals("test_response", response.body());
     }
 
@@ -164,6 +165,7 @@ public class ProtocolNegotiatorTest {
         var response = client.send(request, HttpResponse.BodyHandlers.ofString());
 
         Assertions.assertEquals(200, response.statusCode());
+        Assertions.assertEquals(HttpClient.Version.HTTP_2, response.version());
         Assertions.assertEquals("test_response", response.body());
     }
 
