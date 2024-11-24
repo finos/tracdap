@@ -219,7 +219,8 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         prepareConfig();
         preparePlugins();
 
-        prepareAuth();
+        if (!platformConfig.getAuthentication().getDisableAuth())
+            prepareAuth();
 
         if (runDbDeploy)
             prepareDatabase();
