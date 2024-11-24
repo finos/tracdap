@@ -76,7 +76,7 @@ public class ProtocolNegotiatorTest {
         var gatewayConfig = PlatformConfig.newBuilder()
                 .setAuthentication(AuthenticationConfig.newBuilder()
                         .setJwtIssuer("trac_test_issuer")
-                        .setDisableSigning(true))
+                        .setDisableAuth(true))
                 .setPlatformInfo(PlatformInfo.newBuilder()
                         .setEnvironment("unit_test")
                         .setProduction(false))
