@@ -208,7 +208,7 @@ public class TracPlatformGateway extends CommonServiceBase {
 
         log.info("Closing the gateway to new connections...");
 
-        var bossShutdown = bossGroup.shutdownGracefully();
+        var bossShutdown = bossGroup.shutdownGracefully(0, shutdownTimeout.getSeconds(), TimeUnit.SECONDS);
         bossShutdown.await(shutdownTimeout.getSeconds(), TimeUnit.SECONDS);
 
         if (!bossShutdown.isSuccess()) {
@@ -222,7 +222,7 @@ public class TracPlatformGateway extends CommonServiceBase {
         var shutdownElapsedTime = Duration.between(shutdownStartTime, Instant.now());
         var shutdownTimeRemaining = shutdownTimeout.minus(shutdownElapsedTime);
 
-        var workerShutdown = workerGroup.shutdownGracefully();
+        var workerShutdown = workerGroup.shutdownGracefully(0, shutdownTimeRemaining.getSeconds(), TimeUnit.SECONDS);
         workerShutdown.await(shutdownTimeRemaining.getSeconds(), TimeUnit.SECONDS);
 
         if (!workerShutdown.isSuccess()) {
