@@ -15,19 +15,11 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.gateway;
-
-import org.finos.tracdap.common.auth.internal.JwtSetup;
-import org.finos.tracdap.config.AuthenticationConfig;
-import org.finos.tracdap.config.PlatformConfig;
-import org.finos.tracdap.config.PlatformInfo;
+package org.finos.tracdap.common.netty;
 
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.buffer.Unpooled;
-import io.netty.channel.ChannelDuplexHandler;
-import io.netty.channel.ChannelPromise;
-import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelInboundHandlerAdapter;
+import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.codec.http.*;
@@ -54,11 +46,66 @@ import java.util.concurrent.CompletionStage;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Supplier;
 
 
 public class ProtocolNegotiatorTest {
 
-    private static final ProtocolSetup<WebSocketServerProtocolConfig> UNUSED_PROTOCOL = null;
+    private static final int IDLE_TIMEOUT = 60;
+
+    static class SimpleNegotiator extends BaseProtocolNegotiator {
+
+        private final Supplier<ChannelHandler> http1;
+        private final Supplier<ChannelHandler> http2;
+        private final Supplier<ChannelHandler> ws;
+
+        public SimpleNegotiator(
+                Supplier<ChannelHandler> http1,
+                Supplier<ChannelHandler> http2,
+                Supplier<ChannelHandler> ws) {
+
+            super(http2 != null, http2 != null, ws != null, IDLE_TIMEOUT);
+
+            this.http1 = http1;
+            this.http2 = http2;
+            this.ws = ws;
+        }
+
+        @Override
+        protected ChannelInboundHandler http1AuthHandler() {
+            return new ChannelInboundHandlerAdapter();
+        }
+
+        @Override
+        protected ChannelInboundHandler http2AuthHandler() {
+            return new ChannelInboundHandlerAdapter();
+        }
+
+        @Override
+        protected ChannelHandler http1PrimaryHandler() {
+            return http1.get();
+        }
+
+        @Override
+        protected ChannelHandler http2PrimaryHandler() {
+            return http2.get();
+        }
+
+        @Override
+        protected ChannelHandler wsPrimaryHandler() {
+            return ws.get();
+        }
+
+        @Override
+        protected WebSocketServerProtocolConfig wsProtocolConfig() {
+            return WebSocketServerProtocolConfig.newBuilder().build();
+        }
+    }
+
+
+
+
+    private static final Supplier<ChannelHandler> UNUSED_PROTOCOL = ChannelDuplexHandler::new;
 
     private static final Logger log = LoggerFactory.getLogger(ProtocolNegotiatorTest.class);
 
@@ -69,28 +116,13 @@ public class ProtocolNegotiatorTest {
 
     void startServer(
             int gatewayPort,
-            ProtocolSetup<?> http1, ProtocolSetup<?> http2,
-            ProtocolSetup<WebSocketServerProtocolConfig> webSockets)
+            Supplier<ChannelHandler> http1,
+            Supplier<ChannelHandler>http2,
+            Supplier<ChannelHandler> webSockets)
             throws Exception {
 
-        var gatewayConfig = PlatformConfig.newBuilder()
-                .setAuthentication(AuthenticationConfig.newBuilder()
-                        .setJwtIssuer("trac_test_issuer")
-                        .setDisableAuth(true))
-                .setPlatformInfo(PlatformInfo.newBuilder()
-                        .setEnvironment("unit_test")
-                        .setProduction(false))
-                .build();
-
-        var jwtValidator = JwtSetup.createValidator(
-                gatewayConfig.getAuthentication(),
-                gatewayConfig.getPlatformInfo(),
-                null);
-
         // The protocol negotiator is the top level initializer for new inbound connections
-        var protocolNegotiator = new ProtocolNegotiator(
-                gatewayConfig, jwtValidator,
-                http1, http2, webSockets);
+        var protocolNegotiator = new SimpleNegotiator(http1, http2, webSockets);
 
         bossGroup = new NioEventLoopGroup(2, new DefaultThreadFactory("boss"));
         workerGroup = new NioEventLoopGroup(6, new DefaultThreadFactory("worker"));
@@ -129,9 +161,8 @@ public class ProtocolNegotiatorTest {
     void negotiateClearHttp1() throws Exception {
 
         var port = serverPort.getAndIncrement();
-        var http1 = ProtocolSetup.setup(connId -> new Http1Server("test_response"));
 
-        startServer(port, http1, UNUSED_PROTOCOL, null);
+        startServer(port, () -> new Http1Server("test_response"), UNUSED_PROTOCOL, UNUSED_PROTOCOL);
 
         var request = java.net.http.HttpRequest.newBuilder().GET()
                 .uri(new URI("http://localhost:" + port + "/test/path"))
@@ -151,9 +182,8 @@ public class ProtocolNegotiatorTest {
     void negotiateClearHttp2() throws Exception {
 
         var port = serverPort.getAndIncrement();
-        var http2 = ProtocolSetup.setup(connId -> new Http2Server("test_response"));
 
-        startServer(port, UNUSED_PROTOCOL, http2, UNUSED_PROTOCOL);
+        startServer(port, UNUSED_PROTOCOL, () -> new Http2Server("test_response"), UNUSED_PROTOCOL);
 
         var request = java.net.http.HttpRequest.newBuilder().GET()
                 .uri(new URI("http://localhost:" + port + "/test/path"))
@@ -173,10 +203,8 @@ public class ProtocolNegotiatorTest {
     void negotiateClearWs() throws Exception {
 
         var port = serverPort.getAndIncrement();
-        var wsConfig = WebSocketServerProtocolConfig.newBuilder().build();
-        var ws = ProtocolSetup.setup(connId -> new WebSocketServer("test_response_ws"), wsConfig);
 
-        startServer(port, UNUSED_PROTOCOL, UNUSED_PROTOCOL, ws);
+        startServer(port, UNUSED_PROTOCOL, UNUSED_PROTOCOL, () -> new WebSocketServer("test_response_ws"));
 
         var latch = new CountDownLatch(1);
         var response = new String[1];
@@ -212,9 +240,9 @@ public class ProtocolNegotiatorTest {
         @Override
         public void channelRead(@Nonnull ChannelHandlerContext ctx, @Nonnull Object msg) throws Exception {
 
-            log.info("HTTP/1 server is responding");
-
             if (msg instanceof HttpRequest) {
+
+                log.info("HTTP/1 server is responding");
 
                 var content = Unpooled.wrappedBuffer(response.getBytes(StandardCharsets.UTF_8));
                 var headers = new DefaultHttpHeaders();
@@ -244,9 +272,9 @@ public class ProtocolNegotiatorTest {
         @Override
         public void channelRead(@Nonnull ChannelHandlerContext ctx, @Nonnull Object msg) throws Exception {
 
-            log.info("HTTP/2 server is responding");
-
             if (msg instanceof Http2HeadersFrame) {
+
+                log.info("HTTP/2 server is responding");
 
                 var req = (Http2HeadersFrame) msg;
 
@@ -278,9 +306,9 @@ public class ProtocolNegotiatorTest {
         @Override
         public void channelRead(@Nonnull ChannelHandlerContext ctx, @Nonnull Object msg) throws Exception {
 
-            log.info("WebSocket server is responding");
-
             if (msg instanceof TextWebSocketFrame) {
+
+                log.info("WebSocket server is responding");
 
                 var req = (TextWebSocketFrame) msg;
                 var resp = new TextWebSocketFrame(true, req.rsv(), response);
