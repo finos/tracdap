@@ -17,382 +17,88 @@
 
 package org.finos.tracdap.gateway;
 
-import org.finos.tracdap.config.PlatformConfig;
-import org.finos.tracdap.config.AuthenticationConfig;
 import org.finos.tracdap.common.auth.internal.JwtValidator;
+import org.finos.tracdap.common.netty.BaseProtocolNegotiator;
+import org.finos.tracdap.config.AuthenticationConfig;
+import org.finos.tracdap.config.PlatformConfig;
 import org.finos.tracdap.gateway.auth.Http1AuthHandler;
 
-import io.netty.channel.*;
-import io.netty.channel.socket.SocketChannel;
-import io.netty.handler.codec.http.*;
+import io.netty.channel.ChannelDuplexHandler;
+import io.netty.channel.ChannelHandler;
+import io.netty.channel.ChannelInboundHandler;
 import io.netty.handler.codec.http.websocketx.WebSocketServerProtocolConfig;
-import io.netty.handler.codec.http.websocketx.WebSocketServerProtocolHandler;
-import io.netty.handler.codec.http2.*;
-import io.netty.handler.timeout.IdleStateHandler;
-import io.netty.util.AsciiString;
-import io.netty.util.ReferenceCountUtil;
+import org.finos.tracdap.gateway.exec.Redirect;
+import org.finos.tracdap.gateway.exec.Route;
+import org.finos.tracdap.gateway.routing.Http1Router;
+import org.finos.tracdap.gateway.routing.Http2Router;
+import org.finos.tracdap.gateway.routing.WebSocketsRouter;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import javax.annotation.Nonnull;
-import java.util.Collection;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 
-public class ProtocolNegotiator extends ChannelInitializer<SocketChannel> {
+public class ProtocolNegotiator extends BaseProtocolNegotiator {
 
-    private static final String PROTOCOL_SELECTOR_HANDLER = "protocol_selector";
-    private static final String CLIENT_TIMEOUT = "client_timeout";
-
-    private static final String HTTP_1_INITIALIZER = "http_1_initializer";
-    private static final String HTTP_1_CODEC = "http_1_codec";
-    private static final String HTTP_1_KEEPALIVE = "http_1_keepalive";
-    private static final String HTTP_1_AUTH = "http_1_auth";
-
-    private static final String HTTP_2_CODEC = "http_2_codec";
-
-    private static final String WS_INITIALIZER = "ws_initializer";
-    private static final String WS_FRAME_CODEC = "ws_frame_codec";
-
-    private static final int MAX_TIMEOUT = 3600;
     private static final int DEFAULT_TIMEOUT = 60;
 
-    private final Logger log = LoggerFactory.getLogger(getClass());
-
     private final AuthenticationConfig authCConfig;
-    private final int idleTimeout;
     private final JwtValidator jwtValidator;
-
-    private final ProtocolSetup<?> http1Handler;
-    private final ProtocolSetup<?> http2Handler;
-    private final ProtocolSetup<WebSocketServerProtocolConfig> webSocketsHandler;
+    private final List<Route> routes;
+    private final List<Redirect> redirects;
 
     private final AtomicInteger connId = new AtomicInteger();
 
     public ProtocolNegotiator(
             PlatformConfig config, JwtValidator jwtValidator,
-            ProtocolSetup<?> http1Handler, ProtocolSetup<?> http2Handler,
-            ProtocolSetup<WebSocketServerProtocolConfig> webSocketsHandler) {
+            List<Route> routes, List<Redirect> redirects) {
+
+        super(true, true, true, getIdleTimeout(config));
 
         this.authCConfig = config.getAuthentication();
+        this.jwtValidator = jwtValidator;
+        this.routes = routes;
+        this.redirects = redirects;
+    }
 
-        this.idleTimeout = config.getGateway().getIdleTimeout() > 0
+    private static int getIdleTimeout(PlatformConfig config) {
+
+        return config.getGateway().getIdleTimeout() > 0
                 ? config.getGateway().getIdleTimeout()
                 : DEFAULT_TIMEOUT;
-
-        this.jwtValidator = jwtValidator;
-        this.http1Handler = http1Handler;
-        this.http2Handler = http2Handler;
-        this.webSocketsHandler = webSocketsHandler;
     }
 
     @Override
-    protected void initChannel(SocketChannel channel) {
-
-        var remoteSocket = channel.remoteAddress();
-
-        log.info("New connection from [{}]", remoteSocket);
-
-        var httpCodec = new HttpServerCodec();
-        var http1Init = new Http1Initializer();
-        var http2Init = new Http2Initializer();
-
-        // Upgrade factory, gives out upgrade codec if HTTP upgrade is requested
-        var upgradeFactory = new UpgradeCodecFactory();
-
-        // Upgrade handler, reads the initial HTTP request and decides whether to call the upgrade factory
-        // The alternate version (class below) has different behavior for failed upgrades
-        var upgradeHandler = new HttpServerUpgradeHandler(httpCodec, upgradeFactory);
-
-        // The clear text handler handles prior knowledge upgrades to HTTP/2 on clear text (i.e. PRI)
-        var upgradeHandlerAux = new CleartextHttp2ServerUpgradeHandler(httpCodec, upgradeHandler, http2Init);
-
-        // Initial pipeline has two steps:
-        // - The upgrade handler, that will set up the pipeline for any upgrade protocols
-        // - The init handler for HTTP/1, which will be called if no upgrade occurs
-        var pipeline = channel.pipeline();
-        pipeline.addLast(PROTOCOL_SELECTOR_HANDLER, upgradeHandlerAux);
-        pipeline.addLast(HTTP_1_INITIALIZER, http1Init);
+    protected ChannelInboundHandler http1AuthHandler() {
+        return new Http1AuthHandler(authCConfig, jwtValidator);
     }
 
-
-    // -----------------------------------------------------------------------------------------------------------------
-    // UPGRADE MECHANISM
-    // -----------------------------------------------------------------------------------------------------------------
-
-
-    // Upgrade codec factory is responsible for giving out upgrade codecs for supported protocols
-    // If no codec is available, HTTP spec says the request should continue on the original protocol
-    // In practice this often leads to errors for gRPC or web sockets, it might be better to send an error
-
-    private class UpgradeCodecFactory implements HttpServerUpgradeHandler.UpgradeCodecFactory {
-
-        @Override
-        public HttpServerUpgradeHandler.UpgradeCodec newUpgradeCodec(CharSequence protocol) {
-
-            log.info("Request for protocol upgrade: [{}]", protocol);
-
-            if (AsciiString.contentEquals(Http2CodecUtil.HTTP_UPGRADE_PROTOCOL_NAME, protocol)) {
-
-                var http2Codec = Http2FrameCodecBuilder.forServer().build();
-                return new Http2ServerUpgradeCodec(http2Codec, new Http2Initializer());
-            }
-
-            if (AsciiString.contentEquals(Http2CodecUtil.TLS_UPGRADE_PROTOCOL_NAME, protocol)) {
-
-                var http2Codec = Http2FrameCodecBuilder.forServer().build();
-                return new Http2ServerUpgradeCodec(http2Codec, new Http2Initializer());
-            }
-
-
-            if (AsciiString.contentEquals("websocket", protocol)) {
-
-                // Web sockets support may not be enabled
-                if (webSocketsHandler != null)
-                    return new WebsocketUpgradeCodec();
-            }
-
-            log.warn("Upgrade not available for protocol: " + protocol);
-
-            return null;
-        }
+    @Override
+    protected ChannelInboundHandler http2AuthHandler() {
+        return new ChannelDuplexHandler();
     }
 
-
-    // Upgrade codec for websockets
-
-    // The WebSocketProtocolHandler and HttpServerUpgradeHandler do not work on the same principle
-    // WebSocketProtocolHandler includes everything for handling a web sockets connection, including the upgrade
-    // HttpServerUpgradeHandler assumes the codec sends the upgrade response, before handing off to the new protocol
-    // In order to get the right response from the upgrade handler we would need to take the handshake logic
-    // out of the web socket handler, which would be very messy and break the internal state of that handler
-
-    // The work-around solution here is to intercept and discard the upgrade response sent by the upgrade handler
-    // The web socket handler will send its own upgrade response later, which is the one to reach the client
-    // This allows the web socket initializer to be installed by the HTTP upgrade handler mechanism
-
-    // The alternative, also a work-around, would be to ignore the HTTP upgrade handler altogether for web sockets
-    // Then we would need to check the first inbound message in the HTTP/1 channel initializer
-    // If a web sockets upgrade requests is seen, the HTTP/1 initializer would then defer to the WS initializer
-
-    private static final String WEBSOCKETS_UPGRADE_INTERCEPT_HEADER = "X-Websockets-Upgrade-Intercept";
-    private static final String WEBSOCKETS_UPGRADE_INTERCEPT_MAGIC = "dRThBVai/as3b&ex.==";
-
-    private class WebsocketUpgradeCodec implements HttpServerUpgradeHandler.UpgradeCodec {
-
-        @Override
-        public Collection<CharSequence> requiredUpgradeHeaders() {
-            return List.of();
-        }
-
-        @Override
-        public boolean prepareUpgradeResponse(ChannelHandlerContext ctx, FullHttpRequest upgradeRequest, HttpHeaders upgradeHeaders) {
-
-            // The upgrade headers prepared here are what gets sent back to the client by the HTTP upgrade handler
-            // These do not include the required web sockets fields, such as sec-websocket-key
-            // Calling the web socket handshake logic here would (a) be messy and (b) break the web sockets handler
-            // Instead, we install an interceptor to catch and discard the generated headers
-            // The special header added is used as the signal to the interceptor
-
-            var currentHandler = ctx.name();
-            ctx.pipeline().addBefore(currentHandler, null, new WebSocketUpgradeInterceptor());
-
-            upgradeHeaders.set(WEBSOCKETS_UPGRADE_INTERCEPT_HEADER, WEBSOCKETS_UPGRADE_INTERCEPT_MAGIC);
-
-            return true;
-        }
-
-        @Override
-        public void upgradeTo(ChannelHandlerContext ctx, FullHttpRequest upgradeRequest) {
-
-            var currentHandler = ctx.name();
-            ctx.pipeline().addAfter(currentHandler, WS_INITIALIZER, new WebSocketInitializer());
-        }
+    @Override
+    protected ChannelHandler http1PrimaryHandler() {
+        return new Http1Router(routes, redirects, connId.getAndIncrement());
     }
 
-    private static class WebSocketUpgradeInterceptor extends ChannelOutboundHandlerAdapter {
-
-        @Override
-        public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) throws Exception {
-
-            // Catch and discard the outbound response if the special intercept header is detected
-            // Once the intercept is performed, this handler can be removed
-
-            if (msg instanceof HttpResponse) {
-
-                var resp = (HttpResponse) msg;
-                var headers = resp.headers();
-                var intercept = headers.get(WEBSOCKETS_UPGRADE_INTERCEPT_HEADER);
-
-                if (intercept != null && intercept.equals(WEBSOCKETS_UPGRADE_INTERCEPT_MAGIC)) {
-                    ctx.pipeline().remove(this);
-                    ReferenceCountUtil.release(msg);
-                    return;
-                }
-            }
-
-            super.write(ctx, msg, promise);
-        }
+    @Override
+    protected ChannelHandler http2PrimaryHandler() {
+        return new Http2Router(routes);
     }
 
-
-    // -----------------------------------------------------------------------------------------------------------------
-    // PROTOCOL INITIALIZERS
-    // -----------------------------------------------------------------------------------------------------------------
-
-
-    private class Http1Initializer extends ChannelInboundHandlerAdapter {
-
-        // Set up the HTTP/1 pipeline in response to the first inbound message
-        // This initializer is called if there was no attempt at HTTP upgrade (or the upgrade attempt failed)
-
-        @Override
-        public void channelRead(ChannelHandlerContext ctx, @Nonnull Object msg) {
-
-            var pipeline = ctx.pipeline();
-            var remoteSocket = ctx.channel().remoteAddress();
-            var protocol = "HTTP/1";
-            var conn = connId.getAndIncrement();
-
-            log.info("Selected protocol: {} {}", remoteSocket, protocol);
-
-            // Auth handler goes at the front of the pipeline (HTTP codec is already installed)
-            // This is a regular HTTP auth, modified to redirect browsers to the auth service on failure
-            pipeline.addAfter(HTTP_1_INITIALIZER, HTTP_1_AUTH, new Http1AuthHandler(authCConfig, jwtValidator));
-
-            // Keep alive handler will close connections not marked as keep-alive when a request is complete
-            pipeline.addAfter(HTTP_1_AUTH, HTTP_1_KEEPALIVE, new HttpServerKeepAliveHandler());
-
-            // For connections that are kept alive, we need to handle timeouts
-            // This idle state handler will trigger idle events after the configured timeout
-            // The CoreRouter class is responsible for handling the idle events
-            var idleHandler = new IdleStateHandler(MAX_TIMEOUT, MAX_TIMEOUT, idleTimeout, TimeUnit.SECONDS);
-            pipeline.addAfter(HTTP_1_KEEPALIVE, CLIENT_TIMEOUT, idleHandler);
-
-            // The main HTTP/1 handler
-            pipeline.addLast(http1Handler.create(conn));
-
-            // Since this handler is not based on ChannelInitializer
-            // We need to remove it explicitly and re-trigger the first message
-            pipeline.remove(this);
-            ctx.fireChannelRead(msg);
-        }
+    @Override
+    protected ChannelHandler wsPrimaryHandler() {
+        return new WebSocketsRouter(routes, connId.getAndIncrement());
     }
 
-    private class Http2Initializer extends ChannelInboundHandlerAdapter {
+    @Override
+    protected WebSocketServerProtocolConfig wsProtocolConfig() {
 
-        // Set up the HTTP/2 pipeline in response to an HTTP upgrade event
-        // This will be called after the HTTP upgrade is processed, and before the first inbound HTTP/2 message
-
-        @Override
-        public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
-
-            if (!(evt instanceof HttpServerUpgradeHandler.UpgradeEvent)) {
-                super.userEventTriggered(ctx, evt);
-                return;
-            }
-
-            var upgrade = (HttpServerUpgradeHandler.UpgradeEvent) evt;
-
-            var pipeline = ctx.pipeline();
-            var remoteSocket = ctx.channel().remoteAddress();
-            var protocol = upgrade.protocol();
-
-            log.info("Selected protocol: {} {}", remoteSocket, protocol);
-
-            // Depending on how HTTP/2 is set up, the codec may or may not have been installed
-            if (pipeline.get(Http2FrameCodec.class) == null) {
-                var http2InitName = pipeline.context(this).name();
-                var http2Codec = Http2FrameCodecBuilder.forServer().build();
-                pipeline.addAfter(http2InitName, HTTP_2_CODEC, http2Codec);
-            }
-
-            // The main HTTP/2 handler
-            pipeline.addLast(http2Handler.create(connId.getAndIncrement()));
-
-            pipeline.remove(this);
-            pipeline.remove(HTTP_1_INITIALIZER);
-
-            // The HTTP/2 pipeline does not expect to see the original HTTP/1 upgrade request
-            // This has already been responded to by the upgrade handler
-            // Now the pipeline is reconfigured, we can discard this event and wait for the first HTTP/2 message
-
-            ReferenceCountUtil.release(evt);
-        }
+        return WebSocketServerProtocolConfig.newBuilder()
+                .subprotocols("grpc-websockets")
+                .allowExtensions(true)
+                .handleCloseFrames(false)
+                .build();
     }
-
-    private class WebSocketInitializer extends ChannelInboundHandlerAdapter {
-
-        // Set up the HTTP/2 pipeline in response to an HTTP upgrade event
-        // This will be called after the HTTP upgrade is processed, and before the first inbound HTTP/2 message
-
-        @Override
-        public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
-
-            if (!(evt instanceof HttpServerUpgradeHandler.UpgradeEvent)) {
-                super.userEventTriggered(ctx, evt);
-                return;
-            }
-
-            var upgrade = (HttpServerUpgradeHandler.UpgradeEvent) evt;
-            var req = upgrade.upgradeRequest();
-
-            var pipeline = ctx.pipeline();
-            var remoteSocket = ctx.channel().remoteAddress();
-            var protocol = upgrade.protocol();
-            var conn = connId.getAndIncrement();
-
-            log.info("Selected protocol: {} {}", remoteSocket, protocol);
-
-            pipeline.addAfter(WS_INITIALIZER, HTTP_1_CODEC, new HttpServerCodec());
-
-            // Auth handler goes immediately after the HTTP codec
-            // Since WS piggybacks on HTTP/1, use the HTTP/1 auth handler
-            pipeline.addAfter(HTTP_1_CODEC, HTTP_1_AUTH, new Http1AuthHandler(authCConfig, jwtValidator));
-
-            // WebSockets connections also need to use idle handler
-            // E.g. buggy client code might forget to send the EOS signal or close the connection
-            // The CoreRouter class is responsible for handling the idle events
-            var idleHandler = new IdleStateHandler(MAX_TIMEOUT, MAX_TIMEOUT, idleTimeout, TimeUnit.SECONDS);
-            pipeline.addAfter(HTTP_1_AUTH, CLIENT_TIMEOUT, idleHandler);
-
-
-            // Do not include compression codec at the WS level
-            // Compression happens at the gRPC level for individual message blocks
-            // Those message flow through different hops and protocols, including WS and HTTP/2
-            // Compressing / decompressing on each hop is particularly inefficient since the payload is compressed
-            // Quick testing shows a roughly 10% performance gain in Chrome from removing WS-level compression
-
-
-            // Configure the WS protocol handler - path must match the URI in the upgrade request
-
-            // Do not auto-reply to close frames as this can lead to protocol errors
-            // Chrome in particular is very fussy and will fail a whole request if the close sequence is wrong
-            // The close sequence is managed with the client explicitly in WebSocketsRouter
-
-            var wsConfig = webSocketsHandler.config()
-                    .toBuilder()
-                    .websocketPath(req.uri())
-                    .handleCloseFrames(false)
-                    .build();
-
-            pipeline.addAfter(CLIENT_TIMEOUT, WS_FRAME_CODEC, new WebSocketServerProtocolHandler(wsConfig));
-
-            // Add the main handler - this should be the WebTransportRouter when the full service is running
-            pipeline.addLast(webSocketsHandler.create(connId.getAndIncrement()));
-
-            pipeline.remove(this);
-            pipeline.remove(HTTP_1_INITIALIZER);
-
-            // During the upgrade process, the original upgrade response was intercepted and discarded
-            // The websocket protocol handler expects to see the upgrade request and respond to it
-            // So, re-fire the original upgrade request into the reconfigured pipeline
-
-            ctx.fireChannelRead(req);
-        }
-    }
-
 }

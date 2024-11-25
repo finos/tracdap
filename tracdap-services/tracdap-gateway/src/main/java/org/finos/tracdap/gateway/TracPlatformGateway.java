@@ -31,15 +31,11 @@ import org.finos.tracdap.gateway.builders.RedirectBuilder;
 import org.finos.tracdap.gateway.exec.Redirect;
 import org.finos.tracdap.gateway.exec.Route;
 import org.finos.tracdap.gateway.builders.RouteBuilder;
-import org.finos.tracdap.gateway.routing.Http1Router;
-import org.finos.tracdap.gateway.routing.Http2Router;
-import org.finos.tracdap.gateway.routing.WebSocketsRouter;
 
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
-import io.netty.handler.codec.http.websocketx.WebSocketServerProtocolConfig;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -118,24 +114,10 @@ public class TracPlatformGateway extends CommonServiceBase {
             // JWT validator is responsible for checking auth tokens on inbound requests
             var jwtValidator = JwtSetup.createValidator(platformConfig, configManager);
 
-            // Handlers for all support protocols
-            var http1Handler = ProtocolSetup.setup(connId -> new Http1Router(routes, redirects, connId));
-            var http2Handler = ProtocolSetup.setup(connId -> new Http2Router(routes));
-
-            var webSocketOptions = WebSocketServerProtocolConfig.newBuilder()
-                    .subprotocols("grpc-websockets")
-                    .allowExtensions(true)
-                    .build();
-
-            var webSocketsHandler = ProtocolSetup.setup(
-                    connId -> new WebSocketsRouter(routes, connId),
-                    webSocketOptions);
-
             // The protocol negotiator is the top level initializer for new inbound connections
             var protocolNegotiator = new ProtocolNegotiator(
                     platformConfig, jwtValidator,
-                    http1Handler, http2Handler,
-                    webSocketsHandler);
+                    routes, redirects);
 
             var bossThreadCount = 1;
             var bossExecutor = NettyHelpers.eventLoopExecutor("gw-boss");
