@@ -24,7 +24,7 @@ authentication:
 
 
 services:
-  auth:
+  authentication:
     port: 8081
 
 

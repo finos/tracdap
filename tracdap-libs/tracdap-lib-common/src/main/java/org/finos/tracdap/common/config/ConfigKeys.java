@@ -19,6 +19,7 @@ package org.finos.tracdap.common.config;
 
 public class ConfigKeys {
 
+    public static final String AUTHENTICATION_SERVICE_KEY = "authentication";
     public static final String METADATA_SERVICE_KEY = "metadata";
     public static final String DATA_SERVICE_KEY = "data";
     public static final String ORCHESTRATOR_SERVICE_KEY = "orchestrator";
