@@ -44,7 +44,6 @@ import org.slf4j.LoggerFactory;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Supplier;
 
 
 public class TracWebServer extends CommonServiceBase {
@@ -124,11 +123,11 @@ public class TracWebServer extends CommonServiceBase {
 
         // Handlers for all support protocols
         var contentServer = new ContentServer(platformConfig.getWebServer(), contentStorage);
-        var http1Handler = (Supplier<Http1Server>) () -> new Http1Server(contentServer, arrowAllocator);
-        var http2Handler = (Supplier<Http2Server>) () -> new Http2Server(contentServer);
 
         // The protocol negotiator is the top level initializer for new inbound connections
-        var protocolNegotiator = new ProtocolNegotiator(jwtValidator, http1Handler, http2Handler);
+        var protocolNegotiator = new ProtocolNegotiator(
+                platformConfig, jwtValidator,
+                contentServer, arrowAllocator);
 
         var bootstrap = new ServerBootstrap()
                 .group(bossGroup, workerGroup)
