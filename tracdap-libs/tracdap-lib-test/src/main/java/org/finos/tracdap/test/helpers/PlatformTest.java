@@ -31,6 +31,7 @@ import org.finos.tracdap.common.plugin.PluginManager;
 import org.finos.tracdap.common.startup.StandardArgs;
 import org.finos.tracdap.common.util.RoutingUtils;
 import org.finos.tracdap.config.PlatformConfig;
+import org.finos.tracdap.svc.auth.TracAuthenticationService;
 import org.finos.tracdap.tools.secrets.SecretTool;
 import org.finos.tracdap.tools.deploy.metadb.DeployMetaDB;
 import org.finos.tracdap.svc.data.TracDataService;
@@ -88,6 +89,7 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
     private final boolean manageDataPrefix;
     private final boolean localExecutor;
 
+    private final boolean startAuth;
     private final boolean startMeta;
     private final boolean startData;
     private final boolean startOrch;
@@ -98,7 +100,8 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
     private PlatformTest(
             String testConfig, List<String> tenants, String storageFormat,
             boolean runDbDeploy, boolean manageDataPrefix, boolean localExecutor,
-            boolean startMeta, boolean startData, boolean startOrch, boolean startGateway) {
+            boolean startAuth, boolean startMeta, boolean startData, boolean startOrch,
+            boolean startGateway) {
 
         this.testConfig = testConfig;
         this.tenants = tenants;
@@ -106,6 +109,7 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         this.runDbDeploy = runDbDeploy;
         this.manageDataPrefix = manageDataPrefix;
         this.localExecutor = localExecutor;
+        this.startAuth = startAuth;
         this.startMeta = startMeta;
         this.startData = startData;
         this.startOrch = startOrch;
@@ -126,6 +130,7 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         private boolean runDbDeploy = true;  // Run DB deploy by default
         private boolean manageDataPrefix = false;
         private boolean localExecutor = false;
+        private boolean startAuth;
         private boolean startMeta;
         private boolean startData;
         private boolean startOrch;
@@ -136,18 +141,19 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         public Builder runDbDeploy(boolean runDbDeploy) { this.runDbDeploy = runDbDeploy; return this; }
         public Builder manageDataPrefix(boolean manageDataPrefix) { this.manageDataPrefix = manageDataPrefix; return this; }
         public Builder prepareLocalExecutor(boolean localExecutor) { this.localExecutor = localExecutor; return this; }
+        public Builder startAuth() { startAuth = true; return this; }
         public Builder startMeta() { startMeta = true; return this; }
         public Builder startData() { startData = true; return this; }
         public Builder startOrch() { startOrch = true; return this; }
         public Builder startGateway() { startGateway = true; return this; }
-        public Builder startAll() { return startMeta().startData().startOrch().startGateway(); }
+        public Builder startAll() { return startAuth().startMeta().startData().startOrch().startGateway(); }
 
         public PlatformTest build() {
 
             return new PlatformTest(
                     testConfig, tenants, storageFormat,
                     runDbDeploy, manageDataPrefix, localExecutor,
-                    startMeta, startData, startOrch, startGateway);
+                    startAuth, startMeta, startData, startOrch, startGateway);
         }
     }
 
@@ -159,6 +165,7 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
     private String secretKey;
     private PlatformConfig platformConfig;
 
+    private TracAuthenticationService authSvc;
     private TracMetadataService metaSvc;
     private TracDataService dataSvc;
     private TracOrchestratorService orchSvc;
@@ -506,6 +513,9 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
 
     void startServices() {
 
+        if (startAuth)
+            authSvc = ServiceHelpers.startService(TracAuthenticationService.class, tracDir, platformConfigUrl, secretKey);
+
         if (startMeta)
             metaSvc = ServiceHelpers.startService(TracMetadataService.class, tracDir, platformConfigUrl, secretKey);
 
@@ -532,6 +542,9 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
 
         if (metaSvc != null)
             metaSvc.stop();
+
+        if (authSvc != null)
+            authSvc.stop();
     }
 
     void startClients() {
