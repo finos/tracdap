@@ -1,0 +1,32 @@
+
+
+config:
+  secret.type: PKCS12
+  secret.url: secrets.p12
+
+
+platformInfo:
+  environment: SANDBOX
+  production: false
+
+
+authentication:
+
+  jwtIssuer: trac_platform
+  jwtExpiry: 3600
+  jwtLimit: 57600
+
+  provider:
+    protocol: guest
+    properties:
+      userId: guest
+      userName: Guest User
+
+
+services:
+  auth:
+    port: 8081
+
+
+deployment:
+  layout: SANDBOX
