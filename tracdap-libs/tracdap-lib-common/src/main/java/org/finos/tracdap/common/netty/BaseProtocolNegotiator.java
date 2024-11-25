@@ -257,10 +257,22 @@ public abstract class BaseProtocolNegotiator extends ChannelInitializer<SocketCh
 
             log.info("Selected protocol: {} {}", remoteSocket, protocol);
 
+            // Depending on which upgrades have been set up, the HTTP codec may or may not be installed
+
+            var httpCodec = pipeline.get(HttpServerCodec.class);
+            String priorStageName;
+
+            if (httpCodec == null) {
+                pipeline.addAfter(ctx.name(), HTTP_1_CODEC, new HttpServerCodec());
+                priorStageName = HTTP_1_CODEC;
+            }
+            else
+                priorStageName = ctx.name();
+
             // Auth handler goes at the front of the pipeline (HTTP codec is already installed)
             // This is a regular HTTP auth, modified to redirect browsers to the auth service on failure
             var authHandler = http1AuthHandler();
-            pipeline.addAfter(HTTP_1_INITIALIZER, HTTP_1_AUTH, authHandler);
+            pipeline.addAfter(priorStageName, HTTP_1_AUTH, authHandler);
 
             // Keep alive handler will close connections not marked as keep-alive when a request is complete
             pipeline.addAfter(HTTP_1_AUTH, HTTP_1_KEEPALIVE, new HttpServerKeepAliveHandler());
@@ -301,21 +313,20 @@ public abstract class BaseProtocolNegotiator extends ChannelInitializer<SocketCh
                     log.info("Selected protocol: {} {}", remoteSocket, protocol);
 
                     // Depending on how HTTP/2 is set up, the codec may or may not have been installed
-                    Http2FrameCodec http2Codec = pipeline.get(Http2FrameCodec.class);
-                    String http2CodecName;
+                    var http2Codec = pipeline.get(Http2FrameCodec.class);
+                    String priorStageName;
 
                     if (http2Codec == null) {
-                        http2Codec = Http2FrameCodecBuilder.forServer().build();
-                        http2CodecName = HTTP_2_CODEC;
-                        pipeline.addAfter(ctx.name(), http2CodecName, http2Codec);
+                        pipeline.addAfter(ctx.name(), HTTP_2_CODEC, Http2FrameCodecBuilder.forServer().build());
+                        priorStageName = HTTP_2_CODEC;
                     }
                     else {
-                        http2CodecName = pipeline.context(http2Codec).name();
+                        priorStageName = ctx.name();
                     }
 
                     // Auth handler comes immediately after the codec
                     var authHandler = http2AuthHandler();
-                    pipeline.addAfter(http2CodecName, HTTP_2_AUTH, authHandler);
+                    pipeline.addAfter(priorStageName, HTTP_2_AUTH, authHandler);
 
                     // The main HTTP/2 handler
                     var primaryHandler = http2PrimaryHandler();
