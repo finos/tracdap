@@ -18,7 +18,7 @@
 package org.finos.tracdap.gateway.proxy.rest;
 
 import org.finos.tracdap.api.*;
-import org.finos.tracdap.gateway.proxy.http.Http1Client;
+import org.finos.tracdap.test.http.Http1Client;
 import org.finos.tracdap.metadata.Tag;
 import org.finos.tracdap.metadata.TagHeader;
 import org.finos.tracdap.test.helpers.PlatformTest;
@@ -113,7 +113,7 @@ public class RestProxyTest {
 
         var tenants = responseMessage.getTenantsList();
         var acmeTenant = tenants.stream().filter(t -> t.getTenantCode().equals("ACME_CORP")).findFirst();
-        Assertions.assertTrue(tenants.size() > 0);
+        Assertions.assertFalse(tenants.isEmpty());
         Assertions.assertTrue(acmeTenant.isPresent());
 
         System.out.println("List tenants found the testing tenant: " + acmeTenant.get().getDescription());

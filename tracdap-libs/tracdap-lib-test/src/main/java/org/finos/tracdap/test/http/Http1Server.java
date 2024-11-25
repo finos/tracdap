@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.gateway.proxy.http;
+package org.finos.tracdap.test.http;
 
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.buffer.Unpooled;
