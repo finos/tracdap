@@ -191,14 +191,15 @@ public class Http1Proxy extends ChannelDuplexHandler {
     private String translateHostHeader() {
 
         var target = routeConfig.getTarget();
+        var hostAlias = target.hasHostAlias() ? target.getHostAlias() : target.getHost();
 
         // Do not include :<port> in host header for standard ports
         for (var scheme : List.of(HttpScheme.HTTP, HttpScheme.HTTPS)) {
             if (scheme.toString().equalsIgnoreCase(target.getScheme()) && scheme.port() == target.getPort())
-                return target.getHost();
+                return hostAlias;
         }
 
-        return target.getHost() + ":" + target.getPort();
+        return hostAlias + ":" + target.getPort();
     }
 
     private String translateLocationHeader(String location) {
