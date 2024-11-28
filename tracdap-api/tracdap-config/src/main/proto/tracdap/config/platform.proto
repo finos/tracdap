@@ -128,6 +128,7 @@ message RoutingTarget {
   string host = 2;
   uint32 port = 3;
   string path = 4;
+  optional string hostAlias = 5;
 }
 
 message DeploymentConfig {
