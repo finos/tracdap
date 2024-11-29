@@ -15,10 +15,30 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.auth.login.common;
+package org.finos.tracdap.common.auth.login.simple;
 
 
-public interface IUserDatabase {
+public class UserDbRecord {
 
-    UserDbRecord getUserDbRecord(String userId);
+    private final String userId;
+    private final String userName;
+    private final String passwordHash;
+
+    public UserDbRecord(String userId, String userName, String passwordHash) {
+        this.userId = userId;
+        this.userName = userName;
+        this.passwordHash = passwordHash;
+    }
+
+    public String getUserId() {
+        return userId;
+    }
+
+    public String getUserName() {
+        return userName;
+    }
+
+    public String getPasswordHash() {
+        return passwordHash;
+    }
 }
