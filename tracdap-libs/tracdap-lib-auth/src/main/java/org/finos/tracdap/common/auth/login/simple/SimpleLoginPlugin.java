@@ -58,8 +58,11 @@ class SimpleLoginPlugin extends TracPlugin {
     @Override @SuppressWarnings("unchecked")
     protected <T> T createService(String serviceName, Properties properties, ConfigManager configManager) {
 
-        if (serviceName.equals(GUEST_AUTH_PROVIDER))
-            return (T) new GuestLoginProvider(properties);
+        if (serviceName.equals(GUEST_AUTH_PROVIDER)) {
+            var loginProvider = new GuestLoginProvider(properties);
+            var authProvider = new SimpleLoginAuthProvider(configManager, loginProvider);
+            return (T) authProvider;
+        }
 
         if (serviceName.equals(BASIC_AUTH_PROVIDER))
             return (T) new BasicLoginProvider(configManager);
