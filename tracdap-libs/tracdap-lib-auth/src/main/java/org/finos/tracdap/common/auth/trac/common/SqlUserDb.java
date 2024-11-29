@@ -17,8 +17,6 @@
 
 package org.finos.tracdap.common.auth.trac.common;
 
-import org.finos.tracdap.common.auth.trac.IUserDatabase;
-import org.finos.tracdap.common.auth.trac.UserDbRecord;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.db.JdbcSetup;
 import org.finos.tracdap.common.exception.EAuthorization;

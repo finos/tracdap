@@ -17,7 +17,6 @@
 
 package org.finos.tracdap.common.auth.trac.common;
 
-import org.finos.tracdap.common.auth.trac.IUserDatabase;
 import org.finos.tracdap.common.auth.trac.IAuthProvider;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.exception.EPluginNotAvailable;
