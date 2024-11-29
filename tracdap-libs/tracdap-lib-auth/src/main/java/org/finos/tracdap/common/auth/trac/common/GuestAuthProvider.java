@@ -15,13 +15,12 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.auth.external.common;
+package org.finos.tracdap.common.auth.trac.common;
 
-import org.finos.tracdap.common.auth.external.*;
+import org.finos.tracdap.common.auth.trac.*;
 import org.finos.tracdap.common.auth.internal.UserInfo;
 import org.finos.tracdap.common.exception.EStartup;
 
-import io.netty.channel.ChannelHandlerContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

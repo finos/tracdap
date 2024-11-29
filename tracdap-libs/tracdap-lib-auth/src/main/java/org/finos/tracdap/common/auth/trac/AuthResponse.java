@@ -15,12 +15,37 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.auth.external;
+package org.finos.tracdap.common.auth.trac;
 
+import io.netty.buffer.ByteBuf;
 
-public enum AuthResultCode {
-    AUTHORIZED,
-    FAILED,
-    OTHER_RESPONSE,
-    NEED_CONTENT
+public class AuthResponse {
+
+    private final int statusCode;
+    private final String statusMessage;
+    private final IAuthHeaders headers;
+    private final ByteBuf content;
+
+    public AuthResponse(int statusCode, String statusMessage, IAuthHeaders headers, ByteBuf content) {
+        this.statusCode = statusCode;
+        this.statusMessage = statusMessage;
+        this.headers = headers;
+        this.content = content;
+    }
+
+    public int getStatusCode() {
+        return statusCode;
+    }
+
+    public String getStatusMessage() {
+        return statusMessage;
+    }
+
+    public IAuthHeaders getHeaders() {
+        return headers;
+    }
+
+    public ByteBuf getContent() {
+        return content;
+    }
 }

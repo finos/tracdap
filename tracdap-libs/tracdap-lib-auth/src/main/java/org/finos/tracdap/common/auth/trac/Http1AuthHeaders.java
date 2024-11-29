@@ -15,26 +15,30 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.auth.external;
+package org.finos.tracdap.common.auth.trac;
 
-import io.netty.handler.codec.http2.DefaultHttp2Headers;
-import io.netty.handler.codec.http2.Http2Headers;
+import io.netty.handler.codec.http.DefaultHttpHeaders;
+import io.netty.handler.codec.http.HttpHeaders;
 
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
 
-public class Http2AuthHeaders implements IAuthHeaders {
+public class Http1AuthHeaders implements IAuthHeaders {
 
-    private final Http2Headers headers;
+    private final HttpHeaders headers;
 
-    public Http2AuthHeaders() {
-        this.headers = new DefaultHttp2Headers();
+    public Http1AuthHeaders() {
+        this.headers = new DefaultHttpHeaders();
     }
 
-    public Http2AuthHeaders(Http2Headers headers) {
+    public Http1AuthHeaders(HttpHeaders headers) {
         this.headers = headers;
+    }
+
+    public HttpHeaders headers() {
+        return this.headers;
     }
 
     @Override
@@ -48,7 +52,7 @@ public class Http2AuthHeaders implements IAuthHeaders {
     }
 
     @Override
-    public CharSequence get(CharSequence name) {
+    public String get(CharSequence name) {
         return headers.get(name);
     }
 
@@ -59,6 +63,6 @@ public class Http2AuthHeaders implements IAuthHeaders {
 
     @Override
     public Iterator<Map.Entry<CharSequence, CharSequence>> iterator() {
-        return headers.iterator();
+        return headers.iteratorCharSequence();
     }
 }

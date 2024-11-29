@@ -15,16 +15,30 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.auth.external;
+package org.finos.tracdap.common.auth.trac;
 
 
-import org.finos.tracdap.common.auth.internal.UserInfo;
+public class UserDbRecord {
 
-public interface IAuthProvider {
+    private final String userId;
+    private final String userName;
+    private final String passwordHash;
 
-    AuthResult attemptAuth(AuthRequest authRequest);
+    public UserDbRecord(String userId, String userName, String passwordHash) {
+        this.userId = userId;
+        this.userName = userName;
+        this.passwordHash = passwordHash;
+    }
 
-    boolean postAuthMatch(String method, String uri);
+    public String getUserId() {
+        return userId;
+    }
 
-    AuthResponse postAuth(AuthRequest authRequest, UserInfo userInfo);
+    public String getUserName() {
+        return userName;
+    }
+
+    public String getPasswordHash() {
+        return passwordHash;
+    }
 }

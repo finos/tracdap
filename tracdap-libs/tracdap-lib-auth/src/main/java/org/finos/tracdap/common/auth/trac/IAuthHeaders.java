@@ -15,37 +15,19 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.auth.external;
+package org.finos.tracdap.common.auth.trac;
 
-import io.netty.buffer.ByteBuf;
+import java.util.List;
+import java.util.Map;
 
-public class AuthResponse {
 
-    private final int statusCode;
-    private final String statusMessage;
-    private final IAuthHeaders headers;
-    private final ByteBuf content;
+public interface IAuthHeaders extends Iterable<Map.Entry<CharSequence, CharSequence>> {
 
-    public AuthResponse(int statusCode, String statusMessage, IAuthHeaders headers, ByteBuf content) {
-        this.statusCode = statusCode;
-        this.statusMessage = statusMessage;
-        this.headers = headers;
-        this.content = content;
-    }
+    void add(CharSequence name, CharSequence value);
 
-    public int getStatusCode() {
-        return statusCode;
-    }
+    boolean contains(CharSequence name);
 
-    public String getStatusMessage() {
-        return statusMessage;
-    }
+    CharSequence get(CharSequence name);
 
-    public IAuthHeaders getHeaders() {
-        return headers;
-    }
-
-    public ByteBuf getContent() {
-        return content;
-    }
+    List<? extends CharSequence> getAll(CharSequence name);
 }

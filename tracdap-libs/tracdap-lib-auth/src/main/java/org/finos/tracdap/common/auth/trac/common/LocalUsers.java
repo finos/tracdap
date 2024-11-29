@@ -15,9 +15,9 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.auth.external.common;
+package org.finos.tracdap.common.auth.trac.common;
 
-import org.finos.tracdap.common.auth.external.IUserDatabase;
+import org.finos.tracdap.common.auth.trac.IUserDatabase;
 import org.finos.tracdap.common.auth.internal.UserInfo;
 import org.finos.tracdap.common.config.CryptoHelpers;
 import org.finos.tracdap.common.exception.EAuthorization;

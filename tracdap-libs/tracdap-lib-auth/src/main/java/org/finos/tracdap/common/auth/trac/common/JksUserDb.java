@@ -15,10 +15,10 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.auth.external.common;
+package org.finos.tracdap.common.auth.trac.common;
 
-import org.finos.tracdap.common.auth.external.IUserDatabase;
-import org.finos.tracdap.common.auth.external.UserDbRecord;
+import org.finos.tracdap.common.auth.trac.IUserDatabase;
+import org.finos.tracdap.common.auth.trac.UserDbRecord;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.config.ISecretLoader;
 import org.slf4j.Logger;
