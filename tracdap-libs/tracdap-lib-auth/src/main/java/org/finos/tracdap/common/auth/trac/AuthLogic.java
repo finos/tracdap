@@ -62,7 +62,7 @@ public class AuthLogic {
     // Logic class, do not allow creating instances
     private AuthLogic() {}
 
-    public static String findTracAuthToken(IAuthHeaders headers, boolean cookieDirection) {
+    public static String findTracAuthToken(AuthHeaders headers, boolean cookieDirection) {
 
         var rawToken = findRawAuthToken(headers, cookieDirection);
 
@@ -77,7 +77,7 @@ public class AuthLogic {
             return rawToken;
     }
 
-    private static String findRawAuthToken(IAuthHeaders headers, boolean cookieDirection) {
+    private static String findRawAuthToken(AuthHeaders headers, boolean cookieDirection) {
 
         var cookies = extractCookies(headers, cookieDirection);
 
@@ -98,7 +98,7 @@ public class AuthLogic {
         return NULL_AUTH_TOKEN;
     }
 
-    private static String findHeader(IAuthHeaders headers, String headerName) {
+    private static String findHeader(AuthHeaders headers, String headerName) {
 
         if (headers.contains(headerName))
             return headers.get(headerName).toString();
@@ -117,7 +117,7 @@ public class AuthLogic {
         return null;
     }
 
-    private static List<Cookie> extractCookies(IAuthHeaders headers, boolean cookieDirection) {
+    private static List<Cookie> extractCookies(AuthHeaders headers, boolean cookieDirection) {
 
         var cookieHeader = cookieDirection == CLIENT_COOKIE ? HttpHeaderNames.SET_COOKIE : HttpHeaderNames.COOKIE;
 
@@ -177,7 +177,7 @@ public class AuthLogic {
         return newSession;
     }
 
-    public static <THeaders extends IAuthHeaders>
+    public static <THeaders extends AuthHeaders>
     THeaders setPlatformAuthHeaders(THeaders headers, THeaders emptyHeaders, String token) {
 
         var filtered = removeAuthHeaders(headers, emptyHeaders, SERVER_COOKIE);
@@ -185,7 +185,7 @@ public class AuthLogic {
         return addPlatformAuthHeaders(filtered, token);
     }
 
-    public static <THeaders extends IAuthHeaders>
+    public static <THeaders extends AuthHeaders>
     THeaders setClientAuthHeaders(
             THeaders headers, THeaders emptyHeaders,
             String token, SessionInfo session, boolean wantCookies) {
@@ -198,7 +198,7 @@ public class AuthLogic {
             return addClientAuthHeaders(filtered, token, session);
     }
 
-    private static <THeaders extends IAuthHeaders>
+    private static <THeaders extends AuthHeaders>
     THeaders removeAuthHeaders(THeaders headers, THeaders emptyHeaders, boolean cookieDirection) {
 
         var cookies = extractCookies(headers, cookieDirection);
@@ -215,7 +215,7 @@ public class AuthLogic {
         return filteredHeaders;
     }
 
-    private static <THeaders extends IAuthHeaders>
+    private static <THeaders extends AuthHeaders>
     THeaders filterHeaders(THeaders headers, THeaders newHeaders) {
 
         for (var header : headers) {
@@ -254,7 +254,7 @@ public class AuthLogic {
         return filtered;
     }
 
-    private static <THeaders extends IAuthHeaders>
+    private static <THeaders extends AuthHeaders>
     THeaders addPlatformAuthHeaders(THeaders headers, String token) {
 
         // The platform only cares about the token, that is the definitive source of session info
@@ -264,7 +264,7 @@ public class AuthLogic {
         return headers;
     }
 
-    private static <THeaders extends IAuthHeaders>
+    private static <THeaders extends AuthHeaders>
     THeaders addClientAuthHeaders(THeaders headers, String token, SessionInfo session) {
 
         // For API calls send session info back in headers, these come through as gRPC metadata
@@ -286,7 +286,7 @@ public class AuthLogic {
         return headers;
     }
 
-    private static <THeaders extends IAuthHeaders>
+    private static <THeaders extends AuthHeaders>
     THeaders addClientAuthCookies(THeaders headers, String token, SessionInfo session) {
 
         // For browser requests, send the session info back as cookies, this is by far the easiest approach
@@ -309,7 +309,7 @@ public class AuthLogic {
     }
 
     private static void setClientCookie(
-            IAuthHeaders headers, CharSequence cookieName, String cookieValue,
+            AuthHeaders headers, CharSequence cookieName, String cookieValue,
             Instant expiry, boolean isAuthToken) {
 
         var cookie = new DefaultCookie(cookieName.toString(), cookieValue);

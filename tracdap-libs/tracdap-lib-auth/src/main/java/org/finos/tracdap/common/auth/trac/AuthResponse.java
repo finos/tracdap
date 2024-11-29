@@ -23,10 +23,10 @@ public class AuthResponse {
 
     private final int statusCode;
     private final String statusMessage;
-    private final IAuthHeaders headers;
+    private final AuthHeaders headers;
     private final ByteBuf content;
 
-    public AuthResponse(int statusCode, String statusMessage, IAuthHeaders headers, ByteBuf content) {
+    public AuthResponse(int statusCode, String statusMessage, AuthHeaders headers, ByteBuf content) {
         this.statusCode = statusCode;
         this.statusMessage = statusMessage;
         this.headers = headers;
@@ -41,7 +41,7 @@ public class AuthResponse {
         return statusMessage;
     }
 
-    public IAuthHeaders getHeaders() {
+    public AuthHeaders getHeaders() {
         return headers;
     }
 

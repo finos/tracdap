@@ -25,10 +25,10 @@ public class AuthRequest {
 
     private final String method;
     private final String url;
-    private final IAuthHeaders headers;
+    private final AuthHeaders headers;
     private final byte[] content;
 
-    public static AuthRequest forHttp1Request(HttpRequest request, IAuthHeaders headers) {
+    public static AuthRequest forHttp1Request(HttpRequest request, AuthHeaders headers) {
 
         byte[] content = null;
 
@@ -41,7 +41,7 @@ public class AuthRequest {
         return new AuthRequest(request.method().toString(), request.uri(), headers, content);
     }
 
-    public AuthRequest(String method, String url, IAuthHeaders headers, byte[] content) {
+    public AuthRequest(String method, String url, AuthHeaders headers, byte[] content) {
         this.method = method;
         this.url = url;
         this.headers = headers;
@@ -56,7 +56,7 @@ public class AuthRequest {
         return url;
     }
 
-    public IAuthHeaders getHeaders() {
+    public AuthHeaders getHeaders() {
         return headers;
     }
 

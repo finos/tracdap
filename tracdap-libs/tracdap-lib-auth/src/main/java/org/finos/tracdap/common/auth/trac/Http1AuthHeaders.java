@@ -25,7 +25,7 @@ import java.util.List;
 import java.util.Map;
 
 
-public class Http1AuthHeaders implements IAuthHeaders {
+public class Http1AuthHeaders implements AuthHeaders {
 
     private final HttpHeaders headers;
 

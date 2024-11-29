@@ -21,7 +21,7 @@ import java.util.List;
 import java.util.Map;
 
 
-public interface IAuthHeaders extends Iterable<Map.Entry<CharSequence, CharSequence>> {
+public interface AuthHeaders extends Iterable<Map.Entry<CharSequence, CharSequence>> {
 
     void add(CharSequence name, CharSequence value);
 
