@@ -27,9 +27,9 @@ import org.slf4j.LoggerFactory;
 import java.util.Properties;
 
 
-public class GuestAuthProvider implements ILoginProvider {
+public class GuestLoginProvider implements ILoginProvider {
 
-    private static final Logger log = LoggerFactory.getLogger(GuestAuthProvider.class);
+    private static final Logger log = LoggerFactory.getLogger(GuestLoginProvider.class);
 
     public static final String USER_ID_CONFIG_KEY = "userId";
     public static final String USER_NAME_CONFIG_KEY = "userName";
@@ -37,7 +37,7 @@ public class GuestAuthProvider implements ILoginProvider {
     private final String guestId;
     private final String guestName;
 
-    GuestAuthProvider(Properties properties) {
+    GuestLoginProvider(Properties properties) {
 
         if (!properties.containsKey(USER_ID_CONFIG_KEY) || !properties.containsKey(USER_NAME_CONFIG_KEY)) {
 

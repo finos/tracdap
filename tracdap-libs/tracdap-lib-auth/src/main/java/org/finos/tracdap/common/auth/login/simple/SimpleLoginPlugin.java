@@ -29,12 +29,12 @@ import java.util.List;
 import java.util.Properties;
 
 
-public class CommonAuthPlugin extends TracPlugin {
+public class SimpleLoginPlugin extends TracPlugin {
 
-    private static final String PLUGIN_NAME = "COMMON_AUTH";
-    private static final String GUEST_AUTH_PROVIDER = "GUEST_AUTH_PROVIDER";
-    private static final String BASIC_AUTH_PROVIDER = "BASIC_AUTH_PROVIDER";
-    private static final String BUILT_IN_AUTH_PROVIDER = "BUILT_IN_AUTH_PROVIDER";
+    private static final String PLUGIN_NAME = "SIMPLE_LOGIN";
+    private static final String GUEST_AUTH_PROVIDER = "GUEST_LOGIN_PROVIDER";
+    private static final String BASIC_AUTH_PROVIDER = "BASIC_LOGIN_PROVIDER";
+    private static final String BUILT_IN_AUTH_PROVIDER = "BUILT_IN_LOGIN_PROVIDER";
     private static final String JKS_USER_DATABASE = "JKS_USER_DATABASE";
     private static final String SQL_USER_DATABASE = "SQL_USER_DATABASE";
 
@@ -59,13 +59,13 @@ public class CommonAuthPlugin extends TracPlugin {
     protected <T> T createService(String serviceName, Properties properties, ConfigManager configManager) {
 
         if (serviceName.equals(GUEST_AUTH_PROVIDER))
-            return (T) new GuestAuthProvider(properties);
+            return (T) new GuestLoginProvider(properties);
 
         if (serviceName.equals(BASIC_AUTH_PROVIDER))
-            return (T) new BasicAuthProvider(configManager);
+            return (T) new BasicLoginProvider(configManager);
 
         if (serviceName.equals(BUILT_IN_AUTH_PROVIDER))
-            return (T) new BuiltInAuthProvider(properties, configManager);
+            return (T) new BuiltInLoginProvider(properties, configManager);
 
         var message = String.format("Plugin [%s] does not support the service [%s]", pluginName(), serviceName);
         throw new EPluginNotAvailable(message);

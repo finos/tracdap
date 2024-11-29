@@ -31,17 +31,17 @@ import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 
 
-public class BasicAuthProvider implements ILoginProvider {
+public class BasicLoginProvider implements ILoginProvider {
 
-    private static final Logger log = LoggerFactory.getLogger(BasicAuthProvider.class);
+    private static final Logger log = LoggerFactory.getLogger(BasicLoginProvider.class);
 
     private static final String BASIC_AUTH_PREFIX = "basic ";
 
     private final IUserDatabase userDb;
 
-    public BasicAuthProvider(ConfigManager configManager) {
+    public BasicLoginProvider(ConfigManager configManager) {
 
-        this.userDb = CommonAuthPlugin.createUserDb(configManager);
+        this.userDb = SimpleLoginPlugin.createUserDb(configManager);
     }
 
     @Override

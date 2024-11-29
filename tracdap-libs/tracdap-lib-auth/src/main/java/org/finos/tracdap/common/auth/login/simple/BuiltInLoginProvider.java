@@ -35,7 +35,7 @@ import java.util.MissingResourceException;
 import java.util.Properties;
 
 
-public class BuiltInAuthProvider implements ILoginProvider {
+public class BuiltInLoginProvider implements ILoginProvider {
 
     public static final String MAIN_PAGE_KEY = "mainPage";
 
@@ -47,12 +47,12 @@ public class BuiltInAuthProvider implements ILoginProvider {
     public static final String BUILT_IN_LOGIN_OK_PAGE = "/builtin/content/login_ok.html";
 
 
-    private static final Logger log = LoggerFactory.getLogger(BuiltInAuthProvider.class);
+    private static final Logger log = LoggerFactory.getLogger(BuiltInLoginProvider.class);
 
     private final String mainPage;
     private final IUserDatabase userDb;
 
-    public BuiltInAuthProvider(Properties properties, ConfigManager configManager) {
+    public BuiltInLoginProvider(Properties properties, ConfigManager configManager) {
 
         if (!properties.containsKey(MAIN_PAGE_KEY)) {
 
@@ -64,7 +64,7 @@ public class BuiltInAuthProvider implements ILoginProvider {
 
         mainPage = properties.getProperty(MAIN_PAGE_KEY);
 
-        this.userDb = CommonAuthPlugin.createUserDb(configManager);
+        this.userDb = SimpleLoginPlugin.createUserDb(configManager);
     }
 
     @Override
