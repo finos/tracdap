@@ -23,7 +23,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class JksUserDb implements IUserDatabase {
+class JksUserDb implements IUserDatabase {
 
     private static final String DISPLAY_NAME_ATTR = "displayName";
 

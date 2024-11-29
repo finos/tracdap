@@ -29,7 +29,7 @@ import java.util.List;
 import java.util.Properties;
 
 
-public class SimpleLoginPlugin extends TracPlugin {
+class SimpleLoginPlugin extends TracPlugin {
 
     private static final String PLUGIN_NAME = "SIMPLE_LOGIN";
     private static final String GUEST_AUTH_PROVIDER = "GUEST_LOGIN_PROVIDER";

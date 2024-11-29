@@ -27,7 +27,7 @@ import org.slf4j.LoggerFactory;
 import java.util.Properties;
 
 
-public class GuestLoginProvider implements ILoginProvider {
+class GuestLoginProvider implements ILoginProvider {
 
     private static final Logger log = LoggerFactory.getLogger(GuestLoginProvider.class);
 

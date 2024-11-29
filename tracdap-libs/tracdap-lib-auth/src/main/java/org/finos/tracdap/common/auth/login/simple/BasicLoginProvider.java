@@ -31,7 +31,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 
 
-public class BasicLoginProvider implements ILoginProvider {
+class BasicLoginProvider implements ILoginProvider {
 
     private static final Logger log = LoggerFactory.getLogger(BasicLoginProvider.class);
 

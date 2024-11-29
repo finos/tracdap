@@ -18,7 +18,7 @@
 package org.finos.tracdap.common.auth.login.simple;
 
 
-public interface IUserDatabase {
+interface IUserDatabase {
 
     UserDbRecord getUserDbRecord(String userId);
 }

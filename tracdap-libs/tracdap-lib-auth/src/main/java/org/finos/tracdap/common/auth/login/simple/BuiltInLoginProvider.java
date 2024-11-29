@@ -35,7 +35,7 @@ import java.util.MissingResourceException;
 import java.util.Properties;
 
 
-public class BuiltInLoginProvider implements ILoginProvider {
+class BuiltInLoginProvider implements ILoginProvider {
 
     public static final String MAIN_PAGE_KEY = "mainPage";
 

@@ -22,7 +22,7 @@ import org.finos.tracdap.common.config.CryptoHelpers;
 import org.finos.tracdap.common.exception.EAuthorization;
 import org.slf4j.Logger;
 
-public class LocalUsers {
+class LocalUsers {
 
     static boolean checkPassword(IUserDatabase userDb, String user, String pass, Logger log) {
 

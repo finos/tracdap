@@ -18,7 +18,7 @@
 package org.finos.tracdap.common.auth.login.simple;
 
 
-public class UserDbRecord {
+class UserDbRecord {
 
     private final String userId;
     private final String userName;

@@ -29,7 +29,7 @@ import java.sql.SQLException;
 import java.util.Properties;
 
 
-public class SqlUserDb implements IUserDatabase {
+class SqlUserDb implements IUserDatabase {
 
     public static SqlUserDb getUserDb(ConfigManager configManager, String dialect, String usersUrl) {
 
