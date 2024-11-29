@@ -17,7 +17,7 @@
 
 package org.finos.tracdap.common.auth.trac.common;
 
-import org.finos.tracdap.common.auth.trac.IAuthProvider;
+import org.finos.tracdap.common.auth.trac.ILoginProvider;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.exception.EPluginNotAvailable;
 import org.finos.tracdap.common.exception.EStartup;
@@ -39,9 +39,9 @@ public class CommonAuthPlugin extends TracPlugin {
     private static final String SQL_USER_DATABASE = "SQL_USER_DATABASE";
 
     private static final List<PluginServiceInfo> serviceInfo = List.of(
-            new PluginServiceInfo(IAuthProvider.class, GUEST_AUTH_PROVIDER, List.of("guest")),
-            new PluginServiceInfo(IAuthProvider.class, BASIC_AUTH_PROVIDER, List.of("basic")),
-            new PluginServiceInfo(IAuthProvider.class, BUILT_IN_AUTH_PROVIDER, List.of("builtin")),
+            new PluginServiceInfo(ILoginProvider.class, GUEST_AUTH_PROVIDER, List.of("guest")),
+            new PluginServiceInfo(ILoginProvider.class, BASIC_AUTH_PROVIDER, List.of("basic")),
+            new PluginServiceInfo(ILoginProvider.class, BUILT_IN_AUTH_PROVIDER, List.of("builtin")),
             new PluginServiceInfo(IUserDatabase.class, JKS_USER_DATABASE, List.of("JKS", "PKCS12")),
             new PluginServiceInfo(IUserDatabase.class, SQL_USER_DATABASE, List.of("H2")));
 

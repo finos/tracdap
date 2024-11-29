@@ -27,7 +27,7 @@ import org.slf4j.LoggerFactory;
 import java.util.Properties;
 
 
-public class GuestAuthProvider implements IAuthProvider {
+public class GuestAuthProvider implements ILoginProvider {
 
     private static final Logger log = LoggerFactory.getLogger(GuestAuthProvider.class);
 

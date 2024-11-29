@@ -20,7 +20,7 @@ package org.finos.tracdap.common.auth.trac;
 
 import org.finos.tracdap.common.auth.internal.UserInfo;
 
-public interface IAuthProvider {
+public interface ILoginProvider {
 
     AuthResult attemptAuth(AuthRequest authRequest);
 

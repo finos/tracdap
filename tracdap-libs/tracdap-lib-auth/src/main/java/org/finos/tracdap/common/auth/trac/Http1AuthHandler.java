@@ -48,7 +48,7 @@ public class Http1AuthHandler extends ChannelDuplexHandler {
     private final int connId;
 
     private final JwtProcessor jwtProcessor;
-    private final IAuthProvider authProvider;
+    private final ILoginProvider authProvider;
 
     private AuthResult authResult = AuthResult.FAILED();
     private SessionInfo session;
@@ -61,7 +61,7 @@ public class Http1AuthHandler extends ChannelDuplexHandler {
     public Http1AuthHandler(
             AuthenticationConfig authConfig, int connId,
             JwtProcessor jwtProcessor,
-            IAuthProvider authProvider) {
+            ILoginProvider authProvider) {
 
         this.authConfig = authConfig;
         this.connId = connId;

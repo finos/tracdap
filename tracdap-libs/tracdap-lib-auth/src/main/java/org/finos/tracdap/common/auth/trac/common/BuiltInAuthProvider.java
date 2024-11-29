@@ -35,7 +35,7 @@ import java.util.MissingResourceException;
 import java.util.Properties;
 
 
-public class BuiltInAuthProvider implements IAuthProvider {
+public class BuiltInAuthProvider implements ILoginProvider {
 
     public static final String MAIN_PAGE_KEY = "mainPage";
 
