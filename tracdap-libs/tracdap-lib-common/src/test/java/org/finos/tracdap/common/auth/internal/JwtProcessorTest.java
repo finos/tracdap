@@ -17,7 +17,7 @@
 
 package org.finos.tracdap.common.auth.internal;
 
-import org.finos.tracdap.common.auth.trac.AuthLogic;
+import org.finos.tracdap.common.auth.login.AuthLogic;
 import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.config.AuthenticationConfig;
 

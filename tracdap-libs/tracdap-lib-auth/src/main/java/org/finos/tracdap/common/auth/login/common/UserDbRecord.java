@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.auth.trac.common;
+package org.finos.tracdap.common.auth.login.common;
 
 
 public class UserDbRecord {

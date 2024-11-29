@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.auth.trac;
+package org.finos.tracdap.common.auth.login;
 
 import org.finos.tracdap.common.auth.internal.UserInfo;
 

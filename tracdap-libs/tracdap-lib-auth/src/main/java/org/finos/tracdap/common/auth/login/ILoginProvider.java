@@ -15,10 +15,16 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.auth.trac.common;
+package org.finos.tracdap.common.auth.login;
 
 
-public interface IUserDatabase {
+import org.finos.tracdap.common.auth.internal.UserInfo;
 
-    UserDbRecord getUserDbRecord(String userId);
+public interface ILoginProvider {
+
+    AuthResult attemptLogin(AuthRequest authRequest);
+
+    boolean postLoginmatch(String method, String uri);
+
+    AuthResponse postLogin(AuthRequest authRequest, UserInfo userInfo);
 }

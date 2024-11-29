@@ -15,16 +15,19 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.auth.trac;
+package org.finos.tracdap.common.auth.login;
+
+import java.util.List;
+import java.util.Map;
 
 
-import org.finos.tracdap.common.auth.internal.UserInfo;
+public interface AuthHeaders extends Iterable<Map.Entry<CharSequence, CharSequence>> {
 
-public interface ILoginProvider {
+    void add(CharSequence name, CharSequence value);
 
-    AuthResult attemptLogin(AuthRequest authRequest);
+    boolean contains(CharSequence name);
 
-    boolean postLoginmatch(String method, String uri);
+    CharSequence get(CharSequence name);
 
-    AuthResponse postLogin(AuthRequest authRequest, UserInfo userInfo);
+    List<? extends CharSequence> getAll(CharSequence name);
 }

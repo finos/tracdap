@@ -15,9 +15,9 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.auth.trac.common;
+package org.finos.tracdap.common.auth.login.common;
 
-import org.finos.tracdap.common.auth.trac.ILoginProvider;
+import org.finos.tracdap.common.auth.login.ILoginProvider;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.exception.EPluginNotAvailable;
 import org.finos.tracdap.common.exception.EStartup;
