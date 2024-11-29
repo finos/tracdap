@@ -37,18 +37,15 @@ import org.slf4j.LoggerFactory;
 import javax.annotation.Nonnull;
 
 
-public class Http1AuthHandler extends ChannelDuplexHandler {
+public class Http1LoginHandler extends ChannelDuplexHandler {
 
     private static final int PENDING_CONTENT_LIMIT = 64 * 1024;
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
     private final AuthenticationConfig authConfig;
-
-    private final int connId;
-
     private final JwtProcessor jwtProcessor;
-    private final ILoginProvider authProvider;
+    private final ILoginProvider loginProvider;
 
     private AuthResult authResult = AuthResult.FAILED();
     private SessionInfo session;
@@ -58,16 +55,15 @@ public class Http1AuthHandler extends ChannelDuplexHandler {
     private HttpRequest pendingRequest;
     private CompositeByteBuf pendingContent;
 
-    public Http1AuthHandler(
-            AuthenticationConfig authConfig, int connId,
+    public Http1LoginHandler(
+            AuthenticationConfig authConfig,
             JwtProcessor jwtProcessor,
-            ILoginProvider authProvider) {
+            ILoginProvider loginProvider) {
 
         this.authConfig = authConfig;
-        this.connId = connId;
 
         this.jwtProcessor = jwtProcessor;
-        this.authProvider = authProvider;
+        this.loginProvider = loginProvider;
     }
 
     @Override
@@ -103,7 +99,7 @@ public class Http1AuthHandler extends ChannelDuplexHandler {
             // Special handling for request objects, apply translation to the headers
             if (msg instanceof HttpRequest) {
                 var request = (HttpRequest) msg;
-                if (authProvider.postLoginmatch(request.method().name(), request.uri()))
+                if (loginProvider.postLoginmatch(request.method().name(), request.uri()))
                     processPostAuthMatch(ctx, request);
                 else
                     processRequest(ctx, request);
@@ -218,12 +214,12 @@ public class Http1AuthHandler extends ChannelDuplexHandler {
 
         if (authResult == null || authResult.getCode() != AuthResultCode.NEED_CONTENT) {
             var reason = (session == null) ? "no session available" : session.getErrorMessage();
-            log.info("conn = {}, authentication required ({})", connId, reason);
+            log.info("authentication required ({})", reason);
         }
 
         // Only one auth provider available atm, for both browser and API routes
         var authRequest = AuthRequest.forHttp1Request(request, headers);
-        authResult = authProvider.attemptLogin(authRequest);
+        authResult = loginProvider.attemptLogin(authRequest);
 
         // If primary auth succeeded, set up the session token
         if (authResult.getCode() == AuthResultCode.AUTHORIZED) {
@@ -237,7 +233,7 @@ public class Http1AuthHandler extends ChannelDuplexHandler {
 
         if (authResult.getCode() == AuthResultCode.FAILED) {
 
-            log.error("conn = {}, authentication failed ({})", connId, authResult.getMessage());
+            log.error("authentication failed ({})", authResult.getMessage());
 
             var response = buildFailedResponse(request, authResult);
 
@@ -265,7 +261,7 @@ public class Http1AuthHandler extends ChannelDuplexHandler {
 
         var postAuthHeaders = new Http1AuthHeaders(request.headers());
         var postAuthRequest = AuthRequest.forHttp1Request(request, postAuthHeaders);
-        var postAuthResponse = authProvider.postLogin(postAuthRequest, session.getUserInfo());
+        var postAuthResponse = loginProvider.postLogin(postAuthRequest, session.getUserInfo());
 
         if (postAuthResponse != null) {
 
