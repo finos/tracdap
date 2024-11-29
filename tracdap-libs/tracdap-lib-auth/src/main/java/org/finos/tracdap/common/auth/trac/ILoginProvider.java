@@ -22,9 +22,9 @@ import org.finos.tracdap.common.auth.internal.UserInfo;
 
 public interface ILoginProvider {
 
-    AuthResult attemptAuth(AuthRequest authRequest);
+    AuthResult attemptLogin(AuthRequest authRequest);
 
-    boolean postAuthMatch(String method, String uri);
+    boolean postLoginmatch(String method, String uri);
 
-    AuthResponse postAuth(AuthRequest authRequest, UserInfo userInfo);
+    AuthResponse postLogin(AuthRequest authRequest, UserInfo userInfo);
 }

@@ -52,7 +52,7 @@ public class GuestAuthProvider implements ILoginProvider {
     }
 
     @Override
-    public AuthResult attemptAuth(AuthRequest authRequest) {
+    public AuthResult attemptLogin(AuthRequest authRequest) {
 
         log.info("AUTHENTICATION: Using guest authentication [{}]", guestId);
 
@@ -64,12 +64,12 @@ public class GuestAuthProvider implements ILoginProvider {
     }
 
     @Override
-    public boolean postAuthMatch(String method, String uri) {
+    public boolean postLoginmatch(String method, String uri) {
         return false;
     }
 
     @Override
-    public AuthResponse postAuth(AuthRequest authRequest, UserInfo userInfo) {
+    public AuthResponse postLogin(AuthRequest authRequest, UserInfo userInfo) {
         return null;
     }
 }

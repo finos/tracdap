@@ -45,7 +45,7 @@ public class BasicAuthProvider implements ILoginProvider {
     }
 
     @Override
-    public AuthResult attemptAuth(AuthRequest authRequest) {
+    public AuthResult attemptLogin(AuthRequest authRequest) {
 
         var headers = authRequest.getHeaders();
 
@@ -88,12 +88,12 @@ public class BasicAuthProvider implements ILoginProvider {
     }
 
     @Override
-    public boolean postAuthMatch(String method, String uri) {
+    public boolean postLoginmatch(String method, String uri) {
         return false;
     }
 
     @Override
-    public AuthResponse postAuth(AuthRequest authRequest, UserInfo userInfo) {
+    public AuthResponse postLogin(AuthRequest authRequest, UserInfo userInfo) {
         return null;
     }
 

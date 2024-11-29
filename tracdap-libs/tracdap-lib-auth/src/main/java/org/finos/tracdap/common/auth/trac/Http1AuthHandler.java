@@ -103,7 +103,7 @@ public class Http1AuthHandler extends ChannelDuplexHandler {
             // Special handling for request objects, apply translation to the headers
             if (msg instanceof HttpRequest) {
                 var request = (HttpRequest) msg;
-                if (authProvider.postAuthMatch(request.method().name(), request.uri()))
+                if (authProvider.postLoginmatch(request.method().name(), request.uri()))
                     processPostAuthMatch(ctx, request);
                 else
                     processRequest(ctx, request);
@@ -223,7 +223,7 @@ public class Http1AuthHandler extends ChannelDuplexHandler {
 
         // Only one auth provider available atm, for both browser and API routes
         var authRequest = AuthRequest.forHttp1Request(request, headers);
-        authResult = authProvider.attemptAuth(authRequest);
+        authResult = authProvider.attemptLogin(authRequest);
 
         // If primary auth succeeded, set up the session token
         if (authResult.getCode() == AuthResultCode.AUTHORIZED) {
@@ -265,7 +265,7 @@ public class Http1AuthHandler extends ChannelDuplexHandler {
 
         var postAuthHeaders = new Http1AuthHeaders(request.headers());
         var postAuthRequest = AuthRequest.forHttp1Request(request, postAuthHeaders);
-        var postAuthResponse = authProvider.postAuth(postAuthRequest, session.getUserInfo());
+        var postAuthResponse = authProvider.postLogin(postAuthRequest, session.getUserInfo());
 
         if (postAuthResponse != null) {
 

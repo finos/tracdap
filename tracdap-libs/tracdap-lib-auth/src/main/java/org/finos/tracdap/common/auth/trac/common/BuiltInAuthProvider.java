@@ -68,7 +68,7 @@ public class BuiltInAuthProvider implements ILoginProvider {
     }
 
     @Override
-    public AuthResult attemptAuth(AuthRequest request) {
+    public AuthResult attemptLogin(AuthRequest request) {
 
         // API auth by redirect does not work nicely out of the box!
         // For now send an auth failure on API routes
@@ -102,13 +102,13 @@ public class BuiltInAuthProvider implements ILoginProvider {
     }
 
     @Override
-    public boolean postAuthMatch(String method, String uri) {
+    public boolean postLoginmatch(String method, String uri) {
 
         return uri.startsWith(BUILT_IN_AUTH_ROOT);
     }
 
     @Override
-    public AuthResponse postAuth(AuthRequest request, UserInfo userInfo) {
+    public AuthResponse postLogin(AuthRequest request, UserInfo userInfo) {
 
         if (request.getUrl().startsWith(BUILT_IN_AUTH_ROOT)) {
 
