@@ -49,6 +49,7 @@ dependencies {
     implementation project(':tracdap-api-services')
     implementation project(':tracdap-lib-common')
     implementation project(':tracdap-lib-validation')
+    implementation project(':tracdap-lib-auth')
 
     // Core framework - gRPC on Netty
     implementation group: 'io.netty', name: 'netty-common', version: "$netty_version"
