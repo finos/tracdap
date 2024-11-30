@@ -17,7 +17,6 @@
 
 package org.finos.tracdap.svc.auth;
 
-import org.finos.tracdap.common.auth.internal.JwtProcessor;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.netty.BaseProtocolNegotiator;
 
@@ -25,22 +24,19 @@ import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelInboundHandler;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.handler.codec.http.websocketx.WebSocketServerProtocolConfig;
-import org.finos.tracdap.config.PlatformConfig;
 
 
 public class ProtocolNegotiator extends BaseProtocolNegotiator {
 
     private static final int DEFAULT_IDLE_TIMEOUT = 20;  // seconds, TODO
 
-    private final PlatformConfig platformConfig;
-    private final JwtProcessor jwtProcessor;
+    private final ProviderLookup providerLookup;
 
-    public ProtocolNegotiator(PlatformConfig platformConfig, JwtProcessor jwtProcessor) {
+    public ProtocolNegotiator(ProviderLookup providerLookup) {
 
         super(false, false, false, DEFAULT_IDLE_TIMEOUT);
 
-        this.platformConfig = platformConfig;
-        this.jwtProcessor = jwtProcessor;
+        this.providerLookup = providerLookup;
     }
 
     @Override
@@ -56,8 +52,7 @@ public class ProtocolNegotiator extends BaseProtocolNegotiator {
     @Override
     protected ChannelHandler http1PrimaryHandler() {
 
-        var selector = new Http1AuthSelector();
-        return new Http1AuthRouter(selector);
+        return new Http1AuthRouter(providerLookup);
     }
 
     @Override

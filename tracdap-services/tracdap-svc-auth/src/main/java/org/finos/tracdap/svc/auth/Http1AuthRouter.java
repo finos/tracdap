@@ -23,17 +23,21 @@ import io.netty.channel.*;
 import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.util.ReferenceCountUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nonnull;
 
 
 public class Http1AuthRouter extends ChannelDuplexHandler {
 
-    private final Http1AuthSelector selector;
+    private final Logger log = LoggerFactory.getLogger(getClass());
+
+    private final ProviderLookup providerLookup;
     private ChannelInboundHandler handler;
 
-    public Http1AuthRouter(Http1AuthSelector selector) {
-        this.selector = selector;
+    public Http1AuthRouter(ProviderLookup providerLookup) {
+        this.providerLookup = providerLookup;
     }
 
     @Override
@@ -44,7 +48,9 @@ public class Http1AuthRouter extends ChannelDuplexHandler {
             if (msg instanceof HttpRequest) {
 
                 var request = (HttpRequest) msg;
-                var handler = selector.selectAuthProcessor(request);
+                var handler = providerLookup.selectAuthProcessor(request);
+
+                log.info(handler.getClass().getSimpleName());
 
                 ctx.pipeline().addLast(handler);
                 ctx.pipeline().remove(this);

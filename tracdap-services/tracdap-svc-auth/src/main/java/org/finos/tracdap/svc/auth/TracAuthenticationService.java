@@ -21,7 +21,6 @@ import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
-import org.finos.tracdap.common.auth.internal.JwtSetup;
 import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.exception.EStartup;
@@ -79,10 +78,8 @@ public class TracAuthenticationService extends CommonServiceBase {
         workerGroup = new NioEventLoopGroup(6, workerFactory);
         allocator = ByteBufAllocator.DEFAULT;
 
-        var jwtProcessor = JwtSetup.createProcessor(platformConfig, configManager);
-
-        var protocolNegotiator = new ProtocolNegotiator(
-                platformConfig, jwtProcessor);
+        var providers = new ProviderLookup(platformConfig, configManager, pluginManager);
+        var protocolNegotiator = new ProtocolNegotiator(providers);
 
         var bootstrap = new ServerBootstrap()
                 .group(bossGroup, workerGroup)
