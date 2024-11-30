@@ -29,17 +29,17 @@ import java.util.List;
 import java.util.Properties;
 
 
-class SimpleLoginPlugin extends TracPlugin {
+public class SimpleLoginPlugin extends TracPlugin {
 
     private static final String PLUGIN_NAME = "SIMPLE_LOGIN";
-    private static final String GUEST_AUTH_PROVIDER = "GUEST_LOGIN_PROVIDER";
-    private static final String BASIC_AUTH_PROVIDER = "BASIC_LOGIN_PROVIDER";
-    private static final String BUILT_IN_AUTH_PROVIDER = "BUILT_IN_LOGIN_PROVIDER";
+    private static final String GUEST_LOGIN_PROVIDER = "GUEST_LOGIN_PROVIDER";
+    private static final String BASIC_LOGIN_PROVIDER = "BASIC_LOGIN_PROVIDER";
+    private static final String BUILT_IN_LOGIN_PROVIDER = "BUILT_IN_LOGIN_PROVIDER";
 
     private static final List<PluginServiceInfo> serviceInfo = List.of(
-            new PluginServiceInfo(ILoginProvider.class, GUEST_AUTH_PROVIDER, List.of("guest")),
-            new PluginServiceInfo(ILoginProvider.class, BASIC_AUTH_PROVIDER, List.of("basic")),
-            new PluginServiceInfo(ILoginProvider.class, BUILT_IN_AUTH_PROVIDER, List.of("builtin")));
+            new PluginServiceInfo(ILoginProvider.class, GUEST_LOGIN_PROVIDER, List.of("guest")),
+            new PluginServiceInfo(ILoginProvider.class, BASIC_LOGIN_PROVIDER, List.of("basic")),
+            new PluginServiceInfo(ILoginProvider.class, BUILT_IN_LOGIN_PROVIDER, List.of("builtin")));
 
     @Override
     public String pluginName() {
@@ -54,16 +54,14 @@ class SimpleLoginPlugin extends TracPlugin {
     @Override @SuppressWarnings("unchecked")
     protected <T> T createService(String serviceName, Properties properties, ConfigManager configManager) {
 
-        if (serviceName.equals(GUEST_AUTH_PROVIDER)) {
-            var loginProvider = new GuestLoginProvider(properties);
-            var authProvider = new SimpleLoginAuthProvider(configManager, loginProvider);
-            return (T) authProvider;
+        if (serviceName.equals(GUEST_LOGIN_PROVIDER)) {
+            return (T) new GuestLoginProvider(properties);
         }
 
-        if (serviceName.equals(BASIC_AUTH_PROVIDER))
+        if (serviceName.equals(BASIC_LOGIN_PROVIDER))
             return (T) new BasicLoginProvider(configManager);
 
-        if (serviceName.equals(BUILT_IN_AUTH_PROVIDER))
+        if (serviceName.equals(BUILT_IN_LOGIN_PROVIDER))
             return (T) new BuiltInLoginProvider(properties, configManager);
 
         var message = String.format("Plugin [%s] does not support the service [%s]", pluginName(), serviceName);

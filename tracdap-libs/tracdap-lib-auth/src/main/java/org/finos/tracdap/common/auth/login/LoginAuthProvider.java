@@ -15,37 +15,30 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.auth.login.simple;
+package org.finos.tracdap.common.auth.login;
 
 import org.finos.tracdap.common.auth.internal.JwtProcessor;
-import org.finos.tracdap.common.auth.internal.JwtSetup;
-import org.finos.tracdap.common.auth.login.Http1LoginHandler;
-import org.finos.tracdap.common.auth.login.ILoginProvider;
 import org.finos.tracdap.common.auth.provider.IAuthProvider;
-import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.config.AuthenticationConfig;
-import org.finos.tracdap.config.PlatformConfig;
 
 
 import io.netty.channel.ChannelInboundHandler;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http2.Http2Headers;
 
-public class SimpleLoginAuthProvider implements IAuthProvider {
+public class LoginAuthProvider implements IAuthProvider {
 
     private final AuthenticationConfig authConfig;
     private final JwtProcessor jwtProcessor;
     private final ILoginProvider loginProvider;
 
-    public SimpleLoginAuthProvider(
-            ConfigManager configManager,
+    public LoginAuthProvider(
+            AuthenticationConfig authConfig,
+            JwtProcessor jwtProcessor,
             ILoginProvider loginProvider) {
 
-        var platformConfig = configManager.loadRootConfigObject(PlatformConfig.class);
-
-        this.authConfig = platformConfig.getAuthentication();
-        this.jwtProcessor = JwtSetup.createProcessor(platformConfig, configManager);
-
+        this.authConfig = authConfig;
+        this.jwtProcessor = jwtProcessor;
         this.loginProvider = loginProvider;
     }
 
