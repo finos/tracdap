@@ -22,6 +22,8 @@ authentication:
       userId: guest
       userName: Guest User
 
+  returnPath: /client-app/home
+
 
 services:
   authentication:

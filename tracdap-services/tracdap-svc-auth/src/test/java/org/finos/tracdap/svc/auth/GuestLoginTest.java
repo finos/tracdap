@@ -33,6 +33,8 @@ public class GuestLoginTest {
 
     public static final String TRAC_CONFIG_AUTH_UNIT = "config/auth-svc-login-guest.yaml";
 
+    private static final String REDIRECT_HTML = "<meta http-equiv=\"refresh\" content=\"1; URL='%s'\" />";
+
     private static final short AUTH_SVC_PORT = 8081;
 
     @RegisterExtension
@@ -50,26 +52,72 @@ public class GuestLoginTest {
     @Test
     void testLoginFromScratch() throws Exception {
 
-        var loginUri = new URI("http://localhost:" + AUTH_SVC_PORT + "/login/browser");
+        var loginUriTemplate = "http://localhost:%d/login/browser/login";
+        var loginUri = new URI(String.format(loginUriTemplate, AUTH_SVC_PORT));
 
-        var request = java.net.http.HttpRequest.newBuilder().GET()
-                .uri(loginUri)
-                .version(HttpClient.Version.HTTP_1_1)
-                .timeout(Duration.ofSeconds(3))
-                .build();
+        try (var client = HttpClient.newHttpClient()) {
 
-        var client = HttpClient.newHttpClient();
-        var response = client.send(request, HttpResponse.BodyHandlers.ofString());
+            var request = java.net.http.HttpRequest.newBuilder().GET()
+                    .uri(loginUri)
+                    .version(HttpClient.Version.HTTP_1_1)
+                    .timeout(Duration.ofSeconds(3))
+                    .build();
 
-        Assertions.assertEquals(200, response.statusCode());
-        Assertions.assertEquals(HttpClient.Version.HTTP_1_1, response.version());
+            var response = client.send(request, HttpResponse.BodyHandlers.ofString());
 
-        System.out.println(response.headers().toString());
+            Assertions.assertEquals(200, response.statusCode());
+            Assertions.assertEquals(HttpClient.Version.HTTP_1_1, response.version());
+
+            var cookies = response.headers().allValues("set-cookie");
+
+            var tokenCookie = cookies.stream().filter(c -> c.startsWith("trac_auth_token")).findFirst();
+            var expiryCookie = cookies.stream().filter(c -> c.startsWith("trac_auth_expiry")).findFirst();
+            var userIdCookie = cookies.stream().filter(c -> c.startsWith("trac_user_id")).findFirst();
+            var userNameCookie = cookies.stream().filter(c -> c.startsWith("trac_user_name")).findFirst();
+
+            Assertions.assertTrue(tokenCookie.isPresent());
+            Assertions.assertTrue(expiryCookie.isPresent());
+            Assertions.assertTrue(userIdCookie.isPresent());
+            Assertions.assertTrue(userNameCookie.isPresent());
+
+            var content = response.body();
+
+            var returnPath = "/client-app/home";
+            var redirectHtml = String.format(REDIRECT_HTML, returnPath);
+
+            Assertions.assertTrue(content.contains(redirectHtml));
+        }
     }
 
     @Test
     void testLoginRedirect() throws Exception {
-        Assertions.fail("Not yet implemented");
+
+        var returnPath = "/custom/redirect";
+        var loginUriTemplate = "http://localhost:%d/login/browser/login?return-path=%s";
+        var loginUri = new URI(String.format(loginUriTemplate, AUTH_SVC_PORT, returnPath));
+
+        try (var client = HttpClient.newHttpClient()) {
+
+            var request = java.net.http.HttpRequest.newBuilder().GET()
+                    .uri(loginUri)
+                    .version(HttpClient.Version.HTTP_1_1)
+                    .timeout(Duration.ofSeconds(3))
+                    .build();
+
+            var response = client.send(request, HttpResponse.BodyHandlers.ofString());
+
+            Assertions.assertEquals(200, response.statusCode());
+            Assertions.assertEquals(HttpClient.Version.HTTP_1_1, response.version());
+
+            var cookies = response.headers().allValues("set-cookie");
+            var tokenCookie = cookies.stream().filter(c -> c.startsWith("trac_auth_token")).findFirst();
+            Assertions.assertTrue(tokenCookie.isPresent());
+
+            var content = response.body();
+            var redirectHtml = String.format(REDIRECT_HTML, returnPath);
+
+            Assertions.assertTrue(content.contains(redirectHtml));
+        }
     }
 
     @Test
