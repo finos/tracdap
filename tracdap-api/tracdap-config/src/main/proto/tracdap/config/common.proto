@@ -55,6 +55,9 @@ message AuthenticationConfig {
 
   PluginConfig provider = 3;
 
+  optional string loginPath = 12;
+  optional string returnPath = 13;
+
   bool disableAuth = 4;
   bool disableSigning = 5;
 
@@ -63,7 +66,7 @@ message AuthenticationConfig {
   sint32 systemTicketDuration = 10;
   sint32 systemTicketRefresh = 11;
 
-  repeated ExternalAuthConfig externalSystems = 12;
+  repeated ExternalAuthConfig externalSystems = 14;
 }
 
 message ExternalAuthConfig {
