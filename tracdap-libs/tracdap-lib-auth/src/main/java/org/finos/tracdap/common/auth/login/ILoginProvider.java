@@ -17,14 +17,8 @@
 
 package org.finos.tracdap.common.auth.login;
 
-import org.finos.tracdap.common.auth.internal.UserInfo;
-
 
 public interface ILoginProvider {
 
-    AuthResult attemptLogin(AuthRequest authRequest);
-
-    boolean postLoginmatch(String method, String uri);
-
-    AuthResponse postLogin(AuthRequest authRequest, UserInfo userInfo);
+    AuthResult attemptLogin(AuthRequest loginRequest);
 }

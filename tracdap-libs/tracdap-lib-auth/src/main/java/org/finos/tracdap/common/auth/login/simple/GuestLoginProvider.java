@@ -19,7 +19,6 @@ package org.finos.tracdap.common.auth.login.simple;
 
 import org.finos.tracdap.common.auth.login.*;
 import org.finos.tracdap.common.auth.internal.UserInfo;
-import org.finos.tracdap.common.auth.provider.IAuthProvider;
 import org.finos.tracdap.common.exception.EStartup;
 
 import org.slf4j.Logger;
@@ -28,7 +27,7 @@ import org.slf4j.LoggerFactory;
 import java.util.Properties;
 
 
-class GuestLoginProvider implements  ILoginProvider {
+class GuestLoginProvider implements ILoginProvider {
 
     private static final Logger log = LoggerFactory.getLogger(GuestLoginProvider.class);
 
@@ -52,8 +51,6 @@ class GuestLoginProvider implements  ILoginProvider {
         guestName = properties.getProperty(USER_NAME_CONFIG_KEY);
     }
 
-
-
     @Override
     public AuthResult attemptLogin(AuthRequest authRequest) {
 
@@ -64,15 +61,5 @@ class GuestLoginProvider implements  ILoginProvider {
         user.setDisplayName(guestName);
 
         return AuthResult.AUTHORIZED(user);
-    }
-
-    @Override
-    public boolean postLoginmatch(String method, String uri) {
-        return false;
-    }
-
-    @Override
-    public AuthResponse postLogin(AuthRequest authRequest, UserInfo userInfo) {
-        return null;
     }
 }

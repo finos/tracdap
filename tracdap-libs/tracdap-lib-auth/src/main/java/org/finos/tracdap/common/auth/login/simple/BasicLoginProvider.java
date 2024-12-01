@@ -18,7 +18,6 @@
 package org.finos.tracdap.common.auth.login.simple;
 
 import org.finos.tracdap.common.auth.login.*;
-import org.finos.tracdap.common.auth.internal.UserInfo;
 import org.finos.tracdap.common.config.ConfigManager;
 
 import io.netty.buffer.Unpooled;
@@ -87,16 +86,6 @@ class BasicLoginProvider implements ILoginProvider {
         }
     }
 
-    @Override
-    public boolean postLoginmatch(String method, String uri) {
-        return false;
-    }
-
-    @Override
-    public AuthResponse postLogin(AuthRequest authRequest, UserInfo userInfo) {
-        return null;
-    }
-
     public AuthResult requestAuth() {
 
         log.info("AUTHENTICATION: Using basic authentication");
@@ -111,6 +100,4 @@ class BasicLoginProvider implements ILoginProvider {
 
         return AuthResult.OTHER_RESPONSE(response);
     }
-
-
 }

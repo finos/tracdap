@@ -18,12 +18,11 @@
 package org.finos.tracdap.common.auth.login.simple;
 
 import org.finos.tracdap.common.auth.login.*;
-import org.finos.tracdap.common.auth.internal.UserInfo;
 import org.finos.tracdap.common.config.ConfigManager;
-import org.finos.tracdap.common.exception.EStartup;
 
 import io.netty.handler.codec.http.*;
 
+import org.finos.tracdap.config.PlatformConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -33,29 +32,20 @@ import java.util.Properties;
 
 class BuiltInLoginProvider implements ILoginProvider {
 
-    public static final String MAIN_PAGE_KEY = "mainPage";
-
     public static final String BUILT_IN_AUTH_ROOT = "/trac-auth/";
     public static final String BUILT_IN_AUTH_PAGE = "/trac-auth/login";
 
-
     private static final Logger log = LoggerFactory.getLogger(BuiltInLoginProvider.class);
 
-    private final String mainPage;
+    private final LoginContent loginContent;
     private final IUserDatabase userDb;
 
     public BuiltInLoginProvider(Properties properties, ConfigManager configManager) {
 
-        if (!properties.containsKey(MAIN_PAGE_KEY)) {
+        var platformConfig = configManager.loadRootConfigObject(PlatformConfig.class);
+        var authConfig = platformConfig.getAuthentication();
 
-            var messageTemplate = "The [BUILTIN] auth provider is missing required config property [%s]";
-            var message = String.format(messageTemplate, MAIN_PAGE_KEY);
-            log.error(message);
-            throw new EStartup(message);
-        }
-
-        mainPage = properties.getProperty(MAIN_PAGE_KEY);
-
+        this.loginContent = new LoginContent(authConfig);
         this.userDb = SimpleLoginPlugin.createUserDb(configManager);
     }
 
@@ -76,8 +66,10 @@ class BuiltInLoginProvider implements ILoginProvider {
         if (isApi)
             return AuthResult.FAILED("Session expired or not available");
 
-        if (!request.getUrl().startsWith(BUILT_IN_AUTH_ROOT))
-            return LoginContent.redirectToLogin(request);
+        if (!request.getUrl().startsWith(BUILT_IN_AUTH_ROOT)) {
+            var redirect = loginContent.redirectToLogin(request);
+            return AuthResult.OTHER_RESPONSE(redirect);
+        }
 
         if (request.getMethod().equals(HttpMethod.POST.name()) &&
             request.getUrl().equals(BUILT_IN_AUTH_PAGE)) {
@@ -89,26 +81,8 @@ class BuiltInLoginProvider implements ILoginProvider {
         }
         else {
 
-            return LoginContent.serveLoginContent(request, false);
-        }
-    }
-
-    @Override
-    public boolean postLoginmatch(String method, String uri) {
-
-        return uri.startsWith(BUILT_IN_AUTH_ROOT);
-    }
-
-    @Override
-    public AuthResponse postLogin(AuthRequest request, UserInfo userInfo) {
-
-        if (request.getUrl().startsWith(BUILT_IN_AUTH_ROOT)) {
-
-            return LoginContent.serveLoginContent(request, true).getOtherResponse();
-        }
-        else {
-
-            return null;
+            var loginPage = loginContent.serveLoginContent(request, false);
+            return AuthResult.OTHER_RESPONSE(loginPage);
         }
     }
 
@@ -122,8 +96,10 @@ class BuiltInLoginProvider implements ILoginProvider {
         var passwordParam = loginParams.get("password");
 
         if (usernameParam == null || usernameParam.size() != 1 ||
-                passwordParam == null || passwordParam.size() != 1) {
-            return LoginContent.redirectToLogin(request);
+            passwordParam == null || passwordParam.size() != 1) {
+
+            var redirect = loginContent.redirectToLogin(request);
+            return AuthResult.OTHER_RESPONSE(redirect);
         }
 
         var username = usernameParam.get(0);
@@ -134,7 +110,9 @@ class BuiltInLoginProvider implements ILoginProvider {
             return AuthResult.AUTHORIZED(userInfo);
         }
         else {
-            return LoginContent.redirectToLogin(request);
+
+            var redirect = loginContent.redirectToLogin(request);
+            return AuthResult.OTHER_RESPONSE(redirect);
         }
     }
 }
