@@ -46,6 +46,7 @@ public class Http1LoginHandler extends ChannelDuplexHandler {
     private final AuthenticationConfig authConfig;
     private final JwtProcessor jwtProcessor;
     private final ILoginProvider loginProvider;
+    private final LoginContent loginContent;
 
     private AuthResult authResult = AuthResult.FAILED();
     private SessionInfo session;
@@ -61,9 +62,10 @@ public class Http1LoginHandler extends ChannelDuplexHandler {
             ILoginProvider loginProvider) {
 
         this.authConfig = authConfig;
-
         this.jwtProcessor = jwtProcessor;
         this.loginProvider = loginProvider;
+
+        this.loginContent = new LoginContent(authConfig);
     }
 
     @Override
@@ -86,29 +88,6 @@ public class Http1LoginHandler extends ChannelDuplexHandler {
             if ((msg instanceof HttpRequest)) {
                 var request = (HttpRequest) msg;
                 processAuthentication(ctx, request);
-            }
-
-            // If authorization failed a response has already been sent
-            // Do not pass any further messages down the pipe
-
-            if (authResult.getCode() != AuthResultCode.AUTHORIZED)
-                return;
-
-            // Authentication succeeded, allow messages to flow on the connection
-
-            // Special handling for request objects, apply translation to the headers
-            if (msg instanceof HttpRequest) {
-                var request = (HttpRequest) msg;
-                if (loginProvider.postLoginmatch(request.method().name(), request.uri()))
-                    processPostAuthMatch(ctx, request);
-                else
-                    processRequest(ctx, request);
-            }
-
-            // Everything else flows straight through
-            else {
-                ReferenceCountUtil.retain(msg);
-                ctx.fireChannelRead(msg);
             }
         }
         finally {
@@ -226,6 +205,8 @@ public class Http1LoginHandler extends ChannelDuplexHandler {
 
             session = AuthLogic.newSession(authResult.getUserInfo(), authConfig);
             token = jwtProcessor.encodeToken(session);
+
+            processPostAuthMatch(ctx, request);
         }
 
         // Send a basic error response for authentication failures for now
@@ -261,49 +242,13 @@ public class Http1LoginHandler extends ChannelDuplexHandler {
 
         var postAuthHeaders = new Http1AuthHeaders(request.headers());
         var postAuthRequest = AuthRequest.forHttp1Request(request, postAuthHeaders);
-        var postAuthResponse = loginProvider.postLogin(postAuthRequest, session.getUserInfo());
+        var postAuthResponse = loginContent.serveLoginContent(postAuthRequest, true);
 
-        if (postAuthResponse != null) {
+        authResult = AuthResult.OTHER_RESPONSE(postAuthResponse);
+        var response = buildAuthResponse(request, postAuthResponse);
 
-            authResult = AuthResult.OTHER_RESPONSE(postAuthResponse);
-            var response = buildAuthResponse(request, postAuthResponse);
-
-            processResponse(ctx, response, ctx.newPromise());
-            ctx.flush();
-        }
-    }
-
-    private void processRequest(ChannelHandlerContext ctx, HttpRequest request) {
-
-        var headers = new Http1AuthHeaders(request.headers());
-        var emptyHeaders = new Http1AuthHeaders();
-
-        var relayHeaders = AuthLogic.setPlatformAuthHeaders(headers, emptyHeaders, token);
-
-        if (request instanceof FullHttpRequest) {
-
-            var relayContent = ((FullHttpRequest) request).content().retain();
-
-            var relayRequest = new DefaultFullHttpRequest(
-                    request.protocolVersion(),
-                    request.method(),
-                    request.uri(),
-                    relayContent,
-                    relayHeaders.headers(),
-                    new DefaultHttpHeaders());
-
-            ctx.fireChannelRead(relayRequest);
-        }
-        else {
-
-            var relayRequest = new DefaultHttpRequest(
-                    request.protocolVersion(),
-                    request.method(),
-                    request.uri(),
-                    relayHeaders.headers());
-
-            ctx.fireChannelRead(relayRequest);
-        }
+        processResponse(ctx, response, ctx.newPromise());
+        ctx.flush();
     }
 
     private void processResponse(ChannelHandlerContext ctx, HttpResponse response, ChannelPromise promise) {
