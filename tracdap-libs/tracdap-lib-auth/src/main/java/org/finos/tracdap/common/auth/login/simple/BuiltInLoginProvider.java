@@ -21,17 +21,13 @@ import org.finos.tracdap.common.auth.login.*;
 import org.finos.tracdap.common.auth.internal.UserInfo;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.exception.EStartup;
-import org.finos.tracdap.common.util.ResourceHelpers;
 
-import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.http.*;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.net.URI;
 import java.nio.charset.StandardCharsets;
-import java.util.MissingResourceException;
 import java.util.Properties;
 
 
@@ -41,10 +37,6 @@ class BuiltInLoginProvider implements ILoginProvider {
 
     public static final String BUILT_IN_AUTH_ROOT = "/trac-auth/";
     public static final String BUILT_IN_AUTH_PAGE = "/trac-auth/login";
-
-    public static final String BUILT_IN_CONTENT_PATH = "/builtin/content/";
-    public static final String BUILT_IN_LOGIN_PAGE = "/builtin/content/login.html";
-    public static final String BUILT_IN_LOGIN_OK_PAGE = "/builtin/content/login_ok.html";
 
 
     private static final Logger log = LoggerFactory.getLogger(BuiltInLoginProvider.class);
@@ -85,7 +77,7 @@ class BuiltInLoginProvider implements ILoginProvider {
             return AuthResult.FAILED("Session expired or not available");
 
         if (!request.getUrl().startsWith(BUILT_IN_AUTH_ROOT))
-            return redirectToLogin(request);
+            return LoginContent.redirectToLogin(request);
 
         if (request.getMethod().equals(HttpMethod.POST.name()) &&
             request.getUrl().equals(BUILT_IN_AUTH_PAGE)) {
@@ -97,7 +89,7 @@ class BuiltInLoginProvider implements ILoginProvider {
         }
         else {
 
-            return serveLoginContent(request, false);
+            return LoginContent.serveLoginContent(request, false);
         }
     }
 
@@ -112,31 +104,11 @@ class BuiltInLoginProvider implements ILoginProvider {
 
         if (request.getUrl().startsWith(BUILT_IN_AUTH_ROOT)) {
 
-            return serveLoginContent(request, true).getOtherResponse();
+            return LoginContent.serveLoginContent(request, true).getOtherResponse();
         }
         else {
 
             return null;
-        }
-    }
-
-    private AuthResult redirectToLogin(AuthRequest request) {
-
-        log.info("AUTHENTICATION: Using built-in authentication");
-
-        if (request.getUrl().equals(BUILT_IN_AUTH_PAGE))
-            return serveLoginContent(request, false);
-
-        else {
-
-            var headers = new Http1AuthHeaders();
-            headers.add(HttpHeaderNames.LOCATION, BUILT_IN_AUTH_PAGE);
-
-            var response = new AuthResponse(
-                    HttpResponseStatus.TEMPORARY_REDIRECT.code(), "Login redirect",
-                    headers, Unpooled.EMPTY_BUFFER);
-
-            return AuthResult.OTHER_RESPONSE(response);
         }
     }
 
@@ -151,7 +123,7 @@ class BuiltInLoginProvider implements ILoginProvider {
 
         if (usernameParam == null || usernameParam.size() != 1 ||
                 passwordParam == null || passwordParam.size() != 1) {
-            return redirectToLogin(request);
+            return LoginContent.redirectToLogin(request);
         }
 
         var username = usernameParam.get(0);
@@ -162,67 +134,7 @@ class BuiltInLoginProvider implements ILoginProvider {
             return AuthResult.AUTHORIZED(userInfo);
         }
         else {
-            return redirectToLogin(request);
+            return LoginContent.redirectToLogin(request);
         }
-    }
-
-    private AuthResult serveLoginContent(AuthRequest request, boolean loggedIn) {
-
-        try {
-            var uri = URI.create(request.getUrl());
-
-            var resourcePath = uri.getPath().replace(BUILT_IN_AUTH_ROOT, BUILT_IN_CONTENT_PATH);
-
-            if (uri.getPath().equals(BUILT_IN_AUTH_PAGE))
-                resourcePath = loggedIn ? BUILT_IN_LOGIN_OK_PAGE : BUILT_IN_LOGIN_PAGE;
-
-            var resourceBytes = ResourceHelpers.loadResourceAsBytes(resourcePath, getClass());
-
-            if (loggedIn && resourcePath.equals(BUILT_IN_LOGIN_OK_PAGE))
-                resourceBytes = insertRedirect(resourceBytes);
-
-            var resourceContent = Unpooled.wrappedBuffer(resourceBytes);
-            var resourceType = mimeTypeMapping(resourcePath);
-
-            var headers = new Http1AuthHeaders();
-            headers.add(HttpHeaderNames.CONTENT_TYPE, resourceType);
-            headers.add(HttpHeaderNames.CONTENT_LENGTH, Integer.toString(resourceContent.readableBytes()));
-
-            var response = new AuthResponse(
-                    HttpResponseStatus.OK.code(),
-                    HttpResponseStatus.OK.reasonPhrase(),
-                    new Http1AuthHeaders(),
-                    resourceContent);
-
-            return AuthResult.OTHER_RESPONSE(response);
-        }
-        catch (IllegalArgumentException | MissingResourceException e) {
-            return redirectToLogin(request);
-        }
-    }
-
-    private byte[] insertRedirect(byte[] pageBytes) {
-
-        var pageText = new String(pageBytes, StandardCharsets.UTF_8);
-        pageText = pageText.replace("${REDIRECT}", mainPage);
-        return pageText.getBytes(StandardCharsets.UTF_8);
-    }
-
-    private String mimeTypeMapping(String path) {
-
-        var sep = path.lastIndexOf(".");
-        var ext = path.substring(sep + 1);
-
-        if (ext.equals("html"))
-            return "text/html";
-
-        if (ext.equals("css"))
-            return "text/css";
-
-        if (ext.equals("png"))
-            return "image/png";
-
-        return "text/html";
-
     }
 }
