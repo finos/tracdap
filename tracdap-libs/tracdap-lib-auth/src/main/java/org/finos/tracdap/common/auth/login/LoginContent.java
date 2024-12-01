@@ -21,41 +21,72 @@ import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import org.finos.tracdap.common.util.ResourceHelpers;
+import org.finos.tracdap.config.AuthenticationConfig;
 
+import javax.annotation.Nonnull;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
+import java.util.List;
 import java.util.MissingResourceException;
 
 
 public class LoginContent {
 
-    public static final String MAIN_PAGE_KEY = "mainPage";
+    public static final String DEFAULT_LOGIN_PATH = "/login";
+    public static final String DEFAULT_RETURN_PATH = "/";
 
-    public static final String BUILT_IN_AUTH_ROOT = "/trac-auth/";
-    public static final String BUILT_IN_AUTH_PAGE = "/trac-auth/login";
+    public static final String DEFAULT_LOGIN_MAIN_PAGE = "/login/browser/login";
 
-    public static final String BUILT_IN_CONTENT_PATH = "/builtin/content/";
-    public static final String BUILT_IN_LOGIN_PAGE = "/builtin/content/login.html";
-    public static final String BUILT_IN_LOGIN_OK_PAGE = "/builtin/content/login_ok.html";
+    public static final String BUILT_IN_CONTENT_PATH = "/login/content/";
+    public static final String BUILT_IN_LOGIN_PAGE = "/login/content/login.html";
+    public static final String BUILT_IN_LOGIN_OK_PAGE = "/login/content/login_ok.html";
 
-    private static final String mainPage = "/trac-ui/app/";
+    private final String configLoginPath;
+    private final String configReturnPath;
 
-    // TODO: Review these constants, some should come from config
+    public LoginContent(AuthenticationConfig authConfig) {
 
-    public static AuthResult serveLoginContent(AuthRequest request, boolean loggedIn) {
+        if (authConfig.hasLoginPath())
+            configLoginPath = authConfig.getLoginPath();
+        else
+            configLoginPath = DEFAULT_LOGIN_PATH;
+
+        if (authConfig.hasReturnPath())
+            configReturnPath = authConfig.getReturnPath();
+        else
+            configReturnPath = DEFAULT_RETURN_PATH;
+    }
+
+    @Nonnull
+    public AuthResponse serveLoginContent(AuthRequest request, boolean loggedIn) {
 
         try {
             var uri = URI.create(request.getUrl());
+            var query = uri.getQuery();
+            var queryParams = query != null ? Arrays.asList(query.split("&")) : List.<String>of();
 
-            var resourcePath = uri.getPath().replace(BUILT_IN_AUTH_ROOT, BUILT_IN_CONTENT_PATH);
+            var resourcePath = uri.getPath().replace(configLoginPath, BUILT_IN_CONTENT_PATH);
 
-            if (uri.getPath().equals(BUILT_IN_AUTH_PAGE))
+            if (uri.getPath().equals(DEFAULT_LOGIN_MAIN_PAGE))
                 resourcePath = loggedIn ? BUILT_IN_LOGIN_OK_PAGE : BUILT_IN_LOGIN_PAGE;
 
             var resourceBytes = ResourceHelpers.loadResourceAsBytes(resourcePath, LoginContent.class);
 
-            if (loggedIn && resourcePath.equals(BUILT_IN_LOGIN_OK_PAGE))
-                resourceBytes = insertRedirect(resourceBytes);
+            if (loggedIn && resourcePath.equals(BUILT_IN_LOGIN_OK_PAGE)) {
+
+                var returnPathParam = queryParams.stream()
+                        .filter(p -> p.startsWith("return-path"))
+                        .findFirst();
+
+                if (returnPathParam.isPresent()) {
+                    var returnPath = returnPathParam.get().substring(returnPathParam.get().indexOf('=') + 1);
+                    resourceBytes = insertRedirect(resourceBytes, returnPath);
+                }
+                else {
+                    resourceBytes = insertRedirect(resourceBytes, configReturnPath);
+                }
+            }
 
             var resourceContent = Unpooled.wrappedBuffer(resourceBytes);
             var resourceType = mimeTypeMapping(resourcePath);
@@ -64,41 +95,38 @@ public class LoginContent {
             headers.add(HttpHeaderNames.CONTENT_TYPE, resourceType);
             headers.add(HttpHeaderNames.CONTENT_LENGTH, Integer.toString(resourceContent.readableBytes()));
 
-            var response = new AuthResponse(
+            return new AuthResponse(
                     HttpResponseStatus.OK.code(),
                     HttpResponseStatus.OK.reasonPhrase(),
                     new Http1AuthHeaders(),
                     resourceContent);
-
-            return AuthResult.OTHER_RESPONSE(response);
         }
         catch (IllegalArgumentException | MissingResourceException e) {
             return redirectToLogin(request);
         }
     }
 
-    public static AuthResult redirectToLogin(AuthRequest request) {
+    @Nonnull
+    public AuthResponse redirectToLogin(AuthRequest request) {
 
-        if (request.getUrl().equals(BUILT_IN_AUTH_PAGE))
+        if (request.getUrl().equals(DEFAULT_LOGIN_MAIN_PAGE))
             return serveLoginContent(request, false);
 
         else {
 
             var headers = new Http1AuthHeaders();
-            headers.add(HttpHeaderNames.LOCATION, BUILT_IN_AUTH_PAGE);
+            headers.add(HttpHeaderNames.LOCATION, DEFAULT_LOGIN_MAIN_PAGE);
 
-            var response = new AuthResponse(
+            return new AuthResponse(
                     HttpResponseStatus.TEMPORARY_REDIRECT.code(), "Login redirect",
                     headers, Unpooled.EMPTY_BUFFER);
-
-            return AuthResult.OTHER_RESPONSE(response);
         }
     }
 
-    private static byte[] insertRedirect(byte[] pageBytes) {
+    private static byte[] insertRedirect(byte[] pageBytes, String returnPath) {
 
         var pageText = new String(pageBytes, StandardCharsets.UTF_8);
-        pageText = pageText.replace("${REDIRECT}", mainPage);
+        pageText = pageText.replace("${REDIRECT}", returnPath);
         return pageText.getBytes(StandardCharsets.UTF_8);
     }
 
