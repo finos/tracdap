@@ -31,6 +31,30 @@ import java.time.Duration;
 
 public class GuestLoginTest {
 
+    // HttpClient is a closable resource in Java 21 but not in Java 17
+    private static class CloseWrapper<T> implements AutoCloseable {
+
+        static <T> CloseWrapper<T> wrap(T obj) {
+            return new CloseWrapper<>(obj);
+        }
+
+        private CloseWrapper(T obj) {
+            this.obj = obj;
+        }
+
+        public T get() {
+            return obj;
+        }
+
+        @Override
+        public void close() throws Exception {
+            if (obj instanceof AutoCloseable)
+                ((AutoCloseable) obj).close();
+        }
+
+        private final T obj;
+    }
+
     public static final String TRAC_CONFIG_AUTH_UNIT = "config/auth-svc-login-guest.yaml";
 
     private static final String REDIRECT_HTML = "<meta http-equiv=\"refresh\" content=\"1; URL='%s'\" />";
@@ -55,7 +79,9 @@ public class GuestLoginTest {
         var loginUriTemplate = "http://localhost:%d/login/browser/login";
         var loginUri = new URI(String.format(loginUriTemplate, AUTH_SVC_PORT));
 
-        try (var client = HttpClient.newHttpClient()) {
+        try (var clientWrap = CloseWrapper.wrap(HttpClient.newHttpClient())) {
+
+            var client = clientWrap.get();
 
             var request = java.net.http.HttpRequest.newBuilder().GET()
                     .uri(loginUri)
@@ -96,7 +122,9 @@ public class GuestLoginTest {
         var loginUriTemplate = "http://localhost:%d/login/browser/login?return-path=%s";
         var loginUri = new URI(String.format(loginUriTemplate, AUTH_SVC_PORT, returnPath));
 
-        try (var client = HttpClient.newHttpClient()) {
+        try (var clientWrap = CloseWrapper.wrap(HttpClient.newHttpClient())) {
+
+            var client = clientWrap.get();
 
             var request = java.net.http.HttpRequest.newBuilder().GET()
                     .uri(loginUri)
