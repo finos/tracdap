@@ -234,12 +234,13 @@ public class Http1AuthHandler extends ChannelDuplexHandler {
             state.refreshQueue = null;
         }
 
-        if (state.refreshPromise != null && !state.refreshPromise.isDone()) {
-            state.refreshPromise.cancel(false);
+        if (state.refreshPromise != null) {
+
+            if (!state.refreshPromise.isDone())
+                state.refreshPromise.cancel(false);
+
             state.refreshPromise = null;
         }
-
-        state = null;
     }
 
     private void checkAuthentication(HttpRequest request) {
@@ -314,22 +315,19 @@ public class Http1AuthHandler extends ChannelDuplexHandler {
         if (state.refreshPromise == null) {
 
             // Set up a promise for the token refresh response
-
             state.refreshPromise = ctx.newPromise();
-            state.refreshPromise.addListener(future -> refreshComplete(ctx, future.isSuccess(), future.cause()));
+            state.refreshPromise.addListener(future -> refreshComplete(ctx));
 
             // Set a short timeout on the refresh request
             // If the response doesn't come back quickly, the existing token is still good
-
             ctx.executor().schedule(() -> {
-
-                log.warn("Token refresh did not complete in the allotted time (the previous token is still valid)");
-                state.refreshPromise.setSuccess();
-
+                if (state.refreshPromise != null && !state.refreshPromise.isDone()) {
+                    log.warn("Token refresh did not complete in the allotted time (the previous token is still valid)");
+                    state.refreshPromise.setSuccess();  // TODO
+                }
             }, refreshTimeout.toMillis(), TimeUnit.MILLISECONDS);
 
             // Set up a queue to hold outbound messages until the refresh is ready
-
             state.refreshQueue = new ArrayDeque<>();
         }
 
@@ -341,9 +339,7 @@ public class Http1AuthHandler extends ChannelDuplexHandler {
         else {
 
             // Channel is available - send a refresh request to the auth service
-
             // TODO: Request params
-
             var requestHeaders = new DefaultHttpHeaders();
             requestHeaders.add(HttpHeaderNames.AUTHORIZATION, state.token);
 
@@ -374,9 +370,14 @@ public class Http1AuthHandler extends ChannelDuplexHandler {
         refreshConnect.addListener(future -> {
 
             if (future.isSuccess()) {
+
                 sendRefreshRequest.run();
             }
             else {
+
+                if (!state.refreshPromise.isDone())
+                    state.refreshPromise.setFailure(future.cause());
+
                 refreshChannel.close();
                 refreshChannel = null;
             }
@@ -385,7 +386,7 @@ public class Http1AuthHandler extends ChannelDuplexHandler {
         refreshChannel = refreshConnect.channel();
     }
 
-    private void refreshComplete(ChannelHandlerContext ctx, boolean isSuccess, Throwable error) {
+    private void refreshComplete(ChannelHandlerContext ctx) {
 
         if (state.refreshQueue != null) {
 
@@ -396,21 +397,16 @@ public class Http1AuthHandler extends ChannelDuplexHandler {
                 var msg = queueItem.getKey();
                 var promise = queueItem.getValue();
 
-                queueItem = state.refreshQueue.poll();
+                ctx.pipeline().write(msg, promise);
 
-                if (isSuccess)
-                    ctx.pipeline().write(msg, promise);
-                else {
-                    ReferenceCountUtil.release(msg);
-                    promise.setFailure(error);
-                }
+                queueItem = state.refreshQueue.poll();
             }
 
             ctx.pipeline().flush();
-
-            state.refreshQueue = null;
-            state.refreshPromise = null;
         }
+
+        state.refreshPromise = null;
+        state.refreshQueue = null;
     }
 
     private class Http1RefreshInit extends ChannelInitializer<Channel> {
