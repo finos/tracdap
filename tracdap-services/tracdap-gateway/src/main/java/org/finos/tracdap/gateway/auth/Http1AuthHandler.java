@@ -311,80 +311,81 @@ public class Http1AuthHandler extends ChannelDuplexHandler {
 
     private void sendRefreshRequest(ChannelHandlerContext ctx) {
 
+        if (state.refreshPromise == null) {
+
+            // Set up a promise for the token refresh response
+
+            state.refreshPromise = ctx.newPromise();
+            state.refreshPromise.addListener(future -> refreshComplete(ctx, future.isSuccess(), future.cause()));
+
+            // Set a short timeout on the refresh request
+            // If the response doesn't come back quickly, the existing token is still good
+
+            ctx.executor().schedule(() -> {
+
+                log.warn("Token refresh did not complete in the allotted time (the previous token is still valid)");
+                state.refreshPromise.setSuccess();
+
+            }, refreshTimeout.toMillis(), TimeUnit.MILLISECONDS);
+
+            // Set up a queue to hold outbound messages until the refresh is ready
+
+            state.refreshQueue = new ArrayDeque<>();
+        }
+
         if (refreshChannel == null) {
 
-            var channelClass = ctx.channel().getClass();
-            var eventLoop = ctx.channel().eventLoop();
-            var allocator = ctx.alloc();
-
-            var refreshConnect = new Bootstrap()
-                    .group(eventLoop)
-                    .channel(channelClass)
-                    .option(ChannelOption.ALLOCATOR, allocator)
-                    .handler(new Http1RefreshInit())
-                    .connect("localhost", 8084);  // TODO
-
-            var state = this.state;
-
-            refreshConnect.addListener(future -> {
-
-                if (future.isSuccess()) {
-                    sendRefreshRequest(ctx, state);
-                }
-                else {
-                    refreshChannel.close();
-                    refreshChannel = null;
-                }
-            });
-
-            refreshChannel = refreshConnect.channel();
+            // If the client channel is not available, create it and call back into this function
+            prepareRefreshChannel(ctx, () -> this.sendRefreshRequest(ctx));
         }
         else {
 
-            sendRefreshRequest(ctx, state);
+            // Channel is available - send a refresh request to the auth service
+
+            // TODO: Request params
+
+            var requestHeaders = new DefaultHttpHeaders();
+            requestHeaders.add(HttpHeaderNames.AUTHORIZATION, state.token);
+
+            log.info("Sending refresh request");
+
+            var request = new DefaultFullHttpRequest(
+                    HttpVersion.HTTP_1_1, HttpMethod.GET,
+                    "/login/refresh", Unpooled.EMPTY_BUFFER,
+                    requestHeaders, new DefaultHttpHeaders());
+
+            refreshChannel.pipeline().writeAndFlush(request);
         }
     }
 
-    private void sendRefreshRequest(ChannelHandlerContext ctx, RequestState state) {
+    private void prepareRefreshChannel(ChannelHandlerContext ctx, Runnable sendRefreshRequest) {
 
-        // Send a refresh request to the auth service
+        var channelClass = ctx.channel().getClass();
+        var eventLoop = ctx.channel().eventLoop();
+        var allocator = ctx.alloc();
 
-        // TODO: Request params
+        var refreshConnect = new Bootstrap()
+                .group(eventLoop)
+                .channel(channelClass)
+                .option(ChannelOption.ALLOCATOR, allocator)
+                .handler(new Http1RefreshInit())
+                .connect("localhost", 8084);  // TODO
 
-        var requestHeaders = new DefaultHttpHeaders();
-        requestHeaders.add(HttpHeaderNames.AUTHORIZATION, state.token);
+        refreshConnect.addListener(future -> {
 
-        log.info("Sending refresh request");
-
-        var request = new DefaultFullHttpRequest(
-                HttpVersion.HTTP_1_1, HttpMethod.GET,
-                "/login/refresh", Unpooled.EMPTY_BUFFER,
-                requestHeaders, new DefaultHttpHeaders());
-
-        refreshChannel.pipeline().writeAndFlush(request);
-
-        // Set up queue and promise to hold outbound messages until the refresh request completes
-
-        state.refreshQueue = new ArrayDeque<>();
-        state.refreshPromise = refreshChannel.newPromise();
-        state.refreshPromise.addListener(future -> {
-
-            if (future.isSuccess())
-                refreshComplete(ctx, state);
+            if (future.isSuccess()) {
+                sendRefreshRequest.run();
+            }
+            else {
+                refreshChannel.close();
+                refreshChannel = null;
+            }
         });
 
-        // Set a short timeout on the refresh request
-        // If the response doesn't come back quickly, the existing token is still good
-
-        ctx.executor().schedule(() -> {
-
-            log.warn("Token refresh did not complete in the allotted time (the previous token is still valid)");
-            state.refreshPromise.setSuccess();
-
-        }, refreshTimeout.toMillis(), TimeUnit.MILLISECONDS);
+        refreshChannel = refreshConnect.channel();
     }
 
-    private void refreshComplete(ChannelHandlerContext ctx, RequestState state) {
+    private void refreshComplete(ChannelHandlerContext ctx, boolean isSuccess, Throwable error) {
 
         if (state.refreshQueue != null) {
 
@@ -397,7 +398,12 @@ public class Http1AuthHandler extends ChannelDuplexHandler {
 
                 queueItem = state.refreshQueue.poll();
 
-                ctx.pipeline().write(msg, promise);
+                if (isSuccess)
+                    ctx.pipeline().write(msg, promise);
+                else {
+                    ReferenceCountUtil.release(msg);
+                    promise.setFailure(error);
+                }
             }
 
             ctx.pipeline().flush();
