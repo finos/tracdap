@@ -106,8 +106,16 @@ public class Http1AuthHandler extends ChannelDuplexHandler {
     public void handlerAdded(ChannelHandlerContext ctx) {
 
         if (authConfig.getDisableAuth()) {
+
             log.warn("Authentication disabled in config, auth handler will be removed for this connection");
-            ctx.pipeline().remove(this);
+
+            // Channel initializer gets confused if a newly added handler is not available
+            // Instead, replace this handler with a no-op and remove it later
+            // Anyway this setting cannot be enabled in a production deployment
+
+            var handlerName = ctx.name();
+            ctx.pipeline().replace(handlerName, handlerName, new ChannelDuplexHandler());
+            ctx.executor().execute(() -> ctx.pipeline().remove(handlerName));
         }
     }
 
