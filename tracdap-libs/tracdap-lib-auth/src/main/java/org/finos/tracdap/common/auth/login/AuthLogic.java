@@ -17,13 +17,13 @@
 
 package org.finos.tracdap.common.auth.login;
 
-import io.netty.handler.codec.http.cookie.*;
 import org.finos.tracdap.common.auth.internal.AuthConstants;
 import org.finos.tracdap.common.auth.internal.SessionInfo;
 import org.finos.tracdap.common.auth.internal.UserInfo;
 import org.finos.tracdap.common.config.ConfigDefaults;
 import org.finos.tracdap.config.AuthenticationConfig;
 
+import io.netty.handler.codec.http.cookie.*;
 import io.netty.handler.codec.http.HttpHeaderNames;
 
 import java.net.URLEncoder;
@@ -38,13 +38,13 @@ import java.util.List;
 public class AuthLogic {
 
     public static final String TRAC_AUTH_TOKEN_HEADER = AuthConstants.TRAC_AUTH_TOKEN;
-    public static final String TRAC_AUTH_EXPIRY_HEADER = "trac_auth_expiry";
-    public static final String TRAC_AUTH_COOKIES_HEADER = "trac_auth_cookies";
-    public static final String TRAC_USER_ID_HEADER = "trac_user_id";
-    public static final String TRAC_USER_NAME_HEADER = "trac_user_name";
+    public static final String TRAC_AUTH_EXPIRY_HEADER = "trac-auth-expiry-utc";
+    public static final String TRAC_AUTH_COOKIES_HEADER = "trac-auth-cookies";
+    public static final String TRAC_USER_ID_HEADER = "trac-user-id";
+    public static final String TRAC_USER_NAME_HEADER = "trac-user-name";
 
-    public static final String TRAC_AUTH_PREFIX = "trac_auth_";
-    public static final String TRAC_USER_PREFIX = "trac_user_";
+    public static final String TRAC_AUTH_PREFIX = "trac-auth-";
+    public static final String TRAC_USER_PREFIX = "trac-user-";
 
     public static final boolean CLIENT_COOKIE = true;
     public static final boolean SERVER_COOKIE = false;
@@ -264,7 +264,7 @@ public class AuthLogic {
         return headers;
     }
 
-    private static <THeaders extends AuthHeaders>
+    public static <THeaders extends AuthHeaders>
     THeaders addClientAuthHeaders(THeaders headers, String token, SessionInfo session) {
 
         // For API calls send session info back in headers, these come through as gRPC metadata
@@ -286,7 +286,7 @@ public class AuthLogic {
         return headers;
     }
 
-    private static <THeaders extends AuthHeaders>
+    public static <THeaders extends AuthHeaders>
     THeaders addClientAuthCookies(THeaders headers, String token, SessionInfo session) {
 
         // For browser requests, send the session info back as cookies, this is by far the easiest approach

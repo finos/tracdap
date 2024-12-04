@@ -25,9 +25,9 @@ public class AuthConstants {
 
     public static final String BEARER_PREFIX = "bearer ";
 
-    public static final String TRAC_AUTH_TOKEN = "trac_auth_token";
-    public static final String TRAC_AUTH_USER = "trac_auth_user";
-    public static final String TRAC_DELEGATE = "trac_delegate";
+    public static final String TRAC_AUTH_TOKEN = "trac-auth-token";
+    public static final String TRAC_AUTH_USER = "trac-auth-user";
+    public static final String TRAC_DELEGATE = "trac-delegate";
 
     // Restrict access to the gRPC context keys to the auth.internal package
     // Access is through AuthHelpers.currentUser() and AuthHelpers.currentSystemUser()

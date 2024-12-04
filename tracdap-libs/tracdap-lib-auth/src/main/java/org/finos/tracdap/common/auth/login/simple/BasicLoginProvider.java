@@ -91,7 +91,7 @@ class BasicLoginProvider implements ILoginProvider {
         log.info("AUTHENTICATION: Using basic authentication");
 
         var headers = new Http1AuthHeaders();
-        headers.add(HttpHeaderNames.WWW_AUTHENTICATE, "Basic realm=\"trac_auth_realm\", charset=\"UTF-8\"");
+        headers.add(HttpHeaderNames.WWW_AUTHENTICATE, "Basic realm=\"trac-auth-realm\", charset=\"UTF-8\"");
 
         var response = new AuthResponse(
                 HttpResponseStatus.UNAUTHORIZED.code(),
