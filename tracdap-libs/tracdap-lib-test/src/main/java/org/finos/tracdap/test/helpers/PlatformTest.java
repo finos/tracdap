@@ -160,9 +160,12 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
     private String testId;
     private Path tracDir;
     private Path tracStorageDir;
-    private Path tracExecDir;    private Path tracRepoDir;
+    private Path tracExecDir;
+    private Path tracRepoDir;
     private URL platformConfigUrl;
     private String secretKey;
+    private PluginManager pluginManager;
+    private ConfigManager configManager;
     private PlatformConfig platformConfig;
 
     private TracAuthenticationService authSvc;
@@ -209,12 +212,24 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         return platformConfigUrl.toString();
     }
 
+    public PlatformConfig platformConfig() {
+        return platformConfig;
+    }
+
     public Path tracDir() {
         return tracDir;
     }
 
     public Path tracRepoDir() {
         return tracRepoDir;
+    }
+
+    public PluginManager pluginManager() {
+        return pluginManager;
+    }
+
+    public ConfigManager configManager() {
+        return configManager;
     }
 
     @Override
@@ -334,11 +349,11 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         var env = System.getenv();
         secretKey = env.getOrDefault(SECRET_KEY_ENV_VAR, SECRET_KEY_DEFAULT);
 
-        var plugins = new PluginManager();
-        plugins.initConfigPlugins();
+        pluginManager = new PluginManager();
+        pluginManager.initConfigPlugins();
 
-        var config = new ConfigManager(platformConfigUrl.toString(), tracDir, plugins);
-        platformConfig = config.loadRootConfigObject(PlatformConfig.class);
+        configManager = new ConfigManager(platformConfigUrl.toString(), tracDir, pluginManager, secretKey);
+        platformConfig = configManager.loadRootConfigObject(PlatformConfig.class);
     }
 
     private String getCurrentGitOrigin() throws Exception {
@@ -363,7 +378,7 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         }
     }
 
-    void prepareAuth() throws URISyntaxException {
+    void prepareAuth() {
 
         log.info("Running auth tool to set up root authentication keys...");
 
@@ -377,20 +392,10 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         // To create a valid token, we need to get the auth signing keys out of the secrets file
         // Tokens must be signed with the same key used by the platform services
 
-        var pluginMgr = new PluginManager();
-        pluginMgr.initConfigPlugins();
+        configManager.prepareSecrets();
 
-        var configMgr = new ConfigManager(
-                platformConfigUrl.toString(),
-                Paths.get(platformConfigUrl.toURI()).getParent(),
-                pluginMgr, secretKey);
-
-        configMgr.prepareSecrets();
-
-        var platformConfig = configMgr.loadRootConfigObject(PlatformConfig.class);
         var authConfig = platformConfig.getAuthentication();
-
-        var jwt = JwtSetup.createProcessor(platformConfig, configMgr);
+        var jwt = JwtSetup.createProcessor(platformConfig, configManager);
 
         var userInfo = new UserInfo();
         userInfo.setUserId("platform_testing");
