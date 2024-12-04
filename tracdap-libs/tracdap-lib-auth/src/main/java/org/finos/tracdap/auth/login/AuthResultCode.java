@@ -15,10 +15,12 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.auth.login.simple;
+package org.finos.tracdap.auth.login;
 
 
-interface IUserDatabase {
-
-    UserDbRecord getUserDbRecord(String userId);
+public enum AuthResultCode {
+    AUTHORIZED,
+    FAILED,
+    OTHER_RESPONSE,
+    NEED_CONTENT
 }

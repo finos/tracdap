@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.auth.provider;
+package org.finos.tracdap.auth.provider;
 
 import io.netty.channel.ChannelInboundHandler;
 import io.netty.handler.codec.http.HttpRequest;

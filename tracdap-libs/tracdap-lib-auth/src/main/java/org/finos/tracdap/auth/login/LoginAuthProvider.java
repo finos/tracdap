@@ -15,10 +15,10 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.auth.login;
+package org.finos.tracdap.auth.login;
 
+import org.finos.tracdap.auth.provider.IAuthProvider;
 import org.finos.tracdap.common.auth.internal.JwtProcessor;
-import org.finos.tracdap.common.auth.provider.IAuthProvider;
 import org.finos.tracdap.config.AuthenticationConfig;
 
 

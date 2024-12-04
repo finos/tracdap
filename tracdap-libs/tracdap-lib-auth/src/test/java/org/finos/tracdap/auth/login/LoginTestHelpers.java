@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.auth.login;
+package org.finos.tracdap.auth.login;
 
 import org.finos.tracdap.common.netty.BaseProtocolNegotiator;
 import org.finos.tracdap.common.netty.NettyHelpers;

@@ -17,10 +17,10 @@
 
 package org.finos.tracdap.svc.auth;
 
+import org.finos.tracdap.auth.login.ILoginProvider;
+import org.finos.tracdap.auth.login.LoginAuthProvider;
+import org.finos.tracdap.auth.provider.IAuthProvider;
 import org.finos.tracdap.common.auth.internal.JwtSetup;
-import org.finos.tracdap.common.auth.login.ILoginProvider;
-import org.finos.tracdap.common.auth.login.LoginAuthProvider;
-import org.finos.tracdap.common.auth.provider.IAuthProvider;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.common.plugin.IPluginManager;

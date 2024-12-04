@@ -15,10 +15,10 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.auth.login.simple;
+package org.finos.tracdap.auth.login.simple;
 
+import org.finos.tracdap.auth.login.*;
 import org.finos.tracdap.common.auth.internal.AuthHelpers;
-import org.finos.tracdap.common.auth.login.*;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.http.CommonHttpRequest;
 import org.finos.tracdap.common.http.Http1Headers;
