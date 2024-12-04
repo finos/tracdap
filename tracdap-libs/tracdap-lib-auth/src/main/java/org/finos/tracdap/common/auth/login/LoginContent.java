@@ -17,117 +17,123 @@
 
 package org.finos.tracdap.common.auth.login;
 
+import org.finos.tracdap.common.exception.EUnexpected;
+import org.finos.tracdap.common.util.ResourceHelpers;
+
+import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.http.HttpHeaderNames;
-import io.netty.handler.codec.http.HttpResponseStatus;
-import org.finos.tracdap.common.util.ResourceHelpers;
-import org.finos.tracdap.config.AuthenticationConfig;
+import io.netty.handler.codec.http.HttpRequest;
 
-import javax.annotation.Nonnull;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
-import java.util.List;
-import java.util.MissingResourceException;
+import java.util.*;
+import java.util.stream.Collectors;
 
 
-public class LoginContent {
+public final class LoginContent {
 
-    public static final String DEFAULT_LOGIN_PATH = "/login";
-    public static final String DEFAULT_RETURN_PATH = "/";
+    private static final String LOGIN_PATH = "/login/";
+    private static final String STATIC_CONTENT_PATH = "/login/static/";
+    private static final String PAGE_CONTENT_PATH = "/login/pages/";
+    private static final String LOGIN_OK_PAGE = "login_ok.html";
+    private static final String LOGIN_FORM_PAGE = "login_form.html";
+    private static final String REDIRECT_VARIABLE = "${REDIRECT}";
 
-    public static final String DEFAULT_LOGIN_MAIN_PAGE = "/login/browser/login";
+    private static final Map<String, byte[]> STATIC_CONTENT = preloadContent(STATIC_CONTENT_PATH);
+    private static final Map<String, String> PAGE_CONTENT = stringValues(preloadContent(PAGE_CONTENT_PATH));
 
-    public static final String BUILT_IN_CONTENT_PATH = "/login/content/";
-    public static final String BUILT_IN_LOGIN_PAGE = "/login/content/login.html";
-    public static final String BUILT_IN_LOGIN_OK_PAGE = "/login/content/login_ok.html";
+    boolean exists;
+    ByteBuf content;
+    AuthHeaders headers;
 
-    private final String configLoginPath;
-    private final String configReturnPath;
+    private LoginContent() {}
 
-    public LoginContent(AuthenticationConfig authConfig) {
+    private static Map<String, byte[]> preloadContent(String resourceDir) {
 
-        if (authConfig.hasLoginPath())
-            configLoginPath = authConfig.getLoginPath();
-        else
-            configLoginPath = DEFAULT_LOGIN_PATH;
+        var resourceNames = ResourceHelpers.getResourcesNames(resourceDir, LoginContent.class);
 
-        if (authConfig.hasReturnPath())
-            configReturnPath = authConfig.getReturnPath();
-        else
-            configReturnPath = DEFAULT_RETURN_PATH;
+        if (resourceNames == null)
+            throw new EUnexpected();
+
+        var resources = new HashMap<String, byte[]>();
+
+        for (var resource : resourceNames) {
+
+            var path = resourceDir + resource;
+            var bytes = ResourceHelpers.loadResourceAsBytes(path, LoginContent.class);
+
+            resources.put(resource, bytes);
+        }
+
+        return resources;
     }
 
-    @Nonnull
-    public AuthResponse serveLoginContent(AuthRequest request, boolean loggedIn) {
+    private static Map<String, String> stringValues(Map<String, byte[]> byteMap) {
 
-        try {
-            var uri = URI.create(request.getUrl());
-            var query = uri.getQuery();
-            var queryParams = query != null ? Arrays.asList(query.split("&")) : List.<String>of();
+        return byteMap.entrySet().stream()
+                .map(kv -> Map.entry(kv.getKey(), new String(kv.getValue(), StandardCharsets.UTF_8)))
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
 
-            var resourcePath = uri.getPath().replace(configLoginPath, BUILT_IN_CONTENT_PATH);
-
-            if (uri.getPath().equals(DEFAULT_LOGIN_MAIN_PAGE))
-                resourcePath = loggedIn ? BUILT_IN_LOGIN_OK_PAGE : BUILT_IN_LOGIN_PAGE;
-
-            var resourceBytes = ResourceHelpers.loadResourceAsBytes(resourcePath, LoginContent.class);
-
-            if (loggedIn && resourcePath.equals(BUILT_IN_LOGIN_OK_PAGE)) {
-
-                var returnPathParam = queryParams.stream()
-                        .filter(p -> p.startsWith("return-path"))
-                        .findFirst();
-
-                if (returnPathParam.isPresent()) {
-                    var returnPath = returnPathParam.get().substring(returnPathParam.get().indexOf('=') + 1);
-                    resourceBytes = insertRedirect(resourceBytes, returnPath);
-                }
-                else {
-                    resourceBytes = insertRedirect(resourceBytes, configReturnPath);
-                }
-            }
-
-            var resourceContent = Unpooled.wrappedBuffer(resourceBytes);
-            var resourceType = mimeTypeMapping(resourcePath);
-
-            var headers = new Http1AuthHeaders();
-            headers.add(HttpHeaderNames.CONTENT_TYPE, resourceType);
-            headers.add(HttpHeaderNames.CONTENT_LENGTH, Integer.toString(resourceContent.readableBytes()));
-
-            return new AuthResponse(
-                    HttpResponseStatus.OK.code(),
-                    HttpResponseStatus.OK.reasonPhrase(),
-                    new Http1AuthHeaders(),
-                    resourceContent);
-        }
-        catch (IllegalArgumentException | MissingResourceException e) {
-            return redirectToLogin(request);
-        }
     }
 
-    @Nonnull
-    public AuthResponse redirectToLogin(AuthRequest request) {
+    public static LoginContent getStaticContent(HttpRequest request) {
 
-        if (request.getUrl().equals(DEFAULT_LOGIN_MAIN_PAGE))
-            return serveLoginContent(request, false);
+        var uri = URI.create(request.uri());
+        var path = uri.getPath();
+        var fileKey = path.replace(LOGIN_PATH, "").toLowerCase();
 
+        var content = STATIC_CONTENT.get(fileKey);
+        var response = new LoginContent();
+
+        if (content != null) {
+
+            var mimeType = mimeTypeMapping(fileKey);
+            var length = content.length;
+
+            response.exists = true;
+            response.content = Unpooled.wrappedBuffer(content, 0, length);
+            response.headers = new Http1AuthHeaders();
+            response.headers.add(HttpHeaderNames.CONTENT_TYPE, mimeType);
+            response.headers.add(HttpHeaderNames.CONTENT_LENGTH, Integer.toString(length));
+        }
         else {
 
-            var headers = new Http1AuthHeaders();
-            headers.add(HttpHeaderNames.LOCATION, DEFAULT_LOGIN_MAIN_PAGE);
-
-            return new AuthResponse(
-                    HttpResponseStatus.TEMPORARY_REDIRECT.code(), "Login redirect",
-                    headers, Unpooled.EMPTY_BUFFER);
+            response.exists = false;
         }
+
+        return response;
     }
 
-    private static byte[] insertRedirect(byte[] pageBytes, String returnPath) {
+    public static LoginContent getLoginOkPage(String returnPath) {
 
-        var pageText = new String(pageBytes, StandardCharsets.UTF_8);
-        pageText = pageText.replace("${REDIRECT}", returnPath);
-        return pageText.getBytes(StandardCharsets.UTF_8);
+        System.out.println(returnPath);
+
+        var templatePage = PAGE_CONTENT.get(LOGIN_OK_PAGE);
+        var page = templatePage.replace(REDIRECT_VARIABLE, returnPath);
+
+        return servePage(page);
+    }
+
+    public static LoginContent getLoginFormPage() {
+
+        var page = PAGE_CONTENT.get(LOGIN_FORM_PAGE);
+
+        return servePage(page);
+    }
+
+    private static LoginContent servePage(String page) {
+
+        var content = page.getBytes(StandardCharsets.UTF_8);
+
+        var response = new LoginContent();
+        response.exists = true;
+        response.content = Unpooled.wrappedBuffer(content, 0, content.length);
+        response.headers = new Http1AuthHeaders();
+        response.headers.add(HttpHeaderNames.CONTENT_TYPE, "text/html; charset=utf-8");
+        response.headers.add(HttpHeaderNames.CONTENT_LENGTH, Integer.toString(content.length));
+
+        return response;
     }
 
     private static String mimeTypeMapping(String path) {
