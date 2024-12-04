@@ -54,18 +54,21 @@ public class SimpleLoginPlugin extends TracPlugin {
     @Override @SuppressWarnings("unchecked")
     protected <T> T createService(String serviceName, Properties properties, ConfigManager configManager) {
 
-        if (serviceName.equals(GUEST_LOGIN_PROVIDER)) {
-            return (T) new GuestLoginProvider(properties);
+        switch (serviceName) {
+
+            case GUEST_LOGIN_PROVIDER:
+                return (T) new GuestLoginProvider(properties);
+
+            case BASIC_LOGIN_PROVIDER:
+                return (T) new BasicLoginProvider(configManager);
+
+            case BUILT_IN_LOGIN_PROVIDER:
+                return (T) new BuiltInLoginProvider(configManager);
+
+            default:
+                var message = String.format("Plugin [%s] does not support the service [%s]", pluginName(), serviceName);
+                throw new EPluginNotAvailable(message);
         }
-
-        if (serviceName.equals(BASIC_LOGIN_PROVIDER))
-            return (T) new BasicLoginProvider(configManager);
-
-        if (serviceName.equals(BUILT_IN_LOGIN_PROVIDER))
-            return (T) new BuiltInLoginProvider(properties, configManager);
-
-        var message = String.format("Plugin [%s] does not support the service [%s]", pluginName(), serviceName);
-        throw new EPluginNotAvailable(message);
     }
 
     static IUserDatabase createUserDb(ConfigManager configManager) {

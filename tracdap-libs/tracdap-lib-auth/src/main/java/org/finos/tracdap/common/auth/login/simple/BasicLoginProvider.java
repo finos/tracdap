@@ -19,6 +19,9 @@ package org.finos.tracdap.common.auth.login.simple;
 
 import org.finos.tracdap.common.auth.login.*;
 import org.finos.tracdap.common.config.ConfigManager;
+import org.finos.tracdap.common.http.Http1Headers;
+import org.finos.tracdap.common.http.CommonHttpRequest;
+import org.finos.tracdap.common.http.CommonHttpResponse;
 
 import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.http.*;
@@ -44,9 +47,9 @@ class BasicLoginProvider implements ILoginProvider {
     }
 
     @Override
-    public AuthResult attemptLogin(AuthRequest authRequest) {
+    public AuthResult attemptLogin(CommonHttpRequest authRequest) {
 
-        var headers = authRequest.getHeaders();
+        var headers = authRequest.headers();
 
         if (!headers.contains(HttpHeaderNames.AUTHORIZATION)) {
             log.info("No authorization provided, new authorization required");
@@ -90,12 +93,11 @@ class BasicLoginProvider implements ILoginProvider {
 
         log.info("AUTHENTICATION: Using basic authentication");
 
-        var headers = new Http1AuthHeaders();
+        var headers = new Http1Headers();
         headers.add(HttpHeaderNames.WWW_AUTHENTICATE, "Basic realm=\"trac-auth-realm\", charset=\"UTF-8\"");
 
-        var response = new AuthResponse(
-                HttpResponseStatus.UNAUTHORIZED.code(),
-                HttpResponseStatus.UNAUTHORIZED.reasonPhrase(),
+        var response = new CommonHttpResponse(
+                HttpResponseStatus.UNAUTHORIZED,
                 headers, Unpooled.EMPTY_BUFFER);
 
         return AuthResult.OTHER_RESPONSE(response);

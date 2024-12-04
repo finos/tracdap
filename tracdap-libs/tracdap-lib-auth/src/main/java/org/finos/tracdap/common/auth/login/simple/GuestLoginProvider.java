@@ -20,6 +20,7 @@ package org.finos.tracdap.common.auth.login.simple;
 import org.finos.tracdap.common.auth.login.*;
 import org.finos.tracdap.common.auth.internal.UserInfo;
 import org.finos.tracdap.common.exception.EStartup;
+import org.finos.tracdap.common.http.CommonHttpRequest;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -52,7 +53,7 @@ class GuestLoginProvider implements ILoginProvider {
     }
 
     @Override
-    public AuthResult attemptLogin(AuthRequest authRequest) {
+    public AuthResult attemptLogin(CommonHttpRequest authRequest) {
 
         log.info("AUTHENTICATION: Using guest authentication [{}]", guestId);
 

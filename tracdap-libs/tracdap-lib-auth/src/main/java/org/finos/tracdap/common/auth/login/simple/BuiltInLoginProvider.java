@@ -17,79 +17,53 @@
 
 package org.finos.tracdap.common.auth.login.simple;
 
+import org.finos.tracdap.common.auth.internal.AuthHelpers;
 import org.finos.tracdap.common.auth.login.*;
 import org.finos.tracdap.common.config.ConfigManager;
+import org.finos.tracdap.common.http.CommonHttpRequest;
+import org.finos.tracdap.common.http.CommonHttpResponse;
+import org.finos.tracdap.common.http.Http1Headers;
 
+import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.http.*;
 
-import org.finos.tracdap.config.PlatformConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.nio.charset.StandardCharsets;
-import java.util.Properties;
 
 
 class BuiltInLoginProvider implements ILoginProvider {
 
-    public static final String BUILT_IN_AUTH_ROOT = "/trac-auth/";
-    public static final String BUILT_IN_AUTH_PAGE = "/trac-auth/login";
-
     private static final Logger log = LoggerFactory.getLogger(BuiltInLoginProvider.class);
 
-    private final LoginContent loginContent;
     private final IUserDatabase userDb;
 
-    public BuiltInLoginProvider(Properties properties, ConfigManager configManager) {
+    public BuiltInLoginProvider(ConfigManager configManager) {
 
-        var platformConfig = configManager.loadRootConfigObject(PlatformConfig.class);
-        var authConfig = platformConfig.getAuthentication();
-
-        this.loginContent = new LoginContent(authConfig);
         this.userDb = SimpleLoginPlugin.createUserDb(configManager);
     }
 
     @Override
-    public AuthResult attemptLogin(AuthRequest request) {
+    public AuthResult attemptLogin(CommonHttpRequest request) {
 
-        // API auth by redirect does not work nicely out of the box!
-        // For now send an auth failure on API routes
-        // Anyway for browser re-directs there should be some control in the client layer
-        // Perhaps this can be done in the web bindings package, with suitable config options available?
+        var headers = Http1Headers.fromGenericHeaders(request.headers());
 
-        var headers = request.getHeaders();
-        var isApi =
-                headers.contains(HttpHeaderNames.CONTENT_TYPE) &&
-                headers.get(HttpHeaderNames.CONTENT_TYPE).toString().startsWith("application/") &&
-                !headers.get(HttpHeaderNames.CONTENT_TYPE).equals("application/x-www-form-urlencoded");
-
-        if (isApi)
+        // Only browser-based auth is supported with the built-in login provider
+        if (!AuthHelpers.isBrowserRequest(headers))
             return AuthResult.FAILED("Session expired or not available");
 
-        if (!request.getUrl().startsWith(BUILT_IN_AUTH_ROOT)) {
-            var redirect = loginContent.redirectToLogin(request);
-            return AuthResult.OTHER_RESPONSE(redirect);
-        }
+        // Wait for content if it is not already available
+        if (request.content() == null)
+            return AuthResult.NEED_CONTENT();
 
-        if (request.getMethod().equals(HttpMethod.POST.name()) &&
-            request.getUrl().equals(BUILT_IN_AUTH_PAGE)) {
-
-            if (request.getContent() == null)
-                return AuthResult.NEED_CONTENT();
-
-            return checkLoginRequest(request);
-        }
-        else {
-
-            var loginPage = loginContent.serveLoginContent(request, false);
-            return AuthResult.OTHER_RESPONSE(loginPage);
-        }
+        return checkLoginRequest(request);
     }
 
-    private AuthResult checkLoginRequest(AuthRequest request) {
+    private AuthResult checkLoginRequest(CommonHttpRequest request) {
 
-        var content = new String(request.getContent(), StandardCharsets.US_ASCII);
-        var decoder = new QueryStringDecoder(BUILT_IN_AUTH_PAGE + "?" + content);
+        var content = request.content().toString(StandardCharsets.US_ASCII);
+        var decoder = new QueryStringDecoder(LoginContent.LOGIN_URL + "?" + content);
         var loginParams = decoder.parameters();
 
         var usernameParam = loginParams.get("username");
@@ -98,7 +72,7 @@ class BuiltInLoginProvider implements ILoginProvider {
         if (usernameParam == null || usernameParam.size() != 1 ||
             passwordParam == null || passwordParam.size() != 1) {
 
-            var redirect = loginContent.redirectToLogin(request);
+            var redirect = redirectToLogin(request);
             return AuthResult.OTHER_RESPONSE(redirect);
         }
 
@@ -111,8 +85,22 @@ class BuiltInLoginProvider implements ILoginProvider {
         }
         else {
 
-            var redirect = loginContent.redirectToLogin(request);
+            var redirect = redirectToLogin(request);
             return AuthResult.OTHER_RESPONSE(redirect);
         }
+    }
+
+    private CommonHttpResponse redirectToLogin(CommonHttpRequest request) {
+
+        var status = HttpResponseStatus.valueOf(
+                HttpResponseStatus.TEMPORARY_REDIRECT.code(),
+                "Login redirect");
+
+        var headers = new Http1Headers();
+        headers.add(HttpHeaderNames.LOCATION, LoginContent.LOGIN_URL);
+
+        var buffer = Unpooled.EMPTY_BUFFER;
+
+        return new CommonHttpResponse(status, headers, buffer);
     }
 }
