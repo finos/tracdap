@@ -17,11 +17,12 @@
 
 package org.finos.tracdap.gateway.auth;
 
-import org.finos.tracdap.common.auth.internal.HttpAuthHelpers;
+import org.finos.tracdap.common.auth.internal.AuthHelpers;
 import org.finos.tracdap.common.auth.internal.JwtValidator;
 import org.finos.tracdap.common.auth.internal.SessionInfo;
 import org.finos.tracdap.common.config.ConfigDefaults;
 import org.finos.tracdap.common.exception.EUnexpected;
+import org.finos.tracdap.common.http.Http1Headers;
 import org.finos.tracdap.common.util.LoggingHelpers;
 import org.finos.tracdap.config.AuthenticationConfig;
 
@@ -168,7 +169,7 @@ public class Http1AuthHandler extends ChannelDuplexHandler {
     @Override
     public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) throws Exception {
 
-        if (state.refreshPromise != null  && !state.refreshPromise.isDone()) {
+        if (state.refreshPromise != null && !state.refreshPromise.isDone()) {
             state.refreshQueue.add(Map.entry(msg, promise));
             return;
         }
@@ -250,8 +251,8 @@ public class Http1AuthHandler extends ChannelDuplexHandler {
 
         log.info("Check auth for: {}", request.uri());
 
-        var headers = request.headers();
-        var token = HttpAuthHelpers.findTracAuthToken(headers);
+        var headers = Http1Headers.fromHttpHeaders(request.headers());
+        var token = AuthHelpers.findTracAuthToken(headers);
         var session = token != null ? jwtValidator.decodeAndValidate(token) : null;
 
         if (session != null && session.isValid()) {
@@ -287,7 +288,9 @@ public class Http1AuthHandler extends ChannelDuplexHandler {
 
     private void sendFailResponse(ChannelHandlerContext ctx, HttpRequest request) {
 
-        if (HttpAuthHelpers.isBrowserRequest(request)) {
+        var requestHeaders = Http1Headers.fromHttpHeaders(request.headers());
+
+        if (AuthHelpers.isBrowserRequest(requestHeaders)) {
 
             var returnPath = URLEncoder.encode(request.uri(), StandardCharsets.US_ASCII);
             var redirectUri = String.format(browserLoginUri, returnPath);
@@ -432,7 +435,8 @@ public class Http1AuthHandler extends ChannelDuplexHandler {
                 if (msg instanceof HttpResponse) {
 
                     var refreshResponse = (HttpResponse) msg;
-                    var refreshToken = HttpAuthHelpers.findTracAuthToken(refreshResponse.headers());
+                    var refreshHeaders= Http1Headers.fromHttpHeaders(refreshResponse.headers());
+                    var refreshToken = AuthHelpers.findTracAuthToken(refreshHeaders);
                     var refreshSession = refreshToken != null ? jwtValidator.decodeAndValidate(refreshToken) : null;
 
                     if (refreshToken != null && refreshSession != null && refreshSession.isValid()) {

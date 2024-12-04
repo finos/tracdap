@@ -20,6 +20,7 @@ package org.finos.tracdap.common.auth.internal;
 import io.netty.handler.codec.http.*;
 import io.netty.handler.codec.http.websocketx.WebSocketFrame;
 import org.finos.tracdap.common.exception.EUnexpected;
+import org.finos.tracdap.common.http.Http1Headers;
 import org.finos.tracdap.common.util.LoggingHelpers;
 import org.finos.tracdap.config.AuthenticationConfig;
 
@@ -144,8 +145,8 @@ public class Http1AuthValidator extends ChannelInboundHandlerAdapter {
         // Look for an existing session token in the request
         // If the token gives a valid session then authentication has succeeded
 
-        var headers = request.headers();
-        var token = HttpAuthHelpers.findTracAuthToken(headers);
+        var headers = Http1Headers.fromHttpHeaders(request.headers());
+        var token = AuthHelpers.findTracAuthToken(headers);
 
         if (token == null) {
 
