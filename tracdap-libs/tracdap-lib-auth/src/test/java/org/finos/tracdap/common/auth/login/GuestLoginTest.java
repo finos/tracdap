@@ -17,8 +17,9 @@
 
 package org.finos.tracdap.common.auth.login;
 
-import org.finos.tracdap.common.auth.internal.JwtProcessor;
-import org.finos.tracdap.common.auth.internal.JwtSetup;
+import io.netty.handler.codec.http.HttpHeaderNames;
+import io.netty.handler.codec.http.cookie.CookieDecoder;
+import org.finos.tracdap.common.auth.internal.*;
 import org.finos.tracdap.config.AuthenticationConfig;
 import org.finos.tracdap.test.helpers.PlatformTest;
 
@@ -29,12 +30,16 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
-import org.slf4j.LoggerFactory;
 
+import java.net.CookieStore;
+import java.net.HttpCookie;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.List;
 
 
 public class GuestLoginTest {
@@ -76,21 +81,20 @@ public class GuestLoginTest {
             .runDbDeploy(false)
             .build();
 
+    private static JwtProcessor jwtProcessor;
     private static Runnable shutdownFunc;
 
     @BeforeAll
     static void startNettyWithHandler() throws Exception {
 
-        LoggerFactory.getLogger(GuestLoginTest.class).info("Setting up handler");
-
         var pluginManager = platform.pluginManager();
         var configManager = platform.configManager();
         var platformConfig = platform.platformConfig();
+        var authConfig = platformConfig.getAuthentication();
 
         pluginManager.initRegularPlugins();
 
-        var authConfig = platformConfig.getAuthentication();
-        var jwtProcessor = JwtSetup.createProcessor(platformConfig, configManager);
+        jwtProcessor = JwtSetup.createProcessor(platformConfig, configManager);
 
         shutdownFunc = LoginTestHelpers.setupNettyHttp1(
                 () -> createHandler(authConfig, jwtProcessor),
@@ -137,15 +141,15 @@ public class GuestLoginTest {
 
             var response = client.send(request, HttpResponse.BodyHandlers.ofString());
 
-            Assertions.assertEquals(200, response.statusCode());
             Assertions.assertEquals(HttpClient.Version.HTTP_1_1, response.version());
+            Assertions.assertEquals(200, response.statusCode());
 
             var cookies = response.headers().allValues("set-cookie");
 
-            var tokenCookie = cookies.stream().filter(c -> c.startsWith("trac_auth_token")).findFirst();
-            var expiryCookie = cookies.stream().filter(c -> c.startsWith("trac_auth_expiry")).findFirst();
-            var userIdCookie = cookies.stream().filter(c -> c.startsWith("trac_user_id")).findFirst();
-            var userNameCookie = cookies.stream().filter(c -> c.startsWith("trac_user_name")).findFirst();
+            var tokenCookie = cookies.stream().filter(c -> c.startsWith("trac-auth-token")).findFirst();
+            var expiryCookie = cookies.stream().filter(c -> c.startsWith("trac-auth-expiry-utc")).findFirst();
+            var userIdCookie = cookies.stream().filter(c -> c.startsWith("trac-user-id")).findFirst();
+            var userNameCookie = cookies.stream().filter(c -> c.startsWith("trac-user-name")).findFirst();
 
             Assertions.assertTrue(tokenCookie.isPresent());
             Assertions.assertTrue(expiryCookie.isPresent());
@@ -180,11 +184,11 @@ public class GuestLoginTest {
 
             var response = client.send(request, HttpResponse.BodyHandlers.ofString());
 
-            Assertions.assertEquals(200, response.statusCode());
             Assertions.assertEquals(HttpClient.Version.HTTP_1_1, response.version());
+            Assertions.assertEquals(200, response.statusCode());
 
             var cookies = response.headers().allValues("set-cookie");
-            var tokenCookie = cookies.stream().filter(c -> c.startsWith("trac_auth_token")).findFirst();
+            var tokenCookie = cookies.stream().filter(c -> c.startsWith("trac-auth-token")).findFirst();
             Assertions.assertTrue(tokenCookie.isPresent());
 
             var content = response.body();
@@ -195,32 +199,197 @@ public class GuestLoginTest {
     }
 
     @Test
-    void testValidToken() throws Exception {
-        Assertions.fail("Not yet implemented");
+    void testLoginExistingToken() throws Exception {
+
+        // Should ignore the token and do a normal login
+
+        var loginUriTemplate = "http://localhost:%d/login/browser";
+        var loginUri = new URI(String.format(loginUriTemplate, AUTH_SVC_PORT));
+
+        var user = new UserInfo();
+        user.setUserId("test.user");
+        user.setDisplayName("Test User");
+
+        var session = new SessionInfo();
+        session.setUserInfo(user);
+        session.setIssueTime(Instant.now());
+        session.setExpiryTime(session.getIssueTime().plusSeconds(60));
+        session.setExpiryLimit(session.getIssueTime().plusSeconds(300));
+
+        var token = jwtProcessor.encodeToken(session);
+
+        try (var clientWrap = CloseWrapper.wrap(HttpClient.newHttpClient())) {
+
+            var client = clientWrap.get();
+
+            var request = java.net.http.HttpRequest.newBuilder().GET()
+                    .uri(loginUri)
+                    .version(HttpClient.Version.HTTP_1_1)
+                    .header(AuthConstants.TRAC_AUTH_TOKEN, token)
+                    .timeout(Duration.ofSeconds(3))
+                    .build();
+
+            var response = client.send(request, HttpResponse.BodyHandlers.ofString());
+
+            Assertions.assertEquals(HttpClient.Version.HTTP_1_1, response.version());
+            Assertions.assertEquals(200, response.statusCode());
+
+            var cookies = response.headers().allValues("set-cookie");
+
+            var tokenCookie = cookies.stream().filter(c -> c.startsWith("trac-auth-token")).findFirst();
+            var expiryCookie = cookies.stream().filter(c -> c.startsWith("trac-auth-expiry-utc")).findFirst();
+            var userIdCookie = cookies.stream().filter(c -> c.startsWith("trac-user-id")).findFirst();
+            var userNameCookie = cookies.stream().filter(c -> c.startsWith("trac-user-name")).findFirst();
+
+            Assertions.assertTrue(tokenCookie.isPresent());
+            Assertions.assertTrue(expiryCookie.isPresent());
+            Assertions.assertTrue(userIdCookie.isPresent());
+            Assertions.assertTrue(userNameCookie.isPresent());
+
+            var content = response.body();
+
+            var returnPath = "/client-app/home";
+            var redirectHtml = String.format(REDIRECT_HTML, returnPath);
+
+            Assertions.assertTrue(content.contains(redirectHtml));
+        }
     }
 
     @Test
-    void testValidTokenMissingFields() throws Exception {
-        Assertions.fail("Not yet implemented");
+    void testLoginTokenExpired() throws Exception {
+
+        // Should ignore the token and do a normal login
+
+        var loginUriTemplate = "http://localhost:%d/login/browser";
+        var loginUri = new URI(String.format(loginUriTemplate, AUTH_SVC_PORT));
+
+        var user = new UserInfo();
+        user.setUserId("test.user");
+        user.setDisplayName("Test User");
+
+        var session = new SessionInfo();
+        session.setUserInfo(user);
+        session.setIssueTime(Instant.now().minusSeconds(6000));
+        session.setExpiryTime(session.getIssueTime().plusSeconds(60));
+        session.setExpiryLimit(session.getIssueTime().plusSeconds(300));
+
+        var token = jwtProcessor.encodeToken(session);
+
+        try (var clientWrap = CloseWrapper.wrap(HttpClient.newHttpClient())) {
+
+            var client = clientWrap.get();
+
+            var request = java.net.http.HttpRequest.newBuilder().GET()
+                    .uri(loginUri)
+                    .version(HttpClient.Version.HTTP_1_1)
+                    .header(AuthConstants.TRAC_AUTH_TOKEN, token)
+                    .timeout(Duration.ofSeconds(3))
+                    .build();
+
+            var response = client.send(request, HttpResponse.BodyHandlers.ofString());
+
+            Assertions.assertEquals(HttpClient.Version.HTTP_1_1, response.version());
+            Assertions.assertEquals(200, response.statusCode());
+
+            var cookies = response.headers().allValues("set-cookie");
+
+            var tokenCookie = cookies.stream().filter(c -> c.startsWith("trac-auth-token")).findFirst();
+            var expiryCookie = cookies.stream().filter(c -> c.startsWith("trac-auth-expiry-utc")).findFirst();
+            var userIdCookie = cookies.stream().filter(c -> c.startsWith("trac-user-id")).findFirst();
+            var userNameCookie = cookies.stream().filter(c -> c.startsWith("trac-user-name")).findFirst();
+
+            Assertions.assertTrue(tokenCookie.isPresent());
+            Assertions.assertTrue(expiryCookie.isPresent());
+            Assertions.assertTrue(userIdCookie.isPresent());
+            Assertions.assertTrue(userNameCookie.isPresent());
+
+            var content = response.body();
+
+            var returnPath = "/client-app/home";
+            var redirectHtml = String.format(REDIRECT_HTML, returnPath);
+
+            Assertions.assertTrue(content.contains(redirectHtml));
+        }
     }
 
     @Test
-    void testTokenRefresh() throws Exception {
-        Assertions.fail("Not yet implemented");
-    }
+    void testLoginTokenGarbled() throws Exception {
 
-    @Test
-    void testTokenExpired() throws Exception {
-        Assertions.fail("Not yet implemented");
-    }
+        // Should ignore the token and do a normal login
 
-    @Test
-    void testTokenGarbled() throws Exception {
-        Assertions.fail("Not yet implemented");
+        var token = "xxxxxxNOT_A_VALID_TOKENyyyyyy";
+
+        var loginUriTemplate = "http://localhost:%d/login/browser";
+        var loginUri = new URI(String.format(loginUriTemplate, AUTH_SVC_PORT));
+
+        try (var clientWrap = CloseWrapper.wrap(HttpClient.newHttpClient())) {
+
+            var client = clientWrap.get();
+
+            var request = java.net.http.HttpRequest.newBuilder().GET()
+                    .uri(loginUri)
+                    .version(HttpClient.Version.HTTP_1_1)
+                    .header(AuthConstants.TRAC_AUTH_TOKEN, token)
+                    .timeout(Duration.ofSeconds(3))
+                    .build();
+
+            var response = client.send(request, HttpResponse.BodyHandlers.ofString());
+
+            Assertions.assertEquals(HttpClient.Version.HTTP_1_1, response.version());
+            Assertions.assertEquals(200, response.statusCode());
+
+            var cookies = response.headers().allValues("set-cookie");
+
+            var tokenCookie = cookies.stream().filter(c -> c.startsWith("trac-auth-token")).findFirst();
+            var expiryCookie = cookies.stream().filter(c -> c.startsWith("trac-auth-expiry-utc")).findFirst();
+            var userIdCookie = cookies.stream().filter(c -> c.startsWith("trac-user-id")).findFirst();
+            var userNameCookie = cookies.stream().filter(c -> c.startsWith("trac-user-name")).findFirst();
+
+            Assertions.assertTrue(tokenCookie.isPresent());
+            Assertions.assertTrue(expiryCookie.isPresent());
+            Assertions.assertTrue(userIdCookie.isPresent());
+            Assertions.assertTrue(userNameCookie.isPresent());
+
+            var content = response.body();
+
+            var returnPath = "/client-app/home";
+            var redirectHtml = String.format(REDIRECT_HTML, returnPath);
+
+            Assertions.assertTrue(content.contains(redirectHtml));
+        }
     }
 
     @Test
     void testBadPaths() throws Exception {
-        Assertions.fail("Not yet implemented");
+
+        var badPaths = List.of(
+                "http://localhost:%d/login/browser.bad_extension",
+                "http://localhost:%d/login/refresh.bad_extension",
+                "http://localhost:%d/login/does-not-exist.html",
+                "http://localhost:%d/login/folder/does-not-exist.html",
+                "http://localhost:%d/login/$&-%%2F-123n?a=6",
+                "http://localhost:%d/not-login-at-all/brwoser",
+                "http://localhost:%d/../",
+                "http://localhost:%d//dev/null");
+
+        for (var loginUriTemplate : badPaths) {
+
+            var loginUri = new URI(String.format(loginUriTemplate, AUTH_SVC_PORT));
+
+            try (var clientWrap = CloseWrapper.wrap(HttpClient.newHttpClient())) {
+
+                var client = clientWrap.get();
+                var request = java.net.http.HttpRequest.newBuilder().GET()
+                        .uri(loginUri)
+                        .version(HttpClient.Version.HTTP_1_1)
+                        .timeout(Duration.ofSeconds(3))
+                        .build();
+
+                var response = client.send(request, HttpResponse.BodyHandlers.ofString());
+
+                Assertions.assertEquals(HttpClient.Version.HTTP_1_1, response.version());
+                Assertions.assertEquals(404, response.statusCode());
+            }
+        }
     }
 }

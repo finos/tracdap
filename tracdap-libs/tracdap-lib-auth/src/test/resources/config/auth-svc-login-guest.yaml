@@ -13,6 +13,7 @@ platformInfo:
 authentication:
 
   jwtIssuer: trac_platform
+  jwtRefresh: 60
   jwtExpiry: 3600
   jwtLimit: 57600
 
