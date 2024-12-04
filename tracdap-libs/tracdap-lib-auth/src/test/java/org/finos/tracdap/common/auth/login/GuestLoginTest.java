@@ -17,11 +17,19 @@
 
 package org.finos.tracdap.common.auth.login;
 
+import org.finos.tracdap.common.auth.internal.JwtProcessor;
+import org.finos.tracdap.common.auth.internal.JwtSetup;
+import org.finos.tracdap.config.AuthenticationConfig;
 import org.finos.tracdap.test.helpers.PlatformTest;
 
+import io.netty.channel.ChannelHandler;
+
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
+import org.slf4j.LoggerFactory;
 
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -58,19 +66,57 @@ public class GuestLoginTest {
     public static final String TRAC_CONFIG_AUTH_UNIT = "config/auth-svc-login-guest.yaml";
 
     private static final String REDIRECT_HTML = "<meta http-equiv=\"refresh\" content=\"1; URL=%s\" />";
+    private static final short AUTH_SVC_PORT = 8765;
 
-    private static final short AUTH_SVC_PORT = 8081;
+    // Use PlatformTest to prepare TRAC config, secrets, auth keys etc
+    // Do not start any services, we want to test the login handler in isolation
 
     @RegisterExtension
     public static final PlatformTest platform = PlatformTest.forConfig(TRAC_CONFIG_AUTH_UNIT)
             .runDbDeploy(false)
-            .startAuth()
             .build();
 
-    @Test
-    void startAuthService() {
+    private static Runnable shutdownFunc;
 
-        Assertions.assertTrue(true);
+    @BeforeAll
+    static void startNettyWithHandler() throws Exception {
+
+        LoggerFactory.getLogger(GuestLoginTest.class).info("Setting up handler");
+
+        var pluginManager = platform.pluginManager();
+        var configManager = platform.configManager();
+        var platformConfig = platform.platformConfig();
+
+        pluginManager.initRegularPlugins();
+
+        var authConfig = platformConfig.getAuthentication();
+        var jwtProcessor = JwtSetup.createProcessor(platformConfig, configManager);
+
+        shutdownFunc = LoginTestHelpers.setupNettyHttp1(
+                () -> createHandler(authConfig, jwtProcessor),
+                AUTH_SVC_PORT);
+    }
+
+    private static ChannelHandler createHandler(
+            AuthenticationConfig authConfig,
+            JwtProcessor jwtProcessor) {
+
+        var pluginManager = platform.pluginManager();
+        var configManager = platform.configManager();
+
+        var providerConfig = authConfig.getProvider();
+        var provider = pluginManager.createService(ILoginProvider.class, providerConfig, configManager);
+
+        return new Http1LoginHandler(authConfig, jwtProcessor, provider);
+    }
+
+    @AfterAll
+    static void stopNettyWithHandler() {
+
+        if (shutdownFunc != null) {
+            shutdownFunc.run();
+            shutdownFunc = null;
+        }
     }
 
     @Test
