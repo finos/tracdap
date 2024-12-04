@@ -17,10 +17,12 @@
 
 package org.finos.tracdap.common.auth.login;
 
+import io.netty.handler.codec.http.HttpResponseStatus;
 import org.finos.tracdap.common.exception.EUnexpected;
+import org.finos.tracdap.common.http.Http1Headers;
+import org.finos.tracdap.common.http.CommonHttpResponse;
 import org.finos.tracdap.common.util.ResourceHelpers;
 
-import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpRequest;
@@ -42,10 +44,6 @@ public final class LoginContent {
 
     private static final Map<String, byte[]> STATIC_CONTENT = preloadContent(STATIC_CONTENT_PATH);
     private static final Map<String, String> PAGE_CONTENT = stringValues(preloadContent(PAGE_CONTENT_PATH));
-
-    boolean exists;
-    ByteBuf content;
-    AuthHeaders headers;
 
     private LoginContent() {}
 
@@ -77,37 +75,35 @@ public final class LoginContent {
 
     }
 
-    public static LoginContent getStaticContent(HttpRequest request) {
+    public static CommonHttpResponse getStaticContent(HttpRequest request) {
 
         var uri = URI.create(request.uri());
         var path = uri.getPath();
         var fileKey = path.replace(LOGIN_PATH, "").toLowerCase();
 
         var content = STATIC_CONTENT.get(fileKey);
-        var response = new LoginContent();
 
         if (content != null) {
 
+            var buffer = Unpooled.wrappedBuffer(content, 0, content.length);
             var mimeType = mimeTypeMapping(fileKey);
             var length = content.length;
+            var headers = new Http1Headers();
+            headers.add(HttpHeaderNames.CONTENT_TYPE, mimeType);
+            headers.add(HttpHeaderNames.CONTENT_LENGTH, Integer.toString(length));
 
-            response.exists = true;
-            response.content = Unpooled.wrappedBuffer(content, 0, length);
-            response.headers = new Http1AuthHeaders();
-            response.headers.add(HttpHeaderNames.CONTENT_TYPE, mimeType);
-            response.headers.add(HttpHeaderNames.CONTENT_LENGTH, Integer.toString(length));
+            return new CommonHttpResponse(HttpResponseStatus.OK, headers, buffer);
         }
         else {
 
-            response.exists = false;
-        }
+            var buffer = Unpooled.EMPTY_BUFFER;
+            var headers = new Http1Headers();
 
-        return response;
+            return new CommonHttpResponse(HttpResponseStatus.NOT_FOUND, headers, buffer);
+        }
     }
 
-    public static LoginContent getLoginOkPage(String returnPath) {
-
-        System.out.println(returnPath);
+    public static CommonHttpResponse getLoginOkPage(String returnPath) {
 
         var templatePage = PAGE_CONTENT.get(LOGIN_OK_PAGE);
         var page = templatePage.replace(REDIRECT_VARIABLE, returnPath);
@@ -115,25 +111,22 @@ public final class LoginContent {
         return servePage(page);
     }
 
-    public static LoginContent getLoginFormPage() {
+    public static CommonHttpResponse getLoginFormPage() {
 
         var page = PAGE_CONTENT.get(LOGIN_FORM_PAGE);
 
         return servePage(page);
     }
 
-    private static LoginContent servePage(String page) {
+    private static CommonHttpResponse servePage(String page) {
 
         var content = page.getBytes(StandardCharsets.UTF_8);
+        var buffer = Unpooled.wrappedBuffer(content, 0, content.length);
+        var headers = new Http1Headers();
+        headers.add(HttpHeaderNames.CONTENT_TYPE, "text/html; charset=utf-8");
+        headers.add(HttpHeaderNames.CONTENT_LENGTH, Integer.toString(content.length));
 
-        var response = new LoginContent();
-        response.exists = true;
-        response.content = Unpooled.wrappedBuffer(content, 0, content.length);
-        response.headers = new Http1AuthHeaders();
-        response.headers.add(HttpHeaderNames.CONTENT_TYPE, "text/html; charset=utf-8");
-        response.headers.add(HttpHeaderNames.CONTENT_LENGTH, Integer.toString(content.length));
-
-        return response;
+        return new CommonHttpResponse(HttpResponseStatus.OK, headers, buffer);
     }
 
     private static String mimeTypeMapping(String path) {

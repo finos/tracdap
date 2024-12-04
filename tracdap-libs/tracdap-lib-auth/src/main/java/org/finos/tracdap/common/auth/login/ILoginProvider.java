@@ -17,8 +17,10 @@
 
 package org.finos.tracdap.common.auth.login;
 
+import org.finos.tracdap.common.http.CommonHttpRequest;
+
 
 public interface ILoginProvider {
 
-    AuthResult attemptLogin(AuthRequest loginRequest);
+    AuthResult attemptLogin(CommonHttpRequest loginRequest);
 }

@@ -18,6 +18,7 @@
 package org.finos.tracdap.common.auth.login;
 
 import org.finos.tracdap.common.auth.internal.UserInfo;
+import org.finos.tracdap.common.http.CommonHttpResponse;
 
 
 public class AuthResult {
@@ -25,7 +26,7 @@ public class AuthResult {
     private final AuthResultCode code;
     private final UserInfo userInfo;
     private final String message;
-    private final AuthResponse otherResponse;
+    private final CommonHttpResponse otherResponse;
 
     public static AuthResult AUTHORIZED(UserInfo userInfo) {
         return new AuthResult(AuthResultCode.AUTHORIZED, userInfo);
@@ -39,7 +40,7 @@ public class AuthResult {
         return new AuthResult(AuthResultCode.FAILED, message);
     }
 
-    public static AuthResult OTHER_RESPONSE(AuthResponse response) {
+    public static AuthResult OTHER_RESPONSE(CommonHttpResponse response) {
         return new AuthResult(AuthResultCode.OTHER_RESPONSE, response);
     }
 
@@ -61,7 +62,7 @@ public class AuthResult {
         this.otherResponse = null;
     }
 
-    private AuthResult(AuthResultCode code, AuthResponse otherResponse) {
+    private AuthResult(AuthResultCode code, CommonHttpResponse otherResponse) {
         this.code = code;
         this.userInfo = null;
         this.message = null;
@@ -80,7 +81,7 @@ public class AuthResult {
         return userInfo;
     }
 
-    public AuthResponse getOtherResponse() {
+    public CommonHttpResponse getOtherResponse() {
         return otherResponse;
     }
 }
