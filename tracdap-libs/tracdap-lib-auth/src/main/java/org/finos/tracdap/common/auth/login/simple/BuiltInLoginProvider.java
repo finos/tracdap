@@ -21,10 +21,8 @@ import org.finos.tracdap.common.auth.internal.AuthHelpers;
 import org.finos.tracdap.common.auth.login.*;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.http.CommonHttpRequest;
-import org.finos.tracdap.common.http.CommonHttpResponse;
 import org.finos.tracdap.common.http.Http1Headers;
 
-import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.http.*;
 
 import org.slf4j.Logger;
@@ -72,35 +70,22 @@ class BuiltInLoginProvider implements ILoginProvider {
         if (usernameParam == null || usernameParam.size() != 1 ||
             passwordParam == null || passwordParam.size() != 1) {
 
-            var redirect = redirectToLogin(request);
-            return AuthResult.OTHER_RESPONSE(redirect);
+            var loginFormPage = LoginContent.getLoginFormPage();
+            return AuthResult.OTHER_RESPONSE(loginFormPage);
         }
 
         var username = usernameParam.get(0);
         var password = passwordParam.get(0);
 
         if (LocalUsers.checkPassword(userDb, username, password, log)) {
+
             var userInfo = LocalUsers.getUserInfo(userDb, username);
             return AuthResult.AUTHORIZED(userInfo);
         }
         else {
 
-            var redirect = redirectToLogin(request);
-            return AuthResult.OTHER_RESPONSE(redirect);
+            var loginFormPage = LoginContent.getLoginFormPage();
+            return AuthResult.OTHER_RESPONSE(loginFormPage);
         }
-    }
-
-    private CommonHttpResponse redirectToLogin(CommonHttpRequest request) {
-
-        var status = HttpResponseStatus.valueOf(
-                HttpResponseStatus.TEMPORARY_REDIRECT.code(),
-                "Login redirect");
-
-        var headers = new Http1Headers();
-        headers.add(HttpHeaderNames.LOCATION, LoginContent.LOGIN_URL);
-
-        var buffer = Unpooled.EMPTY_BUFFER;
-
-        return new CommonHttpResponse(status, headers, buffer);
     }
 }
