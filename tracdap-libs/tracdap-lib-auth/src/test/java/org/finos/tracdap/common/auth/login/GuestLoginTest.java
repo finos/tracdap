@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.svc.auth;
+package org.finos.tracdap.common.auth.login;
 
 import org.finos.tracdap.test.helpers.PlatformTest;
 
