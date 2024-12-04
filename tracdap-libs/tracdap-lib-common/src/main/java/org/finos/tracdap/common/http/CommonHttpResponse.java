@@ -15,37 +15,42 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.auth.login;
+package org.finos.tracdap.common.http;
 
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
+import io.netty.handler.codec.Headers;
+import io.netty.handler.codec.http.HttpResponseStatus;
 
-public class AuthResponse {
+public class CommonHttpResponse {
 
-    private final int statusCode;
-    private final String statusMessage;
-    private final AuthHeaders headers;
+    private final HttpResponseStatus status;
+    private final Headers<CharSequence, CharSequence, ?> headers;
     private final ByteBuf content;
 
-    public AuthResponse(int statusCode, String statusMessage, AuthHeaders headers, ByteBuf content) {
-        this.statusCode = statusCode;
-        this.statusMessage = statusMessage;
+    public CommonHttpResponse(
+            HttpResponseStatus status,
+            Headers<CharSequence, CharSequence, ?> headers,
+            ByteBuf content) {
+
+        this.status = status;
         this.headers = headers;
-        this.content = content;
+        this.content = content != null ? content : Unpooled.EMPTY_BUFFER;
     }
 
-    public int getStatusCode() {
-        return statusCode;
+    public HttpResponseStatus status() {
+        return status;
     }
 
-    public String getStatusMessage() {
-        return statusMessage;
-    }
-
-    public AuthHeaders getHeaders() {
+    public Headers<CharSequence, CharSequence,?> headers() {
         return headers;
     }
 
-    public ByteBuf getContent() {
+    public boolean hasContent() {
+        return content.readableBytes() > 0;
+    }
+
+    public ByteBuf content() {
         return content;
     }
 }
