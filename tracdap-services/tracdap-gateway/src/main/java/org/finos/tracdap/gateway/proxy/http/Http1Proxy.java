@@ -121,6 +121,9 @@ public class Http1Proxy extends ChannelDuplexHandler {
             throw new EUnexpected();
 
         var targetPath = sourcePath.replaceFirst(this.sourcePrefix, this.targetPrefix);
+        var targetUri = sourceUri.getRawQuery() != null
+                ? targetPath + "?" + sourceUri.getRawQuery()
+                : targetPath;
 
         var targetHeaders = new DefaultHttpHeaders();
         targetHeaders.add(sourceRequest.headers());
@@ -140,7 +143,7 @@ public class Http1Proxy extends ChannelDuplexHandler {
             return new DefaultFullHttpRequest(
                     sourceRequest.protocolVersion(),
                     sourceRequest.method(),
-                    targetPath,
+                    targetUri,
                     fullContent,
                     targetHeaders,
                     fullRequest.trailingHeaders());
@@ -150,7 +153,7 @@ public class Http1Proxy extends ChannelDuplexHandler {
             return new DefaultHttpRequest(
                     sourceRequest.protocolVersion(),
                     sourceRequest.method(),
-                    targetPath,
+                    targetUri,
                     targetHeaders);
         }
     }
