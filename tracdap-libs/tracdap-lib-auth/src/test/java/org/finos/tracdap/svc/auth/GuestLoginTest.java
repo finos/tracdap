@@ -57,7 +57,7 @@ public class GuestLoginTest {
 
     public static final String TRAC_CONFIG_AUTH_UNIT = "config/auth-svc-login-guest.yaml";
 
-    private static final String REDIRECT_HTML = "<meta http-equiv=\"refresh\" content=\"1; URL='%s'\" />";
+    private static final String REDIRECT_HTML = "<meta http-equiv=\"refresh\" content=\"1; URL=%s\" />";
 
     private static final short AUTH_SVC_PORT = 8081;
 
@@ -76,7 +76,7 @@ public class GuestLoginTest {
     @Test
     void testLoginFromScratch() throws Exception {
 
-        var loginUriTemplate = "http://localhost:%d/login/browser/login";
+        var loginUriTemplate = "http://localhost:%d/login/browser";
         var loginUri = new URI(String.format(loginUriTemplate, AUTH_SVC_PORT));
 
         try (var clientWrap = CloseWrapper.wrap(HttpClient.newHttpClient())) {
@@ -119,7 +119,7 @@ public class GuestLoginTest {
     void testLoginRedirect() throws Exception {
 
         var returnPath = "/custom/redirect";
-        var loginUriTemplate = "http://localhost:%d/login/browser/login?return-path=%s";
+        var loginUriTemplate = "http://localhost:%d/login/browser?return-path=%s";
         var loginUri = new URI(String.format(loginUriTemplate, AUTH_SVC_PORT, returnPath));
 
         try (var clientWrap = CloseWrapper.wrap(HttpClient.newHttpClient())) {
