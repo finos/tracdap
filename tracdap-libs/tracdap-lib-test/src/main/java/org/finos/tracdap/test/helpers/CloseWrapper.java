@@ -15,14 +15,14 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.auth.login;
+package org.finos.tracdap.test.helpers;
 
 
 public class CloseWrapper<T> implements AutoCloseable {
 
-    // HttpClient is a closable resource in Java 21 but not in Java 17
+    // Some types (e.g. built in HttpClient) are closable in some Java versions but not others
 
-    static <T> CloseWrapper<T> wrap(T obj) {
+    public static <T> CloseWrapper<T> wrap(T obj) {
         return new CloseWrapper<>(obj);
     }
 

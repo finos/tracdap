@@ -17,11 +17,14 @@
 
 package org.finos.tracdap.common.auth.login;
 
-import io.netty.channel.ChannelHandler;
-import io.netty.handler.codec.http.HttpHeaderNames;
 import org.finos.tracdap.common.auth.internal.*;
 import org.finos.tracdap.config.AuthenticationConfig;
+import org.finos.tracdap.test.helpers.CloseWrapper;
 import org.finos.tracdap.test.helpers.PlatformTest;
+
+import io.netty.channel.ChannelHandler;
+import io.netty.handler.codec.http.HttpHeaderNames;
+
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;

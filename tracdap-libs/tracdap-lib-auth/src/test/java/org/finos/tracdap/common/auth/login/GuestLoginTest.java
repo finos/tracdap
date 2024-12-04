@@ -17,10 +17,9 @@
 
 package org.finos.tracdap.common.auth.login;
 
-import io.netty.handler.codec.http.HttpHeaderNames;
-import io.netty.handler.codec.http.cookie.CookieDecoder;
 import org.finos.tracdap.common.auth.internal.*;
 import org.finos.tracdap.config.AuthenticationConfig;
+import org.finos.tracdap.test.helpers.CloseWrapper;
 import org.finos.tracdap.test.helpers.PlatformTest;
 
 import io.netty.channel.ChannelHandler;
@@ -31,42 +30,15 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
-import java.net.CookieStore;
-import java.net.HttpCookie;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.List;
 
 
 public class GuestLoginTest {
-
-    // HttpClient is a closable resource in Java 21 but not in Java 17
-    private static class CloseWrapper<T> implements AutoCloseable {
-
-        static <T> CloseWrapper<T> wrap(T obj) {
-            return new CloseWrapper<>(obj);
-        }
-
-        private CloseWrapper(T obj) {
-            this.obj = obj;
-        }
-
-        public T get() {
-            return obj;
-        }
-
-        @Override
-        public void close() throws Exception {
-            if (obj instanceof AutoCloseable)
-                ((AutoCloseable) obj).close();
-        }
-
-        private final T obj;
-    }
 
     public static final String TRAC_CONFIG_AUTH_UNIT = "config/auth-svc-login-guest.yaml";
 
