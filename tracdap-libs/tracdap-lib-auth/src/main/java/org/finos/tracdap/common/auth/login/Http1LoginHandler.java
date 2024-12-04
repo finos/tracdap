@@ -17,17 +17,20 @@
 
 package org.finos.tracdap.common.auth.login;
 
-import io.netty.buffer.ByteBufAllocator;
-import io.netty.buffer.CompositeByteBuf;
-import io.netty.buffer.Unpooled;
+import org.finos.tracdap.common.auth.internal.AuthHelpers;
 import org.finos.tracdap.common.auth.internal.JwtProcessor;
 import org.finos.tracdap.common.auth.internal.SessionInfo;
 import org.finos.tracdap.common.exception.EUnexpected;
+import org.finos.tracdap.common.http.CommonHttpResponse;
+import org.finos.tracdap.common.http.Http1Headers;
+import org.finos.tracdap.common.http.CommonHttpRequest;
 import org.finos.tracdap.config.AuthenticationConfig;
 
-import io.netty.channel.ChannelDuplexHandler;
+import io.netty.buffer.ByteBufAllocator;
+import io.netty.buffer.CompositeByteBuf;
+import io.netty.buffer.Unpooled;
+import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelPromise;
 import io.netty.handler.codec.http.*;
 import io.netty.util.ReferenceCountUtil;
 
@@ -35,9 +38,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nonnull;
+import java.net.URI;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
+import java.util.List;
 
 
-public class Http1LoginHandler extends ChannelDuplexHandler {
+public class Http1LoginHandler extends ChannelInboundHandlerAdapter {
 
     private static final int PENDING_CONTENT_LIMIT = 64 * 1024;
 
@@ -46,12 +54,8 @@ public class Http1LoginHandler extends ChannelDuplexHandler {
     private final AuthenticationConfig authConfig;
     private final JwtProcessor jwtProcessor;
     private final ILoginProvider loginProvider;
-    private final LoginContent loginContent;
 
-    private AuthResult authResult = AuthResult.FAILED();
-    private SessionInfo session;
-    private String token;
-    private boolean wantCookies;
+    private final String defaultReturnPath;
 
     private HttpRequest pendingRequest;
     private CompositeByteBuf pendingContent;
@@ -65,7 +69,9 @@ public class Http1LoginHandler extends ChannelDuplexHandler {
         this.jwtProcessor = jwtProcessor;
         this.loginProvider = loginProvider;
 
-        this.loginContent = new LoginContent(authConfig);
+        this.defaultReturnPath = authConfig.hasReturnPath()
+                ? authConfig.getReturnPath()
+                : "/";
     }
 
     @Override
@@ -77,44 +83,28 @@ public class Http1LoginHandler extends ChannelDuplexHandler {
             // These mechanisms set the result NEED_CONTENT, to trigger aggregation
             // Aggregated messages are fed through the normal flow once they are ready
 
-            msg = handleAggregateContent(msg);
+            if (!(msg instanceof HttpObject))
+                throw new EUnexpected();
 
-            if (msg == null)
-                return;
+            if (pendingContent != null)
+                msg = handleAggregateContent(msg);
 
-            // HTTP/1 auth works purely on the request object
-            // Each new request will re-run the auth processing
+            if (msg instanceof HttpRequest) {
 
-            if ((msg instanceof HttpRequest)) {
                 var request = (HttpRequest) msg;
-                processAuthentication(ctx, request);
-            }
-        }
-        finally {
-            ReferenceCountUtil.release(msg);
-        }
-    }
+                var requestUri = URI.create(request.uri());
 
-    @Override
-    public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) {
+                if (requestUri.getPath().equals(LoginContent.LOGIN_URL))
+                    processLogin(ctx, request);
 
-        try {
+                else if (requestUri.getPath().equals(LoginContent.REFRESH_URL))
+                    processRefresh(ctx, request);
 
-            // Authentication has always succeeded by this point
-            // Otherwise no request is made to the platform, so no response would be sent
+                else if (requestUri.getPath().startsWith(LoginContent.LOGIN_PATH_PREFIX))
+                    serveStaticContent(ctx, request);
 
-            // This does not account for pipelining, which is disabled by default in modern browsers
-
-            // Special handling for response objects, apply translation to the headers
-            if (msg instanceof HttpResponse) {
-                var response = (HttpResponse) msg;
-                processResponse(ctx, response, promise);
-            }
-
-            // Everything else flows straight through
-            else {
-                ReferenceCountUtil.retain(msg);
-                ctx.write(msg, promise);
+                else
+                    serveNotFound(ctx, request);
             }
         }
         finally {
@@ -123,9 +113,6 @@ public class Http1LoginHandler extends ChannelDuplexHandler {
     }
 
     private Object handleAggregateContent(Object msg) {
-
-        if (authResult.getCode() != AuthResultCode.NEED_CONTENT)
-            return msg;
 
         if (!(msg instanceof HttpContent) || pendingContent.readableBytes() > PENDING_CONTENT_LIMIT) {
             pendingContent.release();
@@ -136,9 +123,9 @@ public class Http1LoginHandler extends ChannelDuplexHandler {
         pendingContent.addComponent(content.content());
         pendingContent.writerIndex(pendingContent.writerIndex() + content.content().writerIndex());
 
-        if (content instanceof LastHttpContent)
+        if (content instanceof LastHttpContent) {
 
-            return new DefaultFullHttpRequest(
+            var fullRequest = new DefaultFullHttpRequest(
                     pendingRequest.protocolVersion(),
                     pendingRequest.method(),
                     pendingRequest.uri(),
@@ -146,168 +133,205 @@ public class Http1LoginHandler extends ChannelDuplexHandler {
                     pendingRequest.headers(),
                     ((LastHttpContent) content).trailingHeaders());
 
-        else
+            pendingRequest = null;
+            pendingContent = null;
 
-            return null;
+            return fullRequest;
+        }
+
+        return null;
     }
 
-    private void processAuthentication(ChannelHandlerContext ctx, HttpRequest request) {
+    private void processLogin(ChannelHandlerContext ctx, HttpRequest request) {
 
-        // Start the auth process by looking for the TRAC auth token
-        // If there is already a valid session, this takes priority
+        // Only one auth provider available atm, for both browser and API routes
 
-        var headers = new Http1AuthHeaders(request.headers());
+        var commonRequest = CommonHttpRequest.fromHttpRequest(request);
+        var authResult = loginProvider.attemptLogin(commonRequest);
 
-        // Decide whether to send the auth response as headers or cookies
-        // Always send cookies for browser routes
-        // For API routes the client can set a header to prefer cookies in the response
+        switch (authResult.getCode()) {
 
-        var isApi =
-                headers.contains(HttpHeaderNames.CONTENT_TYPE) &&
-                headers.get(HttpHeaderNames.CONTENT_TYPE).startsWith("application/") &&
-                !headers.get(HttpHeaderNames.CONTENT_TYPE).equals("application/x-www-form-urlencoded");
+            case AUTHORIZED:
 
-        wantCookies = !isApi || headers.contains(AuthLogic.TRAC_AUTH_COOKIES_HEADER);
+                // If primary auth succeeded, set up the session token
+                var session = AuthLogic.newSession(authResult.getUserInfo(), authConfig);
+                var token = jwtProcessor.encodeToken(session);
 
-        // Look for an existing session token in the request
-        // If the token gives a valid session then authentication has succeeded
+                serveLoginOk(ctx, request, session, token);
 
-        token = AuthLogic.findTracAuthToken(headers, AuthLogic.SERVER_COOKIE);
-        session = (token != null) ? jwtProcessor.decodeAndValidate(token) : null;
+                break;
+
+            case FAILED:
+
+                log.error("authentication failed ({})", authResult.getMessage());
+
+                // Send a basic error response for authentication failures for now
+                // If the result is REDIRECTED the auth provider already responded, so no need to respond again here
+                var failedResponse = buildFailedResponse(request, authResult);
+                ctx.writeAndFlush(failedResponse);
+                ctx.close();
+
+                break;
+
+            case OTHER_RESPONSE:
+
+                var otherResponse = buildOtherResponse(request, authResult);
+                ctx.writeAndFlush(otherResponse);
+
+                break;
+
+            case NEED_CONTENT:
+
+                pendingRequest = request;
+                pendingContent = ByteBufAllocator.DEFAULT.compositeBuffer();
+
+                break;
+
+            default:
+                throw new EUnexpected();
+        }
+    }
+
+    private void processRefresh(ChannelHandlerContext ctx, HttpRequest request) {
+
+        var headers = Http1Headers.fromHttpHeaders(request.headers());
+        var token = AuthHelpers.findTracAuthToken(headers);
+        var session = (token != null) ? jwtProcessor.decodeAndValidate(token) : null;
 
         if (session != null && session.isValid()) {
 
-            // Check to see if the token needs refreshing
             var sessionUpdate = AuthLogic.refreshSession(session, authConfig);
+            var tokenUpdate = jwtProcessor.encodeToken(sessionUpdate);
 
-            if (sessionUpdate != session) {
-                token = jwtProcessor.encodeToken(sessionUpdate);
-                session = sessionUpdate;
-            }
-
-            authResult = AuthResult.AUTHORIZED(session.getUserInfo());
-            return;
+            serveLoginOk(ctx, request, sessionUpdate, tokenUpdate);
         }
+        else if (AuthHelpers.isBrowserRequest(headers)) {
 
-        // If the TRAC token is not available or not valid, fall back to the primary auth mechanism
-
-        if (authResult == null || authResult.getCode() != AuthResultCode.NEED_CONTENT) {
-            var reason = (session == null) ? "no session available" : session.getErrorMessage();
-            log.info("authentication required ({})", reason);
-        }
-
-        // Only one auth provider available atm, for both browser and API routes
-        var authRequest = AuthRequest.forHttp1Request(request, headers);
-        authResult = loginProvider.attemptLogin(authRequest);
-
-        // If primary auth succeeded, set up the session token
-        if (authResult.getCode() == AuthResultCode.AUTHORIZED) {
-
-            session = AuthLogic.newSession(authResult.getUserInfo(), authConfig);
-            token = jwtProcessor.encodeToken(session);
-
-            processPostAuthMatch(ctx, request);
-        }
-
-        // Send a basic error response for authentication failures for now
-        // If the result is REDIRECTED the auth provider already responded, so no need to respond again here
-
-        if (authResult.getCode() == AuthResultCode.FAILED) {
-
-            log.error("authentication failed ({})", authResult.getMessage());
-
-            var response = buildFailedResponse(request, authResult);
-
-            ctx.write(response);
-            ctx.flush();
-            ctx.close();
-        }
-
-        if (authResult.getCode() == AuthResultCode.OTHER_RESPONSE) {
-
-            var response = buildAuthResponse(request, authResult.getOtherResponse());
-
-            ctx.write(response);
-            ctx.flush();
-        }
-
-        if (authResult.getCode() == AuthResultCode.NEED_CONTENT) {
-
-            pendingRequest = request;
-            pendingContent = ByteBufAllocator.DEFAULT.compositeBuffer();
-        }
-    }
-
-    private void processPostAuthMatch(ChannelHandlerContext ctx, HttpRequest request) {
-
-        var postAuthHeaders = new Http1AuthHeaders(request.headers());
-        var postAuthRequest = AuthRequest.forHttp1Request(request, postAuthHeaders);
-        var postAuthResponse = loginContent.serveLoginContent(postAuthRequest, true);
-
-        authResult = AuthResult.OTHER_RESPONSE(postAuthResponse);
-        var response = buildAuthResponse(request, postAuthResponse);
-
-        processResponse(ctx, response, ctx.newPromise());
-        ctx.flush();
-    }
-
-    private void processResponse(ChannelHandlerContext ctx, HttpResponse response, ChannelPromise promise) {
-
-        var headers = new Http1AuthHeaders(response.headers());
-        var emptyHeaders = new Http1AuthHeaders();
-
-        var relayHeaders = AuthLogic.setClientAuthHeaders(headers, emptyHeaders, token, session, wantCookies);
-
-        if (response instanceof FullHttpResponse) {
-
-            var relayContent = ((FullHttpResponse) response).content().retain();
-
-            var relayResponse = new DefaultFullHttpResponse(
-                    response.protocolVersion(),
-                    response.status(),
-                    relayContent,
-                    relayHeaders.headers(),
-                    new DefaultHttpHeaders());
-
-            ctx.write(relayResponse, promise);
+            var redirect = buildLoginRedirect(request);
+            ctx.writeAndFlush(redirect);
         }
         else {
 
-            var relayResponse = new DefaultHttpResponse(
-                    response.protocolVersion(),
-                    response.status(),
-                    relayHeaders.headers());
-
-            ctx.write(relayResponse, promise);
+            var failedResponse = buildFailedResponse(request, AuthResult.FAILED());
+            ctx.writeAndFlush(failedResponse);
+            ctx.close();
         }
     }
 
-    private FullHttpResponse buildAuthResponse(HttpRequest request, AuthResponse responseDetails) {
+    private void serveLoginOk(ChannelHandlerContext ctx, HttpRequest request, SessionInfo session, String token) {
 
-        var responseCode = HttpResponseStatus.valueOf(
-                responseDetails.getStatusCode(),
-                responseDetails.getStatusMessage());
+        var requestHeaders = Http1Headers.fromHttpHeaders(request.headers());
 
-        var responseHeaders = new DefaultHttpHeaders();
-        for (var header : responseDetails.getHeaders())
-            responseHeaders.add(header.getKey(), header.getValue());
+        CommonHttpResponse content;
+        Http1Headers headers;
+
+        if (AuthHelpers.isBrowserRequest(requestHeaders)) {
+
+            var uri = URI.create(request.uri());
+            var query = uri.getQuery();
+
+            var queryParams = query != null
+                    ? Arrays.asList(query.split("&"))
+                    : List.<String>of();
+
+            var returnPath = queryParams.stream()
+                    .filter(p -> p.startsWith("return-path="))
+                    .findFirst()
+                    .map(s -> s.substring(s.indexOf('=') + 1))
+                    .map(s -> URLDecoder.decode(s, StandardCharsets.UTF_8))
+                    .orElse(defaultReturnPath);
+
+            content = LoginContent.getLoginOkPage(returnPath);
+            headers = Http1Headers.fromGenericHeaders(content.headers());
+
+            AuthHelpers.addClientAuthCookies(headers, token, session);
+        }
+        else {
+
+            headers = new Http1Headers();
+            content = new CommonHttpResponse(HttpResponseStatus.OK, headers, Unpooled.EMPTY_BUFFER);
+
+            if (AuthHelpers.wantCookies(requestHeaders))
+                AuthHelpers.addClientAuthCookies(headers, token, session);
+            else
+                AuthHelpers.addClientAuthHeaders(headers, token, session);
+        }
+
+        var response = new DefaultFullHttpResponse(
+                request.protocolVersion(),
+                content.status(),
+                content.content(),
+                headers.toHttpHeaders(),
+                EmptyHttpHeaders.INSTANCE);
+
+        ctx.writeAndFlush(response);
+    }
+
+    private void serveStaticContent(ChannelHandlerContext ctx, HttpRequest request) {
+
+        var content = LoginContent.getStaticContent(request);
+        var headers = Http1Headers.fromGenericHeaders(content.headers());
+
+        var response = new DefaultFullHttpResponse(
+                request.protocolVersion(),
+                content.status(),
+                content.content(),
+                headers.toHttpHeaders(),
+                EmptyHttpHeaders.INSTANCE);
+
+        ctx.writeAndFlush(response);
+    }
+
+    private void serveNotFound(ChannelHandlerContext ctx, HttpRequest request) {
+
+        var response = new DefaultFullHttpResponse(
+                request.protocolVersion(),
+                HttpResponseStatus.NOT_FOUND);
+
+        ctx.writeAndFlush(response);
+    }
+
+    private FullHttpResponse buildLoginRedirect(HttpRequest request) {
+
+        var status = LoginContent.LOGIN_REDIRECT_STATUS;
+        var headers = new Http1Headers();
+        headers.set(HttpHeaderNames.LOCATION, LoginContent.LOGIN_URL);
 
         return new DefaultFullHttpResponse(
-                request.protocolVersion(), responseCode,
-                responseDetails.getContent(), responseHeaders,
-                new DefaultHttpHeaders());
+                request.protocolVersion(), status,
+                Unpooled.EMPTY_BUFFER,
+                headers.toHttpHeaders(),
+                EmptyHttpHeaders.INSTANCE);
     }
 
     private FullHttpResponse buildFailedResponse(HttpRequest request, AuthResult authResult) {
 
-        var responseCode = HttpResponseStatus.valueOf(
-                HttpResponseStatus.UNAUTHORIZED.code(),
-                authResult.getMessage());
+        var statusMessage = authResult.getMessage();
+        var status = statusMessage != null
+                ? HttpResponseStatus.valueOf(HttpResponseStatus.UNAUTHORIZED.code(), statusMessage)
+                : HttpResponseStatus.UNAUTHORIZED;
+
+        // Needs a real headers instance even if no headers are set
+        // Otherwise encoded HTTP response will not be valid
+        var headers = new Http1Headers();
 
         return new DefaultFullHttpResponse(
-                request.protocolVersion(), responseCode,
+                request.protocolVersion(), status,
                 Unpooled.EMPTY_BUFFER,
-                new DefaultHttpHeaders(),
-                new DefaultHttpHeaders());
+                headers.toHttpHeaders(),
+                EmptyHttpHeaders.INSTANCE);
+    }
+
+    private FullHttpResponse buildOtherResponse(HttpRequest request, AuthResult authResult) {
+
+        var content = authResult.getOtherResponse();
+        var headers = Http1Headers.fromGenericHeaders(content.headers());
+
+        return new DefaultFullHttpResponse(
+                request.protocolVersion(),
+                content.status(),
+                content.content(),
+                headers.toHttpHeaders(),
+                EmptyHttpHeaders.INSTANCE);
     }
 }

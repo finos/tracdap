@@ -35,7 +35,13 @@ import java.util.stream.Collectors;
 
 public final class LoginContent {
 
-    private static final String LOGIN_PATH = "/login/";
+    public static final String LOGIN_PATH_PREFIX = "/login/";
+    public static final String LOGIN_URL = "/login/browser";
+    public static final String REFRESH_URL = "/login/refresh";
+
+    public static final HttpResponseStatus LOGIN_REDIRECT_STATUS = HttpResponseStatus.valueOf(
+            HttpResponseStatus.TEMPORARY_REDIRECT.code(), "Login redirect");
+
     private static final String STATIC_CONTENT_PATH = "/login/static/";
     private static final String PAGE_CONTENT_PATH = "/login/pages/";
     private static final String LOGIN_OK_PAGE = "login_ok.html";
@@ -79,7 +85,7 @@ public final class LoginContent {
 
         var uri = URI.create(request.uri());
         var path = uri.getPath();
-        var fileKey = path.replace(LOGIN_PATH, "").toLowerCase();
+        var fileKey = path.replace(LOGIN_PATH_PREFIX, "").toLowerCase();
 
         var content = STATIC_CONTENT.get(fileKey);
 
