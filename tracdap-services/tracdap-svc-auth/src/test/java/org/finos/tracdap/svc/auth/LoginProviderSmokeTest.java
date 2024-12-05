@@ -44,9 +44,6 @@ public class LoginProviderSmokeTest {
     public static final String AUTH_SVC_UNIT_CONFIG = "config/auth-svc-unit-test.yaml";
     private static final short AUTH_SVC_PORT = 8081;
 
-    // Use PlatformTest to prepare TRAC config, secrets, auth keys etc
-    // Do not start any services, we want to test the login handler in isolation
-
     @RegisterExtension
     public static final PlatformTest platform = PlatformTest.forConfig(AUTH_SVC_UNIT_CONFIG)
             .runDbDeploy(false)
