@@ -21,55 +21,55 @@ import org.finos.tracdap.common.auth.internal.UserInfo;
 import org.finos.tracdap.common.http.CommonHttpResponse;
 
 
-public class AuthResult {
+public class LoginResult {
 
-    private final AuthResultCode code;
+    private final LoginResultCode code;
     private final UserInfo userInfo;
     private final String message;
     private final CommonHttpResponse otherResponse;
 
-    public static AuthResult AUTHORIZED(UserInfo userInfo) {
-        return new AuthResult(AuthResultCode.AUTHORIZED, userInfo);
+    public static LoginResult AUTHORIZED(UserInfo userInfo) {
+        return new LoginResult(LoginResultCode.AUTHORIZED, userInfo);
     }
 
-    public static AuthResult FAILED() {
-        return new AuthResult(AuthResultCode.FAILED, (String) null);
+    public static LoginResult FAILED() {
+        return new LoginResult(LoginResultCode.FAILED, (String) null);
     }
 
-    public static AuthResult FAILED(String message) {
-        return new AuthResult(AuthResultCode.FAILED, message);
+    public static LoginResult FAILED(String message) {
+        return new LoginResult(LoginResultCode.FAILED, message);
     }
 
-    public static AuthResult OTHER_RESPONSE(CommonHttpResponse response) {
-        return new AuthResult(AuthResultCode.OTHER_RESPONSE, response);
+    public static LoginResult OTHER_RESPONSE(CommonHttpResponse response) {
+        return new LoginResult(LoginResultCode.OTHER_RESPONSE, response);
     }
 
-    public static AuthResult NEED_CONTENT() {
-        return new AuthResult(AuthResultCode.NEED_CONTENT, (UserInfo) null);
+    public static LoginResult NEED_CONTENT() {
+        return new LoginResult(LoginResultCode.NEED_CONTENT, (UserInfo) null);
     }
 
-    private AuthResult(AuthResultCode code, UserInfo userInfo) {
+    private LoginResult(LoginResultCode code, UserInfo userInfo) {
         this.code = code;
         this.userInfo = userInfo;
         this.message = null;
         this.otherResponse = null;
     }
 
-    private AuthResult(AuthResultCode code, String message) {
+    private LoginResult(LoginResultCode code, String message) {
         this.code = code;
         this.userInfo = null;
         this.message = message;
         this.otherResponse = null;
     }
 
-    private AuthResult(AuthResultCode code, CommonHttpResponse otherResponse) {
+    private LoginResult(LoginResultCode code, CommonHttpResponse otherResponse) {
         this.code = code;
         this.userInfo = null;
         this.message = null;
         this.otherResponse = otherResponse;
     }
 
-    public AuthResultCode getCode() {
+    public LoginResultCode getCode() {
         return code;
     }
 

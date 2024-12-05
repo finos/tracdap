@@ -154,7 +154,7 @@ public class Http1LoginHandler extends ChannelInboundHandlerAdapter {
             case AUTHORIZED:
 
                 // If primary auth succeeded, set up the session token
-                var session = AuthLogic.newSession(authResult.getUserInfo(), authConfig);
+                var session = SessionBuilder.newSession(authResult.getUserInfo(), authConfig);
                 var token = jwtProcessor.encodeToken(session);
 
                 serveLoginOk(ctx, request, session, token);
@@ -200,7 +200,7 @@ public class Http1LoginHandler extends ChannelInboundHandlerAdapter {
 
         if (session != null && session.isValid()) {
 
-            var sessionUpdate = AuthLogic.refreshSession(session, authConfig);
+            var sessionUpdate = SessionBuilder.refreshSession(session, authConfig);
             var tokenUpdate = jwtProcessor.encodeToken(sessionUpdate);
 
             serveLoginOk(ctx, request, sessionUpdate, tokenUpdate);
@@ -212,7 +212,7 @@ public class Http1LoginHandler extends ChannelInboundHandlerAdapter {
         }
         else {
 
-            var failedResponse = buildFailedResponse(request, AuthResult.FAILED());
+            var failedResponse = buildFailedResponse(request, LoginResult.FAILED());
             ctx.writeAndFlush(failedResponse);
             ctx.close();
         }
@@ -304,9 +304,9 @@ public class Http1LoginHandler extends ChannelInboundHandlerAdapter {
                 EmptyHttpHeaders.INSTANCE);
     }
 
-    private FullHttpResponse buildFailedResponse(HttpRequest request, AuthResult authResult) {
+    private FullHttpResponse buildFailedResponse(HttpRequest request, LoginResult loginResult) {
 
-        var statusMessage = authResult.getMessage();
+        var statusMessage = loginResult.getMessage();
         var status = statusMessage != null
                 ? HttpResponseStatus.valueOf(HttpResponseStatus.UNAUTHORIZED.code(), statusMessage)
                 : HttpResponseStatus.UNAUTHORIZED;
@@ -322,9 +322,9 @@ public class Http1LoginHandler extends ChannelInboundHandlerAdapter {
                 EmptyHttpHeaders.INSTANCE);
     }
 
-    private FullHttpResponse buildOtherResponse(HttpRequest request, AuthResult authResult) {
+    private FullHttpResponse buildOtherResponse(HttpRequest request, LoginResult loginResult) {
 
-        var content = authResult.getOtherResponse();
+        var content = loginResult.getOtherResponse();
         var headers = Http1Headers.fromGenericHeaders(content.headers());
 
         return new DefaultFullHttpResponse(

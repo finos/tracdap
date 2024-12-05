@@ -18,7 +18,7 @@
 package org.finos.tracdap.auth.login;
 
 
-public enum AuthResultCode {
+public enum LoginResultCode {
     AUTHORIZED,
     FAILED,
     OTHER_RESPONSE,

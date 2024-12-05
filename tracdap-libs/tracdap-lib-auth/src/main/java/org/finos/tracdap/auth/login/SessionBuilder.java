@@ -25,7 +25,7 @@ import org.finos.tracdap.config.AuthenticationConfig;
 import java.time.Instant;
 
 
-public class AuthLogic {
+public class SessionBuilder {
 
     public static SessionInfo newSession(UserInfo userInfo, AuthenticationConfig authConfig) {
 
