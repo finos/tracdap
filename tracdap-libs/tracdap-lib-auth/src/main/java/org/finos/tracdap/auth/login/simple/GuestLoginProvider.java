@@ -53,7 +53,7 @@ class GuestLoginProvider implements ILoginProvider {
     }
 
     @Override
-    public AuthResult attemptLogin(CommonHttpRequest authRequest) {
+    public LoginResult attemptLogin(CommonHttpRequest authRequest) {
 
         log.info("AUTHENTICATION: Using guest authentication [{}]", guestId);
 
@@ -61,6 +61,6 @@ class GuestLoginProvider implements ILoginProvider {
         user.setUserId(guestId);
         user.setDisplayName(guestName);
 
-        return AuthResult.AUTHORIZED(user);
+        return LoginResult.AUTHORIZED(user);
     }
 }

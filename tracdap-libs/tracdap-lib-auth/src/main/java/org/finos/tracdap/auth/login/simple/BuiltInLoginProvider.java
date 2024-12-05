@@ -43,22 +43,22 @@ class BuiltInLoginProvider implements ILoginProvider {
     }
 
     @Override
-    public AuthResult attemptLogin(CommonHttpRequest request) {
+    public LoginResult attemptLogin(CommonHttpRequest request) {
 
         var headers = Http1Headers.fromGenericHeaders(request.headers());
 
         // Only browser-based auth is supported with the built-in login provider
         if (!AuthHelpers.isBrowserRequest(headers))
-            return AuthResult.FAILED("Session expired or not available");
+            return LoginResult.FAILED("Session expired or not available");
 
         // Wait for content if it is not already available
         if (request.content() == null)
-            return AuthResult.NEED_CONTENT();
+            return LoginResult.NEED_CONTENT();
 
         return checkLoginRequest(request);
     }
 
-    private AuthResult checkLoginRequest(CommonHttpRequest request) {
+    private LoginResult checkLoginRequest(CommonHttpRequest request) {
 
         var content = request.content().toString(StandardCharsets.US_ASCII);
         var decoder = new QueryStringDecoder(LoginContent.LOGIN_URL + "?" + content);
@@ -71,7 +71,7 @@ class BuiltInLoginProvider implements ILoginProvider {
             passwordParam == null || passwordParam.size() != 1) {
 
             var loginFormPage = LoginContent.getLoginFormPage();
-            return AuthResult.OTHER_RESPONSE(loginFormPage);
+            return LoginResult.OTHER_RESPONSE(loginFormPage);
         }
 
         var username = usernameParam.get(0);
@@ -80,12 +80,12 @@ class BuiltInLoginProvider implements ILoginProvider {
         if (LocalUsers.checkPassword(userDb, username, password, log)) {
 
             var userInfo = LocalUsers.getUserInfo(userDb, username);
-            return AuthResult.AUTHORIZED(userInfo);
+            return LoginResult.AUTHORIZED(userInfo);
         }
         else {
 
             var loginFormPage = LoginContent.getLoginFormPage();
-            return AuthResult.OTHER_RESPONSE(loginFormPage);
+            return LoginResult.OTHER_RESPONSE(loginFormPage);
         }
     }
 }

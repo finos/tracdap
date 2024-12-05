@@ -47,7 +47,7 @@ class BasicLoginProvider implements ILoginProvider {
     }
 
     @Override
-    public AuthResult attemptLogin(CommonHttpRequest authRequest) {
+    public LoginResult attemptLogin(CommonHttpRequest authRequest) {
 
         var headers = authRequest.headers();
 
@@ -82,14 +82,14 @@ class BasicLoginProvider implements ILoginProvider {
 
         if (LocalUsers.checkPassword(userDb, username, password, log)) {
             var userInfo = LocalUsers.getUserInfo(userDb, username);
-            return AuthResult.AUTHORIZED(userInfo);
+            return LoginResult.AUTHORIZED(userInfo);
         }
         else {
             return requestAuth();
         }
     }
 
-    public AuthResult requestAuth() {
+    public LoginResult requestAuth() {
 
         log.info("AUTHENTICATION: Using basic authentication");
 
@@ -100,6 +100,6 @@ class BasicLoginProvider implements ILoginProvider {
                 HttpResponseStatus.UNAUTHORIZED,
                 headers, Unpooled.EMPTY_BUFFER);
 
-        return AuthResult.OTHER_RESPONSE(response);
+        return LoginResult.OTHER_RESPONSE(response);
     }
 }
