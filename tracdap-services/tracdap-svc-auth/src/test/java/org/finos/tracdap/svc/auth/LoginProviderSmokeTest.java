@@ -102,4 +102,48 @@ public class LoginProviderSmokeTest {
             Assertions.assertEquals("test.user", session.getUserInfo().getUserId());
         }
     }
+
+    @Test
+    void testMultipleRequests() throws Exception {
+
+        // Multiple requests on a single connection
+
+        var loginUriTemplate = "http://localhost:%d/login/browser";
+        var loginUri = new URI(String.format(loginUriTemplate, AUTH_SVC_PORT));
+
+        try (var clientWrap = CloseWrapper.wrap(HttpClient.newHttpClient())) {
+
+            var client = clientWrap.get();
+
+            var request = java.net.http.HttpRequest.newBuilder().GET()
+                    .uri(loginUri)
+                    .version(HttpClient.Version.HTTP_1_1)
+                    .timeout(Duration.ofSeconds(3))
+                    .build();
+
+            var response = client.send(request, HttpResponse.BodyHandlers.ofString());
+
+            Assertions.assertEquals(HttpClient.Version.HTTP_1_1, response.version());
+            Assertions.assertEquals(200, response.statusCode());
+
+            var response2 = client.send(request, HttpResponse.BodyHandlers.ofString());
+
+            Assertions.assertEquals(HttpClient.Version.HTTP_1_1, response2.version());
+            Assertions.assertEquals(200, response2.statusCode());
+
+            var response3 = client.send(request, HttpResponse.BodyHandlers.ofString());
+
+            Assertions.assertEquals(HttpClient.Version.HTTP_1_1, response3.version());
+            Assertions.assertEquals(200, response3.statusCode());
+
+            var cookies = response3.headers().allValues("set-cookie");
+            var tokenCookie = cookies.stream().filter(c -> c.startsWith("trac-auth-token")).findFirst();
+            var token = HttpCookie.parse(tokenCookie.orElseThrow()).stream().findFirst();
+            var session = jwtValidator.decodeAndValidate(token.orElseThrow().getValue());
+
+            Assertions.assertTrue(session.isValid());
+            Assertions.assertTrue(session.getExpiryTime().isAfter(Instant.now()));
+            Assertions.assertEquals("test.user", session.getUserInfo().getUserId());
+        }
+    }
 }
