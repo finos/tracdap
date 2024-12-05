@@ -17,7 +17,6 @@
 
 package org.finos.tracdap.svc.auth;
 
-import org.finos.tracdap.auth.login.ILoginProvider;
 import org.finos.tracdap.auth.provider.IAuthProvider;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.exception.EPluginNotAvailable;
@@ -70,109 +69,124 @@ public class DummyProviderPlugin extends TracPlugin {
         var message = String.format("Plugin [%s] does not support the service [%s]", pluginName(), serviceName);
         throw new EPluginNotAvailable(message);
     }
-}
 
+    private static class DummyAuthProvider implements IAuthProvider {
 
-class DummyAuthProvider implements IAuthProvider {
+        public static String DUMMY_PATH_PREFIX = "/dummy/";
 
-    public static String DUMMY_PATH_PREFIX = "/dummy/";
-
-    @Override
-    public boolean canHandleRequest(HttpRequest request) {
-        return request.uri().startsWith(DUMMY_PATH_PREFIX);
-    }
-
-    @Override
-    public boolean canHandleRequest(Http2Headers headers) {
-        return false;
-    }
-
-    @Override
-    public ChannelInboundHandler createHandlerHttp1() {
-        return new DummyAuthHandler();
-    }
-
-    @Override
-    public ChannelInboundHandler createHandlerHttp2() {
-        return null;
-    }
-}
-
-class DummyAuthHandler extends ChannelInboundHandlerAdapter {
-
-    @Override
-    public void channelRead(ChannelHandlerContext ctx, Object msg) {
-
-        try {
-
-            if (!(msg instanceof HttpObject)) {
-                ctx.close();
-                throw new EUnexpected();
-            }
-
-            if (msg instanceof HttpRequest) {
-
-                var request = (HttpRequest) msg;
-                var commonRequest = CommonHttpRequest.fromHttpRequest(request);
-                var commonResponse = DummyAuthLogic.processRequest(commonRequest);
-
-                var responseHeaders = Http1Headers.fromGenericHeaders(commonResponse.headers());
-
-                var response = new DefaultFullHttpResponse(
-                        request.protocolVersion(),
-                        commonResponse.status(),
-                        commonResponse.content(),
-                        responseHeaders.toHttpHeaders(),
-                        EmptyHttpHeaders.INSTANCE);
-
-                ctx.writeAndFlush(response);
-            }
+        @Override
+        public boolean canHandleRequest(HttpRequest request) {
+            return request.uri().startsWith(DUMMY_PATH_PREFIX);
         }
-        finally {
-            ReferenceCountUtil.release(msg);
+
+        @Override
+        public boolean canHandleRequest(Http2Headers headers) {
+            return false;
+        }
+
+        @Override
+        public ChannelInboundHandler createHandlerHttp1() {
+            return new DummyAuthHandler();
+        }
+
+        @Override
+        public ChannelInboundHandler createHandlerHttp2() {
+            return null;
         }
     }
-}
 
-class DummyAuthLogic {
+    private static class DummyAuthHandler extends ChannelInboundHandlerAdapter {
 
-    public static final String NEW_TOKEN_ENDPOINT = "/dummy/new-token";
+        @Override
+        public void channelRead(ChannelHandlerContext ctx, Object msg) {
 
-    static CommonHttpResponse processRequest(CommonHttpRequest request) {
+            try {
 
-        var uri = URI.create(request.path());
-        var path = uri.getPath();
-        var query = uri.getQuery();
+                if (!(msg instanceof HttpObject)) {
+                    ctx.close();
+                    throw new EUnexpected();
+                }
 
-        if (path.equals(NEW_TOKEN_ENDPOINT)) {
+                if (msg instanceof HttpRequest) {
 
-            var status = HttpResponseStatus.OK;
-            var headers = new Http1Headers();
-            headers.add("x-dummy-token", "DUMMY_TOKEN");
+                    var request = (HttpRequest) msg;
+                    var commonRequest = CommonHttpRequest.fromHttpRequest(request);
+                    var commonResponse = DummyAuthLogic.processRequest(commonRequest);
 
-            if (query != null) {
+                    var responseHeaders = Http1Headers.fromGenericHeaders(commonResponse.headers());
 
-                var parts = query.split("&");
+                    var response = new DefaultFullHttpResponse(
+                            request.protocolVersion(),
+                            commonResponse.status(),
+                            commonResponse.content(),
+                            responseHeaders.toHttpHeaders(),
+                            EmptyHttpHeaders.INSTANCE);
 
-                var param = Arrays.stream(parts)
-                        .filter(p -> p.startsWith("dummy-param="))
-                        .map(s -> s.replace("dummy-param=", ""))
-                        .findFirst();
-
-                if (param.isPresent()) {
-                    headers.add("x-dummy-return", "true");
-                    headers.add("x-dummy-param", param.get());
+                    ctx.writeAndFlush(response);
                 }
             }
-
-            return new CommonHttpResponse(status, headers, Unpooled.EMPTY_BUFFER);
+            finally {
+                ReferenceCountUtil.release(msg);
+            }
         }
-        else {
+    }
 
-            return new CommonHttpResponse(
-                    HttpResponseStatus.NOT_FOUND,
-                    new Http1Headers(),
-                    Unpooled.EMPTY_BUFFER);
+    private static class DummyAuthLogic {
+
+        public static final String GET_TOKEN_ENDPOINT = "/dummy/get-token";
+
+        static CommonHttpResponse processRequest(CommonHttpRequest request) {
+
+            var uri = URI.create(request.path());
+            var path = uri.getPath();
+            var query = uri.getQuery();
+
+            if (path.equals(GET_TOKEN_ENDPOINT)) {
+
+                var status = HttpResponseStatus.OK;
+                var headers = new Http1Headers();
+                headers.add("x-dummy-token", "DUMMY_TOKEN");
+
+                if (query != null) {
+
+                    var parts = query.split("&");
+
+                    var dummyStatus = Arrays.stream(parts)
+                            .filter(p -> p.startsWith("dummy-status="))
+                            .map(s -> s.replace("dummy-status=", ""))
+                            .findFirst();
+
+                    if (dummyStatus.isPresent()) {
+
+                        var suppliedStatusCode = Integer.parseInt(dummyStatus.get());
+                        var suppliedStatus = HttpResponseStatus.valueOf(suppliedStatusCode);
+
+                        return new CommonHttpResponse(
+                                suppliedStatus,
+                                new Http1Headers(),
+                                Unpooled.EMPTY_BUFFER);
+                    }
+
+                    var dummyParam = Arrays.stream(parts)
+                            .filter(p -> p.startsWith("dummy-param="))
+                            .map(s -> s.replace("dummy-param=", ""))
+                            .findFirst();
+
+                    if (dummyParam.isPresent()) {
+                        headers.add("x-dummy-return", "true");
+                        headers.add("x-dummy-param", dummyParam.get());
+                    }
+                }
+
+                return new CommonHttpResponse(status, headers, Unpooled.EMPTY_BUFFER);
+            }
+            else {
+
+                return new CommonHttpResponse(
+                        HttpResponseStatus.NOT_FOUND,
+                        new Http1Headers(),
+                        Unpooled.EMPTY_BUFFER);
+            }
         }
     }
 }

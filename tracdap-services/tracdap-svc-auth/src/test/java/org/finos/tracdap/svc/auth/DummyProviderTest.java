@@ -65,10 +65,10 @@ public class DummyProviderTest {
             Assertions.assertEquals(HttpClient.Version.HTTP_1_1, response.version());
             Assertions.assertEquals(200, response.statusCode());
 
-            var dummyHeader = response.headers().allValues("x-dummy-header").stream().findFirst();
+            var dummyToken = response.headers().allValues("x-dummy-token").stream().findFirst();
 
-            Assertions.assertTrue(dummyHeader.isPresent());
-            Assertions.assertEquals("DUMMY_TOKEN", dummyHeader.get());
+            Assertions.assertTrue(dummyToken.isPresent());
+            Assertions.assertEquals("DUMMY_TOKEN", dummyToken.get());
         }
     }
 
@@ -103,10 +103,10 @@ public class DummyProviderTest {
             Assertions.assertEquals(HttpClient.Version.HTTP_1_1, response3.version());
             Assertions.assertEquals(200, response3.statusCode());
 
-            var dummyHeader = response3.headers().allValues("x-dummy-header").stream().findFirst();
+            var dummyToken = response3.headers().allValues("x-dummy-token").stream().findFirst();
 
-            Assertions.assertTrue(dummyHeader.isPresent());
-            Assertions.assertEquals("DUMMY_TOKEN", dummyHeader.get());
+            Assertions.assertTrue(dummyToken.isPresent());
+            Assertions.assertEquals("DUMMY_TOKEN", dummyToken.get());
         }
     }
 
@@ -131,11 +131,11 @@ public class DummyProviderTest {
             Assertions.assertEquals(HttpClient.Version.HTTP_1_1, response.version());
             Assertions.assertEquals(200, response.statusCode());
 
-            var dummyHeader = response.headers().allValues("x-dummy-header").stream().findFirst();
+            var dummyToken = response.headers().allValues("x-dummy-token").stream().findFirst();
             var dummyParam = response.headers().allValues("x-dummy-param").stream().findFirst();
 
-            Assertions.assertTrue(dummyHeader.isPresent());
-            Assertions.assertEquals("DUMMY_TOKEN", dummyHeader.get());
+            Assertions.assertTrue(dummyToken.isPresent());
+            Assertions.assertEquals("DUMMY_TOKEN", dummyToken.get());
 
             Assertions.assertTrue(dummyParam.isPresent());
             Assertions.assertEquals("DUMMY_VALUE", dummyParam.get());

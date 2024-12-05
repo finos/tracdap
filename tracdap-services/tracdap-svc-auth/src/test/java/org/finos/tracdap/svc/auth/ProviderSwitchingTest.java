@@ -102,10 +102,10 @@ public class ProviderSwitchingTest {
             Assertions.assertEquals(HttpClient.Version.HTTP_1_1, dummyResponse.version());
             Assertions.assertEquals(200, dummyResponse.statusCode());
 
-            var dummyHeader = dummyResponse.headers().allValues("x-dummy-header").stream().findFirst();
+            var dummyToken = dummyResponse.headers().allValues("x-dummy-token").stream().findFirst();
 
-            Assertions.assertTrue(dummyHeader.isPresent());
-            Assertions.assertEquals("DUMMY_TOKEN", dummyHeader.get());
+            Assertions.assertTrue(dummyToken.isPresent());
+            Assertions.assertEquals("DUMMY_TOKEN", dummyToken.get());
         }
     }
 
@@ -142,10 +142,10 @@ public class ProviderSwitchingTest {
             Assertions.assertEquals(HttpClient.Version.HTTP_1_1, dummyResponse.version());
             Assertions.assertEquals(200, dummyResponse.statusCode());
 
-            var dummyHeader = dummyResponse.headers().allValues("x-dummy-header").stream().findFirst();
+            var dummyToken = dummyResponse.headers().allValues("x-dummy-token").stream().findFirst();
 
-            Assertions.assertTrue(dummyHeader.isPresent());
-            Assertions.assertEquals("DUMMY_TOKEN", dummyHeader.get());
+            Assertions.assertTrue(dummyToken.isPresent());
+            Assertions.assertEquals("DUMMY_TOKEN", dummyToken.get());
 
             // Check login response
 
@@ -229,10 +229,10 @@ public class ProviderSwitchingTest {
             Assertions.assertEquals(HttpClient.Version.HTTP_1_1, dummy1.version());
             Assertions.assertEquals(200, dummy1.statusCode());
 
-            var dummyHeader = dummy1.headers().allValues("x-dummy-header").stream().findFirst();
+            var dummyToken = dummy1.headers().allValues("x-dummy-token").stream().findFirst();
 
-            Assertions.assertTrue(dummyHeader.isPresent());
-            Assertions.assertEquals("DUMMY_TOKEN", dummyHeader.get());
+            Assertions.assertTrue(dummyToken.isPresent());
+            Assertions.assertEquals("DUMMY_TOKEN", dummyToken.get());
 
             // Check second responses
 
