@@ -21,7 +21,7 @@ import org.finos.tracdap.api.TracDataApiGrpc;
 import org.finos.tracdap.api.TracMetadataApiGrpc;
 import org.finos.tracdap.api.TracOrchestratorApiGrpc;
 import org.finos.tracdap.api.internal.TrustedMetadataApiGrpc;
-import org.finos.tracdap.auth.login.AuthLogic;
+import org.finos.tracdap.auth.login.SessionBuilder;
 import org.finos.tracdap.common.auth.internal.ClientAuthProvider;
 import org.finos.tracdap.common.auth.internal.JwtSetup;
 import org.finos.tracdap.common.auth.internal.UserInfo;
@@ -52,7 +52,6 @@ import org.junit.jupiter.api.extension.ExtensionContext;
 
 import java.io.File;
 import java.io.IOException;
-import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -401,7 +400,7 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         userInfo.setUserId("platform_testing");
         userInfo.setDisplayName("Platform testing user");
 
-        var session = AuthLogic.newSession(userInfo, authConfig);
+        var session = SessionBuilder.newSession(userInfo, authConfig);
 
         authToken = jwt.encodeToken(session);
     }
