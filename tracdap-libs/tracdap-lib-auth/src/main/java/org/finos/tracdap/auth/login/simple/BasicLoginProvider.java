@@ -37,12 +37,18 @@ class BasicLoginProvider implements ILoginProvider {
 
     private static final Logger log = LoggerFactory.getLogger(BasicLoginProvider.class);
 
+    private static final String BASIC_AUTH_HEADER = "Basic realm=\"%s\", charset=\"%s\"";
     private static final String BASIC_AUTH_PREFIX = "basic ";
 
+    private static final String BASIC_AUTH_REALM = "trac-auth-realm";
+    private static final String BASIC_AUTH_CHARSET = "UTF-8";
+
+    private final String authenticateHeader;
     private final IUserDatabase userDb;
 
     public BasicLoginProvider(ConfigManager configManager) {
 
+        this.authenticateHeader = String.format(BASIC_AUTH_HEADER, BASIC_AUTH_REALM, BASIC_AUTH_CHARSET);
         this.userDb = SimpleLoginPlugin.createUserDb(configManager);
     }
 
@@ -94,7 +100,7 @@ class BasicLoginProvider implements ILoginProvider {
         log.info("AUTHENTICATION: Using basic authentication");
 
         var headers = new Http1Headers();
-        headers.add(HttpHeaderNames.WWW_AUTHENTICATE, "Basic realm=\"trac-auth-realm\", charset=\"UTF-8\"");
+        headers.add(HttpHeaderNames.WWW_AUTHENTICATE, authenticateHeader);
 
         var response = new CommonHttpResponse(
                 HttpResponseStatus.UNAUTHORIZED,
