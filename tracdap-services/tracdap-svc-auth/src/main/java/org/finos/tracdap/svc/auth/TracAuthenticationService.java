@@ -71,8 +71,8 @@ public class TracAuthenticationService extends CommonServiceBase {
 
         // TODO: Review configuration of thread pools and channel options
 
-        var bossFactory = NettyHelpers.threadFactory("webs-boss");
-        var workerFactory = NettyHelpers.threadFactory("web-svc");
+        var bossFactory = NettyHelpers.threadFactory("auth-boss");
+        var workerFactory = NettyHelpers.threadFactory("auth-svc");
 
         bossGroup = new NioEventLoopGroup(2, bossFactory);
         workerGroup = new NioEventLoopGroup(6, workerFactory);
@@ -120,7 +120,7 @@ public class TracAuthenticationService extends CommonServiceBase {
 
         log.info("Closing the authentication service to new connections...");
 
-        var bossShutdown = bossGroup.shutdownGracefully();
+        var bossShutdown = bossGroup.shutdownGracefully(0, 0, TimeUnit.SECONDS);
         bossShutdown.await(shutdownTimeout.getSeconds(), TimeUnit.SECONDS);
 
         if (!bossShutdown.isSuccess()) {
@@ -134,7 +134,7 @@ public class TracAuthenticationService extends CommonServiceBase {
         var shutdownElapsedTime = Duration.between(shutdownStartTime, Instant.now());
         var shutdownTimeRemaining = shutdownTimeout.minus(shutdownElapsedTime);
 
-        var workerShutdown = workerGroup.shutdownGracefully();
+        var workerShutdown = workerGroup.shutdownGracefully(0, 0, TimeUnit.SECONDS);
         workerShutdown.await(shutdownTimeRemaining.getSeconds(), TimeUnit.SECONDS);
 
         if (!workerShutdown.isSuccess()) {
