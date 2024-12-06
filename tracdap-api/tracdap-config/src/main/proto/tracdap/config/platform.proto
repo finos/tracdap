@@ -93,10 +93,11 @@ message WebServerRedirect {
 
 message GatewayConfig {
 
-  uint32 idleTimeout = 1;
+  // Idle timeout moved into common service properties
+  reserved 1;
+  reserved "idleTimeout";
 
   repeated RouteConfig routes = 2;
-
   repeated WebServerRedirect redirects = 3;
 }
 
