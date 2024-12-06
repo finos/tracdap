@@ -17,13 +17,21 @@
 
 package org.finos.tracdap.svc.auth;
 
+import org.finos.tracdap.common.netty.ConnectionId;
+import org.finos.tracdap.common.util.LoggingHelpers;
+
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelOutboundHandlerAdapter;
 import io.netty.channel.ChannelPromise;
 import io.netty.util.concurrent.Future;
 
+import org.slf4j.Logger;
+
 
 public class OutboundRelay extends ChannelOutboundHandlerAdapter {
+
+    private static final ThreadLocal<Logger> logMap = new ThreadLocal<>();
+    private final Logger log = LoggingHelpers.threadLocalLogger(this, logMap);
 
     private final ChannelHandlerContext relayCtx;
 
@@ -34,6 +42,11 @@ public class OutboundRelay extends ChannelOutboundHandlerAdapter {
     @Override
     public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) {
 
+        if (log.isTraceEnabled()) {
+            var connId = ConnectionId.get(ctx.channel());
+            log.trace("{} write: conn = {}, msg = {}", getClass(), connId, msg);
+        }
+
         var relayPromise = relayCtx.newPromise();
         relayPromise.addListener(future -> relayPromise(future, promise));
 
@@ -43,11 +56,21 @@ public class OutboundRelay extends ChannelOutboundHandlerAdapter {
     @Override
     public void flush(ChannelHandlerContext ctx) {
 
+        if (log.isTraceEnabled()) {
+            var connId = ConnectionId.get(ctx.channel());
+            log.trace("{} flush: conn = {}", getClass(), connId);
+        }
+
         relayCtx.pipeline().flush();
     }
 
     @Override
     public void close(ChannelHandlerContext ctx, ChannelPromise promise) {
+
+        if (log.isTraceEnabled()) {
+            var connId = ConnectionId.get(ctx.channel());
+            log.trace("{} close: conn = {}", getClass(), connId);
+        }
 
         var relayPromise = relayCtx.newPromise();
         relayPromise.addListener(future -> relayPromise(future, promise));

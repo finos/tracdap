@@ -19,6 +19,7 @@ package org.finos.tracdap.svc.auth;
 
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.netty.ConnectionId;
+import org.finos.tracdap.common.util.LoggingHelpers;
 
 import io.netty.channel.*;
 import io.netty.channel.embedded.EmbeddedChannel;
@@ -26,7 +27,6 @@ import io.netty.handler.codec.http.*;
 import io.netty.util.ReferenceCountUtil;
 
 import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nonnull;
 import java.util.HashMap;
@@ -35,7 +35,8 @@ import java.util.Map;
 
 public class Http1ProviderLookup extends ChannelInboundHandlerAdapter {
 
-    private final Logger log = LoggerFactory.getLogger(getClass());
+    private static final ThreadLocal<Logger> logMap = new ThreadLocal<>();
+    private final Logger log = LoggingHelpers.threadLocalLogger(this, logMap);
 
     private final ProviderLookup providerLookup;
     private final Map<String, EmbeddedChannel> providerChannels;
