@@ -87,4 +87,6 @@ message ServiceConfig {
 
   string alias = 2;
   uint32 port = 3;
+
+  map<string, string> properties = 4;
 }

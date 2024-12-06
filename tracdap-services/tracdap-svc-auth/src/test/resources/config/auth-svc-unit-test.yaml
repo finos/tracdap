@@ -32,6 +32,8 @@ authentication:
 services:
   authentication:
     port: 8081
+    properties:
+      network.idleTimeout: 5
 
 
 deployment:
