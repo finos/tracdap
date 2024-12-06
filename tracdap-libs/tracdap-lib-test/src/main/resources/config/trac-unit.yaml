@@ -95,13 +95,14 @@ jobCache:
 
 
 gateway:
-  idleTimeout: 10
 
 
 services:
 
   gateway:
     port: 8080
+    properties:
+      network.idleTimeout: 10
 
   metadata:
     port: 8081
