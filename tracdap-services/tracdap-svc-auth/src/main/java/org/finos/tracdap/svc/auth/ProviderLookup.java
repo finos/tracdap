@@ -23,42 +23,34 @@ import org.finos.tracdap.auth.provider.IAuthProvider;
 import org.finos.tracdap.common.auth.internal.JwtSetup;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.exception.EStartup;
+import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.plugin.IPluginManager;
-import org.finos.tracdap.config.ExternalAuthConfig;
 import org.finos.tracdap.config.PlatformConfig;
 
 import io.netty.channel.ChannelInboundHandler;
 import io.netty.handler.codec.http.HttpRequest;
+import org.finos.tracdap.config.PluginConfig;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
 import java.util.Collections;
-import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
 
 
 public class ProviderLookup {
 
-    private final List<IAuthProvider> providers;
+    private static final String LOGIN_PROVIDER_KEY = "login";
+
+    private final Logger log = LoggerFactory.getLogger(getClass());
+
+    private final IAuthProvider loginProvider;
+    private final Map<String, IAuthProvider> externalProviders;
 
     public ProviderLookup(PlatformConfig platformConfig, ConfigManager configManager, IPluginManager pluginManager) {
 
-        providers = createProviders(platformConfig, configManager, pluginManager);
-    }
-
-    private List<IAuthProvider> createProviders(PlatformConfig platformConfig, ConfigManager configManager, IPluginManager pluginManager) {
-
-        var providers = new ArrayList<IAuthProvider>();
-
-        var loginProvider = createLoginProvider(platformConfig, configManager, pluginManager);
-        providers.add(loginProvider);
-
-        var externalSystems = platformConfig.getAuthentication().getExternalSystemsList();
-
-        for (var externalSystem : externalSystems) {
-            var provider = createExternalProvider(externalSystem, configManager, pluginManager);
-            providers.add(provider);
-        }
-
-        return Collections.unmodifiableList(providers);
+        loginProvider = createLoginProvider(platformConfig, configManager, pluginManager);
+        externalProviders = createProviders(platformConfig, configManager, pluginManager);
     }
 
     private IAuthProvider createLoginProvider(PlatformConfig platformConfig, ConfigManager configManager, IPluginManager pluginManager) {
@@ -75,13 +67,35 @@ public class ProviderLookup {
         }
 
         var loginProvider = pluginManager.createService(ILoginProvider.class, loginConfig, configManager);
+        var autoProvider = new LoginAuthProvider(authConfig, jwtProcessor, loginProvider);
 
-        return new LoginAuthProvider(authConfig, jwtProcessor, loginProvider);
+        logLoginProvider(loginProtocol);
+        logAuthProvider(LOGIN_PROVIDER_KEY, LOGIN_PROVIDER_KEY);
+
+        return autoProvider;
     }
 
-    private IAuthProvider createExternalProvider(ExternalAuthConfig externalAuthConfig, ConfigManager configManager, IPluginManager pluginManager) {
+    private Map<String, IAuthProvider> createProviders(PlatformConfig platformConfig, ConfigManager configManager, IPluginManager pluginManager) {
 
-        var providerConfig = externalAuthConfig.getProvider();
+        var providers = new HashMap<String, IAuthProvider>();
+
+        var externalSystems = platformConfig.getAuthentication().getExternalSystemsMap();
+
+        for (var externalSystem : externalSystems.entrySet()) {
+
+            var providerConfig = externalSystem.getValue();
+            var provider = createExternalProvider(providerConfig, configManager, pluginManager);
+
+            logAuthProvider(externalSystem.getKey(), providerConfig.getProtocol());
+
+            providers.put(externalSystem.getKey(), provider);
+        }
+
+        return Collections.unmodifiableMap(providers);
+    }
+
+    private IAuthProvider createExternalProvider(PluginConfig providerConfig, ConfigManager configManager, IPluginManager pluginManager) {
+
         var protocol = providerConfig.getProtocol();
 
         if (! pluginManager.isServiceAvailable(IAuthProvider.class, protocol)) {
@@ -89,17 +103,40 @@ public class ProviderLookup {
             throw new EStartup(error);
         }
 
-        return  pluginManager.createService(IAuthProvider.class, externalAuthConfig.getProvider(), configManager);
+        return  pluginManager.createService(IAuthProvider.class, providerConfig, configManager);
     }
 
-    public ChannelInboundHandler selectAuthProcessor(HttpRequest request) {
+    public String findProvider(HttpRequest request) {
 
-        for (var provider : providers) {
-            if (provider.canHandleRequest(request))
-                return provider.handleRequest(request);
+        if (loginProvider.canHandleRequest(request))
+            return LOGIN_PROVIDER_KEY;
+
+        for (var provider : externalProviders.entrySet()) {
+            if (provider.getValue().canHandleRequest(request))
+                return provider.getKey();
         }
 
-
         return null;
+    }
+
+    public ChannelInboundHandler createProvider(String providerName) {
+
+        if (LOGIN_PROVIDER_KEY.equals(providerName))
+            return loginProvider.createHandlerHttp1();
+
+        var provider = externalProviders.get(providerName);
+
+        if (provider == null)
+            throw new EUnexpected();
+
+        return provider.createHandlerHttp1();
+    }
+
+    private void logLoginProvider(String protocol) {
+        log.info("Loaded login provider: protocol = {}", protocol);
+    }
+
+    private void logAuthProvider(String key, String protocol) {
+        log.info("Loaded auth provider: key = {}, protocol = {}", key, protocol);
     }
 }
