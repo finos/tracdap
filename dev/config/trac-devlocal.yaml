@@ -106,8 +106,6 @@ webServer:
 
 gateway:
 
-  idleTimeout: 10
-
   # Routing for the TRAC services will be configured automatically
   # To add custom routes, uncomment this configuration and modify as required
 
@@ -130,6 +128,8 @@ services:
 
   gateway:
     port: 8080
+    properties:
+      network.idleTimeout: 10
 
   metadata:
     port: 8081
