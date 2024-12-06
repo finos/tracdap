@@ -24,6 +24,10 @@ authentication:
 
   returnPath: /client-app/home
 
+  externalSystems:
+    dummy:
+      protocol: dummy
+
 
 services:
   authentication:
