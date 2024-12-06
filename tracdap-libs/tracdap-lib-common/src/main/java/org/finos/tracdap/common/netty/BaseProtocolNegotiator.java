@@ -59,6 +59,8 @@ public abstract class BaseProtocolNegotiator extends ChannelInitializer<SocketCh
     private final boolean wsEnabled;
     private final int idleTimeout;
 
+    private final ConnectionId connectionId = new ConnectionId();
+
     public BaseProtocolNegotiator(boolean h2Enabled, boolean h2cEnabled, boolean wsEnabled, int idleTimeout) {
 
         this.h2Enabled = h2Enabled;
@@ -80,9 +82,10 @@ public abstract class BaseProtocolNegotiator extends ChannelInitializer<SocketCh
     @Override
     protected final void initChannel(SocketChannel channel) {
 
-        var remoteSocket = channel.remoteAddress();
+        connectionId.assign(channel);
 
-        log.info("New connection from [{}]", remoteSocket);
+        if (log.isDebugEnabled())
+            log.debug("initChannel: {}, connId = {}", channel.remoteAddress(), ConnectionId.get(channel));
 
         var pipeline = channel.pipeline();
 
@@ -128,7 +131,8 @@ public abstract class BaseProtocolNegotiator extends ChannelInitializer<SocketCh
         @Override
         public HttpServerUpgradeHandler.UpgradeCodec newUpgradeCodec(CharSequence protocol) {
 
-            log.info("Request for protocol upgrade: [{}]", protocol);
+            if (log.isDebugEnabled())
+                log.debug("newUpgradeCodec: [{}]", protocol);
 
             if (AsciiString.contentEquals(Http2CodecUtil.HTTP_UPGRADE_PROTOCOL_NAME, protocol)) {
 
@@ -153,7 +157,7 @@ public abstract class BaseProtocolNegotiator extends ChannelInitializer<SocketCh
                 }
             }
 
-            log.warn("Upgrade not available for protocol: {}", protocol);
+            log.warn("Upgrade not available for protocol: [{}]", protocol);
 
             return null;
         }
@@ -246,16 +250,16 @@ public abstract class BaseProtocolNegotiator extends ChannelInitializer<SocketCh
         // Set up the HTTP/1 pipeline in response to the first inbound message
         // This initializer is called if there was no attempt at HTTP upgrade (or the upgrade attempt failed)
 
-
         @Override
         public void channelRead(@Nonnull ChannelHandlerContext ctx, @Nonnull Object msg) {
 
             var channel = ctx.channel();
             var pipeline = channel.pipeline();
-            var remoteSocket = channel.remoteAddress();
-            var protocol = "HTTP/1";
 
-            log.info("Selected protocol: {} {}", remoteSocket, protocol);
+            if (msg instanceof HttpRequest)
+                logNewConnection(channel, ((HttpRequest) msg).protocolVersion().toString());
+            else
+                logNewConnection(channel, "HTTP/1.1");
 
             // Depending on which upgrades have been set up, the HTTP codec may or may not be installed
 
@@ -304,13 +308,11 @@ public abstract class BaseProtocolNegotiator extends ChannelInitializer<SocketCh
 
                 if (evt instanceof HttpServerUpgradeHandler.UpgradeEvent) {
 
+                    var channel = ctx.channel();
+                    var pipeline = ctx.pipeline();
                     var upgrade = (HttpServerUpgradeHandler.UpgradeEvent) evt;
 
-                    var pipeline = ctx.pipeline();
-                    var remoteSocket = ctx.channel().remoteAddress();
-                    var protocol = upgrade.protocol();
-
-                    log.info("Selected protocol: {} {}", remoteSocket, protocol);
+                    logNewUpgradeConnection(channel, "HTTP/2.0", upgrade);
 
                     // Depending on how HTTP/2 is set up, the codec may or may not have been installed
                     var http2Codec = pipeline.get(Http2FrameCodec.class);
@@ -362,14 +364,12 @@ public abstract class BaseProtocolNegotiator extends ChannelInitializer<SocketCh
 
                 if (evt instanceof HttpServerUpgradeHandler.UpgradeEvent) {
 
+                    var channel = ctx.channel();
+                    var pipeline = ctx.pipeline();
                     var upgrade = (HttpServerUpgradeHandler.UpgradeEvent) evt;
                     var request = upgrade.upgradeRequest();
 
-                    var pipeline = ctx.pipeline();
-                    var remoteSocket = ctx.channel().remoteAddress();
-                    var protocol = upgrade.protocol();
-
-                    log.info("Selected protocol: {} {}", remoteSocket, protocol);
+                    logNewUpgradeConnection(channel, "WebSocket", upgrade);
 
                     pipeline.addAfter(ctx.name(), HTTP_1_CODEC, new HttpServerCodec());
 
@@ -426,6 +426,14 @@ public abstract class BaseProtocolNegotiator extends ChannelInitializer<SocketCh
                 ReferenceCountUtil.release(evt);
             }
         }
+    }
+
+    private void logNewConnection(Channel channel, String protocol) {
+        log.info("NEW CONNECTION: {} {}, conn = {}", channel.remoteAddress(), protocol, ConnectionId.get(channel));
+    }
+
+    private void logNewUpgradeConnection(Channel channel, String protocol, HttpServerUpgradeHandler.UpgradeEvent upgrade) {
+        log.info("NEW CONNECTION: {} {} ({}), conn = {}", channel.remoteAddress(), protocol, upgrade.protocol(), ConnectionId.get(channel));
     }
 
 }
