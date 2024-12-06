@@ -37,6 +37,7 @@ import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 
 
@@ -69,6 +70,9 @@ public class TracAuthenticationService extends CommonServiceBase {
         var platformConfig = configManager.loadRootConfigObject(PlatformConfig.class);
         var serviceConfig = platformConfig.getServicesOrThrow(ConfigKeys.AUTHENTICATION_SERVICE_KEY);
 
+        var serviceProperties = new Properties();
+        serviceProperties.putAll(serviceConfig.getPropertiesMap());
+
         // TODO: Review configuration of thread pools and channel options
 
         var bossFactory = NettyHelpers.threadFactory("auth-boss");
@@ -79,7 +83,7 @@ public class TracAuthenticationService extends CommonServiceBase {
         allocator = ByteBufAllocator.DEFAULT;
 
         var providers = new ProviderLookup(platformConfig, configManager, pluginManager);
-        var protocolNegotiator = new ProtocolNegotiator(providers);
+        var protocolNegotiator = new ProtocolNegotiator(serviceProperties, providers);
 
         var bootstrap = new ServerBootstrap()
                 .group(bossGroup, workerGroup)

@@ -17,6 +17,8 @@
 
 package org.finos.tracdap.svc.auth;
 
+import org.finos.tracdap.common.config.ConfigHelpers;
+import org.finos.tracdap.common.config.ServiceProperties;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.netty.BaseProtocolNegotiator;
 
@@ -25,22 +27,29 @@ import io.netty.channel.ChannelInboundHandler;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.handler.codec.http.websocketx.WebSocketServerProtocolConfig;
 
+import java.util.Properties;
+
 
 public class ProtocolNegotiator extends BaseProtocolNegotiator {
 
-    private static final int DEFAULT_IDLE_TIMEOUT = 20;  // seconds, TODO
-
     private final ProviderLookup providerLookup;
 
-    public ProtocolNegotiator(ProviderLookup providerLookup) {
-
-        super(false, false, false, DEFAULT_IDLE_TIMEOUT);
-
+    public ProtocolNegotiator(Properties serviceProperties, ProviderLookup providerLookup) {
+        super(false, false, false, getIdleTimeout(serviceProperties));
         this.providerLookup = providerLookup;
+    }
+
+    private static int getIdleTimeout(Properties serviceProperties) {
+
+        return ConfigHelpers.readInt(
+                "authentication service", serviceProperties,
+                ServiceProperties.NETWORK_IDLE_TIMEOUT,
+                ServiceProperties.NETWORK_READ_TIMEOUT_DEFAULT);
     }
 
     @Override
     protected ChannelInboundHandler http1AuthHandler() {
+        // No-op handler, this service will handle auth
         return new ChannelInboundHandlerAdapter();
     }
 
@@ -51,8 +60,7 @@ public class ProtocolNegotiator extends BaseProtocolNegotiator {
 
     @Override
     protected ChannelHandler http1PrimaryHandler() {
-
-        return new Http1AuthRouter(providerLookup);
+        return new Http1ProviderLookup(providerLookup);
     }
 
     @Override
