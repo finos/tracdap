@@ -43,6 +43,7 @@ import org.slf4j.LoggerFactory;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
@@ -82,6 +83,7 @@ public class TracPlatformGateway extends CommonServiceBase {
     @Override
     protected void doStartup(Duration startupTimeout) throws InterruptedException {
 
+        Properties serviceProperties;
         short proxyPort;
         List<Route> routes;
         List<Redirect> redirects;
@@ -91,10 +93,12 @@ public class TracPlatformGateway extends CommonServiceBase {
 
             platformConfig = configManager.loadRootConfigObject(PlatformConfig.class);
 
-            proxyPort = (short) platformConfig
-                    .getServicesOrThrow(ConfigKeys.GATEWAY_SERVICE_KEY)
-                    .getPort();
+            var serviceConfig = platformConfig.getServicesOrThrow(ConfigKeys.GATEWAY_SERVICE_KEY);
 
+            serviceProperties = new Properties();
+            serviceProperties.putAll(serviceConfig.getPropertiesMap());
+
+            proxyPort = (short) serviceConfig.getPort();
             routes = new RouteBuilder().buildRoutes(platformConfig);
             redirects = new RedirectBuilder().buildRedirects(platformConfig);
 
@@ -116,8 +120,8 @@ public class TracPlatformGateway extends CommonServiceBase {
 
             // The protocol negotiator is the top level initializer for new inbound connections
             var protocolNegotiator = new ProtocolNegotiator(
-                    platformConfig, jwtValidator,
-                    routes, redirects);
+                    platformConfig, serviceProperties,
+                    jwtValidator, routes, redirects);
 
             var bossThreadCount = 1;
             var bossExecutor = NettyHelpers.eventLoopExecutor("gw-boss");

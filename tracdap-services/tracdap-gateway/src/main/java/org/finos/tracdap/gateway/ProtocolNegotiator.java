@@ -18,6 +18,8 @@
 package org.finos.tracdap.gateway;
 
 import org.finos.tracdap.common.auth.internal.JwtValidator;
+import org.finos.tracdap.common.config.ConfigHelpers;
+import org.finos.tracdap.common.config.ServiceProperties;
 import org.finos.tracdap.common.netty.BaseProtocolNegotiator;
 import org.finos.tracdap.config.AuthenticationConfig;
 import org.finos.tracdap.config.PlatformConfig;
@@ -34,12 +36,11 @@ import org.finos.tracdap.gateway.routing.Http2Router;
 import org.finos.tracdap.gateway.routing.WebSocketsRouter;
 
 import java.util.List;
+import java.util.Properties;
 import java.util.concurrent.atomic.AtomicInteger;
 
 
 public class ProtocolNegotiator extends BaseProtocolNegotiator {
-
-    private static final int DEFAULT_TIMEOUT = 60;
 
     private final AuthenticationConfig authCConfig;
     private final JwtValidator jwtValidator;
@@ -49,22 +50,23 @@ public class ProtocolNegotiator extends BaseProtocolNegotiator {
     private final AtomicInteger connId = new AtomicInteger();
 
     public ProtocolNegotiator(
-            PlatformConfig config, JwtValidator jwtValidator,
-            List<Route> routes, List<Redirect> redirects) {
+            PlatformConfig platformConfig, Properties serviceProperties,
+            JwtValidator jwtValidator, List<Route> routes, List<Redirect> redirects) {
 
-        super(true, true, true, getIdleTimeout(config));
+        super(true, true, true, getIdleTimeout(serviceProperties));
 
-        this.authCConfig = config.getAuthentication();
+        this.authCConfig = platformConfig.getAuthentication();
         this.jwtValidator = jwtValidator;
         this.routes = routes;
         this.redirects = redirects;
     }
 
-    private static int getIdleTimeout(PlatformConfig config) {
+    private static int getIdleTimeout(Properties serviceProperties) {
 
-        return config.getGateway().getIdleTimeout() > 0
-                ? config.getGateway().getIdleTimeout()
-                : DEFAULT_TIMEOUT;
+        return ConfigHelpers.readInt(
+                "gateway service", serviceProperties,
+                ServiceProperties.NETWORK_IDLE_TIMEOUT,
+                ServiceProperties.NETWORK_READ_TIMEOUT_DEFAULT);
     }
 
     @Override
