@@ -66,14 +66,7 @@ message AuthenticationConfig {
   sint32 systemTicketDuration = 10;
   sint32 systemTicketRefresh = 11;
 
-  repeated ExternalAuthConfig externalSystems = 14;
-}
-
-message ExternalAuthConfig {
-
-  string name = 1;
-  string path = 2;
-  PluginConfig provider = 3;
+  map<string, PluginConfig> externalSystems = 14;
 }
 
 
