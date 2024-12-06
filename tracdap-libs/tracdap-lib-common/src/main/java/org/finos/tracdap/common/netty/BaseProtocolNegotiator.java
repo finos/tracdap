@@ -84,8 +84,8 @@ public abstract class BaseProtocolNegotiator extends ChannelInitializer<SocketCh
 
         connectionId.assign(channel);
 
-        if (log.isDebugEnabled())
-            log.debug("initChannel: {}, connId = {}", channel.remoteAddress(), ConnectionId.get(channel));
+        if (log.isTraceEnabled())
+            log.trace("BaseProtocolNegotiator initChannel: conn = {}, {}", ConnectionId.get(channel), channel.remoteAddress());
 
         var pipeline = channel.pipeline();
 
@@ -131,8 +131,8 @@ public abstract class BaseProtocolNegotiator extends ChannelInitializer<SocketCh
         @Override
         public HttpServerUpgradeHandler.UpgradeCodec newUpgradeCodec(CharSequence protocol) {
 
-            if (log.isDebugEnabled())
-                log.debug("newUpgradeCodec: [{}]", protocol);
+            if (log.isTraceEnabled())
+                log.trace("UpgradeCodecFactory newUpgradeCodec: protocol = {}", protocol);
 
             if (AsciiString.contentEquals(Http2CodecUtil.HTTP_UPGRADE_PROTOCOL_NAME, protocol)) {
 
@@ -157,7 +157,7 @@ public abstract class BaseProtocolNegotiator extends ChannelInitializer<SocketCh
                 }
             }
 
-            log.warn("Upgrade not available for protocol: [{}]", protocol);
+            log.warn("HTTP upgrade not available for protocol: [{}]", protocol);
 
             return null;
         }
@@ -193,6 +193,9 @@ public abstract class BaseProtocolNegotiator extends ChannelInitializer<SocketCh
         @Override
         public boolean prepareUpgradeResponse(ChannelHandlerContext ctx, FullHttpRequest upgradeRequest, HttpHeaders upgradeHeaders) {
 
+            if (log.isTraceEnabled())
+                log.trace("WebsocketUpgradeCodec prepareUpgradeResponse: conn = {}", ConnectionId.get(ctx.channel()));
+
             // The upgrade headers prepared here are what gets sent back to the client by the HTTP upgrade handler
             // These do not include the required web sockets fields, such as sec-websocket-key
             // Calling the web socket handshake logic here would (a) be messy and (b) break the web sockets handler
@@ -210,14 +213,20 @@ public abstract class BaseProtocolNegotiator extends ChannelInitializer<SocketCh
         @Override
         public void upgradeTo(ChannelHandlerContext ctx, FullHttpRequest upgradeRequest) {
 
+            if (log.isTraceEnabled())
+                log.trace("WebsocketUpgradeCodec upgradeTo: conn = {}", ConnectionId.get(ctx.channel()));
+
             ctx.pipeline().addAfter(ctx.name(), WS_INITIALIZER, new WebSocketInitializer());
         }
     }
 
-    private static class WebSocketUpgradeInterceptor extends ChannelOutboundHandlerAdapter {
+    private class WebSocketUpgradeInterceptor extends ChannelOutboundHandlerAdapter {
 
         @Override
         public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) throws Exception {
+
+            if (log.isTraceEnabled())
+                log.trace("WebSocketUpgradeInterceptor write: conn = {}, msg = {}", ConnectionId.get(ctx.channel()), msg);
 
             // Catch and discard the outbound response if the special intercept header is detected
             // Once the intercept is performed, this handler can be removed
@@ -252,6 +261,9 @@ public abstract class BaseProtocolNegotiator extends ChannelInitializer<SocketCh
 
         @Override
         public void channelRead(@Nonnull ChannelHandlerContext ctx, @Nonnull Object msg) {
+
+            if (log.isTraceEnabled())
+                log.trace("Http1Initializer channelRead: conn = {}, msg = {}", ConnectionId.get(ctx.channel()), msg);
 
             var channel = ctx.channel();
             var pipeline = channel.pipeline();
@@ -305,6 +317,9 @@ public abstract class BaseProtocolNegotiator extends ChannelInitializer<SocketCh
         public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
 
             try {
+
+                if (log.isTraceEnabled())
+                    log.trace("Http2Initializer userEventTriggered: conn = {}, evt = {}", ConnectionId.get(ctx.channel()), evt);
 
                 if (evt instanceof HttpServerUpgradeHandler.UpgradeEvent) {
 
@@ -361,6 +376,9 @@ public abstract class BaseProtocolNegotiator extends ChannelInitializer<SocketCh
         public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
 
             try {
+
+                if (log.isTraceEnabled())
+                    log.trace("WebSocketInitializer userEventTriggered: conn = {}, evt = {}", ConnectionId.get(ctx.channel()), evt);
 
                 if (evt instanceof HttpServerUpgradeHandler.UpgradeEvent) {
 
@@ -429,11 +447,11 @@ public abstract class BaseProtocolNegotiator extends ChannelInitializer<SocketCh
     }
 
     private void logNewConnection(Channel channel, String protocol) {
-        log.info("NEW CONNECTION: {} {}, conn = {}", channel.remoteAddress(), protocol, ConnectionId.get(channel));
+        log.info("NEW CONNECTION: conn = {}, {} {}", ConnectionId.get(channel), channel.remoteAddress(), protocol);
     }
 
     private void logNewUpgradeConnection(Channel channel, String protocol, HttpServerUpgradeHandler.UpgradeEvent upgrade) {
-        log.info("NEW CONNECTION: {} {} ({}), conn = {}", channel.remoteAddress(), protocol, upgrade.protocol(), ConnectionId.get(channel));
+        log.info("NEW CONNECTION: conn = {}, {} {} ({})", ConnectionId.get(channel), channel.remoteAddress(), protocol, upgrade.protocol());
     }
 
 }
