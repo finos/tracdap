@@ -21,8 +21,7 @@ import org.finos.tracdap.common.auth.internal.JwtValidator;
 import org.finos.tracdap.common.config.ConfigHelpers;
 import org.finos.tracdap.common.config.ServiceProperties;
 import org.finos.tracdap.common.netty.BaseProtocolNegotiator;
-import org.finos.tracdap.config.AuthenticationConfig;
-import org.finos.tracdap.config.PlatformConfig;
+import org.finos.tracdap.gateway.auth.AuthHandlerSettings;
 import org.finos.tracdap.gateway.auth.Http1AuthHandler;
 
 import io.netty.channel.ChannelDuplexHandler;
@@ -42,7 +41,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 public class ProtocolNegotiator extends BaseProtocolNegotiator {
 
-    private final AuthenticationConfig authCConfig;
+    private final AuthHandlerSettings authSettings;
     private final JwtValidator jwtValidator;
     private final List<Route> routes;
     private final List<Redirect> redirects;
@@ -50,12 +49,12 @@ public class ProtocolNegotiator extends BaseProtocolNegotiator {
     private final AtomicInteger connId = new AtomicInteger();
 
     public ProtocolNegotiator(
-            PlatformConfig platformConfig, Properties serviceProperties,
+            Properties serviceProperties, AuthHandlerSettings authSettings,
             JwtValidator jwtValidator, List<Route> routes, List<Redirect> redirects) {
 
         super(true, true, true, getIdleTimeout(serviceProperties));
 
-        this.authCConfig = platformConfig.getAuthentication();
+        this.authSettings = authSettings;
         this.jwtValidator = jwtValidator;
         this.routes = routes;
         this.redirects = redirects;
@@ -71,7 +70,7 @@ public class ProtocolNegotiator extends BaseProtocolNegotiator {
 
     @Override
     protected ChannelInboundHandler http1AuthHandler() {
-        return new Http1AuthHandler(authCConfig, jwtValidator);
+        return new Http1AuthHandler(authSettings, jwtValidator);
     }
 
     @Override

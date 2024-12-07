@@ -27,6 +27,7 @@ import org.finos.tracdap.common.netty.EventLoopScheduler;
 import org.finos.tracdap.common.netty.NettyHelpers;
 import org.finos.tracdap.common.plugin.PluginManager;
 import org.finos.tracdap.common.service.CommonServiceBase;
+import org.finos.tracdap.gateway.auth.AuthHandlerSettings;
 import org.finos.tracdap.gateway.builders.RedirectBuilder;
 import org.finos.tracdap.gateway.exec.Redirect;
 import org.finos.tracdap.gateway.exec.Route;
@@ -85,6 +86,8 @@ public class TracPlatformGateway extends CommonServiceBase {
 
         Properties serviceProperties;
         short proxyPort;
+
+        AuthHandlerSettings authSettings;
         List<Route> routes;
         List<Redirect> redirects;
 
@@ -97,8 +100,9 @@ public class TracPlatformGateway extends CommonServiceBase {
 
             serviceProperties = new Properties();
             serviceProperties.putAll(serviceConfig.getPropertiesMap());
-
             proxyPort = (short) serviceConfig.getPort();
+
+            authSettings = new AuthHandlerSettings(platformConfig);
             routes = new RouteBuilder().buildRoutes(platformConfig);
             redirects = new RedirectBuilder().buildRedirects(platformConfig);
 
@@ -120,7 +124,7 @@ public class TracPlatformGateway extends CommonServiceBase {
 
             // The protocol negotiator is the top level initializer for new inbound connections
             var protocolNegotiator = new ProtocolNegotiator(
-                    platformConfig, serviceProperties,
+                    serviceProperties, authSettings,
                     jwtValidator, routes, redirects);
 
             var bossThreadCount = 1;
