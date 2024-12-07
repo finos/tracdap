@@ -20,14 +20,11 @@ package org.finos.tracdap.gateway.auth;
 import org.finos.tracdap.common.auth.internal.AuthHelpers;
 import org.finos.tracdap.common.auth.internal.JwtValidator;
 import org.finos.tracdap.common.auth.internal.SessionInfo;
-import org.finos.tracdap.common.config.ConfigDefaults;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.http.Http1Headers;
+import org.finos.tracdap.common.netty.ConnectionId;
 import org.finos.tracdap.common.util.LoggingHelpers;
-import org.finos.tracdap.config.AuthenticationConfig;
 
-import io.netty.bootstrap.Bootstrap;
-import io.netty.buffer.Unpooled;
 import io.netty.channel.*;
 import io.netty.handler.codec.http.*;
 import io.netty.handler.codec.http.websocketx.WebSocketFrame;
@@ -38,13 +35,7 @@ import org.slf4j.Logger;
 import javax.annotation.Nonnull;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
-import java.time.Duration;
 import java.time.Instant;
-import java.util.ArrayDeque;
-import java.util.List;
-import java.util.Map;
-import java.util.Queue;
-import java.util.concurrent.TimeUnit;
 
 
 /**
@@ -62,25 +53,19 @@ import java.util.concurrent.TimeUnit;
  */
 public class Http1AuthHandler extends ChannelDuplexHandler {
 
+    private static final String RESULT_PASS = "PASS";
+    private static final String RESULT_ALLOW = "ALLOW_LOGIN";
+    private static final String RESULT_FAIL = "FAIL";
+
     private static final ThreadLocal<Logger> logMap = new ThreadLocal<>();
     private final Logger log = LoggingHelpers.threadLocalLogger(this, logMap);
 
-    private final AuthenticationConfig authConfig;
+    private final AuthHandlerSettings handlerSettings;
     private final JwtValidator jwtValidator;
 
-    // TODO: Get these config values
-
-    private static final String browserLoginUri = "/trac-auth/login/browser?return-path=%s";
-
-    private final List<Map.Entry<String, Boolean>> openRoutes = List.of(
-            Map.entry("/trac-auth/login/refresh", false),
-            Map.entry("/trac-auth/login/", true));
-
-    private final int configRefresh;
-    private final Duration refreshTimeout = Duration.ofSeconds(2);
-
-    private Channel refreshChannel;
-    private RequestState state;
+    private long connId = -1;
+    private long reqId = -1;
+    private RequestState state = null;
 
     private static class RequestState {
 
@@ -89,26 +74,28 @@ public class Http1AuthHandler extends ChannelDuplexHandler {
         SessionInfo session;
         boolean authenticated;
         boolean refreshWanted;
-
-        Queue<Map.Entry<Object, ChannelPromise>> refreshQueue;
-        ChannelPromise refreshPromise;
-        HttpHeaders refreshHeaders;
+        boolean isLogin;
+        boolean wantCookies;
     }
 
-    public Http1AuthHandler(AuthenticationConfig authConfig, JwtValidator jwtValidator) {
 
-        this.authConfig = authConfig;
+    public Http1AuthHandler(AuthHandlerSettings handlerSettings, JwtValidator jwtValidator) {
+
+        this.handlerSettings = handlerSettings;
         this.jwtValidator = jwtValidator;
-
-        this.configRefresh = ConfigDefaults.readOrDefault(authConfig.getJwtRefresh(), ConfigDefaults.DEFAULT_JWT_REFRESH);
     }
 
     @Override
     public void handlerAdded(ChannelHandlerContext ctx) {
 
-        if (authConfig.getDisableAuth()) {
+        connId = ConnectionId.get(ctx.channel());
 
-            log.warn("Authentication disabled in config, auth handler will be removed for this connection");
+        if (log.isTraceEnabled())
+            log.trace("Http1AuthHandler handlerAdded: conn = {}", connId);
+
+        if (handlerSettings.authConfig().getDisableAuth()) {
+
+            log.warn("conn = {}, Authentication disabled in config, auth handler will be removed for this connection", connId);
 
             // Channel initializer gets confused if a newly added handler is not available
             // Instead, replace this handler with a no-op and remove it later
@@ -123,13 +110,8 @@ public class Http1AuthHandler extends ChannelDuplexHandler {
     @Override
     public void handlerRemoved(ChannelHandlerContext ctx) {
 
-        if (state != null)
-            releaseState();
-
-        if (refreshChannel != null) {
-            refreshChannel.close();
-            refreshChannel = null;
-        }
+        if (log.isTraceEnabled())
+            log.trace("Http1AuthHandler handlerRemoved: conn = {}", connId);
     }
 
     @Override
@@ -137,29 +119,36 @@ public class Http1AuthHandler extends ChannelDuplexHandler {
 
         try {
 
+            if (log.isTraceEnabled())
+                log.trace("Http1AuthHandler channelRead: conn = {}, msg = {}", connId, msg);
+
+            if (!(msg instanceof HttpObject || msg instanceof WebSocketFrame)) {
+                ctx.close();
+                throw new EUnexpected();
+            }
+
             if (msg instanceof HttpRequest) {
 
                 var request = (HttpRequest) msg;
+                reqId++;
 
                 newState();
                 checkAuthentication(request);
+                checkIsLogin(request);
                 checkRefreshWanted();
 
-                if (!state.authenticated)
+                logAuthentication(request, state);
+
+                if (state.authenticated || state.isLogin)
+                    translateRequestHeaders(request);
+                else
                     sendFailResponse(ctx, request);
-                else if (state.refreshWanted)
-                    sendRefreshRequest(ctx);
             }
 
-            if (msg instanceof HttpObject || msg instanceof WebSocketFrame) {
-
-                if (state.authenticated) {
-                    ReferenceCountUtil.retain(msg);
-                    ctx.fireChannelRead(msg);
-                }
+            if (state.authenticated || state.isLogin) {
+                ReferenceCountUtil.retain(msg);
+                ctx.fireChannelRead(msg);
             }
-            else
-                throw new EUnexpected();
         }
         finally {
             ReferenceCountUtil.release(msg);
@@ -169,30 +158,24 @@ public class Http1AuthHandler extends ChannelDuplexHandler {
     @Override
     public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) throws Exception {
 
-        if (state.refreshPromise != null && !state.refreshPromise.isDone()) {
-            state.refreshQueue.add(Map.entry(msg, promise));
-            return;
-        }
-
         try {
 
-            if (msg instanceof HttpResponse && state.refreshHeaders != null) {
+            if (log.isTraceEnabled())
+                log.trace("Http1AuthHandler write: conn = {}, msg = {}", connId, msg);
+
+            if (!(msg instanceof HttpObject || msg instanceof WebSocketFrame)) {
+                ctx.close();
+                throw new EUnexpected();
+            }
+
+            if (msg instanceof HttpResponse) {
 
                 var response = (HttpResponse) msg;
-                var headers = response.headers();
-
-                // TODO: Is this ok?
-                for (var header : state.refreshHeaders)
-                    headers.add(header.getKey(), header.getValue());
+                translateResponseHeaders(response);
             }
 
-            if (msg instanceof HttpObject || msg instanceof WebSocketFrame) {
-
-                ReferenceCountUtil.retain(msg);
-                ctx.write(msg, promise);
-            }
-            else
-                throw new EUnexpected();
+            ReferenceCountUtil.retain(msg);
+            ctx.write(msg, promise);
         }
         finally {
             ReferenceCountUtil.release(msg);
@@ -201,47 +184,14 @@ public class Http1AuthHandler extends ChannelDuplexHandler {
 
     void newState() {
 
-        if (state != null)
-            releaseState();
-
         var state = new RequestState();
         state.requestTime = Instant.now();
         state.token = null;
         state.session = null;
         state.authenticated = false;
         state.refreshWanted = false;
-        state.refreshHeaders = null;
 
         this.state = state;
-    }
-
-    private void releaseState() {
-
-        if (state.refreshQueue != null) {
-
-            var queueItem = state.refreshQueue.poll();
-
-            while (queueItem != null) {
-
-                var msg = queueItem.getKey();
-                var promise = queueItem.getValue();
-
-                ReferenceCountUtil.release(msg);
-                promise.setSuccess();
-
-                queueItem = state.refreshQueue.poll();
-            }
-
-            state.refreshQueue = null;
-        }
-
-        if (state.refreshPromise != null) {
-
-            if (!state.refreshPromise.isDone())
-                state.refreshPromise.cancel(false);
-
-            state.refreshPromise = null;
-        }
     }
 
     private void checkAuthentication(HttpRequest request) {
@@ -249,215 +199,115 @@ public class Http1AuthHandler extends ChannelDuplexHandler {
         // Look for an existing session token in the request
         // If the token gives a valid session then authentication has succeeded
 
-        log.info("Check auth for: {}", request.uri());
-
-        var headers = Http1Headers.fromHttpHeaders(request.headers());
-        var token = AuthHelpers.findTracAuthToken(headers);
+        var headers = Http1Headers.wrapHttpHeaders(request.headers());
+        var token = AuthHelpers.findTracAuthToken(headers, AuthHelpers.SERVER_COOKIE);
         var session = token != null ? jwtValidator.decodeAndValidate(token) : null;
 
         if (session != null && session.isValid()) {
             state.authenticated = true;
             state.token = token;
             state.session = session;
-            return;
         }
 
-        for (var route : openRoutes) {
-
-            var prefix = route.getKey();
-            var allowOpen = route.getValue();
-
-            if (request.uri().startsWith(prefix)) {
-                state.authenticated = allowOpen;
-                return;
-            }
-        }
+        if (AuthHelpers.isBrowserRequest(headers) || AuthHelpers.wantCookies(headers))
+            state.wantCookies = true;
     }
 
-    void checkRefreshWanted() {
+    private void checkIsLogin(HttpRequest request) {
 
-        if (state.session != null && state.session.isValid()) {
+        if (request.uri().startsWith(handlerSettings.publicLoginPrefix()))
+            state.isLogin = true;
+    }
+
+    private void checkRefreshWanted() {
+
+        if (state.authenticated && !state.isLogin) {
 
             var issueTime = state.session.getIssueTime();
-            var refreshTime = issueTime.plusSeconds(configRefresh);
+            var refreshTime = issueTime.plus(handlerSettings.refreshInterval());
 
             if (state.requestTime.isAfter(refreshTime))
                 state.refreshWanted = true;
         }
     }
 
+    private void translateRequestHeaders(HttpRequest request) {
+
+        var headers = Http1Headers.wrapHttpHeaders(request.headers());
+
+        AuthHelpers.removeAuthHeaders(headers, AuthHelpers.SERVER_COOKIE);
+
+        if (state.token != null)
+            AuthHelpers.addPlatformAuthHeaders(headers, state.token);
+    }
+
+    private void translateResponseHeaders(HttpResponse response) {
+
+        var headers = Http1Headers.wrapHttpHeaders(response.headers());
+        var newToken = AuthHelpers.findTracAuthToken(headers, AuthHelpers.CLIENT_COOKIE);
+
+        if (newToken != null) {
+            state.token = newToken;
+            state.session = jwtValidator.decodeAndValidate(newToken);
+        }
+
+        AuthHelpers.removeAuthHeaders(headers, AuthHelpers.CLIENT_COOKIE);
+
+        if (state.token != null)
+            if (state.wantCookies)
+                AuthHelpers.addClientAuthCookies(headers, state.token, state.session);
+            else
+                AuthHelpers.addClientAuthHeaders(headers, state.token, state.session);
+    }
+
     private void sendFailResponse(ChannelHandlerContext ctx, HttpRequest request) {
 
-        var requestHeaders = Http1Headers.fromHttpHeaders(request.headers());
+        var requestHeaders = Http1Headers.wrapHttpHeaders(request.headers());
 
         if (AuthHelpers.isBrowserRequest(requestHeaders)) {
 
+            var loginUrl = handlerSettings.publicLoginUrl();
             var returnPath = URLEncoder.encode(request.uri(), StandardCharsets.US_ASCII);
-            var redirectUri = String.format(browserLoginUri, returnPath);
+            var loginRedirect = loginUrl.replace(AuthHandlerSettings.RETURN_PATH_VARIABLE, returnPath);
 
-            var redirectResponse = new DefaultFullHttpResponse(
-                    request.protocolVersion(),
-                    HttpResponseStatus.TEMPORARY_REDIRECT);
-
-            redirectResponse.headers().set(HttpHeaderNames.LOCATION, redirectUri);
+            var redirectResponse = new DefaultFullHttpResponse(request.protocolVersion(), HttpResponseStatus.TEMPORARY_REDIRECT);
+            redirectResponse.headers().set(HttpHeaderNames.LOCATION, loginRedirect);
 
             ctx.writeAndFlush(redirectResponse);
         }
         else {
 
-            var unauthorizedResponse = new DefaultFullHttpResponse(
-                    request.protocolVersion(),
-                    HttpResponseStatus.UNAUTHORIZED);
-
+            var unauthorizedResponse = new DefaultFullHttpResponse(request.protocolVersion(), HttpResponseStatus.UNAUTHORIZED);
             ctx.writeAndFlush(unauthorizedResponse);
         }
     }
 
-    private void sendRefreshRequest(ChannelHandlerContext ctx) {
+    private void logAuthentication(HttpRequest request, RequestState state) {
 
-        if (state.refreshPromise == null) {
+        String result;
+        String userId;
 
-            // Set up a promise for the token refresh response
-            state.refreshPromise = ctx.newPromise();
-            state.refreshPromise.addListener(future -> refreshComplete(ctx));
+        if (state.authenticated)
+            result = RESULT_PASS;
+        else if (state.isLogin)
+            result = RESULT_ALLOW;
+        else if (state.token == null)
+            result = RESULT_FAIL + " (no token)";
+        else if (state.session == null || !state.session.isValid())
+            result = RESULT_FAIL + " (invalid token)";
+        else if (state.session.getExpiryTime().isAfter(Instant.now()))
+            result = RESULT_FAIL + " (expired)";
+        else
+            result = RESULT_FAIL;
 
-            // Set a short timeout on the refresh request
-            // If the response doesn't come back quickly, the existing token is still good
-            ctx.executor().schedule(() -> {
-                if (state.refreshPromise != null && !state.refreshPromise.isDone()) {
-                    log.warn("Token refresh did not complete in the allotted time (the previous token is still valid)");
-                    state.refreshPromise.setSuccess();  // TODO
-                }
-            }, refreshTimeout.toMillis(), TimeUnit.MILLISECONDS);
+        if (state.session != null && state.session.getUserInfo() != null)
+            userId = state.session.getUserInfo().getUserId();
+        else
+            userId = null;
 
-            // Set up a queue to hold outbound messages until the refresh is ready
-            state.refreshQueue = new ArrayDeque<>();
-        }
-
-        if (refreshChannel == null) {
-
-            // If the client channel is not available, create it and call back into this function
-            prepareRefreshChannel(ctx, () -> this.sendRefreshRequest(ctx));
-        }
-        else {
-
-            // Channel is available - send a refresh request to the auth service
-            // TODO: Request params
-            var requestHeaders = new DefaultHttpHeaders();
-            requestHeaders.add(HttpHeaderNames.AUTHORIZATION, state.token);
-
-            log.info("Sending refresh request");
-
-            var request = new DefaultFullHttpRequest(
-                    HttpVersion.HTTP_1_1, HttpMethod.GET,
-                    "/login/refresh", Unpooled.EMPTY_BUFFER,
-                    requestHeaders, new DefaultHttpHeaders());
-
-            refreshChannel.pipeline().writeAndFlush(request);
-        }
-    }
-
-    private void prepareRefreshChannel(ChannelHandlerContext ctx, Runnable sendRefreshRequest) {
-
-        var channelClass = ctx.channel().getClass();
-        var eventLoop = ctx.channel().eventLoop();
-        var allocator = ctx.alloc();
-
-        var refreshConnect = new Bootstrap()
-                .group(eventLoop)
-                .channel(channelClass)
-                .option(ChannelOption.ALLOCATOR, allocator)
-                .handler(new Http1RefreshInit())
-                .connect("localhost", 8084);  // TODO
-
-        refreshConnect.addListener(future -> {
-
-            if (future.isSuccess()) {
-
-                sendRefreshRequest.run();
-            }
-            else {
-
-                if (!state.refreshPromise.isDone())
-                    state.refreshPromise.setFailure(future.cause());
-
-                refreshChannel.close();
-                refreshChannel = null;
-            }
-        });
-
-        refreshChannel = refreshConnect.channel();
-    }
-
-    private void refreshComplete(ChannelHandlerContext ctx) {
-
-        if (state.refreshQueue != null) {
-
-            var queueItem = state.refreshQueue.poll();
-
-            while (queueItem != null) {
-
-                var msg = queueItem.getKey();
-                var promise = queueItem.getValue();
-
-                ctx.pipeline().write(msg, promise);
-
-                queueItem = state.refreshQueue.poll();
-            }
-
-            ctx.pipeline().flush();
-        }
-
-        state.refreshPromise = null;
-        state.refreshQueue = null;
-    }
-
-    private class Http1RefreshInit extends ChannelInitializer<Channel> {
-
-        @Override
-        protected void initChannel(Channel channel) {
-
-            channel.pipeline().addLast(new Http1RefreshHandler());
-            channel.pipeline().addLast(new HttpClientCodec());
-        }
-    }
-
-    private class Http1RefreshHandler extends ChannelInboundHandlerAdapter {
-
-        @Override
-        public void channelRead(ChannelHandlerContext ctx, Object msg) {
-
-            try {
-
-                if (state.refreshPromise.isDone())
-                    return;
-
-                if (msg instanceof HttpResponse) {
-
-                    var refreshResponse = (HttpResponse) msg;
-                    var refreshHeaders= Http1Headers.fromHttpHeaders(refreshResponse.headers());
-                    var refreshToken = AuthHelpers.findTracAuthToken(refreshHeaders);
-                    var refreshSession = refreshToken != null ? jwtValidator.decodeAndValidate(refreshToken) : null;
-
-                    if (refreshToken != null && refreshSession != null && refreshSession.isValid()) {
-
-                        if (state.token == null || state.session == null || !state.session.isValid()) {
-                            state.token = refreshToken;
-                            state.session = refreshSession;
-                        }
-                        else if (refreshSession.getExpiryTime().isAfter(state.session.getExpiryTime())) {
-                            state.token = refreshToken;
-                            state.session = refreshSession;
-                        }
-                    }
-                }
-
-                if (msg instanceof LastHttpContent)
-                    state.refreshPromise.setSuccess();
-            }
-            finally {
-                ReferenceCountUtil.release(msg);
-            }
-        }
+        if (userId != null)
+            log.info("AUTHENTICATE: conn = {}, req = {}, result = {}, user= {}, {}", connId, reqId, result, userId, request.uri());
+        else
+            log.info("AUTHENTICATE: conn = {}, req = {}, result = {}, {}", connId, reqId, result, request.uri());
     }
 }
