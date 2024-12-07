@@ -194,7 +194,7 @@ public class Http1LoginHandler extends ChannelInboundHandlerAdapter {
 
     private void processRefresh(ChannelHandlerContext ctx, HttpRequest request) {
 
-        var headers = Http1Headers.fromHttpHeaders(request.headers());
+        var headers = Http1Headers.wrapHttpHeaders(request.headers());
         var token = AuthHelpers.findTracAuthToken(headers);
         var session = (token != null) ? jwtProcessor.decodeAndValidate(token) : null;
 
@@ -220,7 +220,7 @@ public class Http1LoginHandler extends ChannelInboundHandlerAdapter {
 
     private void serveLoginOk(ChannelHandlerContext ctx, HttpRequest request, SessionInfo session, String token) {
 
-        var requestHeaders = Http1Headers.fromHttpHeaders(request.headers());
+        var requestHeaders = Http1Headers.wrapHttpHeaders(request.headers());
 
         CommonHttpResponse content;
         Http1Headers headers;

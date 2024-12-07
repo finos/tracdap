@@ -34,7 +34,7 @@ public class CommonHttpRequest {
 
         var method = httpRequest.method().toString();
         var path = httpRequest.uri();
-        var headers = Http1Headers.fromHttpHeaders(httpRequest.headers());
+        var headers = Http1Headers.wrapHttpHeaders(httpRequest.headers());
 
         var content = (httpRequest instanceof FullHttpRequest)
                 ? ((FullHttpRequest) httpRequest).content()

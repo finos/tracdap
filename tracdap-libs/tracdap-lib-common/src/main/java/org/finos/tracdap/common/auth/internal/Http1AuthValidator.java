@@ -145,7 +145,7 @@ public class Http1AuthValidator extends ChannelInboundHandlerAdapter {
         // Look for an existing session token in the request
         // If the token gives a valid session then authentication has succeeded
 
-        var headers = Http1Headers.fromHttpHeaders(request.headers());
+        var headers = Http1Headers.wrapHttpHeaders(request.headers());
         var token = AuthHelpers.findTracAuthToken(headers);
 
         if (token == null) {

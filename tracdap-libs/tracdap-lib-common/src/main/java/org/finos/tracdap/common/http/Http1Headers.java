@@ -48,7 +48,7 @@ public class Http1Headers implements Headers<CharSequence, CharSequence, Http1He
             return new Http1Headers().setAll(genericHeaders);
     }
 
-    public static Http1Headers fromHttpHeaders(HttpHeaders genericHeaders) {
+    public static Http1Headers wrapHttpHeaders(HttpHeaders genericHeaders) {
 
         return new Http1Headers(genericHeaders);
     }
