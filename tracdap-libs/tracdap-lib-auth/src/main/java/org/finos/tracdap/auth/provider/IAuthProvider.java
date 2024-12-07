@@ -24,9 +24,9 @@ import io.netty.handler.codec.http2.Http2Headers;
 
 public interface IAuthProvider {
 
-    boolean canHandleRequest(HttpRequest request);
-    boolean canHandleRequest(Http2Headers headers);
+    boolean canHandleHttp1(HttpRequest request);
+    ChannelInboundHandler createHttp1Handler();
 
-    ChannelInboundHandler handleRequest(HttpRequest request);
-    ChannelInboundHandler handleRequest(Http2Headers request);
+    boolean canHandleHttp2(Http2Headers headers);
+    ChannelInboundHandler createHttp2Handler();
 }

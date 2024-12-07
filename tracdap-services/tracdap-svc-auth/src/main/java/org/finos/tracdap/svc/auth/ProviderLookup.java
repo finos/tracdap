@@ -108,11 +108,11 @@ public class ProviderLookup {
 
     public String findProvider(HttpRequest request) {
 
-        if (loginProvider.canHandleRequest(request))
+        if (loginProvider.canHandleHttp1(request))
             return LOGIN_PROVIDER_KEY;
 
         for (var provider : externalProviders.entrySet()) {
-            if (provider.getValue().canHandleRequest(request))
+            if (provider.getValue().canHandleHttp1(request))
                 return provider.getKey();
         }
 
@@ -122,14 +122,14 @@ public class ProviderLookup {
     public ChannelInboundHandler createProvider(String providerName) {
 
         if (LOGIN_PROVIDER_KEY.equals(providerName))
-            return loginProvider.createHandlerHttp1();
+            return loginProvider.createHttp1Handler();
 
         var provider = externalProviders.get(providerName);
 
         if (provider == null)
             throw new EUnexpected();
 
-        return provider.createHandlerHttp1();
+        return provider.createHttp1Handler();
     }
 
     private void logLoginProvider(String protocol) {

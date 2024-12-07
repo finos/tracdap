@@ -75,22 +75,22 @@ public class DummyProviderPlugin extends TracPlugin {
         public static String DUMMY_PATH_PREFIX = "/dummy/";
 
         @Override
-        public boolean canHandleRequest(HttpRequest request) {
+        public boolean canHandleHttp1(HttpRequest request) {
             return request.uri().startsWith(DUMMY_PATH_PREFIX);
         }
 
         @Override
-        public boolean canHandleRequest(Http2Headers headers) {
-            return false;
-        }
-
-        @Override
-        public ChannelInboundHandler createHandlerHttp1() {
+        public ChannelInboundHandler createHttp1Handler() {
             return new DummyAuthHandler();
         }
 
         @Override
-        public ChannelInboundHandler createHandlerHttp2() {
+        public boolean canHandleHttp2(Http2Headers headers) {
+            return false;
+        }
+
+        @Override
+        public ChannelInboundHandler createHttp2Handler() {
             return null;
         }
     }

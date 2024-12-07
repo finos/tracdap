@@ -43,22 +43,22 @@ public class LoginAuthProvider implements IAuthProvider {
     }
 
     @Override
-    public boolean canHandleRequest(HttpRequest request) {
-        return true;
+    public boolean canHandleHttp1(HttpRequest request) {
+        return request.uri().startsWith(LoginContent.LOGIN_PATH_PREFIX);
     }
 
     @Override
-    public boolean canHandleRequest(Http2Headers headers) {
-        return false;
-    }
-
-    @Override
-    public ChannelInboundHandler handleRequest(HttpRequest request) {
+    public ChannelInboundHandler createHttp1Handler() {
         return new Http1LoginHandler(authConfig, jwtProcessor, loginProvider);
     }
 
     @Override
-    public ChannelInboundHandler handleRequest(Http2Headers request) {
+    public boolean canHandleHttp2(Http2Headers headers) {
+        return false;
+    }
+
+    @Override
+    public ChannelInboundHandler createHttp2Handler() {
         return null;
     }
 }
