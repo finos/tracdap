@@ -131,17 +131,20 @@ services:
     properties:
       network.idleTimeout: 10
 
-  metadata:
+  authentication:
     port: 8081
 
-  data:
+  metadata:
     port: 8082
 
-  orchestrator:
+  data:
     port: 8083
 
+  orchestrator:
+    port: 8084
+
   webServer:
-    port: 8090
+    port: 9000
 
 
 deployment:
