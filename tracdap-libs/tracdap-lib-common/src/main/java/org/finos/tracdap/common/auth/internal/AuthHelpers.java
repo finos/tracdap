@@ -44,12 +44,6 @@ public class AuthHelpers {
             HttpHeaderNames.SET_COOKIE.toString());
 
     public static <THeaders extends Headers<CharSequence, CharSequence, THeaders>>
-    String findTracAuthToken(THeaders headers) {
-
-        return findTracAuthToken(headers, SERVER_COOKIE);
-    }
-
-    public static <THeaders extends Headers<CharSequence, CharSequence, THeaders>>
     String findTracAuthToken(THeaders headers, boolean cookieDirection) {
 
         var rawToken = findRawAuthToken(headers, cookieDirection);

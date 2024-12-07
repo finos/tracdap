@@ -195,7 +195,7 @@ public class Http1LoginHandler extends ChannelInboundHandlerAdapter {
     private void processRefresh(ChannelHandlerContext ctx, HttpRequest request) {
 
         var headers = Http1Headers.wrapHttpHeaders(request.headers());
-        var token = AuthHelpers.findTracAuthToken(headers);
+        var token = AuthHelpers.findTracAuthToken(headers, AuthHelpers.SERVER_COOKIE);
         var session = (token != null) ? jwtProcessor.decodeAndValidate(token) : null;
 
         if (session != null && session.isValid()) {
