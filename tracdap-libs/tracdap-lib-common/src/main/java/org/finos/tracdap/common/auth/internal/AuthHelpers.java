@@ -68,23 +68,19 @@ public class AuthHelpers {
     private static <THeaders extends Headers<CharSequence, CharSequence, THeaders>>
     String findRawAuthToken(THeaders headers, boolean cookieDirection) {
 
+        var authorizationHeader = headers.get(HttpHeaderNames.AUTHORIZATION.toString());
+
+        if (authorizationHeader != null)
+            return authorizationHeader.toString();
+
         var tracAuthHeader = headers.get(AuthConstants.TRAC_AUTH_TOKEN);
 
         if (tracAuthHeader != null)
             return tracAuthHeader.toString();
 
         var cookies = extractCookies(headers, cookieDirection);
-        var tracAuthCookie = findCookie(cookies, AuthConstants.TRAC_AUTH_TOKEN);
 
-        if (tracAuthCookie != null)
-            return tracAuthCookie;
-
-        var authorizationHeader = headers.get(HttpHeaderNames.AUTHORIZATION.toString());
-
-        if (authorizationHeader != null)
-            return authorizationHeader.toString();
-
-        return findCookie(cookies, HttpHeaderNames.AUTHORIZATION.toString());
+        return findAuthCookie(cookies);
     }
 
     private static <THeaders extends Headers<CharSequence, CharSequence, THeaders>>
@@ -94,16 +90,23 @@ public class AuthHelpers {
         var cookieHeaders = headers.getAll(cookieHeader);
         var cookies = new ArrayList<Cookie>();
 
-        for (var header : cookieHeaders)
-            cookies.addAll(ServerCookieDecoder.LAX.decodeAll(header.toString()));
+        if (cookieDirection == CLIENT_COOKIE) {
+            for (var header : cookieHeaders) {
+                cookies.add(ClientCookieDecoder.STRICT.decode(header.toString()));
+            }
+        }
+        else {
+            for (var header : cookieHeaders)
+                cookies.addAll(ServerCookieDecoder.STRICT.decode(header.toString()));
+        }
 
         return cookies;
     }
 
-    private static String findCookie(List<Cookie> cookies, String cookieName) {
+    private static String findAuthCookie(List<Cookie> cookies) {
 
         for (var cookie : cookies) {
-            if (cookie.name().equals(cookieName)) {
+            if (cookie.name().equals(AuthConstants.TRAC_AUTH_TOKEN)) {
                 return cookie.value();
             }
         }
@@ -137,71 +140,44 @@ public class AuthHelpers {
             return true;
 
         var serverCookies = extractCookies(headers, SERVER_COOKIE);
-        var authCookie = findCookie(serverCookies, AuthConstants.TRAC_AUTH_TOKEN);
+        var authCookie = findAuthCookie(serverCookies);
 
         return authCookie != null;
     }
 
     public static <THeaders extends Headers<CharSequence, CharSequence, THeaders>>
-    THeaders setPlatformAuthHeaders(THeaders headers, THeaders emptyHeaders, String token) {
+    void removeAuthHeaders(THeaders headers, boolean cookieDirection) {
 
-        var filtered = removeAuthHeaders(headers, emptyHeaders, SERVER_COOKIE);
+        var originalCookies = extractCookies(headers, cookieDirection);
+        var cookies = filterCookies(originalCookies);
 
-        return addPlatformAuthHeaders(filtered, token);
-    }
-
-    public static <THeaders extends Headers<CharSequence, CharSequence, THeaders>>
-    THeaders setClientAuthHeaders(
-            THeaders headers, THeaders emptyHeaders,
-            String token, SessionInfo session, boolean wantCookies) {
-
-        var filtered = removeAuthHeaders(headers, emptyHeaders, CLIENT_COOKIE);
-
-        if (wantCookies)
-            return addClientAuthCookies(filtered, token, session);
-        else
-            return addClientAuthHeaders(filtered, token, session);
-    }
-
-    private static <THeaders extends Headers<CharSequence, CharSequence, THeaders>>
-    THeaders removeAuthHeaders(THeaders headers, THeaders emptyHeaders, boolean cookieDirection) {
-
-        var cookies = extractCookies(headers, cookieDirection);
-
-        var filteredHeaders = filterHeaders(headers, emptyHeaders);
-        var filteredCookies = filterCookies(cookies);
+        filterHeaders(headers);
 
         var cookieHeader = cookieDirection == CLIENT_COOKIE ? HttpHeaderNames.SET_COOKIE : HttpHeaderNames.COOKIE;
 
-        for (var cookie : filteredCookies) {
-            filteredHeaders.add(cookieHeader, ServerCookieEncoder.STRICT.encode(cookie));
+        for (var cookie : cookies) {
+            headers.add(cookieHeader, ServerCookieEncoder.STRICT.encode(cookie));
         }
-
-        return filteredHeaders;
     }
 
     private static <THeaders extends Headers<CharSequence, CharSequence, THeaders>>
-    THeaders filterHeaders(THeaders headers, THeaders newHeaders) {
+    void filterHeaders(THeaders headers) {
 
         for (var header : headers) {
 
             var headerName = header.getKey().toString().toLowerCase();
 
             if (headerName.startsWith(TRAC_AUTH_PREFIX) || headerName.startsWith(TRAC_USER_PREFIX))
-                continue;
+                headers.remove(headerName);
 
             if (RESTRICTED_HEADERS.contains(headerName))
-                continue;
-
-            newHeaders.add(header.getKey(), header.getValue());
+                headers.remove(headerName);
         }
-
-        return newHeaders;
     }
 
     private static List<Cookie> filterCookies(List<Cookie> cookies) {
 
-        var filtered = new ArrayList<Cookie>();
+        var filteredCookies = new ArrayList<Cookie>(cookies.size());
 
         for (var cookie : cookies) {
 
@@ -213,24 +189,22 @@ public class AuthHelpers {
             if (RESTRICTED_HEADERS.contains(cookieName))
                 continue;
 
-            filtered.add(cookie);
+            filteredCookies.add(cookie);
         }
 
-        return filtered;
+        return filteredCookies;
     }
 
-    private static <THeaders extends Headers<CharSequence, CharSequence, THeaders>>
-    THeaders addPlatformAuthHeaders(THeaders headers, String token) {
+    public static <THeaders extends Headers<CharSequence, CharSequence, THeaders>>
+    void addPlatformAuthHeaders(THeaders headers, String token) {
 
         // The platform only cares about the token, that is the definitive source of session info
 
         headers.add(AuthConstants.TRAC_AUTH_TOKEN_HEADER, token);
-
-        return headers;
     }
 
     public static <THeaders extends Headers<CharSequence, CharSequence, THeaders>>
-    THeaders addClientAuthHeaders(THeaders headers, String token, SessionInfo session) {
+    void addClientAuthHeaders(THeaders headers, String token, SessionInfo session) {
 
         // For API calls send session info back in headers, these come through as gRPC metadata
         // The web API package will use JavaScript to store these as cookies (cookies get lost over grpc-web)
@@ -247,12 +221,10 @@ public class AuthHelpers {
         headers.add(AuthConstants.TRAC_AUTH_EXPIRY_HEADER, expiry);
         headers.add(AuthConstants.TRAC_USER_ID_HEADER, userId);
         headers.add(AuthConstants.TRAC_USER_NAME_HEADER, userName);
-
-        return headers;
     }
 
     public static <THeaders extends Headers<CharSequence, CharSequence, THeaders>>
-    THeaders addClientAuthCookies(THeaders headers, String token, SessionInfo session) {
+    void addClientAuthCookies(THeaders headers, String token, SessionInfo session) {
 
         // For browser requests, send the session info back as cookies, this is by far the easiest approach
         // The web API package will look for a valid auth token cookie and send it as a header if available
@@ -269,8 +241,6 @@ public class AuthHelpers {
         setClientCookie(headers, AuthConstants.TRAC_AUTH_EXPIRY_HEADER, expiry, session.getExpiryTime(), false);
         setClientCookie(headers, AuthConstants.TRAC_USER_ID_HEADER, userId, session.getExpiryTime(), false);
         setClientCookie(headers, AuthConstants.TRAC_USER_NAME_HEADER, userName, session.getExpiryTime(), false);
-
-        return headers;
     }
 
     private static <THeaders extends Headers<CharSequence, CharSequence, THeaders>>
