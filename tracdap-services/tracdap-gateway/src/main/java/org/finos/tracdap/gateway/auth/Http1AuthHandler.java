@@ -530,7 +530,7 @@ public class Http1AuthHandler extends ChannelDuplexHandler {
 
         var userId = state.session.getUserInfo().getUserId();
 
-        log.info("TOKEN REFRESH: conn = {}, req = {}, user = {}", connId, reqId, userId);
+        log.info("NEW TOKEN REQUESTED: conn = {}, req = {}, user = {}", connId, reqId, userId);
     }
 
     private void logRefreshApplied(Future<String> refreshToken, RequestState state) {
@@ -539,8 +539,8 @@ public class Http1AuthHandler extends ChannelDuplexHandler {
         var expiry = state.session.getExpiryTime();
 
         if (refreshToken.isSuccess())
-            log.info("TOKEN APPLIED: conn = {}, req = {}, user = {}, expiry = {}", connId, reqId, userId, expiry);
+            log.info("NEW TOKEN APPLIED: conn = {}, req = {}, user = {}, expiry = {}", connId, reqId, userId, expiry);
         else
-            log.warn("TOKEN REFRESH FAILED: conn = {}, req = {}, user = {}, {}", connId, reqId, userId, refreshToken.cause());
+            log.warn("NEW TOKEN REQUEST FAILED: conn = {}, req = {}, user = {}, {}", connId, reqId, userId, refreshToken.cause());
     }
 }
