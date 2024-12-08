@@ -17,11 +17,11 @@
 
 package org.finos.tracdap.gateway.builders;
 
-import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.util.RoutingUtils;
 import org.finos.tracdap.config.*;
 import org.finos.tracdap.gateway.exec.IRouteMatcher;
 import org.finos.tracdap.gateway.exec.Route;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -92,17 +92,14 @@ public class RouteBuilder {
 
     private Route buildGrpcServiceRoute(PlatformConfig platformConfig, ServiceInfo serviceInfo) {
 
-        if (serviceInfo.descriptor == null)
-            throw new EUnexpected();
-
         var routeIndex = nextRouteIndex++;
-        var routeName = serviceInfo.serviceName;
+        var routeName = serviceInfo.serviceName();
         var routeType = RoutingProtocol.GRPC;
 
-        var grpcPath = '/' + serviceInfo.descriptor.getFullName() + "/";
+        var grpcPath = '/' + serviceInfo.descriptor().getFullName() + "/";
         var matcher = (IRouteMatcher) (method, url) -> url.getPath().startsWith(grpcPath);
         var protocols = List.of(RoutingProtocol.GRPC, RoutingProtocol.GRPC_WEB);
-        var routing = RoutingUtils.serviceTarget(platformConfig, serviceInfo.serviceKey);
+        var routing = RoutingUtils.serviceTarget(platformConfig, serviceInfo.serviceKey());
 
         var match = RoutingMatch.newBuilder()
                 .setPath(grpcPath);
@@ -125,20 +122,17 @@ public class RouteBuilder {
 
     private Route buildRestServiceRoute(PlatformConfig platformConfig, ServiceInfo serviceInfo) {
 
-        if (serviceInfo.descriptor == null || serviceInfo.restPrefix == null)
-            throw new EUnexpected();
-
         var routeIndex = nextRouteIndex++;
-        var routeName = serviceInfo.serviceName;
+        var routeName = serviceInfo.serviceName();
         var routeType = RoutingProtocol.REST;
 
-        var restPath = serviceInfo.restPrefix;
+        var restPath = serviceInfo.restPrefix();
         var matcher = (IRouteMatcher) (method, url) -> url.getPath().startsWith(restPath);
         var protocols = List.of(RoutingProtocol.REST);
-        var routing = RoutingUtils.serviceTarget(platformConfig, serviceInfo.serviceKey);
+        var routing = RoutingUtils.serviceTarget(platformConfig, serviceInfo.serviceKey());
 
         var restMethodPrefix = restPath.endsWith("/") ? restPath.substring(0, restPath.length() - 1) : restPath;
-        var restMethods = RestApiBuilder.buildAllMethods(serviceInfo.descriptor, restMethodPrefix, API_CLASSLOADER);
+        var restMethods = RestApiBuilder.buildAllMethods(serviceInfo.descriptor(), restMethodPrefix, API_CLASSLOADER);
 
         var match = RoutingMatch.newBuilder()
                 .setPath(restPath);
@@ -161,17 +155,14 @@ public class RouteBuilder {
 
     private Route buildHttpServiceRoute(PlatformConfig platformConfig, ServiceInfo serviceInfo) {
 
-        if (serviceInfo.httpPrefix == null)
-            throw new EUnexpected();
-
         var routeIndex = nextRouteIndex++;
-        var routeName = serviceInfo.serviceName;
+        var routeName = serviceInfo.serviceName();
         var routeType = RoutingProtocol.HTTP;
 
-        var httpPath = serviceInfo.httpPrefix;
+        var httpPath = serviceInfo.httpPrefix();
         var matcher = (IRouteMatcher) (method, url) -> url.getPath().startsWith(httpPath);
         var protocols = List.of(RoutingProtocol.HTTP);
-        var routing = RoutingUtils.serviceTarget(platformConfig, serviceInfo.serviceKey);
+        var routing = RoutingUtils.serviceTarget(platformConfig, serviceInfo.serviceKey());
 
         var match = RoutingMatch.newBuilder()
                 .setPath(httpPath);

@@ -23,12 +23,14 @@ import org.finos.tracdap.common.util.RoutingUtils;
 import org.finos.tracdap.config.AuthenticationConfig;
 import org.finos.tracdap.config.PlatformConfig;
 import org.finos.tracdap.config.RoutingTarget;
+import org.finos.tracdap.gateway.builders.ServiceInfo;
 
 import java.time.Duration;
 
 
 public class AuthHandlerSettings {
 
+    public static final String PUBLIC_LOGIN_PREFIX = "/login/";
     public static final String RETURN_PATH_VARIABLE = "${returnPath}";
     public static final int REFRESH_TIMEOUT_MILLIS = 500;
 
@@ -47,16 +49,17 @@ public class AuthHandlerSettings {
         this.authTarget = RoutingUtils.serviceTarget(platformConfig, ConfigKeys.AUTHENTICATION_SERVICE_KEY);
         this.authConfig = platformConfig.getAuthentication();
 
-        // TODO: Get these from config and tie into routing setup
-        var authPrefix = "/trac-auth/";
-        var loginPrefix = "/login/";
+        var authServiceInfo = ServiceInfo.buildServiceInfo(platformConfig, ConfigKeys.AUTHENTICATION_SERVICE_KEY);
+        var authPrefix = authServiceInfo != null
+                ? authServiceInfo.httpPrefix()
+                : ServiceInfo.SERVICE_PREFIX_DEFAULTS.get(ConfigKeys.AUTHENTICATION_SERVICE_KEY);
 
         var loginPath = ConfigDefaults.readOrDefault(authConfig.getLoginPath(), ConfigDefaults.DEFAULT_LOGIN_PATH);
         var refreshPath = ConfigDefaults.readOrDefault(authConfig.getRefreshPath(), ConfigDefaults.DEFAULT_REFRESH_PATH);
         var returnPath = ConfigDefaults.readOrDefault(authConfig.getReturnPath(), ConfigDefaults.DEFAULT_RETURN_PATH);
         var jwtRefresh = ConfigDefaults.readOrDefault(authConfig.getJwtRefresh(), ConfigDefaults.DEFAULT_JWT_REFRESH);
 
-        this.publicLoginPrefix = joinPathSections(authPrefix, loginPrefix);
+        this.publicLoginPrefix = joinPathSections(authPrefix, PUBLIC_LOGIN_PREFIX);
         this.publicLoginUrl = joinPathSections(authPrefix, loginPath);
         this.publicReturnPath = returnPath;
         this.refreshPath = refreshPath;

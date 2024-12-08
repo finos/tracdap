@@ -17,7 +17,6 @@
 
 package org.finos.tracdap.gateway.builders;
 
-import com.google.protobuf.Descriptors;
 import org.finos.tracdap.api.Data;
 import org.finos.tracdap.api.Metadata;
 import org.finos.tracdap.api.Orchestrator;
@@ -27,6 +26,8 @@ import org.finos.tracdap.common.config.ServiceProperties;
 import org.finos.tracdap.common.exception.ETracInternal;
 import org.finos.tracdap.config.PlatformConfig;
 import org.finos.tracdap.config.ServiceConfig;
+
+import com.google.protobuf.Descriptors;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -49,48 +50,85 @@ public class ServiceInfo {
             Map.entry(ConfigKeys.ORCHESTRATOR_SERVICE_KEY, "/trac-orch/"),
             Map.entry(ConfigKeys.WEB_SERVER_SERVICE_KEY, "/trac-web/"));
 
+    private static final Map<String, Descriptors.ServiceDescriptor> SERVICE_DESCRIPTORS = Map.ofEntries(
+            Map.entry(ConfigKeys.METADATA_SERVICE_KEY, serviceDescriptor(Metadata.getDescriptor(), "TracMetadataApi")),
+            Map.entry(ConfigKeys.DATA_SERVICE_KEY, serviceDescriptor(Data.getDescriptor(), "TracDataApi")),
+            Map.entry(ConfigKeys.ORCHESTRATOR_SERVICE_KEY, serviceDescriptor(Orchestrator.getDescriptor(), "TracOrchestratorApi")));
+
     private static final String API_V1_PREFIX = "api/v1/";
 
-    final String serviceKey;
-    final String serviceName;
-    final ServiceConfig config;
-    final Descriptors.ServiceDescriptor descriptor;
+    private final String serviceKey;
+    private final String serviceName;
+    private final ServiceConfig config;
+    private final Descriptors.ServiceDescriptor descriptor;
 
-    final String httpPrefix;
-    final String restPrefix;
+    private final String httpPrefix;
+    private final String restPrefix;
 
     public static List<ServiceInfo> buildServiceInfo(PlatformConfig platformConfig) {
 
-        var defaultServiceConfig = ServiceConfig.newBuilder().setEnabled(false).build();
-
-        var authConfig = platformConfig.getServicesOrDefault(ConfigKeys.AUTHENTICATION_SERVICE_KEY, defaultServiceConfig);
-        var metaConfig = platformConfig.getServicesOrDefault(ConfigKeys.METADATA_SERVICE_KEY, defaultServiceConfig);
-        var dataConfig = platformConfig.getServicesOrDefault(ConfigKeys.DATA_SERVICE_KEY, defaultServiceConfig);
-        var orchConfig = platformConfig.getServicesOrDefault(ConfigKeys.ORCHESTRATOR_SERVICE_KEY, defaultServiceConfig);
-        var webConfig = platformConfig.getServicesOrDefault(ConfigKeys.WEB_SERVER_SERVICE_KEY, defaultServiceConfig);
-
-        var metaDescriptor = serviceDescriptor(Metadata.getDescriptor(), "TracMetadataApi");
-        var dataDescriptor = serviceDescriptor(Data.getDescriptor(), "TracDataApi");
-        var orchDescriptor = serviceDescriptor(Orchestrator.getDescriptor(), "TracOrchestratorApi");
-
         var services = new ArrayList<ServiceInfo>();
 
-        if (isEnabled(authConfig))
-            services.add(new ServiceInfo(ConfigKeys.AUTHENTICATION_SERVICE_KEY, authConfig));
-
-        if (isEnabled(metaConfig))
-            services.add(new ServiceInfo(ConfigKeys.METADATA_SERVICE_KEY, metaConfig, metaDescriptor, API_V1_PREFIX));
-
-        if (isEnabled(dataConfig))
-            services.add(new ServiceInfo(ConfigKeys.DATA_SERVICE_KEY, dataConfig, dataDescriptor, API_V1_PREFIX));
-
-        if (isEnabled(orchConfig))
-            services.add(new ServiceInfo(ConfigKeys.ORCHESTRATOR_SERVICE_KEY, orchConfig, orchDescriptor, API_V1_PREFIX));
-
-        if (isEnabled(webConfig))
-            services.add(new ServiceInfo(ConfigKeys.WEB_SERVER_SERVICE_KEY, webConfig));
+        for (var serviceKey : SERVICE_NAMES.keySet()) {
+            var serviceInfo = buildServiceInfo(platformConfig, serviceKey);
+            if (serviceInfo != null)
+                services.add(serviceInfo);
+        }
 
         return services;
+    }
+
+    public static ServiceInfo buildServiceInfo(PlatformConfig platformConfig, String serviceKey) {
+
+        var defaultServiceConfig = ServiceConfig.newBuilder().setEnabled(false).build();
+
+        var serviceConfig = platformConfig.getServicesOrDefault(serviceKey, defaultServiceConfig);
+
+        if (!isEnabled(serviceConfig))
+            return null;
+
+        if (SERVICE_DESCRIPTORS.containsKey(serviceKey)) {
+            var descriptor = SERVICE_DESCRIPTORS.get(serviceKey);
+            return new ServiceInfo(serviceKey, serviceConfig, descriptor, API_V1_PREFIX);
+        }
+        else
+            return new ServiceInfo(serviceKey, serviceConfig);
+    }
+
+    public boolean hasGrpc() {
+        return descriptor != null;
+    }
+
+    public boolean hasRest() {
+        return restPrefix != null;
+    }
+
+    public boolean hasHttp() {
+        return httpPrefix != null;
+    }
+
+    public String serviceKey() {
+        return serviceKey;
+    }
+
+    public String serviceName() {
+        return serviceName;
+    }
+
+    public ServiceConfig config() {
+        return config;
+    }
+
+    public Descriptors.ServiceDescriptor descriptor() {
+        return descriptor;
+    }
+
+    public String httpPrefix() {
+        return httpPrefix;
+    }
+
+    public String restPrefix() {
+        return restPrefix;
     }
 
     private static boolean isEnabled(ServiceConfig serviceConfig) {
@@ -145,17 +183,5 @@ public class ServiceInfo {
 
         this.httpPrefix = null;
         this.restPrefix = httpPrefix + restPrefix;
-    }
-
-    public boolean hasGrpc() {
-        return descriptor != null;
-    }
-
-    public boolean hasRest() {
-        return restPrefix != null;
-    }
-
-    public boolean hasHttp() {
-        return httpPrefix != null;
     }
 }
