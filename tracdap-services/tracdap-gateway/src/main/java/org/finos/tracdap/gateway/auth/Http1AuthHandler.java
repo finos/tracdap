@@ -157,8 +157,10 @@ public class Http1AuthHandler extends ChannelDuplexHandler {
 
                 if (state.authenticated || state.isLogin)
                     translateRequestHeaders(request);
-                else
+                else {
                     sendFailResponse(ctx, request);
+                    ctx.close();
+                }
             }
 
             if (state.authenticated || state.isLogin) {
@@ -292,12 +294,15 @@ public class Http1AuthHandler extends ChannelDuplexHandler {
 
             var redirectResponse = new DefaultFullHttpResponse(request.protocolVersion(), HttpResponseStatus.TEMPORARY_REDIRECT);
             redirectResponse.headers().set(HttpHeaderNames.LOCATION, loginRedirect);
+            redirectResponse.headers().set(HttpHeaderNames.CONNECTION, "close");
 
             ctx.writeAndFlush(redirectResponse);
         }
         else {
 
             var unauthorizedResponse = new DefaultFullHttpResponse(request.protocolVersion(), HttpResponseStatus.UNAUTHORIZED);
+            unauthorizedResponse.headers().set(HttpHeaderNames.CONNECTION, "close");
+
             ctx.writeAndFlush(unauthorizedResponse);
         }
     }
