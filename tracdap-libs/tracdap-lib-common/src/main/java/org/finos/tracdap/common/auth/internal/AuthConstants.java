@@ -30,7 +30,7 @@ public class AuthConstants {
     public static final String TRAC_DELEGATE = "trac-auth-delegate";
 
     public static final String TRAC_AUTH_TOKEN_HEADER = TRAC_AUTH_TOKEN;
-    public static final String TRAC_AUTH_EXPIRY_HEADER = "trac-auth-expiry-utc";
+    public static final String TRAC_AUTH_EXPIRY_HEADER = "trac-auth-expiry";
     public static final String TRAC_AUTH_COOKIES_HEADER = "trac-auth-cookies";
     public static final String TRAC_USER_ID_HEADER = "trac-user-id";
     public static final String TRAC_USER_NAME_HEADER = "trac-user-name";
