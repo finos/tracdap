@@ -79,7 +79,7 @@ jobs:
           
           echo SECRET_KEY=xHjFeFlo$k= >> etc/env.sh
           sed -i "s#/path/to#${deploy_dir}#g" etc/trac-platform.yaml
-          sed -i "s#authentication:#authentication:\n  disableAuth: true#g" etc/trac-platform.yaml
+          sed -i "s#authentication:#authentication:\n  disableAuth: true#" etc/trac-platform.yaml
           
           bin/secret-tool run --task init_secrets
           bin/secret-tool run --task create_root_auth_key EC 256
