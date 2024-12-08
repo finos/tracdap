@@ -87,7 +87,7 @@ jobCache:
 
 webServer:
 
-  # To use the TRAC web server, set the enabled flag and uncomment the configuration
+  # To use the TRAC web server, enable the service below and add a content root
 
   enabled: false
 
@@ -111,12 +111,12 @@ gateway:
 
 #  routes:
 #
-#    - routeName: Local Web Server
+#    - routeName: Local Development Server
 #      routeType: HTTP
 #
 #      match:
 #        host: localhost
-#        path: /local/app
+#        path: /local=app/
 #
 #      target:
 #        scheme: http
@@ -144,7 +144,7 @@ services:
     port: 8084
 
   webServer:
-    port: 9000
+    enabled: false
 
 
 deployment:
