@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.auth.internal;
+package org.finos.tracdap.common.auth;
 
 import org.finos.tracdap.auth.login.SessionBuilder;
 import org.finos.tracdap.common.exception.EStartup;

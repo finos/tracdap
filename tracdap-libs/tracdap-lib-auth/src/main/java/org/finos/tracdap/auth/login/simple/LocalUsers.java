@@ -17,7 +17,7 @@
 
 package org.finos.tracdap.auth.login.simple;
 
-import org.finos.tracdap.common.auth.internal.UserInfo;
+import org.finos.tracdap.common.auth.UserInfo;
 import org.finos.tracdap.common.config.CryptoHelpers;
 import org.finos.tracdap.common.exception.EAuthorization;
 import org.slf4j.Logger;

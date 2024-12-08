@@ -18,7 +18,7 @@
 package org.finos.tracdap.auth.login.simple;
 
 import org.finos.tracdap.auth.login.*;
-import org.finos.tracdap.common.auth.internal.UserInfo;
+import org.finos.tracdap.common.auth.UserInfo;
 import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.common.http.CommonHttpRequest;
 

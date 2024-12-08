@@ -18,8 +18,8 @@
 package org.finos.tracdap.svc.auth;
 
 
-import org.finos.tracdap.common.auth.internal.JwtSetup;
-import org.finos.tracdap.common.auth.internal.JwtValidator;
+import org.finos.tracdap.common.auth.JwtSetup;
+import org.finos.tracdap.common.auth.JwtValidator;
 import org.finos.tracdap.test.helpers.CloseWrapper;
 import org.finos.tracdap.test.helpers.PlatformTest;
 

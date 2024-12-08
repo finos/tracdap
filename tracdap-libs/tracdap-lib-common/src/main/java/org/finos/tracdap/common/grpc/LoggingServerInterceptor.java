@@ -18,7 +18,7 @@
 package org.finos.tracdap.common.grpc;
 
 import io.grpc.*;
-import org.finos.tracdap.common.auth.internal.GrpcAuthHelpers;
+import org.finos.tracdap.common.auth.GrpcAuthHelpers;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

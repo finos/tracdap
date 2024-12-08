@@ -17,8 +17,8 @@
 
 package org.finos.tracdap.webserver;
 
-import org.finos.tracdap.common.auth.internal.Http1AuthValidator;
-import org.finos.tracdap.common.auth.internal.JwtValidator;
+import org.finos.tracdap.common.auth.Http1AuthValidator;
+import org.finos.tracdap.common.auth.JwtValidator;
 import org.finos.tracdap.common.netty.BaseProtocolNegotiator;
 import org.finos.tracdap.config.AuthenticationConfig;
 import org.finos.tracdap.config.PlatformConfig;

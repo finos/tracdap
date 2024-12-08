@@ -17,7 +17,7 @@
 
 package org.finos.tracdap.webserver;
 
-import org.finos.tracdap.common.auth.internal.JwtSetup;
+import org.finos.tracdap.common.auth.JwtSetup;
 import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.exception.EStartup;

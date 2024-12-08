@@ -18,9 +18,9 @@
 package org.finos.tracdap.svc.orch;
 
 import org.finos.tracdap.api.internal.TrustedMetadataApiGrpc;
-import org.finos.tracdap.common.auth.internal.InternalAuthProvider;
-import org.finos.tracdap.common.auth.internal.JwtSetup;
-import org.finos.tracdap.common.auth.internal.GrpcAuthValidator;
+import org.finos.tracdap.common.auth.InternalAuthProvider;
+import org.finos.tracdap.common.auth.JwtSetup;
+import org.finos.tracdap.common.auth.GrpcAuthValidator;
 import org.finos.tracdap.common.cache.IJobCacheManager;
 import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.config.ConfigManager;

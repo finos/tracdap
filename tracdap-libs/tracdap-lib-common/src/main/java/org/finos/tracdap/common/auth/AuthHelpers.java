@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.auth.internal;
+package org.finos.tracdap.common.auth;
 
 import io.netty.handler.codec.Headers;
 import io.netty.handler.codec.http.HttpHeaderNames;

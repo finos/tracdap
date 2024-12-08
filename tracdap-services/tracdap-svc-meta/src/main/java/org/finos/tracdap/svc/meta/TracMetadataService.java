@@ -17,8 +17,8 @@
 
 package org.finos.tracdap.svc.meta;
 
-import org.finos.tracdap.common.auth.internal.JwtSetup;
-import org.finos.tracdap.common.auth.internal.GrpcAuthValidator;
+import org.finos.tracdap.common.auth.JwtSetup;
+import org.finos.tracdap.common.auth.GrpcAuthValidator;
 import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.exception.EStartup;

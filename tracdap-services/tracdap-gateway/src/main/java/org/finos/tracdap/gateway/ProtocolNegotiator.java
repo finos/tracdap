@@ -17,7 +17,7 @@
 
 package org.finos.tracdap.gateway;
 
-import org.finos.tracdap.common.auth.internal.JwtValidator;
+import org.finos.tracdap.common.auth.JwtValidator;
 import org.finos.tracdap.common.config.ConfigHelpers;
 import org.finos.tracdap.common.config.ServiceProperties;
 import org.finos.tracdap.common.netty.BaseProtocolNegotiator;

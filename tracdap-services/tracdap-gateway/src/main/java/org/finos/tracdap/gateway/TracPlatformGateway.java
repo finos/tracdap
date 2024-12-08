@@ -19,7 +19,7 @@ package org.finos.tracdap.gateway;
 
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.config.PlatformConfig;
-import org.finos.tracdap.common.auth.internal.JwtSetup;
+import org.finos.tracdap.common.auth.JwtSetup;
 import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.exception.EStartup;

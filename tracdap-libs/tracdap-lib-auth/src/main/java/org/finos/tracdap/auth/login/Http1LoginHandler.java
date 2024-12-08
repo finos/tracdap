@@ -17,9 +17,9 @@
 
 package org.finos.tracdap.auth.login;
 
-import org.finos.tracdap.common.auth.internal.AuthHelpers;
-import org.finos.tracdap.common.auth.internal.JwtProcessor;
-import org.finos.tracdap.common.auth.internal.SessionInfo;
+import org.finos.tracdap.common.auth.AuthHelpers;
+import org.finos.tracdap.common.auth.JwtProcessor;
+import org.finos.tracdap.common.auth.SessionInfo;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.http.CommonHttpResponse;
 import org.finos.tracdap.common.http.Http1Headers;

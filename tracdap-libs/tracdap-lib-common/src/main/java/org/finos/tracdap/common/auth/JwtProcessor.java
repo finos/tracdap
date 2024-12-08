@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.auth.internal;
+package org.finos.tracdap.common.auth;
 
 import com.auth0.jwt.HeaderParams;
 import com.auth0.jwt.JWT;
