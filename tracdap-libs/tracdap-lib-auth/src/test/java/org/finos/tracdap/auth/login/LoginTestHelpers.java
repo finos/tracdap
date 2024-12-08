@@ -17,6 +17,7 @@
 
 package org.finos.tracdap.auth.login;
 
+import io.netty.handler.codec.http.HttpRequest;
 import org.finos.tracdap.common.netty.BaseProtocolNegotiator;
 import org.finos.tracdap.common.netty.NettyHelpers;
 
@@ -110,12 +111,12 @@ public class LoginTestHelpers {
         }
 
         @Override
-        protected ChannelHandler wsPrimaryHandler() {
+        protected WebSocketServerProtocolConfig wsProtocolConfig(HttpRequest upgradeRequest) {
             return null;
         }
 
         @Override
-        protected WebSocketServerProtocolConfig wsProtocolConfig() {
+        protected ChannelHandler wsPrimaryHandler() {
             return null;
         }
     }
