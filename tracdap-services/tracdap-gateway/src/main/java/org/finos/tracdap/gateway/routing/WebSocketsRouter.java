@@ -265,7 +265,7 @@ public class WebSocketsRouter extends CoreRouter {
         if (!firstMessageReceived) {
 
             var uri = URI.create(upgradeUri);
-            var route = lookupRoute(uri, HttpMethod.POST, 1);
+            var route = lookupRoute(uri, HttpMethod.POST, 0);
 
             // Report an error in websockets if the route is not found
             if (route == null) {

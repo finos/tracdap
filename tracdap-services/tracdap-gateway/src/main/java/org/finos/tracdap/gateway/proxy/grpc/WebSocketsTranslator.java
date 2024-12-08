@@ -131,6 +131,12 @@ public class WebSocketsTranslator extends Http2ChannelDuplexHandler {
             log.trace("conn = {}, outbound headers frame: size = [{}], {}", connId, frameSize, headers);
 
         var headersFrame = new DefaultHttp2HeadersFrame(headers).stream(requestStream);
+
+        // Stream ID is not available until the first frame is written to the HTTP/2 codec
+        promise.addListener(f ->
+                log.info("TRANSLATE: conn = {}, stream = {}, gRPC-WebSockets {}",
+                connId, requestStream.id(), headers.get(":path")));
+
         ctx.write(headersFrame, promise);
     }
 
