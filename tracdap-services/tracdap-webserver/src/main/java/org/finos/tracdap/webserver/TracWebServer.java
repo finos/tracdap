@@ -73,8 +73,11 @@ public class TracWebServer extends CommonServiceBase {
     protected void doStartup(Duration startupTimeout) throws InterruptedException {
 
         var platformConfig = configManager.loadRootConfigObject(PlatformConfig.class);
+        var serviceConfig = platformConfig.containsServices(ConfigKeys.WEB_SERVER_SERVICE_KEY)
+            ? platformConfig.getServicesOrThrow(ConfigKeys.WEB_SERVER_SERVICE_KEY)
+            : null;
 
-        if (!platformConfig.hasWebServer() || !platformConfig.getWebServer().getEnabled()) {
+        if (serviceConfig == null || (serviceConfig.hasEnabled() && !serviceConfig.getEnabled())) {
 
             var msg = "Web server is not enabled in the TRAC platform configuration";
             log.error(msg);

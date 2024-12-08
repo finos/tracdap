@@ -44,9 +44,9 @@ message PlatformConfig {
 
   map<string, TenantConfig> tenants = 10;
 
-  optional WebServerConfig webServer = 11;
+  WebServerConfig webServer = 11;
 
-  optional GatewayConfig gateway = 13;
+  GatewayConfig gateway = 13;
 
   map<string, ServiceConfig> services = 4;
 
@@ -71,7 +71,9 @@ message TenantConfig {
 
 message WebServerConfig {
 
-  bool enabled = 1;
+  // Setting removed, use service config instead
+  reserved "enabled";
+  reserved 1;
 
   PluginConfig contentRoot = 3;
   repeated WebServerRewriteRule rewriteRules = 4;
