@@ -46,7 +46,7 @@ public class WebSocketsRouter extends CoreRouter {
 
     private static final String WEBSOCKETS_PROTOCOL = "websockets";
     private static final Duration CLOSE_ON_ERROR_TIMEOUT = Duration.ofSeconds(5);
-    private static final String TRAC_HEADER_PREFIX = "trac_";
+    private static final String TRAC_HEADER_PREFIX = "trac-";
 
     private static final ThreadLocal<Logger> logMap = new ThreadLocal<>();
     private final Logger log = LoggingHelpers.threadLocalLogger(this, logMap);
