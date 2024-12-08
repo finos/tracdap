@@ -59,4 +59,16 @@ public class LoggingHelpers {
 
         return log;
     }
+
+    public static Logger threadLocalLogger(Class<?> clazz, ThreadLocal<Logger> logMap) {
+
+        var log = logMap.get();
+
+        if (log == null) {
+            log = LoggerFactory.getLogger(clazz);
+            logMap.set(log);
+        }
+
+        return log;
+    }
 }

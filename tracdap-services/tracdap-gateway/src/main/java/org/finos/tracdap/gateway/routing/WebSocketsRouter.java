@@ -80,7 +80,8 @@ public class WebSocketsRouter extends CoreRouter {
             upgradeHeaders = handshake.requestHeaders();
             upgradeComplete = true;
 
-            log.info("conn = {}, websockets handshake complete, sub-protocol = [{}]", connId, handshake.selectedSubprotocol());
+            if (log.isDebugEnabled())
+                log.debug("conn = {}, websockets handshake complete, sub-protocol = [{}]", connId, handshake.selectedSubprotocol());
 
             if (log.isTraceEnabled()) {
                 log.trace("conn = {}, handshake headers: {}", connId, handshake.requestHeaders().toString());
@@ -339,8 +340,8 @@ public class WebSocketsRouter extends CoreRouter {
         // If both sides have sent a close frame already, then ok to close immediately
         if (closeFrameSent) {
 
-            log.info("conn = {}, received close response, code = [{}]: {}",
-                    connId, frame.statusCode(), frame.reasonText());
+            if (log.isDebugEnabled())
+                log.debug("conn = {}, received close response, code = [{}]: {}", connId, frame.statusCode(), frame.reasonText());
 
             ctx.close();
         }
@@ -348,14 +349,14 @@ public class WebSocketsRouter extends CoreRouter {
         // Otherwise this is a new request, send the response frame before closing the channel
         else {
 
-            log.info("conn = {}, received close request, code = [{}]: {}",
-                    connId, frame.statusCode(), frame.reasonText());
+            if (log.isDebugEnabled())
+                log.debug("conn = {}, received close request, code = [{}]: {}", connId, frame.statusCode(), frame.reasonText());
 
             var closeResponse = new CloseWebSocketFrame(frame.statusCode(), frame.reasonText());
             var closePromise = ctx.newPromise();
 
-            log.info("conn = {}, sending close response, code = [{}]: {}",
-                    connId, frame.statusCode(), frame.reasonText());
+            if (log.isDebugEnabled())
+                log.debug("conn = {}, sending close response, code = [{}]: {}", connId, frame.statusCode(), frame.reasonText());
 
             closeFrameSent = true;
 
@@ -379,14 +380,13 @@ public class WebSocketsRouter extends CoreRouter {
 
         if (closeFrameSent) {
 
-            log.warn("conn = {}, ignoring duplicate outbound close request [{}]: {}",
-                    connId, frame.statusCode(), frame.reasonText());
+            log.warn("conn = {}, ignoring duplicate outbound close request [{}]: {}", connId, frame.statusCode(), frame.reasonText());
         }
 
         else {
 
-            log.info("conn = {}, sending close request, code = [{}]: {}",
-                    connId, frame.statusCode(), frame.reasonText());
+            if (log.isDebugEnabled())
+                log.debug("conn = {}, sending close request, code = [{}]: {}", connId, frame.statusCode(), frame.reasonText());
 
             ReferenceCountUtil.retain(frame);
             closeFrameSent = true;
