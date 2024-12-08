@@ -22,15 +22,7 @@ platformInfo:
   production: false
 
 authentication:
-
-  jwtIssuer: http://localhost:8080/
-  jwtExpiry: 7200
-
-  provider:
-    protocol: guest
-    properties:
-      userId: guest
-      userName: Guest User
+  disableAuth: true
 
 gateway:
 
@@ -98,12 +90,14 @@ gateway:
 services:
   gateway:
     port: 8080
-  metadata:
+  authentication:
     port: 8081
-  data:
+  metadata:
     port: 8082
-  orchestrator:
+  data:
     port: 8083
+  orchestrator:
+    port: 8084
 
 
 deployment:

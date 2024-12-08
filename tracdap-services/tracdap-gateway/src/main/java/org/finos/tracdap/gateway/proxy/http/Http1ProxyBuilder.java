@@ -17,26 +17,27 @@
 
 package org.finos.tracdap.gateway.proxy.http;
 
+import org.finos.tracdap.common.util.LoggingHelpers;
 import org.finos.tracdap.config.RouteConfig;
 
 import io.netty.channel.*;
 import io.netty.handler.codec.http.HttpClientCodec;
 import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 public class Http1ProxyBuilder extends ChannelInitializer<Channel> {
 
-    private final Logger log = LoggerFactory.getLogger(getClass());
+    private static final ThreadLocal<Logger> logMap = new ThreadLocal<>();
+    private final Logger log = LoggingHelpers.threadLocalLogger(this, logMap);
 
     private final RouteConfig routeConfig;
     ChannelDuplexHandler routerLink;
-    private final int connId;
+    private final long connId;
 
     public Http1ProxyBuilder(
             RouteConfig routeConfig,
             ChannelDuplexHandler routerLink,
-            int connId) {
+            long connId) {
 
         this.routeConfig = routeConfig;
         this.routerLink = routerLink;
@@ -46,11 +47,12 @@ public class Http1ProxyBuilder extends ChannelInitializer<Channel> {
     @Override
     protected void initChannel(Channel channel) {
 
-        log.info("conn = {}, Init HTTP/1.1 proxy channel", connId);
+        if (log.isDebugEnabled())
+            log.debug("conn = {}, Init HTTP/1.1 proxy channel", connId);
 
         var pipeline = channel.pipeline();
         pipeline.addLast(new HttpClientCodec());
-        pipeline.addLast(new Http1Proxy(routeConfig));
+        pipeline.addLast(new Http1Proxy(routeConfig, connId));
         pipeline.addLast(routerLink);
     }
 }

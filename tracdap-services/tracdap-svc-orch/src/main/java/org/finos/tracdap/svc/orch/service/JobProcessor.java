@@ -22,8 +22,8 @@ import org.finos.tracdap.api.JobStatus;
 import org.finos.tracdap.api.MetadataWriteRequest;
 import org.finos.tracdap.api.internal.RuntimeJobStatus;
 import org.finos.tracdap.api.internal.TrustedMetadataApiGrpc.TrustedMetadataApiBlockingStub;
-import org.finos.tracdap.common.auth.internal.AuthHelpers;
-import org.finos.tracdap.common.auth.internal.InternalAuthProvider;
+import org.finos.tracdap.common.auth.GrpcAuthHelpers;
+import org.finos.tracdap.common.auth.InternalAuthProvider;
 import org.finos.tracdap.common.cache.CacheEntry;
 import org.finos.tracdap.common.exception.*;
 import org.finos.tracdap.common.exec.*;
@@ -89,7 +89,7 @@ public class JobProcessor {
 
         var jobState = new JobState();
         jobState.tenant = request.getTenant();
-        jobState.owner = AuthHelpers.currentUser();
+        jobState.owner = GrpcAuthHelpers.currentUser();
 
         jobState.jobType = request.getJob().getJobType();
         jobState.definition = request.getJob();

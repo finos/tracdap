@@ -19,12 +19,14 @@ package org.finos.tracdap.gateway.proxy.http;
 
 import io.netty.util.ReferenceCountUtil;
 import org.finos.tracdap.common.exception.EUnexpected;
+import org.finos.tracdap.common.util.LoggingHelpers;
 import org.finos.tracdap.config.RouteConfig;
 
 import io.netty.channel.ChannelDuplexHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPromise;
 import io.netty.handler.codec.http.*;
+import org.slf4j.Logger;
 
 import javax.annotation.Nonnull;
 import java.net.URI;
@@ -34,15 +36,22 @@ import java.util.List;
 
 public class Http1Proxy extends ChannelDuplexHandler {
 
+    private static final ThreadLocal<Logger> logMap = new ThreadLocal<>();
+    private final Logger log = LoggingHelpers.threadLocalLogger(this, logMap);
+
     private final RouteConfig routeConfig;
+    private final long connId;
 
     private final String sourcePrefix;
     private final String targetPrefix;
 
+    private long seqId = -1;
 
-    public Http1Proxy(RouteConfig routeConfig) {
+
+    public Http1Proxy(RouteConfig routeConfig, long connId) {
 
         this.routeConfig = routeConfig;
+        this.connId = connId;
 
         // For now, route translation is a simple string replace
         // No wild-card matching, regex etc.
@@ -68,8 +77,12 @@ public class Http1Proxy extends ChannelDuplexHandler {
 
             if (msg instanceof HttpRequest) {
 
+                seqId++;
+
                 var sourceRequest = (HttpRequest) msg;
                 var targetRequest = proxyRequest(sourceRequest);
+
+                logRequest(targetRequest);
 
                 ctx.write(targetRequest, promise);
             }
@@ -94,6 +107,8 @@ public class Http1Proxy extends ChannelDuplexHandler {
 
                 var serverResponse = (HttpResponse) msg;
                 var proxyResponse = proxyResponse(serverResponse);
+
+                logResponse(serverResponse);
 
                 ctx.fireChannelRead(proxyResponse);
             }
@@ -121,6 +136,9 @@ public class Http1Proxy extends ChannelDuplexHandler {
             throw new EUnexpected();
 
         var targetPath = sourcePath.replaceFirst(this.sourcePrefix, this.targetPrefix);
+        var targetUri = sourceUri.getRawQuery() != null
+                ? targetPath + "?" + sourceUri.getRawQuery()
+                : targetPath;
 
         var targetHeaders = new DefaultHttpHeaders();
         targetHeaders.add(sourceRequest.headers());
@@ -140,7 +158,7 @@ public class Http1Proxy extends ChannelDuplexHandler {
             return new DefaultFullHttpRequest(
                     sourceRequest.protocolVersion(),
                     sourceRequest.method(),
-                    targetPath,
+                    targetUri,
                     fullContent,
                     targetHeaders,
                     fullRequest.trailingHeaders());
@@ -150,7 +168,7 @@ public class Http1Proxy extends ChannelDuplexHandler {
             return new DefaultHttpRequest(
                     sourceRequest.protocolVersion(),
                     sourceRequest.method(),
-                    targetPath,
+                    targetUri,
                     targetHeaders);
         }
     }
@@ -249,5 +267,21 @@ public class Http1Proxy extends ChannelDuplexHandler {
         // For redirects outside the proxy target, return the unaltered location from the source server
         // This could be e.g. a redirect to a totally different domain
         return location;
+    }
+
+    private void logRequest(HttpRequest request) {
+
+        log.info("HTTP REQUEST: conn = {}, seq = {}, {} {}",
+                connId, seqId,
+                request.method(),
+                request.uri());
+    }
+
+    private void logResponse(HttpResponse response) {
+
+        log.info("HTTP RESPONSE: conn = {}, seq = {}, status = {} ({})",
+                connId, seqId,
+                response.status().reasonPhrase(),
+                response.status().code());
     }
 }

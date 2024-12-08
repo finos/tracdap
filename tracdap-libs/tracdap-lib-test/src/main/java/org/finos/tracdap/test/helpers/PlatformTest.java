@@ -21,16 +21,17 @@ import org.finos.tracdap.api.TracDataApiGrpc;
 import org.finos.tracdap.api.TracMetadataApiGrpc;
 import org.finos.tracdap.api.TracOrchestratorApiGrpc;
 import org.finos.tracdap.api.internal.TrustedMetadataApiGrpc;
-import org.finos.tracdap.common.auth.internal.ClientAuthProvider;
-import org.finos.tracdap.common.auth.external.AuthLogic;
-import org.finos.tracdap.common.auth.internal.JwtSetup;
-import org.finos.tracdap.common.auth.internal.UserInfo;
+import org.finos.tracdap.auth.login.SessionBuilder;
+import org.finos.tracdap.common.auth.ClientAuthProvider;
+import org.finos.tracdap.common.auth.JwtSetup;
+import org.finos.tracdap.common.auth.UserInfo;
 import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.plugin.PluginManager;
 import org.finos.tracdap.common.startup.StandardArgs;
 import org.finos.tracdap.common.util.RoutingUtils;
 import org.finos.tracdap.config.PlatformConfig;
+import org.finos.tracdap.svc.auth.TracAuthenticationService;
 import org.finos.tracdap.tools.secrets.SecretTool;
 import org.finos.tracdap.tools.deploy.metadb.DeployMetaDB;
 import org.finos.tracdap.svc.data.TracDataService;
@@ -51,7 +52,6 @@ import org.junit.jupiter.api.extension.ExtensionContext;
 
 import java.io.File;
 import java.io.IOException;
-import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -88,6 +88,7 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
     private final boolean manageDataPrefix;
     private final boolean localExecutor;
 
+    private final boolean startAuth;
     private final boolean startMeta;
     private final boolean startData;
     private final boolean startOrch;
@@ -98,7 +99,8 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
     private PlatformTest(
             String testConfig, List<String> tenants, String storageFormat,
             boolean runDbDeploy, boolean manageDataPrefix, boolean localExecutor,
-            boolean startMeta, boolean startData, boolean startOrch, boolean startGateway) {
+            boolean startAuth, boolean startMeta, boolean startData, boolean startOrch,
+            boolean startGateway) {
 
         this.testConfig = testConfig;
         this.tenants = tenants;
@@ -106,6 +108,7 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         this.runDbDeploy = runDbDeploy;
         this.manageDataPrefix = manageDataPrefix;
         this.localExecutor = localExecutor;
+        this.startAuth = startAuth;
         this.startMeta = startMeta;
         this.startData = startData;
         this.startOrch = startOrch;
@@ -126,6 +129,7 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         private boolean runDbDeploy = true;  // Run DB deploy by default
         private boolean manageDataPrefix = false;
         private boolean localExecutor = false;
+        private boolean startAuth;
         private boolean startMeta;
         private boolean startData;
         private boolean startOrch;
@@ -136,29 +140,34 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         public Builder runDbDeploy(boolean runDbDeploy) { this.runDbDeploy = runDbDeploy; return this; }
         public Builder manageDataPrefix(boolean manageDataPrefix) { this.manageDataPrefix = manageDataPrefix; return this; }
         public Builder prepareLocalExecutor(boolean localExecutor) { this.localExecutor = localExecutor; return this; }
+        public Builder startAuth() { startAuth = true; return this; }
         public Builder startMeta() { startMeta = true; return this; }
         public Builder startData() { startData = true; return this; }
         public Builder startOrch() { startOrch = true; return this; }
         public Builder startGateway() { startGateway = true; return this; }
-        public Builder startAll() { return startMeta().startData().startOrch().startGateway(); }
+        public Builder startAll() { return startAuth().startMeta().startData().startOrch().startGateway(); }
 
         public PlatformTest build() {
 
             return new PlatformTest(
                     testConfig, tenants, storageFormat,
                     runDbDeploy, manageDataPrefix, localExecutor,
-                    startMeta, startData, startOrch, startGateway);
+                    startAuth, startMeta, startData, startOrch, startGateway);
         }
     }
 
     private String testId;
     private Path tracDir;
     private Path tracStorageDir;
-    private Path tracExecDir;    private Path tracRepoDir;
+    private Path tracExecDir;
+    private Path tracRepoDir;
     private URL platformConfigUrl;
     private String secretKey;
+    private PluginManager pluginManager;
+    private ConfigManager configManager;
     private PlatformConfig platformConfig;
 
+    private TracAuthenticationService authSvc;
     private TracMetadataService metaSvc;
     private TracDataService dataSvc;
     private TracOrchestratorService orchSvc;
@@ -202,12 +211,24 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         return platformConfigUrl.toString();
     }
 
+    public PlatformConfig platformConfig() {
+        return platformConfig;
+    }
+
     public Path tracDir() {
         return tracDir;
     }
 
     public Path tracRepoDir() {
         return tracRepoDir;
+    }
+
+    public PluginManager pluginManager() {
+        return pluginManager;
+    }
+
+    public ConfigManager configManager() {
+        return configManager;
     }
 
     @Override
@@ -219,7 +240,8 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         prepareConfig();
         preparePlugins();
 
-        prepareAuth();
+        if (!platformConfig.getAuthentication().getDisableAuth())
+            prepareAuth();
 
         if (runDbDeploy)
             prepareDatabase();
@@ -326,11 +348,11 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         var env = System.getenv();
         secretKey = env.getOrDefault(SECRET_KEY_ENV_VAR, SECRET_KEY_DEFAULT);
 
-        var plugins = new PluginManager();
-        plugins.initConfigPlugins();
+        pluginManager = new PluginManager();
+        pluginManager.initConfigPlugins();
 
-        var config = new ConfigManager(platformConfigUrl.toString(), tracDir, plugins);
-        platformConfig = config.loadRootConfigObject(PlatformConfig.class);
+        configManager = new ConfigManager(platformConfigUrl.toString(), tracDir, pluginManager, secretKey);
+        platformConfig = configManager.loadRootConfigObject(PlatformConfig.class);
     }
 
     private String getCurrentGitOrigin() throws Exception {
@@ -355,7 +377,7 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         }
     }
 
-    void prepareAuth() throws URISyntaxException {
+    void prepareAuth() {
 
         log.info("Running auth tool to set up root authentication keys...");
 
@@ -369,26 +391,16 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         // To create a valid token, we need to get the auth signing keys out of the secrets file
         // Tokens must be signed with the same key used by the platform services
 
-        var pluginMgr = new PluginManager();
-        pluginMgr.initConfigPlugins();
+        configManager.prepareSecrets();
 
-        var configMgr = new ConfigManager(
-                platformConfigUrl.toString(),
-                Paths.get(platformConfigUrl.toURI()).getParent(),
-                pluginMgr, secretKey);
-
-        configMgr.prepareSecrets();
-
-        var platformConfig = configMgr.loadRootConfigObject(PlatformConfig.class);
         var authConfig = platformConfig.getAuthentication();
-
-        var jwt = JwtSetup.createProcessor(platformConfig, configMgr);
+        var jwt = JwtSetup.createProcessor(platformConfig, configManager);
 
         var userInfo = new UserInfo();
         userInfo.setUserId("platform_testing");
         userInfo.setDisplayName("Platform testing user");
 
-        var session = AuthLogic.newSession(userInfo, authConfig);
+        var session = SessionBuilder.newSession(userInfo, authConfig);
 
         authToken = jwt.encodeToken(session);
     }
@@ -505,6 +517,9 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
 
     void startServices() {
 
+        if (startAuth)
+            authSvc = ServiceHelpers.startService(TracAuthenticationService.class, tracDir, platformConfigUrl, secretKey);
+
         if (startMeta)
             metaSvc = ServiceHelpers.startService(TracMetadataService.class, tracDir, platformConfigUrl, secretKey);
 
@@ -531,6 +546,9 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
 
         if (metaSvc != null)
             metaSvc.stop();
+
+        if (authSvc != null)
+            authSvc.stop();
     }
 
     void startClients() {

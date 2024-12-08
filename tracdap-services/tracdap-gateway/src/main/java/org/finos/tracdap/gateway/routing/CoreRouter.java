@@ -24,7 +24,6 @@ import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.*;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.codec.http.HttpMethod;
-import io.netty.handler.timeout.IdleStateEvent;
 import io.netty.util.ReferenceCountUtil;
 import io.netty.util.concurrent.Future;
 
@@ -44,7 +43,6 @@ abstract class CoreRouter extends ChannelDuplexHandler {
     // Getting it to the same level as e.g. the Grpc translators would probably be worthwhile
     // As well as stability, the router is the heart of the gateway and is likely to change semi-often
     // Clarity and convention make for  happy coders...
-
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
@@ -77,7 +75,8 @@ abstract class CoreRouter extends ChannelDuplexHandler {
     @Override
     public void handlerAdded(ChannelHandlerContext ctx) throws Exception {
 
-        log.info("conn = {}, router added for protocol [{}]", connId, protocol);
+        if (log.isDebugEnabled())
+            log.debug("{} handlerAdded: conn = {}, protocol = {}", getClass().getSimpleName(), connId, protocol);
 
         // Bootstrap is used to create proxy channels for this router channel
         // In an HTTP 1 world, browser clients will normally make several connections,
@@ -97,54 +96,17 @@ abstract class CoreRouter extends ChannelDuplexHandler {
         super.handlerAdded(ctx);
     }
 
-
     @Override
     public void handlerRemoved(ChannelHandlerContext ctx) throws Exception {
 
-        log.info("conn = {}, router removed", connId);
+        if (log.isDebugEnabled())
+            log.debug("{} handlerRemoved: conn = {}", getClass().getSimpleName(), connId);
+
         super.handlerRemoved(ctx);
 
         // Make sure any target connections that are still open are shut down cleanly
         var targetKeys = new ArrayList<>(this.targets.keySet());
         targetKeys.forEach(this::closeAndRemoveTarget);
-    }
-
-    @Override
-    public void channelRegistered(ChannelHandlerContext ctx) throws Exception {
-
-        log.info("conn = {}, channel registered", connId);
-        super.channelRegistered(ctx);
-    }
-
-    @Override
-    public void close(ChannelHandlerContext ctx, ChannelPromise promise) throws Exception {
-
-        // Do not try to close the channel twice
-        if (!ctx.channel().isOpen()) {
-            promise.setSuccess();
-            return;
-        }
-
-        log.info("conn = {}, connection closed", connId);
-        super.close(ctx, promise);
-    }
-
-    @Override
-    public void disconnect(ChannelHandlerContext ctx, ChannelPromise promise) throws Exception {
-
-        log.info("conn = {}, channel disconnected", connId);
-        super.disconnect(ctx, promise);
-    }
-
-    @Override
-    public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
-
-        if (evt instanceof IdleStateEvent) {
-            log.info("conn = {}, Idle time expired", connId);
-            ctx.close();
-        }
-        else
-            super.userEventTriggered(ctx, evt);
     }
 
     protected abstract ChannelInitializer<Channel> initializeProxyRoute(
@@ -162,7 +124,7 @@ abstract class CoreRouter extends ChannelDuplexHandler {
         for (var redirect : this.redirects) {
             if (redirect.getMatcher().matches(method, uri)) {
 
-                log.info("conn = {}, req = {}, REDIRECT {} {} -> {} ({})",
+                log.info("REDIRECT: conn = {}, req = {}, {} {} -> {} ({})",
                         connId, requestId,
                         method, uri,
                         redirect.getConfig().getTarget(),
@@ -181,7 +143,7 @@ abstract class CoreRouter extends ChannelDuplexHandler {
         for (var route : this.routes) {
             if (route.getMatcher().matches(method, uri)) {
 
-                log.info("conn = {}, req = {}, ROUTE MATCHED {} {} -> {} ({})",
+                log.info("ROUTING: conn = {}, req = {}, {} {} -> {} ({})",
                         connId, requestId,
                         method, uri,
                         route.getConfig().getRouteName(),
@@ -192,7 +154,7 @@ abstract class CoreRouter extends ChannelDuplexHandler {
         }
 
         // No route available, send a 404 back to the client
-        log.warn("conn = {}, req = {}, ROUTE NOT MATCHED {} {} ",
+        log.error("ROUTE NOT FOUND: conn = {}, req = {}, {} {} ",
                 connId, requestId,  method, uri);
 
         return null;
@@ -235,11 +197,11 @@ abstract class CoreRouter extends ChannelDuplexHandler {
 
         if (future.isSuccess()) {
 
-            log.info("conn = {}, PROXY CONNECT -> {} {}", connId, targetConfig.getHost(), targetConfig.getPort());
+            log.info("PROXY CONNECT: conn = {}, target = {} {}", connId, targetConfig.getHost(), targetConfig.getPort());
         }
         else {
 
-            log.error("conn = {}, PROXY CONNECT FAILED -> {} {}", connId, targetConfig.getHost(), targetConfig.getPort(), future.cause());
+            log.error("PROXY CONNECT FAILED: conn = {}, target = {} {}", connId, targetConfig.getHost(), targetConfig.getPort(), future.cause());
 
             reportProxyRouteError(ctx, future.cause(), CoreRouterLink.WRITE_DIRECTION);
 
@@ -296,9 +258,9 @@ abstract class CoreRouter extends ChannelDuplexHandler {
         }
 
         if (future.isSuccess())
-            log.info("conn = {}, PROXY DISCONNECT -> {} {}", connId, targetConfig.getHost(), targetConfig.getPort());
+            log.info("PROXY DISCONNECT: conn = {}, target = {} {}", connId, targetConfig.getHost(), targetConfig.getPort());
         else
-            log.error("conn = {}, PROXY DISCONNECT FAILED -> {} {}", connId, targetConfig.getHost(), targetConfig.getPort(), future.cause());
+            log.error("PROXY DISCONNECT FAILED: conn = {}, target = {} {}", connId, targetConfig.getHost(), targetConfig.getPort(), future.cause());
 
         if (lostMsg)
             log.error("conn = {}, Pending messages have been lost", connId);

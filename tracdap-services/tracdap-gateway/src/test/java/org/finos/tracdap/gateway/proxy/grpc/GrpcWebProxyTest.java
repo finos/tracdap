@@ -21,7 +21,7 @@ import org.finos.tracdap.api.ListTenantsRequest;
 import org.finos.tracdap.api.ListTenantsResponse;
 import org.finos.tracdap.api.PlatformInfoRequest;
 import org.finos.tracdap.api.PlatformInfoResponse;
-import org.finos.tracdap.gateway.proxy.http.Http1Client;
+import org.finos.tracdap.test.http.Http1Client;
 import org.finos.tracdap.test.helpers.PlatformTest;
 
 import com.google.protobuf.Message;
@@ -42,7 +42,7 @@ import static org.finos.tracdap.test.meta.TestData.TEST_TENANT;
 
 public class GrpcWebProxyTest {
 
-    public static final short TEST_GW_PORT = 8080;
+    public static final short TEST_GW_PORT = 9100;
     private static final long TEST_TIMEOUT = 10 * 1000;  // 10 second timeout
 
     public static final String TRAC_CONFIG_UNIT = "config/trac-unit.yaml";
@@ -113,7 +113,7 @@ public class GrpcWebProxyTest {
 
         var tenants = responseMessage.getTenantsList();
         var acmeTenant = tenants.stream().filter(t -> t.getTenantCode().equals("ACME_CORP")).findFirst();
-        Assertions.assertTrue(tenants.size() > 0);
+        Assertions.assertFalse(tenants.isEmpty());
         Assertions.assertTrue(acmeTenant.isPresent());
 
         System.out.println("List tenants found the testing tenant: " + acmeTenant.get().getDescription());

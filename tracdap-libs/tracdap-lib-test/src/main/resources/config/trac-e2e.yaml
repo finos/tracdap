@@ -90,25 +90,34 @@ jobCache:
 
 
 gateway:
-  idleTimeout: 10
+
+  redirects:
+    - source: /
+      target: /trac-web/
+      status: 302
 
 
 services:
 
   gateway:
-    port: 8080
+    port: 9200
+    properties:
+      network.idleTimeout: 10
+
+  authentication:
+    port: 9201
 
   metadata:
-    port: 8081
+    port: 9202
 
   data:
-    port: 8082
+    port: 9203
 
   orchestrator:
-    port: 8083
+    port: 9204
 
   webServer:
-    port: 9000
+    enabled: false
 
 
 deployment:

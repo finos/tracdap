@@ -21,6 +21,7 @@ import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.logging.LogLevel;
 import org.finos.tracdap.common.exception.ENetworkHttp;
 import org.finos.tracdap.common.exception.EUnexpected;
+import org.finos.tracdap.common.util.LoggingHelpers;
 import org.finos.tracdap.config.RouteConfig;
 import org.finos.tracdap.gateway.proxy.http.Http1to2Proxy;
 
@@ -29,7 +30,6 @@ import io.netty.handler.codec.http2.*;
 import org.finos.tracdap.gateway.proxy.http.Http2FlowControl;
 import org.finos.tracdap.gateway.proxy.http.HttpProtocol;
 import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nonnull;
 
@@ -47,7 +47,8 @@ public class GrpcProxyBuilder extends ChannelInitializer<Channel> {
     private static final String HTTP_1_TO_2_PROXY = "HTTP_1_TO_2_PROXY";
     private static final String CORE_ROUTER_LINK = "CORE_ROUTER_LINK";
 
-    private final Logger log = LoggerFactory.getLogger(getClass());
+    private static final ThreadLocal<Logger> logMap = new ThreadLocal<>();
+    private final Logger log = LoggingHelpers.threadLocalLogger(this, logMap);
 
     private final RouteConfig routeConfig;
     private final ChannelDuplexHandler routerLink;

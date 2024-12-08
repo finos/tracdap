@@ -53,7 +53,11 @@ message AuthenticationConfig {
   sint32 jwtLimit = 6;
   sint32 jwtRefresh = 7;
 
-  optional PluginConfig provider = 3;
+  PluginConfig provider = 3;
+
+  optional string loginPath = 12;
+  optional string refreshPath = 13;
+  optional string returnPath = 14;
 
   bool disableAuth = 4;
   bool disableSigning = 5;
@@ -62,6 +66,8 @@ message AuthenticationConfig {
   string systemUserName = 9;
   sint32 systemTicketDuration = 10;
   sint32 systemTicketRefresh = 11;
+
+  map<string, PluginConfig> externalSystems = 15;
 }
 
 
@@ -82,4 +88,6 @@ message ServiceConfig {
 
   string alias = 2;
   uint32 port = 3;
+
+  map<string, string> properties = 4;
 }

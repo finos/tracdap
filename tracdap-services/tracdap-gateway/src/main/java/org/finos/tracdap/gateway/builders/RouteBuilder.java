@@ -21,6 +21,7 @@ import org.finos.tracdap.common.util.RoutingUtils;
 import org.finos.tracdap.config.*;
 import org.finos.tracdap.gateway.exec.IRouteMatcher;
 import org.finos.tracdap.gateway.exec.Route;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -52,13 +53,24 @@ public class RouteBuilder {
         var routes = new ArrayList<Route>(nRoutes);
 
         for (var serviceInfo : services) {
-            var grpcRoute = buildGrpcRoute(platformConfig, serviceInfo);
-            routes.add(grpcRoute);
+            if (serviceInfo.hasGrpc()) {
+                var grpcRoute = buildGrpcServiceRoute(platformConfig, serviceInfo);
+                routes.add(grpcRoute);
+            }
         }
 
         for (var serviceInfo : services) {
-            var restApiRoute = buildRestApiRoute(platformConfig, serviceInfo);
-            routes.add(restApiRoute);
+            if (serviceInfo.hasRest()) {
+                var restApiRoute = buildRestServiceRoute(platformConfig, serviceInfo);
+                routes.add(restApiRoute);
+            }
+        }
+
+        for (var serviceInfo : services) {
+            if (serviceInfo.hasHttp()) {
+                var restApiRoute = buildHttpServiceRoute(platformConfig, serviceInfo);
+                routes.add(restApiRoute);
+            }
         }
 
         for (var routeConfig : customRoutes) {
@@ -78,16 +90,16 @@ public class RouteBuilder {
         return routes;
     }
 
-    private Route buildGrpcRoute(PlatformConfig platformConfig, ServiceInfo serviceInfo) {
+    private Route buildGrpcServiceRoute(PlatformConfig platformConfig, ServiceInfo serviceInfo) {
 
         var routeIndex = nextRouteIndex++;
-        var routeName = serviceInfo.serviceName;
+        var routeName = serviceInfo.serviceName();
         var routeType = RoutingProtocol.GRPC;
 
-        var grpcPath = '/' + serviceInfo.descriptor.getFullName() + "/";
+        var grpcPath = '/' + serviceInfo.descriptor().getFullName() + "/";
         var matcher = (IRouteMatcher) (method, url) -> url.getPath().startsWith(grpcPath);
         var protocols = List.of(RoutingProtocol.GRPC, RoutingProtocol.GRPC_WEB);
-        var routing = RoutingUtils.serviceTarget(platformConfig, serviceInfo.serviceKey);
+        var routing = RoutingUtils.serviceTarget(platformConfig, serviceInfo.serviceKey());
 
         var match = RoutingMatch.newBuilder()
                 .setPath(grpcPath);
@@ -108,17 +120,19 @@ public class RouteBuilder {
         return new Route(routeIndex, routeConfig, matcher);
     }
 
-    private Route buildRestApiRoute(PlatformConfig platformConfig, ServiceInfo serviceInfo) {
+    private Route buildRestServiceRoute(PlatformConfig platformConfig, ServiceInfo serviceInfo) {
 
         var routeIndex = nextRouteIndex++;
-        var routeName = serviceInfo.serviceName;
+        var routeName = serviceInfo.serviceName();
         var routeType = RoutingProtocol.REST;
 
-        var restPath = serviceInfo.restPrefix + "/";
+        var restPath = serviceInfo.restPrefix();
         var matcher = (IRouteMatcher) (method, url) -> url.getPath().startsWith(restPath);
         var protocols = List.of(RoutingProtocol.REST);
-        var routing = RoutingUtils.serviceTarget(platformConfig, serviceInfo.serviceKey);
-        var restMethods = RestApiBuilder.buildAllMethods(serviceInfo.descriptor, serviceInfo.restPrefix, API_CLASSLOADER);
+        var routing = RoutingUtils.serviceTarget(platformConfig, serviceInfo.serviceKey());
+
+        var restMethodPrefix = restPath.endsWith("/") ? restPath.substring(0, restPath.length() - 1) : restPath;
+        var restMethods = RestApiBuilder.buildAllMethods(serviceInfo.descriptor(), restMethodPrefix, API_CLASSLOADER);
 
         var match = RoutingMatch.newBuilder()
                 .setPath(restPath);
@@ -137,6 +151,36 @@ public class RouteBuilder {
                 .build();
 
         return new Route(routeIndex, routeConfig, matcher, restMethods);
+    }
+
+    private Route buildHttpServiceRoute(PlatformConfig platformConfig, ServiceInfo serviceInfo) {
+
+        var routeIndex = nextRouteIndex++;
+        var routeName = serviceInfo.serviceName();
+        var routeType = RoutingProtocol.HTTP;
+
+        var httpPath = serviceInfo.httpPrefix();
+        var matcher = (IRouteMatcher) (method, url) -> url.getPath().startsWith(httpPath);
+        var protocols = List.of(RoutingProtocol.HTTP);
+        var routing = RoutingUtils.serviceTarget(platformConfig, serviceInfo.serviceKey());
+
+        var match = RoutingMatch.newBuilder()
+                .setPath(httpPath);
+
+        var target = RoutingTarget.newBuilder()
+                .mergeFrom(routing)
+                .setScheme(HTTP_SCHEME)
+                .setPath("/");
+
+        var routeConfig = RouteConfig.newBuilder()
+                .setRouteName(routeName)
+                .setRouteType(routeType)
+                .addAllProtocols(protocols)
+                .setMatch(match)
+                .setTarget(target)
+                .build();
+
+        return new Route(routeIndex, routeConfig, matcher);
     }
 
     private Route buildCustomRoute(RouteConfig routeConfig) {

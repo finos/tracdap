@@ -30,6 +30,17 @@ public class ConfigDefaults {
     public static final int DEFAULT_JWT_LIMIT = 57600;    // 16 hours
     public static final int DEFAULT_JWT_REFRESH = 300;     // 5 minutes
 
+    public static final String DEFAULT_LOGIN_PATH = "/login/browser?return-path=${returnPath}";
+    public static final String DEFAULT_REFRESH_PATH = "/login/refresh";
+    public static final String DEFAULT_RETURN_PATH = "/";
+
+    public static String readOrDefault(String configValue, String defaultValue) {
+
+        if (configValue == null || configValue.isBlank())
+            return defaultValue;
+        else
+            return configValue;
+    }
 
     public static int readOrDefault(int configValue, int defaultValue) {
 

@@ -17,6 +17,12 @@
 
 package org.finos.tracdap.common.util;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.HashMap;
+import java.util.Map;
+
 public class LoggingHelpers {
 
     public static String formatFileSize(long size) {
@@ -43,5 +49,17 @@ public class LoggingHelpers {
 
         var gb = ((double) size) / (1024.0 * 1024.0 * 1024.0);
         return String.format("%.1f GB", gb);
+    }
+
+    public static Logger threadLocalLogger(Object obj, ThreadLocal<Logger> logMap) {
+
+        var log = logMap.get();
+
+        if (log == null) {
+            log = LoggerFactory.getLogger(obj.getClass());
+            logMap.set(log);
+        }
+
+        return log;
     }
 }

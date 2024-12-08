@@ -17,13 +17,14 @@
 
 package org.finos.tracdap.gateway.proxy.http;
 
-import io.netty.util.ReferenceCountUtil;
 import org.finos.tracdap.common.startup.StandardArgs;
 import org.finos.tracdap.common.startup.Startup;
 
 import io.netty.handler.codec.http.*;
 import org.finos.tracdap.gateway.TracPlatformGateway;
 import org.finos.tracdap.test.helpers.ServiceHelpers;
+import org.finos.tracdap.test.http.Http1Client;
+import org.finos.tracdap.test.http.Http1Server;
 import org.finos.tracdap.tools.secrets.SecretTool;
 import org.junit.jupiter.api.*;
 

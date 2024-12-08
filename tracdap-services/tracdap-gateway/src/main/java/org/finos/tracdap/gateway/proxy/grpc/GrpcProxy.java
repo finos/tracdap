@@ -22,15 +22,16 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPromise;
 import io.netty.handler.codec.http2.*;
 import org.finos.tracdap.common.exception.EUnexpected;
+import org.finos.tracdap.common.util.LoggingHelpers;
 import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nonnull;
 
 
 public class GrpcProxy extends Http2ChannelDuplexHandler {
 
-    private final Logger log = LoggerFactory.getLogger(getClass());
+    private static final ThreadLocal<Logger> logMap = new ThreadLocal<>();
+    private final Logger log = LoggingHelpers.threadLocalLogger(this, logMap);
 
     private final int connId;
 
@@ -55,7 +56,7 @@ public class GrpcProxy extends Http2ChannelDuplexHandler {
                 logRequestStart(headersFrame, promise);
         }
 
-        super.write(ctx, msg, promise);
+        ctx.write(msg, promise);
     }
 
     @Override
@@ -75,7 +76,7 @@ public class GrpcProxy extends Http2ChannelDuplexHandler {
                 logResponseComplete(headersFrame);
         }
 
-        super.channelRead(ctx, msg);
+        ctx.fireChannelRead(msg);
     }
 
     private void logRequestStart(Http2HeadersFrame headersFrame, ChannelPromise promise) {
@@ -83,8 +84,9 @@ public class GrpcProxy extends Http2ChannelDuplexHandler {
         var headers = headersFrame.headers();
         var path = headers.path();
 
-        promise.addListener(f -> f.addListener(f2 -> log.info("conn = {}, stream = {}, REQUEST {}",
-                connId, headersFrame.stream().id(), path)));
+        promise.addListener(f ->
+                log.info("GRPC REQUEST: conn = {}, stream = {}, {}",
+                connId, headersFrame.stream().id(), path));
     }
 
     private void logResponseComplete(Http2HeadersFrame headersFrame) {
@@ -97,14 +99,14 @@ public class GrpcProxy extends Http2ChannelDuplexHandler {
 
             var grpcMessage = headers.get("grpc-message").toString();
 
-            log.info("conn = {}, stream = {}, RESPONSE CODE = {} ({}), MESSAGE = {}",
+            log.info("GRPC RESPONSE: conn = {}, stream = {}, code = {} ({}), {}",
                     connId, headersFrame.stream().id(),
                     grpcStatus.getCode().name(), grpcStatusCode, grpcMessage);
         }
 
         else {
 
-            log.info("conn = {}, stream = {}, RESPONSE CODE = {} ({})",
+            log.info("GRPC RESPONSE: conn = {}, stream = {}, code = {} ({})",
                     connId, headersFrame.stream().id(),
                     grpcStatus.getCode().name(), grpcStatusCode);
         }

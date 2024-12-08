@@ -17,7 +17,7 @@
 
 package org.finos.tracdap.webserver;
 
-import org.finos.tracdap.common.auth.internal.JwtSetup;
+import org.finos.tracdap.common.auth.JwtSetup;
 import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.exception.EStartup;
@@ -44,7 +44,6 @@ import org.slf4j.LoggerFactory;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Supplier;
 
 
 public class TracWebServer extends CommonServiceBase {
@@ -74,8 +73,11 @@ public class TracWebServer extends CommonServiceBase {
     protected void doStartup(Duration startupTimeout) throws InterruptedException {
 
         var platformConfig = configManager.loadRootConfigObject(PlatformConfig.class);
+        var serviceConfig = platformConfig.containsServices(ConfigKeys.WEB_SERVER_SERVICE_KEY)
+            ? platformConfig.getServicesOrThrow(ConfigKeys.WEB_SERVER_SERVICE_KEY)
+            : null;
 
-        if (!platformConfig.hasWebServer() || !platformConfig.getWebServer().getEnabled()) {
+        if (serviceConfig == null || (serviceConfig.hasEnabled() && !serviceConfig.getEnabled())) {
 
             var msg = "Web server is not enabled in the TRAC platform configuration";
             log.error(msg);
@@ -124,11 +126,11 @@ public class TracWebServer extends CommonServiceBase {
 
         // Handlers for all support protocols
         var contentServer = new ContentServer(platformConfig.getWebServer(), contentStorage);
-        var http1Handler = (Supplier<Http1Server>) () -> new Http1Server(contentServer, arrowAllocator);
-        var http2Handler = (Supplier<Http2Server>) () -> new Http2Server(contentServer);
 
         // The protocol negotiator is the top level initializer for new inbound connections
-        var protocolNegotiator = new ProtocolNegotiator(jwtValidator, http1Handler, http2Handler);
+        var protocolNegotiator = new ProtocolNegotiator(
+                platformConfig, jwtValidator,
+                contentServer, arrowAllocator);
 
         var bootstrap = new ServerBootstrap()
                 .group(bossGroup, workerGroup)

@@ -14,4 +14,4 @@
 # limitations under the License.
 
 # Include a number of common auth providers as part of the core implementation
-org.finos.tracdap.common.auth.external.common.CommonAuthPlugin
+org.finos.tracdap.auth.login.simple.SimpleLoginPlugin

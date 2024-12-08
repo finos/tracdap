@@ -23,8 +23,6 @@ authentication:
 
 webServer:
 
-  enabled: true
-
   contentRoot:
     protocol: LOCAL
     properties:

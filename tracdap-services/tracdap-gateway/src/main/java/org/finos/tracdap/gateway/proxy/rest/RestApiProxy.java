@@ -19,6 +19,7 @@ package org.finos.tracdap.gateway.proxy.rest;
 
 import org.finos.tracdap.api.DownloadResponse;
 import org.finos.tracdap.common.exception.*;
+import org.finos.tracdap.common.util.LoggingHelpers;
 import org.finos.tracdap.gateway.proxy.grpc.GrpcUtils;
 
 import io.grpc.Status;
@@ -32,7 +33,6 @@ import io.netty.handler.codec.http2.*;
 import io.netty.util.ReferenceCountUtil;
 
 import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nonnull;
 import java.net.URI;
@@ -59,7 +59,8 @@ public class RestApiProxy extends Http2ChannelDuplexHandler {
             HttpHeaderNames.CONTENT_LENGTH.toString(),
             HttpHeaderNames.CONTENT_ENCODING.toString());
 
-    private final Logger log = LoggerFactory.getLogger(getClass());
+    private static final ThreadLocal<Logger> logMap = new ThreadLocal<>();
+    private final Logger log = LoggingHelpers.threadLocalLogger(this, logMap);
 
     private final List<RestApiMethod<?, ?>> methods;
     private final Map<Http2FrameStream, RestApiCallState> callStateMap;

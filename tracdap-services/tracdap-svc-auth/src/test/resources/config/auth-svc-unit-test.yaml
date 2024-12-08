@@ -1,0 +1,40 @@
+
+config:
+  secret.type: PKCS12
+  secret.url: secrets.p12
+
+
+platformInfo:
+  environment: UNIT_TEST
+  production: false
+
+
+authentication:
+
+  jwtIssuer: trac_platform
+  jwtRefresh: 60
+  jwtExpiry: 3600
+  jwtLimit: 57600
+
+  provider:
+    protocol: guest
+    properties:
+      userId: test.user
+      userName: Test User
+
+  returnPath: /client-app/home
+
+  externalSystems:
+    dummy:
+      protocol: dummy
+
+
+services:
+  authentication:
+    port: 8081
+    properties:
+      network.idleTimeout: 5
+
+
+deployment:
+  layout: SANDBOX

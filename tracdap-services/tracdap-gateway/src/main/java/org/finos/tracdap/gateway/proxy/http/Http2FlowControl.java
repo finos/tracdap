@@ -25,8 +25,8 @@ import io.netty.util.ReferenceCountUtil;
 import org.finos.tracdap.common.exception.ENetworkHttp;
 import org.finos.tracdap.common.exception.ETracInternal;
 import org.finos.tracdap.common.exception.EUnexpected;
+import org.finos.tracdap.common.util.LoggingHelpers;
 import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nonnull;
 import java.util.*;
@@ -64,7 +64,8 @@ public class Http2FlowControl extends Http2ChannelDuplexHandler {
     private static final boolean AUTO_ACK_PING = true;
     private static final boolean AUTO_ACK_SETTINGS = true;
 
-    private final Logger log = LoggerFactory.getLogger(getClass());
+    private static final ThreadLocal<Logger> logMap = new ThreadLocal<>();
+    private final Logger log = LoggingHelpers.threadLocalLogger(this, logMap);
 
     private final int connId;
     private final String target;

@@ -19,8 +19,14 @@ package org.finos.tracdap.common.util;
 
 import com.google.protobuf.ByteString;
 
+import java.io.File;
 import java.io.IOException;
+import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.FileSystems;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Map;
 import java.util.MissingResourceException;
 
 
@@ -60,5 +66,50 @@ public class ResourceHelpers {
         catch (IOException e) {
             throw new MissingResourceException(e.getMessage(), clazz.getName(), resourcePath);
         }
+    }
+
+    public static String[] getResourcesNames(String path, Class<?> clazz) {
+
+        try {
+
+            var resourcePath = path.startsWith("/") ? path.substring(1) : path;
+            var url = clazz.getClassLoader().getResource(resourcePath);
+
+            if (url == null) {
+                return null;
+            }
+
+            var uri = url.toURI();
+
+            if (uri.getScheme().equals("jar")) {
+
+                try (var fileSystem = FileSystems.newFileSystem(uri, Map.of());
+                     var files = Files.walk(fileSystem.getPath(path), 1)) {
+
+                    // Do not include the directory being listed
+                    return files.skip(1)
+                            .map(ResourceHelpers::resourceFileName)
+                            .toArray(String[]::new);
+                }
+            }
+            else {
+                var resource = new File(uri);
+                return resource.list();
+            }
+
+        }
+        catch (IOException | URISyntaxException e) {
+            return null;
+        }
+    }
+
+    private static String resourceFileName(Path path) {
+
+        var name = path.getFileName().toString();
+
+        if (name.endsWith("/"))
+            return name.substring(0, name.length() - 1);
+        else
+            return name;
     }
 }

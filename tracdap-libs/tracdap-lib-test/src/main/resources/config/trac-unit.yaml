@@ -15,8 +15,6 @@
 
 config:
   logging: trac-logging.xml
-  secret.type: PKCS12
-  secret.url: trac-unit.pfx
 
 
 platformInfo:
@@ -27,15 +25,7 @@ platformInfo:
 
 
 authentication:
-
-  jwtIssuer: http://localhost/
-  jwtExpiry: 7200
-
-  provider:
-    protocol: guest
-    properties:
-      userId: guest
-      userName: Guest User
+  disableAuth: true
 
 
 metadata:
@@ -105,25 +95,29 @@ jobCache:
 
 
 gateway:
-  idleTimeout: 10
 
 
 services:
 
   gateway:
-    port: 8080
+    port: 9100
+    properties:
+      network.idleTimeout: 10
+
+  authentication:
+    port: 9101
 
   metadata:
-    port: 8081
+    port: 9102
 
   data:
-    port: 8082
+    port: 9103
 
   orchestrator:
-    port: 8083
+    port: 9104
 
   webServer:
-    port: 9000
+    enabled: false
 
 
 deployment:

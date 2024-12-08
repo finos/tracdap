@@ -87,61 +87,63 @@ jobCache:
 
 webServer:
 
-  # To use the TRAC web server, set the enabled flag and uncomment the configuration
+  # To use the TRAC web server, enable it in the services section then add a content root
 
-  enabled: false
-
-#  contentRoot:
-#    protocol: LOCAL
-#    properties:
-#      rootPath: path/to/web/content/root
-#
-#  rewriteRules:
-#
-#  redirects:
-#    - source: /
-#      target: /index.html
-#      status: 302
+  #  contentRoot:
+  #    protocol: LOCAL
+  #    properties:
+  #      rootPath: path/to/web/content/root
+  #
+  #  rewriteRules:
+  #
+  #  redirects:
+  #    - source: /
+  #      target: /index.html
+  #      status: 302
 
 
 gateway:
 
-  idleTimeout: 10
-
   # Routing for the TRAC services will be configured automatically
   # To add custom routes, uncomment this configuration and modify as required
 
-#  routes:
-#
-#    - routeName: Local Web Server
-#      routeType: HTTP
-#
-#      match:
-#        host: localhost
-#        path: /local/app
-#
-#      target:
-#        scheme: http
-#        host: localhost
-#        port: 9090
-#        path: /
+  #  routes:
+  #
+  #    - routeName: Local Development Server
+  #      routeType: HTTP
+  #
+  #      match:
+  #        host: localhost
+  #        path: /local=app/
+  #
+  #      target:
+  #        scheme: http
+  #        host: localhost
+  #        port: 3000
+  #        path: /
 
 services:
 
   gateway:
     port: 8080
+    properties:
+      network.idleTimeout: 10
 
-  metadata:
+  authentication:
     port: 8081
 
-  data:
+  metadata:
     port: 8082
 
-  orchestrator:
+  data:
     port: 8083
 
+  orchestrator:
+    port: 8084
+
   webServer:
-    port: 8090
+    enabled: false
+    port: 8085
 
 
 deployment:

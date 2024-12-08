@@ -45,11 +45,35 @@ public class ConfigHelpers {
         return rawValue.trim();
     }
 
+    public static int readInt(String context, Properties properties, String key, int defaultValue) {
+
+        return readInt(context, properties, key, defaultValue, false);
+    }
+
+    private static Integer readInt(String context, Properties properties, String key, Integer defaultValue, boolean required) {
+
+        var rawValue = properties.getProperty(key);
+
+        if (rawValue == null || rawValue.isBlank()) {
+            if (required)
+                throw new EStartup(String.format("Missing required property [%s] for [%s]", key, context));
+            else
+                return defaultValue;
+        }
+
+        try {
+            return Integer.parseInt(rawValue);
+        }
+        catch (NumberFormatException e) {
+            throw new EStartup(String.format("Invalid property [%s] for [%s]: Not an integer", key, context));
+        }
+    }
+
     public static boolean optionalBoolean(String context, Properties properties, String key, boolean defaultValue) {
 
         var rawValue = properties.getProperty(key);
 
-        if (rawValue == null || rawValue.trim().isEmpty())
+        if (rawValue == null || rawValue.isBlank())
             return defaultValue;
 
         return checkBoolean(context, key, rawValue);
@@ -57,7 +81,7 @@ public class ConfigHelpers {
 
     private static boolean checkBoolean(String context, String key, String rawValue) {
 
-        if (rawValue == null || rawValue.trim().equals("")) {
+        if (rawValue == null || rawValue.isBlank()) {
             var message = String.format("Missing required property [%s] for [%s]", key, context);
             throw new EStartup(message);
         }

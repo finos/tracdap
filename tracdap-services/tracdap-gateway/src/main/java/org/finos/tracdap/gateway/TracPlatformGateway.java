@@ -17,8 +17,9 @@
 
 package org.finos.tracdap.gateway;
 
-import org.finos.tracdap.common.auth.external.IAuthProvider;
-import org.finos.tracdap.common.auth.internal.JwtSetup;
+import org.finos.tracdap.common.exception.EUnexpected;
+import org.finos.tracdap.config.PlatformConfig;
+import org.finos.tracdap.common.auth.JwtSetup;
 import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.exception.EStartup;
@@ -26,20 +27,16 @@ import org.finos.tracdap.common.netty.EventLoopScheduler;
 import org.finos.tracdap.common.netty.NettyHelpers;
 import org.finos.tracdap.common.plugin.PluginManager;
 import org.finos.tracdap.common.service.CommonServiceBase;
-import org.finos.tracdap.config.PlatformConfig;
+import org.finos.tracdap.gateway.auth.AuthHandlerSettings;
 import org.finos.tracdap.gateway.builders.RedirectBuilder;
 import org.finos.tracdap.gateway.exec.Redirect;
 import org.finos.tracdap.gateway.exec.Route;
 import org.finos.tracdap.gateway.builders.RouteBuilder;
-import org.finos.tracdap.gateway.routing.Http1Router;
-import org.finos.tracdap.gateway.routing.Http2Router;
-import org.finos.tracdap.gateway.routing.WebSocketsRouter;
 
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
-import io.netty.handler.codec.http.websocketx.WebSocketServerProtocolConfig;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -47,6 +44,7 @@ import org.slf4j.LoggerFactory;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
@@ -68,25 +66,28 @@ public class TracPlatformGateway extends CommonServiceBase {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
-    private final PluginManager pluginManager;
     private final ConfigManager configManager;
-
     private PlatformConfig platformConfig;
 
     private EventLoopGroup bossGroup = null;
     private EventLoopGroup workerGroup = null;
 
-
     public TracPlatformGateway(PluginManager pluginManager, ConfigManager configManager) {
 
-        this.pluginManager = pluginManager;
+        // Plugins not currently needed in the gateway (this is a good thing)!
+        if (pluginManager == null)
+            throw new EUnexpected();
+
         this.configManager = configManager;
     }
 
     @Override
     protected void doStartup(Duration startupTimeout) throws InterruptedException {
 
+        Properties serviceProperties;
         short proxyPort;
+
+        AuthHandlerSettings authSettings;
         List<Route> routes;
         List<Redirect> redirects;
 
@@ -95,10 +96,13 @@ public class TracPlatformGateway extends CommonServiceBase {
 
             platformConfig = configManager.loadRootConfigObject(PlatformConfig.class);
 
-            proxyPort = (short) platformConfig
-                    .getServicesOrThrow(ConfigKeys.GATEWAY_SERVICE_KEY)
-                    .getPort();
+            var serviceConfig = platformConfig.getServicesOrThrow(ConfigKeys.GATEWAY_SERVICE_KEY);
 
+            serviceProperties = new Properties();
+            serviceProperties.putAll(serviceConfig.getPropertiesMap());
+            proxyPort = (short) serviceConfig.getPort();
+
+            authSettings = new AuthHandlerSettings(platformConfig);
             routes = new RouteBuilder().buildRoutes(platformConfig);
             redirects = new RedirectBuilder().buildRedirects(platformConfig);
 
@@ -115,30 +119,13 @@ public class TracPlatformGateway extends CommonServiceBase {
 
             log.info("Starting the gateway server on port {}...", proxyPort);
 
-            var authProviderConfig = platformConfig.getAuthentication().getProvider();
-            var authProvider = pluginManager.createService(IAuthProvider.class, authProviderConfig, configManager);
-
-            // JWT processor is responsible for signing and validating auth tokens
-            var jwtProcessor = JwtSetup.createProcessor(platformConfig, configManager);
-
-            // Handlers for all support protocols
-            var http1Handler = ProtocolSetup.setup(connId -> new Http1Router(routes, redirects, connId));
-            var http2Handler = ProtocolSetup.setup(connId -> new Http2Router(routes));
-
-            var webSocketOptions = WebSocketServerProtocolConfig.newBuilder()
-                    .subprotocols("grpc-websockets")
-                    .allowExtensions(true)
-                    .build();
-
-            var webSocketsHandler = ProtocolSetup.setup(
-                    connId -> new WebSocketsRouter(routes, connId),
-                    webSocketOptions);
+            // JWT validator is responsible for checking auth tokens on inbound requests
+            var jwtValidator = JwtSetup.createValidator(platformConfig, configManager);
 
             // The protocol negotiator is the top level initializer for new inbound connections
             var protocolNegotiator = new ProtocolNegotiator(
-                    platformConfig, authProvider, jwtProcessor,
-                    http1Handler, http2Handler,
-                    webSocketsHandler);
+                    serviceProperties, authSettings,
+                    jwtValidator, routes, redirects);
 
             var bossThreadCount = 1;
             var bossExecutor = NettyHelpers.eventLoopExecutor("gw-boss");
@@ -211,7 +198,7 @@ public class TracPlatformGateway extends CommonServiceBase {
 
         log.info("Closing the gateway to new connections...");
 
-        var bossShutdown = bossGroup.shutdownGracefully();
+        var bossShutdown = bossGroup.shutdownGracefully(0, shutdownTimeout.getSeconds(), TimeUnit.SECONDS);
         bossShutdown.await(shutdownTimeout.getSeconds(), TimeUnit.SECONDS);
 
         if (!bossShutdown.isSuccess()) {
@@ -225,7 +212,7 @@ public class TracPlatformGateway extends CommonServiceBase {
         var shutdownElapsedTime = Duration.between(shutdownStartTime, Instant.now());
         var shutdownTimeRemaining = shutdownTimeout.minus(shutdownElapsedTime);
 
-        var workerShutdown = workerGroup.shutdownGracefully();
+        var workerShutdown = workerGroup.shutdownGracefully(0, shutdownTimeRemaining.getSeconds(), TimeUnit.SECONDS);
         workerShutdown.await(shutdownTimeRemaining.getSeconds(), TimeUnit.SECONDS);
 
         if (!workerShutdown.isSuccess()) {

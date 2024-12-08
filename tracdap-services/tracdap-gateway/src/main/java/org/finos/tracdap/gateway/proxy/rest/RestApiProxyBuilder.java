@@ -18,6 +18,7 @@
 package org.finos.tracdap.gateway.proxy.rest;
 
 import org.finos.tracdap.common.exception.ENetworkHttp;
+import org.finos.tracdap.common.util.LoggingHelpers;
 import org.finos.tracdap.gateway.exec.Route;
 import org.finos.tracdap.gateway.proxy.http.Http1to2Proxy;
 import org.finos.tracdap.gateway.proxy.http.Http2FlowControl;
@@ -32,12 +33,12 @@ import io.netty.handler.codec.http2.Http2Settings;
 import io.netty.handler.logging.LogLevel;
 
 import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 public class RestApiProxyBuilder extends ChannelInitializer<Channel> {
 
-    private final Logger log = LoggerFactory.getLogger(getClass());
+    private static final ThreadLocal<Logger> logMap = new ThreadLocal<>();
+    private final Logger log = LoggingHelpers.threadLocalLogger(this, logMap);
 
     private final Route routeConfig;
     private final CoreRouterLink routerLink;

@@ -20,7 +20,7 @@ package org.finos.tracdap.gateway.proxy.rest;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import org.finos.tracdap.api.*;
 import org.finos.tracdap.common.async.Flows;
-import org.finos.tracdap.gateway.proxy.http.Http1Client;
+import org.finos.tracdap.test.http.Http1Client;
 import org.finos.tracdap.test.data.DataApiTestHelpers;
 import org.finos.tracdap.test.helpers.PlatformTest;
 
@@ -50,7 +50,7 @@ import static org.finos.tracdap.test.meta.TestData.selectorForTag;
 
 public class RestDownloadTest {
 
-    public static final short TEST_GW_PORT = 8080;
+    public static final short TEST_GW_PORT = 9100;
     public static final long TEST_TIMEOUT = 10 * 1000;  // 10 second timeout
 
     public static final String TEST_FILE = "README.md";
