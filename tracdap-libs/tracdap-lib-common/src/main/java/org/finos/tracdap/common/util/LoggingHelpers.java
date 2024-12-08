@@ -20,6 +20,9 @@ package org.finos.tracdap.common.util;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.HashMap;
+import java.util.Map;
+
 public class LoggingHelpers {
 
     public static String formatFileSize(long size) {
@@ -60,13 +63,20 @@ public class LoggingHelpers {
         return log;
     }
 
-    public static Logger threadLocalLogger(Class<?> clazz, ThreadLocal<Logger> logMap) {
+    public static Logger typedThreadLocalLogger(Object obj, ThreadLocal<Map<Class<?>, Logger>> logMap) {
 
-        var log = logMap.get();
+        var map = logMap.get();
+
+        if (map == null) {
+            map = new HashMap<>();
+            logMap.set(map);
+        }
+
+        var log = map.get(obj.getClass());
 
         if (log == null) {
-            log = LoggerFactory.getLogger(clazz);
-            logMap.set(log);
+            log = LoggerFactory.getLogger(obj.getClass());
+            map.put(obj.getClass(), log);
         }
 
         return log;

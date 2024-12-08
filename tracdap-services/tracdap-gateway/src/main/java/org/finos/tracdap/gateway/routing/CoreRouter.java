@@ -45,8 +45,8 @@ abstract class CoreRouter extends ChannelDuplexHandler {
     // Clarity and convention make for  happy coders...
 
 
-    private static final ThreadLocal<Logger> logMap = new ThreadLocal<>();
-    private final Logger log = LoggingHelpers.threadLocalLogger(CoreRouter.class, logMap);
+    private static final ThreadLocal<Map<Class<?>, Logger>> logMap = new ThreadLocal<>();
+    private final Logger log = LoggingHelpers.typedThreadLocalLogger(this, logMap);
 
     protected final List<Route> routes;
     protected final List<Redirect> redirects;
