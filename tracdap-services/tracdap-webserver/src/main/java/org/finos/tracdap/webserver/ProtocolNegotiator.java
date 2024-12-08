@@ -17,6 +17,7 @@
 
 package org.finos.tracdap.webserver;
 
+import io.netty.handler.codec.http.HttpRequest;
 import org.finos.tracdap.common.auth.Http1AuthValidator;
 import org.finos.tracdap.common.auth.JwtValidator;
 import org.finos.tracdap.common.netty.BaseProtocolNegotiator;
@@ -73,12 +74,12 @@ public class ProtocolNegotiator extends BaseProtocolNegotiator {
     }
 
     @Override
-    protected ChannelHandler wsPrimaryHandler() {
+    protected WebSocketServerProtocolConfig wsProtocolConfig(HttpRequest upgradeRequest) {
         return null;
     }
 
     @Override
-    protected WebSocketServerProtocolConfig wsProtocolConfig() {
+    protected ChannelHandler wsPrimaryHandler() {
         return null;
     }
 }

@@ -17,6 +17,7 @@
 
 package org.finos.tracdap.gateway;
 
+import io.netty.handler.codec.http.HttpRequest;
 import org.finos.tracdap.common.auth.JwtValidator;
 import org.finos.tracdap.common.config.ConfigHelpers;
 import org.finos.tracdap.common.config.ServiceProperties;
@@ -89,17 +90,18 @@ public class ProtocolNegotiator extends BaseProtocolNegotiator {
     }
 
     @Override
-    protected ChannelHandler wsPrimaryHandler() {
-        return new WebSocketsRouter(routes, connId.getAndIncrement());
-    }
-
-    @Override
-    protected WebSocketServerProtocolConfig wsProtocolConfig() {
+    protected WebSocketServerProtocolConfig wsProtocolConfig(HttpRequest upgradeRequest) {
 
         return WebSocketServerProtocolConfig.newBuilder()
                 .subprotocols("grpc-websockets")
                 .allowExtensions(true)
+                .websocketPath(upgradeRequest.uri())
                 .handleCloseFrames(false)
                 .build();
+    }
+
+    @Override
+    protected ChannelHandler wsPrimaryHandler() {
+        return new WebSocketsRouter(routes, connId.getAndIncrement());
     }
 }

@@ -17,6 +17,7 @@
 
 package org.finos.tracdap.svc.auth;
 
+import io.netty.handler.codec.http.HttpRequest;
 import org.finos.tracdap.common.config.ConfigHelpers;
 import org.finos.tracdap.common.config.ServiceProperties;
 import org.finos.tracdap.common.exception.EUnexpected;
@@ -69,12 +70,12 @@ public class ProtocolNegotiator extends BaseProtocolNegotiator {
     }
 
     @Override
-    protected ChannelHandler wsPrimaryHandler() {
+    protected WebSocketServerProtocolConfig wsProtocolConfig(HttpRequest upgradeRequest) {
         throw new EUnexpected();
     }
 
     @Override
-    protected WebSocketServerProtocolConfig wsProtocolConfig() {
+    protected ChannelHandler wsPrimaryHandler() {
         throw new EUnexpected();
     }
 }

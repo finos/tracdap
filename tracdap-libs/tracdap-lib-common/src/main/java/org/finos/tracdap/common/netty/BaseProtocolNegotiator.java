@@ -76,9 +76,9 @@ public abstract class BaseProtocolNegotiator extends ChannelInitializer<SocketCh
 
     protected abstract ChannelHandler http1PrimaryHandler();
     protected abstract ChannelHandler http2PrimaryHandler();
-    protected abstract ChannelHandler wsPrimaryHandler();
 
-    protected abstract WebSocketServerProtocolConfig wsProtocolConfig();
+    protected abstract WebSocketServerProtocolConfig wsProtocolConfig(HttpRequest upgradeRequest);
+    protected abstract ChannelHandler wsPrimaryHandler();
 
 
     @Override
@@ -423,7 +423,7 @@ public abstract class BaseProtocolNegotiator extends ChannelInitializer<SocketCh
                     // Chrome in particular is very fussy and will fail a whole request if the close sequence is wrong
                     // The close sequence is managed with the client explicitly in WebSocketsRouter
 
-                    var wsProtocolConfig = wsProtocolConfig();
+                    var wsProtocolConfig = wsProtocolConfig(request);
                     var wsProtocolHandler = new WebSocketServerProtocolHandler(wsProtocolConfig);
                     pipeline.addAfter(IDLE_TIMEOUT_HANDLER, WS_FRAME_CODEC, wsProtocolHandler);
 
@@ -467,7 +467,7 @@ public abstract class BaseProtocolNegotiator extends ChannelInitializer<SocketCh
                 ctx.close();
             }
             else
-                ctx.fireChannelRead(evt);
+                ctx.fireUserEventTriggered(evt);
         }
     }
 
