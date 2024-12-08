@@ -65,7 +65,7 @@ public class ProtocolNegotiator extends BaseProtocolNegotiator {
         return ConfigHelpers.readInt(
                 "gateway service", serviceProperties,
                 ServiceProperties.NETWORK_IDLE_TIMEOUT,
-                ServiceProperties.NETWORK_READ_TIMEOUT_DEFAULT);
+                ServiceProperties.NETWORK_IDLE_TIMEOUT_DEFAULT);
     }
 
     @Override

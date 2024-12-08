@@ -16,9 +16,12 @@
 
 package org.finos.tracdap.common.config;
 
+import java.util.Map;
+
 public class ServiceProperties {
 
+    public static final String GATEWAY_HTTP_PREFIX = "gateway.http.prefix";
     public static final String NETWORK_IDLE_TIMEOUT = "network.idleTimeout";
 
-    public static final int NETWORK_READ_TIMEOUT_DEFAULT = 20;  // seconds
+    public static final int NETWORK_IDLE_TIMEOUT_DEFAULT = 30;  // seconds
 }
