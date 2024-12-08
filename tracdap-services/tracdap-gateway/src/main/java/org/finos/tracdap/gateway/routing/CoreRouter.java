@@ -17,7 +17,6 @@
 
 package org.finos.tracdap.gateway.routing;
 
-import org.finos.tracdap.common.util.LoggingHelpers;
 import org.finos.tracdap.gateway.exec.Redirect;
 import org.finos.tracdap.gateway.exec.Route;
 
@@ -29,6 +28,7 @@ import io.netty.util.ReferenceCountUtil;
 import io.netty.util.concurrent.Future;
 
 import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.net.URI;
 import java.util.*;
@@ -44,9 +44,7 @@ abstract class CoreRouter extends ChannelDuplexHandler {
     // As well as stability, the router is the heart of the gateway and is likely to change semi-often
     // Clarity and convention make for  happy coders...
 
-
-    private static final ThreadLocal<Map<Class<?>, Logger>> logMap = new ThreadLocal<>();
-    private final Logger log = LoggingHelpers.typedThreadLocalLogger(this, logMap);
+    private final Logger log = LoggerFactory.getLogger(getClass());
 
     protected final List<Route> routes;
     protected final List<Redirect> redirects;

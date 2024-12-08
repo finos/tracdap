@@ -62,23 +62,4 @@ public class LoggingHelpers {
 
         return log;
     }
-
-    public static Logger typedThreadLocalLogger(Object obj, ThreadLocal<Map<Class<?>, Logger>> logMap) {
-
-        var map = logMap.get();
-
-        if (map == null) {
-            map = new HashMap<>();
-            logMap.set(map);
-        }
-
-        var log = map.get(obj.getClass());
-
-        if (log == null) {
-            log = LoggerFactory.getLogger(obj.getClass());
-            map.put(obj.getClass(), log);
-        }
-
-        return log;
-    }
 }
