@@ -100,8 +100,8 @@ public class Http1AuthHandler extends ChannelDuplexHandler {
 
         connId = ConnectionId.get(ctx.channel());
 
-        if (log.isTraceEnabled())
-            log.trace("Http1AuthHandler handlerAdded: conn = {}", connId);
+        if (log.isDebugEnabled())
+            log.debug("Http1AuthHandler handlerAdded: conn = {}", connId);
 
         if (handlerSettings.authConfig().getDisableAuth()) {
 
@@ -120,8 +120,8 @@ public class Http1AuthHandler extends ChannelDuplexHandler {
     @Override
     public void handlerRemoved(ChannelHandlerContext ctx) {
 
-        if (log.isTraceEnabled())
-            log.trace("Http1AuthHandler handlerRemoved: conn = {}", connId);
+        if (log.isDebugEnabled())
+            log.debug("Http1AuthHandler handlerRemoved: conn = {}", connId);
     }
 
     @Override
@@ -314,12 +314,23 @@ public class Http1AuthHandler extends ChannelDuplexHandler {
 
     private void sendRefreshRequest(ChannelHandlerContext ctx) {
 
+        sendRefreshRequest(ctx, false);
+    }
+
+    private void sendRefreshRequest(ChannelHandlerContext ctx, boolean openChannelCallback) {
+
         if (log.isTraceEnabled())
             log.trace("Http1AuthHandler sendRefreshRequest: conn = {}", connId);
 
+        if (refreshToken == null)
+            logRefreshRequested(state);
+
         // If there is a refresh available or pending, do not try to send another one
-        if (refreshToken != null)
+        if (refreshToken != null && !openChannelCallback)
             return;
+
+        // Make a promise for the refreshed token
+        refreshToken = new DefaultPromise<>(ctx.executor());
 
         // If the refresh channel is not open, then open it
         if (refreshChannel == null) {
@@ -334,9 +345,6 @@ public class Http1AuthHandler extends ChannelDuplexHandler {
             return;
         }
 
-        // Make a promise for the refreshed token
-        refreshToken = new DefaultPromise<>(ctx.executor());
-
         // Send a refresh request
         var refreshPath = handlerSettings.refreshPath();
         var requestHeaders = new DefaultHttpHeaders();
@@ -349,8 +357,6 @@ public class Http1AuthHandler extends ChannelDuplexHandler {
                 EmptyHttpHeaders.INSTANCE);
 
         refreshChannel.pipeline().writeAndFlush(request);
-
-        logRefreshRequested(state);
     }
 
     private void openRefreshChannel(ChannelHandlerContext ctx) {
@@ -382,11 +388,18 @@ public class Http1AuthHandler extends ChannelDuplexHandler {
         connectFuture.addListener(future -> {
             if (future.isSuccess()) {
                 closeFuture.addListener(cf -> refreshChannel = null);
-                sendRefreshRequest(ctx);
+                sendRefreshRequest(ctx, true);
             }
             else {
                 refreshChannel = null;
+                refreshToken = null;
             }
+        });
+
+        // If the channel closes before the refresh completes, the token promise will never be filled
+        closeFuture.addListener(future -> {
+            if (!refreshToken.isDone())
+                refreshToken = null;
         });
 
         // Save the channel reference
@@ -404,8 +417,8 @@ public class Http1AuthHandler extends ChannelDuplexHandler {
         @Override
         protected void initChannel(Channel channel) {
 
-            if (log.isTraceEnabled())
-                log.trace("Http1AuthHandler RefreshInitHandler initChannel: conn = {}", connId);
+            if (log.isDebugEnabled())
+                log.debug("Http1AuthHandler RefreshInitHandler initChannel: conn = {}", connId);
 
             channel.pipeline().addLast(new HttpClientCodec());
             channel.pipeline().addLast(new RefreshHandler());
@@ -517,7 +530,7 @@ public class Http1AuthHandler extends ChannelDuplexHandler {
 
         var userId = state.session.getUserInfo().getUserId();
 
-        log.info("REFRESH TOKEN REQUESTED: conn = {}, req = {}, user = {}", connId, reqId, userId);
+        log.info("TOKEN REFRESH: conn = {}, req = {}, user = {}", connId, reqId, userId);
     }
 
     private void logRefreshApplied(Future<String> refreshToken, RequestState state) {
@@ -526,8 +539,8 @@ public class Http1AuthHandler extends ChannelDuplexHandler {
         var expiry = state.session.getExpiryTime();
 
         if (refreshToken.isSuccess())
-            log.info("REFRESH TOKEN: conn = {}, req = {}, user = {}, expiry = {}", connId, reqId, userId, expiry);
+            log.info("TOKEN APPLIED: conn = {}, req = {}, user = {}, expiry = {}", connId, reqId, userId, expiry);
         else
-            log.warn("REFRESH TOKEN FAILED: conn = {}, req = {}, user = {}, {}", connId, reqId, userId, refreshToken.cause());
+            log.warn("TOKEN REFRESH FAILED: conn = {}, req = {}, user = {}, {}", connId, reqId, userId, refreshToken.cause());
     }
 }

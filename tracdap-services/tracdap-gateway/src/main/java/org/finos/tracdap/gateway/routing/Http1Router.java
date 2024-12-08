@@ -18,6 +18,7 @@
 package org.finos.tracdap.gateway.routing;
 
 import org.finos.tracdap.common.exception.EUnexpected;
+import org.finos.tracdap.common.util.LoggingHelpers;
 import org.finos.tracdap.gateway.exec.Redirect;
 import org.finos.tracdap.gateway.exec.Route;
 import org.finos.tracdap.gateway.proxy.grpc.GrpcProtocol;
@@ -31,7 +32,6 @@ import io.netty.handler.codec.http.*;
 import io.netty.util.ReferenceCountUtil;
 
 import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nonnull;
 import java.net.URI;
@@ -51,7 +51,8 @@ public class Http1Router extends CoreRouter {
             RequestStatus.RECEIVING,
             RequestStatus.RECEIVING_BIDI);
 
-    private final Logger log = LoggerFactory.getLogger(getClass());
+    private static final ThreadLocal<Logger> logMap = new ThreadLocal<>();
+    private final Logger log = LoggingHelpers.threadLocalLogger(this, logMap);
 
     private final Map<Long, RequestState> requests;
 

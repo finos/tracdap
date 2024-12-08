@@ -20,8 +20,8 @@ package org.finos.tracdap.gateway.routing;
 import io.netty.channel.ChannelDuplexHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPromise;
+import org.finos.tracdap.common.util.LoggingHelpers;
 import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nonnull;
 
@@ -44,7 +44,8 @@ public class CoreRouterLink extends ChannelDuplexHandler {
     public static final boolean WRITE_DIRECTION = true;
     public static final boolean READ_DIRECTION = false;
 
-    private final Logger log = LoggerFactory.getLogger(getClass());
+    private static final ThreadLocal<Logger> logMap = new ThreadLocal<>();
+    private final Logger log = LoggingHelpers.threadLocalLogger(this, logMap);
 
     private final CoreRouter router;
     private final ChannelHandlerContext routerCtx;

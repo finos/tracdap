@@ -19,13 +19,13 @@ package org.finos.tracdap.gateway.proxy.http;
 
 import io.netty.util.ReferenceCountUtil;
 import org.finos.tracdap.common.exception.EUnexpected;
+import org.finos.tracdap.common.util.LoggingHelpers;
 import org.finos.tracdap.config.RouteConfig;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPromise;
 import io.netty.handler.codec.http.*;
 import io.netty.handler.codec.http2.*;
 import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nonnull;
 import java.util.ArrayList;
@@ -37,7 +37,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 public class Http1to2Proxy extends Http2ChannelDuplexHandler {
 
-    private final Logger log = LoggerFactory.getLogger(getClass());
+    private static final ThreadLocal<Logger> logMap = new ThreadLocal<>();
+    private final Logger log = LoggingHelpers.threadLocalLogger(this, logMap);
 
     private final RouteConfig routeConfig;
 
@@ -105,7 +106,12 @@ public class Http1to2Proxy extends Http2ChannelDuplexHandler {
         var stream = this.newStream();
         streams.put(inboundSeqId, stream);
 
-        promise.addListener(f -> log.info("conn = {}, seq {} -> stream {}", connId, inboundSeqId, stream.id()));
+        promise.addListener(f -> logTranslation(stream));
+    }
+
+    private void logTranslation(Http2FrameStream stream) {
+
+        log.info("TRANSLATE: conn = {}, stream = {}, seq = {}, HTTP/1 -> HTTP/2 ", connId, stream.id(), inboundSeqId);
     }
 
     private List<Http2Frame> translateRequestFrames(Object http1) {

@@ -18,6 +18,7 @@
 package org.finos.tracdap.gateway.routing;
 
 import org.finos.tracdap.common.exception.EUnexpected;
+import org.finos.tracdap.common.util.LoggingHelpers;
 import org.finos.tracdap.config.RoutingProtocol;
 import org.finos.tracdap.gateway.exec.Route;
 import org.finos.tracdap.gateway.proxy.grpc.GrpcProtocol;
@@ -32,7 +33,6 @@ import io.netty.handler.codec.http.websocketx.*;
 import io.netty.util.ReferenceCountUtil;
 
 import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nonnull;
 import java.net.URI;
@@ -48,7 +48,8 @@ public class WebSocketsRouter extends CoreRouter {
     private static final Duration CLOSE_ON_ERROR_TIMEOUT = Duration.ofSeconds(5);
     private static final String TRAC_HEADER_PREFIX = "trac_";
 
-    private final Logger log = LoggerFactory.getLogger(getClass());
+    private static final ThreadLocal<Logger> logMap = new ThreadLocal<>();
+    private final Logger log = LoggingHelpers.threadLocalLogger(this, logMap);
 
     private String upgradeUri;
     private HttpHeaders upgradeHeaders;

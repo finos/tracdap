@@ -26,8 +26,8 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPromise;
 import io.netty.handler.codec.http.*;
 import io.netty.handler.codec.http2.*;
+import org.finos.tracdap.common.util.LoggingHelpers;
 import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nonnull;
 import java.util.regex.Pattern;
@@ -38,7 +38,8 @@ public class GrpcWebProxy extends Http2ChannelDuplexHandler {
     private static final Pattern CONTENT_TYPE_MATCHER = Pattern.compile(
             "(?<type>\\w+)/(?<subtype>\\w+)(?:\\+(?<payload>\\w+))?(?:;\\w+=\\w+)*");
 
-    private final Logger log = LoggerFactory.getLogger(getClass());
+    private static final ThreadLocal<Logger> logMap = new ThreadLocal<>();
+    private final Logger log = LoggingHelpers.threadLocalLogger(this, logMap);
 
     private final int connId;
     private final boolean isWebTextProtocol;
@@ -64,11 +65,11 @@ public class GrpcWebProxy extends Http2ChannelDuplexHandler {
                 var grpcWebFrame = (Http2HeadersFrame) frame;
                 var grpcFrame = translateRequestHeaders(grpcWebFrame);
 
-                ctx.write(grpcFrame, promise);
-
                 // Stream ID is not available until the first frame is written to the HTTP/2 codec
-                promise.addListener(f -> log.info("conn = {}, stream = {}, TRANSLATE gRPC-Web {}",
+                promise.addListener(f -> log.info("TRANSLATE: conn = {}, stream = {}, gRPC-Web {}",
                         connId, grpcWebFrame.stream().id(), grpcFrame.headers().get(":path")));
+
+                ctx.write(grpcFrame, promise);
             }
             else if (frame instanceof Http2DataFrame) {
 

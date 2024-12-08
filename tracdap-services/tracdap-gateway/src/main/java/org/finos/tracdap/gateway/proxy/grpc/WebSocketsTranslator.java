@@ -27,8 +27,8 @@ import io.netty.util.ReferenceCountUtil;
 
 import org.finos.tracdap.common.exception.ENetwork;
 import org.finos.tracdap.common.exception.EUnexpected;
+import org.finos.tracdap.common.util.LoggingHelpers;
 import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nonnull;
 
@@ -47,7 +47,8 @@ public class WebSocketsTranslator extends Http2ChannelDuplexHandler {
     // The main use case for this transport is streaming upload of large datasets,
     // So the overhead of creating a channel is acceptable in that case
 
-    private final Logger log = LoggerFactory.getLogger(getClass());
+    private static final ThreadLocal<Logger> logMap = new ThreadLocal<>();
+    private final Logger log = LoggingHelpers.threadLocalLogger(this, logMap);
 
     private final int connId;
 

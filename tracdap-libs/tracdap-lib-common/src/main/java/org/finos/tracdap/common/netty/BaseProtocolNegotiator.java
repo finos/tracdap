@@ -23,6 +23,7 @@ import io.netty.handler.codec.http.*;
 import io.netty.handler.codec.http.websocketx.WebSocketServerProtocolConfig;
 import io.netty.handler.codec.http.websocketx.WebSocketServerProtocolHandler;
 import io.netty.handler.codec.http2.*;
+import io.netty.handler.timeout.IdleStateEvent;
 import io.netty.handler.timeout.IdleStateHandler;
 import io.netty.util.AsciiString;
 import io.netty.util.ReferenceCountUtil;
@@ -39,7 +40,8 @@ import java.util.concurrent.TimeUnit;
 public abstract class BaseProtocolNegotiator extends ChannelInitializer<SocketChannel> {
 
     private static final String UPGRADE_HANDLER = "upgrade_handler";
-    private static final String TIMEOUT_HANDLER = "timeout_handler";
+    private static final String IDLE_STATE_HANDLER = "idle_state_handler";
+    private static final String IDLE_TIMEOUT_HANDLER = "idle_timeout_handler";
 
     private static final String HTTP_1_INITIALIZER = "http_1_initializer";
     private static final String HTTP_1_CODEC = "http_1_codec";
@@ -297,7 +299,9 @@ public abstract class BaseProtocolNegotiator extends ChannelInitializer<SocketCh
             // This idle state handler will trigger idle events after the configured timeout
             // The CoreRouter class is responsible for handling the idle events
             var idleHandler = new IdleStateHandler(idleTimeout, idleTimeout, idleTimeout, TimeUnit.SECONDS);
-            pipeline.addAfter(HTTP_1_KEEPALIVE, TIMEOUT_HANDLER, idleHandler);
+            var idleEnforcer = new IdleTimeoutEnforcer();
+            pipeline.addAfter(HTTP_1_KEEPALIVE, IDLE_STATE_HANDLER, idleHandler);
+            pipeline.addAfter(IDLE_STATE_HANDLER, IDLE_TIMEOUT_HANDLER, idleEnforcer);
 
             // The main HTTP/1 handler
             var primaryHandler = http1PrimaryHandler();
@@ -401,7 +405,9 @@ public abstract class BaseProtocolNegotiator extends ChannelInitializer<SocketCh
                     // E.g. buggy client code might forget to send the EOS signal or close the connection
                     // The CoreRouter class is responsible for handling the idle events
                     var idleHandler = new IdleStateHandler(idleTimeout, idleTimeout, idleTimeout, TimeUnit.SECONDS);
-                    pipeline.addAfter(HTTP_1_AUTH, TIMEOUT_HANDLER, idleHandler);
+                    var idleEnforcer = new IdleTimeoutEnforcer();
+                    pipeline.addAfter(HTTP_1_AUTH, IDLE_STATE_HANDLER, idleHandler);
+                    pipeline.addAfter(IDLE_STATE_HANDLER, IDLE_TIMEOUT_HANDLER, idleEnforcer);
 
 
                     // Do not include compression codec at the WS level
@@ -419,7 +425,7 @@ public abstract class BaseProtocolNegotiator extends ChannelInitializer<SocketCh
 
                     var wsProtocolConfig = wsProtocolConfig();
                     var wsProtocolHandler = new WebSocketServerProtocolHandler(wsProtocolConfig);
-                    pipeline.addAfter(TIMEOUT_HANDLER, WS_FRAME_CODEC, wsProtocolHandler);
+                    pipeline.addAfter(IDLE_TIMEOUT_HANDLER, WS_FRAME_CODEC, wsProtocolHandler);
 
                     var primaryHandler = wsPrimaryHandler();
                     pipeline.addLast(primaryHandler);
@@ -446,12 +452,41 @@ public abstract class BaseProtocolNegotiator extends ChannelInitializer<SocketCh
         }
     }
 
+    private class IdleTimeoutEnforcer extends ChannelInboundHandlerAdapter {
+
+        @Override
+        public void userEventTriggered(ChannelHandlerContext ctx, Object evt) {
+
+            if (evt instanceof IdleStateEvent) {
+
+                if (log.isDebugEnabled()) {
+                    var connId = ConnectionId.get(ctx.channel());
+                    log.info("IDLE TIMEOUT: conn = {}", connId);
+                }
+
+                ctx.close();
+            }
+            else
+                ctx.fireChannelRead(evt);
+        }
+    }
+
     private void logNewConnection(Channel channel, String protocol) {
+
         log.info("NEW CONNECTION: conn = {}, {} {}", ConnectionId.get(channel), channel.remoteAddress(), protocol);
+
+        channel.closeFuture().addListener(close -> logCloseConnection((ChannelFuture) close));
     }
 
     private void logNewUpgradeConnection(Channel channel, String protocol, HttpServerUpgradeHandler.UpgradeEvent upgrade) {
+
         log.info("NEW CONNECTION: conn = {}, {} {} ({})", ConnectionId.get(channel), channel.remoteAddress(), protocol, upgrade.protocol());
+
+        channel.closeFuture().addListener(close -> logCloseConnection((ChannelFuture) close));
     }
 
+    private void logCloseConnection(ChannelFuture close) {
+
+        log.info("CLOSE CONNECTION: conn = {}", ConnectionId.get(close.channel()));
+    }
 }
