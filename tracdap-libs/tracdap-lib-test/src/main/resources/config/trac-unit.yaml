@@ -100,24 +100,24 @@ gateway:
 services:
 
   gateway:
-    port: 8080
+    port: 9100
     properties:
       network.idleTimeout: 10
 
   authentication:
-    port: 8081
+    port: 9101
 
   metadata:
-    port: 8082
+    port: 9102
 
   data:
-    port: 8083
+    port: 9103
 
   orchestrator:
-    port: 8084
+    port: 9104
 
   webServer:
-    port: 9000
+    enabled: false
 
 
 deployment:

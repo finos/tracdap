@@ -52,7 +52,7 @@ import static org.finos.tracdap.test.meta.TestData.selectorForTag;
 
 public class RestProxyTest {
 
-    public static final short TEST_GW_PORT = 8080;
+    public static final short TEST_GW_PORT = 9100;
     public static final long TEST_TIMEOUT = 10 * 1000;  // 10 second timeout
 
     public static final String TRAC_CONFIG_UNIT = "config/trac-unit.yaml";

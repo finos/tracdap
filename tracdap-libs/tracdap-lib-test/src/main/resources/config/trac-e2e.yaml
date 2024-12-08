@@ -100,24 +100,24 @@ gateway:
 services:
 
   gateway:
-    port: 9500
+    port: 9200
     properties:
       network.idleTimeout: 10
 
   authentication:
-    port: 9501
+    port: 9201
 
   metadata:
-    port: 9502
+    port: 9202
 
   data:
-    port: 9503
+    port: 9203
 
   orchestrator:
-    port: 9504
+    port: 9204
 
   webServer:
-    port: 9505
+    enabled: false
 
 
 deployment:

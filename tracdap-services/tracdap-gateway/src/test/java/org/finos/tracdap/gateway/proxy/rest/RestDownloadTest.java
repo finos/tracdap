@@ -50,7 +50,7 @@ import static org.finos.tracdap.test.meta.TestData.selectorForTag;
 
 public class RestDownloadTest {
 
-    public static final short TEST_GW_PORT = 8080;
+    public static final short TEST_GW_PORT = 9100;
     public static final long TEST_TIMEOUT = 10 * 1000;  // 10 second timeout
 
     public static final String TEST_FILE = "README.md";
