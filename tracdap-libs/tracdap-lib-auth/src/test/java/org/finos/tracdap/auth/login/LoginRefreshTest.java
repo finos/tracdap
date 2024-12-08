@@ -143,7 +143,7 @@ public class LoginRefreshTest {
             var cookies = response.headers().allValues("set-cookie");
 
             var tokenCookie = cookies.stream().filter(c -> c.startsWith("trac-auth-token")).findFirst();
-            var expiryCookie = cookies.stream().filter(c -> c.startsWith("trac-auth-expiry-utc")).findFirst();
+            var expiryCookie = cookies.stream().filter(c -> c.startsWith("trac-auth-expiry")).findFirst();
             var userIdCookie = cookies.stream().filter(c -> c.startsWith("trac-user-id")).findFirst();
             var userNameCookie = cookies.stream().filter(c -> c.startsWith("trac-user-name")).findFirst();
 
