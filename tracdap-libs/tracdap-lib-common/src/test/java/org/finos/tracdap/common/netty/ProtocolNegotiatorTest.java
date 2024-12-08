@@ -92,13 +92,13 @@ public class ProtocolNegotiatorTest {
         }
 
         @Override
-        protected ChannelHandler wsPrimaryHandler() {
-            return ws.get();
+        protected WebSocketServerProtocolConfig wsProtocolConfig(HttpRequest upgradeRequest) {
+            return WebSocketServerProtocolConfig.newBuilder().build();
         }
 
         @Override
-        protected WebSocketServerProtocolConfig wsProtocolConfig() {
-            return WebSocketServerProtocolConfig.newBuilder().build();
+        protected ChannelHandler wsPrimaryHandler() {
+            return ws.get();
         }
     }
 
