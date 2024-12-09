@@ -28,7 +28,8 @@ description = "Executor plugin for remote execution over SSH"
 group = "org.finos.tracdap.plugins"
 
 // Use a different build dir (don't include plugins in the main release package)
-project.buildDir = rootProject.buildDir.path + '/plugins/' + project.name
+var buildDir = rootProject.layout.buildDirectory.dir("plugins/" + project.name)
+layout.buildDirectory.set(buildDir)
 
 dependencies {
 
