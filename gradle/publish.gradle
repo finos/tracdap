@@ -49,8 +49,12 @@ def publishModule(Project project) {
         }
     }
 
-    signing {
-        sign publishing.publications[project.name]
+    var disableSigning = System.getProperty("disableSigning")
+
+    if (disableSigning != "true") {
+        signing {
+            sign publishing.publications[project.name]
+        }
     }
 }
 

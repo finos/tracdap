@@ -42,7 +42,8 @@ allprojects {
 
 subprojects {
 
-    buildDir = rootProject.buildDir.path + '/modules/' + project.name
+    var buildDir = rootProject.layout.buildDirectory.dir("modules/" + project.name)
+    layout.buildDirectory.set(buildDir)
 
     // Publishing setup is defined in gradle/publish.gradle
     project.afterEvaluate(publishModule)
