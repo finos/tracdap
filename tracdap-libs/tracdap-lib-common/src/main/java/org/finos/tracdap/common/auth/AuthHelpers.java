@@ -244,10 +244,10 @@ public class AuthHelpers {
 
         var cookie = new DefaultCookie(cookieName.toString(), cookieValue);
 
-        // TODO: Can we know the value to set for domain?
-
-        // Do not allow sending TRAC tokens to other end points
-        cookie.setSameSite(CookieHeaderNames.SameSite.Strict);
+        // Allow using the TRAC auth cookie when navigating in from other domains (this is the default)
+        // This is necessary to work as expected with some federated flows (and is also the HTTP default)
+        // TODO: This setting could be made a config parameter for the login auth provider
+        cookie.setSameSite(CookieHeaderNames.SameSite.Lax);
 
         // Make sure cookies are sent to the API endpoints, even if the UI is served from a sub path
         cookie.setPath("/");
