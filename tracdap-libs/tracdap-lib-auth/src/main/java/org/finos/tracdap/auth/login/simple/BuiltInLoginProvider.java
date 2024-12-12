@@ -35,10 +35,12 @@ class BuiltInLoginProvider implements ILoginProvider {
 
     private static final Logger log = LoggerFactory.getLogger(BuiltInLoginProvider.class);
 
+    private final LoginContent loginContent;
     private final IUserDatabase userDb;
 
     public BuiltInLoginProvider(ConfigManager configManager) {
 
+        this.loginContent = new LoginContent();
         this.userDb = SimpleLoginPlugin.createUserDb(configManager);
     }
 
@@ -70,7 +72,7 @@ class BuiltInLoginProvider implements ILoginProvider {
         if (usernameParam == null || usernameParam.size() != 1 ||
             passwordParam == null || passwordParam.size() != 1) {
 
-            var loginFormPage = LoginContent.getLoginFormPage();
+            var loginFormPage = loginContent.getLoginFormPage();
             return LoginResult.OTHER_RESPONSE(loginFormPage);
         }
 
@@ -84,7 +86,7 @@ class BuiltInLoginProvider implements ILoginProvider {
         }
         else {
 
-            var loginFormPage = LoginContent.getLoginFormPage();
+            var loginFormPage = loginContent.getLoginFormPage();
             return LoginResult.OTHER_RESPONSE(loginFormPage);
         }
     }

@@ -54,6 +54,7 @@ public class Http1LoginHandler extends ChannelInboundHandlerAdapter {
     private final AuthenticationConfig authConfig;
     private final JwtProcessor jwtProcessor;
     private final ILoginProvider loginProvider;
+    private final LoginContent loginContent;
 
     private final String defaultReturnPath;
 
@@ -68,6 +69,7 @@ public class Http1LoginHandler extends ChannelInboundHandlerAdapter {
         this.authConfig = authConfig;
         this.jwtProcessor = jwtProcessor;
         this.loginProvider = loginProvider;
+        this.loginContent = new LoginContent();
 
         this.defaultReturnPath = authConfig.hasReturnPath()
                 ? authConfig.getReturnPath()
@@ -241,7 +243,7 @@ public class Http1LoginHandler extends ChannelInboundHandlerAdapter {
                     .map(s -> URLDecoder.decode(s, StandardCharsets.UTF_8))
                     .orElse(defaultReturnPath);
 
-            content = LoginContent.getLoginOkPage(returnPath);
+            content = loginContent.getLoginOkPage(returnPath);
             headers = Http1Headers.fromGenericHeaders(content.headers());
 
             AuthHelpers.addClientAuthCookies(headers, token, session);
@@ -269,7 +271,7 @@ public class Http1LoginHandler extends ChannelInboundHandlerAdapter {
 
     private void serveStaticContent(ChannelHandlerContext ctx, HttpRequest request) {
 
-        var content = LoginContent.getStaticContent(request);
+        var content = loginContent.getStaticContent(request);
         var headers = Http1Headers.fromGenericHeaders(content.headers());
 
         var response = new DefaultFullHttpResponse(
