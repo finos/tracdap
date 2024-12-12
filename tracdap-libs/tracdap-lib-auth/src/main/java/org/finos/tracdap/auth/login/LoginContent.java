@@ -48,14 +48,24 @@ public final class LoginContent {
     private static final String LOGIN_FORM_PAGE = "login_form.html";
     private static final String REDIRECT_VARIABLE = "${REDIRECT}";
 
-    private static final Map<String, byte[]> STATIC_CONTENT = preloadContent(STATIC_CONTENT_PATH);
-    private static final Map<String, String> PAGE_CONTENT = stringValues(preloadContent(PAGE_CONTENT_PATH));
+    private final String pathPrefix;
+    private final Map<String, byte[]> staticContent;
+    private final Map<String, String> pageContent;
 
-    private LoginContent() {}
+    public LoginContent() {
+        this(LOGIN_PATH_PREFIX, STATIC_CONTENT_PATH, PAGE_CONTENT_PATH, LoginContent.class);
+    }
 
-    private static Map<String, byte[]> preloadContent(String resourceDir) {
+    public LoginContent(String pathPrefix, String staticDir, String pageDir, Class<?> resourceOwner) {
 
-        var resourceNames = ResourceHelpers.getResourcesNames(resourceDir, LoginContent.class);
+        this.pathPrefix = pathPrefix;
+        this.staticContent = preloadContent(staticDir, resourceOwner);
+        this.pageContent = stringValues(preloadContent(pageDir, resourceOwner));
+    }
+
+    private Map<String, byte[]> preloadContent(String resourceDir, Class<?> resourceOwner) {
+
+        var resourceNames = ResourceHelpers.getResourcesNames(resourceDir, resourceOwner);
 
         if (resourceNames == null)
             throw new EUnexpected();
@@ -65,7 +75,7 @@ public final class LoginContent {
         for (var resource : resourceNames) {
 
             var path = resourceDir + resource;
-            var bytes = ResourceHelpers.loadResourceAsBytes(path, LoginContent.class);
+            var bytes = ResourceHelpers.loadResourceAsBytes(path, resourceOwner);
 
             resources.put(resource, bytes);
         }
@@ -73,7 +83,7 @@ public final class LoginContent {
         return resources;
     }
 
-    private static Map<String, String> stringValues(Map<String, byte[]> byteMap) {
+    private Map<String, String> stringValues(Map<String, byte[]> byteMap) {
 
         return byteMap.entrySet().stream()
                 .map(kv -> Map.entry(kv.getKey(), new String(kv.getValue(), StandardCharsets.UTF_8)))
@@ -81,13 +91,13 @@ public final class LoginContent {
 
     }
 
-    public static CommonHttpResponse getStaticContent(HttpRequest request) {
+    public CommonHttpResponse getStaticContent(HttpRequest request) {
 
         var uri = URI.create(request.uri());
         var path = uri.getPath();
-        var fileKey = path.replace(LOGIN_PATH_PREFIX, "").toLowerCase();
+        var fileKey = path.replace(pathPrefix, "").toLowerCase();
 
-        var content = STATIC_CONTENT.get(fileKey);
+        var content = staticContent.get(fileKey);
 
         if (content != null) {
 
@@ -109,22 +119,34 @@ public final class LoginContent {
         }
     }
 
-    public static CommonHttpResponse getLoginOkPage(String returnPath) {
+    public CommonHttpResponse getLoginOkPage(String returnPath) {
 
-        var templatePage = PAGE_CONTENT.get(LOGIN_OK_PAGE);
-        var page = templatePage.replace(REDIRECT_VARIABLE, returnPath);
-
-        return servePage(page);
+        var substitutions = Map.of(REDIRECT_VARIABLE, returnPath);
+        return servePage(LOGIN_OK_PAGE, substitutions);
     }
 
-    public static CommonHttpResponse getLoginFormPage() {
+    public CommonHttpResponse getLoginFormPage() {
 
-        var page = PAGE_CONTENT.get(LOGIN_FORM_PAGE);
-
-        return servePage(page);
+        return servePage(LOGIN_FORM_PAGE);
     }
 
-    private static CommonHttpResponse servePage(String page) {
+    public CommonHttpResponse servePage(String pageName) {
+
+        var page = pageContent.get(pageName);
+        return buildPageResponse(page);
+    }
+
+    public CommonHttpResponse servePage(String pageName, Map<String, String> substitutions) {
+
+        var templatePage = pageContent.get(pageName);
+
+        for (var substitution : substitutions.entrySet())
+            templatePage = templatePage.replace(substitution.getKey(), substitution.getValue());
+
+        return buildPageResponse(templatePage);
+    }
+
+    private CommonHttpResponse buildPageResponse(String page) {
 
         var content = page.getBytes(StandardCharsets.UTF_8);
         var buffer = Unpooled.wrappedBuffer(content, 0, content.length);

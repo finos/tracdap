@@ -19,6 +19,7 @@ package org.finos.tracdap.gateway.auth;
 
 import org.finos.tracdap.common.config.ConfigDefaults;
 import org.finos.tracdap.common.config.ConfigKeys;
+import org.finos.tracdap.common.http.HttpHelpers;
 import org.finos.tracdap.common.util.RoutingUtils;
 import org.finos.tracdap.config.AuthenticationConfig;
 import org.finos.tracdap.config.PlatformConfig;
@@ -59,8 +60,8 @@ public class AuthHandlerSettings {
         var returnPath = ConfigDefaults.readOrDefault(authConfig.getReturnPath(), ConfigDefaults.DEFAULT_RETURN_PATH);
         var jwtRefresh = ConfigDefaults.readOrDefault(authConfig.getJwtRefresh(), ConfigDefaults.DEFAULT_JWT_REFRESH);
 
-        this.publicLoginPrefix = joinPathSections(authPrefix, PUBLIC_LOGIN_PREFIX);
-        this.publicLoginUrl = joinPathSections(authPrefix, loginPath);
+        this.publicLoginPrefix = HttpHelpers.joinPathSegments(authPrefix, PUBLIC_LOGIN_PREFIX);
+        this.publicLoginUrl = HttpHelpers.joinPathSegments(authPrefix, loginPath);
         this.publicReturnPath = returnPath;
         this.refreshPath = refreshPath;
         this.refreshInterval = Duration.ofSeconds(jwtRefresh);
@@ -97,21 +98,5 @@ public class AuthHandlerSettings {
 
     public Duration refreshTimeout() {
         return refreshTimeout;
-    }
-
-    private String joinPathSections(String first, String second) {
-
-        if (first.endsWith("/")) {
-            if (second.startsWith("/"))
-                return first + second.substring(1);
-            else
-                return first + second;
-        }
-        else {
-            if (second.startsWith("/"))
-                return first + second;
-            else
-                return first + "/" + second;
-        }
     }
 }
