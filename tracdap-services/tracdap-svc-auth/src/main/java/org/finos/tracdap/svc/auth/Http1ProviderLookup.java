@@ -115,7 +115,12 @@ public class Http1ProviderLookup extends ChannelInboundHandlerAdapter {
 
         var relay = new OutboundRelay(ctx);
         var provider = providerLookup.createProvider(providerKey);
-        var providerChannel = new EmbeddedChannel(relay, provider);
+
+        // Make sure the embedded channel has a reference to the original inbound channel as its parent
+        // For providers that make outbound connections, they need this to share event loop, allocator etc.
+        var providerChannel = new EmbeddedChannel(
+                ctx.channel(), DefaultChannelId.newInstance(),
+                true, false, relay, provider);
 
         providerChannels.put(providerKey, providerChannel);
 
