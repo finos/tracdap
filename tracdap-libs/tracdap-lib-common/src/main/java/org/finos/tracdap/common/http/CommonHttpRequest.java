@@ -23,29 +23,31 @@ import io.netty.handler.codec.Headers;
 import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.HttpRequest;
 
+import java.net.URI;
+
 public class CommonHttpRequest {
 
     private final String method;
-    private final String path;
+    private final URI uri;
     private final Headers<CharSequence, CharSequence, ?> headers;
     private final ByteBuf content;
 
     public static CommonHttpRequest fromHttpRequest(HttpRequest httpRequest) {
 
         var method = httpRequest.method().toString();
-        var path = httpRequest.uri();
+        var uri = URI.create(httpRequest.uri());
         var headers = Http1Headers.wrapHttpHeaders(httpRequest.headers());
 
         var content = (httpRequest instanceof FullHttpRequest)
                 ? ((FullHttpRequest) httpRequest).content()
                 : Unpooled.EMPTY_BUFFER;
 
-        return new CommonHttpRequest(method, path, headers, content);
+        return new CommonHttpRequest(method, uri, headers, content);
     }
 
-    public CommonHttpRequest(String method, String path, Headers<CharSequence, CharSequence, ?> headers, ByteBuf content) {
+    public CommonHttpRequest(String method, URI uri, Headers<CharSequence, CharSequence, ?> headers, ByteBuf content) {
         this.method = method;
-        this.path = path;
+        this.uri = uri;
         this.headers = headers;
         this.content = content;
     }
@@ -54,8 +56,8 @@ public class CommonHttpRequest {
         return method;
     }
 
-    public String path() {
-        return path;
+    public URI uri() {
+        return uri;
     }
 
     public Headers<CharSequence, CharSequence,?> headers() {
