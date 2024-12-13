@@ -27,7 +27,11 @@ prior_version_tag=`git describe --tags --match "v[0-9]*" --abbrev=0 2>/dev/null`
 prior_version_found=$?
 
 
-if [ ${exact_version_found} = 0 ]; then
+if [ -n "${EXPLICIT_VERSION_NUMBER}" ]; then
+
+  version_number=${EXPLICIT_VERSION_NUMBER}
+
+elif [ ${exact_version_found} = 0 ]; then
 
   version_number=`echo ${exact_version_tag} | sed s/^v//`
 
