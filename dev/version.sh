@@ -27,9 +27,9 @@ prior_version_tag=`git describe --tags --match "v[0-9]*" --abbrev=0 2>/dev/null`
 prior_version_found=$?
 
 
-if [ -n "${EXPLICIT_VERSION_NUMBER}" ]; then
+if [ -n "${TRAC_EXPLICIT_VERSION_NUMBER}" ]; then
 
-  version_number=${EXPLICIT_VERSION_NUMBER}
+  version_number=${TRAC_EXPLICIT_VERSION_NUMBER}
 
 elif [ ${exact_version_found} = 0 ]; then
 
