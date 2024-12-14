@@ -194,6 +194,8 @@ jobs:
           pip install -r tracdap-runtime/python/requirements.txt
 
       - name: Build runtime package
+        env:
+          TRAC_PYTHON_BUILD_ISOLATION: false
         run: python tracdap-runtime/python/build_runtime.py --target dist
 
       - name: Save artifacts
