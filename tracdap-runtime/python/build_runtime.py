@@ -43,6 +43,9 @@ COPY_FILES = [
     "src"
 ]
 
+TRAC_PYTHON_BUILD_ISOLATION = os.environ.get("TRAC_PYTHON_BUILD_ISOLATION") or "true"
+BUILD_ISOLATION = TRAC_PYTHON_BUILD_ISOLATION.lower() in ["true", "yes", "1"]
+
 
 def reset_build_dir():
 
@@ -235,6 +238,9 @@ def run_pypa_build():
 
     build_exe = sys.executable
     build_args = ["python", "-m", "build"]
+
+    if not BUILD_ISOLATION:
+        build_args.append('--no-isolation')
 
     build_result = subprocess.run(executable=build_exe, args=build_args, cwd=BUILD_PATH)
 
