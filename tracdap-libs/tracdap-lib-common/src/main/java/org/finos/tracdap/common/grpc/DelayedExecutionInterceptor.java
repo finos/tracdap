@@ -29,10 +29,49 @@ public class DelayedExecutionInterceptor implements ServerInterceptor {
             ServerCall<ReqT, RespT> call, Metadata headers,
             ServerCallHandler<ReqT, RespT> next) {
 
-        return new DelayedExecutionListener<>(call, headers, next);
+        var delayedCall = new DelayedExecutionCall<>(call);
+
+        return new DelayedExecutionListener<>(delayedCall, headers, next);
     }
 
-    private static class DelayedExecutionListener<ReqT, RespT> extends ForwardingServerCallListener<ReqT> {
+    protected static class DelayedExecutionCall<ReqT, RespT> extends ForwardingServerCall.SimpleForwardingServerCall<ReqT, RespT> {
+
+        private long totalRequested;
+
+        public DelayedExecutionCall(ServerCall<ReqT, RespT> delegate) {
+            super(delegate);
+        }
+
+        @Override
+        public void request(int numMessages) {
+
+            // In the listener, onReady() sends out an extra request() call to pull the first message
+            // When the first request() comes from the main handler, it is a duplicate
+            // This method ignores the second request in the stream, to discard that duplicate
+
+            var priorRequested = totalRequested;
+
+            totalRequested += numMessages;
+
+            if (priorRequested >= 2) {
+                delegate().request(numMessages);
+            }
+            else if (priorRequested == 1) {
+                if (numMessages > 1)
+                    delegate().request(numMessages - 1);
+            }
+            else {
+                if (numMessages == 1) {
+                    delegate().request(numMessages);
+                }
+                else {
+                    delegate().request(numMessages - 1);
+                }
+            }
+        }
+    }
+
+    protected static class DelayedExecutionListener<ReqT, RespT> extends ForwardingServerCallListener<ReqT> {
 
         private final ServerCall<ReqT, RespT> call;
         private final Metadata headers;
