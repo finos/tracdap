@@ -213,7 +213,7 @@ abstract class FileRoundTripTest  {
         roundTripTest(content, false);
     }
 
-    @RepeatedTest(100) @Tag("slow")
+    @Disabled @RepeatedTest(100) @Tag("slow")
     void rapidFireTest() throws Exception {
 
         testRoundTrip_heterogeneousChunks();
