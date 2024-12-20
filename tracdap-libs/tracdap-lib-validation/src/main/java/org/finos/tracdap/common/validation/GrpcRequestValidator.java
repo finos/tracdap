@@ -25,6 +25,8 @@ import org.finos.tracdap.common.grpc.GrpcServiceRegister;
 import com.google.protobuf.Descriptors;
 import com.google.protobuf.Message;
 import io.grpc.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class GrpcRequestValidator extends DelayedExecutionInterceptor {
@@ -32,12 +34,21 @@ public class GrpcRequestValidator extends DelayedExecutionInterceptor {
     // Validation requires delayed execution, because it has to wait for the first onMessage() call
     // Use delayed interceptor as a base, which has the logic to manage the request sequence
 
+    private final Logger log = LoggerFactory.getLogger(getClass());
+
     private final GrpcServiceRegister serviceRegister;
     private final Validator validator;
 
+    private final boolean loggingEnabled;
+
     public GrpcRequestValidator(GrpcServiceRegister serviceRegister) {
+        this(serviceRegister, true);
+    }
+
+    public GrpcRequestValidator(GrpcServiceRegister serviceRegister, boolean loggingEnabled) {
         this.serviceRegister = serviceRegister;
         this.validator = new Validator();
+        this.loggingEnabled = loggingEnabled;
     }
 
     @Override
@@ -48,20 +59,22 @@ public class GrpcRequestValidator extends DelayedExecutionInterceptor {
 
         var validationCall = new DelayedExecutionCall<>(serverCall);
 
-        return new ValidationListener<>(validationCall, metadata, nextHandler);
+        return new ValidationListener<>(validationCall, metadata, nextHandler, loggingEnabled);
     }
 
     private class ValidationListener<ReqT, RespT> extends DelayedExecutionListener<ReqT, RespT> {
 
         private final ServerCall<ReqT, RespT> serverCall;
         private final Descriptors.MethodDescriptor methodDescriptor;
+        private final boolean loggingEnabled;
 
         private boolean validated = false;
 
         public ValidationListener(
                 ServerCall<ReqT, RespT> serverCall,
                 Metadata metadata,
-                ServerCallHandler<ReqT, RespT> nextHandler) {
+                ServerCallHandler<ReqT, RespT> nextHandler,
+                boolean loggingEnabled) {
 
             // Using setReady(false) will prevent delayed interceptor from calling startCall()
 
@@ -73,6 +86,7 @@ public class GrpcRequestValidator extends DelayedExecutionInterceptor {
 
             this.serverCall = serverCall;
             this.methodDescriptor = serviceRegister.getMethodDescriptor(grpcMethodName);
+            this.loggingEnabled = loggingEnabled;
         }
 
         @Override
@@ -93,7 +107,19 @@ public class GrpcRequestValidator extends DelayedExecutionInterceptor {
                 catch (EValidation validationError) {
 
                     var mappedError = GrpcErrorMapping.processError(validationError);
-                    serverCall.close(mappedError.getStatus(), mappedError.getTrailers());
+                    var status  = mappedError.getStatus();
+
+                    // Allow logging to be turned on / off to avoid duplicate logs
+                    // E.g. if this interceptor is behind the logging interceptor
+                    if (loggingEnabled) {
+
+                        log.error("VALIDATION FAILED: {}() {}",
+                                methodDescriptor.getName(),
+                                status.getDescription(),
+                                status.getCause());
+                    }
+
+                    serverCall.close(status, mappedError.getTrailers());
                 }
             }
 
