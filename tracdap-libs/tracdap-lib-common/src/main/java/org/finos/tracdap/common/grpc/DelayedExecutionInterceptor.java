@@ -79,6 +79,7 @@ public class DelayedExecutionInterceptor implements ServerInterceptor {
 
         private ServerCall.Listener<ReqT> delegate;
         private boolean ready;
+        private boolean firstRequestSent;
 
         public DelayedExecutionListener(
                 ServerCall<ReqT, RespT> call, Metadata headers,
@@ -124,10 +125,21 @@ public class DelayedExecutionInterceptor implements ServerInterceptor {
 
             // Do not trigger startCall() until the first real message is received
 
-            if (delegate == null)
-                call.request(1);
+            if (delegate == null) {
+                if (!firstRequestSent) {
+                    firstRequestSent = true;
+                    call.request(1);
+                }
+            }
             else
                 delegate.onReady();
+        }
+
+        @Override
+        public void onCancel() {
+
+            if (delegate != null)
+                delegate.onCancel();
         }
     }
 
