@@ -29,9 +29,6 @@ public class DelayedExecutionInterceptor implements ServerInterceptor {
             ServerCall<ReqT, RespT> call, Metadata headers,
             ServerCallHandler<ReqT, RespT> next) {
 
-        // Since startCall() is not called yet, request a message to trigger the listener
-        call.request(1);
-
         return new DelayedExecutionListener<>(call, headers, next);
     }
 
@@ -64,6 +61,17 @@ public class DelayedExecutionInterceptor implements ServerInterceptor {
         private void startCall() {
 
             delegate = next.startCall(call, headers);
+        }
+
+        @Override
+        public void onReady() {
+
+            // Do not trigger startCall() until the first real message is received
+
+            if (delegate == null)
+                call.request(1);
+            else
+                delegate.onReady();
         }
     }
 }
