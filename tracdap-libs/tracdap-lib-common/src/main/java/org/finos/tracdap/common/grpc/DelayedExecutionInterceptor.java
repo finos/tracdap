@@ -78,6 +78,7 @@ public class DelayedExecutionInterceptor implements ServerInterceptor {
         private final ServerCallHandler<ReqT, RespT> next;
 
         private ServerCall.Listener<ReqT> delegate;
+        private boolean ready;
 
         public DelayedExecutionListener(
                 ServerCall<ReqT, RespT> call, Metadata headers,
@@ -86,20 +87,36 @@ public class DelayedExecutionInterceptor implements ServerInterceptor {
             this.call = call;
             this.headers = headers;
             this.next = next;
+
+            // By default, the interceptor is ready and can respond as soon as events arrive
+            this.ready = true;
         }
 
         @Override
+        @SuppressWarnings("unchecked")
         protected ServerCall.Listener<ReqT> delegate() {
 
-            if (delegate == null)
-                startCall();
+            if (delegate != null)
+                return delegate;
 
-            return delegate;
+            else if (ready) {
+                startCall();
+                return delegate;
+            }
+
+            return (ServerCall.Listener<ReqT>) NOOP_SINK;
         }
 
-        private void startCall() {
+        protected void startCall() {
 
             delegate = next.startCall(call, headers);
+        }
+
+        protected void setReady(boolean ready) {
+
+            // Allow child classes to delay the flow of events by turning this flag on / off
+
+            this.ready = ready;
         }
 
         @Override
@@ -113,4 +130,6 @@ public class DelayedExecutionInterceptor implements ServerInterceptor {
                 delegate.onReady();
         }
     }
+
+    private static final ServerCall.Listener<?> NOOP_SINK = new ServerCall.Listener<>() {};
 }

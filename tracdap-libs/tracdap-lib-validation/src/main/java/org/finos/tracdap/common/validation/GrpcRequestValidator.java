@@ -18,6 +18,7 @@
 package org.finos.tracdap.common.validation;
 
 import org.finos.tracdap.common.exception.EValidation;
+import org.finos.tracdap.common.grpc.DelayedExecutionInterceptor;
 import org.finos.tracdap.common.grpc.GrpcErrorMapping;
 import org.finos.tracdap.common.grpc.GrpcServiceRegister;
 
@@ -26,7 +27,10 @@ import com.google.protobuf.Message;
 import io.grpc.*;
 
 
-public class GrpcRequestValidator implements ServerInterceptor {
+public class GrpcRequestValidator extends DelayedExecutionInterceptor {
+
+    // Validation requires delayed execution, because it has to wait for the first onMessage() call
+    // Use delayed interceptor as a base, which has the logic to manage the request sequence
 
     private final GrpcServiceRegister serviceRegister;
     private final Validator validator;
@@ -42,18 +46,16 @@ public class GrpcRequestValidator implements ServerInterceptor {
             ServerCall<ReqT, RespT> serverCall, Metadata metadata,
             ServerCallHandler<ReqT, RespT> nextHandler) {
 
-        return new ValidationListener<>(serverCall, metadata, nextHandler);
+        var validationCall = new DelayedExecutionCall<>(serverCall);
+
+        return new ValidationListener<>(validationCall, metadata, nextHandler);
     }
 
-    private class ValidationListener<ReqT, RespT> extends ForwardingServerCallListener<ReqT> {
+    private class ValidationListener<ReqT, RespT> extends DelayedExecutionListener<ReqT, RespT> {
 
         private final ServerCall<ReqT, RespT> serverCall;
-        private final Metadata metadata;
-        private final ServerCallHandler<ReqT, RespT> nextHandler;
-
         private final Descriptors.MethodDescriptor methodDescriptor;
 
-        private ServerCall.Listener<ReqT> delegate = null;
         private boolean validated = false;
 
         public ValidationListener(
@@ -61,33 +63,16 @@ public class GrpcRequestValidator implements ServerInterceptor {
                 Metadata metadata,
                 ServerCallHandler<ReqT, RespT> nextHandler) {
 
-            this.serverCall = serverCall;
-            this.metadata = metadata;
-            this.nextHandler = nextHandler;
+            // Using setReady(false) will prevent delayed interceptor from calling startCall()
+
+            super(serverCall, metadata, nextHandler);
+            super.setReady(false);
 
             var grpcDescriptor = serverCall.getMethodDescriptor();
             var grpcMethodName = grpcDescriptor.getFullMethodName();
 
+            this.serverCall = serverCall;
             this.methodDescriptor = serviceRegister.getMethodDescriptor(grpcMethodName);
-        }
-
-        @Override
-        @SuppressWarnings("unchecked")
-        protected ServerCall.Listener<ReqT> delegate() {
-
-            if (delegate != null)
-                return delegate;
-
-            return (ServerCall.Listener<ReqT>) NOOP_SINK;
-        }
-
-        @Override
-        public void onReady() {
-
-            if (delegate == null)
-                serverCall.request(1);
-            else
-                delegate.onReady();
         }
 
         @Override
@@ -102,8 +87,8 @@ public class GrpcRequestValidator implements ServerInterceptor {
                     validator.validateFixedMethod(message, methodDescriptor);
                     validated = true;
 
-                    // Start the server call, messages will be passed on instead of going to the no-op sink
-                    delegate = nextHandler.startCall(serverCall, metadata);
+                    // Allow delayed interceptor to call startCAll() and start the normal flow of events
+                    setReady(true);
                 }
                 catch (EValidation validationError) {
 
@@ -112,10 +97,8 @@ public class GrpcRequestValidator implements ServerInterceptor {
                 }
             }
 
-            // If validation has not succeeded, messages are sent to the no-op sink
+            // If validation has not succeeded, messages are sent to a no-op sink
             delegate().onMessage(req);
         }
     }
-
-    private static final ServerCall.Listener<?> NOOP_SINK= new ServerCall.Listener<>() {};
 }
