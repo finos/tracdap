@@ -17,6 +17,7 @@
 
 package org.finos.tracdap.svc.data;
 
+import org.finos.tracdap.api.Data;
 import org.finos.tracdap.api.internal.TrustedMetadataApiGrpc;
 import org.finos.tracdap.common.netty.*;
 import org.finos.tracdap.common.auth.InternalAuthProvider;
@@ -35,6 +36,7 @@ import org.finos.tracdap.common.service.CommonServiceBase;
 import org.finos.tracdap.common.storage.IStorageManager;
 import org.finos.tracdap.common.storage.StorageManager;
 import org.finos.tracdap.common.util.RoutingUtils;
+import org.finos.tracdap.common.validation.GrpcRequestValidator;
 import org.finos.tracdap.config.PlatformConfig;
 import org.finos.tracdap.config.ServiceConfig;
 import org.finos.tracdap.config.StorageConfig;
@@ -177,6 +179,10 @@ public class TracDataService extends CommonServiceBase {
             var dataSvc = new DataService(storageConfig, tenantConfig, storage, formats, metaClient, internalAuth);
             var dataApi = new TracDataApi(dataSvc, fileSvc, eventLoopResolver, arrowAllocator);
 
+            var serviceRegister = GrpcServiceRegister.newBuilder()
+                    .registerServices(Data.getDescriptor().getServices())
+                    .build();
+
             // Create the main server
 
             this.server = NettyServerBuilder
@@ -198,8 +204,10 @@ public class TracDataService extends CommonServiceBase {
                     // Interceptors
                     .intercept(new ErrorMappingInterceptor())
                     .intercept(new LoggingServerInterceptor(TracDataApi.class))
-                    .intercept(new CompressionServerInterceptor())
+                    .intercept(new GrpcRequestValidator(serviceRegister))
                     .intercept(new GrpcAuthValidator(platformConfig.getAuthentication(), tokenProcessor))
+                    .intercept(new CompressionServerInterceptor())
+                    .intercept(new DelayedExecutionInterceptor())
 
                     .build();
 

@@ -17,6 +17,7 @@
 
 package org.finos.tracdap.svc.orch;
 
+import org.finos.tracdap.api.Orchestrator;
 import org.finos.tracdap.api.internal.TrustedMetadataApiGrpc;
 import org.finos.tracdap.common.auth.InternalAuthProvider;
 import org.finos.tracdap.common.auth.JwtSetup;
@@ -32,6 +33,7 @@ import org.finos.tracdap.common.grpc.*;
 import org.finos.tracdap.common.plugin.PluginManager;
 import org.finos.tracdap.common.service.CommonServiceBase;
 import org.finos.tracdap.common.util.RoutingUtils;
+import org.finos.tracdap.common.validation.GrpcRequestValidator;
 import org.finos.tracdap.config.PlatformConfig;
 import org.finos.tracdap.config.ServiceConfig;
 import org.finos.tracdap.svc.orch.api.TracOrchestratorApi;
@@ -151,6 +153,10 @@ public class TracOrchestratorService extends CommonServiceBase {
             jobExecutor.start(clientChannelFactory);
             jobManager.start();
 
+            var serviceRegister = GrpcServiceRegister.newBuilder()
+                    .registerServices(Orchestrator.getDescriptor().getServices())
+                    .build();
+
             this.server = NettyServerBuilder
                     .forPort(serviceConfig.getPort())
 
@@ -166,8 +172,10 @@ public class TracOrchestratorService extends CommonServiceBase {
 
                     .intercept(new ErrorMappingInterceptor())
                     .intercept(new LoggingServerInterceptor(TracOrchestratorService.class))
-                    .intercept(new CompressionServerInterceptor())
+                    .intercept(new GrpcRequestValidator(serviceRegister))
                     .intercept(new GrpcAuthValidator(platformConfig.getAuthentication(), jwtProcessor))
+                    .intercept(new CompressionServerInterceptor())
+                    .intercept(new DelayedExecutionInterceptor())
 
                     // The main service
                     .addService(new TracOrchestratorApi(jobManager, jobProcessor))

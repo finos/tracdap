@@ -17,36 +17,24 @@
 
 package org.finos.tracdap.svc.orch.api;
 
-import com.google.protobuf.Descriptors;
-import com.google.protobuf.Message;
+
 import org.finos.tracdap.api.*;
 import org.finos.tracdap.common.exception.ECacheNotFound;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.grpc.GrpcServerWrap;
 import org.finos.tracdap.common.metadata.MetadataUtil;
-import org.finos.tracdap.common.validation.Validator;
-import io.grpc.MethodDescriptor;
-import io.grpc.stub.StreamObserver;
 import org.finos.tracdap.svc.orch.service.JobManager;
 import org.finos.tracdap.svc.orch.service.JobProcessor;
+
+import io.grpc.stub.StreamObserver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.util.function.Function;
 
 
 public class TracOrchestratorApi extends TracOrchestratorApiGrpc.TracOrchestratorApiImplBase {
 
-    private static final String SERVICE_NAME = TracOrchestratorApiGrpc.SERVICE_NAME.substring(TracOrchestratorApiGrpc.SERVICE_NAME.lastIndexOf(".") + 1);
-    private static final Descriptors.ServiceDescriptor TRAC_ORCHESTRATOR_SERVICE = Orchestrator.getDescriptor().findServiceByName(SERVICE_NAME);
-
-    private static final MethodDescriptor<JobRequest, JobStatus> VALIDATE_JOB_METHOD = TracOrchestratorApiGrpc.getValidateJobMethod();
-    private static final MethodDescriptor<JobRequest, JobStatus> SUBMIT_JOB_METHOD = TracOrchestratorApiGrpc.getSubmitJobMethod();
-    private static final MethodDescriptor<JobStatusRequest, JobStatus> CHECK_JOB_METHOD = TracOrchestratorApiGrpc.getCheckJobMethod();
-
     private final Logger log = LoggerFactory.getLogger(getClass());
 
-    private final Validator validator;
     private final GrpcServerWrap grpcWrap;
     private final JobManager jobManager;
     private final JobProcessor jobProcessor;
@@ -54,7 +42,6 @@ public class TracOrchestratorApi extends TracOrchestratorApiGrpc.TracOrchestrato
 
     public TracOrchestratorApi(JobManager jobManager, JobProcessor jobProcessor) {
 
-        this.validator = new Validator();
         this.grpcWrap = new GrpcServerWrap();
         this.jobManager = jobManager;
         this.jobProcessor = jobProcessor;
@@ -63,25 +50,19 @@ public class TracOrchestratorApi extends TracOrchestratorApiGrpc.TracOrchestrato
     @Override
     public void validateJob(JobRequest request, StreamObserver<JobStatus> responseObserver) {
 
-        grpcWrap.unaryCall(
-                request, responseObserver,
-                apiFunc(VALIDATE_JOB_METHOD, this::validateJobImpl));
+        grpcWrap.unaryCall(request, responseObserver, this::validateJobImpl);
     }
 
     @Override
     public void submitJob(JobRequest request, StreamObserver<JobStatus> responseObserver) {
 
-        grpcWrap.unaryCall(
-                request, responseObserver,
-                apiFunc(SUBMIT_JOB_METHOD, this::submitJobImpl));
+        grpcWrap.unaryCall(request, responseObserver,this::submitJobImpl);
     }
 
     @Override
     public void checkJob(JobStatusRequest request, StreamObserver<JobStatus> responseObserver) {
 
-        grpcWrap.unaryCall(
-                request, responseObserver,
-                apiFunc(CHECK_JOB_METHOD, this::checkJobImpl));
+        grpcWrap.unaryCall(request, responseObserver, this::checkJobImpl);
     }
 
     @Override
@@ -92,20 +73,6 @@ public class TracOrchestratorApi extends TracOrchestratorApiGrpc.TracOrchestrato
     @Override
     public void cancelJob(JobStatusRequest request, StreamObserver<JobStatus> responseObserver) {
         super.cancelJob(request, responseObserver);
-    }
-
-    private <TReq extends Message, TResp extends Message>
-    Function<TReq, TResp>
-    apiFunc(MethodDescriptor<TReq, TResp> method, Function<TReq, TResp> func) {
-
-        var protoMethod = TRAC_ORCHESTRATOR_SERVICE.findMethodByName(method.getBareMethodName());
-
-        return req -> {
-
-            validator.validateFixedMethod(req, protoMethod);
-
-            return func.apply(req);
-        };
     }
 
     private JobStatus validateJobImpl(JobRequest request) {

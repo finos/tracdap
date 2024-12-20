@@ -17,18 +17,19 @@
 
 package org.finos.tracdap.svc.meta;
 
+import org.finos.tracdap.api.Metadata;
+import org.finos.tracdap.api.internal.MetadataTrusted;
 import org.finos.tracdap.common.auth.JwtSetup;
 import org.finos.tracdap.common.auth.GrpcAuthValidator;
 import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.exception.EStartup;
-import org.finos.tracdap.common.grpc.CompressionServerInterceptor;
-import org.finos.tracdap.common.grpc.ErrorMappingInterceptor;
-import org.finos.tracdap.common.grpc.LoggingServerInterceptor;
+import org.finos.tracdap.common.grpc.*;
 import org.finos.tracdap.common.netty.NettyHelpers;
 import org.finos.tracdap.common.plugin.PluginManager;
 import org.finos.tracdap.common.service.CommonServiceBase;
 import org.finos.tracdap.common.util.InterfaceLogging;
+import org.finos.tracdap.common.validation.GrpcRequestValidator;
 import org.finos.tracdap.config.PlatformConfig;
 import org.finos.tracdap.svc.meta.dal.IMetadataDal;
 import org.finos.tracdap.svc.meta.services.MetadataReadService;
@@ -132,15 +133,22 @@ public class TracMetadataService extends CommonServiceBase {
             // This setup is thread-per-request using a thread pool executor
             // Underlying Netty pools / ELs are managed automatically by gRPC for now
 
+            var serviceRegister = GrpcServiceRegister.newBuilder()
+                    .registerServices(Metadata.getDescriptor().getServices())
+                    .registerServices(MetadataTrusted.getDescriptor().getServices())
+                    .build();
+
             this.server = ServerBuilder
                     .forPort(servicePort)
-                    .intercept(new ErrorMappingInterceptor())
-                    .intercept(new LoggingServerInterceptor(TracMetadataApi.class))
-                    .intercept(new CompressionServerInterceptor())
-                    .intercept(new GrpcAuthValidator(platformConfig.getAuthentication(), jwtValidator))
+                    .executor(executor)
                     .addService(publicApi)
                     .addService(trustedApi)
-                    .executor(executor)
+                    .intercept(new ErrorMappingInterceptor())
+                    .intercept(new LoggingServerInterceptor(TracMetadataApi.class))
+                    .intercept(new GrpcRequestValidator(serviceRegister))
+                    .intercept(new GrpcAuthValidator(platformConfig.getAuthentication(), jwtValidator))
+                    .intercept(new CompressionServerInterceptor())
+                    .intercept(new DelayedExecutionInterceptor())
                     .build();
 
             // Good to go, let's start!

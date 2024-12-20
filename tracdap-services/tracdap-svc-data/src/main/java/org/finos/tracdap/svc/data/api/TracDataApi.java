@@ -18,7 +18,6 @@
 package org.finos.tracdap.svc.data.api;
 
 import org.finos.tracdap.api.*;
-import org.finos.tracdap.api.Data;
 import org.finos.tracdap.common.netty.EventLoopResolver;
 import org.finos.tracdap.common.auth.GrpcAuthHelpers;
 import org.finos.tracdap.common.data.DataContext;
@@ -26,13 +25,10 @@ import org.finos.tracdap.common.data.IDataContext;
 import org.finos.tracdap.common.data.pipeline.GrpcDownloadSink;
 import org.finos.tracdap.common.data.pipeline.GrpcUploadSource;
 import org.finos.tracdap.common.util.LoggingHelpers;
-import org.finos.tracdap.common.validation.Validator;
 import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.svc.data.service.DataService;
 import org.finos.tracdap.svc.data.service.FileService;
 
-import com.google.protobuf.Message;
-import io.grpc.MethodDescriptor;
 import io.grpc.stub.StreamObserver;
 import org.apache.arrow.memory.BufferAllocator;
 import org.slf4j.Logger;
@@ -46,30 +42,10 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
     private static final long DEFAULT_INITIAL_ALLOCATION = 16 * 1024 * 1024;
     private static final long DEFAULT_MAX_ALLOCATION = 128 * 1024 * 1024;
 
-    private static final MethodDescriptor<DataWriteRequest, TagHeader> CREATE_DATASET_METHOD = TracDataApiGrpc.getCreateDatasetMethod();
-    private static final MethodDescriptor<DataWriteRequest, TagHeader> UPDATE_DATASET_METHOD = TracDataApiGrpc.getUpdateDatasetMethod();
-    private static final MethodDescriptor<DataReadRequest, DataReadResponse> READ_DATASET_METHOD = TracDataApiGrpc.getReadDatasetMethod();
-
-    private static final MethodDescriptor<DataWriteRequest, TagHeader> CREATE_SMALL_DATASET_METHOD = TracDataApiGrpc.getCreateSmallDatasetMethod();
-    private static final MethodDescriptor<DataWriteRequest, TagHeader> UPDATE_SMALL_DATASET_METHOD = TracDataApiGrpc.getUpdateSmallDatasetMethod();
-    private static final MethodDescriptor<DataReadRequest, DataReadResponse> READ_SMALL_DATASET_METHOD = TracDataApiGrpc.getReadSmallDatasetMethod();
-
-    private static final MethodDescriptor<FileWriteRequest, TagHeader> CREATE_FILE_METHOD = TracDataApiGrpc.getCreateFileMethod();
-    private static final MethodDescriptor<FileWriteRequest, TagHeader> UPDATE_FILE_METHOD = TracDataApiGrpc.getUpdateFileMethod();
-    private static final MethodDescriptor<FileReadRequest, FileReadResponse> READ_FILE_METHOD = TracDataApiGrpc.getReadFileMethod();
-
-    private static final MethodDescriptor<FileWriteRequest, TagHeader> CREATE_SMALL_FILE_METHOD = TracDataApiGrpc.getCreateSmallFileMethod();
-    private static final MethodDescriptor<FileWriteRequest, TagHeader> UPDATE_SMALL_FILE_METHOD = TracDataApiGrpc.getUpdateSmallFileMethod();
-    private static final MethodDescriptor<FileReadRequest, FileReadResponse> READ_SMALL_FILE_METHOD = TracDataApiGrpc.getReadSmallFileMethod();
-
-    private static final MethodDescriptor<DownloadRequest, DownloadResponse> DOWNLOAD_FILE_METHOD = TracDataApiGrpc.getDownloadFileMethod();
-    private static final MethodDescriptor<DownloadRequest, DownloadResponse> DOWNLOAD_LATEST_FILE_METHOD = TracDataApiGrpc.getDownloadLatestFileMethod();
-
     private final Logger log = LoggerFactory.getLogger(getClass());
 
     private final DataService dataRwService;
     private final FileService fileService;
-    private final Validator validator;
 
     private final EventLoopResolver eventLoopResolver;
     private final BufferAllocator rootAllocator;
@@ -87,8 +63,6 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
         this.fileService = fileService;
         this.eventLoopResolver = eventLoopResolver;
         this.rootAllocator = allocator;
-
-        this.validator = new Validator();
 
         this.nextReqId = new AtomicLong();
         this.reqInitAllocation = DEFAULT_INITIAL_ALLOCATION;
@@ -113,7 +87,6 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
         var dataStream = upload.dataStream(DataWriteRequest::getContent, dataContext.arrowAllocator());
 
         firstMessage
-                .thenApply(req -> validateRequest(CREATE_DATASET_METHOD, req))
                 .thenCompose(req -> dataRwService.createDataset(req, dataStream, dataContext, userInfo))
                 .thenAccept(upload::succeeded)
                 .exceptionally(upload::failed);
@@ -123,8 +96,6 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
 
     @Override
     public void createSmallDataset(DataWriteRequest request, StreamObserver<TagHeader> responseObserver) {
-
-        validateRequest(CREATE_SMALL_DATASET_METHOD, request);
 
         var upload = createDataset(responseObserver);
 
@@ -145,7 +116,6 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
         var dataStream = upload.dataStream(DataWriteRequest::getContent, dataContext.arrowAllocator());
 
         firstMessage
-                .thenApply(req -> validateRequest(UPDATE_DATASET_METHOD, req))
                 .thenCompose(req -> dataRwService.updateDataset(req, dataStream, dataContext, userInfo))
                 .thenAccept(upload::succeeded)
                 .exceptionally(upload::failed);
@@ -156,8 +126,6 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
     @Override
     public void updateSmallDataset(DataWriteRequest request, StreamObserver<TagHeader> responseObserver) {
 
-        validateRequest(UPDATE_SMALL_DATASET_METHOD, request);
-
         var upload = updateDataset(responseObserver);
 
         upload.onNext(request);
@@ -167,17 +135,16 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
     @Override
     public void readDataset(DataReadRequest request, StreamObserver<DataReadResponse> responseObserver) {
 
-        readDataset(READ_DATASET_METHOD, request, responseObserver, GrpcDownloadSink.STREAMING);
+        readDataset(request, responseObserver, GrpcDownloadSink.STREAMING);
     }
 
     @Override
     public void readSmallDataset(DataReadRequest request, StreamObserver<DataReadResponse> responseObserver) {
 
-        readDataset(READ_SMALL_DATASET_METHOD, request, responseObserver, GrpcDownloadSink.AGGREGATED);
+        readDataset(request, responseObserver, GrpcDownloadSink.AGGREGATED);
     }
 
     private void readDataset(
-            MethodDescriptor<DataReadRequest, DataReadResponse> method,
             DataReadRequest request, StreamObserver<DataReadResponse> responseObserver,
             boolean streamingMode) {
 
@@ -191,7 +158,6 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
         var dataStream = download.dataStream(DataReadResponse.Builder::setContent);
 
         download.start(request)
-                .thenApply(req -> validateRequest(method, req))
                 .thenAccept(req -> dataRwService.readDataset(req, firstMessage, dataStream, dataContext, userInfo))
                 .exceptionally(download::failed);
     }
@@ -209,7 +175,6 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
         var dataStream = upload.dataStream(FileWriteRequest::getContent, dataContext.arrowAllocator());
 
         firstMessage
-                .thenApply(req -> validateRequest(CREATE_FILE_METHOD, req))
                 .thenCompose(req -> fileService.createFile(
                         req.getTenant(),
                         req.getTagUpdatesList(),
@@ -225,8 +190,6 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
 
     @Override
     public void createSmallFile(FileWriteRequest request, StreamObserver<TagHeader> responseObserver) {
-
-        validateRequest(CREATE_SMALL_FILE_METHOD, request);
 
         var upload = createFile(responseObserver);
 
@@ -247,7 +210,6 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
         var dataStream = upload.dataStream(FileWriteRequest::getContent, dataContext.arrowAllocator());
 
         firstMessage
-                .thenApply(req -> validateRequest(UPDATE_FILE_METHOD, req))
                 .thenCompose(req -> fileService.updateFile(
                         req.getTenant(),
                         req.getTagUpdatesList(),
@@ -265,8 +227,6 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
     @Override
     public void updateSmallFile(FileWriteRequest request, StreamObserver<TagHeader> responseObserver) {
 
-        validateRequest(UPDATE_SMALL_FILE_METHOD, request);
-
         var upload = updateFile(responseObserver);
 
         upload.onNext(request);
@@ -277,19 +237,17 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
     public void readFile(FileReadRequest request, StreamObserver<FileReadResponse> responseObserver) {
 
         var download = new GrpcDownloadSink<>(responseObserver, FileReadResponse::newBuilder, GrpcDownloadSink.STREAMING);
-        readFile(READ_FILE_METHOD, request, download);
+        readFile(request, download);
     }
 
     @Override
     public void readSmallFile(FileReadRequest request, StreamObserver<FileReadResponse> responseObserver) {
 
         var download = new GrpcDownloadSink<>(responseObserver, FileReadResponse::newBuilder, GrpcDownloadSink.AGGREGATED);
-        readFile(READ_SMALL_FILE_METHOD, request, download);
+        readFile(request, download);
     }
 
-    private void readFile(
-            MethodDescriptor<FileReadRequest, FileReadResponse> method, FileReadRequest request,
-            GrpcDownloadSink<FileReadResponse, FileReadResponse.Builder> download) {
+    private void readFile(FileReadRequest request, GrpcDownloadSink<FileReadResponse, FileReadResponse.Builder> download) {
 
         var dataContext = prepareDataContext();
         var userInfo = GrpcAuthHelpers.currentUser();
@@ -300,7 +258,6 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
         var dataStream = download.dataStream(FileReadResponse.Builder::setContent);
 
         download.start(request)
-                .thenApply(req -> validateRequest(method, req))
                 .thenAccept(req -> fileService.readFile(
                         request.getTenant(),
                         request.getSelector(),
@@ -320,7 +277,7 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
                 .build();
 
         var download = new GrpcDownloadSink<>(responseObserver, DownloadResponse::newBuilder, GrpcDownloadSink.STREAMING);
-        downloadFile(DOWNLOAD_FILE_METHOD, request, selector, download);
+        downloadFile(request, selector, download);
     }
 
     @Override
@@ -334,11 +291,10 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
                 .build();
 
         var download = new GrpcDownloadSink<>(responseObserver, DownloadResponse::newBuilder, GrpcDownloadSink.STREAMING);
-        downloadFile(DOWNLOAD_LATEST_FILE_METHOD, request, selector, download);
+        downloadFile(request, selector, download);
     }
 
     private void downloadFile(
-            MethodDescriptor<DownloadRequest, DownloadResponse> method,
             DownloadRequest request, TagSelector selector,
             GrpcDownloadSink<DownloadResponse, DownloadResponse.Builder> download) {
 
@@ -355,7 +311,6 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
         var dataStream = download.dataStream(DownloadResponse.Builder::setContent);
 
         download.start(request)
-                .thenApply(req -> validateRequest(method, req))
                 .thenAccept(req -> fileService.readFile(
                         request.getTenant(), selector,
                         firstMessage, dataStream,
@@ -415,18 +370,5 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
                         LoggingHelpers.formatFileSize(peak),
                         LoggingHelpers.formatFileSize(retained));
         }
-    }
-
-    private <TReq extends Message>
-    TReq validateRequest(MethodDescriptor<TReq, ?> method, TReq request) {
-
-        var protoMethod = Data.getDescriptor()
-                .getFile()
-                .findServiceByName("TracDataApi")
-                .findMethodByName(method.getBareMethodName());
-
-        validator.validateFixedMethod(request, protoMethod);
-
-        return request;
     }
 }

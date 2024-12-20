@@ -18,32 +18,20 @@
 package org.finos.tracdap.svc.meta.api;
 
 import org.finos.tracdap.api.*;
-import org.finos.tracdap.api.internal.TrustedMetadataApiGrpc;
 import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.common.exception.EAuthorization;
-import org.finos.tracdap.common.validation.Validator;
 import org.finos.tracdap.svc.meta.services.MetadataReadService;
 import org.finos.tracdap.svc.meta.services.MetadataSearchService;
 import org.finos.tracdap.svc.meta.services.MetadataWriteService;
-
-import com.google.protobuf.Descriptors;
-import com.google.protobuf.Message;
-import io.grpc.MethodDescriptor;
 
 import java.util.List;
 import java.util.UUID;
 
 import static org.finos.tracdap.common.metadata.MetadataConstants.PUBLIC_WRITABLE_OBJECT_TYPES;
-import static org.finos.tracdap.svc.meta.api.TracMetadataApi.*;
-import static org.finos.tracdap.svc.meta.api.TrustedMetadataApi.CREATE_PREALLOCATED_OBJECT_METHOD;
-import static org.finos.tracdap.svc.meta.api.TrustedMetadataApi.PREALLOCATE_ID_METHOD;
 import static org.finos.tracdap.svc.meta.services.MetadataConstants.PUBLIC_API;
 
 
 public class MetadataApiImpl {
-
-    private final Descriptors.ServiceDescriptor serviceDescriptor;
-    private final Validator validator;
 
     private final MetadataReadService readService;
     private final MetadataWriteService writeService;
@@ -52,14 +40,10 @@ public class MetadataApiImpl {
     private final boolean apiTrustLevel;
 
     public MetadataApiImpl(
-            Descriptors.ServiceDescriptor serviceDescriptor,
             MetadataReadService readService,
             MetadataWriteService writeService,
             MetadataSearchService searchService,
             boolean apiTrustLevel) {
-
-        this.serviceDescriptor = serviceDescriptor;
-        this.validator = new Validator();
 
         this.readService = readService;
         this.writeService = writeService;
@@ -68,37 +52,30 @@ public class MetadataApiImpl {
         this.apiTrustLevel = apiTrustLevel;
     }
 
+    @SuppressWarnings("unused")
     PlatformInfoResponse platformInfo(PlatformInfoRequest request) {
-
-        validateRequest(PLATFORM_INFO_METHOD, request);
 
         return readService.platformInfo();
     }
 
+    @SuppressWarnings("unused")
     ListTenantsResponse listTenants(ListTenantsRequest request) {
-
-        validateRequest(LIST_TENANTS_METHOD, request);
 
         return readService.listTenants();
     }
 
     ListResourcesResponse listResources(ListResourcesRequest request) {
 
-        validateRequest(LIST_RESOURCES_METHOD, request);
-
         return readService.listResources(request.getTenant(), request.getResourceType());
     }
 
     ResourceInfoResponse resourceInfo(ResourceInfoRequest request) {
-
-        validateRequest(RESOURCE_INFO_METHOD, request);
 
         return readService.resourceInfo(request.getTenant(), request.getResourceType(), request.getResourceKey());
     }
 
     TagHeader createObject(MetadataWriteRequest request) {
 
-        validateRequest(CREATE_OBJECT_METHOD, request);
         validateObjectType(request.getObjectType());
 
         return writeService.createObject(request.getTenant(), request);
@@ -106,7 +83,6 @@ public class MetadataApiImpl {
 
     TagHeader updateObject(MetadataWriteRequest request) {
 
-        validateRequest(UPDATE_OBJECT_METHOD, request);
         validateObjectType(request.getObjectType());
 
         return writeService.updateObject(request.getTenant(), request);
@@ -116,14 +92,11 @@ public class MetadataApiImpl {
 
         // Do not check object type for update tags, this is allowed for all types in the public API
 
-        validateRequest(UPDATE_TAG_METHOD, request);
-
         return writeService.updateTag(request.getTenant(), request);
     }
 
     TagHeader preallocateId(MetadataWriteRequest request) {
 
-        validateRequest(PREALLOCATE_ID_METHOD, request);
         validateObjectType(request.getObjectType());
 
         var tenant = request.getTenant();
@@ -133,15 +106,12 @@ public class MetadataApiImpl {
 
     TagHeader createPreallocatedObject(MetadataWriteRequest request) {
 
-        validateRequest(CREATE_PREALLOCATED_OBJECT_METHOD, request);
         validateObjectType(request.getObjectType());
 
         return writeService.createPreallocatedObject(request.getTenant(), request);
     }
 
     public MetadataWriteBatchResponse writeBatch(MetadataWriteBatchRequest request) {
-
-        validateRequest(TrustedMetadataApiGrpc.getWriteBatchMethod(), request);
 
         validateListForObjectType(request.getPreallocateIdsList());
         validateListForObjectType(request.getCreatePreallocatedObjectsList());
@@ -155,22 +125,16 @@ public class MetadataApiImpl {
 
     Tag readObject(MetadataReadRequest request) {
 
-        validateRequest(READ_OBJECT_METHOD, request);
-
         return readService.readObject(request.getTenant(), request.getSelector());
     }
 
     MetadataBatchResponse readBatch(MetadataBatchRequest request) {
-
-        validateRequest(READ_BATCH_METHOD, request);
 
         var tags = readService.readObjects(request.getTenant(), request.getSelectorList());
         return MetadataBatchResponse.newBuilder().addAllTag(tags).build();
     }
 
     MetadataSearchResponse search(MetadataSearchRequest request) {
-
-        validateRequest(SEARCH_METHOD, request);
 
         var tenant = request.getTenant();
         var searchParams = request.getSearchParams();
@@ -184,8 +148,6 @@ public class MetadataApiImpl {
 
     Tag getObject(MetadataGetRequest request) {
 
-        validateRequest(GET_OBJECT_METHOD, request);
-
         var tenant = request.getTenant();
         var objectType = request.getObjectType();
         var objectId = UUID.fromString(request.getObjectId());
@@ -197,8 +159,6 @@ public class MetadataApiImpl {
 
     Tag getLatestObject(MetadataGetRequest request) {
 
-        validateRequest(GET_LATEST_OBJECT_METHOD, request);
-
         var tenant = request.getTenant();
         var objectType = request.getObjectType();
         var objectId = UUID.fromString(request.getObjectId());
@@ -208,22 +168,12 @@ public class MetadataApiImpl {
 
     Tag getLatestTag(MetadataGetRequest request) {
 
-        validateRequest(GET_LATEST_TAG_METHOD, request);
-
         var tenant = request.getTenant();
         var objectType = request.getObjectType();
         var objectId = UUID.fromString(request.getObjectId());
         var objectVersion = request.getObjectVersion();
 
         return readService.loadLatestTag(tenant, objectType, objectId, objectVersion);
-    }
-
-    private <TReq extends Message>
-    void validateRequest(MethodDescriptor<TReq, ?> method, TReq request) {
-
-        var protoMethod = serviceDescriptor.findMethodByName(method.getBareMethodName());
-
-        validator.validateFixedMethod(request, protoMethod);
     }
 
     private void validateObjectType(ObjectType objectType) {

@@ -64,6 +64,7 @@ gcsfs == 2024.3.1
 # Force dependency versions for compliance
 
 aiohttp >= 3.9.5
+attrs < 24.3.0
 
 # END_PLUGIN gcp
 
