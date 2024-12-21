@@ -31,42 +31,32 @@ public class DelayedExecutionInterceptor implements ServerInterceptor {
 
         var delayedCall = new DelayedExecutionCall<>(call);
 
-        return new DelayedExecutionListener<>(delayedCall, headers, next);
+        return new  DelayedExecutionListener<>(delayedCall, headers, next);
     }
 
     protected static class DelayedExecutionCall<ReqT, RespT> extends ForwardingServerCall.SimpleForwardingServerCall<ReqT, RespT> {
 
-        private long totalRequested;
+        private boolean firstRequest = true;
 
         public DelayedExecutionCall(ServerCall<ReqT, RespT> delegate) {
+
             super(delegate);
+
+            // Since startCall() is delayed, request one message straight away to start the pipeline
+            delegate.request(1);
         }
 
         @Override
         public void request(int numMessages) {
 
-            // In the listener, onReady() sends out an extra request() call to pull the first message
-            // When the first request() comes from the main handler, it is a duplicate
-            // This method ignores the second request in the stream, to discard that duplicate
-
-            var priorRequested = totalRequested;
-
-            totalRequested += numMessages;
-
-            if (priorRequested >= 2) {
-                delegate().request(numMessages);
-            }
-            else if (priorRequested == 1) {
+            // Ignore the first request in the pipeline (do not send a duplicate)
+            if (firstRequest) {
+                firstRequest = false;
                 if (numMessages > 1)
                     delegate().request(numMessages - 1);
             }
             else {
-                if (numMessages == 1) {
-                    delegate().request(numMessages);
-                }
-                else {
-                    delegate().request(numMessages - 1);
-                }
+                delegate().request(numMessages);
             }
         }
     }
@@ -78,7 +68,6 @@ public class DelayedExecutionInterceptor implements ServerInterceptor {
         private final ServerCallHandler<ReqT, RespT> next;
 
         private ServerCall.Listener<ReqT> delegate;
-        private boolean ready;
 
         public DelayedExecutionListener(
                 ServerCall<ReqT, RespT> call, Metadata headers,
@@ -87,36 +76,23 @@ public class DelayedExecutionInterceptor implements ServerInterceptor {
             this.call = call;
             this.headers = headers;
             this.next = next;
-
-            // By default, the interceptor is ready and can respond as soon as events arrive
-            this.ready = true;
         }
 
         @Override
-        @SuppressWarnings("unchecked")
         protected ServerCall.Listener<ReqT> delegate() {
 
-            if (delegate != null)
-                return delegate;
-
-            else if (ready) {
+            if (delegate == null)
                 startCall();
-                return delegate;
-            }
 
-            return (ServerCall.Listener<ReqT>) NOOP_SINK;
+            return delegate;
         }
 
         protected void startCall() {
 
-            delegate = next.startCall(call, headers);
-        }
+            // Do not start the call twice if this method is called explicitly
 
-        protected void setReady(boolean ready) {
-
-            // Allow child classes to delay the flow of events by turning this flag on / off
-
-            this.ready = ready;
+            if (delegate == null)
+                delegate = next.startCall(call, headers);
         }
 
         @Override
@@ -124,12 +100,26 @@ public class DelayedExecutionInterceptor implements ServerInterceptor {
 
             // Do not trigger startCall() until the first real message is received
 
-            if (delegate == null)
-                call.request(1);
-            else
+            if (delegate != null)
                 delegate.onReady();
         }
-    }
 
-    private static final ServerCall.Listener<?> NOOP_SINK = new ServerCall.Listener<>() {};
+        @Override
+        public void onCancel() {
+
+            // Do not trigger startCall() if the request is cancelled before it starts
+
+            if (delegate != null)
+                delegate.onCancel();
+        }
+
+        @Override
+        public void onHalfClose() {
+
+            // Do not trigger startCall() if the request is closed before it starts
+
+            if (delegate != null)
+                delegate.onHalfClose();
+        }
+    }
 }
