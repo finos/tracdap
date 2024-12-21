@@ -17,6 +17,7 @@
 
 package org.finos.tracdap.svc.meta.api;
 
+import io.grpc.stub.StreamObserver;
 import org.finos.tracdap.api.*;
 import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.common.exception.EAuthorization;
@@ -39,7 +40,7 @@ public class MetadataApiImpl {
 
     private final boolean apiTrustLevel;
 
-    public MetadataApiImpl(
+    MetadataApiImpl(
             MetadataReadService readService,
             MetadataWriteService writeService,
             MetadataSearchService searchService,
@@ -53,127 +54,250 @@ public class MetadataApiImpl {
     }
 
     @SuppressWarnings("unused")
-    PlatformInfoResponse platformInfo(PlatformInfoRequest request) {
+    void platformInfo(PlatformInfoRequest request, StreamObserver<PlatformInfoResponse> response) {
 
-        return readService.platformInfo();
+        try {
+            var result = readService.platformInfo();
+            response.onNext(result);
+            response.onCompleted();
+        }
+        catch (Exception error) {
+            response.onError(error);
+        }
     }
 
     @SuppressWarnings("unused")
-    ListTenantsResponse listTenants(ListTenantsRequest request) {
+    void listTenants(ListTenantsRequest request, StreamObserver<ListTenantsResponse> response) {
 
-        return readService.listTenants();
+        try {
+            var result = readService.listTenants();
+            response.onNext(result);
+            response.onCompleted();
+        }
+        catch (Exception error) {
+            response.onError(error);
+        }
     }
 
-    ListResourcesResponse listResources(ListResourcesRequest request) {
+    void listResources(ListResourcesRequest request, StreamObserver<ListResourcesResponse> response) {
 
-        return readService.listResources(request.getTenant(), request.getResourceType());
+        try {
+            var result = readService.listResources(request.getTenant(), request.getResourceType());
+            response.onNext(result);
+            response.onCompleted();
+        }
+        catch (Exception error) {
+            response.onError(error);
+        }
     }
 
-    ResourceInfoResponse resourceInfo(ResourceInfoRequest request) {
+    void resourceInfo(ResourceInfoRequest request, StreamObserver<ResourceInfoResponse> response) {
 
-        return readService.resourceInfo(request.getTenant(), request.getResourceType(), request.getResourceKey());
+        try {
+            var result = readService.resourceInfo(request.getTenant(), request.getResourceType(), request.getResourceKey());
+            response.onNext(result);
+            response.onCompleted();
+        }
+        catch (Exception error) {
+            response.onError(error);
+        }
     }
 
-    TagHeader createObject(MetadataWriteRequest request) {
+    void createObject(MetadataWriteRequest request, StreamObserver<TagHeader> response) {
 
-        validateObjectType(request.getObjectType());
+        try {
 
-        return writeService.createObject(request.getTenant(), request);
+            validateObjectType(request.getObjectType());
+
+            var result = writeService.createObject(request.getTenant(), request);
+            response.onNext(result);
+            response.onCompleted();
+        }
+        catch (Exception error) {
+            response.onError(error);
+        }
     }
 
-    TagHeader updateObject(MetadataWriteRequest request) {
+    void updateObject(MetadataWriteRequest request, StreamObserver<TagHeader> response) {
 
-        validateObjectType(request.getObjectType());
+        try {
 
-        return writeService.updateObject(request.getTenant(), request);
+            validateObjectType(request.getObjectType());
+
+            var result = writeService.updateObject(request.getTenant(), request);
+            response.onNext(result);
+            response.onCompleted();
+        }
+        catch (Exception error) {
+            response.onError(error);
+        }
     }
 
-    TagHeader updateTag(MetadataWriteRequest request) {
+    void updateTag(MetadataWriteRequest request, StreamObserver<TagHeader> response) {
 
-        // Do not check object type for update tags, this is allowed for all types in the public API
+        try {
 
-        return writeService.updateTag(request.getTenant(), request);
+            // Do not check object type for update tags, this is allowed for all types in the public API
+
+            var result = writeService.updateTag(request.getTenant(), request);
+            response.onNext(result);
+            response.onCompleted();
+        }
+        catch (Exception error) {
+            response.onError(error);
+        }
     }
 
-    TagHeader preallocateId(MetadataWriteRequest request) {
+    void preallocateId(MetadataWriteRequest request, StreamObserver<TagHeader> response) {
 
-        validateObjectType(request.getObjectType());
+        try {
 
-        var tenant = request.getTenant();
+            validateObjectType(request.getObjectType());
 
-        return writeService.preallocateId(tenant, request);
+            var result = writeService.preallocateId(request.getTenant(), request);
+            response.onNext(result);
+            response.onCompleted();
+        }
+        catch (Exception error) {
+            response.onError(error);
+        }
     }
 
-    TagHeader createPreallocatedObject(MetadataWriteRequest request) {
+    void createPreallocatedObject(MetadataWriteRequest request, StreamObserver<TagHeader> response) {
 
-        validateObjectType(request.getObjectType());
+        try {
 
-        return writeService.createPreallocatedObject(request.getTenant(), request);
+            validateObjectType(request.getObjectType());
+
+            var result = writeService.createPreallocatedObject(request.getTenant(), request);
+            response.onNext(result);
+            response.onCompleted();
+        }
+        catch (Exception error) {
+            response.onError(error);
+        }
     }
 
-    public MetadataWriteBatchResponse writeBatch(MetadataWriteBatchRequest request) {
+    void writeBatch(MetadataWriteBatchRequest request, StreamObserver<MetadataWriteBatchResponse> response) {
 
-        validateListForObjectType(request.getPreallocateIdsList());
-        validateListForObjectType(request.getCreatePreallocatedObjectsList());
-        validateListForObjectType(request.getCreateObjectsList());
-        validateListForObjectType(request.getUpdateObjectsList());
+        try {
 
-        // Do not check object type for update tags, this is allowed for all types in the public API
+            validateListForObjectType(request.getPreallocateIdsList());
+            validateListForObjectType(request.getCreatePreallocatedObjectsList());
+            validateListForObjectType(request.getCreateObjectsList());
+            validateListForObjectType(request.getUpdateObjectsList());
 
-        return writeService.writeBatch(request);
+            // Do not check object type for update tags, this is allowed for all types in the public API
+
+            var result = writeService.writeBatch(request);
+            response.onNext(result);
+            response.onCompleted();
+        }
+        catch (Exception error) {
+            response.onError(error);
+        }
     }
 
-    Tag readObject(MetadataReadRequest request) {
+    void readObject(MetadataReadRequest request, StreamObserver<Tag> response) {
 
-        return readService.readObject(request.getTenant(), request.getSelector());
+        try {
+            var result = readService.readObject(request.getTenant(), request.getSelector());
+            response.onNext(result);
+            response.onCompleted();
+        }
+        catch (Exception error) {
+            response.onError(error);
+        }
     }
 
-    MetadataBatchResponse readBatch(MetadataBatchRequest request) {
+    void readBatch(MetadataBatchRequest request, StreamObserver<MetadataBatchResponse> response) {
 
-        var tags = readService.readObjects(request.getTenant(), request.getSelectorList());
-        return MetadataBatchResponse.newBuilder().addAllTag(tags).build();
+        try {
+            var tags = readService.readObjects(request.getTenant(), request.getSelectorList());
+            var result = MetadataBatchResponse.newBuilder().addAllTag(tags).build();
+            response.onNext(result);
+            response.onCompleted();
+        }
+        catch (Exception error) {
+            response.onError(error);
+        }
     }
 
-    MetadataSearchResponse search(MetadataSearchRequest request) {
+    void search(MetadataSearchRequest request, StreamObserver<MetadataSearchResponse> response) {
 
-        var tenant = request.getTenant();
-        var searchParams = request.getSearchParams();
+        try {
 
-        var searchResult = searchService.search(tenant, searchParams);
+            var tenant = request.getTenant();
+            var searchParams = request.getSearchParams();
 
-        return MetadataSearchResponse.newBuilder()
-                .addAllSearchResult(searchResult)
-                .build();
+            var searchResult = searchService.search(tenant, searchParams);
+            var result = MetadataSearchResponse.newBuilder()
+                    .addAllSearchResult(searchResult)
+                    .build();
+
+            response.onNext(result);
+            response.onCompleted();
+        }
+        catch (Exception error) {
+            response.onError(error);
+        }
     }
 
-    Tag getObject(MetadataGetRequest request) {
+    void getObject(MetadataGetRequest request, StreamObserver<Tag> response) {
 
-        var tenant = request.getTenant();
-        var objectType = request.getObjectType();
-        var objectId = UUID.fromString(request.getObjectId());
-        var objectVersion = request.getObjectVersion();
-        var tagVersion = request.getTagVersion();
+        try {
 
-        return readService.loadTag(tenant, objectType, objectId, objectVersion, tagVersion);
+            var tenant = request.getTenant();
+            var objectType = request.getObjectType();
+            var objectId = UUID.fromString(request.getObjectId());
+            var objectVersion = request.getObjectVersion();
+            var tagVersion = request.getTagVersion();
+
+            var result = readService.loadTag(tenant, objectType, objectId, objectVersion, tagVersion);
+
+            response.onNext(result);
+            response.onCompleted();
+        }
+        catch (Exception error) {
+            response.onError(error);
+        }
     }
 
-    Tag getLatestObject(MetadataGetRequest request) {
+    void getLatestObject(MetadataGetRequest request, StreamObserver<Tag> response) {
 
-        var tenant = request.getTenant();
-        var objectType = request.getObjectType();
-        var objectId = UUID.fromString(request.getObjectId());
+        try {
 
-        return readService.loadLatestObject(tenant, objectType, objectId);
+            var tenant = request.getTenant();
+            var objectType = request.getObjectType();
+            var objectId = UUID.fromString(request.getObjectId());
+
+            var result = readService.loadLatestObject(tenant, objectType, objectId);
+
+            response.onNext(result);
+            response.onCompleted();
+        }
+        catch (Exception error) {
+            response.onError(error);
+        }
     }
 
-    Tag getLatestTag(MetadataGetRequest request) {
+    void getLatestTag(MetadataGetRequest request, StreamObserver<Tag> response) {
 
-        var tenant = request.getTenant();
-        var objectType = request.getObjectType();
-        var objectId = UUID.fromString(request.getObjectId());
-        var objectVersion = request.getObjectVersion();
+        try {
 
-        return readService.loadLatestTag(tenant, objectType, objectId, objectVersion);
+            var tenant = request.getTenant();
+            var objectType = request.getObjectType();
+            var objectId = UUID.fromString(request.getObjectId());
+            var objectVersion = request.getObjectVersion();
+
+            var result = readService.loadLatestTag(tenant, objectType, objectId, objectVersion);
+
+            response.onNext(result);
+            response.onCompleted();
+        }
+        catch (Exception error) {
+            response.onError(error);
+        }
     }
 
     private void validateObjectType(ObjectType objectType) {

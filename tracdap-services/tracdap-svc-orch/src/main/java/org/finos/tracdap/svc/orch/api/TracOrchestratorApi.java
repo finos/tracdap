@@ -21,7 +21,6 @@ package org.finos.tracdap.svc.orch.api;
 import org.finos.tracdap.api.*;
 import org.finos.tracdap.common.exception.ECacheNotFound;
 import org.finos.tracdap.common.exception.EUnexpected;
-import org.finos.tracdap.common.grpc.GrpcServerWrap;
 import org.finos.tracdap.common.metadata.MetadataUtil;
 import org.finos.tracdap.svc.orch.service.JobManager;
 import org.finos.tracdap.svc.orch.service.JobProcessor;
@@ -35,44 +34,63 @@ public class TracOrchestratorApi extends TracOrchestratorApiGrpc.TracOrchestrato
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
-    private final GrpcServerWrap grpcWrap;
     private final JobManager jobManager;
     private final JobProcessor jobProcessor;
 
 
     public TracOrchestratorApi(JobManager jobManager, JobProcessor jobProcessor) {
 
-        this.grpcWrap = new GrpcServerWrap();
         this.jobManager = jobManager;
         this.jobProcessor = jobProcessor;
     }
 
     @Override
-    public void validateJob(JobRequest request, StreamObserver<JobStatus> responseObserver) {
+    public void validateJob(JobRequest request, StreamObserver<JobStatus> response) {
 
-        grpcWrap.unaryCall(request, responseObserver, this::validateJobImpl);
+        try {
+            var result = validateJobImpl(request);
+            response.onNext(result);
+            response.onCompleted();
+        }
+        catch (Exception error) {
+            response.onError(error);
+        }
     }
 
     @Override
-    public void submitJob(JobRequest request, StreamObserver<JobStatus> responseObserver) {
+    public void submitJob(JobRequest request, StreamObserver<JobStatus> response) {
 
-        grpcWrap.unaryCall(request, responseObserver,this::submitJobImpl);
+        try {
+            var result = submitJobImpl(request);
+            response.onNext(result);
+            response.onCompleted();
+        }
+        catch (Exception error) {
+            response.onError(error);
+        }
     }
 
     @Override
-    public void checkJob(JobStatusRequest request, StreamObserver<JobStatus> responseObserver) {
+    public void checkJob(JobStatusRequest request, StreamObserver<JobStatus> response) {
 
-        grpcWrap.unaryCall(request, responseObserver, this::checkJobImpl);
+        try {
+            var result = checkJobImpl(request);
+            response.onNext(result);
+            response.onCompleted();
+        }
+        catch (Exception error) {
+            response.onError(error);
+        }
     }
 
     @Override
-    public void followJob(JobStatusRequest request, StreamObserver<JobStatus> responseObserver) {
-        super.followJob(request, responseObserver);
+    public void followJob(JobStatusRequest request, StreamObserver<JobStatus> response) {
+        super.followJob(request, response);
     }
 
     @Override
-    public void cancelJob(JobStatusRequest request, StreamObserver<JobStatus> responseObserver) {
-        super.cancelJob(request, responseObserver);
+    public void cancelJob(JobStatusRequest request, StreamObserver<JobStatus> response) {
+        super.cancelJob(request, response);
     }
 
     private JobStatus validateJobImpl(JobRequest request) {
