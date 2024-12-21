@@ -23,16 +23,18 @@ public class ErrorMappingInterceptor implements ServerInterceptor {
 
     @Override
     public <ReqT, RespT> ServerCall.Listener<ReqT> interceptCall(
-            ServerCall<ReqT, RespT> call, Metadata headers,
+            ServerCall<ReqT, RespT> serverCall, Metadata headers,
             ServerCallHandler<ReqT, RespT> next) {
 
-        var errorHandler = new ErrorMappingServerCall<>(call);
-        return next.startCall(errorHandler, headers);
+        var errorMappingCall = new ErrorMappingCall<>(serverCall);
+        var nextListener = next.startCall(errorMappingCall, headers);
+
+        return new ErrorMappingListener<>(nextListener, errorMappingCall);
     }
 
-    private static class ErrorMappingServerCall<ReqT, RespT> extends ForwardingServerCall.SimpleForwardingServerCall<ReqT, RespT> {
+    private static class ErrorMappingCall<ReqT, RespT> extends ForwardingServerCall.SimpleForwardingServerCall<ReqT, RespT> {
 
-        protected ErrorMappingServerCall(ServerCall<ReqT, RespT> delegate) {
+        protected ErrorMappingCall(ServerCall<ReqT, RespT> delegate) {
             super(delegate);
         }
 
@@ -69,4 +71,77 @@ public class ErrorMappingInterceptor implements ServerInterceptor {
         }
     }
 
+    // Catch any errors that propagate from processing a request
+    // Apply error mapping and close the call cleanly
+    // Error mapping distinguishes handled vs. unhandled errors and responds accordingly
+
+    private static class ErrorMappingListener<ReqT, RespT> extends ForwardingServerCallListener.SimpleForwardingServerCallListener<ReqT> {
+
+        private final ServerCall<ReqT, RespT> serverCall;
+
+        public ErrorMappingListener(ServerCall.Listener<ReqT> delegate, ServerCall<ReqT, RespT> serverCall) {
+            super(delegate);
+            this.serverCall = serverCall;
+        }
+
+        @Override
+        public void onReady() {
+
+            try {
+                delegate().onReady();
+            }
+            catch (Throwable error) {
+                var mappedError = GrpcErrorMapping.processError(error);
+                serverCall.close(mappedError.getStatus(), mappedError.getTrailers());
+            }
+        }
+
+        @Override
+        public void onMessage(ReqT message) {
+
+            try {
+                delegate().onMessage(message);
+            }
+            catch (Throwable error) {
+                var mappedError = GrpcErrorMapping.processError(error);
+                serverCall.close(mappedError.getStatus(), mappedError.getTrailers());
+            }
+        }
+
+        @Override
+        public void onHalfClose() {
+
+            try {
+                delegate().onHalfClose();
+            }
+            catch (Throwable error) {
+                var mappedError = GrpcErrorMapping.processError(error);
+                serverCall.close(mappedError.getStatus(), mappedError.getTrailers());
+            }
+        }
+
+        @Override
+        public void onComplete() {
+
+            try {
+                delegate().onComplete();
+            }
+            catch (Throwable error) {
+                var mappedError = GrpcErrorMapping.processError(error);
+                serverCall.close(mappedError.getStatus(), mappedError.getTrailers());
+            }
+        }
+
+        @Override
+        public void onCancel() {
+
+            try {
+                delegate().onCancel();
+            }
+            catch (Throwable error) {
+                var mappedError = GrpcErrorMapping.processError(error);
+                serverCall.close(mappedError.getStatus(), mappedError.getTrailers());
+            }
+        }
+    }
 }
