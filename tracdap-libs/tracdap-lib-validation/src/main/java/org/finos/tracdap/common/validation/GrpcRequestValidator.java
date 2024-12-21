@@ -79,7 +79,6 @@ public class GrpcRequestValidator extends DelayedExecutionInterceptor {
             // Using setReady(false) will prevent delayed interceptor from calling startCall()
 
             super(serverCall, metadata, nextHandler);
-            super.setReady(false);
 
             var grpcDescriptor = serverCall.getMethodDescriptor();
             var grpcMethodName = grpcDescriptor.getFullMethodName();
@@ -101,8 +100,9 @@ public class GrpcRequestValidator extends DelayedExecutionInterceptor {
                     validator.validateFixedMethod(message, methodDescriptor);
                     validated = true;
 
-                    // Allow delayed interceptor to call startCAll() and start the normal flow of events
-                    setReady(true);
+                    // Allow delayed interceptor to start the normal flow of events
+                    startCall();
+                    delegate().onMessage(req);
                 }
                 catch (EValidation validationError) {
 
@@ -122,9 +122,10 @@ public class GrpcRequestValidator extends DelayedExecutionInterceptor {
                     serverCall.close(status, mappedError.getTrailers());
                 }
             }
+            else {
 
-            // If validation has not succeeded, messages are sent to a no-op sink
-            delegate().onMessage(req);
+                delegate().onMessage(req);
+            }
         }
     }
 }
