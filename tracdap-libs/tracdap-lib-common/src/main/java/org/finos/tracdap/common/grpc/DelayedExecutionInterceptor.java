@@ -112,5 +112,14 @@ public class DelayedExecutionInterceptor implements ServerInterceptor {
             if (delegate != null)
                 delegate.onCancel();
         }
+
+        @Override
+        public void onHalfClose() {
+
+            // Do not trigger startCall() if the request is closed before it starts
+
+            if (delegate != null)
+                delegate.onHalfClose();
+        }
     }
 }
