@@ -19,7 +19,6 @@ package org.finos.tracdap.svc.meta.api;
 
 import org.finos.tracdap.api.*;
 import org.finos.tracdap.api.internal.TrustedMetadataApiGrpc;
-import org.finos.tracdap.common.grpc.GrpcServerWrap;
 import org.finos.tracdap.metadata.Tag;
 import org.finos.tracdap.metadata.TagHeader;
 import org.finos.tracdap.svc.meta.services.MetadataConstants;
@@ -33,7 +32,6 @@ import io.grpc.stub.StreamObserver;
 public class TrustedMetadataApi extends TrustedMetadataApiGrpc.TrustedMetadataApiImplBase {
 
     private final MetadataApiImpl apiImpl;
-    private final GrpcServerWrap grpcWrap;
 
     public TrustedMetadataApi(
             MetadataReadService readService,
@@ -41,60 +39,59 @@ public class TrustedMetadataApi extends TrustedMetadataApiGrpc.TrustedMetadataAp
             MetadataSearchService searchService) {
 
         apiImpl = new MetadataApiImpl(readService, writeService, searchService, MetadataConstants.TRUSTED_API);
-        grpcWrap = new GrpcServerWrap();
     }
 
     @Override
     public void writeBatch(MetadataWriteBatchRequest request, StreamObserver<MetadataWriteBatchResponse> response) {
 
-        grpcWrap.unaryCall(request, response, apiImpl::writeBatch);
+        apiImpl.writeBatch(request, response);
     }
 
     @Override
     public void createObject(MetadataWriteRequest request, StreamObserver<TagHeader> response) {
 
-        grpcWrap.unaryCall(request, response, apiImpl::createObject);
+        apiImpl.createObject(request, response);
     }
 
     @Override
     public void updateObject(MetadataWriteRequest request, StreamObserver<TagHeader> response) {
 
-        grpcWrap.unaryCall(request, response, apiImpl::updateObject);
+        apiImpl.updateObject(request, response);
     }
 
     @Override
     public void updateTag(MetadataWriteRequest request, StreamObserver<TagHeader> response) {
 
-        grpcWrap.unaryCall(request, response, apiImpl::updateTag);
+        apiImpl.updateTag(request, response);
     }
 
     @Override
     public void preallocateId(MetadataWriteRequest request, StreamObserver<TagHeader> response) {
 
-        grpcWrap.unaryCall(request, response, apiImpl::preallocateId);
+        apiImpl.preallocateId(request, response);
     }
 
     @Override
     public void createPreallocatedObject(MetadataWriteRequest request, StreamObserver<TagHeader> response) {
 
-        grpcWrap.unaryCall(request, response, apiImpl::createPreallocatedObject);
+        apiImpl.createPreallocatedObject(request, response);
     }
 
     @Override
     public void readObject(MetadataReadRequest request, StreamObserver<Tag> response) {
 
-        grpcWrap.unaryCall(request, response, apiImpl::readObject);
+        apiImpl.readObject(request, response);
     }
 
     @Override
     public void readBatch(MetadataBatchRequest request, StreamObserver<MetadataBatchResponse> response) {
 
-        grpcWrap.unaryCall(request, response, apiImpl::readBatch);
+        apiImpl.readBatch(request, response);
     }
 
     @Override
     public void search(MetadataSearchRequest request, StreamObserver<MetadataSearchResponse> response) {
 
-        grpcWrap.unaryCall(request, response, apiImpl::search);
+        apiImpl.search(request, response);
     }
 }
