@@ -65,9 +65,9 @@ public class GrpcRequestValidator extends DelayedExecutionInterceptor {
     private class ValidationListener<ReqT, RespT> extends DelayedExecutionListener<ReqT, RespT> {
 
         private final ServerCall<ReqT, RespT> serverCall;
-        private final Descriptors.MethodDescriptor methodDescriptor;
         private final boolean loggingEnabled;
 
+        private final Descriptors.MethodDescriptor methodDescriptor;
         private boolean validated = false;
 
         public ValidationListener(
@@ -76,16 +76,16 @@ public class GrpcRequestValidator extends DelayedExecutionInterceptor {
                 ServerCallHandler<ReqT, RespT> nextHandler,
                 boolean loggingEnabled) {
 
-            // Using setReady(false) will prevent delayed interceptor from calling startCall()
-
             super(serverCall, metadata, nextHandler);
 
+            this.serverCall = serverCall;
+            this.loggingEnabled = loggingEnabled;
+
+            // Look up the descriptor for this call, to use for validation
             var grpcDescriptor = serverCall.getMethodDescriptor();
             var grpcMethodName = grpcDescriptor.getFullMethodName();
 
-            this.serverCall = serverCall;
             this.methodDescriptor = serviceRegister.getMethodDescriptor(grpcMethodName);
-            this.loggingEnabled = loggingEnabled;
         }
 
         @Override
