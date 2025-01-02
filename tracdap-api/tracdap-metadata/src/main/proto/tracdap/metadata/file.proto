@@ -37,3 +37,10 @@ message FileDefinition {
   TagSelector storageId = 5;
   string dataItem = 6;
 }
+
+
+message FileType {
+
+  string extension = 1;
+  string mimeType = 2;
+}
