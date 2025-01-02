@@ -182,51 +182,67 @@ class StaticApiImpl(_StaticApiHook):
 
         return converter.infer_schema(dataset)
 
-    def define_input_table(
-            self, *fields: _tp.Union[_meta.FieldSchema, _tp.List[_meta.FieldSchema]],
-            label: _tp.Optional[str] = None, optional: bool = False, dynamic: bool = False,
-            input_props: _tp.Optional[_tp.Dict[str, _tp.Any]] = None) \
-            -> _meta.ModelInputSchema:
+    def define_file_type(self, extension: str, mime_type: str) -> _meta.FileType:
+
+        _val.validate_signature(self.define_file_type, extension, mime_type)
+
+        return _meta.FileType(extension=extension, mimeType=mime_type)
+
+    def define_input(
+            self, requirement: _tp.Union[_meta.SchemaDefinition, _meta.FileType], *,
+            label: _tp.Optional[str] = None,
+            optional: bool = False, dynamic: bool = False,
+            input_props: _tp.Optional[_tp.Dict[str, _tp.Any]] = None):
 
         _val.validate_signature(
-            self.define_input_table, *fields,
+            self.define_input, requirement,
             label=label, optional=optional, dynamic=dynamic,
             input_props=input_props)
 
-        # Do not define details for dynamic schemas
+        if isinstance(requirement, _meta.SchemaDefinition):
 
-        if dynamic:
-            schema_def = _meta.SchemaDefinition(_meta.SchemaType.TABLE)
+            return _meta.ModelInputSchema(
+                objectType=_meta.ObjectType.DATA, schema=requirement,
+                label=label, optional=optional, dynamic=dynamic,
+                inputProps=input_props)
+
+        elif isinstance(requirement, _meta.FileType):
+
+            return _meta.ModelInputSchema(
+                objectType=_meta.ObjectType.FILE, fileType=requirement,
+                label=label, optional=optional, dynamic=dynamic,
+                inputProps=input_props)
+
         else:
-            schema_def = self.define_schema(*fields, schema_type=_meta.SchemaType.TABLE)
+            raise _ex.EUnexpected()
 
-        return _meta.ModelInputSchema(
-            schema=schema_def, label=label,
-            optional=optional, dynamic=dynamic,
-            inputProps=input_props)
-
-    def define_output_table(
-            self, *fields: _tp.Union[_meta.FieldSchema, _tp.List[_meta.FieldSchema]],
-            label: _tp.Optional[str] = None, optional: bool = False, dynamic: bool = False,
-            output_props: _tp.Optional[_tp.Dict[str, _tp.Any]] = None) \
-            -> _meta.ModelOutputSchema:
+    def define_output(
+            self, requirement: _tp.Union[_meta.SchemaDefinition, _meta.FileType], *,
+            label: _tp.Optional[str] = None,
+            optional: bool = False, dynamic: bool = False,
+            output_props: _tp.Optional[_tp.Dict[str, _tp.Any]] = None):
 
         _val.validate_signature(
-            self.define_output_table, *fields,
+            self.define_output, requirement,
             label=label, optional=optional, dynamic=dynamic,
             output_props=output_props)
 
-        # Do not define details for dynamic schemas
+        if isinstance(requirement, _meta.SchemaDefinition):
 
-        if dynamic:
-            schema_def = _meta.SchemaDefinition(_meta.SchemaType.TABLE)
+            return _meta.ModelOutputSchema(
+                objectType=_meta.ObjectType.DATA, schema=requirement,
+                label=label, optional=optional, dynamic=dynamic,
+                outputProps=output_props)
+
+        elif isinstance(requirement, _meta.FileType):
+
+            return _meta.ModelOutputSchema(
+                objectType=_meta.ObjectType.FILE, fileType=requirement,
+                label=label, optional=optional, dynamic=dynamic,
+                outputProps=output_props)
+
         else:
-            schema_def = self.define_schema(*fields, schema_type=_meta.SchemaType.TABLE)
-
-        return _meta.ModelOutputSchema(
-            schema=schema_def, label=label,
-            optional=optional, dynamic=dynamic,
-            outputProps=output_props)
+            raise _ex.EUnexpected()
 
     @staticmethod
     def _build_named_dict(

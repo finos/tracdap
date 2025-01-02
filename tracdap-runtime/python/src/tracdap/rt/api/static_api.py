@@ -162,35 +162,6 @@ def define_parameter(
     return sa.define_parameter(param_name, param_type, label, default_value, param_props=param_props)
 
 
-def declare_parameter(
-        param_name: str,
-        param_type: _tp.Union[BasicType, TypeDescriptor],
-        label: str,
-        default_value: _tp.Optional[_tp.Any] = None) \
-        -> _Named[ModelParameter]:
-
-    """
-    .. deprecated:: 0.4.4
-       Use :py:func:`define_parameter` or :py:func:`P` instead.
-
-    This function is deprecated and will be removed in a future version.
-    Please use :py:func:`define_parameter() <tracdap.rt.api.define_parameter>` instead.
-
-    :type param_name: str
-    :type param_type: :py:class:`BasicType <tracdap.rt.metadata.BasicType>` |
-                      :py:class:`TypeDescriptor <tracdap.rt.metadata.TypeDescriptor>`
-
-    :type label: str
-    :type default_value: Any | None
-    :rtype: _Named[:py:class:`ModelParameter <tracdap.rt.metadata.ModelParameter>`]
-
-    :display: False
-    """
-
-    print("TRAC Warning: declare_parameter() is deprecated, please use define_parameter()", file=sys.stderr)
-
-    return define_parameter(param_name, param_type, label, default_value)
-
 
 def P(  # noqa
         param_name: str,
@@ -239,29 +210,6 @@ def define_parameters(
 
     sa = _StaticApiHook.get_instance()
     return sa.define_parameters(*parameters)
-
-
-def declare_parameters(
-        *params: _tp.Union[_Named[ModelParameter], _tp.List[_Named[ModelParameter]]]) \
-        -> _tp.Dict[str, ModelParameter]:
-
-    """
-    .. deprecated:: 0.4.4
-       Use :py:func:`define_parameters` instead
-
-    This function is deprecated and will be removed in a future version.
-    Please use :py:func:`define_parameters() <tracdap.rt.api.define_parameters>` instead.
-
-    :type params: _Named[:py:class:`ModelParameter <tracdap.rt.metadata.ModelParameter>`] |
-                  List[_Named[:py:class:`ModelParameter <tracdap.rt.metadata.ModelParameter>`]]
-    :rtype: Dict[str, :py:class:`ModelParameter <tracdap.rt.metadata.ModelParameter>`]
-
-    :display: False
-    """
-
-    print("TRAC Warning: declare_parameters() is deprecated, please use define_parameters()", file=sys.stderr)
-
-    return define_parameters(*params)
 
 
 def define_field(
@@ -319,45 +267,6 @@ def define_field(
     sa = _StaticApiHook.get_instance()
 
     return sa.define_field(
-        field_name, field_type, label,
-        business_key, categorical, not_null,
-        format_code, field_order)
-
-
-def declare_field(
-        field_name: str,
-        field_type: BasicType,
-        label: str,
-        business_key: bool = False,
-        categorical: bool = False,
-        not_null: _tp.Optional[bool] = None,
-        format_code: _tp.Optional[str] = None,
-        field_order: _tp.Optional[int] = None) \
-        -> FieldSchema:
-
-    """
-    .. deprecated:: 0.4.4
-       Use :py:func:`define_field` or :py:func:`F` instead.
-
-    This function is deprecated and will be removed in a future version.
-    Please use :py:func:`define_field() <tracdap.rt.api.define_field>` instead.
-
-    :type field_name: str
-    :type field_type: :py:class:`BasicType <tracdap.rt.metadata.BasicType>`
-    :type label: str
-    :type business_key: bool
-    :type categorical: bool
-    :type not_null: bool | None
-    :type format_code: str | None
-    :type field_order: int | None
-    :rtype: :py:class:`FieldSchema <tracdap.rt.metadata.FieldSchema>`
-
-    :display: False
-    """
-
-    print("TRAC Warning: declare_field() is deprecated, please use define_field()", file=sys.stderr)
-
-    return define_field(
         field_name, field_type, label,
         business_key, categorical, not_null,
         format_code, field_order)
@@ -471,6 +380,32 @@ def load_schema(
     return sa.load_schema(package, schema_file, schema_type=schema_type)
 
 
+def define_file_type(extension: str, mime_type: str) -> FileType:
+
+    sa = _StaticApiHook.get_instance()
+    return sa.define_file_type(extension, mime_type)
+
+
+def define_input(
+        requirement: _tp.Union[SchemaDefinition, FileType], *,
+        label: _tp.Optional[str] = None,
+        optional: bool = False, dynamic: bool = False,
+        input_props: _tp.Optional[_tp.Dict[str, _tp.Any]] = None):
+
+    sa = _StaticApiHook.get_instance()
+    return sa.define_input(requirement, label=label, optional=optional, dynamic=dynamic, input_props=input_props)
+
+
+def define_output(
+        requirement: _tp.Union[SchemaDefinition, FileType], *,
+        label: _tp.Optional[str] = None,
+        optional: bool = False, dynamic: bool = False,
+        output_props: _tp.Optional[_tp.Dict[str, _tp.Any]] = None):
+
+    sa = _StaticApiHook.get_instance()
+    return sa.define_output(requirement, label=label, optional=optional, dynamic=dynamic, output_props=output_props)
+
+
 def define_input_table(
         *fields: _tp.Union[FieldSchema, _tp.List[FieldSchema]],
         label: _tp.Optional[str] = None, optional: bool = False, dynamic: bool = False,
@@ -512,34 +447,8 @@ def define_input_table(
     :rtype: :py:class:`ModelInputSchema <tracdap.rt.metadata.ModelInputSchema>`
     """
 
-    sa = _StaticApiHook.get_instance()
-
-    return sa.define_input_table(
-        *fields, label=label, optional=optional, dynamic=dynamic,
-        input_props=input_props)
-
-
-def declare_input_table(
-        *fields: _tp.Union[FieldSchema, _tp.List[FieldSchema]]) \
-        -> ModelInputSchema:
-
-    """
-    .. deprecated:: 0.4.4
-       Use :py:func:`define_input_table` instead.
-
-    This function is deprecated and will be removed in a future version.
-    Please use :py:func:`define_input_table() <tracdap.rt.api.define_input_table>` instead.
-
-    :type fields: :py:class:`FieldSchema <tracdap.rt.metadata.FieldSchema>` |
-                  List[:py:class:`FieldSchema <tracdap.rt.metadata.FieldSchema>`]
-    :rtype: :py:class:`ModelInputSchema <tracdap.rt.metadata.ModelInputSchema>`
-
-    :display: False
-    """
-
-    print("TRAC Warning: declare_input_table() is deprecated, please use define_input_table()", file=sys.stderr)
-
-    return define_input_table(*fields)
+    schema = define_schema(*fields, schema_type=SchemaType.TABLE)
+    return define_input(schema, label=label, optional=optional, dynamic=dynamic, input_props=input_props)
 
 
 def define_output_table(
@@ -581,11 +490,143 @@ def define_output_table(
     :rtype: :py:class:`ModelOutputSchema <tracdap.rt.metadata.ModelOutputSchema>`
     """
 
-    sa = _StaticApiHook.get_instance()
+    schema = define_schema(*fields, schema_type=SchemaType.TABLE)
+    return define_output(schema, label=label, optional=optional, dynamic=dynamic, output_props=output_props)
 
-    return sa.define_output_table(
-        *fields, label=label, optional=optional, dynamic=dynamic,
-        output_props=output_props)
+
+def define_input_file(
+        extension: str, mime_type: str, *,
+        label: _tp.Optional[str] = None, optional: bool = False,
+        input_props: _tp.Optional[_tp.Dict[str, _tp.Any]] = None) \
+        -> ModelInputSchema:
+
+    file_type = define_file_type(extension, mime_type)
+    return define_input(file_type, label=label, optional=optional, input_props=input_props)
+
+
+def define_output_file(
+        extension: str, mime_type: str, *,
+        label: _tp.Optional[str] = None, optional: bool = False,
+        output_props: _tp.Optional[_tp.Dict[str, _tp.Any]] = None) \
+        -> ModelOutputSchema:
+
+    file_type = define_file_type(extension, mime_type)
+    return define_output(file_type, label=label, optional=optional, output_props=output_props)
+
+
+def declare_parameter(
+        param_name: str,
+        param_type: _tp.Union[BasicType, TypeDescriptor],
+        label: str,
+        default_value: _tp.Optional[_tp.Any] = None) \
+        -> _Named[ModelParameter]:
+
+    """
+    .. deprecated:: 0.4.4
+       Use :py:func:`define_parameter` or :py:func:`P` instead.
+
+    This function is deprecated and will be removed in a future version.
+    Please use :py:func:`define_parameter() <tracdap.rt.api.define_parameter>` instead.
+
+    :type param_name: str
+    :type param_type: :py:class:`BasicType <tracdap.rt.metadata.BasicType>` |
+                      :py:class:`TypeDescriptor <tracdap.rt.metadata.TypeDescriptor>`
+
+    :type label: str
+    :type default_value: Any | None
+    :rtype: _Named[:py:class:`ModelParameter <tracdap.rt.metadata.ModelParameter>`]
+
+    :display: False
+    """
+
+    print("TRAC Warning: declare_parameter() is deprecated, please use define_parameter()", file=sys.stderr)
+
+    return define_parameter(param_name, param_type, label, default_value)
+
+
+def declare_parameters(
+        *params: _tp.Union[_Named[ModelParameter], _tp.List[_Named[ModelParameter]]]) \
+        -> _tp.Dict[str, ModelParameter]:
+
+    """
+    .. deprecated:: 0.4.4
+       Use :py:func:`define_parameters` instead
+
+    This function is deprecated and will be removed in a future version.
+    Please use :py:func:`define_parameters() <tracdap.rt.api.define_parameters>` instead.
+
+    :type params: _Named[:py:class:`ModelParameter <tracdap.rt.metadata.ModelParameter>`] |
+                  List[_Named[:py:class:`ModelParameter <tracdap.rt.metadata.ModelParameter>`]]
+    :rtype: Dict[str, :py:class:`ModelParameter <tracdap.rt.metadata.ModelParameter>`]
+
+    :display: False
+    """
+
+    print("TRAC Warning: declare_parameters() is deprecated, please use define_parameters()", file=sys.stderr)
+
+    return define_parameters(*params)
+
+
+def declare_field(
+        field_name: str,
+        field_type: BasicType,
+        label: str,
+        business_key: bool = False,
+        categorical: bool = False,
+        not_null: _tp.Optional[bool] = None,
+        format_code: _tp.Optional[str] = None,
+        field_order: _tp.Optional[int] = None) \
+        -> FieldSchema:
+
+    """
+    .. deprecated:: 0.4.4
+       Use :py:func:`define_field` or :py:func:`F` instead.
+
+    This function is deprecated and will be removed in a future version.
+    Please use :py:func:`define_field() <tracdap.rt.api.define_field>` instead.
+
+    :type field_name: str
+    :type field_type: :py:class:`BasicType <tracdap.rt.metadata.BasicType>`
+    :type label: str
+    :type business_key: bool
+    :type categorical: bool
+    :type not_null: bool | None
+    :type format_code: str | None
+    :type field_order: int | None
+    :rtype: :py:class:`FieldSchema <tracdap.rt.metadata.FieldSchema>`
+
+    :display: False
+    """
+
+    print("TRAC Warning: declare_field() is deprecated, please use define_field()", file=sys.stderr)
+
+    return define_field(
+        field_name, field_type, label,
+        business_key, categorical, not_null,
+        format_code, field_order)
+
+
+def declare_input_table(
+        *fields: _tp.Union[FieldSchema, _tp.List[FieldSchema]]) \
+        -> ModelInputSchema:
+
+    """
+    .. deprecated:: 0.4.4
+       Use :py:func:`define_input_table` instead.
+
+    This function is deprecated and will be removed in a future version.
+    Please use :py:func:`define_input_table() <tracdap.rt.api.define_input_table>` instead.
+
+    :type fields: :py:class:`FieldSchema <tracdap.rt.metadata.FieldSchema>` |
+                  List[:py:class:`FieldSchema <tracdap.rt.metadata.FieldSchema>`]
+    :rtype: :py:class:`ModelInputSchema <tracdap.rt.metadata.ModelInputSchema>`
+
+    :display: False
+    """
+
+    print("TRAC Warning: declare_input_table() is deprecated, please use define_input_table()", file=sys.stderr)
+
+    return define_input_table(*fields)
 
 
 def declare_output_table(
@@ -612,3 +653,13 @@ def declare_output_table(
     print("TRAC Warning: declare_output_table() is deprecated, please use define_output_table()", file==sys.stderr)
 
     return define_output_table(*fields)
+
+
+class CommonFileTypes:
+
+    PNG = FileType(".png", "image/png")
+    WORD = FileType(".docx", "application/ms.xxxx")
+    POWERPOINT = FileType(".pptx", "application/ms.yyyy")
+    POWERPOINT_TEMPLATE = FileType(".pptxt", "application/ms.yyyy")
+
+
