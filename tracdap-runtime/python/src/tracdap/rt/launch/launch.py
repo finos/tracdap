@@ -112,9 +112,10 @@ def launch_model(
     runtime_instance = _runtime.TracRuntime(_sys_config, dev_mode=True, plugin_packages=plugin_packages)
     runtime_instance.pre_start()
 
-    job = runtime_instance.load_job_config(_job_config, model_class=model_class)
-
     with runtime_instance as rt:
+
+        job = rt.load_job_config(_job_config, model_class=model_class)
+
         rt.submit_job(job)
         rt.wait_for_job(job.jobId)
 
@@ -160,9 +161,10 @@ def launch_job(
     runtime_instance = _runtime.TracRuntime(_sys_config, dev_mode=dev_mode, plugin_packages=plugin_packages)
     runtime_instance.pre_start()
 
-    job = runtime_instance.load_job_config(_job_config)
-
     with runtime_instance as rt:
+
+        job = rt.load_job_config(_job_config)
+
         rt.submit_job(job)
         rt.wait_for_job(job.jobId)
 
@@ -184,6 +186,7 @@ def launch_cli(programmatic_args: _tp.Optional[_tp.List[str]] = None):
         launch_args = _cli_args()
 
     _sys_config = _resolve_config_file(launch_args.sys_config, None)
+    _job_config = _resolve_config_file(launch_args.job_config, None) if launch_args.job_config else None
 
     runtime_instance = _runtime.TracRuntime(
         _sys_config,
@@ -196,15 +199,10 @@ def launch_cli(programmatic_args: _tp.Optional[_tp.List[str]] = None):
 
     runtime_instance.pre_start()
 
-    if launch_args.job_config is not None:
-        _job_config = _resolve_config_file(launch_args.job_config, None)
-        job = runtime_instance.load_job_config(_job_config)
-    else:
-        job = None
-
     with runtime_instance as rt:
 
-        if job is not None:
+        if _job_config is not None:
+            job = rt.load_job_config(_job_config)
             rt.submit_job(job)
 
         if rt.is_oneshot():
