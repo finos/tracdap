@@ -137,11 +137,14 @@ class DevModeTranslator:
         raise _ex.EConfigParse(msg)
 
 
-    def __init__(self, sys_config: _cfg.RuntimeConfig, config_mgr: _cfg_p.ConfigManager, scratch_dir: pathlib.Path):
+    def __init__(
+            self, sys_config: _cfg.RuntimeConfig, config_mgr: _cfg_p.ConfigManager, scratch_dir: pathlib.Path = None,
+            model_loader: _models.ModelLoader = None, storage_manager: _storage.StorageManager = None):
+
         self._sys_config = sys_config
         self._config_mgr = config_mgr
-        self._scratch_dir = scratch_dir
-        self._model_loader: tp.Optional[_models.ModelLoader] = None
+        self._model_loader = model_loader or _models.ModelLoader(self._sys_config, scratch_dir)
+        self._storage_manager = storage_manager or _storage.StorageManager(self._sys_config)
 
     def translate_job_config(
             self, job_config: _cfg.JobConfig,
@@ -150,8 +153,6 @@ class DevModeTranslator:
 
         try:
             self._log.info(f"Applying dev mode config translation to job config")
-
-            self._model_loader = _models.ModelLoader(self._sys_config, self._scratch_dir)
             self._model_loader.create_scope("DEV_MODE_TRANSLATION")
 
             job_config = copy.deepcopy(job_config)
@@ -168,7 +169,6 @@ class DevModeTranslator:
 
         finally:
             self._model_loader.destroy_scope("DEV_MODE_TRANSLATION")
-            self._model_loader = None
 
     def translate_job_def(
             self, job_config: _cfg.JobConfig, job_def: _meta.JobDefinition,
@@ -798,37 +798,49 @@ class DevModeTranslator:
             if not (isinstance(input_value, str) and input_value in job_resources):
 
                 model_input = required_inputs[input_key]
-                input_schema = model_input.schema if model_input and not model_input.dynamic else None
 
-                input_id = self._process_input_or_output(
-                    input_key, input_value, job_resources,
-                    new_unique_file=False, schema=input_schema)
+                # TODO: inferred model_input for auto-wired flows
+
+                if model_input.objectType == _meta.ObjectType.DATA:
+                    schema = model_input.schema if model_input and not model_input.dynamic else None
+                    input_id = self._process_data_socket(input_key, input_value, schema, job_resources, new_unique_file=False)
+                elif model_input.objectType == _meta.ObjectType.FILE:
+                    file_type = model_input.fileType
+                    input_id = self._process_file_socket(input_key, input_value, file_type, job_resources, new_unique_file=False)
+                else:
+                    raise _ex.EUnexpected()
 
                 job_inputs[input_key] = _util.selector_for(input_id)
 
         for output_key, output_value in job_outputs.items():
             if not (isinstance(output_value, str) and output_value in job_resources):
 
-                model_output= required_outputs[output_key]
-                output_schema = model_output.schema if model_output and not model_output.dynamic else None
+                model_output = required_outputs[output_key]
 
-                output_id = self._process_input_or_output(
-                   output_key, output_value, job_resources,
-                    new_unique_file=True, schema=output_schema)
+                # TODO: inferred model_output for auto-wired flows
+
+                if model_output.objectType == _meta.ObjectType.DATA:
+                    schema = model_output.schema if model_output and not model_output.dynamic else None
+                    output_id = self._process_data_socket(output_key, output_value, schema, job_resources, new_unique_file=True)
+                elif model_output.objectType == _meta.ObjectType.FILE:
+                    file_type = model_output.fileType
+                    output_id = self._process_file_socket(output_key, output_value, file_type, job_resources, new_unique_file=True)
+                else:
+                    raise _ex.EUnexpected()
 
                 job_outputs[output_key] = _util.selector_for(output_id)
 
         return job_config, job_def
 
-    def _process_input_or_output(
-            self, data_key, data_value,
-            resources: tp.Dict[str, _meta.ObjectDefinition],
-            new_unique_file=False,
-            schema: tp.Optional[_meta.SchemaDefinition] = None) \
+    def _process_data_socket(
+            self, data_key, data_value, schema: tp.Optional[_meta.SchemaDefinition],
+            resources: tp.Dict[str, _meta.ObjectDefinition], new_unique_file=False) \
             -> _meta.TagHeader:
 
         data_id = _util.new_object_id(_meta.ObjectType.DATA)
         storage_id = _util.new_object_id(_meta.ObjectType.STORAGE)
+
+        self._log.info(f"Generating data definition for [{data_key}] with ID = [{_util.object_key(data_id)}]")
 
         if isinstance(data_value, str):
             storage_path = data_value
@@ -850,42 +862,84 @@ class DevModeTranslator:
         else:
             raise _ex.EConfigParse(f"Invalid configuration for input '{data_key}'")
 
-        self._log.info(f"Generating data definition for [{data_key}] with ID = [{_util.object_key(data_id)}]")
-
         # For unique outputs, increment the snap number to find a new unique snap
         # These are not incarnations, bc likely in dev mode model code and inputs are changing
         # Incarnations are for recreation of a dataset using the exact same code path and inputs
 
         if new_unique_file:
+            storage_path, snap_version = self._new_unique_file(data_key, storage_key, storage_path, snap_version)
 
-            x_storage_mgr = _storage.StorageManager(self._sys_config)
-            x_storage = x_storage_mgr.get_file_storage(storage_key)
-            x_orig_path = pathlib.PurePath(storage_path)
-            x_name = x_orig_path.name
+        part_key = _meta.PartKey(opaqueKey="part-root", partType=_meta.PartType.PART_ROOT)
+        delta_index = 1
+        incarnation_index = 1
 
-            if x_storage.exists(str(x_orig_path.parent)):
-                listing = x_storage.ls(str(x_orig_path.parent))
-                existing_files = list(map(lambda stat: stat.file_name, listing))
-            else:
-                existing_files = []
+        # This is also defined in functions.DynamicDataSpecFunc, maybe centralize?
+        data_item = f"data/table/{data_id.objectId}/{part_key.opaqueKey}/snap-{snap_version}/delta-{delta_index}"
 
-            while x_name in existing_files:
+        data_obj = self._generate_data_definition(
+            part_key, snap_version, delta_index, data_item,
+            schema, storage_id)
 
-                snap_version += 1
-                x_name = f"{x_orig_path.stem}-{snap_version}"
-                storage_path = str(x_orig_path.parent.joinpath(x_name))
-
-            self._log.info(f"Output for [{data_key}] will be snap version {snap_version}")
-
-        data_obj, storage_obj = self._generate_input_definition(
-            data_id, storage_id, storage_key, storage_path, storage_format,
-            snap_index=snap_version, delta_index=1, incarnation_index=1,
-            schema=schema)
+        storage_obj = self._generate_storage_definition(
+            storage_id, storage_key, storage_path, storage_format,
+            data_item, incarnation_index)
 
         resources[_util.object_key(data_id)] = data_obj
         resources[_util.object_key(storage_id)] = storage_obj
 
         return data_id
+
+    def _process_file_socket(
+            self, file_key, file_value, file_type: _meta.FileType,
+            resources: tp.Dict[str, _meta.ObjectDefinition], new_unique_file=False) \
+            -> _meta.TagHeader:
+
+        file_id = _util.new_object_id(_meta.ObjectType.FILE)
+        storage_id = _util.new_object_id(_meta.ObjectType.STORAGE)
+
+        self._log.info(f"Generating file definition for [{file_key}] with ID = [{_util.object_key(file_id)}]")
+
+        if isinstance(file_value, str):
+
+            storage_key = self._sys_config.storage.defaultBucket
+            storage_path = file_value
+
+        elif isinstance(file_value, dict):
+
+            storage_key = file_value.get("storageKey") or self._sys_config.storage.defaultBucket
+            storage_path = file_value.get("path")
+
+            if not storage_path:
+                raise _ex.EConfigParse(f"Invalid configuration for input [{file_key}] (missing required value 'path'")
+
+        else:
+            raise _ex.EConfigParse(f"Invalid configuration for input '{file_key}'")
+
+        storage_format = "application/x-binary"
+        file_version = 1
+
+        if new_unique_file:
+            storage_path, file_version = self._new_unique_file(file_key, storage_key, storage_path, file_version)
+            file_size = 0
+        else:
+            storage = self._storage_manager.get_file_storage(storage_key)
+            file_size = storage.size(storage_path)
+
+        data_item = f"file/{file_id.objectId}/version-{file_version}"
+        file_name = f"{file_key}.{file_type.extension}"
+
+        file_obj = self._generate_file_definition(
+            file_name, file_type, file_size,
+            storage_id, data_item)
+
+        storage_obj = self._generate_storage_definition(
+            storage_id, storage_key, storage_path, storage_format,
+            data_item, incarnation_index=1)
+
+        resources[_util.object_key(file_id)] = file_obj
+        resources[_util.object_key(storage_id)] = storage_obj
+
+        return file_id
 
     @staticmethod
     def infer_format(storage_path: str, storage_config: _cfg.StorageConfig):
@@ -898,20 +952,33 @@ class DevModeTranslator:
         else:
             return storage_config.defaultFormat
 
+    def _new_unique_file(self, socket_name, storage_key, storage_path, version):
+
+        x_storage = self._storage_manager.get_file_storage(storage_key)
+        x_orig_path = pathlib.PurePath(storage_path)
+        x_name = x_orig_path.name
+
+        if x_storage.exists(str(x_orig_path.parent)):
+            listing = x_storage.ls(str(x_orig_path.parent))
+            existing_files = list(map(lambda stat: stat.file_name, listing))
+        else:
+            existing_files = []
+
+        while x_name in existing_files:
+
+            version += 1
+            x_name = f"{x_orig_path.stem}-{version}"
+            storage_path = str(x_orig_path.parent.joinpath(x_name))
+
+        self._log.info(f"Output for [{socket_name}] will be version {version}")
+
+        return storage_path, version
+
     @classmethod
-    def _generate_input_definition(
-            cls, data_id: _meta.TagHeader, storage_id: _meta.TagHeader,
-            storage_key: str, storage_path: str, storage_format: str,
-            snap_index: int, delta_index: int, incarnation_index: int,
-            schema: tp.Optional[_meta.SchemaDefinition] = None) \
+    def _generate_data_definition(
+            cls, part_key: _meta.PartKey, snap_index: int, delta_index: int, data_item: str,
+            schema: tp.Optional[_meta.SchemaDefinition], storage_id: _meta.TagHeader) \
             -> (_meta.ObjectDefinition, _meta.ObjectDefinition):
-
-        part_key = _meta.PartKey(
-            opaqueKey="part-root",
-            partType=_meta.PartType.PART_ROOT)
-
-        # This is also defined in functions.DynamicDataSpecFunc, maybe centralize?
-        data_item = f"data/table/{data_id.objectId}/{part_key.opaqueKey}/snap-{snap_index}/delta-{delta_index}"
 
         delta = _meta.DataDefinition.Delta(
             deltaIndex=delta_index,
@@ -925,17 +992,31 @@ class DevModeTranslator:
             partKey=part_key,
             snap=snap)
 
-        data_def = _meta.DataDefinition(parts={})
+        data_def = _meta.DataDefinition()
         data_def.parts[part_key.opaqueKey] = part
+        data_def.schema = schema
+        data_def.storageId = _util.selector_for(storage_id)
 
-        if schema is not None:
-            data_def.schema = schema
-        else:
-            data_def.schema = None
+        return _meta.ObjectDefinition(objectType=_meta.ObjectType.DATA, data=data_def)
 
-        data_def.storageId = _meta.TagSelector(
-            _meta.ObjectType.STORAGE, storage_id.objectId,
-            objectVersion=storage_id.objectVersion, latestTag=True)
+    @classmethod
+    def _generate_file_definition(
+            cls, file_name: str, file_type: _meta.FileType, file_size: int,
+            storage_id: _meta.TagHeader, data_item: str) \
+            -> _meta.ObjectDefinition:
+
+        file_def = _meta.FileDefinition(
+            name=file_name, extension=file_type.extension, mimeType=file_type.mimeType,
+            storageId=_util.selector_for(storage_id), dataItem=data_item, size=file_size)
+
+        return _meta.ObjectDefinition(objectType=_meta.ObjectType.FILE, file=file_def)
+
+    @classmethod
+    def _generate_storage_definition(
+            cls, storage_id: _meta.TagHeader,
+            storage_key: str, storage_path: str, storage_format: str,
+            data_item: str, incarnation_index: int) \
+            -> _meta.ObjectDefinition:
 
         storage_copy = _meta.StorageCopy(
             storageKey=storage_key,
@@ -952,16 +1033,14 @@ class DevModeTranslator:
         storage_item = _meta.StorageItem(
             incarnations=[storage_incarnation])
 
-        storage_def = _meta.StorageDefinition(dataItems={})
-        storage_def.dataItems[delta.dataItem] = storage_item
+        storage_def = _meta.StorageDefinition()
+        storage_def.dataItems[data_item] = storage_item
 
         if storage_format.lower() == "csv":
             storage_def.storageOptions["lenient_csv_parser"] = _types.MetadataCodec.encode_value(True)
 
-        data_obj = _meta.ObjectDefinition(objectType=_meta.ObjectType.DATA, data=data_def)
-        storage_obj = _meta.ObjectDefinition(objectType=_meta.ObjectType.STORAGE, storage=storage_def)
+        return _meta.ObjectDefinition(objectType=_meta.ObjectType.STORAGE, storage=storage_def)
 
-        return data_obj, storage_obj
 
 
 DevModeTranslator._log = _util.logger_for_class(DevModeTranslator)
