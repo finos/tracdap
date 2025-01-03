@@ -226,13 +226,15 @@ class ModelLoader:
                 self.__log.info(f"Parameter [{name}] - {param.paramType.basicType.name}")
                 param.paramProps = self._encoded_props(param.paramProps, "parameter", name)
 
-            for name, schema in model_def.inputs.items():
-                self.__log.info(f"Input [{name}] - {schema.schema.schemaType.name}")
-                schema.inputProps = self._encoded_props(schema.inputProps, "input", name)
+            for name, input_def in model_def.inputs.items():
+                input_type = input_def.schema.schemaType.name if input_def.objectType == _meta.ObjectType.DATA else input_def.objectType.name
+                self.__log.info(f"Input [{name}] - {input_type}")
+                input_def.inputProps = self._encoded_props(input_def.inputProps, "input", name)
 
-            for name, schema in model_def.outputs.items():
-                self.__log.info(f"Output [{name}] - {schema.schema.schemaType.name}")
-                schema.outputProps = self._encoded_props(schema.outputProps, "input", name)
+            for name, output_def in model_def.outputs.items():
+                output_type = output_def.schema.schemaType.name if output_def.objectType == _meta.ObjectType.DATA else output_def.objectType.name
+                self.__log.info(f"Output [{name}] - {output_type}")
+                output_def.outputProps = self._encoded_props(output_def.outputProps, "input", name)
 
             return model_def
 
