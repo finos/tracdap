@@ -305,7 +305,7 @@ def F(  # noqa
 
 def define_schema(
         *fields: _tp.Union[FieldSchema, _tp.List[FieldSchema]],
-        schema_type: SchemaType = SchemaType.TABLE) \
+        schema_type: SchemaType = SchemaType.TABLE, dynamic: bool = False) \
         -> SchemaDefinition:
 
     """
@@ -325,16 +325,18 @@ def define_schema(
 
     :param fields: The list of fields to include in the schema
     :param schema_type: The type of schema to create (currently only TABLE schemas are supported)
+    :param dynamic: Define a dynamic schema (fields list should be empty)
     :return: A schema definition built from the supplied fields
 
     :type fields: :py:class:`FieldSchema <tracdap.rt.metadata.FieldSchema>` |
                   List[:py:class:`FieldSchema <tracdap.rt.metadata.FieldSchema>`]
     :type schema_type: :py:class:`SchemaType <tracdap.rt.metadata.SchemaType>`
+    :type dynamic: bool
     :rtype: :py:class:`SchemaDefinition <tracdap.rt.metadata.SchemaDefinition>`
     """
 
     sa = _StaticApiHook.get_instance()
-    return sa.define_schema(*fields, schema_type=schema_type)
+    return sa.define_schema(*fields, schema_type=schema_type, dynamic=dynamic)
 
 
 def load_schema(
@@ -447,7 +449,7 @@ def define_input_table(
     :rtype: :py:class:`ModelInputSchema <tracdap.rt.metadata.ModelInputSchema>`
     """
 
-    schema = define_schema(*fields, schema_type=SchemaType.TABLE)
+    schema = define_schema(*fields, schema_type=SchemaType.TABLE, dynamic=dynamic)
     return define_input(schema, label=label, optional=optional, dynamic=dynamic, input_props=input_props)
 
 
@@ -490,7 +492,7 @@ def define_output_table(
     :rtype: :py:class:`ModelOutputSchema <tracdap.rt.metadata.ModelOutputSchema>`
     """
 
-    schema = define_schema(*fields, schema_type=SchemaType.TABLE)
+    schema = define_schema(*fields, schema_type=SchemaType.TABLE, dynamic=dynamic)
     return define_output(schema, label=label, optional=optional, dynamic=dynamic, output_props=output_props)
 
 
@@ -512,6 +514,45 @@ def define_output_file(
 
     file_type = define_file_type(extension, mime_type)
     return define_output(file_type, label=label, optional=optional, output_props=output_props)
+
+
+def ModelInputSchema(  # noqa
+        schema: SchemaDefinition,
+        label: _tp.Optional[str] = None,
+        optional: bool = False,
+        dynamic: bool = False,
+        inputProps: _tp.Optional[_tp.Dict[str, Value]] = None):  # noqa
+
+    """
+    .. deprecated:: 0.8.0
+       Use :py:func:`define_input` instead.
+
+    This function is provided for compatibility with TRAC versions before 0.8.0.
+    Please use :py:func:`define_input() <tracdap.rt.api.define_input>` instead.
+    """
+
+    input_props = inputProps or dict()
+    return define_input(schema, label=label, optional=optional, dynamic=dynamic, input_props=input_props)
+
+
+def ModelOutputSchema(  # noqa
+        schema: SchemaDefinition,
+        label: _tp.Optional[str] = None,
+        optional: bool = False,
+        dynamic: bool = False,
+        outputProps: _tp.Optional[_tp.Dict[str, Value]] = None):  # noqa
+
+    """
+    .. deprecated:: 0.8.0
+       Use :py:func:`define_output` instead.
+
+    This function is provided for compatibility with TRAC versions before 0.8.0.
+    Please use :py:func:`define_output() <tracdap.rt.api.define_output>` instead.
+    """
+
+    output_props = outputProps or dict()
+    return define_output(schema, label=label, optional=optional, dynamic=dynamic, output_props=output_props)
+
 
 
 def declare_parameter(

@@ -116,7 +116,7 @@ class _StaticApiHook:
     @_abc.abstractmethod
     def define_schema(
             self, *fields: _tp.Union[_meta.FieldSchema, _tp.List[_meta.FieldSchema]],
-            schema_type: _meta.SchemaType = _meta.SchemaType.TABLE) \
+            schema_type: _meta.SchemaType = _meta.SchemaType.TABLE, dynamic: bool = False) \
             -> _meta.SchemaDefinition:
 
         pass
