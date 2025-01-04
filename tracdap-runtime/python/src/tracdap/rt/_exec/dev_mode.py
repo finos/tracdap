@@ -963,7 +963,7 @@ class DevModeTranslator:
         while x_name in existing_files:
 
             version += 1
-            x_name = f"{x_orig_path.stem}-{version}"
+            x_name = f"{x_orig_path.stem}-{version}{x_orig_path.suffix}"
             storage_path = str(x_orig_path.parent.joinpath(x_name))
 
         self._log.info(f"Output for [{socket_name}] will be version {version}")
