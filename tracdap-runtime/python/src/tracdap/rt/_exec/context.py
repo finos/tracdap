@@ -246,7 +246,7 @@ class TracContextImpl(_api.TracContext):
 
         # Data conformance is applied automatically inside the converter, if schema != None
         table = converter.to_internal(dataset, schema)
-        item = _data.DataItem(schema, table)
+        item = _data.DataItem(_meta.ObjectType.DATA, schema, table)
 
         updated_view = _data.DataMapping.add_item_to_view(data_view, part_key, item)
 
