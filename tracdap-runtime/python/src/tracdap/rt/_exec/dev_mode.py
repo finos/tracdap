@@ -694,7 +694,7 @@ class DevModeTranslator:
 
             model_selector = job_def.runFlow.models.get(source.node)
             model_obj = _util.get_job_resource(model_selector, job_config)
-            model_input = model_obj.model.inputs.get(source.socket)
+            model_input = model_obj.model.outputs.get(source.socket)
             model_outputs.append(model_input)
 
         if len(model_outputs) == 0:
@@ -799,8 +799,6 @@ class DevModeTranslator:
 
                 model_input = required_inputs[input_key]
 
-                # TODO: inferred model_input for auto-wired flows
-
                 if model_input.objectType == _meta.ObjectType.DATA:
                     schema = model_input.schema if model_input and not model_input.dynamic else None
                     input_id = self._process_data_socket(input_key, input_value, schema, job_resources, new_unique_file=False)
@@ -816,8 +814,6 @@ class DevModeTranslator:
             if not (isinstance(output_value, str) and output_value in job_resources):
 
                 model_output = required_outputs[output_key]
-
-                # TODO: inferred model_output for auto-wired flows
 
                 if model_output.objectType == _meta.ObjectType.DATA:
                     schema = model_output.schema if model_output and not model_output.dynamic else None
