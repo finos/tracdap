@@ -15,6 +15,7 @@
 
 from __future__ import annotations
 
+import copy
 import datetime
 import abc
 import random
@@ -342,25 +343,24 @@ class DataResultFunc(NodeFunction[ObjectBundle]):
 
     def _execute(self, ctx: NodeContext) -> ObjectBundle:
 
-        data_item = _ctx_lookup(self.node.data_item_id, ctx)
+        data_spec = _ctx_lookup(self.node.data_save_id, ctx)
+
+        result_bundle = dict()
 
         # Do not record output metadata for optional outputs that are empty
-        if data_item.is_empty():
-            return {}
+        if data_spec.is_empty():
+            return result_bundle
 
-        data_spec = _ctx_lookup(self.node.data_spec_id, ctx)
+        if self.node.data_key is not None:
+            result_bundle[self.node.data_key] = meta.ObjectDefinition(objectType=meta.ObjectType.DATA, data=data_spec.data_def)
 
-        # TODO: Check result of save operation
-        # save_result = _ctx_lookup(self.node.data_save_id, ctx)
+        if self.node.file_key is not None:
+            result_bundle[self.node.data_key] = meta.ObjectDefinition(objectType=meta.ObjectType.FILE, file=data_spec.file_def)
 
-        data_result = meta.ObjectDefinition(objectType=meta.ObjectType.DATA, data=data_spec.data_def)
-        storage_result = meta.ObjectDefinition(objectType=meta.ObjectType.STORAGE, storage=data_spec.storage_def)
+        if self.node.storage_key is not None:
+            result_bundle[self.node.storage_key] = meta.ObjectDefinition(objectType=meta.ObjectType.STORAGE, storage=data_spec.storage_def)
 
-        bundle = {
-            self.node.data_key: data_result,
-            self.node.storage_key: storage_result}
-
-        return bundle
+        return result_bundle
 
 
 class DynamicDataSpecFunc(NodeFunction[_data.DataSpec]):
@@ -443,17 +443,23 @@ class DynamicDataSpecFunc(NodeFunction[_data.DataSpec]):
 
         # Dynamic data def will always use an embedded schema (this is no ID for an external schema)
 
-        return _data.DataSpec(
-            data_item,
-            data_def,
-            storage_def,
-            schema_def=None)
+        return _data.DataSpec.create_data_spec(data_item, data_def, storage_def, schema_def=None)
 
 
 class _LoadSaveDataFunc(abc.ABC):
 
     def __init__(self, storage: _storage.StorageManager):
         self.storage = storage
+
+    @classmethod
+    def _choose_data_spec(cls, spec_id, spec, ctx: NodeContext):
+
+        if spec_id is not None:
+            return _ctx_lookup(spec_id, ctx)
+        elif spec is not None:
+            return spec
+        else:
+            raise _ex.EUnexpected()
 
     def _choose_copy(self, data_item: str, storage_def: meta.StorageDefinition) -> meta.StorageCopy:
 
@@ -491,9 +497,19 @@ class LoadDataFunc( _LoadSaveDataFunc, NodeFunction[_data.DataItem],):
 
     def _execute(self, ctx: NodeContext) -> _data.DataItem:
 
-        data_spec = _ctx_lookup(self.node.spec_id, ctx)
+        data_spec = self._choose_data_spec(self.node.spec_id, self.node.spec, ctx)
         data_copy = self._choose_copy(data_spec.data_item, data_spec.storage_def)
-        data_storage = self.storage.get_data_storage(data_copy.storageKey)
+
+        if data_spec.object_type == _api.ObjectType.DATA:
+            return self._load_data(data_spec, data_copy)
+
+        elif data_spec.object_type == _api.ObjectType.FILE:
+            return self._load_file(data_copy)
+
+        else:
+            raise _ex.EUnexpected()
+
+    def _load_data(self, data_spec, data_copy):
 
         trac_schema = data_spec.schema_def if data_spec.schema_def else data_spec.data_def.schema
         arrow_schema = _data.DataMapping.trac_to_arrow_schema(trac_schema) if trac_schema else None
@@ -503,36 +519,52 @@ class LoadDataFunc( _LoadSaveDataFunc, NodeFunction[_data.DataItem],):
         for opt_key, opt_value in data_spec.storage_def.storageOptions.items():
             options[opt_key] = _types.MetadataCodec.decode_value(opt_value)
 
-        table = data_storage.read_table(
+        storage = self.storage.get_data_storage(data_copy.storageKey)
+        table = storage.read_table(
             data_copy.storagePath,
             data_copy.storageFormat,
             arrow_schema,
             storage_options=options)
 
-        return _data.DataItem(table.schema, table)
+        return _data.DataItem(_api.ObjectType.DATA, table.schema, table)
+
+    def _load_file(self, data_copy):
+
+        storage = self.storage.get_file_storage(data_copy.storageKey)
+        raw_bytes = storage.read_bytes(data_copy.storagePath)
+
+        return _data.DataItem(_api.ObjectType.FILE, raw_bytes=raw_bytes, schema=None)
 
 
-class SaveDataFunc(_LoadSaveDataFunc, NodeFunction[None]):
+class SaveDataFunc(_LoadSaveDataFunc, NodeFunction[_data.DataSpec]):
 
     def __init__(self, node: SaveDataNode, storage: _storage.StorageManager):
         super().__init__(storage)
         self.node = node
 
-    def _execute(self, ctx: NodeContext):
+    def _execute(self, ctx: NodeContext) -> _data.DataSpec:
 
         # Item to be saved should exist in the current context
         data_item = _ctx_lookup(self.node.data_item_id, ctx)
 
+        # Metadata already exists as data_spec but may not contain schema, row count, file size etc.
+        data_spec = self._choose_data_spec(self.node.spec_id, self.node.spec, ctx)
+        data_copy = self._choose_copy(data_spec.data_item, data_spec.storage_def)
+
         # Do not save empty outputs (optional outputs that were not produced)
         if data_item.is_empty():
-            return
+            return _data.DataSpec.create_empty_spec(data_item.object_type)
 
-        # This function assumes that metadata has already been generated as the data_spec
-        # i.e. it is already known which incarnation / copy of the data will be created
+        if data_item.object_type == _api.ObjectType.DATA:
+            return self._save_data(data_item, data_spec, data_copy)
 
-        data_spec = _ctx_lookup(self.node.spec_id, ctx)
-        data_copy = self._choose_copy(data_spec.data_item, data_spec.storage_def)
-        data_storage = self.storage.get_data_storage(data_copy.storageKey)
+        elif data_item.object_type == _api.ObjectType.FILE:
+            return self._save_file(data_item, data_spec, data_copy)
+
+        else:
+            raise _ex.EUnexpected()
+
+    def _save_data(self, data_item, data_spec, data_copy):
 
         # Current implementation will always put an Arrow table in the data item
         # Empty tables are allowed, so explicitly check if table is None
@@ -546,11 +578,32 @@ class SaveDataFunc(_LoadSaveDataFunc, NodeFunction[None]):
         for opt_key, opt_value in data_spec.storage_def.storageOptions.items():
             options[opt_key] = _types.MetadataCodec.decode_value(opt_value)
 
-        data_storage.write_table(
+        storage = self.storage.get_data_storage(data_copy.storageKey)
+        storage.write_table(
             data_copy.storagePath, data_copy.storageFormat,
             data_item.table,
             storage_options=options, overwrite=False)
 
+        data_spec = copy.deepcopy(data_spec)
+        # TODO: Save row count in metadata
+
+        if data_spec.data_def.schema is None and data_spec.data_def.schemaId is None:
+            data_spec.data_def.schema = _data.DataMapping.arrow_to_trac_schema(data_item.table.schema)
+
+        return data_spec
+
+    def _save_file(self, data_item, data_spec, data_copy):
+
+        if data_item.raw_bytes is None:
+            raise _ex.EUnexpected()
+
+        storage = self.storage.get_file_storage(data_copy.storageKey)
+        storage.write_bytes(data_copy.storagePath, data_item.raw_bytes)
+
+        data_spec = copy.deepcopy(data_spec)
+        data_spec.file_def.fileSize = len(data_item.raw_bytes)
+
+        return data_spec
 
 def _model_def_for_import(import_details: meta.ImportModelJob):
 

@@ -357,14 +357,15 @@ class GraphBuilder:
         outputs = set()
         must_run = list()
 
-        for input_name, input_schema in required_inputs.items():
+        for input_name, input_def in required_inputs.items():
 
-            data_selector = supplied_inputs.get(input_name)
+            input_selector = supplied_inputs.get(input_name)
 
-            if data_selector is None:
-                if input_schema.optional:
+            if input_selector is None:
+                if input_def.optional:
                     data_view_id = NodeId.of(input_name, self._job_namespace, _data.DataView)
-                    nodes[data_view_id] = StaticValueNode(data_view_id, _data.DataView.create_empty())
+                    data_view = _data.DataView.create_empty()
+                    nodes[data_view_id] = StaticValueNode(data_view_id, data_view, explicit_deps=explicit_deps)
                     outputs.add(data_view_id)
                     continue
                 else:
@@ -373,7 +374,7 @@ class GraphBuilder:
 
             # Build a data spec using metadata from the job config
             # For now we are always loading the root part, snap 0, delta 0
-            data_def = _util.get_job_resource(data_selector, self._job_config).data
+            data_def = _util.get_job_resource(input_selector, self._job_config).data
             storage_def = _util.get_job_resource(data_def.storageId, self._job_config).storage
 
             if data_def.schemaId:
@@ -383,28 +384,22 @@ class GraphBuilder:
 
             root_part_opaque_key = 'part-root'  # TODO: Central part names / constants
             data_item = data_def.parts[root_part_opaque_key].snap.deltas[0].dataItem
-            data_spec = _data.DataSpec(data_item, data_def, storage_def, schema_def)
-
-            # Data spec node is static, using the assembled data spec
-            data_spec_id = NodeId.of(f"{input_name}:SPEC", self._job_namespace, _data.DataSpec)
-            data_spec_node = StaticValueNode(data_spec_id, data_spec, explicit_deps=explicit_deps)
+            data_spec = _data.DataSpec.create_data_spec(data_item, data_def, storage_def, schema_def)
 
             # Physical load of data items from disk
             # Currently one item per input, since inputs are single part/delta
             data_load_id = NodeId.of(f"{input_name}:LOAD", self._job_namespace, _data.DataItem)
-            data_load_node = LoadDataNode(data_load_id, data_spec_id, explicit_deps=explicit_deps)
+            data_load_node = LoadDataNode(data_load_id, spec=data_spec, explicit_deps=explicit_deps)
 
             # Input views assembled by mapping one root part to each view
             data_view_id = NodeId.of(input_name, self._job_namespace, _data.DataView)
             data_view_node = DataViewNode(data_view_id, schema_def, data_load_id)
 
-            nodes[data_spec_id] = data_spec_node
             nodes[data_load_id] = data_load_node
             nodes[data_view_id] = data_view_node
 
             # Job-level data view is an output of the load operation
             outputs.add(data_view_id)
-            must_run.append(data_spec_id)
 
         return GraphSection(nodes, outputs=outputs, must_run=must_run)
 
@@ -418,12 +413,12 @@ class GraphBuilder:
         nodes = {}
         inputs = set()
 
-        for output_name, output_schema in required_outputs.items():
+        for output_name, output_def in required_outputs.items():
 
             data_selector = supplied_outputs.get(output_name)
 
             if data_selector is None:
-                if output_schema.optional:
+                if output_def.optional:
                     optional_info = "(configuration is required for all optional outputs, in case they are produced)"
                     self._error(_ex.EJobValidation(f"Missing optional output: [{output_name}] {optional_info}"))
                     continue
@@ -433,7 +428,10 @@ class GraphBuilder:
 
             # Output data view must already exist in the namespace
             data_view_id = NodeId.of(output_name, self._job_namespace, _data.DataView)
-            data_spec_id = NodeId.of(f"{output_name}:SPEC", self._job_namespace, _data.DataSpec)
+
+            # Map one data item from each view, since outputs are single part/delta
+            data_item_id = NodeId(f"{output_name}:ITEM", self._job_namespace, _data.DataItem)
+            nodes[data_item_id] = DataItemNode(data_item_id, data_view_id)
 
             data_obj = _util.get_job_resource(data_selector, self._job_config, optional=True)
 
@@ -451,9 +449,11 @@ class GraphBuilder:
 
                 root_part_opaque_key = 'part-root'  # TODO: Central part names / constants
                 data_item = data_def.parts[root_part_opaque_key].snap.deltas[0].dataItem
-                data_spec = _data.DataSpec(data_item, data_def, storage_def, schema_def)
+                data_spec = _data.DataSpec.create_data_spec(data_item, data_def, storage_def, schema_def)
 
-                data_spec_node = StaticValueNode(data_spec_id, data_spec, explicit_deps=explicit_deps)
+                # Create a physical save operation for the data item
+                data_save_id = NodeId.of(f"{output_name}:SAVE", self._job_namespace, _data.DataSpec)
+                nodes[data_save_id] = SaveDataNode(data_save_id, data_item_id, spec=data_spec)
 
                 output_data_key = output_name + ":DATA"
                 output_storage_key = output_name + ":STORAGE"
@@ -468,33 +468,25 @@ class GraphBuilder:
                 storage_key = output_name + ":STORAGE"
                 storage_id = self._job_config.resultMapping[storage_key]
 
-                data_spec_node = DynamicDataSpecNode(
+                data_spec_id = NodeId.of(f"{output_name}:SPEC", self._job_namespace, _data.DataSpec)
+                nodes[data_spec_id] = DynamicDataSpecNode(
                     data_spec_id, data_view_id,
                     data_id, storage_id,
                     prior_data_spec=None,
                     explicit_deps=explicit_deps)
 
+                # Create a physical save operation for the data item
+                data_save_id = NodeId.of(f"{output_name}:SAVE", self._job_namespace, _data.DataSpec)
+                nodes[data_save_id] = SaveDataNode(data_save_id, data_item_id, spec_id=data_spec_id)
+
                 output_data_key = _util.object_key(data_id)
                 output_storage_key = _util.object_key(storage_id)
 
-            # Map one data item from each view, since outputs are single part/delta
-            data_item_id = NodeId(f"{output_name}:ITEM", self._job_namespace, _data.DataItem)
-            data_item_node = DataItemNode(data_item_id, data_view_id)
-
-            # Create a physical save operation for the data item
-            data_save_id = NodeId.of(f"{output_name}:SAVE", self._job_namespace, None)
-            data_save_node = SaveDataNode(data_save_id, data_spec_id, data_item_id)
-
             data_result_id = NodeId.of(f"{output_name}:RESULT", self._job_namespace, ObjectBundle)
-            data_result_node = DataResultNode(
-                data_result_id, output_name,
-                data_item_id, data_spec_id, data_save_id,
-                output_data_key, output_storage_key)
-
-            nodes[data_spec_id] = data_spec_node
-            nodes[data_item_id] = data_item_node
-            nodes[data_save_id] = data_save_node
-            nodes[data_result_id] = data_result_node
+            nodes[data_result_id] = DataResultNode(
+                data_result_id, output_name, data_save_id,
+                data_key=output_data_key,
+                storage_key=output_storage_key)
 
             # Job-level data view is an input to the save operation
             inputs.add(data_view_id)
@@ -537,13 +529,12 @@ class GraphBuilder:
             data_item_node = DataItemNode(data_item_id, data_view_id)
 
             # Create a physical save operation for the data item
-            data_save_id = NodeId.of(f"{output_name}:SAVE", job_namespace, None)
-            data_save_node = SaveDataNode(data_save_id, data_spec_id, data_item_id)
+            data_save_id = NodeId.of(f"{output_name}:SAVE", job_namespace, _data.DataSpec)
+            data_save_node = SaveDataNode(data_save_id, data_item_id, spec_id=data_spec_id)
 
             data_result_id = NodeId.of(f"{output_name}:RESULT", job_namespace, ObjectBundle)
             data_result_node = DataResultNode(
-                data_result_id, output_name,
-                data_item_id, data_spec_id, data_save_id,
+                data_result_id, output_name, data_save_id,
                 output_data_key, output_storage_key)
 
             nodes[data_spec_id] = data_spec_node

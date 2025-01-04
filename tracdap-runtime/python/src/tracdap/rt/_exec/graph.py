@@ -309,20 +309,18 @@ class DataItemNode(MappingNode[_data.DataItem]):
 @_node_type
 class DataResultNode(Node[ObjectBundle]):
 
-    output_name: str
-    data_item_id: NodeId[_data.DataItem]
-    data_spec_id: NodeId[_data.DataSpec]
-    data_save_id: NodeId[type(None)]
+    # TODO: Remove this node type
+    # Either produce metadata in SaveDataNode, or handle DataSpec outputs in result processing nodes
 
-    data_key: str
-    storage_key: str
+    output_name: str
+    data_save_id: NodeId[_data.DataSpec]
+
+    data_key: str = None
+    file_key: str = None
+    storage_key: str = None
 
     def _node_dependencies(self) -> tp.Dict[NodeId, DependencyType]:
-
-        return {
-            self.data_item_id: DependencyType.HARD,
-            self.data_spec_id: DependencyType.HARD,
-            self.data_save_id: DependencyType.HARD}
+        return {self.data_save_id: DependencyType.HARD}
 
 
 @_node_type
@@ -333,24 +331,33 @@ class LoadDataNode(Node[_data.DataItem]):
     The latest incarnation of the item will be loaded from any available copy
     """
 
-    spec_id: NodeId[_data.DataSpec]
+    spec_id: tp.Optional[NodeId[_data.DataSpec]] = None
+    spec: tp.Optional[_data.DataSpec] = None
 
     def _node_dependencies(self) -> tp.Dict[NodeId, DependencyType]:
-        return {self.spec_id: DependencyType.HARD}
+        deps = dict()
+        if self.spec_id is not None:
+            deps[self.spec_id] = DependencyType.HARD
+        return deps
 
 
 @_node_type
-class SaveDataNode(Node[None]):
+class SaveDataNode(Node[_data.DataSpec]):
 
     """
     Save an individual data item to storage
     """
 
-    spec_id: NodeId[_data.DataSpec]
     data_item_id: NodeId[_data.DataItem]
 
+    spec_id: tp.Optional[NodeId[_data.DataSpec]] = None
+    spec: tp.Optional[_data.DataSpec] = None
+
     def _node_dependencies(self) -> tp.Dict[NodeId, DependencyType]:
-        return {self.spec_id: DependencyType.HARD, self.data_item_id: DependencyType.HARD}
+        deps = {self.data_item_id: DependencyType.HARD}
+        if self.spec_id is not None:
+            deps[self.spec_id] = DependencyType.HARD
+        return deps
 
 
 @_node_type
