@@ -198,6 +198,10 @@ class TracContext(metaclass=_abc.ABCMeta):
 
         pass
 
+    def get_file_stream(self, file_name: str) -> _tp.ContextManager[_tp.BinaryIO]:
+
+        pass
+
     def put_schema(self, dataset_name: str, schema: SchemaDefinition):
 
         """
@@ -287,7 +291,11 @@ class TracContext(metaclass=_abc.ABCMeta):
 
         pass
 
-    def put_file(self, file_name: str, file_content: bytes):
+    def put_file(self, file_name: str, file_content: _tp.Union[bytes, bytearray]):
+
+        pass
+
+    def put_file_stream(self, file_name: str) -> _tp.ContextManager[_tp.BinaryIO]:
 
         pass
 

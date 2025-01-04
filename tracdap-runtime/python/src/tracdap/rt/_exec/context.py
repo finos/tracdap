@@ -13,7 +13,9 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import contextlib
 import copy
+import io
 import logging
 import pathlib
 import typing as tp
@@ -193,6 +195,11 @@ class TracContextImpl(_api.TracContext):
         
         return file_view.file_item.raw_bytes
 
+    def get_file_stream(self, file_name: str) -> tp.ContextManager[tp.BinaryIO]:
+
+        buffer = self.get_file(file_name)
+        return contextlib.closing(io.BytesIO(buffer))
+
     def put_schema(self, dataset_name: str, schema: _meta.SchemaDefinition):
 
         _val.validate_signature(self.get_schema, dataset_name, schema)
@@ -281,7 +288,7 @@ class TracContextImpl(_api.TracContext):
 
         self.put_table(dataset_name, dataset, _eapi.POLARS)
     
-    def put_file(self, file_name: str, file_content: bytes):
+    def put_file(self, file_name: str, file_content: tp.Union[bytes, bytearray]):
 
         _val.validate_signature(self.put_file, file_name, file_content)
 
@@ -297,8 +304,29 @@ class TracContextImpl(_api.TracContext):
         self.__val.check_context_data_view_type(file_name, file_view, _meta.ObjectType.FILE)
         self.__val.check_file_content_not_present(file_name, file_view)
 
+        if isinstance(file_content, bytearray):
+            file_content = bytes(bytearray)
+
         file_item = _data.DataItem.for_file_content(file_content)
         self.__local_ctx[file_name] = file_view.with_file_item(file_item)
+
+    def put_file_stream(self, file_name: str) -> tp.ContextManager[tp.BinaryIO]:
+
+        _val.validate_signature(self.put_file_stream, file_name)
+
+        self.__val.check_item_valid_identifier(file_name, TracContextValidator.FILE)
+        self.__val.check_item_is_model_output(file_name, TracContextValidator.FILE)
+
+        @contextlib.contextmanager
+        def memory_stream(stream: io.BytesIO):
+            try:
+                yield stream
+                buffer = stream.getbuffer().tobytes()
+                self.put_file(file_name, buffer)
+            finally:
+                stream.close()
+
+        return memory_stream(io.BytesIO())
 
     def log(self) -> logging.Logger:
 
