@@ -701,6 +701,6 @@ class CommonFileTypes:
     PNG = FileType(".png", "image/png")
     WORD = FileType(".docx", "application/ms.xxxx")
     POWERPOINT = FileType(".pptx", "application/ms.yyyy")
-    POWERPOINT_TEMPLATE = FileType(".pptxt", "application/ms.yyyy")
+    POWERPOINT_TEMPLATE = FileType(".potx", "application/ms.yyyy")
 
 
