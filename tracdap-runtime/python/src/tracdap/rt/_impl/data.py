@@ -126,19 +126,18 @@ class DataView:
 
     object_type: _meta.ObjectType
 
-    trac_schema: _meta.SchemaDefinition
-    arrow_schema: pa.Schema
+    trac_schema: _meta.SchemaDefinition = None
+    arrow_schema: pa.Schema = None
 
-    parts: tp.Dict[DataPartKey, tp.List[DataItem]]
+    parts: tp.Dict[DataPartKey, tp.List[DataItem]] = None
     file_item: tp.Optional[DataItem] = None
 
     @staticmethod
-    def create_empty() -> "DataView":
-        return DataView(_meta.ObjectType.DATA, _meta.SchemaDefinition(), pa.schema([]), dict())
-
-    @staticmethod
-    def create_empty_file():
-        return DataView(_meta.ObjectType.FILE, None, None, None)
+    def create_empty(object_type: _meta.ObjectType = _meta.ObjectType.DATA) -> "DataView":
+        if object_type == _meta.ObjectType.DATA:
+            return DataView(object_type, _meta.SchemaDefinition(), pa.schema([]), dict())
+        else:
+            return DataView(object_type)
 
     @staticmethod
     def for_trac_schema(trac_schema: _meta.SchemaDefinition):
@@ -148,6 +147,10 @@ class DataView:
     def with_trac_schema(self, trac_schema: _meta.SchemaDefinition):
         arrow_schema = DataMapping.trac_to_arrow_schema(trac_schema)
         return DataView(_meta.ObjectType.DATA, trac_schema, arrow_schema, self.parts)
+
+    @staticmethod
+    def for_file(file_item: DataItem):
+        return DataView(file_item.object_type, file_item=file_item)
 
     def is_empty(self) -> bool:
         return self.parts is None or not any(self.parts.values()) and self.file_item is None

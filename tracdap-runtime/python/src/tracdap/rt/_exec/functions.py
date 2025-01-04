@@ -297,8 +297,13 @@ class DataViewFunc(NodeFunction[_data.DataView]):
 
         # Map empty item -> emtpy view (for optional inputs not supplied)
         if root_item.is_empty():
-            return _data.DataView.create_empty()
+            return _data.DataView.create_empty(root_item.object_type)
 
+        # Handle file data views
+        if root_item.object_type == meta.ObjectType.FILE:
+            return _data.DataView.for_file(root_item)
+
+        # Everything else is a regular data view
         if self.node.schema is not None and len(self.node.schema.table.fields) > 0:
             trac_schema = self.node.schema
         else:
