@@ -84,31 +84,34 @@ class ConfigParserTest(unittest.TestCase):
         plugin_package = "tracdap_test.rt.plugins.test_ext"
 
         trac_runtime = runtime.TracRuntime(self.sys_config, plugin_packages=[plugin_package], dev_mode=True)
-        trac_runtime.pre_start()
 
-        # Load a config object that exists
-        job_config = trac_runtime.load_job_config("test-ext:job_config_A1-6")
-        self.assertIsInstance(job_config, cfg.JobConfig)
+        with trac_runtime as rt:
+
+            # Load a config object that exists
+            job_config = rt.load_job_config("test-ext:job_config_A1-6")
+            self.assertIsInstance(job_config, cfg.JobConfig)
 
     def test_ext_config_loader_job_not_found(self):
 
         plugin_package = "tracdap_test.rt.plugins.test_ext"
 
         trac_runtime = runtime.TracRuntime(self.sys_config, plugin_packages=[plugin_package], dev_mode=True)
-        trac_runtime.pre_start()
 
-        # Load a config object that does not exist
-        self.assertRaises(ex.EConfigLoad, lambda: trac_runtime.load_job_config("test-ext:job_config_B1-9"))
+        with trac_runtime as rt:
+
+            # Load a config object that does not exist
+            self.assertRaises(ex.EConfigLoad, lambda: rt.load_job_config("test-ext:job_config_B1-9"))
 
     def test_ext_config_loader_wrong_protocol(self):
 
         plugin_package = "tracdap_test.rt.plugins.test_ext"
 
         trac_runtime = runtime.TracRuntime(self.sys_config, plugin_packages=[plugin_package], dev_mode=True)
-        trac_runtime.pre_start()
 
-        # Load a config object with the wrong protocol
-        self.assertRaises(ex.EConfigLoad, lambda: trac_runtime.load_job_config("test-ext-2:job_config_B1-9"))
+        with trac_runtime as rt:
+
+            # Load a config object with the wrong protocol
+            self.assertRaises(ex.EConfigLoad, lambda: rt.load_job_config("test-ext-2:job_config_B1-9"))
 
     def test_launch_model(self):
 
