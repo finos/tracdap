@@ -301,7 +301,7 @@ class DataViewFunc(NodeFunction[_data.DataView]):
 
         # Handle file data views
         if root_item.object_type == meta.ObjectType.FILE:
-            return _data.DataView.for_file(root_item)
+            return _data.DataView.for_file_item(root_item)
 
         # Everything else is a regular data view
         if self.node.schema is not None and len(self.node.schema.table.fields) > 0:
@@ -328,7 +328,11 @@ class DataItemFunc(NodeFunction[_data.DataItem]):
 
         # Map empty view -> emtpy item (for optional outputs not supplied)
         if data_view.is_empty():
-            return _data.DataItem.create_empty()
+            return _data.DataItem.create_empty(data_view.object_type)
+
+        # Handle file data views
+        if data_view.object_type == meta.ObjectType.FILE:
+            return data_view.file_item
 
         # TODO: Support selecting data item described by self.node
 
@@ -360,7 +364,7 @@ class DataResultFunc(NodeFunction[ObjectBundle]):
             result_bundle[self.node.data_key] = meta.ObjectDefinition(objectType=meta.ObjectType.DATA, data=data_spec.data_def)
 
         if self.node.file_key is not None:
-            result_bundle[self.node.data_key] = meta.ObjectDefinition(objectType=meta.ObjectType.FILE, file=data_spec.file_def)
+            result_bundle[self.node.file_key] = meta.ObjectDefinition(objectType=meta.ObjectType.FILE, file=data_spec.file_def)
 
         if self.node.storage_key is not None:
             result_bundle[self.node.storage_key] = meta.ObjectDefinition(objectType=meta.ObjectType.STORAGE, storage=data_spec.storage_def)
@@ -538,7 +542,7 @@ class LoadDataFunc( _LoadSaveDataFunc, NodeFunction[_data.DataItem],):
         storage = self.storage.get_file_storage(data_copy.storageKey)
         raw_bytes = storage.read_bytes(data_copy.storagePath)
 
-        return _data.DataItem(_api.ObjectType.FILE, raw_bytes=raw_bytes, schema=None)
+        return _data.DataItem(_api.ObjectType.FILE, raw_bytes=raw_bytes)
 
 
 class SaveDataFunc(_LoadSaveDataFunc, NodeFunction[_data.DataSpec]):

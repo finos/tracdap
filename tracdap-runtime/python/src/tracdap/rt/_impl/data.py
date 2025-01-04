@@ -14,6 +14,7 @@
 #  limitations under the License.
 
 import abc
+import copy
 import dataclasses as dc
 import typing as tp
 import datetime as dt
@@ -100,7 +101,7 @@ class DataItem:
 
     object_type: _meta.ObjectType
 
-    schema: pa.Schema
+    schema: pa.Schema = None
     table: tp.Optional[pa.Table] = None
     batches: tp.Optional[tp.List[pa.RecordBatch]] = None
 
@@ -110,15 +111,21 @@ class DataItem:
     raw_bytes: bytes = None
 
     def is_empty(self) -> bool:
-        return self.table is None and (self.batches is None or len(self.batches) == 0) and self.raw_bytes is None
+        if self.object_type == _meta.ObjectType.FILE:
+            return self.raw_bytes is None or len(self.raw_bytes) == 0
+        else:
+            return self.table is None and (self.batches is None or len(self.batches) == 0)
 
     @staticmethod
-    def create_empty() -> "DataItem":
-        return DataItem(_meta.ObjectType.DATA, pa.schema([]))
+    def create_empty(object_type: _meta.ObjectType = _meta.ObjectType.DATA) -> "DataItem":
+        if object_type == _meta.ObjectType.DATA:
+            return DataItem(_meta.ObjectType.DATA, pa.schema([]))
+        else:
+            return DataItem(object_type)
 
     @staticmethod
-    def create_empty_file() -> "DataItem":
-        return DataItem(_meta.ObjectType.FILE, None)
+    def for_file_content(raw_bytes: bytes):
+        return DataItem(_meta.ObjectType.FILE, raw_bytes=raw_bytes)
 
 
 @dc.dataclass(frozen=True)
@@ -144,16 +151,27 @@ class DataView:
         arrow_schema = DataMapping.trac_to_arrow_schema(trac_schema)
         return DataView(_meta.ObjectType.DATA, trac_schema, arrow_schema, dict())
 
+    @staticmethod
+    def for_file_item(file_item: DataItem):
+        return DataView(file_item.object_type, file_item=file_item)
+
     def with_trac_schema(self, trac_schema: _meta.SchemaDefinition):
         arrow_schema = DataMapping.trac_to_arrow_schema(trac_schema)
         return DataView(_meta.ObjectType.DATA, trac_schema, arrow_schema, self.parts)
 
-    @staticmethod
-    def for_file(file_item: DataItem):
-        return DataView(file_item.object_type, file_item=file_item)
+    def with_part(self, part_key: DataPartKey, part: DataItem):
+        new_parts = copy.copy(self.parts)
+        new_parts[part_key] = [part]
+        return DataView(self.object_type, self.trac_schema, self.arrow_schema, new_parts)
+
+    def with_file_item(self, file_item: DataItem):
+        return DataView(self.object_type, file_item=file_item)
 
     def is_empty(self) -> bool:
-        return self.parts is None or not any(self.parts.values()) and self.file_item is None
+        if self.object_type == _meta.ObjectType.FILE:
+            return self.file_item is None
+        else:
+            return self.parts is None or not any(self.parts.values())
 
 
 class _DataInternal:
