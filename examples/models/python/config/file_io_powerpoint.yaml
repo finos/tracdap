@@ -1,0 +1,10 @@
+
+job:
+  runModel:
+
+    inputs:
+      quarterly_sales: "outputs/using_data/profit_by_region.csv"
+      report_template: "inputs/sales_report_template.pptx"
+
+    outputs:
+      sales_report: "outputs/file_io/sales_report.pptx"
