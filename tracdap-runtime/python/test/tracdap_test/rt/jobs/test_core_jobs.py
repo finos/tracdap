@@ -183,7 +183,9 @@ class CoreJobsTest(unittest.TestCase):
                     "filter_defaults": meta.ModelParameter(paramType=types.TypeMapping.python_to_trac(bool)),
                 },
                 inputs={
-                    "customer_loans": meta.ModelInputSchema(meta.SchemaDefinition(
+                    "customer_loans": meta.ModelInputSchema(
+                        objectType=meta.ObjectType.DATA,
+                        schema=meta.SchemaDefinition(
                         schemaType=meta.SchemaType.TABLE,
                         table=meta.TableSchema(fields=[
                             meta.FieldSchema("id", fieldType=meta.BasicType.STRING, businessKey=True),
@@ -194,7 +196,9 @@ class CoreJobsTest(unittest.TestCase):
                         ])))
                 },
                 outputs={
-                    "profit_by_region": meta.ModelOutputSchema(meta.SchemaDefinition(
+                    "profit_by_region": meta.ModelOutputSchema(
+                        objectType=meta.ObjectType.DATA,
+                        schema=meta.SchemaDefinition(
                         schemaType=meta.SchemaType.TABLE,
                         table=meta.TableSchema(fields=[
                             meta.FieldSchema("region", fieldType=meta.BasicType.STRING, categorical=True),
