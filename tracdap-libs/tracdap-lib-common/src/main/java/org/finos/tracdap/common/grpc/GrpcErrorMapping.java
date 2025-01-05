@@ -100,7 +100,7 @@ public class GrpcErrorMapping {
 
                 log.warn("No gRPC error code mapping is available for the error {}", error.getClass().getSimpleName());
 
-                var trailers = basicErrorTrailers(Status.Code.INTERNAL, Status.INTERNAL.getDescription());
+                var trailers = basicErrorTrailers(Status.Code.INTERNAL, INTERNAL_ERROR_MESSAGE);
 
                 return Status.fromCode(Status.Code.INTERNAL)
                         .withDescription(Status.INTERNAL.getDescription())
