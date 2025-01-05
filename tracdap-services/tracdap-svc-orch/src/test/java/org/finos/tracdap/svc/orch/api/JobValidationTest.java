@@ -192,9 +192,11 @@ public class JobValidationTest {
                         .setParamType(TypeSystem.descriptor(BasicType.FLOAT))
                         .build())
                 .putInputs("basic_input", ModelInputSchema.newBuilder()
+                        .setObjectType(ObjectType.DATA)
                         .setSchema(inputSchema)
                         .build())
                 .putOutputs("enriched_output", ModelOutputSchema.newBuilder()
+                        .setObjectType(ObjectType.DATA)
                         .setSchema(outputSchema)
                         .build())
                 .build();
@@ -436,12 +438,14 @@ public class JobValidationTest {
 
         for (var input : inputSchemas.entrySet()) {
             modelDef.putInputs(input.getKey(), ModelInputSchema.newBuilder()
+                    .setObjectType(ObjectType.DATA)
                     .setSchema(input.getValue())
                     .build());
         }
 
         for (var output : outputSchemas.entrySet()) {
             modelDef.putOutputs(output.getKey(), ModelOutputSchema.newBuilder()
+                    .setObjectType(ObjectType.DATA)
                     .setSchema(output.getValue())
                     .build());
         }
