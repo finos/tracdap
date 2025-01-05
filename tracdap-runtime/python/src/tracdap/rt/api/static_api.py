@@ -698,10 +698,11 @@ def declare_output_table(
 
 class CommonFileTypes:
 
-    SVG = FileType(".svg", "image/svg+xml")
-    PNG = FileType(".png", "image/png")
-    WORD = FileType(".docx", "application/ms.xxxx")
-    POWERPOINT = FileType(".pptx", "application/ms.yyyy")
-    POWERPOINT_TEMPLATE = FileType(".potx", "application/ms.yyyy")
+    TXT = FileType("txt", "text/plain")
+    SVG = FileType("svg", "image/svg+xml")
+    PNG = FileType("png", "image/png")
+    WORD = FileType("docx", "application/ms.xxxx")
+    POWERPOINT = FileType("pptx", "application/ms.yyyy")
+    POWERPOINT_TEMPLATE = FileType("potx", "application/ms.yyyy")
 
 

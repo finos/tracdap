@@ -306,7 +306,7 @@ class StaticValidator:
     __reserved_identifier_pattern = re.compile("\\A(_|trac_)", re.ASCII)
     __label_length_limit = 4096
 
-    __file_extension_pattern = re.compile('\\A\\.[a-zA-Z0-9]+\\Z')
+    __file_extension_pattern = re.compile('\\A[a-zA-Z0-9]+\\Z')
     __mime_type_pattern = re.compile('\\A\\w+/[-.\\w]+(?:\\+[-.\\w]+)?\\Z')
 
     __PRIMITIVE_TYPES = [

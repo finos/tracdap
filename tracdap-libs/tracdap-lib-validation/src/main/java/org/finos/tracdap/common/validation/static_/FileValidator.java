@@ -34,7 +34,7 @@ import java.util.regex.Pattern;
 public class FileValidator {
 
     private static final Pattern NAME_EXT_PATTERN = Pattern.compile(".*\\.([^./\\\\]+)\\Z");
-    private static final Pattern EXT_PATTERN = Pattern.compile("\\A\\.([^./\\\\]+)\\Z");
+    private static final Pattern EXT_PATTERN = Pattern.compile("\\A([^./\\\\]+)\\Z");
 
     private static final Descriptors.Descriptor FILE_DEF;
     private static final Descriptors.FieldDescriptor FD_NAME;
