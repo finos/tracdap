@@ -610,7 +610,7 @@ class SaveDataFunc(_LoadSaveDataFunc, NodeFunction[_data.DataSpec]):
         storage.write_bytes(data_copy.storagePath, data_item.raw_bytes)
 
         data_spec = copy.deepcopy(data_spec)
-        data_spec.file_def.fileSize = len(data_item.raw_bytes)
+        data_spec.file_def.size = len(data_item.raw_bytes)
 
         return data_spec
 

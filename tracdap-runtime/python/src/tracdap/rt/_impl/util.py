@@ -235,7 +235,7 @@ def get_job_resource(
     if optional:
         return None
 
-    err = f"Missing required {selector.objectType} resource [{object_key(selector)}]"
+    err = f"Missing required {selector.objectType.name} resource [{object_key(selector)}]"
     raise ex.ERuntimeValidation(err)
 
 
