@@ -13,12 +13,10 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import pathlib
 import tempfile
 import typing as tp
 import unittest
-import pathlib
-import subprocess as sp
-import platform
 
 import tracdap.rt.api as api
 import tracdap.rt.metadata as meta
@@ -65,62 +63,24 @@ class ImportModelTest(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls) -> None:
+
         plugins.PluginManager.register_core_plugins()
         api_hook.StaticApiImpl.register_impl()
         util.configure_logging()
 
     def setUp(self) -> None:
+
         self.test_scope = f"{self.__class__.__name__}.{self._testMethodName}"
-
-        repo_url_proc = sp.run(["git", "config", "--get", "remote.origin.url"], stdout=sp.PIPE)
-        commit_hash_proc = sp.run(["git", "rev-parse", "HEAD"], stdout=sp.PIPE)
-
-        if repo_url_proc.returncode != 0 or commit_hash_proc.returncode != 0:
-            raise RuntimeError("Could not discover details of the current git repo")
-
-        self.repo_url = repo_url_proc.stdout.decode('utf-8').strip()
-        self.commit_hash = commit_hash_proc.stdout.decode('utf-8').strip()
-
         self.scratch_dir = pathlib.Path(tempfile.mkdtemp())
 
     def tearDown(self) -> None:
 
         util.try_clean_dir(self.scratch_dir, remove=True)
 
-    def test_load_integrated_ok(self):
+    def test_load_model(self, override_scope = None):
 
-        sys_config = config.RuntimeConfig()
-        sys_config.repositories["trac_integrated"] = config.PluginConfig(protocol="integrated")
-
-        stub_model_def = meta.ModelDefinition(
-            language="python",
-            repository="trac_integrated",
-            entryPoint="tracdap_test.rt.impl.test_models.SampleModel"
-        )
-
-        loader = models.ModelLoader(sys_config, self.scratch_dir)
-        loader.create_scope(self.test_scope)
-
-        model_class = loader.load_model_class(self.test_scope, stub_model_def)
-        model = model_class()
-
-        self.assertIsInstance(model_class, api.TracModel.__class__)
-        self.assertIsInstance(model, model_class)
-        self.assertIsInstance(model, api.TracModel)
-
-        loader.destroy_scope(self.test_scope)
-
-    def test_load_local_ok(self):
-
-        self._test_load_local(self.test_scope)
-
-    def test_load_local_long_path_ok(self):
-
-        long_path_scope = "long_" + "A" * 250
-
-        self._test_load_local(long_path_scope)
-
-    def _test_load_local(self, test_scope):
+        if override_scope:
+            self.test_scope = override_scope
 
         example_repo_url = pathlib.Path(__file__) \
             .parent \
@@ -142,37 +102,34 @@ class ImportModelTest(unittest.TestCase):
         )
 
         loader = models.ModelLoader(sys_config, self.scratch_dir)
-        loader.create_scope(test_scope)
+        loader.create_scope(self.test_scope)
 
-        model_class = loader.load_model_class(test_scope, stub_model_def)
+        model_class = loader.load_model_class(self.test_scope, stub_model_def)
         model = model_class()
 
         self.assertIsInstance(model_class, api.TracModel.__class__)
-        self.assertIsInstance(model, model_class)
         self.assertIsInstance(model, api.TracModel)
 
-        loader.destroy_scope(test_scope)
+        loader.destroy_scope(self.test_scope)
 
-    def test_load_git_ok(self):
+    def test_load_model_long_path(self):
 
-        example_repo_config = config.PluginConfig(
-            protocol="git",
-            properties={"repoUrl": self.repo_url})
+        long_path_scope = "long_" + "A" * 250
+        self.test_load_model(long_path_scope)
+
+    def test_load_model_integrated(self):
+
+        # Integrated repo uses a different loader mechanism so include a test here
+        # All other repo types copy into the loader scope, so loader behavior is the same as local
+        # Also, tests for remote repo types are integration tests
 
         sys_config = config.RuntimeConfig()
-        sys_config.repositories["example_repo"] = example_repo_config
-
-        # On macOS, SSL certificates are not set up correctly by default in urllib3
-        # We can reconfigure them by passing Git config properties into the pure python Git client
-        if platform.system() == "Darwin":
-            sys_config.repositories["example_repo"].properties["git.http.sslCaInfo"] = "/etc/ssl/cert.pem"
+        sys_config.repositories["trac_integrated"] = config.PluginConfig(protocol="integrated")
 
         stub_model_def = meta.ModelDefinition(
             language="python",
-            repository="example_repo",
-            path="examples/models/python/src",
-            entryPoint="tutorial.hello_world.HelloWorldModel",
-            version=self.commit_hash
+            repository="trac_integrated",
+            entryPoint="tracdap_test.rt.impl.test_models.SampleModel"
         )
 
         loader = models.ModelLoader(sys_config, self.scratch_dir)
@@ -182,12 +139,11 @@ class ImportModelTest(unittest.TestCase):
         model = model_class()
 
         self.assertIsInstance(model_class, api.TracModel.__class__)
-        self.assertIsInstance(model, model_class)
         self.assertIsInstance(model, api.TracModel)
 
         loader.destroy_scope(self.test_scope)
 
-    def test_scan_model_ok(self):
+    def test_scan_model(self):
 
         def _td(basic_type: meta.BasicType) -> meta.TypeDescriptor:
             return meta.TypeDescriptor(basic_type)
