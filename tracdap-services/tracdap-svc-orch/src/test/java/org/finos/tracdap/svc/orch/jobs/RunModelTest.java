@@ -29,6 +29,8 @@ import com.google.protobuf.ByteString;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.extension.RegisterExtension;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -72,6 +74,12 @@ public class RunModelTest {
     static TagHeader optionalIoOutputDataId;
     static TagHeader dynamicIoModelId;
     static TagHeader dynamicIoOutputDataId;
+
+    static TagHeader inputFileId;
+    static long inputFileSize;
+    static TagHeader fileIoModelId;
+    static TagHeader outputFileId;
+    static TagHeader outputFileIdStream;
 
     @Test @Order(1)
     void loadInputData() throws Exception {
@@ -275,7 +283,7 @@ public class RunModelTest {
     @Test @Order(5)
     void optionalIO_importModel() throws Exception {
 
-        log.info("Running IMPORT_MODEL job...");
+        log.info("Running IMPORT_MODEL job for optional IO...");
 
         var modelVersion = GitHelpers.getCurrentCommit();
         var modelStub = ModelDefinition.newBuilder()
@@ -379,7 +387,7 @@ public class RunModelTest {
     @Test @Order(7)
     void optionalIO_checkOutputData() {
 
-        log.info("Checking output data...");
+        log.info("Checking output data for optional IO...");
 
         var dataClient = platform.dataClientBlocking();
 
@@ -408,10 +416,7 @@ public class RunModelTest {
     @Test @Order(8)
     void dynamicIO_importModel() throws Exception {
 
-        log.info("Running IMPORT_MODEL job...");
-
-        var metaClient = platform.metaClientBlocking();
-        var orchClient = platform.orchClientBlocking();
+        log.info("Running IMPORT_MODEL job for dynamic IO...");
 
         var modelVersion = GitHelpers.getCurrentCommit();
         var modelStub = ModelDefinition.newBuilder()
@@ -514,7 +519,7 @@ public class RunModelTest {
     @Test @Order(10)
     void dynamicIO_checkOutputData() {
 
-        log.info("Checking output data...");
+        log.info("Checking output data for dynamic IO...");
 
         var dataClient = platform.dataClientBlocking();
 
@@ -540,6 +545,174 @@ public class RunModelTest {
 
         Assertions.assertTrue(csvText.contains("leinster"));
         Assertions.assertFalse(csvText.contains("munster"));
+    }
+
+    @Test @Order(11)
+    void fileIO_loadInputData() {
+
+        log.info("Loading input file...");
+
+        var sampleData = "Some text in a file\r\n".getBytes(StandardCharsets.UTF_8);
+        var sampleDataSize = sampleData.length;
+
+        var metaClient = platform.metaClientBlocking();
+        var dataClient = platform.dataClientBlocking();
+
+        var writeRequest = FileWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setName("input_file.txt")
+                .setMimeType("text/plain")
+                .setContent(ByteString.copyFrom(sampleData))
+                .setSize(sampleDataSize)
+                .addTagUpdates(TagUpdate.newBuilder()
+                        .setAttrName("e2e_test_file")
+                        .setValue(MetadataCodec.encodeValue("run_model:file_io")))
+                .build();
+
+        inputFileId = dataClient.createSmallFile(writeRequest);
+        inputFileSize = sampleDataSize;
+
+        var fileSelector = MetadataUtil.selectorFor(inputFileId);
+        var fileRequest = MetadataReadRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSelector(fileSelector)
+                .build();
+
+        var fileTag = metaClient.readObject(fileRequest);
+
+        var fileAttr = fileTag.getAttrsOrThrow("e2e_test_file");
+        var fileDef = fileTag.getDefinition().getFile();
+
+        Assertions.assertEquals("run_model:file_io", MetadataCodec.decodeStringValue(fileAttr));
+        Assertions.assertEquals(sampleDataSize, fileDef.getSize());
+
+        log.info("Input file loaded, data ID = [{}]", fileTag.getHeader().getObjectId());
+    }
+
+    @Test @Order(12)
+    void fileIO_importModel() throws Exception {
+
+        log.info("Running IMPORT_MODEL job for file IO...");
+
+        var modelVersion = GitHelpers.getCurrentCommit();
+        var modelStub = ModelDefinition.newBuilder()
+                .setLanguage("python")
+                .setRepository(useTracRepo())
+                .setPath("tracdap-services/tracdap-svc-orch/src/test/resources")
+                .setEntryPoint("file_io.FileIOModel")
+                .setVersion(modelVersion)
+                .build();
+
+        var modelAttrs = List.of(TagUpdate.newBuilder()
+                .setAttrName("e2e_test_model")
+                .setValue(MetadataCodec.encodeValue("run_model:file_io"))
+                .build());
+
+        var jobAttrs = List.of(TagUpdate.newBuilder()
+                .setAttrName("e2e_test_job")
+                .setValue(MetadataCodec.encodeValue("run_model:file_io_import_model"))
+                .build());
+
+        var modelTag = ImportModelTest.doImportModel(platform, TEST_TENANT, modelStub, modelAttrs, jobAttrs);
+        var modelDef = modelTag.getDefinition().getModel();
+        var modelAttr = modelTag.getAttrsOrThrow("e2e_test_model");
+
+        Assertions.assertEquals("run_model:file_io", MetadataCodec.decodeStringValue(modelAttr));
+        Assertions.assertEquals("file_io.FileIOModel", modelDef.getEntryPoint());
+        Assertions.assertTrue(modelDef.getInputsMap().containsKey("file_input"));
+        Assertions.assertTrue(modelDef.getOutputsMap().containsKey("file_output"));
+
+        fileIoModelId = modelTag.getHeader();
+    }
+
+    @ParameterizedTest() @Order(13)
+    @ValueSource(booleans= {true, false})
+    void fileIO_runModel(boolean useStreams) {
+
+        var metaClient = platform.metaClientBlocking();
+        var orchClient = platform.orchClientBlocking();
+
+        var runModel = RunModelJob.newBuilder()
+                .setModel(MetadataUtil.selectorFor(fileIoModelId))
+                .putParameters("n_copies", MetadataCodec.encodeValue(3))
+                .putParameters("use_streams", MetadataCodec.encodeValue(useStreams))
+                .putInputs("file_input", MetadataUtil.selectorFor(inputFileId))
+                .addOutputAttrs(TagUpdate.newBuilder()
+                        .setAttrName("e2e_test_data")
+                        .setValue(MetadataCodec.encodeValue("run_model:file_io_data_output")))
+                .build();
+
+        var jobRequest = JobRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setJob(JobDefinition.newBuilder()
+                        .setJobType(JobType.RUN_MODEL)
+                        .setRunModel(runModel))
+                .addJobAttrs(TagUpdate.newBuilder()
+                        .setAttrName("e2e_test_job")
+                        .setValue(MetadataCodec.encodeValue("run_model:file_io_run_model")))
+                .build();
+
+        var jobStatus = runJob(orchClient, jobRequest);
+        var jobKey = MetadataUtil.objectKey(jobStatus.getJobId());
+
+        Assertions.assertEquals(JobStatusCode.SUCCEEDED, jobStatus.getStatusCode());
+
+        var fileSearch = MetadataSearchRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSearchParams(SearchParameters.newBuilder()
+                .setObjectType(ObjectType.FILE)
+                .setSearch(SearchExpression.newBuilder()
+                .setTerm(SearchTerm.newBuilder()
+                        .setAttrName("trac_create_job")
+                        .setAttrType(BasicType.STRING)
+                        .setOperator(SearchOperator.EQ)
+                        .setSearchValue(MetadataCodec.encodeValue(jobKey)))))
+                .build();
+
+        var dataSearchResult = metaClient.search(fileSearch);
+
+        Assertions.assertEquals(1, dataSearchResult.getSearchResultCount());
+
+        var searchResult = dataSearchResult.getSearchResult(0);
+        var fileReq = MetadataReadRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSelector(MetadataUtil.selectorFor(searchResult.getHeader()))
+                .build();
+
+        var fileTag = metaClient.readObject(fileReq);
+        var fileDef = fileTag.getDefinition().getFile();
+        var outputAttr = fileTag.getAttrsOrThrow("e2e_test_data");
+
+        Assertions.assertEquals("run_model:file_io_data_output", MetadataCodec.decodeStringValue(outputAttr));
+        Assertions.assertEquals(inputFileSize * 3, fileDef.getSize());
+
+        if (useStreams)
+            outputFileIdStream = fileTag.getHeader();
+        else
+            outputFileId = fileTag.getHeader();
+    }
+
+    @ParameterizedTest @Order(14)
+    @ValueSource(booleans= {true, false})
+    void fileIO_checkOutputData(boolean useStreams) {
+
+        log.info("Checking output data for file IO...");
+
+        var dataClient = platform.dataClientBlocking();
+
+        var fileId = useStreams ? outputFileIdStream : outputFileId;
+
+        var readRequest = FileReadRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSelector(MetadataUtil.selectorFor(fileId))
+                .build();
+
+        var readResponse = dataClient.readSmallFile(readRequest);
+
+        var expectedContent = "Some text in a file\r\n".repeat(3);
+        var fileContents = readResponse.getContent().toString(StandardCharsets.UTF_8);
+
+        Assertions.assertEquals(expectedContent, fileContents);
     }
 
 }
