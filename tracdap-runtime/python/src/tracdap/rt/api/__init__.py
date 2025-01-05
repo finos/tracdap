@@ -23,6 +23,7 @@ from tracdap.rt.metadata import *  # noqa DOCGEN_REMOVE
 
 from .model_api import *
 from .static_api import *
+from .file_types import *
 
 # Map basic types into the root of the API package
 

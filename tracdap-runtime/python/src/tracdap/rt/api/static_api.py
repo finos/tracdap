@@ -529,6 +529,8 @@ def ModelInputSchema(  # noqa
 
     This function is provided for compatibility with TRAC versions before 0.8.0.
     Please use :py:func:`define_input() <tracdap.rt.api.define_input>` instead.
+
+    :display: False
     """
 
     input_props = inputProps or dict()
@@ -548,6 +550,8 @@ def ModelOutputSchema(  # noqa
 
     This function is provided for compatibility with TRAC versions before 0.8.0.
     Please use :py:func:`define_output() <tracdap.rt.api.define_output>` instead.
+
+    :display: False
     """
 
     output_props = outputProps or dict()
@@ -694,15 +698,3 @@ def declare_output_table(
     print("TRAC Warning: declare_output_table() is deprecated, please use define_output_table()", file==sys.stderr)
 
     return define_output_table(*fields)
-
-
-class CommonFileTypes:
-
-    TXT = FileType("txt", "text/plain")
-    SVG = FileType("svg", "image/svg+xml")
-    PNG = FileType("png", "image/png")
-    WORD = FileType("docx", "application/ms.xxxx")
-    POWERPOINT = FileType("pptx", "application/ms.yyyy")
-    POWERPOINT_TEMPLATE = FileType("potx", "application/ms.yyyy")
-
-
