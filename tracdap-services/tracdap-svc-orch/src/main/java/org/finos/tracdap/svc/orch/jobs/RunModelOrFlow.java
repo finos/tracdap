@@ -21,6 +21,7 @@ package org.finos.tracdap.svc.orch.jobs;
 import org.finos.tracdap.api.MetadataWriteRequest;
 import org.finos.tracdap.api.internal.RuntimeJobResult;
 import org.finos.tracdap.common.exception.EConsistencyValidation;
+import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.config.JobConfig;
 import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.common.metadata.MetadataCodec;
@@ -38,36 +39,42 @@ public abstract class RunModelOrFlow {
 
         for (var obj : newResources.values()) {
 
-            if (obj.getObjectType() != ObjectType.DATA)
-                continue;
+            if (obj.getObjectType() == ObjectType.DATA) {
 
-            var dataDef = obj.getData();
-            resources.add(dataDef.getStorageId());
+                var dataDef = obj.getData();
+                resources.add(dataDef.getStorageId());
 
-            if (dataDef.hasSchemaId())
-                resources.add(dataDef.getSchemaId());
+                if (dataDef.hasSchemaId())
+                    resources.add(dataDef.getSchemaId());
+            }
+
+            else if (obj.getObjectType() == ObjectType.FILE) {
+
+                var fileDef = obj.getFile();
+                resources.add(fileDef.getStorageId());
+            }
         }
 
         return resources;
     }
 
     public Map<String, MetadataWriteRequest> newResultIds(
-            String tenant, Set<String> outputKeys,
+            String tenant, Map<String, ModelOutputSchema> outputRequirements,
             Map<String, TagSelector> priorOutputsMap) {
 
         var resultMapping = new HashMap<String, MetadataWriteRequest>();
 
-        for (var outputKey : outputKeys) {
+        for (var output : outputRequirements.entrySet()) {
 
-            if (priorOutputsMap.containsKey(outputKey))
+            if (priorOutputsMap.containsKey(output.getKey()))
                 continue;
 
-            var dataKey = String.format("%s:%s", outputKey, ObjectType.DATA);
+            var outputKey = output.getKey();
             var storageKey = String.format("%s:%s", outputKey, ObjectType.STORAGE);
 
-            var dataReq = MetadataWriteRequest.newBuilder()
+            var outputReq = MetadataWriteRequest.newBuilder()
                     .setTenant(tenant)
-                    .setObjectType(ObjectType.DATA)
+                    .setObjectType(output.getValue().getObjectType())
                     .build();
 
             var storageReq = MetadataWriteRequest.newBuilder()
@@ -75,7 +82,7 @@ public abstract class RunModelOrFlow {
                     .setObjectType(ObjectType.STORAGE)
                     .build();
 
-            resultMapping.put(dataKey, dataReq);
+            resultMapping.put(outputKey, outputReq);
             resultMapping.put(storageKey, storageReq);
         }
 
@@ -95,17 +102,25 @@ public abstract class RunModelOrFlow {
             if (priorOutput == null)
                 continue;
 
-            var priorDataKey = MetadataUtil.objectKey(priorOutput);
-            var priorDataId = resourceMapping.get(priorDataKey);
-            var priorDataDef = resources.get(MetadataUtil.objectKey(priorDataId)).getData();
+            var priorOutputKey = MetadataUtil.objectKey(priorOutput);
+            var priorOutputId = resourceMapping.get(priorOutputKey);
+            var priorOutputDef = resources.get(MetadataUtil.objectKey(priorOutputId));
 
-            var priorStorageKey = MetadataUtil.objectKey(priorDataDef.getStorageId());
+            TagSelector priorStorageSelector;
+
+            if (priorOutputDef.getObjectType() == ObjectType.DATA)
+                priorStorageSelector = priorOutputDef.getData().getStorageId();
+            else if (priorOutputDef.getObjectType() == ObjectType.FILE)
+                priorStorageSelector = priorOutputDef.getFile().getStorageId();
+            else
+                throw new EUnexpected();
+
+            var priorStorageKey = MetadataUtil.objectKey(priorStorageSelector);
             var priorStorageId = resourceMapping.get(priorStorageKey);
 
-            var dataKey = String.format("%s:%s", outputKey, ObjectType.DATA);
             var storageKey = String.format("%s:%s", outputKey, ObjectType.STORAGE);
 
-            resultMapping.put(dataKey, priorDataId);
+            resultMapping.put(outputKey, priorOutputId);
             resultMapping.put(storageKey, priorStorageId);
         }
 
@@ -120,10 +135,9 @@ public abstract class RunModelOrFlow {
 
         for (var outputKey : outputKeys) {
 
-            var dataKey = String.format("%s:%s", outputKey, ObjectType.DATA);
-            var dataId = resultMapping.get(dataKey);
-            var dataSelector = MetadataUtil.selectorFor(dataId);
-            outputSelectors.put(outputKey, dataSelector);
+            var outputId = resultMapping.get(outputKey);
+            var outputSelector = MetadataUtil.selectorFor(outputId);
+            outputSelectors.put(outputKey, outputSelector);
         }
 
         return outputSelectors;
@@ -140,35 +154,34 @@ public abstract class RunModelOrFlow {
         for (var output: expectedOutputs.entrySet()) {
 
             var outputName = output.getKey();
-            var outputSchema = output.getValue();
+            var outputDef = output.getValue();
 
-            // TODO: String constants
+            var outputId = jobConfig.getResultMappingOrThrow(outputName);
+            var outputKey = MetadataUtil.objectKey(outputId);
 
-            var dataIdLookup = outputName + ":DATA";
-            var dataId = jobConfig.getResultMappingOrThrow(dataIdLookup);
-            var dataKey = MetadataUtil.objectKey(dataId);
-
-            if (!jobResult.containsResults(dataKey)) {
-                if (outputSchema.getOptional())
+            if (!jobResult.containsResults(outputKey)) {
+                if (outputDef.getOptional())
                     continue;
                 else
                     throw new EConsistencyValidation(String.format("Missing required output [%s]", outputName));
             }
 
-            var storageIdLookup = outputName + ":STORAGE";
-            var storageId = jobConfig.getResultMappingOrThrow(storageIdLookup);
+            // TODO: Preallocated IDs for storage outputs
+
+            var storageMapping = outputName + ":STORAGE";
+            var storageId = jobConfig.getResultMappingOrThrow(storageMapping);
             var storageKey = MetadataUtil.objectKey(storageId);
 
-            var dataObj = jobResult.getResultsOrThrow(dataKey);
+            var outputObj = jobResult.getResultsOrThrow(outputKey);
             var storageObj = jobResult.getResultsOrThrow(storageKey);
 
-            var priorDataSelector = priorOutputs.containsKey(outputName)
+            var priorOutputSelector = priorOutputs.containsKey(outputName)
                     ? priorOutputs.get(outputName)
                     : MetadataUtil.preallocated(outputs.get(outputName));
 
             var priorStorageSelector = priorOutputs.containsKey(outputName)
-                    ? priorStorageSelector(priorDataSelector, jobConfig)
-                    : MetadataUtil.preallocated(dataObj.getData().getStorageId());
+                    ? priorStorageSelector(priorOutputSelector, jobConfig)
+                    : preallocatedStorageSelector(outputObj);
 
             var controlledAttrs = List.of(
                     TagUpdate.newBuilder()
@@ -181,27 +194,27 @@ public abstract class RunModelOrFlow {
                 nodeOutputAttrs = List.of();
             }
 
-            var dataUpdate = MetadataWriteRequest.newBuilder()
+            var outputUpdate = MetadataWriteRequest.newBuilder()
                     .setTenant(tenant)
-                    .setObjectType(ObjectType.DATA)
-                    .setPriorVersion(priorDataSelector)
-                    .setDefinition(dataObj)
+                    .setObjectType(outputObj.getObjectType())
+                    .setPriorVersion(priorOutputSelector)
+                    .setDefinition(outputObj)
                     .addAllTagUpdates(controlledAttrs)
                     .addAllTagUpdates(outputAttrs)
                     .addAllTagUpdates(nodeOutputAttrs)
                     .build();
 
-            updates.add(dataUpdate);
+            updates.add(outputUpdate);
 
             var storageAttrs = List.of(
                     TagUpdate.newBuilder()
                     .setAttrName(MetadataConstants.TRAC_STORAGE_OBJECT_ATTR)
-                    .setValue(MetadataCodec.encodeValue(dataKey))
+                    .setValue(MetadataCodec.encodeValue(outputKey))
                     .build());
 
             var storageUpdate = MetadataWriteRequest.newBuilder()
                     .setTenant(tenant)
-                    .setObjectType(ObjectType.STORAGE)
+                    .setObjectType(storageObj.getObjectType())
                     .setPriorVersion(priorStorageSelector)
                     .setDefinition(storageObj)
                     .addAllTagUpdates(storageAttrs)
@@ -213,27 +226,50 @@ public abstract class RunModelOrFlow {
         return updates;
     }
 
-    private TagSelector priorStorageSelector(TagSelector priorDataSelector, JobConfig jobConfig) {
+    private TagSelector priorStorageSelector(TagSelector priorOutputSelector, JobConfig jobConfig) {
 
-        var dataKey = MetadataUtil.objectKey(priorDataSelector);
+        var mappedOutputKey = MetadataUtil.objectKey(priorOutputSelector);
+        String outputKey;
 
-        if (jobConfig.containsResourceMapping(dataKey)) {
-            var dataId = jobConfig.getResourceMappingOrDefault(dataKey, null);
-            var dataSelector = MetadataUtil.selectorFor(dataId);
-            dataKey = MetadataUtil.objectKey(dataSelector);
+        if (jobConfig.containsResourceMapping(mappedOutputKey)) {
+            var outputId = jobConfig.getResourceMappingOrDefault(mappedOutputKey, null);
+            var outputSelector = MetadataUtil.selectorFor(outputId);
+            outputKey = MetadataUtil.objectKey(outputSelector);
         }
+        else
+            outputKey = mappedOutputKey;
 
-        var dataObj = jobConfig.getResourcesOrThrow(dataKey);
+        var outputObj = jobConfig.getResourcesOrThrow(outputKey);
 
-        var storageSelector = dataObj.getData().getStorageId();
+        TagSelector storageSelector;
+
+        if (outputObj.getObjectType() == ObjectType.DATA)
+            storageSelector = outputObj.getData().getStorageId();
+        else if (outputObj.getObjectType() == ObjectType.FILE)
+            storageSelector = outputObj.getFile().getStorageId();
+        else
+            throw new EUnexpected();
+
         var storageKey = MetadataUtil.objectKey(storageSelector);
 
         if (jobConfig.containsResourceMapping(storageKey)) {
 
             var storageId = jobConfig.getResourceMappingOrDefault(storageKey, null);
-            storageSelector = MetadataUtil.selectorFor(storageId);
+            return MetadataUtil.selectorFor(storageId);
         }
+        else
+            return storageSelector;
+    }
 
-        return storageSelector;
+    private TagSelector preallocatedStorageSelector(ObjectDefinition outputObj) {
+
+        if (outputObj.getObjectType() == ObjectType.DATA)
+            return MetadataUtil.preallocated(outputObj.getData().getStorageId());
+
+        else if (outputObj.getObjectType() == ObjectType.FILE)
+            return  MetadataUtil.preallocated(outputObj.getFile().getStorageId());
+
+        else
+            throw new EUnexpected();
     }
 }

@@ -88,8 +88,12 @@ public class RunFlowJob extends RunModelOrFlow implements IJobLogic {
 
         var runFlow = job.getRunFlow();
 
+        var flowKey = MetadataUtil.objectKey(runFlow.getFlow());
+        var flowId = resourceMapping.get(flowKey);
+        var flowDef = resources.get(MetadataUtil.objectKey(flowId)).getFlow();
+
         var outputFlowNodes = getFlowOutputNodes(runFlow.getFlow(), resources, resourceMapping);
-        var outputs = getFlowOutputNames(outputFlowNodes);
+        var outputs = getFlowOutputs(outputFlowNodes, flowDef);
 
         return newResultIds(tenant, outputs, runFlow.getPriorOutputsMap());
     }
@@ -110,6 +114,12 @@ public class RunFlowJob extends RunModelOrFlow implements IJobLogic {
 
     private static Set<String> getFlowOutputNames(Map<String, FlowNode> outputFlowNodes) {
         return new HashSet<>(outputFlowNodes.keySet());
+    }
+
+    private static Map<String, ModelOutputSchema> getFlowOutputs(Map<String, FlowNode> outputFlowNodes, FlowDefinition flow) {
+
+        return outputFlowNodes.entrySet().stream()
+                .collect(Collectors.toMap(Map.Entry::getKey, e -> flow.getOutputsOrThrow(e.getKey())));
     }
 
     private static Map<String, FlowNode> getFlowOutputNodes(

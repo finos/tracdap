@@ -74,7 +74,7 @@ public class RunModelJob extends RunModelOrFlow implements IJobLogic {
         var modelDef = resources.get(MetadataUtil.objectKey(modelId)).getModel();
 
         return newResultIds(
-                tenant, modelDef.getOutputsMap().keySet(),
+                tenant, modelDef.getOutputsMap(),
                 runModel.getPriorOutputsMap());
     }
 
