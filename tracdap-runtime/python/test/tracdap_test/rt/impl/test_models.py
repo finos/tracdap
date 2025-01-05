@@ -18,6 +18,7 @@ import typing as tp
 import unittest
 import pathlib
 import subprocess as sp
+import platform
 
 import tracdap.rt.api as api
 import tracdap.rt.metadata as meta
@@ -160,6 +161,11 @@ class ImportModelTest(unittest.TestCase):
 
         sys_config = config.RuntimeConfig()
         sys_config.repositories["example_repo"] = example_repo_config
+
+        # On macOS, SSL certificates are not set up correctly by default in urllib3
+        # We can reconfigure them by passing Git config properties into the pure python Git client
+        if platform.system() == "Darwin":
+            sys_config.repositories["example_repo"].properties["git.http.sslCaInfo"] = "/etc/ssl/cert.pem"
 
         stub_model_def = meta.ModelDefinition(
             language="python",
