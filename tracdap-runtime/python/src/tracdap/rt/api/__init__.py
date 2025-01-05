@@ -21,9 +21,11 @@ TRAC model API for Python
 # Remove this import when generating docs, so metadata classes are only documented once
 from tracdap.rt.metadata import *  # noqa DOCGEN_REMOVE
 
+# static_api overrides some metadata types for backwards compatibility with pre-0.8 versions
+# Make sure it is last in the list
+from .file_types import *
 from .model_api import *
 from .static_api import *
-from .file_types import *
 
 # Map basic types into the root of the API package
 
