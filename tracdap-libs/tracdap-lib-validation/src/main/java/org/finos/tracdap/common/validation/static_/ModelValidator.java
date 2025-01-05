@@ -51,14 +51,18 @@ public class ModelValidator {
     private static final Descriptors.FieldDescriptor MP_PARAM_PROPS;
 
     private static final Descriptors.Descriptor MODEL_INPUT_SCHEMA;
+    private static final Descriptors.FieldDescriptor MIS_OBJECT_TYPE;
     private static final Descriptors.FieldDescriptor MIS_SCHEMA;
+    private static final Descriptors.FieldDescriptor MIS_FILE_TYPE;
     private static final Descriptors.FieldDescriptor MIS_LABEL;
     private static final Descriptors.FieldDescriptor MIS_OPTIONAL;
     private static final Descriptors.FieldDescriptor MIS_DYNAMIC;
     private static final Descriptors.FieldDescriptor MIS_INPUT_PROPS;
 
     private static final Descriptors.Descriptor MODEL_OUTPUT_SCHEMA;
+    private static final Descriptors.FieldDescriptor MOS_OBJECT_TYPE;
     private static final Descriptors.FieldDescriptor MOS_SCHEMA;
+    private static final Descriptors.FieldDescriptor MOS_FILE_TYPE;
     private static final Descriptors.FieldDescriptor MOS_LABEL;
     private static final Descriptors.FieldDescriptor MOS_OPTIONAL;
     private static final Descriptors.FieldDescriptor MOS_DYNAMIC;
@@ -83,14 +87,18 @@ public class ModelValidator {
         MP_PARAM_PROPS = field(MODEL_PARAMETER, ModelParameter.PARAMPROPS_FIELD_NUMBER);
 
         MODEL_INPUT_SCHEMA = ModelInputSchema.getDescriptor();
+        MIS_OBJECT_TYPE = field(MODEL_INPUT_SCHEMA, ModelOutputSchema.OBJECTTYPE_FIELD_NUMBER);
         MIS_SCHEMA = field(MODEL_INPUT_SCHEMA, ModelInputSchema.SCHEMA_FIELD_NUMBER);
+        MIS_FILE_TYPE = field(MODEL_INPUT_SCHEMA, ModelInputSchema.FILETYPE_FIELD_NUMBER);
         MIS_LABEL = field(MODEL_INPUT_SCHEMA, ModelInputSchema.LABEL_FIELD_NUMBER);
         MIS_OPTIONAL = field(MODEL_INPUT_SCHEMA, ModelInputSchema.OPTIONAL_FIELD_NUMBER);
         MIS_DYNAMIC = field(MODEL_INPUT_SCHEMA, ModelInputSchema.DYNAMIC_FIELD_NUMBER);
         MIS_INPUT_PROPS = field(MODEL_INPUT_SCHEMA, ModelInputSchema.INPUTPROPS_FIELD_NUMBER);
 
         MODEL_OUTPUT_SCHEMA = ModelOutputSchema.getDescriptor();
+        MOS_OBJECT_TYPE = field(MODEL_OUTPUT_SCHEMA, ModelOutputSchema.OBJECTTYPE_FIELD_NUMBER);
         MOS_SCHEMA = field(MODEL_OUTPUT_SCHEMA, ModelOutputSchema.SCHEMA_FIELD_NUMBER);
+        MOS_FILE_TYPE = field(MODEL_OUTPUT_SCHEMA, ModelOutputSchema.FILETYPE_FIELD_NUMBER);
         MOS_LABEL = field(MODEL_OUTPUT_SCHEMA, ModelOutputSchema.LABEL_FIELD_NUMBER);
         MOS_OPTIONAL = field(MODEL_OUTPUT_SCHEMA, ModelOutputSchema.OPTIONAL_FIELD_NUMBER);
         MOS_DYNAMIC = field(MODEL_OUTPUT_SCHEMA, ModelOutputSchema.DYNAMIC_FIELD_NUMBER);
@@ -207,13 +215,34 @@ public class ModelValidator {
     @Validator
     public static ValidationContext modelInputSchema(ModelInputSchema msg, ValidationContext ctx) {
 
-        // Dynamic schemas require different validation logic
-
-        ctx = ctx.push(MIS_SCHEMA)
+        ctx = ctx.push(MIS_OBJECT_TYPE)
                 .apply(CommonValidators::required)
-                .applyIf(!msg.getDynamic(), SchemaValidator::schema, SchemaDefinition.class)
-                .applyIf(msg.getDynamic(), SchemaValidator::dynamicSchema, SchemaDefinition.class)
+                .apply(CommonValidators::nonZeroEnum, ObjectType.class)
                 .pop();
+
+        if (msg.getObjectType() == ObjectType.DATA) {
+
+            // Dynamic schemas require different validation logic
+
+            ctx = ctx.push(MIS_SCHEMA)
+                    .apply(CommonValidators::required)
+                    .applyIf(!msg.getDynamic(), SchemaValidator::schema, SchemaDefinition.class)
+                    .applyIf(msg.getDynamic(), SchemaValidator::dynamicSchema, SchemaDefinition.class)
+                    .pop();
+        }
+        else if (msg.getObjectType() == ObjectType.FILE) {
+
+            ctx = ctx.push(MIS_FILE_TYPE)
+                    .apply(CommonValidators::required)
+                    .apply(FileValidator::fileType, FileType.class)
+                    .pop();
+        }
+        else {
+
+            ctx = ctx.push(MIS_OBJECT_TYPE)
+                    .error(String.format("Object type [%s] is not supported", msg.getObjectType()))
+                    .pop();
+        }
 
         ctx = ctx.push(MIS_LABEL)
                 .apply(CommonValidators::optional)
@@ -231,13 +260,34 @@ public class ModelValidator {
     @Validator
     public static ValidationContext modelOutputSchema(ModelOutputSchema msg, ValidationContext ctx) {
 
-        // Dynamic schemas require different validation logic
-
-        ctx = ctx.push(MOS_SCHEMA)
+        ctx = ctx.push(MOS_OBJECT_TYPE)
                 .apply(CommonValidators::required)
-                .applyIf(!msg.getDynamic(), SchemaValidator::schema, SchemaDefinition.class)
-                .applyIf(msg.getDynamic(), SchemaValidator::dynamicSchema, SchemaDefinition.class)
+                .apply(CommonValidators::nonZeroEnum, ObjectType.class)
                 .pop();
+
+        if (msg.getObjectType() == ObjectType.DATA) {
+
+            // Dynamic schemas require different validation logic
+
+            ctx = ctx.push(MOS_SCHEMA)
+                    .apply(CommonValidators::required)
+                    .applyIf(!msg.getDynamic(), SchemaValidator::schema, SchemaDefinition.class)
+                    .applyIf(msg.getDynamic(), SchemaValidator::dynamicSchema, SchemaDefinition.class)
+                    .pop();
+        }
+        else if (msg.getObjectType() == ObjectType.FILE) {
+
+            ctx = ctx.push(MOS_FILE_TYPE)
+                    .apply(CommonValidators::required)
+                    .apply(FileValidator::fileType, FileType.class)
+                    .pop();
+        }
+        else {
+
+            ctx = ctx.push(MOS_OBJECT_TYPE)
+                    .error(String.format("Object type [%s] is not supported", msg.getObjectType()))
+                    .pop();
+        }
 
         ctx = ctx.push(MOS_LABEL)
                 .apply(CommonValidators::optional)

@@ -22,6 +22,7 @@ import org.finos.tracdap.common.validation.core.ValidationType;
 import org.finos.tracdap.common.validation.core.Validator;
 import org.finos.tracdap.common.validation.core.ValidatorUtils;
 import org.finos.tracdap.metadata.FileDefinition;
+import org.finos.tracdap.metadata.FileType;
 import org.finos.tracdap.metadata.ObjectType;
 import org.finos.tracdap.metadata.TagSelector;
 import com.google.protobuf.Descriptors;
@@ -32,7 +33,8 @@ import java.util.regex.Pattern;
 @Validator(type = ValidationType.STATIC)
 public class FileValidator {
 
-    private static final Pattern EXT_PATTERN = Pattern.compile(".*\\.([^./\\\\]+)");
+    private static final Pattern NAME_EXT_PATTERN = Pattern.compile(".*\\.([^./\\\\]+)\\Z");
+    private static final Pattern EXT_PATTERN = Pattern.compile("\\A\\.([^./\\\\]+)\\Z");
 
     private static final Descriptors.Descriptor FILE_DEF;
     private static final Descriptors.FieldDescriptor FD_NAME;
@@ -42,6 +44,10 @@ public class FileValidator {
     private static final Descriptors.FieldDescriptor FD_DATA_ITEM;
     private static final Descriptors.FieldDescriptor FD_STORAGE_ID;
 
+    private static final Descriptors.Descriptor FILE_TYPE;
+    private static final Descriptors.FieldDescriptor FT_EXTENSION;
+    private static final Descriptors.FieldDescriptor FT_MIME_TYPE;
+
     static {
         FILE_DEF = FileDefinition.getDescriptor();
         FD_NAME = ValidatorUtils.field(FILE_DEF, FileDefinition.NAME_FIELD_NUMBER);
@@ -50,6 +56,10 @@ public class FileValidator {
         FD_SIZE = ValidatorUtils.field(FILE_DEF, FileDefinition.SIZE_FIELD_NUMBER);
         FD_DATA_ITEM = ValidatorUtils.field(FILE_DEF, FileDefinition.DATAITEM_FIELD_NUMBER);
         FD_STORAGE_ID = ValidatorUtils.field(FILE_DEF, FileDefinition.STORAGEID_FIELD_NUMBER);
+
+        FILE_TYPE = FileType.getDescriptor();
+        FT_EXTENSION = ValidatorUtils.field(FILE_TYPE, FileType.EXTENSION_FIELD_NUMBER);
+        FT_MIME_TYPE = ValidatorUtils.field(FILE_TYPE, FileType.MIMETYPE_FIELD_NUMBER);
     }
 
     @Validator
@@ -89,9 +99,25 @@ public class FileValidator {
         return ctx;
     }
 
+    @Validator
+    public static ValidationContext fileType(FileType msg, ValidationContext ctx) {
+
+        ctx = ctx.push(FT_EXTENSION)
+                .apply(CommonValidators::required)
+                .apply(FileValidator::extensionIsValid)
+                .pop();
+
+        ctx = ctx.push(FT_MIME_TYPE)
+                .apply(CommonValidators::required)
+                .apply(CommonValidators::mimeType)
+                .pop();
+
+        return ctx;
+    }
+
     private static ValidationContext extensionMatchesName(String extension, String fileName, ValidationContext ctx) {
 
-        var nameExtMatch = EXT_PATTERN.matcher(fileName);
+        var nameExtMatch = NAME_EXT_PATTERN.matcher(fileName);
 
         if (nameExtMatch.matches()) {
 
@@ -106,6 +132,16 @@ public class FileValidator {
                 ctx = ctx.error(err);
             }
         }
+
+        return ctx;
+    }
+
+    private static ValidationContext extensionIsValid(String extension, ValidationContext ctx) {
+
+        var extMatch = EXT_PATTERN.matcher(extension);
+
+        if (!extMatch.matches())
+            ctx.error(String.format("File extension [%s] is not valid", extension));
 
         return ctx;
     }
