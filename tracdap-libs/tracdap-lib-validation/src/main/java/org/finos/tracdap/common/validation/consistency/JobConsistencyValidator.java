@@ -343,19 +343,19 @@ public class JobConsistencyValidator {
     }
 
     // Param comes from the job definition
-    private static ValidationContext paramMatchesSchema(String paramName, Value paramValue, ModelParameter requiredParam, ValidationContext ctx) {
+    private static ValidationContext paramMatchesSchema(String paramName, Value paramValue, ModelParameter paramDef, ValidationContext ctx) {
 
         var paramType = TypeSystem.descriptor(paramValue);
-        var requiredType = requiredParam.getParamType();
+        var requiredType = paramDef.getParamType();
 
         return paramMatchesType(paramName, paramType, requiredType, ctx);
     }
 
     // Param comes from upstream node
-    private static ValidationContext paramMatchesSchema(String paramName, ModelParameter suppliedParam, ModelParameter requiredParam, ValidationContext ctx) {
+    private static ValidationContext paramMatchesSchema(String paramName, ModelParameter suppliedParam, ModelParameter paramDef, ValidationContext ctx) {
 
         var paramType = suppliedParam.getParamType();
-        var requiredType = requiredParam.getParamType();
+        var requiredType = paramDef.getParamType();
 
         return paramMatchesType(paramName, paramType, requiredType, ctx);
     }
@@ -389,14 +389,14 @@ public class JobConsistencyValidator {
     }
 
     // Input comes from the job definition
-    private static ValidationContext inputMatchesSchema(String inputName, TagSelector inputSelector, ModelInputSchema requiredSchema, ValidationContext ctx) {
+    private static ValidationContext inputMatchesSchema(String inputName, TagSelector inputSelector, ModelInputSchema inputDef, ValidationContext ctx) {
 
         var inputObject = ctx.getMetadataBundle().getResource(inputSelector);
 
         if (inputObject == null) {
 
             // It is fine if an optional input is not supplied
-            if (requiredSchema.getOptional())
+            if (inputDef.getOptional())
                 return ctx;
 
             return ctx.error(String.format(
@@ -404,44 +404,62 @@ public class JobConsistencyValidator {
                     inputName, MetadataUtil.objectKey(inputSelector)));
         }
 
-        if (inputObject.getObjectType() != ObjectType.DATA) {
+        if (inputObject.getObjectType() != inputDef.getObjectType()) {
             return ctx.error(String.format(
-                    "Input is not a dataset (expected %s, got %s)",
-                    ObjectType.DATA, inputObject.getObjectType()));
+                    "Input [%s] is not the right object type (expected %s, got %s)",
+                    inputName, inputDef.getObjectType(), inputObject.getObjectType()));
         }
 
-        // In case inference failed, requiredSchema == null so stop here
+        // In case inference failed, inputDef == null so stop here
         if (ctx.failed())
             return ctx;
 
-        if (requiredSchema.getDynamic())
-            return checkDynamicDataSchema(inputObject.getData(), requiredSchema.getSchema(), ctx);
+        if (inputDef.getObjectType() == ObjectType.FILE)
+            return checkFileType(inputObject.getFile(), inputDef.getFileType(), ctx);
+        else if (inputDef.getDynamic())
+            return checkDynamicDataSchema(inputObject.getData(), inputDef.getSchema(), ctx);
         else
-            return checkDataSchema(inputObject.getData(), requiredSchema.getSchema(), ctx);
+            return checkDataSchema(inputObject.getData(), inputDef.getSchema(), ctx);
     }
 
     // Input comes from upstream node
-    private static ValidationContext inputMatchesSchema(String inputName, ModelInputSchema inputSchema, ModelInputSchema requiredSchema, ValidationContext ctx) {
+    private static ValidationContext inputMatchesSchema(String inputName, ModelInputSchema inputSchema, ModelInputSchema inputDef, ValidationContext ctx) {
 
-        if (inputSchema.getOptional() && !requiredSchema.getOptional())
+        if (inputSchema.getObjectType() != inputDef.getObjectType()) {
+            return ctx.error(String.format(
+                    "Input [%s] is not the right object type (expected %s, got %s)",
+                    inputName, inputDef.getObjectType(), inputSchema.getObjectType()));
+        }
+
+        if (inputSchema.getOptional() && !inputDef.getOptional())
             ctx.error("Required model input [" + inputName + "] is connected to an optional input");
 
-        if (requiredSchema.getDynamic() || inputSchema.getDynamic())
-            return checkDynamicDataSchema(inputSchema.getSchema(), requiredSchema.getSchema(), ctx);
+        if (inputDef.getObjectType() == ObjectType.FILE)
+            return checkFileType(inputSchema.getFileType(), inputDef.getFileType(), ctx);
+        else if (inputDef.getDynamic() || inputSchema.getDynamic())
+            return checkDynamicDataSchema(inputSchema.getSchema(), inputDef.getSchema(), ctx);
         else
-            return checkDataSchema(inputSchema.getSchema(), requiredSchema.getSchema(), ctx);
+            return checkDataSchema(inputSchema.getSchema(), inputDef.getSchema(), ctx);
     }
 
     // Input comes from upstream node
-    private static ValidationContext inputMatchesSchema(String inputName, ModelOutputSchema outputSchema, ModelInputSchema requiredSchema, ValidationContext ctx) {
+    private static ValidationContext inputMatchesSchema(String inputName, ModelOutputSchema outputSchema, ModelInputSchema inputDef, ValidationContext ctx) {
 
-        if (outputSchema.getOptional() && !requiredSchema.getOptional())
+        if (outputSchema.getObjectType() != inputDef.getObjectType()) {
+            return ctx.error(String.format(
+                    "Input [%s] is not the right object type (expected %s, got %s)",
+                    inputName, inputDef.getObjectType(), outputSchema.getObjectType()));
+        }
+
+        if (outputSchema.getOptional() && !inputDef.getOptional())
             ctx.error("Required model input [" + inputName + "] is connected to an optional model output");
 
-        if (requiredSchema.getDynamic() || outputSchema.getDynamic())
-            return checkDynamicDataSchema(outputSchema.getSchema(), requiredSchema.getSchema(), ctx);
+        if (inputDef.getObjectType() == ObjectType.FILE)
+            return checkFileType(outputSchema.getFileType(), inputDef.getFileType(), ctx);
+        else if (inputDef.getDynamic() || outputSchema.getDynamic())
+            return checkDynamicDataSchema(outputSchema.getSchema(), inputDef.getSchema(), ctx);
         else
-            return checkDataSchema(outputSchema.getSchema(), requiredSchema.getSchema(), ctx);
+            return checkDataSchema(outputSchema.getSchema(), inputDef.getSchema(), ctx);
     }
 
     // Output comes from the job definition
@@ -454,7 +472,7 @@ public class JobConsistencyValidator {
     }
 
     // Output comes from the job definition
-    private static ValidationContext outputMatchesSchema(String outputName, TagSelector outputSelector, ModelOutputSchema requiredSchema, ValidationContext ctx) {
+    private static ValidationContext outputMatchesSchema(String outputName, TagSelector outputSelector, ModelOutputSchema outputDef, ValidationContext ctx) {
 
         var outputObject = ctx.getMetadataBundle().getResource(outputSelector);
 
@@ -469,44 +487,62 @@ public class JobConsistencyValidator {
                     outputName, MetadataUtil.objectKey(outputSelector)));
         }
 
-        if (outputObject.getObjectType() != ObjectType.DATA) {
+        if (outputObject.getObjectType() != outputDef.getObjectType()) {
             return ctx.error(String.format(
-                    "Output is not a dataset (expected %s, got %s)",
-                    ObjectType.DATA, outputObject.getObjectType()));
+                    "Output [%s] is not the right object type (expected %s, got %s)",
+                    outputName, outputDef.getObjectType(), outputObject.getObjectType()));
         }
 
-        // In case inference failed, requiredSchema == null so stop here
+        // In case inference failed, outputDef == null so stop here
         if (ctx.failed())
             return ctx;
 
-        if (requiredSchema.getDynamic())
-            return checkDynamicDataSchema(outputObject.getData(), requiredSchema.getSchema(), ctx);
+        if (outputDef.getObjectType() == ObjectType.FILE)
+            return checkFileType(outputObject.getFile(), outputDef.getFileType(), ctx);
+        else if (outputDef.getDynamic())
+            return checkDynamicDataSchema(outputObject.getData(), outputDef.getSchema(), ctx);
         else
-            return checkDataSchema(outputObject.getData(), requiredSchema.getSchema(), ctx);
+            return checkDataSchema(outputObject.getData(), outputDef.getSchema(), ctx);
     }
 
     // Output comes from upstream node
-    private static ValidationContext outputMatchesSchema(String outputName, ModelInputSchema inputSchema, ModelOutputSchema requiredSchema, ValidationContext ctx) {
+    private static ValidationContext outputMatchesSchema(String outputName, ModelInputSchema inputSchema, ModelOutputSchema outputDef, ValidationContext ctx) {
 
-        if (inputSchema.getOptional() && !requiredSchema.getOptional())
+        if (inputSchema.getObjectType() != outputDef.getObjectType()) {
+            return ctx.error(String.format(
+                    "Input [%s] is not the right object type (expected %s, got %s)",
+                    outputName, outputDef.getObjectType(), inputSchema.getObjectType()));
+        }
+
+        if (inputSchema.getOptional() && !outputDef.getOptional())
             ctx.error("Required output [" + outputName + "] is connected to an optional input");
 
-        if (requiredSchema.getDynamic() || inputSchema.getDynamic())
-            return checkDynamicDataSchema(inputSchema.getSchema(), requiredSchema.getSchema(), ctx);
+        if (outputDef.getObjectType() == ObjectType.FILE)
+            return checkFileType(inputSchema.getFileType(), outputDef.getFileType(), ctx);
+        else if (outputDef.getDynamic() || inputSchema.getDynamic())
+            return checkDynamicDataSchema(inputSchema.getSchema(), outputDef.getSchema(), ctx);
         else
-            return checkDataSchema(inputSchema.getSchema(), requiredSchema.getSchema(), ctx);
+            return checkDataSchema(inputSchema.getSchema(), outputDef.getSchema(), ctx);
     }
 
     // Output comes from upstream node
-    private static ValidationContext outputMatchesSchema(String outputName, ModelOutputSchema outputSchema, ModelOutputSchema requiredSchema, ValidationContext ctx) {
+    private static ValidationContext outputMatchesSchema(String outputName, ModelOutputSchema outputSchema, ModelOutputSchema outputDef, ValidationContext ctx) {
 
-        if (outputSchema.getOptional() && !requiredSchema.getOptional())
+        if (outputSchema.getObjectType() != outputDef.getObjectType()) {
+            return ctx.error(String.format(
+                    "Input [%s] is not the right object type (expected %s, got %s)",
+                    outputName, outputDef.getObjectType(), outputSchema.getObjectType()));
+        }
+
+        if (outputSchema.getOptional() && !outputDef.getOptional())
             ctx.error("Required output [" + outputName + "] is connected to an optional model output");
 
-        if (requiredSchema.getDynamic() || outputSchema.getDynamic())
-            return checkDynamicDataSchema(outputSchema.getSchema(), requiredSchema.getSchema(), ctx);
+        if (outputDef.getObjectType() == ObjectType.FILE)
+            return checkFileType(outputSchema.getFileType(), outputDef.getFileType(), ctx);
+        else if (outputDef.getDynamic() || outputSchema.getDynamic())
+            return checkDynamicDataSchema(outputSchema.getSchema(), outputDef.getSchema(), ctx);
         else
-            return checkDataSchema(outputSchema.getSchema(), requiredSchema.getSchema(), ctx);
+            return checkDataSchema(outputSchema.getSchema(), outputDef.getSchema(), ctx);
     }
 
     private static ValidationContext checkDataSchema(DataDefinition suppliedData, SchemaDefinition requiredSchema, ValidationContext ctx) {
@@ -628,6 +664,44 @@ public class JobConsistencyValidator {
 
         // Should never happen - something has gone very wrong with object consistency!
         throw new EUnexpected();
+    }
+
+    private static ValidationContext checkFileType(FileDefinition fileDef, FileType fileType, ValidationContext ctx) {
+
+        if (!fileType.getExtension().equals(fileDef.getExtension())) {
+
+            ctx.error(String.format(
+                    "File extension does not match (expected [%s], got [%s])",
+                    fileType.getExtension(), fileDef.getExtension()));
+        }
+
+        if (!fileType.getMimeType().equals(fileDef.getMimeType())) {
+
+            ctx.error(String.format(
+                    "Mime type does not match (expected [%s], got [%s])",
+                    fileType.getExtension(), fileDef.getExtension()));
+        }
+
+        return ctx;
+    }
+
+    private static ValidationContext checkFileType(FileType suppliedFileType, FileType requiredFileType, ValidationContext ctx) {
+
+        if (!requiredFileType.getExtension().equals(suppliedFileType.getExtension())) {
+
+            ctx.error(String.format(
+                    "File extension does not match (expected [%s], got [%s])",
+                    requiredFileType.getExtension(), suppliedFileType.getExtension()));
+        }
+
+        if (!requiredFileType.getMimeType().equals(suppliedFileType.getMimeType())) {
+
+            ctx.error(String.format(
+                    "Mime type does not match (expected [%s], got [%s])",
+                    requiredFileType.getExtension(), suppliedFileType.getExtension()));
+        }
+
+        return ctx;
     }
 
 

@@ -194,6 +194,14 @@ class TracContext(metaclass=_abc.ABCMeta):
 
         pass
 
+    def get_file(self, file_name: str) -> bytes:
+
+        pass
+
+    def get_file_stream(self, file_name: str) -> _tp.ContextManager[_tp.BinaryIO]:
+
+        pass
+
     def put_schema(self, dataset_name: str, schema: SchemaDefinition):
 
         """
@@ -280,6 +288,14 @@ class TracContext(metaclass=_abc.ABCMeta):
         :raises: :py:class:`ERuntimeValidation <tracdap.rt.exceptions.ERuntimeValidation>`,
                  :py:class:`EDataConformance <tracdap.rt.exceptions.EDataConformance>`
         """
+
+        pass
+
+    def put_file(self, file_name: str, file_content: _tp.Union[bytes, bytearray]):
+
+        pass
+
+    def put_file_stream(self, file_name: str) -> _tp.ContextManager[_tp.BinaryIO]:
 
         pass
 

@@ -120,7 +120,8 @@ class ModelRepositoriesTest(unittest.TestCase):
         sys_config.repositories["git_test"] = config.PluginConfig(
             protocol="git",
             properties={
-                "repoUrl": "https://github.com/finos/tracdap"})
+                "repoUrl": "https://github.com/finos/tracdap",
+                "nativeGit": "true"})
 
         model_def = meta.ModelDefinition(
             language="python",
@@ -163,8 +164,7 @@ class ModelRepositoriesTest(unittest.TestCase):
         sys_config.repositories["git_test"] = config.PluginConfig(
             protocol="git",
             properties={
-                "repoUrl": "https://github.com/finos/tracdap",
-                "nativeGit": "false"})
+                "repoUrl": "https://github.com/finos/tracdap"})
 
         # On macOS, SSL certificates are not set up correctly by default in urllib3
         # We can reconfigure them by passing Git config properties into the pure python Git client

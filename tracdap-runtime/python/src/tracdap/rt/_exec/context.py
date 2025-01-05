@@ -13,7 +13,9 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import contextlib
 import copy
+import io
 import logging
 import pathlib
 import typing as tp
@@ -82,9 +84,9 @@ class TracContextImpl(_api.TracContext):
 
         _val.validate_signature(self.get_parameter, parameter_name)
 
-        self.__val.check_param_valid_identifier(parameter_name)
-        self.__val.check_param_defined_in_model(parameter_name)
-        self.__val.check_param_available_in_context(parameter_name)
+        self.__val.check_item_valid_identifier(parameter_name, TracContextValidator.PARAMETER)
+        self.__val.check_item_defined_in_model(parameter_name, TracContextValidator.PARAMETER)
+        self.__val.check_item_available_in_context(parameter_name, TracContextValidator.PARAMETER)
 
         value: _meta.Value = self.__local_ctx.get(parameter_name)
 
@@ -96,8 +98,8 @@ class TracContextImpl(_api.TracContext):
 
         _val.validate_signature(self.has_dataset, dataset_name)
 
-        self.__val.check_dataset_valid_identifier(dataset_name)
-        self.__val.check_dataset_defined_in_model(dataset_name)
+        self.__val.check_item_valid_identifier(dataset_name, TracContextValidator.DATASET)
+        self.__val.check_item_defined_in_model(dataset_name, TracContextValidator.DATASET)
 
         data_view: _data.DataView = self.__local_ctx.get(dataset_name)
 
@@ -105,6 +107,7 @@ class TracContextImpl(_api.TracContext):
             return False
 
         self.__val.check_context_object_type(dataset_name, data_view, _data.DataView)
+        self.__val.check_context_data_view_type(dataset_name, data_view, _meta.ObjectType.DATA)
 
         return not data_view.is_empty()
 
@@ -112,9 +115,9 @@ class TracContextImpl(_api.TracContext):
 
         _val.validate_signature(self.get_schema, dataset_name)
 
-        self.__val.check_dataset_valid_identifier(dataset_name)
-        self.__val.check_dataset_defined_in_model(dataset_name)
-        self.__val.check_dataset_available_in_context(dataset_name)
+        self.__val.check_item_valid_identifier(dataset_name, TracContextValidator.DATASET)
+        self.__val.check_item_defined_in_model(dataset_name, TracContextValidator.DATASET)
+        self.__val.check_item_available_in_context(dataset_name, TracContextValidator.DATASET)
 
         static_schema = self.__get_static_schema(self.__model_def, dataset_name)
         data_view: _data.DataView = self.__local_ctx.get(dataset_name)
@@ -123,6 +126,7 @@ class TracContextImpl(_api.TracContext):
         # This ensures errors are always reported and is consistent with get_pandas_table()
 
         self.__val.check_context_object_type(dataset_name, data_view, _data.DataView)
+        self.__val.check_context_data_view_type(dataset_name, data_view, _meta.ObjectType.DATA)
         self.__val.check_dataset_schema_defined(dataset_name, data_view)
 
         # If a static schema exists, that takes priority
@@ -138,9 +142,9 @@ class TracContextImpl(_api.TracContext):
         _val.validate_signature(self.get_table, dataset_name, framework)
         _val.require_package(framework.protocol_name, framework.api_type)
 
-        self.__val.check_dataset_valid_identifier(dataset_name)
-        self.__val.check_dataset_defined_in_model(dataset_name)
-        self.__val.check_dataset_available_in_context(dataset_name)
+        self.__val.check_item_valid_identifier(dataset_name, TracContextValidator.DATASET)
+        self.__val.check_item_defined_in_model(dataset_name, TracContextValidator.DATASET)
+        self.__val.check_item_available_in_context(dataset_name, TracContextValidator.DATASET)
         self.__val.check_data_framework_args(framework, framework_args)
 
         static_schema = self.__get_static_schema(self.__model_def, dataset_name)
@@ -150,6 +154,7 @@ class TracContextImpl(_api.TracContext):
         converter = _data.DataConverter.for_framework(framework, **framework_args)
 
         self.__val.check_context_object_type(dataset_name, data_view, _data.DataView)
+        self.__val.check_context_data_view_type(dataset_name, data_view, _meta.ObjectType.DATA)
         self.__val.check_dataset_schema_defined(dataset_name, data_view)
         self.__val.check_dataset_part_present(dataset_name, data_view, part_key)
 
@@ -173,6 +178,27 @@ class TracContextImpl(_api.TracContext):
     def get_polars_table(self, dataset_name: str) -> "_data.polars.DataFrame":
 
         return self.get_table(dataset_name, _eapi.POLARS)
+    
+    def get_file(self, file_name: str) -> bytes:
+
+        _val.validate_signature(self.get_file, file_name)
+
+        self.__val.check_item_valid_identifier(file_name, TracContextValidator.FILE)
+        self.__val.check_item_defined_in_model(file_name, TracContextValidator.FILE)
+        self.__val.check_item_available_in_context(file_name, TracContextValidator.FILE)
+        
+        file_view: _data.DataView = self.__local_ctx.get(file_name)
+
+        self.__val.check_context_object_type(file_name, file_view, _data.DataView)
+        self.__val.check_context_data_view_type(file_name, file_view, _meta.ObjectType.FILE)
+        self.__val.check_file_content_present(file_name, file_view)
+        
+        return file_view.file_item.raw_bytes
+
+    def get_file_stream(self, file_name: str) -> tp.ContextManager[tp.BinaryIO]:
+
+        buffer = self.get_file(file_name)
+        return contextlib.closing(io.BytesIO(buffer))
 
     def put_schema(self, dataset_name: str, schema: _meta.SchemaDefinition):
 
@@ -182,7 +208,7 @@ class TracContextImpl(_api.TracContext):
         # If field ordering is not assigned by the model, assign it here (model code will not see the numbers)
         schema_copy = self.__assign_field_order(copy.deepcopy(schema))
 
-        self.__val.check_dataset_valid_identifier(dataset_name)
+        self.__val.check_item_valid_identifier(dataset_name, TracContextValidator.DATASET)
         self.__val.check_dataset_is_dynamic_output(dataset_name)
         self.__val.check_provided_schema_is_valid(dataset_name, schema_copy)
 
@@ -197,6 +223,7 @@ class TracContextImpl(_api.TracContext):
 
         # If there is a prior view it must contain nothing and will be replaced
         self.__val.check_context_object_type(dataset_name, data_view, _data.DataView)
+        self.__val.check_context_data_view_type(dataset_name, data_view, _meta.ObjectType.DATA)
         self.__val.check_dataset_schema_not_defined(dataset_name, data_view)
         self.__val.check_dataset_is_empty(dataset_name, data_view)
 
@@ -216,8 +243,8 @@ class TracContextImpl(_api.TracContext):
 
         _val.require_package(framework.protocol_name, framework.api_type)
 
-        self.__val.check_dataset_valid_identifier(dataset_name)
-        self.__val.check_dataset_is_model_output(dataset_name)
+        self.__val.check_item_valid_identifier(dataset_name, TracContextValidator.DATASET)
+        self.__val.check_item_is_model_output(dataset_name, TracContextValidator.DATASET)
         self.__val.check_provided_dataset_type(dataset, framework.api_type)
         self.__val.check_data_framework_args(framework, framework_args)
 
@@ -234,6 +261,7 @@ class TracContextImpl(_api.TracContext):
                 data_view = _data.DataView.create_empty()
 
         self.__val.check_context_object_type(dataset_name, data_view, _data.DataView)
+        self.__val.check_context_data_view_type(dataset_name, data_view, _meta.ObjectType.DATA)
         self.__val.check_dataset_schema_defined(dataset_name, data_view)
         self.__val.check_dataset_part_not_present(dataset_name, data_view, part_key)
 
@@ -246,7 +274,7 @@ class TracContextImpl(_api.TracContext):
 
         # Data conformance is applied automatically inside the converter, if schema != None
         table = converter.to_internal(dataset, schema)
-        item = _data.DataItem(schema, table)
+        item = _data.DataItem(_meta.ObjectType.DATA, schema, table)
 
         updated_view = _data.DataMapping.add_item_to_view(data_view, part_key, item)
 
@@ -259,6 +287,46 @@ class TracContextImpl(_api.TracContext):
     def put_polars_table(self, dataset_name: str, dataset: "_data.polars.DataFrame"):
 
         self.put_table(dataset_name, dataset, _eapi.POLARS)
+    
+    def put_file(self, file_name: str, file_content: tp.Union[bytes, bytearray]):
+
+        _val.validate_signature(self.put_file, file_name, file_content)
+
+        self.__val.check_item_valid_identifier(file_name, TracContextValidator.FILE)
+        self.__val.check_item_is_model_output(file_name, TracContextValidator.FILE)
+        
+        file_view: _data.DataView = self.__local_ctx.get(file_name)
+
+        if file_view is None:
+            file_view = _data.DataView.create_empty(_meta.ObjectType.FILE)
+
+        self.__val.check_context_object_type(file_name, file_view, _data.DataView)
+        self.__val.check_context_data_view_type(file_name, file_view, _meta.ObjectType.FILE)
+        self.__val.check_file_content_not_present(file_name, file_view)
+
+        if isinstance(file_content, bytearray):
+            file_content = bytes(bytearray)
+
+        file_item = _data.DataItem.for_file_content(file_content)
+        self.__local_ctx[file_name] = file_view.with_file_item(file_item)
+
+    def put_file_stream(self, file_name: str) -> tp.ContextManager[tp.BinaryIO]:
+
+        _val.validate_signature(self.put_file_stream, file_name)
+
+        self.__val.check_item_valid_identifier(file_name, TracContextValidator.FILE)
+        self.__val.check_item_is_model_output(file_name, TracContextValidator.FILE)
+
+        @contextlib.contextmanager
+        def memory_stream(stream: io.BytesIO):
+            try:
+                yield stream
+                buffer = stream.getbuffer().tobytes()
+                self.put_file(file_name, buffer)
+            finally:
+                stream.close()
+
+        return memory_stream(io.BytesIO())
 
     def log(self) -> logging.Logger:
 
@@ -310,7 +378,7 @@ class TracDataContextImpl(TracContextImpl, _eapi.TracDataContext):
         self.__storage_map = storage_map
         self.__checkout_directory = checkout_directory
 
-        self.__val = self._TracContextImpl__val  # noqa
+        self.__val: TracContextValidator = self._TracContextImpl__val  # noqa
 
     def get_file_storage(self, storage_key: str) -> _eapi.TracFileStorage:
 
@@ -348,9 +416,9 @@ class TracDataContextImpl(TracContextImpl, _eapi.TracDataContext):
 
         _val.validate_signature(self.add_data_import, dataset_name)
 
-        self.__val.check_dataset_valid_identifier(dataset_name)
-        self.__val.check_dataset_not_defined_in_model(dataset_name)
-        self.__val.check_dataset_not_available_in_context(dataset_name)
+        self.__val.check_item_valid_identifier(dataset_name, TracContextValidator.DATASET)
+        self.__val.check_item_not_defined_in_model(dataset_name, TracContextValidator.DATASET)
+        self.__val.check_item_not_available_in_context(dataset_name, TracContextValidator.DATASET)
 
         self.__local_ctx[dataset_name] = _data.DataView.create_empty()
         self.__dynamic_outputs.append(dataset_name)
@@ -359,8 +427,8 @@ class TracDataContextImpl(TracContextImpl, _eapi.TracDataContext):
 
         _val.validate_signature(self.set_source_metadata, dataset_name, storage_key, source_info)
 
-        self.__val.check_dataset_valid_identifier(dataset_name)
-        self.__val.check_dataset_available_in_context(dataset_name)
+        self.__val.check_item_valid_identifier(dataset_name, TracContextValidator.DATASET)
+        self.__val.check_item_available_in_context(dataset_name, TracContextValidator.DATASET)
         self.__val.check_storage_valid_identifier(storage_key)
         self.__val.check_storage_available(self.__storage_map, storage_key)
 
@@ -368,11 +436,11 @@ class TracDataContextImpl(TracContextImpl, _eapi.TracDataContext):
 
         if isinstance(storage, _eapi.TracFileStorage):
             if not isinstance(source_info, _eapi.FileStat):
-                self.__val.report_public_error(f"Expected storage_info to be a FileStat, [{storage_key}] refers to file storage")
+                self.__val.report_public_error(_ex.ERuntimeValidation(f"Expected storage_info to be a FileStat, [{storage_key}] refers to file storage"))
 
         if isinstance(storage, _eapi.TracDataStorage):
             if not isinstance(source_info, str):
-                self.__val.report_public_error(f"Expected storage_info to be a table name, [{storage_key}] refers to dadta storage")
+                self.__val.report_public_error(_ex.ERuntimeValidation(f"Expected storage_info to be a table name, [{storage_key}] refers to dadta storage"))
 
         pass  # Not implemented yet, only required when imports are sent back to the platform
 
@@ -684,6 +752,10 @@ class TracContextErrorReporter:
 
 class TracContextValidator(TracContextErrorReporter):
 
+    PARAMETER = "Parameter"
+    DATASET = "Dataset"
+    FILE = "File"
+
     def __init__(
             self, log: logging.Logger,
             model_def: _meta.ModelDefinition,
@@ -697,49 +769,45 @@ class TracContextValidator(TracContextErrorReporter):
         self.__local_ctx = local_ctx
         self.__dynamic_outputs = dynamic_outputs
 
-    def check_param_valid_identifier(self, param_name: str):
+    def check_item_valid_identifier(self, item_name: str, item_type: str):
 
-        if param_name is None:
-            self._report_error(f"Parameter name is null")
+        if item_name is None:
+            self._report_error(f"{item_type} name is null")
 
-        if not self._VALID_IDENTIFIER.match(param_name):
-            self._report_error(f"Parameter name {param_name} is not a valid identifier")
+        if not self._VALID_IDENTIFIER.match(item_name):
+            self._report_error(f"{item_type} name {item_name} is not a valid identifier")
 
-    def check_param_defined_in_model(self, param_name: str):
+    def check_item_defined_in_model(self, item_name: str, item_type: str):
 
-        if param_name not in self.__model_def.parameters:
-            self._report_error(f"Parameter {param_name} is not defined in the model")
+        if item_type == self.PARAMETER:
+            if item_name not in self.__model_def.parameters:
+                self._report_error(f"{item_type} {item_name} is not defined in the model")
+        else:
+            if item_name not in self.__model_def.inputs and item_name not in self.__model_def.outputs:
+                self._report_error(f"{item_type} {item_name} is not defined in the model")
 
-    def check_param_available_in_context(self, param_name: str):
+    def check_item_not_defined_in_model(self, item_name: str, item_type: str):
 
-        if param_name not in self.__local_ctx:
-            self._report_error(f"Parameter {param_name} is not available in the current context")
+        if item_name  in self.__model_def.inputs or item_name in self.__model_def.outputs:
+            self._report_error(f"{item_type} {item_name} is already defined in the model")
 
-    def check_dataset_valid_identifier(self, dataset_name: str):
+        if item_name  in self.__model_def.parameters:
+            self._report_error(f"{item_name} name {item_name} is already in use as a model parameter")
 
-        if dataset_name is None:
-            self._report_error(f"Dataset name is null")
+    def check_item_is_model_output(self, item_name: str, item_type: str):
 
-        if not self._VALID_IDENTIFIER.match(dataset_name):
-            self._report_error(f"Dataset name {dataset_name} is not a valid identifier")
+        if item_name not in self.__model_def.outputs and item_name not in self.__dynamic_outputs:
+            self._report_error(f"{item_type} {item_name} is not defined as a model output")
 
-    def check_dataset_not_defined_in_model(self, dataset_name: str):
+    def check_item_available_in_context(self, item_name: str, item_type: str):
 
-        if dataset_name  in self.__model_def.inputs or dataset_name in self.__model_def.outputs:
-            self._report_error(f"Dataset {dataset_name} is already defined in the model")
+        if item_name not in self.__local_ctx:
+            self._report_error(f"{item_type} {item_name} is not available in the current context")
 
-        if dataset_name  in self.__model_def.parameters:
-            self._report_error(f"Dataset name {dataset_name} is already in use as a model parameter")
+    def check_item_not_available_in_context(self, item_name: str, item_type: str):
 
-    def check_dataset_defined_in_model(self, dataset_name: str):
-
-        if dataset_name not in self.__model_def.inputs and dataset_name not in self.__model_def.outputs:
-            self._report_error(f"Dataset {dataset_name} is not defined in the model")
-
-    def check_dataset_is_model_output(self, dataset_name: str):
-
-        if dataset_name not in self.__model_def.outputs and dataset_name not in self.__dynamic_outputs:
-            self._report_error(f"Dataset {dataset_name} is not defined as a model output")
+        if item_name in self.__local_ctx:
+            self._report_error(f"{item_type} {item_name} already exists in the current context")
 
     def check_dataset_is_dynamic_output(self, dataset_name: str):
 
@@ -751,16 +819,6 @@ class TracContextValidator(TracContextErrorReporter):
 
         if model_output and not model_output.dynamic:
             self._report_error(f"Model output {dataset_name} is not a dynamic output")
-
-    def check_dataset_available_in_context(self, item_name: str):
-
-        if item_name not in self.__local_ctx:
-            self._report_error(f"Dataset {item_name} is not available in the current context")
-
-    def check_dataset_not_available_in_context(self, item_name: str):
-
-        if item_name in self.__local_ctx:
-            self._report_error(f"Dataset {item_name} already exists in the current context")
 
     def check_dataset_schema_defined(self, dataset_name: str, data_view: _data.DataView):
 
@@ -834,6 +892,14 @@ class TracContextValidator(TracContextErrorReporter):
                 f"The object referenced by [{item_name}] in the current context has the wrong type" +
                 f" (expected {expected_type_name}, got {actual_type_name})")
 
+    def check_context_data_view_type(self, item_name: str, data_vew: _data.DataView, expected_type: _meta.ObjectType):
+
+        if data_vew.object_type != expected_type:
+
+            self._report_error(
+                f"The object referenced by [{item_name}] in the current context has the wrong type" +
+                f" (expected {expected_type.name}, got {data_vew.object_type.name})")
+
     def check_data_framework_args(self, framework: _eapi.DataFramework, framework_args: tp.Dict[str, tp.Any]):
 
         expected_args = _data.DataConverter.get_framework_args(framework)
@@ -861,6 +927,16 @@ class TracContextValidator(TracContextErrorReporter):
                     f"Using [{framework}], argument [{arg_name}] has the wrong type" +
                     f" (expected {expected_type_name}, got {actual_type_name})")
 
+    def check_file_content_present(self, file_name: str, file_view: _data.DataView):
+
+        if file_view.file_item is None or not file_view.file_item.raw_bytes:
+            self._report_error(f"File content is missing or empty for [{file_name}] in the current context")
+
+    def check_file_content_not_present(self, file_name: str, file_view: _data.DataView):
+
+        if file_view.file_item is not None and file_view.file_item.raw_bytes:
+            self._report_error(f"File content is already present for [{file_name}] in the current context")
+
     def check_storage_valid_identifier(self, storage_key):
 
         if storage_key is None:
@@ -878,7 +954,7 @@ class TracContextValidator(TracContextErrorReporter):
 
     def check_storage_type(
             self, storage_map: tp.Dict, storage_key: str,
-            storage_type: tp.Union[_eapi.TracFileStorage.__class__]):
+            storage_type: tp.Union[_eapi.TracFileStorage.__class__, _eapi.TracDataStorage.__class__]):
 
         storage_instance = storage_map.get(storage_key)
 

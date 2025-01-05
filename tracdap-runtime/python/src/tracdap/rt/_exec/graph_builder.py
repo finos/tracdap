@@ -13,6 +13,8 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import datetime as _dt
+
 import tracdap.rt.config as config
 import tracdap.rt.exceptions as _ex
 import tracdap.rt._impl.data as _data  # noqa
@@ -33,8 +35,9 @@ class GraphBuilder:
 
     __JOB_BUILD_FUNC = tp.Callable[[meta.JobDefinition, NodeId], GraphSection]
 
-    def __init__(self, job_config: config.JobConfig, result_spec: JobResultSpec):
+    def __init__(self, sys_config: config.RuntimeConfig, job_config: config.JobConfig, result_spec: JobResultSpec):
 
+        self._sys_config = sys_config
         self._job_config = job_config
         self._result_spec = result_spec
 
@@ -45,7 +48,7 @@ class GraphBuilder:
 
     def _child_builder(self, job_id: meta.TagHeader) -> "GraphBuilder":
 
-        builder = GraphBuilder(self._job_config, JobResultSpec(save_result=False))
+        builder = GraphBuilder(self._sys_config, self._job_config, JobResultSpec(save_result=False))
         builder._job_key = _util.object_key(job_id)
         builder._job_namespace = NodeNamespace(builder._job_key)
 
@@ -355,58 +358,76 @@ class GraphBuilder:
 
         nodes = dict()
         outputs = set()
-        must_run = list()
 
-        for input_name, input_schema in required_inputs.items():
+        for input_name, input_def in required_inputs.items():
 
-            data_selector = supplied_inputs.get(input_name)
+            # Backwards compatibility with pre 0.8 versions
+            input_type = meta.ObjectType.DATA \
+                if input_def.objectType == meta.ObjectType.OBJECT_TYPE_NOT_SET \
+                else input_def.objectType
 
-            if data_selector is None:
-                if input_schema.optional:
+            input_selector = supplied_inputs.get(input_name)
+
+            if input_selector is None:
+
+                if input_def.optional:
                     data_view_id = NodeId.of(input_name, self._job_namespace, _data.DataView)
-                    nodes[data_view_id] = StaticValueNode(data_view_id, _data.DataView.create_empty())
+                    data_view = _data.DataView.create_empty(input_type)
+                    nodes[data_view_id] = StaticValueNode(data_view_id, data_view, explicit_deps=explicit_deps)
                     outputs.add(data_view_id)
-                    continue
                 else:
                     self._error(_ex.EJobValidation(f"Missing required input: [{input_name}]"))
-                    continue
 
-            # Build a data spec using metadata from the job config
-            # For now we are always loading the root part, snap 0, delta 0
-            data_def = _util.get_job_resource(data_selector, self._job_config).data
-            storage_def = _util.get_job_resource(data_def.storageId, self._job_config).storage
+            elif input_type == meta.ObjectType.DATA:
+                self._build_data_input(input_name, input_selector, nodes, outputs, explicit_deps)
 
-            if data_def.schemaId:
-                schema_def = _util.get_job_resource(data_def.schemaId, self._job_config).schema
+            elif input_type == meta.ObjectType.FILE:
+                self._build_file_input(input_name, input_selector, nodes, outputs, explicit_deps)
+
             else:
-                schema_def = data_def.schema
+                self._error(_ex.EJobValidation(f"Invalid input type [{input_type.name}] for input [{input_name}]"))
 
-            root_part_opaque_key = 'part-root'  # TODO: Central part names / constants
-            data_item = data_def.parts[root_part_opaque_key].snap.deltas[0].dataItem
-            data_spec = _data.DataSpec(data_item, data_def, storage_def, schema_def)
+        return GraphSection(nodes, outputs=outputs)
 
-            # Data spec node is static, using the assembled data spec
-            data_spec_id = NodeId.of(f"{input_name}:SPEC", self._job_namespace, _data.DataSpec)
-            data_spec_node = StaticValueNode(data_spec_id, data_spec, explicit_deps=explicit_deps)
+    def _build_data_input(self, input_name, input_selector, nodes, outputs, explicit_deps):
 
-            # Physical load of data items from disk
-            # Currently one item per input, since inputs are single part/delta
-            data_load_id = NodeId.of(f"{input_name}:LOAD", self._job_namespace, _data.DataItem)
-            data_load_node = LoadDataNode(data_load_id, data_spec_id, explicit_deps=explicit_deps)
+        # Build a data spec using metadata from the job config
+        # For now we are always loading the root part, snap 0, delta 0
+        data_def = _util.get_job_resource(input_selector, self._job_config).data
+        storage_def = _util.get_job_resource(data_def.storageId, self._job_config).storage
 
-            # Input views assembled by mapping one root part to each view
-            data_view_id = NodeId.of(input_name, self._job_namespace, _data.DataView)
-            data_view_node = DataViewNode(data_view_id, schema_def, data_load_id)
+        if data_def.schemaId:
+            schema_def = _util.get_job_resource(data_def.schemaId, self._job_config).schema
+        else:
+            schema_def = data_def.schema
 
-            nodes[data_spec_id] = data_spec_node
-            nodes[data_load_id] = data_load_node
-            nodes[data_view_id] = data_view_node
+        root_part_opaque_key = 'part-root'  # TODO: Central part names / constants
+        data_item = data_def.parts[root_part_opaque_key].snap.deltas[0].dataItem
+        data_spec = _data.DataSpec.create_data_spec(data_item, data_def, storage_def, schema_def)
 
-            # Job-level data view is an output of the load operation
-            outputs.add(data_view_id)
-            must_run.append(data_spec_id)
+        # Physical load of data items from disk
+        # Currently one item per input, since inputs are single part/delta
+        data_load_id = NodeId.of(f"{input_name}:LOAD", self._job_namespace, _data.DataItem)
+        nodes[data_load_id] = LoadDataNode(data_load_id, spec=data_spec, explicit_deps=explicit_deps)
 
-        return GraphSection(nodes, outputs=outputs, must_run=must_run)
+        # Input views assembled by mapping one root part to each view
+        data_view_id = NodeId.of(input_name, self._job_namespace, _data.DataView)
+        nodes[data_view_id] = DataViewNode(data_view_id, schema_def, data_load_id)
+        outputs.add(data_view_id)
+
+    def _build_file_input(self, input_name, input_selector, nodes, outputs, explicit_deps):
+
+        file_def = _util.get_job_resource(input_selector, self._job_config).file
+        storage_def = _util.get_job_resource(file_def.storageId, self._job_config).storage
+
+        file_spec = _data.DataSpec.create_file_spec(file_def.dataItem, file_def, storage_def)
+        file_load_id = NodeId.of(f"{input_name}:LOAD", self._job_namespace, _data.DataItem)
+        nodes[file_load_id] = LoadDataNode(file_load_id, spec=file_spec, explicit_deps=explicit_deps)
+
+        # Input views assembled by mapping one root part to each view
+        file_view_id = NodeId.of(input_name, self._job_namespace, _data.DataView)
+        nodes[file_view_id] = DataViewNode(file_view_id, None, file_load_id)
+        outputs.add(file_view_id)
 
     def build_job_outputs(
             self,
@@ -418,12 +439,21 @@ class GraphBuilder:
         nodes = {}
         inputs = set()
 
-        for output_name, output_schema in required_outputs.items():
+        for output_name, output_def in required_outputs.items():
 
-            data_selector = supplied_outputs.get(output_name)
+            # Output data view must already exist in the namespace, it is an input to the save operation
+            data_view_id = NodeId.of(output_name, self._job_namespace, _data.DataView)
+            inputs.add(data_view_id)
 
-            if data_selector is None:
-                if output_schema.optional:
+            # Backwards compatibility with pre 0.8 versions
+            output_type = meta.ObjectType.DATA \
+                if output_def.objectType == meta.ObjectType.OBJECT_TYPE_NOT_SET \
+                else output_def.objectType
+
+            output_selector = supplied_outputs.get(output_name)
+
+            if output_selector is None:
+                if output_def.optional:
                     optional_info = "(configuration is required for all optional outputs, in case they are produced)"
                     self._error(_ex.EJobValidation(f"Missing optional output: [{output_name}] {optional_info}"))
                     continue
@@ -431,75 +461,129 @@ class GraphBuilder:
                     self._error(_ex.EJobValidation(f"Missing required output: [{output_name}]"))
                     continue
 
-            # Output data view must already exist in the namespace
-            data_view_id = NodeId.of(output_name, self._job_namespace, _data.DataView)
-            data_spec_id = NodeId.of(f"{output_name}:SPEC", self._job_namespace, _data.DataSpec)
+            elif output_type == meta.ObjectType.DATA:
+                self._build_data_output(output_name, output_selector, data_view_id, nodes, explicit_deps)
 
-            data_obj = _util.get_job_resource(data_selector, self._job_config, optional=True)
-
-            if data_obj is not None:
-
-                # If data def for the output has been built in advance, use a static data spec
-
-                data_def = data_obj.data
-                storage_def = _util.get_job_resource(data_def.storageId, self._job_config).storage
-
-                if data_def.schemaId:
-                    schema_def = _util.get_job_resource(data_def.schemaId, self._job_config).schema
-                else:
-                    schema_def = data_def.schema
-
-                root_part_opaque_key = 'part-root'  # TODO: Central part names / constants
-                data_item = data_def.parts[root_part_opaque_key].snap.deltas[0].dataItem
-                data_spec = _data.DataSpec(data_item, data_def, storage_def, schema_def)
-
-                data_spec_node = StaticValueNode(data_spec_id, data_spec, explicit_deps=explicit_deps)
-
-                output_data_key = output_name + ":DATA"
-                output_storage_key = output_name + ":STORAGE"
+            elif output_type == meta.ObjectType.FILE:
+                self._build_file_output(output_name, output_def, output_selector, data_view_id, nodes, explicit_deps)
 
             else:
-
-                # If output data def for an output was not supplied in the job, create a dynamic data spec
-                # Dynamic data def will always use an embedded schema (this is no ID for an external schema)
-
-                data_key = output_name + ":DATA"
-                data_id = self._job_config.resultMapping[data_key]
-                storage_key = output_name + ":STORAGE"
-                storage_id = self._job_config.resultMapping[storage_key]
-
-                data_spec_node = DynamicDataSpecNode(
-                    data_spec_id, data_view_id,
-                    data_id, storage_id,
-                    prior_data_spec=None,
-                    explicit_deps=explicit_deps)
-
-                output_data_key = _util.object_key(data_id)
-                output_storage_key = _util.object_key(storage_id)
-
-            # Map one data item from each view, since outputs are single part/delta
-            data_item_id = NodeId(f"{output_name}:ITEM", self._job_namespace, _data.DataItem)
-            data_item_node = DataItemNode(data_item_id, data_view_id)
-
-            # Create a physical save operation for the data item
-            data_save_id = NodeId.of(f"{output_name}:SAVE", self._job_namespace, None)
-            data_save_node = SaveDataNode(data_save_id, data_spec_id, data_item_id)
-
-            data_result_id = NodeId.of(f"{output_name}:RESULT", self._job_namespace, ObjectBundle)
-            data_result_node = DataResultNode(
-                data_result_id, output_name,
-                data_item_id, data_spec_id, data_save_id,
-                output_data_key, output_storage_key)
-
-            nodes[data_spec_id] = data_spec_node
-            nodes[data_item_id] = data_item_node
-            nodes[data_save_id] = data_save_node
-            nodes[data_result_id] = data_result_node
-
-            # Job-level data view is an input to the save operation
-            inputs.add(data_view_id)
+                self._error(_ex.EJobValidation(f"Invalid output type [{output_type.name}] for input [{output_name}]"))
 
         return GraphSection(nodes, inputs=inputs)
+
+    def _build_data_output(self, output_name, output_selector, data_view_id, nodes, explicit_deps):
+
+        # Map one data item from each view, since outputs are single part/delta
+        data_item_id = NodeId(f"{output_name}:ITEM", self._job_namespace, _data.DataItem)
+        nodes[data_item_id] = DataItemNode(data_item_id, data_view_id)
+
+        data_obj = _util.get_job_resource(output_selector, self._job_config, optional=True)
+
+        if data_obj is not None:
+
+            # If data def for the output has been built in advance, use a static data spec
+
+            data_def = data_obj.data
+            storage_def = _util.get_job_resource(data_def.storageId, self._job_config).storage
+
+            if data_def.schemaId:
+                schema_def = _util.get_job_resource(data_def.schemaId, self._job_config).schema
+            else:
+                schema_def = data_def.schema
+
+            root_part_opaque_key = 'part-root'  # TODO: Central part names / constants
+            data_item = data_def.parts[root_part_opaque_key].snap.deltas[0].dataItem
+            data_spec = _data.DataSpec.create_data_spec(data_item, data_def, storage_def, schema_def)
+
+            # Create a physical save operation for the data item
+            data_save_id = NodeId.of(f"{output_name}:SAVE", self._job_namespace, _data.DataSpec)
+            nodes[data_save_id] = SaveDataNode(data_save_id, data_item_id, spec=data_spec)
+
+            output_key = output_name
+            storage_key = output_name + ":STORAGE"
+
+        else:
+
+            # If output data def for an output was not supplied in the job, create a dynamic data spec
+            # Dynamic data def will always use an embedded schema (this is no ID for an external schema)
+
+            mapped_output_key = output_name
+            mapped_storage_key = output_name + ":STORAGE"
+
+            data_id = self._job_config.resultMapping[mapped_output_key]
+            storage_id = self._job_config.resultMapping[mapped_storage_key]
+
+            data_spec_id = NodeId.of(f"{output_name}:SPEC", self._job_namespace, _data.DataSpec)
+            nodes[data_spec_id] = DynamicDataSpecNode(
+                data_spec_id, data_view_id,
+                data_id, storage_id,
+                prior_data_spec=None,
+                explicit_deps=explicit_deps)
+
+            # Create a physical save operation for the data item
+            data_save_id = NodeId.of(f"{output_name}:SAVE", self._job_namespace, _data.DataSpec)
+            nodes[data_save_id] = SaveDataNode(data_save_id, data_item_id, spec_id=data_spec_id)
+
+            output_key = _util.object_key(data_id)
+            storage_key = _util.object_key(storage_id)
+
+        data_result_id = NodeId.of(f"{output_name}:RESULT", self._job_namespace, ObjectBundle)
+        nodes[data_result_id] = DataResultNode(
+            data_result_id, output_name, data_save_id,
+            data_key=output_key,
+            storage_key=storage_key)
+
+    def _build_file_output(self, output_name, output_def, output_selector, file_view_id, nodes, explicit_deps):
+
+        mapped_output_key = output_name
+        mapped_storage_key = output_name + ":STORAGE"
+
+        file_obj = _util.get_job_resource(output_selector, self._job_config, optional=True)
+
+        if file_obj is not None:
+
+            # Definitions already exist (generated by dev mode translator)
+
+            file_def = _util.get_job_resource(output_selector, self._job_config).file
+            storage_def = _util.get_job_resource(file_def.storageId, self._job_config).storage
+
+            resolved_output_key = mapped_output_key
+            resolved_storage_key = mapped_storage_key
+
+        else:
+
+            # Create new definitions (default behavior for jobs sent from the platform)
+
+            output_id = self._job_config.resultMapping[mapped_output_key]
+            storage_id = self._job_config.resultMapping[mapped_storage_key]
+
+            file_type = output_def.fileType
+            timestamp = _dt.datetime.fromisoformat(output_id.objectTimestamp.isoDatetime)
+            data_item = f"file/{output_id.objectId}/version-{output_id.objectVersion}"
+            storage_key = self._sys_config.storage.defaultBucket
+            storage_path = f"file/FILE-{output_id.objectId}/version-{output_id.objectVersion}/{output_name}.{file_type.extension}"
+
+            file_def = self.build_file_def(output_name, file_type, storage_id, data_item)
+            storage_def = self.build_storage_def(data_item, storage_key, storage_path, file_type.mimeType, timestamp)
+
+            resolved_output_key = _util.object_key(output_id)
+            resolved_storage_key = _util.object_key(storage_id)
+
+        # Required object defs are available, now build the graph nodes
+
+        file_item_id = NodeId(f"{output_name}:ITEM", self._job_namespace, _data.DataItem)
+        nodes[file_item_id] = DataItemNode(file_item_id, file_view_id, explicit_deps=explicit_deps)
+
+        file_spec = _data.DataSpec.create_file_spec(file_def.dataItem, file_def, storage_def)
+        file_save_id = NodeId.of(f"{output_name}:SAVE", self._job_namespace, _data.DataSpec)
+        nodes[file_save_id] = SaveDataNode(file_save_id, file_item_id, spec=file_spec)
+
+        data_result_id = NodeId.of(f"{output_name}:RESULT", self._job_namespace, ObjectBundle)
+        nodes[data_result_id] = DataResultNode(
+            data_result_id, output_name, file_save_id,
+            file_key=resolved_output_key,
+            storage_key=resolved_storage_key)
 
     @classmethod
     def build_runtime_outputs(cls, output_names: tp.List[str], job_namespace: NodeNamespace):
@@ -519,9 +603,10 @@ class GraphBuilder:
             data_view_id = NodeId.of(output_name, job_namespace, _data.DataView)
             data_spec_id = NodeId.of(f"{output_name}:SPEC", job_namespace, _data.DataSpec)
 
-            data_key = output_name + ":DATA"
+            mapped_output_key = output_name
+            mapped_storage_key = output_name + ":STORAGE"
+
             data_id = _util.new_object_id(meta.ObjectType.DATA)
-            storage_key = output_name + ":STORAGE"
             storage_id = _util.new_object_id(meta.ObjectType.STORAGE)
 
             data_spec_node = DynamicDataSpecNode(
@@ -529,22 +614,21 @@ class GraphBuilder:
                 data_id, storage_id,
                 prior_data_spec=None)
 
-            output_data_key = _util.object_key(data_id)
-            output_storage_key = _util.object_key(storage_id)
+            output_key = _util.object_key(data_id)
+            storage_key = _util.object_key(storage_id)
 
             # Map one data item from each view, since outputs are single part/delta
             data_item_id = NodeId(f"{output_name}:ITEM", job_namespace, _data.DataItem)
             data_item_node = DataItemNode(data_item_id, data_view_id)
 
             # Create a physical save operation for the data item
-            data_save_id = NodeId.of(f"{output_name}:SAVE", job_namespace, None)
-            data_save_node = SaveDataNode(data_save_id, data_spec_id, data_item_id)
+            data_save_id = NodeId.of(f"{output_name}:SAVE", job_namespace, _data.DataSpec)
+            data_save_node = SaveDataNode(data_save_id, data_item_id, spec_id=data_spec_id)
 
             data_result_id = NodeId.of(f"{output_name}:RESULT", job_namespace, ObjectBundle)
             data_result_node = DataResultNode(
-                data_result_id, output_name,
-                data_item_id, data_spec_id, data_save_id,
-                output_data_key, output_storage_key)
+                data_result_id, output_name, data_save_id,
+                output_key, storage_key)
 
             nodes[data_spec_id] = data_spec_node
             nodes[data_item_id] = data_item_node
@@ -562,6 +646,45 @@ class GraphBuilder:
         nodes[runtime_outputs_id] = runtime_outputs_node
 
         return GraphSection(nodes, inputs=inputs, outputs={runtime_outputs_id})
+
+    @classmethod
+    def build_file_def(cls, file_name, file_type, storage_id, data_item):
+
+        file_def = meta.FileDefinition()
+        file_def.name = f"{file_name}.{file_type.extension}"
+        file_def.extension = file_type.extension
+        file_def.mimeType = file_type.mimeType
+        file_def.storageId = _util.selector_for_latest(storage_id)
+        file_def.dataItem = data_item
+        file_def.size = 0
+
+        return file_def
+
+    @classmethod
+    def build_storage_def(
+            cls, data_item: str,
+            storage_key, storage_path, storage_format,
+            timestamp: _dt.datetime):
+
+        first_incarnation = 0
+
+        storage_copy = meta.StorageCopy(
+            storage_key, storage_path, storage_format,
+            copyStatus=meta.CopyStatus.COPY_AVAILABLE,
+            copyTimestamp=meta.DatetimeValue(timestamp.isoformat()))
+
+        storage_incarnation = meta.StorageIncarnation(
+            [storage_copy],
+            incarnationIndex=first_incarnation,
+            incarnationTimestamp=meta.DatetimeValue(timestamp.isoformat()),
+            incarnationStatus=meta.IncarnationStatus.INCARNATION_AVAILABLE)
+
+        storage_item = meta.StorageItem([storage_incarnation])
+
+        storage_def = meta.StorageDefinition()
+        storage_def.dataItems[data_item] = storage_item
+
+        return storage_def
 
     def build_job_results(
             self,

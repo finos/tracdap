@@ -306,6 +306,9 @@ class StaticValidator:
     __reserved_identifier_pattern = re.compile("\\A(_|trac_)", re.ASCII)
     __label_length_limit = 4096
 
+    __file_extension_pattern = re.compile('\\A[a-zA-Z0-9]+\\Z')
+    __mime_type_pattern = re.compile('\\A\\w+/[-.\\w]+(?:\\+[-.\\w]+)?\\Z')
+
     __PRIMITIVE_TYPES = [
         meta.BasicType.BOOLEAN,
         meta.BasicType.INTEGER,
@@ -418,48 +421,71 @@ class StaticValidator:
                 cls._valid_identifiers(param.paramProps.keys(), "entry in param props")
 
     @classmethod
-    def _check_inputs_or_outputs(cls, inputs_or_outputs):
+    def _check_inputs_or_outputs(cls, sockets):
 
-        for input_name, input_schema in inputs_or_outputs.items():
+        for socket_name, socket in sockets.items():
 
-            cls._log.info(f"Checking {input_name}")
-
-            if input_schema.dynamic:
-                if input_schema.schema and input_schema.schema.table:
-                    error = "Dynamic schemas must have schema.table = None"
-                    cls._fail(f"Invalid schema for [{input_name}]: {error}")
-                else:
-                    continue
-
-            fields = input_schema.schema.table.fields
-            field_names = list(map(lambda f: f.fieldName, fields))
-            property_type = f"field in [{input_name}]"
-
-            if len(fields) == 0:
-                cls._fail(f"Invalid schema for [{input_name}]: No fields defined")
-
-            cls._valid_identifiers(field_names, property_type)
-            cls._case_insensitive_duplicates(field_names, property_type)
-
-            for field in fields:
-                cls._check_single_field(field, property_type)
-
-            label = input_schema.label
-            cls._check_label(label, input_name)
-
-            if isinstance(input_schema, meta.ModelInputSchema):
-                if input_schema.inputProps is not None:
-                    cls._valid_identifiers(input_schema.inputProps.keys(), "entry in input props")
+            if socket.objectType == meta.ObjectType.DATA:
+                cls._check_socket_schema(socket_name, socket)
+            elif socket.objectType == meta.ObjectType.FILE:
+                cls._check_socket_file_type(socket_name, socket)
             else:
-                if input_schema.outputProps is not None:
-                    cls._valid_identifiers(input_schema.outputProps.keys(), "entry in output props")
+                raise ex.EModelValidation(f"Invalid object type [{socket.objectType.name}] for [{socket_name}]")
+
+            label = socket.label
+            cls._check_label(label, socket_name)
+
+            if isinstance(socket, meta.ModelInputSchema):
+                if socket.inputProps is not None:
+                    cls._valid_identifiers(socket.inputProps.keys(), "entry in input props")
+            else:
+                if socket.outputProps is not None:
+                    cls._valid_identifiers(socket.outputProps.keys(), "entry in output props")
+
+    @classmethod
+    def _check_socket_schema(cls, socket_name, socket):
+
+        if socket.schema is None:
+            cls._fail(f"Missing schema requirement for [{socket_name}]")
+            return
+
+        if socket.dynamic:
+            if socket.schema and socket.schema.table:
+                error = "Dynamic schemas must have schema.table = None"
+                cls._fail(f"Invalid schema for [{socket_name}]: {error}")
+            else:
+                return
+
+        fields = socket.schema.table.fields
+        field_names = list(map(lambda f: f.fieldName, fields))
+        property_type = f"field in [{socket_name}]"
+
+        if len(fields) == 0:
+            cls._fail(f"Invalid schema for [{socket_name}]: No fields defined")
+
+        cls._valid_identifiers(field_names, property_type)
+        cls._case_insensitive_duplicates(field_names, property_type)
+
+        for field in fields:
+            cls._check_single_field(field, property_type)
+
+    @classmethod
+    def _check_socket_file_type(cls, socket_name, socket):
+
+        if socket.fileType is None:
+            cls._fail(f"Missing file type requirement for [{socket_name}]")
+            return
+
+        if not cls.__file_extension_pattern.match(socket.fileType.extension):
+            cls._fail(f"Invalid extension [{socket.fileType.extension}] for [{socket_name}]")
+
+        if not cls.__mime_type_pattern.match(socket.fileType.mimeType):
+            cls._fail(f"Invalid mime type [{socket.fileType.mimeType}] for [{socket_name}]")
 
     @classmethod
     def _check_single_field(cls, field: meta.FieldSchema, property_type):
 
         # Valid identifier and not trac reserved checked separately
-
-        cls._log.info(field.fieldName)
 
         if field.fieldOrder < 0:
             cls._fail(f"Invalid {property_type}: [{field.fieldName}] fieldOrder < 0")

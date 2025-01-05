@@ -96,6 +96,7 @@ class TracRuntime:
         self._scratch_dir_persist = scratch_dir_persist
         self._plugin_packages = plugin_packages or []
         self._dev_mode = dev_mode
+        self._dev_mode_translator = None
 
         # Runtime control
         self._runtime_lock = threading.Lock()
@@ -140,10 +141,6 @@ class TracRuntime:
         try:
 
             self._log.info(f"Beginning pre-start sequence...")
-
-            # Scratch dir is needed during pre-start (at least dev mode translation uses the model loader)
-
-            self._prepare_scratch_dir()
 
             # Plugin manager, static API and guard rails are singletons
             # Calling these methods multiple times is safe (e.g. for embedded or testing scenarios)
@@ -198,8 +195,16 @@ class TracRuntime:
 
             self._log.info("Starting the engine...")
 
+            self._prepare_scratch_dir()
+
             self._models = _models.ModelLoader(self._sys_config, self._scratch_dir)
             self._storage = _storage.StorageManager(self._sys_config)
+
+            if self._dev_mode:
+
+                self._dev_mode_translator = _dev_mode.DevModeTranslator(
+                    self._sys_config, self._config_mgr, self._scratch_dir,
+                    model_loader=self._models, storage_manager=self._storage)
 
             # Enable protection after the initial setup of the runtime is complete
             # Storage plugins in particular are likely to tigger protected imports
@@ -323,6 +328,9 @@ class TracRuntime:
             self, job_config: tp.Union[str, pathlib.Path, _cfg.JobConfig],
             model_class: tp.Optional[_api.TracModel.__class__] = None):
 
+        if not self._engine or self._shutdown_requested:
+            raise _ex.ETracInternal("Engine is not started or shutdown has been requested")
+
         if isinstance(job_config, _cfg.JobConfig):
             self._log.info("Using embedded job config")
 
@@ -334,12 +342,14 @@ class TracRuntime:
                 config_file_name="job")
 
         if self._dev_mode:
-            translator = _dev_mode.DevModeTranslator(self._sys_config, self._config_mgr, self._scratch_dir)
-            job_config = translator.translate_job_config(job_config, model_class)
+            job_config = self._dev_mode_translator.translate_job_config(job_config, model_class)
 
         return job_config
 
     def submit_job(self, job_config: _cfg.JobConfig):
+
+        if not self._engine or self._shutdown_requested:
+            raise _ex.ETracInternal("Engine is not started or shutdown has been requested")
 
         job_key = _util.object_key(job_config.jobId)
         self._jobs[job_key] = _RuntimeJobInfo()
@@ -350,6 +360,9 @@ class TracRuntime:
             self._job_result_format if self._job_result_format else "")
 
     def wait_for_job(self, job_id: _api.TagHeader):
+
+        if not self._engine or self._shutdown_requested:
+            raise _ex.ETracInternal("Engine is not started or shutdown has been requested")
 
         job_key = _util.object_key(job_id)
 

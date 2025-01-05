@@ -22,7 +22,9 @@ option java_package = "org.finos.tracdap.metadata";
 option java_multiple_files = true;
 
 import "tracdap/metadata/type.proto";
+import "tracdap/metadata/object_id.proto";
 import "tracdap/metadata/data.proto";
+import "tracdap/metadata/file.proto";
 
 
 /**
@@ -69,7 +71,12 @@ message ModelParameter {
  */
 message ModelInputSchema {
 
-    SchemaDefinition schema = 1;
+    ObjectType objectType = 6;
+
+    oneof requirement {
+        SchemaDefinition schema = 1;
+        FileType fileType = 7;
+    }
 
     optional string label = 2;
 
@@ -93,7 +100,12 @@ message ModelInputSchema {
  */
 message ModelOutputSchema {
 
-    SchemaDefinition schema = 1;
+    ObjectType objectType = 6;
+
+    oneof requirement {
+        SchemaDefinition schema = 1;
+        FileType fileType = 7;
+    }
 
     optional string label = 2;
 

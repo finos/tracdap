@@ -170,7 +170,7 @@ class TracEngine(_actors.Actor):
 
         self._log.info(f"Job submitted: [{job_key}]")
 
-        job_processor = JobProcessor(self._models, self._storage, job_key, job_config, result_spec, graph_spec=None)
+        job_processor = JobProcessor(self._sys_config, self._models, self._storage, job_key, job_config, result_spec, graph_spec=None)
         job_actor_id = self.actors().spawn(job_processor)
 
         job_monitor_success = lambda ctx, key, result: self._notify_callback(key, result, None)
@@ -190,7 +190,7 @@ class TracEngine(_actors.Actor):
 
         child_key = _util.object_key(child_id)
 
-        child_processor = JobProcessor(self._models, self._storage, child_key, None, None, graph_spec=child_graph)  # noqa
+        child_processor = JobProcessor(self._sys_config, self._models, self._storage, child_key, None, None, graph_spec=child_graph)  # noqa
         child_actor_id = self.actors().spawn(child_processor)
 
         child_state = _JobState(child_id)
@@ -336,7 +336,8 @@ class JobProcessor(_actors.Actor):
     """
 
     def __init__(
-            self, models: _models.ModelLoader, storage: _storage.StorageManager,
+            self, sys_config: _cfg.RuntimeConfig,
+            models: _models.ModelLoader, storage: _storage.StorageManager,
             job_key: str, job_config: _cfg.JobConfig, result_spec: _graph.JobResultSpec,
             graph_spec: tp.Optional[_graph.Graph]):
 
@@ -345,6 +346,7 @@ class JobProcessor(_actors.Actor):
         self.job_config = job_config
         self.result_spec = result_spec
         self.graph_spec = graph_spec
+        self._sys_config = sys_config
         self._models = models
         self._storage = storage
         self._resolver = _func.FunctionResolver(models, storage)
@@ -358,7 +360,7 @@ class JobProcessor(_actors.Actor):
         if self.graph_spec is not None:
             self.actors().send(self.actors().id, "build_graph_succeeded", self.graph_spec)
         else:
-            self.actors().spawn(GraphBuilder(self.job_config, self.result_spec))
+            self.actors().spawn(GraphBuilder(self._sys_config, self.job_config, self.result_spec))
 
     def on_stop(self):
 
@@ -426,8 +428,9 @@ class GraphBuilder(_actors.Actor):
     GraphBuilder is a worker (actor) to wrap the GraphBuilder logic from graph_builder.py
     """
 
-    def __init__(self, job_config: _cfg.JobConfig, result_spec: _graph.JobResultSpec):
+    def __init__(self, sys_config: _cfg.RuntimeConfig, job_config: _cfg.JobConfig, result_spec: _graph.JobResultSpec):
         super().__init__()
+        self.sys_config = sys_config
         self.job_config = job_config
         self.result_spec = result_spec
         self._log = _util.logger_for_object(self)
@@ -440,8 +443,7 @@ class GraphBuilder(_actors.Actor):
 
         self._log.info("Building execution graph")
 
-        # TODO: Get sys config, or find a way to pass storage settings
-        graph_builder = _graph.GraphBuilder(job_config, self.result_spec)
+        graph_builder = _graph.GraphBuilder(self.sys_config, job_config, self.result_spec)
         graph_spec = graph_builder.build_job(job_config.job)
 
         self.actors().reply("build_graph_succeeded", graph_spec)

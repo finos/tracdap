@@ -1,0 +1,9 @@
+
+job:
+  runModel:
+
+    inputs:
+      quarterly_sales: "outputs/using_data/profit_by_region.csv"
+
+    outputs:
+      sales_report: "outputs/file_io/sales_report.svg"

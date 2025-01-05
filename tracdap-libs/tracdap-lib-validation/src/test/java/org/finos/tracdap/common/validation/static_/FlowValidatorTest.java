@@ -115,6 +115,7 @@ public class FlowValidatorTest extends BaseValidatorTest {
 
                 // Flow schema
                 .putInputs("input_1", ModelInputSchema.newBuilder()
+                        .setObjectType(ObjectType.DATA)
                         .setSchema(SchemaDefinition.newBuilder()
                         .setSchemaType(SchemaType.TABLE)
                         .setPartType(PartType.PART_ROOT)
@@ -132,6 +133,7 @@ public class FlowValidatorTest extends BaseValidatorTest {
                         .build())
 
                 .putInputs("input_2", ModelInputSchema.newBuilder()
+                        .setObjectType(ObjectType.DATA)
                         .setSchema(SchemaDefinition.newBuilder()
                         .setSchemaType(SchemaType.TABLE)
                         .setPartType(PartType.PART_ROOT)
@@ -149,6 +151,7 @@ public class FlowValidatorTest extends BaseValidatorTest {
                         .build())
 
                 .putOutputs("output_1", ModelOutputSchema.newBuilder()
+                        .setObjectType(ObjectType.DATA)
                         .setSchema(SchemaDefinition.newBuilder()
                         .setSchemaType(SchemaType.TABLE)
                         .setPartType(PartType.PART_ROOT)

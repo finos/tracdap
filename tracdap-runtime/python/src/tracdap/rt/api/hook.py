@@ -116,7 +116,7 @@ class _StaticApiHook:
     @_abc.abstractmethod
     def define_schema(
             self, *fields: _tp.Union[_meta.FieldSchema, _tp.List[_meta.FieldSchema]],
-            schema_type: _meta.SchemaType = _meta.SchemaType.TABLE) \
+            schema_type: _meta.SchemaType = _meta.SchemaType.TABLE, dynamic: bool = False) \
             -> _meta.SchemaDefinition:
 
         pass
@@ -131,21 +131,29 @@ class _StaticApiHook:
 
     @_abc.abstractmethod
     def infer_schema(self, dataset: _tp.Any) -> _meta.SchemaDefinition:
+
         pass
 
     @_abc.abstractmethod
-    def define_input_table(
-            self, *fields: _tp.Union[_meta.FieldSchema, _tp.List[_meta.FieldSchema]],
-            label: _tp.Optional[str] = None, optional: bool = False, dynamic: bool = False,
+    def define_file_type(self, extension: str, mime_type: str) -> _meta.FileType:
+
+        pass
+
+    @_abc.abstractmethod
+    def define_input(
+            self, requirement: _tp.Union[_meta.SchemaDefinition, _meta.FileType], *,
+            label: _tp.Optional[str] = None,
+            optional: bool = False, dynamic: bool = False,
             input_props: _tp.Optional[_tp.Dict[str, _tp.Any]] = None) \
             -> _meta.ModelInputSchema:
 
         pass
 
     @_abc.abstractmethod
-    def define_output_table(
-            self, *fields: _tp.Union[_meta.FieldSchema, _tp.List[_meta.FieldSchema]],
-            label: _tp.Optional[str] = None, optional: bool = False, dynamic: bool = False,
+    def define_output(
+            self, requirement: _tp.Union[_meta.SchemaDefinition, _meta.FileType], *,
+            label: _tp.Optional[str] = None,
+            optional: bool = False, dynamic: bool = False,
             output_props: _tp.Optional[_tp.Dict[str, _tp.Any]] = None) \
             -> _meta.ModelOutputSchema:
 

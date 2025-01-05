@@ -99,7 +99,7 @@ class TracContextTest(unittest.TestCase):
 
         customer_loans_view = _data.DataMapping.add_item_to_view(
             customer_loans_view, _data.DataPartKey.for_root(),
-            _data.DataItem(customer_loans_view.arrow_schema, customer_loans_delta0))
+            _data.DataItem(_api.ObjectType.DATA, customer_loans_view.arrow_schema, customer_loans_delta0))
 
         profit_by_region_schema = _test_model_def.outputs.get("profit_by_region").schema
         profit_by_region_view = _data.DataView.for_trac_schema(profit_by_region_schema)

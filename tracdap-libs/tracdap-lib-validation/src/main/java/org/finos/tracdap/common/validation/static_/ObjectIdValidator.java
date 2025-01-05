@@ -25,6 +25,9 @@ import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.common.validation.core.ValidationContext;
 import com.google.protobuf.Descriptors;
 
+import java.util.List;
+import java.util.stream.Collectors;
+
 import static org.finos.tracdap.common.validation.core.ValidatorUtils.field;
 
 
@@ -199,6 +202,18 @@ public class ObjectIdValidator {
         if (!selector.getObjectType().equals(requiredType)) {
             var err = String.format("Wrong object type in [%s] selector: expected [%s], got [%s]",
                     ctx.fieldName(), requiredType, selector.getObjectType());
+            return ctx.error(err);
+        }
+
+        return ctx;
+    }
+
+    public static ValidationContext selectorType(TagSelector selector, List<ObjectType> allowedTypes, ValidationContext ctx) {
+
+        if (!allowedTypes.contains(selector.getObjectType())) {
+            var allowed = allowedTypes.stream().map(Enum::name).collect(Collectors.joining(", "));
+            var err = String.format("Wrong object type in [%s] selector: allowed [%s], got [%s]",
+                    ctx.fieldName(), allowed, selector.getObjectType());
             return ctx.error(err);
         }
 

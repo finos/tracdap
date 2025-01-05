@@ -24,6 +24,7 @@ import org.finos.tracdap.metadata.*;
 
 import com.google.protobuf.Descriptors;
 
+import java.util.List;
 import java.util.Map;
 
 import static org.finos.tracdap.common.validation.core.ValidatorUtils.field;
@@ -36,6 +37,8 @@ public class JobValidator {
             Map.entry(JobDefinition.JobDetailsCase.RUNMODEL, JobType.RUN_MODEL),
             Map.entry(JobDefinition.JobDetailsCase.RUNFLOW, JobType.RUN_FLOW),
             Map.entry(JobDefinition.JobDetailsCase.IMPORTMODEL, JobType.IMPORT_MODEL));
+
+    private static final List<ObjectType> ALLOWED_IO_TYPES = List.of(ObjectType.DATA, ObjectType.FILE);
 
     private static final Descriptors.Descriptor JOB_DEFINITION;
     private static final Descriptors.FieldDescriptor JD_JOB_TYPE;
@@ -165,7 +168,7 @@ public class JobValidator {
                 .applyMapKeys(CommonValidators::identifier)
                 .applyMapKeys(CommonValidators::notTracReserved)
                 .applyMapValues(ObjectIdValidator::tagSelector, TagSelector.class)
-                .applyMapValues(ObjectIdValidator::selectorType, TagSelector.class, ObjectType.DATA)
+                .applyMapValues(ObjectIdValidator::selectorType, TagSelector.class, ALLOWED_IO_TYPES)
                 .applyMapValues(ObjectIdValidator::fixedObjectVersion, TagSelector.class)
                 .pop();
 
@@ -173,7 +176,7 @@ public class JobValidator {
                 .applyMapKeys(CommonValidators::identifier)
                 .applyMapKeys(CommonValidators::notTracReserved)
                 .applyMapValues(ObjectIdValidator::tagSelector, TagSelector.class)
-                .applyMapValues(ObjectIdValidator::selectorType, TagSelector.class, ObjectType.DATA)
+                .applyMapValues(ObjectIdValidator::selectorType, TagSelector.class, ALLOWED_IO_TYPES)
                 .applyMapValues(ObjectIdValidator::fixedObjectVersion, TagSelector.class)
                 .pop();
 
@@ -181,7 +184,7 @@ public class JobValidator {
                 .applyMapKeys(CommonValidators::identifier)
                 .applyMapKeys(CommonValidators::notTracReserved)
                 .applyMapValues(ObjectIdValidator::tagSelector, TagSelector.class)
-                .applyMapValues(ObjectIdValidator::selectorType, TagSelector.class, ObjectType.DATA)
+                .applyMapValues(ObjectIdValidator::selectorType, TagSelector.class, ALLOWED_IO_TYPES)
                 .applyMapValues(ObjectIdValidator::fixedObjectVersion, TagSelector.class)
                 .pop();
 

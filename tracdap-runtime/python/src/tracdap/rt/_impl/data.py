@@ -14,6 +14,7 @@
 #  limitations under the License.
 
 import abc
+import copy
 import dataclasses as dc
 import typing as tp
 import datetime as dt
@@ -42,10 +43,47 @@ import tracdap.rt._impl.util as _util
 @dc.dataclass(frozen=True)
 class DataSpec:
 
+    object_type: _meta.ObjectType
     data_item: str
+
     data_def: _meta.DataDefinition
+    file_def: _meta.FileDefinition
     storage_def: _meta.StorageDefinition
     schema_def: tp.Optional[_meta.SchemaDefinition]
+
+    @staticmethod
+    def create_data_spec(
+            data_item: str,
+            data_def: _meta.DataDefinition,
+            storage_def: _meta.StorageDefinition,
+            schema_def: tp.Optional[_meta.SchemaDefinition] = None) -> "DataSpec":
+
+        return DataSpec(
+            _meta.ObjectType.DATA, data_item,
+            data_def,
+            storage_def=storage_def,
+            schema_def=schema_def,
+            file_def=None)
+
+    @staticmethod
+    def create_file_spec(
+            data_item: str,
+            file_def: _meta.FileDefinition,
+            storage_def: _meta.StorageDefinition) -> "DataSpec":
+
+        return DataSpec(
+            _meta.ObjectType.FILE, data_item,
+            file_def=file_def,
+            storage_def=storage_def,
+            data_def=None,
+            schema_def=None)
+
+    @staticmethod
+    def create_empty_spec(object_type: _meta.ObjectType):
+        return DataSpec(object_type, None, None, None, None, None)
+
+    def is_empty(self):
+        return self.data_item is None or len(self.data_item) == 0
 
 
 @dc.dataclass(frozen=True)
@@ -61,44 +99,79 @@ class DataPartKey:
 @dc.dataclass(frozen=True)
 class DataItem:
 
-    schema: pa.Schema
+    object_type: _meta.ObjectType
+
+    schema: pa.Schema = None
     table: tp.Optional[pa.Table] = None
     batches: tp.Optional[tp.List[pa.RecordBatch]] = None
 
     pandas: "tp.Optional[pandas.DataFrame]" = None
     pyspark: tp.Any = None
 
+    raw_bytes: bytes = None
+
     def is_empty(self) -> bool:
-        return self.table is None and (self.batches is None or len(self.batches) == 0)
+        if self.object_type == _meta.ObjectType.FILE:
+            return self.raw_bytes is None or len(self.raw_bytes) == 0
+        else:
+            return self.table is None and (self.batches is None or len(self.batches) == 0)
 
     @staticmethod
-    def create_empty() -> "DataItem":
-        return DataItem(pa.schema([]))
+    def create_empty(object_type: _meta.ObjectType = _meta.ObjectType.DATA) -> "DataItem":
+        if object_type == _meta.ObjectType.DATA:
+            return DataItem(_meta.ObjectType.DATA, pa.schema([]))
+        else:
+            return DataItem(object_type)
+
+    @staticmethod
+    def for_file_content(raw_bytes: bytes):
+        return DataItem(_meta.ObjectType.FILE, raw_bytes=raw_bytes)
 
 
 @dc.dataclass(frozen=True)
 class DataView:
 
-    trac_schema: _meta.SchemaDefinition
-    arrow_schema: pa.Schema
+    object_type: _meta.ObjectType
 
-    parts: tp.Dict[DataPartKey, tp.List[DataItem]]
+    trac_schema: _meta.SchemaDefinition = None
+    arrow_schema: pa.Schema = None
+
+    parts: tp.Dict[DataPartKey, tp.List[DataItem]] = None
+    file_item: tp.Optional[DataItem] = None
 
     @staticmethod
-    def create_empty() -> "DataView":
-        return DataView(_meta.SchemaDefinition(), pa.schema([]), dict())
+    def create_empty(object_type: _meta.ObjectType = _meta.ObjectType.DATA) -> "DataView":
+        if object_type == _meta.ObjectType.DATA:
+            return DataView(object_type, _meta.SchemaDefinition(), pa.schema([]), dict())
+        else:
+            return DataView(object_type)
 
     @staticmethod
     def for_trac_schema(trac_schema: _meta.SchemaDefinition):
         arrow_schema = DataMapping.trac_to_arrow_schema(trac_schema)
-        return DataView(trac_schema, arrow_schema, dict())
+        return DataView(_meta.ObjectType.DATA, trac_schema, arrow_schema, dict())
+
+    @staticmethod
+    def for_file_item(file_item: DataItem):
+        return DataView(file_item.object_type, file_item=file_item)
 
     def with_trac_schema(self, trac_schema: _meta.SchemaDefinition):
         arrow_schema = DataMapping.trac_to_arrow_schema(trac_schema)
-        return DataView(trac_schema, arrow_schema, self.parts)
+        return DataView(_meta.ObjectType.DATA, trac_schema, arrow_schema, self.parts)
+
+    def with_part(self, part_key: DataPartKey, part: DataItem):
+        new_parts = copy.copy(self.parts)
+        new_parts[part_key] = [part]
+        return DataView(self.object_type, self.trac_schema, self.arrow_schema, new_parts)
+
+    def with_file_item(self, file_item: DataItem):
+        return DataView(self.object_type, file_item=file_item)
 
     def is_empty(self) -> bool:
-        return self.parts is None or not any(self.parts.values())
+        if self.object_type == _meta.ObjectType.FILE:
+            return self.file_item is None
+        else:
+            return self.parts is None or not any(self.parts.values())
 
 
 class _DataInternal:
@@ -293,7 +366,7 @@ class DataMapping:
         deltas = [*prior_deltas, item]
         parts = {**view.parts, part: deltas}
 
-        return DataView(view.trac_schema, view.arrow_schema, parts)
+        return DataView(view.object_type, view.trac_schema, view.arrow_schema, parts=parts)
 
     @classmethod
     def view_to_arrow(cls, view: DataView, part: DataPartKey) -> pa.Table:
