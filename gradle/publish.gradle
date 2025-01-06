@@ -6,10 +6,11 @@ def publishModule(Project project) {
 
             "$project.name" (MavenPublication) {
 
-                groupId project.group
-                artifactId project.name
-                version project.version
                 from project.components.java
+
+                groupId = project.group
+                artifactId = project.name
+                version = project.version
 
                 pom {
 
