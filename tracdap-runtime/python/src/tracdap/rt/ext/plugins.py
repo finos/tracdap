@@ -14,13 +14,13 @@
 #  limitations under the License.
 
 import typing as _tp
-import logging as _log
 import pkgutil as _pkg
 import importlib as _il
 
 import tracdap.rt.config as _cfg
 import tracdap.rt.exceptions as _ex
 import tracdap.rt._impl.guard_rails as _guard  # noqa
+import tracdap.rt._impl.logging as _logging  # noqa
 from tracdap.rt.exceptions import EStartup
 
 
@@ -28,7 +28,7 @@ class PluginManager:
 
     T_SERVICE = _tp.TypeVar("T_SERVICE")
 
-    __log = _log.getLogger(f"{__name__}.PluginManager")
+    __log = _logging.getLogger(f"{__name__}.PluginManager")
 
     __core_registered = False
     __3rd_party_registered = list()

@@ -22,6 +22,7 @@ import pathlib
 
 import tracdap.rt.metadata as meta
 import tracdap.rt.exceptions as ex
+import tracdap.rt._impl.logging as log
 import tracdap.rt._impl.util as util
 
 # _Named placeholder type from API hook is needed for API type checking
@@ -74,7 +75,7 @@ class _TypeValidator:
     # Inspecting a function signature can take ~ half a second in Python 3.7
     __method_cache: tp.Dict[str, tp.Tuple[inspect.Signature, tp.Any]] = dict()
 
-    _log: logging.Logger = util.logger_for_namespace(__name__)
+    _log: logging.Logger = log.logger_for_namespace(__name__)
 
     @classmethod
     def validate_signature(cls, method: tp.Callable, *args, **kwargs):
@@ -324,7 +325,7 @@ class StaticValidator:
         meta.BasicType.INTEGER,
         meta.BasicType.DATE]
 
-    _log: logging.Logger = util.logger_for_namespace(__name__)
+    _log: logging.Logger = log.logger_for_namespace(__name__)
 
     @classmethod
     def is_primitive_type(cls, basic_type: meta.BasicType) -> bool:

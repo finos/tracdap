@@ -24,8 +24,9 @@ import tracdap.rt.exceptions as _ex
 import tracdap.rt._exec.actors as _actors
 import tracdap.rt._exec.graph_builder as _graph
 import tracdap.rt._exec.functions as _func
-import tracdap.rt._impl.models as _models  # noqa
 import tracdap.rt._impl.data as _data  # noqa
+import tracdap.rt._impl.logging as _logging  # noqa
+import tracdap.rt._impl.models as _models  # noqa
 import tracdap.rt._impl.storage as _storage  # noqa
 import tracdap.rt._impl.util as _util  # noqa
 
@@ -107,7 +108,7 @@ class TracEngine(_actors.Actor):
 
         super().__init__()
 
-        self._log = _util.logger_for_object(self)
+        self._log = _logging.logger_for_object(self)
 
         self._sys_config = sys_config
         self._models = models
@@ -350,7 +351,7 @@ class JobProcessor(_actors.Actor):
         self._models = models
         self._storage = storage
         self._resolver = _func.FunctionResolver(models, storage)
-        self._log = _util.logger_for_object(self)
+        self._log = _logging.logger_for_object(self)
 
     def on_start(self):
 
@@ -433,7 +434,7 @@ class GraphBuilder(_actors.Actor):
         self.sys_config = sys_config
         self.job_config = job_config
         self.result_spec = result_spec
-        self._log = _util.logger_for_object(self)
+        self._log = _logging.logger_for_object(self)
 
     def on_start(self):
         self.build_graph(self, self.job_config)
@@ -459,7 +460,7 @@ class FunctionResolver(_actors.Actor):
         super().__init__()
         self.graph = graph
         self._resolver = resolver
-        self._log = _util.logger_for_object(self)
+        self._log = _logging.logger_for_object(self)
 
     def on_start(self):
         self.resolve_functions(self, self.graph)
@@ -494,7 +495,7 @@ class GraphProcessor(_actors.Actor):
         self.root_id_ = graph.root_id
         self.processors: tp.Dict[NodeId, _actors.ActorId] = dict()
         self._resolver = resolver
-        self._log = _util.logger_for_object(self)
+        self._log = _logging.logger_for_object(self)
 
     def on_start(self):
 
@@ -959,7 +960,7 @@ class GraphLogger:
     Log the activity of the GraphProcessor
     """
 
-    _log = _util.logger_for_class(GraphProcessor)
+    _log = _logging.logger_for_class(GraphProcessor)
 
     @classmethod
     def log_node_add(cls, node: _graph.Node):
@@ -992,7 +993,7 @@ class NodeLogger:
 
     # Separate out the logic for logging nodes, so the NodeProcessor itself stays a bit cleaner
 
-    _log = _util.logger_for_class(NodeProcessor)
+    _log = _logging.logger_for_class(NodeProcessor)
 
     class LoggingType(enum.Enum):
         DEFAULT = 0

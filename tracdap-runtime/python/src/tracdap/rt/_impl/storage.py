@@ -30,6 +30,7 @@ import tracdap.rt.config as _cfg
 import tracdap.rt.exceptions as _ex
 import tracdap.rt.ext.plugins as plugins
 import tracdap.rt._impl.data as _data
+import tracdap.rt._impl.logging as _logging
 import tracdap.rt._impl.util as _util
 import tracdap.rt._impl.validation as _val
 
@@ -76,7 +77,7 @@ class StorageManager:
 
     def __init__(self, sys_config: _cfg.RuntimeConfig):
 
-        self.__log = _util.logger_for_object(self)
+        self.__log = _logging.logger_for_object(self)
         self.__file_storage: tp.Dict[str, IFileStorage] = dict()
         self.__data_storage: tp.Dict[str, IDataStorage] = dict()
         self.__external: tp.List[str] = list()
@@ -224,7 +225,7 @@ class CommonFileStorage(IFileStorage):
 
     def __init__(self, storage_key: str, storage_config: _cfg.PluginConfig, fs: pa_fs.SubTreeFileSystem):
 
-        self._log = _util.logger_for_object(self)
+        self._log = _logging.logger_for_object(self)
         self._key = storage_key
         self._config = storage_config
         self._fs = fs
@@ -731,7 +732,7 @@ class CommonDataStorage(IDataStorage):
             self, config: _cfg.PluginConfig, file_storage: IFileStorage,
             pushdown_pandas: bool = False, pushdown_spark: bool = False):
 
-        self.__log = _util.logger_for_object(self)
+        self.__log = _logging.logger_for_object(self)
 
         self.__config = config
         self.__file_storage = file_storage

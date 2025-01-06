@@ -37,7 +37,7 @@ except ModuleNotFoundError:
 import tracdap.rt.api.experimental as _api
 import tracdap.rt.metadata as _meta
 import tracdap.rt.exceptions as _ex
-import tracdap.rt._impl.util as _util
+import tracdap.rt._impl.logging as _log
 
 
 @dc.dataclass(frozen=True)
@@ -188,7 +188,7 @@ class DataMapping:
     :py:class:`TypeMapping <tracdap.rt.impl.type_system.MetadataCodec>`.
     """
 
-    __log = _util.logger_for_namespace(_DataInternal.__module__ + ".DataMapping")
+    __log = _log.logger_for_namespace(_DataInternal.__module__ + ".DataMapping")
 
     # Matches TRAC_ARROW_TYPE_MAPPING in ArrowSchema, tracdap-lib-data
 
@@ -715,7 +715,7 @@ class DataConformance:
     Check and/or apply conformance between datasets and schemas.
     """
 
-    __log = _util.logger_for_namespace(_DataInternal.__module__ + ".DataConformance")
+    __log = _log.logger_for_namespace(_DataInternal.__module__ + ".DataConformance")
 
     __E_FIELD_MISSING = \
         "Field [{field_name}] is missing from the data"

@@ -23,6 +23,7 @@ import tracdap.rt.config as _cfg
 import tracdap.rt.metadata as _meta
 import tracdap.rt.exceptions as _ex
 import tracdap.rt._impl.config_parser as _cfg_p  # noqa
+import tracdap.rt._impl.logging as _logging  # noqa
 import tracdap.rt._impl.models as _models  # noqa
 import tracdap.rt._impl.storage as _storage  # noqa
 import tracdap.rt._impl.type_system as _types  # noqa
@@ -50,7 +51,7 @@ DEV_MODE_SYS_CONFIG = []
 
 class DevModeTranslator:
 
-    _log: tp.Optional[_util.logging.Logger] = None
+    _log: tp.Optional[_logging.Logger] = None
 
     @classmethod
     def translate_sys_config(cls, sys_config: _cfg.RuntimeConfig, config_mgr: _cfg_p.ConfigManager):
@@ -1039,4 +1040,4 @@ class DevModeTranslator:
 
 
 
-DevModeTranslator._log = _util.logger_for_class(DevModeTranslator)
+DevModeTranslator._log = _logging.logger_for_class(DevModeTranslator)

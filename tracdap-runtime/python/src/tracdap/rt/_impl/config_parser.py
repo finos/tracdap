@@ -32,6 +32,7 @@ import tracdap.rt.config as _config
 import tracdap.rt.exceptions as _ex
 import tracdap.rt.ext.plugins as _plugins
 import tracdap.rt.ext.config as _config_ext
+import tracdap.rt._impl.logging as _logging
 import tracdap.rt._impl.util as _util
 
 import yaml
@@ -103,7 +104,7 @@ class ConfigManager:
             return raw_url
 
     def __init__(self, root_dir_url: _urlp.ParseResult, root_file_url: tp.Optional[_urlp.ParseResult]):
-        self._log = _util.logger_for_object(self)
+        self._log = _logging.logger_for_object(self)
         self._root_dir_url = root_dir_url
         self._root_file_url = root_file_url
 
@@ -294,7 +295,7 @@ class ConfigParser(tp.Generic[_T]):
     }
 
     def __init__(self, config_class: _T.__class__, dev_mode_locations: tp.List[str] = None):
-        self._log = _util.logger_for_object(self)
+        self._log = _logging.logger_for_object(self)
         self._config_class = config_class
         self._dev_mode_locations = dev_mode_locations or []
         self._errors = []

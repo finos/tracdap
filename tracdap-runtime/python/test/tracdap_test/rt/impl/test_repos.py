@@ -22,8 +22,9 @@ import subprocess as sp
 import tracdap.rt.metadata as meta
 import tracdap.rt.config as config
 import tracdap.rt.ext.plugins as plugins
-import tracdap.rt._impl.static_api as api_hook  # noqa
+import tracdap.rt._impl.logging as log  # noqa
 import tracdap.rt._impl.models as models  # noqa
+import tracdap.rt._impl.static_api as api_hook  # noqa
 import tracdap.rt._impl.repos as repos  # noqa
 import tracdap.rt._impl.util as util  # noqa
 
@@ -34,7 +35,7 @@ class ModelRepositoriesTest(unittest.TestCase):
     def setUpClass(cls) -> None:
         plugins.PluginManager.register_core_plugins()
         api_hook.StaticApiImpl.register_impl()
-        util.configure_logging()
+        log.configure_logging()
 
     def setUp(self) -> None:
         self.test_scope = f"{self.__class__.__name__}.{self._testMethodName}"

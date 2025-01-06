@@ -31,6 +31,7 @@ import tracdap.rt.ext.plugins as plugins
 import tracdap.rt.config as _cfg
 import tracdap.rt.exceptions as _ex
 import tracdap.rt._impl.data as _data  # noqa
+import tracdap.rt._impl.logging as _log # noqa
 import tracdap.rt._impl.storage as _storage  # noqa
 import tracdap.rt._impl.util as _util  # noqa
 import tracdap.rt._exec.context as _ctx  # noqa
@@ -113,8 +114,8 @@ class TestDataImportExport(unittest.TestCase):
         cls.test_dir = tempfile.TemporaryDirectory()
         cls.test_number = 0
 
-        _util.configure_logging()
-        cls.log = _util.logger_for_class(cls)
+        _log.configure_logging()
+        cls.log = _log.logger_for_class(cls)
 
     @classmethod
     def tearDownClass(cls) -> None:

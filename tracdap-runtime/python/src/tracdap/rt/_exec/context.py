@@ -26,9 +26,10 @@ import tracdap.rt.api as _api
 import tracdap.rt.api.experimental as _eapi
 import tracdap.rt.metadata as _meta
 import tracdap.rt.exceptions as _ex
-import tracdap.rt._impl.type_system as _types  # noqa
 import tracdap.rt._impl.data as _data  # noqa
+import tracdap.rt._impl.logging as _log  # noqa
 import tracdap.rt._impl.storage as _storage  # noqa
+import tracdap.rt._impl.type_system as _types  # noqa
 import tracdap.rt._impl.util as _util  # noqa
 import tracdap.rt._impl.validation as _val  # noqa
 
@@ -65,8 +66,8 @@ class TracContextImpl(_api.TracContext):
                  dynamic_outputs: tp.List[str] = None,
                  checkout_directory: pathlib.Path = None):
 
-        self.__ctx_log = _util.logger_for_object(self)
-        self.__model_log = _util.logger_for_class(model_class)
+        self.__ctx_log = _log.logger_for_object(self)
+        self.__model_log = _log.logger_for_class(model_class)
 
         self.__model_def = model_def
         self.__model_class = model_class
@@ -481,7 +482,7 @@ class TracFileStorageImpl(_eapi.TracFileStorage):
             self.__rmdir = None
             self.__write_byte_stream = None
 
-        self.__log = _util.logger_for_object(self)
+        self.__log = _log.logger_for_object(self)
         self.__val = TracStorageValidator(self.__log, checkout_directory, self.__storage_key)
 
     def get_storage_key(self) -> str:
@@ -619,7 +620,7 @@ class TracDataStorageImpl(_eapi.TracDataStorage[_eapi.DATA_API]):
             self.__create_table = None
             self.__write_table = None
 
-        self.__log = _util.logger_for_object(self)
+        self.__log = _log.logger_for_object(self)
         self.__val = TracStorageValidator(self.__log, checkout_directory, self.__storage_key)
 
     def has_table(self, table_name: str) -> bool:

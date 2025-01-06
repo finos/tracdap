@@ -20,8 +20,8 @@ import unittest
 import tracdap.rt.api as trac
 import tracdap.rt.launch as launch
 import tracdap.rt.exceptions as ex
+import tracdap.rt._impl.logging as log  # noqa
 import tracdap.rt._impl.static_api as api_hook  # noqa
-import tracdap.rt._impl.util as util  # noqa
 
 import tracdap_test.resources as test_resources
 
@@ -53,7 +53,7 @@ class SchemaResourcesTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         api_hook.StaticApiImpl.register_impl()
-        util.configure_logging()
+        log.configure_logging()
 
     def test_load_from_package(self):
 

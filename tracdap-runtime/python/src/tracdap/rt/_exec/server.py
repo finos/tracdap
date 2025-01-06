@@ -21,6 +21,7 @@ import tracdap.rt.config as config
 import tracdap.rt.exceptions as ex
 import tracdap.rt._exec.actors as actors
 import tracdap.rt._impl.grpc.codec as codec  # noqa
+import tracdap.rt._impl.logging as logging  # noqa
 import tracdap.rt._impl.util as util  # noqa
 
 # Check whether gRPC is installed before trying to load any of the generated modules
@@ -44,7 +45,7 @@ class RuntimeApiServer(runtime_grpc.TracRuntimeApiServicer):
 
     def __init__(self, system: actors.ActorSystem, port: int):
 
-        self.__log = util.logger_for_object(self)
+        self.__log = logging.logger_for_object(self)
 
         self.__system = system
         self.__engine_id = system.main_id()
@@ -158,7 +159,7 @@ class ApiAgent(actors.ThreadsafeActor):
 
     def __init__(self):
         super().__init__()
-        self._log = util.logger_for_object(self)
+        self._log = logging.logger_for_object(self)
         self._event_loop = asyncio.get_event_loop()
         self.__start_signal = asyncio.Event()
 
@@ -258,7 +259,7 @@ class ApiRequest(actors.ThreadsafeActor, tp.Generic[_T_REQUEST, _T_RESPONSE]):
             self.threadsafe().stop()
 
 
-ApiRequest._log = util.logger_for_class(ApiRequest)
+ApiRequest._log = logging.logger_for_class(ApiRequest)
 
 
 class ListJobsRequest(ApiRequest[runtime_pb2.RuntimeListJobsRequest, runtime_pb2.RuntimeListJobsResponse]):

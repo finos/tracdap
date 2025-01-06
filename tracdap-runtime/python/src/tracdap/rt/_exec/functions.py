@@ -276,8 +276,6 @@ class SaveJobResultFunc(NodeFunction[None]):
             .Path(self.node.result_spec.result_dir) \
             .joinpath(job_result_file)
 
-        _util.logger_for_object(self).info(f"Saving job result to [{job_result_path}]")
-
         with open(job_result_path, "xb") as result_stream:
             result_stream.write(job_result_bytes)
 
@@ -632,8 +630,6 @@ class ImportModelFunc(NodeFunction[meta.ObjectDefinition]):
         super().__init__()
         self.node = node
         self._models = models
-
-        self._log = _util.logger_for_object(self)
 
     def _execute(self, ctx: NodeContext) -> meta.ObjectDefinition:
 

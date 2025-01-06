@@ -20,8 +20,8 @@ import unittest
 import tracdap.rt.config as _cfg
 import tracdap.rt.ext.plugins as _plugins
 import tracdap.rt._impl.config_parser as _cfg_p  # noqa
+import tracdap.rt._impl.logging as _log  # noqa
 import tracdap.rt._impl.storage as _storage  # noqa
-import tracdap.rt._impl.util as _util  # noqa
 
 from tracdap_test.rt.suites.data_storage_suite_2 import DataStorageSuite2
 
@@ -33,10 +33,10 @@ class SqlDataStorageTest(unittest.TestCase, DataStorageSuite2):
     @classmethod
     def setUpClass(cls) -> None:
 
-        _util.configure_logging()
+        _log.configure_logging()
         _plugins.PluginManager.register_core_plugins()
 
-        cls.log = _util.logger_for_class(cls)
+        cls.log = _log.logger_for_class(cls)
 
         sys_config_path = os.getenv("TRAC_RT_SYS_CONFIG")
         config_manager = _cfg_p.ConfigManager.for_root_config(sys_config_path)

@@ -13,7 +13,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import tracdap.rt._impl.util as util  # noqa
+import tracdap.rt._impl.logging as log  # noqa
 import tracdap.rt._exec.actors as actors  # noqa
 import unittest
 
@@ -27,7 +27,7 @@ class ActorSystemTest(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls) -> None:
-        util.configure_logging()
+        log.configure_logging()
 
     def test_actor_lifecycle(self):
 

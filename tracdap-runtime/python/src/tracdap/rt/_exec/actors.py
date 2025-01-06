@@ -25,7 +25,8 @@ import inspect
 import queue
 import time
 
-import tracdap.rt._impl.util as util  # noqa
+import tracdap.rt._impl.logging as _logging  # noqa
+import tracdap.rt._impl.util as _util  # noqa
 import tracdap.rt._impl.validation as _val  # noqa
 import tracdap.rt.exceptions as _ex
 
@@ -235,7 +236,7 @@ class EventLoop:
         self.__shutdown = False
         self.__shutdown_now = False
         self.__done = False
-        self.__log = util.logger_for_object(self)
+        self.__log = _logging.logger_for_object(self)
 
     def post_message(self, msg: _T_MSG, processor: tp.Callable[[_T_MSG], None]) -> bool:
         with self.__msg_lock:
@@ -365,7 +366,7 @@ class FunctionCache:
 
 class ActorNode:
 
-    _log = util.logger_for_class(Actor)
+    _log = _logging.logger_for_class(Actor)
 
     def __init__(
             self, actor_id: ActorId, actor: Actor,
@@ -904,7 +905,7 @@ class ActorSystem:
 
         super().__init__()
 
-        self._log = util.logger_for_object(self)
+        self._log = _logging.logger_for_object(self)
 
         # self.__actors: tp.Dict[ActorId, ActorNode] = {self.__ROOT_ID: ActorNode("", self.__ROOT_ID, None)}
         # self.__message_queue: tp.List[Msg] = list()

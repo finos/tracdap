@@ -22,9 +22,9 @@ import pyarrow as pa
 import tracdap.rt.metadata as _meta
 import tracdap.rt.exceptions as _ex
 import tracdap.rt._impl.data as _data
+import tracdap.rt._impl.logging as _log
 import tracdap.rt._impl.storage as _storage
 import tracdap.rt._impl.shim as _shim
-import tracdap.rt._impl.util as _util
 
 
 class SchemaLoader:
@@ -169,4 +169,4 @@ class SchemaLoader:
         raise _ex.EDataConformance(err)
 
 
-SchemaLoader._log = _util.logger_for_class(SchemaLoader)
+SchemaLoader._log = _log.logger_for_class(SchemaLoader)
