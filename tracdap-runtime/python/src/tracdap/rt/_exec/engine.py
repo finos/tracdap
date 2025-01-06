@@ -16,6 +16,8 @@
 import copy as cp
 import dataclasses as dc
 import enum
+import io
+import sys
 import typing as tp
 
 import tracdap.rt.metadata as _meta
@@ -84,13 +86,26 @@ class _EngineContext:
 class _JobState:
 
     job_id: _meta.TagHeader
-    actor_id: _actors.ActorId = None
+    log: _logging.Logger
 
+    actor_id: _actors.ActorId = None
     monitors: tp.List[_actors.ActorId] = dc.field(default_factory=list)
 
     job_config: _cfg.JobConfig = None
     job_result: _cfg.JobResult = None
     job_error: Exception = None
+
+    parent_key: str = None
+
+    log_buffer: io.BytesIO = None
+    log_provider: _logging.JobLogProvider = None
+
+    def __post_init__(self):
+
+        if not isinstance(self.log, _logging.JobLogProvider):
+            self.log_buffer = io.BytesIO()
+            self.log_provider = _logging.configure_job_log(self.log_buffer)
+            self.log = self.log_provider.make_logger(self.log)
 
 
 class TracEngine(_actors.Actor):
@@ -165,11 +180,12 @@ class TracEngine(_actors.Actor):
             job_result_format: str):
 
         job_key = _util.object_key(job_config.jobId)
+        job_state = _JobState(job_config.jobId, self._log)
+
+        job_state.log.info(f"Job submitted: [{job_key}]")
 
         result_needed = bool(job_result_dir)
         result_spec = _graph.JobResultSpec(result_needed, job_result_dir, job_result_format)
-
-        self._log.info(f"Job submitted: [{job_key}]")
 
         job_processor = JobProcessor(self._sys_config, self._models, self._storage, job_key, job_config, result_spec, graph_spec=None)
         job_actor_id = self.actors().spawn(job_processor)
@@ -179,7 +195,6 @@ class TracEngine(_actors.Actor):
         job_monitor = JobMonitor(job_key, job_monitor_success, job_monitor_failure)
         job_monitor_id = self.actors().spawn(job_monitor)
 
-        job_state = _JobState(job_config.jobId)
         job_state.actor_id = job_actor_id
         job_state.monitors.append(job_monitor_id)
         job_state.job_config = job_config
@@ -187,16 +202,25 @@ class TracEngine(_actors.Actor):
         self._jobs[job_key] = job_state
 
     @_actors.Message
-    def submit_child_job(self, child_id: _meta.TagHeader, child_graph: _graph.Graph, monitor_id: _actors.ActorId):
+    def submit_child_job(self, parent_key: str, child_id: _meta.TagHeader, child_graph: _graph.Graph, monitor_id: _actors.ActorId):
+
+        parent_state = self._jobs.get(parent_key)
+
+        # Ignore duplicate messages from the job processor (can happen in unusual error cases)
+        if parent_state is None:
+            self._log.warning(f"Ignoring [submit_child_job] message, parent [{parent_key}] has already completed")
+            return
 
         child_key = _util.object_key(child_id)
 
         child_processor = JobProcessor(self._sys_config, self._models, self._storage, child_key, None, None, graph_spec=child_graph)  # noqa
         child_actor_id = self.actors().spawn(child_processor)
 
-        child_state = _JobState(child_id)
+        child_state = _JobState(child_id, parent_state.log)
+        child_state.log = child_state.log_provider.make_logger(self._log)
         child_state.actor_id = child_actor_id
         child_state.monitors.append(monitor_id)
+        child_state.parent_key = parent_key
 
         self._jobs[child_key] = child_state
 
@@ -220,9 +244,9 @@ class TracEngine(_actors.Actor):
             self._log.warning(f"Ignoring [job_succeeded] message, job [{job_key}] has already completed")
             return
 
-        self._log.info(f"Recording job as successful: {job_key}")
-
         job_state = self._jobs[job_key]
+        job_state.log.info(f"Recording job as successful: {job_key}")
+
         job_state.job_result = job_result
 
         for monitor_id in job_state.monitors:
@@ -238,9 +262,9 @@ class TracEngine(_actors.Actor):
             self._log.warning(f"Ignoring [job_failed] message, job [{job_key}] has already completed")
             return
 
-        self._log.error(f"Recording job as failed: {job_key}")
-
         job_state = self._jobs[job_key]
+        job_state.log.error(f"Recording job as failed: {job_key}")
+
         job_state.job_error = error
 
         for monitor_id in job_state.monitors:
@@ -256,6 +280,10 @@ class TracEngine(_actors.Actor):
         # For now each instance of the runtime only processes one job so no need to worry
 
         job_state = self._jobs.get(job_key)
+
+        if job_state.parent_key is None:
+            job_log =  str(job_state.log_buffer.getbuffer(), "utf-8")
+            print(job_log, sys.stderr)
 
         # Stop any monitors that were created directly by the engine
         # (Other actors are responsible for stopping their own monitors)
@@ -921,6 +949,7 @@ class ChildJobNodeProcessor(NodeProcessor):
 
         job_id = self.node.node.job_id  # noqa
         job_key = _util.object_key(job_id)
+        parent_key = self.graph.job_key
 
         node_id = self.actors().id
 
@@ -935,7 +964,7 @@ class ChildJobNodeProcessor(NodeProcessor):
 
         graph_spec: _graph.Graph = self.node.node.graph  # noqa
 
-        self.actors().send(self.graph.engine_id, "submit_child_job", job_id, graph_spec, monitor_id)
+        self.actors().send(self.graph.engine_id, "submit_child_job", parent_key, job_id, graph_spec, monitor_id)
 
     @_actors.Message
     def child_job_succeeded(self, job_result: _cfg.JobResult):

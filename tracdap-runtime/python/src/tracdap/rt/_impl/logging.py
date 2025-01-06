@@ -13,9 +13,20 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import io as _io
 import sys as _sys
+import typing as _tp
 
 from logging import *
+
+
+class PlainFormatter(Formatter):
+
+    FORMAT = f"%(asctime)s [%(threadName)s] %(levelname)s %(name)s" + \
+                     f" - %(message)s"
+
+    def __init__(self):
+        super().__init__(self.FORMAT)
 
 
 class ColorFormatter(Formatter):
@@ -124,3 +135,40 @@ def logger_for_class(clazz: type) -> Logger:
 
 def logger_for_namespace(namespace: str) -> Logger:
     return getLogger(namespace)
+
+
+class JobLogger(Logger):
+
+    def __init__(self, sys_log: Logger, *handlers: Handler):
+
+        super().__init__(sys_log.name, sys_log.level)
+        self._sys_log = sys_log._log
+        self._job_log = super()._log
+
+        for handler in handlers:
+            self.addHandler(handler)
+
+    def _log(self, level, msg, args, exc_info=None, extra=None, stack_info=False, stacklevel=1):
+
+        self._sys_log(level, msg, args, exc_info, extra, stack_info, stacklevel)
+        self._job_log(level, msg, args, exc_info, extra, stack_info, stacklevel)
+
+
+class JobLogProvider:
+
+    def __init__(self, *handlers: Handler):
+        self.__handlers = handlers
+
+    def make_logger(self, sys_log:Logger):
+        return JobLogger(sys_log, *self.__handlers)
+
+
+def configure_job_log(target: _tp.BinaryIO) -> JobLogProvider:
+
+    stream = _io.TextIOWrapper(target)
+    formatter = PlainFormatter()
+
+    handler = StreamHandler(stream)
+    handler.setFormatter(formatter)
+
+    return JobLogProvider(handler)
