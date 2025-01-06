@@ -47,7 +47,7 @@ jobs:
         cache: gradle
 
     - name: Build
-      run: ./gradlew classes testClasses
+      run: ./gradlew classes testClasses --parallel
 
     - name: Unit tests
       run: ./gradlew test

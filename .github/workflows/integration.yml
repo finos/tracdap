@@ -53,7 +53,7 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
 
       - name: Platform - Build distribution files
-        run: ./gradlew installDist
+        run: ./gradlew installDist --parallel
 
       - name: Platform - Install the sandbox
         run: |
@@ -147,7 +147,7 @@ jobs:
           cache: gradle
 
       - name: Build
-        run: ./gradlew testClasses
+        run: ./gradlew testClasses --parallel
 
       - name: Slow tests
         run: ./gradlew integration -DintegrationTags="slow"
@@ -185,7 +185,7 @@ jobs:
           cache: gradle
 
       - name: Java - Build platform
-        run: ./gradlew testClasses
+        run: ./gradlew testClasses --parallel
 
       - name: Python - setup
         uses: actions/setup-python@v5

@@ -36,8 +36,8 @@ def versionNumber = ext.getVersionFromGit()
 
 allprojects {
 
-    group 'org.finos.tracdap'
-    version versionNumber
+    group = 'org.finos.tracdap'
+    version = versionNumber
 }
 
 subprojects {

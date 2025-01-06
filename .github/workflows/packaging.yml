@@ -66,7 +66,7 @@ jobs:
           cache: gradle
 
       - name: Build JARs
-        run: ./gradlew jar javadocJar sourcesJar -PincludeJavadoc=true -PincludeSources=true
+        run: ./gradlew jar javadocJar sourcesJar -PincludeJavadoc=true -PincludeSources=true --parallel
 
       - name: Build packages for distribution
         run: ./gradlew installDist
