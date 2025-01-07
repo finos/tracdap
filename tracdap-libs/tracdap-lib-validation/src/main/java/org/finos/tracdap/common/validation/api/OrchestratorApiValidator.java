@@ -74,8 +74,7 @@ public class OrchestratorApiValidator {
 
         ctx = ctx.push(JR_JOB)
                 .apply(CommonValidators::required)
-                .applyRegistered()
-                .apply(JobValidator::outputsMustBeEmpty, JobDefinition.class)
+                .apply(JobValidator::jobRequest, JobDefinition.class)
                 .pop();
 
         ctx = ctx.pushRepeated(JR_JOB_ATTRS)

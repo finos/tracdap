@@ -97,9 +97,21 @@ public class JobValidator {
         RFJ_PRIOR_OUTPUTS = field(RUN_FLOW_JOB, RunFlowJob.PRIOROUTPUTS_FIELD_NUMBER);
     }
 
-
     @Validator
     public static ValidationContext job(JobDefinition msg, ValidationContext ctx) {
+
+        return ctx.apply(JobValidator::job, JobDefinition.class, /* isClientRequest = */ false);
+    }
+
+    @Validator
+    public static ValidationContext jobRequest(JobDefinition msg, ValidationContext ctx) {
+
+        return ctx
+                .apply(JobValidator::job, JobDefinition.class, /* isClientRequest = */ true)
+                .apply(JobValidator::outputsMustBeEmpty, JobDefinition.class);
+    }
+
+    public static ValidationContext job(JobDefinition msg, boolean isClientRequest, ValidationContext ctx) {
 
         ctx = ctx.push(JD_JOB_TYPE)
                 .apply(CommonValidators::required)
@@ -112,8 +124,12 @@ public class JobValidator {
                 .applyRegistered()
                 .pop();
 
+        // Jobs submitted through the API must not contain a result ID (it is added later by the orchestrator)
+
+        var clientRequestQualifier = "a job is submitted from the client";
+
         ctx = ctx.push(JD_RESULT_ID)
-                .apply(CommonValidators::required)
+                .apply(CommonValidators.ifAndOnlyIf(!isClientRequest, clientRequestQualifier, true))
                 .apply(ObjectIdValidator::tagSelector, TagSelector.class)
                 .apply(ObjectIdValidator::selectorType, TagSelector.class, ObjectType.RESULT)
                 .apply(ObjectIdValidator::fixedObjectVersion, TagSelector.class)
