@@ -86,7 +86,7 @@ class _EngineContext:
 class _JobState:
 
     job_id: _meta.TagHeader
-    log: _logging.Logger
+    log_init: dc.InitVar[tp.Optional[_logging.LogProvider]] = None
 
     actor_id: _actors.ActorId = None
     monitors: tp.List[_actors.ActorId] = dc.field(default_factory=list)
@@ -98,14 +98,18 @@ class _JobState:
     parent_key: str = None
 
     log_buffer: io.BytesIO = None
-    log_provider: _logging.JobLogProvider = None
+    log_provider: _logging.LogProvider = None
+    log: _logging.Logger = None
 
-    def __post_init__(self):
+    def __post_init__(self, log_init):
 
-        if not isinstance(self.log, _logging.JobLogProvider):
+        if isinstance(self.log, _logging.LogProvider):
+            self.log_provider = log_init
+        else:
             self.log_buffer = io.BytesIO()
-            self.log_provider = _logging.configure_job_log(self.log_buffer)
-            self.log = self.log_provider.make_logger(self.log)
+            self.log_provider = _logging.job_log_provider(self.log_buffer)
+
+        self.log = self.log_provider.logger_for_class(TracEngine)
 
 
 class TracEngine(_actors.Actor):
@@ -180,14 +184,17 @@ class TracEngine(_actors.Actor):
             job_result_format: str):
 
         job_key = _util.object_key(job_config.jobId)
-        job_state = _JobState(job_config.jobId, self._log)
+        job_state = _JobState(job_config.jobId)
 
         job_state.log.info(f"Job submitted: [{job_key}]")
 
         result_needed = bool(job_result_dir)
         result_spec = _graph.JobResultSpec(result_needed, job_result_dir, job_result_format)
 
-        job_processor = JobProcessor(self._sys_config, self._models, self._storage, job_key, job_config, result_spec, graph_spec=None)
+        job_processor = JobProcessor(
+            self._sys_config, self._models, self._storage, job_state.log_provider,
+            job_key, job_config, result_spec, graph_spec=None)
+
         job_actor_id = self.actors().spawn(job_processor)
 
         job_monitor_success = lambda ctx, key, result: self._notify_callback(key, result, None)
@@ -213,11 +220,12 @@ class TracEngine(_actors.Actor):
 
         child_key = _util.object_key(child_id)
 
-        child_processor = JobProcessor(self._sys_config, self._models, self._storage, child_key, None, None, graph_spec=child_graph)  # noqa
+        child_processor = JobProcessor(
+            self._sys_config, self._models, self._storage, parent_state.log_provider,
+            child_key, None, None, graph_spec=child_graph)  # noqa
         child_actor_id = self.actors().spawn(child_processor)
 
-        child_state = _JobState(child_id, parent_state.log)
-        child_state.log = child_state.log_provider.make_logger(self._log)
+        child_state = _JobState(child_id, parent_state.log_provider)
         child_state.actor_id = child_actor_id
         child_state.monitors.append(monitor_id)
         child_state.parent_key = parent_key
@@ -366,7 +374,7 @@ class JobProcessor(_actors.Actor):
 
     def __init__(
             self, sys_config: _cfg.RuntimeConfig,
-            models: _models.ModelLoader, storage: _storage.StorageManager,
+            models: _models.ModelLoader, storage: _storage.StorageManager, log_provider: _logging.LogProvider,
             job_key: str, job_config: _cfg.JobConfig, result_spec: _graph.JobResultSpec,
             graph_spec: tp.Optional[_graph.Graph]):
 
@@ -378,8 +386,9 @@ class JobProcessor(_actors.Actor):
         self._sys_config = sys_config
         self._models = models
         self._storage = storage
+        self._log_provider = log_provider
         self._resolver = _func.FunctionResolver(models, storage)
-        self._log = _logging.logger_for_object(self)
+        self._log = log_provider.logger_for_object(self)
 
     def on_start(self):
 
@@ -389,7 +398,7 @@ class JobProcessor(_actors.Actor):
         if self.graph_spec is not None:
             self.actors().send(self.actors().id, "build_graph_succeeded", self.graph_spec)
         else:
-            self.actors().spawn(GraphBuilder(self._sys_config, self.job_config, self.result_spec))
+            self.actors().spawn(GraphBuilder(self._sys_config, self.job_config, self._log_provider, self.result_spec))
 
     def on_stop(self):
 
@@ -427,14 +436,14 @@ class JobProcessor(_actors.Actor):
         # Add all the nodes as pending nodes to start
         graph.pending_nodes.update(graph.nodes.keys())
 
-        self.actors().spawn(FunctionResolver(self._resolver, graph))
+        self.actors().spawn(FunctionResolver(self._resolver, self._log_provider, graph))
         if self.actors().sender != self.actors().id and self.actors().sender != self.actors().parent:
             self.actors().stop(self.actors().sender)
 
     @_actors.Message
     def resolve_functions_succeeded(self, graph: _EngineContext):
 
-        self.actors().spawn(GraphProcessor(graph, self._resolver))
+        self.actors().spawn(GraphProcessor(graph, self._resolver, self._log_provider))
         if self.actors().sender != self.actors().id and self.actors().sender != self.actors().parent:
             self.actors().stop(self.actors().sender)
 
@@ -457,12 +466,15 @@ class GraphBuilder(_actors.Actor):
     GraphBuilder is a worker (actor) to wrap the GraphBuilder logic from graph_builder.py
     """
 
-    def __init__(self, sys_config: _cfg.RuntimeConfig, job_config: _cfg.JobConfig, result_spec: _graph.JobResultSpec):
+    def __init__(
+            self, sys_config: _cfg.RuntimeConfig, job_config: _cfg.JobConfig,
+            log_provider: _logging.LogProvider, result_spec: _graph.JobResultSpec):
+
         super().__init__()
         self.sys_config = sys_config
         self.job_config = job_config
         self.result_spec = result_spec
-        self._log = _logging.logger_for_object(self)
+        self._log = log_provider.logger_for_object(self)
 
     def on_start(self):
         self.build_graph(self, self.job_config)
@@ -481,14 +493,14 @@ class GraphBuilder(_actors.Actor):
 class FunctionResolver(_actors.Actor):
 
     """
-    GraphResolver is a worker (actors) to wrap the FunctionResolver logic in functions.py
+    FunctionResolver is a worker (actors) to wrap the FunctionResolver logic in functions.py
     """
 
-    def __init__(self, resolver: _func.FunctionResolver, graph: _EngineContext):
+    def __init__(self, resolver: _func.FunctionResolver, log_provider: _logging.LogProvider, graph: _EngineContext):
         super().__init__()
         self.graph = graph
         self._resolver = resolver
-        self._log = _logging.logger_for_object(self)
+        self._log = log_provider.logger_for_object(self)
 
     def on_start(self):
         self.resolve_functions(self, self.graph)
@@ -517,13 +529,15 @@ class GraphProcessor(_actors.Actor):
     Once all running nodes are stopped, an error is reported to the parent
     """
 
-    def __init__(self, graph: _EngineContext, resolver: _func.FunctionResolver):
+    def __init__(self, graph: _EngineContext, resolver: _func.FunctionResolver, log_provider: _logging.LogProvider):
         super().__init__()
         self.graph = graph
         self.root_id_ = graph.root_id
         self.processors: tp.Dict[NodeId, _actors.ActorId] = dict()
         self._resolver = resolver
-        self._log = _logging.logger_for_object(self)
+        self._log = log_provider.logger_for_object(self)
+        self._graph_logger = GraphLogger(log_provider)
+        self._node_logger = NodeLogger(log_provider)
 
     def on_start(self):
 
@@ -544,7 +558,7 @@ class GraphProcessor(_actors.Actor):
             for node_id, node in graph.nodes.items():
                 if node_id in graph.succeeded_nodes and not self._is_required_node(node, graph):
                     node = processed_graph.nodes.pop(node_id)
-                    NodeLogger.log_node_evict(node)
+                    self._node_logger.log_node_evict(node)
                     del node
 
             pending_nodes = cp.copy(graph.pending_nodes)
@@ -569,13 +583,13 @@ class GraphProcessor(_actors.Actor):
                     # There is scope for a much more sophisticated approach, with prioritized scheduling
 
                     if isinstance(node.node, _graph.ChildJobNode):
-                        processor = ChildJobNodeProcessor(processed_graph, node)
+                        processor = ChildJobNodeProcessor(processed_graph, node, self._node_logger)
                     elif isinstance(node.node, _graph.RunModelNode) or isinstance(node.node, _graph.ImportModelNode):
-                        processor = ModelNodeProcessor(processed_graph, node)
+                        processor = ModelNodeProcessor(processed_graph, node, self._node_logger)
                     elif isinstance(node.node, _graph.LoadDataNode) or isinstance(node.node, _graph.SaveDataNode):
-                        processor = DataNodeProcessor(processed_graph, node)
+                        processor = DataNodeProcessor(processed_graph, node, self._node_logger)
                     else:
-                        processor = NodeProcessor(processed_graph, node)
+                        processor = NodeProcessor(processed_graph, node, self._node_logger)
 
                     # New nodes can be launched with the updated graph
                     # Anything that was pruned is not needed by the new node
@@ -643,7 +657,7 @@ class GraphProcessor(_actors.Actor):
         new_graph.pending_nodes = cp.copy(new_graph.pending_nodes)
 
         for node_id, node in new_nodes.items():
-            GraphLogger.log_node_add(node)
+            self._graph_logger.log_node_add(node)
             node_func = self._resolver.resolve_node(node)
             new_node = _EngineNode(node, node_func)
             new_graph.nodes[node_id] = new_node
@@ -653,7 +667,7 @@ class GraphProcessor(_actors.Actor):
             engine_node = cp.copy(new_graph.nodes[node_id])
             engine_node.dependencies = cp.copy(engine_node.dependencies)
             for dep in deps:
-                GraphLogger.log_dependency_add(node_id, dep.node_id)
+                self._graph_logger.log_dependency_add(node_id, dep.node_id)
                 engine_node.dependencies[dep.node_id] = dep.dependency_type
             new_graph.nodes[node_id] = engine_node
 
@@ -813,11 +827,12 @@ class NodeProcessor(_actors.Actor):
 
     __NONE_TYPE = type(None)
 
-    def __init__(self, graph: _EngineContext, node: _EngineNode):
+    def __init__(self, graph: _EngineContext, node: _EngineNode, node_logger: "NodeLogger"):
         super().__init__()
         self.graph = graph
         self.node = node
         self.node_id = node.node.id
+        self.node_logger = node_logger
 
 
     def on_start(self):
@@ -852,7 +867,7 @@ class NodeProcessor(_actors.Actor):
 
         try:
 
-            NodeLogger.log_node_start(self.node)
+            self.node_logger.log_node_start(self.node)
 
             # Context contains only node states available when the context is set up
             ctx = NodeContextImpl(self.graph.nodes)
@@ -865,13 +880,13 @@ class NodeProcessor(_actors.Actor):
 
             self._check_result_type(result)
 
-            NodeLogger.log_node_succeeded(self.node)
+            self.node_logger.log_node_succeeded(self.node)
 
             self.actors().send_parent("node_succeeded", self.node_id, result)
 
         except Exception as e:
 
-            NodeLogger.log_node_failed(self.node, e)
+            self.node_logger.log_node_failed(self.node, e)
 
             self.actors().send_parent("node_failed", self.node_id, e)
 
@@ -927,25 +942,25 @@ class NodeProcessor(_actors.Actor):
 
 class ModelNodeProcessor(NodeProcessor):
 
-    def __init__(self, graph: _EngineContext, node: _EngineNode):
-        super().__init__(graph, node)
+    def __init__(self, graph: _EngineContext, node: _EngineNode, node_logger: "NodeLogger"):
+        super().__init__(graph, node, node_logger)
 
 
 class DataNodeProcessor(NodeProcessor):
 
-    def __init__(self, graph: _EngineContext, node: _EngineNode):
-        super().__init__(graph, node)
+    def __init__(self, graph: _EngineContext, node: _EngineNode, node_logger: "NodeLogger"):
+        super().__init__(graph, node, node_logger)
 
 
 class ChildJobNodeProcessor(NodeProcessor):
 
-    def __init__(self, graph: _EngineContext, node: _EngineNode):
-        super().__init__(graph, node)
+    def __init__(self, graph: _EngineContext, node: _EngineNode, node_logger: "NodeLogger"):
+        super().__init__(graph, node, node_logger)
 
     @_actors.Message
     def evaluate_node(self):
 
-        NodeLogger.log_node_start(self.node)
+        self.node_logger.log_node_start(self.node)
 
         job_id = self.node.node.job_id  # noqa
         job_key = _util.object_key(job_id)
@@ -971,14 +986,14 @@ class ChildJobNodeProcessor(NodeProcessor):
 
         self._check_result_type(job_result)
 
-        NodeLogger.log_node_succeeded(self.node)
+        self.node_logger.log_node_succeeded(self.node)
 
         self.actors().send_parent("node_succeeded", self.node_id, job_result)
 
     @_actors.Message
     def child_job_failed(self, job_error: Exception):
 
-        NodeLogger.log_node_failed(self.node, job_error)
+        self.node_logger.log_node_failed(self.node, job_error)
 
         self.actors().send_parent("node_failed", self.node_id, job_error)
 
@@ -989,23 +1004,22 @@ class GraphLogger:
     Log the activity of the GraphProcessor
     """
 
-    _log = _logging.logger_for_class(GraphProcessor)
+    def __init__(self, log_provider: _logging.LogProvider):
+        self._log = log_provider.logger_for_class(GraphProcessor)
 
-    @classmethod
-    def log_node_add(cls, node: _graph.Node):
+    def log_node_add(self, node: _graph.Node):
 
         node_name = node.id.name
         namespace = node.id.namespace
 
-        cls._log.info(f"ADD {cls._func_type(node)} [{node_name}] / {namespace}")
+        self._log.info(f"ADD {self._func_type(node)} [{node_name}] / {namespace}")
 
-    @classmethod
-    def log_dependency_add(cls, node_id: NodeId, dep_id: NodeId):
+    def log_dependency_add(self, node_id: NodeId, dep_id: NodeId):
 
         if node_id.namespace == dep_id.namespace:
-            cls._log.info(f"ADD DEPENDENCY [{node_id.name}] -> [{dep_id.name}] / {node_id.namespace}")
+            self._log.info(f"ADD DEPENDENCY [{node_id.name}] -> [{dep_id.name}] / {node_id.namespace}")
         else:
-            cls._log.info(f"ADD DEPENDENCY [{node_id.name}] / {node_id.namespace} -> [{dep_id.name}] / {dep_id.namespace}")
+            self._log.info(f"ADD DEPENDENCY [{node_id.name}] / {node_id.namespace} -> [{dep_id.name}] / {dep_id.namespace}")
 
     @classmethod
     def _func_type(cls, node: _graph.Node):
@@ -1022,7 +1036,8 @@ class NodeLogger:
 
     # Separate out the logic for logging nodes, so the NodeProcessor itself stays a bit cleaner
 
-    _log = _logging.logger_for_class(NodeProcessor)
+    def __init__(self, log_provider: _logging.LogProvider):
+        self._log = log_provider.logger_for_class(NodeProcessor)
 
     class LoggingType(enum.Enum):
         DEFAULT = 0
@@ -1031,81 +1046,75 @@ class NodeLogger:
         SIMPLE_MAPPING = 3
         MODEL = 4
 
-    @classmethod
-    def log_node_start(cls, node: _EngineNode):
+    def log_node_start(self, node: _EngineNode):
 
-        logging_type = cls._logging_type(node)
+        logging_type = self._logging_type(node)
         node_name = node.node.id.name
         namespace = node.node.id.namespace
 
-        if logging_type == cls.LoggingType.STATIC_VALUE:
-            cls._log.info(f"SET {cls._value_type(node)} [{node_name}] / {namespace}")
+        if logging_type == self.LoggingType.STATIC_VALUE:
+            self._log.info(f"SET {self._value_type(node)} [{node_name}] / {namespace}")
 
-        elif logging_type in [cls.LoggingType.SIMPLE_MAPPING]:
-            cls._log.info(f"MAP {cls._value_type(node)} [{cls._mapping_source(node)}] -> [{node_name}] / {namespace}")
+        elif logging_type in [self.LoggingType.SIMPLE_MAPPING]:
+            self._log.info(f"MAP {self._value_type(node)} [{self._mapping_source(node)}] -> [{node_name}] / {namespace}")
 
         else:
-            cls._log.info(f"START {cls._func_type(node)} [{node_name}] / {namespace}")
+            self._log.info(f"START {self._func_type(node)} [{node_name}] / {namespace}")
 
-    @classmethod
-    def log_node_succeeded(cls, node: _EngineNode):
+    def log_node_succeeded(self, node: _EngineNode):
 
-        logging_type = cls._logging_type(node)
+        logging_type = self._logging_type(node)
         node_name = node.node.id.name
         namespace = node.node.id.namespace
 
-        if logging_type in [cls.LoggingType.STATIC_VALUE, cls.LoggingType.SIMPLE_MAPPING]:
+        if logging_type in [self.LoggingType.STATIC_VALUE, self.LoggingType.SIMPLE_MAPPING]:
             return
 
-        if logging_type == cls.LoggingType.PUSH_POP:
-            cls._log_push_pop_node_details(node.node)  # noqa
+        if logging_type == self.LoggingType.PUSH_POP:
+            self._log_push_pop_node_details(node.node)  # noqa
 
-        if logging_type == cls.LoggingType.MODEL:
-            cls._log_model_node_details(node.node)  # noqa
+        if logging_type == self.LoggingType.MODEL:
+            self._log_model_node_details(node.node)  # noqa
 
-        cls._log.info(f"DONE {cls._func_type(node)} [{node_name}] / {namespace}")
+        self._log.info(f"DONE {self._func_type(node)} [{node_name}] / {namespace}")
 
-    @classmethod
-    def log_node_failed(cls, node: _EngineNode, e: Exception):
+    def log_node_failed(self, node: _EngineNode, e: Exception):
 
         node_name = node.node.id.name
         namespace = node.node.id.namespace
 
-        cls._log.error(f"FAILED {cls._func_type(node)} [{node_name}] / {namespace}")
-        cls._log.exception(e)
+        self._log.error(f"FAILED {self._func_type(node)} [{node_name}] / {namespace}")
+        self._log.exception(e)
 
-    @classmethod
-    def log_node_evict(cls, node: _EngineNode):
+    def log_node_evict(self, node: _EngineNode):
 
-        logging_type = cls._logging_type(node)
+        logging_type = self._logging_type(node)
         node_name = node.node.id.name
         namespace = node.node.id.namespace
 
-        if logging_type in [cls.LoggingType.STATIC_VALUE, cls.LoggingType.SIMPLE_MAPPING]:
+        if logging_type in [self.LoggingType.STATIC_VALUE, self.LoggingType.SIMPLE_MAPPING]:
             return
 
-        cls._log.info(f"EVICT {cls._func_type(node)} [{node_name}] / {namespace}")
+        self._log.info(f"EVICT {self._func_type(node)} [{node_name}] / {namespace}")
 
-    @classmethod
-    def _log_push_pop_node_details(cls, node: tp.Union[_graph.ContextPushNode, _graph.ContextPopNode]):
+    def _log_push_pop_node_details(self, node: tp.Union[_graph.ContextPushNode, _graph.ContextPopNode]):
 
         push_or_pop = "PUSH" if isinstance(node, _graph.ContextPushNode) else "POP"
         direction = "->" if isinstance(node, _graph.ContextPushNode) else "<-"
 
         for inner_id, outer_id in node.mapping.items():
-            item_type = cls._type_str(inner_id.result_type)
+            item_type = self._type_str(inner_id.result_type)
             msg = f"{push_or_pop} {item_type} [{outer_id.name}] {direction} [{inner_id.name}] / {node.id.namespace}"
-            cls._log.info(msg)
+            self._log.info(msg)
 
-    @classmethod
-    def _log_model_node_details(cls, node: _graph.RunModelNode):
+    def _log_model_node_details(self, node: _graph.RunModelNode):
 
-        cls._type_str(_data.DataView)
+        self._type_str(_data.DataView)
 
         for output in node.model_def.outputs:
-            result_type = cls._type_str(_data.DataView)
+            result_type = self._type_str(_data.DataView)
             msg = f"RESULT {result_type} [{output}] / {node.bundle_namespace}"
-            cls._log.info(msg)
+            self._log.info(msg)
 
     @classmethod
     def _logging_type(cls, node: _EngineNode) -> LoggingType:

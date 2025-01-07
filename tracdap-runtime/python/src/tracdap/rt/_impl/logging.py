@@ -154,18 +154,39 @@ class JobLogger(Logger):
         self._job_log(level, msg, args, exc_info, extra, stack_info, stacklevel)
 
 
-class JobLogProvider:
+class LogProvider:
+
+    def logger_for_object(self, obj: object) -> Logger:
+        return logger_for_object(obj)
+
+    def logger_for_class(self, clazz: type) -> Logger:
+        return logger_for_class(clazz)
+
+    def logger_for_namespace(self, namespace: str) -> Logger:
+        return logger_for_namespace(namespace)
+
+
+class JobLogProvider(LogProvider):
 
     def __init__(self, *handlers: Handler):
         self.__handlers = handlers
 
-    def make_logger(self, sys_log:Logger):
-        return JobLogger(sys_log, *self.__handlers)
+    def logger_for_object(self, obj: object) -> Logger:
+        base_logger = logger_for_object(obj)
+        return JobLogger(base_logger, *self.__handlers)
+
+    def logger_for_class(self, clazz: type) -> Logger:
+        base_logger = logger_for_class(clazz)
+        return JobLogger(base_logger, *self.__handlers)
+
+    def logger_for_namespace(self, namespace: str) -> Logger:
+        base_logger = logger_for_namespace(namespace)
+        return JobLogger(base_logger, *self.__handlers)
 
 
-def configure_job_log(target: _tp.BinaryIO) -> JobLogProvider:
+def job_log_provider(target: _tp.BinaryIO) -> JobLogProvider:
 
-    stream = _io.TextIOWrapper(target)
+    stream = _io.TextIOWrapper(target, newline="\r\n")
     formatter = PlainFormatter()
 
     handler = StreamHandler(stream)
