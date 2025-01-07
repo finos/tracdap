@@ -21,6 +21,7 @@ import random
 import tracdap.rt.config as cfg
 import tracdap.rt.exceptions as ex
 import tracdap.rt._impl.config_parser as cfg_p  # noqa
+import tracdap.rt._impl.logging as log  # noqa
 import tracdap.rt._impl.util as util  # noqa
 import tracdap.rt._exec.dev_mode as dev_mode  # noqa
 
@@ -37,7 +38,7 @@ class ConfigParserTest(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls) -> None:
-        util.configure_logging()
+        log.configure_logging()
         # Ensure the plugin for local config is loaded
         import tracdap.rt._plugins.config_local  # noqa
 

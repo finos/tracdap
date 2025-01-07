@@ -22,6 +22,7 @@ import tracdap.rt.config as cfg
 import tracdap.rt.metadata as meta
 import tracdap.rt._exec.runtime as runtime  # noqa
 import tracdap.rt._exec.dev_mode as dev_mode  # noqa
+import tracdap.rt._impl.logging as log  # noqa
 import tracdap.rt._impl.type_system as types  # noqa
 import tracdap.rt._impl.util as util  # noqa
 
@@ -30,7 +31,7 @@ class CoreJobsTest(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls) -> None:
-        util.configure_logging()
+        log.configure_logging()
 
     def setUp(self) -> None:
 

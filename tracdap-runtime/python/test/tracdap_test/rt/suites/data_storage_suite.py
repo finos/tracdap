@@ -25,8 +25,8 @@ import pyarrow as pa
 
 import tracdap.rt.metadata as _meta
 import tracdap.rt._impl.data as _data  # noqa
+import tracdap.rt._impl.logging as _log  # noqa
 import tracdap.rt._impl.storage as _storage  # noqa
-import tracdap.rt._impl.util as _util  # noqa
 
 
 _ROOT_DIR = pathlib.Path(__file__).parent \
@@ -36,7 +36,7 @@ _ROOT_DIR = pathlib.Path(__file__).parent \
 _TEST_DATA_DIR = _ROOT_DIR \
     .joinpath("tracdap-libs/tracdap-lib-test/src/main/resources/sample_data")
 
-_util.configure_logging()
+_log.configure_logging()
 
 
 class DataStorageTestSuite:

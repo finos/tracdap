@@ -39,6 +39,7 @@ enum ObjectType {
   CUSTOM = 6;
   STORAGE = 7;
   SCHEMA = 8;
+  RESULT = 9;
 }
 
 

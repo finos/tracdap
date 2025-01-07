@@ -58,6 +58,7 @@ public class TestData {
             case CUSTOM: return dummyCustomDef();
             case STORAGE: return dummyStorageDef();
             case SCHEMA: return dummySchemaDef();
+            case RESULT: return dummyResultDef();
 
             default:
                 throw new RuntimeException("No dummy data available for object type " + objectType.name());
@@ -88,6 +89,7 @@ public class TestData {
 
             case FLOW:
             case JOB:
+            case RESULT:
 
                 return definition;
 
@@ -435,12 +437,43 @@ public class TestData {
                 .setObjectVersion(1)
                 .setLatestTag(true);
 
+        var resultSelector = TagSelector.newBuilder()
+                .setObjectType(ObjectType.RESULT)
+                .setObjectId(UUID.randomUUID().toString())
+                .setObjectVersion(1)
+                .setLatestTag(true);
+
         return ObjectDefinition.newBuilder()
                 .setObjectType(ObjectType.JOB)
                 .setJob(JobDefinition.newBuilder()
                 .setJobType(JobType.RUN_MODEL)
                 .setRunModel(RunModelJob.newBuilder()
-                .setModel(targetSelector)))
+                .setModel(targetSelector))
+                .setResultId(resultSelector))
+                .build();
+    }
+
+    public static ObjectDefinition dummyResultDef() {
+
+        var jobSelector = TagSelector.newBuilder()
+                .setObjectType(ObjectType.JOB)
+                .setObjectId(UUID.randomUUID().toString())
+                .setObjectVersion(1)
+                .setLatestTag(true);
+
+        var logFileSelector = TagSelector.newBuilder()
+                .setObjectType(ObjectType.FILE)
+                .setObjectId(UUID.randomUUID().toString())
+                .setObjectVersion(1)
+                .setLatestTag(true);
+
+        return ObjectDefinition.newBuilder()
+                .setObjectType(ObjectType.RESULT)
+                .setResult(ResultDefinition.newBuilder()
+                .setJobId(jobSelector)
+                .setStatusCode(JobStatusCode.SUCCEEDED)
+                .setStatusMessage("Job completed in [42] seconds")
+                .setLogFileId(logFileSelector))
                 .build();
     }
 

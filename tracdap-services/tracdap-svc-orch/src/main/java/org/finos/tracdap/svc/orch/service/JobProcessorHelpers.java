@@ -33,10 +33,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import static org.finos.tracdap.common.metadata.MetadataCodec.encodeValue;
@@ -45,6 +42,10 @@ import static org.finos.tracdap.common.metadata.MetadataUtil.selectorFor;
 
 
 public class JobProcessorHelpers {
+
+    private static final String JOB_RESULT_KEY = "trac_job_result";
+    private static final String JOB_LOG_FILE_KEY = "trac_job_log_file";
+    private static final String JOB_LOG_STORAGE_KEY = "trac_job_log_file:STORAGE";
 
     private final Logger log = LoggerFactory.getLogger(JobProcessorHelpers.class);
 
@@ -176,27 +177,42 @@ public class JobProcessorHelpers {
         // meta svc must accept object timestamps as out-of-band gRPC metadata for trusted API calls
         var jobTimestamp = Instant.now();
 
+        var newResultIds = new HashMap<String, MetadataWriteRequest>();
+
+        var resultId = MetadataWriteRequest.newBuilder()
+                .setObjectType(ObjectType.RESULT)
+                .build();
+
+        var logFileId = MetadataWriteRequest.newBuilder()
+                .setObjectType(ObjectType.FILE)
+                .build();
+
+        var logStorageId = MetadataWriteRequest.newBuilder()
+                .setObjectType(ObjectType.STORAGE)
+                .build();
+
         var jobLogic = JobLogic.forJobType(jobState.jobType);
 
         var priorResultIds = jobLogic.priorResultIds(
                 jobState.definition,
                 jobState.resources, jobState.resourceMapping);
 
-        var newResultIds = jobLogic.newResultIds(
+        var jobResultIds = jobLogic.newResultIds(
                 jobState.tenant, jobState.definition,
                 jobState.resources, jobState.resourceMapping);
 
+        newResultIds.put(JOB_RESULT_KEY, resultId);
+        newResultIds.put(JOB_LOG_FILE_KEY, logFileId);
+        newResultIds.put(JOB_LOG_STORAGE_KEY, logStorageId);
+        newResultIds.putAll(jobResultIds);
+
         for (var priorId : priorResultIds.entrySet()) {
 
-            var resultId = MetadataUtil.nextObjectVersion(priorId.getValue(), jobTimestamp);
-            jobState.resultMapping.put(priorId.getKey(), resultId);
+            var nextId = MetadataUtil.nextObjectVersion(priorId.getValue(), jobTimestamp);
+            jobState.resultMapping.put(priorId.getKey(), nextId);
         }
 
-        jobState = allocateResultIds(
-                jobState,
-                jobTimestamp,
-                newResultIds
-        );
+        jobState = allocateResultIds(jobState, jobTimestamp, newResultIds);
 
         return setResultIds(jobState);
     }
@@ -254,8 +270,14 @@ public class JobProcessorHelpers {
 
     JobState buildJobConfig(JobState jobState) {
 
+        var resultId = jobState.resultMapping.get(JOB_RESULT_KEY);
+
+        jobState.definition = jobState.definition.toBuilder()
+                .setResultId(MetadataUtil.selectorFor(resultId))
+                .build();
+
+        // Do not set jobId, it is not available yet
         jobState.jobConfig = JobConfig.newBuilder()
-                //.setJobId(jobState.jobId)
                 .setJob(jobState.definition)
                 .putAllResources(jobState.resources)
                 .putAllResourceMapping(jobState.resourceMapping)
@@ -333,44 +355,106 @@ public class JobProcessorHelpers {
 
         log.info("Record job result [{}]: {}", jobState.jobKey, jobState.tracStatus);
 
-        var jobLogic = JobLogic.forJobType(jobState.jobType);
+        var batchUpdate = MetadataWriteBatchRequest.newBuilder();
+        batchUpdate.setTenant(jobState.tenant);
 
-        var metaUpdates = jobState.tracStatus == JobStatusCode.SUCCEEDED
+        var commonUpdates = buildCommonResults(jobState);
+
+        var jobLogic = JobLogic.forJobType(jobState.jobType);
+        var jobUpdates = jobState.tracStatus == JobStatusCode.SUCCEEDED
                 ? jobLogic.buildResultMetadata(jobState.tenant, jobState.jobConfig, jobState.executorResult)
                 : List.<MetadataWriteRequest>of();
+
+        for (var update : commonUpdates) {
+            addUpdateToWriteBatch(batchUpdate, update);
+        }
+
+        for (var update : jobUpdates) {
+            var update_ = applyJobAttrs(jobState, scrapTenant(update));
+            addUpdateToWriteBatch(batchUpdate, update_);
+        }
+
+        var batch = batchUpdate.build();
+        var batchNotEmpty = isAnyToSend(batch);
+
+        if (batchNotEmpty) {
+            var metadataClient = metaClient.withCallCredentials(jobState.credentials);
+            metadataClient.writeBatch(batch);
+        }
+    }
+
+    List<MetadataWriteRequest> buildCommonResults(JobState jobState) {
+
+        var commonResults = new ArrayList<MetadataWriteRequest>();
 
         var jobUpdate = jobState.tracStatus == JobStatusCode.SUCCEEDED
                 ? buildJobSucceededUpdate(jobState)
                 : buildJobFailedUpdate(jobState);
 
-        var requestBuilder = MetadataWriteBatchRequest.newBuilder();
-        requestBuilder.setTenant(jobState.tenant);
+        commonResults.add(scrapTenant(jobUpdate));
 
-        for (var update : metaUpdates) {
+        // For severe error cases, the result object may not be available
+        // Then no additional objects can be recorded
+        if (jobState.executorResult == null)
+            return commonResults;
 
-            var update_ = applyJobAttrs(jobState, scrapTenant(update));
-            addUpdateToWriteBatch(requestBuilder, update_);
+        if (jobState.resultMapping.containsKey(JOB_RESULT_KEY)) {
+
+            var resultId = jobState.resultMapping.get(JOB_RESULT_KEY);
+            var resultKey = resultId != null ? MetadataUtil.objectKey(resultId) : null;
+
+            if (resultKey != null && jobState.executorResult.containsResults(resultKey)) {
+
+                var resultObj = jobState.executorResult.getResultsOrThrow(MetadataUtil.objectKey(resultId));
+                var resultUpdate = MetadataWriteRequest.newBuilder()
+                        .setObjectType(ObjectType.RESULT)
+                        .setPriorVersion(MetadataUtil.preallocated(resultId))
+                        .setDefinition(resultObj)
+                        .build();
+
+                commonResults.add(resultUpdate);
+            }
         }
 
-        addUpdateToWriteBatch(requestBuilder, scrapTenant(jobUpdate));
+        if (jobState.resultMapping.containsKey(JOB_LOG_FILE_KEY)) {
 
-        MetadataWriteBatchRequest request = requestBuilder.build();
+            var logFileId = jobState.resultMapping.get(JOB_LOG_FILE_KEY);
+            var logStorageId = jobState.resultMapping.get(JOB_LOG_STORAGE_KEY);
+            var logFileKey = logFileId != null ? MetadataUtil.objectKey(logFileId) : null;
+            var logStorageKey = logStorageId != null ? MetadataUtil.objectKey(logStorageId) : null;
 
-        boolean anyToSend = isAnyToSend(request);
+            if (logFileKey != null && jobState.executorResult.containsResults(logFileKey) &&
+                logStorageKey != null && jobState.executorResult.containsResults(logStorageKey)) {
 
-        if (anyToSend) {
-            var metadataClient = metaClient.withCallCredentials(jobState.credentials);
-            metadataClient.writeBatch(request);
+                var logFileObj = jobState.executorResult.getResultsOrThrow(MetadataUtil.objectKey(logFileId));
+                var logFileUpdate = MetadataWriteRequest.newBuilder()
+                        .setObjectType(ObjectType.FILE)
+                        .setPriorVersion(MetadataUtil.preallocated(logFileId))
+                        .setDefinition(logFileObj)
+                        .build();
+
+                var logStorageObj = jobState.executorResult.getResultsOrThrow(MetadataUtil.objectKey(logStorageId));
+                var logStorageUpdate = MetadataWriteRequest.newBuilder()
+                        .setObjectType(ObjectType.STORAGE)
+                        .setPriorVersion(MetadataUtil.preallocated(logStorageId))
+                        .setDefinition(logStorageObj)
+                        .build();
+
+                commonResults.add(applyJobAttrs(jobState, logFileUpdate));
+                commonResults.add(applyJobAttrs(jobState, logStorageUpdate));
+            }
+
         }
+
+        return commonResults;
     }
 
     private static boolean isAnyToSend(MetadataWriteBatchRequest request) {
-        var c = 0;
-        c += request.getCreatePreallocatedObjectsCount();
-        c += request.getCreateObjectsCount();
-        c += request.getUpdateObjectsCount();
-        c += request.getUpdateTagsCount();
-        return c != 0;
+
+        return request.getCreatePreallocatedObjectsCount() > 0 ||
+                request.getCreateObjectsCount() > 0 ||
+                request.getUpdateObjectsCount() > 0 ||
+                request.getUpdateTagsCount() > 0;
     }
 
     private MetadataWriteRequest buildJobSucceededUpdate(JobState jobState) {

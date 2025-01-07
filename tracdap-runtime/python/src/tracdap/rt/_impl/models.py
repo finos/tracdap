@@ -25,9 +25,10 @@ import tracdap.rt.metadata as _meta
 import tracdap.rt.config as _cfg
 import tracdap.rt.exceptions as _ex
 
-import tracdap.rt._impl.type_system as _types
+import tracdap.rt._impl.logging as _logging
 import tracdap.rt._impl.repos as _repos
 import tracdap.rt._impl.shim as _shim
+import tracdap.rt._impl.type_system as _types
 import tracdap.rt._impl.util as _util
 import tracdap.rt._impl.validation as _val
 
@@ -43,7 +44,7 @@ class ModelLoader:
 
     def __init__(self, sys_config: _cfg.RuntimeConfig, scratch_dir: pathlib.Path):
 
-        self.__log = _util.logger_for_object(self)
+        self.__log = _logging.logger_for_object(self)
 
         self.__scratch_dir = scratch_dir.joinpath("models")
         self.__repos = _repos.RepositoryManager(sys_config)

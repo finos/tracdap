@@ -22,10 +22,11 @@ import random
 
 import tracdap.rt.exceptions as _ex
 import tracdap.rt._impl.data as _data  # noqa
+import tracdap.rt._impl.logging as _log  # noqa
 import tracdap.rt._impl.storage as _storage  # noqa
 import tracdap.rt._impl.util as _util  # noqa
 
-_util.configure_logging()
+_log.configure_logging()
 
 # randbytes was only added to the random module in 3.9
 # For testing, alias to secrets.token_bytes if it is not available (available since 3.6)

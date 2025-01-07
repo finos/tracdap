@@ -20,6 +20,7 @@ import unittest
 import tracdap.rt.metadata as meta
 import tracdap.rt.config as config
 import tracdap.rt._exec.runtime as runtime # noqa
+import tracdap.rt._impl.logging as log  # noqa
 import tracdap.rt._impl.util as util  # noqa
 
 import grpc
@@ -50,7 +51,7 @@ class RuntimeApiServerTest(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls) -> None:
-        util.configure_logging()
+        log.configure_logging()
 
     def test_server_start_stop(self):
 

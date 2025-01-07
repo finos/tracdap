@@ -13,10 +13,12 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import typing as _tp
+
 import tracdap.rt.ext.plugins as plugins
 import tracdap.rt.config as cfg
 import tracdap.rt.exceptions as ex
-import tracdap.rt._impl.util as util
+import tracdap.rt._impl.logging as _logging
 
 # Import repo interfaces
 from tracdap.rt.ext.repos import *
@@ -26,8 +28,8 @@ class RepositoryManager:
 
     def __init__(self, sys_config: cfg.RuntimeConfig):
 
-        self._log = util.logger_for_object(self)
-        self._repos: tp.Dict[str, IModelRepository] = dict()
+        self._log = _logging.logger_for_object(self)
+        self._repos: _tp.Dict[str, IModelRepository] = dict()
 
         # Initialize all repos in the system config
         # Any errors for missing repo types (plugins) will be raised during startup

@@ -77,6 +77,7 @@ message ObjectDefinition {
         CustomDefinition custom = 7;
         StorageDefinition storage = 8;
         SchemaDefinition schema = 9;
+        ResultDefinition result = 10;
     }
 
     map<string, Value> objectProps = 100;

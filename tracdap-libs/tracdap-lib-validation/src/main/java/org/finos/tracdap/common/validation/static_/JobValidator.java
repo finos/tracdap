@@ -43,6 +43,7 @@ public class JobValidator {
     private static final Descriptors.Descriptor JOB_DEFINITION;
     private static final Descriptors.FieldDescriptor JD_JOB_TYPE;
     private static final Descriptors.OneofDescriptor JD_JOB_DETAILS;
+    private static final Descriptors.FieldDescriptor JD_RESULT_ID;
 
     private static final Descriptors.Descriptor IMPORT_MODEL_JOB;
     private static final Descriptors.FieldDescriptor IMJ_LANGUAGE;
@@ -71,6 +72,7 @@ public class JobValidator {
         JOB_DEFINITION = JobDefinition.getDescriptor();
         JD_JOB_TYPE = field(JOB_DEFINITION, JobDefinition.JOBTYPE_FIELD_NUMBER);
         JD_JOB_DETAILS = field(JOB_DEFINITION, JobDefinition.RUNMODEL_FIELD_NUMBER).getContainingOneof();
+        JD_RESULT_ID = field(JOB_DEFINITION, JobDefinition.RESULTID_FIELD_NUMBER);
 
         IMPORT_MODEL_JOB = ImportModelJob.getDescriptor();
         IMJ_LANGUAGE = field(IMPORT_MODEL_JOB, ImportModelJob.LANGUAGE_FIELD_NUMBER);
@@ -95,9 +97,22 @@ public class JobValidator {
         RFJ_PRIOR_OUTPUTS = field(RUN_FLOW_JOB, RunFlowJob.PRIOROUTPUTS_FIELD_NUMBER);
     }
 
-
     @Validator
     public static ValidationContext job(JobDefinition msg, ValidationContext ctx) {
+
+        return ctx.apply(JobValidator::job, JobDefinition.class, /* isClientRequest = */ false);
+    }
+
+    // Do not register two validators for the same object type
+    // This method is called directly from the orch API validator
+    public static ValidationContext jobRequest(JobDefinition msg, ValidationContext ctx) {
+
+        return ctx
+                .apply(JobValidator::job, JobDefinition.class, /* isClientRequest = */ true)
+                .apply(JobValidator::outputsMustBeEmpty, JobDefinition.class);
+    }
+
+    public static ValidationContext job(JobDefinition msg, boolean isClientRequest, ValidationContext ctx) {
 
         ctx = ctx.push(JD_JOB_TYPE)
                 .apply(CommonValidators::required)
@@ -108,6 +123,17 @@ public class JobValidator {
                 .apply(CommonValidators::required)
                 .apply(JobValidator::jobMatchesType)
                 .applyRegistered()
+                .pop();
+
+        // Jobs submitted through the API must not contain a result ID (it is added later by the orchestrator)
+
+        var clientRequestQualifier = "a job is submitted from the client";
+
+        ctx = ctx.push(JD_RESULT_ID)
+                .apply(CommonValidators.ifAndOnlyIf(!isClientRequest, clientRequestQualifier, true))
+                .apply(ObjectIdValidator::tagSelector, TagSelector.class)
+                .apply(ObjectIdValidator::selectorType, TagSelector.class, ObjectType.RESULT)
+                .apply(ObjectIdValidator::fixedObjectVersion, TagSelector.class)
                 .pop();
 
         return ctx;

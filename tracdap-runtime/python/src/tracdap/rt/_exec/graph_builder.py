@@ -35,11 +35,10 @@ class GraphBuilder:
 
     __JOB_BUILD_FUNC = tp.Callable[[meta.JobDefinition, NodeId], GraphSection]
 
-    def __init__(self, sys_config: config.RuntimeConfig, job_config: config.JobConfig, result_spec: JobResultSpec):
+    def __init__(self, sys_config: config.RuntimeConfig, job_config: config.JobConfig):
 
         self._sys_config = sys_config
         self._job_config = job_config
-        self._result_spec = result_spec
 
         self._job_key = _util.object_key(job_config.jobId)
         self._job_namespace = NodeNamespace(self._job_key)
@@ -48,7 +47,7 @@ class GraphBuilder:
 
     def _child_builder(self, job_id: meta.TagHeader) -> "GraphBuilder":
 
-        builder = GraphBuilder(self._sys_config, self._job_config, JobResultSpec(save_result=False))
+        builder = GraphBuilder(self._sys_config, self._job_config)
         builder._job_key = _util.object_key(job_id)
         builder._job_namespace = NodeNamespace(builder._job_key)
 
@@ -586,6 +585,27 @@ class GraphBuilder:
             storage_key=resolved_storage_key)
 
     @classmethod
+    def build_output_file_and_storage(cls, output_key, file_type: meta.FileType, sys_config: cfg.RuntimeConfig, job_config: cfg.JobConfig):
+
+        # TODO: Review and de-dupe building of output metadata
+        # Responsibility for assigning outputs could perhaps move from orchestrator to runtime
+
+        output_storage_key = f"{output_key}:STORAGE"
+
+        output_id = job_config.resultMapping[output_key]
+        output_storage_id = job_config.resultMapping[output_storage_key]
+
+        timestamp = _dt.datetime.fromisoformat(output_id.objectTimestamp.isoDatetime)
+        data_item = f"file/{output_id.objectId}/version-{output_id.objectVersion}"
+        storage_key = sys_config.storage.defaultBucket
+        storage_path = f"file/FILE-{output_id.objectId}/version-{output_id.objectVersion}/{output_key}.{file_type.extension}"
+
+        file_def = cls.build_file_def(output_key, file_type, output_storage_id, data_item)
+        storage_def = cls.build_storage_def(data_item, storage_key, storage_path, file_type.mimeType, timestamp)
+
+        return file_def, storage_def
+
+    @classmethod
     def build_runtime_outputs(cls, output_names: tp.List[str], job_namespace: NodeNamespace):
 
         # This method is called dynamically during job execution
@@ -693,15 +713,16 @@ class GraphBuilder:
             explicit_deps: tp.Optional[tp.List[NodeId]] = None) \
             -> GraphSection:
 
-        build_result_id = NodeId.of("trac_job_result", self._job_namespace, cfg.JobResult)
+        result_id = self._job_config.resultMapping.get("trac_job_result")
+        result_node_id = NodeId.of("trac_job_result", self._job_namespace, cfg.JobResult)
 
         if objects is not None:
 
             results_inputs = set(objects.values())
 
             build_result_node = BuildJobResultNode(
-                build_result_id, self._job_config.jobId,
-                outputs = JobOutputs(objects=objects),
+                result_node_id, result_id, self._job_config.jobId,
+                outputs=JobOutputs(objects=objects),
                 explicit_deps=explicit_deps)
 
         elif bundles is not None:
@@ -709,23 +730,16 @@ class GraphBuilder:
             results_inputs = set(bundles)
 
             build_result_node = BuildJobResultNode(
-                build_result_id, self._job_config.jobId,
-                outputs = JobOutputs(bundles=bundles),
+                result_node_id, result_id, self._job_config.jobId,
+                outputs=JobOutputs(bundles=bundles),
                 explicit_deps=explicit_deps)
 
         else:
             raise _ex.EUnexpected()
 
-        if self._result_spec.save_result:
-            save_result_id = NodeId("trac_save_result", self._job_namespace)
-            save_result_node = SaveJobResultNode(save_result_id, build_result_id, self._result_spec)
-            result_nodes = {build_result_id: build_result_node, save_result_id: save_result_node}
-            job_result_id = save_result_id
-        else:
-            result_nodes = {build_result_id: build_result_node}
-            job_result_id = build_result_id
+        result_nodes = {result_node_id: build_result_node}
 
-        return GraphSection(result_nodes, inputs=results_inputs, must_run=[job_result_id])
+        return GraphSection(result_nodes, inputs=results_inputs, must_run=[result_node_id])
 
     def build_model_or_flow_with_context(
             self, namespace: NodeNamespace, model_or_flow_name: str,

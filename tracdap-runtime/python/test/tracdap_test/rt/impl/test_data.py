@@ -26,7 +26,7 @@ import pyarrow as pa
 import tracdap.rt.metadata as _meta
 import tracdap.rt.exceptions as _ex
 import tracdap.rt._impl.data as _data  # noqa
-import tracdap.rt._impl.util as _util  # noqa
+import tracdap.rt._impl.logging as _log  # noqa
 
 
 class DataConverterSuite:
@@ -56,7 +56,7 @@ class DataConverterSuite:
 
     @classmethod
     def setUpClass(cls):  # noqa
-        _util.configure_logging()
+        _log.configure_logging()
 
     @classmethod
     def sample_data(cls):
@@ -402,7 +402,7 @@ class DataConformanceTest(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        _util.configure_logging()
+        _log.configure_logging()
 
     def test_fields_exact_match(self):
 

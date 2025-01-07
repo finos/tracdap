@@ -31,6 +31,7 @@ import importlib.resources as _ilr
 
 import tracdap.rt.exceptions as _ex
 import tracdap.rt._impl.guard_rails as _guard
+import tracdap.rt._impl.logging as _log
 import tracdap.rt._impl.util as _util
 
 
@@ -138,7 +139,7 @@ class _NamespaceShimFinder(_ila.MetaPathFinder):
     def __init__(self, shim_map: tp.Dict[str, _Shim], active_shim: _ActiveShim):
         self.__shim_map = shim_map
         self.__active_shim = active_shim
-        self._log = _util.logger_for_class(ShimLoader)
+        self._log = _log.logger_for_class(ShimLoader)
 
     def find_spec(
             self, fullname: str,
@@ -561,5 +562,5 @@ class ShimLoader:
                 raise _ex.ERuntimeValidation(err)
 
 
-ShimLoader._log = _util.logger_for_class(ShimLoader)
+ShimLoader._log = _log.logger_for_class(ShimLoader)
 ShimLoader._init()  # noqa

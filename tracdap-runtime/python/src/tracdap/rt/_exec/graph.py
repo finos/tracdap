@@ -13,7 +13,6 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import pathlib
 import typing as tp
 import dataclasses as dc
 
@@ -180,15 +179,6 @@ class JobOutputs:
 
     objects: tp.Dict[str, NodeId[meta.ObjectDefinition]] = dc.field(default_factory=dict)
     bundles: tp.List[NodeId[ObjectBundle]] = dc.field(default_factory=list)
-
-
-# TODO: Where does this go?
-@dc.dataclass(frozen=True)
-class JobResultSpec:
-
-    save_result: bool = False
-    result_dir: tp.Union[str, pathlib.Path] = None
-    result_format: str = None
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -402,6 +392,7 @@ class RuntimeOutputsNode(Node[JobOutputs]):
 @_node_type
 class BuildJobResultNode(Node[cfg.JobResult]):
 
+    result_id: meta.TagHeader
     job_id: meta.TagHeader
 
     outputs: JobOutputs
@@ -412,16 +403,6 @@ class BuildJobResultNode(Node[cfg.JobResult]):
         if self.runtime_outputs is not None:
             dep_ids.append(self.runtime_outputs)
         return {node_id: DependencyType.HARD for node_id in dep_ids}
-
-
-@_node_type
-class SaveJobResultNode(Node[None]):
-
-    job_result_id: NodeId[cfg.JobResult]
-    result_spec: JobResultSpec
-
-    def _node_dependencies(self) -> tp.Dict[NodeId, DependencyType]:
-        return {self.job_result_id: DependencyType.HARD}
 
 
 @_node_type

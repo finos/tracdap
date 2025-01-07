@@ -13,11 +13,10 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from __future__ import annotations
-
 import copy
 import datetime
 import abc
+import pathlib
 import random
 import dataclasses as dc  # noqa
 
@@ -29,6 +28,7 @@ import tracdap.rt._exec.graph_builder as _graph
 import tracdap.rt._impl.config_parser as _cfg_p  # noqa
 import tracdap.rt._impl.type_system as _types  # noqa
 import tracdap.rt._impl.data as _data  # noqa
+import tracdap.rt._impl.logging as _logging  # noqa
 import tracdap.rt._impl.storage as _storage  # noqa
 import tracdap.rt._impl.models as _models  # noqa
 import tracdap.rt._impl.util as _util  # noqa
@@ -228,11 +228,22 @@ class BuildJobResultFunc(NodeFunction[_config.JobResult]):
         job_result.jobId = self.node.job_id
         job_result.statusCode = meta.JobStatusCode.SUCCEEDED
 
+        if self.node.result_id is not None:
+
+            result_def = meta.ResultDefinition()
+            result_def.jobId = _util.selector_for(self.node.job_id)
+            result_def.statusCode = meta.JobStatusCode.SUCCEEDED
+
+            result_key = _util.object_key(self.node.result_id)
+            result_obj = meta.ObjectDefinition(objectType=meta.ObjectType.RESULT, result=result_def)
+
+            job_result.results[result_key] = result_obj
+
         # TODO: Handle individual failed results
 
-        for obj_id, node_id in self.node.outputs.objects.items():
+        for obj_key, node_id in self.node.outputs.objects.items():
             obj_def = _ctx_lookup(node_id, ctx)
-            job_result.results[obj_id] = obj_def
+            job_result.results[obj_key] = obj_def
 
         for bundle_id in self.node.outputs.bundles:
             bundle = _ctx_lookup(bundle_id, ctx)
@@ -242,46 +253,15 @@ class BuildJobResultFunc(NodeFunction[_config.JobResult]):
 
             runtime_outputs = _ctx_lookup(self.node.runtime_outputs, ctx)
 
-            for obj_id, node_id in runtime_outputs.objects.items():
+            for obj_key, node_id in runtime_outputs.objects.items():
                 obj_def = _ctx_lookup(node_id, ctx)
-                job_result.results[obj_id] = obj_def
+                job_result.results[obj_key] = obj_def
 
             for bundle_id in runtime_outputs.bundles:
                 bundle = _ctx_lookup(bundle_id, ctx)
                 job_result.results.update(bundle.items())
 
         return job_result
-
-
-class SaveJobResultFunc(NodeFunction[None]):
-
-    def __init__(self, node: SaveJobResultNode):
-        super().__init__()
-        self.node = node
-
-    def _execute(self, ctx: NodeContext) -> None:
-
-        job_result = _ctx_lookup(self.node.job_result_id, ctx)
-
-        if not self.node.result_spec.save_result:
-            return None
-
-        job_result_format = self.node.result_spec.result_format
-        job_result_str = _cfg_p.ConfigQuoter.quote(job_result, job_result_format)
-        job_result_bytes = bytes(job_result_str, "utf-8")
-
-        job_key = _util.object_key(job_result.jobId)
-        job_result_file = f"job_result_{job_key}.{self.node.result_spec.result_format}"
-        job_result_path = pathlib \
-            .Path(self.node.result_spec.result_dir) \
-            .joinpath(job_result_file)
-
-        _util.logger_for_object(self).info(f"Saving job result to [{job_result_path}]")
-
-        with open(job_result_path, "xb") as result_stream:
-            result_stream.write(job_result_bytes)
-
-        return None
 
 
 class DataViewFunc(NodeFunction[_data.DataView]):
@@ -633,8 +613,6 @@ class ImportModelFunc(NodeFunction[meta.ObjectDefinition]):
         self.node = node
         self._models = models
 
-        self._log = _util.logger_for_object(self)
-
     def _execute(self, ctx: NodeContext) -> meta.ObjectDefinition:
 
         model_stub = _model_def_for_import(self.node.import_details)
@@ -651,13 +629,15 @@ class RunModelFunc(NodeFunction[Bundle[_data.DataView]]):
             self, node: RunModelNode,
             model_class: _api.TracModel.__class__,
             checkout_directory: pathlib.Path,
-            storage_manager: _storage.StorageManager):
+            storage_manager: _storage.StorageManager,
+            log_provider: _logging.LogProvider):
 
         super().__init__()
         self.node = node
         self.model_class = model_class
         self.checkout_directory = checkout_directory
         self.storage_manager = storage_manager
+        self.log_provider = log_provider
 
     def _execute(self, ctx: NodeContext) -> Bundle[_data.DataView]:
 
@@ -684,7 +664,7 @@ class RunModelFunc(NodeFunction[Bundle[_data.DataView]]):
             for storage_key in self.node.storage_access:
                 if self.storage_manager.has_file_storage(storage_key, external=True):
                     storage_impl = self.storage_manager.get_file_storage(storage_key, external=True)
-                    storage = _ctx.TracFileStorageImpl(storage_key, storage_impl, write_access, self.checkout_directory)
+                    storage = _ctx.TracFileStorageImpl(storage_key, storage_impl, write_access, self.checkout_directory, self.log_provider)
                     storage_map[storage_key] = storage
                 elif self.storage_manager.has_data_storage(storage_key, external=True):
                     storage_impl = self.storage_manager.get_data_storage(storage_key, external=True)
@@ -692,7 +672,7 @@ class RunModelFunc(NodeFunction[Bundle[_data.DataView]]):
                     if not isinstance(storage_impl, _storage.IDataStorageBase):
                         raise _ex.EStorageConfig(f"External storage for [{storage_key}] is using the legacy storage framework]")
                     converter = _data.DataConverter.noop()
-                    storage = _ctx.TracDataStorageImpl(storage_key, storage_impl, converter, write_access, self.checkout_directory)
+                    storage = _ctx.TracDataStorageImpl(storage_key, storage_impl, converter, write_access, self.checkout_directory, self.log_provider)
                     storage_map[storage_key] = storage
                 else:
                     raise _ex.EStorageConfig(f"External storage is not available: [{storage_key}]")
@@ -704,12 +684,12 @@ class RunModelFunc(NodeFunction[Bundle[_data.DataView]]):
             trac_ctx = _ctx.TracDataContextImpl(
                 self.node.model_def, self.model_class,
                 local_ctx, dynamic_outputs, storage_map,
-                self.checkout_directory)
+                self.checkout_directory, self.log_provider)
         else:
             trac_ctx = _ctx.TracContextImpl(
                 self.node.model_def, self.model_class,
                 local_ctx, dynamic_outputs,
-                self.checkout_directory)
+                self.checkout_directory, self.log_provider)
 
         try:
             model = self.model_class()
@@ -812,9 +792,10 @@ class FunctionResolver:
 
     __ResolveFunc = tp.Callable[['FunctionResolver', Node[_T]], NodeFunction[_T]]
 
-    def __init__(self, models: _models.ModelLoader, storage: _storage.StorageManager):
+    def __init__(self, models: _models.ModelLoader, storage: _storage.StorageManager, log_provider: _logging.LogProvider):
         self._models = models
         self._storage = storage
+        self._log_provider = log_provider
 
     def resolve_node(self, node: Node[_T]) -> NodeFunction[_T]:
 
@@ -850,7 +831,7 @@ class FunctionResolver:
         checkout_directory = self._models.model_load_checkout_directory(node.model_scope, node.model_def)
         storage_manager = self._storage if node.storage_access else None
 
-        return RunModelFunc(node, model_class, checkout_directory, storage_manager)
+        return RunModelFunc(node, model_class, checkout_directory, storage_manager, self._log_provider)
 
     __basic_node_mapping: tp.Dict[Node.__class__, NodeFunction.__class__] = {
 
@@ -861,7 +842,6 @@ class FunctionResolver:
         DataViewNode: DataViewFunc,
         DataItemNode: DataItemFunc,
         BuildJobResultNode: BuildJobResultFunc,
-        SaveJobResultNode: SaveJobResultFunc,
         DataResultNode: DataResultFunc,
         StaticValueNode: StaticValueFunc,
         RuntimeOutputsNode: RuntimeOutputsFunc,

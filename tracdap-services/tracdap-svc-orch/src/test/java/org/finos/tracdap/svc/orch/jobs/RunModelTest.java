@@ -657,16 +657,28 @@ public class RunModelTest {
 
         Assertions.assertEquals(JobStatusCode.SUCCEEDED, jobStatus.getStatusCode());
 
+        // TRAC creates an extra FILE output which is the job log
+        // Use a logical search expression to find the actual model output
+
         var fileSearch = MetadataSearchRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setSearchParams(SearchParameters.newBuilder()
                 .setObjectType(ObjectType.FILE)
                 .setSearch(SearchExpression.newBuilder()
-                .setTerm(SearchTerm.newBuilder()
+                .setLogical(LogicalExpression.newBuilder()
+                .setOperator(LogicalOperator.AND)
+                .addExpr(SearchExpression.newBuilder()
+                        .setTerm(SearchTerm.newBuilder()
                         .setAttrName("trac_create_job")
                         .setAttrType(BasicType.STRING)
                         .setOperator(SearchOperator.EQ)
-                        .setSearchValue(MetadataCodec.encodeValue(jobKey)))))
+                        .setSearchValue(MetadataCodec.encodeValue(jobKey))))
+                .addExpr(SearchExpression.newBuilder()
+                        .setTerm(SearchTerm.newBuilder()
+                        .setAttrName("trac_job_output")
+                        .setAttrType(BasicType.STRING)
+                        .setOperator(SearchOperator.EQ)
+                        .setSearchValue(MetadataCodec.encodeValue("file_output")))))))
                 .build();
 
         var dataSearchResult = metaClient.search(fileSearch);

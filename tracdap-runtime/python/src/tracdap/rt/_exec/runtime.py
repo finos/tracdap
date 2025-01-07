@@ -33,11 +33,12 @@ import tracdap.rt._exec.actors as _actors
 import tracdap.rt._exec.engine as _engine
 import tracdap.rt._exec.dev_mode as _dev_mode
 import tracdap.rt._impl.config_parser as _cparse  # noqa
-import tracdap.rt._impl.util as _util  # noqa
+import tracdap.rt._impl.guard_rails as _guard  # noqa
+import tracdap.rt._impl.logging as _log  # noqa
 import tracdap.rt._impl.models as _models  # noqa
 import tracdap.rt._impl.storage as _storage  # noqa
 import tracdap.rt._impl.static_api as _static_api  # noqa
-import tracdap.rt._impl.guard_rails as _guard  # noqa
+import tracdap.rt._impl.util as _util  # noqa
 import tracdap.rt._version as _version
 
 
@@ -83,8 +84,8 @@ class TracRuntime:
         if isinstance(scratch_dir, str):
             scratch_dir = pathlib.Path(scratch_dir)
 
-        _util.configure_logging()
-        self._log = _util.logger_for_object(self)
+        _log.configure_logging()
+        self._log = _log.logger_for_object(self)
         self._log.info(f"TRAC D.A.P. Python Runtime {trac_version}")
 
         self._sys_config = sys_config if isinstance(sys_config, _cfg.RuntimeConfig) else None
