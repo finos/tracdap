@@ -82,6 +82,7 @@ public class RunFlowTest {
     static TagHeader currencyDataId;
     static TagHeader model1Id;
     static TagHeader model2Id;
+    static TagHeader jobId;
     static TagHeader outputDataId;
 
     static TagHeader flowId2;
@@ -388,7 +389,8 @@ public class RunFlowTest {
                 .build();
 
         var jobStatus = runJob(orchClient, jobRequest);
-        var jobKey = MetadataUtil.objectKey(jobStatus.getJobId());
+
+        jobId = jobStatus.getJobId();
 
         Assertions.assertEquals(JobStatusCode.SUCCEEDED, jobStatus.getStatusCode());
 
@@ -401,7 +403,7 @@ public class RunFlowTest {
                         .setAttrName("trac_create_job")
                         .setAttrType(BasicType.STRING)
                         .setOperator(SearchOperator.EQ)
-                        .setSearchValue(MetadataCodec.encodeValue(jobKey)))))
+                        .setSearchValue(MetadataCodec.encodeValue(MetadataUtil.objectKey(jobId))))))
                 .build();
 
         var dataSearchResult = metaClient.search(dataSearch);
@@ -440,6 +442,52 @@ public class RunFlowTest {
     private static String getJobOutput(org.finos.tracdap.metadata.Tag t) {
         var attr = t.getAttrsOrThrow("trac_job_output");
         return attr.getStringValue();
+    }
+
+    @Test @Order(6)
+    void checkResultAndLogFile() {
+
+        var metaClient = platform.metaClientBlocking();
+        var dataClient = platform.dataClientBlocking();
+
+        var jobDef = metaClient.readObject(MetadataReadRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSelector(MetadataUtil.selectorFor(jobId))
+                .build())
+                .getDefinition().getJob();
+
+        var resultId = jobDef.getResultId();
+        var resultDef = metaClient.readObject(MetadataReadRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSelector(resultId)
+                .build())
+                .getDefinition().getResult();
+
+        var logFileId = resultDef.getLogFileId();
+        var logFileDef = metaClient.readObject(MetadataReadRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSelector(logFileId)
+                .build())
+                .getDefinition().getFile();
+
+        Assertions.assertEquals(jobId.getObjectId(), resultDef.getJobId().getObjectId());
+        Assertions.assertEquals(JobStatusCode.SUCCEEDED, resultDef.getStatusCode());
+        Assertions.assertTrue(logFileDef.getSize() > 0);
+
+        var logFileContent = dataClient.readSmallFile(FileReadRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSelector(logFileId)
+                .build())
+                .getContent()
+                .toString(StandardCharsets.UTF_8);
+
+        System.out.println(logFileContent);
+
+        // Some things that are expected in the log
+        // Might need to be updated if there are logging changes in the runtime
+        Assertions.assertTrue(logFileContent.contains(MetadataUtil.objectKey(jobId)));
+        Assertions.assertTrue(logFileContent.contains("START RunModel"));
+        Assertions.assertTrue(logFileContent.contains("Recording job as successful"));
     }
 
     @Test @Order(6)
