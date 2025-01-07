@@ -13,11 +13,10 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from __future__ import annotations
-
 import copy
 import datetime
 import abc
+import pathlib
 import random
 import dataclasses as dc  # noqa
 
@@ -229,11 +228,22 @@ class BuildJobResultFunc(NodeFunction[_config.JobResult]):
         job_result.jobId = self.node.job_id
         job_result.statusCode = meta.JobStatusCode.SUCCEEDED
 
+        if self.node.result_id is not None:
+
+            result_def = meta.ResultDefinition()
+            result_def.jobId = _util.selector_for(self.node.job_id)
+            result_def.statusCode = meta.JobStatusCode.SUCCEEDED
+
+            result_key = _util.object_key(self.node.result_id)
+            result_obj = meta.ObjectDefinition(objectType=meta.ObjectType.RESULT, result=result_def)
+
+            job_result.results[result_key] = result_obj
+
         # TODO: Handle individual failed results
 
-        for obj_id, node_id in self.node.outputs.objects.items():
+        for obj_key, node_id in self.node.outputs.objects.items():
             obj_def = _ctx_lookup(node_id, ctx)
-            job_result.results[obj_id] = obj_def
+            job_result.results[obj_key] = obj_def
 
         for bundle_id in self.node.outputs.bundles:
             bundle = _ctx_lookup(bundle_id, ctx)
@@ -243,9 +253,9 @@ class BuildJobResultFunc(NodeFunction[_config.JobResult]):
 
             runtime_outputs = _ctx_lookup(self.node.runtime_outputs, ctx)
 
-            for obj_id, node_id in runtime_outputs.objects.items():
+            for obj_key, node_id in runtime_outputs.objects.items():
                 obj_def = _ctx_lookup(node_id, ctx)
-                job_result.results[obj_id] = obj_def
+                job_result.results[obj_key] = obj_def
 
             for bundle_id in runtime_outputs.bundles:
                 bundle = _ctx_lookup(bundle_id, ctx)

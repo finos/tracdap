@@ -392,6 +392,7 @@ class RuntimeOutputsNode(Node[JobOutputs]):
 @_node_type
 class BuildJobResultNode(Node[cfg.JobResult]):
 
+    result_id: meta.TagHeader
     job_id: meta.TagHeader
 
     outputs: JobOutputs
