@@ -289,10 +289,23 @@ class TracEngine(_actors.Actor):
         job_state.job_error = error
 
         # Create a failed result so there is something to report
-        job_state.job_result = _cfg.JobResult(
-            jobId=job_state.job_id,
-            statusCode=_meta.JobStatusCode.FAILED,
-            statusMessage=str(error))
+        result_id = job_state.job_config.resultMapping.get("trac_job_result")
+
+        if result_id is not None:
+
+            job_state.job_result = _cfg.JobResult(
+                jobId=job_state.job_id,
+                statusCode=_meta.JobStatusCode.FAILED,
+                statusMessage=str(error))
+
+            result_def = _meta.ResultDefinition()
+            result_def.jobId = _util.selector_for(job_state.job_id)
+            result_def.statusCode = _meta.JobStatusCode.FAILED
+
+            result_key = _util.object_key(result_id)
+            result_obj = _meta.ObjectDefinition(objectType=_meta.ObjectType.RESULT, result=result_def)
+
+            job_state.job_result.results[result_key] = result_obj
 
         for monitor_id in job_state.monitors:
             self.actors().send(monitor_id, "job_failed", error)
@@ -330,7 +343,7 @@ class TracEngine(_actors.Actor):
 
     def _save_job_log_file(self, job_key: str, job_state: _JobState):
 
-        self._log.info("Saving job log file for [{}]", job_key)
+        self._log.info(f"Saving job log file for [{job_key}]")
 
         # Saving log files could go into a separate actor, perhaps a job monitor along with _save_job_result()
 
@@ -361,7 +374,7 @@ class TracEngine(_actors.Actor):
 
     def _save_job_result(self, job_key: str, job_state: _JobState):
 
-        self._log.info("Saving job result for [{}]", job_key)
+        self._log.info(f"Saving job result for [{job_key}]")
 
         # It might be better abstract reporting of results, job status etc., perhaps with a job monitor
 

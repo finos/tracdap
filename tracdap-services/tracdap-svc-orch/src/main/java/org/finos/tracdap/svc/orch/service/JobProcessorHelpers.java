@@ -393,11 +393,17 @@ public class JobProcessorHelpers {
 
         commonResults.add(scrapTenant(jobUpdate));
 
+        // For severe error cases, the result object may not be available
+        // Then no additional objects can be recorded
+        if (jobState.executorResult == null)
+            return commonResults;
+
         if (jobState.resultMapping.containsKey(JOB_RESULT_KEY)) {
 
             var resultId = jobState.resultMapping.get(JOB_RESULT_KEY);
+            var resultKey = resultId != null ? MetadataUtil.objectKey(resultId) : null;
 
-            if (resultId != null) {
+            if (resultKey != null && jobState.executorResult.containsResults(resultKey)) {
 
                 var resultObj = jobState.executorResult.getResultsOrThrow(MetadataUtil.objectKey(resultId));
                 var resultUpdate = MetadataWriteRequest.newBuilder()
@@ -414,8 +420,11 @@ public class JobProcessorHelpers {
 
             var logFileId = jobState.resultMapping.get(JOB_LOG_FILE_KEY);
             var logStorageId = jobState.resultMapping.get(JOB_LOG_STORAGE_KEY);
+            var logFileKey = logFileId != null ? MetadataUtil.objectKey(logFileId) : null;
+            var logStorageKey = logStorageId != null ? MetadataUtil.objectKey(logStorageId) : null;
 
-            if (logFileId != null && logStorageId != null) {
+            if (logFileKey != null && jobState.executorResult.containsResults(logFileKey) &&
+                logStorageKey != null && jobState.executorResult.containsResults(logStorageKey)) {
 
                 var logFileObj = jobState.executorResult.getResultsOrThrow(MetadataUtil.objectKey(logFileId));
                 var logFileUpdate = MetadataWriteRequest.newBuilder()
