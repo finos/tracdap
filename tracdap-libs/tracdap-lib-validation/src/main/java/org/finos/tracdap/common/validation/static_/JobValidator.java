@@ -43,6 +43,7 @@ public class JobValidator {
     private static final Descriptors.Descriptor JOB_DEFINITION;
     private static final Descriptors.FieldDescriptor JD_JOB_TYPE;
     private static final Descriptors.OneofDescriptor JD_JOB_DETAILS;
+    private static final Descriptors.FieldDescriptor JD_RESULT_ID;
 
     private static final Descriptors.Descriptor IMPORT_MODEL_JOB;
     private static final Descriptors.FieldDescriptor IMJ_LANGUAGE;
@@ -71,6 +72,7 @@ public class JobValidator {
         JOB_DEFINITION = JobDefinition.getDescriptor();
         JD_JOB_TYPE = field(JOB_DEFINITION, JobDefinition.JOBTYPE_FIELD_NUMBER);
         JD_JOB_DETAILS = field(JOB_DEFINITION, JobDefinition.RUNMODEL_FIELD_NUMBER).getContainingOneof();
+        JD_RESULT_ID = field(JOB_DEFINITION, JobDefinition.RESULTID_FIELD_NUMBER);
 
         IMPORT_MODEL_JOB = ImportModelJob.getDescriptor();
         IMJ_LANGUAGE = field(IMPORT_MODEL_JOB, ImportModelJob.LANGUAGE_FIELD_NUMBER);
@@ -108,6 +110,13 @@ public class JobValidator {
                 .apply(CommonValidators::required)
                 .apply(JobValidator::jobMatchesType)
                 .applyRegistered()
+                .pop();
+
+        ctx = ctx.push(JD_RESULT_ID)
+                .apply(CommonValidators::required)
+                .apply(ObjectIdValidator::tagSelector, TagSelector.class)
+                .apply(ObjectIdValidator::selectorType, TagSelector.class, ObjectType.RESULT)
+                .apply(ObjectIdValidator::fixedObjectVersion, TagSelector.class)
                 .pop();
 
         return ctx;

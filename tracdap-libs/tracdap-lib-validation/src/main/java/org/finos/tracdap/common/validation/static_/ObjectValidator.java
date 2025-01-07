@@ -41,7 +41,8 @@ public class ObjectValidator {
             Map.entry(ObjectDefinition.DefinitionCase.FILE, ObjectType.FILE),
             Map.entry(ObjectDefinition.DefinitionCase.CUSTOM, ObjectType.CUSTOM),
             Map.entry(ObjectDefinition.DefinitionCase.STORAGE, ObjectType.STORAGE),
-            Map.entry(ObjectDefinition.DefinitionCase.SCHEMA, ObjectType.SCHEMA));
+            Map.entry(ObjectDefinition.DefinitionCase.SCHEMA, ObjectType.SCHEMA),
+            Map.entry(ObjectDefinition.DefinitionCase.RESULT, ObjectType.RESULT));
 
     private static final Descriptors.Descriptor OBJECT_DEFINITION;
     private static final Descriptors.FieldDescriptor OD_OBJECT_TYPE;
