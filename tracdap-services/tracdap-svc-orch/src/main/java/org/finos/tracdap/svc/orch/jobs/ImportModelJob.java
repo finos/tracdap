@@ -137,7 +137,11 @@ public class ImportModelJob implements IJobLogic {
     @Override
     public List<MetadataWriteRequest> buildResultMetadata(String tenant, JobConfig jobConfig, RuntimeJobResult jobResult) {
 
-        var modelKeyMaybe = jobResult.getResultsMap().keySet().stream().findFirst();
+        var modelKeyMaybe = jobResult.getResultsMap().entrySet()
+                .stream()
+                .filter(entry -> entry.getValue().getObjectType() == ObjectType.MODEL)
+                .map(Map.Entry::getKey)
+                .findFirst();
 
         if (modelKeyMaybe.isEmpty())
             throw new EUnexpected();
