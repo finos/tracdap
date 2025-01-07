@@ -291,7 +291,7 @@ class TracEngine(_actors.Actor):
 
         if job_state.parent_key is None:
             job_log =  str(job_state.log_buffer.getbuffer(), "utf-8")
-            print(job_log, sys.stderr)
+            print(job_log)
 
         # Stop any monitors that were created directly by the engine
         # (Other actors are responsible for stopping their own monitors)
