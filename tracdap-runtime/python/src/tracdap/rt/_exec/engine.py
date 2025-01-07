@@ -17,7 +17,7 @@ import copy as cp
 import dataclasses as dc
 import enum
 import io
-import sys
+import pathlib
 import typing as tp
 
 import tracdap.rt.metadata as _meta
@@ -26,6 +26,7 @@ import tracdap.rt.exceptions as _ex
 import tracdap.rt._exec.actors as _actors
 import tracdap.rt._exec.graph_builder as _graph
 import tracdap.rt._exec.functions as _func
+import tracdap.rt._impl.config_parser as _cfg_p  # noqa
 import tracdap.rt._impl.data as _data  # noqa
 import tracdap.rt._impl.logging as _logging  # noqa
 import tracdap.rt._impl.models as _models  # noqa
@@ -96,6 +97,7 @@ class _JobState:
     job_error: Exception = None
 
     parent_key: str = None
+    result_spec: _graph.JobResultSpec = None
 
     log_buffer: io.BytesIO = None
     log_provider: _logging.LogProvider = None
@@ -205,6 +207,7 @@ class TracEngine(_actors.Actor):
         job_state.actor_id = job_actor_id
         job_state.monitors.append(job_monitor_id)
         job_state.job_config = job_config
+        job_state.result_spec = result_spec
 
         self._jobs[job_key] = job_state
 
@@ -229,6 +232,7 @@ class TracEngine(_actors.Actor):
         child_state.actor_id = child_actor_id
         child_state.monitors.append(monitor_id)
         child_state.parent_key = parent_key
+        child_state.result_spec = _graph.JobResultSpec(False)  # Do not output separate results for child jobs
 
         self._jobs[child_key] = child_state
 
@@ -289,9 +293,9 @@ class TracEngine(_actors.Actor):
 
         job_state = self._jobs.get(job_key)
 
-        if job_state.parent_key is None:
-            job_log =  str(job_state.log_buffer.getbuffer(), "utf-8")
-            print(job_log)
+        # Record output metadata if required (not needed for local runs or when using API server)
+        if job_state.result_spec.save_result:
+            self._save_job_result(job_key, job_state)
 
         # Stop any monitors that were created directly by the engine
         # (Other actors are responsible for stopping their own monitors)
@@ -304,6 +308,22 @@ class TracEngine(_actors.Actor):
         if job_state.actor_id is not None:
             self.actors().stop(job_state.actor_id )
             job_state.actor_id = None
+
+    @classmethod
+    def _save_job_result(cls, job_key: str, job_state: _JobState):
+
+        # It might be better abstract reporting of results, job status etc., perhaps with a job monitor
+
+        if job_state.result_spec.save_result:
+
+            result_format = job_state.result_spec.result_format
+            result_dir = job_state.result_spec.result_dir
+            result_file = f"job_result_{job_key}.{result_format}"
+            result_path = pathlib.Path(result_dir).joinpath(result_file)
+
+            with open(result_path, "xt") as result_stream:
+                result_content = _cfg_p.ConfigQuoter.quote(job_state.job_result, result_format)
+                result_stream.write(result_content)
 
     def _get_job_info(self, job_key: str, details: bool = False) -> tp.Optional[_cfg.JobResult]:
 
