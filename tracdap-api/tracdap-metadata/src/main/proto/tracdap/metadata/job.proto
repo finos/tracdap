@@ -104,6 +104,21 @@ message JobDefinition {
     ExportDataJob exportData = 6;
     JobGroup jobGroup = 7;
   }
+
+  TagSelector resultId = 8;
+}
+
+/**
+ * Define the result of a job after it has completed
+ */
+message ResultDefinition {
+
+  TagSelector jobId = 1;
+
+  JobStatusCode statusCode = 2;
+  string statusMessage = 3;
+
+  TagSelector logFileId = 4;
 }
 
 /**
