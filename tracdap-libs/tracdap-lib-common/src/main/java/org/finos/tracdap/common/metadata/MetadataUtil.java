@@ -85,6 +85,16 @@ public class MetadataUtil {
                 .build();
     }
 
+    public static TagSelector preallocated(TagHeader selector) {
+
+        return TagSelector.newBuilder()
+                .setObjectType(selector.getObjectType())
+                .setObjectId(selector.getObjectId())
+                .setObjectVersion(0)
+                .setTagVersion(0)
+                .build();
+    }
+
     public static TagSelector preallocated(TagSelector selector) {
 
         return TagSelector.newBuilder()
