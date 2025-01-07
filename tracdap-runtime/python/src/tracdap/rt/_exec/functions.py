@@ -29,6 +29,7 @@ import tracdap.rt._exec.graph_builder as _graph
 import tracdap.rt._impl.config_parser as _cfg_p  # noqa
 import tracdap.rt._impl.type_system as _types  # noqa
 import tracdap.rt._impl.data as _data  # noqa
+import tracdap.rt._impl.logging as _logging  # noqa
 import tracdap.rt._impl.storage as _storage  # noqa
 import tracdap.rt._impl.models as _models  # noqa
 import tracdap.rt._impl.util as _util  # noqa
@@ -647,13 +648,15 @@ class RunModelFunc(NodeFunction[Bundle[_data.DataView]]):
             self, node: RunModelNode,
             model_class: _api.TracModel.__class__,
             checkout_directory: pathlib.Path,
-            storage_manager: _storage.StorageManager):
+            storage_manager: _storage.StorageManager,
+            log_provider: _logging.LogProvider):
 
         super().__init__()
         self.node = node
         self.model_class = model_class
         self.checkout_directory = checkout_directory
         self.storage_manager = storage_manager
+        self.log_provider = log_provider
 
     def _execute(self, ctx: NodeContext) -> Bundle[_data.DataView]:
 
@@ -680,7 +683,7 @@ class RunModelFunc(NodeFunction[Bundle[_data.DataView]]):
             for storage_key in self.node.storage_access:
                 if self.storage_manager.has_file_storage(storage_key, external=True):
                     storage_impl = self.storage_manager.get_file_storage(storage_key, external=True)
-                    storage = _ctx.TracFileStorageImpl(storage_key, storage_impl, write_access, self.checkout_directory)
+                    storage = _ctx.TracFileStorageImpl(storage_key, storage_impl, write_access, self.checkout_directory, self.log_provider)
                     storage_map[storage_key] = storage
                 elif self.storage_manager.has_data_storage(storage_key, external=True):
                     storage_impl = self.storage_manager.get_data_storage(storage_key, external=True)
@@ -688,7 +691,7 @@ class RunModelFunc(NodeFunction[Bundle[_data.DataView]]):
                     if not isinstance(storage_impl, _storage.IDataStorageBase):
                         raise _ex.EStorageConfig(f"External storage for [{storage_key}] is using the legacy storage framework]")
                     converter = _data.DataConverter.noop()
-                    storage = _ctx.TracDataStorageImpl(storage_key, storage_impl, converter, write_access, self.checkout_directory)
+                    storage = _ctx.TracDataStorageImpl(storage_key, storage_impl, converter, write_access, self.checkout_directory, self.log_provider)
                     storage_map[storage_key] = storage
                 else:
                     raise _ex.EStorageConfig(f"External storage is not available: [{storage_key}]")
@@ -700,12 +703,12 @@ class RunModelFunc(NodeFunction[Bundle[_data.DataView]]):
             trac_ctx = _ctx.TracDataContextImpl(
                 self.node.model_def, self.model_class,
                 local_ctx, dynamic_outputs, storage_map,
-                self.checkout_directory)
+                self.checkout_directory, self.log_provider)
         else:
             trac_ctx = _ctx.TracContextImpl(
                 self.node.model_def, self.model_class,
                 local_ctx, dynamic_outputs,
-                self.checkout_directory)
+                self.checkout_directory, self.log_provider)
 
         try:
             model = self.model_class()
@@ -808,9 +811,10 @@ class FunctionResolver:
 
     __ResolveFunc = tp.Callable[['FunctionResolver', Node[_T]], NodeFunction[_T]]
 
-    def __init__(self, models: _models.ModelLoader, storage: _storage.StorageManager):
+    def __init__(self, models: _models.ModelLoader, storage: _storage.StorageManager, log_provider: _logging.LogProvider):
         self._models = models
         self._storage = storage
+        self._log_provider = log_provider
 
     def resolve_node(self, node: Node[_T]) -> NodeFunction[_T]:
 
@@ -846,7 +850,7 @@ class FunctionResolver:
         checkout_directory = self._models.model_load_checkout_directory(node.model_scope, node.model_def)
         storage_manager = self._storage if node.storage_access else None
 
-        return RunModelFunc(node, model_class, checkout_directory, storage_manager)
+        return RunModelFunc(node, model_class, checkout_directory, storage_manager, self._log_provider)
 
     __basic_node_mapping: tp.Dict[Node.__class__, NodeFunction.__class__] = {
 

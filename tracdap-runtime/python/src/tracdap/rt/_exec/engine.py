@@ -387,7 +387,7 @@ class JobProcessor(_actors.Actor):
         self._models = models
         self._storage = storage
         self._log_provider = log_provider
-        self._resolver = _func.FunctionResolver(models, storage)
+        self._resolver = _func.FunctionResolver(models, storage, log_provider)
         self._log = log_provider.logger_for_object(self)
 
     def on_start(self):

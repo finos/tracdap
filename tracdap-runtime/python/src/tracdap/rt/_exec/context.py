@@ -27,7 +27,7 @@ import tracdap.rt.api.experimental as _eapi
 import tracdap.rt.metadata as _meta
 import tracdap.rt.exceptions as _ex
 import tracdap.rt._impl.data as _data  # noqa
-import tracdap.rt._impl.logging as _log  # noqa
+import tracdap.rt._impl.logging as _logging  # noqa
 import tracdap.rt._impl.storage as _storage  # noqa
 import tracdap.rt._impl.type_system as _types  # noqa
 import tracdap.rt._impl.util as _util  # noqa
@@ -64,10 +64,15 @@ class TracContextImpl(_api.TracContext):
                  model_class: _api.TracModel.__class__,
                  local_ctx: tp.Dict[str, tp.Any],
                  dynamic_outputs: tp.List[str] = None,
-                 checkout_directory: pathlib.Path = None):
+                 checkout_directory: pathlib.Path = None,
+                 log_provider: _logging.LogProvider = None):
 
-        self.__ctx_log = _log.logger_for_object(self)
-        self.__model_log = _log.logger_for_class(model_class)
+        # If no log provider is supplied, use the default (system logs only)
+        if log_provider is None:
+            log_provider = _logging.LogProvider()
+
+        self.__ctx_log = log_provider.logger_for_object(self)
+        self.__model_log = log_provider.logger_for_class(model_class)
 
         self.__model_def = model_def
         self.__model_class = model_class
@@ -369,9 +374,9 @@ class TracDataContextImpl(TracContextImpl, _eapi.TracDataContext):
             self, model_def: _meta.ModelDefinition, model_class: _api.TracModel.__class__,
             local_ctx: tp.Dict[str, tp.Any], dynamic_outputs: tp.List[str],
             storage_map: tp.Dict[str, tp.Union[_eapi.TracFileStorage, _eapi.TracDataStorage]],
-            checkout_directory: pathlib.Path = None):
+            checkout_directory: pathlib.Path = None, log_provider: _logging.LogProvider = None):
 
-        super().__init__(model_def, model_class, local_ctx, dynamic_outputs, checkout_directory)
+        super().__init__(model_def, model_class, local_ctx, dynamic_outputs, checkout_directory, log_provider)
 
         self.__model_def = model_def
         self.__local_ctx = local_ctx
@@ -461,7 +466,9 @@ class TracDataContextImpl(TracContextImpl, _eapi.TracDataContext):
 
 class TracFileStorageImpl(_eapi.TracFileStorage):
 
-    def __init__(self, storage_key: str, storage_impl: _storage.IFileStorage, write_access: bool, checkout_directory):
+    def __init__(
+            self, storage_key: str, storage_impl: _storage.IFileStorage,
+            write_access: bool, checkout_directory, log_provider: _logging.LogProvider):
 
         self.__storage_key = storage_key
 
@@ -482,7 +489,11 @@ class TracFileStorageImpl(_eapi.TracFileStorage):
             self.__rmdir = None
             self.__write_byte_stream = None
 
-        self.__log = _log.logger_for_object(self)
+        # If no log provider is supplied, use the default (system logs only)
+        if log_provider is None:
+            log_provider = _logging.LogProvider()
+
+        self.__log = log_provider.logger_for_object(self)
         self.__val = TracStorageValidator(self.__log, checkout_directory, self.__storage_key)
 
     def get_storage_key(self) -> str:
@@ -603,7 +614,7 @@ class TracDataStorageImpl(_eapi.TracDataStorage[_eapi.DATA_API]):
     def __init__(
             self, storage_key: str, storage_impl: _storage.IDataStorageBase[_data.T_INTERNAL_DATA, _data.T_INTERNAL_SCHEMA],
             data_converter: _data.DataConverter[_eapi.DATA_API, _data.T_INTERNAL_DATA, _data.T_INTERNAL_SCHEMA],
-            write_access: bool, checkout_directory):
+            write_access: bool, checkout_directory, log_provider: _logging.LogProvider):
 
         self.__storage_key = storage_key
         self.__converter = data_converter
@@ -620,7 +631,11 @@ class TracDataStorageImpl(_eapi.TracDataStorage[_eapi.DATA_API]):
             self.__create_table = None
             self.__write_table = None
 
-        self.__log = _log.logger_for_object(self)
+        # If no log provider is supplied, use the default (system logs only)
+        if log_provider is None:
+            log_provider = _logging.LogProvider()
+
+        self.__log = log_provider.logger_for_object(self)
         self.__val = TracStorageValidator(self.__log, checkout_directory, self.__storage_key)
 
     def has_table(self, table_name: str) -> bool:
