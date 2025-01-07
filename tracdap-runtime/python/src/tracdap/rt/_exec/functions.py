@@ -254,35 +254,6 @@ class BuildJobResultFunc(NodeFunction[_config.JobResult]):
         return job_result
 
 
-class SaveJobResultFunc(NodeFunction[None]):
-
-    def __init__(self, node: SaveJobResultNode):
-        super().__init__()
-        self.node = node
-
-    def _execute(self, ctx: NodeContext) -> None:
-
-        job_result = _ctx_lookup(self.node.job_result_id, ctx)
-
-        if not self.node.result_spec.save_result:
-            return None
-
-        job_result_format = self.node.result_spec.result_format
-        job_result_str = _cfg_p.ConfigQuoter.quote(job_result, job_result_format)
-        job_result_bytes = bytes(job_result_str, "utf-8")
-
-        job_key = _util.object_key(job_result.jobId)
-        job_result_file = f"job_result_{job_key}.{self.node.result_spec.result_format}"
-        job_result_path = pathlib \
-            .Path(self.node.result_spec.result_dir) \
-            .joinpath(job_result_file)
-
-        with open(job_result_path, "xb") as result_stream:
-            result_stream.write(job_result_bytes)
-
-        return None
-
-
 class DataViewFunc(NodeFunction[_data.DataView]):
 
     def __init__(self, node: DataViewNode):
@@ -861,7 +832,6 @@ class FunctionResolver:
         DataViewNode: DataViewFunc,
         DataItemNode: DataItemFunc,
         BuildJobResultNode: BuildJobResultFunc,
-        SaveJobResultNode: SaveJobResultFunc,
         DataResultNode: DataResultFunc,
         StaticValueNode: StaticValueFunc,
         RuntimeOutputsNode: RuntimeOutputsFunc,

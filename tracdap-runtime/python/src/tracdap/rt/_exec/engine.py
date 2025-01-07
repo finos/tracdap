@@ -84,6 +84,14 @@ class _EngineContext:
 
 
 @dc.dataclass
+class _JobResultSpec:
+
+    save_result: bool = False
+    result_dir: tp.Union[str, pathlib.Path] = None
+    result_format: str = None
+
+
+@dc.dataclass
 class _JobState:
 
     job_id: _meta.TagHeader
@@ -97,7 +105,7 @@ class _JobState:
     job_error: Exception = None
 
     parent_key: str = None
-    result_spec: _graph.JobResultSpec = None
+    result_spec: _JobResultSpec = None
 
     log_buffer: io.BytesIO = None
     log_provider: _logging.LogProvider = None
@@ -191,11 +199,11 @@ class TracEngine(_actors.Actor):
         job_state.log.info(f"Job submitted: [{job_key}]")
 
         result_needed = bool(job_result_dir)
-        result_spec = _graph.JobResultSpec(result_needed, job_result_dir, job_result_format)
+        result_spec = _JobResultSpec(result_needed, job_result_dir, job_result_format)
 
         job_processor = JobProcessor(
             self._sys_config, self._models, self._storage, job_state.log_provider,
-            job_key, job_config, result_spec, graph_spec=None)
+            job_key, job_config, graph_spec=None)
 
         job_actor_id = self.actors().spawn(job_processor)
 
@@ -225,14 +233,15 @@ class TracEngine(_actors.Actor):
 
         child_processor = JobProcessor(
             self._sys_config, self._models, self._storage, parent_state.log_provider,
-            child_key, None, None, graph_spec=child_graph)  # noqa
+            child_key, None, graph_spec=child_graph)
+
         child_actor_id = self.actors().spawn(child_processor)
 
         child_state = _JobState(child_id, parent_state.log_provider)
         child_state.actor_id = child_actor_id
         child_state.monitors.append(monitor_id)
         child_state.parent_key = parent_key
-        child_state.result_spec = _graph.JobResultSpec(False)  # Do not output separate results for child jobs
+        child_state.result_spec = _JobResultSpec(False)  # Do not output separate results for child jobs
 
         self._jobs[child_key] = child_state
 
@@ -278,6 +287,12 @@ class TracEngine(_actors.Actor):
         job_state.log.error(f"Recording job as failed: {job_key}")
 
         job_state.job_error = error
+
+        # Create a failed result so there is something to report
+        job_state.job_result = _cfg.JobResult(
+            jobId=job_state.job_id,
+            statusCode=_meta.JobStatusCode.FAILED,
+            statusMessage=str(error))
 
         for monitor_id in job_state.monitors:
             self.actors().send(monitor_id, "job_failed", error)
@@ -395,13 +410,16 @@ class JobProcessor(_actors.Actor):
     def __init__(
             self, sys_config: _cfg.RuntimeConfig,
             models: _models.ModelLoader, storage: _storage.StorageManager, log_provider: _logging.LogProvider,
-            job_key: str, job_config: _cfg.JobConfig, result_spec: _graph.JobResultSpec,
-            graph_spec: tp.Optional[_graph.Graph]):
+            job_key: str, job_config: tp.Optional[_cfg.JobConfig], graph_spec: tp.Optional[_graph.Graph]):
 
         super().__init__()
+
+        # Either a job config or a pre-built spec is required
+        if not job_config and not graph_spec:
+            raise _ex.EUnexpected()
+
         self.job_key = job_key
         self.job_config = job_config
-        self.result_spec = result_spec
         self.graph_spec = graph_spec
         self._sys_config = sys_config
         self._models = models
@@ -418,7 +436,7 @@ class JobProcessor(_actors.Actor):
         if self.graph_spec is not None:
             self.actors().send(self.actors().id, "build_graph_succeeded", self.graph_spec)
         else:
-            self.actors().spawn(GraphBuilder(self._sys_config, self.job_config, self._log_provider, self.result_spec))
+            self.actors().spawn(GraphBuilder(self._sys_config, self.job_config, self._log_provider))
 
     def on_stop(self):
 
@@ -486,14 +504,11 @@ class GraphBuilder(_actors.Actor):
     GraphBuilder is a worker (actor) to wrap the GraphBuilder logic from graph_builder.py
     """
 
-    def __init__(
-            self, sys_config: _cfg.RuntimeConfig, job_config: _cfg.JobConfig,
-            log_provider: _logging.LogProvider, result_spec: _graph.JobResultSpec):
+    def __init__(self, sys_config: _cfg.RuntimeConfig, job_config: _cfg.JobConfig, log_provider: _logging.LogProvider):
 
         super().__init__()
         self.sys_config = sys_config
         self.job_config = job_config
-        self.result_spec = result_spec
         self._log = log_provider.logger_for_object(self)
 
     def on_start(self):
@@ -504,7 +519,7 @@ class GraphBuilder(_actors.Actor):
 
         self._log.info("Building execution graph")
 
-        graph_builder = _graph.GraphBuilder(self.sys_config, job_config, self.result_spec)
+        graph_builder = _graph.GraphBuilder(self.sys_config, job_config)
         graph_spec = graph_builder.build_job(job_config.job)
 
         self.actors().reply("build_graph_succeeded", graph_spec)

@@ -35,11 +35,10 @@ class GraphBuilder:
 
     __JOB_BUILD_FUNC = tp.Callable[[meta.JobDefinition, NodeId], GraphSection]
 
-    def __init__(self, sys_config: config.RuntimeConfig, job_config: config.JobConfig, result_spec: JobResultSpec):
+    def __init__(self, sys_config: config.RuntimeConfig, job_config: config.JobConfig):
 
         self._sys_config = sys_config
         self._job_config = job_config
-        self._result_spec = result_spec
 
         self._job_key = _util.object_key(job_config.jobId)
         self._job_namespace = NodeNamespace(self._job_key)
@@ -48,7 +47,7 @@ class GraphBuilder:
 
     def _child_builder(self, job_id: meta.TagHeader) -> "GraphBuilder":
 
-        builder = GraphBuilder(self._sys_config, self._job_config, JobResultSpec(save_result=False))
+        builder = GraphBuilder(self._sys_config, self._job_config)
         builder._job_key = _util.object_key(job_id)
         builder._job_namespace = NodeNamespace(builder._job_key)
 
@@ -716,14 +715,8 @@ class GraphBuilder:
         else:
             raise _ex.EUnexpected()
 
-        if self._result_spec.save_result:
-            save_result_id = NodeId("trac_save_result", self._job_namespace)
-            save_result_node = SaveJobResultNode(save_result_id, build_result_id, self._result_spec)
-            result_nodes = {build_result_id: build_result_node, save_result_id: save_result_node}
-            job_result_id = save_result_id
-        else:
-            result_nodes = {build_result_id: build_result_node}
-            job_result_id = build_result_id
+        result_nodes = {build_result_id: build_result_node}
+        job_result_id = build_result_id
 
         return GraphSection(result_nodes, inputs=results_inputs, must_run=[job_result_id])
 
