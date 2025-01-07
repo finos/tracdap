@@ -103,7 +103,8 @@ public class JobValidator {
         return ctx.apply(JobValidator::job, JobDefinition.class, /* isClientRequest = */ false);
     }
 
-    @Validator
+    // Do not register two validators for the same object type
+    // This method is called directly from the orch API validator
     public static ValidationContext jobRequest(JobDefinition msg, ValidationContext ctx) {
 
         return ctx
