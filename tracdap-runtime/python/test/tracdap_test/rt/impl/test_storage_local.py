@@ -20,7 +20,7 @@ import tracdap.rt.config as _cfg
 import tracdap.rt.exceptions as _ex
 import tracdap.rt.ext.plugins as _plugins
 import tracdap.rt._impl.core.data as _data  # noqa
-import tracdap.rt._impl.storage as _storage  # noqa
+import tracdap.rt._impl.core.storage as _storage  # noqa
 import tracdap.rt._impl.core.util as _util  # noqa
 
 from tracdap_test.rt.suites.file_storage_suite import *

@@ -26,7 +26,7 @@ import pyarrow as pa
 import tracdap.rt.metadata as _meta
 import tracdap.rt._impl.core.data as _data  # noqa
 import tracdap.rt._impl.core.logging as _log  # noqa
-import tracdap.rt._impl.storage as _storage  # noqa
+import tracdap.rt._impl.core.storage as _storage  # noqa
 
 
 _ROOT_DIR = pathlib.Path(__file__).parent \

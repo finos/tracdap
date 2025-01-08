@@ -25,7 +25,7 @@ import tracdap.rt.exceptions as _ex
 import tracdap.rt._impl.config_parser as _cfg_p
 import tracdap.rt._impl.core.logging as _logging
 import tracdap.rt._impl.models as _models
-import tracdap.rt._impl.storage as _storage
+import tracdap.rt._impl.core.storage as _storage
 import tracdap.rt._impl.core.type_system as _types
 import tracdap.rt._impl.core.util as _util
 

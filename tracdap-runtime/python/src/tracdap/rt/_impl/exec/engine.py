@@ -30,7 +30,7 @@ import tracdap.rt._impl.config_parser as _cfg_p
 import tracdap.rt._impl.core.data as _data
 import tracdap.rt._impl.core.logging as _logging
 import tracdap.rt._impl.models as _models
-import tracdap.rt._impl.storage as _storage
+import tracdap.rt._impl.core.storage as _storage
 import tracdap.rt._impl.core.util as _util
 
 from .graph import NodeId

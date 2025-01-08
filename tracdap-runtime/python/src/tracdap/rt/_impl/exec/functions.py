@@ -28,7 +28,7 @@ import tracdap.rt._impl.exec.graph_builder as _graph
 import tracdap.rt._impl.core.type_system as _types
 import tracdap.rt._impl.core.data as _data
 import tracdap.rt._impl.core.logging as _logging
-import tracdap.rt._impl.storage as _storage
+import tracdap.rt._impl.core.storage as _storage
 import tracdap.rt._impl.models as _models
 import tracdap.rt._impl.core.util as _util
 
