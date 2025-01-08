@@ -26,7 +26,7 @@ import tracdap.rt.exceptions as _ex
 import tracdap.rt._impl.exec.context as _ctx
 import tracdap.rt._impl.exec.graph_builder as _graph
 import tracdap.rt._impl.core.type_system as _types
-import tracdap.rt._impl.data as _data
+import tracdap.rt._impl.core.data as _data
 import tracdap.rt._impl.core.logging as _logging
 import tracdap.rt._impl.storage as _storage
 import tracdap.rt._impl.models as _models

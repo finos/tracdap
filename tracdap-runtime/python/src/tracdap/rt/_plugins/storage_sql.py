@@ -30,7 +30,7 @@ from tracdap.rt._impl.ext.sql import *  # noqa
 import tracdap.rt._plugins._helpers as _helpers
 
 # TODO: Remove internal references
-import tracdap.rt._impl.data as _data
+import tracdap.rt._impl.core.data as _data
 
 
 class SqlDataStorage(IDataStorageBase[pa.Table, pa.Schema]):

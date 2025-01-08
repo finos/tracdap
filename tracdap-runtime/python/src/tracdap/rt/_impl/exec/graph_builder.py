@@ -17,7 +17,7 @@ import datetime as _dt
 
 import tracdap.rt.config as config
 import tracdap.rt.exceptions as _ex
-import tracdap.rt._impl.data as _data
+import tracdap.rt._impl.core.data as _data
 import tracdap.rt._impl.core.util as _util
 
 from .graph import *
