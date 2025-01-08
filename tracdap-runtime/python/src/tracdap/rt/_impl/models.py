@@ -30,7 +30,7 @@ import tracdap.rt._impl.repos as _repos
 import tracdap.rt._impl.shim as _shim
 import tracdap.rt._impl.core.type_system as _types
 import tracdap.rt._impl.core.util as _util
-import tracdap.rt._impl.validation as _val
+import tracdap.rt._impl.core.validation as _val
 
 
 class ModelLoader:

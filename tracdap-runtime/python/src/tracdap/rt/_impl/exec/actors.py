@@ -26,7 +26,7 @@ import queue
 import time
 
 import tracdap.rt._impl.core.logging as _logging
-import tracdap.rt._impl.validation as _val
+import tracdap.rt._impl.core.validation as _val
 import tracdap.rt.exceptions as _ex
 
 

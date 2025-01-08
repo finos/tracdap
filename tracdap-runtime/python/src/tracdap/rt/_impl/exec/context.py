@@ -31,7 +31,7 @@ import tracdap.rt._impl.core.logging as _logging
 import tracdap.rt._impl.storage as _storage
 import tracdap.rt._impl.core.type_system as _types
 import tracdap.rt._impl.core.util as _util
-import tracdap.rt._impl.validation as _val
+import tracdap.rt._impl.core.validation as _val
 
 
 class TracContextImpl(_api.TracContext):
