@@ -32,7 +32,7 @@ import tracdap.rt.ext.plugins as _plugins
 import tracdap.rt._impl.config_parser as _cparse
 import tracdap.rt._impl.core.guard_rails as _guard
 import tracdap.rt._impl.core.logging as _logging
-import tracdap.rt._impl.models as _models
+import tracdap.rt._impl.core.models as _models
 import tracdap.rt._impl.core.storage as _storage
 import tracdap.rt._impl.static_api as _static_api
 import tracdap.rt._impl.core.util as _util

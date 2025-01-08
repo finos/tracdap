@@ -26,7 +26,7 @@ import tracdap.rt.config as _cfg
 import tracdap.rt.exceptions as _ex
 
 import tracdap.rt._impl.core.logging as _logging
-import tracdap.rt._impl.repos as _repos
+import tracdap.rt._impl.core.repos as _repos
 import tracdap.rt._impl.core.shim as _shim
 import tracdap.rt._impl.core.type_system as _types
 import tracdap.rt._impl.core.util as _util
