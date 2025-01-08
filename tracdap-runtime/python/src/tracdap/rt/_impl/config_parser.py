@@ -33,7 +33,7 @@ import tracdap.rt.exceptions as _ex
 import tracdap.rt.ext.plugins as _plugins
 import tracdap.rt.ext.config as _config_ext
 import tracdap.rt._impl.logging as _logging
-import tracdap.rt._impl.util as _util
+import tracdap.rt._impl.core.util as _util
 
 import yaml
 import yaml.parser

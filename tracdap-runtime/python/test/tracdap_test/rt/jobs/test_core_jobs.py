@@ -23,7 +23,7 @@ import tracdap.rt.metadata as meta
 import tracdap.rt._impl.logging as log  # noqa
 import tracdap.rt._impl.runtime as runtime  # noqa
 import tracdap.rt._impl.type_system as types  # noqa
-import tracdap.rt._impl.util as util  # noqa
+import tracdap.rt._impl.core.util as util  # noqa
 import tracdap.rt._impl.exec.dev_mode as dev_mode  # noqa
 
 

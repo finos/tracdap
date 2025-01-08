@@ -24,7 +24,7 @@ import tracdap.rt.exceptions as _ex
 import tracdap.rt._impl.data as _data  # noqa
 import tracdap.rt._impl.logging as _log  # noqa
 import tracdap.rt._impl.storage as _storage  # noqa
-import tracdap.rt._impl.util as _util  # noqa
+import tracdap.rt._impl.core.util as _util  # noqa
 
 _log.configure_logging()
 

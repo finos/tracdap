@@ -25,7 +25,7 @@ import tracdap.rt.ext.plugins as plugins
 import tracdap.rt._impl.logging as log  # noqa
 import tracdap.rt._impl.models as models  # noqa
 import tracdap.rt._impl.static_api as api_hook  # noqa
-import tracdap.rt._impl.util as util  # noqa
+import tracdap.rt._impl.core.util as util  # noqa
 
 
 class SampleModel(api.TracModel):

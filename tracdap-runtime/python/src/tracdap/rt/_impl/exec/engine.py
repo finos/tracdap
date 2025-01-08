@@ -12,14 +12,6 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-#
-#      http://www.apache.org/licenses/LICENSE-2.0
-#
-#  Unless required by applicable law or agreed to in writing, software
-#  distributed under the License is distributed on an "AS IS" BASIS,
-#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#  See the License for the specific language governing permissions and
-#  limitations under the License.
 
 import copy as cp
 import dataclasses as dc
@@ -39,7 +31,7 @@ import tracdap.rt._impl.data as _data
 import tracdap.rt._impl.logging as _logging
 import tracdap.rt._impl.models as _models
 import tracdap.rt._impl.storage as _storage
-import tracdap.rt._impl.util as _util
+import tracdap.rt._impl.core.util as _util
 
 from .graph import NodeId
 
