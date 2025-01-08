@@ -22,7 +22,7 @@ import tracdap.rt.api as _api
 import tracdap.rt.config as _cfg
 import tracdap.rt.metadata as _meta
 import tracdap.rt.exceptions as _ex
-import tracdap.rt._impl.config_parser as _cfg_p
+import tracdap.rt._impl.core.config_parser as _cfg_p
 import tracdap.rt._impl.core.logging as _logging
 import tracdap.rt._impl.core.models as _models
 import tracdap.rt._impl.core.storage as _storage

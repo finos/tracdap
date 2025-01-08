@@ -26,7 +26,7 @@ import tracdap.rt.exceptions as _ex
 import tracdap.rt._impl.exec.actors as _actors
 import tracdap.rt._impl.exec.graph_builder as _graph
 import tracdap.rt._impl.exec.functions as _func
-import tracdap.rt._impl.config_parser as _cfg_p
+import tracdap.rt._impl.core.config_parser as _cfg_p
 import tracdap.rt._impl.core.data as _data
 import tracdap.rt._impl.core.logging as _logging
 import tracdap.rt._impl.core.models as _models

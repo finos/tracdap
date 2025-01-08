@@ -20,7 +20,7 @@ import random
 
 import tracdap.rt.config as cfg
 import tracdap.rt.exceptions as ex
-import tracdap.rt._impl.config_parser as cfg_p  # noqa
+import tracdap.rt._impl.core.config_parser as cfg_p  # noqa
 import tracdap.rt._impl.core.logging as log  # noqa
 import tracdap.rt._impl.core.util as util  # noqa
 import tracdap.rt._impl.exec.dev_mode as dev_mode  # noqa
