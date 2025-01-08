@@ -166,7 +166,7 @@ class LocalCsvFormatStorageTest(unittest.TestCase, LocalStorageTest):
     def tearDownClass(cls):
         cls.storage_root.cleanup()
 
-    @unittest.skip("CSV read hangs with the strict (Arrow) CSV implementation for garbled data")
+    # @unittest.skip("CSV read hangs with the strict (Arrow) CSV implementation for garbled data")
     def test_read_garbled_data(self):
         super().test_read_garbled_data()
 

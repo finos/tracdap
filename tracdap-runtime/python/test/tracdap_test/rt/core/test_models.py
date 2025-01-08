@@ -130,7 +130,7 @@ class ImportModelTest(unittest.TestCase):
         stub_model_def = meta.ModelDefinition(
             language="python",
             repository="trac_integrated",
-            entryPoint="tracdap_test.rt.impl.test_models.SampleModel"
+            entryPoint="tracdap_test.rt.core.test_models.SampleModel"
         )
 
         loader = models.ModelLoader(sys_config, self.scratch_dir)
