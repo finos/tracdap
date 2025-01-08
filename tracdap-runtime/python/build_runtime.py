@@ -153,7 +153,7 @@ def move_generated_into_src():
     # Update reference to gRPC generated classes in server.py
 
     grpc_src_files = [
-        "src/tracdap/rt/_exec/server.py",
+        "src/tracdap/rt/_impl/grpc/server.py",
         "src/tracdap/rt/_impl/grpc/codec.py"
     ]
 
