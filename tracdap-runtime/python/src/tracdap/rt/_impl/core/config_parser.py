@@ -12,8 +12,14 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-
-from __future__ import annotations
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
 
 import dataclasses as _dc
 import decimal
@@ -44,7 +50,7 @@ _T = tp.TypeVar('_T')
 class ConfigManager:
 
     @classmethod
-    def for_root_config(cls, root_config_file: tp.Union[str, pathlib.Path, None]) -> ConfigManager:
+    def for_root_config(cls, root_config_file: tp.Union[str, pathlib.Path, None]) -> "ConfigManager":
 
         if isinstance(root_config_file, pathlib.Path):
             root_file_path = cls._resolve_scheme(root_config_file)
@@ -70,7 +76,7 @@ class ConfigManager:
             return ConfigManager(working_dir_url, None)
 
     @classmethod
-    def for_root_dir(cls, root_config_dir: tp.Union[str, pathlib.Path]) -> ConfigManager:
+    def for_root_dir(cls, root_config_dir: tp.Union[str, pathlib.Path]) -> "ConfigManager":
 
         if isinstance(root_config_dir, pathlib.Path):
             root_dir_path = cls._resolve_scheme(root_config_dir)
