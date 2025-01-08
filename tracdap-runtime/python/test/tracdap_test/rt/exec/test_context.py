@@ -22,7 +22,7 @@ import pandas as pd
 import tracdap.rt.api as _api
 import tracdap.rt.exceptions as _ex
 import tracdap.rt._impl.static_api as _api_hook  # noqa
-import tracdap.rt._impl.type_system as _types  # noqa
+import tracdap.rt._impl.core.type_system as _types  # noqa
 import tracdap.rt._impl.data as _data  # noqa
 
 from tracdap.rt._impl.exec.context import TracContextImpl  # noqa
