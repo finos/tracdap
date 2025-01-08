@@ -21,7 +21,7 @@ import tracdap.rt.config as config
 import tracdap.rt.exceptions as ex
 import tracdap.rt._impl.exec.actors as actors
 import tracdap.rt._impl.grpc.codec as codec
-import tracdap.rt._impl.logging as logging
+import tracdap.rt._impl.core.logging as logging
 import tracdap.rt._impl.core.util as util
 
 # Check whether gRPC is installed before trying to load any of the generated modules

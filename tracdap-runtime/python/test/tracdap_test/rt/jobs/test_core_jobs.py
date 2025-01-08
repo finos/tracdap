@@ -20,7 +20,7 @@ import subprocess as sp
 
 import tracdap.rt.config as cfg
 import tracdap.rt.metadata as meta
-import tracdap.rt._impl.logging as log  # noqa
+import tracdap.rt._impl.core.logging as log  # noqa
 import tracdap.rt._impl.runtime as runtime  # noqa
 import tracdap.rt._impl.core.type_system as types  # noqa
 import tracdap.rt._impl.core.util as util  # noqa

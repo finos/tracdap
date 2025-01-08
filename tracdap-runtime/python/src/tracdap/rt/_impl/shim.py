@@ -31,7 +31,7 @@ import importlib.resources as _ilr
 
 import tracdap.rt.exceptions as _ex
 import tracdap.rt._impl.guard_rails as _guard
-import tracdap.rt._impl.logging as _log
+import tracdap.rt._impl.core.logging as _log
 import tracdap.rt._impl.core.util as _util
 
 

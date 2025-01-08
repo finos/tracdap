@@ -25,7 +25,7 @@ import pyarrow as pa
 
 import tracdap.rt.metadata as _meta
 import tracdap.rt._impl.data as _data  # noqa
-import tracdap.rt._impl.logging as _log  # noqa
+import tracdap.rt._impl.core.logging as _log  # noqa
 import tracdap.rt._impl.storage as _storage  # noqa
 
 

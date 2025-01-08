@@ -21,7 +21,7 @@ import tracdap.rt.config as cfg
 import tracdap.rt.exceptions as ex
 import tracdap.rt.launch as launch
 import tracdap.rt._impl.runtime as runtime
-import tracdap.rt._impl.logging as log
+import tracdap.rt._impl.core.logging as log
 
 import tracdap_test.rt.plugins.test_ext.test_ext_config_loader as ext_loader
 

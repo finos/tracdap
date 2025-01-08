@@ -22,7 +22,7 @@ import pathlib
 
 import tracdap.rt.metadata as meta
 import tracdap.rt.exceptions as ex
-import tracdap.rt._impl.logging as log
+import tracdap.rt._impl.core.logging as log
 import tracdap.rt._impl.core.util as util
 
 # _Named placeholder type from API hook is needed for API type checking

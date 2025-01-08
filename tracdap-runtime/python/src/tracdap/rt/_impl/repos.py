@@ -18,7 +18,7 @@ import typing as _tp
 import tracdap.rt.ext.plugins as plugins
 import tracdap.rt.config as cfg
 import tracdap.rt.exceptions as ex
-import tracdap.rt._impl.logging as _logging
+import tracdap.rt._impl.core.logging as _logging
 
 # Import repo interfaces
 from tracdap.rt.ext.repos import *

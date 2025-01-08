@@ -22,7 +22,7 @@ import tracdap.rt.api as api
 import tracdap.rt.metadata as meta
 import tracdap.rt.config as config
 import tracdap.rt.ext.plugins as plugins
-import tracdap.rt._impl.logging as log  # noqa
+import tracdap.rt._impl.core.logging as log  # noqa
 import tracdap.rt._impl.models as models  # noqa
 import tracdap.rt._impl.static_api as api_hook  # noqa
 import tracdap.rt._impl.core.util as util  # noqa

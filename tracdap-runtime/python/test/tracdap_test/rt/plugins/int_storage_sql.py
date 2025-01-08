@@ -20,7 +20,7 @@ import unittest
 import tracdap.rt.config as _cfg
 import tracdap.rt.ext.plugins as _plugins
 import tracdap.rt._impl.config_parser as _cfg_p  # noqa
-import tracdap.rt._impl.logging as _log  # noqa
+import tracdap.rt._impl.core.logging as _log  # noqa
 import tracdap.rt._impl.storage as _storage  # noqa
 
 from tracdap_test.rt.suites.data_storage_suite_2 import DataStorageSuite2

@@ -20,7 +20,7 @@ import unittest
 import tracdap.rt.api as trac
 import tracdap.rt.launch as launch
 import tracdap.rt.exceptions as ex
-import tracdap.rt._impl.logging as log  # noqa
+import tracdap.rt._impl.core.logging as log  # noqa
 import tracdap.rt._impl.static_api as api_hook  # noqa
 
 import tracdap_test.resources as test_resources
