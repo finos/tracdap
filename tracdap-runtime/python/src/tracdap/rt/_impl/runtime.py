@@ -30,7 +30,7 @@ import tracdap.rt.config as _cfg
 import tracdap.rt.exceptions as _ex
 import tracdap.rt.ext.plugins as _plugins
 import tracdap.rt._impl.config_parser as _cparse
-import tracdap.rt._impl.guard_rails as _guard
+import tracdap.rt._impl.core.guard_rails as _guard
 import tracdap.rt._impl.core.logging as _logging
 import tracdap.rt._impl.models as _models
 import tracdap.rt._impl.storage as _storage

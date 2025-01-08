@@ -18,7 +18,7 @@ import shutil
 import tempfile
 import unittest
 
-import tracdap.rt._impl.guard_rails as guard
+import tracdap.rt._impl.core.guard_rails as guard
 import tracdap.rt._impl.core.logging as log
 import tracdap.rt._impl.shim as shim
 import tracdap.rt._impl.core.util as util
