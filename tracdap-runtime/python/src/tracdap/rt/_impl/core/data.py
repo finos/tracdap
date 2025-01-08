@@ -37,7 +37,7 @@ except ModuleNotFoundError:
 import tracdap.rt.api.experimental as _api
 import tracdap.rt.metadata as _meta
 import tracdap.rt.exceptions as _ex
-import tracdap.rt._impl.logging as _log
+import tracdap.rt._impl.core.logging as _log
 
 
 @dc.dataclass(frozen=True)

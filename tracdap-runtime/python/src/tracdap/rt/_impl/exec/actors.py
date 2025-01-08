@@ -13,8 +13,6 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from __future__ import annotations
-
 import logging
 import threading
 import functools as func
@@ -25,9 +23,8 @@ import inspect
 import queue
 import time
 
-import tracdap.rt._impl.logging as _logging  # noqa
-import tracdap.rt._impl.util as _util  # noqa
-import tracdap.rt._impl.validation as _val  # noqa
+import tracdap.rt._impl.core.logging as _logging
+import tracdap.rt._impl.core.validation as _val
 import tracdap.rt.exceptions as _ex
 
 
@@ -119,7 +116,7 @@ class Actor:
     def error(self) -> tp.Optional[Exception]:
         return self.__ctx.get_error()
 
-    def actors(self) -> ActorContext:
+    def actors(self) -> "ActorContext":
         return self.__ctx
 
     def on_start(self):
@@ -135,7 +132,7 @@ class Actor:
 class ActorContext:
 
     def __init__(
-            self, node: ActorNode, message: str,
+            self, node: "ActorNode", message: str,
             current_actor: ActorId, parent: ActorId, sender: tp.Optional[ActorId]):
 
         self.__node = node
@@ -189,13 +186,13 @@ class ThreadsafeActor(Actor):
         super().__init__()
         self.__threadsafe: tp.Optional[ThreadsafeContext] = None
 
-    def threadsafe(self) -> ThreadsafeContext:
+    def threadsafe(self) -> "ThreadsafeContext":
         return self.__threadsafe
 
 
 class ThreadsafeContext:
 
-    def __init__(self, node: ActorNode):
+    def __init__(self, node: "ActorNode"):
         self.__node = node
         self.__id = node.actor_id
         self.__parent = node.parent.actor_id if node.parent is not None else None
@@ -370,8 +367,8 @@ class ActorNode:
 
     def __init__(
             self, actor_id: ActorId, actor: Actor,
-            parent: tp.Optional[ActorNode],
-            system: ActorSystem,
+            parent: "tp.Optional[ActorNode]",
+            system: "ActorSystem",
             event_loop: EventLoop):
 
         self.actor_id = actor_id
@@ -484,7 +481,7 @@ class ActorNode:
 
         target_node._accept(msg)
 
-    def _lookup_node(self, target_id: ActorId) -> tp.Optional[ActorNode]:
+    def _lookup_node(self, target_id: ActorId) -> "tp.Optional[ActorNode]":
 
         # Check self first
 

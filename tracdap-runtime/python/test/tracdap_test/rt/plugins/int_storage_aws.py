@@ -20,8 +20,8 @@ from tracdap_test.rt.suites.file_storage_suite import *
 
 import tracdap.rt.config as cfg
 import tracdap.rt.ext.plugins as plugins
-import tracdap.rt._impl.logging as log  # noqa
-import tracdap.rt._impl.storage as storage  # noqa
+import tracdap.rt._impl.core.logging as log  # noqa
+import tracdap.rt._impl.core.storage as storage  # noqa
 import tracdap.rt._plugins.storage_aws as storage_aws  # noqa
 
 log.configure_logging()

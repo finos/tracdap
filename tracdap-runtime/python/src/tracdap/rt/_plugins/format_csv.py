@@ -34,7 +34,7 @@ from tracdap.rt.ext.storage import IDataFormat
 from . import _helpers
 
 # TODO: Remove dependency on internal code
-import tracdap.rt._impl.data as _data
+import tracdap.rt._impl.core.data as _data
 
 
 class CsvStorageFormat(IDataFormat):

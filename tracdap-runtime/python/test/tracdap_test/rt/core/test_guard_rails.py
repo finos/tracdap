@@ -15,7 +15,7 @@
 
 import tracdap.rt.api as trac
 import tracdap.rt.exceptions as ex
-import tracdap.rt._impl.guard_rails as guard  # noqa
+import tracdap.rt._impl.core.guard_rails as guard  # noqa
 
 import typing as tp
 import unittest

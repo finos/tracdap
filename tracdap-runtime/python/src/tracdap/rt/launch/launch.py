@@ -20,9 +20,9 @@ import pathlib as _pathlib
 import typing as _tp
 
 import tracdap.rt.api as _api
-import tracdap.rt._impl.config_parser as _cparse  # noqa
-import tracdap.rt._impl.util as _util  # noqa
-import tracdap.rt._exec.runtime as _runtime  # noqa
+import tracdap.rt._impl.core.config_parser as _cparse  # noqa
+import tracdap.rt._impl.core.util as _util  # noqa
+import tracdap.rt._impl.runtime as _runtime  # noqa
 
 from .cli import _cli_args
 

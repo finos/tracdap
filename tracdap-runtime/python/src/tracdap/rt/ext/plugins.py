@@ -19,8 +19,8 @@ import importlib as _il
 
 import tracdap.rt.config as _cfg
 import tracdap.rt.exceptions as _ex
-import tracdap.rt._impl.guard_rails as _guard  # noqa
-import tracdap.rt._impl.logging as _logging  # noqa
+import tracdap.rt._impl.core.guard_rails as _guard  # noqa
+import tracdap.rt._impl.core.logging as _logging  # noqa
 from tracdap.rt.exceptions import EStartup
 
 

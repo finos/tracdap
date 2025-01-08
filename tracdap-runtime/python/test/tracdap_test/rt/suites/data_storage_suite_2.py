@@ -21,7 +21,7 @@ import datetime as dt
 
 import tracdap.rt.api as _meta
 import tracdap.rt.exceptions as _ex
-import tracdap.rt._impl.data as _data  # noqa
+import tracdap.rt._impl.core.data as _data  # noqa
 
 from tracdap.rt._impl.ext.storage import *  # noqa
 

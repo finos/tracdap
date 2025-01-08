@@ -19,10 +19,10 @@ import types as _ts
 import tracdap.rt.api.experimental as _api
 import tracdap.rt.metadata as _meta
 import tracdap.rt.exceptions as _ex
-import tracdap.rt._impl.data as _data
-import tracdap.rt._impl.schemas as _schemas
-import tracdap.rt._impl.type_system as _type_system
-import tracdap.rt._impl.validation as _val
+import tracdap.rt._impl.core.data as _data
+import tracdap.rt._impl.core.schemas as _schemas
+import tracdap.rt._impl.core.type_system as _type_system
+import tracdap.rt._impl.core.validation as _val
 
 # Import hook interfaces into this module namespace
 from tracdap.rt.api.hook import _StaticApiHook  # noqa
