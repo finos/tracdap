@@ -25,7 +25,7 @@ import tracdap.rt._impl.static_api as _api_hook  # noqa
 import tracdap.rt._impl.type_system as _types  # noqa
 import tracdap.rt._impl.data as _data  # noqa
 
-from tracdap.rt._exec.context import TracContextImpl  # noqa
+from tracdap.rt._impl.exec.context import TracContextImpl  # noqa
 
 import tracdap_test.resources.test_models as test_models
 

@@ -19,7 +19,7 @@ import unittest
 
 import tracdap.rt.metadata as meta
 import tracdap.rt.config as config
-import tracdap.rt._exec.runtime as runtime # noqa
+import tracdap.rt._impl.runtime as runtime # noqa
 import tracdap.rt._impl.logging as log  # noqa
 import tracdap.rt._impl.util as util  # noqa
 

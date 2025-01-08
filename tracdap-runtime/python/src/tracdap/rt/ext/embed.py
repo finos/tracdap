@@ -15,7 +15,7 @@
 
 import tracdap.rt.config as _cfg
 import tracdap.rt._impl.guard_rails as _guard  # noqa
-import tracdap.rt._exec.runtime as _rt  # noqa
+import tracdap.rt._impl.runtime as _rt  # noqa
 
 
 class __EmbeddedRuntime:

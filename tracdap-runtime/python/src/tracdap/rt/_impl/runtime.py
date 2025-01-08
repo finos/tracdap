@@ -12,6 +12,14 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
 
 from __future__ import annotations
 
@@ -29,16 +37,16 @@ import tracdap.rt.api as _api
 import tracdap.rt.config as _cfg
 import tracdap.rt.exceptions as _ex
 import tracdap.rt.ext.plugins as _plugins
-import tracdap.rt._exec.actors as _actors
-import tracdap.rt._exec.engine as _engine
-import tracdap.rt._exec.dev_mode as _dev_mode
-import tracdap.rt._impl.config_parser as _cparse  # noqa
-import tracdap.rt._impl.guard_rails as _guard  # noqa
-import tracdap.rt._impl.logging as _log  # noqa
-import tracdap.rt._impl.models as _models  # noqa
-import tracdap.rt._impl.storage as _storage  # noqa
-import tracdap.rt._impl.static_api as _static_api  # noqa
-import tracdap.rt._impl.util as _util  # noqa
+import tracdap.rt._impl.config_parser as _cparse
+import tracdap.rt._impl.guard_rails as _guard
+import tracdap.rt._impl.logging as _logging
+import tracdap.rt._impl.models as _models
+import tracdap.rt._impl.storage as _storage
+import tracdap.rt._impl.static_api as _static_api
+import tracdap.rt._impl.util as _util
+import tracdap.rt._impl.exec.actors as _actors
+import tracdap.rt._impl.exec.engine as _engine
+import tracdap.rt._impl.exec.dev_mode as _dev_mode
 import tracdap.rt._version as _version
 
 
@@ -84,8 +92,8 @@ class TracRuntime:
         if isinstance(scratch_dir, str):
             scratch_dir = pathlib.Path(scratch_dir)
 
-        _log.configure_logging()
-        self._log = _log.logger_for_object(self)
+        _logging.configure_logging()
+        self._log = _logging.logger_for_object(self)
         self._log.info(f"TRAC D.A.P. Python Runtime {trac_version}")
 
         self._sys_config = sys_config if isinstance(sys_config, _cfg.RuntimeConfig) else None
@@ -229,7 +237,7 @@ class TracRuntime:
                 self._log.info("Starting the runtime API server...")
 
                 # The server module pulls in all the gRPC dependencies, don't import it unless we have to
-                import tracdap.rt._exec.server as _server
+                import tracdap.rt._impl.grpc.server as _server
 
                 self._server = _server.RuntimeApiServer(self._system, self._server_port)
                 self._server.start()
