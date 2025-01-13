@@ -79,6 +79,18 @@ public class MetadataApiImpl {
         }
     }
 
+    void clientConfig(ClientConfigRequest request, StreamObserver<ClientConfigResponse> response) {
+
+        try {
+            var result = readService.clientConfig(request);
+            response.onNext(result);
+            response.onCompleted();
+        }
+        catch (Exception error) {
+            response.onError(error);
+        }
+    }
+
     void listResources(ListResourcesRequest request, StreamObserver<ListResourcesResponse> response) {
 
         try {

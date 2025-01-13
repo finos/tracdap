@@ -56,9 +56,12 @@ public class MetadataConstants {
     // ^...$ would allow matches like "my_var\n_gotcha"
     public static final Pattern VALID_IDENTIFIER = Pattern.compile("\\A[a-zA-Z_]\\w*\\Z");
 
+    // Resource keys are similar to identifiers but can also include hyphens
+    public static final Pattern VALID_RESOURCE_KEY = Pattern.compile("\\A[a-zA-Z_\\-][a-zA-Z0-9_\\-]*\\Z");
+
     // Identifiers starting trac_ are reserved for use by the TRAC platform
     // Identifiers starting _ are also reserved by convention, for private / protected / system variables
-    public static final Pattern TRAC_RESERVED_IDENTIFIER = Pattern.compile("\\A(trac_|_).*", Pattern.CASE_INSENSITIVE);
+    public static final Pattern TRAC_RESERVED_IDENTIFIER = Pattern.compile("\\A(trac[_\\-.]|[_\\-.]).*", Pattern.CASE_INSENSITIVE);
 
     public static final String TRAC_CREATE_TIME = "trac_create_time";
     public static final String TRAC_CREATE_USER_ID = "trac_create_user_id";

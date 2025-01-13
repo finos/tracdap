@@ -53,6 +53,12 @@ public class TracMetadataApi extends TracMetadataApiGrpc.TracMetadataApiImplBase
     }
 
     @Override
+    public void clientConfig(ClientConfigRequest request, StreamObserver<ClientConfigResponse> responseObserver) {
+
+        apiImpl.clientConfig(request, responseObserver);
+    }
+
+    @Override
     public void listResources(ListResourcesRequest request, StreamObserver<ListResourcesResponse> response) {
 
         apiImpl.listResources(request, response);

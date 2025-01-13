@@ -122,3 +122,10 @@ services:
 
 deployment:
   layout: SANDBOX
+
+
+clientConfig:
+
+  client-app:
+    properties:
+      unit.test.property: value1

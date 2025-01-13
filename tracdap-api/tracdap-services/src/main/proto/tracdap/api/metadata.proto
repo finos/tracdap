@@ -119,6 +119,23 @@ service TracMetadataApi {
     }
 
     /**
+     * Get configuration for a client application, which is managed as pat of the TRAC deployment.
+     *
+     * Configuration properties for individual client applications can be set and managed as
+     * part of the TRAC platform configuration. Those properties are made available to
+     * authenticated client applications via this API call. There is currently no API to set
+     * these properties, they must be set by an administrator as part of the platform deployment.
+     *
+     * This API is typically accessed using the credentials of the currently logged-in user,
+     * it should not be used for sensitive configuration such as private keys or secrets.
+     */
+    rpc clientConfig(ClientConfigRequest) returns (ClientConfigResponse) {
+        option (google.api.http) = {
+            get: "/trac/client-config/{application}"
+        };
+    }
+
+    /**
      * Get a list of infrastructure resources of a given type.
      *
      * For a given tenant and resource type, obtain a list of all the resources
@@ -517,6 +534,21 @@ message ListTenantsResponse {
     repeated metadata.TenantInfo tenants = 1;
 }
 
+/**
+ * Request object for the clientConfig() API call.
+ */
+message ClientConfigRequest {
+
+    string application = 1;
+}
+
+/**
+ * Response object for the clientConfig() API call.
+ */
+message ClientConfigResponse {
+
+    map<string, string> properties = 1;
+}
 
 /**
  * Request object for the listResources() API call.

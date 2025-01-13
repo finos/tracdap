@@ -17,10 +17,7 @@
 
 package org.finos.tracdap.svc.meta.services;
 
-import org.finos.tracdap.api.ListResourcesResponse;
-import org.finos.tracdap.api.ListTenantsResponse;
-import org.finos.tracdap.api.PlatformInfoResponse;
-import org.finos.tracdap.api.ResourceInfoResponse;
+import org.finos.tracdap.api.*;
 import org.finos.tracdap.common.exception.EResourceNotFound;
 import org.finos.tracdap.common.exception.ETenantNotFound;
 import org.finos.tracdap.common.util.VersionInfo;
@@ -46,11 +43,11 @@ public class MetadataReadService {
     private final Logger log = LoggerFactory.getLogger(getClass());
 
     private final IMetadataDal dal;
-    private final PlatformConfig config;
+    private final PlatformConfig platformConfig;
 
     public MetadataReadService(IMetadataDal dal, PlatformConfig platformConfig) {
         this.dal = dal;
-        this.config = platformConfig;
+        this.platformConfig = platformConfig;
     }
 
     // Literally all the read logic is in the DAL at present!
@@ -60,9 +57,9 @@ public class MetadataReadService {
 
         var tracVersion = VersionInfo.getComponentVersion(TracMetadataService.class);
 
-        var configInfo = config.getPlatformInfo();
-        var environment = configInfo.getEnvironment();
-        var production = configInfo.getProduction();    // defaults to false
+        var platformInfo = platformConfig.getPlatformInfo();
+        var environment = platformInfo.getEnvironment();
+        var production = platformInfo.getProduction();    // defaults to false
 
         // TODO: Validate environment is set during startup
         if (environment.isBlank())
@@ -72,7 +69,7 @@ public class MetadataReadService {
                 .setTracVersion(tracVersion)
                 .setEnvironment(environment)
                 .setProduction(production)
-                .putAllDeploymentInfo(configInfo.getDeploymentInfoMap())
+                .putAllDeploymentInfo(platformInfo.getDeploymentInfoMap())
                 .build();
     }
 
@@ -85,6 +82,21 @@ public class MetadataReadService {
             .build();
     }
 
+    public ClientConfigResponse clientConfig(ClientConfigRequest request) {
+
+        if (!platformConfig.containsClientConfig(request.getApplication())) {
+            var message = String.format("Unknown client application: [%s]", request.getApplication());
+            log.error(message);
+            throw new EResourceNotFound(message);
+        }
+
+        var clientConfig = platformConfig.getClientConfigOrThrow(request.getApplication());
+
+        return ClientConfigResponse.newBuilder()
+                .putAllProperties(clientConfig.getPropertiesMap())
+                .build();
+    }
+
     public ListResourcesResponse listResources(String tenantCode, ResourceType resourceType) {
 
         // Explicit check is required because resources currently come from platform config
@@ -93,12 +105,12 @@ public class MetadataReadService {
         var response = ListResourcesResponse.newBuilder();
 
         if (resourceType == ResourceType.MODEL_REPOSITORY) {
-            for (var repoEntry : config.getRepositoriesMap().entrySet()) {
+            for (var repoEntry : platformConfig.getRepositoriesMap().entrySet()) {
                 response.addResources(buildResourceInfo(resourceType, repoEntry.getKey(), repoEntry.getValue()));
             }
         }
         else if (resourceType == ResourceType.INTERNAL_STORAGE) {
-            for (var storageEntry : config.getStorage().getBucketsMap().entrySet()) {
+            for (var storageEntry : platformConfig.getStorage().getBucketsMap().entrySet()) {
                 response.addResources(buildResourceInfo(resourceType, storageEntry.getKey(), storageEntry.getValue()));
             }
         }
@@ -120,23 +132,23 @@ public class MetadataReadService {
 
         if (resourceType == ResourceType.MODEL_REPOSITORY) {
 
-            if (!this.config.containsRepositories(resourceKey)){
+            if (!this.platformConfig.containsRepositories(resourceKey)){
                 var message = String.format("Model repository not found: [%s]", resourceKey);
                 log.error(message);
                 throw new EResourceNotFound(message);
             }
 
-            pluginConfig = this.config.getRepositoriesOrThrow(resourceKey);
+            pluginConfig = this.platformConfig.getRepositoriesOrThrow(resourceKey);
         }
         else if (resourceType == ResourceType.INTERNAL_STORAGE) {
 
-            if (!this.config.getStorage().containsBuckets(resourceKey)) {
+            if (!this.platformConfig.getStorage().containsBuckets(resourceKey)) {
                 var message = String.format("Storage location not found: [%s]", resourceKey);
                 log.error(message);
                 throw new EResourceNotFound(message);
             }
 
-            pluginConfig = this.config.getStorage().getBucketsOrThrow(resourceKey);
+            pluginConfig = this.platformConfig.getStorage().getBucketsOrThrow(resourceKey);
         }
         else {
 
