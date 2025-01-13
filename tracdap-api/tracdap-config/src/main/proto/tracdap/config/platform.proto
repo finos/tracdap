@@ -51,6 +51,8 @@ message PlatformConfig {
   map<string, ServiceConfig> services = 4;
 
   DeploymentConfig deployment = 14;
+
+  map<string, ClientConfig> clientConfig = 15;
 }
 
 
@@ -144,4 +146,9 @@ enum DeploymentLayout {
   SANDBOX = 1;
   HOSTED = 2;
   CUSTOM = 3;
+}
+
+message ClientConfig {
+
+  map<string, string> properties = 1;
 }
