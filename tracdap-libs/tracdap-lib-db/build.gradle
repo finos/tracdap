@@ -46,4 +46,7 @@ dependencies {
 
 // Enable SQL drivers according to plugins.gradle or corresponding env vars
 apply from: "${rootProject.projectDir.path}/tracdap-plugins/sql-drivers/drivers.gradle"
-ext.enableBuildTimePlugins(["sql"])
+
+beforeEvaluate {
+    ext.enableBuildTimePlugins(["sql"])
+}
