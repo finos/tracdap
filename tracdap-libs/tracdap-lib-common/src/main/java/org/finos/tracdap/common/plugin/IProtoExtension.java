@@ -15,25 +15,14 @@
  * limitations under the License.
  */
 
-syntax = 'proto3';
-package tracdap.config;
+package org.finos.tracdap.common.plugin;
 
-option java_package = "org.finos.tracdap.config";
-option java_outer_classname = "JobConfigProto";
-option java_multiple_files = true;
+import com.google.protobuf.Descriptors;
 
-import "tracdap/metadata/object_id.proto";
-import "tracdap/metadata/object.proto";;
-import "tracdap/metadata/job.proto";
+import java.util.List;
 
 
-message JobConfig {
+public interface IProtoExtension {
 
-    metadata.TagHeader jobId = 1;
-    metadata.JobDefinition job = 2;
-
-    map<string, metadata.ObjectDefinition> resources = 3;
-
-    map<string, metadata.TagHeader> resourceMapping = 4;
-    map<string, metadata.TagHeader> resultMapping = 5;
+    List<Descriptors.FileDescriptor> protoFiles();
 }

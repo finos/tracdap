@@ -22,11 +22,11 @@ import org.finos.tracdap.common.exception.EConfigLoad;
 import org.finos.tracdap.common.plugin.IPluginManager;
 import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.common.startup.Startup;
+import org.finos.tracdap.common.startup.StartupLog;
 import org.finos.tracdap.common.startup.StartupSequence;
+import org.finos.tracdap.config._ConfigFile;
 
 import com.google.protobuf.Message;
-import org.finos.tracdap.common.startup.StartupLog;
-import org.finos.tracdap.config._ConfigFile;
 import org.slf4j.event.Level;
 
 import java.net.URI;
@@ -36,6 +36,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.PrivateKey;
 import java.security.PublicKey;
+import java.util.ArrayList;
 import java.util.Map;
 import java.util.Properties;
 
@@ -72,6 +73,7 @@ import java.util.Properties;
 public class ConfigManager {
 
     private final IPluginManager plugins;
+    private final ConfigParser configParser;
 
     private final URI rootConfigFile;
     private final URI rootConfigDir;
@@ -106,6 +108,15 @@ public class ConfigManager {
                 : rootConfigDir.toString();
 
         StartupLog.log(this, Level.INFO, String.format("Using config root: %s", rootDirDisplay));
+
+        var extensions = new ArrayList<IConfigExtension>();
+
+        for (var extensionProtocol : plugins.availableProtocols(IConfigExtension.class)) {
+            var extension = plugins.createConfigService(IConfigExtension.class, extensionProtocol, new Properties());
+            extensions.add(extension);
+        }
+
+        this.configParser = new ConfigParser(extensions);
     }
 
     public void prepareSecrets() {
@@ -261,7 +272,7 @@ public class ConfigManager {
         var bytes = loadUrl(resolved);
         var format = ConfigFormat.fromExtension(resolved);
 
-        return ConfigParser.parseConfig(bytes, format, configClass, leniency);
+        return configParser.parseConfig(bytes, format, configClass, leniency);
     }
 
     /**
@@ -310,7 +321,7 @@ public class ConfigManager {
 
         var format = ConfigFormat.fromExtension(rootConfigFile);
 
-        return ConfigParser.parseConfig(bytes, format, configClass, leniency);
+        return configParser.parseConfig(bytes, format, configClass, leniency);
     }
 
     /**

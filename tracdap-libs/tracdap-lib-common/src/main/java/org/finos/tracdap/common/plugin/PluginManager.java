@@ -32,6 +32,7 @@ import java.util.stream.Collectors;
 public class PluginManager implements IPluginManager {
 
     private static final List<String> CONFIG_SERVICE_TYPES = List.of(
+            PluginServiceInfo.CONFIG_EXTENSION_TYPE,
             PluginServiceInfo.CONFIG_SERVICE_TYPE,
             PluginServiceInfo.SECRETS_SERVICE_TYPE);
 

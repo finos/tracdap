@@ -19,10 +19,14 @@ syntax = 'proto3';
 package tracdap.config;
 
 option java_package = "org.finos.tracdap.config";
+option java_outer_classname = "PlatformConfigProto";
 option java_multiple_files = true;
 
 import "tracdap/metadata/common.proto";
 import "tracdap/config/common.proto";
+
+import "google/protobuf/any.proto";
+
 
 message PlatformConfig {
 
@@ -53,6 +57,8 @@ message PlatformConfig {
   DeploymentConfig deployment = 14;
 
   map<string, ClientConfig> clientConfig = 15;
+
+  map<string, google.protobuf.Any> extensions = 16;
 }
 
 

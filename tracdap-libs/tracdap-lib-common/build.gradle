@@ -24,6 +24,7 @@ apply from: "${rootProject.projectDir.path}/gradle/base-java.gradle"
 
 description = "TRAC D.A.P. common library, interfaces and utilities used across all TRAC components"
 
+
 dependencies {
 
     // Export framework version constraints for 3rd party plugins

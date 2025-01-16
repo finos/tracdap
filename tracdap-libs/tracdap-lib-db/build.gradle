@@ -35,6 +35,8 @@ dependencies {
         // Use the provided version of SLF4J, do not pull in the version from Hikari
         exclude group: 'org.slf4j', module: 'slf4j-api'
     }
+
+    testImplementation project(':tracdap-lib-test')
 }
 
 

@@ -1,0 +1,18 @@
+
+syntax = "proto3";
+package tracdap.test.config;
+
+option java_package = "org.finos.tracdap.test.config";
+option java_outer_classname = "ConfigExtensionsProto";
+option java_multiple_files = true;
+
+import "tracdap/metadata/object_id.proto";
+
+
+message TestConfigExt {
+
+  string setting1 = 1;
+  bool setting2 = 2;
+
+  map<string, tracdap.metadata.TagSelector> metadataMapping = 3;
+}

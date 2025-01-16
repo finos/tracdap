@@ -15,25 +15,25 @@
  * limitations under the License.
  */
 
-syntax = 'proto3';
-package tracdap.config;
+package org.finos.tracdap.common.config.test;
 
-option java_package = "org.finos.tracdap.config";
-option java_outer_classname = "JobConfigProto";
-option java_multiple_files = true;
+import com.google.protobuf.Descriptors;
+import org.finos.tracdap.common.config.IConfigExtension;
+import org.finos.tracdap.test.config.ConfigExtensionsProto;
 
-import "tracdap/metadata/object_id.proto";
-import "tracdap/metadata/object.proto";;
-import "tracdap/metadata/job.proto";
+import java.util.List;
 
 
-message JobConfig {
+public class TestConfigExtension implements IConfigExtension {
 
-    metadata.TagHeader jobId = 1;
-    metadata.JobDefinition job = 2;
+    private final List<Descriptors.FileDescriptor> protoFiles;
 
-    map<string, metadata.ObjectDefinition> resources = 3;
+    public TestConfigExtension() {
+        this.protoFiles = List.of(ConfigExtensionsProto.getDescriptor());
+    }
 
-    map<string, metadata.TagHeader> resourceMapping = 4;
-    map<string, metadata.TagHeader> resultMapping = 5;
+    @Override
+    public List<Descriptors.FileDescriptor> protoFiles() {
+        return protoFiles;
+    }
 }
