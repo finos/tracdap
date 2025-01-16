@@ -24,6 +24,9 @@ option java_multiple_files = true;
 import "tracdap/metadata/common.proto";
 import "tracdap/config/common.proto";
 
+import "google/protobuf/any.proto";
+
+
 message PlatformConfig {
 
   map<string, string> config = 1;
@@ -53,6 +56,8 @@ message PlatformConfig {
   DeploymentConfig deployment = 14;
 
   map<string, ClientConfig> clientConfig = 15;
+
+  map<string, google.protobuf.Any> extensions = 16;
 }
 
 
