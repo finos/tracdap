@@ -54,11 +54,13 @@ public class BatchJobExecutor<TBatchState extends Serializable> implements IJobE
 
     private final Logger log = LoggerFactory.getLogger(getClass());
     private final IBatchExecutor<TBatchState> batchExecutor;
+    private final ConfigParser configParser;
 
     private GrpcChannelFactory channelFactory;
 
     public BatchJobExecutor(IBatchExecutor<TBatchState> batchExecutor) {
         this.batchExecutor = batchExecutor;
+        this.configParser = new ConfigParser();
     }
 
     @Override
@@ -119,8 +121,8 @@ public class BatchJobExecutor<TBatchState extends Serializable> implements IJobE
                         batchSysConfig::mergeStorage);
             }
 
-            var jobConfigJson = ConfigParser.quoteConfig(jobConfig, ConfigFormat.JSON);
-            var sysConfigJson = ConfigParser.quoteConfig(batchSysConfig.build(), ConfigFormat.JSON);
+            var jobConfigJson = configParser.quoteConfig(jobConfig, ConfigFormat.JSON);
+            var sysConfigJson = configParser.quoteConfig(batchSysConfig.build(), ConfigFormat.JSON);
 
             batchState = batchExecutor.addVolume(batchKey, batchState, "config", BatchVolumeType.CONFIG_VOLUME);
             batchState = batchExecutor.addFile(batchKey, batchState, "config", "job_config.json", jobConfigJson);
@@ -391,7 +393,7 @@ public class BatchJobExecutor<TBatchState extends Serializable> implements IJobE
         try {
 
             var batchResultBytes = batchExecutor.getOutputFile(jobState.batchKey, jobState.batchState, "result", resultFile);
-            var batchResult = ConfigParser.parseConfig(batchResultBytes, ConfigFormat.JSON, JobResult.class);
+            var batchResult = configParser.parseConfig(batchResultBytes, ConfigFormat.JSON, JobResult.class);
 
             return RuntimeJobResult.newBuilder()
                     .setJobId(batchResult.getJobId())
