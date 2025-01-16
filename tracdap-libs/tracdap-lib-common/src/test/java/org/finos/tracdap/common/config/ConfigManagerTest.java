@@ -22,7 +22,12 @@ import org.finos.tracdap.common.exception.EConfigLoad;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.plugin.PluginManager;
 import org.finos.tracdap.config.PlatformConfig;
+import org.finos.tracdap.config.PluginConfig;
 import org.finos.tracdap.config._ConfigFile;
+import org.finos.tracdap.metadata.ObjectType;
+import org.finos.tracdap.metadata.TagSelector;
+import org.finos.tracdap.test.config.TestConfigExt;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -45,7 +50,8 @@ class ConfigManagerTest {
             "/config_mgr_test/log-test.xml",
             "/config_mgr_test/secrets.p12",
             "/config_mgr_test/secrets.jceks",
-            "/config_mgr_test/secrets-jceks.yaml");
+            "/config_mgr_test/secrets-jceks.yaml",
+            "/config_mgr_test/extension-test.yaml");
 
     private static final String SECRET_KEY = "secret_master_key";
     private static final String SECRET_NAME = "very_secret_password";
@@ -279,6 +285,62 @@ class ConfigManagerTest {
         var config2 = manager2.loadConfigObject(relativePath, PlatformConfig.class);
         var prop2 = config2.getConfigMap().get("logging");
         assertEquals("log-test.xml", prop2);
+    }
+
+    @Test
+    void loadConfig_extensions() throws Exception {
+
+        // Using file loader
+
+        var configUrl = "config_dir/extension-test.yaml";
+        var manager = new ConfigManager(configUrl, tempDir, plugins);
+
+        var relativePath = "extension-test.yaml";
+
+        var config1 = manager.loadConfigObject(relativePath, PlatformConfig.class);
+
+
+        Assertions.assertEquals(3, config1.getExtensionsCount());
+        Assertions.assertTrue(config1.containsExtensions("test_core_metadata_type"));
+        Assertions.assertTrue(config1.containsExtensions("test_core_config_type"));
+        Assertions.assertTrue(config1.containsExtensions("test_ext_type"));
+
+        var coreMeta = config1.getExtensionsOrThrow("test_core_metadata_type");
+        var coreConfig = config1.getExtensionsOrThrow("test_core_config_type");
+        var extConfig = config1.getExtensionsOrThrow("test_ext_type");
+
+        Assertions.assertTrue(coreMeta.is(TagSelector.class));
+        Assertions.assertEquals(ObjectType.MODEL, coreMeta.unpack(TagSelector.class).getObjectType());
+
+        Assertions.assertTrue(coreConfig.is(PluginConfig.class));
+        Assertions.assertEquals("DUMMY_PROTOCOL", coreConfig.unpack(PluginConfig.class).getProtocol());
+
+        Assertions.assertTrue(extConfig.is(TestConfigExt.class));
+        Assertions.assertEquals("some_value", extConfig.unpack(TestConfigExt.class).getSetting1());
+
+        // Using test-protocol loader
+
+        var configUrl2 = "test://config_svr/config_dir/sample-config.yaml";
+        var manager2 = new ConfigManager(configUrl2, tempDir, plugins);
+        var config2 = manager2.loadConfigObject(relativePath, PlatformConfig.class);
+
+        Assertions.assertEquals(3, config2.getExtensionsCount());
+        Assertions.assertTrue(config2.containsExtensions("test_core_metadata_type"));
+        Assertions.assertTrue(config2.containsExtensions("test_core_config_type"));
+        Assertions.assertTrue(config2.containsExtensions("test_ext_type"));
+
+        var coreMeta2 = config2.getExtensionsOrThrow("test_core_metadata_type");
+        var coreConfig2 = config2.getExtensionsOrThrow("test_core_config_type");
+        var extConfig2 = config2.getExtensionsOrThrow("test_ext_type");
+
+        Assertions.assertTrue(coreMeta2.is(TagSelector.class));
+        Assertions.assertEquals(ObjectType.MODEL, coreMeta2.unpack(TagSelector.class).getObjectType());
+
+        Assertions.assertTrue(coreConfig2.is(PluginConfig.class));
+        Assertions.assertEquals("DUMMY_PROTOCOL", coreConfig2.unpack(PluginConfig.class).getProtocol());
+
+        Assertions.assertTrue(extConfig2.is(TestConfigExt.class));
+        Assertions.assertEquals("some_value", extConfig2.unpack(TestConfigExt.class).getSetting1());
     }
 
     @Test

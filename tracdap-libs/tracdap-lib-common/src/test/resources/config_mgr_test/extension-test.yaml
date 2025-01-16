@@ -1,0 +1,59 @@
+# Licensed to the Fintech Open Source Foundation (FINOS) under one or
+# more contributor license agreements. See the NOTICE file distributed
+# with this work for additional information regarding copyright ownership.
+# FINOS licenses this file to you under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with the
+# License. You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+config:
+  logging: log-test.xml
+
+
+extensions:
+
+  test_core_metadata_type:
+
+    "@type": "trac://tracdap.finos.org/tracdap.metadata.TagSelector"
+
+    objectType: MODEL
+    objectId: some_model_id
+    objectVersion: 1
+    tagVersion: 2
+
+  test_core_config_type:
+
+    "@type": "trac://tracdap.finos.org/tracdap.config.PluginConfig"
+
+    protocol: DUMMY_PROTOCOL
+    properties:
+      prop1: some_value
+      prop2: true
+    secrets:
+      prop3: abex3dx===
+
+  test_ext_type:
+
+    "@type": "trac://tracdap.finos.org/tracdap.test.config.TestConfigExt"
+
+    setting1: some_value
+    setting2: false
+
+    metadataMapping:
+      object_1:
+        objectType: DATA
+        objectId: some_id
+        objectVersion: 3
+        tagVersion: 2
+      object_2:
+        objectType: STORAGE
+        objectId: some_other_id
+        objectVersion: 3
+        tagVersion: 1
