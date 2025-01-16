@@ -35,6 +35,8 @@ dependencies {
         // Use the provided version of SLF4J, do not pull in the version from Hikari
         exclude group: 'org.slf4j', module: 'slf4j-api'
     }
+
+    testImplementation project(':tracdap-lib-test')
 }
 
 
@@ -46,7 +48,4 @@ dependencies {
 
 // Enable SQL drivers according to plugins.gradle or corresponding env vars
 apply from: "${rootProject.projectDir.path}/tracdap-plugins/sql-drivers/drivers.gradle"
-
-beforeEvaluate {
-    ext.enableBuildTimePlugins(["sql"])
-}
+ext.enableBuildTimePlugins(["sql"])
