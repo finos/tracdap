@@ -31,6 +31,9 @@ import java.util.Map;
  */
 public class PluginServiceInfo {
 
+    /** Service type for config extensions **/
+    public static final String CONFIG_EXTENSION_TYPE = "CONFIG_EXTENSION";
+
     /** Standard service type for config services **/
     public static final String CONFIG_SERVICE_TYPE = "CONFIG";
 
@@ -68,6 +71,7 @@ public class PluginServiceInfo {
      * using the TRAC plugin mechanism</p>
      **/
     static final Map<String, String> SERVICE_TYPES = Map.ofEntries(
+            Map.entry("org.finos.tracdap.common.config.IConfigExtension", CONFIG_EXTENSION_TYPE),
             Map.entry("org.finos.tracdap.common.config.IConfigLoader", CONFIG_SERVICE_TYPE),
             Map.entry("org.finos.tracdap.common.config.ISecretLoader", SECRETS_SERVICE_TYPE),
             Map.entry("org.finos.tracdap.auth.provider.IAuthProvider", AUTH_PROVIDER_SERVICE_TYPE),

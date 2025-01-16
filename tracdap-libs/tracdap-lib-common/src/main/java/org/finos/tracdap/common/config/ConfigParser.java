@@ -18,30 +18,70 @@
 package org.finos.tracdap.common.config;
 
 import org.finos.tracdap.common.exception.EConfigParse;
+import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.common.exception.EUnexpected;
+import org.finos.tracdap.config.*;
 
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.fasterxml.jackson.dataformat.yaml.YAMLMapper;
-import com.google.protobuf.InvalidProtocolBufferException;
-import com.google.protobuf.Message;
+import com.google.protobuf.*;
 import com.google.protobuf.util.JsonFormat;
 
 import java.io.*;
 import java.lang.reflect.InvocationTargetException;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 
 
 public class ConfigParser {
 
-    public static <TConfig extends Message>
+    private final List<Descriptors.FileDescriptor> CORE_CONFIG_DESCRIPTORS = List.of(
+            CommonConfigProto.getDescriptor(),
+            PlatformConfigProto.getDescriptor(),
+            RuntimeConfigProto.getDescriptor(),
+            JobConfigProto.getDescriptor(),
+            ResultConfigProto.getDescriptor());
+
+    private final TypeRegistry typeRegistry;
+
+    public ConfigParser() {
+        this.typeRegistry = buildTypeRegistry(List.of());
+    }
+
+    public ConfigParser(List<IConfigExtension> extensions) {
+        this.typeRegistry = buildTypeRegistry(extensions);
+    }
+
+    private TypeRegistry buildTypeRegistry(List<IConfigExtension> extensions) throws EStartup {
+
+        var typeRegistry = TypeRegistry.newBuilder();
+
+        for (var protoFile : CORE_CONFIG_DESCRIPTORS) {
+            for (var messageType : protoFile.getMessageTypes()) {
+                typeRegistry.add(messageType);
+            }
+        }
+
+        for (var extension : extensions) {
+            for (var protoFile : extension.protoFiles()) {
+                for (var messageType : protoFile.getMessageTypes()) {
+                    typeRegistry.add(messageType);
+                }
+            }
+        }
+
+        return typeRegistry.build();
+    }
+
+    public <TConfig extends Message>
     TConfig parseConfig(byte[] configData, ConfigFormat configFormat, Class<TConfig> configClass) {
 
         return parseConfig(configData, configFormat, configClass, /* leniency = */ false);
     }
 
-    public static <TConfig extends Message>
+    public <TConfig extends Message>
     TConfig parseConfig(byte[] configData, ConfigFormat configFormat, Class<TConfig> configClass, boolean leniency) {
 
         try {
@@ -76,7 +116,7 @@ public class ConfigParser {
     }
 
     @SuppressWarnings("unchecked")
-    private static <TConfig extends Message>
+    private <TConfig extends Message>
     TConfig parseProtoConfig(byte[] protoData, TConfig.Builder builder) throws InvalidProtocolBufferException {
 
         return (TConfig) builder
@@ -85,18 +125,18 @@ public class ConfigParser {
     }
 
     @SuppressWarnings("unchecked")
-    private static <TConfig extends Message>
+    private <TConfig extends Message>
     TConfig parseJsonConfig(byte[] jsonData, TConfig.Builder builder, boolean lenient) throws InvalidProtocolBufferException {
 
-        var parser = JsonFormat.parser();
+        var parser = JsonFormat.parser().usingTypeRegistry(typeRegistry);
 
-        if (lenient)
-            parser = parser.ignoringUnknownFields();
+        try (var in = new ByteArrayInputStream(jsonData); var reader = new InputStreamReader(in, StandardCharsets.UTF_8)) {
 
-        try (var in = new ByteArrayInputStream(jsonData);
-             var reader = new InputStreamReader(in, StandardCharsets.UTF_8)) {
+            if (lenient)
+                parser.ignoringUnknownFields().merge(reader, builder);
+            else
+                parser.merge(reader, builder);
 
-            parser.merge(reader, builder);
             return (TConfig) builder.build();
         }
         catch (InvalidProtocolBufferException e) {
@@ -107,7 +147,7 @@ public class ConfigParser {
         }
     }
 
-    private static <TConfig extends Message>
+    private <TConfig extends Message>
     TConfig parseYamlConfig(byte[] yamlData, TConfig.Builder builder, boolean leniency) throws InvalidProtocolBufferException {
 
         // To parse YAML, first convert into JSON using Jackson
@@ -135,7 +175,7 @@ public class ConfigParser {
         }
     }
 
-    public static <TConfig extends Message>
+    public <TConfig extends Message>
     byte[] quoteConfig(TConfig config, ConfigFormat configFormat) {
 
         try {
@@ -161,16 +201,16 @@ public class ConfigParser {
         }
     }
 
-    private static <TConfig extends Message>
+    private <TConfig extends Message>
     byte[] quoteProtoConfig(TConfig config) throws InvalidProtocolBufferException {
 
         return config.toByteArray();
     }
 
-    private static <TConfig extends Message>
+    private <TConfig extends Message>
     byte[] quoteJsonConfig(TConfig config) throws InvalidProtocolBufferException {
 
-        var quoter = JsonFormat.printer();
+        var quoter = JsonFormat.printer().usingTypeRegistry(typeRegistry);
 
         try (var out = new ByteArrayOutputStream();
              var writer = new OutputStreamWriter(out, StandardCharsets.UTF_8)) {
@@ -188,7 +228,7 @@ public class ConfigParser {
         }
     }
 
-    private static <TConfig extends Message>
+    private <TConfig extends Message>
     byte[] quoteYamlConfig(TConfig config) throws InvalidProtocolBufferException {
 
         // To quote YAML, first quote JSON then convert into YAML using Jackson
