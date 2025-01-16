@@ -16,6 +16,7 @@
  */
 
 plugins {
+    id "com.google.protobuf"
     id "java-library"
 }
 
@@ -23,6 +24,15 @@ apply from: "${rootProject.projectDir.path}/gradle/base-java.gradle"
 
 
 description = "TRAC D.A.P. common library, interfaces and utilities used across all TRAC components"
+
+
+// Protobuf needed to compile test extension proto files
+protobuf {
+    protoc {
+        artifact = "com.google.protobuf:protoc:$proto_version"
+    }
+}
+
 
 dependencies {
 
@@ -78,6 +88,9 @@ dependencies {
     implementation group: 'org.apache.logging.log4j', name: 'log4j-slf4j2-impl', version: "$log4j_version"
 
     testImplementation project(':tracdap-lib-test')
+
+    // Protobuf needed to compile test extension proto files
+    testImplementation "com.google.protobuf:protobuf-java"
 }
 
 

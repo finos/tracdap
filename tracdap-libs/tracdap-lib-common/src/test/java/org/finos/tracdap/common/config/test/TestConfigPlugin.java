@@ -17,6 +17,7 @@
 
 package org.finos.tracdap.common.config.test;
 
+import org.finos.tracdap.common.config.IConfigExtension;
 import org.finos.tracdap.common.config.IConfigLoader;
 import org.finos.tracdap.common.exception.EPluginNotAvailable;
 import org.finos.tracdap.common.plugin.PluginServiceInfo;
@@ -32,9 +33,11 @@ public class TestConfigPlugin extends TracPlugin {
 
     private static final String PLUGIN_NAME = "TEST_CONFIG";
     private static final String SERVICE_NAME = "TEST_CONFIG";
+    private static final String EXTENSION_NAME = "TEST_CONFIG_EXTENSION";
 
     private static final List<PluginServiceInfo> serviceInfo = List.of(
-            new PluginServiceInfo(IConfigLoader.class, SERVICE_NAME, List.of("test")));
+            new PluginServiceInfo(IConfigLoader.class, SERVICE_NAME, List.of("test")),
+            new PluginServiceInfo(IConfigExtension.class, EXTENSION_NAME, List.of("test_config_ext")));
 
     @Override
     public String pluginName() {
@@ -54,6 +57,9 @@ public class TestConfigPlugin extends TracPlugin {
 
         if (serviceName.equals(SERVICE_NAME))
             return (T) new TestConfigLoader(tempDir);
+
+        if (serviceName.equals(EXTENSION_NAME))
+            return (T) new TestConfigExtension();
 
         var message = String.format("Plugin [%s] does not support the service [%s]", pluginName(), serviceName);
         throw new EPluginNotAvailable(message);
