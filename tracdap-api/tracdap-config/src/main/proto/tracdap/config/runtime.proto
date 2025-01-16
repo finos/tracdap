@@ -19,6 +19,7 @@ syntax = 'proto3';
 package tracdap.config;
 
 option java_package = "org.finos.tracdap.config";
+option java_outer_classname = "RuntimeConfigProto";
 option java_multiple_files = true;
 
 import "tracdap/config/common.proto";
