@@ -16,7 +16,6 @@
  */
 
 plugins {
-    id "com.google.protobuf"
     id "java-library"
 }
 
@@ -24,13 +23,6 @@ apply from: "${rootProject.projectDir.path}/gradle/base-java.gradle"
 
 
 description = "TRAC D.A.P. test library, pulls in everything needed to run tests across the TRAC platform services"
-
-// Protobuf needed to compile extension proto files
-protobuf {
-    protoc {
-        artifact = "com.google.protobuf:protoc:$proto_version"
-    }
-}
 
 dependencies {
 
@@ -43,6 +35,9 @@ dependencies {
     api project(':tracdap-lib-db')
     api project(':tracdap-lib-data')
 
+    // Include the proto extension test files
+    api project(':tracdap-lib-test-proto')
+
     // Tests need the ability to spin up instances of the TRAC services to test against
     api project(':tracdap-svc-auth')
     api project(':tracdap-svc-meta')
@@ -53,9 +48,6 @@ dependencies {
     // Give tests access to the deploy tools to set up services for integration
     api project(':deploy-metadb')
     api project(':secret-tool')
-
-    // Protobuf needed to support extension proto files
-    testImplementation "com.google.protobuf:protobuf-java"
 
     implementation group: 'org.junit.jupiter', name: 'junit-jupiter-api', version: "$junit_version"
     implementation group: 'org.junit.jupiter', name: 'junit-jupiter-params', version: "$junit_version"
