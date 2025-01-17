@@ -55,7 +55,7 @@ class StaticApiImpl(_StaticApiHook):
         if not _val.is_primitive_type(entry_type):
             raise _ex.EModelValidation(f"Maps can only contain primitive types, [{entry_type}] is not primitive")
 
-        return _meta.TypeDescriptor(_meta.BasicType.MAP, arrayType=_meta.TypeDescriptor(entry_type))
+        return _meta.TypeDescriptor(_meta.BasicType.MAP, mapType=_meta.TypeDescriptor(entry_type))
 
     def define_attribute(
             self, attr_name: str, attr_value: _tp.Any,
