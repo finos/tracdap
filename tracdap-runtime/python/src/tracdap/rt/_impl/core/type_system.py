@@ -253,7 +253,8 @@ class MetadataCodec:
 
         type_desc = _meta.TypeDescriptor(_meta.BasicType.INTEGER)
 
-        if isinstance(raw_value, int):
+        # isinstance(bool_value, int) returns True! An explicit check is needed
+        if isinstance(raw_value, int) and not isinstance(raw_value, bool):
             return _meta.Value(type_desc, integerValue=raw_value)
 
         if isinstance(raw_value, float) and raw_value.is_integer():
@@ -270,7 +271,8 @@ class MetadataCodec:
         if isinstance(raw_value, float):
             return _meta.Value(type_desc, floatValue=raw_value)
 
-        if isinstance(raw_value, int):
+        # isinstance(bool_value, int) returns True! An explicit check is needed
+        if isinstance(raw_value, int) and not isinstance(raw_value, bool):
             return _meta.Value(type_desc, floatValue=float(raw_value))
 
         msg = f"Value of type [{type(raw_value)}] cannot be converted to {_meta.BasicType.FLOAT.name}"
@@ -284,7 +286,8 @@ class MetadataCodec:
         if isinstance(raw_value, decimal.Decimal):
             return _meta.Value(type_desc, decimalValue=_meta.DecimalValue(str(raw_value)))
 
-        if isinstance(raw_value, int) or isinstance(raw_value, float):
+        # isinstance(bool_value, int) returns True! An explicit check is needed
+        if isinstance(raw_value, int) or isinstance(raw_value, float) and not isinstance(raw_value, bool):
             return _meta.Value(type_desc, decimalValue=_meta.DecimalValue(str(raw_value)))
 
         msg = f"Value of type [{type(raw_value)}] cannot be converted to {_meta.BasicType.DECIMAL.name}"
