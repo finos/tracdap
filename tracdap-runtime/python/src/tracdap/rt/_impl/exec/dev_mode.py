@@ -765,10 +765,15 @@ class DevModeTranslator:
             else:
                 p_spec = param_specs[p_name]
 
-                cls._log.info(f"Encoding parameter [{p_name}] as {p_spec.paramType.basicType.name}")
+                try:
+                    cls._log.info(f"Encoding parameter [{p_name}] as {p_spec.paramType.basicType.name}")
+                    encoded_value = _types.MetadataCodec.convert_value(p_value, p_spec.paramType)
+                    encoded_values[p_name] = encoded_value
 
-                encoded_value = _types.MetadataCodec.convert_value(p_value, p_spec.paramType)
-                encoded_values[p_name] = encoded_value
+                except Exception as e:
+                    msg = f"Failed to encode parameter [{p_name}]: {str(e)}"
+                    cls._log.error(msg)
+                    raise _ex.EConfigParse(msg) from e
 
         return encoded_values
 
