@@ -193,7 +193,24 @@ class MetadataCodec:
                 _meta.TypeDescriptor(_meta.BasicType.ARRAY, arrayType=array_trac_type),
                 arrayValue=_meta.ArrayValue(encoded_items))
 
-        raise _ex.ETracInternal(f"Value type [{type(value)}] is not supported yet")
+        if isinstance(value, dict):
+
+            if len(value) == 0:
+                raise _ex.ETracInternal("Cannot encode an empty dict")
+
+            map_raw_type = type(next(iter(value.values())))
+            map_trac_type = TypeMapping.python_to_trac(map_raw_type)
+
+            if any(map(lambda x: type(x) != array_raw_type, value.values())):
+                raise _ex.ETracInternal("Cannot encode a dict with values of different types")
+
+            encoded_entries = dict(map(lambda kv: (kv[0], cls.convert_value(kv[1], map_trac_type)), value.items()))
+
+            return _meta.Value(
+                _meta.TypeDescriptor(_meta.BasicType.ARRAY, mapType=map_trac_type),
+                mapValue=_meta.MapValue(encoded_entries))
+
+        raise _ex.ETracInternal(f"Cannot encode value of type [{type(value).__name__}]")
 
     @classmethod
     def convert_value(cls, raw_value: tp.Any, type_desc: _meta.TypeDescriptor):
