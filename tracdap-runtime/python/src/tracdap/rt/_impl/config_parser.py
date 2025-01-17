@@ -422,7 +422,7 @@ class ConfigParser(tp.Generic[_T]):
     def _parse_simple_class(self, location: str, raw_dict: tp.Any, metaclass: type) -> object:
 
         if raw_dict is not None and not isinstance(raw_dict, dict):
-            pass
+            return self._error(location, f"Expected type {metaclass.__name__}, got '{str(raw_dict)}'")
 
         obj = metaclass.__new__(metaclass, object())  # noqa
 
@@ -516,7 +516,7 @@ class ConfigParser(tp.Generic[_T]):
                 return self._error(location, f"Expected a list, got {type(raw_value)}")
 
             return [
-                self._parse_value(self._child_location(location, str(idx)), item, list_type)
+                self._parse_value(self._child_location(location, idx), item, list_type)
                 for (idx, item) in enumerate(raw_value)]
 
         if origin == tp.Dict or origin == dict:
@@ -547,12 +547,14 @@ class ConfigParser(tp.Generic[_T]):
         return None
 
     @staticmethod
-    def _child_location(parent_location: str, item: str):
+    def _child_location(parent_location: str, item: tp.Union[str, int]):
 
         if parent_location is None or parent_location == "":
             return item
+        elif isinstance(item, int):
+            return f"{parent_location}[{item}]"
         else:
-            return parent_location + "." + item
+            return f"{parent_location}.{item}"
 
 
 class ConfigQuoter:
