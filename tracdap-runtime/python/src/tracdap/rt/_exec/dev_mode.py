@@ -37,12 +37,12 @@ DEV_MODE_JOB_CONFIG = [
     re.compile(r"job\.\w+\.model"),
     re.compile(r"job\.\w+\.flow"),
 
-    re.compile(r".*\.jobs\.\d+\.\w+\.parameters\.\w+"),
-    re.compile(r".*\.jobs\.\d+\.\w+\.inputs\.\w+"),
-    re.compile(r".*\.jobs\.\d+\.\w+\.outputs\.\w+"),
-    re.compile(r".*\.jobs\.\d+\.\w+\.models\.\w+"),
-    re.compile(r".*\.jobs\.\d+\.\w+\.model"),
-    re.compile(r".*\.jobs\.\d+\.\w+\.flow")
+    re.compile(r".*\.jobs\[\d+]\.\w+\.parameters\.\w+"),
+    re.compile(r".*\.jobs\[\d+]\.\w+\.inputs\.\w+"),
+    re.compile(r".*\.jobs\[\d+]\.\w+\.outputs\.\w+"),
+    re.compile(r".*\.jobs\[\d+]\.\w+\.models\.\w+"),
+    re.compile(r".*\.jobs\[\d+]\.\w+\.model"),
+    re.compile(r".*\.jobs\[\d+]\.\w+\.flow")
 ]
 
 DEV_MODE_SYS_CONFIG = []
