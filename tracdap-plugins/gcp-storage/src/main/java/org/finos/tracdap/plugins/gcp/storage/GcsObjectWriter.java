@@ -40,12 +40,12 @@ import java.util.concurrent.Flow;
 
 public class GcsObjectWriter implements Flow.Subscriber<ArrowBuf> {
 
-    // gRPC has a default max message size of 4 MB, message over this size will be rejected
-    // Using a max chunk size of 3 MB is safely inside the limit
+    // gRPC has a default max message size of 2.25 MB, message over this size will be rejected
+    // Using a max chunk size of 2 MB means messages will be safely inside the limit
     // Allowing a range of chunk sizes should allow chunks to flow with less fragmentation
 
-    private final static long MAX_CHUNK_SIZE = 3145728;  // 3 MB
-    private final static long MIN_CHUNK_SIZE = 1572864;  // 1.5 MB
+    private final static long MAX_CHUNK_SIZE = 2097152;  // 2 MB
+    private final static long MIN_CHUNK_SIZE = 1048576;  // 1 MB
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
