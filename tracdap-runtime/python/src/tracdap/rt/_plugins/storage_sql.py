@@ -268,9 +268,17 @@ plugins.PluginManager.register_plugin(IStorageProvider, SqlStorageProvider, ["SQ
 
 
 try:
-
     import sqlalchemy as sqla  # noqa
     import sqlalchemy.exc as sqla_exc  # noqa
+
+    # Only 2.x versions of SQL Alchemy are currently supported
+    sqla_supported = sqla.__version__.startswith("2.")
+
+except ModuleNotFoundError:
+    sqla = None
+    sqla_supported = False
+
+if sqla_supported:
 
     class SqlAlchemyDriver(ISqlDriver):
 
@@ -336,7 +344,7 @@ try:
 
         class ConnectionWrapper(DbApiWrapper.Connection):
 
-            def __init__(self, conn: sqla.Connection):
+            def __init__(self, conn: "sqla.Connection"):
                 self.__conn = conn
 
             def close(self):
@@ -355,7 +363,7 @@ try:
 
             arraysize: int = 1000
 
-            def __init__(self, conn: sqla.Connection):
+            def __init__(self, conn: "sqla.Connection"):
                 self.__conn = conn
                 self.__result: tp.Optional[sqla.CursorResult] = None
 
@@ -414,5 +422,4 @@ try:
 
     plugins.PluginManager.register_plugin(ISqlDriver, SqlAlchemyDriver, ["alchemy"])
 
-except ModuleNotFoundError:
-    pass
+
