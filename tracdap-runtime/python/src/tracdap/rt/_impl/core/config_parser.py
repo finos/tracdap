@@ -328,6 +328,23 @@ class ConfigParser(tp.Generic[_T]):
 
     def _parse_value(self, location: str, raw_value: tp.Any, annotation: type):
 
+        if self._is_dev_mode_location(location):
+
+            if type(raw_value) in ConfigParser.__primitive_types:
+                return self._parse_primitive(location, raw_value, type(raw_value))
+
+            if isinstance(raw_value, list):
+                if len(raw_value) == 0:
+                    return []
+                items = iter((self._child_location(location, i), x) for i, x in enumerate(raw_value))
+                return list(self._parse_value(loc, x, tp.Any) for loc, x in items)
+
+            if isinstance(raw_value, dict):
+                if len(raw_value) == 0:
+                    return {}
+                items = iter((self._child_location(location, k), k, v) for k, v in raw_value.items())
+                return dict((k, self._parse_value(loc, v, tp.Any)) for loc, k, v in items)
+
         if raw_value is None:
             return None
 
@@ -346,23 +363,12 @@ class ConfigParser(tp.Generic[_T]):
             return self._parse_enum(location, raw_value, annotation)
 
         if _dc.is_dataclass(annotation):
-
-            if isinstance(raw_value, tp.Dict):
-                return self._parse_simple_class(location, raw_value, annotation)
-
-            if self._is_dev_mode_location(location):
-                if type(raw_value) in ConfigParser.__primitive_types:
-                    return self._parse_primitive(location, raw_value, type(raw_value))
-                if isinstance(raw_value, list):
-                    if len(raw_value) == 0:
-                        return []
-                    list_type = type(raw_value[0])
-                    return list(map(lambda x: self._parse_primitive(location, x, list_type), raw_value))
-
-            return self._error(location, f"Expected type {annotation.__name__}, got '{str(raw_value)}'")
+            return self._parse_simple_class(location, raw_value, annotation)
 
         if isinstance(annotation, self.__generic_metaclass):
             return self._parse_generic_class(location, raw_value, annotation)  # noqa
+
+        return self._error(location, f"Cannot parse value of type {annotation.__name__}")
 
     def _is_dev_mode_location(self, location):
 
@@ -423,7 +429,7 @@ class ConfigParser(tp.Generic[_T]):
     def _parse_simple_class(self, location: str, raw_dict: tp.Any, metaclass: type) -> object:
 
         if raw_dict is not None and not isinstance(raw_dict, dict):
-            pass
+            return self._error(location, f"Expected type {metaclass.__name__}, got '{str(raw_dict)}'")
 
         obj = metaclass.__new__(metaclass, object())  # noqa
 
@@ -517,7 +523,7 @@ class ConfigParser(tp.Generic[_T]):
                 return self._error(location, f"Expected a list, got {type(raw_value)}")
 
             return [
-                self._parse_value(self._child_location(location, str(idx)), item, list_type)
+                self._parse_value(self._child_location(location, idx), item, list_type)
                 for (idx, item) in enumerate(raw_value)]
 
         if origin == tp.Dict or origin == dict:
@@ -548,12 +554,14 @@ class ConfigParser(tp.Generic[_T]):
         return None
 
     @staticmethod
-    def _child_location(parent_location: str, item: str):
+    def _child_location(parent_location: str, item: tp.Union[str, int]):
 
         if parent_location is None or parent_location == "":
             return item
+        elif isinstance(item, int):
+            return f"{parent_location}[{item}]"
         else:
-            return parent_location + "." + item
+            return f"{parent_location}.{item}"
 
 
 class ConfigQuoter:
