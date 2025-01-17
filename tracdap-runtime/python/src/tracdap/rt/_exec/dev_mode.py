@@ -37,12 +37,12 @@ DEV_MODE_JOB_CONFIG = [
     re.compile(r"job\.\w+\.model"),
     re.compile(r"job\.\w+\.flow"),
 
-    re.compile(r".*\.jobs\.\d+\.\w+\.parameters\.\w+"),
-    re.compile(r".*\.jobs\.\d+\.\w+\.inputs\.\w+"),
-    re.compile(r".*\.jobs\.\d+\.\w+\.outputs\.\w+"),
-    re.compile(r".*\.jobs\.\d+\.\w+\.models\.\w+"),
-    re.compile(r".*\.jobs\.\d+\.\w+\.model"),
-    re.compile(r".*\.jobs\.\d+\.\w+\.flow")
+    re.compile(r".*\.jobs\[\d+]\.\w+\.parameters\.\w+"),
+    re.compile(r".*\.jobs\[\d+]\.\w+\.inputs\.\w+"),
+    re.compile(r".*\.jobs\[\d+]\.\w+\.outputs\.\w+"),
+    re.compile(r".*\.jobs\[\d+]\.\w+\.models\.\w+"),
+    re.compile(r".*\.jobs\[\d+]\.\w+\.model"),
+    re.compile(r".*\.jobs\[\d+]\.\w+\.flow")
 ]
 
 DEV_MODE_SYS_CONFIG = []
@@ -764,10 +764,15 @@ class DevModeTranslator:
             else:
                 p_spec = param_specs[p_name]
 
-                cls._log.info(f"Encoding parameter [{p_name}] as {p_spec.paramType.basicType}")
+                try:
+                    cls._log.info(f"Encoding parameter [{p_name}] as {p_spec.paramType.basicType}")
+                    encoded_value = _types.MetadataCodec.convert_value(p_value, p_spec.paramType)
+                    encoded_values[p_name] = encoded_value
 
-                encoded_value = _types.MetadataCodec.convert_value(p_value, p_spec.paramType)
-                encoded_values[p_name] = encoded_value
+                except Exception as e:
+                    msg = f"Failed to encode parameter [{p_name}]: {str(e)}"
+                    cls._log.error(msg)
+                    raise _ex.EConfigParse(msg) from e
 
         return encoded_values
 
