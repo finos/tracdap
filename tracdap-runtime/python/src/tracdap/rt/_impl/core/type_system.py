@@ -239,6 +239,9 @@ class MetadataCodec:
         if type_desc.basicType == _meta.BasicType.ARRAY:
             return cls.convert_array_value(raw_value, type_desc.arrayType)
 
+        if type_desc.basicType == _meta.BasicType.MAP:
+            return cls.convert_map_value(raw_value, type_desc.mapType)
+
         raise _ex.ETracInternal(f"Conversion to value type [{type_desc.basicType.name}] is not supported yet")
 
     @staticmethod
@@ -253,6 +256,19 @@ class MetadataCodec:
         items = list(map(lambda x: MetadataCodec.convert_value(x, array_type), raw_value))
 
         return _meta.Value(type_desc, arrayValue=_meta.ArrayValue(items))
+
+    @staticmethod
+    def convert_map_value(raw_value: tp.Dict[str, tp.Any], map_type: _meta.TypeDescriptor) -> _meta.Value:
+
+        type_desc = _meta.TypeDescriptor(basicType=_meta.BasicType.MAP, mapType=map_type)
+
+        if not isinstance(raw_value, dict):
+            msg = f"Value of type [{type(raw_value).__name__}] cannot be converted to {_meta.BasicType.MAP.name}"
+            raise _ex.ETracInternal(msg)
+
+        entries = dict(map(lambda kv: (kv[0], MetadataCodec.convert_value(kv[1], map_type)), raw_value.items()))
+
+        return _meta.Value(type_desc, mapValue=_meta.MapValue(entries))
 
     @staticmethod
     def convert_boolean_value(raw_value: tp.Any) -> _meta.Value:
