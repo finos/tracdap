@@ -133,9 +133,13 @@ class MetadataCodec:
 
         if basic_type == _meta.BasicType.ARRAY:
             items = value.arrayValue.items
-            return list(map(lambda x: MetadataCodec._decode_value_for_type(x, type_desc.arrayType), items))
+            return list(MetadataCodec._decode_value_for_type(x, type_desc.arrayType) for x in items)
 
-        raise _ex.ETracInternal(f"Decoding value type [{basic_type}] is not supported yet")
+        if basic_type == _meta.BasicType.MAP:
+            items = value.mapValue.entries.items()
+            return dict((k, MetadataCodec._decode_value_for_type(v, type_desc.mapType)) for k, v in items)
+
+        raise _ex.ETracInternal(f"Cannot decode value of type [{basic_type}]")
 
     @classmethod
     def encode_value(cls, value: tp.Any) -> _meta.Value:
