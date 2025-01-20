@@ -42,9 +42,9 @@ def getVersionFromGit() {
 
 def addVersionInfo(SourceSet sourceSet, String serviceName) {
 
-    def propsFileDir = "${project.buildDir}/generated/versionInfo/resources"
+    def propsFileDir = "${project.layout.getBuildDirectory()}/generated/versionInfo/resources"
 
-    task generateVersionInfo {
+    tasks.register("generateVersionInfo") {
 
         def props = new Properties()
         props.setProperty("trac.component.name", serviceName)
@@ -60,8 +60,9 @@ def addVersionInfo(SourceSet sourceSet, String serviceName) {
         srcDir propsFileDir
     }
 
-    tasks.getByName(sourceSet.getProcessResourcesTaskName())
-         .dependsOn("generateVersionInfo")
+    tasks.named(sourceSet.getProcessResourcesTaskName()) {
+        dependsOn("generateVersionInfo")
+    }
 
     jar {
         manifest.attributes(
