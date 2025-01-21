@@ -18,7 +18,7 @@
 package org.finos.tracdap.gateway.builders;
 
 import org.finos.tracdap.config.PlatformConfig;
-import org.finos.tracdap.config.WebServerRedirect;
+import org.finos.tracdap.config.GatewayRedirect;
 import org.finos.tracdap.gateway.exec.IRouteMatcher;
 import org.finos.tracdap.gateway.exec.Redirect;
 
@@ -70,7 +70,7 @@ public class RedirectBuilder {
         return redirects;
     }
 
-    private Redirect buildRedirect(WebServerRedirect redirectConfig) {
+    private Redirect buildRedirect(GatewayRedirect redirectConfig) {
 
         var index = nextRouteIndex++;
 
