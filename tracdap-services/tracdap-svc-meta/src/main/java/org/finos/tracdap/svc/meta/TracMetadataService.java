@@ -27,7 +27,7 @@ import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.common.grpc.*;
 import org.finos.tracdap.common.netty.NettyHelpers;
 import org.finos.tracdap.common.plugin.PluginManager;
-import org.finos.tracdap.common.service.CommonServiceBase;
+import org.finos.tracdap.common.service.TracServiceBase;
 import org.finos.tracdap.common.util.InterfaceLogging;
 import org.finos.tracdap.common.validation.GrpcRequestValidator;
 import org.finos.tracdap.config.PlatformConfig;
@@ -51,7 +51,7 @@ import java.util.Properties;
 import java.util.concurrent.*;
 
 
-public class TracMetadataService extends CommonServiceBase {
+public class TracMetadataService extends TracServiceBase {
 
     // This is a quick implementation of the service scaffold, it will need to be re-visited!
     // All the components are created in start()
@@ -251,6 +251,6 @@ public class TracMetadataService extends CommonServiceBase {
 
     public static void main(String[] args) {
 
-        CommonServiceBase.svcMain(TracMetadataService.class, args);
+        TracServiceBase.svcMain(TracMetadataService.class, args);
     }
 }

@@ -20,7 +20,7 @@ package org.finos.tracdap.test.helpers;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.exception.ETracInternal;
 import org.finos.tracdap.common.plugin.PluginManager;
-import org.finos.tracdap.common.service.CommonServiceBase;
+import org.finos.tracdap.common.service.TracServiceBase;
 import org.finos.tracdap.common.startup.StandardArgs;
 import org.finos.tracdap.common.startup.Startup;
 import org.finos.tracdap.tools.secrets.SecretTool;
@@ -60,7 +60,7 @@ public class ServiceHelpers {
         deployDb.runDeployment(tasks);
     }
 
-    public static <TSvc extends CommonServiceBase> TSvc startService(
+    public static <TSvc extends TracServiceBase> TSvc startService(
             Class<TSvc> serviceClass, Path workingDir,
             URL configPath, String keystoreKey) {
 

@@ -32,7 +32,7 @@ import org.finos.tracdap.common.exception.EPluginNotAvailable;
 import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.common.exception.EStorageConfig;
 import org.finos.tracdap.common.plugin.PluginManager;
-import org.finos.tracdap.common.service.CommonServiceBase;
+import org.finos.tracdap.common.service.TracServiceBase;
 import org.finos.tracdap.common.storage.IStorageManager;
 import org.finos.tracdap.common.storage.StorageManager;
 import org.finos.tracdap.common.util.RoutingUtils;
@@ -63,7 +63,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 
 
-public class TracDataService extends CommonServiceBase {
+public class TracDataService extends TracServiceBase {
 
     private static final int MAX_SERVICE_CORES = 12;
     private static final int MIN_SERVICE_CORES = 2;
@@ -317,6 +317,6 @@ public class TracDataService extends CommonServiceBase {
 
     public static void main(String[] args) {
 
-        CommonServiceBase.svcMain(TracDataService.class, args);
+        TracServiceBase.svcMain(TracDataService.class, args);
     }
 }

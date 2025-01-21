@@ -23,7 +23,7 @@ import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.common.netty.NettyHelpers;
 import org.finos.tracdap.common.plugin.PluginManager;
-import org.finos.tracdap.common.service.CommonServiceBase;
+import org.finos.tracdap.common.service.TracServiceBase;
 import org.finos.tracdap.common.storage.IFileStorage;
 import org.finos.tracdap.common.storage.IStorageManager;
 import org.finos.tracdap.config.PlatformConfig;
@@ -46,7 +46,7 @@ import java.time.Instant;
 import java.util.concurrent.TimeUnit;
 
 
-public class TracWebServer extends CommonServiceBase {
+public class TracWebServer extends TracServiceBase {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
@@ -60,7 +60,7 @@ public class TracWebServer extends CommonServiceBase {
 
     public static void main(String[] args) {
 
-        CommonServiceBase.svcMain(TracWebServer.class, args);
+        TracServiceBase.svcMain(TracWebServer.class, args);
     }
 
     public TracWebServer(PluginManager pluginManager, ConfigManager configManager) {

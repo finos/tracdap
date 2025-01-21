@@ -50,7 +50,7 @@ import java.util.TimerTask;
  * sequences, so they will automatically fail if they do not complete in the required
  * time.</p>
  */
-public abstract class CommonServiceBase {
+public abstract class TracServiceBase {
 
     private static final Duration DEFAULT_STARTUP_TIMEOUT = Duration.of(30, ChronoUnit.SECONDS);
     private static final Duration DEFAULT_SHUTDOWN_TIMEOUT = Duration.of(30, ChronoUnit.SECONDS);
@@ -172,7 +172,7 @@ public abstract class CommonServiceBase {
      * @param svcClass The service class to be spawned
      * @param args Command line args passed into the JVM
      */
-    public static void svcMain(Class<? extends CommonServiceBase> svcClass, String[] args) {
+    public static void svcMain(Class<? extends TracServiceBase> svcClass, String[] args) {
 
         try {
 
