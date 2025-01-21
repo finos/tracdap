@@ -42,7 +42,7 @@ def getVersionFromGit() {
 
 def addVersionInfo(SourceSet sourceSet, String serviceName) {
 
-    def propsFileDir = "${project.layout.getBuildDirectory()}/generated/versionInfo/resources"
+    def propsFileDir = project.layout.buildDirectory.dir("generated/versionInfo/resources")
 
     tasks.register("generateVersionInfo") {
 
@@ -50,14 +50,14 @@ def addVersionInfo(SourceSet sourceSet, String serviceName) {
         props.setProperty("trac.component.name", serviceName)
         props.setProperty("trac.component.version", "${project.version}")
 
-        def propsFilePath = "${propsFileDir}/version.properties"
+        def propsFilePath = "${propsFileDir.get()}/version.properties"
         def propsFile = file(propsFilePath)
         propsFile.parentFile.mkdirs()
         propsFile.withWriter { props.store(it, null) }
     }
 
     sourceSet.resources {
-        srcDir propsFileDir
+        srcDir propsFileDir.get()
     }
 
     tasks.named(sourceSet.getProcessResourcesTaskName()) {
