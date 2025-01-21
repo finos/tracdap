@@ -116,9 +116,6 @@ services:
   orchestrator:
     port: 9104
 
-  webServer:
-    enabled: false
-
 
 deployment:
   layout: SANDBOX

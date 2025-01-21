@@ -85,23 +85,6 @@ jobCache:
   protocol: LOCAL
 
 
-webServer:
-
-  # To use the TRAC web server, enable it in the services section then add a content root
-
-  #  contentRoot:
-  #    protocol: LOCAL
-  #    properties:
-  #      rootPath: path/to/web/content/root
-  #
-  #  rewriteRules:
-  #
-  #  redirects:
-  #    - source: /
-  #      target: /index.html
-  #      status: 302
-
-
 gateway:
 
   # Routing for the TRAC services will be configured automatically
@@ -140,10 +123,6 @@ services:
 
   orchestrator:
     port: 8084
-
-  webServer:
-    enabled: false
-    port: 8085
 
 
 deployment:
