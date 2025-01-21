@@ -31,7 +31,7 @@ import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.common.exec.IJobExecutor;
 import org.finos.tracdap.common.grpc.*;
 import org.finos.tracdap.common.plugin.PluginManager;
-import org.finos.tracdap.common.service.CommonServiceBase;
+import org.finos.tracdap.common.service.TracServiceBase;
 import org.finos.tracdap.common.util.RoutingUtils;
 import org.finos.tracdap.common.validation.GrpcRequestValidator;
 import org.finos.tracdap.config.PlatformConfig;
@@ -61,7 +61,7 @@ import java.time.Instant;
 import java.util.concurrent.TimeUnit;
 
 
-public class TracOrchestratorService extends CommonServiceBase {
+public class TracOrchestratorService extends TracServiceBase {
 
     private static final String JOB_CACHE_NAME = "TRAC_JOB_STATE";
     private static final int CONCURRENT_REQUESTS = 30;
@@ -292,6 +292,6 @@ public class TracOrchestratorService extends CommonServiceBase {
 
     public static void main(String[] args) {
 
-        CommonServiceBase.svcMain(TracOrchestratorService.class, args);
+        TracServiceBase.svcMain(TracOrchestratorService.class, args);
     }
 }

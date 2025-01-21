@@ -17,15 +17,15 @@
 
 package org.finos.tracdap.gateway.exec;
 
-import org.finos.tracdap.config.WebServerRedirect;
+import org.finos.tracdap.config.GatewayRedirect;
 
 public class Redirect {
 
     private final int index;
-    private final WebServerRedirect config;
+    private final GatewayRedirect config;
     private final IRouteMatcher matcher;
 
-    public Redirect(int index, WebServerRedirect config, IRouteMatcher matcher) {
+    public Redirect(int index, GatewayRedirect config, IRouteMatcher matcher) {
         this.index = index;
         this.config = config;
         this.matcher = matcher;
@@ -35,7 +35,7 @@ public class Redirect {
         return index;
     }
 
-    public WebServerRedirect getConfig() {
+    public GatewayRedirect getConfig() {
         return config;
     }
 

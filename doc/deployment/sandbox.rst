@@ -252,7 +252,6 @@ The remaining sections in the config file can be left as they are for noq. They 
 
     * The *jobCache* section, which allows for different job cache mechanisms
       when TRAC is running on a distributed cluster
-    * The *webServer* section, which can be enabled to provide a light-weight embedded web server
     * The *gateway* section, which can be used to customize routing in the TRAC gateway
       (by default it will just relay any TRAC platform services that are enabled)
     * The *services* section provides common options for all the TRAC services,

@@ -26,7 +26,7 @@ import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.common.netty.EventLoopScheduler;
 import org.finos.tracdap.common.netty.NettyHelpers;
 import org.finos.tracdap.common.plugin.PluginManager;
-import org.finos.tracdap.common.service.CommonServiceBase;
+import org.finos.tracdap.common.service.TracServiceBase;
 import org.finos.tracdap.gateway.auth.AuthHandlerSettings;
 import org.finos.tracdap.gateway.builders.RedirectBuilder;
 import org.finos.tracdap.gateway.exec.Redirect;
@@ -49,7 +49,7 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 
-public class TracPlatformGateway extends CommonServiceBase {
+public class TracPlatformGateway extends TracServiceBase {
 
     /*
      * This version of the gateway provides some basic structures, including a configurable router component
@@ -227,6 +227,6 @@ public class TracPlatformGateway extends CommonServiceBase {
 
     public static void main(String[] args) {
 
-        CommonServiceBase.svcMain(TracPlatformGateway.class, args);
+        TracServiceBase.svcMain(TracPlatformGateway.class, args);
     }
 }

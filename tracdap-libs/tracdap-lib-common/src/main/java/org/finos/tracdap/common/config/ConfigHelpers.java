@@ -31,6 +31,14 @@ public class ConfigHelpers {
         return readString(context, properties, key, true);
     }
 
+    public static String readStringOrDefault(String context, Properties properties, String key, String defaultValue) {
+        var configValue = readString(context, properties, key, false);
+        if (configValue == null || configValue.isEmpty())
+            return defaultValue;
+        else
+            return configValue;
+    }
+
     public static String readString(String context, Properties properties, String key, boolean required) {
 
         var rawValue = properties.getProperty(key);

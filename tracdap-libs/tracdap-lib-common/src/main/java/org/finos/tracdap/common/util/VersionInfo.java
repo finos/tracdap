@@ -63,19 +63,20 @@ public class VersionInfo {
 
     private static String readVersionInfo(Class<?> component, String propKey) throws IOException {
 
-        var versionInfoStream = component.getClassLoader().getResourceAsStream(VERSION_INFO_PROPS);
+        try (var versionInfoStream = component.getClassLoader().getResourceAsStream(VERSION_INFO_PROPS)) {
 
-        if (versionInfoStream == null)
+            if (versionInfoStream == null)
+                throw new ETracInternal("Component version info not available");
+
+            var versionInfo = new Properties();
+            versionInfo.load(versionInfoStream);
+
+            var unpackedVersion = versionInfo.getProperty(propKey);
+
+            if (unpackedVersion != null && !unpackedVersion.isBlank())
+                return unpackedVersion;
+
             throw new ETracInternal("Component version info not available");
-
-        var versionInfo = new Properties();
-        versionInfo.load(versionInfoStream);
-
-        var unpackedVersion = versionInfo.getProperty(propKey);
-
-        if (unpackedVersion != null && !unpackedVersion.isBlank())
-            return unpackedVersion;
-
-        throw new ETracInternal("Component version info not available");
+        }
     }
 }
