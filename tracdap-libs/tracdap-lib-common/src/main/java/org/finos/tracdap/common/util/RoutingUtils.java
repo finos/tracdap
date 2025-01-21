@@ -33,7 +33,6 @@ public class RoutingUtils {
             Map.entry(ConfigKeys.METADATA_SERVICE_KEY, "tracdap-svc-meta"),
             Map.entry(ConfigKeys.DATA_SERVICE_KEY, "tracdap-svc-data"),
             Map.entry(ConfigKeys.ORCHESTRATOR_SERVICE_KEY, "tracdap-svc-orch"),
-            Map.entry(ConfigKeys.WEB_SERVER_SERVICE_KEY, "tracdap-webserver"),
             Map.entry(ConfigKeys.GATEWAY_SERVICE_KEY, "tracdap-gateway"));
 
     public static RoutingTarget serviceTarget(PlatformConfig platformConfig, String serviceKey) {
@@ -57,11 +56,14 @@ public class RoutingUtils {
 
             case HOSTED:
 
-                var hostedAlias = serviceConfig.getAlias();
-                var serviceAlias = hostedAlias.isEmpty() ? STANDARD_ALIASES.get(serviceKey) : hostedAlias;
+                var configuredAlias = serviceConfig.getAlias();
+                var hostedAlias = configuredAlias.isEmpty() ? STANDARD_ALIASES.get(serviceKey) : configuredAlias;
+
+                if (hostedAlias.isEmpty())
+                    throw new EConfig(String.format("Missing required config: services.%s.alias", serviceKey));
 
                 return RoutingTarget.newBuilder()
-                        .setHost(serviceAlias)
+                        .setHost(hostedAlias)
                         .setPort(serviceConfig.getPort())
                         .build();
 
@@ -70,7 +72,7 @@ public class RoutingUtils {
                 var customAlias = serviceConfig.getAlias();
 
                 if (customAlias.isEmpty())
-                    throw new EConfig(String.format("Missing or invalid config: services.%s.alias", serviceKey));
+                    throw new EConfig(String.format("Missing required config: services.%s.alias", serviceKey));
 
                 return RoutingTarget.newBuilder()
                         .setHost(customAlias)

@@ -24,7 +24,6 @@ public class ConfigKeys {
     public static final String DATA_SERVICE_KEY = "data";
     public static final String ORCHESTRATOR_SERVICE_KEY = "orchestrator";
     public static final String GATEWAY_SERVICE_KEY = "gateway";
-    public static final String WEB_SERVER_SERVICE_KEY = "webServer";
 
     public static final String LOGGING_CONFIG_KEY = "logging";
     public static final String SECRET_TYPE_KEY = "secret.type";

@@ -20,7 +20,7 @@ package org.finos.tracdap.gateway.builders;
 import org.finos.tracdap.api.Data;
 import org.finos.tracdap.api.Metadata;
 import org.finos.tracdap.api.Orchestrator;
-import org.finos.tracdap.common.config.ConfigDefaults;
+import org.finos.tracdap.common.config.ConfigHelpers;
 import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.config.ServiceProperties;
 import org.finos.tracdap.common.exception.ETracInternal;
@@ -37,18 +37,17 @@ import java.util.Properties;
 public class ServiceInfo {
 
     public static final Map<String, String> SERVICE_NAMES = Map.ofEntries(
+            Map.entry(ConfigKeys.GATEWAY_SERVICE_KEY, "TRAC Platform Gateway"),
             Map.entry(ConfigKeys.AUTHENTICATION_SERVICE_KEY, "TRAC Authentication Service"),
             Map.entry(ConfigKeys.METADATA_SERVICE_KEY, "TRAC Metadata Service"),
             Map.entry(ConfigKeys.DATA_SERVICE_KEY, "TRAC Data Service"),
-            Map.entry(ConfigKeys.ORCHESTRATOR_SERVICE_KEY, "TRAC Orchestrator Service"),
-            Map.entry(ConfigKeys.WEB_SERVER_SERVICE_KEY, "TRAC Web Server"));
+            Map.entry(ConfigKeys.ORCHESTRATOR_SERVICE_KEY, "TRAC Orchestrator Service"));
 
     public static final Map<String, String> SERVICE_PREFIX_DEFAULTS = Map.ofEntries(
             Map.entry(ConfigKeys.AUTHENTICATION_SERVICE_KEY, "/trac-auth/"),
             Map.entry(ConfigKeys.METADATA_SERVICE_KEY, "/trac-meta/"),
             Map.entry(ConfigKeys.DATA_SERVICE_KEY, "/trac-data/"),
-            Map.entry(ConfigKeys.ORCHESTRATOR_SERVICE_KEY, "/trac-orch/"),
-            Map.entry(ConfigKeys.WEB_SERVER_SERVICE_KEY, "/trac-web/"));
+            Map.entry(ConfigKeys.ORCHESTRATOR_SERVICE_KEY, "/trac-orch/"));
 
     private static final Map<String, Descriptors.ServiceDescriptor> SERVICE_DESCRIPTORS = Map.ofEntries(
             Map.entry(ConfigKeys.METADATA_SERVICE_KEY, serviceDescriptor(Metadata.getDescriptor(), "TracMetadataApi")),
@@ -69,10 +68,19 @@ public class ServiceInfo {
 
         var services = new ArrayList<ServiceInfo>();
 
-        for (var serviceKey : SERVICE_NAMES.keySet()) {
-            var serviceInfo = buildServiceInfo(platformConfig, serviceKey);
-            if (serviceInfo != null)
+        // Process all services in the platform config
+        for (var serviceEntry : platformConfig.getServicesMap().entrySet()) {
+
+            // Do not build service info for the gateway
+            if (serviceEntry.getKey().equals(ConfigKeys.GATEWAY_SERVICE_KEY))
+                continue;
+
+            // Only include enabled services
+            if (isEnabled(serviceEntry.getValue())) {
+
+                var serviceInfo = buildServiceInfo(platformConfig, serviceEntry.getKey());
                 services.add(serviceInfo);
+            }
         }
 
         return services;
@@ -83,9 +91,6 @@ public class ServiceInfo {
         var defaultServiceConfig = ServiceConfig.newBuilder().setEnabled(false).build();
 
         var serviceConfig = platformConfig.getServicesOrDefault(serviceKey, defaultServiceConfig);
-
-        if (!isEnabled(serviceConfig))
-            return null;
 
         if (SERVICE_DESCRIPTORS.containsKey(serviceKey)) {
             var descriptor = SERVICE_DESCRIPTORS.get(serviceKey);
@@ -150,19 +155,7 @@ public class ServiceInfo {
 
     private ServiceInfo(String serviceKey, ServiceConfig config) {
 
-        this.serviceKey = serviceKey;
-        this.serviceName = SERVICE_NAMES.get(serviceKey);
-        this.config = config;
-        this.descriptor = null;
-
-        var serviceProps = new Properties();
-        serviceProps.putAll(config.getPropertiesMap());
-
-        this.httpPrefix = ConfigDefaults.readOrDefault(
-                serviceProps.getProperty(ServiceProperties.GATEWAY_HTTP_PREFIX),
-                SERVICE_PREFIX_DEFAULTS.get(serviceKey));
-
-        this.restPrefix = null;
+        this(serviceKey, config, null, null);
     }
 
     private ServiceInfo(
@@ -170,18 +163,31 @@ public class ServiceInfo {
             Descriptors.ServiceDescriptor descriptor, String restPrefix) {
 
         this.serviceKey = serviceKey;
-        this.serviceName = SERVICE_NAMES.get(serviceKey);
         this.config = config;
         this.descriptor = descriptor;
 
+        var configContext = "services." + serviceKey;
         var serviceProps = new Properties();
         serviceProps.putAll(config.getPropertiesMap());
 
-        var httpPrefix = ConfigDefaults.readOrDefault(
-                serviceProps.getProperty(ServiceProperties.GATEWAY_HTTP_PREFIX),
-                SERVICE_PREFIX_DEFAULTS.get(serviceKey));
+        var defaultServiceName = SERVICE_NAMES.get(serviceKey);
+        this.serviceName = defaultServiceName != null
+                ? ConfigHelpers.readStringOrDefault(configContext, serviceProps, ServiceProperties.SERVICE_NAME, defaultServiceName)
+                : ConfigHelpers.readString(configContext, serviceProps, ServiceProperties.SERVICE_NAME);
 
-        this.httpPrefix = null;
-        this.restPrefix = httpPrefix + restPrefix;
+
+        var defaultHttpPrefix = SERVICE_PREFIX_DEFAULTS.get(serviceKey);
+        var httpPrefix = defaultHttpPrefix != null
+                ? ConfigHelpers.readStringOrDefault(configContext, serviceProps, ServiceProperties.GATEWAY_HTTP_PREFIX, defaultHttpPrefix)
+                : ConfigHelpers.readString(configContext, serviceProps, ServiceProperties.GATEWAY_HTTP_PREFIX);
+
+        if (restPrefix == null) {
+            this.httpPrefix = httpPrefix;
+            this.restPrefix = null;
+        }
+        else {
+            this.httpPrefix = null;
+            this.restPrefix = httpPrefix + restPrefix;
+        }
     }
 }
