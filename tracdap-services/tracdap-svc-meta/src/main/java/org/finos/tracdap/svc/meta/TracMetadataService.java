@@ -147,6 +147,7 @@ public class TracMetadataService extends TracServiceBase {
                     .intercept(new LoggingServerInterceptor(TracMetadataApi.class))
                     .intercept(new GrpcRequestValidator(serviceRegister))
                     .intercept(new GrpcAuthValidator(platformConfig.getAuthentication(), jwtValidator))
+                    .intercept(new RequestMetadataInterceptor())
                     .intercept(new CompressionServerInterceptor())
                     .intercept(new DelayedExecutionInterceptor())
                     .build();

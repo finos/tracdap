@@ -174,6 +174,7 @@ public class TracOrchestratorService extends TracServiceBase {
                     .intercept(new LoggingServerInterceptor(TracOrchestratorService.class))
                     .intercept(new GrpcRequestValidator(serviceRegister))
                     .intercept(new GrpcAuthValidator(platformConfig.getAuthentication(), jwtProcessor))
+                    .intercept(new RequestMetadataInterceptor())
                     .intercept(new CompressionServerInterceptor())
                     .intercept(new DelayedExecutionInterceptor())
 

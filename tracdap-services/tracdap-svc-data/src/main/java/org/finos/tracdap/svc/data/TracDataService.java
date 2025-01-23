@@ -206,6 +206,7 @@ public class TracDataService extends TracServiceBase {
                     .intercept(new LoggingServerInterceptor(TracDataApi.class))
                     .intercept(new GrpcRequestValidator(serviceRegister))
                     .intercept(new GrpcAuthValidator(platformConfig.getAuthentication(), tokenProcessor))
+                    .intercept(new RequestMetadataInterceptor())
                     .intercept(new CompressionServerInterceptor())
                     .intercept(new DelayedExecutionInterceptor())
 
