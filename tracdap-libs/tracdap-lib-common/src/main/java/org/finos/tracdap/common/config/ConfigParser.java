@@ -20,6 +20,7 @@ package org.finos.tracdap.common.config;
 import org.finos.tracdap.common.exception.EConfigParse;
 import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.common.exception.EUnexpected;
+import org.finos.tracdap.common.plugin.ITracExtension;
 import org.finos.tracdap.config.*;
 
 import com.fasterxml.jackson.core.JsonFactory;
@@ -50,11 +51,11 @@ public class ConfigParser {
         this.typeRegistry = buildTypeRegistry(List.of());
     }
 
-    public ConfigParser(List<IConfigExtension> extensions) {
+    public ConfigParser(List<ITracExtension> extensions) {
         this.typeRegistry = buildTypeRegistry(extensions);
     }
 
-    private TypeRegistry buildTypeRegistry(List<IConfigExtension> extensions) throws EStartup {
+    private TypeRegistry buildTypeRegistry(List<ITracExtension> extensions) throws EStartup {
 
         var typeRegistry = TypeRegistry.newBuilder();
 
@@ -65,7 +66,7 @@ public class ConfigParser {
         }
 
         for (var extension : extensions) {
-            for (var protoFile : extension.protoFiles()) {
+            for (var protoFile : extension.configExtensions()) {
                 for (var messageType : protoFile.getMessageTypes()) {
                     typeRegistry.add(messageType);
                 }
