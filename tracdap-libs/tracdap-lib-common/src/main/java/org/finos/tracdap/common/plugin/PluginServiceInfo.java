@@ -17,11 +17,8 @@
 
 package org.finos.tracdap.common.plugin;
 
-import org.finos.tracdap.common.exception.ETracInternal;
-
 import javax.annotation.Nonnull;
 import java.util.List;
-import java.util.Map;
 
 
 /**
@@ -30,9 +27,6 @@ import java.util.Map;
  * @see ITracPlugin
  */
 public class PluginServiceInfo {
-
-    /** Service type for config extensions **/
-    public static final String CONFIG_EXTENSION_TYPE = "CONFIG_EXTENSION";
 
     /** Standard service type for config services **/
     public static final String CONFIG_SERVICE_TYPE = "CONFIG";
@@ -64,28 +58,8 @@ public class PluginServiceInfo {
     /** Standard service type for the metadata DAL **/
     public static final String METADATA_DAL_SERVICE_TYPE = "METADATA_DAL";
 
-    /**
-     * Mapping of known service interfaces to service types.
-     *
-     * <p>Only service interfaces included in this mapping can be loaded
-     * using the TRAC plugin mechanism</p>
-     **/
-    static final Map<String, String> SERVICE_TYPES = Map.ofEntries(
-            Map.entry("org.finos.tracdap.common.config.IConfigExtension", CONFIG_EXTENSION_TYPE),
-            Map.entry("org.finos.tracdap.common.config.IConfigLoader", CONFIG_SERVICE_TYPE),
-            Map.entry("org.finos.tracdap.common.config.ISecretLoader", SECRETS_SERVICE_TYPE),
-            Map.entry("org.finos.tracdap.auth.provider.IAuthProvider", AUTH_PROVIDER_SERVICE_TYPE),
-            Map.entry("org.finos.tracdap.auth.login.ILoginProvider", LOGIN_PROVIDER_SERVICE_TYPE),
-            Map.entry("org.finos.tracdap.common.codec.ICodec", FORMAT_SERVICE_TYPE),
-            Map.entry("org.finos.tracdap.common.storage.IFileStorage", FILE_STORAGE_SERVICE_TYPE),
-            Map.entry("org.finos.tracdap.common.storage.IDataStorage", DATA_STORAGE_SERVICE_TYPE),
-            Map.entry("org.finos.tracdap.common.exec.IBatchExecutor", EXECUTION_SERVICE_TYPE),
-            Map.entry("org.finos.tracdap.common.cache.IJobCacheManager", JOB_CACHE_SERVICE_TYPE),
-            Map.entry("org.finos.tracdap.svc.meta.dal.IMetadataDal", METADATA_DAL_SERVICE_TYPE));
-
     private final Class<?> serviceClass;
     private final String serviceName;
-    private final String serviceType;
     private final List<String> protocols;
 
     /**
@@ -103,11 +77,6 @@ public class PluginServiceInfo {
         this.serviceClass = serviceClass;
         this.serviceName = serviceName;
         this.protocols = protocols;
-
-        this.serviceType = SERVICE_TYPES.getOrDefault(serviceClass.getName(), null);
-
-        if (this.serviceType == null)
-            throw new ETracInternal("Service class is not a recognized pluggable service class");
     }
 
     /**
@@ -126,15 +95,6 @@ public class PluginServiceInfo {
      **/
     public String serviceName() {
         return serviceName;
-    }
-
-    /**
-     * Get the standard service type for this service
-     *
-     * @return The standard service type for this service
-     **/
-    public String serviceType() {
-        return serviceType;
     }
 
     /**
