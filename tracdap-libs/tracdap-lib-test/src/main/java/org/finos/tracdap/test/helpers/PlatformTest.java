@@ -286,7 +286,7 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
 
         tracRepoDir = Paths.get(".").toAbsolutePath();
 
-        while (!Files.exists(tracRepoDir.resolve(".git")))
+        while (!Files.exists(tracRepoDir.resolve("tracdap-api")) && !Files.exists(tracRepoDir.resolve(".git")))
             tracRepoDir = tracRepoDir.getParent();
     }
 
