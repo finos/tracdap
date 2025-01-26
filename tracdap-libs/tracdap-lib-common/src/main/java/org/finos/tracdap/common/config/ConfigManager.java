@@ -36,7 +36,6 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.PrivateKey;
 import java.security.PublicKey;
-import java.util.ArrayList;
 import java.util.Map;
 import java.util.Properties;
 
@@ -109,14 +108,7 @@ public class ConfigManager {
 
         StartupLog.log(this, Level.INFO, String.format("Using config root: %s", rootDirDisplay));
 
-        var extensions = new ArrayList<IConfigExtension>();
-
-        for (var extensionProtocol : plugins.availableProtocols(IConfigExtension.class)) {
-            var extension = plugins.createConfigService(IConfigExtension.class, extensionProtocol, new Properties());
-            extensions.add(extension);
-        }
-
-        this.configParser = new ConfigParser(extensions);
+        this.configParser = new ConfigParser(plugins.getExtensions());
     }
 
     public void prepareSecrets() {

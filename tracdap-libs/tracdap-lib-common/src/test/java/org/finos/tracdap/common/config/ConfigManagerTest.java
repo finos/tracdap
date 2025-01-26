@@ -66,6 +66,7 @@ class ConfigManagerTest {
     void setup() throws Exception {
 
         plugins = new PluginManager();
+        plugins.registerExtensions();
         plugins.initConfigPlugins();
 
         Files.createDirectory(tempDir.resolve("config_dir"));

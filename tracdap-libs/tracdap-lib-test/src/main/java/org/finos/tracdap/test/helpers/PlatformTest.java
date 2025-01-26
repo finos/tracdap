@@ -286,7 +286,7 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
 
         tracRepoDir = Paths.get(".").toAbsolutePath();
 
-        while (!Files.exists(tracRepoDir.resolve("tracdap-api")))
+        while (!Files.exists(tracRepoDir.resolve("tracdap-api")) && !Files.exists(tracRepoDir.resolve(".git")))
             tracRepoDir = tracRepoDir.getParent();
     }
 
@@ -448,6 +448,7 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         var elg = new NioEventLoopGroup(2);
 
         var plugins = new PluginManager();
+        plugins.registerExtensions();
         plugins.initConfigPlugins();
         plugins.initRegularPlugins();
 

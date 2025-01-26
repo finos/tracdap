@@ -22,7 +22,15 @@ import com.google.protobuf.Descriptors;
 import java.util.List;
 
 
-public interface IProtoExtension {
+public interface ITracExtension {
 
-    List<Descriptors.FileDescriptor> protoFiles();
+    String extensionName();
+
+    default List<Descriptors.FileDescriptor> configExtensions() {
+        return List.of();
+    }
+
+    default List<PluginType> pluginTypes() {
+        return List.of();
+    }
 }
