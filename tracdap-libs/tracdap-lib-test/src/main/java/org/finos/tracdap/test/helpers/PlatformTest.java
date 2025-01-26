@@ -448,6 +448,7 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         var elg = new NioEventLoopGroup(2);
 
         var plugins = new PluginManager();
+        plugins.registerExtensions();
         plugins.initConfigPlugins();
         plugins.initRegularPlugins();
 
