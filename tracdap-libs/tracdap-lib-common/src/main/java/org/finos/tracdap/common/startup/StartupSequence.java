@@ -78,7 +78,7 @@ public class StartupSequence {
 
         printSubBanner();
 
-        initConfigPlugins();
+        initPluginManager();
         loadConfig();
         initLogging();
 
@@ -175,9 +175,10 @@ public class StartupSequence {
         }
     }
 
-    private void initConfigPlugins() {
+    private void initPluginManager() {
 
         plugins = new PluginManager();
+        plugins.registerExtensions();
         plugins.initConfigPlugins();
     }
 
