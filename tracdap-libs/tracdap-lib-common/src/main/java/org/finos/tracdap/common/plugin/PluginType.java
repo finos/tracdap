@@ -25,6 +25,8 @@ public class PluginType {
     public static final List<PluginType> CORE_PLUGIN_TYPES = List.of(
             new PluginType("org.finos.tracdap.common.config.IConfigLoader", PluginServiceInfo.CONFIG_SERVICE_TYPE, true),
             new PluginType("org.finos.tracdap.common.config.ISecretLoader", PluginServiceInfo.SECRETS_SERVICE_TYPE, true),
+            new PluginType("org.finos.tracdap.auth.login.ILoginProvider", PluginServiceInfo.LOGIN_PROVIDER_SERVICE_TYPE, false),
+            new PluginType("org.finos.tracdap.auth.provider.IAuthProvider", PluginServiceInfo.AUTH_PROVIDER_SERVICE_TYPE, false),
             new PluginType("org.finos.tracdap.common.codec.ICodec", PluginServiceInfo.FORMAT_SERVICE_TYPE, false),
             new PluginType("org.finos.tracdap.common.storage.IFileStorage", PluginServiceInfo.FILE_STORAGE_SERVICE_TYPE, false),
             new PluginType("org.finos.tracdap.common.storage.IDataStorage", PluginServiceInfo.DATA_STORAGE_SERVICE_TYPE, false),
