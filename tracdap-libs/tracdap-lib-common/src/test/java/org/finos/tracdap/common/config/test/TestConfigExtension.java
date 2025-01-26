@@ -18,13 +18,15 @@
 package org.finos.tracdap.common.config.test;
 
 import com.google.protobuf.Descriptors;
-import org.finos.tracdap.common.config.IConfigExtension;
+import org.finos.tracdap.common.plugin.ITracExtension;
 import org.finos.tracdap.test.config.ConfigExtensionsProto;
 
 import java.util.List;
 
 
-public class TestConfigExtension implements IConfigExtension {
+public class TestConfigExtension implements ITracExtension {
+
+    private static final String EXTENSION_NAME = "TEST_CONFIG_EXTENSION";
 
     private final List<Descriptors.FileDescriptor> protoFiles;
 
@@ -33,7 +35,12 @@ public class TestConfigExtension implements IConfigExtension {
     }
 
     @Override
-    public List<Descriptors.FileDescriptor> protoFiles() {
+    public String extensionName() {
+        return EXTENSION_NAME;
+    }
+
+    @Override
+    public List<Descriptors.FileDescriptor> configExtensions() {
         return protoFiles;
     }
 }
