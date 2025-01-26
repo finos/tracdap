@@ -25,6 +25,8 @@ import java.util.Properties;
 
 public interface IPluginManager {
 
+    List<ITracExtension> getExtensions();
+
     List<String> availableProtocols(Class<?> serviceClass);
 
     boolean isServiceAvailable(Class<?> serviceClass, String protocol);
