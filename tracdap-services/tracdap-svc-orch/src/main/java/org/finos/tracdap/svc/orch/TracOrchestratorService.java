@@ -17,7 +17,7 @@
 
 package org.finos.tracdap.svc.orch;
 
-import org.finos.tracdap.api.Orchestrator;
+import org.finos.tracdap.api.OrchestratorServiceProto;
 import org.finos.tracdap.api.internal.TrustedMetadataApiGrpc;
 import org.finos.tracdap.common.auth.InternalAuthProvider;
 import org.finos.tracdap.common.auth.JwtSetup;
@@ -154,7 +154,7 @@ public class TracOrchestratorService extends TracServiceBase {
             jobManager.start();
 
             var serviceRegister = GrpcServiceRegister.newBuilder()
-                    .registerServices(Orchestrator.getDescriptor().getServices())
+                    .registerServices(OrchestratorServiceProto.getDescriptor().getServices())
                     .build();
 
             this.server = NettyServerBuilder

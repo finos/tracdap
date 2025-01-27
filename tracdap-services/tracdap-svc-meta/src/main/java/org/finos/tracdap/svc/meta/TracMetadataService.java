@@ -17,8 +17,8 @@
 
 package org.finos.tracdap.svc.meta;
 
-import org.finos.tracdap.api.Metadata;
-import org.finos.tracdap.api.internal.MetadataTrusted;
+import org.finos.tracdap.api.MetadataServiceProto;
+import org.finos.tracdap.api.internal.MetadataTrustedProto;
 import org.finos.tracdap.common.auth.JwtSetup;
 import org.finos.tracdap.common.auth.GrpcAuthValidator;
 import org.finos.tracdap.common.config.ConfigKeys;
@@ -134,8 +134,8 @@ public class TracMetadataService extends TracServiceBase {
             // Underlying Netty pools / ELs are managed automatically by gRPC for now
 
             var serviceRegister = GrpcServiceRegister.newBuilder()
-                    .registerServices(Metadata.getDescriptor().getServices())
-                    .registerServices(MetadataTrusted.getDescriptor().getServices())
+                    .registerServices(MetadataServiceProto.getDescriptor().getServices())
+                    .registerServices(MetadataTrustedProto.getDescriptor().getServices())
                     .build();
 
             this.server = ServerBuilder
