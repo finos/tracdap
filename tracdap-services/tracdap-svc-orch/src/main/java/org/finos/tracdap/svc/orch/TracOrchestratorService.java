@@ -33,7 +33,7 @@ import org.finos.tracdap.common.grpc.*;
 import org.finos.tracdap.common.plugin.PluginManager;
 import org.finos.tracdap.common.service.TracServiceBase;
 import org.finos.tracdap.common.util.RoutingUtils;
-import org.finos.tracdap.common.validation.GrpcRequestValidator;
+import org.finos.tracdap.common.validation.ValidationInterceptor;
 import org.finos.tracdap.config.PlatformConfig;
 import org.finos.tracdap.config.ServiceConfig;
 import org.finos.tracdap.svc.orch.api.TracOrchestratorApi;
@@ -172,7 +172,7 @@ public class TracOrchestratorService extends TracServiceBase {
 
                     .intercept(new ErrorMappingInterceptor())
                     .intercept(new LoggingServerInterceptor(TracOrchestratorService.class))
-                    .intercept(new GrpcRequestValidator(serviceRegister))
+                    .intercept(new ValidationInterceptor(serviceRegister))
                     .intercept(new GrpcAuthValidator(platformConfig.getAuthentication(), jwtProcessor))
                     .intercept(new RequestMetadataInterceptor())
                     .intercept(new CompressionServerInterceptor())

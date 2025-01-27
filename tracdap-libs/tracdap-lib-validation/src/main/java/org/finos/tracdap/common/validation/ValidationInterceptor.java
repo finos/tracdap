@@ -29,7 +29,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class GrpcRequestValidator extends DelayedExecutionInterceptor {
+public class ValidationInterceptor extends DelayedExecutionInterceptor {
 
     // Validation requires delayed execution, because it has to wait for the first onMessage() call
     // Use delayed interceptor as a base, which has the logic to manage the request sequence
@@ -41,11 +41,11 @@ public class GrpcRequestValidator extends DelayedExecutionInterceptor {
 
     private final boolean loggingEnabled;
 
-    public GrpcRequestValidator(GrpcServiceRegister serviceRegister) {
+    public ValidationInterceptor(GrpcServiceRegister serviceRegister) {
         this(serviceRegister, true);
     }
 
-    public GrpcRequestValidator(GrpcServiceRegister serviceRegister, boolean loggingEnabled) {
+    public ValidationInterceptor(GrpcServiceRegister serviceRegister, boolean loggingEnabled) {
         this.serviceRegister = serviceRegister;
         this.validator = new Validator();
         this.loggingEnabled = loggingEnabled;

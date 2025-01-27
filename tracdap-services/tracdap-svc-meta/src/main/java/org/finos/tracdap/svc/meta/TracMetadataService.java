@@ -29,7 +29,7 @@ import org.finos.tracdap.common.netty.NettyHelpers;
 import org.finos.tracdap.common.plugin.PluginManager;
 import org.finos.tracdap.common.service.TracServiceBase;
 import org.finos.tracdap.common.util.InterfaceLogging;
-import org.finos.tracdap.common.validation.GrpcRequestValidator;
+import org.finos.tracdap.common.validation.ValidationInterceptor;
 import org.finos.tracdap.config.PlatformConfig;
 import org.finos.tracdap.svc.meta.dal.IMetadataDal;
 import org.finos.tracdap.svc.meta.services.MetadataReadService;
@@ -145,7 +145,7 @@ public class TracMetadataService extends TracServiceBase {
                     .addService(trustedApi)
                     .intercept(new ErrorMappingInterceptor())
                     .intercept(new LoggingServerInterceptor(TracMetadataApi.class))
-                    .intercept(new GrpcRequestValidator(serviceRegister))
+                    .intercept(new ValidationInterceptor(serviceRegister))
                     .intercept(new GrpcAuthValidator(platformConfig.getAuthentication(), jwtValidator))
                     .intercept(new RequestMetadataInterceptor())
                     .intercept(new CompressionServerInterceptor())
