@@ -20,9 +20,11 @@ package org.finos.tracdap.svc.orch.service;
 import org.finos.tracdap.api.JobRequest;
 import org.finos.tracdap.api.internal.RuntimeJobResult;
 import org.finos.tracdap.api.internal.RuntimeJobStatus;
-import org.finos.tracdap.common.auth.InternalCallCredentials;
-import org.finos.tracdap.common.auth.UserInfo;
 import org.finos.tracdap.common.exception.EUnexpected;
+import org.finos.tracdap.common.grpc.RequestMetadata;
+import org.finos.tracdap.common.grpc.UserMetadata;
+import org.finos.tracdap.common.middleware.GrpcClientConfig;
+import org.finos.tracdap.common.middleware.GrpcClientState;
 import org.finos.tracdap.config.JobConfig;
 import org.finos.tracdap.config.RuntimeConfig;
 import org.finos.tracdap.metadata.JobDefinition;
@@ -44,13 +46,17 @@ public class JobState implements Serializable, Cloneable {
     private final static long serialVersionUID = 1L;
 
     // Original request as received from the client
-    UserInfo owner;
     String tenant;
     JobRequest jobRequest;
 
-    // Internal credentials used to authenticate within the TRAC platform
-    // Do not serialize to the cache, can be recreated using the internal key as a delegate
-    transient InternalCallCredentials credentials;
+    RequestMetadata requestMetadata;
+    UserMetadata userMetadata;
+
+    // Middleware config for client calls
+    // Client state is serialized with the job state and is always available
+    // Client config is not saved but can be restored from client state when required
+    GrpcClientState clientState;
+    transient GrpcClientConfig clientConfig;
 
     // Identifiers
     String jobKey;

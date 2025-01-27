@@ -17,18 +17,21 @@
 
 package org.finos.tracdap.svc.orch.service;
 
+import io.grpc.Context;
 import org.finos.tracdap.api.JobRequest;
 import org.finos.tracdap.api.JobStatus;
 import org.finos.tracdap.api.MetadataWriteRequest;
 import org.finos.tracdap.api.internal.RuntimeJobStatus;
 import org.finos.tracdap.api.internal.TrustedMetadataApiGrpc.TrustedMetadataApiBlockingStub;
-import org.finos.tracdap.common.auth.GrpcAuthHelpers;
-import org.finos.tracdap.common.auth.InternalAuthProvider;
 import org.finos.tracdap.common.cache.CacheEntry;
 import org.finos.tracdap.common.exception.*;
 import org.finos.tracdap.common.exec.*;
+import org.finos.tracdap.common.grpc.RequestMetadata;
+import org.finos.tracdap.common.grpc.UserMetadata;
 import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.metadata.MetadataUtil;
+import org.finos.tracdap.common.middleware.GrpcClientState;
+import org.finos.tracdap.common.middleware.GrpcConcern;
 import org.finos.tracdap.common.validation.Validator;
 import org.finos.tracdap.common.metadata.MetadataBundle;
 import org.finos.tracdap.config.PlatformConfig;
@@ -43,8 +46,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.Serializable;
-import java.time.Duration;
-import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -53,17 +54,10 @@ import static org.finos.tracdap.common.metadata.MetadataConstants.TRAC_JOB_STATU
 
 public class JobProcessor {
 
-    // Timeout for delegate sessions used to record metadata updates
-    // We regenerate these for each operation, e.g. reporting failures after a job hang we don't want the token to expire
-    // As a result the delegate token can be short-lived
-
-    private static final Duration DELEGATE_SESSION_TIMEOUT = Duration.of(5, ChronoUnit.MINUTES);
-
     private final Logger log = LoggerFactory.getLogger(getClass());
 
     private final PlatformConfig platformConfig;
     private final TrustedMetadataApiBlockingStub metaClient;
-    private final InternalAuthProvider internalAuth;
     private final IJobExecutor<?> executor;
     private final Validator validator = new Validator();
 
@@ -74,26 +68,28 @@ public class JobProcessor {
     public JobProcessor(
             PlatformConfig platformConfig,
             TrustedMetadataApiBlockingStub metaClient,
-            InternalAuthProvider internalAuth,
+            GrpcConcern commonConcerns,
             IJobExecutor<?> jobExecutor) {
 
         this.platformConfig = platformConfig;
         this.metaClient = metaClient;
-        this.internalAuth = internalAuth;
         this.executor = jobExecutor;
 
-        this.lifecycle = new JobProcessorHelpers(platformConfig, metaClient);
+        this.lifecycle = new JobProcessorHelpers(platformConfig, metaClient, commonConcerns);
     }
 
-    public JobState newJob(JobRequest request) {
+    public JobState newJob(JobRequest request, GrpcClientState clientState) {
 
         var jobState = new JobState();
-        jobState.tenant = request.getTenant();
-        jobState.owner = GrpcAuthHelpers.currentUser();
 
+        jobState.tenant = request.getTenant();
+        jobState.jobRequest = request;
         jobState.jobType = request.getJob().getJobType();
         jobState.definition = request.getJob();
-        jobState.jobRequest = request;
+
+        jobState.clientState = clientState;
+        jobState.requestMetadata = RequestMetadata.get(Context.current());
+        jobState.userMetadata = UserMetadata.get(Context.current());
 
         jobState.tracStatus = JobStatusCode.PREPARING;
 
@@ -132,9 +128,6 @@ public class JobProcessor {
 
         try {
 
-            // Credentials are not serialized in the cache, they need to be regenerated
-            newState.credentials = internalAuth.createDelegateSession(jobState.owner, DELEGATE_SESSION_TIMEOUT);
-
             // Load in all the resources referenced by the job
             newState = lifecycle.loadResources(newState);
 
@@ -161,9 +154,6 @@ public class JobProcessor {
     public JobState saveInitialMetadata(JobState jobState) {
 
         var newState = jobState.clone();
-
-        // Credentials are not serialized in the cache, they need to be regenerated
-        newState.credentials = internalAuth.createDelegateSession(jobState.owner, DELEGATE_SESSION_TIMEOUT);
 
         // Apply any transformations specific to the job type
         newState = lifecycle.applyTransform(newState);
@@ -197,9 +187,6 @@ public class JobProcessor {
 
         var newState = jobState.clone();
 
-        // Credentials are not serialized in the cache, they need to be regenerated
-        newState.credentials = internalAuth.createDelegateSession(jobState.owner, DELEGATE_SESSION_TIMEOUT);
-
         var writeRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(jobState.tenant)
                 .setObjectType(ObjectType.JOB)
@@ -209,7 +196,7 @@ public class JobProcessor {
                         .setValue(MetadataCodec.encodeValue(jobState.tracStatus.name())))
                 .build();
 
-        var userAuth = metaClient.withCallCredentials(newState.credentials);
+        var userAuth = lifecycle.configureClient(metaClient, jobState);
         newState.jobId = userAuth.updateTag(writeRequest);
 
         return newState;
@@ -419,9 +406,6 @@ public class JobProcessor {
 
         var newState = jobState.clone();
 
-        // Credentials are not serialized in the cache, they need to be regenerated
-        newState.credentials = internalAuth.createDelegateSession(jobState.owner, DELEGATE_SESSION_TIMEOUT);
-
         // TRAC job status must already be set before calling lifecycle
 
         lifecycle.processJobResult(newState);
@@ -472,9 +456,6 @@ public class JobProcessor {
         var newState = jobState.clone();
         newState.tracStatus = JobStatusCode.FAILED;
         newState.statusMessage = errorMessage;
-
-        // Credentials are not serialized in the cache, they need to be regenerated
-        newState.credentials = internalAuth.createDelegateSession(jobState.owner, DELEGATE_SESSION_TIMEOUT);
 
         lifecycle.processJobResult(newState);
 
