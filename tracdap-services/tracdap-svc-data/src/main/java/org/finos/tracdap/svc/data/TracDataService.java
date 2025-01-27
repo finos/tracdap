@@ -17,7 +17,7 @@
 
 package org.finos.tracdap.svc.data;
 
-import org.finos.tracdap.api.Data;
+import org.finos.tracdap.api.DataServiceProto;
 import org.finos.tracdap.api.internal.TrustedMetadataApiGrpc;
 import org.finos.tracdap.common.netty.*;
 import org.finos.tracdap.common.auth.InternalAuthProvider;
@@ -180,7 +180,7 @@ public class TracDataService extends TracServiceBase {
             var dataApi = new TracDataApi(dataSvc, fileSvc, eventLoopResolver, arrowAllocator);
 
             var serviceRegister = GrpcServiceRegister.newBuilder()
-                    .registerServices(Data.getDescriptor().getServices())
+                    .registerServices(DataServiceProto.getDescriptor().getServices())
                     .build();
 
             // Create the main server
