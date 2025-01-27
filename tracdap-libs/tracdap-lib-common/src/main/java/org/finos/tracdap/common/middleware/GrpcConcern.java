@@ -36,16 +36,23 @@ public interface GrpcConcern extends GrpcServerConfig, GrpcClientConfig, BaseCon
         return clientStub;
     }
 
-    default GrpcClientConfig prepareClientCall(Context callContext) {
+    default GrpcClientState prepareClientCall(Context callContext) {
         return NOOP_CLIENT_CONFIG;
     }
 
-    GrpcClientConfig NOOP_CLIENT_CONFIG = new GrpcClientConfig() {
+    GrpcClientState NOOP_CLIENT_CONFIG = new GrpcClientState() {
+
+        private static final long serialVersionUID = 1;
 
         @Override
         public <TStub extends AbstractStub<TStub>> TStub
         configureClient(TStub clientStub) {
             return clientStub;
+        }
+
+        @Override
+        public GrpcClientState restore(GrpcConcern grpcConcern) {
+            return this;
         }
     };
 }
