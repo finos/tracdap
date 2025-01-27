@@ -17,19 +17,17 @@
 
 package org.finos.tracdap.svc.data.service;
 
-import io.grpc.CallCredentials;
-import org.finos.tracdap.common.auth.UserInfo;
+import org.finos.tracdap.common.middleware.GrpcClientConfig;
+import org.finos.tracdap.common.grpc.RequestMetadata;
 import org.finos.tracdap.metadata.*;
 
-import java.time.Instant;
 import java.util.List;
 
 
 class RequestState {
 
-    UserInfo requestOwner;
-    Instant requestTimestamp;
-    CallCredentials credentials;
+    RequestMetadata requestMetadata;
+    GrpcClientConfig clientConfig;
 
     List<TagUpdate> dataTags;
     List<TagUpdate> fileTags;

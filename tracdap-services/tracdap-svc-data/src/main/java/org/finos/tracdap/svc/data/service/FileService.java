@@ -19,11 +19,11 @@ package org.finos.tracdap.svc.data.service;
 
 
 import org.finos.tracdap.api.internal.TrustedMetadataApiGrpc.TrustedMetadataApiFutureStub;
-import org.finos.tracdap.common.auth.UserInfo;
-import org.finos.tracdap.common.auth.InternalAuthProvider;
 import org.finos.tracdap.common.async.Futures;
 import org.finos.tracdap.common.data.IDataContext;
 import org.finos.tracdap.common.exception.EMetadataDuplicate;
+import org.finos.tracdap.common.middleware.GrpcClientConfig;
+import org.finos.tracdap.common.grpc.RequestMetadata;
 import org.finos.tracdap.common.metadata.MetadataUtil;
 import org.finos.tracdap.common.exception.EDataSize;
 import org.finos.tracdap.common.metadata.MetadataCodec;
@@ -39,9 +39,7 @@ import org.apache.arrow.memory.ArrowBuf;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.time.Duration;
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -64,8 +62,6 @@ public class FileService {
     private static final String FILE_STORAGE_PATH_TEMPLATE = "file/%s/version-%d%s/%s";
     private static final String FILE_STORAGE_PATH_SUFFIX_TEMPLATE = "-x%06x";
 
-    private static final Duration FILE_OPERATION_TIMEOUT = Duration.of(1, ChronoUnit.HOURS);
-
     private static final String BACKSLASH = "/";
 
     private final Logger log = LoggerFactory.getLogger(getClass());
@@ -74,7 +70,6 @@ public class FileService {
     private final Map<String, TenantConfig> tenantConfig;
     private final IStorageManager storageManager;
     private final TrustedMetadataApiFutureStub metaApi;
-    private final InternalAuthProvider internalAuth;
 
     private final Validator validator = new Validator();
     private final Random random = new Random();
@@ -83,14 +78,12 @@ public class FileService {
             StorageConfig storageConfig,
             Map<String, TenantConfig> tenantConfig,
             IStorageManager storageManager,
-            TrustedMetadataApiFutureStub metaApi,
-            InternalAuthProvider internalAuth) {
+            TrustedMetadataApiFutureStub metaApi) {
 
         this.storageConfig = storageConfig;
         this.tenantConfig = tenantConfig;
         this.storageManager = storageManager;
         this.metaApi = metaApi;
-        this.internalAuth = internalAuth;
     }
 
     public CompletionStage<TagHeader> createFile(
@@ -98,12 +91,12 @@ public class FileService {
             String name, String mimeType, Long expectedSize,
             Flow.Publisher<ArrowBuf> contentStream,
             IDataContext dataCtx,
-            UserInfo userInfo) {
+            RequestMetadata requestMetadata,
+            GrpcClientConfig clientConfig) {
 
         var state = new RequestState();
-        state.requestOwner = userInfo;
-        state.requestTimestamp = Instant.now();
-        state.credentials = internalAuth.createDelegateSession(state.requestOwner, FILE_OPERATION_TIMEOUT);
+        state.requestMetadata = requestMetadata;
+        state.clientConfig = clientConfig;
 
         state.fileTags = tags;           // File tags requested by the client
         state.storageTags = List.of();   // Storage tags is empty to start with
@@ -116,18 +109,10 @@ public class FileService {
         // This timestamp is set in the storage definition to timestamp storage incarnations/copies
         // It is also used in the physical storage path
 
-        // TODO: Single object timestamp
+        var client = state.clientConfig.configureClient(metaApi);
 
-        // It would be nice to have a single timestamp for each object version,
-        // which is used in the object header, inside the definitions where needed and for any physical attributes
-        // Currently the metadata service generates its own timestamps, which will always be different
-        // One possible solution would be a change in the trusted metadata API,
-        // letting other TRAC services specify the object timestamp
-        // To avoid polluting the public API, this could go into the gRPC call metadata
-
-        state.requestTimestamp = Instant.now();
-
-        var client = metaApi.withCallCredentials(state.credentials);
+        // TODO: Simplify
+        var objectTimestamp = state.requestMetadata.requestTimestamp().toInstant();
 
         return CompletableFuture.completedFuture(null)
 
@@ -148,7 +133,7 @@ public class FileService {
                 // Build definition objects
                 .thenAccept(x -> state.file = createFileDef(state.fileId, name, mimeType, state.storageId))
                 .thenAccept(x -> state.storage = createStorageDef(
-                        bucket,  state.requestTimestamp,
+                        bucket,  objectTimestamp,
                         state.fileId, name, mimeType))
 
                 // Write file content stream to the storage layer
@@ -175,23 +160,26 @@ public class FileService {
             String name, String mimeType, Long expectedSize,
             Flow.Publisher<ArrowBuf> contentStream,
             IDataContext dataCtx,
-            UserInfo userInfo) {
+            RequestMetadata requestMetadata,
+            GrpcClientConfig clientConfig) {
 
         var state = new RequestState();
-        state.requestOwner = userInfo;
-        state.requestTimestamp = Instant.now();
-        state.credentials = internalAuth.createDelegateSession(state.requestOwner, FILE_OPERATION_TIMEOUT);
+        state.requestMetadata = requestMetadata;
+        state.clientConfig = clientConfig;
 
         state.fileTags = tags;           // File tags requested by the client
         state.storageTags = List.of();   // Storage tags is empty to start with
 
         var prior = new RequestState();
-        prior.credentials = state.credentials;
+        prior.clientConfig = state.clientConfig;
 
         // Currently tenant config is optional for single-tenant deployments, fall back to global defaults
         var bucket = tenantConfig.containsKey(tenant) && tenantConfig.get(tenant).hasDefaultBucket()
                 ? tenantConfig.get(tenant).getDefaultBucket()
                 : storageConfig.getDefaultBucket();
+
+        // TODO: Simplify
+        var objectTimestamp = state.requestMetadata.requestTimestamp().toInstant();
 
         return CompletableFuture.completedFuture(null)
 
@@ -205,7 +193,7 @@ public class FileService {
                 // Build definition objects
                 .thenAccept(x -> state.file = updateFileDef(prior.file, state.fileId, name, mimeType))
                 .thenAccept(x -> state.storage = updateStorageDef(
-                        prior.storage, bucket, state.requestTimestamp,
+                        prior.storage, bucket, objectTimestamp,
                         state.fileId, name, mimeType))
 
                 .thenAccept(x -> validator.validateVersion(state.file, prior.file))
@@ -234,12 +222,12 @@ public class FileService {
             CompletableFuture<FileDefinition> definition,
             Flow.Subscriber<ArrowBuf> content,
             IDataContext dataCtx,
-            UserInfo userInfo) {
+            RequestMetadata requestMetadata,
+            GrpcClientConfig clientConfig) {
 
         var state = new RequestState();
-        state.requestOwner = userInfo;
-        state.requestTimestamp = Instant.now();
-        state.credentials = internalAuth.createDelegateSession(state.requestOwner, FILE_OPERATION_TIMEOUT);
+        state.requestMetadata = requestMetadata;
+        state.clientConfig = clientConfig;
 
         CompletableFuture.completedFuture(null)
 
@@ -255,7 +243,7 @@ public class FileService {
 
     private CompletionStage<Void> loadMetadata(String tenant, TagSelector fileSelector, RequestState state) {
 
-        var client = metaApi.withCallCredentials(state.credentials);
+        var client = state.clientConfig.configureClient(metaApi);
         var request = requestForSelector(tenant, fileSelector);
 
         return Futures.javaFuture(client.readObject(request))
@@ -268,7 +256,7 @@ public class FileService {
 
     private CompletionStage<Void> loadStorageMetadata(String tenant, RequestState state) {
 
-        var client = metaApi.withCallCredentials(state.credentials);
+        var client = state.clientConfig.configureClient(metaApi);
         var request = requestForSelector(tenant, state.file.getStorageId());
 
         return Futures.javaFuture(client.readObject(request))
@@ -281,7 +269,7 @@ public class FileService {
 
     private CompletionStage<TagHeader> saveMetadata(String tenant, RequestState state) {
 
-        var client = metaApi.withCallCredentials(state.credentials);
+        var client = state.clientConfig.configureClient(metaApi);
 
         var priorStorageId = selectorFor(state.preAllocStorageId);
         var storageReq = buildCreateObjectReq(tenant, priorStorageId, state.storage, state.storageTags);
@@ -295,7 +283,7 @@ public class FileService {
 
     private CompletionStage<TagHeader> saveMetadata(String tenant, RequestState state, RequestState prior) {
 
-        var client = metaApi.withCallCredentials(state.credentials);
+        var client = state.clientConfig.configureClient(metaApi);
 
         var priorStorageId = selectorFor(prior.storageId);
         var storageReq = buildCreateObjectReq(tenant, priorStorageId, state.storage, state.storageTags);
