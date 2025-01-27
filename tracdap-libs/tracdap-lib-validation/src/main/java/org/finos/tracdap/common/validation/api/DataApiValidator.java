@@ -34,7 +34,7 @@ import org.finos.tracdap.common.validation.core.ValidationContext;
 import com.google.protobuf.Descriptors;
 
 
-@Validator(type = ValidationType.STATIC, serviceFile = Data.class, serviceName = TracDataApiGrpc.SERVICE_NAME)
+@Validator(type = ValidationType.STATIC, serviceFile = DataServiceProto.class, serviceName = TracDataApiGrpc.SERVICE_NAME)
 public class DataApiValidator {
 
     private static final Descriptors.Descriptor DATA_WRITE_REQUEST;

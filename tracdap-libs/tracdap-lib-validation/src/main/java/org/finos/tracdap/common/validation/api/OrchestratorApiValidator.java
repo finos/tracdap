@@ -29,7 +29,7 @@ import com.google.protobuf.Descriptors;
 import static org.finos.tracdap.common.validation.core.ValidatorUtils.field;
 
 
-@Validator(type = ValidationType.STATIC, serviceFile = Orchestrator.class, serviceName = TracOrchestratorApiGrpc.SERVICE_NAME)
+@Validator(type = ValidationType.STATIC, serviceFile = OrchestratorServiceProto.class, serviceName = TracOrchestratorApiGrpc.SERVICE_NAME)
 public class OrchestratorApiValidator {
 
     private static final Descriptors.Descriptor JOB_REQUEST;
