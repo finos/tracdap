@@ -54,10 +54,21 @@ public class UserMetadata implements Serializable {
 
     private final String userId;
     private final String userName;
+    private final String delegateId;
+    private final String delegateName;
 
     public UserMetadata(@Nonnull String userId, @Nonnull String userName) {
         this.userId = userId;
         this.userName = userName;
+        this.delegateId = null;
+        this.delegateName = null;
+    }
+
+    public UserMetadata(@Nonnull String userId, @Nonnull String userName, @Nonnull String delegateId, @Nonnull String delegateName) {
+        this.userId = userId;
+        this.userName = userName;
+        this.delegateId = delegateId;
+        this.delegateName = delegateName;
     }
 
     public String userId() {
@@ -66,5 +77,17 @@ public class UserMetadata implements Serializable {
 
     public String userName() {
         return userName;
+    }
+
+    public boolean hasDelegate() {
+        return delegateId != null;
+    }
+
+    public String delegateId() {
+        return delegateId;
+    }
+
+    public String delegateName() {
+        return delegateName;
     }
 }

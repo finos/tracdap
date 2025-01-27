@@ -99,8 +99,13 @@ public class LoggingServerInterceptor implements ServerInterceptor {
 
         var userMetadata = UserMetadata.get(Context.current());
 
-        // TODO: Do we need to log delegates here? If so delegates must be added to userMetadata
+        if (userMetadata.hasDelegate())
+            return String.format("%s <%s> on behalf of %s <%s>",
+                    userMetadata.userName(), userMetadata.userId(),
+                    userMetadata.delegateName(), userMetadata.delegateId());
 
-        return String.format("%s <%s>", userMetadata.userName(), userMetadata.userId());
+        else
+            return String.format("%s <%s>",
+                    userMetadata.userName(), userMetadata.userId());
     }
 }
