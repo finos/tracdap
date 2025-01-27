@@ -174,7 +174,7 @@ public class TracMetadataService extends TracServiceBase {
 
     private GrpcConcern buildCommonConcerns(ConfigManager configManager, PluginManager pluginManager) {
 
-        var commonConcerns = CommonServiceConfig.coreConcerns(TracMetadataApi.class);
+        var commonConcerns = CommonServiceConfig.coreConcerns(TracMetadataService.class);
 
         var authConcern = new CommonServiceConfig.Authentication(configManager, METADATA_OPERATION_TIMEOUT);
         commonConcerns.addAfter(CommonConcerns.TRAC_PROTOCOL, authConcern);

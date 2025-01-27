@@ -246,7 +246,7 @@ public class TracOrchestratorService extends TracServiceBase {
 
     private GrpcConcern buildCommonConcerns(ConfigManager configManager, PluginManager pluginManager) {
 
-        var commonConcerns = CommonServiceConfig.coreConcerns(TracOrchestratorApi.class);
+        var commonConcerns = CommonServiceConfig.coreConcerns(TracOrchestratorService.class);
 
         var authConcern = new CommonServiceConfig.Authentication(configManager, JOB_TOKEN_TIMEOUT);
         commonConcerns.addAfter(CommonConcerns.TRAC_PROTOCOL, authConcern);

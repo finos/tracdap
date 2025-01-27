@@ -212,7 +212,7 @@ public class TracDataService extends TracServiceBase {
 
     private GrpcConcern buildCommonConcerns(ConfigManager configManager, PluginManager pluginManager) {
 
-        var commonConcerns = CommonServiceConfig.coreConcerns(TracDataApi.class);
+        var commonConcerns = CommonServiceConfig.coreConcerns(TracDataService.class);
 
         var authConcern = new CommonServiceConfig.Authentication(configManager, DATA_OPERATION_TIMEOUT);
         commonConcerns = commonConcerns.addAfter(CommonConcerns.TRAC_PROTOCOL, authConcern);
