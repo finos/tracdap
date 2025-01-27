@@ -19,8 +19,9 @@ package org.finos.tracdap.common.service;
 
 import org.finos.tracdap.common.auth.*;
 import org.finos.tracdap.common.config.ConfigManager;
+import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.middleware.CommonConcerns;
-import org.finos.tracdap.common.middleware.GrpcClientConfig;
+import org.finos.tracdap.common.middleware.GrpcClientState;
 import org.finos.tracdap.common.middleware.GrpcConcern;
 import org.finos.tracdap.common.grpc.*;
 import org.finos.tracdap.config.AuthenticationConfig;
@@ -101,25 +102,24 @@ public class CommonServiceConfig extends CommonConcerns<GrpcConcern> implements 
     }
 
     @Override
-    public GrpcClientConfig prepareClientCall(Context callContext) {
+    public GrpcClientState prepareClientCall(Context callContext) {
 
-        var clientConfigs = new ArrayList<GrpcClientConfig>();
+        var clientConfigs = new ArrayList<GrpcClientState>();
 
         for (var stageName : stageOrder) {
             var stage = stages.get(stageName);
             var stageCallConfig = stage.prepareClientCall(callContext);
-            if (stageCallConfig != GrpcConcern.NOOP_CLIENT_CONFIG)
-                clientConfigs.add(stageCallConfig);
+            clientConfigs.add(stageCallConfig);
         }
 
         return new ClientCallConcerns(clientConfigs);
     }
 
-    private static class ClientCallConcerns implements GrpcClientConfig {
+    private static class ClientCallConcerns implements GrpcClientState {
 
-        private final List<GrpcClientConfig> clientConfigs;
+        private final List<GrpcClientState> clientConfigs;
 
-        public ClientCallConcerns(List<GrpcClientConfig> clientConfigs) {
+        public ClientCallConcerns(List<GrpcClientState> clientConfigs) {
             this.clientConfigs = clientConfigs;
         }
 
@@ -130,6 +130,26 @@ public class CommonServiceConfig extends CommonConcerns<GrpcConcern> implements 
                 clientStub = config.configureClient(clientStub);
 
             return clientStub;
+        }
+
+        @Override
+        public GrpcClientState restore(GrpcConcern grpcConcern) {
+
+            if (!(grpcConcern instanceof CommonServiceConfig))
+                throw new EUnexpected();
+
+            var commonConcerns = (CommonServiceConfig) grpcConcern;
+
+            for (int i = 0; i < commonConcerns.stageOrder.size(); i++) {
+
+                var concernName = commonConcerns.stageOrder.get(i);
+                var concern = commonConcerns.stages.get(concernName);
+
+                var config = clientConfigs.get(i);
+                config.restore(concern);
+            }
+
+            return this;
         }
     }
 
@@ -197,25 +217,37 @@ public class CommonServiceConfig extends CommonConcerns<GrpcConcern> implements 
         }
 
         @Override
-        public GrpcClientConfig prepareClientCall(Context callContext) {
-
+        public GrpcClientState prepareClientCall(Context callContext) {
             var userInfo = GrpcAuthHelpers.currentUser(callContext);
-            return new ClientConfig(userInfo);
+            var credentials = internalAuthProvider.createDelegateSession(userInfo, sessionTimeout);
+            return new ClientConfig(credentials);
         }
 
-        private class ClientConfig implements GrpcClientConfig {
+        private static class ClientConfig implements GrpcClientState {
 
-            private final UserInfo userInfo;
+            private static final long serialVersionUID = 1L;
 
-            public ClientConfig(UserInfo userInfo) {
-                this.userInfo = userInfo;
+            private final InternalCallCredentials credentials;
+
+            public ClientConfig(InternalCallCredentials credentials) {
+                this.credentials = credentials;
             }
 
             @Override
             public <TStub extends AbstractStub<TStub>> TStub configureClient(TStub clientStub) {
-
-                var credentials = internalAuthProvider.createDelegateSession(userInfo, sessionTimeout);
                 return clientStub.withCallCredentials(credentials);
+            }
+
+            @Override
+            public ClientConfig restore(GrpcConcern grpcConcern) {
+
+                if (!(grpcConcern instanceof Authentication))
+                    throw new EUnexpected();
+
+                var authConcern = (Authentication) grpcConcern;
+                authConcern.internalAuthProvider.setTokenProcessor(credentials);
+
+                return this;
             }
         }
     }
