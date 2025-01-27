@@ -19,12 +19,9 @@ package org.finos.tracdap.svc.data;
 
 import org.finos.tracdap.api.DataServiceProto;
 import org.finos.tracdap.api.internal.TrustedMetadataApiGrpc;
+import org.finos.tracdap.common.middleware.GrpcConcern;
 import org.finos.tracdap.common.netty.*;
-import org.finos.tracdap.common.auth.InternalAuthProvider;
-import org.finos.tracdap.common.auth.JwtSetup;
-import org.finos.tracdap.common.auth.GrpcAuthValidator;
 import org.finos.tracdap.common.config.ConfigKeys;
-import org.finos.tracdap.common.grpc.*;
 import org.finos.tracdap.common.codec.CodecManager;
 import org.finos.tracdap.common.codec.ICodecManager;
 import org.finos.tracdap.common.config.ConfigManager;
@@ -32,11 +29,12 @@ import org.finos.tracdap.common.exception.EPluginNotAvailable;
 import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.common.exception.EStorageConfig;
 import org.finos.tracdap.common.plugin.PluginManager;
+import org.finos.tracdap.common.service.CommonServiceConfig;
 import org.finos.tracdap.common.service.TracServiceBase;
 import org.finos.tracdap.common.storage.IStorageManager;
 import org.finos.tracdap.common.storage.StorageManager;
 import org.finos.tracdap.common.util.RoutingUtils;
-import org.finos.tracdap.common.validation.GrpcRequestValidator;
+import org.finos.tracdap.common.validation.ValidationConcern;
 import org.finos.tracdap.config.PlatformConfig;
 import org.finos.tracdap.config.ServiceConfig;
 import org.finos.tracdap.config.StorageConfig;
@@ -59,11 +57,14 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 
 
 public class TracDataService extends TracServiceBase {
+
+    private static final Duration DATA_OPERATION_TIMEOUT = Duration.of(1, ChronoUnit.HOURS);
 
     private static final int MAX_SERVICE_CORES = 12;
     private static final int MIN_SERVICE_CORES = 2;
@@ -171,21 +172,15 @@ public class TracDataService extends TracServiceBase {
             // Check default storage and format are available
             checkDefaultStorageAndFormat(storage, formats, storageConfig);
 
-            var tokenProcessor = JwtSetup.createProcessor(platformConfig, configManager);
-            var internalAuth = new InternalAuthProvider(tokenProcessor, platformConfig.getAuthentication());
-            var metaClient = prepareMetadataClient(platformConfig, clientChannelType, eventLoopResolver);
+            var commonConcerns = buildCommonConcerns(configManager, pluginManager);
 
-            var fileSvc = new FileService(storageConfig, tenantConfig, storage, metaClient, internalAuth);
-            var dataSvc = new DataService(storageConfig, tenantConfig, storage, formats, metaClient, internalAuth);
-            var dataApi = new TracDataApi(dataSvc, fileSvc, eventLoopResolver, arrowAllocator);
+            var metaClient = prepareMetadataClient(platformConfig, clientChannelType, eventLoopResolver, commonConcerns);
 
-            var serviceRegister = GrpcServiceRegister.newBuilder()
-                    .registerServices(DataServiceProto.getDescriptor().getServices())
-                    .build();
+            var fileSvc = new FileService(storageConfig, tenantConfig, storage, metaClient);
+            var dataSvc = new DataService(storageConfig, tenantConfig, storage, formats, metaClient);
+            var dataApi = new TracDataApi(dataSvc, fileSvc, eventLoopResolver, arrowAllocator, commonConcerns);
 
-            // Create the main server
-
-            this.server = NettyServerBuilder
+            var serverBuilder = NettyServerBuilder
                     .forPort(serviceConfig.getPort())
 
                     // Netty setup
@@ -195,25 +190,12 @@ public class TracDataService extends TracServiceBase {
                     .directExecutor()
 
                     // Services
-                    .addService(dataApi)
+                    .addService(dataApi);
 
-                    // Interceptor order: Last added is executed first
-                    // But note, on close it is the other way round, because the stack is unwinding
-                    // We want error mapping at the bottom of the stack, so it unwinds before logging
+            commonConcerns.configureServer(serverBuilder);
 
-                    // Interceptors
-                    .intercept(new ErrorMappingInterceptor())
-                    .intercept(new LoggingServerInterceptor(TracDataApi.class))
-                    .intercept(new GrpcRequestValidator(serviceRegister))
-                    .intercept(new GrpcAuthValidator(platformConfig.getAuthentication(), tokenProcessor))
-                    .intercept(new RequestMetadataInterceptor())
-                    .intercept(new CompressionServerInterceptor())
-                    .intercept(new DelayedExecutionInterceptor())
-
-                    .build();
-
-            // Good to go, let's start!
-            server.start();
+            this.server = serverBuilder.build();
+            this.server.start();
 
             log.info("Data service is listening on port {}", server.getPort());
         }
@@ -221,6 +203,22 @@ public class TracDataService extends TracServiceBase {
 
             throw new EStartup(e.getMessage(), e);
         }
+    }
+
+    private GrpcConcern buildCommonConcerns(ConfigManager configManager, PluginManager pluginManager) {
+
+        var commonConcerns = CommonServiceConfig.newConfig()
+                .addFirst(new CommonServiceConfig.TracProtocol())
+                .addLast( new CommonServiceConfig.Authentication(configManager, DATA_OPERATION_TIMEOUT))
+                .addLast(new ValidationConcern(DataServiceProto.getDescriptor()))
+                .addLast(new CommonServiceConfig.Logging(TracDataApi.class))
+                .addLast(new CommonServiceConfig.ErrorHandling());
+
+        for (var extension : pluginManager.getExtensions()) {
+            commonConcerns = extension.addServiceConcerns(commonConcerns);
+        }
+
+        return commonConcerns.build();
     }
 
     private void checkDefaultStorageAndFormat(IStorageManager storage, ICodecManager formats, StorageConfig config) {
@@ -249,7 +247,8 @@ public class TracDataService extends TracServiceBase {
     prepareMetadataClient(
             PlatformConfig platformConfig,
             Class<? extends io.netty.channel.Channel> channelType,
-            EventLoopResolver eventLoopResolver) {
+            EventLoopResolver eventLoopResolver,
+            GrpcConcern commonConcerns) {
 
         var metadataTarget = RoutingUtils.serviceTarget(platformConfig, ConfigKeys.METADATA_SERVICE_KEY);
 
@@ -265,11 +264,10 @@ public class TracDataService extends TracServiceBase {
                 .usePlaintext()
                 .build();
 
-        return TrustedMetadataApiGrpc.newFutureStub(clientChannel)
-                .withInterceptors(new EventLoopInterceptor(eventLoopResolver))
-                .withCompression(CompressionClientInterceptor.COMPRESSION_TYPE)
-                .withInterceptors(new CompressionClientInterceptor())
-                .withInterceptors(new LoggingClientInterceptor(TracDataService.class));
+        var client = TrustedMetadataApiGrpc.newFutureStub(clientChannel)
+                .withInterceptors(new EventLoopInterceptor(eventLoopResolver));
+
+        return commonConcerns.configureClient(client);
     }
 
     @Override
