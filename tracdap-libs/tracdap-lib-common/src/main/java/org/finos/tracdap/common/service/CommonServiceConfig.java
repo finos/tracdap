@@ -38,8 +38,16 @@ public class CommonServiceConfig extends CommonConcerns<GrpcConcern> implements 
 
     private static final String TRAC_SERVICE_CONFIG = "trac_service_config";
 
-    public static CommonServiceConfig newConfig() {
+    public static CommonConcerns<GrpcConcern> emptyConfig() {
         return new CommonServiceConfig();
+    }
+
+    public static CommonConcerns<GrpcConcern> coreConcerns(Class<?> serviceClass) {
+
+        return emptyConfig()
+                .addLast(new CommonServiceConfig.TracProtocol())
+                .addLast(new CommonServiceConfig.Logging(serviceClass))
+                .addLast(new CommonServiceConfig.ErrorHandling());
     }
 
     @Override

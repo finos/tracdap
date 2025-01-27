@@ -19,17 +19,17 @@ package org.finos.tracdap.svc.meta;
 
 import org.finos.tracdap.api.MetadataServiceProto;
 import org.finos.tracdap.api.internal.MetadataTrustedProto;
-import org.finos.tracdap.common.auth.JwtSetup;
-import org.finos.tracdap.common.auth.GrpcAuthValidator;
 import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.exception.EStartup;
-import org.finos.tracdap.common.grpc.*;
+import org.finos.tracdap.common.middleware.CommonConcerns;
+import org.finos.tracdap.common.middleware.GrpcConcern;
 import org.finos.tracdap.common.netty.NettyHelpers;
 import org.finos.tracdap.common.plugin.PluginManager;
+import org.finos.tracdap.common.service.CommonServiceConfig;
 import org.finos.tracdap.common.service.TracServiceBase;
 import org.finos.tracdap.common.util.InterfaceLogging;
-import org.finos.tracdap.common.validation.ValidationInterceptor;
+import org.finos.tracdap.common.validation.ValidationConcern;
 import org.finos.tracdap.config.PlatformConfig;
 import org.finos.tracdap.svc.meta.dal.IMetadataDal;
 import org.finos.tracdap.svc.meta.services.MetadataReadService;
@@ -65,6 +65,8 @@ public class TracMetadataService extends TracServiceBase {
     // We do set up a blocking queue as an overflow
     // It would be good to tie this into health reporting and load balancing
     // That is not for this first quick implementation!
+
+    private static final Duration METADATA_OPERATION_TIMEOUT = Duration.of(30, ChronoUnit.SECONDS);
 
     private static final String POOL_SIZE_KEY = "pool.size";
     private static final String POOL_OVERFLOW_KEY = "pool.overflow";
@@ -119,41 +121,29 @@ public class TracMetadataService extends TracServiceBase {
             var publicApi = new TracMetadataApi(readService, writeService, searchService);
             var trustedApi = new TrustedMetadataApi(readService, writeService, searchService);
 
-            var jwtValidator = JwtSetup.createValidator(platformConfig, configManager);
+            // Common framework for cross-cutting concerns
+            var commonConcerns = buildCommonConcerns(configManager, pluginManager);
 
             // Create the main server
+            // This setup is thread-per-request using a thread pool executor
+            // Underlying Netty pools / ELs are managed automatically by gRPC for now
 
             var serviceConfig = platformConfig.getServicesOrThrow(ConfigKeys.METADATA_SERVICE_KEY);
             var servicePort = serviceConfig.getPort();
 
-            // Interceptor order: Last added is executed first
-            // But note, on close it is the other way round, because the stack is unwinding
-            // We want error mapping at the bottom of the stack, so it unwinds before logging
-
-            // This setup is thread-per-request using a thread pool executor
-            // Underlying Netty pools / ELs are managed automatically by gRPC for now
-
-            var serviceRegister = GrpcServiceRegister.newBuilder()
-                    .registerServices(MetadataServiceProto.getDescriptor().getServices())
-                    .registerServices(MetadataTrustedProto.getDescriptor().getServices())
-                    .build();
-
-            this.server = ServerBuilder
+            var serverBuilder = ServerBuilder
                     .forPort(servicePort)
                     .executor(executor)
                     .addService(publicApi)
-                    .addService(trustedApi)
-                    .intercept(new ErrorMappingInterceptor())
-                    .intercept(new LoggingServerInterceptor(TracMetadataApi.class))
-                    .intercept(new ValidationInterceptor(serviceRegister))
-                    .intercept(new GrpcAuthValidator(platformConfig.getAuthentication(), jwtValidator))
-                    .intercept(new RequestMetadataInterceptor())
-                    .intercept(new CompressionServerInterceptor())
-                    .intercept(new DelayedExecutionInterceptor())
+                    .addService(trustedApi);
+
+            // Apply common concerns
+            this.server = commonConcerns
+                    .configureServer(serverBuilder)
                     .build();
 
             // Good to go, let's start!
-            server.start();
+            this.server.start();
 
         }
         catch (IOException e) {
@@ -180,6 +170,25 @@ public class TracMetadataService extends TracServiceBase {
         executor.shutdown();
 
         return 0;
+    }
+
+    private GrpcConcern buildCommonConcerns(ConfigManager configManager, PluginManager pluginManager) {
+
+        var commonConcerns = CommonServiceConfig.coreConcerns(TracMetadataApi.class);
+
+        var authConcern = new CommonServiceConfig.Authentication(configManager, METADATA_OPERATION_TIMEOUT);
+        commonConcerns.addAfter(CommonConcerns.TRAC_PROTOCOL, authConcern);
+
+        // Validation concern for the APIs being served
+        var validationConcern = new ValidationConcern(MetadataServiceProto.getDescriptor(), MetadataTrustedProto.getDescriptor());
+        commonConcerns = commonConcerns.addAfter(CommonConcerns.TRAC_AUTHENTICATION, validationConcern);
+
+        // Additional cross-cutting concerns configured by extensions
+        for (var extension : pluginManager.getExtensions()) {
+            commonConcerns = extension.addServiceConcerns(commonConcerns);
+        }
+
+        return commonConcerns.build();
     }
 
     ExecutorService createPrimaryExecutor(Properties properties) {
