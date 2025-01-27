@@ -133,7 +133,7 @@ public class TracOrchestratorService extends TracServiceBase {
             // Common framework for cross-cutting concerns
             var commonConcerns = buildCommonConcerns(configManager, pluginManager);
 
-            var metaClient = prepareMetadataClient(platformConfig, clientChannelFactory);
+            var metaClient = prepareMetadataClient(platformConfig, clientChannelFactory, commonConcerns);
 
             var batchExecutor = (IBatchExecutor<? extends Serializable>) pluginManager.createService(
                     IBatchExecutor.class,
@@ -264,7 +264,8 @@ public class TracOrchestratorService extends TracServiceBase {
     }
 
     private TrustedMetadataApiGrpc.TrustedMetadataApiBlockingStub prepareMetadataClient(
-            PlatformConfig platformConfig, GrpcChannelFactory channelFactory) {
+            PlatformConfig platformConfig, GrpcChannelFactory channelFactory,
+            GrpcConcern commonConcerns) {
 
         var metadataTarget = RoutingUtils.serviceTarget(platformConfig, ConfigKeys.METADATA_SERVICE_KEY);
 
@@ -273,11 +274,9 @@ public class TracOrchestratorService extends TracServiceBase {
 
         clientChannel = channelFactory.createChannel(metadataTarget.getHost(), metadataTarget.getPort());
 
-        return TrustedMetadataApiGrpc
-                .newBlockingStub(clientChannel)
-                .withCompression(CompressionClientInterceptor.COMPRESSION_TYPE)
-                .withInterceptors(new CompressionClientInterceptor())
-                .withInterceptors(new LoggingClientInterceptor(TracOrchestratorService.class));
+        var metadataClient = TrustedMetadataApiGrpc.newBlockingStub(clientChannel);
+
+        return commonConcerns.configureClient(metadataClient);
     }
 
     private class ClientChannelFactory implements GrpcChannelFactory {
