@@ -17,9 +17,9 @@
 
 package org.finos.tracdap.gateway.builders;
 
-import org.finos.tracdap.api.Data;
-import org.finos.tracdap.api.Metadata;
-import org.finos.tracdap.api.Orchestrator;
+import org.finos.tracdap.api.DataServiceProto;
+import org.finos.tracdap.api.MetadataServiceProto;
+import org.finos.tracdap.api.OrchestratorServiceProto;
 import org.finos.tracdap.common.config.ConfigHelpers;
 import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.config.ServiceProperties;
@@ -50,9 +50,9 @@ public class ServiceInfo {
             Map.entry(ConfigKeys.ORCHESTRATOR_SERVICE_KEY, "/trac-orch/"));
 
     private static final Map<String, Descriptors.ServiceDescriptor> SERVICE_DESCRIPTORS = Map.ofEntries(
-            Map.entry(ConfigKeys.METADATA_SERVICE_KEY, serviceDescriptor(Metadata.getDescriptor(), "TracMetadataApi")),
-            Map.entry(ConfigKeys.DATA_SERVICE_KEY, serviceDescriptor(Data.getDescriptor(), "TracDataApi")),
-            Map.entry(ConfigKeys.ORCHESTRATOR_SERVICE_KEY, serviceDescriptor(Orchestrator.getDescriptor(), "TracOrchestratorApi")));
+            Map.entry(ConfigKeys.METADATA_SERVICE_KEY, serviceDescriptor(MetadataServiceProto.getDescriptor(), "TracMetadataApi")),
+            Map.entry(ConfigKeys.DATA_SERVICE_KEY, serviceDescriptor(DataServiceProto.getDescriptor(), "TracDataApi")),
+            Map.entry(ConfigKeys.ORCHESTRATOR_SERVICE_KEY, serviceDescriptor(OrchestratorServiceProto.getDescriptor(), "TracOrchestratorApi")));
 
     private static final String API_V1_PREFIX = "api/v1/";
 
