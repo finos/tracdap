@@ -20,6 +20,7 @@ package org.finos.tracdap.common.grpc;
 import io.grpc.Context;
 
 import javax.annotation.Nonnull;
+import java.io.Serializable;
 
 
 /**
@@ -31,7 +32,9 @@ import javax.annotation.Nonnull;
  * to add user annotations to jobs, service logs etc. It is not intended
  * as a way to manage authentication or access control.
  */
-public class UserMetadata {
+public class UserMetadata implements Serializable {
+
+    private static final long serialVersionUID = 1L;
 
     public static final String UNKNOWN_USER_ID = "#trac_unknown";
     public static final String UNKNOWN_USER_NAME = "Unknown User";

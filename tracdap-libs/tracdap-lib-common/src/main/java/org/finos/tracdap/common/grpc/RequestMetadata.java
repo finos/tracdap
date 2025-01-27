@@ -20,6 +20,7 @@ package org.finos.tracdap.common.grpc;
 import io.grpc.Context;
 
 import javax.annotation.Nonnull;
+import java.io.Serializable;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -32,7 +33,9 @@ import java.time.ZoneOffset;
  * In the default configuration, TRAC will set request metadata for each incoming request.
  * Service extensions can override or add to request metadata using custom interceptors.
  */
-public class RequestMetadata {
+public class RequestMetadata implements Serializable {
+
+    private static final long serialVersionUID = 1L;
 
     public static final String UNKNOWN_REQUEST_ID = "#unknown_request_id";
     public static final OffsetDateTime UNKNOWN_REQUEST_TIMESTAMP = Instant.EPOCH.atOffset(ZoneOffset.UTC);
