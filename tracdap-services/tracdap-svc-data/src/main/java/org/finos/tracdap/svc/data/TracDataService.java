@@ -19,6 +19,7 @@ package org.finos.tracdap.svc.data;
 
 import org.finos.tracdap.api.DataServiceProto;
 import org.finos.tracdap.api.internal.TrustedMetadataApiGrpc;
+import org.finos.tracdap.common.middleware.CommonConcerns;
 import org.finos.tracdap.common.middleware.GrpcConcern;
 import org.finos.tracdap.common.netty.*;
 import org.finos.tracdap.common.config.ConfigKeys;
@@ -172,6 +173,7 @@ public class TracDataService extends TracServiceBase {
             // Check default storage and format are available
             checkDefaultStorageAndFormat(storage, formats, storageConfig);
 
+            // Common framework for cross-cutting concerns
             var commonConcerns = buildCommonConcerns(configManager, pluginManager);
 
             var metaClient = prepareMetadataClient(platformConfig, clientChannelType, eventLoopResolver, commonConcerns);
@@ -192,9 +194,12 @@ public class TracDataService extends TracServiceBase {
                     // Services
                     .addService(dataApi);
 
-            commonConcerns.configureServer(serverBuilder);
+            // Apply common concerns
+            this.server =  commonConcerns
+                    .configureServer(serverBuilder)
+                    .build();
 
-            this.server = serverBuilder.build();
+            // Good to go, let's start!
             this.server.start();
 
             log.info("Data service is listening on port {}", server.getPort());
@@ -207,13 +212,16 @@ public class TracDataService extends TracServiceBase {
 
     private GrpcConcern buildCommonConcerns(ConfigManager configManager, PluginManager pluginManager) {
 
-        var commonConcerns = CommonServiceConfig.newConfig()
-                .addFirst(new CommonServiceConfig.TracProtocol())
-                .addLast( new CommonServiceConfig.Authentication(configManager, DATA_OPERATION_TIMEOUT))
-                .addLast(new ValidationConcern(DataServiceProto.getDescriptor()))
-                .addLast(new CommonServiceConfig.Logging(TracDataApi.class))
-                .addLast(new CommonServiceConfig.ErrorHandling());
+        var commonConcerns = CommonServiceConfig.coreConcerns(TracDataApi.class);
 
+        var authConcern = new CommonServiceConfig.Authentication(configManager, DATA_OPERATION_TIMEOUT);
+        commonConcerns = commonConcerns.addAfter(CommonConcerns.TRAC_PROTOCOL, authConcern);
+
+        // Validation concern for the APIs being served
+        var validationConcern = new ValidationConcern(DataServiceProto.getDescriptor());
+        commonConcerns = commonConcerns.addAfter(CommonConcerns.TRAC_AUTHENTICATION, validationConcern);
+
+        // Additional cross-cutting concerns configured by extensions
         for (var extension : pluginManager.getExtensions()) {
             commonConcerns = extension.addServiceConcerns(commonConcerns);
         }
