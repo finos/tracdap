@@ -349,6 +349,7 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         secretKey = env.getOrDefault(SECRET_KEY_ENV_VAR, SECRET_KEY_DEFAULT);
 
         pluginManager = new PluginManager();
+        pluginManager.registerExtensions();
         pluginManager.initConfigPlugins();
 
         configManager = new ConfigManager(platformConfigUrl.toString(), tracDir, pluginManager, secretKey);
