@@ -68,7 +68,7 @@ public class TracServiceConfig {
 
             return serverBuilder
                     .intercept(new RequestMetadataInterceptor())
-                    .intercept(new CompressionServerInterceptor())
+                    .intercept(new CompressionInterceptor())
                     .intercept(new DelayedExecutionInterceptor());
         }
 
@@ -76,8 +76,8 @@ public class TracServiceConfig {
         public <TStub extends AbstractStub<TStub>> TStub configureClient(TStub clientStub) {
 
             return clientStub
-                    .withCompression(CompressionClientInterceptor.COMPRESSION_TYPE)
-                    .withInterceptors(new CompressionClientInterceptor());
+                    .withCompression(ClientCompressionInterceptor.COMPRESSION_TYPE)
+                    .withInterceptors(new ClientCompressionInterceptor());
         }
     }
 
@@ -163,13 +163,13 @@ public class TracServiceConfig {
         @Override
         public ServerBuilder<? extends ServerBuilder<?>> configureServer(ServerBuilder<? extends ServerBuilder<?>> serverBuilder) {
 
-            return serverBuilder.intercept(new LoggingServerInterceptor(serviceClass));
+            return serverBuilder.intercept(new LoggingInterceptor(serviceClass));
         }
 
         @Override
         public <TStub extends AbstractStub<TStub>> TStub configureClient(TStub clientStub) {
 
-            return clientStub.withInterceptors(new LoggingClientInterceptor(serviceClass));
+            return clientStub.withInterceptors(new ClientLoggingInterceptor(serviceClass));
         }
     }
 

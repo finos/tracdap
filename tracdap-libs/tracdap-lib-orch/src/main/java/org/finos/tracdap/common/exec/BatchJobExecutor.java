@@ -21,9 +21,9 @@ import org.finos.tracdap.api.internal.*;
 import org.finos.tracdap.common.config.ConfigFormat;
 import org.finos.tracdap.common.config.ConfigParser;
 import org.finos.tracdap.common.exception.*;
-import org.finos.tracdap.common.grpc.CompressionClientInterceptor;
+import org.finos.tracdap.common.grpc.ClientCompressionInterceptor;
 import org.finos.tracdap.common.grpc.GrpcChannelFactory;
-import org.finos.tracdap.common.grpc.LoggingClientInterceptor;
+import org.finos.tracdap.common.grpc.ClientLoggingInterceptor;
 import org.finos.tracdap.common.metadata.MetadataUtil;
 import org.finos.tracdap.config.JobConfig;
 import org.finos.tracdap.config.JobResult;
@@ -438,9 +438,9 @@ public class BatchJobExecutor<TBatchState extends Serializable> implements IJobE
 
         return TracRuntimeApiGrpc
                 .newBlockingStub(clientChannel)
-                .withCompression(CompressionClientInterceptor.COMPRESSION_TYPE)
-                .withInterceptors(new CompressionClientInterceptor())
-                .withInterceptors(new LoggingClientInterceptor(BatchJobExecutor.class));
+                .withCompression(ClientCompressionInterceptor.COMPRESSION_TYPE)
+                .withInterceptors(new ClientCompressionInterceptor())
+                .withInterceptors(new ClientLoggingInterceptor(BatchJobExecutor.class));
     }
 
     private JobStatusCode mapStatusCode(BatchStatusCode batchStatusCode) {

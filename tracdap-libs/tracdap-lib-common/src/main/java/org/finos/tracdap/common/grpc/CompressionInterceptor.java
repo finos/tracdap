@@ -21,33 +21,35 @@ import com.google.protobuf.MessageLite;
 import io.grpc.*;
 
 
-public class CompressionClientInterceptor implements ClientInterceptor {
+public class CompressionInterceptor implements ServerInterceptor  {
 
     public static final String COMPRESSION_TYPE = "gzip";
     public static final int COMPRESSION_THRESHOLD = 65336;
 
     @Override
-    public <ReqT, RespT> ClientCall<ReqT, RespT>
-    interceptCall(MethodDescriptor<ReqT, RespT> method, CallOptions callOptions, Channel next) {
+    public <ReqT, RespT> ServerCall.Listener<ReqT>
+    interceptCall(ServerCall<ReqT, RespT> call, Metadata headers, ServerCallHandler<ReqT, RespT> next) {
 
-        var nextCall = next.newCall(method, callOptions);
+        call.setCompression(COMPRESSION_TYPE);
 
-        return new CompressionClientCall<>(nextCall);
+        var compressionCall = new CompressionServerCall<>(call);
+
+        return next.startCall(compressionCall, headers);
     }
 
-    private static class CompressionClientCall<ReqT, RespT> extends ForwardingClientCall.SimpleForwardingClientCall<ReqT, RespT> {
+    private static class CompressionServerCall<ReqT, RespT> extends ForwardingServerCall.SimpleForwardingServerCall<ReqT, RespT> {
 
-        public CompressionClientCall(ClientCall<ReqT, RespT> delegate) {
+        public CompressionServerCall(ServerCall<ReqT, RespT> delegate) {
             super(delegate);
         }
 
         @Override
-        public void sendMessage(ReqT message) {
+        public void sendMessage(RespT message) {
 
             var msg = (MessageLite) message;
 
-            if (msg.getSerializedSize() > COMPRESSION_THRESHOLD)
-                delegate().setMessageCompression(true);
+            if (msg != null)
+                delegate().setMessageCompression(msg.getSerializedSize() > COMPRESSION_THRESHOLD);
 
             delegate().sendMessage(message);
         }
