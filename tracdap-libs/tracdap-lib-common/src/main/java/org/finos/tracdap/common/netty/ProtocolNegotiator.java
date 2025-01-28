@@ -96,6 +96,8 @@ public class ProtocolNegotiator extends ChannelInitializer<SocketChannel> {
         }
         else {
 
+            // Basic upgrade handler requires HTTP codec pre-installed on the pipeline
+            pipeline.addLast(HTTP_1_CODEC, httpCodec);
             pipeline.addLast(UPGRADE_HANDLER, upgradeHandler);
         }
 
