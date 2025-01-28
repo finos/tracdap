@@ -17,11 +17,6 @@
 
 package org.finos.tracdap.svc.auth;
 
-import io.netty.bootstrap.ServerBootstrap;
-import io.netty.channel.ChannelHandler;
-import io.netty.channel.ChannelOption;
-import io.netty.channel.EventLoopGroup;
-import io.netty.channel.socket.nio.NioServerSocketChannel;
 import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.exception.EStartup;
@@ -32,12 +27,17 @@ import org.finos.tracdap.common.netty.ProtocolHandler;
 import org.finos.tracdap.common.plugin.PluginManager;
 import org.finos.tracdap.common.service.TracNettyConfig;
 import org.finos.tracdap.common.service.TracServiceBase;
-
-import io.netty.buffer.ByteBufAllocator;
-import io.netty.channel.nio.NioEventLoopGroup;
-
 import org.finos.tracdap.config.PlatformConfig;
 import org.finos.tracdap.config.ServiceConfig;
+
+import io.netty.bootstrap.ServerBootstrap;
+import io.netty.buffer.ByteBufAllocator;
+import io.netty.channel.ChannelHandler;
+import io.netty.channel.ChannelOption;
+import io.netty.channel.EventLoopGroup;
+import io.netty.channel.socket.nio.NioServerSocketChannel;
+import io.netty.channel.nio.NioEventLoopGroup;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
