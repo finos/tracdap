@@ -22,11 +22,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class LoggingClientInterceptor implements ClientInterceptor {
+public class ClientLoggingInterceptor implements ClientInterceptor {
 
     private final Logger log;
 
-    public LoggingClientInterceptor(Class<?> serviceClass) {
+    public ClientLoggingInterceptor(Class<?> serviceClass) {
         log = LoggerFactory.getLogger(serviceClass);
     }
 

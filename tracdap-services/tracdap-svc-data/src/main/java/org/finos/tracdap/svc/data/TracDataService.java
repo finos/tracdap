@@ -19,7 +19,6 @@ package org.finos.tracdap.svc.data;
 
 import org.finos.tracdap.api.DataServiceProto;
 import org.finos.tracdap.api.internal.TrustedMetadataApiGrpc;
-import org.finos.tracdap.common.middleware.CommonConcerns;
 import org.finos.tracdap.common.middleware.GrpcConcern;
 import org.finos.tracdap.common.netty.*;
 import org.finos.tracdap.common.config.ConfigKeys;
@@ -30,7 +29,7 @@ import org.finos.tracdap.common.exception.EPluginNotAvailable;
 import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.common.exception.EStorageConfig;
 import org.finos.tracdap.common.plugin.PluginManager;
-import org.finos.tracdap.common.service.CommonServiceConfig;
+import org.finos.tracdap.common.service.TracServiceConfig;
 import org.finos.tracdap.common.service.TracServiceBase;
 import org.finos.tracdap.common.storage.IStorageManager;
 import org.finos.tracdap.common.storage.StorageManager;
@@ -80,6 +79,11 @@ public class TracDataService extends TracServiceBase {
     private ExecutorService offloadExecutor;
     private StorageManager storage;
     private Server server;
+
+    public static void main(String[] args) {
+
+        TracServiceBase.svcMain(TracDataService.class, args);
+    }
 
     public TracDataService(PluginManager plugins, ConfigManager config) {
         this.pluginManager = plugins;
@@ -212,14 +216,14 @@ public class TracDataService extends TracServiceBase {
 
     private GrpcConcern buildCommonConcerns(ConfigManager configManager, PluginManager pluginManager) {
 
-        var commonConcerns = CommonServiceConfig.coreConcerns(TracDataService.class);
+        var commonConcerns = TracServiceConfig.coreConcerns(TracDataService.class);
 
-        var authConcern = new CommonServiceConfig.Authentication(configManager, DATA_OPERATION_TIMEOUT);
-        commonConcerns = commonConcerns.addAfter(CommonConcerns.TRAC_PROTOCOL, authConcern);
+        var authConcern = new TracServiceConfig.Authentication(configManager, DATA_OPERATION_TIMEOUT);
+        commonConcerns = commonConcerns.addAfter(TracServiceConfig.TRAC_PROTOCOL, authConcern);
 
         // Validation concern for the APIs being served
         var validationConcern = new ValidationConcern(DataServiceProto.getDescriptor());
-        commonConcerns = commonConcerns.addAfter(CommonConcerns.TRAC_AUTHENTICATION, validationConcern);
+        commonConcerns = commonConcerns.addAfter(TracServiceConfig.TRAC_AUTHENTICATION, validationConcern);
 
         // Additional cross-cutting concerns configured by extensions
         for (var extension : pluginManager.getExtensions()) {
@@ -320,10 +324,5 @@ public class TracDataService extends TracServiceBase {
             server.shutdownNow();
 
         return -1;
-    }
-
-    public static void main(String[] args) {
-
-        TracServiceBase.svcMain(TracDataService.class, args);
     }
 }

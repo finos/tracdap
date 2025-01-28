@@ -17,26 +17,34 @@
 
 package org.finos.tracdap.gateway;
 
-import org.finos.tracdap.common.exception.EUnexpected;
-import org.finos.tracdap.config.PlatformConfig;
-import org.finos.tracdap.common.auth.JwtSetup;
 import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.exception.EStartup;
+import org.finos.tracdap.common.middleware.NettyConcern;
+import org.finos.tracdap.common.netty.ProtocolNegotiator;
 import org.finos.tracdap.common.netty.EventLoopScheduler;
 import org.finos.tracdap.common.netty.NettyHelpers;
+import org.finos.tracdap.common.netty.ProtocolHandler;
 import org.finos.tracdap.common.plugin.PluginManager;
+import org.finos.tracdap.common.service.TracNettyConfig;
 import org.finos.tracdap.common.service.TracServiceBase;
-import org.finos.tracdap.gateway.auth.AuthHandlerSettings;
+import org.finos.tracdap.config.PlatformConfig;
+import org.finos.tracdap.config.ServiceConfig;
+import org.finos.tracdap.gateway.auth.AuthConcern;
 import org.finos.tracdap.gateway.builders.RedirectBuilder;
+import org.finos.tracdap.gateway.builders.RouteBuilder;
 import org.finos.tracdap.gateway.exec.Redirect;
 import org.finos.tracdap.gateway.exec.Route;
-import org.finos.tracdap.gateway.builders.RouteBuilder;
+import org.finos.tracdap.gateway.routing.Http1Router;
+import org.finos.tracdap.gateway.routing.WebSocketsRouter;
 
 import io.netty.bootstrap.ServerBootstrap;
+import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
+import io.netty.handler.codec.http.HttpRequest;
+import io.netty.handler.codec.http.websocketx.WebSocketServerProtocolConfig;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -44,9 +52,9 @@ import org.slf4j.LoggerFactory;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
-import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 
 public class TracPlatformGateway extends TracServiceBase {
@@ -66,43 +74,41 @@ public class TracPlatformGateway extends TracServiceBase {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
+    private final PluginManager pluginManager;
     private final ConfigManager configManager;
-    private PlatformConfig platformConfig;
+
+    private ServiceConfig serviceConfig;
 
     private EventLoopGroup bossGroup = null;
     private EventLoopGroup workerGroup = null;
 
+    private AtomicInteger connId;
+    private List<Route> routes;
+    private List<Redirect> redirects;
+
+    public static void main(String[] args) {
+
+        TracServiceBase.svcMain(TracPlatformGateway.class, args);
+    }
+
     public TracPlatformGateway(PluginManager pluginManager, ConfigManager configManager) {
-
-        // Plugins not currently needed in the gateway (this is a good thing)!
-        if (pluginManager == null)
-            throw new EUnexpected();
-
+        this.pluginManager = pluginManager;
         this.configManager = configManager;
     }
 
     @Override
     protected void doStartup(Duration startupTimeout) throws InterruptedException {
 
-        Properties serviceProperties;
         short proxyPort;
-
-        AuthHandlerSettings authSettings;
-        List<Route> routes;
-        List<Redirect> redirects;
 
         try {
             log.info("Preparing gateway config...");
 
-            platformConfig = configManager.loadRootConfigObject(PlatformConfig.class);
-
-            var serviceConfig = platformConfig.getServicesOrThrow(ConfigKeys.GATEWAY_SERVICE_KEY);
-
-            serviceProperties = new Properties();
-            serviceProperties.putAll(serviceConfig.getPropertiesMap());
+            var platformConfig = configManager.loadRootConfigObject(PlatformConfig.class);
+            serviceConfig = platformConfig.getServicesOrThrow(ConfigKeys.GATEWAY_SERVICE_KEY);
             proxyPort = (short) serviceConfig.getPort();
 
-            authSettings = new AuthHandlerSettings(platformConfig);
+            connId = new AtomicInteger();
             routes = new RouteBuilder().buildRoutes(platformConfig);
             redirects = new RedirectBuilder().buildRedirects(platformConfig);
 
@@ -119,13 +125,16 @@ public class TracPlatformGateway extends TracServiceBase {
 
             log.info("Starting the gateway server on port {}...", proxyPort);
 
-            // JWT validator is responsible for checking auth tokens on inbound requests
-            var jwtValidator = JwtSetup.createValidator(platformConfig, configManager);
+            // Currently HTTP and WS are supported
+            var mainHandler = ProtocolHandler.create()
+                    .withHttp(this::httpHandler)
+                    .withWebsocket(this::websocketHandler, this::websocketConfig);
+
+            // Common framework for cross-cutting concerns
+            var commonConcerns = buildCommonConcerns();
 
             // The protocol negotiator is the top level initializer for new inbound connections
-            var protocolNegotiator = new ProtocolNegotiator(
-                    serviceProperties, authSettings,
-                    jwtValidator, routes, redirects);
+            var protocolNegotiator = new ProtocolNegotiator(mainHandler, commonConcerns);
 
             var bossThreadCount = 1;
             var bossExecutor = NettyHelpers.eventLoopExecutor("gw-boss");
@@ -225,8 +234,36 @@ public class TracPlatformGateway extends TracServiceBase {
         return 0;
     }
 
-    public static void main(String[] args) {
+    private NettyConcern buildCommonConcerns() {
 
-        TracServiceBase.svcMain(TracPlatformGateway.class, args);
+        var commonConcerns = TracNettyConfig.coreConcerns("gateway service", serviceConfig);
+
+        var authConcern = new AuthConcern(configManager);
+        commonConcerns = commonConcerns.addFirst(authConcern);
+
+        // Additional cross-cutting concerns configured by extensions
+        for (var extension : pluginManager.getExtensions()) {
+            commonConcerns = extension.addGatewayConcerns(commonConcerns);
+        }
+
+        return commonConcerns.build();
+    }
+
+    private ChannelHandler httpHandler() {
+        return new Http1Router(routes, redirects, connId.getAndIncrement());
+    }
+
+    private ChannelHandler websocketHandler() {
+        return new WebSocketsRouter(routes, connId.getAndIncrement());
+    }
+
+    private WebSocketServerProtocolConfig websocketConfig(HttpRequest upgradeRequest) {
+
+        return WebSocketServerProtocolConfig.newBuilder()
+                .websocketPath(upgradeRequest.uri())
+                .subprotocols("grpc-websockets")
+                .allowExtensions(true)
+                .handleCloseFrames(false)
+                .build();
     }
 }

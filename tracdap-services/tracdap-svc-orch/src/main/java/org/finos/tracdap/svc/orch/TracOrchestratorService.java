@@ -27,10 +27,9 @@ import org.finos.tracdap.common.exec.IBatchExecutor;
 import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.common.exec.IJobExecutor;
 import org.finos.tracdap.common.grpc.*;
-import org.finos.tracdap.common.middleware.CommonConcerns;
 import org.finos.tracdap.common.middleware.GrpcConcern;
 import org.finos.tracdap.common.plugin.PluginManager;
-import org.finos.tracdap.common.service.CommonServiceConfig;
+import org.finos.tracdap.common.service.TracServiceConfig;
 import org.finos.tracdap.common.service.TracServiceBase;
 import org.finos.tracdap.common.util.RoutingUtils;
 import org.finos.tracdap.common.validation.ValidationConcern;
@@ -84,6 +83,11 @@ public class TracOrchestratorService extends TracServiceBase {
     private IJobExecutor<?> jobExecutor;
     private IJobCacheManager jobCacheManager;
     private JobManager jobManager;
+
+    public static void main(String[] args) {
+
+        TracServiceBase.svcMain(TracOrchestratorService.class, args);
+    }
 
     public TracOrchestratorService(PluginManager pluginManager, ConfigManager configManager) {
 
@@ -246,14 +250,14 @@ public class TracOrchestratorService extends TracServiceBase {
 
     private GrpcConcern buildCommonConcerns(ConfigManager configManager, PluginManager pluginManager) {
 
-        var commonConcerns = CommonServiceConfig.coreConcerns(TracOrchestratorService.class);
+        var commonConcerns = TracServiceConfig.coreConcerns(TracOrchestratorService.class);
 
-        var authConcern = new CommonServiceConfig.Authentication(configManager, JOB_TOKEN_TIMEOUT);
-        commonConcerns.addAfter(CommonConcerns.TRAC_PROTOCOL, authConcern);
+        var authConcern = new TracServiceConfig.Authentication(configManager, JOB_TOKEN_TIMEOUT);
+        commonConcerns.addAfter(TracServiceConfig.TRAC_PROTOCOL, authConcern);
 
         // Validation concern for the APIs being served
         var validationConcern = new ValidationConcern(OrchestratorServiceProto.getDescriptor());
-        commonConcerns = commonConcerns.addAfter(CommonConcerns.TRAC_AUTHENTICATION, validationConcern);
+        commonConcerns = commonConcerns.addAfter(TracServiceConfig.TRAC_AUTHENTICATION, validationConcern);
 
         // Additional cross-cutting concerns configured by extensions
         for (var extension : pluginManager.getExtensions()) {
@@ -299,10 +303,5 @@ public class TracOrchestratorService extends TracServiceBase {
 
             return clientChannelBuilder.build();
         }
-    }
-
-    public static void main(String[] args) {
-
-        TracServiceBase.svcMain(TracOrchestratorService.class, args);
     }
 }
