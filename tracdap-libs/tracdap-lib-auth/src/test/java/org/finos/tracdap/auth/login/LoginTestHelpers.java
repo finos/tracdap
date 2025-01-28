@@ -17,25 +17,23 @@
 
 package org.finos.tracdap.auth.login;
 
-import io.netty.handler.codec.http.HttpRequest;
-import org.finos.tracdap.common.netty.BaseProtocolNegotiator;
 import org.finos.tracdap.common.netty.NettyHelpers;
+import org.finos.tracdap.common.netty.ProtocolHandler;
+import org.finos.tracdap.common.netty.ProtocolNegotiator;
+import org.finos.tracdap.common.service.TracNettyConfig;
+import org.finos.tracdap.config.ServiceConfig;
 
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
-import io.netty.handler.codec.http.websocketx.WebSocketServerProtocolConfig;
 
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 
 
 public class LoginTestHelpers {
-
-    static int IDLE_TIMEOUT = 5;  // seconds
-
 
     public static Runnable setupNettyHttp1(Supplier<ChannelHandler>  http1Handler, short port) throws InterruptedException {
 
@@ -59,7 +57,18 @@ public class LoginTestHelpers {
         var workerGroup = new NioEventLoopGroup(2, workerFactory);
         var allocator = ByteBufAllocator.DEFAULT;
 
-        var protocolNegotiator = new ProtocolNegotiator(http1Handler, http2Handler);
+        // Service config is not supplied atm
+        var blankServiceConfig = ServiceConfig.newBuilder().build();
+
+        // Set up the supplied handlers
+        var mainHandler = ProtocolHandler.create()
+                .withHttp(http1Handler)
+                .withHttp2(http2Handler);
+
+        // Use default core concerns for testing
+        var commonConcerns = TracNettyConfig.coreConcerns("test auth service", blankServiceConfig).build();
+
+        var protocolNegotiator = new ProtocolNegotiator(mainHandler, commonConcerns);
 
         var bootstrap = new ServerBootstrap()
                 .group(bossGroup, workerGroup)
@@ -77,47 +86,5 @@ public class LoginTestHelpers {
             workerGroup.shutdownGracefully(0, 1, TimeUnit.SECONDS);
             bossGroup.shutdownGracefully(0, 1, TimeUnit.SECONDS);
         };
-    }
-
-    private static class ProtocolNegotiator extends BaseProtocolNegotiator {
-
-        private final Supplier<ChannelHandler>  http1Handler;
-        private final Supplier<ChannelHandler>  http2Handler;
-
-        public ProtocolNegotiator(Supplier<ChannelHandler> http1Handler, Supplier<ChannelHandler> http2Handler) {
-            super(http2Handler != null, http2Handler != null, false, IDLE_TIMEOUT);
-            this.http1Handler = http1Handler;
-            this.http2Handler = http2Handler;
-        }
-
-        @Override
-        protected ChannelInboundHandler http1AuthHandler() {
-            return new ChannelInboundHandlerAdapter();
-        }
-
-        @Override
-        protected ChannelInboundHandler http2AuthHandler() {
-            return new ChannelInboundHandlerAdapter();
-        }
-
-        @Override
-        protected ChannelHandler http1PrimaryHandler() {
-            return http1Handler.get();
-        }
-
-        @Override
-        protected ChannelHandler http2PrimaryHandler() {
-            return http2Handler.get();
-        }
-
-        @Override
-        protected WebSocketServerProtocolConfig wsProtocolConfig(HttpRequest upgradeRequest) {
-            return null;
-        }
-
-        @Override
-        protected ChannelHandler wsPrimaryHandler() {
-            return null;
-        }
     }
 }
