@@ -17,21 +17,19 @@
 
 package org.finos.tracdap.svc.meta.services;
 
+import io.grpc.Context;
 import org.finos.tracdap.api.MetadataWriteBatchRequest;
 import org.finos.tracdap.api.MetadataWriteBatchResponse;
 import org.finos.tracdap.api.MetadataWriteRequest;
+import org.finos.tracdap.common.grpc.RequestMetadata;
+import org.finos.tracdap.common.grpc.UserMetadata;
 import org.finos.tracdap.metadata.*;
-import org.finos.tracdap.common.auth.GrpcAuthHelpers;
-import org.finos.tracdap.common.auth.UserInfo;
 import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.metadata.MetadataConstants;
 import org.finos.tracdap.common.validation.Validator;
 import org.finos.tracdap.svc.meta.dal.IMetadataDal;
 import org.finos.tracdap.svc.meta.dal.MetadataBatchUpdate;
 
-import java.time.Instant;
-import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -61,10 +59,11 @@ public class MetadataWriteService {
 
     public TagHeader createPreallocatedObject(String tenant, MetadataWriteRequest request) {
 
-        var userInfo = GrpcAuthHelpers.currentUser();
-        var timestamp = Instant.now().atOffset(ZoneOffset.UTC);
+        // Get request and user metadata from the current gRPC context
+        var requestMetadata = RequestMetadata.get(Context.current());
+        var userMetadata = UserMetadata.get(Context.current());
 
-        var preallocatedObjects = processPreallocatedObjects(List.of(request), userInfo, timestamp);
+        var preallocatedObjects = processPreallocatedObjects(List.of(request), requestMetadata, userMetadata);
 
         dal.savePreallocatedObjects(tenant, preallocatedObjects);
 
@@ -73,10 +72,11 @@ public class MetadataWriteService {
 
     public TagHeader createObject(String tenant, MetadataWriteRequest request) {
 
-        var userInfo = GrpcAuthHelpers.currentUser();
-        var timestamp = Instant.now().atOffset(ZoneOffset.UTC);
+        // Get request and user metadata from the current gRPC context
+        var requestMetadata = RequestMetadata.get(Context.current());
+        var userMetadata = UserMetadata.get(Context.current());
 
-        var newObjects = processNewObjects(List.of(request), userInfo, timestamp);
+        var newObjects = processNewObjects(List.of(request), requestMetadata, userMetadata);
 
         dal.saveNewObjects(tenant, newObjects);
 
@@ -85,10 +85,11 @@ public class MetadataWriteService {
 
     public TagHeader updateObject(String tenant, MetadataWriteRequest request) {
 
-        var userInfo = GrpcAuthHelpers.currentUser();
-        var timestamp = Instant.now().atOffset(ZoneOffset.UTC);
+        // Get request and user metadata from the current gRPC context
+        var requestMetadata = RequestMetadata.get(Context.current());
+        var userMetadata = UserMetadata.get(Context.current());
 
-        var newVersions = processNewVersions(tenant, List.of(request), userInfo, timestamp);
+        var newVersions = processNewVersions(tenant, List.of(request), requestMetadata, userMetadata);
 
         dal.saveNewVersions(tenant, newVersions);
 
@@ -97,10 +98,11 @@ public class MetadataWriteService {
 
     public TagHeader updateTag(String tenant, MetadataWriteRequest request) {
 
-        var userInfo = GrpcAuthHelpers.currentUser();
-        var timestamp = Instant.now().atOffset(ZoneOffset.UTC);
+        // Get request and user metadata from the current gRPC context
+        var requestMetadata = RequestMetadata.get(Context.current());
+        var userMetadata = UserMetadata.get(Context.current());
 
-        var newTags = processNewTags(tenant, List.of(request), userInfo, timestamp);
+        var newTags = processNewTags(tenant, List.of(request), requestMetadata, userMetadata);
 
         dal.saveNewTags(tenant, newTags);
 
@@ -109,16 +111,17 @@ public class MetadataWriteService {
 
     public MetadataWriteBatchResponse writeBatch(MetadataWriteBatchRequest request) {
 
+        // Get request and user metadata from the current gRPC context
+        var requestMetadata = RequestMetadata.get(Context.current());
+        var userMetadata = UserMetadata.get(Context.current());
+
         var tenant = request.getTenant();
 
-        var userInfo = GrpcAuthHelpers.currentUser();
-        var timestamp = Instant.now().atOffset(ZoneOffset.UTC);
-
         var preallocatedIds = processPreallocatedIds(request.getPreallocateIdsList());
-        var preallocatedObjects = processPreallocatedObjects(request.getCreatePreallocatedObjectsList(), userInfo, timestamp);
-        var newObjects = processNewObjects(request.getCreateObjectsList(), userInfo, timestamp);
-        var newVersions = processNewVersions(tenant, request.getUpdateObjectsList(), userInfo, timestamp);
-        var newTags = processNewTags(tenant, request.getUpdateTagsList(), userInfo, timestamp);
+        var preallocatedObjects = processPreallocatedObjects(request.getCreatePreallocatedObjectsList(), requestMetadata, userMetadata);
+        var newObjects = processNewObjects(request.getCreateObjectsList(), requestMetadata, userMetadata);
+        var newVersions = processNewVersions(tenant, request.getUpdateObjectsList(), requestMetadata, userMetadata);
+        var newTags = processNewTags(tenant, request.getUpdateTagsList(), requestMetadata, userMetadata);
 
         var batchUpdate = new MetadataBatchUpdate(
                 preallocatedIds, preallocatedObjects,
@@ -163,7 +166,7 @@ public class MetadataWriteService {
 
     private List<Tag> processPreallocatedObjects(
             List<MetadataWriteRequest> requests,
-            UserInfo userInfo, OffsetDateTime timestamp) {
+            RequestMetadata requestMetadata, UserMetadata userMetadata) {
 
         var preallocatedObjects = new ArrayList<Tag>(requests.size());
 
@@ -172,11 +175,8 @@ public class MetadataWriteService {
             var objectId = UUID.fromString(request.getPriorVersion().getObjectId());
 
             var preallocatedObject = buildNewObject(
-                    objectId,
-                    request.getDefinition(),
-                    request.getTagUpdatesList(),
-                    userInfo,
-                    timestamp);
+                    objectId, request.getDefinition(), request.getTagUpdatesList(),
+                    requestMetadata, userMetadata);
 
             preallocatedObjects.add(preallocatedObject);
         }
@@ -186,7 +186,7 @@ public class MetadataWriteService {
 
     private List<Tag> processNewObjects(
             List<MetadataWriteRequest> requests,
-            UserInfo userInfo, OffsetDateTime timestamp) {
+            RequestMetadata requestMetadata, UserMetadata userMetadata) {
 
         var newObjects = new ArrayList<Tag>(requests.size());
 
@@ -197,11 +197,8 @@ public class MetadataWriteService {
             var objectId = UUID.randomUUID();
 
             var newObject = buildNewObject(
-                    objectId,
-                    request.getDefinition(),
-                    request.getTagUpdatesList(),
-                    userInfo,
-                    timestamp);
+                    objectId, request.getDefinition(), request.getTagUpdatesList(),
+                    requestMetadata, userMetadata);
 
             newObjects.add(newObject);
         }
@@ -211,7 +208,7 @@ public class MetadataWriteService {
 
     private List<Tag> processNewVersions(
             String tenant, List<MetadataWriteRequest> requests,
-            UserInfo userInfo, OffsetDateTime timestamp) {
+            RequestMetadata requestMetadata, UserMetadata userMetadata) {
 
         // Do not query the DAL if there are no requests
         if (requests.isEmpty())
@@ -235,11 +232,8 @@ public class MetadataWriteService {
                     priorVersion.getDefinition());
 
             var newObject = buildNewVersion(
-                    priorVersion,
-                    request.getDefinition(),
-                    request.getTagUpdatesList(),
-                    userInfo,
-                    timestamp);
+                    priorVersion, request.getDefinition(), request.getTagUpdatesList(),
+                    requestMetadata, userMetadata);
 
             newVersions.add(newObject);
         }
@@ -249,7 +243,7 @@ public class MetadataWriteService {
 
     private List<Tag> processNewTags(
             String tenant, List<MetadataWriteRequest> requests,
-            UserInfo userInfo, OffsetDateTime timestamp) {
+            RequestMetadata requestMetadata, UserMetadata userMetadata) {
 
         // Do not query the DAL if there are no requests
         if (requests.isEmpty())
@@ -266,10 +260,8 @@ public class MetadataWriteService {
             var priorTag = priorTags.get(i);
 
             var newTag = buildNewTag(
-                    priorTag,
-                    request.getTagUpdatesList(),
-                    userInfo,
-                    timestamp);
+                    priorTag, request.getTagUpdatesList(),
+                    requestMetadata, userMetadata);
 
             newTags.add(newTag);
         }
@@ -279,15 +271,15 @@ public class MetadataWriteService {
 
     private Tag buildNewObject(
             UUID objectId, ObjectDefinition definition, List<TagUpdate> tagUpdates,
-            UserInfo userInfo, OffsetDateTime timestamp) {
+            RequestMetadata requestMetadata, UserMetadata userMetadata) {
 
         var newHeader = TagHeader.newBuilder()
                 .setObjectType(definition.getObjectType())
                 .setObjectId(objectId.toString())
                 .setObjectVersion(OBJECT_FIRST_VERSION)
-                .setObjectTimestamp(MetadataCodec.encodeDatetime(timestamp))
+                .setObjectTimestamp(MetadataCodec.encodeDatetime(requestMetadata.requestTimestamp()))
                 .setTagVersion(TAG_FIRST_VERSION)
-                .setTagTimestamp(MetadataCodec.encodeDatetime(timestamp))
+                .setTagTimestamp(MetadataCodec.encodeDatetime(requestMetadata.requestTimestamp()))
                 .setIsLatestTag(true)
                 .setIsLatestObject(true)
                 .build();
@@ -301,10 +293,8 @@ public class MetadataWriteService {
 
         // Apply the common controlled trac_ tags for newly created objects
 
-        var userId = userInfo.getUserId();
-        var userName = userInfo.getDisplayName();
-        var createAttrs = commonCreateAttrs(timestamp, userId, userName);
-        var updateAttrs = commonUpdateAttrs(timestamp, userId, userName);
+        var createAttrs = commonCreateAttrs(requestMetadata, userMetadata);
+        var updateAttrs = commonUpdateAttrs(requestMetadata, userMetadata);
 
         newTag = TagUpdateService.applyTagUpdates(newTag, createAttrs);
         newTag = TagUpdateService.applyTagUpdates(newTag, updateAttrs);
@@ -314,15 +304,15 @@ public class MetadataWriteService {
 
     private Tag buildNewVersion(
             Tag priorTag, ObjectDefinition definition, List<TagUpdate> tagUpdates,
-            UserInfo userInfo, OffsetDateTime timestamp) {
+            RequestMetadata requestMetadata, UserMetadata userMetadata) {
 
         var oldHeader = priorTag.getHeader();
 
         var newHeader = oldHeader.toBuilder()
                 .setObjectVersion(oldHeader.getObjectVersion() + 1)
-                .setObjectTimestamp(MetadataCodec.encodeDatetime(timestamp))
+                .setObjectTimestamp(MetadataCodec.encodeDatetime(requestMetadata.requestTimestamp()))
                 .setTagVersion(TAG_FIRST_VERSION)
-                .setTagTimestamp(MetadataCodec.encodeDatetime(timestamp))
+                .setTagTimestamp(MetadataCodec.encodeDatetime(requestMetadata.requestTimestamp()))
                 .setIsLatestTag(true)
                 .setIsLatestObject(true)
                 .build();
@@ -332,14 +322,11 @@ public class MetadataWriteService {
                 .setDefinition(definition)
                 .build();
 
-        newTag = TagUpdateService.applyTagUpdates(newTag, tagUpdates);
-
         // Apply the common controlled trac_ tags for updated objects
 
-        var userId = userInfo.getUserId();
-        var userName = userInfo.getDisplayName();
-        var commonAttrs = commonUpdateAttrs(timestamp, userId, userName);
+        var commonAttrs = commonUpdateAttrs(requestMetadata, userMetadata);
 
+        newTag = TagUpdateService.applyTagUpdates(newTag, tagUpdates);
         newTag = TagUpdateService.applyTagUpdates(newTag, commonAttrs);
 
         return newTag;
@@ -347,7 +334,7 @@ public class MetadataWriteService {
 
     private static Tag buildNewTag(
             Tag priorTag, List<TagUpdate> tagUpdates,
-            UserInfo userInfo, OffsetDateTime timestamp) {
+            RequestMetadata requestMetadata, UserMetadata userMetadata) {
 
         // TODO: Record user info for tag-only updates
         // Audit history for object revisions is most important
@@ -357,7 +344,7 @@ public class MetadataWriteService {
 
         var newHeader = oldHeader.toBuilder()
                 .setTagVersion(oldHeader.getTagVersion() + 1)
-                .setTagTimestamp(MetadataCodec.encodeDatetime(timestamp))
+                .setTagTimestamp(MetadataCodec.encodeDatetime(requestMetadata.requestTimestamp()))
                 .setIsLatestTag(true)
                 .build();
 
@@ -370,47 +357,41 @@ public class MetadataWriteService {
         return newTag;
     }
 
-    private static List<TagUpdate> commonCreateAttrs(
-            OffsetDateTime createTime,
-            String createUserId,
-            String createUserName) {
+    private static List<TagUpdate> commonCreateAttrs(RequestMetadata requestMetadata, UserMetadata userMetadata) {
 
         var createTimeAttr = TagUpdate.newBuilder()
                 .setAttrName(MetadataConstants.TRAC_CREATE_TIME)
-                .setValue(MetadataCodec.encodeValue(createTime))
+                .setValue(MetadataCodec.encodeValue(requestMetadata.requestTimestamp()))
                 .build();
 
         var createUserIdAttr = TagUpdate.newBuilder()
                 .setAttrName(MetadataConstants.TRAC_CREATE_USER_ID)
-                .setValue(MetadataCodec.encodeValue(createUserId))
+                .setValue(MetadataCodec.encodeValue(userMetadata.userId()))
                 .build();
 
         var createUserNameAttr = TagUpdate.newBuilder()
                 .setAttrName(MetadataConstants.TRAC_CREATE_USER_NAME)
-                .setValue(MetadataCodec.encodeValue(createUserName))
+                .setValue(MetadataCodec.encodeValue(userMetadata.userName()))
                 .build();
 
         return List.of(createTimeAttr, createUserIdAttr, createUserNameAttr);
     }
 
-    private static List<TagUpdate> commonUpdateAttrs(
-            OffsetDateTime createTime,
-            String createUserId,
-            String createUserName) {
+    private static List<TagUpdate> commonUpdateAttrs(RequestMetadata requestMetadata, UserMetadata userMetadata) {
 
         var updateTimeAttr = TagUpdate.newBuilder()
                 .setAttrName(MetadataConstants.TRAC_UPDATE_TIME)
-                .setValue(MetadataCodec.encodeValue(createTime))
+                .setValue(MetadataCodec.encodeValue(requestMetadata.requestTimestamp()))
                 .build();
 
         var updateUserIdAttr = TagUpdate.newBuilder()
                 .setAttrName(MetadataConstants.TRAC_UPDATE_USER_ID)
-                .setValue(MetadataCodec.encodeValue(createUserId))
+                .setValue(MetadataCodec.encodeValue(userMetadata.userId()))
                 .build();
 
         var updateUserNameAttr = TagUpdate.newBuilder()
                 .setAttrName(MetadataConstants.TRAC_UPDATE_USER_NAME)
-                .setValue(MetadataCodec.encodeValue(createUserName))
+                .setValue(MetadataCodec.encodeValue(userMetadata.userName()))
                 .build();
 
         return List.of(updateTimeAttr, updateUserIdAttr, updateUserNameAttr);

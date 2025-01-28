@@ -17,12 +17,14 @@
 
 package org.finos.tracdap.svc.orch.service;
 
+import io.grpc.stub.AbstractStub;
 import org.finos.tracdap.api.*;
 import org.finos.tracdap.api.internal.TrustedMetadataApiGrpc;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.metadata.MetadataBundle;
 import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.metadata.MetadataUtil;
+import org.finos.tracdap.common.middleware.GrpcConcern;
 import org.finos.tracdap.config.JobConfig;
 import org.finos.tracdap.config.PlatformConfig;
 import org.finos.tracdap.config.RuntimeConfig;
@@ -51,14 +53,17 @@ public class JobProcessorHelpers {
 
     private final PlatformConfig platformConfig;
     private final TrustedMetadataApiGrpc.TrustedMetadataApiBlockingStub metaClient;
+    private final GrpcConcern commonConcerns;
 
 
     public JobProcessorHelpers(
             PlatformConfig platformConfig,
-            TrustedMetadataApiGrpc.TrustedMetadataApiBlockingStub metaClient) {
+            TrustedMetadataApiGrpc.TrustedMetadataApiBlockingStub metaClient,
+            GrpcConcern commonConcerns) {
 
         this.platformConfig = platformConfig;
         this.metaClient = metaClient;
+        this.commonConcerns = commonConcerns;
     }
 
     /**
@@ -129,7 +134,7 @@ public class JobProcessorHelpers {
                 .addAllSelector(orderedSelectors)
                 .build();
 
-        var client = metaClient.withCallCredentials(jobState.credentials);
+        var client = configureClient(metaClient, jobState);
         var batchResponse = client.readBatch(batchRequest);
 
         return loadResourcesResponse(jobState, orderedKeys, batchResponse);
@@ -240,7 +245,7 @@ public class JobProcessorHelpers {
                 .addAllPreallocateIds(requests)
                 .build();
 
-        var client = metaClient.withCallCredentials(jobState.credentials);
+        var client = configureClient(metaClient, jobState);
 
         var preallocatedIds = client.writeBatch(request)
                 .getPreallocateIdsList();
@@ -337,7 +342,7 @@ public class JobProcessorHelpers {
                 .addAllTagUpdates(freeJobAttrs)
                 .build();
 
-        var client = metaClient.withCallCredentials(jobState.credentials);
+        var client = configureClient(metaClient, jobState);
 
         var jobId = client.createObject(jobWriteReq);
 
@@ -378,7 +383,7 @@ public class JobProcessorHelpers {
         var batchNotEmpty = isAnyToSend(batch);
 
         if (batchNotEmpty) {
-            var metadataClient = metaClient.withCallCredentials(jobState.credentials);
+            var metadataClient = configureClient(metaClient, jobState);
             metadataClient.writeBatch(batch);
         }
     }
@@ -512,5 +517,14 @@ public class JobProcessorHelpers {
         }
 
         return builder.build();
+    }
+
+    <TStub extends AbstractStub<TStub>>
+    TStub configureClient(TStub clientStub, JobState jobState) {
+
+        if (jobState.clientConfig == null)
+            jobState.clientConfig = jobState.clientState.restore(commonConcerns);
+
+        return jobState.clientConfig.configureClient(clientStub);
     }
 }

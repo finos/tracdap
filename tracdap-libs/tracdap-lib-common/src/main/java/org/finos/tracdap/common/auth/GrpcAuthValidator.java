@@ -18,6 +18,7 @@
 package org.finos.tracdap.common.auth;
 
 import org.finos.tracdap.common.exception.EStartup;
+import org.finos.tracdap.common.grpc.UserMetadata;
 import org.finos.tracdap.config.AuthenticationConfig;
 
 import io.grpc.*;
@@ -62,7 +63,11 @@ public class GrpcAuthValidator implements ServerInterceptor {
             userInfo.setUserId(AUTH_DISABLED_USER_ID);
             userInfo.setDisplayName(AUTH_DISABLED_USER_NAME);
 
-            var ctx = Context.current()
+            var userMetadata = new UserMetadata(
+                    userInfo.getUserId(), userInfo.getDisplayName());
+
+            var ctx = UserMetadata
+                    .set(Context.current(), userMetadata)
                     .withValue(AuthConstants.TRAC_AUTH_USER_KEY, userInfo);
 
             return Contexts.interceptCall(ctx, call, headers, next);
@@ -109,6 +114,10 @@ public class GrpcAuthValidator implements ServerInterceptor {
         var userInfo = sessionInfo.getUserInfo();
         var delegate = sessionInfo.getDelegate();
 
+        var userMetadata = delegate == null
+                ? new UserMetadata(userInfo.getUserId(), userInfo.getDisplayName())
+                : new UserMetadata(userInfo.getUserId(), userInfo.getDisplayName(), delegate.getUserId(), delegate.getDisplayName());
+
         if (authConfig.getDisableSigning()) {
             log.warn("AUTHENTICATE: {}() [{}] SUCCEEDED WITHOUT VALIDATION",
                     call.getMethodDescriptor().getBareMethodName(),
@@ -122,7 +131,8 @@ public class GrpcAuthValidator implements ServerInterceptor {
 
         // Auth complete, put details into the current call context
 
-        var ctx = Context.current()
+        var ctx = UserMetadata
+                .set(Context.current(), userMetadata)
                 .withValue(AuthConstants.TRAC_AUTH_USER_KEY, userInfo)
                 .withValue(AuthConstants.TRAC_DELEGATE_KEY, delegate);
 

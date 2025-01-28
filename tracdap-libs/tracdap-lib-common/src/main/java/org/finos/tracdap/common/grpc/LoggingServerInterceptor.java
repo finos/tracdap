@@ -18,9 +18,9 @@
 package org.finos.tracdap.common.grpc;
 
 import io.grpc.*;
-import org.finos.tracdap.common.auth.GrpcAuthHelpers;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 
 public class LoggingServerInterceptor implements ServerInterceptor {
 
@@ -41,13 +41,13 @@ public class LoggingServerInterceptor implements ServerInterceptor {
 
             log.info("API CALL START: {}() [{}]",
                     method.getBareMethodName(),
-                    GrpcAuthHelpers.printCurrentUser());
+                    logCurrentUser());
         }
         else {
 
             log.info("API CALL START: {}() [{}] ({})",
                     method.getBareMethodName(),
-                    GrpcAuthHelpers.printCurrentUser(),
+                    logCurrentUser(),
                     method.getType());
         }
 
@@ -93,5 +93,19 @@ public class LoggingServerInterceptor implements ServerInterceptor {
 
             delegate().close(status, trailers);
         }
+    }
+
+    private String logCurrentUser() {
+
+        var userMetadata = UserMetadata.get(Context.current());
+
+        if (userMetadata.hasDelegate())
+            return String.format("%s <%s> on behalf of %s <%s>",
+                    userMetadata.userName(), userMetadata.userId(),
+                    userMetadata.delegateName(), userMetadata.delegateId());
+
+        else
+            return String.format("%s <%s>",
+                    userMetadata.userName(), userMetadata.userId());
     }
 }

@@ -18,10 +18,12 @@
 package org.finos.tracdap.svc.orch.api;
 
 
+import io.grpc.Context;
 import org.finos.tracdap.api.*;
 import org.finos.tracdap.common.exception.ECacheNotFound;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.metadata.MetadataUtil;
+import org.finos.tracdap.common.middleware.GrpcConcern;
 import org.finos.tracdap.svc.orch.service.JobManager;
 import org.finos.tracdap.svc.orch.service.JobProcessor;
 
@@ -36,12 +38,14 @@ public class TracOrchestratorApi extends TracOrchestratorApiGrpc.TracOrchestrato
 
     private final JobManager jobManager;
     private final JobProcessor jobProcessor;
+    private final GrpcConcern commonConcerns;
 
 
-    public TracOrchestratorApi(JobManager jobManager, JobProcessor jobProcessor) {
+    public TracOrchestratorApi(JobManager jobManager, JobProcessor jobProcessor, GrpcConcern commonConcerns) {
 
         this.jobManager = jobManager;
         this.jobProcessor = jobProcessor;
+        this.commonConcerns = commonConcerns;
     }
 
     @Override
@@ -95,7 +99,8 @@ public class TracOrchestratorApi extends TracOrchestratorApiGrpc.TracOrchestrato
 
     private JobStatus validateJobImpl(JobRequest request) {
 
-        var jobState = jobProcessor.newJob(request);
+        var clientConfig = commonConcerns.prepareClientCall(Context.current());
+        var jobState = jobProcessor.newJob(request, clientConfig);
         var assembled = jobProcessor.assembleAndValidate(jobState);
 
         return jobProcessor.getStatus(assembled);
@@ -103,7 +108,8 @@ public class TracOrchestratorApi extends TracOrchestratorApiGrpc.TracOrchestrato
 
     private JobStatus submitJobImpl(JobRequest request) {
 
-        var jobState = jobProcessor.newJob(request);
+        var clientConfig = commonConcerns.prepareClientCall(Context.current());
+        var jobState = jobProcessor.newJob(request, clientConfig);
         var assembled = jobProcessor.assembleAndValidate(jobState);
         var cached = jobManager.addNewJob(assembled);
 

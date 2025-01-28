@@ -19,6 +19,7 @@ syntax = "proto3";
 package tracdap.api;
 
 option java_package = "org.finos.tracdap.api";
+option java_outer_classname = "MetadataServiceProto";
 option java_multiple_files = true;
 
 import "tracdap/metadata/common.proto";

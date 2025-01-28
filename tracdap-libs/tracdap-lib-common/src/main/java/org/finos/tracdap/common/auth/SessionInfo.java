@@ -17,9 +17,12 @@
 
 package org.finos.tracdap.common.auth;
 
+import java.io.Serializable;
 import java.time.Instant;
 
-public class SessionInfo {
+public class SessionInfo implements Serializable {
+
+    private final static long serialVersionUID = 1L;
 
     private boolean valid;
     private String errorMessage;

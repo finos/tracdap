@@ -15,39 +15,27 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.svc.data.service;
+package org.finos.tracdap.common.grpc;
 
-import org.finos.tracdap.common.middleware.GrpcClientConfig;
-import org.finos.tracdap.common.grpc.RequestMetadata;
-import org.finos.tracdap.metadata.*;
+import io.grpc.*;
 
-import java.util.List;
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.util.UUID;
 
 
-class RequestState {
+public class RequestMetadataInterceptor implements ServerInterceptor {
 
-    RequestMetadata requestMetadata;
-    GrpcClientConfig clientConfig;
+    @Override
+    public <ReqT, RespT> ServerCall.Listener<ReqT>
+    interceptCall(ServerCall<ReqT, RespT> call, Metadata headers, ServerCallHandler<ReqT, RespT> next) {
 
-    List<TagUpdate> dataTags;
-    List<TagUpdate> fileTags;
-    List<TagUpdate> storageTags;
+        var requestId = UUID.randomUUID().toString();
+        var requestTimestamp = Instant.now().atOffset(ZoneOffset.UTC);
+        var requestMetadata = new RequestMetadata(requestId, requestTimestamp);
 
-    TagHeader dataId, preAllocDataId;
-    TagHeader fileId, preAllocFileId;
-    TagHeader storageId, preAllocStorageId;
+        var context = RequestMetadata.set(Context.current(), requestMetadata);
 
-    DataDefinition data;
-    SchemaDefinition schema;
-    FileDefinition file;
-    StorageDefinition storage;
-
-    PartKey part;
-    int snap;
-    int delta;
-
-    long offset;
-    long limit;
-
-    StorageCopy copy;
+        return Contexts.interceptCall(context, call, headers, next);
+    }
 }

@@ -17,6 +17,10 @@
 
 package org.finos.tracdap.common.plugin;
 
+import org.finos.tracdap.common.middleware.CommonConcerns;
+import org.finos.tracdap.common.middleware.GrpcConcern;
+import org.finos.tracdap.common.middleware.NettyConcern;
+
 import com.google.protobuf.Descriptors;
 
 import java.util.List;
@@ -32,5 +36,13 @@ public interface ITracExtension {
 
     default List<PluginType> pluginTypes() {
         return List.of();
+    }
+
+    default CommonConcerns<GrpcConcern> addServiceConcerns(CommonConcerns<GrpcConcern> serviceConcerns) {
+        return serviceConcerns;
+    }
+
+    default CommonConcerns<NettyConcern> addGatewayConcerns(CommonConcerns<NettyConcern> gatewayConcerns) {
+        return gatewayConcerns;
     }
 }

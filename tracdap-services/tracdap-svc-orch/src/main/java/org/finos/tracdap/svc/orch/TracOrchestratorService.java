@@ -17,11 +17,8 @@
 
 package org.finos.tracdap.svc.orch;
 
-import org.finos.tracdap.api.Orchestrator;
+import org.finos.tracdap.api.OrchestratorServiceProto;
 import org.finos.tracdap.api.internal.TrustedMetadataApiGrpc;
-import org.finos.tracdap.common.auth.InternalAuthProvider;
-import org.finos.tracdap.common.auth.JwtSetup;
-import org.finos.tracdap.common.auth.GrpcAuthValidator;
 import org.finos.tracdap.common.cache.IJobCacheManager;
 import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.config.ConfigManager;
@@ -30,10 +27,13 @@ import org.finos.tracdap.common.exec.IBatchExecutor;
 import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.common.exec.IJobExecutor;
 import org.finos.tracdap.common.grpc.*;
+import org.finos.tracdap.common.middleware.CommonConcerns;
+import org.finos.tracdap.common.middleware.GrpcConcern;
 import org.finos.tracdap.common.plugin.PluginManager;
+import org.finos.tracdap.common.service.CommonServiceConfig;
 import org.finos.tracdap.common.service.TracServiceBase;
 import org.finos.tracdap.common.util.RoutingUtils;
-import org.finos.tracdap.common.validation.GrpcRequestValidator;
+import org.finos.tracdap.common.validation.ValidationConcern;
 import org.finos.tracdap.config.PlatformConfig;
 import org.finos.tracdap.config.ServiceConfig;
 import org.finos.tracdap.svc.orch.api.TracOrchestratorApi;
@@ -58,10 +58,13 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.concurrent.TimeUnit;
 
 
 public class TracOrchestratorService extends TracServiceBase {
+
+    private static final Duration JOB_TOKEN_TIMEOUT = Duration.of(1, ChronoUnit.HOURS);
 
     private static final String JOB_CACHE_NAME = "TRAC_JOB_STATE";
     private static final int CONCURRENT_REQUESTS = 30;
@@ -121,16 +124,16 @@ public class TracOrchestratorService extends TracServiceBase {
 
             var channelType = NioServerSocketChannel.class;
             var clientChannelType = NioSocketChannel.class;
+            var clientChannelFactory = new ClientChannelFactory(clientChannelType);
 
             bossGroup = new NioEventLoopGroup(1, new DefaultThreadFactory("orch-boss"));
             nettyGroup = new NioEventLoopGroup(2, new DefaultThreadFactory("orch-netty"));
             serviceGroup = new NioEventLoopGroup(CONCURRENT_REQUESTS, new DefaultThreadFactory("orch-svc"));
 
-            var clientChannelFactory = new ClientChannelFactory(clientChannelType);
-            var metaClient = prepareMetadataClient(platformConfig, clientChannelFactory);
+            // Common framework for cross-cutting concerns
+            var commonConcerns = buildCommonConcerns(configManager, pluginManager);
 
-            var jwtProcessor = JwtSetup.createProcessor(platformConfig, configManager);
-            var internalAuth = new InternalAuthProvider(jwtProcessor, platformConfig.getAuthentication());
+            var metaClient = prepareMetadataClient(platformConfig, clientChannelFactory, commonConcerns);
 
             var batchExecutor = (IBatchExecutor<? extends Serializable>) pluginManager.createService(
                     IBatchExecutor.class,
@@ -146,18 +149,14 @@ public class TracOrchestratorService extends TracServiceBase {
 
             var jobCache = jobCacheManager.getCache(JOB_CACHE_NAME, JobState.class);
 
-            var jobProcessor = new JobProcessor(platformConfig, metaClient, internalAuth, jobExecutor);
+            var jobProcessor = new JobProcessor(platformConfig, metaClient, commonConcerns, jobExecutor);
 
             jobManager = new JobManager(platformConfig, jobProcessor, jobCache, serviceGroup);
 
             jobExecutor.start(clientChannelFactory);
             jobManager.start();
 
-            var serviceRegister = GrpcServiceRegister.newBuilder()
-                    .registerServices(Orchestrator.getDescriptor().getServices())
-                    .build();
-
-            this.server = NettyServerBuilder
+            var serverBuilder = NettyServerBuilder
                     .forPort(serviceConfig.getPort())
 
                     // Netty config
@@ -166,21 +165,15 @@ public class TracOrchestratorService extends TracServiceBase {
                     .workerEventLoopGroup(nettyGroup)
                     .executor(serviceGroup)
 
-                    // Interceptor order: Last added is executed first
-                    // But note, on close it is the other way round, because the stack is unwinding
-                    // We want error mapping at the bottom of the stack, so it unwinds before logging
-
-                    .intercept(new ErrorMappingInterceptor())
-                    .intercept(new LoggingServerInterceptor(TracOrchestratorService.class))
-                    .intercept(new GrpcRequestValidator(serviceRegister))
-                    .intercept(new GrpcAuthValidator(platformConfig.getAuthentication(), jwtProcessor))
-                    .intercept(new CompressionServerInterceptor())
-                    .intercept(new DelayedExecutionInterceptor())
-
                     // The main service
-                    .addService(new TracOrchestratorApi(jobManager, jobProcessor))
+                    .addService(new TracOrchestratorApi(jobManager, jobProcessor, commonConcerns));
+
+            // Apply common concerns
+            this.server = commonConcerns
+                    .configureServer(serverBuilder)
                     .build();
 
+            // Good to go, let's start!
             this.server.start();
 
             log.info("Orchestrator is listening on port {}", server.getPort());
@@ -251,8 +244,28 @@ public class TracOrchestratorService extends TracServiceBase {
         return -1;
     }
 
+    private GrpcConcern buildCommonConcerns(ConfigManager configManager, PluginManager pluginManager) {
+
+        var commonConcerns = CommonServiceConfig.coreConcerns(TracOrchestratorService.class);
+
+        var authConcern = new CommonServiceConfig.Authentication(configManager, JOB_TOKEN_TIMEOUT);
+        commonConcerns.addAfter(CommonConcerns.TRAC_PROTOCOL, authConcern);
+
+        // Validation concern for the APIs being served
+        var validationConcern = new ValidationConcern(OrchestratorServiceProto.getDescriptor());
+        commonConcerns = commonConcerns.addAfter(CommonConcerns.TRAC_AUTHENTICATION, validationConcern);
+
+        // Additional cross-cutting concerns configured by extensions
+        for (var extension : pluginManager.getExtensions()) {
+            commonConcerns = extension.addServiceConcerns(commonConcerns);
+        }
+
+        return commonConcerns.build();
+    }
+
     private TrustedMetadataApiGrpc.TrustedMetadataApiBlockingStub prepareMetadataClient(
-            PlatformConfig platformConfig, GrpcChannelFactory channelFactory) {
+            PlatformConfig platformConfig, GrpcChannelFactory channelFactory,
+            GrpcConcern commonConcerns) {
 
         var metadataTarget = RoutingUtils.serviceTarget(platformConfig, ConfigKeys.METADATA_SERVICE_KEY);
 
@@ -261,11 +274,9 @@ public class TracOrchestratorService extends TracServiceBase {
 
         clientChannel = channelFactory.createChannel(metadataTarget.getHost(), metadataTarget.getPort());
 
-        return TrustedMetadataApiGrpc
-                .newBlockingStub(clientChannel)
-                .withCompression(CompressionClientInterceptor.COMPRESSION_TYPE)
-                .withInterceptors(new CompressionClientInterceptor())
-                .withInterceptors(new LoggingClientInterceptor(TracOrchestratorService.class));
+        var metadataClient = TrustedMetadataApiGrpc.newBlockingStub(clientChannel);
+
+        return commonConcerns.configureClient(metadataClient);
     }
 
     private class ClientChannelFactory implements GrpcChannelFactory {

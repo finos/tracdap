@@ -18,23 +18,23 @@
 package org.finos.tracdap.svc.data.api;
 
 import org.finos.tracdap.api.*;
-import org.finos.tracdap.common.netty.EventLoopResolver;
-import org.finos.tracdap.common.auth.GrpcAuthHelpers;
 import org.finos.tracdap.common.data.DataContext;
 import org.finos.tracdap.common.data.IDataContext;
 import org.finos.tracdap.common.data.pipeline.GrpcDownloadSink;
 import org.finos.tracdap.common.data.pipeline.GrpcUploadSource;
+import org.finos.tracdap.common.grpc.RequestMetadata;
+import org.finos.tracdap.common.middleware.GrpcConcern;
+import org.finos.tracdap.common.netty.EventLoopResolver;
 import org.finos.tracdap.common.util.LoggingHelpers;
 import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.svc.data.service.DataService;
 import org.finos.tracdap.svc.data.service.FileService;
 
+import io.grpc.Context;
 import io.grpc.stub.StreamObserver;
 import org.apache.arrow.memory.BufferAllocator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.util.concurrent.atomic.AtomicLong;
 
 
 public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
@@ -49,22 +49,23 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
 
     private final EventLoopResolver eventLoopResolver;
     private final BufferAllocator rootAllocator;
+    private final GrpcConcern commonConcerns;
 
-    private final AtomicLong nextReqId;
     private final long reqInitAllocation;
     private final long reqMaxAllocation;
 
 
     public TracDataApi(
             DataService dataRwService, FileService fileService,
-            EventLoopResolver eventLoopResolver, BufferAllocator allocator) {
+            EventLoopResolver eventLoopResolver, BufferAllocator allocator,
+            GrpcConcern commonConcerns) {
 
         this.dataRwService = dataRwService;
         this.fileService = fileService;
         this.eventLoopResolver = eventLoopResolver;
         this.rootAllocator = allocator;
+        this.commonConcerns = commonConcerns;
 
-        this.nextReqId = new AtomicLong();
         this.reqInitAllocation = DEFAULT_INITIAL_ALLOCATION;
         this.reqMaxAllocation = DEFAULT_MAX_ALLOCATION;
     }
@@ -77,8 +78,9 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
     @Override
     public StreamObserver<DataWriteRequest> createDataset(StreamObserver<TagHeader> responseObserver) {
 
-        var dataContext = prepareDataContext();
-        var userInfo = GrpcAuthHelpers.currentUser();
+        var requestMetadata = RequestMetadata.get(Context.current());
+        var clientConfig = commonConcerns.prepareClientCall(Context.current());
+        var dataContext = prepareDataContext(requestMetadata);
 
         var upload = new GrpcUploadSource<>(DataWriteRequest.class, responseObserver);
         upload.whenComplete(() -> closeDataContext(dataContext));
@@ -87,7 +89,7 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
         var dataStream = upload.dataStream(DataWriteRequest::getContent, dataContext.arrowAllocator());
 
         firstMessage
-                .thenCompose(req -> dataRwService.createDataset(req, dataStream, dataContext, userInfo))
+                .thenCompose(req -> dataRwService.createDataset(req, dataStream, dataContext, requestMetadata, clientConfig))
                 .thenAccept(upload::succeeded)
                 .exceptionally(upload::failed);
 
@@ -106,9 +108,10 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
     @Override
     public StreamObserver<DataWriteRequest> updateDataset(StreamObserver<TagHeader> responseObserver) {
 
-        var dataContext = prepareDataContext();
-        var userInfo = GrpcAuthHelpers.currentUser();
+        var requestMetadata = RequestMetadata.get(Context.current());
+        var clientConfig = commonConcerns.prepareClientCall(Context.current());
 
+        var dataContext = prepareDataContext(requestMetadata);
         var upload = new GrpcUploadSource<>(DataWriteRequest.class, responseObserver);
         upload.whenComplete(() -> closeDataContext(dataContext));
 
@@ -116,7 +119,7 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
         var dataStream = upload.dataStream(DataWriteRequest::getContent, dataContext.arrowAllocator());
 
         firstMessage
-                .thenCompose(req -> dataRwService.updateDataset(req, dataStream, dataContext, userInfo))
+                .thenCompose(req -> dataRwService.updateDataset(req, dataStream, dataContext, requestMetadata, clientConfig))
                 .thenAccept(upload::succeeded)
                 .exceptionally(upload::failed);
 
@@ -148,8 +151,9 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
             DataReadRequest request, StreamObserver<DataReadResponse> responseObserver,
             boolean streamingMode) {
 
-        var dataContext = prepareDataContext();
-        var userInfo = GrpcAuthHelpers.currentUser();
+        var requestMetadata = RequestMetadata.get(Context.current());
+        var clientConfig = commonConcerns.prepareClientCall(Context.current());
+        var dataContext = prepareDataContext(requestMetadata);
 
         var download = new GrpcDownloadSink<>(responseObserver, DataReadResponse::newBuilder, streamingMode);
         download.whenComplete(() -> closeDataContext(dataContext));
@@ -158,15 +162,16 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
         var dataStream = download.dataStream(DataReadResponse.Builder::setContent);
 
         download.start(request)
-                .thenAccept(req -> dataRwService.readDataset(req, firstMessage, dataStream, dataContext, userInfo))
+                .thenAccept(req -> dataRwService.readDataset(req, firstMessage, dataStream, dataContext, requestMetadata, clientConfig))
                 .exceptionally(download::failed);
     }
 
     @Override
     public StreamObserver<FileWriteRequest> createFile(StreamObserver<TagHeader> responseObserver) {
 
-        var dataContext = prepareDataContext();
-        var userInfo = GrpcAuthHelpers.currentUser();
+        var requestMetadata = RequestMetadata.get(Context.current());
+        var clientConfig = commonConcerns.prepareClientCall(Context.current());
+        var dataContext = prepareDataContext(requestMetadata);
 
         var upload = new GrpcUploadSource<>(FileWriteRequest.class, responseObserver);
         upload.whenComplete(() -> closeDataContext(dataContext));
@@ -181,7 +186,7 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
                         req.getName(),
                         req.getMimeType(),
                         req.hasSize() ? req.getSize() : null,
-                        dataStream, dataContext, userInfo))
+                        dataStream, dataContext, requestMetadata, clientConfig))
                 .thenAccept(upload::succeeded)
                 .exceptionally(upload::failed);
 
@@ -200,8 +205,9 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
     @Override
     public StreamObserver<FileWriteRequest> updateFile(StreamObserver<TagHeader> responseObserver) {
 
-        var dataContext = prepareDataContext();
-        var userInfo = GrpcAuthHelpers.currentUser();
+        var requestMetadata = RequestMetadata.get(Context.current());
+        var clientConfig = commonConcerns.prepareClientCall(Context.current());
+        var dataContext = prepareDataContext(requestMetadata);
 
         var upload = new GrpcUploadSource<>(FileWriteRequest.class, responseObserver);
         upload.whenComplete(() -> closeDataContext(dataContext));
@@ -217,7 +223,7 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
                         req.getName(),
                         req.getMimeType(),
                         req.hasSize() ? req.getSize() : null,
-                        dataStream, dataContext, userInfo))
+                        dataStream, dataContext, requestMetadata, clientConfig))
                 .thenAccept(upload::succeeded)
                 .exceptionally(upload::failed);
 
@@ -249,8 +255,9 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
 
     private void readFile(FileReadRequest request, GrpcDownloadSink<FileReadResponse, FileReadResponse.Builder> download) {
 
-        var dataContext = prepareDataContext();
-        var userInfo = GrpcAuthHelpers.currentUser();
+        var requestMetadata = RequestMetadata.get(Context.current());
+        var clientConfig = commonConcerns.prepareClientCall(Context.current());
+        var dataContext = prepareDataContext(requestMetadata);
 
         download.whenComplete(() -> closeDataContext(dataContext));
 
@@ -262,7 +269,7 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
                         request.getTenant(),
                         request.getSelector(),
                         firstMessage, dataStream,
-                        dataContext, userInfo))
+                        dataContext, requestMetadata, clientConfig))
                 .exceptionally(download::failed);
     }
 
@@ -298,8 +305,9 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
             DownloadRequest request, TagSelector selector,
             GrpcDownloadSink<DownloadResponse, DownloadResponse.Builder> download) {
 
-        var dataContext = prepareDataContext();
-        var userInfo = GrpcAuthHelpers.currentUser();
+        var requestMetadata = RequestMetadata.get(Context.current());
+        var clientConfig = commonConcerns.prepareClientCall(Context.current());
+        var dataContext = prepareDataContext(requestMetadata);
 
         download.whenComplete(() -> closeDataContext(dataContext));
 
@@ -314,7 +322,7 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
                 .thenAccept(req -> fileService.readFile(
                         request.getTenant(), selector,
                         firstMessage, dataStream,
-                        dataContext, userInfo))
+                        dataContext, requestMetadata, clientConfig))
                 .exceptionally(download::failed);
     }
 
@@ -322,18 +330,12 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
     // Common scaffolding for client and server streaming
     // -----------------------------------------------------------------------------------------------------------------
 
-    private DataContext prepareDataContext() {
-
-        // TODO: Universal request ID
-        // This basic req-id is enough to create a unique allocator name for each request
-        // Each service should generate a req-id for every inbound request
-        // If service A calls service B, then B should also record "source-req-id" to link back
-        // req-id and source-req-id should be included with every log message
+    private DataContext prepareDataContext(RequestMetadata requestMetadata) {
 
         // Enforce strict requirement on the event loop
         // All processing for the request must happen on the EL originally assigned to the request
 
-        var requestId = String.format("REQ-%d", nextReqId.incrementAndGet());
+        var requestId = requestMetadata.requestId();
         var eventLoop = eventLoopResolver.currentEventLoop(/* strict = */ true);
         var allocator = rootAllocator.newChildAllocator(requestId, reqInitAllocation, reqMaxAllocation);
 

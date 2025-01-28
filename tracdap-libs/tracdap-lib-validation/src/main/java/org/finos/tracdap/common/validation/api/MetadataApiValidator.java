@@ -34,7 +34,7 @@ import java.util.Set;
 import static org.finos.tracdap.common.validation.core.ValidatorUtils.field;
 
 
-@Validator(type = ValidationType.STATIC, serviceFile = Metadata.class, serviceName = TracMetadataApiGrpc.SERVICE_NAME)
+@Validator(type = ValidationType.STATIC, serviceFile = MetadataServiceProto.class, serviceName = TracMetadataApiGrpc.SERVICE_NAME)
 public class MetadataApiValidator {
 
     public static final boolean PUBLIC_API = false;

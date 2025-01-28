@@ -17,6 +17,7 @@
 
 package org.finos.tracdap.common.auth;
 
+import io.grpc.Context;
 import org.finos.tracdap.common.exception.EAuthorization;
 
 
@@ -40,6 +41,26 @@ public class GrpcAuthHelpers {
             return delegate;
 
         return currentAuthUser();
+    }
+
+    public static UserInfo currentAuthUser(Context callContext) {
+
+        var authUser = AuthConstants.TRAC_AUTH_USER_KEY.get(callContext);
+
+        if (authUser != null)
+            return authUser;
+
+        throw new EAuthorization("User details are not available");
+    }
+
+    public static UserInfo currentUser(Context callContext) {
+
+        var delegate = AuthConstants.TRAC_DELEGATE_KEY.get(callContext);
+
+        if (delegate != null)
+            return delegate;
+
+        return currentAuthUser(callContext);
     }
 
     public static String printCurrentUser() {

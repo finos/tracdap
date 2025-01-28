@@ -15,39 +15,12 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.svc.data.service;
+package org.finos.tracdap.common.middleware;
 
-import org.finos.tracdap.common.middleware.GrpcClientConfig;
-import org.finos.tracdap.common.grpc.RequestMetadata;
-import org.finos.tracdap.metadata.*;
-
-import java.util.List;
+import java.io.Serializable;
 
 
-class RequestState {
+public interface GrpcClientState extends GrpcClientConfig, Serializable {
 
-    RequestMetadata requestMetadata;
-    GrpcClientConfig clientConfig;
-
-    List<TagUpdate> dataTags;
-    List<TagUpdate> fileTags;
-    List<TagUpdate> storageTags;
-
-    TagHeader dataId, preAllocDataId;
-    TagHeader fileId, preAllocFileId;
-    TagHeader storageId, preAllocStorageId;
-
-    DataDefinition data;
-    SchemaDefinition schema;
-    FileDefinition file;
-    StorageDefinition storage;
-
-    PartKey part;
-    int snap;
-    int delta;
-
-    long offset;
-    long limit;
-
-    StorageCopy copy;
+    GrpcClientState restore(GrpcConcern grpcConcern);
 }
