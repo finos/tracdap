@@ -18,26 +18,31 @@
 package org.finos.tracdap.svc.auth;
 
 import io.netty.bootstrap.ServerBootstrap;
+import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.exception.EStartup;
+import org.finos.tracdap.common.middleware.NettyConcern;
+import org.finos.tracdap.common.netty.ProtocolNegotiator;
 import org.finos.tracdap.common.netty.NettyHelpers;
+import org.finos.tracdap.common.netty.ProtocolHandler;
 import org.finos.tracdap.common.plugin.PluginManager;
+import org.finos.tracdap.common.service.TracNettyConfig;
 import org.finos.tracdap.common.service.TracServiceBase;
 
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.channel.nio.NioEventLoopGroup;
 
 import org.finos.tracdap.config.PlatformConfig;
+import org.finos.tracdap.config.ServiceConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 
 
@@ -47,6 +52,8 @@ public class TracAuthenticationService extends TracServiceBase {
 
     private final PluginManager pluginManager;
     private final ConfigManager configManager;
+
+    private ProviderLookup providers;
 
     private EventLoopGroup bossGroup = null;
     private EventLoopGroup workerGroup = null;
@@ -59,7 +66,6 @@ public class TracAuthenticationService extends TracServiceBase {
     }
 
     public TracAuthenticationService(PluginManager pluginManager, ConfigManager configManager) {
-
         this.pluginManager = pluginManager;
         this.configManager = configManager;
     }
@@ -70,8 +76,17 @@ public class TracAuthenticationService extends TracServiceBase {
         var platformConfig = configManager.loadRootConfigObject(PlatformConfig.class);
         var serviceConfig = platformConfig.getServicesOrThrow(ConfigKeys.AUTHENTICATION_SERVICE_KEY);
 
-        var serviceProperties = new Properties();
-        serviceProperties.putAll(serviceConfig.getPropertiesMap());
+        // Set up providers - supplies the core auth providers to the main handler
+        providers = new ProviderLookup(platformConfig, configManager, pluginManager);
+
+        // Primary logic - Currently only HTTP protocol is supported
+        var mainHandler = ProtocolHandler.create().withHttp(this::httpHandler);
+
+        // Common framework for cross-cutting concerns
+        var commonConcerns = buildCommonConcerns(serviceConfig);
+
+        // Top level channel handler for inbound connections
+        var protocolNegotiator = new ProtocolNegotiator(mainHandler, commonConcerns);
 
         // TODO: Review configuration of thread pools and channel options
 
@@ -81,9 +96,6 @@ public class TracAuthenticationService extends TracServiceBase {
         bossGroup = new NioEventLoopGroup(2, bossFactory);
         workerGroup = new NioEventLoopGroup(6, workerFactory);
         allocator = ByteBufAllocator.DEFAULT;
-
-        var providers = new ProviderLookup(platformConfig, configManager, pluginManager);
-        var protocolNegotiator = new ProtocolNegotiator(serviceProperties, providers);
 
         var bootstrap = new ServerBootstrap()
                 .group(bossGroup, workerGroup)
@@ -152,5 +164,21 @@ public class TracAuthenticationService extends TracServiceBase {
         log.info("All connections are closed");
 
         return 0;
+    }
+
+    private NettyConcern buildCommonConcerns(ServiceConfig serviceConfig) {
+
+        var commonConcerns = TracNettyConfig.coreConcerns("authentication service", serviceConfig);
+
+        // Additional cross-cutting concerns configured by extensions
+        for (var extension : pluginManager.getExtensions()) {
+            commonConcerns = extension.addGatewayConcerns(commonConcerns);
+        }
+
+        return commonConcerns.build();
+    }
+
+    private ChannelHandler httpHandler() {
+        return new Http1ProviderLookup(providers);
     }
 }
