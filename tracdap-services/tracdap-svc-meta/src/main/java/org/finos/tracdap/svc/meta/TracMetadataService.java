@@ -22,7 +22,6 @@ import org.finos.tracdap.api.internal.MetadataTrustedProto;
 import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.exception.EStartup;
-import org.finos.tracdap.common.middleware.CommonConcerns;
 import org.finos.tracdap.common.middleware.GrpcConcern;
 import org.finos.tracdap.common.netty.NettyHelpers;
 import org.finos.tracdap.common.plugin.PluginManager;
@@ -82,6 +81,11 @@ public class TracMetadataService extends TracServiceBase {
     private ExecutorService executor;
     private IMetadataDal dal;
     private Server server;
+
+    public static void main(String[] args) {
+
+        TracServiceBase.svcMain(TracMetadataService.class, args);
+    }
 
     public TracMetadataService(PluginManager pluginManager, ConfigManager configManager) {
 
@@ -177,11 +181,11 @@ public class TracMetadataService extends TracServiceBase {
         var commonConcerns = CommonServiceConfig.coreConcerns(TracMetadataService.class);
 
         var authConcern = new CommonServiceConfig.Authentication(configManager, METADATA_OPERATION_TIMEOUT);
-        commonConcerns.addAfter(CommonConcerns.TRAC_PROTOCOL, authConcern);
+        commonConcerns.addAfter(CommonServiceConfig.TRAC_PROTOCOL, authConcern);
 
         // Validation concern for the APIs being served
         var validationConcern = new ValidationConcern(MetadataServiceProto.getDescriptor(), MetadataTrustedProto.getDescriptor());
-        commonConcerns = commonConcerns.addAfter(CommonConcerns.TRAC_AUTHENTICATION, validationConcern);
+        commonConcerns = commonConcerns.addAfter(CommonServiceConfig.TRAC_AUTHENTICATION, validationConcern);
 
         // Additional cross-cutting concerns configured by extensions
         for (var extension : pluginManager.getExtensions()) {
@@ -257,10 +261,5 @@ public class TracMetadataService extends TracServiceBase {
             log.error(message);
             throw new EStartup(message);
         }
-    }
-
-    public static void main(String[] args) {
-
-        TracServiceBase.svcMain(TracMetadataService.class, args);
     }
 }

@@ -19,7 +19,6 @@ package org.finos.tracdap.svc.data;
 
 import org.finos.tracdap.api.DataServiceProto;
 import org.finos.tracdap.api.internal.TrustedMetadataApiGrpc;
-import org.finos.tracdap.common.middleware.CommonConcerns;
 import org.finos.tracdap.common.middleware.GrpcConcern;
 import org.finos.tracdap.common.netty.*;
 import org.finos.tracdap.common.config.ConfigKeys;
@@ -80,6 +79,11 @@ public class TracDataService extends TracServiceBase {
     private ExecutorService offloadExecutor;
     private StorageManager storage;
     private Server server;
+
+    public static void main(String[] args) {
+
+        TracServiceBase.svcMain(TracDataService.class, args);
+    }
 
     public TracDataService(PluginManager plugins, ConfigManager config) {
         this.pluginManager = plugins;
@@ -215,11 +219,11 @@ public class TracDataService extends TracServiceBase {
         var commonConcerns = CommonServiceConfig.coreConcerns(TracDataService.class);
 
         var authConcern = new CommonServiceConfig.Authentication(configManager, DATA_OPERATION_TIMEOUT);
-        commonConcerns = commonConcerns.addAfter(CommonConcerns.TRAC_PROTOCOL, authConcern);
+        commonConcerns = commonConcerns.addAfter(CommonServiceConfig.TRAC_PROTOCOL, authConcern);
 
         // Validation concern for the APIs being served
         var validationConcern = new ValidationConcern(DataServiceProto.getDescriptor());
-        commonConcerns = commonConcerns.addAfter(CommonConcerns.TRAC_AUTHENTICATION, validationConcern);
+        commonConcerns = commonConcerns.addAfter(CommonServiceConfig.TRAC_AUTHENTICATION, validationConcern);
 
         // Additional cross-cutting concerns configured by extensions
         for (var extension : pluginManager.getExtensions()) {
@@ -320,10 +324,5 @@ public class TracDataService extends TracServiceBase {
             server.shutdownNow();
 
         return -1;
-    }
-
-    public static void main(String[] args) {
-
-        TracServiceBase.svcMain(TracDataService.class, args);
     }
 }
