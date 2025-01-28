@@ -28,6 +28,8 @@ import io.netty.handler.codec.http.websocketx.WebSocketServerProtocolConfig;
 import io.netty.handler.codec.http2.*;
 import io.netty.util.concurrent.DefaultThreadFactory;
 
+import org.finos.tracdap.common.service.TracNettyConfig;
+import org.finos.tracdap.config.ServiceConfig;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -51,60 +53,6 @@ import java.util.function.Supplier;
 
 public class ProtocolNegotiatorTest {
 
-    private static final int IDLE_TIMEOUT = 60;
-
-    static class SimpleNegotiator extends BaseProtocolNegotiator {
-
-        private final Supplier<ChannelHandler> http1;
-        private final Supplier<ChannelHandler> http2;
-        private final Supplier<ChannelHandler> ws;
-
-        public SimpleNegotiator(
-                Supplier<ChannelHandler> http1,
-                Supplier<ChannelHandler> http2,
-                Supplier<ChannelHandler> ws) {
-
-            super(http2 != null, http2 != null, ws != null, IDLE_TIMEOUT);
-
-            this.http1 = http1;
-            this.http2 = http2;
-            this.ws = ws;
-        }
-
-        @Override
-        protected ChannelInboundHandler http1AuthHandler() {
-            return new ChannelInboundHandlerAdapter();
-        }
-
-        @Override
-        protected ChannelInboundHandler http2AuthHandler() {
-            return new ChannelInboundHandlerAdapter();
-        }
-
-        @Override
-        protected ChannelHandler http1PrimaryHandler() {
-            return http1.get();
-        }
-
-        @Override
-        protected ChannelHandler http2PrimaryHandler() {
-            return http2.get();
-        }
-
-        @Override
-        protected WebSocketServerProtocolConfig wsProtocolConfig(HttpRequest upgradeRequest) {
-            return WebSocketServerProtocolConfig.newBuilder().build();
-        }
-
-        @Override
-        protected ChannelHandler wsPrimaryHandler() {
-            return ws.get();
-        }
-    }
-
-
-
-
     private static final Supplier<ChannelHandler> UNUSED_PROTOCOL = ChannelDuplexHandler::new;
 
     private static final Logger log = LoggerFactory.getLogger(ProtocolNegotiatorTest.class);
@@ -121,8 +69,20 @@ public class ProtocolNegotiatorTest {
             Supplier<ChannelHandler> webSockets)
             throws Exception {
 
+        // Blank configs
+        var wsConfig = WebSocketServerProtocolConfig.newBuilder().build();
+        var serviceConfig = ServiceConfig.newBuilder().build();
+
+        var protocolHandler = ProtocolHandler.create()
+                .withHttp(http1)
+                .withHttp2(http2)
+                .withWebsocket(webSockets, request -> wsConfig);
+
+        // Use the default core concerns for testing
+        var commonConcerns = TracNettyConfig.coreConcerns("test service", serviceConfig).build();
+
         // The protocol negotiator is the top level initializer for new inbound connections
-        var protocolNegotiator = new SimpleNegotiator(http1, http2, webSockets);
+        var protocolNegotiator = new ProtocolNegotiator(protocolHandler, commonConcerns);
 
         bossGroup = new NioEventLoopGroup(2, new DefaultThreadFactory("boss"));
         workerGroup = new NioEventLoopGroup(6, new DefaultThreadFactory("worker"));
