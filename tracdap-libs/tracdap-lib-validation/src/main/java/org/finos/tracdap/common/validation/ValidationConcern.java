@@ -20,7 +20,7 @@ package org.finos.tracdap.common.validation;
 import com.google.protobuf.Descriptors;
 import org.finos.tracdap.common.middleware.GrpcConcern;
 import org.finos.tracdap.common.grpc.GrpcServiceRegister;
-import org.finos.tracdap.common.service.CommonServiceConfig;
+import org.finos.tracdap.common.service.TracServiceConfig;
 
 import io.grpc.ServerBuilder;
 
@@ -31,7 +31,7 @@ import java.util.stream.Collectors;
 
 public class ValidationConcern implements GrpcConcern {
 
-    public static final String CONFIG_NAME = CommonServiceConfig.TRAC_VALIDATION;
+    public static final String CONFIG_NAME = TracServiceConfig.TRAC_VALIDATION;
 
     private final List<Descriptors.ServiceDescriptor> serviceDescriptors;
 

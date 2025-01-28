@@ -35,7 +35,7 @@ import io.grpc.stub.AbstractStub;
 import java.time.Duration;
 
 
-public class CommonServiceConfig {
+public class TracServiceConfig {
 
     public static final String TRAC_SERVICE_CONFIG = "trac_service_config";
     public static final String TRAC_PROTOCOL = "trac_protocol";
@@ -51,9 +51,9 @@ public class CommonServiceConfig {
     public static CommonConcerns<GrpcConcern> coreConcerns(Class<?> serviceClass) {
 
         return emptyConfig()
-                .addLast(new CommonServiceConfig.TracProtocol())
-                .addLast(new CommonServiceConfig.Logging(serviceClass))
-                .addLast(new CommonServiceConfig.ErrorHandling());
+                .addLast(new TracServiceConfig.TracProtocol())
+                .addLast(new TracServiceConfig.Logging(serviceClass))
+                .addLast(new TracServiceConfig.ErrorHandling());
     }
 
     public static class TracProtocol implements GrpcConcern {
