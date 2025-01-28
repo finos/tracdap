@@ -17,14 +17,14 @@
 
 package org.finos.tracdap.common.netty;
 
+import org.finos.tracdap.common.middleware.NettyConcern;
+import org.finos.tracdap.common.middleware.SupportedProtocol;
+
 import io.netty.channel.*;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.handler.codec.http.*;
-import io.netty.handler.codec.http.websocketx.WebSocketServerProtocolConfig;
 import io.netty.handler.codec.http.websocketx.WebSocketServerProtocolHandler;
 import io.netty.handler.codec.http2.*;
-import io.netty.handler.timeout.IdleStateEvent;
-import io.netty.handler.timeout.IdleStateHandler;
 import io.netty.util.AsciiString;
 import io.netty.util.ReferenceCountUtil;
 
@@ -34,23 +34,14 @@ import org.slf4j.LoggerFactory;
 import javax.annotation.Nonnull;
 import java.util.Collection;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 
 
-public abstract class BaseProtocolNegotiator extends ChannelInitializer<SocketChannel> {
+public class ProtocolNegotiator extends ChannelInitializer<SocketChannel> {
 
     private static final String UPGRADE_HANDLER = "upgrade_handler";
-    private static final String IDLE_STATE_HANDLER = "idle_state_handler";
-    private static final String IDLE_TIMEOUT_HANDLER = "idle_timeout_handler";
-
     private static final String HTTP_1_INITIALIZER = "http_1_initializer";
     private static final String HTTP_1_CODEC = "http_1_codec";
-    private static final String HTTP_1_AUTH = "http_1_auth";
-    private static final String HTTP_1_KEEPALIVE = "http_1_keepalive";
-
     private static final String HTTP_2_CODEC = "http_2_codec";
-    private static final String HTTP_2_AUTH = "http_2_AUTH";
-
     private static final String WS_INITIALIZER = "ws_initializer";
     private static final String WS_FRAME_CODEC = "ws_frame_codec";
 
@@ -59,27 +50,21 @@ public abstract class BaseProtocolNegotiator extends ChannelInitializer<SocketCh
     private final boolean h2Enabled;
     private final boolean h2cEnabled;
     private final boolean wsEnabled;
-    private final int idleTimeout;
+
+    private final ProtocolHandler mainHandler;
+    private final NettyConcern commonConcerns;
 
     private final ConnectionId connectionId = new ConnectionId();
 
-    public BaseProtocolNegotiator(boolean h2Enabled, boolean h2cEnabled, boolean wsEnabled, int idleTimeout) {
+    public ProtocolNegotiator(ProtocolHandler mainHandler, NettyConcern commonConcerns) {
 
-        this.h2Enabled = h2Enabled;
-        this.h2cEnabled = h2cEnabled;
-        this.wsEnabled = wsEnabled;
-        this.idleTimeout = idleTimeout;
+        this.h2Enabled = mainHandler.http2Supported();
+        this.h2cEnabled = mainHandler.http2Supported();
+        this.wsEnabled = mainHandler.websocketSupported();
+
+        this.mainHandler = mainHandler;
+        this.commonConcerns = commonConcerns;
     }
-
-    protected abstract ChannelInboundHandler http1AuthHandler();
-    protected abstract ChannelInboundHandler http2AuthHandler();
-
-    protected abstract ChannelHandler http1PrimaryHandler();
-    protected abstract ChannelHandler http2PrimaryHandler();
-
-    protected abstract WebSocketServerProtocolConfig wsProtocolConfig(HttpRequest upgradeRequest);
-    protected abstract ChannelHandler wsPrimaryHandler();
-
 
     @Override
     protected final void initChannel(SocketChannel channel) {
@@ -276,35 +261,16 @@ public abstract class BaseProtocolNegotiator extends ChannelInitializer<SocketCh
                 logNewConnection(channel, "HTTP/1.1");
 
             // Depending on which upgrades have been set up, the HTTP codec may or may not be installed
-
             var httpCodec = pipeline.get(HttpServerCodec.class);
-            String priorStageName;
 
-            if (httpCodec == null) {
+            if (httpCodec == null)
                 pipeline.addAfter(ctx.name(), HTTP_1_CODEC, new HttpServerCodec());
-                priorStageName = HTTP_1_CODEC;
-            }
-            else
-                priorStageName = ctx.name();
 
-            // Auth handler goes at the front of the pipeline (HTTP codec is already installed)
-            // This is a regular HTTP auth, modified to redirect browsers to the auth service on failure
-            var authHandler = http1AuthHandler();
-            pipeline.addAfter(priorStageName, HTTP_1_AUTH, authHandler);
-
-            // Keep alive handler will close connections not marked as keep-alive when a request is complete
-            pipeline.addAfter(HTTP_1_AUTH, HTTP_1_KEEPALIVE, new HttpServerKeepAliveHandler());
-
-            // For connections that are kept alive, we need to handle timeouts
-            // This idle state handler will trigger idle events after the configured timeout
-            // The CoreRouter class is responsible for handling the idle events
-            var idleHandler = new IdleStateHandler(idleTimeout, idleTimeout, idleTimeout, TimeUnit.SECONDS);
-            var idleEnforcer = new IdleTimeoutEnforcer();
-            pipeline.addAfter(HTTP_1_KEEPALIVE, IDLE_STATE_HANDLER, idleHandler);
-            pipeline.addAfter(IDLE_STATE_HANDLER, IDLE_TIMEOUT_HANDLER, idleEnforcer);
+            // Use common framework for cross-cutting concerns
+            commonConcerns.configureInboundChannel(pipeline, SupportedProtocol.HTTP);
 
             // The main HTTP/1 handler
-            var primaryHandler = http1PrimaryHandler();
+            var primaryHandler = mainHandler.createHttpHandler();
             pipeline.addLast(primaryHandler);
 
             pipeline.remove(this);
@@ -335,22 +301,15 @@ public abstract class BaseProtocolNegotiator extends ChannelInitializer<SocketCh
 
                     // Depending on how HTTP/2 is set up, the codec may or may not have been installed
                     var http2Codec = pipeline.get(Http2FrameCodec.class);
-                    String priorStageName;
 
-                    if (http2Codec == null) {
+                    if (http2Codec == null)
                         pipeline.addAfter(ctx.name(), HTTP_2_CODEC, Http2FrameCodecBuilder.forServer().build());
-                        priorStageName = HTTP_2_CODEC;
-                    }
-                    else {
-                        priorStageName = ctx.name();
-                    }
 
-                    // Auth handler comes immediately after the codec
-                    var authHandler = http2AuthHandler();
-                    pipeline.addAfter(priorStageName, HTTP_2_AUTH, authHandler);
+                    // Use common framework for cross-cutting concerns
+                    commonConcerns.configureInboundChannel(pipeline, SupportedProtocol.HTTP_2);
 
                     // The main HTTP/2 handler
-                    var primaryHandler = http2PrimaryHandler();
+                    var primaryHandler = mainHandler.createHttp2Handler();
                     pipeline.addLast(primaryHandler);
 
                     pipeline.remove(this);
@@ -393,41 +352,23 @@ public abstract class BaseProtocolNegotiator extends ChannelInitializer<SocketCh
 
                     logNewUpgradeConnection(channel, "WebSocket", upgrade);
 
+                    // HTTP codec is needed to bootstrap WS protocol
+                    // It is not set up automatically by the upgrade codec
                     pipeline.addAfter(ctx.name(), HTTP_1_CODEC, new HttpServerCodec());
 
-                    // Auth handler goes immediately after the HTTP codec
-                    // Since WS piggybacks on HTTP/1, use the HTTP/1 auth handler
-
-                    var authHandler = http1AuthHandler();
-                    pipeline.addAfter(HTTP_1_CODEC, HTTP_1_AUTH, authHandler);
-
-                    // WebSockets connections also need to use idle handler
-                    // E.g. buggy client code might forget to send the EOS signal or close the connection
-                    // The CoreRouter class is responsible for handling the idle events
-                    var idleHandler = new IdleStateHandler(idleTimeout, idleTimeout, idleTimeout, TimeUnit.SECONDS);
-                    var idleEnforcer = new IdleTimeoutEnforcer();
-                    pipeline.addAfter(HTTP_1_AUTH, IDLE_STATE_HANDLER, idleHandler);
-                    pipeline.addAfter(IDLE_STATE_HANDLER, IDLE_TIMEOUT_HANDLER, idleEnforcer);
-
-
-                    // Do not include compression codec at the WS level
-                    // Compression happens at the gRPC level for individual message blocks
-                    // Those message flow through different hops and protocols, including WS and HTTP/2
-                    // Compressing / decompressing on each hop is particularly inefficient since the payload is compressed
-                    // Quick testing shows a roughly 10% performance gain in Chrome from removing WS-level compression
-
-
                     // Configure the WS protocol handler - path must match the URI in the upgrade request
-
                     // Do not auto-reply to close frames as this can lead to protocol errors
                     // Chrome in particular is very fussy and will fail a whole request if the close sequence is wrong
                     // The close sequence is managed with the client explicitly in WebSocketsRouter
-
-                    var wsProtocolConfig = wsProtocolConfig(request);
+                    var wsProtocolConfig = mainHandler.createWebSocketConfig(request);
                     var wsProtocolHandler = new WebSocketServerProtocolHandler(wsProtocolConfig);
-                    pipeline.addAfter(IDLE_TIMEOUT_HANDLER, WS_FRAME_CODEC, wsProtocolHandler);
+                    pipeline.addAfter(HTTP_1_CODEC, WS_FRAME_CODEC, wsProtocolHandler);
 
-                    var primaryHandler = wsPrimaryHandler();
+                    // Use common framework for cross-cutting concerns
+                    commonConcerns.configureInboundChannel(pipeline, SupportedProtocol.WEB_SOCKETS);
+
+                    // The main WebSockets handler
+                    var primaryHandler = mainHandler.createWebsocketHandler();
                     pipeline.addLast(primaryHandler);
 
                     pipeline.remove(this);
@@ -449,25 +390,6 @@ public abstract class BaseProtocolNegotiator extends ChannelInitializer<SocketCh
             finally {
                 ReferenceCountUtil.release(evt);
             }
-        }
-    }
-
-    private class IdleTimeoutEnforcer extends ChannelInboundHandlerAdapter {
-
-        @Override
-        public void userEventTriggered(ChannelHandlerContext ctx, Object evt) {
-
-            if (evt instanceof IdleStateEvent) {
-
-                if (log.isDebugEnabled()) {
-                    var connId = ConnectionId.get(ctx.channel());
-                    log.info("IDLE TIMEOUT: conn = {}", connId);
-                }
-
-                ctx.close();
-            }
-            else
-                ctx.fireUserEventTriggered(evt);
         }
     }
 
