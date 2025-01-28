@@ -17,9 +17,9 @@
 
 package org.finos.tracdap.common.middleware;
 
-import io.netty.channel.ChannelPipeline;
-
-public interface NettyInboundConfig {
-
-    void configureInboundChannel(ChannelPipeline pipeline, SupportedProtocol protocol);
+public enum SupportedProtocol {
+    UNKNOWN,
+    HTTP,
+    HTTP_2,
+    WEB_SOCKETS
 }

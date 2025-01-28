@@ -22,12 +22,14 @@ import io.netty.channel.ChannelPipeline;
 public interface NettyConcern extends NettyInboundConfig, NettyOutboundConfig, BaseConcern {
 
     @Override
-    default ChannelPipeline configureInboundChannel(ChannelPipeline pipeline) {
-        return pipeline;
+    default void configureInboundChannel(ChannelPipeline pipeline, SupportedProtocol protocol) {
+
+        // Default to no-op
     }
 
     @Override
-    default ChannelPipeline configureOutboundChannel(ChannelPipeline pipeline) {
-        return pipeline;
+    default void configureOutboundChannel(ChannelPipeline pipeline, SupportedProtocol protocol) {
+
+        // Default to no-op
     }
 }

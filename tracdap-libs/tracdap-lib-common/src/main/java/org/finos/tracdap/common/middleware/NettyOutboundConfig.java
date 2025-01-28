@@ -21,5 +21,5 @@ import io.netty.channel.ChannelPipeline;
 
 public interface NettyOutboundConfig {
 
-    ChannelPipeline configureOutboundChannel(ChannelPipeline pipeline);
+    void configureOutboundChannel(ChannelPipeline pipeline, SupportedProtocol protocol);
 }
