@@ -20,25 +20,23 @@ package org.finos.tracdap.common.middleware;
 import org.finos.tracdap.common.exception.ETracInternal;
 import java.util.*;
 
-public abstract class CommonConcerns<TConcern extends BaseConcern> {
-
-    public static final String TRAC_PROTOCOL = "trac_protocol";
-    public static final String TRAC_AUTHENTICATION = "trac_authentication";
-    public static final String TRAC_VALIDATION = "trac_validation";
-    public static final String TRAC_LOGGING = "trac_logging";
-    public static final String TRAC_ERROR_HANDLING = "trac_error_handling";
+public abstract class CommonConcerns<TConcern extends BaseConcern> implements BaseConcern {
 
     protected final List<String> stageOrder;
     protected final Map<String, TConcern> stages;
 
-    protected CommonConcerns() {
+    private final String concernName;
+
+    protected CommonConcerns(String concernName) {
         this.stageOrder = new ArrayList<>();
         this.stages = new HashMap<>();
+        this.concernName = concernName;
     }
 
-    protected CommonConcerns(List<String> stageOrder, Map<String, TConcern> stages) {
+    protected CommonConcerns(String concernName, List<String> stageOrder, Map<String, TConcern> stages) {
         this.stageOrder = stageOrder;
         this.stages = stages;
+        this.concernName = concernName;
     }
 
     public abstract TConcern build();
@@ -99,5 +97,10 @@ public abstract class CommonConcerns<TConcern extends BaseConcern> {
 
     public List<String> stageNames() {
         return Collections.unmodifiableList(stageOrder);
+    }
+
+    @Override
+    public String concernName() {
+        return concernName;
     }
 }
