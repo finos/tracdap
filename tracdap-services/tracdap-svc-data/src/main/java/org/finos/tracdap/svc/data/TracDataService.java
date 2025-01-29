@@ -221,7 +221,7 @@ public class TracDataService extends TracServiceBase {
 
         // Additional cross-cutting concerns configured by extensions
         for (var extension : pluginManager.getExtensions()) {
-            commonConcerns = extension.addServiceConcerns(commonConcerns);
+            commonConcerns = extension.addServiceConcerns(commonConcerns, configManager, ConfigKeys.DATA_SERVICE_KEY);
         }
 
         return commonConcerns.build();

@@ -17,6 +17,7 @@
 
 package org.finos.tracdap.common.plugin;
 
+import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.middleware.CommonConcerns;
 import org.finos.tracdap.common.middleware.GrpcConcern;
 import org.finos.tracdap.common.middleware.NettyConcern;
@@ -38,11 +39,20 @@ public interface ITracExtension {
         return List.of();
     }
 
-    default CommonConcerns<GrpcConcern> addServiceConcerns(CommonConcerns<GrpcConcern> serviceConcerns) {
+    @SuppressWarnings("unused")
+    default CommonConcerns<GrpcConcern> addServiceConcerns(
+            CommonConcerns<GrpcConcern> serviceConcerns,
+            ConfigManager configManager,
+            String serviceKey) {
+
         return serviceConcerns;
     }
 
-    default CommonConcerns<NettyConcern> addGatewayConcerns(CommonConcerns<NettyConcern> gatewayConcerns) {
+    @SuppressWarnings("unused")
+    default CommonConcerns<NettyConcern> addGatewayConcerns(
+            CommonConcerns<NettyConcern> gatewayConcerns,
+            ConfigManager configManager) {
+
         return gatewayConcerns;
     }
 }

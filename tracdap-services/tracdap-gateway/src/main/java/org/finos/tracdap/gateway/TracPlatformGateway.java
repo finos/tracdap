@@ -239,7 +239,7 @@ public class TracPlatformGateway extends TracServiceBase {
 
         // Additional cross-cutting concerns configured by extensions
         for (var extension : pluginManager.getExtensions()) {
-            commonConcerns = extension.addGatewayConcerns(commonConcerns);
+            commonConcerns = extension.addGatewayConcerns(commonConcerns, configManager);
         }
 
         return commonConcerns.build();
