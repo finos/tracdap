@@ -47,8 +47,8 @@ import java.util.Map;
 import static io.netty.util.NetUtil.LOCALHOST;
 import static org.finos.tracdap.test.concurrent.ConcurrentTestHelpers.getResultOf;
 import static org.finos.tracdap.test.concurrent.ConcurrentTestHelpers.waitFor;
-import static org.finos.tracdap.test.meta.TestData.TEST_TENANT;
-import static org.finos.tracdap.test.meta.TestData.selectorForTag;
+import static org.finos.tracdap.test.meta.SampleMetadata.TEST_TENANT;
+import static org.finos.tracdap.test.meta.SampleMetadata.selectorForTag;
 
 
 public class RestDownloadTest {

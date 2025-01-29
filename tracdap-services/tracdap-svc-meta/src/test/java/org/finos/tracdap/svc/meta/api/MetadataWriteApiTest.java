@@ -24,7 +24,7 @@ import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.svc.meta.TracMetadataService;
 import org.finos.tracdap.test.helpers.PlatformTest;
-import org.finos.tracdap.test.meta.TestData;
+import org.finos.tracdap.test.meta.SampleMetadata;
 
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
@@ -42,7 +42,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
-import static org.finos.tracdap.test.meta.TestData.*;
+import static org.finos.tracdap.test.meta.SampleMetadata.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 
@@ -141,9 +141,9 @@ abstract class MetadataWriteApiTest {
                 names = {"OBJECT_TYPE_NOT_SET", "UNRECOGNIZED", "SCHEMA", "FLOW", "CUSTOM"})
     void createObject_publicTypesNotAllowed(ObjectType objectType) {
 
-        var objToSave = TestData.dummyDefinitionForType(objectType);
-        var tagToSave = TestData.dummyTag(objToSave, TestData.NO_HEADER);
-        var tagUpdates = TestData.tagUpdatesForAttrs(tagToSave.getAttrsMap());
+        var objToSave = SampleMetadata.dummyDefinitionForType(objectType);
+        var tagToSave = SampleMetadata.dummyTag(objToSave, SampleMetadata.NO_HEADER);
+        var tagUpdates = SampleMetadata.tagUpdatesForAttrs(tagToSave.getAttrsMap());
 
         var writeRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
@@ -158,9 +158,9 @@ abstract class MetadataWriteApiTest {
 
     void createObject_ok(ObjectType objectType, Function<MetadataWriteRequest, TagHeader> saveApiCall) {
 
-        var objToSave = TestData.dummyDefinitionForType(objectType);
-        var tagToSave = TestData.dummyTag(objToSave, TestData.NO_HEADER);
-        var tagUpdates = TestData.tagUpdatesForAttrs(tagToSave.getAttrsMap());
+        var objToSave = SampleMetadata.dummyDefinitionForType(objectType);
+        var tagToSave = SampleMetadata.dummyTag(objToSave, SampleMetadata.NO_HEADER);
+        var tagUpdates = SampleMetadata.tagUpdatesForAttrs(tagToSave.getAttrsMap());
 
         var writeRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
@@ -214,9 +214,9 @@ abstract class MetadataWriteApiTest {
 
         // Make sure both types are allowed on the public API, so we don't get permission denied
 
-        var objToSave = TestData.dummyDefinitionForType(ObjectType.CUSTOM);
-        var tagToSave = TestData.dummyTag(objToSave, TestData.NO_HEADER);
-        var tagUpdates = TestData.tagUpdatesForAttrs(tagToSave.getAttrsMap());
+        var objToSave = SampleMetadata.dummyDefinitionForType(ObjectType.CUSTOM);
+        var tagToSave = SampleMetadata.dummyTag(objToSave, SampleMetadata.NO_HEADER);
+        var tagUpdates = SampleMetadata.tagUpdatesForAttrs(tagToSave.getAttrsMap());
 
         // Request to save a MODEL, even though the definition is for DATA
         var writeRequest = MetadataWriteRequest.newBuilder()
@@ -236,7 +236,7 @@ abstract class MetadataWriteApiTest {
     @Test
     void createObject_invalidContent() {
 
-        var validFlow = TestData.dummyFlowDef();
+        var validFlow = SampleMetadata.dummyFlowDef();
 
         // Create a flow with an invalid node graph, this should get picked up by the validation layer
 
@@ -250,8 +250,8 @@ abstract class MetadataWriteApiTest {
                 .setFlow(brokenEdges)
                 .build();
 
-        var tagToSave = TestData.dummyTag(invalidFlow, TestData.NO_HEADER);
-        var tagUpdates = TestData.tagUpdatesForAttrs(tagToSave.getAttrsMap());
+        var tagToSave = SampleMetadata.dummyTag(invalidFlow, SampleMetadata.NO_HEADER);
+        var tagUpdates = SampleMetadata.tagUpdatesForAttrs(tagToSave.getAttrsMap());
 
         // Try to save the flow with a broken graph, should fail validation
         var writeRequest = MetadataWriteRequest.newBuilder()
@@ -271,14 +271,14 @@ abstract class MetadataWriteApiTest {
     @Test
     void createObject_invalidAttrs() {
 
-        var objToSave = TestData.dummyDefinitionForType(ObjectType.CUSTOM);
-        var validTag = TestData.dummyTag(objToSave, TestData.NO_HEADER);
+        var objToSave = SampleMetadata.dummyDefinitionForType(ObjectType.CUSTOM);
+        var validTag = SampleMetadata.dummyTag(objToSave, SampleMetadata.NO_HEADER);
 
         var invalidTag = validTag.toBuilder()
                 .putAttrs("${escape_key}", MetadataCodec.encodeValue(1.0))
                 .build();
 
-        var tagUpdates = TestData.tagUpdatesForAttrs(invalidTag.getAttrsMap());
+        var tagUpdates = SampleMetadata.tagUpdatesForAttrs(invalidTag.getAttrsMap());
 
         // Request to save a MODEL, even though the definition is for DATA
         var writeRequest = MetadataWriteRequest.newBuilder()
@@ -298,14 +298,14 @@ abstract class MetadataWriteApiTest {
     @Test
     void createObject_reservedAttrs() {
 
-        var objToSave = TestData.dummyDefinitionForType(ObjectType.CUSTOM);
-        var validTag = TestData.dummyTag(objToSave, TestData.NO_HEADER);
+        var objToSave = SampleMetadata.dummyDefinitionForType(ObjectType.CUSTOM);
+        var validTag = SampleMetadata.dummyTag(objToSave, SampleMetadata.NO_HEADER);
 
         var invalidTag = validTag.toBuilder()
                 .putAttrs("trac_anything_reserved", MetadataCodec.encodeValue(1.0))
                 .build();
 
-        var tagUpdates = TestData.tagUpdatesForAttrs(invalidTag.getAttrsMap());
+        var tagUpdates = SampleMetadata.tagUpdatesForAttrs(invalidTag.getAttrsMap());
 
         // Request to save a MODEL, even though the definition is for DATA
         var writeRequest = MetadataWriteRequest.newBuilder()
@@ -340,9 +340,9 @@ abstract class MetadataWriteApiTest {
 
         for (int i = 0; i < 7; i++) {
 
-            var objToSave = TestData.dummyDefinitionForType(objectType);
-            var tagToSave = TestData.dummyTag(objToSave, TestData.NO_HEADER);
-            var tagUpdates = TestData.tagUpdatesForAttrs(tagToSave.getAttrsMap());
+            var objToSave = SampleMetadata.dummyDefinitionForType(objectType);
+            var tagToSave = SampleMetadata.dummyTag(objToSave, SampleMetadata.NO_HEADER);
+            var tagUpdates = SampleMetadata.tagUpdatesForAttrs(tagToSave.getAttrsMap());
 
             requests.add(MetadataWriteRequest.newBuilder()
                     .setObjectType(objectType)
@@ -367,9 +367,9 @@ abstract class MetadataWriteApiTest {
 
         for (int i = 0; i < 7; i++) {
 
-            var objToSave = TestData.dummyDefinitionForType(objectType);
-            var tagToSave = TestData.dummyTag(objToSave, TestData.NO_HEADER);
-            var tagUpdates = TestData.tagUpdatesForAttrs(tagToSave.getAttrsMap());
+            var objToSave = SampleMetadata.dummyDefinitionForType(objectType);
+            var tagToSave = SampleMetadata.dummyTag(objToSave, SampleMetadata.NO_HEADER);
+            var tagUpdates = SampleMetadata.tagUpdatesForAttrs(tagToSave.getAttrsMap());
 
             requests.add(MetadataWriteRequest.newBuilder()
                     .setObjectType(objectType)
@@ -441,9 +441,9 @@ abstract class MetadataWriteApiTest {
 
         for (int i = 0; i < 7; i++) {
 
-            var objToSave = TestData.dummyDefinitionForType(ObjectType.CUSTOM);
-            var tagToSave = TestData.dummyTag(objToSave, TestData.NO_HEADER);
-            var tagUpdates = TestData.tagUpdatesForAttrs(tagToSave.getAttrsMap());
+            var objToSave = SampleMetadata.dummyDefinitionForType(ObjectType.CUSTOM);
+            var tagToSave = SampleMetadata.dummyTag(objToSave, SampleMetadata.NO_HEADER);
+            var tagUpdates = SampleMetadata.tagUpdatesForAttrs(tagToSave.getAttrsMap());
 
             // Request to save a MODEL, even though the definition is for DATA
             requests.add(MetadataWriteRequest.newBuilder()
@@ -472,7 +472,7 @@ abstract class MetadataWriteApiTest {
 
         for (int i = 0; i < 7; i++) {
 
-            var validFlow = TestData.dummyFlowDef();
+            var validFlow = SampleMetadata.dummyFlowDef();
 
             // Create a flow with an invalid node graph, this should get picked up by the validation layer
 
@@ -486,8 +486,8 @@ abstract class MetadataWriteApiTest {
                     .setFlow(brokenEdges)
                     .build();
 
-            var tagToSave = TestData.dummyTag(invalidFlow, TestData.NO_HEADER);
-            var tagUpdates = TestData.tagUpdatesForAttrs(tagToSave.getAttrsMap());
+            var tagToSave = SampleMetadata.dummyTag(invalidFlow, SampleMetadata.NO_HEADER);
+            var tagUpdates = SampleMetadata.tagUpdatesForAttrs(tagToSave.getAttrsMap());
 
             // Try to save the flow with a broken graph, should fail validation
             requests.add(
@@ -517,14 +517,14 @@ abstract class MetadataWriteApiTest {
 
         for (int i = 0; i < 7; i++) {
 
-            var objToSave = TestData.dummyDefinitionForType(ObjectType.CUSTOM);
-            var validTag = TestData.dummyTag(objToSave, TestData.NO_HEADER);
+            var objToSave = SampleMetadata.dummyDefinitionForType(ObjectType.CUSTOM);
+            var validTag = SampleMetadata.dummyTag(objToSave, SampleMetadata.NO_HEADER);
 
             var invalidTag = validTag.toBuilder()
                     .putAttrs("${escape_key}", MetadataCodec.encodeValue(1.0))
                     .build();
 
-            var tagUpdates = TestData.tagUpdatesForAttrs(invalidTag.getAttrsMap());
+            var tagUpdates = SampleMetadata.tagUpdatesForAttrs(invalidTag.getAttrsMap());
 
             // Request to save a MODEL, even though the definition is for DATA
             requests.add(
@@ -554,14 +554,14 @@ abstract class MetadataWriteApiTest {
 
         for (int i = 0; i < 7; i++) {
 
-            var objToSave = TestData.dummyDefinitionForType(ObjectType.CUSTOM);
-            var validTag = TestData.dummyTag(objToSave, TestData.NO_HEADER);
+            var objToSave = SampleMetadata.dummyDefinitionForType(ObjectType.CUSTOM);
+            var validTag = SampleMetadata.dummyTag(objToSave, SampleMetadata.NO_HEADER);
 
             var invalidTag = validTag.toBuilder()
                     .putAttrs("trac_anything_reserved", MetadataCodec.encodeValue(1.0))
                     .build();
 
-            var tagUpdates = TestData.tagUpdatesForAttrs(invalidTag.getAttrsMap());
+            var tagUpdates = SampleMetadata.tagUpdatesForAttrs(invalidTag.getAttrsMap());
 
             // Request to save a MODEL, even though the definition is for DATA
             requests.add(
@@ -612,7 +612,7 @@ abstract class MetadataWriteApiTest {
         var v1SavedTag = updateObject_prepareV1(objectType);
         var v1Selector = selectorForTag(v1SavedTag);
 
-        var v2Obj = TestData.dummyBadVersionForType(v1SavedTag.getDefinition());
+        var v2Obj = SampleMetadata.dummyBadVersionForType(v1SavedTag.getDefinition());
 
         var v2WriteRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
@@ -644,7 +644,7 @@ abstract class MetadataWriteApiTest {
         var v1SavedTag = updateObject_prepareV1(objectType);
         var v1Selector = selectorForTag(v1SavedTag);
 
-        var v2Obj = TestData.dummyBadVersionForType(v1SavedTag.getDefinition());
+        var v2Obj = SampleMetadata.dummyBadVersionForType(v1SavedTag.getDefinition());
 
         var v2WriteRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
@@ -666,7 +666,7 @@ abstract class MetadataWriteApiTest {
         var v1SavedTag = updateObject_prepareV1(objectType);
         var v1Selector = selectorForTag(v1SavedTag);
 
-        var v2Obj = TestData.dummyVersionForType(v1SavedTag.getDefinition());
+        var v2Obj = SampleMetadata.dummyVersionForType(v1SavedTag.getDefinition());
 
         var v2WriteRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
@@ -690,7 +690,7 @@ abstract class MetadataWriteApiTest {
         var v1SavedTag = updateObject_prepareV1(objectType);
         var v1Selector = selectorForTag(v1SavedTag);
 
-        var v2Obj = TestData.dummyVersionForType(v1SavedTag.getDefinition());
+        var v2Obj = SampleMetadata.dummyVersionForType(v1SavedTag.getDefinition());
 
         var v2WriteRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
@@ -716,7 +716,7 @@ abstract class MetadataWriteApiTest {
         var v1Selector = selectorForTag(v1SavedTag);
         var v1ObjectId = UUID.fromString(v1SavedTag.getHeader().getObjectId());
 
-        var v2Obj = TestData.dummyVersionForType(v1SavedTag.getDefinition());
+        var v2Obj = SampleMetadata.dummyVersionForType(v1SavedTag.getDefinition());
 
         var v2NewAttrName = "update_object_v2_attr_" + objectType.name();
         var v2NewAttrValue = MetadataCodec.encodeValue(1.0);
@@ -782,9 +782,9 @@ abstract class MetadataWriteApiTest {
 
         // Save and retrieve version 1, the saved version will have an object header filled in
 
-        var v1Obj = TestData.dummyDefinitionForType(objectType);
-        var v1Tag = TestData.dummyTag(v1Obj, TestData.NO_HEADER);
-        var tagUpdates = TestData.tagUpdatesForAttrs(v1Tag.getAttrsMap());
+        var v1Obj = SampleMetadata.dummyDefinitionForType(objectType);
+        var v1Tag = SampleMetadata.dummyTag(v1Obj, SampleMetadata.NO_HEADER);
+        var tagUpdates = SampleMetadata.tagUpdatesForAttrs(v1Tag.getAttrsMap());
 
         var v1WriteRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
@@ -837,7 +837,7 @@ abstract class MetadataWriteApiTest {
         var v1Latest = readApi.readObject(readRequest);
         assertEquals(1, v1Latest.getHeader().getObjectVersion());
 
-        var v2Obj = TestData.dummyVersionForType(v1SavedTag.getDefinition());
+        var v2Obj = SampleMetadata.dummyVersionForType(v1SavedTag.getDefinition());
 
         var v2WriteRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
@@ -853,7 +853,7 @@ abstract class MetadataWriteApiTest {
         assertEquals(2, v2Latest.getHeader().getObjectVersion());
 
         var v2Selector = selectorForTag(v2Latest);
-        var v3Obj = TestData.dummyVersionForType(v2Latest.getDefinition());
+        var v3Obj = SampleMetadata.dummyVersionForType(v2Latest.getDefinition());
 
         var v3WriteRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
@@ -879,7 +879,7 @@ abstract class MetadataWriteApiTest {
         var v1SavedTag = updateObject_prepareV1(ObjectType.CUSTOM);
         var v1Selector = selectorForTag(v1SavedTag);
 
-        var v2Obj = TestData.dummyVersionForType(v1SavedTag.getDefinition());
+        var v2Obj = SampleMetadata.dummyVersionForType(v1SavedTag.getDefinition());
 
         var v2WriteRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
@@ -905,7 +905,7 @@ abstract class MetadataWriteApiTest {
         // Currently only testing the trusted API, as public does not support two types with versioning
 
         var v1SavedTag = updateObject_prepareV1(ObjectType.CUSTOM);
-        var v2Obj = TestData.dummyDataDef();
+        var v2Obj = SampleMetadata.dummyDataDef();
 
         // First attempt - use a prior version selector that does not match the new object
         // This should be an invalid request (it is always invalid, regardless of what is in the DB)
@@ -944,10 +944,10 @@ abstract class MetadataWriteApiTest {
     void updateObject_missingObject() {
 
         // V1 object is not saved
-        var v1Tag = TestData.dummyTagForObjectType(ObjectType.CUSTOM);
+        var v1Tag = SampleMetadata.dummyTagForObjectType(ObjectType.CUSTOM);
         var v1Selector = selectorForTag(v1Tag);
 
-        var v2Obj = TestData.dummyVersionForType(v1Tag.getDefinition());
+        var v2Obj = SampleMetadata.dummyVersionForType(v1Tag.getDefinition());
 
         var v2WriteRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
@@ -971,10 +971,10 @@ abstract class MetadataWriteApiTest {
         var v1Selector = selectorForTag(v1SavedTag);
 
         // V2 object is not saved
-        var v2Obj = TestData.dummyVersionForType(v1SavedTag.getDefinition());
+        var v2Obj = SampleMetadata.dummyVersionForType(v1SavedTag.getDefinition());
         var v2Selector = v1Selector.toBuilder().setObjectVersion(2).build();
 
-        var v3Obj = TestData.dummyVersionForType(v2Obj);
+        var v3Obj = SampleMetadata.dummyVersionForType(v2Obj);
 
         var v3WriteRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
@@ -997,7 +997,7 @@ abstract class MetadataWriteApiTest {
         var v1SavedTag = updateObject_prepareV1(ObjectType.CUSTOM);
         var v1Selector = selectorForTag(v1SavedTag);
 
-        var v2Obj = TestData.dummyVersionForType(v1SavedTag.getDefinition());
+        var v2Obj = SampleMetadata.dummyVersionForType(v1SavedTag.getDefinition());
 
         var v2WriteRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
@@ -1062,7 +1062,7 @@ abstract class MetadataWriteApiTest {
         var v1SavedTag = updateObject_prepareV1(ObjectType.CUSTOM);
         var v1Selector = selectorForTag(v1SavedTag);
 
-        var v2Obj = TestData.dummyVersionForType(v1SavedTag.getDefinition());
+        var v2Obj = SampleMetadata.dummyVersionForType(v1SavedTag.getDefinition());
 
         var tagUpdate = TagUpdate.newBuilder()
                 .setAttrName("very\nbroken.attr")
@@ -1090,7 +1090,7 @@ abstract class MetadataWriteApiTest {
         var v1SavedTag = updateObject_prepareV1(ObjectType.CUSTOM);
         var v1Selector = selectorForTag(v1SavedTag);
 
-        var v2Obj = TestData.dummyVersionForType(v1SavedTag.getDefinition());
+        var v2Obj = SampleMetadata.dummyVersionForType(v1SavedTag.getDefinition());
 
         var tagUpdate = TagUpdate.newBuilder()
                 .setAttrName("trac_anything_reserved")
@@ -1152,7 +1152,7 @@ abstract class MetadataWriteApiTest {
             var v1SavedTag = updateObject_prepareV1(objectType);
             var v1Selector = selectorForTag(v1SavedTag);
 
-            var v2Obj = TestData.dummyVersionForType(v1SavedTag.getDefinition());
+            var v2Obj = SampleMetadata.dummyVersionForType(v1SavedTag.getDefinition());
 
             requests.add(
                     MetadataWriteRequest.newBuilder()
@@ -1192,7 +1192,7 @@ abstract class MetadataWriteApiTest {
             var v1Selector = selectorForTag(r.v1SavedTag);
             r.v1ObjectId = UUID.fromString(r.v1SavedTag.getHeader().getObjectId());
 
-            r.v2Obj = TestData.dummyVersionForType(r.v1SavedTag.getDefinition());
+            r.v2Obj = SampleMetadata.dummyVersionForType(r.v1SavedTag.getDefinition());
 
             r.v2NewAttrName = "update_batch_v2_attr_" + objectType.name();
             r.v2NewAttrValue = MetadataCodec.encodeValue(1.0);
@@ -1371,7 +1371,7 @@ abstract class MetadataWriteApiTest {
         var v1Selector = selectorForTag(v1SavedTag);
         var v1Header = v1SavedTag.getHeader();
 
-        var v2Obj = TestData.dummyVersionForType(v1SavedTag.getDefinition());
+        var v2Obj = SampleMetadata.dummyVersionForType(v1SavedTag.getDefinition());
 
         var v2WriteRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
@@ -1476,7 +1476,7 @@ abstract class MetadataWriteApiTest {
 
         var v1t2Tag = trustedApi.updateTag(v1t2WriteRequest);
 
-        var v2Obj = TestData.dummyVersionForType(v1SavedTag.getDefinition());
+        var v2Obj = SampleMetadata.dummyVersionForType(v1SavedTag.getDefinition());
 
         var v2WriteRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
@@ -1535,7 +1535,7 @@ abstract class MetadataWriteApiTest {
         var v1Selector = selectorForTag(v1SavedTag);
         var v1Header = v1SavedTag.getHeader();
 
-        var v2Obj = TestData.dummyVersionForType(v1SavedTag.getDefinition());
+        var v2Obj = SampleMetadata.dummyVersionForType(v1SavedTag.getDefinition());
 
         var v2WriteRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
@@ -1663,8 +1663,8 @@ abstract class MetadataWriteApiTest {
     @Test
     void updateTag_missingObject() {
 
-        var v1Obj = TestData.dummyDataDef();
-        var v1Tag = TestData.dummyTag(v1Obj, INCLUDE_HEADER);
+        var v1Obj = SampleMetadata.dummyDataDef();
+        var v1Tag = SampleMetadata.dummyTag(v1Obj, INCLUDE_HEADER);
         var v1Selector = selectorForTag(v1Tag);
 
         var t2Update = TagUpdate.newBuilder()
@@ -1996,9 +1996,9 @@ abstract class MetadataWriteApiTest {
         var preallocateHeader = trustedApi.preallocateId(preallocateRequest);
         var preallocateSelector = selectorForTag(preallocateHeader);
 
-        var newObject = TestData.dummyDefinitionForType(ObjectType.DATA);
-        var newTag = TestData.dummyTag(newObject, TestData.NO_HEADER);
-        var tagUpdates = TestData.tagUpdatesForAttrs(newTag.getAttrsMap());
+        var newObject = SampleMetadata.dummyDefinitionForType(ObjectType.DATA);
+        var newTag = SampleMetadata.dummyTag(newObject, SampleMetadata.NO_HEADER);
+        var tagUpdates = SampleMetadata.tagUpdatesForAttrs(newTag.getAttrsMap());
 
         var writeRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
@@ -2055,9 +2055,9 @@ abstract class MetadataWriteApiTest {
                 .setTagVersion(0)
                 .build();
 
-        var newObject = TestData.dummyDefinitionForType(ObjectType.DATA);
-        var newTag = TestData.dummyTag(newObject, TestData.NO_HEADER);
-        var tagUpdates = TestData.tagUpdatesForAttrs(newTag.getAttrsMap());
+        var newObject = SampleMetadata.dummyDefinitionForType(ObjectType.DATA);
+        var newTag = SampleMetadata.dummyTag(newObject, SampleMetadata.NO_HEADER);
+        var tagUpdates = SampleMetadata.tagUpdatesForAttrs(newTag.getAttrsMap());
 
         var writeRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
@@ -2085,9 +2085,9 @@ abstract class MetadataWriteApiTest {
         var preallocateHeader = trustedApi.preallocateId(preallocateRequest);
         var preallocateSelector = selectorForTag(preallocateHeader);
 
-        var newObject = TestData.dummyDefinitionForType(ObjectType.DATA);
-        var newTag = TestData.dummyTag(newObject, TestData.NO_HEADER);
-        var tagUpdates = TestData.tagUpdatesForAttrs(newTag.getAttrsMap());
+        var newObject = SampleMetadata.dummyDefinitionForType(ObjectType.DATA);
+        var newTag = SampleMetadata.dummyTag(newObject, SampleMetadata.NO_HEADER);
+        var tagUpdates = SampleMetadata.tagUpdatesForAttrs(newTag.getAttrsMap());
 
         var writeRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
@@ -2124,9 +2124,9 @@ abstract class MetadataWriteApiTest {
                 .setTagVersion(0)
                 .build();
 
-        var newObject = TestData.dummyDefinitionForType(ObjectType.MODEL);
-        var newTag = TestData.dummyTag(newObject, TestData.NO_HEADER);
-        var tagUpdates = TestData.tagUpdatesForAttrs(newTag.getAttrsMap());
+        var newObject = SampleMetadata.dummyDefinitionForType(ObjectType.MODEL);
+        var newTag = SampleMetadata.dummyTag(newObject, SampleMetadata.NO_HEADER);
+        var tagUpdates = SampleMetadata.tagUpdatesForAttrs(newTag.getAttrsMap());
 
         var writeRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
@@ -2158,9 +2158,9 @@ abstract class MetadataWriteApiTest {
         var preallocateHeader = trustedApi.preallocateId(preallocateRequest);
         var preallocateSelector = selectorForTag(preallocateHeader);
 
-        var newObject = TestData.dummyDefinitionForType(ObjectType.MODEL);
-        var newTag = TestData.dummyTag(newObject, TestData.NO_HEADER);
-        var tagUpdates = TestData.tagUpdatesForAttrs(newTag.getAttrsMap());
+        var newObject = SampleMetadata.dummyDefinitionForType(ObjectType.MODEL);
+        var newTag = SampleMetadata.dummyTag(newObject, SampleMetadata.NO_HEADER);
+        var tagUpdates = SampleMetadata.tagUpdatesForAttrs(newTag.getAttrsMap());
 
         // Attempt one: object type matches definition, does not match selector
 
@@ -2217,7 +2217,7 @@ abstract class MetadataWriteApiTest {
         var preallocateHeader = trustedApi.preallocateId(preallocateRequest);
         var preallocateSelector = selectorForTag(preallocateHeader);
 
-        var validSchema = TestData.dummySchemaDef();
+        var validSchema = SampleMetadata.dummySchemaDef();
 
         // Create a flow with an invalid node graph, this should get picked up by the validation layer
 
@@ -2234,8 +2234,8 @@ abstract class MetadataWriteApiTest {
                 .setSchema(brokenTableSchema)
                 .build();
 
-        var tagToSave = TestData.dummyTag(invalidSchema, TestData.NO_HEADER);
-        var tagUpdates = TestData.tagUpdatesForAttrs(tagToSave.getAttrsMap());
+        var tagToSave = SampleMetadata.dummyTag(invalidSchema, SampleMetadata.NO_HEADER);
+        var tagUpdates = SampleMetadata.tagUpdatesForAttrs(tagToSave.getAttrsMap());
 
         // Try to save the flow with a broken graph, should fail validation
         var writeRequest = MetadataWriteRequest.newBuilder()
@@ -2270,9 +2270,9 @@ abstract class MetadataWriteApiTest {
                 .setTagVersion(1)
                 .build();
 
-        var newObject = TestData.dummyDefinitionForType(ObjectType.DATA);
-        var newTag = TestData.dummyTag(newObject, TestData.NO_HEADER);
-        var tagUpdates = TestData.tagUpdatesForAttrs(newTag.getAttrsMap());
+        var newObject = SampleMetadata.dummyDefinitionForType(ObjectType.DATA);
+        var newTag = SampleMetadata.dummyTag(newObject, SampleMetadata.NO_HEADER);
+        var tagUpdates = SampleMetadata.tagUpdatesForAttrs(newTag.getAttrsMap());
 
         var newVersionRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
@@ -2384,9 +2384,9 @@ abstract class MetadataWriteApiTest {
             var r = new RequestData();
             var preallocateSelector = selectorForTag(preallocateHeader);
 
-            var newObject = TestData.dummyDefinitionForType(ObjectType.DATA);
-            r.newTag = TestData.dummyTag(newObject, TestData.NO_HEADER);
-            var tagUpdates = TestData.tagUpdatesForAttrs(r.newTag.getAttrsMap());
+            var newObject = SampleMetadata.dummyDefinitionForType(ObjectType.DATA);
+            r.newTag = SampleMetadata.dummyTag(newObject, SampleMetadata.NO_HEADER);
+            var tagUpdates = SampleMetadata.tagUpdatesForAttrs(r.newTag.getAttrsMap());
 
             r.writeRequest = MetadataWriteRequest.newBuilder()
                     .setObjectType(ObjectType.DATA)
@@ -2461,9 +2461,9 @@ abstract class MetadataWriteApiTest {
                     .setTagVersion(0)
                     .build();
 
-            var newObject = TestData.dummyDefinitionForType(ObjectType.DATA);
-            var newTag = TestData.dummyTag(newObject, TestData.NO_HEADER);
-            var tagUpdates = TestData.tagUpdatesForAttrs(newTag.getAttrsMap());
+            var newObject = SampleMetadata.dummyDefinitionForType(ObjectType.DATA);
+            var newTag = SampleMetadata.dummyTag(newObject, SampleMetadata.NO_HEADER);
+            var tagUpdates = SampleMetadata.tagUpdatesForAttrs(newTag.getAttrsMap());
 
             return MetadataWriteRequest.newBuilder()
                     .setObjectType(ObjectType.DATA)

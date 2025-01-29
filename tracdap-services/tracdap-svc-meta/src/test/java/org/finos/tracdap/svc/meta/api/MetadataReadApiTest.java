@@ -20,17 +20,15 @@ package org.finos.tracdap.svc.meta.api;
 import org.finos.tracdap.api.*;
 import org.finos.tracdap.api.internal.TrustedMetadataApiGrpc;
 import org.finos.tracdap.common.metadata.MetadataConstants;
-import org.finos.tracdap.common.util.VersionInfo;
 import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.svc.meta.TracMetadataService;
 import org.finos.tracdap.test.helpers.PlatformTest;
-import org.finos.tracdap.test.meta.TestData;
+import org.finos.tracdap.test.meta.SampleMetadata;
 
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -41,8 +39,8 @@ import org.junit.jupiter.params.provider.EnumSource;
 import java.util.HashMap;
 import java.util.UUID;
 
-import static org.finos.tracdap.test.meta.TestData.TEST_TENANT;
-import static org.finos.tracdap.test.meta.TestData.selectorForTag;
+import static org.finos.tracdap.test.meta.SampleMetadata.TEST_TENANT;
+import static org.finos.tracdap.test.meta.SampleMetadata.selectorForTag;
 import static org.junit.jupiter.api.Assertions.*;
 
 
@@ -96,9 +94,9 @@ abstract class MetadataReadApiTest {
                 names = {"OBJECT_TYPE_NOT_SET", "UNRECOGNIZED"})
     void readObject_ok(ObjectType objectType) {
 
-        var origObj = TestData.dummyDefinitionForType(objectType);
-        var attrs = TestData.dummyAttrs();
-        var tagUpdates = TestData.tagUpdatesForAttrs(attrs);
+        var origObj = SampleMetadata.dummyDefinitionForType(objectType);
+        var attrs = SampleMetadata.dummyAttrs();
+        var tagUpdates = SampleMetadata.tagUpdatesForAttrs(attrs);
 
         var writeRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
@@ -133,9 +131,9 @@ abstract class MetadataReadApiTest {
             names = {"OBJECT_TYPE_NOT_SET", "UNRECOGNIZED"})
     void readBatch_ok(ObjectType objectType) {
 
-        var origObj = TestData.dummyDefinitionForType(objectType);
-        var attrs = TestData.dummyAttrs();
-        var tagUpdates = TestData.tagUpdatesForAttrs(attrs);
+        var origObj = SampleMetadata.dummyDefinitionForType(objectType);
+        var attrs = SampleMetadata.dummyAttrs();
+        var tagUpdates = SampleMetadata.tagUpdatesForAttrs(attrs);
 
         var writeRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
@@ -184,9 +182,9 @@ abstract class MetadataReadApiTest {
     @Test
     void readObject_versions() {
 
-        var v1Obj = TestData.dummyDefinitionForType(ObjectType.DATA);
-        var v1Attrs = TestData.dummyAttrs();
-        var v1TagUpdates = TestData.tagUpdatesForAttrs(v1Attrs);
+        var v1Obj = SampleMetadata.dummyDefinitionForType(ObjectType.DATA);
+        var v1Attrs = SampleMetadata.dummyAttrs();
+        var v1TagUpdates = SampleMetadata.tagUpdatesForAttrs(v1Attrs);
 
         var v1WriteRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
@@ -199,7 +197,7 @@ abstract class MetadataReadApiTest {
         var v1Selector = selectorForTag(v1Header);
 
         // No attr changes for v2
-        var v2Obj = TestData.dummyVersionForType(v1Obj);
+        var v2Obj = SampleMetadata.dummyVersionForType(v1Obj);
 
         var v2WriteRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
@@ -274,9 +272,9 @@ abstract class MetadataReadApiTest {
     @Test
     void readBatch_versions() {
 
-        var v1Obj = TestData.dummyDefinitionForType(ObjectType.DATA);
-        var v1Attrs = TestData.dummyAttrs();
-        var v1TagUpdates = TestData.tagUpdatesForAttrs(v1Attrs);
+        var v1Obj = SampleMetadata.dummyDefinitionForType(ObjectType.DATA);
+        var v1Attrs = SampleMetadata.dummyAttrs();
+        var v1TagUpdates = SampleMetadata.tagUpdatesForAttrs(v1Attrs);
 
         var v1WriteRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
@@ -289,7 +287,7 @@ abstract class MetadataReadApiTest {
         var v1Selector = selectorForTag(v1Header);
 
         // No attr changes for v2
-        var v2Obj = TestData.dummyVersionForType(v1Obj);
+        var v2Obj = SampleMetadata.dummyVersionForType(v1Obj);
 
         var v2WriteRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
@@ -359,9 +357,9 @@ abstract class MetadataReadApiTest {
     @Test
     void readObject_asOf() throws Exception {
 
-        var v1Obj = TestData.dummyDefinitionForType(ObjectType.DATA);
-        var v1Attrs = TestData.dummyAttrs();
-        var v1TagUpdates = TestData.tagUpdatesForAttrs(v1Attrs);
+        var v1Obj = SampleMetadata.dummyDefinitionForType(ObjectType.DATA);
+        var v1Attrs = SampleMetadata.dummyAttrs();
+        var v1TagUpdates = SampleMetadata.tagUpdatesForAttrs(v1Attrs);
 
         var v1WriteRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
@@ -377,7 +375,7 @@ abstract class MetadataReadApiTest {
         Thread.sleep(10);
 
         // No attr changes for v2
-        var v2Obj = TestData.dummyVersionForType(v1Obj);
+        var v2Obj = SampleMetadata.dummyVersionForType(v1Obj);
 
         var v2WriteRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
@@ -473,9 +471,9 @@ abstract class MetadataReadApiTest {
     @Test
     void readBatch_asOf() throws Exception {
 
-        var v1Obj = TestData.dummyDefinitionForType(ObjectType.DATA);
-        var v1Attrs = TestData.dummyAttrs();
-        var v1TagUpdates = TestData.tagUpdatesForAttrs(v1Attrs);
+        var v1Obj = SampleMetadata.dummyDefinitionForType(ObjectType.DATA);
+        var v1Attrs = SampleMetadata.dummyAttrs();
+        var v1TagUpdates = SampleMetadata.tagUpdatesForAttrs(v1Attrs);
 
         var v1WriteRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
@@ -491,7 +489,7 @@ abstract class MetadataReadApiTest {
         Thread.sleep(10);
 
         // No attr changes for v2
-        var v2Obj = TestData.dummyVersionForType(v1Obj);
+        var v2Obj = SampleMetadata.dummyVersionForType(v1Obj);
 
         var v2WriteRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
@@ -588,9 +586,9 @@ abstract class MetadataReadApiTest {
 
         // Save v1 object
 
-        var v1Obj = TestData.dummyDefinitionForType(ObjectType.DATA);
-        var v1Attrs = TestData.dummyAttrs();
-        var v1TagUpdates = TestData.tagUpdatesForAttrs(v1Attrs);
+        var v1Obj = SampleMetadata.dummyDefinitionForType(ObjectType.DATA);
+        var v1Attrs = SampleMetadata.dummyAttrs();
+        var v1TagUpdates = SampleMetadata.tagUpdatesForAttrs(v1Attrs);
 
         var v1WriteRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
@@ -631,7 +629,7 @@ abstract class MetadataReadApiTest {
 
         // Save V2 object
 
-        var v2Obj = TestData.dummyVersionForType(v1Obj);
+        var v2Obj = SampleMetadata.dummyVersionForType(v1Obj);
 
         var v2WriteRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
@@ -706,9 +704,9 @@ abstract class MetadataReadApiTest {
 
         // Create a second object to put in batch read requests next to the selectors being tested
 
-        var extraObj = TestData.dummyCustomDef();
-        var extraAttrs = TestData.dummyAttrs();
-        var extraTagUpdates = TestData.tagUpdatesForAttrs(extraAttrs);
+        var extraObj = SampleMetadata.dummyCustomDef();
+        var extraAttrs = SampleMetadata.dummyAttrs();
+        var extraTagUpdates = SampleMetadata.tagUpdatesForAttrs(extraAttrs);
 
         var extraWriteRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
@@ -722,9 +720,9 @@ abstract class MetadataReadApiTest {
 
         // Save v1 object
 
-        var v1Obj = TestData.dummyDefinitionForType(ObjectType.DATA);
-        var v1Attrs = TestData.dummyAttrs();
-        var v1TagUpdates = TestData.tagUpdatesForAttrs(v1Attrs);
+        var v1Obj = SampleMetadata.dummyDefinitionForType(ObjectType.DATA);
+        var v1Attrs = SampleMetadata.dummyAttrs();
+        var v1TagUpdates = SampleMetadata.tagUpdatesForAttrs(v1Attrs);
 
         var v1WriteRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
@@ -767,7 +765,7 @@ abstract class MetadataReadApiTest {
 
         // Save V2 object
 
-        var v2Obj = TestData.dummyVersionForType(v1Obj);
+        var v2Obj = SampleMetadata.dummyVersionForType(v1Obj);
 
         var v2WriteRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
@@ -846,9 +844,9 @@ abstract class MetadataReadApiTest {
 
         // Create an object to test with
 
-        var origObj = TestData.dummyDefinitionForType(ObjectType.MODEL);
-        var origAttrs = TestData.dummyAttrs();
-        var origTagUpdates = TestData.tagUpdatesForAttrs(origAttrs);
+        var origObj = SampleMetadata.dummyDefinitionForType(ObjectType.MODEL);
+        var origAttrs = SampleMetadata.dummyAttrs();
+        var origTagUpdates = SampleMetadata.tagUpdatesForAttrs(origAttrs);
 
         var writeRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
@@ -904,9 +902,9 @@ abstract class MetadataReadApiTest {
 
         // Create an object to test with
 
-        var origObj = TestData.dummyDefinitionForType(ObjectType.MODEL);
-        var origAttrs = TestData.dummyAttrs();
-        var origTagUpdates = TestData.tagUpdatesForAttrs(origAttrs);
+        var origObj = SampleMetadata.dummyDefinitionForType(ObjectType.MODEL);
+        var origAttrs = SampleMetadata.dummyAttrs();
+        var origTagUpdates = SampleMetadata.tagUpdatesForAttrs(origAttrs);
 
         var writeRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
@@ -970,9 +968,9 @@ abstract class MetadataReadApiTest {
         // This should result in a failed pre-condition,
         // because failure depends on the contents of the metadata store
 
-        var origObj = TestData.dummyDefinitionForType(ObjectType.DATA);
-        var origAttrs = TestData.dummyAttrs();
-        var origTagUpdates = TestData.tagUpdatesForAttrs(origAttrs);
+        var origObj = SampleMetadata.dummyDefinitionForType(ObjectType.DATA);
+        var origAttrs = SampleMetadata.dummyAttrs();
+        var origTagUpdates = SampleMetadata.tagUpdatesForAttrs(origAttrs);
 
         var writeRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
@@ -1000,9 +998,9 @@ abstract class MetadataReadApiTest {
         // This should result in a failed pre-condition,
         // because failure depends on the contents of the metadata store
 
-        var origObj = TestData.dummyDefinitionForType(ObjectType.DATA);
-        var origAttrs = TestData.dummyAttrs();
-        var origTagUpdates = TestData.tagUpdatesForAttrs(origAttrs);
+        var origObj = SampleMetadata.dummyDefinitionForType(ObjectType.DATA);
+        var origAttrs = SampleMetadata.dummyAttrs();
+        var origTagUpdates = SampleMetadata.tagUpdatesForAttrs(origAttrs);
 
         var writeRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)

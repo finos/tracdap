@@ -44,7 +44,7 @@ import java.util.stream.Stream;
 
 import static org.finos.tracdap.common.metadata.MetadataCodec.encodeArrayValue;
 import static org.finos.tracdap.common.metadata.MetadataCodec.encodeValue;
-import static org.finos.tracdap.test.meta.TestData.*;
+import static org.finos.tracdap.test.meta.SampleMetadata.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 
@@ -72,24 +72,24 @@ abstract class MetadataDalSearchTest implements IDalTestable {
     @Test
     void basicStringSearch() {
 
-        var def1 = TestData.dummyDataDef();
-        var def2 = TestData.dummyDataDef();
+        var def1 = SampleMetadata.dummyDataDef();
+        var def2 = SampleMetadata.dummyDataDef();
 
-        var tag1 = TestData.dummyTag(def1, INCLUDE_HEADER)
+        var tag1 = SampleMetadata.dummyTag(def1, INCLUDE_HEADER)
                 .toBuilder().clearAttrs()
                 .putAttrs("rodent_type", encodeValue("bilge_rat"))
                 .putAttrs("rodent_name", encodeValue("Ricky the Rat"))
                 .build();
 
-        var tag2 = TestData.dummyTag(def2, INCLUDE_HEADER)
+        var tag2 = SampleMetadata.dummyTag(def2, INCLUDE_HEADER)
                 .toBuilder().clearAttrs()
                 .putAttrs("rodent_type", encodeValue("house_mouse"))
                 .putAttrs("rodent_name", encodeValue("Casandra McMouse"))
                 .build();
 
 
-        dal.saveNewObjects(TestData.TEST_TENANT, Collections.singletonList(tag1));
-        dal.saveNewObjects(TestData.TEST_TENANT, Collections.singletonList(tag2));
+        dal.saveNewObjects(SampleMetadata.TEST_TENANT, Collections.singletonList(tag1));
+        dal.saveNewObjects(SampleMetadata.TEST_TENANT, Collections.singletonList(tag2));
 
         var searchParams = SearchParameters.newBuilder()
                 .setObjectType(ObjectType.DATA)
@@ -101,7 +101,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
                     .setSearchValue(encodeValue("bilge_rat"))))
                 .build();
 
-        var searchResult = dal.search(TestData.TEST_TENANT, searchParams);
+        var searchResult = dal.search(SampleMetadata.TEST_TENANT, searchParams);
 
         assertEquals(1, searchResult.size());
 
@@ -123,10 +123,10 @@ abstract class MetadataDalSearchTest implements IDalTestable {
         //      NOT ( data_classification IN ["pii", "confidential"] )
         // )
 
-        var def1 = TestData.dummyDataDef();
-        var def2 = TestData.dummyDataDef();
-        var def3 = TestData.dummyDataDef();
-        var def4 = TestData.dummyDataDef();
+        var def1 = SampleMetadata.dummyDataDef();
+        var def2 = SampleMetadata.dummyDataDef();
+        var def3 = SampleMetadata.dummyDataDef();
+        var def4 = SampleMetadata.dummyDataDef();
 
         var attrNames = List.of("dataset_class", "record_date", "data_classification");
 
@@ -155,7 +155,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
                 encodeValue("internal")));
 
         var tags = List.of(tag1, tag2, tag3, tag4);
-        dal.saveNewObjects(TestData.TEST_TENANT, tags);
+        dal.saveNewObjects(SampleMetadata.TEST_TENANT, tags);
 
         var searchParams = SearchParameters.newBuilder()
                 .setObjectType(ObjectType.DATA)
@@ -175,7 +175,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
 
                 .build();
 
-        var searchResult = dal.search(TestData.TEST_TENANT, searchParams);
+        var searchResult = dal.search(SampleMetadata.TEST_TENANT, searchParams);
 
         var t1 = clearDefinitionBody(tag1);
         var t3 = clearDefinitionBody(tag3);
@@ -199,14 +199,14 @@ abstract class MetadataDalSearchTest implements IDalTestable {
         var otherType = objectType == ObjectType.DATA ? ObjectType.MODEL : ObjectType.DATA;
 
         var attrToLookFor = "object_type_test_for_" + objectType.name();
-        var def1 = TestData.dummyDefinitionForType(objectType);
-        var def2 = TestData.dummyDefinitionForType(otherType);
+        var def1 = SampleMetadata.dummyDefinitionForType(objectType);
+        var def2 = SampleMetadata.dummyDefinitionForType(otherType);
 
         var tag1 = tagForDef(def1, attrToLookFor, encodeValue("bilge_rat"));
         var tag2 = tagForDef(def2, attrToLookFor, encodeValue("bilge_rat"));
         var tags = List.of(tag1, tag2);
 
-        dal.saveNewObjects(TestData.TEST_TENANT, tags);
+        dal.saveNewObjects(SampleMetadata.TEST_TENANT, tags);
 
         // Search should respect object type even if all other criteria are matched
 
@@ -220,7 +220,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
                         .setSearchValue(MetadataCodec.encodeNativeObject("bilge_rat"))))
                 .build();
 
-        var searchResult = dal.search(TestData.TEST_TENANT, searchParams);
+        var searchResult = dal.search(SampleMetadata.TEST_TENANT, searchParams);
 
         var t1 = clearDefinitionBody(tag1);
 
@@ -247,7 +247,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
                                 .setSearchValue(MetadataCodec.encodeNativeObject(searchAttrValue))))
                 .build();
 
-        var searchResult = dal.search(TestData.TEST_TENANT, searchParams);
+        var searchResult = dal.search(SampleMetadata.TEST_TENANT, searchParams);
 
         assertEquals(0, searchResult.size());
     }
@@ -267,7 +267,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
 
         var attrToLookFor = "existence_search_test_" + basicType.name();
         var testTags = existenceTestTags(basicType, attrToLookFor);
-        dal.saveNewObjects(TestData.TEST_TENANT, testTags);
+        dal.saveNewObjects(SampleMetadata.TEST_TENANT, testTags);
 
         var searchParams = SearchParameters.newBuilder()
                 .setObjectType(ObjectType.DATA)
@@ -278,7 +278,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
                                 .setAttrType(basicType)))
                 .build();
 
-        var searchResult = dal.search(TestData.TEST_TENANT, searchParams);
+        var searchResult = dal.search(SampleMetadata.TEST_TENANT, searchParams);
 
         // Search results should come back with no definition body
         var tag1 = clearDefinitionBody(testTags.get(0));
@@ -295,7 +295,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
         var attrToLookFor = "existence_search_test_no_type_" + basicType.name();
         var testTags = existenceTestTags(basicType, attrToLookFor);
 
-        dal.saveNewObjects(TestData.TEST_TENANT, testTags);
+        dal.saveNewObjects(SampleMetadata.TEST_TENANT, testTags);
 
         var searchParams = SearchParameters.newBuilder()
                 .setObjectType(ObjectType.DATA)
@@ -305,7 +305,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
                                 .setOperator(SearchOperator.EXISTS)))
                 .build();
 
-        var searchResult = dal.search(TestData.TEST_TENANT, searchParams);
+        var searchResult = dal.search(SampleMetadata.TEST_TENANT, searchParams);
 
         Tag tag3 = clearDefinitionBody(testTags.get(2));
 
@@ -326,7 +326,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
 
         var testTags = equalityTestTags(basicType, attrToLookFor, valueToLookFor);
 
-        dal.saveNewObjects(TestData.TEST_TENANT, testTags);
+        dal.saveNewObjects(SampleMetadata.TEST_TENANT, testTags);
 
         var searchParams = SearchParameters.newBuilder()
                 .setObjectType(ObjectType.DATA)
@@ -341,7 +341,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
         // Equality should match only one of the four tags in the test set
         // Everything must match - attr name, type and value
 
-        var searchResult = dal.search(TestData.TEST_TENANT, searchParams);
+        var searchResult = dal.search(SampleMetadata.TEST_TENANT, searchParams);
 
         // Search results should come back with no definition body
         var tag1 = clearDefinitionBody(testTags.get(0));
@@ -362,7 +362,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
         var valueToLookFor = objectOfType(basicType);
         var testTags = equalityArrayTestTags(basicType, attrToLookFor, valueToLookFor);
 
-        dal.saveNewObjects(TestData.TEST_TENANT, testTags);
+        dal.saveNewObjects(SampleMetadata.TEST_TENANT, testTags);
 
         var searchParams = SearchParameters.newBuilder()
                 .setObjectType(ObjectType.DATA)
@@ -377,7 +377,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
         // Equality should match only one of the four tags in the test set
         // Everything must match for at least one element in the array - attr name, type and value
 
-        var searchResult = dal.search(TestData.TEST_TENANT, searchParams);
+        var searchResult = dal.search(SampleMetadata.TEST_TENANT, searchParams);
 
         // Search results should come back with no definition body
         var tag1 = clearDefinitionBody(testTags.get(0));
@@ -404,7 +404,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
             .build())
             .collect(Collectors.toList());
 
-        dal.saveNewObjects(TestData.TEST_TENANT, testTags);
+        dal.saveNewObjects(SampleMetadata.TEST_TENANT, testTags);
 
         var searchParams = SearchParameters.newBuilder()
                 .setObjectType(ObjectType.DATA)
@@ -427,7 +427,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
         // In this case we should match all but the first tag in the test set
         // For a single search term we are not concerned about order, so test the result as a set
 
-        var searchResult = dal.search(TestData.TEST_TENANT, searchParams);
+        var searchResult = dal.search(SampleMetadata.TEST_TENANT, searchParams);
         var searchResultSet = Set.copyOf(searchResult);
 
         var expectedResult = Set.copyOf(testTags.subList(1, 4).stream()
@@ -459,7 +459,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
                 .build())
                 .collect(Collectors.toList());
 
-        dal.saveNewObjects(TestData.TEST_TENANT, testTags);
+        dal.saveNewObjects(SampleMetadata.TEST_TENANT, testTags);
 
         var searchParams = SearchParameters.newBuilder()
                 .setObjectType(ObjectType.DATA)
@@ -480,7 +480,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
         // Consistency can be expressed formally as {t : Attrs(t, A) !in X} = {t : !( Attrs(t, A) in X )}
         // Single-value attrs are also covered by this general definition, just with |Attrs(t, A)| = 1
 
-        var searchResult = dal.search(TestData.TEST_TENANT, searchParams);
+        var searchResult = dal.search(SampleMetadata.TEST_TENANT, searchParams);
         var searchResultSet = Set.copyOf(searchResult);
 
         var expectedResult = Set.copyOf(testTags.subList(1, 4).stream()
@@ -493,9 +493,9 @@ abstract class MetadataDalSearchTest implements IDalTestable {
 
     private List<Tag> existenceTestTags(BasicType basicType, String attrToLookFor) {
 
-        var def1 = TestData.dummyDataDef();
-        var def2 = TestData.nextDataDef(def1);
-        var def3 = TestData.nextDataDef(def2);
+        var def1 = SampleMetadata.dummyDataDef();
+        var def2 = SampleMetadata.nextDataDef(def1);
+        var def3 = SampleMetadata.nextDataDef(def2);
 
         var attr_value_2 = objectOfDifferentType(basicType);
 
@@ -512,10 +512,10 @@ abstract class MetadataDalSearchTest implements IDalTestable {
 
     private List<Tag> equalityTestTags(BasicType basicType, String attrToLookFor, Object valueToLookFor) {
 
-        var def1 = TestData.dummyDataDef();
-        var def2 = TestData.nextDataDef(def1);
-        var def3 = TestData.nextDataDef(def2);
-        var def4 = TestData.nextDataDef(def3);
+        var def1 = SampleMetadata.dummyDataDef();
+        var def2 = SampleMetadata.nextDataDef(def1);
+        var def3 = SampleMetadata.nextDataDef(def2);
+        var def4 = SampleMetadata.nextDataDef(def3);
 
         var attr_value_2 = differentObjectOfSameType(basicType, valueToLookFor);
         var attr_value_3 = objectOfDifferentType(basicType);
@@ -538,10 +538,10 @@ abstract class MetadataDalSearchTest implements IDalTestable {
 
         var arrayType = TypeSystem.descriptor(basicType);
 
-        var def1 = TestData.dummyDataDef();
-        var def2 = TestData.nextDataDef(def1);
-        var def3 = TestData.nextDataDef(def2);
-        var def4 = TestData.nextDataDef(def3);
+        var def1 = SampleMetadata.dummyDataDef();
+        var def2 = SampleMetadata.nextDataDef(def1);
+        var def3 = SampleMetadata.nextDataDef(def2);
+        var def4 = SampleMetadata.nextDataDef(def3);
 
         var attr_value_2 = differentObjectOfSameType(basicType, valueYouAreLookingFor);
         var attr_value_3 = differentObjectOfSameType(basicType, attr_value_2);
@@ -581,7 +581,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
         var orderedTags = orderedTestTags(basicType, attrToLookFor, orderedValues);
         var valueToLookFor = orderedValues.get(1);  // Middle value in a list of 3
 
-        dal.saveNewObjects(TestData.TEST_TENANT, orderedTags);
+        dal.saveNewObjects(SampleMetadata.TEST_TENANT, orderedTags);
 
         var searchParams = SearchParameters.newBuilder()
                 .setObjectType(ObjectType.DATA)
@@ -595,7 +595,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
 
         // GT operator should match values > middleValue, i.e. t2
 
-        var searchResult = dal.search(TestData.TEST_TENANT, searchParams);
+        var searchResult = dal.search(SampleMetadata.TEST_TENANT, searchParams);
 
         // Search results should come back with no definition body
         var t2 = clearDefinitionBody(orderedTags.get(2));
@@ -615,7 +615,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
         var orderedTags = orderedTestTags(basicType, attrToLookFor, orderedValues);
         var valueToLookFor = orderedValues.get(1);  // Middle value in a list of 3
 
-        dal.saveNewObjects(TestData.TEST_TENANT, orderedTags);
+        dal.saveNewObjects(SampleMetadata.TEST_TENANT, orderedTags);
 
         var searchParams = SearchParameters.newBuilder()
                 .setObjectType(ObjectType.DATA)
@@ -629,7 +629,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
 
         // GE operator should match values >= middleValue, i.e. t1 and t2
 
-        var searchResult = dal.search(TestData.TEST_TENANT, searchParams);
+        var searchResult = dal.search(SampleMetadata.TEST_TENANT, searchParams);
 
         // Search results should come back with no definition body
         var t1 = clearDefinitionBody(orderedTags.get(1));
@@ -650,7 +650,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
         var orderedTags = orderedTestTags(basicType, attrToLookFor, orderedValues);
         var valueToLookFor = orderedValues.get(1);  // Middle value in a list of 3
 
-        dal.saveNewObjects(TestData.TEST_TENANT, orderedTags);
+        dal.saveNewObjects(SampleMetadata.TEST_TENANT, orderedTags);
 
         var searchParams = SearchParameters.newBuilder()
                 .setObjectType(ObjectType.DATA)
@@ -664,7 +664,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
 
         // LT operator should match values < middleValue, i.e. t0
 
-        var searchResult = dal.search(TestData.TEST_TENANT, searchParams);
+        var searchResult = dal.search(SampleMetadata.TEST_TENANT, searchParams);
 
         // Search results should come back with no definition body
         var t0 = clearDefinitionBody(orderedTags.get(0));
@@ -684,7 +684,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
         var orderedTags = orderedTestTags(basicType, attrToLookFor, orderedValues);
         var valueToLookFor = orderedValues.get(1);  // Middle value in a list of 3
 
-        dal.saveNewObjects(TestData.TEST_TENANT, orderedTags);
+        dal.saveNewObjects(SampleMetadata.TEST_TENANT, orderedTags);
 
         var searchParams = SearchParameters.newBuilder()
                 .setObjectType(ObjectType.DATA)
@@ -698,7 +698,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
 
         // LE operator should match values <= middleValue, i.e. t0 and t1
 
-        var searchResult = dal.search(TestData.TEST_TENANT, searchParams);
+        var searchResult = dal.search(SampleMetadata.TEST_TENANT, searchParams);
 
         // Search results should come back with no definition body
         var t0 = clearDefinitionBody(orderedTags.get(0));
@@ -722,13 +722,13 @@ abstract class MetadataDalSearchTest implements IDalTestable {
         var attrValues = orderedAttrValues(basicType);
 
         // Create a tag with a multivalued attr
-        var def = TestData.dummyDataDef();
-        var tag = TestData.dummyTag(def, INCLUDE_HEADER)
+        var def = SampleMetadata.dummyDataDef();
+        var tag = SampleMetadata.dummyTag(def, INCLUDE_HEADER)
                 .toBuilder().clearAttrs()
                 .putAttrs(attrToLookFor, MetadataCodec.encodeArrayValue(attrValues, TypeSystem.descriptor(basicType)))
                 .build();
 
-        dal.saveNewObjects(TestData.TEST_TENANT, Collections.singletonList(tag));
+        dal.saveNewObjects(SampleMetadata.TEST_TENANT, Collections.singletonList(tag));
 
         var inequalities = Set.of(
                 SearchOperator.GT,
@@ -752,7 +752,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
                             .setSearchValue(MetadataCodec.encodeNativeObject(v1))))
                     .build();
 
-            var result = dal.search(TestData.TEST_TENANT, searchParams);
+            var result = dal.search(SampleMetadata.TEST_TENANT, searchParams);
 
             // Inequalities should never match against an array value
             // It is not valid to perform ordered comparison of a single value against a set
@@ -763,17 +763,17 @@ abstract class MetadataDalSearchTest implements IDalTestable {
 
     private List<Tag> orderedTestTags(BasicType basicType, String attrToLookFor, List<Object> attrValues) {
 
-        var def1 = TestData.dummyDataDef();
-        var def2 = TestData.nextDataDef(def1);
-        var def3 = TestData.nextDataDef(def2);
-        var def4 = TestData.dummyModelDef();
+        var def1 = SampleMetadata.dummyDataDef();
+        var def2 = SampleMetadata.nextDataDef(def1);
+        var def3 = SampleMetadata.nextDataDef(def2);
+        var def4 = SampleMetadata.dummyModelDef();
 
         var defs = List.of(def1, def2, def3);
         var tags = new ArrayList<Tag>();
 
         for (var i = 0; i < defs.size(); i++) {
 
-            var tag = TestData.dummyTag(defs.get(i), INCLUDE_HEADER)
+            var tag = SampleMetadata.dummyTag(defs.get(i), INCLUDE_HEADER)
                     .toBuilder()
                     .clearAttrs()
                     .putAttrs(attrToLookFor, MetadataCodec.encodeNativeObject(attrValues.get(i)))
@@ -785,7 +785,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
         // Also add a tag with the wrong type
         // This should not get picked up by any of the inequality operators
         var attrValueWrongType = objectOfDifferentType(basicType);
-        var tagWrongType = TestData.dummyTag(def4, INCLUDE_HEADER)
+        var tagWrongType = SampleMetadata.dummyTag(def4, INCLUDE_HEADER)
                 .toBuilder()
                 .clearAttrs()
                 .putAttrs(attrToLookFor, MetadataCodec.encodeNativeObject(attrValueWrongType))
@@ -819,7 +819,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
                     OffsetDateTime.now(ZoneOffset.UTC).plusWeeks(1))
 
                     // Metadata datetime attrs are at microsecond precision
-                    .map(TestData::truncateMicrosecondPrecision)
+                    .map(SampleMetadata::truncateMicrosecondPrecision)
                     .collect(Collectors.toList());
 
             default:
@@ -838,11 +838,11 @@ abstract class MetadataDalSearchTest implements IDalTestable {
         // Note: IN query for BOOLEAN attr is not allowed
         // This should be rejected as invalid at the API level
 
-        var def1 = TestData.dummyDataDef();
-        var def2 = TestData.nextDataDef(def1);
-        var def3 = TestData.nextDataDef(def2);
-        var def4 = TestData.nextDataDef(def3);
-        var def5 = TestData.nextDataDef(def4);
+        var def1 = SampleMetadata.dummyDataDef();
+        var def2 = SampleMetadata.nextDataDef(def1);
+        var def3 = SampleMetadata.nextDataDef(def2);
+        var def4 = SampleMetadata.nextDataDef(def3);
+        var def5 = SampleMetadata.nextDataDef(def4);
 
         var attrToLookFor = "attr_to_look_for_IN_" + basicType.name();
         var valueToLookFor = objectOfType(basicType);
@@ -859,7 +859,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
         var tag5 = tagForDef(def5, "not_" + attrToLookFor, MetadataCodec.encodeNativeObject(valueToLookFor));
 
         var tags = List.of(tag1, tag2, tag3, tag4, tag5);
-        dal.saveNewObjects(TestData.TEST_TENANT, tags);
+        dal.saveNewObjects(SampleMetadata.TEST_TENANT, tags);
 
         var searchValues = List.of(valueToLookFor, attr_value_2);
 
@@ -873,7 +873,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
                         .setSearchValue(MetadataCodec.encodeArrayValue(searchValues, TypeSystem.descriptor(basicType)))))
                 .build();
 
-        var searchResult = dal.search(TestData.TEST_TENANT, searchParams);
+        var searchResult = dal.search(SampleMetadata.TEST_TENANT, searchParams);
 
         var t1 = clearDefinitionBody(tag1);
         var t2 = clearDefinitionBody(tag2);
@@ -891,11 +891,11 @@ abstract class MetadataDalSearchTest implements IDalTestable {
         // Note: Also BOOLEAN array attrs are not allowed
         // This should be rejected as invalid at the API level
 
-        var def1 = TestData.dummyDataDef();
-        var def2 = TestData.nextDataDef(def1);
-        var def3 = TestData.nextDataDef(def2);
-        var def4 = TestData.nextDataDef(def3);
-        var def5 = TestData.nextDataDef(def4);
+        var def1 = SampleMetadata.dummyDataDef();
+        var def2 = SampleMetadata.nextDataDef(def1);
+        var def3 = SampleMetadata.nextDataDef(def2);
+        var def4 = SampleMetadata.nextDataDef(def3);
+        var def5 = SampleMetadata.nextDataDef(def4);
 
         var attrToLookFor = "attr_to_look_for_IN_ARRAY_" + basicType.name();
         var valueToLookFor = objectOfType(basicType);
@@ -922,7 +922,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
         var tag5 = tagForDef(def5, "not_" + attrToLookFor, MetadataCodec.encodeArrayValue(array1, typeToLookFor));
 
         var tags = List.of(tag1, tag2, tag3, tag4, tag5);
-        dal.saveNewObjects(TestData.TEST_TENANT, tags);
+        dal.saveNewObjects(SampleMetadata.TEST_TENANT, tags);
 
         var searchValues = List.of(valueToLookFor, attr_value_2);
 
@@ -936,7 +936,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
                         .setSearchValue(MetadataCodec.encodeArrayValue(searchValues, typeToLookFor))))
                 .build();
 
-        var searchResult = dal.search(TestData.TEST_TENANT, searchParams);
+        var searchResult = dal.search(SampleMetadata.TEST_TENANT, searchParams);
 
         var t1 = clearDefinitionBody(tag1);
         var t2 = clearDefinitionBody(tag2);
@@ -957,10 +957,10 @@ abstract class MetadataDalSearchTest implements IDalTestable {
         var attrName2 = "search_attr_AND_SINGLE_2";
         var attrNames = List.of(attrName1, attrName2);
 
-        var def1 = TestData.dummyDataDef();
-        var def2 = TestData.nextDataDef(def1);
-        var def3 = TestData.nextDataDef(def2);
-        var def4 = TestData.nextDataDef(def3);
+        var def1 = SampleMetadata.dummyDataDef();
+        var def2 = SampleMetadata.nextDataDef(def1);
+        var def3 = SampleMetadata.nextDataDef(def2);
+        var def4 = SampleMetadata.nextDataDef(def3);
 
         var tag1 = tagForDef(def1, attrNames, List.of(encodeValue("match_1"), encodeValue("match_2")));
         var tag2 = tagForDef(def2, attrNames, List.of(encodeValue("match_1"), encodeValue("not_match_2")));
@@ -968,7 +968,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
         var tag4 = tagForDef(def4, attrNames, List.of(encodeValue("not_match_1"), encodeValue("not_match_2")));
 
         var tags = List.of(tag1, tag2, tag3, tag4);
-        dal.saveNewObjects(TestData.TEST_TENANT, tags);
+        dal.saveNewObjects(SampleMetadata.TEST_TENANT, tags);
 
         var searchParams = SearchParameters.newBuilder()
                 .setObjectType(ObjectType.DATA)
@@ -979,7 +979,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
                         .addExpr(searchTerm(attrName2, BasicType.STRING, SearchOperator.EQ, encodeValue("match_2")))))
                 .build();
 
-        var searchResult = dal.search(TestData.TEST_TENANT, searchParams);
+        var searchResult = dal.search(SampleMetadata.TEST_TENANT, searchParams);
 
         var t1 = clearDefinitionBody(tag1);
 
@@ -994,10 +994,10 @@ abstract class MetadataDalSearchTest implements IDalTestable {
         var attrName2 = "search_attr_AND_ARRAY_2";
         var attrNames = List.of(attrName1, attrName2);
 
-        var def1 = TestData.dummyDataDef();
-        var def2 = TestData.nextDataDef(def1);
-        var def3 = TestData.nextDataDef(def2);
-        var def4 = TestData.nextDataDef(def3);
+        var def1 = SampleMetadata.dummyDataDef();
+        var def2 = SampleMetadata.nextDataDef(def1);
+        var def3 = SampleMetadata.nextDataDef(def2);
+        var def4 = SampleMetadata.nextDataDef(def3);
 
         var match1List = List.of("match_1", "match_1a", "match_1b");
         var match2List = List.of("match_2", "match_2a", "match_2b");
@@ -1011,7 +1011,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
         var tag4 = tagForDef(def4, attrNames, List.of(encodeArrayValue(notMatch1List, typeDesc), encodeArrayValue(notMatch2List, typeDesc)));
 
         var tags = List.of(tag1, tag2, tag3, tag4);
-        dal.saveNewObjects(TestData.TEST_TENANT, tags);
+        dal.saveNewObjects(SampleMetadata.TEST_TENANT, tags);
 
         var searchParams = SearchParameters.newBuilder()
                 .setObjectType(ObjectType.DATA)
@@ -1022,7 +1022,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
                         .addExpr(searchTerm(attrName2, BasicType.STRING, SearchOperator.EQ, encodeValue("match_2")))))
                 .build();
 
-        var searchResult = dal.search(TestData.TEST_TENANT, searchParams);
+        var searchResult = dal.search(SampleMetadata.TEST_TENANT, searchParams);
 
         var t1 = clearDefinitionBody(tag1);
 
@@ -1037,10 +1037,10 @@ abstract class MetadataDalSearchTest implements IDalTestable {
         var attrName2 = "search_attr_AND_MIXED_2";
         var attrNames = List.of(attrName1, attrName2);
 
-        var def1 = TestData.dummyDataDef();
-        var def2 = TestData.nextDataDef(def1);
-        var def3 = TestData.nextDataDef(def2);
-        var def4 = TestData.nextDataDef(def3);
+        var def1 = SampleMetadata.dummyDataDef();
+        var def2 = SampleMetadata.nextDataDef(def1);
+        var def3 = SampleMetadata.nextDataDef(def2);
+        var def4 = SampleMetadata.nextDataDef(def3);
 
         var match2List = List.of("match_2", "match_2a", "match_2b");
         var notMatch2List = List.of("match_2a", "match_2b");
@@ -1052,7 +1052,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
         var tag4 = tagForDef(def4, attrNames, List.of(encodeValue("not_match_1"), encodeArrayValue(notMatch2List, typeDesc)));
 
         var tags = List.of(tag1, tag2, tag3, tag4);
-        dal.saveNewObjects(TestData.TEST_TENANT, tags);
+        dal.saveNewObjects(SampleMetadata.TEST_TENANT, tags);
 
         var searchParams = SearchParameters.newBuilder()
                 .setObjectType(ObjectType.DATA)
@@ -1063,7 +1063,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
                         .addExpr(searchTerm(attrName2, BasicType.STRING, SearchOperator.EQ, encodeValue("match_2")))))
                 .build();
 
-        var searchResult = dal.search(TestData.TEST_TENANT, searchParams);
+        var searchResult = dal.search(SampleMetadata.TEST_TENANT, searchParams);
 
         var t1 = clearDefinitionBody(tag1);
 
@@ -1078,10 +1078,10 @@ abstract class MetadataDalSearchTest implements IDalTestable {
         var attrName2 = "search_attr_OR_SINGLE_2";
         var attrNames = List.of(attrName1, attrName2);
 
-        var def1 = TestData.dummyDataDef();
-        var def2 = TestData.nextDataDef(def1);
-        var def3 = TestData.nextDataDef(def2);
-        var def4 = TestData.nextDataDef(def3);
+        var def1 = SampleMetadata.dummyDataDef();
+        var def2 = SampleMetadata.nextDataDef(def1);
+        var def3 = SampleMetadata.nextDataDef(def2);
+        var def4 = SampleMetadata.nextDataDef(def3);
 
         var tag1 = tagForDef(def1, attrNames, List.of(encodeValue("match_1"), encodeValue("match_2")));
         var tag2 = tagForDef(def2, attrNames, List.of(encodeValue("match_1"), encodeValue("not_match_2")));
@@ -1089,7 +1089,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
         var tag4 = tagForDef(def4, attrNames, List.of(encodeValue("not_match_1"), encodeValue("not_match_2")));
 
         var tags = List.of(tag1, tag2, tag3, tag4);
-        dal.saveNewObjects(TestData.TEST_TENANT, tags);
+        dal.saveNewObjects(SampleMetadata.TEST_TENANT, tags);
 
         var searchParams = SearchParameters.newBuilder()
                 .setObjectType(ObjectType.DATA)
@@ -1100,7 +1100,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
                         .addExpr(searchTerm(attrName2, BasicType.STRING, SearchOperator.EQ, encodeValue("match_2")))))
                 .build();
 
-        var searchResult = dal.search(TestData.TEST_TENANT, searchParams);
+        var searchResult = dal.search(SampleMetadata.TEST_TENANT, searchParams);
 
         var t1 = clearDefinitionBody(tag1);
         var t2 = clearDefinitionBody(tag2);
@@ -1117,10 +1117,10 @@ abstract class MetadataDalSearchTest implements IDalTestable {
         var attrName2 = "search_attr_OR_ARRAY_2";
         var attrNames = List.of(attrName1, attrName2);
 
-        var def1 = TestData.dummyDataDef();
-        var def2 = TestData.nextDataDef(def1);
-        var def3 = TestData.nextDataDef(def2);
-        var def4 = TestData.nextDataDef(def3);
+        var def1 = SampleMetadata.dummyDataDef();
+        var def2 = SampleMetadata.nextDataDef(def1);
+        var def3 = SampleMetadata.nextDataDef(def2);
+        var def4 = SampleMetadata.nextDataDef(def3);
 
         var match1List = List.of("match_1", "match_1a", "match_1b");
         var match2List = List.of("match_2", "match_2a", "match_2b");
@@ -1134,7 +1134,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
         var tag4 = tagForDef(def4, attrNames, List.of(encodeArrayValue(notMatch1List, typeDesc), encodeArrayValue(notMatch2List, typeDesc)));
 
         var tags = List.of(tag1, tag2, tag3, tag4);
-        dal.saveNewObjects(TestData.TEST_TENANT, tags);
+        dal.saveNewObjects(SampleMetadata.TEST_TENANT, tags);
 
         var searchParams = SearchParameters.newBuilder()
                 .setObjectType(ObjectType.DATA)
@@ -1145,7 +1145,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
                         .addExpr(searchTerm(attrName2, BasicType.STRING, SearchOperator.EQ, encodeValue("match_2")))))
                 .build();
 
-        var searchResult = dal.search(TestData.TEST_TENANT, searchParams);
+        var searchResult = dal.search(SampleMetadata.TEST_TENANT, searchParams);
 
         var t1 = clearDefinitionBody(tag1);
         var t2 = clearDefinitionBody(tag2);
@@ -1162,10 +1162,10 @@ abstract class MetadataDalSearchTest implements IDalTestable {
         var attrName2 = "search_attr_OR_MIXED_2";
         var attrNames = List.of(attrName1, attrName2);
 
-        var def1 = TestData.dummyDataDef();
-        var def2 = TestData.nextDataDef(def1);
-        var def3 = TestData.nextDataDef(def2);
-        var def4 = TestData.nextDataDef(def3);
+        var def1 = SampleMetadata.dummyDataDef();
+        var def2 = SampleMetadata.nextDataDef(def1);
+        var def3 = SampleMetadata.nextDataDef(def2);
+        var def4 = SampleMetadata.nextDataDef(def3);
 
         var match2List = List.of("match_2", "match_2a", "match_2b");
         var notMatch2List = List.of("match_2a", "match_2b");
@@ -1177,7 +1177,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
         var tag4 = tagForDef(def4, attrNames, List.of(encodeValue("not_match_1"), encodeArrayValue(notMatch2List, typeDesc)));
 
         var tags = List.of(tag1, tag2, tag3, tag4);
-        dal.saveNewObjects(TestData.TEST_TENANT, tags);
+        dal.saveNewObjects(SampleMetadata.TEST_TENANT, tags);
 
         var searchParams = SearchParameters.newBuilder()
                 .setObjectType(ObjectType.DATA)
@@ -1188,7 +1188,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
                         .addExpr(searchTerm(attrName2, BasicType.STRING, SearchOperator.EQ, encodeValue("match_2")))))
                 .build();
 
-        var searchResult = dal.search(TestData.TEST_TENANT, searchParams);
+        var searchResult = dal.search(SampleMetadata.TEST_TENANT, searchParams);
 
         var t1 = clearDefinitionBody(tag1);
         var t2 = clearDefinitionBody(tag2);
@@ -1207,8 +1207,8 @@ abstract class MetadataDalSearchTest implements IDalTestable {
         var markerName = "search_attr_NOT_SINGLE_marker";
         var attrName = "search_attr_NOT_SINGLE";
 
-        var def1 = TestData.dummyDataDef();
-        var def2 = TestData.nextDataDef(def1);
+        var def1 = SampleMetadata.dummyDataDef();
+        var def2 = SampleMetadata.nextDataDef(def1);
 
         var tag1 = tagForDef(def1, List.of(attrName, markerName), List.of(
                 encodeValue("droids_you_are_looking_for"),
@@ -1219,7 +1219,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
                 encodeValue("negative_test_marker")));
 
         var tags = List.of(tag1, tag2);
-        dal.saveNewObjects(TestData.TEST_TENANT, tags);
+        dal.saveNewObjects(SampleMetadata.TEST_TENANT, tags);
 
         var searchParams = SearchParameters.newBuilder()
                 .setObjectType(ObjectType.DATA)
@@ -1233,7 +1233,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
                         .addExpr(searchTerm(attrName, BasicType.STRING, SearchOperator.EQ, encodeValue("droids_you_are_looking_for")))))))
                 .build();
 
-        var searchResult = dal.search(TestData.TEST_TENANT, searchParams);
+        var searchResult = dal.search(SampleMetadata.TEST_TENANT, searchParams);
 
         var t2 = clearDefinitionBody(tag2);
 
@@ -1250,8 +1250,8 @@ abstract class MetadataDalSearchTest implements IDalTestable {
         var markerName = "search_attr_NOT_ARRAY_marker";
         var attrName = "search_attr_NOT_ARRAY";
 
-        var def1 = TestData.dummyDataDef();
-        var def2 = TestData.nextDataDef(def1);
+        var def1 = SampleMetadata.dummyDataDef();
+        var def2 = SampleMetadata.nextDataDef(def1);
 
         var matchList = List.of("match_1", "match_1a", "match_1b");
         var notMatchList = List.of("match_1a", "match_1b");
@@ -1266,7 +1266,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
                 encodeValue("negative_test_marker")));
 
         var tags = List.of(tag1, tag2);
-        dal.saveNewObjects(TestData.TEST_TENANT, tags);
+        dal.saveNewObjects(SampleMetadata.TEST_TENANT, tags);
 
         var searchParams = SearchParameters.newBuilder()
                 .setObjectType(ObjectType.DATA)
@@ -1280,7 +1280,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
                         .addExpr(searchTerm(attrName, BasicType.STRING, SearchOperator.EQ, encodeValue("match_1")))))))
                 .build();
 
-        var searchResult = dal.search(TestData.TEST_TENANT, searchParams);
+        var searchResult = dal.search(SampleMetadata.TEST_TENANT, searchParams);
 
         var t2 = clearDefinitionBody(tag2);
 
@@ -1305,13 +1305,13 @@ abstract class MetadataDalSearchTest implements IDalTestable {
         var attrNames = List.of(attrToLookFor, markerName);
         var attrValues = List.of(encodeValue(valueToLookFor), encodeValue(markerValue));
 
-        var defV1 = TestData.dummyDataDef();
-        var defV2 = TestData.nextDataDef(defV1);
+        var defV1 = SampleMetadata.dummyDataDef();
+        var defV2 = SampleMetadata.nextDataDef(defV1);
 
         var tagV1T1 = tagForDef(defV1, attrNames, attrValues);
-        var tagV1T2 = TestData.nextTag(tagV1T1, UPDATE_TAG_VERSION);
+        var tagV1T2 = SampleMetadata.nextTag(tagV1T1, UPDATE_TAG_VERSION);
         var tagV2T1 = tagForNextObject(tagV1T2, defV2, INCLUDE_HEADER);
-        var tagV2T2 = TestData.nextTag(tagV2T1, UPDATE_TAG_VERSION);
+        var tagV2T2 = SampleMetadata.nextTag(tagV2T1, UPDATE_TAG_VERSION);
 
         dal.saveNewObjects(TEST_TENANT, Collections.singletonList(tagV1T1));
         dal.saveNewTags(TEST_TENANT, Collections.singletonList(tagV1T2));
@@ -1331,7 +1331,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
                         .setSearchValue(encodeValue(valueToLookFor))))
                 .build();
 
-        var searchResult = dal.search(TestData.TEST_TENANT, searchParams);
+        var searchResult = dal.search(SampleMetadata.TEST_TENANT, searchParams);
 
         // Also perform a negative search
         // The JDBC implementation uses sub-queries
@@ -1351,7 +1351,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
                         .setSearchValue(encodeValue("not_the_droids_you_are_looking_for"))))))
                 .build();
 
-        var searchResult2 = dal.search(TestData.TEST_TENANT, searchParams2);
+        var searchResult2 = dal.search(SampleMetadata.TEST_TENANT, searchParams2);
 
         var v2t2 = clearDefinitionBody(tagV2T2);
 
@@ -1483,7 +1483,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
         // Extra object so that will still match after V1 is updated
 
         var unchangedObj = nextDataDef(dummyDataDef());
-        var unchangedTag = TestData.dummyTag(unchangedObj, INCLUDE_HEADER).toBuilder()
+        var unchangedTag = SampleMetadata.dummyTag(unchangedObj, INCLUDE_HEADER).toBuilder()
                 .putAttrs("dal_as_of_attr_1", MetadataCodec.encodeValue("initial_value"))
                 .build();
 
@@ -1496,7 +1496,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
 
         var obj1 = dummyDataDef();
 
-        var v1Tag = TestData.dummyTag(obj1, INCLUDE_HEADER).toBuilder()
+        var v1Tag = SampleMetadata.dummyTag(obj1, INCLUDE_HEADER).toBuilder()
                 .putAttrs("dal_as_of_attr_1", MetadataCodec.encodeValue("initial_value"))
                 .build();
 
@@ -1874,14 +1874,14 @@ abstract class MetadataDalSearchTest implements IDalTestable {
 
         var obj1 = dummyDataDef();
 
-        var obj1Tag = TestData.dummyTag(obj1, INCLUDE_HEADER).toBuilder()
+        var obj1Tag = SampleMetadata.dummyTag(obj1, INCLUDE_HEADER).toBuilder()
                 .putAttrs("dal_search_ordering_test", MetadataCodec.encodeValue("some_value"))
                 .build();
 
         Thread.sleep(10);
 
         var obj2 = nextDataDef(obj1);
-        var obj2Tag = TestData.dummyTag(obj2, INCLUDE_HEADER).toBuilder()
+        var obj2Tag = SampleMetadata.dummyTag(obj2, INCLUDE_HEADER).toBuilder()
                 .putAttrs("dal_search_ordering_test", MetadataCodec.encodeValue("some_value"))
                 .build();
 
@@ -1917,7 +1917,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
     private Tag tagForDef(ObjectDefinition def, String attrName, Value attrValue) {
 
         return Tag.newBuilder()
-                .setHeader(TestData.newHeader(def.getObjectType()))
+                .setHeader(SampleMetadata.newHeader(def.getObjectType()))
                 .setDefinition(def)
                 .putAttrs(attrName, attrValue)
                 .putAttrs("more_than_one_attr", encodeValue(true))
@@ -1927,7 +1927,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
     private Tag tagForDef(ObjectDefinition def, List<String> attrNames, List<Value> attrValues) {
 
         var tag = Tag.newBuilder()
-                .setHeader(TestData.newHeader(def.getObjectType()))
+                .setHeader(SampleMetadata.newHeader(def.getObjectType()))
                 .setDefinition(def);
 
         for (var i = 0; i < attrNames.size(); i++)

@@ -22,7 +22,6 @@ import org.finos.tracdap.api.ListTenantsResponse;
 import org.finos.tracdap.api.PlatformInfoRequest;
 import org.finos.tracdap.api.PlatformInfoResponse;
 import org.finos.tracdap.gateway.TracPlatformGateway;
-import org.finos.tracdap.svc.data.TracDataService;
 import org.finos.tracdap.svc.meta.TracMetadataService;
 import org.finos.tracdap.test.http.Http1Client;
 import org.finos.tracdap.test.helpers.PlatformTest;
@@ -40,7 +39,7 @@ import org.junit.jupiter.api.extension.RegisterExtension;
 import java.util.Map;
 
 import static io.netty.util.NetUtil.LOCALHOST;
-import static org.finos.tracdap.test.meta.TestData.TEST_TENANT;
+import static org.finos.tracdap.test.meta.SampleMetadata.TEST_TENANT;
 
 
 public class GrpcWebProxyTest {

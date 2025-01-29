@@ -23,7 +23,7 @@ import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.svc.meta.TracMetadataService;
 import org.finos.tracdap.test.helpers.PlatformTest;
-import org.finos.tracdap.test.meta.TestData;
+import org.finos.tracdap.test.meta.SampleMetadata;
 
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
@@ -41,7 +41,7 @@ import java.util.stream.Stream;
 
 import static org.finos.tracdap.common.metadata.MetadataCodec.encodeNativeObject;
 import static org.finos.tracdap.common.metadata.MetadataCodec.encodeValue;
-import static org.finos.tracdap.test.meta.TestData.*;
+import static org.finos.tracdap.test.meta.SampleMetadata.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 
@@ -103,8 +103,8 @@ abstract class MetadataSearchApiTest {
 
         var someAttr = "trivialSearch_WHICH_DROIDS";
 
-        var obj1 = TestData.dummyDataDef();
-        var obj2 = TestData.dummyDataDef();
+        var obj1 = SampleMetadata.dummyDataDef();
+        var obj2 = SampleMetadata.dummyDataDef();
 
         var tag1 = Tag.newBuilder()
                 .setDefinition(obj1)
@@ -157,8 +157,8 @@ abstract class MetadataSearchApiTest {
 
         var searchAttr = "basicSearch_DROIDS_EXIST";
 
-        var obj1 = TestData.dummyDataDef();
-        var obj2 = TestData.dummyDataDef();
+        var obj1 = SampleMetadata.dummyDataDef();
+        var obj2 = SampleMetadata.dummyDataDef();
 
         var tag1 = Tag.newBuilder()
                 .setDefinition(obj1)
@@ -209,8 +209,8 @@ abstract class MetadataSearchApiTest {
 
         var searchAttr = "basicSearch_DROIDS_EXIST_without_type_";
 
-        var obj1 = TestData.dummyDataDef();
-        var obj2 = TestData.dummyDataDef();
+        var obj1 = SampleMetadata.dummyDataDef();
+        var obj2 = SampleMetadata.dummyDataDef();
 
         var tag1 = Tag.newBuilder()
                 .setDefinition(obj1)
@@ -259,8 +259,8 @@ abstract class MetadataSearchApiTest {
 
         var searchAttr = "basicSearch_WHICH_DROIDS";
 
-        var obj1 = TestData.dummyDataDef();
-        var obj2 = TestData.dummyDataDef();
+        var obj1 = SampleMetadata.dummyDataDef();
+        var obj2 = SampleMetadata.dummyDataDef();
 
         var tag1 = Tag.newBuilder()
                 .setDefinition(obj1)
@@ -315,8 +315,8 @@ abstract class MetadataSearchApiTest {
         var searchAttr = "compoundSearch_WHICH_DROIDS";
         var searchAttr2 = "compoundSearch_WHERE_ARE_THEY";
 
-        var obj1 = TestData.dummyDataDef();
-        var obj2 = TestData.dummyDataDef();
+        var obj1 = SampleMetadata.dummyDataDef();
+        var obj2 = SampleMetadata.dummyDataDef();
 
         var tag1 = Tag.newBuilder()
                 .setDefinition(obj1)
@@ -383,8 +383,8 @@ abstract class MetadataSearchApiTest {
 
         var searchAttr = "allObjectTypes_" + objectType.name();
 
-        var obj1 = TestData.dummyDefinitionForType(objectType);
-        var obj2 = TestData.dummyDefinitionForType(objectType);
+        var obj1 = SampleMetadata.dummyDefinitionForType(objectType);
+        var obj2 = SampleMetadata.dummyDefinitionForType(objectType);
 
         var tag1 = Tag.newBuilder()
                 .setDefinition(obj1)
@@ -442,8 +442,8 @@ abstract class MetadataSearchApiTest {
         var valueToLookFor = objectOfType(attrType);
         var valueNotToLookFor = differentObjectOfSameType(attrType, valueToLookFor);
 
-        var obj1 = TestData.dummyDataDef();
-        var obj2 = TestData.dummyDataDef();
+        var obj1 = SampleMetadata.dummyDataDef();
+        var obj2 = SampleMetadata.dummyDataDef();
 
         var tag1 = Tag.newBuilder()
                 .setDefinition(obj1)
@@ -506,8 +506,8 @@ abstract class MetadataSearchApiTest {
         var valueMid = differentObjectOfSameType(attrType, valueLow);
         var valueHigh = differentObjectOfSameType(attrType, valueMid);
 
-        var obj1 = TestData.dummyDataDef();
-        var obj2 = TestData.dummyDataDef();
+        var obj1 = SampleMetadata.dummyDataDef();
+        var obj2 = SampleMetadata.dummyDataDef();
 
         var tag1 = Tag.newBuilder()
                 .setDefinition(obj1)

@@ -27,7 +27,7 @@ import org.finos.tracdap.test.helpers.PlatformTest;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
-import static org.finos.tracdap.test.meta.TestData.TEST_TENANT;
+import static org.finos.tracdap.test.meta.SampleMetadata.TEST_TENANT;
 
 
 abstract class InfoAndResourcesTest {

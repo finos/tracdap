@@ -21,7 +21,7 @@ import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.metadata.TypeSystem;
 import org.finos.tracdap.common.validation.test.BaseValidatorTest;
 import org.finos.tracdap.metadata.*;
-import org.finos.tracdap.test.meta.TestData;
+import org.finos.tracdap.test.meta.SampleMetadata;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -154,7 +154,7 @@ class TypeSystemTest extends BaseValidatorTest {
 
         // Basic primitive values
 
-        var value = TestData.randomPrimitive(basicType);
+        var value = SampleMetadata.randomPrimitive(basicType);
         expectValid(value);
     }
 
@@ -165,7 +165,7 @@ class TypeSystemTest extends BaseValidatorTest {
 
         // If a primitive value is supplied, type can be omitted and will be inferred
 
-        var value = TestData.randomPrimitive(basicType)
+        var value = SampleMetadata.randomPrimitive(basicType)
                 .toBuilder()
                 .clearType()
                 .build();
@@ -203,7 +203,7 @@ class TypeSystemTest extends BaseValidatorTest {
     @Test
     void date_valid() {
 
-        var value = TestData.randomPrimitive(BasicType.DATE);
+        var value = SampleMetadata.randomPrimitive(BasicType.DATE);
 
         expectValid(value);
     }
@@ -229,7 +229,7 @@ class TypeSystemTest extends BaseValidatorTest {
     @Test
     void datetime_valid() {
 
-        var value = TestData.randomPrimitive(BasicType.DATETIME);
+        var value = SampleMetadata.randomPrimitive(BasicType.DATETIME);
 
         expectValid(value);
     }
@@ -255,7 +255,7 @@ class TypeSystemTest extends BaseValidatorTest {
     @Test
     void decimal_valid() {
 
-        var value = TestData.randomPrimitive(BasicType.DECIMAL);
+        var value = SampleMetadata.randomPrimitive(BasicType.DECIMAL);
 
         expectValid(value);
     }

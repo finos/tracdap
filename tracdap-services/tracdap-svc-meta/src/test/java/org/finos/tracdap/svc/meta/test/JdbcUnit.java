@@ -35,7 +35,7 @@ import java.nio.file.Paths;
 import java.util.Properties;
 import java.util.UUID;
 
-import static org.finos.tracdap.test.meta.TestData.TEST_TENANT;
+import static org.finos.tracdap.test.meta.SampleMetadata.TEST_TENANT;
 
 
 public class JdbcUnit implements BeforeAllCallback, BeforeEachCallback, AfterEachCallback {

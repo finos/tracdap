@@ -38,7 +38,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 
-import static org.finos.tracdap.test.meta.TestData.*;
+import static org.finos.tracdap.test.meta.SampleMetadata.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 

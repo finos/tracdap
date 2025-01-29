@@ -32,7 +32,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 
-public class TestData {
+public class SampleMetadata {
 
     public static final boolean INCLUDE_HEADER = true;
     public static final boolean NO_HEADER = false;
