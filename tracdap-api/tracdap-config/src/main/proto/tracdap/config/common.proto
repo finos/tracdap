@@ -47,31 +47,6 @@ message PlatformInfo {
 }
 
 
-message AuthenticationConfig {
-
-  string jwtIssuer = 1;
-  sint32 jwtExpiry = 2;
-  sint32 jwtLimit = 6;
-  sint32 jwtRefresh = 7;
-
-  PluginConfig provider = 3;
-
-  optional string loginPath = 12;
-  optional string refreshPath = 13;
-  optional string returnPath = 14;
-
-  bool disableAuth = 4;
-  bool disableSigning = 5;
-
-  string systemUserId = 8;
-  string systemUserName = 9;
-  sint32 systemTicketDuration = 10;
-  sint32 systemTicketRefresh = 11;
-
-  map<string, PluginConfig> externalSystems = 15;
-}
-
-
 message StorageConfig {
 
   // TODO: Rename "buckets" as "internal" for 0.7
