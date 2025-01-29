@@ -32,6 +32,9 @@ import java.security.UnrecoverableEntryException;
 
 public class JksHelpers {
 
+    public static final String TRAC_AUTH_PUBLIC_KEY = "trac_auth_public_key";
+    public static final String TRAC_AUTH_PRIVATE_KEY = "trac_auth_private_key";
+
     public static KeyStore loadKeystore(
             String keystoreType, Path keystorePath, String keystoreKey,
             boolean createIfMissing) {
@@ -87,8 +90,8 @@ public class JksHelpers {
             var publicEncoded = CryptoHelpers.encodePublicKey(keyPair.getPublic(), false);
             var privateEncoded = CryptoHelpers.encodePrivateKey(keyPair.getPrivate(), false);
 
-            CryptoHelpers.writeTextEntry(keystore, keystoreKey, ConfigKeys.TRAC_AUTH_PUBLIC_KEY, publicEncoded);
-            CryptoHelpers.writeTextEntry(keystore, keystoreKey, ConfigKeys.TRAC_AUTH_PRIVATE_KEY, privateEncoded);
+            CryptoHelpers.writeTextEntry(keystore, keystoreKey, TRAC_AUTH_PUBLIC_KEY, publicEncoded);
+            CryptoHelpers.writeTextEntry(keystore, keystoreKey, TRAC_AUTH_PRIVATE_KEY, privateEncoded);
         }
         catch (Exception e) {
 
