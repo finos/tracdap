@@ -26,18 +26,6 @@ platformInfo:
     region: UK
 
 
-authentication:
-
-  jwtIssuer: http://localhost/
-  jwtExpiry: 7200
-
-  provider:
-    protocol: guest
-    properties:
-      userId: guest
-      userName: Guest User
-
-
 metadata:
   format: PROTO
   database:
@@ -104,17 +92,14 @@ services:
     properties:
       network.idleTimeout: 10
 
-  authentication:
+  metadata:
     port: 9201
 
-  metadata:
+  data:
     port: 9202
 
-  data:
-    port: 9203
-
   orchestrator:
-    port: 9204
+    port: 9203
 
 
 deployment:
