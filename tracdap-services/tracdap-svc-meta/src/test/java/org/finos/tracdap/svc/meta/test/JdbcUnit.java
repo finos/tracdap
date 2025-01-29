@@ -15,18 +15,19 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.test.meta;
+package org.finos.tracdap.svc.meta.test;
 
+import org.finos.tracdap.common.db.JdbcDialect;
 import org.finos.tracdap.common.db.JdbcSetup;
 import org.finos.tracdap.common.util.InterfaceLogging;
-import org.finos.tracdap.common.db.JdbcDialect;
 import org.finos.tracdap.svc.meta.dal.IMetadataDal;
 import org.finos.tracdap.svc.meta.dal.jdbc.JdbcMetadataDal;
-
 import org.flywaydb.core.Flyway;
-
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.extension.*;
+import org.junit.jupiter.api.extension.AfterEachCallback;
+import org.junit.jupiter.api.extension.BeforeAllCallback;
+import org.junit.jupiter.api.extension.BeforeEachCallback;
+import org.junit.jupiter.api.extension.ExtensionContext;
 
 import javax.sql.DataSource;
 import java.nio.file.Files;

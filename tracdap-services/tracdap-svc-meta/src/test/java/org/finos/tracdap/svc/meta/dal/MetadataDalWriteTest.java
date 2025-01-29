@@ -18,6 +18,8 @@
 package org.finos.tracdap.svc.meta.dal;
 
 import org.finos.tracdap.metadata.ObjectType;
+import org.finos.tracdap.metadata.TagHeader;
+import org.finos.tracdap.metadata.TagSelector;
 import org.finos.tracdap.common.exception.EMetadataDuplicate;
 import org.finos.tracdap.common.exception.EMetadataNotFound;
 import org.finos.tracdap.common.exception.EMetadataWrongType;
@@ -26,11 +28,9 @@ import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
-import org.finos.tracdap.metadata.TagHeader;
-import org.finos.tracdap.metadata.TagSelector;
-import org.finos.tracdap.test.meta.IDalTestable;
-import org.finos.tracdap.test.meta.JdbcUnit;
-import org.finos.tracdap.test.meta.JdbcIntegration;
+import org.finos.tracdap.svc.meta.test.IDalTestable;
+import org.finos.tracdap.svc.meta.test.JdbcUnit;
+import org.finos.tracdap.svc.meta.test.JdbcIntegration;
 
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
