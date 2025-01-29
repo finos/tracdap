@@ -21,6 +21,9 @@ import org.finos.tracdap.api.ListTenantsRequest;
 import org.finos.tracdap.api.ListTenantsResponse;
 import org.finos.tracdap.api.PlatformInfoRequest;
 import org.finos.tracdap.api.PlatformInfoResponse;
+import org.finos.tracdap.gateway.TracPlatformGateway;
+import org.finos.tracdap.svc.data.TracDataService;
+import org.finos.tracdap.svc.meta.TracMetadataService;
 import org.finos.tracdap.test.http.Http1Client;
 import org.finos.tracdap.test.helpers.PlatformTest;
 
@@ -50,8 +53,8 @@ public class GrpcWebProxyTest {
     @RegisterExtension
     public static final PlatformTest platform = PlatformTest.forConfig(TRAC_CONFIG_UNIT)
             .addTenant(TEST_TENANT)
-            .startMeta()
-            .startGateway()
+            .startService(TracMetadataService.class)
+            .startService(TracPlatformGateway.class)
             .build();
 
     @Test

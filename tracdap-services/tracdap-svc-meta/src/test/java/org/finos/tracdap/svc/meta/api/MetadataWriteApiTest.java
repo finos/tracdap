@@ -22,6 +22,7 @@ import org.finos.tracdap.api.internal.TrustedMetadataApiGrpc;
 import org.finos.tracdap.common.metadata.MetadataConstants;
 import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.common.metadata.MetadataCodec;
+import org.finos.tracdap.svc.meta.TracMetadataService;
 import org.finos.tracdap.test.helpers.PlatformTest;
 import org.finos.tracdap.test.meta.TestData;
 
@@ -59,7 +60,7 @@ abstract class MetadataWriteApiTest {
         @RegisterExtension
         public static final PlatformTest platform = PlatformTest.forConfig(TRAC_CONFIG_UNIT)
                 .addTenant(TEST_TENANT)
-                .startMeta()
+                .startService(TracMetadataService.class)
                 .build();
 
         @BeforeEach
@@ -80,7 +81,7 @@ abstract class MetadataWriteApiTest {
         public static final PlatformTest platform = PlatformTest.forConfig(TRAC_CONFIG_ENV_FILE)
                 .addTenant(TEST_TENANT)
                 .runDbDeploy(false)
-                .startMeta()
+                .startService(TracMetadataService.class)
                 .build();
 
         @BeforeEach

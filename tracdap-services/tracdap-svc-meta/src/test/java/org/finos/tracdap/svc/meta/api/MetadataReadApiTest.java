@@ -60,7 +60,7 @@ abstract class MetadataReadApiTest {
         @RegisterExtension
         private static final PlatformTest platform = PlatformTest.forConfig(TRAC_CONFIG_UNIT)
                 .addTenant(TEST_TENANT)
-                .startMeta()
+                .startService(TracMetadataService.class)
                 .build();
 
         @BeforeEach
@@ -81,7 +81,7 @@ abstract class MetadataReadApiTest {
         private static final PlatformTest platform = PlatformTest.forConfig(TRAC_CONFIG_ENV_FILE)
                 .addTenant(TEST_TENANT)
                 .runDbDeploy(false)
-                .startMeta()
+                .startService(TracMetadataService.class)
                 .build();
 
         @BeforeEach

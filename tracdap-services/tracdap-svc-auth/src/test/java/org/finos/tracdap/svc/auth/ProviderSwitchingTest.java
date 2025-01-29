@@ -44,7 +44,7 @@ public class ProviderSwitchingTest {
     @RegisterExtension
     public static final PlatformTest platform = PlatformTest.forConfig(AUTH_SVC_UNIT_CONFIG)
             .runDbDeploy(false)
-            .startAuth()
+            .startService(TracAuthenticationService.class)
             .build();
 
     private static JwtValidator jwtValidator;

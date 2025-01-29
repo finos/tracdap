@@ -22,6 +22,9 @@ import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.metadata.MetadataUtil;
 import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.metadata.RunModelJob;
+import org.finos.tracdap.svc.data.TracDataService;
+import org.finos.tracdap.svc.meta.TracMetadataService;
+import org.finos.tracdap.svc.orch.TracOrchestratorService;
 import org.finos.tracdap.test.helpers.GitHelpers;
 import org.finos.tracdap.test.helpers.PlatformTest;
 
@@ -62,7 +65,9 @@ public class RunModelTest {
     public static final PlatformTest platform = PlatformTest.forConfig(E2E_CONFIG)
             .addTenant(TEST_TENANT)
             .prepareLocalExecutor(true)
-            .startAll()
+            .startService(TracMetadataService.class)
+            .startService(TracDataService.class)
+            .startService(TracOrchestratorService.class)
             .build();
 
     private final Logger log = LoggerFactory.getLogger(getClass());

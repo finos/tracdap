@@ -20,6 +20,9 @@ package org.finos.tracdap.gateway.proxy.rest;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import org.finos.tracdap.api.*;
 import org.finos.tracdap.common.async.Flows;
+import org.finos.tracdap.gateway.TracPlatformGateway;
+import org.finos.tracdap.svc.data.TracDataService;
+import org.finos.tracdap.svc.meta.TracMetadataService;
 import org.finos.tracdap.test.http.Http1Client;
 import org.finos.tracdap.test.data.DataApiTestHelpers;
 import org.finos.tracdap.test.helpers.PlatformTest;
@@ -63,9 +66,9 @@ public class RestDownloadTest {
     @RegisterExtension
     public static final PlatformTest platform = PlatformTest.forConfig(TRAC_CONFIG_UNIT)
             .addTenant(TEST_TENANT)
-            .startMeta()
-            .startData()
-            .startGateway()
+            .startService(TracMetadataService.class)
+            .startService(TracDataService.class)
+            .startService(TracPlatformGateway.class)
             .build();
 
     private static final Path tracRepoDir = ResourceHelpers.findTracProjectRoot();

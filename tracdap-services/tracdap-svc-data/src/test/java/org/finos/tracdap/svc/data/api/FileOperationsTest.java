@@ -25,6 +25,8 @@ import org.finos.tracdap.common.metadata.MetadataUtil;
 import org.finos.tracdap.common.async.Flows;
 import org.finos.tracdap.common.async.Futures;
 import org.finos.tracdap.metadata.*;
+import org.finos.tracdap.svc.data.TracDataService;
+import org.finos.tracdap.svc.meta.TracMetadataService;
 import org.finos.tracdap.test.data.DataApiTestHelpers;
 import org.finos.tracdap.test.helpers.PlatformTest;
 
@@ -75,8 +77,8 @@ abstract class FileOperationsTest {
                 .runDbDeploy(true)
                 .addTenant(TEST_TENANT)
                 .addTenant(TEST_TENANT_2)
-                .startMeta()
-                .startData()
+                .startService(TracMetadataService.class)
+                .startService(TracDataService.class)
                 .build();
 
         @BeforeAll
@@ -106,8 +108,8 @@ abstract class FileOperationsTest {
                 .manageDataPrefix(true)
                 .addTenant(TEST_TENANT)
                 .addTenant(TEST_TENANT_2)
-                .startMeta()
-                .startData()
+                .startService(TracMetadataService.class)
+                .startService(TracDataService.class)
                 .build();
 
         @BeforeAll

@@ -32,13 +32,8 @@ import org.finos.tracdap.common.service.TracServiceBase;
 import org.finos.tracdap.common.startup.StandardArgs;
 import org.finos.tracdap.common.util.RoutingUtils;
 import org.finos.tracdap.config.PlatformConfig;
-import org.finos.tracdap.svc.auth.TracAuthenticationService;
 import org.finos.tracdap.tools.secrets.SecretTool;
 import org.finos.tracdap.tools.deploy.metadb.DeployMetaDB;
-import org.finos.tracdap.svc.data.TracDataService;
-import org.finos.tracdap.svc.meta.TracMetadataService;
-import org.finos.tracdap.svc.orch.TracOrchestratorService;
-import org.finos.tracdap.gateway.TracPlatformGateway;
 import org.finos.tracdap.test.config.ConfigHelpers;
 
 import io.grpc.*;
@@ -131,10 +126,6 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         return serviceClasses.stream().anyMatch(c -> c.getSimpleName().equals(ORCH_SVC_CLASS));
     }
 
-    public boolean hasSvc(Class<? extends TracServiceBase> serviceClass) {
-        return serviceClasses.contains(serviceClass);
-    }
-
     public static class Builder {
 
         private String testConfig;
@@ -151,12 +142,6 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         public Builder manageDataPrefix(boolean manageDataPrefix) { this.manageDataPrefix = manageDataPrefix; return this; }
         public Builder prepareLocalExecutor(boolean localExecutor) { this.localExecutor = localExecutor; return this; }
         public Builder startService(Class<? extends TracServiceBase> serviceClass) { this.serviceClasses.add(serviceClass); return this; }
-        public Builder startAuth() { return startService(TracAuthenticationService.class); }
-        public Builder startMeta() { return startService(TracMetadataService.class); }
-        public Builder startData() { return startService(TracDataService.class); }
-        public Builder startOrch() { return startService(TracOrchestratorService.class); }
-        public Builder startGateway() { return startService(TracPlatformGateway.class); }
-        public Builder startAll() { return startAuth().startMeta().startData().startOrch().startGateway(); }
 
         public PlatformTest build() {
 
