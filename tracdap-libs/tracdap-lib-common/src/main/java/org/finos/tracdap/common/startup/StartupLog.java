@@ -33,7 +33,8 @@ public class StartupLog {
 
         if (logSystemActive) {
 
-            var log = LoggerFactory.getLogger(obj.getClass());
+            var clazz = obj instanceof Class<?> ? (Class<?>) obj : obj.getClass();
+            var log = LoggerFactory.getLogger(clazz);
 
             switch (level) {
 
