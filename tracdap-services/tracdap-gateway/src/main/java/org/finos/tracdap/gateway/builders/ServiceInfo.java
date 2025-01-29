@@ -172,14 +172,14 @@ public class ServiceInfo {
 
         var defaultServiceName = SERVICE_NAMES.get(serviceKey);
         this.serviceName = defaultServiceName != null
-                ? ConfigHelpers.readStringOrDefault(configContext, serviceProps, ServiceProperties.SERVICE_NAME, defaultServiceName)
-                : ConfigHelpers.readString(configContext, serviceProps, ServiceProperties.SERVICE_NAME);
+                ? ConfigHelpers.readStringOrDefault(configContext, serviceProps, ServiceProperties.GATEWAY_ROUTE_NAME, defaultServiceName)
+                : ConfigHelpers.readString(configContext, serviceProps, ServiceProperties.GATEWAY_ROUTE_NAME);
 
 
         var defaultHttpPrefix = SERVICE_PREFIX_DEFAULTS.get(serviceKey);
         var httpPrefix = defaultHttpPrefix != null
-                ? ConfigHelpers.readStringOrDefault(configContext, serviceProps, ServiceProperties.GATEWAY_HTTP_PREFIX, defaultHttpPrefix)
-                : ConfigHelpers.readString(configContext, serviceProps, ServiceProperties.GATEWAY_HTTP_PREFIX);
+                ? ConfigHelpers.readStringOrDefault(configContext, serviceProps, ServiceProperties.GATEWAY_ROUTE_PREFIX, defaultHttpPrefix)
+                : ConfigHelpers.readString(configContext, serviceProps, ServiceProperties.GATEWAY_ROUTE_PREFIX);
 
         if (restPrefix == null) {
             this.httpPrefix = httpPrefix;

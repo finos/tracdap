@@ -19,9 +19,9 @@ package org.finos.tracdap.common.config;
 
 public class ServiceProperties {
 
-    public static final String SERVICE_NAME = "service.name";
-    public static final String GATEWAY_HTTP_PREFIX = "gateway.http.prefix";
-    public static final String NETWORK_IDLE_TIMEOUT = "network.idleTimeout";
+    public static final String GATEWAY_ROUTE_NAME = "gateway.route.name";
+    public static final String GATEWAY_ROUTE_PREFIX = "gateway.route.prefix";
 
+    public static final String NETWORK_IDLE_TIMEOUT = "network.idleTimeout";
     public static final int NETWORK_IDLE_TIMEOUT_DEFAULT = 30;  // seconds
 }
