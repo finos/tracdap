@@ -24,10 +24,6 @@ platformInfo:
     region: UK
 
 
-authentication:
-  disableAuth: true
-
-
 metadata:
   format: PROTO
   database:
@@ -104,17 +100,14 @@ services:
     properties:
       network.idleTimeout: 10
 
-  authentication:
+  metadata:
     port: 9101
 
-  metadata:
+  data:
     port: 9102
 
-  data:
-    port: 9103
-
   orchestrator:
-    port: 9104
+    port: 9103
 
 
 deployment:
