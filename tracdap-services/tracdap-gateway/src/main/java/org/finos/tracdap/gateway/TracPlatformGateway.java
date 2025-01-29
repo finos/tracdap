@@ -30,7 +30,6 @@ import org.finos.tracdap.common.service.TracNettyConfig;
 import org.finos.tracdap.common.service.TracServiceBase;
 import org.finos.tracdap.config.PlatformConfig;
 import org.finos.tracdap.config.ServiceConfig;
-import org.finos.tracdap.gateway.auth.AuthConcern;
 import org.finos.tracdap.gateway.builders.RedirectBuilder;
 import org.finos.tracdap.gateway.builders.RouteBuilder;
 import org.finos.tracdap.gateway.exec.Redirect;
@@ -237,9 +236,6 @@ public class TracPlatformGateway extends TracServiceBase {
     private NettyConcern buildCommonConcerns() {
 
         var commonConcerns = TracNettyConfig.coreConcerns("gateway service", serviceConfig);
-
-        var authConcern = new AuthConcern(configManager);
-        commonConcerns = commonConcerns.addFirst(authConcern);
 
         // Additional cross-cutting concerns configured by extensions
         for (var extension : pluginManager.getExtensions()) {

@@ -57,13 +57,10 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.time.Duration;
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.concurrent.TimeUnit;
 
 
 public class TracOrchestratorService extends TracServiceBase {
-
-    private static final Duration JOB_TOKEN_TIMEOUT = Duration.of(1, ChronoUnit.HOURS);
 
     private static final String JOB_CACHE_NAME = "TRAC_JOB_STATE";
     private static final int CONCURRENT_REQUESTS = 30;
@@ -135,7 +132,7 @@ public class TracOrchestratorService extends TracServiceBase {
             serviceGroup = new NioEventLoopGroup(CONCURRENT_REQUESTS, new DefaultThreadFactory("orch-svc"));
 
             // Common framework for cross-cutting concerns
-            var commonConcerns = buildCommonConcerns(configManager, pluginManager);
+            var commonConcerns = buildCommonConcerns();
 
             var metaClient = prepareMetadataClient(platformConfig, clientChannelFactory, commonConcerns);
 
@@ -248,16 +245,13 @@ public class TracOrchestratorService extends TracServiceBase {
         return -1;
     }
 
-    private GrpcConcern buildCommonConcerns(ConfigManager configManager, PluginManager pluginManager) {
+    private GrpcConcern buildCommonConcerns() {
 
         var commonConcerns = TracServiceConfig.coreConcerns(TracOrchestratorService.class);
 
-        var authConcern = new TracServiceConfig.Authentication(configManager, JOB_TOKEN_TIMEOUT);
-        commonConcerns.addAfter(TracServiceConfig.TRAC_PROTOCOL, authConcern);
-
         // Validation concern for the APIs being served
         var validationConcern = new ValidationConcern(OrchestratorServiceProto.getDescriptor());
-        commonConcerns = commonConcerns.addAfter(TracServiceConfig.TRAC_AUTHENTICATION, validationConcern);
+        commonConcerns = commonConcerns.addAfter(TracServiceConfig.TRAC_PROTOCOL, validationConcern);
 
         // Additional cross-cutting concerns configured by extensions
         for (var extension : pluginManager.getExtensions()) {
