@@ -42,13 +42,13 @@ import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 
 
-public class TracNettyConfig {
+public class TracGatewayConfig {
 
-    public static final String GATEWAY_COMMON_CONCERNS = "trac_gw_common_concerns";
-    public static final String GATEWAY_IDLE_STATE = "trac_gw_idle_state";
+    public static final String TRAC_GATEWAY_CONCERNS = "trac_gateway_concerns";
+    public static final String TRAC_IDLE_STATE = "trac_idle_state";
 
     public static CommonConcerns<NettyConcern> emptyConfig() {
-        return new CommonNettyConcerns(GATEWAY_COMMON_CONCERNS);
+        return new CommonNettyConcerns(TRAC_GATEWAY_CONCERNS);
     }
 
     public static CommonConcerns<NettyConcern> coreConcerns(String serviceName, ServiceConfig serviceConfig) {
@@ -82,7 +82,7 @@ public class TracNettyConfig {
 
         @Override
         public String concernName() {
-            return GATEWAY_IDLE_STATE;
+            return TRAC_IDLE_STATE;
         }
 
         @Override

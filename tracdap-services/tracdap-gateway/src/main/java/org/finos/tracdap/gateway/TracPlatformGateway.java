@@ -26,7 +26,7 @@ import org.finos.tracdap.common.netty.EventLoopScheduler;
 import org.finos.tracdap.common.netty.NettyHelpers;
 import org.finos.tracdap.common.netty.ProtocolHandler;
 import org.finos.tracdap.common.plugin.PluginManager;
-import org.finos.tracdap.common.service.TracNettyConfig;
+import org.finos.tracdap.common.service.TracGatewayConfig;
 import org.finos.tracdap.common.service.TracServiceBase;
 import org.finos.tracdap.config.PlatformConfig;
 import org.finos.tracdap.config.ServiceConfig;
@@ -235,7 +235,7 @@ public class TracPlatformGateway extends TracServiceBase {
 
     private NettyConcern buildCommonConcerns() {
 
-        var commonConcerns = TracNettyConfig.coreConcerns("gateway service", serviceConfig);
+        var commonConcerns = TracGatewayConfig.coreConcerns("gateway service", serviceConfig);
 
         // Additional cross-cutting concerns configured by extensions
         for (var extension : pluginManager.getExtensions()) {

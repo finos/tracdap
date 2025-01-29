@@ -28,7 +28,7 @@ import io.netty.handler.codec.http.websocketx.WebSocketServerProtocolConfig;
 import io.netty.handler.codec.http2.*;
 import io.netty.util.concurrent.DefaultThreadFactory;
 
-import org.finos.tracdap.common.service.TracNettyConfig;
+import org.finos.tracdap.common.service.TracGatewayConfig;
 import org.finos.tracdap.config.ServiceConfig;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -79,7 +79,7 @@ public class ProtocolNegotiatorTest {
                 .withWebsocket(webSockets, request -> wsConfig);
 
         // Use the default core concerns for testing
-        var commonConcerns = TracNettyConfig.coreConcerns("test service", serviceConfig).build();
+        var commonConcerns = TracGatewayConfig.coreConcerns("test service", serviceConfig).build();
 
         // The protocol negotiator is the top level initializer for new inbound connections
         var protocolNegotiator = new ProtocolNegotiator(protocolHandler, commonConcerns);
