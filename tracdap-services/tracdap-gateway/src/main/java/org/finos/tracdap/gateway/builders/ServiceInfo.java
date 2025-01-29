@@ -38,13 +38,11 @@ public class ServiceInfo {
 
     public static final Map<String, String> SERVICE_NAMES = Map.ofEntries(
             Map.entry(ConfigKeys.GATEWAY_SERVICE_KEY, "TRAC Platform Gateway"),
-            Map.entry(ConfigKeys.AUTHENTICATION_SERVICE_KEY, "TRAC Authentication Service"),
             Map.entry(ConfigKeys.METADATA_SERVICE_KEY, "TRAC Metadata Service"),
             Map.entry(ConfigKeys.DATA_SERVICE_KEY, "TRAC Data Service"),
             Map.entry(ConfigKeys.ORCHESTRATOR_SERVICE_KEY, "TRAC Orchestrator Service"));
 
     public static final Map<String, String> SERVICE_PREFIX_DEFAULTS = Map.ofEntries(
-            Map.entry(ConfigKeys.AUTHENTICATION_SERVICE_KEY, "/trac-auth/"),
             Map.entry(ConfigKeys.METADATA_SERVICE_KEY, "/trac-meta/"),
             Map.entry(ConfigKeys.DATA_SERVICE_KEY, "/trac-data/"),
             Map.entry(ConfigKeys.ORCHESTRATOR_SERVICE_KEY, "/trac-orch/"));
