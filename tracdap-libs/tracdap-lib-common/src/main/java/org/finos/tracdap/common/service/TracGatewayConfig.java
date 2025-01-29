@@ -18,7 +18,8 @@
 package org.finos.tracdap.common.service;
 
 import org.finos.tracdap.common.config.ConfigHelpers;
-import org.finos.tracdap.common.config.ServiceProperties;
+import org.finos.tracdap.common.config.ConfigKeys;
+import org.finos.tracdap.common.config.ConfigDefaults;
 import org.finos.tracdap.common.middleware.CommonConcerns;
 import org.finos.tracdap.common.middleware.CommonNettyConcerns;
 import org.finos.tracdap.common.middleware.NettyConcern;
@@ -76,8 +77,8 @@ public class TracGatewayConfig {
 
             return ConfigHelpers.readInt(
                     serviceName, serviceProperties,
-                    ServiceProperties.NETWORK_IDLE_TIMEOUT,
-                    ServiceProperties.NETWORK_IDLE_TIMEOUT_DEFAULT);
+                    ConfigKeys.NETWORK_IDLE_TIMEOUT,
+                    ConfigDefaults.NETWORK_IDLE_TIMEOUT);
         }
 
         @Override

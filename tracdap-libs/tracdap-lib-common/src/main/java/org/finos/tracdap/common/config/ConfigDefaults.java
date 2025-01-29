@@ -17,6 +17,7 @@
 
 package org.finos.tracdap.common.config;
 
+
 public class ConfigDefaults {
 
     // Really we should mark these defaults up in the .proto files for the config
@@ -26,28 +27,5 @@ public class ConfigDefaults {
 
     // For now, here are some config defaults!
 
-    public static final int DEFAULT_JWT_EXPIRY = 3600;    // 1 hour
-    public static final int DEFAULT_JWT_LIMIT = 57600;    // 16 hours
-    public static final int DEFAULT_JWT_REFRESH = 300;     // 5 minutes
-
-    public static final String DEFAULT_LOGIN_PATH = "/login/browser?return-path=${returnPath}";
-    public static final String DEFAULT_REFRESH_PATH = "/login/refresh";
-    public static final String DEFAULT_RETURN_PATH = "/";
-
-    public static String readOrDefault(String configValue, String defaultValue) {
-
-        if (configValue == null || configValue.isBlank())
-            return defaultValue;
-        else
-            return configValue;
-    }
-
-    public static int readOrDefault(int configValue, int defaultValue) {
-
-        if (configValue == 0)
-            return defaultValue;
-        else
-            return configValue;
-    }
-
+    public static final int NETWORK_IDLE_TIMEOUT = 30;  // seconds
 }
