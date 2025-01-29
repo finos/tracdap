@@ -42,13 +42,10 @@ dependencies {
     api project(':deploy-metadb')
     api project(':secret-tool')
 
-    implementation group: 'org.junit.jupiter', name: 'junit-jupiter-api', version: "$junit_version"
-    implementation group: 'org.junit.jupiter', name: 'junit-jupiter-params', version: "$junit_version"
+    // Use Jupiter API to define test extensions
+    api group: 'org.junit.jupiter', name: 'junit-jupiter-api', version: "$junit_version"
 
-    implementation group: 'io.netty', name: 'netty-common', version: "$netty_version"
-    implementation group: 'io.netty', name: 'netty-codec-http', version: "$netty_version"
-    implementation group: 'io.netty', name: 'netty-codec-http2', version: "$netty_version"
-    implementation group: 'io.netty', name: 'netty-handler-proxy', version: "$netty_version"
+    // Embedded test services run on gRPC with Netty
     implementation group: 'io.grpc', name: 'grpc-netty', version: "$grpc_version"
 
     // Apache Arrow data framework
