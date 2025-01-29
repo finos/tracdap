@@ -21,19 +21,18 @@ import org.finos.tracdap.api.TracDataApiGrpc;
 import org.finos.tracdap.api.TracMetadataApiGrpc;
 import org.finos.tracdap.api.TracOrchestratorApiGrpc;
 import org.finos.tracdap.api.internal.TrustedMetadataApiGrpc;
-import org.finos.tracdap.auth.login.SessionBuilder;
-import org.finos.tracdap.common.auth.ClientAuthProvider;
-import org.finos.tracdap.common.auth.JwtSetup;
-import org.finos.tracdap.common.auth.UserInfo;
 import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.config.ConfigManager;
+import org.finos.tracdap.common.middleware.CommonConcerns;
+import org.finos.tracdap.common.middleware.CommonGrpcConcerns;
+import org.finos.tracdap.common.middleware.GrpcConcern;
 import org.finos.tracdap.common.plugin.PluginManager;
 import org.finos.tracdap.common.service.TracServiceBase;
 import org.finos.tracdap.common.startup.StandardArgs;
 import org.finos.tracdap.common.util.RoutingUtils;
 import org.finos.tracdap.config.PlatformConfig;
-import org.finos.tracdap.tools.secrets.SecretTool;
 import org.finos.tracdap.tools.deploy.metadb.DeployMetaDB;
+import org.finos.tracdap.tools.secrets.SecretTool;
 import org.finos.tracdap.test.config.ConfigHelpers;
 
 import io.grpc.*;
@@ -90,13 +89,13 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
 
     private final List<Class<? extends TracServiceBase>> serviceClasses;
     private final List<TracServiceBase> services;
-
-    private String authToken;
+    private final GrpcConcern clientConcerns;
 
     private PlatformTest(
             String testConfig, List<String> tenants, String storageFormat,
             boolean runDbDeploy, boolean manageDataPrefix, boolean localExecutor,
-            List<Class<? extends TracServiceBase>> serviceClasses) {
+            List<Class<? extends TracServiceBase>> serviceClasses,
+            GrpcConcern clientConcerns) {
 
         this.testConfig = testConfig;
         this.tenants = tenants;
@@ -106,6 +105,7 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         this.localExecutor = localExecutor;
         this.serviceClasses = serviceClasses;
         this.services = new ArrayList<>(serviceClasses.size());
+        this.clientConcerns = clientConcerns;
     }
 
     public static Builder forConfig(String testConfig) {
@@ -135,6 +135,9 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         private boolean manageDataPrefix = false;
         private boolean localExecutor = false;
         private final List<Class<? extends TracServiceBase>> serviceClasses = new ArrayList<>();
+        private final CommonConcerns<GrpcConcern> clientConcerns = new CommonGrpcConcerns("client_concerns");
+
+        // Should client concerns be pre-configured? If so what is the right configuration for testing?
 
         public Builder addTenant(String testTenant) { this.tenants.add(testTenant); return this; }
         public Builder storageFormat(String storageFormat) { this.storageFormat = storageFormat; return this; }
@@ -142,13 +145,14 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         public Builder manageDataPrefix(boolean manageDataPrefix) { this.manageDataPrefix = manageDataPrefix; return this; }
         public Builder prepareLocalExecutor(boolean localExecutor) { this.localExecutor = localExecutor; return this; }
         public Builder startService(Class<? extends TracServiceBase> serviceClass) { this.serviceClasses.add(serviceClass); return this; }
+        public Builder withClientConcern(GrpcConcern concern) { clientConcerns.addLast(concern); return this; }
 
         public PlatformTest build() {
 
             return new PlatformTest(
                     testConfig, tenants, storageFormat,
                     runDbDeploy, manageDataPrefix, localExecutor,
-                    serviceClasses);
+                    serviceClasses, clientConcerns.build());
         }
     }
 
@@ -169,32 +173,32 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
 
     public TracMetadataApiGrpc.TracMetadataApiFutureStub metaClientFuture() {
         var client = TracMetadataApiGrpc.newFutureStub(metaChannel);
-        return ClientAuthProvider.applyIfAvailable(client, authToken);
+        return clientConcerns.configureClient(client);
     }
 
     public TracMetadataApiGrpc.TracMetadataApiBlockingStub metaClientBlocking() {
         var client = TracMetadataApiGrpc.newBlockingStub(metaChannel);
-        return ClientAuthProvider.applyIfAvailable(client, authToken);
+        return clientConcerns.configureClient(client);
     }
 
     public TrustedMetadataApiGrpc.TrustedMetadataApiBlockingStub metaClientTrustedBlocking() {
         var client = TrustedMetadataApiGrpc.newBlockingStub(metaChannel);
-        return ClientAuthProvider.applyIfAvailable(client, authToken);
+        return clientConcerns.configureClient(client);
     }
 
     public TracDataApiGrpc.TracDataApiStub dataClient() {
         var client = TracDataApiGrpc.newStub(dataChannel);
-        return ClientAuthProvider.applyIfAvailable(client, authToken);
+        return clientConcerns.configureClient(client);
     }
 
     public TracDataApiGrpc.TracDataApiBlockingStub dataClientBlocking() {
         var client = TracDataApiGrpc.newBlockingStub(dataChannel);
-        return ClientAuthProvider.applyIfAvailable(client, authToken);
+        return clientConcerns.configureClient(client);
     }
 
     public TracOrchestratorApiGrpc.TracOrchestratorApiBlockingStub orchClientBlocking() {
         var client = TracOrchestratorApiGrpc.newBlockingStub(orchChannel);
-        return ClientAuthProvider.applyIfAvailable(client, authToken);
+        return clientConcerns.configureClient(client);
     }
 
     public String platformConfigUrl() {
@@ -230,8 +234,9 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         prepareConfig();
         preparePlugins();
 
-        if (!platformConfig.getAuthentication().getDisableAuth())
-            prepareAuth();
+        // If the config is using secrets, init the secret store
+        if (platformConfig.containsConfig(ConfigKeys.SECRET_URL_KEY))
+            prepareSecrets();
 
         if (runDbDeploy)
             prepareDatabase();
@@ -346,6 +351,19 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         platformConfig = configManager.loadRootConfigObject(PlatformConfig.class);
     }
 
+    void prepareSecrets() {
+
+        log.info("Running secret tool to prepare secrets...");
+
+        // Running the secret tool will create the secrets file so it is available for loading
+
+        var secretTasks = new ArrayList<StandardArgs.Task>();
+        secretTasks.add(StandardArgs.task(SecretTool.INIT_SECRETS, List.of(), "Init secret store"));
+        ServiceHelpers.runAuthTool(tracDir, platformConfigUrl, secretKey, secretTasks);
+
+        configManager.prepareSecrets();
+    }
+
     private String getCurrentGitOrigin() throws Exception {
 
         var pb = new ProcessBuilder();
@@ -366,34 +384,6 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         finally {
             proc.destroy();
         }
-    }
-
-    void prepareAuth() {
-
-        log.info("Running auth tool to set up root authentication keys...");
-
-        // Running the auth tool will create the secrets file and add the public / private keys for auth
-
-        var authTasks = new ArrayList<StandardArgs.Task>();
-        authTasks.add(StandardArgs.task(SecretTool.CREATE_ROOT_AUTH_KEY, List.of("EC", "256"), ""));
-        ServiceHelpers.runAuthTool(tracDir, platformConfigUrl, secretKey, authTasks);
-
-        // Authentication is mandatory, so we need to build a token in order to test at the API level
-        // To create a valid token, we need to get the auth signing keys out of the secrets file
-        // Tokens must be signed with the same key used by the platform services
-
-        configManager.prepareSecrets();
-
-        var authConfig = platformConfig.getAuthentication();
-        var jwt = JwtSetup.createProcessor(platformConfig, configManager);
-
-        var userInfo = new UserInfo();
-        userInfo.setUserId("platform_testing");
-        userInfo.setDisplayName("Platform testing user");
-
-        var session = SessionBuilder.newSession(userInfo, authConfig);
-
-        authToken = jwt.encodeToken(session);
     }
 
     void prepareDatabase() {
