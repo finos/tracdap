@@ -17,29 +17,19 @@
 
 package org.finos.tracdap.common.service;
 
-import org.finos.tracdap.common.auth.*;
-import org.finos.tracdap.common.config.ConfigManager;
-import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.middleware.CommonConcerns;
 import org.finos.tracdap.common.middleware.CommonGrpcConcerns;
-import org.finos.tracdap.common.middleware.GrpcClientState;
 import org.finos.tracdap.common.middleware.GrpcConcern;
 import org.finos.tracdap.common.grpc.*;
-import org.finos.tracdap.config.AuthenticationConfig;
-import org.finos.tracdap.config.PlatformConfig;
 
-import io.grpc.Context;
 import io.grpc.ServerBuilder;
 import io.grpc.stub.AbstractStub;
-
-import java.time.Duration;
 
 
 public class TracServiceConfig {
 
     public static final String TRAC_SERVICE_CONFIG = "trac_service_config";
     public static final String TRAC_PROTOCOL = "trac_protocol";
-    public static final String TRAC_AUTHENTICATION = "trac_authentication";
     public static final String TRAC_VALIDATION = "trac_validation";
     public static final String TRAC_LOGGING = "trac_logging";
     public static final String TRAC_ERROR_HANDLING = "trac_error_handling";
@@ -78,72 +68,6 @@ public class TracServiceConfig {
             return clientStub
                     .withCompression(ClientCompressionInterceptor.COMPRESSION_TYPE)
                     .withInterceptors(new ClientCompressionInterceptor());
-        }
-    }
-
-    public static class Authentication implements GrpcConcern {
-
-        private final AuthenticationConfig authConfig;
-        private final JwtProcessor jwtProcessor;
-        private final InternalAuthProvider internalAuthProvider;
-
-        private final Duration sessionTimeout;
-
-        public Authentication(ConfigManager configManager, Duration sessionTimeout) {
-
-            var platformConfig = configManager.loadRootConfigObject(PlatformConfig.class);
-
-            this.authConfig = platformConfig.getAuthentication();
-            this.jwtProcessor = JwtSetup.createProcessor(platformConfig, configManager);
-            this.internalAuthProvider = new InternalAuthProvider(jwtProcessor, authConfig);
-
-            this.sessionTimeout = sessionTimeout;
-        }
-
-        @Override
-        public String concernName() {
-            return TRAC_AUTHENTICATION;
-        }
-
-        @Override
-        public ServerBuilder<? extends ServerBuilder<?>> configureServer(ServerBuilder<? extends ServerBuilder<?>> serverBuilder) {
-
-            return serverBuilder.intercept(new GrpcAuthValidator(authConfig, jwtProcessor));
-        }
-
-        @Override
-        public GrpcClientState prepareClientCall(Context callContext) {
-            var userInfo = GrpcAuthHelpers.currentUser(callContext);
-            var credentials = internalAuthProvider.createDelegateSession(userInfo, sessionTimeout);
-            return new ClientConfig(credentials);
-        }
-
-        private static class ClientConfig implements GrpcClientState {
-
-            private static final long serialVersionUID = 1L;
-
-            private final InternalCallCredentials credentials;
-
-            public ClientConfig(InternalCallCredentials credentials) {
-                this.credentials = credentials;
-            }
-
-            @Override
-            public <TStub extends AbstractStub<TStub>> TStub configureClient(TStub clientStub) {
-                return clientStub.withCallCredentials(credentials);
-            }
-
-            @Override
-            public ClientConfig restore(GrpcConcern grpcConcern) {
-
-                if (!(grpcConcern instanceof Authentication))
-                    throw new EUnexpected();
-
-                var authConcern = (Authentication) grpcConcern;
-                authConcern.internalAuthProvider.setTokenProcessor(credentials);
-
-                return this;
-            }
         }
     }
 

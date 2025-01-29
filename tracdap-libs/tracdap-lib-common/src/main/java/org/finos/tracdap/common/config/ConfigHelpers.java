@@ -19,6 +19,7 @@ package org.finos.tracdap.common.config;
 
 import org.finos.tracdap.common.exception.EStartup;
 
+import java.util.Map;
 import java.util.Properties;
 
 
@@ -28,6 +29,12 @@ public class ConfigHelpers {
     private static final String BOOLEAN_FALSE = Boolean.FALSE.toString();
 
     public static String readString(String context, Properties properties, String key) {
+        return readString(context, properties, key, true);
+    }
+
+    public static String readString(String context, Map<String, String> propertiesMap, String key) {
+        var properties = new Properties();
+        properties.putAll(propertiesMap);
         return readString(context, properties, key, true);
     }
 
@@ -102,5 +109,21 @@ public class ConfigHelpers {
 
         var message = String.format("Invalid boolean value for property [%s] in [%s]", key, context);
         throw new EStartup(message);
+    }
+
+    public static String readOrDefault(String configValue, String defaultValue) {
+
+        if (configValue == null || configValue.isBlank())
+            return defaultValue;
+        else
+            return configValue;
+    }
+
+    public static int readOrDefault(int configValue, int defaultValue) {
+
+        if (configValue == 0)
+            return defaultValue;
+        else
+            return configValue;
     }
 }

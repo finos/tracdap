@@ -26,6 +26,8 @@ import org.finos.tracdap.metadata.CopyStatus;
 import org.finos.tracdap.metadata.ObjectDefinition;
 import org.finos.tracdap.metadata.ObjectType;
 import org.finos.tracdap.metadata.TagSelector;
+import org.finos.tracdap.svc.data.TracDataService;
+import org.finos.tracdap.svc.meta.TracMetadataService;
 import org.finos.tracdap.test.data.DataApiTestHelpers;
 import org.finos.tracdap.test.helpers.PlatformTest;
 
@@ -73,8 +75,8 @@ abstract class FileRoundTripTest  {
         public static final PlatformTest platform = PlatformTest.forConfig(TRAC_CONFIG_UNIT)
                 .runDbDeploy(true)
                 .addTenant(TEST_TENANT)
-                .startMeta()
-                .startData()
+                .startService(TracMetadataService.class)
+                .startService(TracDataService.class)
                 .build();
 
         @BeforeAll
@@ -106,8 +108,8 @@ abstract class FileRoundTripTest  {
                 .runDbDeploy(true)
                 .manageDataPrefix(true)
                 .addTenant(TEST_TENANT)
-                .startMeta()
-                .startData()
+                .startService(TracMetadataService.class)
+                .startService(TracDataService.class)
                 .build();
 
         @BeforeAll

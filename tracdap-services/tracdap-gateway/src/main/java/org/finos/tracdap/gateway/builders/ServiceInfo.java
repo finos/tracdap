@@ -22,7 +22,6 @@ import org.finos.tracdap.api.MetadataServiceProto;
 import org.finos.tracdap.api.OrchestratorServiceProto;
 import org.finos.tracdap.common.config.ConfigHelpers;
 import org.finos.tracdap.common.config.ConfigKeys;
-import org.finos.tracdap.common.config.ServiceProperties;
 import org.finos.tracdap.common.exception.ETracInternal;
 import org.finos.tracdap.config.PlatformConfig;
 import org.finos.tracdap.config.ServiceConfig;
@@ -38,13 +37,11 @@ public class ServiceInfo {
 
     public static final Map<String, String> SERVICE_NAMES = Map.ofEntries(
             Map.entry(ConfigKeys.GATEWAY_SERVICE_KEY, "TRAC Platform Gateway"),
-            Map.entry(ConfigKeys.AUTHENTICATION_SERVICE_KEY, "TRAC Authentication Service"),
             Map.entry(ConfigKeys.METADATA_SERVICE_KEY, "TRAC Metadata Service"),
             Map.entry(ConfigKeys.DATA_SERVICE_KEY, "TRAC Data Service"),
             Map.entry(ConfigKeys.ORCHESTRATOR_SERVICE_KEY, "TRAC Orchestrator Service"));
 
     public static final Map<String, String> SERVICE_PREFIX_DEFAULTS = Map.ofEntries(
-            Map.entry(ConfigKeys.AUTHENTICATION_SERVICE_KEY, "/trac-auth/"),
             Map.entry(ConfigKeys.METADATA_SERVICE_KEY, "/trac-meta/"),
             Map.entry(ConfigKeys.DATA_SERVICE_KEY, "/trac-data/"),
             Map.entry(ConfigKeys.ORCHESTRATOR_SERVICE_KEY, "/trac-orch/"));
@@ -172,14 +169,14 @@ public class ServiceInfo {
 
         var defaultServiceName = SERVICE_NAMES.get(serviceKey);
         this.serviceName = defaultServiceName != null
-                ? ConfigHelpers.readStringOrDefault(configContext, serviceProps, ServiceProperties.SERVICE_NAME, defaultServiceName)
-                : ConfigHelpers.readString(configContext, serviceProps, ServiceProperties.SERVICE_NAME);
+                ? ConfigHelpers.readStringOrDefault(configContext, serviceProps, ConfigKeys.GATEWAY_ROUTE_NAME, defaultServiceName)
+                : ConfigHelpers.readString(configContext, serviceProps, ConfigKeys.GATEWAY_ROUTE_NAME);
 
 
         var defaultHttpPrefix = SERVICE_PREFIX_DEFAULTS.get(serviceKey);
         var httpPrefix = defaultHttpPrefix != null
-                ? ConfigHelpers.readStringOrDefault(configContext, serviceProps, ServiceProperties.GATEWAY_HTTP_PREFIX, defaultHttpPrefix)
-                : ConfigHelpers.readString(configContext, serviceProps, ServiceProperties.GATEWAY_HTTP_PREFIX);
+                ? ConfigHelpers.readStringOrDefault(configContext, serviceProps, ConfigKeys.GATEWAY_ROUTE_PREFIX, defaultHttpPrefix)
+                : ConfigHelpers.readString(configContext, serviceProps, ConfigKeys.GATEWAY_ROUTE_PREFIX);
 
         if (restPrefix == null) {
             this.httpPrefix = httpPrefix;

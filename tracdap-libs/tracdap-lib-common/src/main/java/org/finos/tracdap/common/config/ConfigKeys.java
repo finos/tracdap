@@ -19,22 +19,24 @@ package org.finos.tracdap.common.config;
 
 public class ConfigKeys {
 
-    public static final String AUTHENTICATION_SERVICE_KEY = "authentication";
-    public static final String METADATA_SERVICE_KEY = "metadata";
-    public static final String DATA_SERVICE_KEY = "data";
-    public static final String ORCHESTRATOR_SERVICE_KEY = "orchestrator";
-    public static final String GATEWAY_SERVICE_KEY = "gateway";
-
+    // Secondary config keys
     public static final String LOGGING_CONFIG_KEY = "logging";
     public static final String SECRET_TYPE_KEY = "secret.type";
     public static final String SECRET_URL_KEY = "secret.url";
     public static final String SECRET_KEY_KEY = "secret.key";
     public static final String SECRET_KEY_ENV = "TRAC_SECRET_KEY";
-
     public static final String USER_DB_TYPE = "users.type";
     public static final String USER_DB_URL = "users.url";
     public static final String USER_DB_KEY = "users.key";
 
-    public static final String TRAC_AUTH_PUBLIC_KEY = "trac_auth_public_key";
-    public static final String TRAC_AUTH_PRIVATE_KEY = "trac_auth_private_key";
+    // Service keys
+    public static final String METADATA_SERVICE_KEY = "metadata";
+    public static final String DATA_SERVICE_KEY = "data";
+    public static final String ORCHESTRATOR_SERVICE_KEY = "orchestrator";
+    public static final String GATEWAY_SERVICE_KEY = "gateway";
+
+    // Service properties
+    public static final String GATEWAY_ROUTE_NAME = "gateway.route.name";
+    public static final String GATEWAY_ROUTE_PREFIX = "gateway.route.prefix";
+    public static final String NETWORK_IDLE_TIMEOUT = "network.idleTimeout";
 }

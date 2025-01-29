@@ -27,15 +27,15 @@ import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
-import org.finos.tracdap.test.meta.IDalTestable;
-import org.finos.tracdap.test.meta.JdbcUnit;
-import org.finos.tracdap.test.meta.JdbcIntegration;
+import org.finos.tracdap.svc.meta.test.IDalTestable;
+import org.finos.tracdap.svc.meta.test.JdbcUnit;
+import org.finos.tracdap.svc.meta.test.JdbcIntegration;
 
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
-import static org.finos.tracdap.test.meta.TestData.*;
+import static org.finos.tracdap.test.meta.SampleMetadata.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 

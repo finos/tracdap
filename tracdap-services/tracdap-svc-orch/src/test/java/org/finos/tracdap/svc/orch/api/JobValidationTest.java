@@ -27,6 +27,9 @@ import org.finos.tracdap.common.metadata.MetadataUtil;
 import org.finos.tracdap.common.metadata.TypeSystem;
 import org.finos.tracdap.common.util.ResourceHelpers;
 import org.finos.tracdap.metadata.*;
+import org.finos.tracdap.svc.data.TracDataService;
+import org.finos.tracdap.svc.meta.TracMetadataService;
+import org.finos.tracdap.svc.orch.TracOrchestratorService;
 import org.finos.tracdap.test.data.SampleData;
 import org.finos.tracdap.test.helpers.PlatformTest;
 
@@ -61,9 +64,9 @@ public class JobValidationTest {
     public static final PlatformTest platform = PlatformTest.forConfig(TRAC_CONFIG_UNIT)
             .runDbDeploy(true)
             .addTenant(TEST_TENANT)
-            .startMeta()
-            .startData()
-            .startOrch()
+            .startService(TracMetadataService.class)
+            .startService(TracDataService.class)
+            .startService(TracOrchestratorService.class)
             .build();
 
     @BeforeAll

@@ -21,23 +21,18 @@ import org.finos.tracdap.api.TracDataApiGrpc;
 import org.finos.tracdap.api.TracMetadataApiGrpc;
 import org.finos.tracdap.api.TracOrchestratorApiGrpc;
 import org.finos.tracdap.api.internal.TrustedMetadataApiGrpc;
-import org.finos.tracdap.auth.login.SessionBuilder;
-import org.finos.tracdap.common.auth.ClientAuthProvider;
-import org.finos.tracdap.common.auth.JwtSetup;
-import org.finos.tracdap.common.auth.UserInfo;
 import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.config.ConfigManager;
+import org.finos.tracdap.common.middleware.CommonConcerns;
+import org.finos.tracdap.common.middleware.CommonGrpcConcerns;
+import org.finos.tracdap.common.middleware.GrpcConcern;
 import org.finos.tracdap.common.plugin.PluginManager;
+import org.finos.tracdap.common.service.TracServiceBase;
 import org.finos.tracdap.common.startup.StandardArgs;
 import org.finos.tracdap.common.util.RoutingUtils;
 import org.finos.tracdap.config.PlatformConfig;
-import org.finos.tracdap.svc.auth.TracAuthenticationService;
-import org.finos.tracdap.tools.secrets.SecretTool;
 import org.finos.tracdap.tools.deploy.metadb.DeployMetaDB;
-import org.finos.tracdap.svc.data.TracDataService;
-import org.finos.tracdap.svc.meta.TracMetadataService;
-import org.finos.tracdap.svc.orch.TracOrchestratorService;
-import org.finos.tracdap.gateway.TracPlatformGateway;
+import org.finos.tracdap.tools.secrets.SecretTool;
 import org.finos.tracdap.test.config.ConfigHelpers;
 
 import io.grpc.*;
@@ -78,6 +73,10 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
     private static final String VENV_ENV_VAR = "VIRTUAL_ENV";
     private static final String TRAC_RUNTIME_DIST_DIR = "tracdap-runtime/python/build/dist";
 
+    private static final String META_SVC_CLASS = "TracMetadataService";
+    private static final String DATA_SVC_CLASS = "TracDataService";
+    private static final String ORCH_SVC_CLASS = "TracOrchestratorService";
+
     private final Logger log = LoggerFactory.getLogger(getClass());
 
     private final String testConfig;
@@ -88,19 +87,15 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
     private final boolean manageDataPrefix;
     private final boolean localExecutor;
 
-    private final boolean startAuth;
-    private final boolean startMeta;
-    private final boolean startData;
-    private final boolean startOrch;
-    private final boolean startGateway;
-
-    private String authToken;
+    private final List<Class<? extends TracServiceBase>> serviceClasses;
+    private final List<TracServiceBase> services;
+    private final GrpcConcern clientConcerns;
 
     private PlatformTest(
             String testConfig, List<String> tenants, String storageFormat,
             boolean runDbDeploy, boolean manageDataPrefix, boolean localExecutor,
-            boolean startAuth, boolean startMeta, boolean startData, boolean startOrch,
-            boolean startGateway) {
+            List<Class<? extends TracServiceBase>> serviceClasses,
+            GrpcConcern clientConcerns) {
 
         this.testConfig = testConfig;
         this.tenants = tenants;
@@ -108,17 +103,27 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         this.runDbDeploy = runDbDeploy;
         this.manageDataPrefix = manageDataPrefix;
         this.localExecutor = localExecutor;
-        this.startAuth = startAuth;
-        this.startMeta = startMeta;
-        this.startData = startData;
-        this.startOrch = startOrch;
-        this.startGateway = startGateway;
+        this.serviceClasses = serviceClasses;
+        this.services = new ArrayList<>(serviceClasses.size());
+        this.clientConcerns = clientConcerns;
     }
 
     public static Builder forConfig(String testConfig) {
         var builder = new Builder();
         builder.testConfig = testConfig;
         return builder;
+    }
+
+    public boolean hasMetaSvc() {
+        return serviceClasses.stream().anyMatch(c -> c.getSimpleName().equals(META_SVC_CLASS));
+    }
+
+    public boolean hasDataSvc() {
+        return serviceClasses.stream().anyMatch(c -> c.getSimpleName().equals(DATA_SVC_CLASS));
+    }
+
+    public boolean hasOrchSvc() {
+        return serviceClasses.stream().anyMatch(c -> c.getSimpleName().equals(ORCH_SVC_CLASS));
     }
 
     public static class Builder {
@@ -129,30 +134,25 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         private boolean runDbDeploy = true;  // Run DB deploy by default
         private boolean manageDataPrefix = false;
         private boolean localExecutor = false;
-        private boolean startAuth;
-        private boolean startMeta;
-        private boolean startData;
-        private boolean startOrch;
-        private boolean startGateway;
+        private final List<Class<? extends TracServiceBase>> serviceClasses = new ArrayList<>();
+        private final CommonConcerns<GrpcConcern> clientConcerns = new CommonGrpcConcerns("client_concerns");
+
+        // Should client concerns be pre-configured? If so what is the right configuration for testing?
 
         public Builder addTenant(String testTenant) { this.tenants.add(testTenant); return this; }
         public Builder storageFormat(String storageFormat) { this.storageFormat = storageFormat; return this; }
         public Builder runDbDeploy(boolean runDbDeploy) { this.runDbDeploy = runDbDeploy; return this; }
         public Builder manageDataPrefix(boolean manageDataPrefix) { this.manageDataPrefix = manageDataPrefix; return this; }
         public Builder prepareLocalExecutor(boolean localExecutor) { this.localExecutor = localExecutor; return this; }
-        public Builder startAuth() { startAuth = true; return this; }
-        public Builder startMeta() { startMeta = true; return this; }
-        public Builder startData() { startData = true; return this; }
-        public Builder startOrch() { startOrch = true; return this; }
-        public Builder startGateway() { startGateway = true; return this; }
-        public Builder startAll() { return startAuth().startMeta().startData().startOrch().startGateway(); }
+        public Builder startService(Class<? extends TracServiceBase> serviceClass) { this.serviceClasses.add(serviceClass); return this; }
+        public Builder withClientConcern(GrpcConcern concern) { clientConcerns.addLast(concern); return this; }
 
         public PlatformTest build() {
 
             return new PlatformTest(
                     testConfig, tenants, storageFormat,
                     runDbDeploy, manageDataPrefix, localExecutor,
-                    startAuth, startMeta, startData, startOrch, startGateway);
+                    serviceClasses, clientConcerns.build());
         }
     }
 
@@ -167,44 +167,38 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
     private ConfigManager configManager;
     private PlatformConfig platformConfig;
 
-    private TracAuthenticationService authSvc;
-    private TracMetadataService metaSvc;
-    private TracDataService dataSvc;
-    private TracOrchestratorService orchSvc;
-    private TracPlatformGateway gatewaySvc;
-
     private ManagedChannel metaChannel;
     private ManagedChannel dataChannel;
     private ManagedChannel orchChannel;
 
     public TracMetadataApiGrpc.TracMetadataApiFutureStub metaClientFuture() {
         var client = TracMetadataApiGrpc.newFutureStub(metaChannel);
-        return ClientAuthProvider.applyIfAvailable(client, authToken);
+        return clientConcerns.configureClient(client);
     }
 
     public TracMetadataApiGrpc.TracMetadataApiBlockingStub metaClientBlocking() {
         var client = TracMetadataApiGrpc.newBlockingStub(metaChannel);
-        return ClientAuthProvider.applyIfAvailable(client, authToken);
+        return clientConcerns.configureClient(client);
     }
 
     public TrustedMetadataApiGrpc.TrustedMetadataApiBlockingStub metaClientTrustedBlocking() {
         var client = TrustedMetadataApiGrpc.newBlockingStub(metaChannel);
-        return ClientAuthProvider.applyIfAvailable(client, authToken);
+        return clientConcerns.configureClient(client);
     }
 
     public TracDataApiGrpc.TracDataApiStub dataClient() {
         var client = TracDataApiGrpc.newStub(dataChannel);
-        return ClientAuthProvider.applyIfAvailable(client, authToken);
+        return clientConcerns.configureClient(client);
     }
 
     public TracDataApiGrpc.TracDataApiBlockingStub dataClientBlocking() {
         var client = TracDataApiGrpc.newBlockingStub(dataChannel);
-        return ClientAuthProvider.applyIfAvailable(client, authToken);
+        return clientConcerns.configureClient(client);
     }
 
     public TracOrchestratorApiGrpc.TracOrchestratorApiBlockingStub orchClientBlocking() {
         var client = TracOrchestratorApiGrpc.newBlockingStub(orchChannel);
-        return ClientAuthProvider.applyIfAvailable(client, authToken);
+        return clientConcerns.configureClient(client);
     }
 
     public String platformConfigUrl() {
@@ -240,8 +234,9 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         prepareConfig();
         preparePlugins();
 
-        if (!platformConfig.getAuthentication().getDisableAuth())
-            prepareAuth();
+        // If the config is using secrets, init the secret store
+        if (platformConfig.containsConfig(ConfigKeys.SECRET_URL_KEY))
+            prepareSecrets();
 
         if (runDbDeploy)
             prepareDatabase();
@@ -356,6 +351,19 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         platformConfig = configManager.loadRootConfigObject(PlatformConfig.class);
     }
 
+    void prepareSecrets() {
+
+        log.info("Running secret tool to prepare secrets...");
+
+        // Running the secret tool will create the secrets file so it is available for loading
+
+        var secretTasks = new ArrayList<StandardArgs.Task>();
+        secretTasks.add(StandardArgs.task(SecretTool.INIT_SECRETS, List.of(), "Init secret store"));
+        ServiceHelpers.runAuthTool(tracDir, platformConfigUrl, secretKey, secretTasks);
+
+        configManager.prepareSecrets();
+    }
+
     private String getCurrentGitOrigin() throws Exception {
 
         var pb = new ProcessBuilder();
@@ -376,34 +384,6 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         finally {
             proc.destroy();
         }
-    }
-
-    void prepareAuth() {
-
-        log.info("Running auth tool to set up root authentication keys...");
-
-        // Running the auth tool will create the secrets file and add the public / private keys for auth
-
-        var authTasks = new ArrayList<StandardArgs.Task>();
-        authTasks.add(StandardArgs.task(SecretTool.CREATE_ROOT_AUTH_KEY, List.of("EC", "256"), ""));
-        ServiceHelpers.runAuthTool(tracDir, platformConfigUrl, secretKey, authTasks);
-
-        // Authentication is mandatory, so we need to build a token in order to test at the API level
-        // To create a valid token, we need to get the auth signing keys out of the secrets file
-        // Tokens must be signed with the same key used by the platform services
-
-        configManager.prepareSecrets();
-
-        var authConfig = platformConfig.getAuthentication();
-        var jwt = JwtSetup.createProcessor(platformConfig, configManager);
-
-        var userInfo = new UserInfo();
-        userInfo.setUserId("platform_testing");
-        userInfo.setDisplayName("Platform testing user");
-
-        var session = SessionBuilder.newSession(userInfo, authConfig);
-
-        authToken = jwt.encodeToken(session);
     }
 
     void prepareDatabase() {
@@ -467,11 +447,11 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
 
         // TODO: Allow running whole-platform tests over different backend configurations
 
-        if (startData) {
+        if (hasDataSvc()) {
             Files.createDirectory(tracDir.resolve("unit_test_storage"));
         }
 
-        if (startOrch && localExecutor) {
+        if (hasOrchSvc() && localExecutor) {
 
             var venvDir = tracExecDir.resolve("venv").normalize();
 
@@ -519,49 +499,38 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
 
     void startServices() {
 
-        if (startAuth)
-            authSvc = ServiceHelpers.startService(TracAuthenticationService.class, tracDir, platformConfigUrl, secretKey);
-
-        if (startMeta)
-            metaSvc = ServiceHelpers.startService(TracMetadataService.class, tracDir, platformConfigUrl, secretKey);
-
-        if (startData)
-            dataSvc = ServiceHelpers.startService(TracDataService.class, tracDir, platformConfigUrl, secretKey);
-
-        if (startOrch)
-            orchSvc = ServiceHelpers.startService(TracOrchestratorService.class, tracDir, platformConfigUrl, secretKey);
-
-        if (startGateway)
-            gatewaySvc = ServiceHelpers.startService(TracPlatformGateway.class, tracDir, platformConfigUrl, secretKey);
+        for (var serviceClass : serviceClasses) {
+            var service = ServiceHelpers.startService(serviceClass, tracDir, platformConfigUrl, secretKey);
+            services.add(service);
+        }
     }
 
     void stopServices() {
 
-        if (gatewaySvc != null)
-            gatewaySvc.stop();
+        var iter = services.listIterator();
 
-        if (orchSvc != null)
-            orchSvc.stop();
+        while (iter.hasNext()) {
 
-        if (dataSvc != null)
-            dataSvc.stop();
-
-        if (metaSvc != null)
-            metaSvc.stop();
-
-        if (authSvc != null)
-            authSvc.stop();
+            try {
+                var service = iter.next();
+                service.stop();
+                iter.remove();
+            }
+            catch (Exception e) {
+                log.error("Error stopping service: {}", e.getMessage(), e);
+            }
+        }
     }
 
     void startClients() {
 
-        if (startMeta)
+        if (hasMetaSvc())
             metaChannel = channelForService(platformConfig, ConfigKeys.METADATA_SERVICE_KEY);
 
-        if (startData)
+        if (hasDataSvc())
             dataChannel = channelForService(platformConfig, ConfigKeys.DATA_SERVICE_KEY);
 
-        if (startOrch)
+        if (hasOrchSvc())
             orchChannel = channelForService(platformConfig, ConfigKeys.ORCHESTRATOR_SERVICE_KEY);
     }
 

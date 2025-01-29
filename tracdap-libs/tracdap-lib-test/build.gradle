@@ -31,31 +31,20 @@ dependencies {
     api project(":tracdap-api-services")
 
     api project(':tracdap-lib-common')
-    api project(':tracdap-lib-auth')
     api project(':tracdap-lib-db')
     api project(':tracdap-lib-data')
 
     // Include the proto extension test files
     api project(':tracdap-lib-test-proto')
 
-    // Tests need the ability to spin up instances of the TRAC services to test against
-    api project(':tracdap-svc-auth')
-    api project(':tracdap-svc-meta')
-    api project(':tracdap-svc-data')
-    api project(':tracdap-svc-orch')
-    api project(':tracdap-gateway')
-
     // Give tests access to the deploy tools to set up services for integration
     api project(':deploy-metadb')
     api project(':secret-tool')
 
-    implementation group: 'org.junit.jupiter', name: 'junit-jupiter-api', version: "$junit_version"
-    implementation group: 'org.junit.jupiter', name: 'junit-jupiter-params', version: "$junit_version"
+    // Use Jupiter API to define test extensions
+    api group: 'org.junit.jupiter', name: 'junit-jupiter-api', version: "$junit_version"
 
-    implementation group: 'io.netty', name: 'netty-common', version: "$netty_version"
-    implementation group: 'io.netty', name: 'netty-codec-http', version: "$netty_version"
-    implementation group: 'io.netty', name: 'netty-codec-http2', version: "$netty_version"
-    implementation group: 'io.netty', name: 'netty-handler-proxy', version: "$netty_version"
+    // Embedded test services run on gRPC with Netty
     implementation group: 'io.grpc', name: 'grpc-netty', version: "$grpc_version"
 
     // Apache Arrow data framework

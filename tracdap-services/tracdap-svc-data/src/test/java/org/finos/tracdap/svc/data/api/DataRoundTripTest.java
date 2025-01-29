@@ -23,6 +23,8 @@ import org.finos.tracdap.common.async.Flows;
 import org.finos.tracdap.common.data.IExecutionContext;
 import org.finos.tracdap.common.util.ResourceHelpers;
 import org.finos.tracdap.metadata.*;
+import org.finos.tracdap.svc.data.TracDataService;
+import org.finos.tracdap.svc.meta.TracMetadataService;
 import org.finos.tracdap.test.data.DataApiTestHelpers;
 import org.finos.tracdap.test.data.SampleData;
 import org.finos.tracdap.test.helpers.PlatformTest;
@@ -71,8 +73,8 @@ abstract class DataRoundTripTest {
         public static final PlatformTest platform = PlatformTest.forConfig(TRAC_CONFIG_UNIT)
                 .runDbDeploy(true)
                 .addTenant(TEST_TENANT)
-                .startMeta()
-                .startData()
+                .startService(TracMetadataService.class)
+                .startService(TracDataService.class)
                 .build();
 
         @BeforeAll
@@ -100,8 +102,8 @@ abstract class DataRoundTripTest {
                 .runDbDeploy(true)
                 .manageDataPrefix(true)
                 .addTenant(TEST_TENANT)
-                .startMeta()
-                .startData()
+                .startService(TracMetadataService.class)
+                .startService(TracDataService.class)
                 .build();
 
         @BeforeAll

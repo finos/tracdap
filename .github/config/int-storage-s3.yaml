@@ -25,16 +25,6 @@ platformInfo:
     region: UK
 
 
-authentication:
-  jwtIssuer: http://localhost/
-  jwtExpiry: 7200
-  provider:
-    protocol: guest
-    properties:
-      userId: guest
-      userName: Guest User
-
-
 # Stick with H2 database for storage integration testing
 metadata:
   format: PROTO

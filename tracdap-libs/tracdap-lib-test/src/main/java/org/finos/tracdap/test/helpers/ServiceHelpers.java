@@ -25,7 +25,6 @@ import org.finos.tracdap.common.startup.StandardArgs;
 import org.finos.tracdap.common.startup.Startup;
 import org.finos.tracdap.tools.secrets.SecretTool;
 import org.finos.tracdap.tools.deploy.metadb.DeployMetaDB;
-import org.finos.tracdap.svc.meta.TracMetadataService;
 
 import java.lang.reflect.InvocationTargetException;
 import java.net.URL;
@@ -67,7 +66,7 @@ public class ServiceHelpers {
         try {
 
             var startup = Startup.useConfigFile(
-                    TracMetadataService.class, workingDir,
+                    serviceClass, workingDir,
                     configPath.toString(), keystoreKey);
 
             startup.runStartupSequence();

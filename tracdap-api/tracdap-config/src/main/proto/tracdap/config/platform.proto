@@ -34,8 +34,6 @@ message PlatformConfig {
 
   PlatformInfo platformInfo = 2;
 
-  AuthenticationConfig authentication = 5;
-
   MetadataConfig metadata = 6;
 
   StorageConfig storage = 7;

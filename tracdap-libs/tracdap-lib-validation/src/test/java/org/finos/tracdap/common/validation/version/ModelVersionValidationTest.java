@@ -20,7 +20,7 @@ package org.finos.tracdap.common.validation.version;
 import org.finos.tracdap.common.metadata.TypeSystem;
 import org.finos.tracdap.common.validation.test.BaseValidatorTest;
 import org.finos.tracdap.metadata.*;
-import org.finos.tracdap.test.meta.TestData;
+import org.finos.tracdap.test.meta.SampleMetadata;
 import org.junit.jupiter.api.Test;
 
 
@@ -33,7 +33,7 @@ class ModelVersionValidationTest extends BaseValidatorTest {
     @Test
     void versionChangesModelType() {
 
-        var modelV1 = TestData.dummyModelDef();
+        var modelV1 = SampleMetadata.dummyModelDef();
 
         var modelV2 = modelV1.toBuilder()
                 .setModel(modelV1.getModel().toBuilder()
@@ -46,7 +46,7 @@ class ModelVersionValidationTest extends BaseValidatorTest {
     @Test
     void versionChangesModelLanguage() {
 
-        var modelV1 = TestData.dummyModelDef();
+        var modelV1 = SampleMetadata.dummyModelDef();
 
         var modelV2 = modelV1.toBuilder()
                 .setModel(modelV1.getModel().toBuilder()
@@ -59,7 +59,7 @@ class ModelVersionValidationTest extends BaseValidatorTest {
     @Test
     void versionChangesModelCoordinates() {
 
-        var modelV1 = TestData.dummyModelDef();
+        var modelV1 = SampleMetadata.dummyModelDef();
 
         var modelV2 = modelV1.toBuilder()
                 .setModel(modelV1.getModel().toBuilder()
@@ -73,7 +73,7 @@ class ModelVersionValidationTest extends BaseValidatorTest {
     @Test
     void versionAddsParameter() {
 
-        var modelV1 = TestData.dummyModelDef();
+        var modelV1 = SampleMetadata.dummyModelDef();
 
         var modelV2 = modelV1.toBuilder()
                 .setModel(modelV1.getModel().toBuilder()
@@ -89,7 +89,7 @@ class ModelVersionValidationTest extends BaseValidatorTest {
     @Test
     void versionChangesParameter() {
 
-        var modelV1 = TestData.dummyModelDef();
+        var modelV1 = SampleMetadata.dummyModelDef();
 
         var param1 = modelV1.getModel().getParametersOrThrow("param1");
         var param1V2 = param1.toBuilder()
@@ -107,7 +107,7 @@ class ModelVersionValidationTest extends BaseValidatorTest {
     @Test
     void versionAddsInput() {
 
-        var modelV1 = TestData.dummyModelDef();
+        var modelV1 = SampleMetadata.dummyModelDef();
 
         var newInput = ModelInputSchema.newBuilder()
                 .setSchema(SchemaDefinition.newBuilder()
@@ -129,7 +129,7 @@ class ModelVersionValidationTest extends BaseValidatorTest {
     @Test
     void versionAddsInputField() {
 
-        var modelV1 = TestData.dummyModelDef();
+        var modelV1 = SampleMetadata.dummyModelDef();
 
         var input1 = modelV1.getModel().getInputsOrThrow("input1");
         var input1V2 = input1.toBuilder()
@@ -151,7 +151,7 @@ class ModelVersionValidationTest extends BaseValidatorTest {
     @Test
     void versionChangesInputField() {
 
-        var modelV1 = TestData.dummyModelDef();
+        var modelV1 = SampleMetadata.dummyModelDef();
 
         var input1 = modelV1.getModel().getInputsOrThrow("input1");
         var field1 = input1.getSchema().getTable().getFields(0);
@@ -173,7 +173,7 @@ class ModelVersionValidationTest extends BaseValidatorTest {
     @Test
     void versionAddsOutput() {
 
-        var modelV1 = TestData.dummyModelDef();
+        var modelV1 = SampleMetadata.dummyModelDef();
 
         var newOutput = ModelOutputSchema.newBuilder()
                 .setSchema(SchemaDefinition.newBuilder()
@@ -195,7 +195,7 @@ class ModelVersionValidationTest extends BaseValidatorTest {
     @Test
     void versionAddsOutputField() {
 
-        var modelV1 = TestData.dummyModelDef();
+        var modelV1 = SampleMetadata.dummyModelDef();
 
         var output1 = modelV1.getModel().getOutputsOrThrow("output1");
         var output1V2 = output1.toBuilder()
@@ -217,7 +217,7 @@ class ModelVersionValidationTest extends BaseValidatorTest {
     @Test
     void versionChangesOutputField() {
 
-        var modelV1 = TestData.dummyModelDef();
+        var modelV1 = SampleMetadata.dummyModelDef();
 
         var output1 = modelV1.getModel().getOutputsOrThrow("output1");
         var field1 = output1.getSchema().getTable().getFields(0);

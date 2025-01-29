@@ -42,7 +42,6 @@ project(":tracdap-api-services").projectDir = file("tracdap-api/tracdap-services
 
 include 'tracdap-lib-annotations'
 include 'tracdap-lib-common'
-include 'tracdap-lib-auth'
 include 'tracdap-lib-validation'
 include 'tracdap-lib-db'
 include 'tracdap-lib-data'
@@ -52,7 +51,6 @@ include 'tracdap-lib-test-proto'
 
 project(":tracdap-lib-annotations").projectDir = file("tracdap-libs/tracdap-lib-annotations")
 project(":tracdap-lib-common").projectDir = file("tracdap-libs/tracdap-lib-common")
-project(":tracdap-lib-auth").projectDir = file("tracdap-libs/tracdap-lib-auth")
 project(":tracdap-lib-validation").projectDir = file("tracdap-libs/tracdap-lib-validation")
 project(":tracdap-lib-db").projectDir = file("tracdap-libs/tracdap-lib-db")
 project(":tracdap-lib-data").projectDir = file("tracdap-libs/tracdap-lib-data")
@@ -63,13 +61,11 @@ project(":tracdap-lib-test-proto").projectDir = file("tracdap-libs/tracdap-lib-t
 
 // Java services
 
-include 'tracdap-svc-auth'
 include 'tracdap-svc-meta'
 include 'tracdap-svc-data'
 include 'tracdap-svc-orch'
 include 'tracdap-gateway'
 
-project(":tracdap-svc-auth").projectDir = file("tracdap-services/tracdap-svc-auth")
 project(":tracdap-svc-meta").projectDir = file("tracdap-services/tracdap-svc-meta")
 project(":tracdap-svc-data").projectDir = file("tracdap-services/tracdap-svc-data")
 project(":tracdap-svc-orch").projectDir = file("tracdap-services/tracdap-svc-orch")
@@ -90,14 +86,12 @@ project(":secret-tool").projectDir = file("tracdap-tools/secret-tool")
 
 include 'sql-drivers'
 include 'aws-storage'
-include 'gcp-config'
 include 'gcp-storage'
 include 'azure-storage'
 include 'ssh-executor'
 
 project(":sql-drivers").projectDir = file("tracdap-plugins/sql-drivers")
 project(":aws-storage").projectDir = file("tracdap-plugins/aws-storage")
-project(":gcp-config").projectDir = file("tracdap-plugins/gcp-config")
 project(":gcp-storage").projectDir = file("tracdap-plugins/gcp-storage")
 project(":azure-storage").projectDir = file("tracdap-plugins/azure-storage")
 project(":ssh-executor").projectDir = file("tracdap-plugins/ssh-executor")

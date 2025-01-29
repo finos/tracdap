@@ -21,9 +21,6 @@ platformInfo:
   environment: UNIT_TESTS
   production: false
 
-authentication:
-  disableAuth: true
-
 gateway:
 
   routes:
@@ -90,14 +87,12 @@ gateway:
 services:
   gateway:
     port: 8080
-  authentication:
-    port: 8081
   metadata:
-    port: 8082
+    port: 8081
   data:
-    port: 8083
+    port: 8082
   orchestrator:
-    port: 8084
+    port: 8083
 
 
 deployment:

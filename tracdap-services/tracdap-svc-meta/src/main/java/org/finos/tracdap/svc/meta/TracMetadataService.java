@@ -65,8 +65,6 @@ public class TracMetadataService extends TracServiceBase {
     // It would be good to tie this into health reporting and load balancing
     // That is not for this first quick implementation!
 
-    private static final Duration METADATA_OPERATION_TIMEOUT = Duration.of(30, ChronoUnit.SECONDS);
-
     private static final String POOL_SIZE_KEY = "pool.size";
     private static final String POOL_OVERFLOW_KEY = "pool.overflow";
 
@@ -126,7 +124,7 @@ public class TracMetadataService extends TracServiceBase {
             var trustedApi = new TrustedMetadataApi(readService, writeService, searchService);
 
             // Common framework for cross-cutting concerns
-            var commonConcerns = buildCommonConcerns(configManager, pluginManager);
+            var commonConcerns = buildCommonConcerns();
 
             // Create the main server
             // This setup is thread-per-request using a thread pool executor
@@ -176,20 +174,17 @@ public class TracMetadataService extends TracServiceBase {
         return 0;
     }
 
-    private GrpcConcern buildCommonConcerns(ConfigManager configManager, PluginManager pluginManager) {
+    private GrpcConcern buildCommonConcerns() {
 
         var commonConcerns = TracServiceConfig.coreConcerns(TracMetadataService.class);
 
-        var authConcern = new TracServiceConfig.Authentication(configManager, METADATA_OPERATION_TIMEOUT);
-        commonConcerns.addAfter(TracServiceConfig.TRAC_PROTOCOL, authConcern);
-
         // Validation concern for the APIs being served
         var validationConcern = new ValidationConcern(MetadataServiceProto.getDescriptor(), MetadataTrustedProto.getDescriptor());
-        commonConcerns = commonConcerns.addAfter(TracServiceConfig.TRAC_AUTHENTICATION, validationConcern);
+        commonConcerns = commonConcerns.addAfter(TracServiceConfig.TRAC_PROTOCOL, validationConcern);
 
         // Additional cross-cutting concerns configured by extensions
         for (var extension : pluginManager.getExtensions()) {
-            commonConcerns = extension.addServiceConcerns(commonConcerns);
+            commonConcerns = extension.addServiceConcerns(commonConcerns, configManager, ConfigKeys.METADATA_SERVICE_KEY);
         }
 
         return commonConcerns.build();

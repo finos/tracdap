@@ -300,8 +300,8 @@ public class SecretTool {
             var armoredPublicKey = CryptoHelpers.encodePublicKey(keyPair.getPublic(), true);
             var armoredPrivateKey = CryptoHelpers.encodePrivateKey(keyPair.getPrivate(), true);
 
-            var publicKeyPath = configDir.resolve(ConfigKeys.TRAC_AUTH_PUBLIC_KEY + ".pem");
-            var privateKeyPath = configDir.resolve(ConfigKeys.TRAC_AUTH_PRIVATE_KEY + ".pem");
+            var publicKeyPath = configDir.resolve(JksHelpers.TRAC_AUTH_PUBLIC_KEY + ".pem");
+            var privateKeyPath = configDir.resolve(JksHelpers.TRAC_AUTH_PRIVATE_KEY + ".pem");
 
             if (Files.exists(publicKeyPath))
                 log.error("Key file already exists: {}", publicKeyPath);

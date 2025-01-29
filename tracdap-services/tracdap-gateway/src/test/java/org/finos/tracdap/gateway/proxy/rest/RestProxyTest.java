@@ -18,6 +18,8 @@
 package org.finos.tracdap.gateway.proxy.rest;
 
 import org.finos.tracdap.api.*;
+import org.finos.tracdap.gateway.TracPlatformGateway;
+import org.finos.tracdap.svc.meta.TracMetadataService;
 import org.finos.tracdap.test.http.Http1Client;
 import org.finos.tracdap.metadata.Tag;
 import org.finos.tracdap.metadata.TagHeader;
@@ -46,8 +48,8 @@ import java.util.Random;
 import java.util.UUID;
 
 import static io.netty.util.NetUtil.LOCALHOST;
-import static org.finos.tracdap.test.meta.TestData.TEST_TENANT;
-import static org.finos.tracdap.test.meta.TestData.selectorForTag;
+import static org.finos.tracdap.test.meta.SampleMetadata.TEST_TENANT;
+import static org.finos.tracdap.test.meta.SampleMetadata.selectorForTag;
 
 
 public class RestProxyTest {
@@ -60,8 +62,8 @@ public class RestProxyTest {
     @RegisterExtension
     public static final PlatformTest platform = PlatformTest.forConfig(TRAC_CONFIG_UNIT)
             .addTenant(TEST_TENANT)
-            .startMeta()
-            .startGateway()
+            .startService(TracMetadataService.class)
+            .startService(TracPlatformGateway.class)
             .build();
 
     private static final Path tracRepoDir = ResourceHelpers.findTracProjectRoot();

@@ -27,7 +27,7 @@ import org.finos.tracdap.test.helpers.PlatformTest;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
-import static org.finos.tracdap.test.meta.TestData.TEST_TENANT;
+import static org.finos.tracdap.test.meta.SampleMetadata.TEST_TENANT;
 
 
 abstract class InfoAndResourcesTest {
@@ -43,7 +43,7 @@ abstract class InfoAndResourcesTest {
         @RegisterExtension
         private static final PlatformTest platform = PlatformTest.forConfig(TRAC_CONFIG_UNIT)
                 .addTenant(TEST_TENANT)
-                .startMeta()
+                .startService(TracMetadataService.class)
                 .build();
 
         @BeforeEach
@@ -66,7 +66,7 @@ abstract class InfoAndResourcesTest {
         private static final PlatformTest platform = PlatformTest.forConfig(TRAC_CONFIG_ENV_FILE)
                 .addTenant(TEST_TENANT)
                 .runDbDeploy(false)
-                .startMeta()
+                .startService(TracMetadataService.class)
                 .build();
 
         @BeforeEach

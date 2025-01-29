@@ -24,19 +24,6 @@ platformInfo:
   production: false
 
 
-authentication:
-
-  jwtIssuer: http://localhost:8080/
-  jwtExpiry: 7200
-  jwtLimit: 57600
-
-  provider:
-    protocol: guest
-    properties:
-      userId: guest
-      userName: Guest User
-
-
 metadata:
   format: PROTO
   database:
@@ -112,17 +99,14 @@ services:
     properties:
       network.idleTimeout: 10
 
-  authentication:
+  metadata:
     port: 8081
 
-  metadata:
+  data:
     port: 8082
 
-  data:
-    port: 8083
-
   orchestrator:
-    port: 8084
+    port: 8083
 
 
 deployment:

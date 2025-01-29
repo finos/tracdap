@@ -15,17 +15,12 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.config;
+package org.finos.tracdap.svc.meta.test;
+
+import org.finos.tracdap.svc.meta.dal.IMetadataDal;
 
 
-public class ConfigDefaults {
+public interface IDalTestable {
 
-    // Really we should mark these defaults up in the .proto files for the config
-    // Defaults and validation can both be done using protobuf extensions
-    // (not sure if they call it something else now)!
-    // Also, we could get the same behavior across different coding languages that way...
-
-    // For now, here are some config defaults!
-
-    public static final int NETWORK_IDLE_TIMEOUT = 30;  // seconds
+    void setDal(IMetadataDal dal);
 }

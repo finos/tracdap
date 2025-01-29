@@ -25,15 +25,6 @@ platformInfo:
   deploymentInfo:
     region: UK
 
-authentication:
-  jwtIssuer: http://localhost/
-  jwtExpiry: 7200
-  provider:
-    protocol: guest
-    properties:
-      userId: guest
-      userName: Guest User
-
 metadata:
   format: PROTO
   database:
