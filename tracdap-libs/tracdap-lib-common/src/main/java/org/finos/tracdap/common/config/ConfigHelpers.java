@@ -19,6 +19,7 @@ package org.finos.tracdap.common.config;
 
 import org.finos.tracdap.common.exception.EStartup;
 
+import java.util.Map;
 import java.util.Properties;
 
 
@@ -28,6 +29,12 @@ public class ConfigHelpers {
     private static final String BOOLEAN_FALSE = Boolean.FALSE.toString();
 
     public static String readString(String context, Properties properties, String key) {
+        return readString(context, properties, key, true);
+    }
+
+    public static String readString(String context, Map<String, String> propertiesMap, String key) {
+        var properties = new Properties();
+        properties.putAll(propertiesMap);
         return readString(context, properties, key, true);
     }
 
