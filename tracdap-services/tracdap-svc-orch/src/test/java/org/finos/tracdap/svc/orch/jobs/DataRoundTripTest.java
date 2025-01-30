@@ -110,6 +110,7 @@ public abstract class DataRoundTripTest {
 
     @RegisterExtension
     public final PlatformTest platform = PlatformTest.forConfig(E2E_CONFIG)
+            .runDbDeploy(true)
             .addTenant(TEST_TENANT)
             .storageFormat(storageFormat())
             .prepareLocalExecutor(true)
