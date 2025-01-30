@@ -57,6 +57,7 @@ import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 
 
 public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
@@ -81,6 +82,7 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
     private final Logger log = LoggerFactory.getLogger(getClass());
 
     private final String testConfig;
+    private final Consumer<URL> modifyConfigFunc;
     private final List<String> tenants;
     private final String storageFormat;
 
@@ -93,12 +95,14 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
     private final GrpcConcern clientConcerns;
 
     private PlatformTest(
-            String testConfig, List<String> tenants, String storageFormat,
+            String testConfig, Consumer<URL> modifyConfigFunc,
+            List<String> tenants, String storageFormat,
             boolean runDbDeploy, boolean manageDataPrefix, boolean localExecutor,
             List<Class<? extends TracServiceBase>> serviceClasses,
             GrpcConcern clientConcerns) {
 
         this.testConfig = testConfig;
+        this.modifyConfigFunc = modifyConfigFunc;
         this.tenants = tenants;
         this.storageFormat = storageFormat;
         this.runDbDeploy = runDbDeploy;
@@ -130,6 +134,7 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
     public static class Builder {
 
         private String testConfig;
+        private Consumer<URL> modifyConfigFunc;
         private final List<String> tenants = new ArrayList<>();
         private String storageFormat = DEFAULT_STORAGE_FORMAT;
         private boolean runDbDeploy = true;  // Run DB deploy by default
@@ -140,6 +145,7 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
 
         // Should client concerns be pre-configured? If so what is the right configuration for testing?
 
+        public Builder modifyConfig(Consumer<URL> modifyConfigFunc) { this.modifyConfigFunc = modifyConfigFunc; return this; }
         public Builder addTenant(String testTenant) { this.tenants.add(testTenant); return this; }
         public Builder storageFormat(String storageFormat) { this.storageFormat = storageFormat; return this; }
         public Builder runDbDeploy(boolean runDbDeploy) { this.runDbDeploy = runDbDeploy; return this; }
@@ -151,7 +157,7 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         public PlatformTest build() {
 
             return new PlatformTest(
-                    testConfig, tenants, storageFormat,
+                    testConfig, modifyConfigFunc, tenants, storageFormat,
                     runDbDeploy, manageDataPrefix, localExecutor,
                     serviceClasses, clientConcerns.build());
         }
@@ -334,6 +340,9 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         var configOutputs = ConfigHelpers.prepareConfig(configInputs, tracDir, substitutions);
         platformConfigUrl = configOutputs.get(0);
 
+        if (modifyConfigFunc != null)
+            modifyConfigFunc.accept(platformConfigUrl);
+
         // The Secret key is used for storing and accessing secrets
         // If secrets are set up externally, a key can be passed in the env to access the secret store
         // Otherwise the default is used, which is fine if the store is being initialised here
@@ -368,7 +377,6 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         }
 
         configManager.prepareSecrets();
-
         pluginManager.initRegularPlugins();
     }
 
