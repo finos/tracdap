@@ -61,6 +61,7 @@ public class RestProxyTest {
 
     @RegisterExtension
     public static final PlatformTest platform = PlatformTest.forConfig(TRAC_CONFIG_UNIT)
+            .runDbDeploy(true)
             .addTenant(TEST_TENANT)
             .startService(TracMetadataService.class)
             .startService(TracPlatformGateway.class)

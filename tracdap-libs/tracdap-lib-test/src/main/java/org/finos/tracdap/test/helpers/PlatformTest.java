@@ -47,6 +47,7 @@ import org.junit.jupiter.api.extension.ExtensionContext;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.URI;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -56,6 +57,7 @@ import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 
 
 public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
@@ -90,12 +92,13 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
     private final List<Class<? extends TracServiceBase>> serviceClasses;
     private final List<TracServiceBase> services;
     private final GrpcConcern clientConcerns;
+    private final List<Consumer<PlatformTest>> preStartActions;
 
     private PlatformTest(
-            String testConfig, List<String> tenants, String storageFormat,
+            String testConfig, String secretKey, List<String> tenants, String storageFormat,
             boolean runDbDeploy, boolean manageDataPrefix, boolean localExecutor,
             List<Class<? extends TracServiceBase>> serviceClasses,
-            GrpcConcern clientConcerns) {
+            GrpcConcern clientConcerns, List<Consumer<PlatformTest>> preStartActions) {
 
         this.testConfig = testConfig;
         this.tenants = tenants;
@@ -106,11 +109,20 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         this.serviceClasses = serviceClasses;
         this.services = new ArrayList<>(serviceClasses.size());
         this.clientConcerns = clientConcerns;
+        this.preStartActions = preStartActions;
+
+        // Secret key can be set here, otherwise it is discovered later
+        this.secretKey = secretKey;
     }
 
     public static Builder forConfig(String testConfig) {
+        return forConfig(testConfig, "");
+    }
+
+    public static Builder forConfig(String testConfig, String secretKey) {
         var builder = new Builder();
         builder.testConfig = testConfig;
+        builder.secretKey = secretKey;
         return builder;
     }
 
@@ -129,13 +141,15 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
     public static class Builder {
 
         private String testConfig;
+        private String secretKey;
         private final List<String> tenants = new ArrayList<>();
         private String storageFormat = DEFAULT_STORAGE_FORMAT;
-        private boolean runDbDeploy = true;  // Run DB deploy by default
+        private boolean runDbDeploy = false;
         private boolean manageDataPrefix = false;
         private boolean localExecutor = false;
         private final List<Class<? extends TracServiceBase>> serviceClasses = new ArrayList<>();
         private final CommonConcerns<GrpcConcern> clientConcerns = new CommonGrpcConcerns("client_concerns");
+        private final List<Consumer<PlatformTest>> preStartActions = new ArrayList<>();
 
         // Should client concerns be pre-configured? If so what is the right configuration for testing?
 
@@ -145,21 +159,22 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         public Builder manageDataPrefix(boolean manageDataPrefix) { this.manageDataPrefix = manageDataPrefix; return this; }
         public Builder prepareLocalExecutor(boolean localExecutor) { this.localExecutor = localExecutor; return this; }
         public Builder startService(Class<? extends TracServiceBase> serviceClass) { this.serviceClasses.add(serviceClass); return this; }
-        public Builder withClientConcern(GrpcConcern concern) { clientConcerns.addLast(concern); return this; }
+        public Builder clientConcern(GrpcConcern concern) { clientConcerns.addLast(concern); return this; }
+        public Builder preStartAction(Consumer<PlatformTest> action) { this.preStartActions.add(action); return this; }
 
         public PlatformTest build() {
 
             return new PlatformTest(
-                    testConfig, tenants, storageFormat,
+                    testConfig, secretKey, tenants, storageFormat,
                     runDbDeploy, manageDataPrefix, localExecutor,
-                    serviceClasses, clientConcerns.build());
+                    serviceClasses, clientConcerns.build(), preStartActions);
         }
     }
 
     private String testId;
-    private Path tracDir;
-    private Path tracStorageDir;
-    private Path tracExecDir;
+    private Path workingDir;
+    private Path storageDir;
+    private Path executorDir;
     private Path tracRepoDir;
     private URL platformConfigUrl;
     private String secretKey;
@@ -201,20 +216,16 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         return clientConcerns.configureClient(client);
     }
 
-    public String platformConfigUrl() {
-        return platformConfigUrl.toString();
-    }
-
-    public PlatformConfig platformConfig() {
-        return platformConfig;
-    }
-
-    public Path tracDir() {
-        return tracDir;
+    public Path workingDir() {
+        return workingDir;
     }
 
     public Path tracRepoDir() {
         return tracRepoDir;
+    }
+
+    public URL platformConfigUrl() {
+        return platformConfigUrl;
     }
 
     public PluginManager pluginManager() {
@@ -225,21 +236,24 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         return configManager;
     }
 
+    public PlatformConfig platformConfig() {
+        return platformConfig;
+    }
+
     @Override
     public void beforeAll(ExtensionContext context) throws Exception {
 
         setTestId();
-
         findDirectories();
-        prepareConfig();
-        preparePlugins();
+        createTestConfig();
+        runPreStartActions();
 
-        // If the config is using secrets, init the secret store
-        if (platformConfig.containsConfig(ConfigKeys.SECRET_URL_KEY))
-            prepareSecrets();
+        loadPluginsAndConfig();
 
         if (runDbDeploy)
             prepareDatabase();
+
+        prepareDataAndExecutor();
 
         if (manageDataPrefix)
             prepareDataPrefix();
@@ -270,14 +284,14 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
 
     void findDirectories() throws Exception {
 
-        tracDir = Files.createTempDirectory("trac_platform_test_");
+        workingDir = Files.createTempDirectory("trac_platform_test_");
 
-        tracStorageDir = tracDir.resolve(STORAGE_ROOT_DIR);
-        Files.createDirectory(tracStorageDir);
+        storageDir = workingDir.resolve(STORAGE_ROOT_DIR);
+        Files.createDirectory(storageDir);
 
-        tracExecDir = System.getenv().containsKey(TRAC_EXEC_DIR)
+        executorDir = System.getenv().containsKey(TRAC_EXEC_DIR)
                 ? Paths.get(System.getenv(TRAC_EXEC_DIR))
-                : tracDir;
+                : workingDir;
 
         tracRepoDir = Paths.get(".").toAbsolutePath();
 
@@ -287,7 +301,7 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
 
     void cleanupDirectories() {
 
-        try (var walk = Files.walk(tracDir)) {
+        try (var walk = Files.walk(workingDir)) {
 
             walk.sorted(Comparator.reverseOrder())
                     .map(Path::toFile)
@@ -299,7 +313,7 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         }
     }
 
-    void prepareConfig() throws Exception {
+    void createTestConfig() throws Exception {
 
         log.info("Prepare config for platform testing...");
 
@@ -315,10 +329,10 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
 
         // The substitutions have some special handling in PlatformTest to set them up
         var staticSubstitutions = Map.of(
-                "${TRAC_DIR}", tracDir.toString().replace("\\", "\\\\"),
-                "${TRAC_STORAGE_DIR}", tracStorageDir.toString().replace("\\", "\\\\"),
+                "${TRAC_DIR}", workingDir.toString().replace("\\", "\\\\"),
+                "${TRAC_STORAGE_DIR}", storageDir.toString().replace("\\", "\\\\"),
                 "${TRAC_STORAGE_FORMAT}", storageFormat,
-                "${TRAC_EXEC_DIR}", tracExecDir.toString().replace("\\", "\\\\"),
+                "${TRAC_EXEC_DIR}", executorDir.toString().replace("\\", "\\\\"),
                 "${TRAC_LOCAL_REPO}", tracRepoDir.toString(),
                 "${TRAC_GIT_REPO}", currentGitOrigin,
                 "${TRAC_TEST_ID}", testId);
@@ -334,34 +348,56 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         }
 
         var configInputs = List.of(testConfig);
-        var configOutputs = ConfigHelpers.prepareConfig(configInputs, tracDir, substitutions);
+        var configOutputs = ConfigHelpers.prepareConfig(configInputs, workingDir, substitutions);
         platformConfigUrl = configOutputs.get(0);
 
         // The Secret key is used for storing and accessing secrets
         // If secrets are set up externally, a key can be passed in the env to access the secret store
         // Otherwise the default is used, which is fine if the store is being initialised here
-        var env = System.getenv();
-        secretKey = env.getOrDefault(SECRET_KEY_ENV_VAR, SECRET_KEY_DEFAULT);
+
+        if (secretKey == null || secretKey.isEmpty()) {
+            var env = System.getenv();
+            secretKey = env.getOrDefault(SECRET_KEY_ENV_VAR, SECRET_KEY_DEFAULT);
+        }
+    }
+
+    private void runPreStartActions() {
+
+        for (var action : preStartActions)
+            action.accept(this);
+    }
+
+    private void loadPluginsAndConfig() {
 
         pluginManager = new PluginManager();
         pluginManager.registerExtensions();
         pluginManager.initConfigPlugins();
 
-        configManager = new ConfigManager(platformConfigUrl.toString(), tracDir, pluginManager, secretKey);
+        configManager = new ConfigManager(platformConfigUrl.toString(), workingDir, pluginManager, secretKey);
         platformConfig = configManager.loadRootConfigObject(PlatformConfig.class);
-    }
 
-    void prepareSecrets() {
+        // If the config uses JKS secrets, create an empty store if none is provided
+        var secretType = platformConfig.containsConfig(ConfigKeys.SECRET_TYPE_KEY)
+                ? platformConfig.getConfigOrThrow(ConfigKeys.SECRET_TYPE_KEY)
+                : null;
 
-        log.info("Running secret tool to prepare secrets...");
+        if (secretType != null && List.of("PKCS12", "JCEKS").contains(secretType)) {
 
-        // Running the secret tool will create the secrets file so it is available for loading
+            var secretFile = platformConfig.getConfigOrThrow(ConfigKeys.SECRET_URL_KEY);
+            var secretUrl = configManager.resolveConfigFile(URI.create(secretFile));
 
-        var secretTasks = new ArrayList<StandardArgs.Task>();
-        secretTasks.add(StandardArgs.task(SecretTool.INIT_SECRETS, List.of(), "Init secret store"));
-        ServiceHelpers.runAuthTool(tracDir, platformConfigUrl, secretKey, secretTasks);
+            if (!Files.exists(Paths.get(secretUrl))) {
+
+                log.info("Running secret tool to create an empty secret store...");
+
+                var secretTasks = new ArrayList<StandardArgs.Task>();
+                secretTasks.add(StandardArgs.task(SecretTool.INIT_SECRETS, List.of(), "Init secret store"));
+                PlatformTestHelpers.runSecretTool(workingDir, platformConfigUrl, secretKey, secretTasks);
+            }
+        }
 
         configManager.prepareSecrets();
+        pluginManager.initRegularPlugins();
     }
 
     private String getCurrentGitOrigin() throws Exception {
@@ -403,23 +439,14 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
             databaseTasks.add(StandardArgs.task(DeployMetaDB.ALTER_TENANT_TASK, List.of(tenant, description), ""));
         }
 
-        ServiceHelpers.runDbDeploy(tracDir, platformConfigUrl, secretKey, databaseTasks);
+        PlatformTestHelpers.runDbDeploy(workingDir, platformConfigUrl, secretKey, databaseTasks);
     }
 
     void prepareDataPrefix() throws Exception {
 
         var elg = new NioEventLoopGroup(2);
 
-        var plugins = new PluginManager();
-        plugins.initConfigPlugins();
-        plugins.initRegularPlugins();
-
-        var config = new ConfigManager(
-                platformConfigUrl(),
-                tracDir(),
-                plugins);
-
-        StorageTestHelpers.createStoragePrefix(config, plugins, elg);
+        StorageTestHelpers.createStoragePrefix(configManager, pluginManager, elg);
 
         elg.shutdownGracefully();
     }
@@ -428,32 +455,22 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
 
         var elg = new NioEventLoopGroup(2);
 
-        var plugins = new PluginManager();
-        plugins.registerExtensions();
-        plugins.initConfigPlugins();
-        plugins.initRegularPlugins();
-
-        var config = new ConfigManager(
-                platformConfigUrl(),
-                tracDir(),
-                plugins);
-
-        StorageTestHelpers.deleteStoragePrefix(config, plugins, elg);
+        StorageTestHelpers.deleteStoragePrefix(configManager, pluginManager, elg);
 
         elg.shutdownGracefully();
     }
 
-    void preparePlugins() throws Exception {
+    void prepareDataAndExecutor() throws Exception {
 
         // TODO: Allow running whole-platform tests over different backend configurations
 
         if (hasDataSvc()) {
-            Files.createDirectory(tracDir.resolve("unit_test_storage"));
+            Files.createDirectory(workingDir.resolve("unit_test_storage"));
         }
 
         if (hasOrchSvc() && localExecutor) {
 
-            var venvDir = tracExecDir.resolve("venv").normalize();
+            var venvDir = executorDir.resolve("venv").normalize();
 
             if (Files.exists(venvDir)) {
 
@@ -462,7 +479,7 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
             else {
                 log.info("Creating a new venv: [{}]", venvDir);
 
-                var venvPath = tracDir.resolve("venv");
+                var venvPath = workingDir.resolve("venv");
                 var venvPb = new ProcessBuilder();
                 venvPb.command("python", "-m", "venv", venvPath.toString());
 
@@ -500,7 +517,7 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
     void startServices() {
 
         for (var serviceClass : serviceClasses) {
-            var service = ServiceHelpers.startService(serviceClass, tracDir, platformConfigUrl, secretKey);
+            var service = PlatformTestHelpers.startService(serviceClass, workingDir, platformConfigUrl, secretKey);
             services.add(service);
         }
     }

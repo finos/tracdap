@@ -93,16 +93,14 @@ public class TracGatewayConfig {
 
             if (protocol == SupportedProtocol.HTTP) {
 
-                // Keep alive handler will close connections not marked as keep-alive when a request is complete
-                var httpCodec = pipeline.context(HttpServerCodec.class);
-                pipeline.addAfter(httpCodec.name(), HTTP_1_KEEPALIVE, new HttpServerKeepAliveHandler());
-
-                priorStage = HTTP_1_KEEPALIVE;
+                // For HTTP/1 connections, keep-alive will always be present and is the last protocol stage
+                var httpKeepalive = pipeline.context(HttpServerKeepAliveHandler.class);
+                priorStage = httpKeepalive.name();
             }
             else if (protocol == SupportedProtocol.WEB_SOCKETS) {
 
+                // For Websockets, the WS protocol handler is the last protocol stage
                 var wsCodec = pipeline.context(WebSocketServerProtocolHandler.class);
-
                 priorStage = wsCodec.name();
             }
 

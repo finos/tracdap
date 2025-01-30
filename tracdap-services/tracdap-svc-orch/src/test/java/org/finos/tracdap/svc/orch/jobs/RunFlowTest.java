@@ -71,6 +71,7 @@ public class RunFlowTest {
 
     @RegisterExtension
     public static final PlatformTest platform = PlatformTest.forConfig(E2E_CONFIG)
+            .runDbDeploy(true)
             .addTenant(TEST_TENANT)
             .prepareLocalExecutor(true)
             .startService(TracMetadataService.class)
