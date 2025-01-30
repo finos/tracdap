@@ -144,7 +144,7 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         private String secretKey;
         private final List<String> tenants = new ArrayList<>();
         private String storageFormat = DEFAULT_STORAGE_FORMAT;
-        private boolean runDbDeploy = true;  // Run DB deploy by default
+        private boolean runDbDeploy = false;
         private boolean manageDataPrefix = false;
         private boolean localExecutor = false;
         private final List<Class<? extends TracServiceBase>> serviceClasses = new ArrayList<>();
