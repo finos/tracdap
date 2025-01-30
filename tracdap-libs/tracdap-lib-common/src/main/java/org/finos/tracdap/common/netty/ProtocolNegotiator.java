@@ -248,6 +248,7 @@ public class ProtocolNegotiator extends ChannelInitializer<SocketChannel> {
 
         // Set up the HTTP/1 pipeline in response to the first inbound message
         // This initializer is called if there was no attempt at HTTP upgrade (or the upgrade attempt failed)
+        // The HTTP codec is already on the pipeline and sits before this initializer
 
         @Override
         public void channelRead(@Nonnull ChannelHandlerContext ctx, @Nonnull Object msg) {
@@ -263,16 +264,8 @@ public class ProtocolNegotiator extends ChannelInitializer<SocketChannel> {
             else
                 logNewConnection(channel, "HTTP/1.1");
 
-            // Depending on which upgrades have been set up, the HTTP codec may or may not be installed
-            var httpCodec = pipeline.context(HttpServerCodec.class);
-
-            if (httpCodec == null) {
-                pipeline.addAfter(ctx.name(), HTTP_1_CODEC, new HttpServerCodec());
-                pipeline.addAfter(HTTP_1_CODEC, HTTP_1_KEEPALIVE, new HttpServerKeepAliveHandler());
-            }
-            else {
-                pipeline.addAfter(httpCodec.name(), HTTP_1_KEEPALIVE, new HttpServerKeepAliveHandler());
-            }
+            // Put keep-alive directly after the codec, really it is part of the HTTP/1.1 protocol
+            pipeline.addAfter(ctx.name(), HTTP_1_KEEPALIVE, new HttpServerKeepAliveHandler());
 
             // Use common framework for cross-cutting concerns
             commonConcerns.configureInboundChannel(pipeline, SupportedProtocol.HTTP);
@@ -361,7 +354,7 @@ public class ProtocolNegotiator extends ChannelInitializer<SocketChannel> {
                     logNewUpgradeConnection(channel, "WebSocket", upgrade);
 
                     // HTTP codec is needed to bootstrap WS protocol
-                    // It is not set up automatically by the upgrade codec
+                    // The WS upgrade handler seems to remove it...
                     pipeline.addAfter(ctx.name(), HTTP_1_CODEC, new HttpServerCodec());
 
                     // Configure the WS protocol handler - path must match the URI in the upgrade request
