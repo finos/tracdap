@@ -67,6 +67,7 @@ abstract class MetadataSearchApiTest {
         @RegisterExtension
         private static final PlatformTest platform = PlatformTest.forConfig(TRAC_CONFIG_UNIT)
                 .addTenant(TEST_TENANT)
+                .runDbDeploy(true)
                 .startService(TracMetadataService.class)
                 .build();
 
