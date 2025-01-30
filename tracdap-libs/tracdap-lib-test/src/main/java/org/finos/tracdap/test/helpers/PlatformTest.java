@@ -159,8 +159,8 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         public Builder manageDataPrefix(boolean manageDataPrefix) { this.manageDataPrefix = manageDataPrefix; return this; }
         public Builder prepareLocalExecutor(boolean localExecutor) { this.localExecutor = localExecutor; return this; }
         public Builder startService(Class<? extends TracServiceBase> serviceClass) { this.serviceClasses.add(serviceClass); return this; }
-        public Builder withClientConcern(GrpcConcern concern) { clientConcerns.addLast(concern); return this; }
-        public Builder withPreStartAction(Consumer<PlatformTest> action) { this.preStartActions.add(action); return this; }
+        public Builder clientConcern(GrpcConcern concern) { clientConcerns.addLast(concern); return this; }
+        public Builder preStartAction(Consumer<PlatformTest> action) { this.preStartActions.add(action); return this; }
 
         public PlatformTest build() {
 
