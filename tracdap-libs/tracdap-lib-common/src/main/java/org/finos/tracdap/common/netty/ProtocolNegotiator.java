@@ -41,6 +41,7 @@ public class ProtocolNegotiator extends ChannelInitializer<SocketChannel> {
     private static final String UPGRADE_HANDLER = "upgrade_handler";
     private static final String HTTP_1_INITIALIZER = "http_1_initializer";
     private static final String HTTP_1_CODEC = "http_1_codec";
+    private static final String HTTP_1_KEEPALIVE = "http_1_keepalive";
     private static final String HTTP_2_CODEC = "http_2_codec";
     private static final String WS_INITIALIZER = "ws_initializer";
     private static final String WS_FRAME_CODEC = "ws_frame_codec";
@@ -263,10 +264,15 @@ public class ProtocolNegotiator extends ChannelInitializer<SocketChannel> {
                 logNewConnection(channel, "HTTP/1.1");
 
             // Depending on which upgrades have been set up, the HTTP codec may or may not be installed
-            var httpCodec = pipeline.get(HttpServerCodec.class);
+            var httpCodec = pipeline.context(HttpServerCodec.class);
 
-            if (httpCodec == null)
+            if (httpCodec == null) {
                 pipeline.addAfter(ctx.name(), HTTP_1_CODEC, new HttpServerCodec());
+                pipeline.addAfter(HTTP_1_CODEC, HTTP_1_KEEPALIVE, new HttpServerKeepAliveHandler());
+            }
+            else {
+                pipeline.addAfter(httpCodec.name(), HTTP_1_KEEPALIVE, new HttpServerKeepAliveHandler());
+            }
 
             // Use common framework for cross-cutting concerns
             commonConcerns.configureInboundChannel(pipeline, SupportedProtocol.HTTP);
