@@ -47,6 +47,7 @@ import org.junit.jupiter.api.extension.ExtensionContext;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.URI;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -234,10 +235,6 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         prepareConfig();
         preparePlugins();
 
-        // If the config is using secrets, init the secret store
-        if (platformConfig.containsConfig(ConfigKeys.SECRET_URL_KEY))
-            prepareSecrets();
-
         if (runDbDeploy)
             prepareDatabase();
 
@@ -349,19 +346,30 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
 
         configManager = new ConfigManager(platformConfigUrl.toString(), tracDir, pluginManager, secretKey);
         platformConfig = configManager.loadRootConfigObject(PlatformConfig.class);
-    }
 
-    void prepareSecrets() {
+        // If the config uses JKS secrets, create an empty store if none is provided
+        var secretType = platformConfig.containsConfig(ConfigKeys.SECRET_TYPE_KEY)
+                ? platformConfig.getConfigOrThrow(ConfigKeys.SECRET_TYPE_KEY)
+                : null;
 
-        log.info("Running secret tool to prepare secrets...");
+        if (secretType != null && List.of("PKCS12", "JCEKS").contains(secretType)) {
 
-        // Running the secret tool will create the secrets file so it is available for loading
+            var secretFile = platformConfig.getConfigOrThrow(ConfigKeys.SECRET_URL_KEY);
+            var secretUrl = configManager.resolveConfigFile(URI.create(secretFile));
 
-        var secretTasks = new ArrayList<StandardArgs.Task>();
-        secretTasks.add(StandardArgs.task(SecretTool.INIT_SECRETS, List.of(), "Init secret store"));
-        ServiceHelpers.runAuthTool(tracDir, platformConfigUrl, secretKey, secretTasks);
+            if (!Files.exists(Paths.get(secretUrl))) {
+
+                log.info("Running secret tool to create an empty secret store...");
+
+                var secretTasks = new ArrayList<StandardArgs.Task>();
+                secretTasks.add(StandardArgs.task(SecretTool.INIT_SECRETS, List.of(), "Init secret store"));
+                ServiceHelpers.runAuthTool(tracDir, platformConfigUrl, secretKey, secretTasks);
+            }
+        }
 
         configManager.prepareSecrets();
+
+        pluginManager.initRegularPlugins();
     }
 
     private String getCurrentGitOrigin() throws Exception {
@@ -410,16 +418,7 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
 
         var elg = new NioEventLoopGroup(2);
 
-        var plugins = new PluginManager();
-        plugins.initConfigPlugins();
-        plugins.initRegularPlugins();
-
-        var config = new ConfigManager(
-                platformConfigUrl(),
-                tracDir(),
-                plugins);
-
-        StorageTestHelpers.createStoragePrefix(config, plugins, elg);
+        StorageTestHelpers.createStoragePrefix(configManager, pluginManager, elg);
 
         elg.shutdownGracefully();
     }
@@ -428,17 +427,7 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
 
         var elg = new NioEventLoopGroup(2);
 
-        var plugins = new PluginManager();
-        plugins.registerExtensions();
-        plugins.initConfigPlugins();
-        plugins.initRegularPlugins();
-
-        var config = new ConfigManager(
-                platformConfigUrl(),
-                tracDir(),
-                plugins);
-
-        StorageTestHelpers.deleteStoragePrefix(config, plugins, elg);
+        StorageTestHelpers.deleteStoragePrefix(configManager, pluginManager, elg);
 
         elg.shutdownGracefully();
     }
