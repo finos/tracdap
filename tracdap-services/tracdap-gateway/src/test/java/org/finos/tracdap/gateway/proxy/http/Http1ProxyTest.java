@@ -22,7 +22,7 @@ import org.finos.tracdap.common.startup.Startup;
 
 import io.netty.handler.codec.http.*;
 import org.finos.tracdap.gateway.TracPlatformGateway;
-import org.finos.tracdap.test.helpers.ServiceHelpers;
+import org.finos.tracdap.test.helpers.PlatformTestHelpers;
 import org.finos.tracdap.test.http.Http1Client;
 import org.finos.tracdap.test.http.Http1Server;
 import org.finos.tracdap.tools.secrets.SecretTool;
@@ -70,7 +70,7 @@ public class Http1ProxyTest {
 
         var authTasks = new ArrayList<StandardArgs.Task>();
         authTasks.add(StandardArgs.task(SecretTool.CREATE_ROOT_AUTH_KEY, List.of("EC", "256"), ""));
-        ServiceHelpers.runAuthTool(rootDir, configFile, secretKey, authTasks);
+        PlatformTestHelpers.runSecretTool(rootDir, configFile, secretKey, authTasks);
 
 
         // Gradle sometimes runs tests out of the sub-project folder instead of the root

@@ -32,20 +32,20 @@ import java.nio.file.Path;
 import java.util.List;
 
 
-public class ServiceHelpers {
+public class PlatformTestHelpers {
 
-    public static void runAuthTool(Path workingDir, URL configPath, String keystoreKey, List<StandardArgs.Task> tasks) {
+    public static void runSecretTool(Path workingDir, URL configPath, String keystoreKey, List<StandardArgs.Task> tasks) {
 
-        // Do not use secrets during start up for the auth tool
-        // The auth tool is often used to create the secrets file
+        // Do not use secrets during start up for the secret tool
+        // The secret tool is often used to create the secrets file
 
         var startup = Startup.useConfigFile(SecretTool.class, workingDir, configPath.toString(), keystoreKey);
         startup.runStartupSequence(/* useSecrets = */ false);
 
         var config = startup.getConfig();
-        var authTool = new SecretTool(config, keystoreKey);
+        var secretTool = new SecretTool(config, keystoreKey);
 
-        authTool.runTasks(tasks);
+        secretTool.runTasks(tasks);
     }
 
     public static void runDbDeploy(Path workingDir, URL configPath, String keystoreKey, List<StandardArgs.Task> tasks) {
