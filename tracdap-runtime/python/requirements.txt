@@ -8,23 +8,23 @@
 
 # Core protobuf support for metadata / config classes
 # This should match the Java Protobuf version, if possible
-protobuf == 5.28.2
+protobuf == 5.29.3
 
 # Support for the gRPC runtime API server
 # Optional in the distributed package but required for development
-grpcio == 1.66.1
-grpcio-status == 1.66.1
-grpcio-tools == 1.66.1
+grpcio == 1.70.0
+grpcio-status == 1.70.0
+grpcio-tools == 1.70.0
 
 # Core data framework is based on Arrow
 # This should always match the Java Arrow version
-pyarrow == 16.1.0
+pyarrow == 18.1.0
 
 # PyYAML is used to load config supplied in YAML format
 pyyaml == 6.0.2
 
 # Python implementation of Git, for model loading
-dulwich == 0.22.1
+dulwich == 0.22.7
 
 # Requests, used for downloading model packages
 requests == 2.32.3
@@ -45,7 +45,7 @@ requests == 2.32.3
 # NumPy 2.0 is not supported yet, it breaks the ABI and other packages need time to catch up
 
 pandas >= 1.2.0, < 2.3.0
-numpy < 2.0.0
+numpy >= 1.20, < 2.3.0
 
 # Polars is an optional dependency - support the 1.x series
 

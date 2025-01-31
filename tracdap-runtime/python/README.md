@@ -16,12 +16,13 @@ Documentation for the TRAC platform is available on our website at
 
 The TRAC runtime for Python has these requirements:
 
-* Python: 3.8 up to 3.12
+* Python: 3.9 up to 3.13
 * Pandas: 1.2 up to 2.2
 * PySpark 3.0 up to 3.5 (optional)
 
-3rd party libraries may impose additional constraints on supported versions of Python, Pandas or PySpark.
-As of February 2024, the Python libraries for GCP do not yet support Python 3.12.
+3rd party libraries may impose additional constraints on supported versions of key libraries.
+For example, Pandas 1.5 is not available for Python 3.12 or 3.13, while NumPy 2.0 is only
+compatible with Pandas 2.1 and later.
 
 ## Installing the runtime
 

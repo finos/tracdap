@@ -18,7 +18,7 @@ on:
 env:
   JAVA_VERSION: "21"
   JAVA_DISTRIBUTION: "zulu"
-  PYTHON_VERSION: "3.12"
+  PYTHON_VERSION: "3.13"
   # Node 20 breaks relative imports used in examples for web API tests
   NODE_VERSION: "18"
 
@@ -310,7 +310,6 @@ jobs:
               TRAC_CONFIG_FILE: '.github/config/int-storage-gcs.yaml',
               TRAC_SECRET_KEY: short-lived-secret,
               PYTHON_TESTS: int_storage_gcp*.py,
-              PYTHON_VERSION: "3.11",
               JAVA_TESTS: int-storage }
 
           - { SERVICE: storage,

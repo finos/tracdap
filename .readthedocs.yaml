@@ -18,12 +18,11 @@
 # RTD schema version
 version: 2
 
-# Use latest stable image and Python version
-# May 2023: Older versions (Python 3.8) have dependency issues with liburl3 and OpenSSL
+# Use latest stable image and Python version (updated Jan 25)
 build:
-  os: ubuntu-22.04
+  os: ubuntu-24.04
   tools:
-    python: "3.11"
+    python: "3.13"
 
 # Use requirements from the dev (build tools) folder
 python:

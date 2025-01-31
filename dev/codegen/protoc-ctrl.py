@@ -67,7 +67,8 @@ def _copytree(src, dst):
 
     _log.info(f"Copying {src} -> {dst}")
 
-    # In shutil.copytree, dir_exists_ok is only available from Python 3.8, but we need Python 3.7
+    # This could be replaced with shutil since minimum Python version is 3.9 as of Jan 2025
+    # In shutil.copytree, dir_exists_ok is available from Python 3.8
     # Codegen is part of the core build tools so needs to match supported Python versions of the TRAC runtime
 
     src_dir = pathlib.Path(src)

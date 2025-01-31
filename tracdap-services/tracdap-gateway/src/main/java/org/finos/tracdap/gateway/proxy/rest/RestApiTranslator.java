@@ -25,7 +25,6 @@ import org.finos.tracdap.common.exception.EInputValidation;
 import org.finos.tracdap.common.exception.ETracInternal;
 import org.finos.tracdap.common.exception.EUnexpected;
 
-import com.google.gson.stream.MalformedJsonException;
 import com.google.protobuf.Descriptors;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.Message;
@@ -132,22 +131,14 @@ public class RestApiTranslator<TRequest extends Message, TResponse extends Messa
         }
         catch (InvalidProtocolBufferException e) {
 
-            // TODO: error handling
-
-            // Validation failures will go back to users (API users, i.e. application developers)
-            // Strip out GSON class name from the error message for readability
-            var detailMessage = e.getLocalizedMessage();
-            var classNamePrefix = MalformedJsonException.class.getName() + ": ";
-
-            if (detailMessage.startsWith(classNamePrefix))
-                detailMessage = detailMessage.substring(classNamePrefix.length());
+            var errorDetails = sanitizeErrorMessage(e.getMessage());
 
             var message = String.format(
                     "Invalid JSON input for type [%s]: %s",
                     body.getDescriptorForType().getName(),
-                    detailMessage);
+                    errorDetails);
 
-            log.warn(message);
+            log.error(message);
             throw new EInputValidation(message, e);
         }
         catch (IOException e) {
@@ -435,4 +426,17 @@ public class RestApiTranslator<TRequest extends Message, TResponse extends Messa
     private Function<URI, String> preparePathSegmentExtractor(int pathSegmentIndex) {
         return uri -> extractPathSegment(pathSegmentIndex, uri);
     }
+
+    private String sanitizeErrorMessage(String message) {
+
+        // Some error messages from JSON parsing include the exception class name
+        // Clean these up to make errors more readable for users
+
+        if (message.contains(GSON_ERROR_PREFIX))
+            return message.replace(GSON_ERROR_PREFIX, "");
+        else
+            return message;
+    }
+
+    private static final String GSON_ERROR_PREFIX = "com.google.gson.stream.MalformedJsonException: ";
 }

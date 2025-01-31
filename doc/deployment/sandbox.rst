@@ -41,10 +41,10 @@ so long as it is version 11 or higher.
 
 **Python**
 
-TRAC requires Python 3.8 or higher, which can be downloaded and installed from
+TRAC requires Python 3.9 or higher, which can be downloaded and installed from
 `python.org <https://www.python.org/downloads/>`_.
 If your company restricts software deployment, it is fine to use the Python package they provide
-so long as it is version 3.8 or higher.
+so long as it is version 3.9 or higher.
 
 **TRAC Services**
 

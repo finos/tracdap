@@ -6,7 +6,6 @@
 # Dependencies in the dist package are controlled as optional features
 
 # Some of these libraries do not support the oldest versions of Python
-# So e.g. to use the Azure libraries, Python 3.8 is required
 # We can still support older Python versions, so long as those plugins are not being used
 
 # To control dependencies installed during CI, the BEGIN_PLUGIN and END_PLUGIN markers are used

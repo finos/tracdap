@@ -10,7 +10,7 @@ on:
 
 env:
   JAVA_DISTRIBUTION: "zulu"
-  PYTHON_VERSION: "3.12"
+  PYTHON_VERSION: "3.13"
   NODE_VERSION: "22"
 
 
@@ -79,42 +79,46 @@ jobs:
 
           # Latest supported versions on all 3 major platforms
           - { PLATFORM: "windows",
-              PYTHON_VERSION: "3.12",
-              PANDAS_DEPENDENCY: "pandas ~= 2.1.0",
-              PYSPARK_DEPENDENCY: "pyspark ~= 3.5.0" }
+              PYTHON_VERSION: "3.13",
+              PANDAS_DEPENDENCY: "'pandas ~= 2.2.0'",
+              PYSPARK_DEPENDENCY: "'pyspark ~= 3.5.0'" }
 
           - { PLATFORM: "macos",
-              PYTHON_VERSION: "3.12",
-              PANDAS_DEPENDENCY: "pandas ~= 2.1.0",
-              PYSPARK_DEPENDENCY: "pyspark ~= 3.5.0" }
+              PYTHON_VERSION: "3.13",
+              PANDAS_DEPENDENCY: "'pandas ~= 2.2.0'",
+              PYSPARK_DEPENDENCY: "'pyspark ~= 3.5.0'" }
 
           - { PLATFORM: "ubuntu",
-              PYTHON_VERSION: "3.12",
-              PANDAS_DEPENDENCY: "pandas ~= 2.1.0",
-              PYSPARK_DEPENDENCY: "pyspark ~= 3.5.0" }
+              PYTHON_VERSION: "3.13",
+              PANDAS_DEPENDENCY: "'pandas ~= 2.2.0'",
+              PYSPARK_DEPENDENCY: "'pyspark ~= 3.5.0'" }
 
-          # Intermediate supported versions, force testing against .0 for Pandas 2.0
+          # Python 3.12 requires Pandas 2.1, Pandas 2.0 only has binaries for 3.11
+          - { PLATFORM: "ubuntu",
+              PYTHON_VERSION: "3.12",
+              PANDAS_DEPENDENCY: "'pandas ~= 2.1.0'",
+              PYSPARK_DEPENDENCY: "'pyspark ~= 3.4.0'" }
+
+          # Force testing on the first release of the Pandas 2 series, requires Python 3.11
+          # Note NumPy 2.0 only works with Pandas 2.1 and later
           - { PLATFORM: "ubuntu",
               PYTHON_VERSION: "3.11",
-              PANDAS_DEPENDENCY: "pandas == 2.0.0",
-              PYSPARK_DEPENDENCY: "pyspark ~= 3.4.0" }
+              PANDAS_DEPENDENCY: "'pandas == 2.0.0' 'numpy < 2.0.0'",
+              PYSPARK_DEPENDENCY: "'pyspark ~= 3.3.0'" }
 
+          # Test the latest release in the Pandas 1.X series
+          # This could also work with Python 3.11 but we want to test every supported Python version
           - { PLATFORM: "ubuntu",
               PYTHON_VERSION: "3.10",
-              PANDAS_DEPENDENCY: "pandas ~= 1.5.0",
-              PYSPARK_DEPENDENCY: "pyspark ~= 3.3.0" }
-
-          - { PLATFORM: "ubuntu",
-              PYTHON_VERSION: "3.9",
-              PANDAS_DEPENDENCY: "pandas ~= 1.3.0",
-              PYSPARK_DEPENDENCY: "pyspark ~= 3.1.0" }
+              PANDAS_DEPENDENCY: "'pandas ~= 1.5.0' 'numpy < 2.0.0'",
+              PYSPARK_DEPENDENCY: "'pyspark ~= 3.1.0'" }
 
           # Oldest supported versions, force testing against .0 for Pandas and PySpark
           # If those don't work due to bugs, we need to update README for the supported versions
           - { PLATFORM: "ubuntu",
-              PYTHON_VERSION: "3.8",
-              PANDAS_DEPENDENCY: "pandas == 1.2.0",
-              PYSPARK_DEPENDENCY: "pyspark == 3.0.0" }
+              PYTHON_VERSION: "3.9",
+              PANDAS_DEPENDENCY: "'pandas == 1.2.0' 'numpy < 2.0.0'",
+              PYSPARK_DEPENDENCY: "'pyspark == 3.0.0'" }
 
     # E.g. platform = "windows" -> build image = "windows-latest"
     runs-on: ${{ matrix.environment.PLATFORM }}-latest
@@ -136,8 +140,8 @@ jobs:
       - name: Install dependencies
         run: |
           cd tracdap-runtime/python
-          pip install "${{ matrix.environment.PANDAS_DEPENDENCY }}"
-          pip install "${{ matrix.environment.PYSPARK_DEPENDENCY }}"
+          pip install ${{ matrix.environment.PANDAS_DEPENDENCY }}
+          pip install ${{ matrix.environment.PYSPARK_DEPENDENCY }}
           pip install -r requirements.txt
 
       - name: Protoc code generation
