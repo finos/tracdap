@@ -24,7 +24,7 @@ pyarrow == 18.1.0
 pyyaml == 6.0.2
 
 # Python implementation of Git, for model loading
-dulwich == 0.22.1
+dulwich == 0.22.7
 
 # Requests, used for downloading model packages
 requests == 2.32.3
