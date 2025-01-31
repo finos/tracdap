@@ -18,7 +18,7 @@ grpcio-tools == 1.66.1
 
 # Core data framework is based on Arrow
 # This should always match the Java Arrow version
-pyarrow == 16.1.0
+pyarrow == 18.1.0
 
 # PyYAML is used to load config supplied in YAML format
 pyyaml == 6.0.2
