@@ -50,7 +50,6 @@ import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import org.apache.arrow.memory.RootAllocator;
 import org.apache.arrow.memory.netty.NettyAllocationManager;
-import org.apache.arrow.memory.util.MemoryUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -93,19 +92,6 @@ public class TracDataService extends TracServiceBase {
         PlatformConfig platformConfig;
         ServiceConfig serviceConfig;
         StorageConfig storageConfig;
-
-        // Force initialization of Arrow MemoryUtil, rather than waiting until the first API call
-        // This can fail on Java versions >= 16 if the java.nio module is not marked as open
-
-        try {
-            if (MemoryUtil.UNSAFE == null)
-                throw new NullPointerException("MemoryUtil.UNSAFE == null");
-        }
-        catch (RuntimeException e) {
-
-            log.error("Failed to set up native memory access for Apache Arrow", e);
-            throw new EStartup("Failed to set up native memory access for Apache Arrow", e);
-        }
 
         try {
             log.info("Loading TRAC platform config...");
@@ -164,6 +150,18 @@ public class TracDataService extends TracServiceBase {
                     .build();
 
             var arrowAllocator = new RootAllocator(arrowAllocatorConfig);
+
+            // Force initialization of Arrow memory subsystem, rather than waiting until the first API call
+            // This can fail on Java versions >= 16 if the java.nio module is not marked as open
+
+            try (var buffer = arrowAllocator.buffer(4096)) {
+                buffer.writeLong(1L);
+            }
+            catch (RuntimeException e) {
+
+                log.error("Failed to set up native memory access for Apache Arrow", e);
+                throw new EStartup("Failed to set up native memory access for Apache Arrow", e);
+            }
 
             var formats = new CodecManager(pluginManager, configManager);
             storage = new StorageManager(pluginManager, configManager);
