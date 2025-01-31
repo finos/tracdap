@@ -265,7 +265,7 @@ jobs:
               SA_PASSWORD: "tR4c_aDm!n",
               DB_SECRET: "tR4c_aDm!n" }
 
-    uses: .github/workflows/integration-sql.yaml
+    uses: ./.github/workflows/integration-sql.yaml
 
     with:
       matrix: ${{ toJson( matrix.database ) }}
@@ -325,7 +325,7 @@ jobs:
               PYTHON_TESTS: int_storage_azure*.py,
               JAVA_TESTS: int-storage }
 
-    uses: .github/workflows/integration-cloud.yaml
+    uses: ./.github/workflows/integration-cloud.yaml
 
     with:
       service: ${{ matrix.storage.SERVICE }}
