@@ -45,7 +45,7 @@ requests == 2.32.3
 # NumPy 2.0 is not supported yet, it breaks the ABI and other packages need time to catch up
 
 pandas >= 1.2.0, < 2.3.0
-numpy < 2.0.0
+numpy >= 1.20, < 2.3.0
 
 # Polars is an optional dependency - support the 1.x series
 
