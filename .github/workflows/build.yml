@@ -100,6 +100,7 @@ jobs:
               PYSPARK_DEPENDENCY: "'pyspark ~= 3.4.0'" }
 
           # Force testing on the first release of the Pandas 2 series, requires Python 3.11
+          # Note NumPy 2.0 only works with Pandas 2.1 and later
           - { PLATFORM: "ubuntu",
               PYTHON_VERSION: "3.11",
               PANDAS_DEPENDENCY: "'pandas == 2.0.0' 'numpy < 2.0.0'",
