@@ -847,7 +847,7 @@ class DevModeTranslator:
         if isinstance(data_value, str):
             storage_path = data_value
             storage_key = self._sys_config.storage.defaultBucket
-            storage_format = self.infer_format(storage_path, self._sys_config.storage)
+            storage_format = self.infer_format(storage_path, self._sys_config.storage, schema)
             snap_version = 1
 
         elif isinstance(data_value, dict):
@@ -858,7 +858,7 @@ class DevModeTranslator:
                 raise _ex.EConfigParse(f"Invalid configuration for input [{data_key}] (missing required value 'path'")
 
             storage_key = data_value.get("storageKey") or self._sys_config.storage.defaultBucket
-            storage_format = data_value.get("format") or self.infer_format(storage_path, self._sys_config.storage)
+            storage_format = data_value.get("format") or self.infer_format(storage_path, self._sys_config.storage, schema)
             snap_version = 1
 
         else:
@@ -944,12 +944,18 @@ class DevModeTranslator:
         return file_id
 
     @staticmethod
-    def infer_format(storage_path: str, storage_config: _cfg.StorageConfig):
+    def infer_format(storage_path: str, storage_config: _cfg.StorageConfig, schema: tp.Optional[_meta.SchemaDefinition]):
+
+        schema_type = schema.schemaType if schema and schema.schemaType else _meta.SchemaType.TABLE
 
         if re.match(r'.*\.\w+$', storage_path):
             extension = pathlib.Path(storage_path).suffix
-            codec = _storage.FormatManager.get_data_format(extension, format_options={})
-            return codec.format_code()
+            # Only try to map TABLE codecs through IDataFormat for now
+            if schema_type == _meta.SchemaType.TABLE:
+                codec = _storage.FormatManager.get_data_format(extension, format_options={})
+                return codec.format_code()
+            else:
+                return extension[1:] if extension.startswith(".") else extension
 
         else:
             return storage_config.defaultFormat
