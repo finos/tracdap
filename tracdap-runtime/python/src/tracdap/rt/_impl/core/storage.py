@@ -496,7 +496,10 @@ class CommonFileStorage(IFileStorage):
 
         # For successful write streams, log the total size written
         if is_write and not error:
-            file_size = _util.format_file_size(stream.tell())
+            if not stream.closed:
+                file_size = _util.format_file_size(stream.tell())
+            else:
+                file_size = self._fs.get_file_info(storage_path).size
             self._log.info(f"File size [{self._key}]: {file_size} [{storage_path}]")
 
         # Close the stream - this may take time for write streams that are not flushed
