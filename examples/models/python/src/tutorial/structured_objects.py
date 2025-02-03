@@ -12,19 +12,24 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+import enum
 
 import typing as _tp
 import dataclasses as _dc
 
 import tracdap.rt.api.experimental as trac
 
+class EvolutionModel(enum.Enum):
+    PERTURB = 1
+    SCATTER = 2
+    STOCHASTIC = 3
 
 @_dc.dataclass
 class ScenarioConfig:
 
     scenario_name: str
     default_weight: float
-    evolution_model: str
+    evolution_model: EvolutionModel
     apply_smoothing: bool
 
 @_dc.dataclass
@@ -64,7 +69,7 @@ class StructModel(trac.TracModel):
         new_scenario = ScenarioConfig(
             scenario_name="hpi_shock",
             default_weight=1.0,
-            evolution_model="perturb",
+            evolution_model=EvolutionModel.STOCHASTIC,
             apply_smoothing=True)
 
         run_config.stress_scenarios["hpi_shock"] = new_scenario

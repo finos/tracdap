@@ -285,6 +285,8 @@ class StructQuoter:
             return True
 
         def represent_data(self, data):
+            if isinstance(data, _enum.Enum):
+                return self.represent_str(data.name)
             if _dc.is_dataclass(data):
                 return self.represent_dict(data.__dict__)
             elif _pydantic and isinstance(data, _pydantic.BaseModel):
