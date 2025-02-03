@@ -21,6 +21,7 @@ import tracdap.rt.metadata as _meta
 import tracdap.rt.exceptions as _ex
 import tracdap.rt._impl.core.data as _data
 import tracdap.rt._impl.core.schemas as _schemas
+import tracdap.rt._impl.core.struct as _struct
 import tracdap.rt._impl.core.type_system as _type_system
 import tracdap.rt._impl.core.validation as _val
 
@@ -149,6 +150,13 @@ class StaticApiImpl(_StaticApiHook):
             categorical=categorical,
             notNull=not_null,
             formatCode=format_code)
+
+    def define_struct(self, python_type: type[_api.STRUCT_TYPE]):
+
+        _val.validate_signature(self.define_struct, python_type)
+
+        struct_schema = _struct.StructProcessor.define_struct(python_type)
+        return _meta.SchemaDefinition(schemaType=_meta.SchemaType.STRUCT, struct=struct_schema)
 
     def define_schema(
             self, *fields: _tp.Union[_meta.FieldSchema, _tp.List[_meta.FieldSchema]],

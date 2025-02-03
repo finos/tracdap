@@ -122,6 +122,11 @@ class _StaticApiHook:
         pass
 
     @_abc.abstractmethod
+    def define_struct(self, python_type: type) -> _meta.SchemaDefinition:
+
+        pass
+
+    @_abc.abstractmethod
     def load_schema(
             self, package: _tp.Union[_ts.ModuleType, str], schema_file: str,
             schema_type: _meta.SchemaType = _meta.SchemaType.TABLE) \
@@ -158,3 +163,9 @@ class _StaticApiHook:
             -> _meta.ModelOutputSchema:
 
         pass
+
+X = _tp.TypeVar("X")
+
+def do_x(x: type[X]) -> X:
+
+    return x.__new__(x)
