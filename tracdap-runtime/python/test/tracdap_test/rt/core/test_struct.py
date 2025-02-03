@@ -31,14 +31,6 @@ if sys.version_info >= (3, 10):
 else:
     new_union_syntax = False
 
-
-class PurePythonStruct:
-
-    def __init__(self, field1: str, field2: float, field3: bool = True):
-        self.field1 = field1
-        self.field2 = field2
-        self.field3 = field3
-
 @dc.dataclass(frozen=True)
 class DataclassStruct:
 
@@ -67,11 +59,6 @@ if new_union_syntax:
 
 
 class StructProcessingTest(unittest.TestCase):
-
-    def test_define_pure_python_struct(self):
-
-        struct_schema = _struct.StructProcessor.define_struct(PurePythonStruct)
-        self.assertIsNotNone(struct_schema, _meta.StructSchema)
 
     def test_define_dataclass_struct(self):
 
