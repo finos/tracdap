@@ -291,10 +291,13 @@ class ConfigParser(tp.Generic[_T]):
     # Old-style annotations are still valid, even when the new style is fully supported
     __generic_types: list[type] = [
         ts.GenericAlias,
-        ts.UnionType,
         type(tp.List[int]),
         type(tp.Optional[int])
     ]
+
+    # UnionType was added to the types module in Python 3.10, we support 3.9 (Jan 2025)
+    if hasattr(ts, "UnionType"):
+        __generic_types.append(ts.UnionType)
 
     __primitive_types: tp.Dict[type, callable] = {
         bool: bool,
