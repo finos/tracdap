@@ -496,18 +496,20 @@ class StaticValidator:
             else:
                 return
 
-        fields = socket.schema.table.fields
-        field_names = list(map(lambda f: f.fieldName, fields))
-        property_type = f"field in [{socket_name}]"
+        if socket.schema.schemaType == meta.SchemaType.TABLE:
 
-        if len(fields) == 0:
-            cls._fail(f"Invalid schema for [{socket_name}]: No fields defined")
+            fields = socket.schema.table.fields
+            field_names = list(map(lambda f: f.fieldName, fields))
+            property_type = f"field in [{socket_name}]"
 
-        cls._valid_identifiers(field_names, property_type)
-        cls._case_insensitive_duplicates(field_names, property_type)
+            if len(fields) == 0:
+                cls._fail(f"Invalid schema for [{socket_name}]: No fields defined")
 
-        for field in fields:
-            cls._check_single_field(field, property_type)
+            cls._valid_identifiers(field_names, property_type)
+            cls._case_insensitive_duplicates(field_names, property_type)
+
+            for field in fields:
+                cls._check_single_field(field, property_type)
 
     @classmethod
     def _check_socket_file_type(cls, socket_name, socket):
