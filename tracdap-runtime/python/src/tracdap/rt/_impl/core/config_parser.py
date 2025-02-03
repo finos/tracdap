@@ -30,6 +30,7 @@ import json
 import os
 import pathlib
 import re
+import types as ts
 import typing as tp
 import urllib.parse as _urlp
 import uuid
@@ -286,9 +287,14 @@ class ConfigManager:
 
 class ConfigParser(tp.Generic[_T]):
 
-    # The metaclass for generic types varies between versions of the typing library
-    # To work around this, detect the correct metaclass by inspecting a generic type variable
-    __generic_metaclass = type(tp.List[object])
+    # Support both new and old styles for generic, union and optional types
+    # Old-style annotations are still valid, even when the new style is fully supported
+    __generic_types: list[type] = [
+        ts.GenericAlias,
+        ts.UnionType,
+        type(tp.List[int]),
+        type(tp.Optional[int])
+    ]
 
     __primitive_types: tp.Dict[type, callable] = {
         bool: bool,
@@ -365,7 +371,7 @@ class ConfigParser(tp.Generic[_T]):
         if _dc.is_dataclass(annotation):
             return self._parse_simple_class(location, raw_value, annotation)
 
-        if isinstance(annotation, self.__generic_metaclass):
+        if any(map(lambda _t: isinstance(annotation, _t), self.__generic_types)):
             return self._parse_generic_class(location, raw_value, annotation)  # noqa
 
         return self._error(location, f"Cannot parse value of type {annotation.__name__}")
@@ -484,7 +490,7 @@ class ConfigParser(tp.Generic[_T]):
                 self._error(location, message)
 
             # Generic members must be declared in __init__ since that is the only way to get the full annotation
-            if isinstance(type(default_value), self.__generic_metaclass):
+            if any(map(lambda _t: isinstance(type(default_value), _t), self.__generic_types)):
                 message = f"Class {metaclass.__name__} does not support config decoding: " + \
                           f"Members with no default value must be declared in __init__: '{member_name}'"
                 self._error(location, message)
@@ -510,7 +516,7 @@ class ConfigParser(tp.Generic[_T]):
 
         return obj
 
-    def _parse_generic_class(self, location: str, raw_value: tp.Any, metaclass:  __generic_metaclass):
+    def _parse_generic_class(self, location: str, raw_value: tp.Any,  metaclass: type):
 
         origin = _util.get_origin(metaclass)
         args = _util.get_args(metaclass)
