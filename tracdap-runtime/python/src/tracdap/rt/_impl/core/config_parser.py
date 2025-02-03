@@ -12,14 +12,6 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-#
-#      http://www.apache.org/licenses/LICENSE-2.0
-#
-#  Unless required by applicable law or agreed to in writing, software
-#  distributed under the License is distributed on an "AS IS" BASIS,
-#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#  See the License for the specific language governing permissions and
-#  limitations under the License.
 
 import dataclasses as _dc
 import decimal
@@ -44,6 +36,11 @@ import tracdap.rt._impl.core.util as _util
 
 import yaml
 import yaml.parser
+
+try:
+    import pydantic as _pyd  # noqa
+except ModuleNotFoundError:
+    _pydantic = None
 
 _T = tp.TypeVar('_T')
 
@@ -374,6 +371,10 @@ class ConfigParser(tp.Generic[_T]):
         if _dc.is_dataclass(annotation):
             return self._parse_simple_class(location, raw_value, annotation)
 
+        # Basic support for Pydantic, if it is installed
+        if _pyd and isinstance(annotation, type) and issubclass(annotation, _pyd.BaseModel):
+            return self._parse_simple_class(location, raw_value, annotation)
+
         if any(map(lambda _t: isinstance(annotation, _t), self.__generic_types)):
             return self._parse_generic_class(location, raw_value, annotation)  # noqa
 
@@ -445,7 +446,7 @@ class ConfigParser(tp.Generic[_T]):
         init_signature = inspect.signature(metaclass.__init__)
         init_types = tp.get_type_hints(metaclass.__init__)
         init_params = iter(init_signature.parameters.items())
-        init_values: tp.List[tp.Any] = list()
+        init_values: tp.Dict[str, tp.Any] = dict()
 
         # Do not process 'self'
         next(init_params)
@@ -459,20 +460,20 @@ class ConfigParser(tp.Generic[_T]):
                 message = f"Class {metaclass.__name__} does not support config decoding: " + \
                           f"Missing type information for init parameter '{param_name}'"
                 self._error(location, message)
-                init_values.append(None)
+                init_values[param_name] = None
 
             elif param_name in raw_dict and raw_dict[param_name] is not None:
                 param_value = self._parse_value(param_location, raw_dict[param_name], param_type)
-                init_values.append(param_value)
+                init_values[param_name] = param_value
 
             elif param.default != inspect._empty:  # noqa
-                init_values.append(param.default)
+                init_values[param_name] = param.default
 
             else:
                 self._error(location, f"Missing required value '{param_name}'")
-                init_values.append(None)
+                init_values[param_name] = None
 
-        binding = init_signature.bind(obj, *init_values)
+        binding = init_signature.bind(obj, **init_values)
         metaclass.__init__(*binding.args, **binding.kwargs)
 
         # Now go back over the members and look for any that weren't declared in __init__
