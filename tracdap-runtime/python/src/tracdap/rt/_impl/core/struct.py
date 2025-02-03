@@ -119,9 +119,9 @@ class StructProcessor:
         if _dc.is_dataclass(python_type):
             return _cfg_p.ConfigParser(python_type)._parse_value("", data, python_type)
 
-        # For Pydantic types, build models using model_construct()
+        # For Pydantic types, build models using the Pydantic constructor
         if _pydantic and isinstance(python_type, type) and issubclass(python_type, _pydantic.BaseModel):
-            return python_type.model_construct(**data)
+            return python_type(**data)
 
         raise _ex.ETracInternal("Python type must be a dataclass or a pydantic model")
 
