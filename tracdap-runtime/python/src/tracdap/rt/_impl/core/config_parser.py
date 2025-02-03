@@ -40,7 +40,7 @@ import yaml.parser
 try:
     import pydantic as _pyd  # noqa
 except ModuleNotFoundError:
-    _pydantic = None
+    _pyd = None
 
 _T = tp.TypeVar('_T')
 
