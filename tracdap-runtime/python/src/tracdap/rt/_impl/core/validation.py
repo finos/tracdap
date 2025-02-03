@@ -67,9 +67,17 @@ class SkipValidation(tp.Generic[T_SKIP_VAL]):
 
 class _TypeValidator:
 
-    # The metaclass for generic types varies between versions of the typing library
-    # To work around this, detect the correct metaclass by inspecting a generic type variable
-    __generic_metaclass = type(tp.List[object])
+    # Support both new and old styles for generic, union and optional types
+    # Old-style annotations are still valid, even when the new style is fully supported
+    __generic_metaclass = [
+        types.GenericAlias,
+        type(tp.List[object]),
+        type(tp.Optional[object])
+    ]
+
+    # UnionType was added to the types module in Python 3.10, we support 3.9 (Jan 2025)
+    if hasattr(types, "UnionType"):
+        __generic_metaclass.append(types.UnionType)
 
     # Cache method signatures to avoid inspection on every call
     # Inspecting a function signature can take ~ half a second in Python 3.7
@@ -204,7 +212,7 @@ class _TypeValidator:
             if value.skip_type == expected_type:
                 return True
 
-        if isinstance(expected_type, cls.__generic_metaclass):
+        if any(map(lambda _t: isinstance(expected_type, _t),  cls.__generic_metaclass)):
 
             origin = util.get_origin(expected_type)
             args = util.get_args(expected_type)
@@ -240,6 +248,33 @@ class _TypeValidator:
                     all(map(lambda k: cls._validate_type(key_type, k), value.keys())) and \
                     all(map(lambda v: cls._validate_type(value_type, v), value.values()))
 
+            if origin is type:
+
+                if not isinstance(value, type):
+                    return False
+
+                type_arg = args[0]
+
+                if type_arg == tp.Any:
+                    return True
+
+                if isinstance(type_arg, tp.TypeVar):
+
+                    constraints =  util.get_constraints(type_arg)
+                    bound = util.get_bound(type_arg)
+
+                    if constraints:
+                        if not any(map(lambda c: expected_type == c, constraints)):
+                            return False
+
+                    if bound:
+                        if not issubclass(expected_type, bound):
+                            return False
+
+                    # So long as constraints / bound are ok, any type matches a generic type var
+                    return True
+
+
             if origin.__module__.startswith("tracdap.rt.api."):
                 return isinstance(value, origin)
 
@@ -274,7 +309,7 @@ class _TypeValidator:
     @classmethod
     def _type_name(cls, type_var: tp.Type, qualified: bool = False) -> str:
 
-        if isinstance(type_var, cls.__generic_metaclass):
+        if any(map(lambda _t: isinstance(type_var, _t),  cls.__generic_metaclass)):
 
             origin = util.get_origin(type_var)
             args = util.get_args(type_var)
@@ -291,7 +326,11 @@ class _TypeValidator:
 
             if origin is list:
                 list_type = cls._type_name(args[0])
-                return f"List[{list_type}]"
+                return f"list[{list_type}]"
+
+            if origin is type:
+                type_arg = cls._type_name(args[0])
+                return f"type[{type_arg}]"
 
             raise ex.ETracInternal(f"Validation of [{origin.__name__}] generic parameters is not supported yet")
 
