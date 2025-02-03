@@ -1,0 +1,13 @@
+
+job:
+  runModel:
+
+    parameters:
+      t0_date: "2025-02-01"
+      projection_period: 24
+
+    inputs:
+      run_config: "inputs/structured_run_config.yaml"
+
+    outputs:
+      modified_config: "outputs/structured_objects/modified_run_config.yaml"
