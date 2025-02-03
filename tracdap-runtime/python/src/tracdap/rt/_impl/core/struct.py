@@ -208,7 +208,8 @@ class StructProcessor:
         origin = _tp.get_origin(python_type)
         args = _tp.get_args(python_type)
 
-        if origin in cls.__union_types and len(args) == 2 and args[1] is _ts.NoneType:
+        # types.NoneType not available in Python 3.9, so use type(None) instead
+        if origin in cls.__union_types and len(args) == 2 and args[1] is type(None):
             optional_type = args[0]
             return cls._define_primitive_field(optional_type, optional=True, dc_field=dc_field, pyd_field=pyd_field)
 
