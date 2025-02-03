@@ -52,12 +52,20 @@ class StructProcessor:
     __generic_types: list[type] = [
         _ts.GenericAlias,
         type(_tp.List[int]),
+        type(_tp.Union[int, str]),
         type(_tp.Optional[int])
+    ]
+
+    __union_types: list[type] = [
+        _tp.Union,
+        _tp.Optional
     ]
 
     # UnionType was added to the types module in Python 3.10, we support 3.9 (Jan 2025)
     if hasattr(_ts, "UnionType"):
         __generic_types.append(_ts.UnionType)
+        __union_types.append(_ts.UnionType)
+
 
     @classmethod
     def define_struct(cls, python_type: type) -> _meta.StructSchema:
@@ -200,7 +208,7 @@ class StructProcessor:
         origin = _tp.get_origin(python_type)
         args = _tp.get_args(python_type)
 
-        if origin in [_ts.UnionType, _tp.Union] and len(args) == 2 and args[1] is _ts.NoneType:
+        if origin in cls.__union_types and len(args) == 2 and args[1] is _ts.NoneType:
             optional_type = args[0]
             return cls._define_primitive_field(optional_type, optional=True, dc_field=dc_field, pyd_field=pyd_field)
 
