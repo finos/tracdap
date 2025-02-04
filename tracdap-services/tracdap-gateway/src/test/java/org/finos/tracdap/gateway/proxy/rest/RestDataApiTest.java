@@ -17,8 +17,6 @@
 
 package org.finos.tracdap.gateway.proxy.rest;
 
-import com.google.protobuf.Message;
-import com.google.protobuf.util.JsonFormat;
 import org.finos.tracdap.api.*;
 import org.finos.tracdap.common.async.Flows;
 import org.finos.tracdap.gateway.TracPlatformGateway;
@@ -28,11 +26,12 @@ import org.finos.tracdap.svc.meta.TracMetadataService;
 import org.finos.tracdap.test.data.DataApiTestHelpers;
 import org.finos.tracdap.test.data.SampleData;
 import org.finos.tracdap.test.helpers.PlatformTest;
+import org.finos.tracdap.test.helpers.ResourceHelpers;
 
 import com.google.protobuf.ByteString;
+import com.google.protobuf.Message;
+import com.google.protobuf.util.JsonFormat;
 
-import org.finos.tracdap.test.helpers.ResourceHelpers;
-import org.finos.tracdap.test.meta.SampleMetadata;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
