@@ -211,6 +211,14 @@ public class RestProxyTest {
     @Test
     void smallFileRoundTrip() throws Exception {
 
+        /*
+            Test REST API for small files with this sequence:
+            createSmallFile()
+            readSmallFile()
+            updateSmallFile()
+            readSmallFile()
+         */
+
         var createMethod = "/trac-data/api/v1/ACME_CORP/create-small-file";
         var createFilePath = "examples/rest_calls/create_flow.json";
         var createFileBytes = Files.readAllBytes(tracRepoDir.resolve(createFilePath));
@@ -257,6 +265,53 @@ public class RestProxyTest {
         var readResponseContent = readResponseMessage.getContent().toByteArray();
 
         Assertions.assertArrayEquals(createFileBytes, readResponseContent);
+
+        var updateMethod = "/trac-data/api/v1/ACME_CORP/update-small-file";
+        var updateFilePath = "examples/rest_calls/search.json";
+        var updateFileBytes = Files.readAllBytes(tracRepoDir.resolve(updateFilePath));
+        var updateFileBase64 = Base64.getEncoder().encodeToString(updateFileBytes);
+        var updateRequestJson = "{\n" +
+                "    \"name\": \"create_flow.json\",\n" +
+                "    \"priorVersion\": " + fileSelectorJson + ",\n" +
+                "    \"mimeType\": \"text/json\",\n" +
+                "    \"size\": " + updateFileBytes.length + ",\n" +
+                "    \"content\": \"" + updateFileBase64+ "\"\n" +
+                "}";
+
+        var updateRequest = HttpRequest.newBuilder()
+                .POST(HttpRequest.BodyPublishers.ofString(updateRequestJson))
+                .uri(new URI("http://localhost:" + TEST_GW_PORT + updateMethod))
+                .version(HttpClient.Version.HTTP_1_1)
+                .header("content-type", "application/json")
+                .header("accept", "application/json")
+                .timeout(Duration.ofMillis(TEST_TIMEOUT))
+                .build();
+
+        var updateResponse = client.send(updateRequest, HttpResponse.BodyHandlers.ofString());
+        Assertions.assertEquals(200, updateResponse.statusCode());
+
+        var updatedId = parseJson(updateResponse.body(), TagHeader.class);
+        var updatedSelector = selectorForTag(updatedId);
+        var updatedSelectorJson = JsonFormat.printer().print(updatedSelector);
+
+        var updatedReadRequestJson = "{ \"selector\": " + updatedSelectorJson + " }";
+
+        var updatedReadRequest = HttpRequest.newBuilder()
+                .POST(HttpRequest.BodyPublishers.ofString(updatedReadRequestJson))
+                .uri(new URI("http://localhost:" + TEST_GW_PORT + readMethod))
+                .version(HttpClient.Version.HTTP_1_1)
+                .header("content-type", "application/json")
+                .header("accept", "application/json")
+                .timeout(Duration.ofMillis(TEST_TIMEOUT))
+                .build();
+
+        var updatedReadResponse = client.send(updatedReadRequest, HttpResponse.BodyHandlers.ofString());
+        Assertions.assertEquals(200, updatedReadResponse.statusCode());
+
+        var updatedReadResponseMessage = parseJson(updatedReadResponse.body(), FileReadResponse.class);
+        var updatedReadResponseContent = updatedReadResponseMessage.getContent().toByteArray();
+
+        Assertions.assertArrayEquals(updateFileBytes, updatedReadResponseContent);
     }
 
     @Test
