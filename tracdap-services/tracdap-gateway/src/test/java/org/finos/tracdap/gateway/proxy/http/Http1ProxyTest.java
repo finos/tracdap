@@ -21,7 +21,7 @@ import org.finos.tracdap.common.startup.StandardArgs;
 import org.finos.tracdap.common.startup.Startup;
 import org.finos.tracdap.gateway.TracPlatformGateway;
 import org.finos.tracdap.test.helpers.PlatformTestHelpers;
-import org.finos.tracdap.test.http.Http1Server;
+import org.finos.tracdap.gateway.test.Http1TestServer;
 import org.finos.tracdap.tools.secrets.SecretTool;
 
 import org.junit.jupiter.api.*;
@@ -54,8 +54,8 @@ public class Http1ProxyTest {
     private static Path rootDir;
     private static final int svrPort = 8090;
     private static final int timeoutSvrPort = 8091;
-    private static Http1Server svr;
-    private static Http1Server timeoutSvr;
+    private static Http1TestServer svr;
+    private static Http1TestServer timeoutSvr;
     private static TracPlatformGateway gateway;
 
     private static HttpClient client;
@@ -92,10 +92,10 @@ public class Http1ProxyTest {
 
         // Start up our test server to use as a target
 
-        svr = new Http1Server(svrPort, svrContentDir);
+        svr = new Http1TestServer(svrPort, svrContentDir);
         svr.run();
 
-        timeoutSvr = new Http1Server(timeoutSvrPort, svrContentDir, true);
+        timeoutSvr = new Http1TestServer(timeoutSvrPort, svrContentDir, true);
         timeoutSvr.run();
 
         // Start the gateway
