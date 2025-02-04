@@ -25,20 +25,7 @@ gateway:
 
   routes:
 
-    - routeName: TRAC Metadata Service
-      routeType: GRPC
-
-      match:
-        host: localhost
-        path: /trac.api.TracMetadataApi/.*
-
-      target:
-        scheme: http
-        host: localhost
-        port: 8081
-        path: /trac.api.TracMetadataApi/
-
-    - routeName: Static Docs
+    - routeName: Test Server
       routeType: HTTP
 
       match:
@@ -51,7 +38,7 @@ gateway:
         port: 8090
         path: /
 
-    - routeName: Server timeout
+    - routeName: Test Server (timeout)
       routeType: HTTP
 
       match:
@@ -62,7 +49,7 @@ gateway:
         scheme: http
         host: localhost
         port: 8091
-        path: /
+        path: /timeout
 
     - routeName: Server down
       routeType: HTTP
@@ -87,6 +74,9 @@ gateway:
 services:
   gateway:
     port: 8080
+    properties:
+      # Very short timeout used for timeout testing
+      network.idleTimeout: 1
   metadata:
     port: 8081
   data:
