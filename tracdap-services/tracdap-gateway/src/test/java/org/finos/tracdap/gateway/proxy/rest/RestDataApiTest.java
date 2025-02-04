@@ -26,11 +26,13 @@ import org.finos.tracdap.metadata.TagHeader;
 import org.finos.tracdap.svc.data.TracDataService;
 import org.finos.tracdap.svc.meta.TracMetadataService;
 import org.finos.tracdap.test.data.DataApiTestHelpers;
+import org.finos.tracdap.test.data.SampleData;
 import org.finos.tracdap.test.helpers.PlatformTest;
 
 import com.google.protobuf.ByteString;
 
 import org.finos.tracdap.test.helpers.ResourceHelpers;
+import org.finos.tracdap.test.meta.SampleMetadata;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -60,6 +62,8 @@ public class RestDataApiTest {
     public static final long TEST_TIMEOUT = 10 * 1000;  // 10 second timeout
 
     public static final String TEST_FILE = "README.md";
+    public static final String SMALL_TEST_FILE = "tracdap-libs/tracdap-lib-test/src/main/resources/sample_data/csv_basic.csv";
+    public static final String SMALL_TEST_FILE_V2 = "tracdap-libs/tracdap-lib-test/src/main/resources/sample_data/csv_basic_v2.csv";
     public static final String LARGE_TEST_FILE = "tracdap-services/tracdap-svc-data/src/test/resources/large_csv_data_100000.csv";
 
     public static final String TRAC_CONFIG_UNIT = "config/trac-unit.yaml";
@@ -82,6 +86,122 @@ public class RestDataApiTest {
     @BeforeAll
     static void setupClient() {
         client = HttpClient.newHttpClient();
+    }
+
+    @Test
+    void smallDatasetRoundTrip() throws Exception {
+
+        /*
+            Test REST API for small datasets with this sequence:
+            createSmallDataset()
+            readSmallDataset()
+            updateSmallDataset()
+            readSmallDataset()
+         */
+
+        var createMethod = "/trac-data/api/v1/ACME_CORP/create-small-dataset";
+        var createDataBytes = Files.readAllBytes(tracRepoDir.resolve(SMALL_TEST_FILE));
+        var createDataBase64 = Base64.getEncoder().encodeToString(createDataBytes);
+        var createSchema = SampleData.BASIC_TABLE_SCHEMA;
+        var createSchemaJson = JsonFormat.printer().print(createSchema);
+        var createRequestJson = "{\n" +
+                "    \"schema\": " + createSchemaJson + ",\n" +
+                "    \"format\": \"text/csv\",\n" +
+                "    \"content\": \"" + createDataBase64+ "\"\n" +
+                "}";
+
+        var createRequest = HttpRequest.newBuilder()
+                .POST(HttpRequest.BodyPublishers.ofString(createRequestJson))
+                .uri(new URI("http://localhost:" + TEST_GW_PORT + createMethod))
+                .version(HttpClient.Version.HTTP_1_1)
+                .header("content-type", "application/json")
+                .header("accept", "application/json")
+                .timeout(Duration.ofMillis(TEST_TIMEOUT))
+                .build();
+
+        var createResponse = client.send(createRequest, HttpResponse.BodyHandlers.ofString());
+        Assertions.assertEquals(200, createResponse.statusCode());
+
+        var dataId = parseJson(createResponse.body(), TagHeader.class);
+        var dataSelector = selectorForTag(dataId);
+        var dataSelectorJson = JsonFormat.printer().print(dataSelector);
+
+        var readMethod = "/trac-data/api/v1/ACME_CORP/read-small-dataset";
+        var readRequestJson = "{ \"selector\": " + dataSelectorJson + ", \"format\": \"text/csv\" }";
+
+        var readRequest = HttpRequest.newBuilder()
+                .POST(HttpRequest.BodyPublishers.ofString(readRequestJson))
+                .uri(new URI("http://localhost:" + TEST_GW_PORT + readMethod))
+                .version(HttpClient.Version.HTTP_1_1)
+                .header("content-type", "application/json")
+                .header("accept", "application/json")
+                .timeout(Duration.ofMillis(TEST_TIMEOUT))
+                .build();
+
+        var readResponse = client.send(readRequest, HttpResponse.BodyHandlers.ofString());
+        Assertions.assertEquals(200, readResponse.statusCode());
+
+        var readResponseMessage = parseJson(readResponse.body(), DataReadResponse.class);
+        var readResponseSchema = readResponseMessage.getSchema();
+        var readResponseContent = readResponseMessage.getContent().toByteArray();
+
+        var nCreatedLines = new String(createDataBytes).split("\n").length;
+        var nResponseLines = new String(readResponseContent).split("\n").length;
+
+        Assertions.assertEquals(createSchema, readResponseSchema);
+        Assertions.assertEquals(nCreatedLines, nResponseLines);
+
+        var updateMethod = "/trac-data/api/v1/ACME_CORP/update-small-dataset";
+        var updateDataBytes = Files.readAllBytes(tracRepoDir.resolve(SMALL_TEST_FILE_V2));
+        var updateDataBase64 = Base64.getEncoder().encodeToString(updateDataBytes);
+        var updateSchema = SampleData.BASIC_TABLE_SCHEMA_V2;
+        var updateSchemaJson = JsonFormat.printer().print(updateSchema);
+        var updateRequestJson = "{\n" +
+                "    \"schema\": " + updateSchemaJson + ",\n" +
+                "    \"priorVersion\": " + dataSelectorJson + ",\n" +
+                "    \"format\": \"text/csv\",\n" +
+                "    \"content\": \"" + updateDataBase64+ "\"\n" +
+                "}";
+
+        var updateRequest = HttpRequest.newBuilder()
+                .POST(HttpRequest.BodyPublishers.ofString(updateRequestJson))
+                .uri(new URI("http://localhost:" + TEST_GW_PORT + updateMethod))
+                .version(HttpClient.Version.HTTP_1_1)
+                .header("content-type", "application/json")
+                .header("accept", "application/json")
+                .timeout(Duration.ofMillis(TEST_TIMEOUT))
+                .build();
+
+        var updateResponse = client.send(updateRequest, HttpResponse.BodyHandlers.ofString());
+        Assertions.assertEquals(200, updateResponse.statusCode());
+
+        var updatedId = parseJson(updateResponse.body(), TagHeader.class);
+        var updatedSelector = selectorForTag(updatedId);
+        var updatedSelectorJson = JsonFormat.printer().print(updatedSelector);
+
+        var updatedReadRequestJson = "{ \"selector\": " + updatedSelectorJson + ", \"format\": \"text/csv\" }";
+
+        var updatedReadRequest = HttpRequest.newBuilder()
+                .POST(HttpRequest.BodyPublishers.ofString(updatedReadRequestJson))
+                .uri(new URI("http://localhost:" + TEST_GW_PORT + readMethod))
+                .version(HttpClient.Version.HTTP_1_1)
+                .header("content-type", "application/json")
+                .header("accept", "application/json")
+                .timeout(Duration.ofMillis(TEST_TIMEOUT))
+                .build();
+
+        var updatedReadResponse = client.send(updatedReadRequest, HttpResponse.BodyHandlers.ofString());
+        Assertions.assertEquals(200, updatedReadResponse.statusCode());
+
+        var updatedResponseMessage = parseJson(updatedReadResponse.body(), DataReadResponse.class);
+        var updatedResponseSchema = updatedResponseMessage.getSchema();
+        var updatedResponseContent = updatedResponseMessage.getContent().toByteArray();
+
+        var nUpdatedLines = new String(updateDataBytes).split("\n").length;
+        var nUpdatedResponseLines = new String(updatedResponseContent).split("\n").length;
+
+        Assertions.assertEquals(updateSchema, updatedResponseSchema);
+        Assertions.assertEquals(nUpdatedLines, nUpdatedResponseLines);
     }
 
     @Test
