@@ -17,34 +17,33 @@
 
 package org.finos.tracdap.gateway.proxy.rest;
 
-import io.netty.handler.codec.http.HttpHeaderNames;
 import org.finos.tracdap.api.*;
 import org.finos.tracdap.common.async.Flows;
 import org.finos.tracdap.gateway.TracPlatformGateway;
 import org.finos.tracdap.svc.data.TracDataService;
 import org.finos.tracdap.svc.meta.TracMetadataService;
-import org.finos.tracdap.test.http.Http1Client;
 import org.finos.tracdap.test.data.DataApiTestHelpers;
 import org.finos.tracdap.test.helpers.PlatformTest;
 
 import com.google.protobuf.ByteString;
-import io.netty.handler.codec.http.HttpResponseStatus;
-import io.netty.handler.codec.http.HttpScheme;
 
 import org.finos.tracdap.test.helpers.ResourceHelpers;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.FileWriter;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.Map;
 
-import static io.netty.util.NetUtil.LOCALHOST;
 import static org.finos.tracdap.test.concurrent.ConcurrentTestHelpers.getResultOf;
 import static org.finos.tracdap.test.concurrent.ConcurrentTestHelpers.waitFor;
 import static org.finos.tracdap.test.meta.SampleMetadata.TEST_TENANT;
@@ -74,6 +73,13 @@ public class RestDownloadTest {
 
     private static final Path tracRepoDir = ResourceHelpers.findTracProjectRoot();
 
+    private static HttpClient client;
+
+    @BeforeAll
+    static void setupClient() {
+        client = HttpClient.newHttpClient();
+    }
+
     @Test
     void simpleDownload() throws Exception {
 
@@ -90,30 +96,27 @@ public class RestDownloadTest {
 
         var fileId = dataClient.createSmallFile(upload);
 
-        var client = new Http1Client(HttpScheme.HTTP, LOCALHOST, TEST_GW_PORT);
-        var commonHeaders = Map.<CharSequence, Object>ofEntries();
-
         var downloadUrl = String.format(
                 "/trac-data/api/v1/%s/FILE/%s/versions/%d/README.md",
                 TEST_TENANT, fileId.getObjectId(), fileId.getObjectVersion());
 
+        var downloadRequest = HttpRequest.newBuilder()
+                .GET()
+                .uri(new URI("http://localhost:" + TEST_GW_PORT + downloadUrl))
+                .version(HttpClient.Version.HTTP_1_1)
+                .timeout(Duration.ofMillis(TEST_TIMEOUT))
+                .build();
 
-        var downloadCall = client.getRequest(downloadUrl, commonHeaders);
-        downloadCall.await(TEST_TIMEOUT);
+        var downloadResponse = client.send(downloadRequest, HttpResponse.BodyHandlers.ofByteArray());
+        var contentTypeHeader = downloadResponse.headers().firstValue("content-type");
+        var contentLengthHeader = downloadResponse.headers().firstValueAsLong("content-length");
+        Assertions.assertEquals(200, downloadResponse.statusCode());
+        Assertions.assertTrue(contentTypeHeader.isPresent());
+        Assertions.assertTrue(contentLengthHeader.isPresent());
+        Assertions.assertEquals("text/markdown", contentTypeHeader.get());
+        Assertions.assertEquals(content.length, contentLengthHeader.getAsLong());
 
-        Assertions.assertTrue(downloadCall.isDone());
-        if (!downloadCall.isSuccess())
-            Assertions.fail(downloadCall.cause());
-
-        var downloadResponse = downloadCall.getNow();
-        Assertions.assertEquals(HttpResponseStatus.OK, downloadResponse.status());
-        Assertions.assertEquals("text/markdown", downloadResponse.headers().get(HttpHeaderNames.CONTENT_TYPE));
-        Assertions.assertEquals(content.length, downloadResponse.headers().getInt(HttpHeaderNames.CONTENT_LENGTH));
-
-        var downloadBuffer = downloadResponse.content();
-        var downloadLength = downloadBuffer.readableBytes();
-        var downloadContent = new byte[downloadLength];
-        downloadBuffer.readBytes(downloadContent);
+        var downloadContent = downloadResponse.body();
 
         Assertions.assertArrayEquals(content, downloadContent);
     }
@@ -148,30 +151,27 @@ public class RestDownloadTest {
 
         var fileId = getResultOf(upload);
 
-        var client = new Http1Client(HttpScheme.HTTP, LOCALHOST, TEST_GW_PORT);
-        var commonHeaders = Map.<CharSequence, Object>ofEntries();
-
         var downloadUrl = String.format(
                 "/trac-data/api/v1/%s/FILE/%s/versions/%d/large_csv_data_100000.csv",
                 TEST_TENANT, fileId.getObjectId(), fileId.getObjectVersion());
 
+        var downloadRequest = HttpRequest.newBuilder()
+                .GET()
+                .uri(new URI("http://localhost:" + TEST_GW_PORT + downloadUrl))
+                .version(HttpClient.Version.HTTP_1_1)
+                .timeout(Duration.ofMillis(TEST_TIMEOUT))
+                .build();
 
-        var downloadCall = client.getRequest(downloadUrl, commonHeaders);
-        downloadCall.await(TEST_TIMEOUT);
+        var downloadResponse = client.send(downloadRequest, HttpResponse.BodyHandlers.ofByteArray());
+        var contentTypeHeader = downloadResponse.headers().firstValue("content-type");
+        var contentLengthHeader = downloadResponse.headers().firstValueAsLong("content-length");
+        Assertions.assertEquals(200, downloadResponse.statusCode());
+        Assertions.assertTrue(contentTypeHeader.isPresent());
+        Assertions.assertTrue(contentLengthHeader.isPresent());
+        Assertions.assertEquals("text/csv", contentTypeHeader.get());
+        Assertions.assertEquals(content.length, contentLengthHeader.getAsLong());
 
-        Assertions.assertTrue(downloadCall.isDone());
-        if (!downloadCall.isSuccess())
-            Assertions.fail(downloadCall.cause());
-
-        var downloadResponse = downloadCall.getNow();
-        Assertions.assertEquals(HttpResponseStatus.OK, downloadResponse.status());
-        Assertions.assertEquals("text/csv", downloadResponse.headers().get(HttpHeaderNames.CONTENT_TYPE));
-        Assertions.assertEquals(content.length, downloadResponse.headers().getInt(HttpHeaderNames.CONTENT_LENGTH));
-
-        var downloadBuffer = downloadResponse.content();
-        var downloadLength = downloadBuffer.readableBytes();
-        var downloadContent = new byte[downloadLength];
-        downloadBuffer.readBytes(downloadContent);
+        var downloadContent = downloadResponse.body();
 
         Assertions.assertArrayEquals(content, downloadContent);
     }
@@ -196,29 +196,27 @@ public class RestDownloadTest {
 
         var fileId = dataClient.createSmallFile(upload);
 
-        var client = new Http1Client(HttpScheme.HTTP, LOCALHOST, TEST_GW_PORT);
-        var commonHeaders = Map.<CharSequence, Object>ofEntries();
-
         var downloadUrl = String.format(
                 "/trac-data/api/v1/%s/FILE/%s/versions/latest/README.md",
                 TEST_TENANT, fileId.getObjectId());
 
-        var downloadCall = client.getRequest(downloadUrl, commonHeaders);
-        downloadCall.await(TEST_TIMEOUT);
+        var downloadRequest = HttpRequest.newBuilder()
+                .GET()
+                .uri(new URI("http://localhost:" + TEST_GW_PORT + downloadUrl))
+                .version(HttpClient.Version.HTTP_1_1)
+                .timeout(Duration.ofMillis(TEST_TIMEOUT))
+                .build();
 
-        Assertions.assertTrue(downloadCall.isDone());
-        if (!downloadCall.isSuccess())
-            Assertions.fail(downloadCall.cause());
+        var downloadResponse = client.send(downloadRequest, HttpResponse.BodyHandlers.ofByteArray());
+        var contentTypeHeader = downloadResponse.headers().firstValue("content-type");
+        var contentLengthHeader = downloadResponse.headers().firstValueAsLong("content-length");
+        Assertions.assertEquals(200, downloadResponse.statusCode());
+        Assertions.assertTrue(contentTypeHeader.isPresent());
+        Assertions.assertTrue(contentLengthHeader.isPresent());
+        Assertions.assertEquals("text/markdown", contentTypeHeader.get());
+        Assertions.assertEquals(content.length, contentLengthHeader.getAsLong());
 
-        var downloadResponse = downloadCall.getNow();
-        Assertions.assertEquals(HttpResponseStatus.OK, downloadResponse.status());
-        Assertions.assertEquals("text/markdown", downloadResponse.headers().get(HttpHeaderNames.CONTENT_TYPE));
-        Assertions.assertEquals(content.length, downloadResponse.headers().getInt(HttpHeaderNames.CONTENT_LENGTH));
-
-        var downloadBuffer = downloadResponse.content();
-        var downloadLength = downloadBuffer.readableBytes();
-        var downloadContent = new byte[downloadLength];
-        downloadBuffer.readBytes(downloadContent);
+        var downloadContent = downloadResponse.body();
 
         Assertions.assertArrayEquals(content, downloadContent);
 
@@ -242,23 +240,24 @@ public class RestDownloadTest {
 
         Assertions.assertTrue(fileIdV2.getObjectVersion() > fileId.getObjectVersion());
 
-        var downloadV2 = client.getRequest(downloadUrl, commonHeaders);
-        downloadV2.await(TEST_TIMEOUT);
+        var downloadRequest2 = HttpRequest.newBuilder()
+                .GET()
+                .uri(new URI("http://localhost:" + TEST_GW_PORT + downloadUrl))
+                .version(HttpClient.Version.HTTP_1_1)
+                .timeout(Duration.ofMillis(TEST_TIMEOUT))
+                .build();
 
-        Assertions.assertTrue(downloadV2.isDone());
-        if (!downloadV2.isSuccess())
-            Assertions.fail(downloadV2.cause());
+        var downloadResponse2 = client.send(downloadRequest2, HttpResponse.BodyHandlers.ofByteArray());
+        var contentTypeHeader2 = downloadResponse2.headers().firstValue("content-type");
+        var contentLengthHeader2 = downloadResponse2.headers().firstValueAsLong("content-length");
+        Assertions.assertEquals(200, downloadResponse2.statusCode());
+        Assertions.assertTrue(contentTypeHeader2.isPresent());
+        Assertions.assertTrue(contentLengthHeader2.isPresent());
+        Assertions.assertEquals("text/markdown", contentTypeHeader2.get());
+        Assertions.assertEquals(updatedContent.length, contentLengthHeader2.getAsLong());
 
-        var downloadResponseV2 = downloadV2.getNow();
-        Assertions.assertEquals(HttpResponseStatus.OK, downloadResponseV2.status());
-        Assertions.assertEquals("text/markdown", downloadResponseV2.headers().get(HttpHeaderNames.CONTENT_TYPE));
-        Assertions.assertEquals(updatedContent.length, downloadResponseV2.headers().getInt(HttpHeaderNames.CONTENT_LENGTH));
+        var downloadContent2 = downloadResponse2.body();
 
-        var downloadBufferV2 = downloadResponseV2.content();
-        var downloadLengthV2 = downloadBufferV2.readableBytes();
-        var downloadContentV2 = new byte[downloadLengthV2];
-        downloadBufferV2.readBytes(downloadContentV2);
-
-        Assertions.assertArrayEquals(updatedContent, downloadContentV2);
+        Assertions.assertArrayEquals(updatedContent, downloadContent2);
     }
 }
