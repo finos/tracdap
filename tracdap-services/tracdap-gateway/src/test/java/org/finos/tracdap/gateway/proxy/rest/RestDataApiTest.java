@@ -17,9 +17,12 @@
 
 package org.finos.tracdap.gateway.proxy.rest;
 
+import com.google.protobuf.Message;
+import com.google.protobuf.util.JsonFormat;
 import org.finos.tracdap.api.*;
 import org.finos.tracdap.common.async.Flows;
 import org.finos.tracdap.gateway.TracPlatformGateway;
+import org.finos.tracdap.metadata.TagHeader;
 import org.finos.tracdap.svc.data.TracDataService;
 import org.finos.tracdap.svc.meta.TracMetadataService;
 import org.finos.tracdap.test.data.DataApiTestHelpers;
@@ -43,6 +46,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Base64;
 
 import static org.finos.tracdap.test.concurrent.ConcurrentTestHelpers.getResultOf;
 import static org.finos.tracdap.test.concurrent.ConcurrentTestHelpers.waitFor;
@@ -50,7 +54,7 @@ import static org.finos.tracdap.test.meta.SampleMetadata.TEST_TENANT;
 import static org.finos.tracdap.test.meta.SampleMetadata.selectorForTag;
 
 
-public class RestDownloadTest {
+public class RestDataApiTest {
 
     public static final short TEST_GW_PORT = 9100;
     public static final long TEST_TIMEOUT = 10 * 1000;  // 10 second timeout
@@ -78,6 +82,112 @@ public class RestDownloadTest {
     @BeforeAll
     static void setupClient() {
         client = HttpClient.newHttpClient();
+    }
+
+    @Test
+    void smallFileRoundTrip() throws Exception {
+
+        /*
+            Test REST API for small files with this sequence:
+            createSmallFile()
+            readSmallFile()
+            updateSmallFile()
+            readSmallFile()
+         */
+
+        var createMethod = "/trac-data/api/v1/ACME_CORP/create-small-file";
+        var createFilePath = "examples/rest_calls/create_flow.json";
+        var createFileBytes = Files.readAllBytes(tracRepoDir.resolve(createFilePath));
+        var createFileBase64 = Base64.getEncoder().encodeToString(createFileBytes);
+        var createRequestJson = "{\n" +
+                "    \"name\": \"create_flow.json\",\n" +
+                "    \"mimeType\": \"text/json\",\n" +
+                "    \"size\": " + createFileBytes.length + ",\n" +
+                "    \"content\": \"" + createFileBase64+ "\"\n" +
+                "}";
+
+        var createRequest = HttpRequest.newBuilder()
+                .POST(HttpRequest.BodyPublishers.ofString(createRequestJson))
+                .uri(new URI("http://localhost:" + TEST_GW_PORT + createMethod))
+                .version(HttpClient.Version.HTTP_1_1)
+                .header("content-type", "application/json")
+                .header("accept", "application/json")
+                .timeout(Duration.ofMillis(TEST_TIMEOUT))
+                .build();
+
+        var createResponse = client.send(createRequest, HttpResponse.BodyHandlers.ofString());
+        Assertions.assertEquals(200, createResponse.statusCode());
+
+        var fileId = parseJson(createResponse.body(), TagHeader.class);
+        var fileSelector = selectorForTag(fileId);
+        var fileSelectorJson = JsonFormat.printer().print(fileSelector);
+
+        var readMethod = "/trac-data/api/v1/ACME_CORP/read-small-file";
+        var readRequestJson = "{ \"selector\": " + fileSelectorJson + " }";
+
+        var readRequest = HttpRequest.newBuilder()
+                .POST(HttpRequest.BodyPublishers.ofString(readRequestJson))
+                .uri(new URI("http://localhost:" + TEST_GW_PORT + readMethod))
+                .version(HttpClient.Version.HTTP_1_1)
+                .header("content-type", "application/json")
+                .header("accept", "application/json")
+                .timeout(Duration.ofMillis(TEST_TIMEOUT))
+                .build();
+
+        var readResponse = client.send(readRequest, HttpResponse.BodyHandlers.ofString());
+        Assertions.assertEquals(200, readResponse.statusCode());
+
+        var readResponseMessage = parseJson(readResponse.body(), FileReadResponse.class);
+        var readResponseContent = readResponseMessage.getContent().toByteArray();
+
+        Assertions.assertArrayEquals(createFileBytes, readResponseContent);
+
+        var updateMethod = "/trac-data/api/v1/ACME_CORP/update-small-file";
+        var updateFilePath = "examples/rest_calls/search.json";
+        var updateFileBytes = Files.readAllBytes(tracRepoDir.resolve(updateFilePath));
+        var updateFileBase64 = Base64.getEncoder().encodeToString(updateFileBytes);
+        var updateRequestJson = "{\n" +
+                "    \"name\": \"create_flow.json\",\n" +
+                "    \"priorVersion\": " + fileSelectorJson + ",\n" +
+                "    \"mimeType\": \"text/json\",\n" +
+                "    \"size\": " + updateFileBytes.length + ",\n" +
+                "    \"content\": \"" + updateFileBase64+ "\"\n" +
+                "}";
+
+        var updateRequest = HttpRequest.newBuilder()
+                .POST(HttpRequest.BodyPublishers.ofString(updateRequestJson))
+                .uri(new URI("http://localhost:" + TEST_GW_PORT + updateMethod))
+                .version(HttpClient.Version.HTTP_1_1)
+                .header("content-type", "application/json")
+                .header("accept", "application/json")
+                .timeout(Duration.ofMillis(TEST_TIMEOUT))
+                .build();
+
+        var updateResponse = client.send(updateRequest, HttpResponse.BodyHandlers.ofString());
+        Assertions.assertEquals(200, updateResponse.statusCode());
+
+        var updatedId = parseJson(updateResponse.body(), TagHeader.class);
+        var updatedSelector = selectorForTag(updatedId);
+        var updatedSelectorJson = JsonFormat.printer().print(updatedSelector);
+
+        var updatedReadRequestJson = "{ \"selector\": " + updatedSelectorJson + " }";
+
+        var updatedReadRequest = HttpRequest.newBuilder()
+                .POST(HttpRequest.BodyPublishers.ofString(updatedReadRequestJson))
+                .uri(new URI("http://localhost:" + TEST_GW_PORT + readMethod))
+                .version(HttpClient.Version.HTTP_1_1)
+                .header("content-type", "application/json")
+                .header("accept", "application/json")
+                .timeout(Duration.ofMillis(TEST_TIMEOUT))
+                .build();
+
+        var updatedReadResponse = client.send(updatedReadRequest, HttpResponse.BodyHandlers.ofString());
+        Assertions.assertEquals(200, updatedReadResponse.statusCode());
+
+        var updatedReadResponseMessage = parseJson(updatedReadResponse.body(), FileReadResponse.class);
+        var updatedReadResponseContent = updatedReadResponseMessage.getContent().toByteArray();
+
+        Assertions.assertArrayEquals(updateFileBytes, updatedReadResponseContent);
     }
 
     @Test
@@ -259,5 +369,15 @@ public class RestDownloadTest {
         var downloadContent2 = downloadResponse2.body();
 
         Assertions.assertArrayEquals(updatedContent, downloadContent2);
+    }
+
+    @SuppressWarnings("unchecked")
+    private <T extends Message> T parseJson(String json, Class<T> msgClass) throws Exception {
+
+        var builder = (T.Builder) msgClass.getMethod("newBuilder").invoke(null);
+        var jsonParser = JsonFormat.parser();
+        jsonParser.merge(json, builder);
+
+        return (T) builder.build();
     }
 }
