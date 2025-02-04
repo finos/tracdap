@@ -16,6 +16,7 @@ import enum
 
 import typing as _tp
 import dataclasses as _dc
+import datetime as _dt
 
 import tracdap.rt.api.experimental as trac
 
@@ -36,6 +37,7 @@ class ScenarioConfig:
 class RunConfig:
 
     include_front_book: bool
+    base_date: _dt.date
 
     base_scenario: ScenarioConfig
     stress_scenarios: dict[str, ScenarioConfig]

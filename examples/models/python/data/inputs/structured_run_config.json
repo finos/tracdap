@@ -1,5 +1,6 @@
 {
    "include_front_book": true,
+   "base_date": "2025-01-01",
    "base_scenario": {
       "scenario_name": "base",
       "default_weight": 1.0,
