@@ -42,6 +42,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.Base64;
 import java.util.Random;
 import java.util.UUID;
 
@@ -205,6 +206,57 @@ public class RestProxyTest {
         var originalDefinition = parseJson(originalRequest, MetadataWriteRequest.class).getDefinition();
 
         Assertions.assertEquals(originalDefinition, definition);
+    }
+
+    @Test
+    void smallFileRoundTrip() throws Exception {
+
+        var createMethod = "/trac-data/api/v1/ACME_CORP/create-small-file";
+        var createFilePath = "examples/rest_calls/create_flow.json";
+        var createFileBytes = Files.readAllBytes(tracRepoDir.resolve(createFilePath));
+        var createFileBase64 = Base64.getEncoder().encodeToString(createFileBytes);
+        var createRequestJson = "{\n" +
+            "    \"name\": \"create_flow.json\",\n" +
+            "    \"mimeType\": \"text/json\",\n" +
+            "    \"size\": " + createFileBytes.length + ",\n" +
+            "    \"content\": \"" + createFileBase64+ "\"\n" +
+            "}";
+
+        var createRequest = HttpRequest.newBuilder()
+                .POST(HttpRequest.BodyPublishers.ofString(createRequestJson))
+                .uri(new URI("http://localhost:" + TEST_GW_PORT + createMethod))
+                .version(HttpClient.Version.HTTP_1_1)
+                .header("content-type", "application/json")
+                .header("accept", "application/json")
+                .timeout(Duration.ofMillis(TEST_TIMEOUT))
+                .build();
+
+        var createResponse = client.send(createRequest, HttpResponse.BodyHandlers.ofString());
+        Assertions.assertEquals(200, createResponse.statusCode());
+
+        var fileId = parseJson(createResponse.body(), TagHeader.class);
+        var fileSelector = selectorForTag(fileId);
+        var fileSelectorJson = JsonFormat.printer().print(fileSelector);
+
+        var readMethod = "/trac-data/api/v1/ACME_CORP/read-small-file";
+        var readRequestJson = "{ \"selector\": " + fileSelectorJson + " }";
+
+        var readRequest = HttpRequest.newBuilder()
+                .POST(HttpRequest.BodyPublishers.ofString(readRequestJson))
+                .uri(new URI("http://localhost:" + TEST_GW_PORT + readMethod))
+                .version(HttpClient.Version.HTTP_1_1)
+                .header("content-type", "application/json")
+                .header("accept", "application/json")
+                .timeout(Duration.ofMillis(TEST_TIMEOUT))
+                .build();
+
+        var readResponse = client.send(readRequest, HttpResponse.BodyHandlers.ofString());
+        Assertions.assertEquals(200, readResponse.statusCode());
+
+        var readResponseMessage = parseJson(readResponse.body(), FileReadResponse.class);
+        var readResponseContent = readResponseMessage.getContent().toByteArray();
+
+        Assertions.assertArrayEquals(createFileBytes, readResponseContent);
     }
 
     @Test
