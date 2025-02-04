@@ -70,7 +70,7 @@ googleapis-common-protos >= 1.63, < 2.0
 
 # Tools for building and packaging the Python runtime
 
-setuptools >= 66.1.1
+setuptools >= 75.8.0
 wheel >= 0.38.4
 build >= 0.10.0
 packaging >= 23.0
@@ -82,4 +82,4 @@ safety >= 3.2, < 4.0
 # Series 3.x does not work with Python 3.11
 # Series 4.x does not work with Python 3.7
 # So, let PIP pick a version that works with the version of Python being used
-pip-licenses >= 3.5.2, < 5.0
+pip-licenses >= 5.0, < 6.0

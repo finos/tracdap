@@ -12,14 +12,6 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-#
-#      http://www.apache.org/licenses/LICENSE-2.0
-#
-#  Unless required by applicable law or agreed to in writing, software
-#  distributed under the License is distributed on an "AS IS" BASIS,
-#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#  See the License for the specific language governing permissions and
-#  limitations under the License.
 
 import dataclasses as _dc
 import decimal
@@ -30,6 +22,7 @@ import json
 import os
 import pathlib
 import re
+import types as ts
 import typing as tp
 import urllib.parse as _urlp
 import uuid
@@ -43,6 +36,11 @@ import tracdap.rt._impl.core.util as _util
 
 import yaml
 import yaml.parser
+
+try:
+    import pydantic as _pyd  # noqa
+except ModuleNotFoundError:
+    _pyd = None
 
 _T = tp.TypeVar('_T')
 
@@ -286,9 +284,17 @@ class ConfigManager:
 
 class ConfigParser(tp.Generic[_T]):
 
-    # The metaclass for generic types varies between versions of the typing library
-    # To work around this, detect the correct metaclass by inspecting a generic type variable
-    __generic_metaclass = type(tp.List[object])
+    # Support both new and old styles for generic, union and optional types
+    # Old-style annotations are still valid, even when the new style is fully supported
+    __generic_types: list[type] = [
+        ts.GenericAlias,
+        type(tp.List[int]),
+        type(tp.Optional[int])
+    ]
+
+    # UnionType was added to the types module in Python 3.10, we support 3.9 (Jan 2025)
+    if hasattr(ts, "UnionType"):
+        __generic_types.append(ts.UnionType)
 
     __primitive_types: tp.Dict[type, callable] = {
         bool: bool,
@@ -365,7 +371,11 @@ class ConfigParser(tp.Generic[_T]):
         if _dc.is_dataclass(annotation):
             return self._parse_simple_class(location, raw_value, annotation)
 
-        if isinstance(annotation, self.__generic_metaclass):
+        # Basic support for Pydantic, if it is installed
+        if _pyd and isinstance(annotation, type) and issubclass(annotation, _pyd.BaseModel):
+            return self._parse_simple_class(location, raw_value, annotation)
+
+        if any(map(lambda _t: isinstance(annotation, _t), self.__generic_types)):
             return self._parse_generic_class(location, raw_value, annotation)  # noqa
 
         return self._error(location, f"Cannot parse value of type {annotation.__name__}")
@@ -436,7 +446,7 @@ class ConfigParser(tp.Generic[_T]):
         init_signature = inspect.signature(metaclass.__init__)
         init_types = tp.get_type_hints(metaclass.__init__)
         init_params = iter(init_signature.parameters.items())
-        init_values: tp.List[tp.Any] = list()
+        init_values: tp.Dict[str, tp.Any] = dict()
 
         # Do not process 'self'
         next(init_params)
@@ -450,20 +460,20 @@ class ConfigParser(tp.Generic[_T]):
                 message = f"Class {metaclass.__name__} does not support config decoding: " + \
                           f"Missing type information for init parameter '{param_name}'"
                 self._error(location, message)
-                init_values.append(None)
+                init_values[param_name] = None
 
             elif param_name in raw_dict and raw_dict[param_name] is not None:
                 param_value = self._parse_value(param_location, raw_dict[param_name], param_type)
-                init_values.append(param_value)
+                init_values[param_name] = param_value
 
             elif param.default != inspect._empty:  # noqa
-                init_values.append(param.default)
+                init_values[param_name] = param.default
 
             else:
                 self._error(location, f"Missing required value '{param_name}'")
-                init_values.append(None)
+                init_values[param_name] = None
 
-        binding = init_signature.bind(obj, *init_values)
+        binding = init_signature.bind(obj, **init_values)
         metaclass.__init__(*binding.args, **binding.kwargs)
 
         # Now go back over the members and look for any that weren't declared in __init__
@@ -484,7 +494,7 @@ class ConfigParser(tp.Generic[_T]):
                 self._error(location, message)
 
             # Generic members must be declared in __init__ since that is the only way to get the full annotation
-            if isinstance(type(default_value), self.__generic_metaclass):
+            if any(map(lambda _t: isinstance(type(default_value), _t), self.__generic_types)):
                 message = f"Class {metaclass.__name__} does not support config decoding: " + \
                           f"Members with no default value must be declared in __init__: '{member_name}'"
                 self._error(location, message)
@@ -510,7 +520,7 @@ class ConfigParser(tp.Generic[_T]):
 
         return obj
 
-    def _parse_generic_class(self, location: str, raw_value: tp.Any, metaclass:  __generic_metaclass):
+    def _parse_generic_class(self, location: str, raw_value: tp.Any,  metaclass: type):
 
         origin = _util.get_origin(metaclass)
         args = _util.get_args(metaclass)

@@ -38,6 +38,9 @@ enum SchemaType {
 
     /// Tabular data
     TABLE = 1;
+
+    /// Structured objects
+    STRUCT = 2;
 }
 
 /**
@@ -72,6 +75,37 @@ message TableSchema {
 }
 
 
+/** Schema for an individual field in a structured object dataset */
+message StructField {
+
+    TypeDescriptor fieldType = 3;
+
+    string label = 4;
+
+    bool businessKey = 5;
+    bool categorical = 6;
+
+    // This could become mandatory with the next metadata update
+    optional bool notNull = 8;
+
+    optional string formatCode = 7;
+
+    Value defaultValue = 9;
+
+    optional string structType = 10;
+
+}
+
+/** Schema for a structured object dataset */
+message StructSchema {
+
+    map<string, StructField> fields = 1;
+
+    map<string, StructSchema> namedTypes = 2;
+
+}
+
+
 /**
  * A schema definition describes the schema of a dataset
  *
@@ -92,6 +126,7 @@ message SchemaDefinition {
     oneof schemaDetails {
 
         TableSchema table = 3;
+        StructSchema struct = 4;
     }
 }
 

@@ -29,6 +29,7 @@ import tracdap.rt.exceptions as _ex
 import tracdap.rt._impl.core.data as _data
 import tracdap.rt._impl.core.logging as _logging
 import tracdap.rt._impl.core.storage as _storage
+import tracdap.rt._impl.core.struct as _struct
 import tracdap.rt._impl.core.type_system as _types
 import tracdap.rt._impl.core.util as _util
 import tracdap.rt._impl.core.validation as _val
@@ -184,7 +185,25 @@ class TracContextImpl(_api.TracContext):
     def get_polars_table(self, dataset_name: str) -> "_data.polars.DataFrame":
 
         return self.get_table(dataset_name, _eapi.POLARS)
-    
+
+    def get_struct(self, struct_name: str, python_class: type[_eapi.STRUCT_TYPE] = None) -> _eapi.STRUCT_TYPE:
+
+        _val.validate_signature(self.get_struct, struct_name, python_class)
+
+        self.__val.check_item_valid_identifier(struct_name, TracContextValidator.DATASET)
+        self.__val.check_item_defined_in_model(struct_name, TracContextValidator.DATASET)
+        self.__val.check_item_available_in_context(struct_name, TracContextValidator.DATASET)
+
+        data_view: _data.DataView = self.__local_ctx.get(struct_name)
+        part_key = _data.DataPartKey.for_root()
+
+        self.__val.check_context_object_type(struct_name, data_view, _data.DataView)
+        self.__val.check_context_data_view_type(struct_name, data_view, _meta.ObjectType.DATA)
+        self.__val.check_dataset_schema_defined(struct_name, data_view)
+
+        struct_data: dict = data_view.parts[part_key][0].content
+        return _struct.StructProcessor.parse_struct(struct_data, None, python_class)
+
     def get_file(self, file_name: str) -> bytes:
 
         _val.validate_signature(self.get_file, file_name)
@@ -199,7 +218,7 @@ class TracContextImpl(_api.TracContext):
         self.__val.check_context_data_view_type(file_name, file_view, _meta.ObjectType.FILE)
         self.__val.check_file_content_present(file_name, file_view)
         
-        return file_view.file_item.raw_bytes
+        return file_view.file_item.content
 
     def get_file_stream(self, file_name: str) -> tp.ContextManager[tp.BinaryIO]:
 
@@ -274,13 +293,15 @@ class TracContextImpl(_api.TracContext):
         # Prefer static schemas for data conformance
 
         if static_schema is not None:
-            schema = _data.DataMapping.trac_to_arrow_schema(static_schema)
+            trac_schema = static_schema
+            native_schema = _data.DataMapping.trac_to_arrow_schema(static_schema)
         else:
-            schema = data_view.arrow_schema
+            trac_schema = _data.DataMapping.arrow_to_trac_schema(data_view.arrow_schema)
+            native_schema = data_view.arrow_schema
 
         # Data conformance is applied automatically inside the converter, if schema != None
-        table = converter.to_internal(dataset, schema)
-        item = _data.DataItem(_meta.ObjectType.DATA, schema, table)
+        table = converter.to_internal(dataset, native_schema)
+        item = _data.DataItem.for_table(table, native_schema, trac_schema)
 
         updated_view = _data.DataMapping.add_item_to_view(data_view, part_key, item)
 
@@ -293,7 +314,34 @@ class TracContextImpl(_api.TracContext):
     def put_polars_table(self, dataset_name: str, dataset: "_data.polars.DataFrame"):
 
         self.put_table(dataset_name, dataset, _eapi.POLARS)
-    
+
+    def put_struct(self, struct_name: str, struct: _eapi.STRUCT_TYPE):
+
+        _val.validate_signature(self.put_struct, struct_name, struct)
+
+        self.__val.check_item_valid_identifier(struct_name, TracContextValidator.DATASET)
+        self.__val.check_item_is_model_output(struct_name, TracContextValidator.DATASET)
+
+        static_schema = self.__get_static_schema(self.__model_def, struct_name)
+        data_view = self.__local_ctx.get(struct_name)
+        part_key = _data.DataPartKey.for_root()
+
+        if data_view is None:
+            if static_schema is not None:
+                data_view = _data.DataView.for_trac_schema(static_schema)
+            else:
+                data_view = _data.DataView.create_empty()
+
+        self.__val.check_context_object_type(struct_name, data_view, _data.DataView)
+        self.__val.check_context_data_view_type(struct_name, data_view, _meta.ObjectType.DATA)
+        self.__val.check_dataset_schema_defined(struct_name, data_view)
+        self.__val.check_dataset_part_not_present(struct_name, data_view, part_key)
+
+        data_item = _data.DataItem.for_struct(struct)
+        updated_view = _data.DataMapping.add_item_to_view(data_view, part_key, data_item)
+
+        self.__local_ctx[struct_name] = updated_view
+
     def put_file(self, file_name: str, file_content: tp.Union[bytes, bytearray]):
 
         _val.validate_signature(self.put_file, file_name, file_content)
@@ -840,7 +888,13 @@ class TracContextValidator(TracContextErrorReporter):
 
         schema = data_view.trac_schema if data_view is not None else None
 
-        if schema is None or schema.table is None or not schema.table.fields:
+        if schema is None:
+            self._report_error(f"Schema not defined for dataset {dataset_name} in the current context")
+
+        if schema.schemaType == _meta.SchemaType.TABLE and (schema.table is None or not schema.table.fields):
+            self._report_error(f"Schema not defined for dataset {dataset_name} in the current context")
+
+        if schema.schemaType == _meta.SchemaType.STRUCT and (schema.struct is None or not schema.struct.fields):
             self._report_error(f"Schema not defined for dataset {dataset_name} in the current context")
 
     def check_dataset_schema_not_defined(self, dataset_name: str, data_view: _data.DataView):
@@ -945,12 +999,12 @@ class TracContextValidator(TracContextErrorReporter):
 
     def check_file_content_present(self, file_name: str, file_view: _data.DataView):
 
-        if file_view.file_item is None or not file_view.file_item.raw_bytes:
+        if file_view.file_item is None or file_view.file_item.content is None:
             self._report_error(f"File content is missing or empty for [{file_name}] in the current context")
 
     def check_file_content_not_present(self, file_name: str, file_view: _data.DataView):
 
-        if file_view.file_item is not None and file_view.file_item.raw_bytes:
+        if file_view.file_item is not None and file_view.file_item.content is not None:
             self._report_error(f"File content is already present for [{file_name}] in the current context")
 
     def check_storage_valid_identifier(self, storage_key):

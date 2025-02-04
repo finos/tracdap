@@ -16,6 +16,7 @@
 import copy
 import datetime
 import abc
+import io
 import pathlib
 import random
 import dataclasses as dc  # noqa
@@ -29,6 +30,7 @@ import tracdap.rt._impl.core.type_system as _types
 import tracdap.rt._impl.core.data as _data
 import tracdap.rt._impl.core.logging as _logging
 import tracdap.rt._impl.core.storage as _storage
+import tracdap.rt._impl.core.struct as _struct
 import tracdap.rt._impl.core.models as _models
 import tracdap.rt._impl.core.util as _util
 
@@ -282,6 +284,13 @@ class DataViewFunc(NodeFunction[_data.DataView]):
         if root_item.object_type == meta.ObjectType.FILE:
             return _data.DataView.for_file_item(root_item)
 
+        # TODO: Generalize processing across DataView / DataItem types
+
+        if root_item.schema_type == meta.SchemaType.STRUCT:
+            view = _data.DataView.for_trac_schema(self.node.schema)
+            view.parts[root_part_key] = [root_item]
+            return view
+
         # Everything else is a regular data view
         if self.node.schema is not None and len(self.node.schema.table.fields) > 0:
             trac_schema = self.node.schema
@@ -488,40 +497,55 @@ class LoadDataFunc( _LoadSaveDataFunc, NodeFunction[_data.DataItem],):
         data_spec = self._choose_data_spec(self.node.spec_id, self.node.spec, ctx)
         data_copy = self._choose_copy(data_spec.data_item, data_spec.storage_def)
 
-        if data_spec.object_type == _api.ObjectType.DATA:
-            return self._load_data(data_spec, data_copy)
-
-        elif data_spec.object_type == _api.ObjectType.FILE:
+        if data_spec.object_type == _api.ObjectType.FILE:
             return self._load_file(data_copy)
+
+        elif data_spec.schema_type == _api.SchemaType.TABLE:
+            return self._load_table(data_spec, data_copy)
+
+        elif data_spec.schema_type == _api.SchemaType.STRUCT:
+            return self._load_struct(data_copy)
+
+        # TODO: Handle dynamic inputs, they should work for any schema type
+        elif data_spec.schema_type == _api.SchemaType.SCHEMA_TYPE_NOT_SET:
+            return self._load_table(data_spec, data_copy)
 
         else:
             raise _ex.EUnexpected()
 
-    def _load_data(self, data_spec, data_copy):
+    def _load_file(self, data_copy):
+
+        storage = self.storage.get_file_storage(data_copy.storageKey)
+        content = storage.read_bytes(data_copy.storagePath)
+
+        return _data.DataItem.for_file_content(content)
+
+    def _load_table(self, data_spec, data_copy):
 
         trac_schema = data_spec.schema_def if data_spec.schema_def else data_spec.data_def.schema
         arrow_schema = _data.DataMapping.trac_to_arrow_schema(trac_schema) if trac_schema else None
 
-        # Decode options (metadata values) from the storage definition
-        options = dict()
-        for opt_key, opt_value in data_spec.storage_def.storageOptions.items():
-            options[opt_key] = _types.MetadataCodec.decode_value(opt_value)
+        storage_options = dict(
+            (opt_key, _types.MetadataCodec.decode_value(opt_value))
+            for opt_key, opt_value in data_spec.storage_def.storageOptions.items())
 
         storage = self.storage.get_data_storage(data_copy.storageKey)
+
         table = storage.read_table(
-            data_copy.storagePath,
-            data_copy.storageFormat,
-            arrow_schema,
-            storage_options=options)
+            data_copy.storagePath, data_copy.storageFormat, arrow_schema,
+            storage_options=storage_options)
 
-        return _data.DataItem(_api.ObjectType.DATA, table.schema, table)
+        return _data.DataItem.for_table(table, table.schema, trac_schema)
 
-    def _load_file(self, data_copy):
+    def _load_struct(self, data_copy):
 
         storage = self.storage.get_file_storage(data_copy.storageKey)
-        raw_bytes = storage.read_bytes(data_copy.storagePath)
 
-        return _data.DataItem(_api.ObjectType.FILE, raw_bytes=raw_bytes)
+        with storage.read_byte_stream(data_copy.storagePath) as stream:
+            with io.TextIOWrapper(stream, "utf-8") as text_stream:
+                struct = _struct.StructProcessor.load_struct(text_stream, data_copy.storageFormat)
+
+        return _data.DataItem.for_struct(struct)
 
 
 class SaveDataFunc(_LoadSaveDataFunc, NodeFunction[_data.DataSpec]):
@@ -541,24 +565,40 @@ class SaveDataFunc(_LoadSaveDataFunc, NodeFunction[_data.DataSpec]):
 
         # Do not save empty outputs (optional outputs that were not produced)
         if data_item.is_empty():
-            return _data.DataSpec.create_empty_spec(data_item.object_type)
+            return _data.DataSpec.create_empty_spec(data_item.object_type, data_item.schema_type)
 
-        if data_item.object_type == _api.ObjectType.DATA:
-            return self._save_data(data_item, data_spec, data_copy)
-
-        elif data_item.object_type == _api.ObjectType.FILE:
+        if data_item.object_type == _api.ObjectType.FILE:
             return self._save_file(data_item, data_spec, data_copy)
+
+        elif data_item.schema_type == _api.SchemaType.TABLE:
+            return self._save_table(data_item, data_spec, data_copy)
+
+        elif data_item.schema_type == _api.SchemaType.STRUCT:
+            return self._save_struct(data_item, data_spec, data_copy)
 
         else:
             raise _ex.EUnexpected()
 
-    def _save_data(self, data_item, data_spec, data_copy):
+    def _save_file(self, data_item, data_spec, data_copy):
+
+        if data_item.content is None:
+            raise _ex.EUnexpected()
+
+        storage = self.storage.get_file_storage(data_copy.storageKey)
+        storage.write_bytes(data_copy.storagePath, data_item.content)
+
+        data_spec = copy.deepcopy(data_spec)
+        data_spec.file_def.size = len(data_item.content)
+
+        return data_spec
+
+    def _save_table(self, data_item, data_spec, data_copy):
 
         # Current implementation will always put an Arrow table in the data item
         # Empty tables are allowed, so explicitly check if table is None
         # Testing "if not data_item.table" will fail for empty tables
 
-        if data_item.table is None:
+        if data_item.content is None:
             raise _ex.EUnexpected()
 
         # Decode options (metadata values) from the storage definition
@@ -569,7 +609,7 @@ class SaveDataFunc(_LoadSaveDataFunc, NodeFunction[_data.DataSpec]):
         storage = self.storage.get_data_storage(data_copy.storageKey)
         storage.write_table(
             data_copy.storagePath, data_copy.storageFormat,
-            data_item.table,
+            data_item.content,
             storage_options=options, overwrite=False)
 
         data_spec = copy.deepcopy(data_spec)
@@ -580,16 +620,26 @@ class SaveDataFunc(_LoadSaveDataFunc, NodeFunction[_data.DataSpec]):
 
         return data_spec
 
-    def _save_file(self, data_item, data_spec, data_copy):
+    def _save_struct(self, data_item, data_spec, data_copy):
 
-        if data_item.raw_bytes is None:
+        if data_item.content is None:
             raise _ex.EUnexpected()
 
+        struct_data = data_item.content
+        storage_format = data_copy.storageFormat
+
         storage = self.storage.get_file_storage(data_copy.storageKey)
-        storage.write_bytes(data_copy.storagePath, data_item.raw_bytes)
+
+        # Using the text wrapper closes the stream early, which is inefficient in the data layer
+        # Supporting text IO directly from the storage API would allow working with text streams more naturally
+        with storage.write_byte_stream(data_copy.storagePath) as stream:
+            with io.TextIOWrapper(stream, "utf-8") as text_stream:
+                _struct.StructProcessor.save_struct(struct_data, text_stream, storage_format)
 
         data_spec = copy.deepcopy(data_spec)
-        data_spec.file_def.size = len(data_item.raw_bytes)
+
+        if data_spec.data_def.schema is None and data_spec.data_def.schemaId is None:
+            data_spec.data_def.schema = data_item.trac_schema
 
         return data_spec
 

@@ -44,6 +44,7 @@ import tracdap.rt._impl.core.logging as _log
 class DataSpec:
 
     object_type: _meta.ObjectType
+    schema_type: _meta.SchemaType
     data_item: str
 
     data_def: _meta.DataDefinition
@@ -58,8 +59,15 @@ class DataSpec:
             storage_def: _meta.StorageDefinition,
             schema_def: tp.Optional[_meta.SchemaDefinition] = None) -> "DataSpec":
 
+        if schema_def:
+            schema_type = schema_def.schemaType
+        elif data_def.schema:
+            schema_type = data_def.schema.schemaType
+        else:
+            schema_type = _meta.SchemaType.SCHEMA_TYPE_NOT_SET
+
         return DataSpec(
-            _meta.ObjectType.DATA, data_item,
+            _meta.ObjectType.DATA, schema_type, data_item,
             data_def,
             storage_def=storage_def,
             schema_def=schema_def,
@@ -72,15 +80,15 @@ class DataSpec:
             storage_def: _meta.StorageDefinition) -> "DataSpec":
 
         return DataSpec(
-            _meta.ObjectType.FILE, data_item,
+            _meta.ObjectType.FILE, _meta.SchemaType.SCHEMA_TYPE_NOT_SET, data_item,
             file_def=file_def,
             storage_def=storage_def,
             data_def=None,
             schema_def=None)
 
     @staticmethod
-    def create_empty_spec(object_type: _meta.ObjectType):
-        return DataSpec(object_type, None, None, None, None, None)
+    def create_empty_spec(object_type: _meta.ObjectType, schema_type: _meta.SchemaType):
+        return DataSpec(object_type, schema_type, None, None, None, None, None)
 
     def is_empty(self):
         return self.data_item is None or len(self.data_item) == 0
@@ -100,32 +108,54 @@ class DataPartKey:
 class DataItem:
 
     object_type: _meta.ObjectType
+    schema_type: _meta.SchemaType
 
+    content: tp.Any = None
+    content_type: tp.Type = None
+    content_func: tp.Callable[[], tp.Any] = None
+
+    trac_schema: _meta.SchemaDefinition = None
+    native_schema: tp.Any = None
+
+    # TODO: Remove legacy API and use content / native_schema instead
     schema: pa.Schema = None
     table: tp.Optional[pa.Table] = None
-    batches: tp.Optional[tp.List[pa.RecordBatch]] = None
-
-    pandas: "tp.Optional[pandas.DataFrame]" = None
-    pyspark: tp.Any = None
-
-    raw_bytes: bytes = None
 
     def is_empty(self) -> bool:
-        if self.object_type == _meta.ObjectType.FILE:
-            return self.raw_bytes is None or len(self.raw_bytes) == 0
-        else:
-            return self.table is None and (self.batches is None or len(self.batches) == 0)
+        return self.content is None
 
     @staticmethod
-    def create_empty(object_type: _meta.ObjectType = _meta.ObjectType.DATA) -> "DataItem":
-        if object_type == _meta.ObjectType.DATA:
-            return DataItem(_meta.ObjectType.DATA, pa.schema([]))
+    def create_empty(
+            object_type: _meta.ObjectType = _meta.ObjectType.DATA,
+            schema_type: _meta.SchemaType = _meta.SchemaType.TABLE) -> "DataItem":
+
+        if object_type == _meta.ObjectType.DATA and schema_type == _meta.SchemaType.TABLE:
+            return DataItem(_meta.ObjectType.DATA, _meta.SchemaType.TABLE, schema=pa.schema([]))
         else:
-            return DataItem(object_type)
+            return DataItem(object_type, schema_type)
 
     @staticmethod
-    def for_file_content(raw_bytes: bytes):
-        return DataItem(_meta.ObjectType.FILE, raw_bytes=raw_bytes)
+    def for_table(table: pa.Table, schema: pa.Schema, trac_schema: _meta.SchemaDefinition) -> "DataItem":
+
+        return DataItem(
+            _meta.ObjectType.DATA, _meta.SchemaType.TABLE,
+            content=table, content_type=pa.Table,
+            trac_schema=trac_schema, native_schema=schema,
+            table=table, schema=schema)
+
+    @staticmethod
+    def for_struct(content: tp.Any):
+
+        return DataItem(
+            _meta.ObjectType.DATA, _meta.SchemaType.STRUCT,
+            content=content, content_type=type(content))
+
+    @staticmethod
+    def for_file_content(content: bytes):
+
+        return DataItem(
+            _meta.ObjectType.FILE, _meta.SchemaType.SCHEMA_TYPE_NOT_SET,
+            content=content, content_type=bytes)
 
 
 @dc.dataclass(frozen=True)
@@ -148,8 +178,11 @@ class DataView:
 
     @staticmethod
     def for_trac_schema(trac_schema: _meta.SchemaDefinition):
-        arrow_schema = DataMapping.trac_to_arrow_schema(trac_schema)
-        return DataView(_meta.ObjectType.DATA, trac_schema, arrow_schema, dict())
+        if trac_schema.schemaType == _meta.SchemaType.TABLE:
+            arrow_schema = DataMapping.trac_to_arrow_schema(trac_schema)
+            return DataView(_meta.ObjectType.DATA, trac_schema, arrow_schema, dict())
+        else:
+            return DataView(_meta.ObjectType.DATA, trac_schema, parts = dict())
 
     @staticmethod
     def for_file_item(file_item: DataItem):
@@ -381,29 +414,27 @@ class DataMapping:
         if not deltas:
             raise _ex.ETracInternal(f"Data view for part [{part.opaque_key}] does not contain any items")
 
+        # For a single delta, use the existing Arrow content
         if len(deltas) == 1:
             return cls.item_to_arrow(deltas[0])
 
-        batches = {
+        # For multiple deltas, construct a new table by assembling the record batches
+        # Atm no consideration is given to overwriting records based on business key
+        batches = iter(
             batch
             for delta in deltas
-            for batch in (
-                delta.batches
-                if delta.batches
-                else delta.table.to_batches())}
+            for batch in cls.item_to_arrow(delta).to_batches())
 
         return pa.Table.from_batches(batches) # noqa
 
     @classmethod
     def item_to_arrow(cls, item: DataItem) -> pa.Table:
 
-        if item.table is not None:
-            return item.table
+        if item.content_type != pa.Table:
+            detail = f"expected Arrow table, got [{item.content_type}]"
+            raise _ex.ETracInternal(f"Data item does not contain tabular data ({detail})")
 
-        if item.batches is not None:
-            return pa.Table.from_batches(item.batches, item.schema)  # noqa
-
-        raise _ex.ETracInternal(f"Data item does not contain any usable data")
+        return item.content
 
     @classmethod
     def arrow_to_pandas(

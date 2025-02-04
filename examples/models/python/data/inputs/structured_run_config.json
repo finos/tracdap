@@ -1,0 +1,30 @@
+{
+   "include_front_book": true,
+   "base_date": "2025-01-01",
+   "base_scenario": {
+      "scenario_name": "base",
+      "default_weight": 1.0,
+      "evolution_model": "perturb",
+      "apply_smoothing": true,
+      "correlated_scenario": {
+         "scenario_name": "correlated",
+         "default_weight": 1.0,
+         "evolution_model": "perturb_smooth",
+         "apply_smoothing": false
+      }
+   },
+   "stress_scenarios": {
+      "downturn": {
+         "scenario_name": "downturn",
+         "default_weight": 0.37,
+         "evolution_model": "perturb",
+         "apply_smoothing": false
+      },
+      "high_interest": {
+         "scenario_name": "high_interest",
+         "default_weight": 0.66,
+         "evolution_model": "perturb",
+         "apply_smoothing": false
+      }
+   }
+}
