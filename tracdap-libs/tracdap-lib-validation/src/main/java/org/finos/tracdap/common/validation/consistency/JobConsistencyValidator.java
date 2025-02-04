@@ -638,7 +638,7 @@ public class JobConsistencyValidator {
 
         if (requiredField.getCategorical() && !suppliedField.getCategorical()) {
             return ctx.error(String.format(
-                    "Field [%s] should not be categorical, but is not categorical in the supplied dataset",
+                    "Field [%s] should be categorical, but is not categorical in the supplied dataset",
                     requiredField.getFieldName()));
         }
 
