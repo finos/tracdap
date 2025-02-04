@@ -17,43 +17,25 @@
 
 package org.finos.tracdap.gateway.test;
 
-import io.netty.bootstrap.ServerBootstrap;
-import io.netty.buffer.Unpooled;
-import io.netty.channel.*;
-import io.netty.channel.nio.NioEventLoopGroup;
-import io.netty.channel.socket.nio.NioServerSocketChannel;
-import io.netty.handler.codec.http.*;
-import io.netty.handler.logging.LogLevel;
-import io.netty.handler.logging.LoggingHandler;
-import io.netty.util.CharsetUtil;
-import io.netty.util.concurrent.DefaultThreadFactory;
+import com.sun.net.httpserver.HttpExchange;
+import com.sun.net.httpserver.HttpHandler;
+import com.sun.net.httpserver.HttpServer;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.net.URI;
-import java.nio.channels.FileChannel;
+import java.net.InetSocketAddress;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardOpenOption;
-import java.time.Clock;
-import java.time.ZoneOffset;
-import java.time.format.DateTimeFormatter;
-import java.time.temporal.ChronoUnit;
-import java.util.Locale;
-import java.util.concurrent.Callable;
-import java.util.concurrent.TimeUnit;
-
-import static io.netty.handler.codec.http.HttpResponseStatus.*;
-import static io.netty.handler.codec.http.HttpResponseStatus.OK;
-import static io.netty.handler.codec.http.HttpVersion.HTTP_1_0;
-import static io.netty.handler.codec.http.HttpVersion.HTTP_1_1;
 
 public class Http1TestServer {
 
-    // Very quick test server, serves static content to test proxying at HTTP level
-    // Based on the Netty example here:
-    // https://github.com/netty/netty/tree/4.1/example/src/main/java/io/netty/example/http/file
+    // Use the JDK HttpServer in com.sun.net as the test server for HTTP proxy testing
+    // This provides a standard implementation, rather than relying on another implementation in Netty
+    // It also avoids any duplication of assumptions between the gateway and the test server
+
+    private static final long TIMEOUT_DURATION = 5 * 1000;  // Wait 1 minute for timeout tests
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
@@ -61,9 +43,7 @@ public class Http1TestServer {
     private final Path contentRoot;
     private final boolean simulateTimeout;
 
-    EventLoopGroup bossGroup;
-    EventLoopGroup workerGroup;
-    private ChannelFuture serverChannel;
+    private HttpServer jdkServer;
 
     public Http1TestServer(int port, Path contentRoot) {
         this(port, contentRoot, false);
@@ -75,227 +55,99 @@ public class Http1TestServer {
         this.simulateTimeout = simulateTimeout;
     }
 
-    public void run() throws Exception {
+    public void start() throws Exception {
 
-        bossGroup = new NioEventLoopGroup(1, new DefaultThreadFactory("http1_boss"));
-        workerGroup = new NioEventLoopGroup(1, new DefaultThreadFactory("http1_worker"));
+        // Create an HTTP server
+        jdkServer = HttpServer.create(new InetSocketAddress(port), 0);
 
-        ServerBootstrap bootstrap = new ServerBootstrap()
-                .group(bossGroup, workerGroup)
-                .channel(NioServerSocketChannel.class)
-                .handler(new LoggingHandler(LogLevel.INFO))
-                .childHandler(new Http1ServerInitializer());
+        if (simulateTimeout)
+            // Handler that will time out the request
+            jdkServer.createContext("/", new TimeoutHandler());
+        else
+            // Add a context to serve files
+            jdkServer.createContext("/", new FileHandler(contentRoot));
 
-        this.serverChannel = bootstrap.bind(port);
+        jdkServer.setExecutor(null); // Use a default executor
+        jdkServer.start();
 
-        // Wait for the server to come up
-        serverChannel.sync();
-
-        log.info("Test server is up on port {}", port);
+        log.info("Server is running on http://localhost:{} and serving files from {}", port, contentRoot);
     }
 
-    public void shutdown() {
+    public void stop() {
 
-        try {
-
-            if (serverChannel == null)
-                return;
-
-            var closePromise = serverChannel.channel().newPromise();
-            serverChannel.channel().close(closePromise);
-
-            closePromise.addListener(ch -> {
-                workerGroup.shutdownGracefully(1, 1, TimeUnit.SECONDS);
-                bossGroup.shutdownGracefully(1, 1, TimeUnit.SECONDS);
-            });
-
-            closePromise.sync();
-            log.info("Test server has gone done");
-        }
-        catch (InterruptedException e) {
-            log.warn("Interrupt during test server shutdown");
-            Thread.currentThread().interrupt();
-        }
+        jdkServer.stop(0);
     }
 
-    private class Http1ServerInitializer extends ChannelInitializer<Channel> {
+    static class FileHandler implements HttpHandler {
 
-        @Override
-        protected void initChannel(Channel ch) {
+        private final Path contentRoot;
 
-            log.info("New connection from {}", ch.remoteAddress());
+        public FileHandler(Path contentRoot) {
 
-            ChannelPipeline p = ch.pipeline();
-            p.addLast(new HttpRequestDecoder());
-            p.addLast(new HttpResponseEncoder());
-            p.addLast(new Http1Handler());
-        }
-    }
+            this.contentRoot = contentRoot.toAbsolutePath();
 
-    private class Http1Handler extends SimpleChannelInboundHandler<HttpObject> {
-
-        private HttpRequest request;
-        //private HttpContent content;
-
-        @Override
-        protected void channelRead0(ChannelHandlerContext ctx, HttpObject msg) throws Exception {
-
-            if (msg instanceof HttpRequest) {
-                request = (HttpRequest) msg;
-                log.info("New HTTP request: {} {}", request.method(), request.uri());
+            if (!Files.isDirectory(this.contentRoot)) {
+                throw new IllegalArgumentException("Root directory does not exist or is not a directory: " + contentRoot);
             }
-
-//            if (msg instanceof HttpContent)
-//                content = (HttpContent) msg;
-
-            if (request == null)
-                throw new RuntimeException("Bad request");
-
-            if (request.method() == HttpMethod.GET || request.method() == HttpMethod.HEAD) {
-                var uri = URI.create(request.uri());
-
-                if (simulateTimeout)
-                    simulateTimeout(ctx);
-                else
-                    serveStaticContent(ctx, uri, request.method());
-            }
-            else
-                sendError(ctx, BAD_REQUEST);
         }
 
         @Override
-        public void channelReadComplete(ChannelHandlerContext ctx) {
-            ctx.flush();
-        }
+        public void handle(HttpExchange exchange) throws IOException {
 
-        @Override
-        public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
-            cause.printStackTrace();
-            ctx.close();
-        }
+            var requestPath = exchange.getRequestURI().getPath();
+            var requestedFile = contentRoot.resolve("." + requestPath).normalize(); // Resolve file path safely
 
-        private void serveStaticContent(ChannelHandlerContext ctx, URI uri, HttpMethod method) throws IOException {
-
-            var uriPath = uri.getPath().startsWith("/")
-                    ? uri.getPath().substring(1)
-                    : uri.getPath();
-
-            var fullPath = contentRoot.resolve(uriPath);
-
-            if (!Files.exists(fullPath)) {
-                sendError(ctx, NOT_FOUND);
+            // Check if the requested file is within the root directory
+            if (!requestedFile.startsWith(contentRoot)) {
+                send404(exchange);
                 return;
             }
 
-            if (!Files.isRegularFile(fullPath) || !Files.isReadable(fullPath)) {
-                sendError(ctx, FORBIDDEN);
+            // Check if the file exists and is readable
+            if (!Files.exists(requestedFile) || !Files.isReadable(requestedFile)) {
+                send404(exchange);
                 return;
             }
 
-            var keepAlive = HttpUtil.isKeepAlive(request);
-
-            // This is not a reliable way of determining the MIME type, but good enough for our test server!
-            var fileType = "text/plain"; // Files.probeContentType(fullPath);
-            var fileLength = Files.size(fullPath);
-
-            var response = new DefaultHttpResponse(HTTP_1_1, OK);
-            response.headers().set(HttpHeaderNames.CONTENT_TYPE, fileType);
-            response.headers().set(HttpHeaderNames.CONTENT_LENGTH, fileLength);
-            setDateAndCacheHeaders(response, fullPath);
-
-            if (!keepAlive)
-                response.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
-            else if (request.protocolVersion().equals(HTTP_1_0))
-                response.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE);
-
-            ctx.write(response);
-
-            // For GET requests, set up transfer of the file content
-            if (method == HttpMethod.GET) {
-
-                var fileChannel = FileChannel.open(fullPath, StandardOpenOption.READ);
-                var fileRegion = new DefaultFileRegion(fileChannel, 0, fileLength);
-
-                // No SSL atm in the test server, so no need to chunk up the file
-
-                var sendFuture = ctx.write(fileRegion, ctx.newProgressivePromise());
-                var lastContentFuture = ctx.writeAndFlush(LastHttpContent.EMPTY_LAST_CONTENT);
-
-                // Option to monitor on sendFuture progress
-
-                if (!keepAlive) {
-                    // Close the connection when the whole content is written out.
-                    lastContentFuture.addListener(ChannelFutureListener.CLOSE);
-                }
+            // Do not send content or content length for HEAD requests
+            if (exchange.getRequestMethod().equalsIgnoreCase("HEAD")) {
+                exchange.sendResponseHeaders(200, -1);
+                return;
             }
 
-            // For HEAD requests, do not send any content
-            else {
+            // Regular request - Serve the file
 
-                ctx.writeAndFlush(LastHttpContent.EMPTY_LAST_CONTENT);
+            var fileBytes = Files.readAllBytes(requestedFile);
+            exchange.sendResponseHeaders(200, fileBytes.length);
 
-                if (!keepAlive)
-                    ctx.close();
+            try (var os = exchange.getResponseBody()) {
+                os.write(fileBytes);
             }
         }
 
-        private void simulateTimeout(ChannelHandlerContext ctx) {
+        // Helper method to send a 404 response
+        private void send404(HttpExchange exchange) throws IOException {
 
-            ctx.executor().schedule(
-                    (Callable<ChannelFuture>) ctx::close,
-                    60, TimeUnit.SECONDS);
-        }
+            var response = "NOT FOUND";
+            exchange.sendResponseHeaders(404, response.getBytes().length);
 
-        private void setDateAndCacheHeaders(HttpResponse response, Path fileToCache) throws IOException {
-
-            var HTTP_CACHE_SECONDS = 3600;
-
-            var clock = Clock.systemUTC();
-            var currentTime = clock.instant();
-            var expireTime = currentTime.plus(HTTP_CACHE_SECONDS, ChronoUnit.SECONDS);
-            var lastModifiedTime = Files.getLastModifiedTime(fileToCache).toInstant();
-
-            // HTTP date format
-            var formatter = DateTimeFormatter.ofPattern("EEE, dd MMM yyyy HH:mm:ss 'GMT'")
-                    .withZone(ZoneOffset.UTC)
-                    .withLocale(Locale.ENGLISH);
-
-            response.headers().set(HttpHeaderNames.DATE, formatter.format(currentTime));
-            response.headers().set(HttpHeaderNames.EXPIRES, formatter.format(expireTime));
-            response.headers().set(HttpHeaderNames.CACHE_CONTROL, "private, max-age=" + HTTP_CACHE_SECONDS);
-            response.headers().set(HttpHeaderNames.LAST_MODIFIED, formatter.format(lastModifiedTime));
-        }
-
-        private void sendError(ChannelHandlerContext ctx, HttpResponseStatus status) {
-
-            var response = new DefaultFullHttpResponse(
-                    HTTP_1_1, status, Unpooled.copiedBuffer("Failure: " + status + "\r\n", CharsetUtil.UTF_8));
-
-            response.headers().set(HttpHeaderNames.CONTENT_TYPE, "text/plain; charset=UTF-8");
-
-            sendAndCleanupConnection(ctx, response);
-        }
-
-        private void sendAndCleanupConnection(ChannelHandlerContext ctx, FullHttpResponse response) {
-
-            HttpUtil.setContentLength(response, response.content().readableBytes());
-
-            var keepAlive = HttpUtil.isKeepAlive(request);
-
-            if (!keepAlive) {
-                // We're going to close the connection as soon as the response is sent,
-                // so we should also make it clear for the client.
-                response.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
+            try (var os = exchange.getResponseBody()) {
+                os.write(response.getBytes());
             }
-            else if (request.protocolVersion().equals(HTTP_1_0)) {
-                response.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE);
+        }
+    }
+
+    static class TimeoutHandler implements HttpHandler {
+
+        @Override
+        public void handle(HttpExchange exchange) {
+
+            try {
+                Thread.sleep(TIMEOUT_DURATION);
+                exchange.close();
             }
-
-            ChannelFuture flushPromise = ctx.writeAndFlush(response);
-
-            if (!keepAlive) {
-                // Close the connection as soon as the response is sent.
-                flushPromise.addListener(ChannelFutureListener.CLOSE);
+            catch (InterruptedException e) {
+                exchange.close();
             }
         }
     }
