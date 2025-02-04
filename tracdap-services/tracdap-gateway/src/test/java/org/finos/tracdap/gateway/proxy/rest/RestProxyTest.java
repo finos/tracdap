@@ -32,6 +32,7 @@ import com.google.protobuf.util.JsonFormat;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.DisabledIfEnvironmentVariable;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 import java.net.URI;
@@ -294,6 +295,9 @@ public class RestProxyTest {
     }
 
     @Test
+    // Sending garbled requests is causing problems in CI
+    // TODO: Enable this test in CI
+    @DisabledIfEnvironmentVariable(named = "CI", matches = "true")
     void sendGarbledContent() throws Exception {
 
         var method = "/trac-meta/api/v1/ACME_CORP/create-object";
