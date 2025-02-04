@@ -292,15 +292,15 @@ class StructParser:
         if isinstance(annotation, _enum.EnumMeta):
             return self._parse_enum(location, raw_value, annotation)
 
+        if any(map(lambda _t: isinstance(annotation, _t), self.__generic_types)):
+            return self._parse_generic_class(location, raw_value, annotation)  # noqa
+
         if _dc.is_dataclass(annotation):
             return self._parser_dataclass(location, raw_value, annotation)
 
         # Basic support for Pydantic, if it is installed
-        if _pyd and isinstance(annotation, type) and issubclass(annotation, _pyd.BaseModel):
+        if _pyd and issubclass(annotation, _pyd.BaseModel):
             return self._parser_pydantic_model(location, raw_value, annotation)
-
-        if any(map(lambda _t: isinstance(annotation, _t), self.__generic_types)):
-            return self._parse_generic_class(location, raw_value, annotation)  # noqa
 
         return self._error(location, f"Cannot parse value of type {annotation.__name__}")
 
