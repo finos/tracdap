@@ -23,22 +23,23 @@ import org.finos.tracdap.api.PlatformInfoRequest;
 import org.finos.tracdap.api.PlatformInfoResponse;
 import org.finos.tracdap.gateway.TracPlatformGateway;
 import org.finos.tracdap.svc.meta.TracMetadataService;
-import org.finos.tracdap.test.http.Http1Client;
 import org.finos.tracdap.test.helpers.PlatformTest;
 
 import com.google.protobuf.Message;
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.Unpooled;
-import io.netty.handler.codec.http.HttpHeaderNames;
-import io.netty.handler.codec.http.HttpScheme;
 
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
-import java.util.Map;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.time.Duration;
 
-import static io.netty.util.NetUtil.LOCALHOST;
 import static org.finos.tracdap.test.meta.SampleMetadata.TEST_TENANT;
 
 
@@ -57,29 +58,37 @@ public class GrpcWebProxyTest {
             .startService(TracPlatformGateway.class)
             .build();
 
+    private static HttpClient client;
+
+    @BeforeAll
+    static void setupClient() {
+        client = HttpClient.newHttpClient();
+    }
+
     @Test
     void platformInfo() throws Exception {
 
         var method = "/tracdap.api.TracMetadataApi/platformInfo";
 
-        var metadata = Map.<CharSequence, Object>ofEntries(
-                Map.entry(HttpHeaderNames.CONTENT_TYPE, "application/grpc-web+proto"),
-                Map.entry(HttpHeaderNames.ACCEPT, "application/grpc-web+proto"),
-                Map.entry("x-grpc-web", 1),
-                Map.entry("x-user-agent", "trac-gateway-test"));
-
         var requestMessage = PlatformInfoRequest.newBuilder().build();
         var requestBytes = wrapLpm(requestMessage);
 
-        var client = new Http1Client(HttpScheme.HTTP, LOCALHOST, TEST_GW_PORT);
-        var call = client.postRequest(method, metadata, requestBytes);
-        call.await(TEST_TIMEOUT);
+        var readRequest = HttpRequest.newBuilder()
+                .POST(HttpRequest.BodyPublishers.ofByteArray(requestBytes.array()))
+                .uri(new URI("http://localhost:" + TEST_GW_PORT + method))
+                .version(HttpClient.Version.HTTP_1_1)
+                .header("content-type", "application/grpc-web+proto")
+                .header("accept", "application/grpc-web+proto")
+                .header("x-user-agent", "trac-gateway-test")
+                .header("x-grpc-web", "1")
+                .timeout(Duration.ofMillis(TEST_TIMEOUT))
+                .build();
 
-        Assertions.assertTrue(call.isDone());
-        Assertions.assertTrue(call.isSuccess());
+        var readResponse = client.send(readRequest, HttpResponse.BodyHandlers.ofByteArray());
+        Assertions.assertEquals(200, readResponse.statusCode());
 
-        var response = call.getNow();
-        var responseMessage = unwrapLpm(response.content(), PlatformInfoResponse.class);
+        var responseBytes = ByteBuffer.wrap(readResponse.body());
+        var responseMessage = unwrapLpm(responseBytes, PlatformInfoResponse.class);
 
         // This is set in trac-unit.yaml
         Assertions.assertEquals("TEST_ENVIRONMENT", responseMessage.getEnvironment());
@@ -93,24 +102,25 @@ public class GrpcWebProxyTest {
 
         var method = "/tracdap.api.TracMetadataApi/listTenants";
 
-        var metadata = Map.<CharSequence, Object>ofEntries(
-                Map.entry(HttpHeaderNames.CONTENT_TYPE, "application/grpc-web+proto"),
-                Map.entry(HttpHeaderNames.ACCEPT, "application/grpc-web+proto"),
-                Map.entry("x-grpc-web", 1),
-                Map.entry("x-user-agent", "trac-gateway-test"));
-
         var requestMessage = ListTenantsRequest.newBuilder().build();
         var requestBytes = wrapLpm(requestMessage);
 
-        var client = new Http1Client(HttpScheme.HTTP, LOCALHOST, TEST_GW_PORT);
-        var call = client.postRequest(method, metadata, requestBytes);
-        call.await(TEST_TIMEOUT);
+        var readRequest = HttpRequest.newBuilder()
+                .POST(HttpRequest.BodyPublishers.ofByteArray(requestBytes.array()))
+                .uri(new URI("http://localhost:" + TEST_GW_PORT + method))
+                .version(HttpClient.Version.HTTP_1_1)
+                .header("content-type", "application/grpc-web+proto")
+                .header("accept", "application/grpc-web+proto")
+                .header("x-user-agent", "trac-gateway-test")
+                .header("x-grpc-web", "1")
+                .timeout(Duration.ofMillis(TEST_TIMEOUT))
+                .build();
 
-        Assertions.assertTrue(call.isDone());
-        Assertions.assertTrue(call.isSuccess());
+        var readResponse = client.send(readRequest, HttpResponse.BodyHandlers.ofByteArray());
+        Assertions.assertEquals(200, readResponse.statusCode());
 
-        var response = call.getNow();
-        var responseMessage = unwrapLpm(response.content(), ListTenantsResponse.class);
+        var responseBytes = ByteBuffer.wrap(readResponse.body());
+        var responseMessage = unwrapLpm(responseBytes, ListTenantsResponse.class);
 
         // There should be at least one tenant and the ACME_CORP tenant used in the test setup should exist
 
@@ -122,39 +132,38 @@ public class GrpcWebProxyTest {
         System.out.println("List tenants found the testing tenant: " + acmeTenant.get().getDescription());
     }
 
-    private <T extends Message> ByteBuf wrapLpm(T msg) {
+    private <T extends Message> ByteBuffer wrapLpm(T msg) {
 
-        var msgBytes = Unpooled.wrappedBuffer(msg.toByteArray());
-        var lpmPrefix = Unpooled.wrappedBuffer(new byte[5]);
-        lpmPrefix.writerIndex(0);
-        lpmPrefix.readerIndex(0);
-        lpmPrefix.writeByte(0);
-        lpmPrefix.writeInt(msgBytes.readableBytes());
+        var msgBytes = msg.toByteArray();
+        var lpm = ByteBuffer.allocate(5 + msgBytes.length);
+        lpm.order(ByteOrder.LITTLE_ENDIAN);
+        lpm.put((byte) 0x00);
+        lpm.putInt(msgBytes.length);
+        lpm.put(msgBytes);
 
-        return Unpooled.wrappedBuffer(lpmPrefix, msgBytes);
+        return lpm;
     }
 
     @SuppressWarnings("unchecked")
-    private <T extends Message> T unwrapLpm(ByteBuf buf, Class<T> msgClass) throws Exception {
+    private <T extends Message> T unwrapLpm(ByteBuffer buf, Class<T> msgClass) throws Exception {
 
         try {
 
             var builder = (T.Builder) msgClass.getMethod("newBuilder").invoke(null);
 
-            var lpmPrefix = buf.readSlice(5);
-            var flag = lpmPrefix.readByte();
-            var length = lpmPrefix.readInt();
+            var flag = buf.get();
+            var length = buf.getInt();
 
             if ((flag & (byte) 0x01) != (byte) 0x00)
                 throw new RuntimeException("LPM compression not supported in gateway tests");
 
             var msgBytes = new byte[length];
-            buf.readBytes(msgBytes);
+            buf.get(msgBytes);
 
             return (T) builder.mergeFrom(msgBytes).build();
         }
         finally {
-            buf.release();
+            buf.clear();
         }
     }
 }

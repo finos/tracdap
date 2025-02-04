@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.test.http;
+package org.finos.tracdap.gateway.test;
 
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.buffer.Unpooled;
@@ -49,7 +49,7 @@ import static io.netty.handler.codec.http.HttpResponseStatus.OK;
 import static io.netty.handler.codec.http.HttpVersion.HTTP_1_0;
 import static io.netty.handler.codec.http.HttpVersion.HTTP_1_1;
 
-public class Http1Server {
+public class Http1TestServer {
 
     // Very quick test server, serves static content to test proxying at HTTP level
     // Based on the Netty example here:
@@ -65,11 +65,11 @@ public class Http1Server {
     EventLoopGroup workerGroup;
     private ChannelFuture serverChannel;
 
-    public Http1Server(int port, Path contentRoot) {
+    public Http1TestServer(int port, Path contentRoot) {
         this(port, contentRoot, false);
     }
 
-    public Http1Server(int port, Path contentRoot, boolean simulateTimeout) {
+    public Http1TestServer(int port, Path contentRoot, boolean simulateTimeout) {
         this.port = port;
         this.contentRoot = contentRoot;
         this.simulateTimeout = simulateTimeout;

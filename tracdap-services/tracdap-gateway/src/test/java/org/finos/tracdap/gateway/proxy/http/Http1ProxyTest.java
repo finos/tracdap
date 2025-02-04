@@ -19,23 +19,23 @@ package org.finos.tracdap.gateway.proxy.http;
 
 import org.finos.tracdap.common.startup.StandardArgs;
 import org.finos.tracdap.common.startup.Startup;
-
-import io.netty.handler.codec.http.*;
 import org.finos.tracdap.gateway.TracPlatformGateway;
 import org.finos.tracdap.test.helpers.PlatformTestHelpers;
-import org.finos.tracdap.test.http.Http1Client;
-import org.finos.tracdap.test.http.Http1Server;
+import org.finos.tracdap.gateway.test.Http1TestServer;
 import org.finos.tracdap.tools.secrets.SecretTool;
+
 import org.junit.jupiter.api.*;
 
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
-
-import static io.netty.util.NetUtil.LOCALHOST;
 
 
 public class Http1ProxyTest {
@@ -54,9 +54,11 @@ public class Http1ProxyTest {
     private static Path rootDir;
     private static final int svrPort = 8090;
     private static final int timeoutSvrPort = 8091;
-    private static Http1Server svr;
-    private static Http1Server timeoutSvr;
+    private static Http1TestServer svr;
+    private static Http1TestServer timeoutSvr;
     private static TracPlatformGateway gateway;
+
+    private static HttpClient client;
 
     @BeforeAll
     public static void setupServer() throws Exception {
@@ -90,10 +92,10 @@ public class Http1ProxyTest {
 
         // Start up our test server to use as a target
 
-        svr = new Http1Server(svrPort, svrContentDir);
+        svr = new Http1TestServer(svrPort, svrContentDir);
         svr.run();
 
-        timeoutSvr = new Http1Server(timeoutSvrPort, svrContentDir, true);
+        timeoutSvr = new Http1TestServer(timeoutSvrPort, svrContentDir, true);
         timeoutSvr.run();
 
         // Start the gateway
@@ -113,6 +115,11 @@ public class Http1ProxyTest {
         gateway.start();
     }
 
+    @BeforeAll
+    static void setupClient() {
+        client = HttpClient.newHttpClient();
+    }
+
     @AfterAll
     public static void tearDownServer() {
 
@@ -129,46 +136,45 @@ public class Http1ProxyTest {
     @Test
     void http1SimpleProxy_head() throws Exception {
 
-        var client = new Http1Client(HttpScheme.HTTP, LOCALHOST, TEST_GW_PORT);
-        var request = client.headRequest(TEST_URL_SAMPLE_DOC);
-        request.await(TEST_TIMEOUT);
+        var request = java.net.http.HttpRequest.newBuilder()
+                .method("HEAD", java.net.http.HttpRequest.BodyPublishers.noBody())
+                .uri(new URI("http://localhost:" + TEST_GW_PORT + TEST_URL_SAMPLE_DOC))
+                .version(HttpClient.Version.HTTP_1_1)
+                .timeout(Duration.ofMillis(TEST_TIMEOUT))
+                .build();
 
-        Assertions.assertTrue(request.isDone());
-        Assertions.assertTrue(request.isSuccess());
-
-        var response = request.getNow();
-        var contentLength = response.headers().getInt(HttpHeaderNames.CONTENT_LENGTH);
+        var response = client.send(request, HttpResponse.BodyHandlers.ofString());
+        var contentLength = response.headers().firstValueAsLong("content-length").orElseThrow();
 
         var fsPath = rootDir.resolve(TEST_FILE_LOCAL_PATH);
         var fsLength = Files.size(fsPath);
 
-        Assertions.assertEquals(HttpResponseStatus.OK, response.status());
-        Assertions.assertEquals(fsLength, (long) contentLength);
+        Assertions.assertEquals(200, response.statusCode());
+        Assertions.assertEquals(200, response.statusCode());
+        Assertions.assertEquals(fsLength, contentLength);
     }
 
     @Test
     void http1SimpleProxy_get() throws Exception {
 
-        var client = new Http1Client(HttpScheme.HTTP, LOCALHOST, TEST_GW_PORT);
-        var request = client.getRequest(TEST_URL_SAMPLE_DOC);
-        request.await(TEST_TIMEOUT);
+        var request = java.net.http.HttpRequest.newBuilder()
+                .GET()
+                .uri(new URI("http://localhost:" + TEST_GW_PORT + TEST_URL_SAMPLE_DOC))
+                .version(HttpClient.Version.HTTP_1_1)
+                .timeout(Duration.ofMillis(TEST_TIMEOUT))
+                .build();
 
-        Assertions.assertTrue(request.isDone());
-        Assertions.assertTrue(request.isSuccess());
-
-        var response = request.getNow();
-        var contentLength = response.headers().getInt(HttpHeaderNames.CONTENT_LENGTH);
-        var content = response.content().readCharSequence(contentLength, StandardCharsets.UTF_8);
+        var response = client.send(request, HttpResponse.BodyHandlers.ofString());
+        var contentLength = response.headers().firstValueAsLong("content-length").orElseThrow();
+        var content = response.body();
 
         var fsPath = rootDir.resolve(TEST_FILE_LOCAL_PATH);
         var fsLength = Files.size(fsPath);
         var fsContent = Files.readString(fsPath, StandardCharsets.UTF_8);
 
-        Assertions.assertEquals(HttpResponseStatus.OK, response.status());
-        Assertions.assertEquals(fsLength, (long) contentLength);
+        Assertions.assertEquals(200, response.statusCode());
+        Assertions.assertEquals(fsLength, contentLength);
         Assertions.assertEquals(fsContent, content);
-
-        response.release();
     }
 
     @Test @Disabled
@@ -189,37 +195,31 @@ public class Http1ProxyTest {
     @Test
     void http1SimpleProxy_notFound() throws Exception {
 
-        var client = new Http1Client(HttpScheme.HTTP, LOCALHOST, TEST_GW_PORT);
-        var request = client.getRequest(TEST_URL_MISSING_DOC);
-        request.await(TEST_TIMEOUT);
+        var request = java.net.http.HttpRequest.newBuilder()
+                .GET()
+                .uri(new URI("http://localhost:" + TEST_GW_PORT + TEST_URL_MISSING_DOC))
+                .version(HttpClient.Version.HTTP_1_1)
+                .timeout(Duration.ofMillis(TEST_TIMEOUT))
+                .build();
 
         // Should be a successful response with error code 404
-
-        Assertions.assertTrue(request.isDone());
-        Assertions.assertTrue(request.isSuccess());
-
-        var response = request.getNow();
-
-        Assertions.assertEquals(HttpResponseStatus.NOT_FOUND, response.status());
-
-        response.release();
+        var response = client.send(request, HttpResponse.BodyHandlers.ofString());
+        Assertions.assertEquals(404, response.statusCode());
     }
 
     @Test
     void http1SimpleProxy_serverDown() throws Exception {
 
-        var client = new Http1Client(HttpScheme.HTTP, LOCALHOST, TEST_GW_PORT);
-        var request = client.getRequest(TEST_URL_SERVER_DOWN);
-        request.await(TEST_TIMEOUT);
+        var request = java.net.http.HttpRequest.newBuilder()
+                .GET()
+                .uri(new URI("http://localhost:" + TEST_GW_PORT + TEST_URL_SERVER_DOWN))
+                .version(HttpClient.Version.HTTP_1_1)
+                .timeout(Duration.ofMillis(TEST_TIMEOUT))
+                .build();
 
         // Should be a successful response with error code 503, source server is not available
-
-        Assertions.assertTrue(request.isDone());
-        Assertions.assertTrue(request.isSuccess());
-
-        var response = request.getNow();
-
-        Assertions.assertEquals(HttpResponseStatus.SERVICE_UNAVAILABLE, response.status());
+        var response = client.send(request, HttpResponse.BodyHandlers.ofString());
+        Assertions.assertEquals(503, response.statusCode());
     }
 
     @Test @Disabled
@@ -227,40 +227,35 @@ public class Http1ProxyTest {
 
         // Timeout handling not implemented yet in GW
 
-        var client = new Http1Client(HttpScheme.HTTP, LOCALHOST, TEST_GW_PORT);
-        var request = client.getRequest(TEST_URL_SERVER_TIMEOUT);
-        request.await(TEST_TIMEOUT);
+        var request = java.net.http.HttpRequest.newBuilder()
+                .GET()
+                .uri(new URI("http://localhost:" + TEST_GW_PORT + TEST_URL_SERVER_TIMEOUT))
+                .version(HttpClient.Version.HTTP_1_1)
+                .timeout(Duration.ofMillis(TEST_TIMEOUT))
+                .build();
 
         // Should be a successful response with error code 504, source server timed out
-
-        Assertions.assertTrue(request.isDone());
-        Assertions.assertTrue(request.isSuccess());
-
-        var response = request.getNow();
-
-        Assertions.assertEquals(HttpResponseStatus.GATEWAY_TIMEOUT, response.status());
+        var response = client.send(request, HttpResponse.BodyHandlers.ofString());
+        Assertions.assertEquals(504, response.statusCode());
     }
 
     @Test
     void http1SimpleProxy_gatewayRedirect() throws Exception {
 
-        var client = new Http1Client(HttpScheme.HTTP, LOCALHOST, TEST_GW_PORT);
-        var request = client.getRequest("/");
-        request.await(TEST_TIMEOUT);
+        var request = java.net.http.HttpRequest.newBuilder()
+                .GET()
+                .uri(new URI("http://localhost:" + TEST_GW_PORT + "/"))
+                .version(HttpClient.Version.HTTP_1_1)
+                .timeout(Duration.ofMillis(TEST_TIMEOUT))
+                .build();
 
-        // Should be a successful response with error code 404
+        // Expect the gateway to respond with a redirect
 
-        Assertions.assertTrue(request.isDone());
-        Assertions.assertTrue(request.isSuccess());
+        var response = client.send(request, HttpResponse.BodyHandlers.ofString());
+        var location = response.headers().firstValue("location").orElseThrow();
 
-        var response = request.getNow();
-        var location = response.headers().get(HttpHeaderNames.LOCATION);
-
-        Assertions.assertEquals(HttpResponseStatus.FOUND, response.status());
+        Assertions.assertEquals(302, response.statusCode());
         Assertions.assertEquals("/static/docs/", location);
-
-        if (response.content().refCnt() > 0)
-            response.release();
     }
 
 }

@@ -18,6 +18,7 @@
 plugins {
     id "com.google.protobuf"
     id "java-library"
+    id "idea"
 }
 
 apply from: "${rootProject.projectDir.path}/gradle/base-java.gradle"
