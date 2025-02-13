@@ -20,7 +20,7 @@ version: 2
 
 # Use latest stable image and Python version (updated Jan 25)
 build:
-  os: ubuntu-24.10
+  os: ubuntu-24.04
   tools:
     python: "3.13"
 
