@@ -37,6 +37,9 @@ dependencies {
     implementation "com.azure:azure-storage-blob-batch"
     implementation "com.azure:azure-identity"
 
+    // Feb 2025: Force version for compliance (can be removed once Azure updates)
+    implementation group: 'net.minidev', name: 'json-smart', version: '2.5.2'
+
     testImplementation project(path: ":tracdap-lib-data", configuration: "testSuite")
 }
 
