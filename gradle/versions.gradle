@@ -26,7 +26,7 @@ ext {
     license_check_plugin_version = "2.8"
 
     // Core platform technologies
-    netty_version = '4.1.117.Final'
+    netty_version = '4.1.118.Final'
     guava_version = '33.4.0-jre'
     proto_version = '4.29.3'
     grpc_version = '1.70.0'
