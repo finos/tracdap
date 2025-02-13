@@ -4,7 +4,11 @@
 protobuf ~= 5.29.3
 grpcio-tools ~= 1.70.0
 protoc-wheel-0 >= 25, < 26
-googleapis-common-protos >= 1.63, < 2.0
+
+# Google stopped shipping proto files as part of the API package in version 1.67
+# Restrict version numbers for now until we get a better solution
+
+googleapis-common-protos >= 1.63, < 1.67
 
 # Doc generation
 sphinx ~= 8.1.3
