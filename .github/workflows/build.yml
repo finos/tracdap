@@ -10,7 +10,7 @@ on:
 
 env:
   JAVA_DISTRIBUTION: "zulu"
-  PYTHON_VERSION: "3.13"
+  PYTHON_VERSION: "3.12"
   NODE_VERSION: "22"
 
 
