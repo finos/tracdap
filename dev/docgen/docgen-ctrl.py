@@ -34,14 +34,14 @@ ROOT_DIR = SCRIPT_DIR\
     .joinpath("../..") \
     .resolve()
 
+CODEGEN_SCRIPT = ROOT_DIR \
+    .joinpath('dev/codegen/protoc-ctrl.py')
+
 DOC_DIR = ROOT_DIR \
     .joinpath("doc")
 
-BUILD_DIR = ROOT_DIR \
-    .joinpath('build/doc')
-
-CODEGEN_SCRIPT = ROOT_DIR \
-    .joinpath('dev/codegen/protoc-ctrl.py')
+DEFAULT_BUILD_DIR = ROOT_DIR.joinpath('build/doc')
+BUILD_DIR = os.getenv("TRAC_DOC_BUILD_DIR") or DEFAULT_BUILD_DIR
 
 
 class DocGen:
