@@ -80,7 +80,8 @@ packaging >= 23.0
 
 # Compliance dependencies
 
-safety >= 3.2, < 4.0
+# Safety 3.3 introduces a GPL dependency, excluding for now
+safety >= 3.2, < 3.3
 
 # Series 3.x does not work with Python 3.11
 # Series 4.x does not work with Python 3.7

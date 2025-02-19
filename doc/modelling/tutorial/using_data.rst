@@ -3,9 +3,7 @@
 Chapter 2 - Using Data
 **********************
 
-This tutorial is based on example code which can be found in the
-`TRAC GitHub Repository <https://github.com/finos/tracdap>`_
-under *examples/models/python*.
+This tutorial is based on example code which can be found in the |examples_repo|.
 
 
 Wrap existing code
@@ -212,7 +210,7 @@ will be suffixed with a number.
 
 .. seealso::
     Full source code is available for the
-    `Using Data example on GitHub <https://github.com/finos/tracdap/tree/main/examples/models/python/src/tutorial/using_data.py>`_
+    :example:`Using Data example on GitHub <src/tutorial/using_data.py>`.
 
 Schema files
 ------------
@@ -298,4 +296,4 @@ for input and output schemas, so we need to use
 
 .. seealso::
     Full source code is available for the
-    `Schema Files example on GitHub <https://github.com/finos/tracdap/tree/main/examples/models/python/src/tutorial/schema_files.py>`_
+    :example:`Schema Files example on GitHub <src/tutorial/schema_files.py>`.

@@ -23,29 +23,7 @@ from tracdap.rt.metadata import *  # noqa DOCGEN_REMOVE
 
 # static_api overrides some metadata types for backwards compatibility with pre-0.8 versions
 # Make sure it is last in the list
-from .file_types import *
+from .constants import *
 from .model_api import *
 from .static_api import *
 
-# Map basic types into the root of the API package
-
-BOOLEAN = BasicType.BOOLEAN
-"""Synonym for :py:attr:`BasicType.BOOLEAN <tracdap.rt.metadata.BasicType.BOOLEAN>`"""
-
-INTEGER = BasicType.INTEGER
-"""Synonym for :py:attr:`BasicType.INTEGER <tracdap.rt.metadata.BasicType.INTEGER>`"""
-
-FLOAT = BasicType.FLOAT
-"""Synonym for :py:attr:`BasicType.FLOAT <tracdap.rt.metadata.BasicType.FLOAT>`"""
-
-DECIMAL = BasicType.DECIMAL
-"""Synonym for :py:attr:`BasicType.DECIMAL <tracdap.rt.metadata.BasicType.DECIMAL>`"""
-
-STRING = BasicType.STRING
-"""Synonym for :py:attr:`BasicType.STRING <tracdap.rt.metadata.BasicType.STRING>`"""
-
-DATE = BasicType.DATE
-"""Synonym for :py:attr:`BasicType.DATE <tracdap.rt.metadata.BasicType.DATE>`"""
-
-DATETIME = BasicType.DATETIME
-"""Synonym for :py:attr:`BasicType.DATETIME <tracdap.rt.metadata.BasicType.DATETIME>`"""

@@ -124,12 +124,13 @@ short_title = f"{project} {release}"
 # ones.
 extensions = [
     'sphinx.ext.autosectionlabel',
+    'sphinx.ext.extlinks',
     'sphinx.ext.autodoc',
     'sphinx.ext.autosummary',
     'autoapi.extension',
     
     'sphinx_design',
-    "sphinx_wagtail_theme"
+    "sphinx_wagtail_theme",
 ]
 
 # Custom templates are being used for autoapi
@@ -180,6 +181,14 @@ rst_prolog = """
 .. meta::
    :theme-color: #1D3D59
 """
+
+rst_epilog = """
+.. |examples_repo| replace:: `TRAC GitHub Repository <https://github.com/finos/tracdap>`__ under *examples/models/python*
+"""
+
+extlinks = {
+    "example": ("https://github.com/finos/tracdap/tree/main/examples/models/python/%s", "example at %s")
+}
 
 
 
