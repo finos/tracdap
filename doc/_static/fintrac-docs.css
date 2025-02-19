@@ -173,6 +173,10 @@ a.reference:not(:disabled):not(.disabled).active,
     color: #D9815E;
 }
 
+.toc .current > .toctree-expand {
+    background-color: #F2F2F2;
+}
+
 
 /* Sphinx Design Elements */
 
