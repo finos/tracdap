@@ -22,7 +22,7 @@ ext {
     // Gradle plugin versions
     proto_plugin_version = "0.9.4"
     nexus_publish_plugin_version = "2.0.0"
-    owasp_check_plugin_version = "10.0.1"
+    owasp_check_plugin_version = "12.1.0"
     license_check_plugin_version = "2.8"
 
     // Core platform technologies
