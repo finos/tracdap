@@ -3,9 +3,7 @@
 Chapter 1 - Hello World
 ***********************
 
-This tutorial is based on example code which can be found in the
-`TRAC GitHub Repository <https://github.com/finos/tracdap>`_
-under *examples/models/python*.
+This tutorial is based on example code which can be found in the |examples_repo|.
 
 
 Requirements
@@ -285,4 +283,4 @@ Now you should be able to run your model script and see the model output in the 
 
 .. seealso::
     Full source code is available for the
-    `Hello World example on GitHub <https://github.com/finos/tracdap/tree/main/examples/models/python/src/tutorial/hello_world.py>`_
+    :example:`Hello World example on GitHub <src/tutorial/hello_world.py>`.

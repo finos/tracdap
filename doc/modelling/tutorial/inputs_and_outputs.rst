@@ -3,9 +3,7 @@
 Chapter 3 - Inputs & Outputs
 ****************************
 
-This tutorial is based on example code which can be found in the
-`TRAC GitHub Repository <https://github.com/finos/tracdap>`_
-under *examples/models/python*.
+This tutorial is based on example code which can be found in the |examples_repo|.
 
 
 Optional Inputs & Outputs
@@ -62,7 +60,7 @@ produced then it is subject to all the same validation rules as any other datase
 
 .. seealso::
     Full source code is available for the
-    `Optional IO example on GitHub <https://github.com/finos/tracdap/tree/main/examples/models/python/src/tutorial/optional_io.py>`_
+    :example:`Optional IO example on GitHub <src/tutorial/optional_io.py>`.
 
 
 Dynamic Inputs & Outputs
@@ -267,4 +265,4 @@ and output will be the same.
 
 .. seealso::
     Full source code is available for the
-    `Dynamic IO examples on GitHub <https://github.com/finos/tracdap/tree/main/examples/models/python/src/tutorial/dynamic_io.py>`_
+    :example:`Dynamic IO examples on GitHub <src/tutorial/dynamic_io.py>`.
