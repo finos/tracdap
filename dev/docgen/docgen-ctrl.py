@@ -40,8 +40,8 @@ CODEGEN_SCRIPT = ROOT_DIR \
 DOC_DIR = ROOT_DIR \
     .joinpath("doc")
 
-DEFAULT_BUILD_DIR = ROOT_DIR.joinpath('build/doc')
-BUILD_DIR = os.getenv("TRAC_DOC_BUILD_DIR") or DEFAULT_BUILD_DIR
+BUILD_DIR = ROOT_DIR. \
+    joinpath('build/doc')
 
 
 class DocGen:
@@ -66,11 +66,16 @@ class DocGen:
 
         self._log = logging.getLogger(self.__class__.__name__)
 
+        self._build_dir = BUILD_DIR
+
+    def set_build_dir(self, build_dir: pathlib.Path):
+        self._build_dir = build_dir
+
     def clean(self):
 
         self._log_target()
 
-        self._rm_tree(BUILD_DIR)
+        self._rm_tree(self._build_dir)
 
     def all(self):
 
@@ -97,7 +102,7 @@ class DocGen:
             str(CODEGEN_SCRIPT), "api_doc",
             "--proto_path", "tracdap-api/tracdap-services/src/main/proto",
             "--proto_path", "tracdap-api/tracdap-metadata/src/main/proto",
-            "--out", "build/doc/code/platform_api",
+            "--out", f"{self._build_dir}/code/platform_api",
             "--package", "tracdap",
             "--no-internal"]
 
@@ -111,7 +116,7 @@ class DocGen:
 
         sphinx_exe = 'sphinx-build'
         sphinx_src = DOC_DIR
-        sphinx_dst = BUILD_DIR.joinpath('main').resolve()
+        sphinx_dst = self._build_dir.joinpath('main').resolve()
         sphinx_args = ['-M', 'html', f'{sphinx_src}', f'{sphinx_dst}']
 
         self._mkdir(sphinx_dst)
@@ -122,7 +127,7 @@ class DocGen:
         self._log_target()
 
         runtime_src = ROOT_DIR.joinpath('tracdap-runtime/python/src')
-        doc_src = BUILD_DIR.joinpath("code/runtime_python")
+        doc_src = self._build_dir.joinpath("code/runtime_python")
 
         # Set up the tracdap.rt package
         self._mkdir(doc_src.joinpath("tracdap"))
@@ -157,7 +162,7 @@ class DocGen:
         fix_import_modules = [
             'tracdap/rt/api/__init__.py',
             'tracdap/rt/api/model_api.py',
-            'tracdap/rt/api/static_api.py',
+            'tracdap/rt/api/static_api.py'
         ]
 
         for module in fix_import_modules:
@@ -172,7 +177,7 @@ class DocGen:
         codegen_args = [
             str(CODEGEN_SCRIPT), "python_doc",
             "--proto_path", "tracdap-api/tracdap-metadata/src/main/proto",
-            "--out", "build/doc/code/runtime_python"]
+            "--out", f"{self._build_dir}/code/runtime_python"]
 
         self._run_subprocess(codegen_exe, codegen_args)
         self._mv(doc_src.joinpath('tracdap/metadata.py'), doc_src.joinpath('tracdap/rt/metadata.py'))
@@ -319,15 +324,21 @@ def _find_targets(doc_gen: DocGen):
 
 if __name__ == "__main__":
 
-    _doc_gen = DocGen()
-    _targets = _find_targets(_doc_gen)
+    _docgen = DocGen()
+    _targets = _find_targets(_docgen)
 
     parser = argparse.ArgumentParser(description='Documentation generator')
     parser.add_argument(
         'targets', type=str, metavar="target", choices=list(_targets.keys()), nargs='+',
         help='The documentation targets to build')
+    parser.add_argument(
+        "--build-dir", type=pathlib.Path, metavar="build_dir", default=None,
+        help="Local of docgen build outputs")
 
     args = parser.parse_args()
+
+    if args.build_dir is not None:
+        _docgen.set_build_dir(args.build_dir)
 
     for target in args.targets:
         _targets[target].__call__()
