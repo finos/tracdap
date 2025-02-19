@@ -384,6 +384,12 @@ def load_schema(
 
 def define_file_type(extension: str, mime_type: str) -> FileType:
 
+    """
+    :type extension: str
+    :type mime_type: str
+    :rtype: :py:class:`FileType <tracdap.rt.metadata.FileType>`
+    """
+
     sa = _StaticApiHook.get_instance()
     return sa.define_file_type(extension, mime_type)
 
@@ -394,6 +400,15 @@ def define_input(
         optional: bool = False, dynamic: bool = False,
         input_props: _tp.Optional[_tp.Dict[str, _tp.Any]] = None):
 
+    """
+    :type requirement: :py:class:`SchemaDefinition <tracdap.rt.metadata.SchemaDefinition>` | :py:class:`FileType <tracdap.rt.metadata.FileType>`
+    :type label: str | None
+    :type optional: bool
+    :type dynamic: bool
+    :type input_props: dict[str, :py:class:`Value <tracdap.rt.metadata.Value>`
+    :rtype: :py:class:`ModelInputSchema <tracdap.rt.metadata.ModelInputSchema>`
+    """
+
     sa = _StaticApiHook.get_instance()
     return sa.define_input(requirement, label=label, optional=optional, dynamic=dynamic, input_props=input_props)
 
@@ -403,6 +418,15 @@ def define_output(
         label: _tp.Optional[str] = None,
         optional: bool = False, dynamic: bool = False,
         output_props: _tp.Optional[_tp.Dict[str, _tp.Any]] = None):
+
+    """
+    :type requirement: :py:class:`SchemaDefinition <tracdap.rt.metadata.SchemaDefinition>` | :py:class:`FileType <tracdap.rt.metadata.FileType>`
+    :type label: str | None
+    :type optional: bool
+    :type dynamic: bool
+    :type output_props: dict[str, :py:class:`Value <tracdap.rt.metadata.Value>`
+    :rtype: :py:class:`ModelOutputSchema <tracdap.rt.metadata.ModelOutputSchema>`
+    """
 
     sa = _StaticApiHook.get_instance()
     return sa.define_output(requirement, label=label, optional=optional, dynamic=dynamic, output_props=output_props)
@@ -502,6 +526,15 @@ def define_input_file(
         input_props: _tp.Optional[_tp.Dict[str, _tp.Any]] = None) \
         -> ModelInputSchema:
 
+    """
+    :type extension str
+    :type mime_type: sr
+    :type label: str | None
+    :type optional: bool
+    :type input_props: dict[str, Any] | None
+    :rtype: :py:class:`ModelInputSchema <tracdap.rt.metadata.ModelInputSchema>`
+    """
+
     file_type = define_file_type(extension, mime_type)
     return define_input(file_type, label=label, optional=optional, input_props=input_props)
 
@@ -511,6 +544,15 @@ def define_output_file(
         label: _tp.Optional[str] = None, optional: bool = False,
         output_props: _tp.Optional[_tp.Dict[str, _tp.Any]] = None) \
         -> ModelOutputSchema:
+
+    """
+    :type extension str
+    :type mime_type: sr
+    :type label: str | None
+    :type optional: bool
+    :type output_props: dict[str, Any] | None
+    :rtype: :py:class:`ModelOutputSchema <tracdap.rt.metadata.ModelOutputSchema>`
+    """
 
     file_type = define_file_type(extension, mime_type)
     return define_output(file_type, label=label, optional=optional, output_props=output_props)
