@@ -34,7 +34,7 @@ class SecondModel(trac.TracModel):
 
         preprocessed = trac.define_input_table(
             trac.F("id", trac.STRING, label="Customer account ID", business_key=True),
-            trac.F("some_quantity_x", trac.DECIMAL, label="Some quantity X"))
+            trac.F("some_quantity_x", trac.FLOAT, label="Some quantity X"))
 
         return {"preprocessed_data": preprocessed}
 
@@ -42,7 +42,7 @@ class SecondModel(trac.TracModel):
 
         profit_by_region = trac.define_output_table(
             trac.F("region", trac.STRING, label="Customer home region", categorical=True),
-            trac.F("gross_profit", trac.DECIMAL, label="Total gross profit"))
+            trac.F("gross_profit", trac.FLOAT, label="Total gross profit"))
 
         return {"profit_by_region": profit_by_region}
 
@@ -52,6 +52,6 @@ class SecondModel(trac.TracModel):
 
         profit_by_region = pd.DataFrame(data={
             "region": ["uk", "us"],
-            "gross_profit": [decimal.Decimal(24000000), decimal.Decimal(13000000)]})
+            "gross_profit": [24000000.0, 13000000.0]})
 
         ctx.put_pandas_table("profit_by_region", profit_by_region)
