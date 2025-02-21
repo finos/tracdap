@@ -180,7 +180,7 @@ public class RunFlowTest {
                                 .setLabel("Customer Id"))
                         .addFields(FieldSchema.newBuilder()
                                 .setFieldName("loan_amount")
-                                .setFieldType(BasicType.DECIMAL)
+                                .setFieldType(BasicType.FLOAT)
                                 .setLabel("Loan amount"))
                         .addFields(FieldSchema.newBuilder()
                                 .setFieldName("loan_condition_cat")
@@ -188,7 +188,7 @@ public class RunFlowTest {
                                 .setLabel("Loan condition category code"))
                         .addFields(FieldSchema.newBuilder()
                                 .setFieldName("total_pymnt")
-                                .setFieldType(BasicType.DECIMAL)
+                                .setFieldType(BasicType.FLOAT)
                                 .setLabel("Total payment received to date"))
                         .addFields(FieldSchema.newBuilder()
                                 .setFieldName("region")
@@ -211,7 +211,7 @@ public class RunFlowTest {
                                 .setFieldType(BasicType.DATE))
                         .addFields(FieldSchema.newBuilder()
                                 .setFieldName("dollar_rate")
-                                .setFieldType(BasicType.DECIMAL))))
+                                .setFieldType(BasicType.FLOAT))))
                 .build();
 
         var loansSchemaAttrs = List.of(TagUpdate.newBuilder()
