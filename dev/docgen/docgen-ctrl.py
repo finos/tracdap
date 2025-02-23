@@ -182,11 +182,15 @@ class DocGen:
         self._run_subprocess(codegen_exe, codegen_args)
         self._mv(doc_src.joinpath('tracdap/metadata.py'), doc_src.joinpath('tracdap/rt/metadata.py'))
 
+    def set_version_and_release(self, version, release):
+        setattr(self, "_version", version)
+        setattr(self, "_release", release)
+
     def get_version_and_release(self):
 
         self._log_target()
 
-        if "_version" in self.__dict__ and "_release" in self.__dict__:
+        if hasattr(self, "_version") and hasattr(self, "_release"):
             return getattr(self, "_version"), getattr(self, "_release")
 
         self._log.info(f"Looking up version / release info...")
@@ -213,8 +217,8 @@ class DocGen:
         self._log.info(f"TRAC D.A.P. version: {version}")
         self._log.info(f"TRAC D.A.P. release: {release}")
 
-        self._version = version  # noqa
-        self._release = release  # noqa
+        setattr(self, "_version", version)
+        setattr(self, "_release", release)
 
         return version, release
 
@@ -304,7 +308,7 @@ class DocGen:
             args_ = [sp_exe] + sp_args
 
         # Ready to run!
-        result = sp.run(executable=exe_, args=args_, stdout=sp.PIPE)
+        result = sp.run(executable=exe_, args=args_, stdout=sp.PIPE, cwd=ROOT_DIR)
 
         if result.returncode != 0:
             err = f"{sp_exe} failed with exit code {result.returncode}"
