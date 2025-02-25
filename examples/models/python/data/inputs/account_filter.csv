@@ -1,5 +1,5 @@
 account_id,reason
-1069639,Account closed by customer
-1069506,Duplicate account
-1069071,Live proving account
-1068934,Account closed by customer
+cust_1069639,Account closed by customer
+cust_1069506,Duplicate account
+cust_1069071,Live proving account
+cust_1068934,Account closed by customer
