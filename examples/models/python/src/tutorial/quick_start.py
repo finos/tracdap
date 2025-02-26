@@ -32,7 +32,7 @@ class QuickStartModel(trac.TracModel):
             trac.F("total_pymnt", trac.FLOAT, label="Total amount repaid"),
             trac.F("region", trac.STRING, label="Customer home region"),
             trac.F("loan_condition_cat", trac.INTEGER, label="Loan condition category"),
-            label="Quick-start input dataset (customer loans)")
+            label="Quick-start input (customer loans)")
 
         return {"quick_start_input": quick_start_input}
 
@@ -41,7 +41,7 @@ class QuickStartModel(trac.TracModel):
         quick_start_output = trac.define_output_table(
             trac.F("region", trac.STRING, label="Customer home region"),
             trac.F("gross_profit", trac.FLOAT, label="Total gross profit"),
-            label="Quick-start output dataset (profit by region)")
+            label="Quick-start output (profit by region)")
 
         return {"quick_start_output": quick_start_output}
 
