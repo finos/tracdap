@@ -24,7 +24,7 @@ import tracdap.rt_gen.grpc.tracdap.metadata.object_id_pb2 as object_id_pb2
 import tracdap.rt_gen.grpc.tracdap.metadata.object_pb2 as object_pb2
 from tracdap.rt_gen.grpc.tracdap.metadata import model_pb2
 import tracdap.rt_gen.grpc.tracdap.metadata.data_pb2 as data_pb2
-import tracdap.rt_gen.grpc.tracdap.metadata.stoarge_pb2 as storage_pb2
+import tracdap.rt_gen.grpc.tracdap.metadata.storage_pb2 as storage_pb2
 
 from google.protobuf import message as _message
 
