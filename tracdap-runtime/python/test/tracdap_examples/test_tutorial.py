@@ -54,6 +54,15 @@ class TutorialModelsTest(unittest.TestCase):
 
         launch.launch_model(HelloWorldModel, job_config, sys_config)
 
+    def test_quick_start(self):
+
+        from tutorial.quick_start import QuickStartModel  # noqa
+
+        job_config = self.examples_root.joinpath("config/quick_start.yaml")
+        sys_config = self.examples_root.joinpath("config/sys_config.yaml")
+
+        launch.launch_model(QuickStartModel, job_config, sys_config)
+
     def test_using_data(self):
 
         from tutorial.using_data import UsingDataModel  # noqa
