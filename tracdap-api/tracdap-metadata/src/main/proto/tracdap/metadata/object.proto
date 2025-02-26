@@ -30,7 +30,7 @@ import "tracdap/metadata/flow.proto";
 import "tracdap/metadata/job.proto";
 import "tracdap/metadata/file.proto";
 import "tracdap/metadata/custom.proto";
-import "tracdap/metadata/stoarge.proto";
+import "tracdap/metadata/storage.proto";
 
 
 /**

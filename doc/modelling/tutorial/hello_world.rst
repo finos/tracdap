@@ -9,9 +9,17 @@ This tutorial is based on example code which can be found in the |examples_repo|
 Requirements
 ------------
 
-.. include:: ../../../tracdap-runtime/python/README.md
-    :start-after: ## Requirements
-    :end-before: ## Installing the runtime
+The TRAC runtime for Python has these requirements:
+
+* Python: 3.9 up to 3.13
+* Pandas: 1.2 up to 2.2 (optional)
+* NumPy: 1.2 up to 2.2 (optional, required by Pandas)
+* Polars: 1.X (optional)
+
+3rd party libraries may impose additional constraints on supported versions of key libraries.
+For example, Pandas 1.5 is not available for Python 3.12 or 3.13, while NumPy 2.0 is only
+compatible with Pandas 2.1 and later.
+
 
 Setting up a new project
 ------------------------
@@ -19,7 +27,7 @@ Setting up a new project
 If you are starting a project from scratch, it's a good idea to follow the standard
 Python conventions for package naming and folder layout. If you are working on an
 existing project or are already familiar with the Python conventions, then you can
-:ref:`skip this section <modelling/tutorial/hello_world:Installing the runtime>`
+:ref:`skip this section <installing-the-runtime>`.
 
 For this example we will create a project folder called example-project. Typically
 this will be a Git repository. You will also want to create a Python virtual environment
@@ -112,6 +120,8 @@ The README.txt file is not required but it is usually a good idea to have one. Y
 description of the project, instructions for build and running the code etc. if you are using
 GitHub the contents of this file will be displayed on the home page for your repository.
 
+
+.. _installing-the-runtime:
 
 Installing the runtime
 ----------------------

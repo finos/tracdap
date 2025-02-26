@@ -75,7 +75,9 @@ message TableSchema {
 }
 
 
-/** Schema for an individual field in a structured object dataset */
+/**
+ * Schema for an individual field in a structured object dataset
+ */
 message StructField {
 
     TypeDescriptor fieldType = 3;
@@ -93,16 +95,17 @@ message StructField {
     Value defaultValue = 9;
 
     optional string structType = 10;
-
 }
 
-/** Schema for a structured object dataset */
+
+/**
+  * Schema for a structured object dataset
+  */
 message StructSchema {
 
     map<string, StructField> fields = 1;
 
     map<string, StructSchema> namedTypes = 2;
-
 }
 
 
