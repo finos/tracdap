@@ -27,7 +27,7 @@ class QuickStartModel(trac.TracModel):
     def define_inputs(self) -> tp.Dict[str, trac.ModelInputSchema]:
 
         customer_loans = trac.define_input_table(
-            trac.F("id", trac.STRING, label="Customer account ID", business_key=True),
+            trac.F("id", trac.STRING, label="Customer account ID"),
             trac.F("loan_amount", trac.FLOAT, label="Principal loan amount"),
             trac.F("total_pymnt", trac.FLOAT, label="Total amount repaid"),
             trac.F("region", trac.STRING, label="Customer home region"),
