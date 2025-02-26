@@ -38,7 +38,9 @@ message FileDefinition {
   string dataItem = 6;
 }
 
-
+/**
+ * Specify a file type that is produced or consumed by a model, flow or job
+ */
 message FileType {
 
   string extension = 1;
