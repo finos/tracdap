@@ -1,5 +1,5 @@
 id,loan_amount,loan_condition_cat,total_pymnt,region
-cust_1077501,5000.0,0,5861.071414,munster
+cust_1077501,5000.1,0,5861.071414,munster
 cust_1077430,2500.0,1,1008.71,leinster
 cust_1077175,2400.0,0,3003.653644,cannught
 cust_1076863,10000.0,0,12226.30221,ulster
