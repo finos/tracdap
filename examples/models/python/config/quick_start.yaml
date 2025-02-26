@@ -1,0 +1,12 @@
+
+job:
+  runModel:
+
+    parameters:
+      eur_usd_rate: 1.2071
+
+    inputs:
+      customer_loans: "inputs/loan_final313_100_shortform.csv"
+
+    outputs:
+      profit_by_region: "outputs/quick_start/profit_by_region.csv"
