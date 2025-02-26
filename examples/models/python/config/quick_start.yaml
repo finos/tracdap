@@ -6,7 +6,7 @@ job:
       eur_usd_rate: 1.2071
 
     inputs:
-      customer_loans: "inputs/loan_final313_100_shortform.csv"
+      customer_loans: "inputs/quick_start_input.csv"
 
     outputs:
-      profit_by_region: "outputs/quick_start/profit_by_region.csv"
+      profit_by_region: "outputs/quick_start/quick_start_output.csv"
