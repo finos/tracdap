@@ -26,37 +26,39 @@ class QuickStartModel(trac.TracModel):
 
     def define_inputs(self) -> tp.Dict[str, trac.ModelInputSchema]:
 
-        customer_loans = trac.define_input_table(
-            trac.F("id", trac.STRING, label="Customer account ID", business_key=True),
+        quick_start_input = trac.define_input_table(
+            trac.F("id", trac.STRING, label="Customer account ID"),
             trac.F("loan_amount", trac.FLOAT, label="Principal loan amount"),
             trac.F("total_pymnt", trac.FLOAT, label="Total amount repaid"),
             trac.F("region", trac.STRING, label="Customer home region"),
-            trac.F("loan_condition_cat", trac.INTEGER, label="Loan condition category"))
+            trac.F("loan_condition_cat", trac.INTEGER, label="Loan condition category"),
+            label="Quick-start input (customer loans)")
 
-        return {"customer_loans": customer_loans}
+        return {"quick_start_input": quick_start_input}
 
     def define_outputs(self) -> tp.Dict[str, trac.ModelOutputSchema]:
 
-        profit_by_region = trac.define_output_table(
+        quick_start_output = trac.define_output_table(
             trac.F("region", trac.STRING, label="Customer home region"),
-            trac.F("gross_profit", trac.FLOAT, label="Total gross profit"))
+            trac.F("gross_profit", trac.FLOAT, label="Total gross profit"),
+            label="Quick-start output (profit by region)")
 
-        return {"profit_by_region": profit_by_region}
+        return {"quick_start_output": quick_start_output}
 
     def run_model(self, ctx: trac.TracContext):
 
         eur_usd_rate = ctx.get_parameter("eur_usd_rate")
-        customer_loans = ctx.get_pandas_table("customer_loans")
+        quick_start_input = ctx.get_pandas_table("quick_start_input")
 
-        customer_loans["gross_profit"] = \
-            (customer_loans["total_pymnt"] - customer_loans["loan_amount"]) \
+        quick_start_input["gross_profit"] = \
+            (quick_start_input["total_pymnt"] - quick_start_input["loan_amount"]) \
             * eur_usd_rate
 
-        profit_by_region = customer_loans \
+        quick_start_output = quick_start_input \
             .groupby("region", as_index=False) \
             .aggregate({"gross_profit": "sum"})
 
-        ctx.put_pandas_table("profit_by_region", profit_by_region)
+        ctx.put_pandas_table("quick_start_output", quick_start_output)
 
 
 if __name__ == "__main__":
