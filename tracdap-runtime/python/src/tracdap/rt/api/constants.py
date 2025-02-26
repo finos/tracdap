@@ -18,6 +18,10 @@ import tracdap.rt.metadata
 
 class CommonFileTypes:
 
+    """
+    A collection of common :py:class:`FileTypes <tracdap.rt.metadata.FileType>` to use as model inputs and outputs
+    """
+
     TXT = tracdap.rt.metadata.FileType("txt", "text/plain")
 
     JPG = tracdap.rt.metadata.FileType("jpg", "image/jpeg")

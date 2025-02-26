@@ -385,6 +385,8 @@ def load_schema(
 def define_file_type(extension: str, mime_type: str) -> FileType:
 
     """
+    Define a :py:class:`FileType <tracdap.rt.metadata.FileType>` for use as a model input or output
+
     :type extension: str
     :type mime_type: str
     :rtype: :py:class:`FileType <tracdap.rt.metadata.FileType>`
@@ -401,6 +403,8 @@ def define_input(
         input_props: _tp.Optional[_tp.Dict[str, _tp.Any]] = None):
 
     """
+    Define a model input, which can be any type of dataset or file
+
     :type requirement: :py:class:`SchemaDefinition <tracdap.rt.metadata.SchemaDefinition>` | :py:class:`FileType <tracdap.rt.metadata.FileType>`
     :type label: str | None
     :type optional: bool
@@ -420,6 +424,8 @@ def define_output(
         output_props: _tp.Optional[_tp.Dict[str, _tp.Any]] = None):
 
     """
+    Define a model output, which can be any type of dataset or file
+
     :type requirement: :py:class:`SchemaDefinition <tracdap.rt.metadata.SchemaDefinition>` | :py:class:`FileType <tracdap.rt.metadata.FileType>`
     :type label: str | None
     :type optional: bool
@@ -439,7 +445,7 @@ def define_input_table(
         -> ModelInputSchema:
 
     """
-    Define a model input with a table schema
+    Define a model input for a :py:class:`TableSchema <tracdap.rt.metadata.TableSchema>`
 
     Individual fields can be defined using :py:func:`define_field` or the shorthand alias :py:func:`F`.
     This function takes a number of fields, either as individual arguments or as a list, and uses them
@@ -484,7 +490,7 @@ def define_output_table(
         -> ModelOutputSchema:
 
     """
-    Define a model output with a table schema
+    Define a model output for a :py:class:`TableSchema <tracdap.rt.metadata.TableSchema>`
 
     Individual fields can be defined using :py:func:`define_field` or the shorthand alias :py:func:`F`.
     This function takes a number of fields, either as individual arguments or as a list, and uses them
@@ -527,6 +533,8 @@ def define_input_file(
         -> ModelInputSchema:
 
     """
+    Define a model input for a :py:class:`FileType <tracdap.rt.metadata.FileType>`
+
     :type extension str
     :type mime_type: sr
     :type label: str | None
@@ -546,6 +554,8 @@ def define_output_file(
         -> ModelOutputSchema:
 
     """
+    Define a model output for a :py:class:`FileType <tracdap.rt.metadata.FileType>`
+
     :type extension str
     :type mime_type: sr
     :type label: str | None
