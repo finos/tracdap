@@ -239,8 +239,10 @@ public class Http1Proxy extends ChannelDuplexHandler {
         if (locationPath.startsWith(target.getPath())) {
 
             // Redirects specified without a host, only the leading path section needs to match
-            if (locationHost == null)
-                return location.replace(target.getPath(), routeConfig.getMatch().getPath());
+            if (locationHost == null) {
+                var suffix = location.substring(target.getPath().length());
+                return routeConfig.getMatch().getPath() + suffix;
+            }
 
             // If host and port are specified, these need to match as well
             if (locationHost.equals(target.getHost()) && locationPort == target.getPort()) {
@@ -251,7 +253,8 @@ public class Http1Proxy extends ChannelDuplexHandler {
                     // This is interpreted to mean the current host / port / scheme
                     // Query and fragment sections need to be copied over if they are present
 
-                    var proxyPath = locationPath.replace(target.getPath(), routeConfig.getMatch().getPath());
+                    var suffix = location.substring(target.getPath().length());
+                    var proxyPath = routeConfig.getMatch().getPath() + suffix;
                     var proxyUri = new URI(
                             /* scheme = */ null, /* host = */ null,
                             proxyPath, locationUri.getQuery(), locationUri.getFragment());
