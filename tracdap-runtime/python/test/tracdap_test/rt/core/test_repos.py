@@ -104,6 +104,10 @@ class ModelRepositoriesTest(unittest.TestCase):
         checkout_key = "git_native_short"
         self._test_checkout_git_native(checkout_key)
 
+    # This test has broken in CI without any changes made to the codebase
+    # Could be related to the build image but might indicate a more fundamental problem on recent Windows OS
+    # TODO: Investigation required if this issue persists
+    @unittest.skipIf(util.is_windows(), "Native long-path checkout failing on Windows, 5th March 2025")
     def test_checkout_git_native_long_path(self):
 
         # Using native Git on Windows, the checkout dir cannot exceed the Windows max path length
