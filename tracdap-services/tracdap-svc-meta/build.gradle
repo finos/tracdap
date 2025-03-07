@@ -94,12 +94,6 @@ ext.enableBuildTimePlugins(["config"])
 // This dependency ensures resources are always processed, even for partial builds
 compileJava.dependsOn(processResources)
 
-// Bring DDL files into test JAR as resources
-processTestResources {
-
-    from "${project(':tracdap-svc-meta').projectDir.path}/src/schema"
-}
-
 distributions {
     main {
         contents {

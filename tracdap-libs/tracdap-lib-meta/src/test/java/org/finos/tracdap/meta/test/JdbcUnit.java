@@ -40,7 +40,7 @@ import static org.finos.tracdap.test.meta.SampleMetadata.TEST_TENANT;
 
 public class JdbcUnit implements BeforeAllCallback, BeforeEachCallback, AfterEachCallback {
 
-    private static final String SCRIPT_LOCATION = "tracdap-services/tracdap-svc-meta/src/schema/h2/rollout";
+    private static final String SCRIPT_LOCATION = "tracdap-libs/tracdap-lib-meta/src/schema/h2/rollout";
 
     private static final String JDBC_URL_TEMPLATE = "mem:%s;DB_CLOSE_DELAY=-1";
 
