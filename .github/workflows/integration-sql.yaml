@@ -91,7 +91,7 @@ jobs:
           --task add_tenant ACME_CORP 'Test tenant [ACME_CORP]'"
 
       - name: Integration tests
-        run: ./gradlew trac-svc-meta:integration -DintegrationTags="int-metadb"
+        run: ./gradlew integration -DintegrationTags="int-metadb"
 
       # If the tests fail, make the output available for download
       - name: Store failed test results
