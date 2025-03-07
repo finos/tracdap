@@ -17,7 +17,7 @@
 
 package org.finos.tracdap.meta.test;
 
-import org.finos.tracdap.meta.dal.IMetadataDal;
+import org.finos.tracdap.common.metadata.dal.IMetadataDal;
 
 
 public interface IDalTestable {

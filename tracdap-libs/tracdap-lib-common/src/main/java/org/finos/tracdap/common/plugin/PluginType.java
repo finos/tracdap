@@ -32,7 +32,7 @@ public class PluginType {
             new PluginType("org.finos.tracdap.common.storage.IDataStorage", PluginServiceInfo.DATA_STORAGE_SERVICE_TYPE, false),
             new PluginType("org.finos.tracdap.common.exec.IBatchExecutor", PluginServiceInfo.EXECUTION_SERVICE_TYPE, false),
             new PluginType("org.finos.tracdap.common.cache.IJobCacheManager", PluginServiceInfo.JOB_CACHE_SERVICE_TYPE, false),
-            new PluginType("org.finos.tracdap.meta.dal.IMetadataDal", PluginServiceInfo.METADATA_DAL_SERVICE_TYPE, false));
+            new PluginType("org.finos.tracdap.common.metadata.dal.IMetadataDal", PluginServiceInfo.METADATA_DAL_SERVICE_TYPE, false));
 
 
     private final String serviceClassName;

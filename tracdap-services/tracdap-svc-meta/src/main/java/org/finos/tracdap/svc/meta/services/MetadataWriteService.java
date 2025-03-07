@@ -27,8 +27,8 @@ import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.metadata.MetadataConstants;
 import org.finos.tracdap.common.validation.Validator;
-import org.finos.tracdap.meta.dal.IMetadataDal;
-import org.finos.tracdap.meta.dal.MetadataBatchUpdate;
+import org.finos.tracdap.common.metadata.dal.IMetadataDal;
+import org.finos.tracdap.common.metadata.dal.MetadataBatchUpdate;
 
 import java.util.ArrayList;
 import java.util.List;

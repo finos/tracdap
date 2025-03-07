@@ -15,28 +15,26 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.svc.meta.services;
+package org.finos.tracdap.common.metadata.dal.jdbc.dialects;
 
-import org.finos.tracdap.metadata.Tag;
-import org.finos.tracdap.metadata.SearchParameters;
-import org.finos.tracdap.common.metadata.dal.IMetadataDal;
+import org.finos.tracdap.common.db.JdbcDialect;
+import org.finos.tracdap.common.metadata.dal.jdbc.JdbcErrorCode;
 
-import java.util.List;
+import java.sql.Connection;
+import java.sql.SQLException;
 
 
-public class MetadataSearchService {
+public interface IDialect {
 
-    private final IMetadataDal dal;
+    JdbcDialect dialectCode();
 
-    public MetadataSearchService(IMetadataDal dal) {
-        this.dal = dal;
-    }
+    JdbcErrorCode mapErrorCode(SQLException e);
 
-    public List<Tag>
-    search(String tenant, SearchParameters searchParameters) {
+    void prepareMappingTable(Connection conn) throws SQLException;
 
-        // Validation currently in the API layer
+    String mappingTableName();
 
-        return dal.search(tenant, searchParameters);
-    }
+    boolean supportsGeneratedKeys();
+
+    int booleanType();
 }

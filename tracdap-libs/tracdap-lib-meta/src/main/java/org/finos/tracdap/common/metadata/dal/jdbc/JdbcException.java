@@ -15,28 +15,16 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.svc.meta.services;
+package org.finos.tracdap.common.metadata.dal.jdbc;
 
-import org.finos.tracdap.metadata.Tag;
-import org.finos.tracdap.metadata.SearchParameters;
-import org.finos.tracdap.common.metadata.dal.IMetadataDal;
-
-import java.util.List;
+import java.sql.SQLException;
 
 
-public class MetadataSearchService {
+public class JdbcException extends SQLException {
 
-    private final IMetadataDal dal;
+    public static final String SYNTHETIC_ERROR = "SYNTHETIC_ERROR";
 
-    public MetadataSearchService(IMetadataDal dal) {
-        this.dal = dal;
-    }
-
-    public List<Tag>
-    search(String tenant, SearchParameters searchParameters) {
-
-        // Validation currently in the API layer
-
-        return dal.search(tenant, searchParameters);
+    JdbcException(JdbcErrorCode errorCode) {
+        super(errorCode.name(), SYNTHETIC_ERROR, errorCode.ordinal());
     }
 }

@@ -15,28 +15,18 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.svc.meta.services;
+package org.finos.tracdap.common.metadata.dal.jdbc;
 
-import org.finos.tracdap.metadata.Tag;
-import org.finos.tracdap.metadata.SearchParameters;
-import org.finos.tracdap.common.metadata.dal.IMetadataDal;
+public enum JdbcErrorCode {
+    UNKNOWN_ERROR_CODE,
+    INSERT_DUPLICATE,
+    INSERT_MISSING_FK,
+    NO_DATA,
+    TOO_MANY_ROWS,
 
-import java.util.List;
+    // Object type of a metadata item does not match what is stored / expected
+    WRONG_OBJECT_TYPE,
 
-
-public class MetadataSearchService {
-
-    private final IMetadataDal dal;
-
-    public MetadataSearchService(IMetadataDal dal) {
-        this.dal = dal;
-    }
-
-    public List<Tag>
-    search(String tenant, SearchParameters searchParameters) {
-
-        // Validation currently in the API layer
-
-        return dal.search(tenant, searchParameters);
-    }
+    // The definition of a metadata item could not be understood
+    INVALID_OBJECT_DEFINITION
 }
