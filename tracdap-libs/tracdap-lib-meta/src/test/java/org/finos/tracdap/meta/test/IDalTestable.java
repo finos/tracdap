@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.svc.meta.test;
+package org.finos.tracdap.meta.test;
 
 import org.finos.tracdap.meta.dal.IMetadataDal;
 

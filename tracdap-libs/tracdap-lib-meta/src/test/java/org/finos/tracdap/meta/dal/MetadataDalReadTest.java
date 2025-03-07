@@ -15,9 +15,8 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.svc.meta.dal;
+package org.finos.tracdap.meta.dal;
 
-import org.finos.tracdap.meta.dal.IMetadataDal;
 import org.finos.tracdap.metadata.TagSelector;
 import org.finos.tracdap.metadata.ObjectType;
 import org.finos.tracdap.common.metadata.MetadataCodec;
@@ -28,9 +27,9 @@ import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
-import org.finos.tracdap.svc.meta.test.IDalTestable;
-import org.finos.tracdap.svc.meta.test.JdbcUnit;
-import org.finos.tracdap.svc.meta.test.JdbcIntegration;
+import org.finos.tracdap.meta.test.IDalTestable;
+import org.finos.tracdap.meta.test.JdbcUnit;
+import org.finos.tracdap.meta.test.JdbcIntegration;
 
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
