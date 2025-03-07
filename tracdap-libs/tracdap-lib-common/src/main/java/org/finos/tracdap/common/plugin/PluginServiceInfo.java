@@ -34,11 +34,8 @@ public class PluginServiceInfo {
     /** Standard service type for secret-loading services **/
     public static final String SECRETS_SERVICE_TYPE = "SECRETS";
 
-    /** Standard service type for generic authentication providers **/
-    public static final String AUTH_PROVIDER_SERVICE_TYPE = "AUTH_PROVIDER";
-
-    /** Standard service type for TRAC login providers **/
-    public static final String LOGIN_PROVIDER_SERVICE_TYPE = "LOGIN_PROVIDER";
+    /** Standard service type for the metadata DAL **/
+    public static final String METADATA_DAL_SERVICE_TYPE = "METADATA_DAL";
 
     /** Standard service type for file storage services **/
     public static final String FILE_STORAGE_SERVICE_TYPE = "FILE_STORAGE";
@@ -54,9 +51,6 @@ public class PluginServiceInfo {
 
     /** Standard service types for execution services **/
     public static final String JOB_CACHE_SERVICE_TYPE = "JOB_CACHE";
-
-    /** Standard service type for the metadata DAL **/
-    public static final String METADATA_DAL_SERVICE_TYPE = "METADATA_DAL";
 
     private final Class<?> serviceClass;
     private final String serviceName;
