@@ -43,18 +43,20 @@ project(":tracdap-api-services").projectDir = file("tracdap-api/tracdap-services
 include 'tracdap-lib-annotations'
 include 'tracdap-lib-common'
 include 'tracdap-lib-validation'
-include 'tracdap-lib-db'
+include 'tracdap-lib-meta'
 include 'tracdap-lib-data'
 include 'tracdap-lib-orch'
+include 'tracdap-lib-db'
 include 'tracdap-lib-test'
 include 'tracdap-lib-test-proto'
 
 project(":tracdap-lib-annotations").projectDir = file("tracdap-libs/tracdap-lib-annotations")
 project(":tracdap-lib-common").projectDir = file("tracdap-libs/tracdap-lib-common")
 project(":tracdap-lib-validation").projectDir = file("tracdap-libs/tracdap-lib-validation")
-project(":tracdap-lib-db").projectDir = file("tracdap-libs/tracdap-lib-db")
+project(":tracdap-lib-meta").projectDir = file("tracdap-libs/tracdap-lib-meta")
 project(":tracdap-lib-data").projectDir = file("tracdap-libs/tracdap-lib-data")
 project(":tracdap-lib-orch").projectDir = file("tracdap-libs/tracdap-lib-orch")
+project(":tracdap-lib-db").projectDir = file("tracdap-libs/tracdap-lib-db")
 project(":tracdap-lib-test").projectDir = file("tracdap-libs/tracdap-lib-test")
 project(":tracdap-lib-test-proto").projectDir = file("tracdap-libs/tracdap-lib-test-proto")
 

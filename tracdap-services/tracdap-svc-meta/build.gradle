@@ -45,9 +45,11 @@ ext.addVersionInfo(sourceSets.getByName("main"), "TRAC Metadata Service")
 
 dependencies {
 
-    implementation project(':tracdap-api-metadata')
-    implementation project(':tracdap-api-config')
+    // Service API to implement
     implementation project(':tracdap-api-services')
+
+    // TRAC library dependencies
+    implementation project(':tracdap-lib-meta')
     implementation project(':tracdap-lib-common')
     implementation project(':tracdap-lib-validation')
 
