@@ -27,7 +27,10 @@ description = "TRAC D.A.P. metadata library, interfaces and core functionality f
 dependencies {
 
     api project(':tracdap-api-metadata')
-    api project(':tracdap-lib-common')
+
+    // TRAC library dependencies
+    implementation project(':tracdap-lib-common')
+    implementation project(':tracdap-lib-db')
 
     testImplementation project(':tracdap-lib-test')
 }

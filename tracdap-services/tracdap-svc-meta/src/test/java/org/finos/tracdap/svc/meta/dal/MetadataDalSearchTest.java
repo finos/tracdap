@@ -17,6 +17,7 @@
 
 package org.finos.tracdap.svc.meta.dal;
 
+import org.finos.tracdap.meta.dal.IMetadataDal;
 import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.common.metadata.TypeSystem;
 import org.finos.tracdap.common.metadata.MetadataCodec;

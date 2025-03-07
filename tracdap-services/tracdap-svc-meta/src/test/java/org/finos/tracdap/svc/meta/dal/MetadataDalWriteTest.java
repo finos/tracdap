@@ -17,6 +17,7 @@
 
 package org.finos.tracdap.svc.meta.dal;
 
+import org.finos.tracdap.meta.dal.IMetadataDal;
 import org.finos.tracdap.metadata.ObjectType;
 import org.finos.tracdap.metadata.TagHeader;
 import org.finos.tracdap.metadata.TagSelector;

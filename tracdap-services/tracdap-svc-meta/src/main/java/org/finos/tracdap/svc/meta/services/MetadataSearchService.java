@@ -19,7 +19,7 @@ package org.finos.tracdap.svc.meta.services;
 
 import org.finos.tracdap.metadata.Tag;
 import org.finos.tracdap.metadata.SearchParameters;
-import org.finos.tracdap.svc.meta.dal.IMetadataDal;
+import org.finos.tracdap.meta.dal.IMetadataDal;
 
 import java.util.List;
 
