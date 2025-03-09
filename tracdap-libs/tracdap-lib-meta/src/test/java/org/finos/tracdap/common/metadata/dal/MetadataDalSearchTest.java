@@ -22,9 +22,9 @@ import org.finos.tracdap.common.metadata.TypeSystem;
 import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.test.meta.*;
 
-import org.finos.tracdap.meta.test.IDalTestable;
-import org.finos.tracdap.meta.test.JdbcIntegration;
-import org.finos.tracdap.meta.test.JdbcUnit;
+import org.finos.tracdap.common.metadata.test.IDalTestable;
+import org.finos.tracdap.common.metadata.test.JdbcIntegration;
+import org.finos.tracdap.common.metadata.test.JdbcUnit;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;

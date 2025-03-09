@@ -28,9 +28,9 @@ import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
-import org.finos.tracdap.meta.test.IDalTestable;
-import org.finos.tracdap.meta.test.JdbcUnit;
-import org.finos.tracdap.meta.test.JdbcIntegration;
+import org.finos.tracdap.common.metadata.test.IDalTestable;
+import org.finos.tracdap.common.metadata.test.JdbcUnit;
+import org.finos.tracdap.common.metadata.test.JdbcIntegration;
 
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
