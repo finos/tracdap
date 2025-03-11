@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.svc.meta.services;
+package org.finos.tracdap.common.metadata.tag;
 
 import org.finos.tracdap.common.exception.EMetadataBadUpdate;
 import org.finos.tracdap.common.exception.EValidationGap;
@@ -34,18 +34,18 @@ import java.util.function.BiFunction;
 import static org.finos.tracdap.common.metadata.MetadataConstants.TRAC_RESERVED_IDENTIFIER;
 
 
-public class TagUpdateService {
+public class TagUpdateLogic {
 
     // Available update operations
     private static final Map<TagOperation, BiFunction<Tag.Builder, TagUpdate, Tag.Builder>> TAG_OPERATION_MAP =
             Map.ofEntries(
-            Map.entry(TagOperation.CREATE_OR_REPLACE_ATTR, TagUpdateService::createOrReplaceAttr),
-            Map.entry(TagOperation.CREATE_OR_APPEND_ATTR, TagUpdateService::createOrAppendAttr),
-            Map.entry(TagOperation.CREATE_ATTR, TagUpdateService::createAttr),
-            Map.entry(TagOperation.REPLACE_ATTR, TagUpdateService::replaceAttr),
-            Map.entry(TagOperation.APPEND_ATTR, TagUpdateService::appendAttr),
-            Map.entry(TagOperation.DELETE_ATTR, TagUpdateService::deleteAttr),
-            Map.entry(TagOperation.CLEAR_ALL_ATTR, TagUpdateService::clearAllAttr));
+            Map.entry(TagOperation.CREATE_OR_REPLACE_ATTR, TagUpdateLogic::createOrReplaceAttr),
+            Map.entry(TagOperation.CREATE_OR_APPEND_ATTR, TagUpdateLogic::createOrAppendAttr),
+            Map.entry(TagOperation.CREATE_ATTR, TagUpdateLogic::createAttr),
+            Map.entry(TagOperation.REPLACE_ATTR, TagUpdateLogic::replaceAttr),
+            Map.entry(TagOperation.APPEND_ATTR, TagUpdateLogic::appendAttr),
+            Map.entry(TagOperation.DELETE_ATTR, TagUpdateLogic::deleteAttr),
+            Map.entry(TagOperation.CLEAR_ALL_ATTR, TagUpdateLogic::clearAllAttr));
 
     // Error message templates
     private static final String CREATE_ALREADY_EXISTS = "{0} \"{1}\": Attribute already exists";
@@ -55,7 +55,7 @@ public class TagUpdateService {
     private static final String APPEND_WRONG_TYPE = "{0} \"{1}\": Attribute type does not match (original type = {2}, new type = {3})";
     private static final String DELETE_DOES_NOT_EXIST = "{0} \"{1}\": Attribute does not exist";
 
-    private static final Logger log = LoggerFactory.getLogger(TagUpdateService.class);
+    private static final Logger log = LoggerFactory.getLogger(TagUpdateLogic.class);
 
 
     public static Tag applyTagUpdates(Tag priorTag, List<TagUpdate> updates) {

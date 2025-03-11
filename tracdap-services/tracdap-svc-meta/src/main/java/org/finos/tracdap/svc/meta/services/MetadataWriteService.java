@@ -23,6 +23,7 @@ import org.finos.tracdap.api.MetadataWriteBatchResponse;
 import org.finos.tracdap.api.MetadataWriteRequest;
 import org.finos.tracdap.common.grpc.RequestMetadata;
 import org.finos.tracdap.common.grpc.UserMetadata;
+import org.finos.tracdap.common.metadata.tag.TagUpdateLogic;
 import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.metadata.MetadataConstants;
@@ -289,15 +290,15 @@ public class MetadataWriteService {
                 .setDefinition(definition)
                 .build();
 
-        newTag = TagUpdateService.applyTagUpdates(newTag, tagUpdates);
+        newTag = TagUpdateLogic.applyTagUpdates(newTag, tagUpdates);
 
         // Apply the common controlled trac_ tags for newly created objects
 
         var createAttrs = commonCreateAttrs(requestMetadata, userMetadata);
         var updateAttrs = commonUpdateAttrs(requestMetadata, userMetadata);
 
-        newTag = TagUpdateService.applyTagUpdates(newTag, createAttrs);
-        newTag = TagUpdateService.applyTagUpdates(newTag, updateAttrs);
+        newTag = TagUpdateLogic.applyTagUpdates(newTag, createAttrs);
+        newTag = TagUpdateLogic.applyTagUpdates(newTag, updateAttrs);
 
         return newTag;
     }
@@ -326,8 +327,8 @@ public class MetadataWriteService {
 
         var commonAttrs = commonUpdateAttrs(requestMetadata, userMetadata);
 
-        newTag = TagUpdateService.applyTagUpdates(newTag, tagUpdates);
-        newTag = TagUpdateService.applyTagUpdates(newTag, commonAttrs);
+        newTag = TagUpdateLogic.applyTagUpdates(newTag, tagUpdates);
+        newTag = TagUpdateLogic.applyTagUpdates(newTag, commonAttrs);
 
         return newTag;
     }
@@ -352,7 +353,7 @@ public class MetadataWriteService {
                 .setHeader(newHeader)
                 .build();
 
-        newTag = TagUpdateService.applyTagUpdates(newTag, tagUpdates);
+        newTag = TagUpdateLogic.applyTagUpdates(newTag, tagUpdates);
 
         return newTag;
     }

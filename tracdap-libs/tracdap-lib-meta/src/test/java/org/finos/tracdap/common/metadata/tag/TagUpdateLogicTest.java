@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.svc.meta.services;
+package org.finos.tracdap.common.metadata.tag;
 
 import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.common.metadata.TypeSystem;
@@ -28,7 +28,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import java.util.List;
 
 
-class TagUpdateServiceTest {
+class TagUpdateLogicTest {
 
     @Test
     void createAttr_ok() {
@@ -41,7 +41,7 @@ class TagUpdateServiceTest {
                 .setValue(MetadataCodec.encodeValue(42))
                 .build();
 
-        var updatedTag = TagUpdateService.applyTagUpdates(baseTag, List.of(update1));
+        var updatedTag = TagUpdateLogic.applyTagUpdates(baseTag, List.of(update1));
 
         assertEquals(1, updatedTag.getAttrsCount());
         assertTrue(updatedTag.containsAttrs("attr_1"));
@@ -63,7 +63,7 @@ class TagUpdateServiceTest {
                 .setValue(arrayValue)
                 .build();
 
-        var updatedTag = TagUpdateService.applyTagUpdates(baseTag, List.of(update1));
+        var updatedTag = TagUpdateLogic.applyTagUpdates(baseTag, List.of(update1));
 
         assertEquals(1, updatedTag.getAttrsCount());
         assertTrue(updatedTag.containsAttrs("attr_1"));
@@ -86,7 +86,7 @@ class TagUpdateServiceTest {
                 .build();
 
         assertThrows(EMetadataBadUpdate.class, () ->
-                TagUpdateService.applyTagUpdates(baseTag, List.of(update1)));
+                TagUpdateLogic.applyTagUpdates(baseTag, List.of(update1)));
 
     }
 
@@ -103,7 +103,7 @@ class TagUpdateServiceTest {
                 .setValue(MetadataCodec.encodeValue(43))
                 .build();
 
-        var updatedTag = TagUpdateService.applyTagUpdates(baseTag, List.of(update1));
+        var updatedTag = TagUpdateLogic.applyTagUpdates(baseTag, List.of(update1));
 
         assertEquals(1, updatedTag.getAttrsCount());
         assertTrue(updatedTag.containsAttrs("attr_1"));
@@ -124,7 +124,7 @@ class TagUpdateServiceTest {
                 .build();
 
         assertThrows(EMetadataBadUpdate.class, () ->
-                TagUpdateService.applyTagUpdates(baseTag, List.of(update1)));
+                TagUpdateLogic.applyTagUpdates(baseTag, List.of(update1)));
     }
 
     @Test
@@ -141,7 +141,7 @@ class TagUpdateServiceTest {
                 .build();
 
         assertThrows(EMetadataBadUpdate.class, () ->
-                TagUpdateService.applyTagUpdates(baseTag, List.of(update1)));
+                TagUpdateLogic.applyTagUpdates(baseTag, List.of(update1)));
     }
 
     @Test
@@ -159,7 +159,7 @@ class TagUpdateServiceTest {
                 .setValue(arrayValue)
                 .build();
 
-        var updatedTag = TagUpdateService.applyTagUpdates(baseTag, List.of(update1));
+        var updatedTag = TagUpdateLogic.applyTagUpdates(baseTag, List.of(update1));
 
         assertEquals(1, updatedTag.getAttrsCount());
         assertTrue(updatedTag.containsAttrs("attr_1"));
@@ -173,7 +173,7 @@ class TagUpdateServiceTest {
                 .setValue(MetadataCodec.encodeValue(42))
                 .build();
 
-        var updatedTag2 = TagUpdateService.applyTagUpdates(baseTag, List.of(update2));
+        var updatedTag2 = TagUpdateLogic.applyTagUpdates(baseTag, List.of(update2));
 
         assertEquals(1, updatedTag2.getAttrsCount());
         assertTrue(updatedTag2.containsAttrs("attr_1"));
@@ -195,7 +195,7 @@ class TagUpdateServiceTest {
                 .setValue(MetadataCodec.encodeValue(43))
                 .build();
 
-        var updatedTag = TagUpdateService.applyTagUpdates(baseTag, List.of(update1));
+        var updatedTag = TagUpdateLogic.applyTagUpdates(baseTag, List.of(update1));
 
         assertEquals(1, updatedTag.getAttrsCount());
         assertTrue(updatedTag.containsAttrs("attr_1"));
@@ -219,7 +219,7 @@ class TagUpdateServiceTest {
                 .setValue(arrayValue)
                 .build();
 
-        var updatedTag = TagUpdateService.applyTagUpdates(baseTag, List.of(update1));
+        var updatedTag = TagUpdateLogic.applyTagUpdates(baseTag, List.of(update1));
 
         assertEquals(1, updatedTag.getAttrsCount());
         assertTrue(updatedTag.containsAttrs("attr_1"));
@@ -241,7 +241,7 @@ class TagUpdateServiceTest {
                 .build();
 
         assertThrows(EMetadataBadUpdate.class, () ->
-                TagUpdateService.applyTagUpdates(baseTag, List.of(update1)));
+                TagUpdateLogic.applyTagUpdates(baseTag, List.of(update1)));
     }
 
     @Test
@@ -258,7 +258,7 @@ class TagUpdateServiceTest {
                 .build();
 
         assertThrows(EMetadataBadUpdate.class, () ->
-                TagUpdateService.applyTagUpdates(baseTag, List.of(update1)));
+                TagUpdateLogic.applyTagUpdates(baseTag, List.of(update1)));
     }
 
     @Test
@@ -274,7 +274,7 @@ class TagUpdateServiceTest {
                 .setAttrName("attr_2")
                 .build();
 
-        var updatedTag = TagUpdateService.applyTagUpdates(baseTag, List.of(update1));
+        var updatedTag = TagUpdateLogic.applyTagUpdates(baseTag, List.of(update1));
 
         assertEquals(1, updatedTag.getAttrsCount());
         assertTrue(updatedTag.containsAttrs("attr_1"));
@@ -296,7 +296,7 @@ class TagUpdateServiceTest {
                 .build();
 
         assertThrows(EMetadataBadUpdate.class, () ->
-                TagUpdateService.applyTagUpdates(baseTag, List.of(update1)));
+                TagUpdateLogic.applyTagUpdates(baseTag, List.of(update1)));
     }
 
     @Test
@@ -311,7 +311,7 @@ class TagUpdateServiceTest {
                 .setOperation(TagOperation.CLEAR_ALL_ATTR)
                 .build();
 
-        var updatedTag = TagUpdateService.applyTagUpdates(baseTag, List.of(update1));
+        var updatedTag = TagUpdateLogic.applyTagUpdates(baseTag, List.of(update1));
 
         assertEquals(0, updatedTag.getAttrsCount());
     }
@@ -329,7 +329,7 @@ class TagUpdateServiceTest {
                 .setOperation(TagOperation.CLEAR_ALL_ATTR)
                 .build();
 
-        var updatedTag = TagUpdateService.applyTagUpdates(baseTag, List.of(update1));
+        var updatedTag = TagUpdateLogic.applyTagUpdates(baseTag, List.of(update1));
 
         assertEquals(1, updatedTag.getAttrsCount());
         assertTrue(updatedTag.containsAttrs("trac_controlled"));
@@ -349,7 +349,7 @@ class TagUpdateServiceTest {
                 .setValue(MetadataCodec.encodeValue(42))
                 .build();
 
-        var updatedTag = TagUpdateService.applyTagUpdates(baseTag, List.of(update1));
+        var updatedTag = TagUpdateLogic.applyTagUpdates(baseTag, List.of(update1));
 
         assertEquals(1, updatedTag.getAttrsCount());
         assertTrue(updatedTag.containsAttrs("attr_1"));
@@ -371,7 +371,7 @@ class TagUpdateServiceTest {
                 .setValue(MetadataCodec.encodeValue(43))
                 .build();
 
-        var updatedTag = TagUpdateService.applyTagUpdates(baseTag, List.of(update1));
+        var updatedTag = TagUpdateLogic.applyTagUpdates(baseTag, List.of(update1));
 
         assertEquals(1, updatedTag.getAttrsCount());
         assertTrue(updatedTag.containsAttrs("attr_1"));
@@ -391,7 +391,7 @@ class TagUpdateServiceTest {
                 .setValue(MetadataCodec.encodeValue(42))
                 .build();
 
-        var updatedTag = TagUpdateService.applyTagUpdates(baseTag, List.of(update1));
+        var updatedTag = TagUpdateLogic.applyTagUpdates(baseTag, List.of(update1));
 
         assertEquals(1, updatedTag.getAttrsCount());
         assertTrue(updatedTag.containsAttrs("attr_1"));
@@ -413,7 +413,7 @@ class TagUpdateServiceTest {
                 .setValue(MetadataCodec.encodeValue(43))
                 .build();
 
-        var updatedTag = TagUpdateService.applyTagUpdates(baseTag, List.of(update1));
+        var updatedTag = TagUpdateLogic.applyTagUpdates(baseTag, List.of(update1));
 
         assertEquals(1, updatedTag.getAttrsCount());
         assertTrue(updatedTag.containsAttrs("attr_1"));
@@ -433,7 +433,7 @@ class TagUpdateServiceTest {
                 .setValue(MetadataCodec.encodeValue(42))
                 .build();
 
-        var updatedTag = TagUpdateService.applyTagUpdates(baseTag, List.of(update1));
+        var updatedTag = TagUpdateLogic.applyTagUpdates(baseTag, List.of(update1));
 
         assertEquals(1, updatedTag.getAttrsCount());
         assertTrue(updatedTag.containsAttrs("attr_1"));
@@ -447,7 +447,7 @@ class TagUpdateServiceTest {
                 .setValue(MetadataCodec.encodeValue("the_droids_you_are_looking_for"))
                 .build();
 
-        var updatedTag2 = TagUpdateService.applyTagUpdates(baseTag, List.of(update2));
+        var updatedTag2 = TagUpdateLogic.applyTagUpdates(baseTag, List.of(update2));
 
         assertEquals(1, updatedTag2.getAttrsCount());
         assertTrue(updatedTag2.containsAttrs("attr_1"));
@@ -473,7 +473,7 @@ class TagUpdateServiceTest {
                 .setValue(MetadataCodec.encodeValue("the_droids_you_are_looking_for"))
                 .build();
 
-        var updatedTag = TagUpdateService.applyTagUpdates(baseTag, List.of(update1, update2));
+        var updatedTag = TagUpdateLogic.applyTagUpdates(baseTag, List.of(update1, update2));
 
         assertEquals(2, updatedTag.getAttrsCount());
         assertTrue(updatedTag.containsAttrs("attr_1"));
@@ -505,10 +505,10 @@ class TagUpdateServiceTest {
 
         // Create should fail when attr already exists
         assertThrows(EMetadataBadUpdate.class, () ->
-                TagUpdateService.applyTagUpdates(baseTag, List.of(createOp)));
+                TagUpdateLogic.applyTagUpdates(baseTag, List.of(createOp)));
 
         // Applying delete then recreate in one operation should succeed
-        var updatedTag = TagUpdateService.applyTagUpdates(baseTag, List.of(deleteOp, createOp));
+        var updatedTag = TagUpdateLogic.applyTagUpdates(baseTag, List.of(deleteOp, createOp));
 
         assertEquals(1, updatedTag.getAttrsCount());
         assertTrue(updatedTag.containsAttrs("attr_1"));
@@ -531,10 +531,10 @@ class TagUpdateServiceTest {
 
         // Duplicate create op should fail
         assertThrows(EMetadataBadUpdate.class, () ->
-                TagUpdateService.applyTagUpdates(baseTag, List.of(createOp, createOp)));
+                TagUpdateLogic.applyTagUpdates(baseTag, List.of(createOp, createOp)));
 
         // Retry a single create op - should succeed
-        var updatedTag = TagUpdateService.applyTagUpdates(baseTag, List.of(createOp));
+        var updatedTag = TagUpdateLogic.applyTagUpdates(baseTag, List.of(createOp));
 
         assertEquals(1, updatedTag.getAttrsCount());
         assertTrue(updatedTag.containsAttrs("attr_1"));
@@ -561,7 +561,7 @@ class TagUpdateServiceTest {
                 .setValue(MetadataCodec.encodeValue(43))
                 .build();
 
-        var updatedTag = TagUpdateService.applyTagUpdates(baseTag, List.of(createOp, appendOp));
+        var updatedTag = TagUpdateLogic.applyTagUpdates(baseTag, List.of(createOp, appendOp));
 
         assertEquals(1, updatedTag.getAttrsCount());
         assertTrue(updatedTag.containsAttrs("attr_1"));
@@ -591,7 +591,7 @@ class TagUpdateServiceTest {
                 .setValue(MetadataCodec.encodeValue(45))
                 .build();
 
-        var updatedTag = TagUpdateService.applyTagUpdates(baseTag, List.of(appendOp1, appendOp2));
+        var updatedTag = TagUpdateLogic.applyTagUpdates(baseTag, List.of(appendOp1, appendOp2));
 
         assertEquals(1, updatedTag.getAttrsCount());
         assertTrue(updatedTag.containsAttrs("attr_1"));
@@ -615,7 +615,7 @@ class TagUpdateServiceTest {
                 .setValue(nonNormalValue)
                 .build();
 
-        var updatedTag = TagUpdateService.applyTagUpdates(baseTag, List.of(update1));
+        var updatedTag = TagUpdateLogic.applyTagUpdates(baseTag, List.of(update1));
 
         var storedValue = updatedTag.getAttrsOrThrow("attr_1");
         assertTrue(storedValue.hasType());
@@ -627,7 +627,7 @@ class TagUpdateServiceTest {
                 .setValue(nonNormalValue)
                 .build();
 
-        var updatedTag2 = TagUpdateService.applyTagUpdates(updatedTag, List.of(update2));
+        var updatedTag2 = TagUpdateLogic.applyTagUpdates(updatedTag, List.of(update2));
 
         var storedValue2 = updatedTag2.getAttrsOrThrow("attr_1");
         assertTrue(storedValue2.hasType());
@@ -639,7 +639,7 @@ class TagUpdateServiceTest {
                 .setValue(nonNormalValue)
                 .build();
 
-        var updatedTag3 = TagUpdateService.applyTagUpdates(updatedTag2, List.of(update3));
+        var updatedTag3 = TagUpdateLogic.applyTagUpdates(updatedTag2, List.of(update3));
 
         var storedValue3 = updatedTag3.getAttrsOrThrow("attr_1");
         assertTrue(storedValue3.hasType());
