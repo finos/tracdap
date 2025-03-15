@@ -35,5 +35,9 @@ create local temporary table key_mapping (
     mapping_stage int,
 
     -- Ordering to ensure all stages of a load read object parts in the same order
-    ordering int
+    ordering int,
+
+    -- For mapping config entries
+    config_class varchar(256),
+    config_key varchar(256)
 );
