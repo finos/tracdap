@@ -17,6 +17,7 @@
 
 package org.finos.tracdap.common.metadata.dal;
 
+import org.finos.tracdap.metadata.ConfigEntry;
 import org.finos.tracdap.metadata.Tag;
 import org.finos.tracdap.metadata.TagHeader;
 
@@ -31,6 +32,9 @@ public class MetadataBatchUpdate {
     private final List<Tag> newVersions;
     private final List<Tag> newTags;
 
+    private final List<ConfigEntry> configEntries;
+    private final List<ConfigEntry> configVersions;
+
 
     public MetadataBatchUpdate(
             List<TagHeader> preallocatedIds,
@@ -39,11 +43,25 @@ public class MetadataBatchUpdate {
             List<Tag> newVersions,
             List<Tag> newTags) {
 
+        this(preallocatedIds, preallocatedObjects, newObjects, newVersions, newTags, List.of(), List.of());
+    }
+
+    public MetadataBatchUpdate(
+            List<TagHeader> preallocatedIds,
+            List<Tag> preallocatedObjects,
+            List<Tag> newObjects,
+            List<Tag> newVersions,
+            List<Tag> newTags,
+            List<ConfigEntry> configEntries,
+            List<ConfigEntry> configVersions) {
+
         this.preallocatedIds = preallocatedIds;
         this.preallocatedObjects = preallocatedObjects;
         this.newObjects = newObjects;
         this.newVersions = newVersions;
         this.newTags = newTags;
+        this.configEntries = configEntries;
+        this.configVersions = configVersions;
     }
 
     public List<TagHeader> getPreallocatedIds() {
@@ -66,20 +84,32 @@ public class MetadataBatchUpdate {
         return newTags;
     }
 
+    public List<ConfigEntry> getConfigEntries() {
+        return configEntries;
+    }
+
+    public List<ConfigEntry> getConfigVersions() {
+        return configVersions;
+    }
+
     @Override
     public String toString() {
 
         // For logging / debugging
 
-        var nPrealloatedIds = preallocatedIds == null ? "(null)" : preallocatedIds.size();
+        var nPreallocatedIds = preallocatedIds == null ? "(null)" : preallocatedIds.size();
         var nPreallocatedObjects = preallocatedIds == null ? "(null)" : preallocatedObjects.size();
         var nNewObjects = preallocatedIds == null ? "(null)" : newObjects.size();
         var nNewVersions = preallocatedIds == null ? "(null)" : newVersions.size();
         var nNewTags = preallocatedIds == null ? "(null)" : newTags.size();
+        var nConfigEntries = configEntries == null ? "(null)" : configEntries.size();
+        var nConfigVersions = configVersions == null ? "(null)" : configVersions.size();
 
         return String.format(
-                "{preallocatedIds = %s, preallocatedObjects = %s, newObjects = %s, newVersions = %s, newTags = %s}",
-                nPrealloatedIds, nPreallocatedObjects,
-                nNewObjects, nNewVersions, nNewTags);
+                "{preallocatedIds = %s, preallocatedObjects = %s, newObjects = %s, newVersions = %s, newTags = %s," +
+                " configEntries = %s, configVersions = %s}",
+                nPreallocatedIds, nPreallocatedObjects,
+                nNewObjects, nNewVersions, nNewTags,
+                nConfigEntries, nConfigVersions);
     }
 }

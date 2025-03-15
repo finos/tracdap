@@ -115,6 +115,9 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
             saveNewObjects(conn, tenant, batchUpdate.getNewObjects());
             saveNewVersions(conn, tenant, batchUpdate.getNewVersions());
             saveNewTags(conn, tenant, batchUpdate.getNewTags());
+
+            saveConfigEntries(conn, tenant, batchUpdate.getConfigEntries());
+            saveConfigVersions(conn, tenant, batchUpdate.getConfigVersions());
         });
     }
 
