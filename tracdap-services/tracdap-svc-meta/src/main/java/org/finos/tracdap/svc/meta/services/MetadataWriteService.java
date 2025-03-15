@@ -23,13 +23,13 @@ import org.finos.tracdap.api.MetadataWriteBatchResponse;
 import org.finos.tracdap.api.MetadataWriteRequest;
 import org.finos.tracdap.common.grpc.RequestMetadata;
 import org.finos.tracdap.common.grpc.UserMetadata;
-import org.finos.tracdap.common.metadata.tag.TagUpdateLogic;
-import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.metadata.MetadataConstants;
-import org.finos.tracdap.common.validation.Validator;
 import org.finos.tracdap.common.metadata.dal.IMetadataDal;
 import org.finos.tracdap.common.metadata.dal.MetadataBatchUpdate;
+import org.finos.tracdap.common.metadata.tag.TagUpdateLogic;
+import org.finos.tracdap.common.validation.Validator;
+import org.finos.tracdap.metadata.*;
 
 import java.util.ArrayList;
 import java.util.List;
