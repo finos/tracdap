@@ -268,6 +268,41 @@ class JdbcWriteBatchImpl {
         return rootValue.getArrayValue().getItemsList();
     }
 
+    void writeConfigEntry(Connection conn, short tenantId, long[] definitionPk, JdbcMetadataDal.ObjectParts parts) throws SQLException {
+
+        var query =
+                "insert into config_entry (\n" +
+                "  tenant_id,\n" +
+                "  config_class,\n" +
+                "  config_key,\n" +
+                "  config_version,\n" +
+                "  config_timestamp,\n" +
+                "  config_is_latest,\n" +
+                "  definition_fk\n" +
+                ")\n" +
+                "values (?, ?, ?, ?, ?, ?, ?)";
+
+        try (var stmt = conn.prepareStatement(query)) {
+
+            for (var i = 0; i < definitionPk.length; i++) {
+
+                var sqlTimestamp = java.sql.Timestamp.from(parts.configTimestamp[i]);
+
+                stmt.setShort(1, tenantId);
+                stmt.setString(2, parts.configEntry[i].getConfigClass());
+                stmt.setString(3, parts.configEntry[i].getConfigKey());
+                stmt.setInt(4, parts.configEntry[i].getConfigVersion());
+                stmt.setTimestamp(5, sqlTimestamp);
+                stmt.setBoolean(6, true);
+                stmt.setLong(7, definitionPk[i]);
+
+                stmt.addBatch();
+            }
+
+            stmt.executeBatch();
+        }
+    }
+
     void closeObjectDefinition(Connection conn, short tenantId, long[] objectPk, JdbcMetadataDal.ObjectParts parts) throws SQLException {
 
         var query =
@@ -297,6 +332,23 @@ class JdbcWriteBatchImpl {
 
         try (var stmt = conn.prepareStatement(query)) {
             closeRecord(stmt, tenantId, definitionPk, parts.tagTimestamp);
+        }
+    }
+
+    void closeConfigEntry(Connection conn, short tenantId, long[] configPk, JdbcMetadataDal.ObjectParts parts) throws SQLException {
+
+        var query =
+                "update config_entry \n" +
+                "set\n" +
+                "  config_superseded = ?,\n" +
+                "  config_is_latest = ?\n" +
+                "where tenant_id = ?\n" +
+                "  and config_pk = ?\n" +
+                "  and config_is_latest = ?";
+
+        try (var stmt = conn.prepareStatement(query)) {
+
+            closeRecord(stmt, tenantId, configPk, parts.configTimestamp);
         }
     }
 

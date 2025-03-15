@@ -163,6 +163,24 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
         });
     }
 
+    @Override
+    public void saveConfigEntries(String tenant, List<ConfigEntry> configEntries) {
+
+        wrapTransaction(conn -> {
+            prepareMappingTable(conn);
+            saveConfigEntries(conn, tenant, configEntries);
+        });
+    }
+
+    @Override
+    public void saveConfigVersions(String tenant, List<ConfigEntry> configEntries) {
+
+        wrapTransaction(conn -> {
+            prepareMappingTable(conn);
+            saveConfigVersions(conn, tenant, configEntries);
+        });
+    }
+
     private void savePreallocatedIds(Connection conn, String tenant, List<TagHeader> objectIds) {
 
         var parts = separateIdParts(objectIds);
@@ -281,6 +299,57 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
         }
     }
 
+    private void saveConfigEntries(Connection conn, String tenant, List<ConfigEntry> configEntries) {
+
+        var parts = configParts(configEntries);
+
+        try {
+
+            var tenantId = tenants.getTenantId(conn, tenant);
+            var objectType = readBatch.readObjectTypeById(conn, tenantId, parts.objectId);
+            long[] defPk = readBatch.lookupDefinitionPk(conn, tenantId, objectType.keys, parts.selector);
+
+            checkObjectTypes(parts, objectType);
+
+            writeBatch.writeConfigEntry(conn, tenantId, defPk, parts);
+        }
+        catch (SQLException error) {
+
+            // TODO: Config entry error handling
+            JdbcError.priorTagMissing(error, dialect, parts);
+            JdbcError.tagSuperseded(error, dialect, parts);
+            JdbcError.wrongObjectType(error, dialect, parts);
+
+            throw JdbcError.catchAll(error, dialect);
+        }
+    }
+
+    private void saveConfigVersions(Connection conn, String tenant, List<ConfigEntry> configEntries) {
+
+        var parts = configParts(configEntries);
+
+        try {
+
+            var tenantId = tenants.getTenantId(conn, tenant);
+            var objectType = readBatch.readObjectTypeById(conn, tenantId, parts.objectId);
+            long[] defPk = readBatch.lookupDefinitionPk(conn, tenantId, objectType.keys, parts.selector);
+            long[] configPk = readBatch.lookupConfigPk(conn, tenantId, parts.configEntry);
+
+            checkObjectTypes(parts, objectType);
+
+            writeBatch.closeConfigEntry(conn, tenantId, configPk, parts);
+            writeBatch.writeConfigEntry(conn, tenantId, defPk, parts);
+        }
+        catch (SQLException error) {
+
+            // TODO: Config entry error handling
+            JdbcError.priorTagMissing(error, dialect, parts);
+            JdbcError.tagSuperseded(error, dialect, parts);
+            JdbcError.wrongObjectType(error, dialect, parts);
+
+            throw JdbcError.catchAll(error, dialect);
+        }
+    }
 
     // -----------------------------------------------------------------------------------------------------------------
     // LOAD METHODS
@@ -440,6 +509,9 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
         ObjectDefinition[] definition;
 
         TagSelector[] selector;
+
+        ConfigEntry[] configEntry;
+        Instant[] configTimestamp;
     }
 
     private ObjectParts separateParts(List<Tag> tags) {
@@ -503,6 +575,25 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
                 .toArray(UUID[]::new);
 
         parts.selector = selector.toArray(TagSelector[]::new);
+
+        return parts;
+    }
+
+    private ObjectParts configParts(List<ConfigEntry> configEntry) {
+
+        var parts = new ObjectParts();
+
+        parts.selector = configEntry.stream().map(ConfigEntry::getObjectSelector).toArray(TagSelector[]::new);
+        parts.objectType = Arrays.stream(parts.selector).map(TagSelector::getObjectType).toArray(ObjectType[]::new);
+        parts.objectId = Arrays.stream(parts.selector).map(TagSelector::getObjectId).map(UUID::fromString).toArray(UUID[]::new);
+
+        parts.configEntry = configEntry.toArray(ConfigEntry[]::new);
+
+        parts.configTimestamp = configEntry.stream()
+                .map(ConfigEntry::getConfigTimestamp)
+                .map(MetadataCodec::decodeDatetime)
+                .map(OffsetDateTime::toInstant)
+                .toArray(Instant[]::new);
 
         return parts;
     }

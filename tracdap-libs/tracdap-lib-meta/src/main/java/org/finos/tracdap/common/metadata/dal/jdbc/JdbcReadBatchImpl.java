@@ -487,12 +487,28 @@ class JdbcReadBatchImpl {
         return fetchMappedPk(conn, mappingStage, objectPk.length);
     }
 
+    long[] lookupDefinitionPk(Connection conn, short tenantId, long[] objectPk, TagSelector[] objectSelectors) throws SQLException {
+
+        var mappingStage = insertObjectSelectors(conn, objectPk, objectSelectors);
+        mapObjectSelectors(conn, tenantId, mappingStage);
+
+        return fetchMappedPk(conn, mappingStage, objectPk.length);
+    }
+
     long[] lookupTagPk(Connection conn, short tenantId, long[] definitionPk, int[] tagVersion) throws SQLException {
 
         var mappingStage = insertFkAndVersionForMapping(conn, definitionPk, tagVersion);
         mapTagByVersion(conn, tenantId, mappingStage);
 
         return fetchMappedPk(conn, mappingStage, definitionPk.length);
+    }
+
+    long[] lookupConfigPk(Connection conn, short tenantId, ConfigEntry[] configEntry) throws SQLException {
+
+        var mappingStage = insertConfigEntries(conn, configEntry);
+        mapConfigEntriesByVersion(conn, tenantId, mappingStage);
+
+        return fetchMappedPk(conn, mappingStage, configEntry.length);
     }
 
     private long[] fetchMappedPk(Connection conn, int mappingStage, int length) throws SQLException {
@@ -898,6 +914,64 @@ class JdbcReadBatchImpl {
         }
     }
 
+    private int insertConfigEntries(Connection conn, ConfigEntry[] configEntry) throws SQLException {
+
+        // Method does not insert config as_of, which is not currently used
+
+        var query =
+                "insert into key_mapping (\n" +
+                "  config_class, config_key,\n" +
+                "  ver, is_latest,\n" +
+                "  mapping_stage, ordering)\n" +
+                "values (?, ?, ?, ?, ?)";
+
+        query = query.replaceFirst("key_mapping", dialect.mappingTableName());
+
+        try (var stmt = conn.prepareStatement(query)) {
+
+            var mappingStage = nextMappingStage();
+
+            for (var i = 0; i < configEntry.length; i++) {
+
+                stmt.clearParameters();
+
+                stmt.setString(1, configEntry[i].getConfigClass());
+                stmt.setString(2 ,configEntry[i].getConfigKey());
+                stmt.setInt(3, configEntry[i].getConfigVersion());
+                stmt.setBoolean(5, configEntry[i].getIsLatestConfig());
+                stmt.setInt(6, mappingStage);
+                stmt.setInt(7, i);
+
+                stmt.addBatch();
+            }
+
+            stmt.executeBatch();
+
+            return mappingStage;
+        }
+    }
+
+    private void mapConfigEntriesByVersion(Connection conn, short tenantId, int mappingStage) throws SQLException {
+
+        var query = "update key_mapping\n" +
+                "set pk = (\n" +
+                "  select config_pk from config_entry\n" +
+                "  where config_entry.tenant_id = ?\n" +
+                "  and config_entry.config_class = key_mapping.config_class\n" +
+                "  and config_entry.config_key = key_mapping.config_key\n" +
+                "  and config_entry.config_version = key_mapping.ver)\n" +
+                "where mapping_stage = ?";
+
+        query = query.replaceAll("key_mapping", dialect.mappingTableName());
+
+        try (var stmt = conn.prepareStatement(query))  {
+
+            stmt.setShort(1, tenantId);
+            stmt.setInt(2, mappingStage);
+
+            stmt.execute();
+        }
+    }
 
     private int nextMappingStage() {
 
