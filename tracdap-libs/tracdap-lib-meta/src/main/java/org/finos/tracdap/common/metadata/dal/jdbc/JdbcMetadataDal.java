@@ -109,15 +109,26 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
 
             prepareMappingTable(conn);
 
-            savePreallocatedIds(conn, tenant, batchUpdate.getPreallocatedIds());
-            savePreallocatedObjects(conn, tenant, batchUpdate.getPreallocatedObjects());
+            if (!batchUpdate.getPreallocatedIds().isEmpty())
+                savePreallocatedIds(conn, tenant, batchUpdate.getPreallocatedIds());
 
-            saveNewObjects(conn, tenant, batchUpdate.getNewObjects());
-            saveNewVersions(conn, tenant, batchUpdate.getNewVersions());
-            saveNewTags(conn, tenant, batchUpdate.getNewTags());
+            if (!batchUpdate.getPreallocatedObjects().isEmpty())
+                savePreallocatedObjects(conn, tenant, batchUpdate.getPreallocatedObjects());
 
-            saveConfigEntries(conn, tenant, batchUpdate.getConfigEntries());
-            saveConfigVersions(conn, tenant, batchUpdate.getConfigVersions());
+            if (!batchUpdate.getNewObjects().isEmpty())
+                saveNewObjects(conn, tenant, batchUpdate.getNewObjects());
+
+            if (!batchUpdate.getNewVersions().isEmpty())
+                saveNewVersions(conn, tenant, batchUpdate.getNewVersions());
+
+            if (!batchUpdate.getNewTags().isEmpty())
+                saveNewTags(conn, tenant, batchUpdate.getNewTags());
+
+            if (!batchUpdate.getConfigEntries().isEmpty())
+                saveConfigEntries(conn, tenant, batchUpdate.getConfigEntries());
+
+            if (!batchUpdate.getConfigVersions().isEmpty())
+                saveConfigVersions(conn, tenant, batchUpdate.getConfigVersions());
         });
     }
 
