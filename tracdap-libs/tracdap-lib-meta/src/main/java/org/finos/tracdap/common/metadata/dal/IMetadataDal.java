@@ -49,6 +49,10 @@ public interface IMetadataDal {
 
     List<Tag> search(String tenant, SearchParameters searchParameters);
 
+    void saveConfigEntries(String tenant, List<ConfigEntry> configEntries);
+
+    void saveConfigVersions(String tenant, List<ConfigEntry> configEntries);
+
     // -----------------------------------------------------------------------------------------------------------------
     // ALTERNATE LOAD METHODS
     // -----------------------------------------------------------------------------------------------------------------
