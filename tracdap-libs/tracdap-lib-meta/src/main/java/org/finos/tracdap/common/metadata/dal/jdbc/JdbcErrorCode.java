@@ -28,5 +28,6 @@ public enum JdbcErrorCode {
     WRONG_OBJECT_TYPE,
 
     // The definition of a metadata item could not be understood
-    INVALID_OBJECT_DEFINITION
+    INVALID_OBJECT_DEFINITION,
+    INVALID_CONFIG_ENTRY
 }

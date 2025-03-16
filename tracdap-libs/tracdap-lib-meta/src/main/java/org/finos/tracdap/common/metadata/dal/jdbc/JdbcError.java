@@ -53,6 +53,13 @@ class JdbcError {
     static final String TAG_SUPERSEDED = "Prior tag has been superseded for {0} [{1}] (version = {2}, tag = {3})";
     static final String TAG_SUPERSEDED_MULTIPLE = "Prior tag has been superseded for one or more tag updates";
 
+    static final String MISSING_CONFIG = "Config not found for {0} [{1}] (version = {2})";
+    static final String MISSING_CONFIG_MULTIPLE = "Config not found for one or more config entries";
+    static final String DUPLICATE_CONFIG = "Duplicate config entry for {0} [{1}] (version = {2})";
+    static final String DUPLICATE_CONFIG_MULTIPLE = "Duplicate config entry for one or more config updates";
+    static final String PRIOR_CONFIG_MISSING = "Prior config not found for {0} [{1}] (version = {2})";
+    static final String PRIOR_CONFIG_MISSING_MULTIPLE = "Prior config not found for one or more config updates";
+
     static final String UNRECOGNISED_ERROR_CODE = "Unrecognised SQL Error code: {0}, sqlstate = {1}, error code = {2}";
     static final String UNHANDLED_ERROR = "Unhandled SQL Error code: {0}";
 
@@ -245,6 +252,73 @@ class JdbcError {
                 parts.tagVersion[0]);
 
         throw new EMetadataDuplicate(message, error);
+    }
+
+    static void configNotFound(
+            SQLException error, IDialect dialect, JdbcMetadataDal.ObjectParts parts) {
+
+        var code = dialect.mapErrorCode(error);
+
+        if (code != JdbcErrorCode.NO_DATA)
+            return;
+
+        if (parts.configEntry.length != 1)
+            throw new EMetadataNotFound(MISSING_CONFIG_MULTIPLE, error);
+
+        var configKey  = parts.configEntry[0];
+
+        var version = configKey.getConfigVersion() > 0
+            ? Integer.toString(configKey.getConfigVersion())
+            : !configKey.getConfigTimestamp().getIsoDatetime().isBlank()
+                ? "as-of " + configKey.getConfigTimestamp().getIsoDatetime()
+                : "latest";
+
+        var message = MessageFormat.format(MISSING_CONFIG,
+                configKey.getConfigClass(),
+                configKey.getConfigKey(),
+                version);
+
+        throw new EMetadataNotFound(message, error);
+    }
+
+    static void duplicateConfig(SQLException error, IDialect dialect, JdbcMetadataDal.ObjectParts parts) {
+
+        var code = dialect.mapErrorCode(error);
+
+        if (code != JdbcErrorCode.INSERT_DUPLICATE)
+            return;
+
+        if (parts.configEntry.length != 1)
+            throw new EMetadataDuplicate(DUPLICATE_CONFIG_MULTIPLE, error);
+
+        var configKey  = parts.configEntry[0];
+
+        var message = MessageFormat.format(DUPLICATE_CONFIG,
+                configKey.getConfigClass(),
+                configKey.getConfigKey(),
+                configKey.getConfigVersion());
+
+        throw new EMetadataDuplicate(message, error);
+    }
+
+    static void priorConfigMissing(SQLException error, IDialect dialect, JdbcMetadataDal.ObjectParts parts) {
+
+        var code = dialect.mapErrorCode(error);
+
+        if (code != JdbcErrorCode.NO_DATA)
+            return;
+
+        if (parts.configEntry.length != 1)
+            throw new EMetadataNotFound(PRIOR_CONFIG_MISSING_MULTIPLE, error);
+
+        var configKey  = parts.configEntry[0];
+
+        var message = MessageFormat.format(PRIOR_CONFIG_MISSING,
+                configKey.getConfigClass(),
+                configKey.getConfigKey(),
+                configKey.getConfigVersion());
+
+        throw new EMetadataNotFound(message, error);
     }
 
     static ETracInternal catchAll(SQLException error, IDialect dialect) {
