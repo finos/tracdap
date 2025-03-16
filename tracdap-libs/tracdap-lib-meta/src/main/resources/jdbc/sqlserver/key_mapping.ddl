@@ -27,5 +27,9 @@ create table #key_mapping (
     is_latest bit,
 
     mapping_stage int,
-    ordering int
+    ordering int,
+
+    -- For mapping config entries
+    config_class varchar(256),
+    config_key varchar(256)
 );
