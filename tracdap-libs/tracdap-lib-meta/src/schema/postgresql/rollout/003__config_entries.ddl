@@ -30,7 +30,7 @@ create table config_entry (
 
     meta_format int not null,
     meta_version int not null,
-    details blob not null,
+    details bytea not null,
 
     constraint pk_config primary key (config_pk),
     constraint fk_config_tenant foreign key (tenant_id) references tenant (tenant_id)

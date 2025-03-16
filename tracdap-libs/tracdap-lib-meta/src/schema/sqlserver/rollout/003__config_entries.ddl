@@ -23,14 +23,14 @@ create table config_entry (
     config_key varchar (256) not null,
 
     config_version int not null,
-    config_timestamp timestamp (6) not null,
-    config_superseded timestamp (6) null,
-    config_is_latest boolean not null,
-    config_deleted boolean not null,
+    config_timestamp datetime2 not null,
+    config_superseded datetime2 null,
+    config_is_latest bit not null,
+    config_deleted bit not null,
 
     meta_format int not null,
     meta_version int not null,
-    details blob not null,
+    details varbinary(max) not null,
 
     constraint pk_config primary key (config_pk),
     constraint fk_config_tenant foreign key (tenant_id) references tenant (tenant_id)

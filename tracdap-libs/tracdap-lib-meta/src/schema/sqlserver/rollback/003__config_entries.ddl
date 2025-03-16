@@ -13,27 +13,4 @@
 --  See the License for the specific language governing permissions and
 --  limitations under the License.
 
-
-create table config_entry (
-
-    tenant_id smallint not null,
-    config_pk bigint not null auto_increment,
-
-    config_class varchar (256) not null,
-    config_key varchar (256) not null,
-
-    config_version int not null,
-    config_timestamp timestamp (6) not null,
-    config_superseded timestamp (6) null,
-    config_is_latest boolean not null,
-    config_deleted boolean not null,
-
-    meta_format int not null,
-    meta_version int not null,
-    details blob not null,
-
-    constraint pk_config primary key (config_pk),
-    constraint fk_config_tenant foreign key (tenant_id) references tenant (tenant_id)
-);
-
-create unique index idx_config_unq on config_entry (tenant_id, config_class, config_key, config_version);
+drop table config_entry;
