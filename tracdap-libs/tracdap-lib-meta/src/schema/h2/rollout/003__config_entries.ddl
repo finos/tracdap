@@ -26,12 +26,14 @@ create table config_entry (
     config_timestamp timestamp (6) not null,
     config_superseded timestamp (6) null,
     config_is_latest boolean not null,
+    config_deleted boolean not null,
 
-    definition_fk bigint not null,
+    meta_format int not null,
+    meta_version int not null,
+    details blob not null,
 
     constraint pk_config primary key (config_pk),
-    constraint fk_config_tenant foreign key (tenant_id) references tenant (tenant_id),
-    constraint fk_config_object foreign key (definition_fk) references object_definition (definition_pk)
+    constraint fk_config_tenant foreign key (tenant_id) references tenant (tenant_id)
 );
 
 create unique index idx_config_unq on config_entry (tenant_id, config_class, config_key, config_version);
