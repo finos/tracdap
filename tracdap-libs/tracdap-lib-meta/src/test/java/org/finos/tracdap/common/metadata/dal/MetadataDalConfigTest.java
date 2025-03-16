@@ -1662,6 +1662,36 @@ abstract class MetadataDalConfigTest implements IDalTestable {
         Assertions.assertTrue(entriesIncludingDeleted.stream().anyMatch(e -> e.getConfigKey().equals("entry2")));
     }
 
+    @Test
+    void testListConfigEntries_unknown() {
+
+        // List entries respects config class
+
+        var testTimestamp = MetadataCodec.encodeDatetime(Instant.now());
+
+        var selector1 = TagSelector.newBuilder()
+                .setObjectType(ObjectType.CUSTOM)
+                .setObjectId(UUID.randomUUID().toString())
+                .setObjectVersion(1)
+                .setTagVersion(1)
+                .build();
+
+        var entry1 = ConfigEntry.newBuilder()
+                .setConfigClass("testListConfigEntries_unknown")
+                .setConfigKey("entry1")
+                .setConfigVersion(1)
+                .setConfigTimestamp(testTimestamp)
+                .setIsLatestConfig(true)
+                .setDetails(ConfigDetails.newBuilder()
+                .setObjectSelector(selector1)
+                .setObjectType(selector1.getObjectType()))
+                .build();
+
+        dal.saveConfigEntries(TEST_TENANT, List.of(entry1));
+
+        Assertions.assertThrows(EMetadataNotFound.class, () -> dal.listConfigEntries(TEST_TENANT, "testListConfigEntries_unknown_alt", false));
+    }
+
 
     // -----------------------------------------------------------------------------------------------------------------
     // TENANT SEPARATION
