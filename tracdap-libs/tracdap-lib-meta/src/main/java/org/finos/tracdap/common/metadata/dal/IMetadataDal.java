@@ -49,17 +49,13 @@ public interface IMetadataDal {
 
     List<Tag> search(String tenant, SearchParameters searchParameters);
 
-    void saveConfigEntries(String tenant, List<ConfigEntry> configEntries);
-
-    void saveConfigVersions(String tenant, List<ConfigEntry> configEntries);
-
     // -----------------------------------------------------------------------------------------------------------------
     // ALTERNATE LOAD METHODS
     // -----------------------------------------------------------------------------------------------------------------
 
     // These two methods are functionally equivalent to loadObjects()
-    // They are used when the write service to load prior versions during object / tag updates
-    // It is fine to use the default versions, or implementations can override to provide different error handling
+    // They are used during object / tag updates to provide different error messages to the client
+    // Implementations are free to use the default versions, this may affect the readability of error messages
 
     default List<Tag> loadPriorObjects(String tenant, List<TagSelector> selector) {
         return loadObjects(tenant, selector);
@@ -68,6 +64,18 @@ public interface IMetadataDal {
     default List<Tag> loadPriorTags(String tenant, List<TagSelector> selector) {
         return loadObjects(tenant, selector);
     }
+
+    // -----------------------------------------------------------------------------------------------------------------
+    // CONFIG ENTRIES
+    // -----------------------------------------------------------------------------------------------------------------
+
+    void saveConfigEntries(String tenant, List<ConfigEntry> configEntries);
+
+    List<ConfigEntry> loadConfigEntries(String tenant, List<ConfigEntry> configKeys);
+
+    ConfigEntry loadConfigEntry(String tenant, ConfigEntry configKey);
+
+    List<ConfigEntry> listConfigEntries(String tenant, String configClass, boolean includeDeleted);
 
     // -----------------------------------------------------------------------------------------------------------------
     // LEGACY LOAD API

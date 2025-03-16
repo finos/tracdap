@@ -33,7 +33,6 @@ public class MetadataBatchUpdate {
     private final List<Tag> newTags;
 
     private final List<ConfigEntry> configEntries;
-    private final List<ConfigEntry> configVersions;
 
 
     public MetadataBatchUpdate(
@@ -43,7 +42,7 @@ public class MetadataBatchUpdate {
             List<Tag> newVersions,
             List<Tag> newTags) {
 
-        this(preallocatedIds, preallocatedObjects, newObjects, newVersions, newTags, List.of(), List.of());
+        this(preallocatedIds, preallocatedObjects, newObjects, newVersions, newTags, List.of());
     }
 
     public MetadataBatchUpdate(
@@ -52,8 +51,7 @@ public class MetadataBatchUpdate {
             List<Tag> newObjects,
             List<Tag> newVersions,
             List<Tag> newTags,
-            List<ConfigEntry> configEntries,
-            List<ConfigEntry> configVersions) {
+            List<ConfigEntry> configEntries) {
 
         this.preallocatedIds = preallocatedIds;
         this.preallocatedObjects = preallocatedObjects;
@@ -61,7 +59,6 @@ public class MetadataBatchUpdate {
         this.newVersions = newVersions;
         this.newTags = newTags;
         this.configEntries = configEntries;
-        this.configVersions = configVersions;
     }
 
     public List<TagHeader> getPreallocatedIds() {
@@ -88,10 +85,6 @@ public class MetadataBatchUpdate {
         return configEntries;
     }
 
-    public List<ConfigEntry> getConfigVersions() {
-        return configVersions;
-    }
-
     @Override
     public String toString() {
 
@@ -103,13 +96,9 @@ public class MetadataBatchUpdate {
         var nNewVersions = preallocatedIds == null ? "(null)" : newVersions.size();
         var nNewTags = preallocatedIds == null ? "(null)" : newTags.size();
         var nConfigEntries = configEntries == null ? "(null)" : configEntries.size();
-        var nConfigVersions = configVersions == null ? "(null)" : configVersions.size();
 
         return String.format(
-                "{preallocatedIds = %s, preallocatedObjects = %s, newObjects = %s, newVersions = %s, newTags = %s," +
-                " configEntries = %s, configVersions = %s}",
-                nPreallocatedIds, nPreallocatedObjects,
-                nNewObjects, nNewVersions, nNewTags,
-                nConfigEntries, nConfigVersions);
+                "{preallocatedIds = %s, preallocatedObjects = %s, newObjects = %s, newVersions = %s, newTags = %s, configEntries = %s}",
+                nPreallocatedIds, nPreallocatedObjects, nNewObjects, nNewVersions, nNewTags, nConfigEntries);
     }
 }
