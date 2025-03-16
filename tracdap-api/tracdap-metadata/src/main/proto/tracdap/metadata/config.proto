@@ -30,33 +30,41 @@ import "tracdap/metadata/object_id.proto";
  */
 message ConfigEntry {
 
-  /**
-   * Config class for this config entry.
-   */
+  /// Config class for this config entry.
   string configClass = 1;
 
-  /**
-   * Config key for this config entry.
-   */
+  /// Config key for this config entry.
   string configKey = 2;
 
-  /**
-   * Version of the config entry.
-   */
+  /// Version of the config entry.
   int32 configVersion = 3;
 
-  /**
-   * Timestamp for when this version of the config entry was created.
-   */
+  /// Timestamp for when this version of the config entry was created.
   DatetimeValue configTimestamp = 4;
 
-  /**
-   * Flag indicating whether this is the latest version of the config entry.
-   */
+  /// Flag indicating whether this is the latest version of the config entry.
   bool isLatestConfig = 5;
 
-  /**
-   * Selector for the object this config entry refers to.
-   */
-  TagSelector objectSelector = 6;
+  /// Flag indicating whether this config entry has been deleted.
+  bool configDeleted = 6;
+
+  /// Describes the content of this config entry, can be used for list / summary views (optional).
+  optional ConfigDetails details = 7;
 }
+
+
+/**
+ * Summary content of a config entry.
+ *
+ * @see ConfigEntry
+ */
+message ConfigDetails {
+
+  /// Selector for the metadata object holding the content of this config entry.
+  metadata.TagSelector objectSelector = 1;
+
+  /// Type of the metadata object referred to by this config entry.
+  ObjectType objectType = 2;
+}
+
+
