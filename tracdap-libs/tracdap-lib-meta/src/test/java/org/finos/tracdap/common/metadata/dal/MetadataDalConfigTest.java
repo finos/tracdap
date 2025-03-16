@@ -690,7 +690,9 @@ abstract class MetadataDalConfigTest implements IDalTestable {
 
         dal.saveConfigEntries(TEST_TENANT, List.of(entry2V2));
 
-        Assertions.assertEquals(List.of(entry1V2, entry2V2), savedEntries2);
+        var savedEntries3 = dal.loadConfigEntries(TEST_TENANT, List.of(key1, key2));
+
+        Assertions.assertEquals(List.of(entry1V2, entry2V2), savedEntries3);
     }
 
     @Test
@@ -1636,6 +1638,10 @@ abstract class MetadataDalConfigTest implements IDalTestable {
 
         dal.saveConfigEntries(TEST_TENANT, List.of(entry1, entry2));
 
+        var entriesBeforeDeleting = dal.listConfigEntries(TEST_TENANT, "testListConfigEntries_deleted", false);
+
+        Assertions.assertEquals(2, entriesBeforeDeleting.size());
+
         var testTimestamp2 = MetadataCodec.encodeDatetime(Instant.now());
 
         var entry1v2 = ConfigEntry.newBuilder()
@@ -1657,7 +1663,7 @@ abstract class MetadataDalConfigTest implements IDalTestable {
 
         var entriesIncludingDeleted = dal.listConfigEntries(TEST_TENANT, "testListConfigEntries_deleted", true);
 
-        Assertions.assertEquals(2, entries.size());
+        Assertions.assertEquals(2, entriesIncludingDeleted.size());
         Assertions.assertTrue(entriesIncludingDeleted.stream().anyMatch(e -> e.getConfigKey().equals("entry1")));
         Assertions.assertTrue(entriesIncludingDeleted.stream().anyMatch(e -> e.getConfigKey().equals("entry2")));
     }
