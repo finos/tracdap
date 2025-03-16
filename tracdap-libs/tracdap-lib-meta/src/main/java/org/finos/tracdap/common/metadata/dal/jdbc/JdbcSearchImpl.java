@@ -17,14 +17,15 @@
 
 package org.finos.tracdap.common.metadata.dal.jdbc;
 
-
 import org.finos.tracdap.metadata.SearchParameters;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.Arrays;
+
 
 class JdbcSearchImpl {
 
@@ -43,27 +44,57 @@ class JdbcSearchImpl {
         if (log.isDebugEnabled())
             log.debug("Running search query: \n{}", query.getQuery());
 
-        var pks = new long[MAX_SEARCH_RESULT];
-
         try (var stmt = conn.prepareStatement(query.getQuery())) {
 
             for (int pIndex = 0; pIndex < query.getParams().size(); pIndex++)
                 query.getParams().get(pIndex).accept(stmt, pIndex + 1);
 
-            int i = 0;
+            return readPks(stmt, "tag_pk");
+        }
+    }
 
-            try (var rs = stmt.executeQuery()) {
+    long[] searchConfigKeys(Connection conn, short tenantId, String configClass, boolean includeDeleted) throws SQLException {
 
-                while (rs.next() && i < MAX_SEARCH_RESULT) {
-                    pks[i] = rs.getLong("tag_pk");
-                    i++;
-                }
+        var query =
+                "select config_pk\n" +
+                "from config_entry\n" +
+                "where tenant_id = ?\n" +
+                "and config_class = ?\n" +
+                "and config_is_latest = ?\n" +
+                // Optional filter on deleted items
+                (includeDeleted ? "" : "  and config_deleted = ?\n") +
+                // Use alphabetical ordering by key
+                "order by config_key";
 
-                if (i < MAX_SEARCH_RESULT)
-                    return Arrays.copyOfRange(pks, 0, i);
-                else
-                    return pks;
+        try (var stmt = conn.prepareStatement(query)) {
+
+            stmt.setInt(1, tenantId);
+            stmt.setString(2, configClass);
+            stmt.setBoolean(3, true);
+
+            if (!includeDeleted)
+                stmt.setBoolean(4, false);
+
+            return readPks(stmt, "config_pk");
+        }
+    }
+
+    private long[] readPks(PreparedStatement stmt, String columnName) throws SQLException {
+
+        long[] pks = new long[MAX_SEARCH_RESULT];
+        int i = 0;
+
+        try (var rs = stmt.executeQuery()) {
+
+            while (rs.next() && i < MAX_SEARCH_RESULT) {
+                pks[i] = rs.getLong(columnName);
+                i++;
             }
+
+            if (i < MAX_SEARCH_RESULT)
+                return Arrays.copyOfRange(pks, 0, i);
+            else
+                return pks;
         }
     }
 }

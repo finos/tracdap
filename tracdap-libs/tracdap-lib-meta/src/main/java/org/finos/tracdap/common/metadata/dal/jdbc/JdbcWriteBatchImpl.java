@@ -268,7 +268,7 @@ class JdbcWriteBatchImpl {
         return rootValue.getArrayValue().getItemsList();
     }
 
-    void writeConfigEntry(Connection conn, short tenantId, long[] definitionPk, JdbcMetadataDal.ObjectParts parts) throws SQLException {
+    void writeConfigEntry(Connection conn, short tenantId, JdbcMetadataDal.ObjectParts parts) throws SQLException {
 
         var query =
                 "insert into config_entry (\n" +
@@ -278,13 +278,16 @@ class JdbcWriteBatchImpl {
                 "  config_version,\n" +
                 "  config_timestamp,\n" +
                 "  config_is_latest,\n" +
-                "  definition_fk\n" +
+                "  config_deleted,\n" +
+                "  meta_format,\n" +
+                "  meta_version,\n" +
+                "  details\n" +
                 ")\n" +
-                "values (?, ?, ?, ?, ?, ?, ?)";
+                "values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
         try (var stmt = conn.prepareStatement(query)) {
 
-            for (var i = 0; i < definitionPk.length; i++) {
+            for (var i = 0; i < parts.configEntry.length; i++) {
 
                 var sqlTimestamp = java.sql.Timestamp.from(parts.configTimestamp[i]);
 
@@ -294,7 +297,10 @@ class JdbcWriteBatchImpl {
                 stmt.setInt(4, parts.configEntry[i].getConfigVersion());
                 stmt.setTimestamp(5, sqlTimestamp);
                 stmt.setBoolean(6, true);
-                stmt.setLong(7, definitionPk[i]);
+                stmt.setBoolean(7, parts.configEntry[i].getConfigDeleted());
+                stmt.setInt(8, MetadataFormat.PROTO.getNumber());
+                stmt.setInt(9, MetadataVersion.CURRENT.getNumber());
+                stmt.setBytes(10, parts.configEntry[i].getDetails().toByteArray());
 
                 stmt.addBatch();
             }

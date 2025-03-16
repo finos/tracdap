@@ -466,6 +466,145 @@ class JdbcReadBatchImpl {
         return new JdbcBaseDal.KeyedItems<>(headers.keys, tagRecords.versions, tagRecords.timestamps, tags, tagRecords.isLatest);
     }
 
+    public JdbcBaseDal.KeyedItems<ConfigDetails>
+    readConfigEntry(Connection conn, short tenantId, ConfigEntry[] configEntry, Instant[] configTimestamp) throws SQLException {
+
+        var mappingStage = insertConfigEntries(conn, configEntry, configTimestamp);
+        mapConfigEntries(conn, tenantId, mappingStage);
+
+        return fetchConfigEntry(conn, tenantId, configEntry.length, mappingStage);
+    }
+
+    public JdbcBaseDal.KeyedItems<String>
+    readConfigStub(Connection conn, short tenantId, long[] configPk) throws SQLException {
+
+        var mappingStage = insertPk(conn, configPk);
+
+        return fetchConfigStub(conn, tenantId, configPk.length, mappingStage);
+    }
+
+    private JdbcBaseDal.KeyedItems<ConfigDetails>
+    fetchConfigEntry(Connection conn, short tenantId, int length, int mappingStage)
+    throws SQLException {
+
+        var query =
+                "select config_pk, config_version, config_timestamp, config_is_latest, config_deleted, details\n" +
+                "from config_entry cfg\n" +
+                "join key_mapping km\n" +
+                "  on cfg.config_pk = km.pk\n" +
+                "where cfg.tenant_id = ?\n" +
+                "  and km.mapping_stage = ?\n" +
+                "order by km.ordering";
+
+        query = query.replaceFirst("key_mapping", dialect.mappingTableName());
+
+        try (var stmt = conn.prepareStatement(query)) {
+
+            stmt.setShort(1, tenantId);
+            stmt.setInt(2, mappingStage);
+
+            try (var rs = stmt.executeQuery()) {
+
+                long[] pks = new long[length];
+                int[] versions = new int[length];
+                Instant[] timestamps = new Instant[length];
+                boolean[] latest = new boolean[length];
+                boolean[] deleted = new boolean[length];
+                ConfigDetails[] details = new ConfigDetails[length];
+
+                for (var i = 0; i < length; i++) {
+
+                    if (!rs.next())
+                        throw new JdbcException(JdbcErrorCode.NO_DATA);
+
+                    var cfgPk = rs.getLong(1);
+                    var cfgVersion = rs.getInt(2);
+                    var sqlTimestamp = rs.getTimestamp(3);
+                    var cfgTimestamp = sqlTimestamp.toInstant();
+                    var cfgLatest = rs.getBoolean(4);
+                    var cfgDeleted = rs.getBoolean(5);
+
+                    // TODO: Encode / decode helper, type = protobuf | json ?
+                    var detailsEncoded = rs.getBytes(6);
+                    var detailsDecoded = cfgDeleted
+                            ? ConfigDetails.getDefaultInstance()
+                            : ConfigDetails.parseFrom(detailsEncoded);
+
+                    pks[i] = cfgPk;
+                    versions[i] = cfgVersion;
+                    timestamps[i] = cfgTimestamp;
+                    latest[i] = cfgLatest;
+                    deleted[i] = cfgDeleted;
+                    details[i] = detailsDecoded;
+                }
+
+                if (rs.next())
+                    throw new JdbcException(JdbcErrorCode.TOO_MANY_ROWS);
+
+                return new JdbcBaseDal.KeyedItems<>(pks, versions, timestamps, details, latest, deleted);
+            }
+            catch (InvalidProtocolBufferException e) {
+                throw new JdbcException(JdbcErrorCode.INVALID_CONFIG_ENTRY);
+            }
+        }
+    }
+
+    private JdbcBaseDal.KeyedItems<String>
+    fetchConfigStub(Connection conn, short tenantId, int length, int mappingStage) throws SQLException {
+
+        var query =
+                "select config_pk, config_version, config_timestamp, config_is_latest, config_deleted, cfg.config_key\n" +
+                "from config_entry cfg\n" +
+                "join key_mapping km\n" +
+                "  on cfg.config_pk = km.pk\n" +
+                "where cfg.tenant_id = ?\n" +
+                "  and km.mapping_stage = ?\n" +
+                "order by km.ordering";
+
+        query = query.replaceFirst("key_mapping", dialect.mappingTableName());
+
+        try (var stmt = conn.prepareStatement(query)) {
+
+            stmt.setShort(1, tenantId);
+            stmt.setInt(2, mappingStage);
+
+            try (var rs = stmt.executeQuery()) {
+
+                long[] pks = new long[length];
+                int[] versions = new int[length];
+                Instant[] timestamps = new Instant[length];
+                boolean[] latest = new boolean[length];
+                boolean[] deleted = new boolean[length];
+                String[] keys =  new String[length];
+
+                for (var i = 0; i < length; i++) {
+
+                    if (!rs.next())
+                        throw new JdbcException(JdbcErrorCode.NO_DATA);
+
+                    var cfgPk = rs.getLong(1);
+                    var cfgVersion = rs.getInt(2);
+                    var sqlTimestamp = rs.getTimestamp(3);
+                    var cfgTimestamp = sqlTimestamp.toInstant();
+                    var cfgLatest = rs.getBoolean(4);
+                    var cfgDeleted = rs.getBoolean(5);
+                    var cfgKey = rs.getString(6);
+
+                    pks[i] = cfgPk;
+                    versions[i] = cfgVersion;
+                    timestamps[i] = cfgTimestamp;
+                    latest[i] = cfgLatest;
+                    deleted[i] = cfgDeleted;
+                    keys[i] = cfgKey;
+                }
+
+                if (rs.next())
+                    throw new JdbcException(JdbcErrorCode.TOO_MANY_ROWS);
+
+                return new JdbcBaseDal.KeyedItems<>(pks, versions, timestamps, keys, latest, deleted);
+            }
+        }
+    }
 
     // -----------------------------------------------------------------------------------------------------------------
     // KEY LOOKUP FUNCTIONS
@@ -503,9 +642,9 @@ class JdbcReadBatchImpl {
         return fetchMappedPk(conn, mappingStage, definitionPk.length);
     }
 
-    long[] lookupConfigPk(Connection conn, short tenantId, ConfigEntry[] configEntry) throws SQLException {
+    long[] lookupConfigPkByVersion(Connection conn, short tenantId, ConfigEntry[] configEntry) throws SQLException {
 
-        var mappingStage = insertConfigEntries(conn, configEntry);
+        var mappingStage = insertConfigEntries(conn, configEntry, null);
         mapConfigEntriesByVersion(conn, tenantId, mappingStage);
 
         return fetchMappedPk(conn, mappingStage, configEntry.length);
@@ -914,16 +1053,16 @@ class JdbcReadBatchImpl {
         }
     }
 
-    private int insertConfigEntries(Connection conn, ConfigEntry[] configEntry) throws SQLException {
+    private int insertConfigEntries(Connection conn, ConfigEntry[] configEntry, Instant[] configTimestamps) throws SQLException {
 
         // Method does not insert config as_of, which is not currently used
 
         var query =
                 "insert into key_mapping (\n" +
                 "  config_class, config_key,\n" +
-                "  ver, is_latest,\n" +
+                "  ver, as_of, is_latest,\n" +
                 "  mapping_stage, ordering)\n" +
-                "values (?, ?, ?, ?, ?)";
+                "values (?, ?, ?, ?, ?, ?, ?)";
 
         query = query.replaceFirst("key_mapping", dialect.mappingTableName());
 
@@ -933,12 +1072,29 @@ class JdbcReadBatchImpl {
 
             for (var i = 0; i < configEntry.length; i++) {
 
+                var configTimestamp = configTimestamps != null ? configTimestamps[i] : null;
+                var sqlTimestamp = configTimestamp != null ? java.sql.Timestamp.from(configTimestamp) : null;
+
                 stmt.clearParameters();
 
                 stmt.setString(1, configEntry[i].getConfigClass());
                 stmt.setString(2 ,configEntry[i].getConfigKey());
-                stmt.setInt(3, configEntry[i].getConfigVersion());
-                stmt.setBoolean(5, configEntry[i].getIsLatestConfig());
+
+                if (configEntry[i].getConfigVersion() > 0)
+                    stmt.setInt(3, configEntry[i].getConfigVersion());
+                else
+                    stmt.setNull(3, Types.INTEGER);
+
+                if (sqlTimestamp != null)
+                    stmt.setTimestamp(4, sqlTimestamp);
+                else
+                    stmt.setNull(4, Types.INTEGER);
+
+                if (configEntry[i].getIsLatestConfig())
+                    stmt.setBoolean(5, configEntry[i].getIsLatestConfig());
+                else
+                    stmt.setNull(5, Types.BOOLEAN);
+
                 stmt.setInt(6, mappingStage);
                 stmt.setInt(7, i);
 
@@ -951,7 +1107,47 @@ class JdbcReadBatchImpl {
         }
     }
 
+    private void mapConfigEntries(Connection conn, short tenantId, int mappingStage) throws SQLException {
+
+        // Match all criteria specified in the config entry (not known ahead of time)
+
+        var query = "update key_mapping\n" +
+                "set pk = (\n" +
+                "  select config_pk from config_entry\n" +
+                "  where config_entry.tenant_id = ?\n" +
+                "  and config_entry.config_class = key_mapping.config_class\n" +
+                "  and config_entry.config_key = key_mapping.config_key\n" +
+                "  and (\n" +
+
+                // Do not return anything if no criteria are specified
+                "    (key_mapping.ver is not null or key_mapping.as_of is not null or key_mapping.is_latest is not null) and\n" +
+
+                // Match on version
+                "    (key_mapping.ver is null or config_entry.config_version = key_mapping.ver) and\n" +
+
+                // Match on as-of
+                "    (key_mapping.as_of is null or (config_entry.config_timestamp <= key_mapping.as_of and\n" +
+                "    (config_entry.config_superseded is null or config_entry.config_superseded > key_mapping.as_of))) and\n" +
+
+                // Match on latest
+                "    (key_mapping.is_latest is null or config_entry.config_is_latest = key_mapping.is_latest)))\n" +
+
+                "where mapping_stage = ?";
+
+        query = query.replaceAll("key_mapping", dialect.mappingTableName());
+
+        try (var stmt = conn.prepareStatement(query))  {
+
+            stmt.setShort(1, tenantId);
+            stmt.setInt(2, mappingStage);
+
+            stmt.execute();
+        }
+    }
+
     private void mapConfigEntriesByVersion(Connection conn, short tenantId, int mappingStage) throws SQLException {
+
+        // Specialization for mapping by version (used in updates)
 
         var query = "update key_mapping\n" +
                 "set pk = (\n" +

@@ -109,26 +109,23 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
 
             prepareMappingTable(conn);
 
-            if (!batchUpdate.getPreallocatedIds().isEmpty())
+            if (batchUpdate.getPreallocatedIds() != null && !batchUpdate.getPreallocatedIds().isEmpty())
                 savePreallocatedIds(conn, tenant, batchUpdate.getPreallocatedIds());
 
-            if (!batchUpdate.getPreallocatedObjects().isEmpty())
+            if (batchUpdate.getPreallocatedObjects() != null && !batchUpdate.getPreallocatedObjects().isEmpty())
                 savePreallocatedObjects(conn, tenant, batchUpdate.getPreallocatedObjects());
 
-            if (!batchUpdate.getNewObjects().isEmpty())
+            if (batchUpdate.getNewObjects() != null && !batchUpdate.getNewObjects().isEmpty())
                 saveNewObjects(conn, tenant, batchUpdate.getNewObjects());
 
-            if (!batchUpdate.getNewVersions().isEmpty())
+            if (batchUpdate.getNewVersions() != null && !batchUpdate.getNewVersions().isEmpty())
                 saveNewVersions(conn, tenant, batchUpdate.getNewVersions());
 
-            if (!batchUpdate.getNewTags().isEmpty())
+            if (batchUpdate.getNewTags() != null && !batchUpdate.getNewTags().isEmpty())
                 saveNewTags(conn, tenant, batchUpdate.getNewTags());
 
-            if (!batchUpdate.getConfigEntries().isEmpty())
+            if (batchUpdate.getConfigEntries() != null && !batchUpdate.getConfigEntries().isEmpty())
                 saveConfigEntries(conn, tenant, batchUpdate.getConfigEntries());
-
-            if (!batchUpdate.getConfigVersions().isEmpty())
-                saveConfigVersions(conn, tenant, batchUpdate.getConfigVersions());
         });
     }
 
@@ -174,24 +171,6 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
         wrapTransaction(conn -> {
             prepareMappingTable(conn);
             saveNewTags(conn, tenant, tags);
-        });
-    }
-
-    @Override
-    public void saveConfigEntries(String tenant, List<ConfigEntry> configEntries) {
-
-        wrapTransaction(conn -> {
-            prepareMappingTable(conn);
-            saveConfigEntries(conn, tenant, configEntries);
-        });
-    }
-
-    @Override
-    public void saveConfigVersions(String tenant, List<ConfigEntry> configEntries) {
-
-        wrapTransaction(conn -> {
-            prepareMappingTable(conn);
-            saveConfigVersions(conn, tenant, configEntries);
         });
     }
 
@@ -305,58 +284,6 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
         }
         catch (SQLException error) {
 
-            JdbcError.priorTagMissing(error, dialect, parts);
-            JdbcError.tagSuperseded(error, dialect, parts);
-            JdbcError.wrongObjectType(error, dialect, parts);
-
-            throw JdbcError.catchAll(error, dialect);
-        }
-    }
-
-    private void saveConfigEntries(Connection conn, String tenant, List<ConfigEntry> configEntries) {
-
-        var parts = configParts(configEntries);
-
-        try {
-
-            var tenantId = tenants.getTenantId(conn, tenant);
-            var objectType = readBatch.readObjectTypeById(conn, tenantId, parts.objectId);
-            long[] defPk = readBatch.lookupDefinitionPk(conn, tenantId, objectType.keys, parts.selector);
-
-            checkObjectTypes(parts, objectType);
-
-            writeBatch.writeConfigEntry(conn, tenantId, defPk, parts);
-        }
-        catch (SQLException error) {
-
-            // TODO: Config entry error handling
-            JdbcError.priorTagMissing(error, dialect, parts);
-            JdbcError.tagSuperseded(error, dialect, parts);
-            JdbcError.wrongObjectType(error, dialect, parts);
-
-            throw JdbcError.catchAll(error, dialect);
-        }
-    }
-
-    private void saveConfigVersions(Connection conn, String tenant, List<ConfigEntry> configEntries) {
-
-        var parts = configParts(configEntries);
-
-        try {
-
-            var tenantId = tenants.getTenantId(conn, tenant);
-            var objectType = readBatch.readObjectTypeById(conn, tenantId, parts.objectId);
-            long[] defPk = readBatch.lookupDefinitionPk(conn, tenantId, objectType.keys, parts.selector);
-            long[] configPk = readBatch.lookupConfigPk(conn, tenantId, parts.configEntry);
-
-            checkObjectTypes(parts, objectType);
-
-            writeBatch.closeConfigEntry(conn, tenantId, configPk, parts);
-            writeBatch.writeConfigEntry(conn, tenantId, defPk, parts);
-        }
-        catch (SQLException error) {
-
-            // TODO: Config entry error handling
             JdbcError.priorTagMissing(error, dialect, parts);
             JdbcError.tagSuperseded(error, dialect, parts);
             JdbcError.wrongObjectType(error, dialect, parts);
@@ -505,6 +432,121 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
 
 
     // -----------------------------------------------------------------------------------------------------------------
+    // CONFIG ENTRIES
+    // -----------------------------------------------------------------------------------------------------------------
+
+    @Override
+    public void saveConfigEntries(String tenant, List<ConfigEntry> configEntries) {
+
+        wrapTransaction(conn -> {
+            prepareMappingTable(conn);
+            saveConfigEntries(conn, tenant, configEntries);
+        });
+    }
+
+    @Override
+    public ConfigEntry loadConfigEntry(String tenant, ConfigEntry configKey) {
+
+        return wrapTransaction(conn -> {
+            return loadConfigEntry(conn, tenant, configKey);
+        });
+    }
+
+    private ConfigEntry loadConfigEntry(Connection conn, String tenant, ConfigEntry configKey) {
+
+        // TODO: Real single instance read
+        return loadConfigEntries(conn, tenant, List.of(configKey)).get(0);
+    }
+
+    @Override
+    public List<ConfigEntry> loadConfigEntries(String tenant, List<ConfigEntry> configKeys) {
+
+        return wrapTransaction(conn -> {
+            prepareMappingTable(conn);
+            return loadConfigEntries(conn, tenant, configKeys);
+        });
+    }
+
+    private void saveConfigEntries(Connection conn, String tenant, List<ConfigEntry> configEntries) {
+
+        var parts = configParts(configEntries);
+
+        try {
+
+            var tenantId = tenants.getTenantId(conn, tenant);
+
+            // Find prior versions for entries with version > 1
+            var priorVersions = configPriorVersions(parts.configEntry);
+
+            // Close any prior version entries if they exist
+            if (priorVersions.length > 0) {
+                long[] priorPk = readBatch.lookupConfigPkByVersion(conn, tenantId, priorVersions);
+                writeBatch.closeConfigEntry(conn, tenantId, priorPk, parts);
+            }
+
+            writeBatch.writeConfigEntry(conn, tenantId, parts);
+        }
+        catch (SQLException error) {
+
+            JdbcError.priorConfigMissing(error, dialect, parts);
+            JdbcError.duplicateConfig(error, dialect, parts);
+
+            throw JdbcError.catchAll(error, dialect);
+        }
+    }
+
+    private List<ConfigEntry> loadConfigEntries(Connection conn, String tenant, List<ConfigEntry> configKeys) {
+
+        var parts = configParts(configKeys);
+
+        try {
+
+            var tenantId = tenants.getTenantId(conn, tenant);
+            var configEntries = readBatch.readConfigEntry(conn, tenantId, parts.configEntry, parts.configTimestamp);
+
+            return buildConfigEntry(configKeys, configEntries);
+        }
+        catch (SQLException error) {
+
+            JdbcError.configNotFound(error, dialect, parts);
+            throw JdbcError.catchAll(error, dialect);
+        }
+    }
+
+    @Override
+    public List<ConfigEntry> listConfigEntries(String tenant, String configClass, boolean includeDeleted) {
+
+        return wrapTransaction(conn -> {
+            prepareMappingTable(conn);
+            return listConfigEntries(conn, tenant, configClass, includeDeleted);
+        });
+    }
+
+    private List<ConfigEntry> listConfigEntries(Connection conn, String tenant, String configClass, boolean includeDeleted) {
+
+        try {
+
+            var tenantId = tenants.getTenantId(conn, tenant);
+
+            long[] configPk = search.searchConfigKeys(conn, tenantId, configClass, includeDeleted);
+
+            if (configPk.length == 0)
+                throw new JdbcException(JdbcErrorCode.NO_DATA);
+
+            var configStub = readBatch.readConfigStub(conn, tenantId, configPk);
+
+            return buildConfigStub(configClass, configStub);
+
+        }
+        catch (SQLException error) {
+
+            JdbcError.configClassNotFound(error, dialect, configClass);
+            throw JdbcError.catchAll(error, dialect);
+        }
+    }
+
+
+    // -----------------------------------------------------------------------------------------------------------------
     // OBJECT PARTS
     // -----------------------------------------------------------------------------------------------------------------
 
@@ -597,19 +639,28 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
 
         var parts = new ObjectParts();
 
-        parts.selector = configEntry.stream().map(ConfigEntry::getObjectSelector).toArray(TagSelector[]::new);
-        parts.objectType = Arrays.stream(parts.selector).map(TagSelector::getObjectType).toArray(ObjectType[]::new);
-        parts.objectId = Arrays.stream(parts.selector).map(TagSelector::getObjectId).map(UUID::fromString).toArray(UUID[]::new);
-
         parts.configEntry = configEntry.toArray(ConfigEntry[]::new);
 
         parts.configTimestamp = configEntry.stream()
                 .map(ConfigEntry::getConfigTimestamp)
-                .map(MetadataCodec::decodeDatetime)
-                .map(OffsetDateTime::toInstant)
+                .map(dtv -> dtv.getIsoDatetime().isBlank() ? null : MetadataCodec.decodeDatetime(dtv).toInstant())
                 .toArray(Instant[]::new);
 
         return parts;
+    }
+
+    private ConfigEntry[] configPriorVersions(ConfigEntry[] configEntries) {
+
+        return Arrays.stream(configEntries)
+                .filter(entry -> entry.getConfigVersion() > 1)
+                .map(ConfigEntry::toBuilder)
+                .map(entry -> entry.setConfigVersion(entry.getConfigVersion() - 1))
+                .map(ConfigEntry.Builder::clearConfigTimestamp)
+                .map(ConfigEntry.Builder::clearIsLatestConfig)
+                .map(ConfigEntry.Builder::clearConfigDeleted)
+                .map(ConfigEntry.Builder::clearDetails)
+                .map(ConfigEntry.Builder::build)
+                .toArray(ConfigEntry[]::new);
     }
 
 
@@ -689,6 +740,61 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
                     .build();
 
             result.add(tag);
+        }
+
+        return result;
+    }
+
+    private List<ConfigEntry> buildConfigEntry(List<ConfigEntry> entries, KeyedItems<ConfigDetails> keyedDetails) {
+
+        var result = new ArrayList<ConfigEntry>(keyedDetails.keys.length);
+
+        for (int i = 0; i < keyedDetails.keys.length; i++) {
+
+            var version = keyedDetails.versions[i];
+            var timestamp = keyedDetails.timestamps[i];
+            var latest = keyedDetails.isLatest[i];
+            var deleted = keyedDetails.deleted[i];
+            var details = keyedDetails.items[i];
+
+            var entry = ConfigEntry.newBuilder()
+                    .setConfigClass(entries.get(i).getConfigClass())
+                    .setConfigKey(entries.get(i).getConfigKey())
+                    .setConfigVersion(version)
+                    .setConfigTimestamp(MetadataCodec.encodeDatetime(timestamp))
+                    .setIsLatestConfig(latest)
+                    .setConfigDeleted(deleted)
+                    .setDetails(details)
+                    .build();
+
+            result.add(entry);
+        }
+
+        return result;
+    }
+
+    private List<ConfigEntry> buildConfigStub(String configClass, KeyedItems<String> keyedStubs) {
+
+        var result = new ArrayList<ConfigEntry>(keyedStubs.keys.length);
+
+        for (int i = 0; i < keyedStubs.keys.length; i++) {
+
+            var version = keyedStubs.versions[i];
+            var timestamp = keyedStubs.timestamps[i];
+            var latest = keyedStubs.isLatest[i];
+            var deleted = keyedStubs.deleted[i];
+            var configKey = keyedStubs.items[i];
+
+            var entry = ConfigEntry.newBuilder()
+                    .setConfigClass(configClass)
+                    .setConfigKey(configKey)
+                    .setConfigVersion(version)
+                    .setConfigTimestamp(MetadataCodec.encodeDatetime(timestamp))
+                    .setIsLatestConfig(latest)
+                    .setConfigDeleted(deleted)
+                    .build();
+
+            result.add(entry);
         }
 
         return result;
