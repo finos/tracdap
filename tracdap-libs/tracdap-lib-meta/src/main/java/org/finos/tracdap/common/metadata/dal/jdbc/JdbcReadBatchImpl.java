@@ -1088,7 +1088,7 @@ class JdbcReadBatchImpl {
                 if (sqlTimestamp != null)
                     stmt.setTimestamp(4, sqlTimestamp);
                 else
-                    stmt.setNull(4, Types.INTEGER);
+                    stmt.setNull(4, Types.TIMESTAMP);
 
                 if (configEntry[i].getIsLatestConfig())
                     stmt.setBoolean(5, configEntry[i].getIsLatestConfig());
