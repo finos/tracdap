@@ -17,7 +17,7 @@
 create table config_entry (
 
     tenant_id smallint not null,
-    config_pk bigint not null auto_increment,
+    config_pk bigint not null identity,
 
     config_class varchar (256) not null,
     config_key varchar (256) not null,
