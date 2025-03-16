@@ -350,4 +350,79 @@ class JdbcReadImpl {
             }
         }
     }
+
+    public JdbcBaseDal.KeyedItem<ConfigDetails>
+    readConfigEntry(Connection conn, short tenantId, ConfigEntry configEntry, Instant configTimestamp) throws SQLException {
+
+        // Explicit check for a config key with no selection criteria (no need to add to the SQL)
+        if (configEntry.getConfigVersion() < 1 && configTimestamp == null && !configEntry.getIsLatestConfig())
+            throw new JdbcException(JdbcErrorCode.NO_DATA);
+
+        var query = "select config_pk, config_version, config_timestamp, config_is_latest, config_deleted, details\n" +
+                "from config_entry cfg\n" +
+                "where tenant_id = ?\n" +
+                "and config_class = ?\n" +
+                "and config_key = ?\n" +
+
+                // Match on config version
+                (configEntry.getConfigVersion() > 0 ? "and config_version = ?\n" : "") +
+
+                // Match on as-of timestamp
+                (configTimestamp != null ? "and config_timestamp <= ? and (config_superseded is null or config_superseded > ?)\n" : "") +
+
+                // Match on latest
+                (configEntry.getIsLatestConfig() ? "and config_is_latest = ?\n" : "");
+
+        try (var stmt = conn.prepareStatement(query)) {
+
+            stmt.setShort(1, tenantId);
+            stmt.setString(2, configEntry.getConfigClass());
+            stmt.setString(3, configEntry.getConfigKey());
+
+            int nextParam = 4;
+
+            if (configEntry.getConfigVersion() > 0)
+                stmt.setInt(nextParam++, configEntry.getConfigVersion());
+
+            if (configTimestamp != null) {
+                var sqlTimestamp = java.sql.Timestamp.from(configTimestamp);
+                stmt.setTimestamp(nextParam++, sqlTimestamp);
+                stmt.setTimestamp(nextParam++, sqlTimestamp);
+            }
+
+            if (configEntry.getIsLatestConfig())
+                stmt.setBoolean(nextParam++, true);
+
+            return fetchConfigEntry(stmt);
+        }
+    }
+
+    private JdbcBaseDal.KeyedItem<ConfigDetails>
+    fetchConfigEntry(PreparedStatement stmt) throws SQLException {
+
+        try (var rs = stmt.executeQuery()) {
+
+            if (!rs.next())
+                throw new JdbcException(JdbcErrorCode.NO_DATA);
+
+            var cfgPk = rs.getLong(1);
+            var cfgVersion = rs.getInt(2);
+            var sqlTimestamp = rs.getTimestamp(3);
+            var cfgTimestamp = sqlTimestamp.toInstant();
+            var cfgIsLatest = rs.getBoolean(4);
+            var cfgDeleted = rs.getBoolean(5);
+
+            // TODO: Encode / decode helper, type = protobuf | json ?
+            var cfgEncoded = rs.getBytes(6);
+            var cfgDecoded = ConfigDetails.parseFrom(cfgEncoded);
+
+            if (rs.next())
+                throw new JdbcException(JdbcErrorCode.TOO_MANY_ROWS);
+
+            return new KeyedItem<>(cfgPk, cfgVersion, cfgTimestamp, cfgDecoded, cfgIsLatest, cfgDeleted);
+        }
+        catch (InvalidProtocolBufferException e) {
+            throw new JdbcException(JdbcErrorCode.INVALID_CONFIG_ENTRY);
+        }
+    }
 }

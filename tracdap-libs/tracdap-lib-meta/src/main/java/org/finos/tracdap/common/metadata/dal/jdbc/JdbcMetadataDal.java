@@ -452,18 +452,21 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
         });
     }
 
-    private ConfigEntry loadConfigEntry(Connection conn, String tenant, ConfigEntry configKey) {
-
-        // TODO: Real single instance read
-        return loadConfigEntries(conn, tenant, List.of(configKey)).get(0);
-    }
-
     @Override
     public List<ConfigEntry> loadConfigEntries(String tenant, List<ConfigEntry> configKeys) {
 
         return wrapTransaction(conn -> {
             prepareMappingTable(conn);
             return loadConfigEntries(conn, tenant, configKeys);
+        });
+    }
+
+    @Override
+    public List<ConfigEntry> listConfigEntries(String tenant, String configClass, boolean includeDeleted) {
+
+        return wrapTransaction(conn -> {
+            prepareMappingTable(conn);
+            return listConfigEntries(conn, tenant, configClass, includeDeleted);
         });
     }
 
@@ -513,13 +516,22 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
         }
     }
 
-    @Override
-    public List<ConfigEntry> listConfigEntries(String tenant, String configClass, boolean includeDeleted) {
+    private ConfigEntry loadConfigEntry(Connection conn, String tenant, ConfigEntry configKey) {
 
-        return wrapTransaction(conn -> {
-            prepareMappingTable(conn);
-            return listConfigEntries(conn, tenant, configClass, includeDeleted);
-        });
+        var parts = configParts(configKey);
+
+        try {
+
+            var tenantId = tenants.getTenantId(conn, tenant);
+            var configEntry = readSingle.readConfigEntry(conn, tenantId, parts.configEntry[0], parts.configTimestamp[0]);
+
+            return buildConfigEntry(configKey, configEntry);
+        }
+        catch (SQLException error) {
+
+            JdbcError.configNotFound(error, dialect, parts);
+            throw JdbcError.catchAll(error, dialect);
+        }
     }
 
     private List<ConfigEntry> listConfigEntries(Connection conn, String tenant, String configClass, boolean includeDeleted) {
@@ -635,6 +647,22 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
         return parts;
     }
 
+    private ObjectParts configParts(ConfigEntry configEntry) {
+
+        var parts = new ObjectParts();
+
+        parts.configEntry = new ConfigEntry[] {configEntry};
+
+        var isoDatetime = configEntry.getConfigTimestamp();
+
+        if (isoDatetime.getIsoDatetime().isBlank())
+            parts.configTimestamp = new Instant[] {null};
+        else
+            parts.configTimestamp = new Instant[] {MetadataCodec.decodeDatetime(isoDatetime).toInstant()};
+
+        return parts;
+    }
+
     private ObjectParts configParts(List<ConfigEntry> configEntry) {
 
         var parts = new ObjectParts();
@@ -743,6 +771,19 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
         }
 
         return result;
+    }
+
+    private ConfigEntry buildConfigEntry(ConfigEntry entry, KeyedItem<ConfigDetails> keyedDetails) {
+
+        return ConfigEntry.newBuilder()
+                .setConfigClass(entry.getConfigClass())
+                .setConfigKey(entry.getConfigKey())
+                .setConfigVersion(keyedDetails.version)
+                .setConfigTimestamp(MetadataCodec.encodeDatetime(keyedDetails.timestamp))
+                .setIsLatestConfig(keyedDetails.isLatest)
+                .setConfigDeleted(keyedDetails.deleted)
+                .setDetails(keyedDetails.item)
+                .build();
     }
 
     private List<ConfigEntry> buildConfigEntry(List<ConfigEntry> entries, KeyedItems<ConfigDetails> keyedDetails) {
