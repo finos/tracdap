@@ -96,13 +96,19 @@ class JdbcBaseDal {
         final Instant timestamp;
         final TItem item;
         final boolean isLatest;
+        final boolean deleted;
 
-        KeyedItem(long key, int version, Instant timestamp, TItem item, boolean isLatest) {
+        KeyedItem(long key, int version, Instant timestamp, TItem item, boolean isLatest, boolean deleted) {
             this.key = key;
             this.version = version;
             this.timestamp = timestamp;
             this.item = item;
             this.isLatest = isLatest;
+            this.deleted = deleted;
+        }
+
+        KeyedItem(long key, int version, Instant timestamp, TItem item, boolean isLatest) {
+            this(key, version, timestamp, item, isLatest, false);
         }
 
         KeyedItem(long key, TItem item) {
@@ -117,13 +123,19 @@ class JdbcBaseDal {
         final Instant[] timestamps;
         final TItem[] items;
         final boolean[] isLatest;
+        final boolean[] deleted;
 
-        KeyedItems(long[] keys, int[] versions, Instant[] timestamps, TItem[] items, boolean[] isLatest) {
+        KeyedItems(long[] keys, int[] versions, Instant[] timestamps, TItem[] items, boolean[] isLatest, boolean[] deleted) {
             this.keys = keys;
             this.versions = versions;
             this.timestamps = timestamps;
             this.items = items;
             this.isLatest = isLatest;
+            this.deleted = deleted;
+        }
+
+        KeyedItems(long[] keys, int[] versions, Instant[] timestamps, TItem[] items, boolean[] isLatest) {
+            this(keys, versions, timestamps, items, isLatest, null);
         }
 
         KeyedItems(long[] keys, int[] versions, TItem[] items) {
