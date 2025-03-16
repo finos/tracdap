@@ -55,6 +55,7 @@ class JdbcError {
 
     static final String MISSING_CONFIG = "Config not found for {0} [{1}] (version = {2})";
     static final String MISSING_CONFIG_MULTIPLE = "Config not found for one or more config entries";
+    static final String MISSING_CONFIG_CLASS= "No config found for config class [{1}]";
     static final String DUPLICATE_CONFIG = "Duplicate config entry for {0} [{1}] (version = {2})";
     static final String DUPLICATE_CONFIG_MULTIPLE = "Duplicate config entry for one or more config updates";
     static final String PRIOR_CONFIG_MISSING = "Prior config not found for {0} [{1}] (version = {2})";
@@ -277,6 +278,19 @@ class JdbcError {
                 configKey.getConfigClass(),
                 configKey.getConfigKey(),
                 version);
+
+        throw new EMetadataNotFound(message, error);
+    }
+
+    static void configClassNotFound(
+            SQLException error, IDialect dialect, String configClass) {
+
+        var code = dialect.mapErrorCode(error);
+
+        if (code != JdbcErrorCode.NO_DATA)
+            return;
+
+        var message = MessageFormat.format(MISSING_CONFIG_CLASS, configClass);
 
         throw new EMetadataNotFound(message, error);
     }
