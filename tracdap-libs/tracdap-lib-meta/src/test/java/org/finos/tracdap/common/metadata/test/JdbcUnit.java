@@ -35,6 +35,7 @@ import java.nio.file.Paths;
 import java.util.Properties;
 import java.util.UUID;
 
+import static org.finos.tracdap.test.meta.SampleMetadata.ALT_TEST_TENANT;
 import static org.finos.tracdap.test.meta.SampleMetadata.TEST_TENANT;
 
 
@@ -90,6 +91,12 @@ public class JdbcUnit implements BeforeAllCallback, BeforeEachCallback, AfterEac
                 stmt.setShort(1, (short) 1);
                 stmt.setString(2, TEST_TENANT);
                 stmt.setString(3, "Test tenant");
+
+                stmt.execute();
+
+                stmt.setShort(1, (short) 2);
+                stmt.setString(2, ALT_TEST_TENANT);
+                stmt.setString(3, "Alt test tenant");
 
                 stmt.execute();
             }

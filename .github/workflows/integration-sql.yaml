@@ -88,7 +88,8 @@ jobs:
           --config ${{ env.TRAC_CONFIG_FILE }} \
           --secret-key ${{ env.TRAC_SECRET_KEY }} \
           --task deploy_schema \
-          --task add_tenant ACME_CORP 'Test tenant [ACME_CORP]'"
+          --task add_tenant ACME_CORP 'Test tenant [ACME_CORP]' \
+          --task add_tenant ALT_CORP 'Alt test tenant [ALT_CORP]'"
 
       - name: Integration tests
         run: ./gradlew integration -DintegrationTags="int-metadb"
