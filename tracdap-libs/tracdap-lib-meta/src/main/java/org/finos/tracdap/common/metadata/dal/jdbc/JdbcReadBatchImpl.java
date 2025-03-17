@@ -467,10 +467,10 @@ class JdbcReadBatchImpl {
     }
 
     public JdbcBaseDal.KeyedItems<ConfigDetails>
-    readConfigEntry(Connection conn, short tenantId, ConfigEntry[] configEntry, Instant[] configTimestamp) throws SQLException {
+    readConfigEntry(Connection conn, short tenantId, ConfigEntry[] configEntry, Instant[] configTimestamp, boolean includeDeleted) throws SQLException {
 
         var mappingStage = insertConfigEntries(conn, configEntry, configTimestamp);
-        mapConfigEntries(conn, tenantId, mappingStage);
+        mapConfigEntries(conn, tenantId, mappingStage, includeDeleted);
 
         return fetchConfigEntry(conn, tenantId, configEntry.length, mappingStage);
     }
@@ -642,10 +642,10 @@ class JdbcReadBatchImpl {
         return fetchMappedPk(conn, mappingStage, definitionPk.length);
     }
 
-    long[] lookupConfigPkByVersion(Connection conn, short tenantId, ConfigEntry[] configEntry) throws SQLException {
+    long[] lookupConfigPkByVersion(Connection conn, short tenantId, ConfigEntry[] configEntry, boolean includeDeleted) throws SQLException {
 
         var mappingStage = insertConfigEntries(conn, configEntry, null);
-        mapConfigEntriesByVersion(conn, tenantId, mappingStage);
+        mapConfigEntriesByVersion(conn, tenantId, mappingStage, includeDeleted);
 
         return fetchMappedPk(conn, mappingStage, configEntry.length);
     }
@@ -1107,7 +1107,7 @@ class JdbcReadBatchImpl {
         }
     }
 
-    private void mapConfigEntries(Connection conn, short tenantId, int mappingStage) throws SQLException {
+    private void mapConfigEntries(Connection conn, short tenantId, int mappingStage, boolean includeDeleted) throws SQLException {
 
         // Match all criteria specified in the config entry (not known ahead of time)
 
@@ -1130,7 +1130,10 @@ class JdbcReadBatchImpl {
                 "    (config_entry.config_superseded is null or config_entry.config_superseded > key_mapping.as_of))) and\n" +
 
                 // Match on latest
-                "    (key_mapping.is_latest is null or config_entry.config_is_latest = key_mapping.is_latest)))\n" +
+                "    (key_mapping.is_latest is null or config_entry.config_is_latest = key_mapping.is_latest))\n" +
+
+                // Whether to filter deleted items
+                (includeDeleted ? ")\n" : "and config_entry.config_deleted = ?)\n") +
 
                 "where mapping_stage = ?";
 
@@ -1138,14 +1141,18 @@ class JdbcReadBatchImpl {
 
         try (var stmt = conn.prepareStatement(query))  {
 
-            stmt.setShort(1, tenantId);
-            stmt.setInt(2, mappingStage);
+            int nextParam = 1;
+            stmt.setShort(nextParam++, tenantId);
 
+            if (!includeDeleted)
+                stmt.setBoolean(nextParam++, false);
+
+            stmt.setInt(nextParam, mappingStage);
             stmt.execute();
         }
     }
 
-    private void mapConfigEntriesByVersion(Connection conn, short tenantId, int mappingStage) throws SQLException {
+    private void mapConfigEntriesByVersion(Connection conn, short tenantId, int mappingStage, boolean includeDeleted) throws SQLException {
 
         // Specialization for mapping by version (used in updates)
 
@@ -1155,16 +1162,24 @@ class JdbcReadBatchImpl {
                 "  where config_entry.tenant_id = ?\n" +
                 "  and config_entry.config_class = key_mapping.config_class\n" +
                 "  and config_entry.config_key = key_mapping.config_key\n" +
-                "  and config_entry.config_version = key_mapping.ver)\n" +
+                "  and config_entry.config_version = key_mapping.ver\n" +
+
+                // Whether to filter deleted items
+                (includeDeleted ? ")\n" : "and config_entry.config_deleted = ?)\n") +
+
                 "where mapping_stage = ?";
 
         query = query.replaceAll("key_mapping", dialect.mappingTableName());
 
         try (var stmt = conn.prepareStatement(query))  {
 
-            stmt.setShort(1, tenantId);
-            stmt.setInt(2, mappingStage);
+            int nextParam = 1;
+            stmt.setShort(nextParam++, tenantId);
 
+            if (!includeDeleted)
+                stmt.setBoolean(nextParam++, false);
+
+            stmt.setInt(nextParam, mappingStage);
             stmt.execute();
         }
     }

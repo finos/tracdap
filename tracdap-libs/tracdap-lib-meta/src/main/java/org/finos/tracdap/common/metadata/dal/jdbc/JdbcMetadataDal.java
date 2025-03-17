@@ -445,19 +445,19 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
     }
 
     @Override
-    public ConfigEntry loadConfigEntry(String tenant, ConfigEntry configKey) {
+    public ConfigEntry loadConfigEntry(String tenant, ConfigEntry configKey, boolean includeDeleted) {
 
         return wrapTransaction(conn -> {
-            return loadConfigEntry(conn, tenant, configKey);
+            return loadConfigEntry(conn, tenant, configKey, includeDeleted);
         });
     }
 
     @Override
-    public List<ConfigEntry> loadConfigEntries(String tenant, List<ConfigEntry> configKeys) {
+    public List<ConfigEntry> loadConfigEntries(String tenant, List<ConfigEntry> configKeys, boolean includeDeleted) {
 
         return wrapTransaction(conn -> {
             prepareMappingTable(conn);
-            return loadConfigEntries(conn, tenant, configKeys);
+            return loadConfigEntries(conn, tenant, configKeys, includeDeleted);
         });
     }
 
@@ -483,7 +483,7 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
 
             // Close any prior version entries if they exist
             if (priorVersions.length > 0) {
-                long[] priorPk = readBatch.lookupConfigPkByVersion(conn, tenantId, priorVersions);
+                long[] priorPk = readBatch.lookupConfigPkByVersion(conn, tenantId, priorVersions, /* includeDeleted = */ true);
                 writeBatch.closeConfigEntry(conn, tenantId, priorPk, parts);
             }
 
@@ -498,14 +498,14 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
         }
     }
 
-    private List<ConfigEntry> loadConfigEntries(Connection conn, String tenant, List<ConfigEntry> configKeys) {
+    private List<ConfigEntry> loadConfigEntries(Connection conn, String tenant, List<ConfigEntry> configKeys, boolean includeDeleted) {
 
         var parts = configParts(configKeys);
 
         try {
 
             var tenantId = tenants.getTenantId(conn, tenant);
-            var configEntries = readBatch.readConfigEntry(conn, tenantId, parts.configEntry, parts.configTimestamp);
+            var configEntries = readBatch.readConfigEntry(conn, tenantId, parts.configEntry, parts.configTimestamp, includeDeleted);
 
             return buildConfigEntry(configKeys, configEntries);
         }
@@ -516,14 +516,14 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
         }
     }
 
-    private ConfigEntry loadConfigEntry(Connection conn, String tenant, ConfigEntry configKey) {
+    private ConfigEntry loadConfigEntry(Connection conn, String tenant, ConfigEntry configKey, boolean includeDeleted) {
 
         var parts = configParts(configKey);
 
         try {
 
             var tenantId = tenants.getTenantId(conn, tenant);
-            var configEntry = readSingle.readConfigEntry(conn, tenantId, parts.configEntry[0], parts.configTimestamp[0]);
+            var configEntry = readSingle.readConfigEntry(conn, tenantId, parts.configEntry[0], parts.configTimestamp[0], includeDeleted);
 
             return buildConfigEntry(configKey, configEntry);
         }

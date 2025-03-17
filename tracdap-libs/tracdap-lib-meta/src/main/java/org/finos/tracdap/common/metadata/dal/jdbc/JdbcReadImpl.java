@@ -352,7 +352,7 @@ class JdbcReadImpl {
     }
 
     public JdbcBaseDal.KeyedItem<ConfigDetails>
-    readConfigEntry(Connection conn, short tenantId, ConfigEntry configEntry, Instant configTimestamp) throws SQLException {
+    readConfigEntry(Connection conn, short tenantId, ConfigEntry configEntry, Instant configTimestamp, boolean includeDeleted) throws SQLException {
 
         // Explicit check for a config key with no selection criteria (no need to add to the SQL)
         if (configEntry.getConfigVersion() < 1 && configTimestamp == null && !configEntry.getIsLatestConfig())
@@ -371,7 +371,10 @@ class JdbcReadImpl {
                 (configTimestamp != null ? "and config_timestamp <= ? and (config_superseded is null or config_superseded > ?)\n" : "") +
 
                 // Match on latest
-                (configEntry.getIsLatestConfig() ? "and config_is_latest = ?\n" : "");
+                (configEntry.getIsLatestConfig() ? "and config_is_latest = ?\n" : "") +
+
+                // Whether to filter deleted entries
+                (includeDeleted ? "" : "and config_deleted = ?\n");
 
         try (var stmt = conn.prepareStatement(query)) {
 
@@ -392,6 +395,9 @@ class JdbcReadImpl {
 
             if (configEntry.getIsLatestConfig())
                 stmt.setBoolean(nextParam++, true);
+
+            if (!includeDeleted)
+                stmt.setBoolean(nextParam, false);
 
             return fetchConfigEntry(stmt);
         }

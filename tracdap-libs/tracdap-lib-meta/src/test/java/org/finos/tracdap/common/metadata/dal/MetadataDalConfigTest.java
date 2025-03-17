@@ -119,7 +119,7 @@ abstract class MetadataDalConfigTest implements IDalTestable {
                 .setConfigVersion(entry2.getConfigVersion())
                 .build();
 
-        var savedEntries = dal.loadConfigEntries(TEST_TENANT, List.of(key1, key2));
+        var savedEntries = dal.loadConfigEntries(TEST_TENANT, List.of(key1, key2), false);
 
         Assertions.assertEquals(List.of(entry1, entry2), savedEntries);
     }
@@ -215,7 +215,7 @@ abstract class MetadataDalConfigTest implements IDalTestable {
                 .setConfigVersion(entry1v2.getConfigVersion())
                 .build();
 
-        var savedEntries = dal.loadConfigEntries(TEST_TENANT, List.of(key1, key1v2));
+        var savedEntries = dal.loadConfigEntries(TEST_TENANT, List.of(key1, key1v2), false);
 
         var entry1Superseded = entry1.toBuilder()
                 .clearIsLatestConfig()
@@ -325,7 +325,7 @@ abstract class MetadataDalConfigTest implements IDalTestable {
                 .setConfigVersion(entry1v2.getConfigVersion())
                 .build();
 
-        var savedEntries = dal.loadConfigEntries(TEST_TENANT, List.of(key1v2));
+        var savedEntries = dal.loadConfigEntries(TEST_TENANT, List.of(key1v2), false);
 
         Assertions.assertEquals(List.of(entry1v2), savedEntries);
     }
@@ -377,8 +377,11 @@ abstract class MetadataDalConfigTest implements IDalTestable {
                 .setConfigVersion(entry1v2.getConfigVersion())
                 .build();
 
-        var savedEntries = dal.loadConfigEntries(TEST_TENANT, List.of(key1v2));
+        // Not found error if includeDeleted = false
+        Assertions.assertThrows(EMetadataNotFound.class, () -> dal.loadConfigEntries(TEST_TENANT, List.of(key1v2), false));
 
+        // Read with includeDeleted = true
+        var savedEntries = dal.loadConfigEntries(TEST_TENANT, List.of(key1v2), true);
         Assertions.assertEquals(List.of(entry1v2), savedEntries);
 
         var testTimestamp3 = MetadataCodec.encodeDatetime(Instant.now());
@@ -403,7 +406,7 @@ abstract class MetadataDalConfigTest implements IDalTestable {
                 .setConfigVersion(entry1v3.getConfigVersion())
                 .build();
 
-        var savedEntriesV3 = dal.loadConfigEntries(TEST_TENANT, List.of(key1v3));
+        var savedEntriesV3 = dal.loadConfigEntries(TEST_TENANT, List.of(key1v3), false);
 
         Assertions.assertEquals(List.of(entry1v3), savedEntriesV3);
     }
@@ -469,7 +472,7 @@ abstract class MetadataDalConfigTest implements IDalTestable {
                 .setConfigVersion(entry2.getConfigVersion())
                 .build();
 
-        var savedEntries = dal.loadConfigEntries(TEST_TENANT, List.of(key1, key2));
+        var savedEntries = dal.loadConfigEntries(TEST_TENANT, List.of(key1, key2), false);
 
         Assertions.assertEquals(List.of(entry1, entry2), savedEntries);
     }
@@ -538,7 +541,7 @@ abstract class MetadataDalConfigTest implements IDalTestable {
                 .setConfigKey(entry2V2.getConfigKey())
                 .setConfigVersion(entry2V2.getConfigVersion())
                 .build();
-        var savedEntries = dal.loadConfigEntries(TEST_TENANT, List.of(key1v1, key2v2));
+        var savedEntries = dal.loadConfigEntries(TEST_TENANT, List.of(key1v1, key2v2), false);
 
         var entry1Superseded = entry1.toBuilder().setIsLatestConfig(false).build();
 
@@ -608,7 +611,7 @@ abstract class MetadataDalConfigTest implements IDalTestable {
                 .setConfigTimestamp(testTimestamp2)
                 .build();
 
-        var savedEntries = dal.loadConfigEntries(TEST_TENANT, List.of(key1v1, key2v2));
+        var savedEntries = dal.loadConfigEntries(TEST_TENANT, List.of(key1v1, key2v2), false);
 
         var entry1Superseded = entry1.toBuilder().setIsLatestConfig(false).build();
 
@@ -670,7 +673,7 @@ abstract class MetadataDalConfigTest implements IDalTestable {
                 .setIsLatestConfig(true)
                 .build();
 
-        var savedEntries = dal.loadConfigEntries(TEST_TENANT, List.of(key1, key2));
+        var savedEntries = dal.loadConfigEntries(TEST_TENANT, List.of(key1, key2), false);
 
         Assertions.assertEquals(List.of(entry1, entry2), savedEntries);
 
@@ -680,7 +683,7 @@ abstract class MetadataDalConfigTest implements IDalTestable {
 
         dal.saveConfigEntries(TEST_TENANT, List.of(entry1V2));
 
-        var savedEntries2 = dal.loadConfigEntries(TEST_TENANT, List.of(key1, key2));
+        var savedEntries2 = dal.loadConfigEntries(TEST_TENANT, List.of(key1, key2), false);
 
         Assertions.assertEquals(List.of(entry1V2, entry2), savedEntries2);
 
@@ -690,7 +693,7 @@ abstract class MetadataDalConfigTest implements IDalTestable {
 
         dal.saveConfigEntries(TEST_TENANT, List.of(entry2V2));
 
-        var savedEntries3 = dal.loadConfigEntries(TEST_TENANT, List.of(key1, key2));
+        var savedEntries3 = dal.loadConfigEntries(TEST_TENANT, List.of(key1, key2), false);
 
         Assertions.assertEquals(List.of(entry1V2, entry2V2), savedEntries3);
     }
@@ -760,12 +763,12 @@ abstract class MetadataDalConfigTest implements IDalTestable {
                 .setIsLatestConfig(true)
                 .build();
 
-        var savedEntries = dal.loadConfigEntries(TEST_TENANT, List.of(key1, key2));
+        var savedEntries = dal.loadConfigEntries(TEST_TENANT, List.of(key1, key2), false);
         var entry1Superseded = entry1.toBuilder().setIsLatestConfig(false).build();
         Assertions.assertEquals(List.of(entry1Superseded, entry2V2), savedEntries);
 
         var key1AsOf = key1.toBuilder().clearIsLatestConfig().setConfigTimestamp(testTimestamp).build();
-        var savedEntries2 = dal.loadConfigEntries(TEST_TENANT, List.of(key1AsOf, key2));
+        var savedEntries2 = dal.loadConfigEntries(TEST_TENANT, List.of(key1AsOf, key2), false);
         Assertions.assertEquals(List.of(entry1Superseded, entry2V2), savedEntries2);
     }
 
@@ -810,7 +813,7 @@ abstract class MetadataDalConfigTest implements IDalTestable {
                 .setIsLatestConfig(true)
                 .build();
 
-        var savedEntries = dal.loadConfigEntries(TEST_TENANT, List.of(key1));
+        var savedEntries = dal.loadConfigEntries(TEST_TENANT, List.of(key1), false);
 
         Assertions.assertEquals(List.of(entry1V2), savedEntries);
 
@@ -824,7 +827,7 @@ abstract class MetadataDalConfigTest implements IDalTestable {
                 .setIsLatestConfig(true)
                 .build();
 
-        Assertions.assertThrows(EMetadataNotFound.class, () -> dal.loadConfigEntries(TEST_TENANT, List.of(key1Alt)));
+        Assertions.assertThrows(EMetadataNotFound.class, () -> dal.loadConfigEntries(TEST_TENANT, List.of(key1Alt), false));
     }
 
     @Test
@@ -857,7 +860,7 @@ abstract class MetadataDalConfigTest implements IDalTestable {
                 .setConfigKey(entry1.getConfigKey())
                 .build();
 
-        Assertions.assertThrows(EMetadataNotFound.class, () -> dal.loadConfigEntries(TEST_TENANT, List.of(badKey)));
+        Assertions.assertThrows(EMetadataNotFound.class, () -> dal.loadConfigEntries(TEST_TENANT, List.of(badKey), false));
     }
 
     @Test
@@ -906,7 +909,8 @@ abstract class MetadataDalConfigTest implements IDalTestable {
                 .build();
 
         // Read using fixed version
-        var savedEntries = dal.loadConfigEntries(TEST_TENANT, List.of(key1v2));
+        Assertions.assertThrows(EMetadataNotFound.class, () -> dal.loadConfigEntries(TEST_TENANT, List.of(key1v2), false));
+        var savedEntries = dal.loadConfigEntries(TEST_TENANT, List.of(key1v2), true);
         Assertions.assertEquals(List.of(entry1v2), savedEntries);
         Assertions.assertTrue(savedEntries.get(0).getConfigDeleted());
 
@@ -917,7 +921,8 @@ abstract class MetadataDalConfigTest implements IDalTestable {
                 .build();
 
         // Read using latest flag
-        var savedEntries2 = dal.loadConfigEntries(TEST_TENANT, List.of(key1Latest));
+        Assertions.assertThrows(EMetadataNotFound.class, () -> dal.loadConfigEntries(TEST_TENANT, List.of(key1Latest), false));
+        var savedEntries2 = dal.loadConfigEntries(TEST_TENANT, List.of(key1Latest), true);
         Assertions.assertEquals(List.of(entry1v2), savedEntries2);
         Assertions.assertTrue(savedEntries2.get(0).getConfigDeleted());
     }
@@ -953,12 +958,12 @@ abstract class MetadataDalConfigTest implements IDalTestable {
                 .setConfigVersion(entry1.getConfigVersion())
                 .build();
 
-        var savedEntries = dal.loadConfigEntries(TEST_TENANT, List.of(key1));
+        var savedEntries = dal.loadConfigEntries(TEST_TENANT, List.of(key1), false);
         Assertions.assertEquals(List.of(entry1), savedEntries);
 
         var missingKey = key1.toBuilder().setConfigKey("missing_key").build();
 
-        Assertions.assertThrows(EMetadataNotFound.class, () -> dal.loadConfigEntries(TEST_TENANT, List.of(missingKey)));
+        Assertions.assertThrows(EMetadataNotFound.class, () -> dal.loadConfigEntries(TEST_TENANT, List.of(missingKey), false));
     }
 
     @Test
@@ -992,12 +997,12 @@ abstract class MetadataDalConfigTest implements IDalTestable {
                 .setConfigVersion(entry1.getConfigVersion())
                 .build();
 
-        var savedEntries = dal.loadConfigEntries(TEST_TENANT, List.of(key1));
+        var savedEntries = dal.loadConfigEntries(TEST_TENANT, List.of(key1), false);
         Assertions.assertEquals(List.of(entry1), savedEntries);
 
         var missingKey = key1.toBuilder().setConfigVersion(2).build();
 
-        Assertions.assertThrows(EMetadataNotFound.class, () -> dal.loadConfigEntries(TEST_TENANT, List.of(missingKey)));
+        Assertions.assertThrows(EMetadataNotFound.class, () -> dal.loadConfigEntries(TEST_TENANT, List.of(missingKey), false));
     }
 
 
@@ -1037,7 +1042,7 @@ abstract class MetadataDalConfigTest implements IDalTestable {
                 .setConfigVersion(entry1.getConfigVersion())
                 .build();
 
-        var savedEntry = dal.loadConfigEntry(TEST_TENANT, key1);
+        var savedEntry = dal.loadConfigEntry(TEST_TENANT, key1, false);
 
         Assertions.assertEquals(entry1, savedEntry);
     }
@@ -1085,8 +1090,8 @@ abstract class MetadataDalConfigTest implements IDalTestable {
                 .setConfigVersion(entry1V2.getConfigVersion())
                 .build();
 
-        var savedEntry1 = dal.loadConfigEntry(TEST_TENANT, key1v1);
-        var savedEntry2 = dal.loadConfigEntry(TEST_TENANT, key1v2);
+        var savedEntry1 = dal.loadConfigEntry(TEST_TENANT, key1v1, false);
+        var savedEntry2 = dal.loadConfigEntry(TEST_TENANT, key1v2, false);
 
         var entry1Superseded = entry1.toBuilder().setIsLatestConfig(false).build();
 
@@ -1137,8 +1142,8 @@ abstract class MetadataDalConfigTest implements IDalTestable {
                 .setConfigTimestamp(testTimestamp2)
                 .build();
 
-        var savedEntry1 = dal.loadConfigEntry(TEST_TENANT, key1v1);
-        var savedEntry2 = dal.loadConfigEntry(TEST_TENANT, key1v2);
+        var savedEntry1 = dal.loadConfigEntry(TEST_TENANT, key1v1, false);
+        var savedEntry2 = dal.loadConfigEntry(TEST_TENANT, key1v2, false);
 
         var entry1Superseded = entry1.toBuilder().setIsLatestConfig(false).build();
 
@@ -1177,7 +1182,7 @@ abstract class MetadataDalConfigTest implements IDalTestable {
                 .setIsLatestConfig(true)
                 .build();
 
-        var savedEntry1 = dal.loadConfigEntry(TEST_TENANT, key1);
+        var savedEntry1 = dal.loadConfigEntry(TEST_TENANT, key1, false);
 
         Assertions.assertEquals(entry1, savedEntry1);
 
@@ -1187,7 +1192,7 @@ abstract class MetadataDalConfigTest implements IDalTestable {
 
         dal.saveConfigEntries(TEST_TENANT, List.of(entry1V2));
 
-        var savedEntry2 = dal.loadConfigEntry(TEST_TENANT, key1);
+        var savedEntry2 = dal.loadConfigEntry(TEST_TENANT, key1, false);
 
         Assertions.assertEquals(entry1V2, savedEntry2);
     }
@@ -1233,7 +1238,7 @@ abstract class MetadataDalConfigTest implements IDalTestable {
                 .setIsLatestConfig(true)
                 .build();
 
-        var savedEntry = dal.loadConfigEntry(TEST_TENANT, key1);
+        var savedEntry = dal.loadConfigEntry(TEST_TENANT, key1, false);
 
         Assertions.assertEquals(entry1V2, savedEntry);
 
@@ -1247,7 +1252,7 @@ abstract class MetadataDalConfigTest implements IDalTestable {
                 .setIsLatestConfig(true)
                 .build();
 
-        Assertions.assertThrows(EMetadataNotFound.class, () -> dal.loadConfigEntry(TEST_TENANT, key1Alt));
+        Assertions.assertThrows(EMetadataNotFound.class, () -> dal.loadConfigEntry(TEST_TENANT, key1Alt, false));
     }
 
     @Test
@@ -1280,7 +1285,7 @@ abstract class MetadataDalConfigTest implements IDalTestable {
                 .setConfigKey(entry1.getConfigKey())
                 .build();
 
-        Assertions.assertThrows(EMetadataNotFound.class, () -> dal.loadConfigEntry(TEST_TENANT, badKey));
+        Assertions.assertThrows(EMetadataNotFound.class, () -> dal.loadConfigEntry(TEST_TENANT, badKey, false));
     }
 
     @Test
@@ -1329,7 +1334,8 @@ abstract class MetadataDalConfigTest implements IDalTestable {
                 .build();
 
         // Read using fixed version
-        var savedEntry = dal.loadConfigEntry(TEST_TENANT, key1v2);
+        Assertions.assertThrows(EMetadataNotFound.class, () -> dal.loadConfigEntry(TEST_TENANT, key1v2, false));
+        var savedEntry = dal.loadConfigEntry(TEST_TENANT, key1v2, true);
         Assertions.assertEquals(entry1v2, savedEntry);
         Assertions.assertTrue(savedEntry.getConfigDeleted());
 
@@ -1340,7 +1346,8 @@ abstract class MetadataDalConfigTest implements IDalTestable {
                 .build();
 
         // Read using latest flag
-        var savedEntry2 = dal.loadConfigEntry(TEST_TENANT, key1Latest);
+        Assertions.assertThrows(EMetadataNotFound.class, () -> dal.loadConfigEntry(TEST_TENANT, key1Latest, false));
+        var savedEntry2 = dal.loadConfigEntry(TEST_TENANT, key1Latest, true);
         Assertions.assertEquals(entry1v2, savedEntry2);
         Assertions.assertTrue(savedEntry2.getConfigDeleted());
     }
@@ -1376,12 +1383,12 @@ abstract class MetadataDalConfigTest implements IDalTestable {
                 .setConfigVersion(entry1.getConfigVersion())
                 .build();
 
-        var savedEntry = dal.loadConfigEntry(TEST_TENANT, key1);
+        var savedEntry = dal.loadConfigEntry(TEST_TENANT, key1, false);
         Assertions.assertEquals(entry1, savedEntry);
 
         var missingKey = key1.toBuilder().setConfigKey("missing_key").build();
 
-        Assertions.assertThrows(EMetadataNotFound.class, () -> dal.loadConfigEntry(TEST_TENANT, missingKey));
+        Assertions.assertThrows(EMetadataNotFound.class, () -> dal.loadConfigEntry(TEST_TENANT, missingKey, false));
     }
 
     @Test
@@ -1415,12 +1422,12 @@ abstract class MetadataDalConfigTest implements IDalTestable {
                 .setConfigVersion(entry1.getConfigVersion())
                 .build();
 
-        var savedEntry = dal.loadConfigEntry(TEST_TENANT, key1);
+        var savedEntry = dal.loadConfigEntry(TEST_TENANT, key1, false);
         Assertions.assertEquals(entry1, savedEntry);
 
         var missingKey = key1.toBuilder().setConfigVersion(2).build();
 
-        Assertions.assertThrows(EMetadataNotFound.class, () -> dal.loadConfigEntry(TEST_TENANT, missingKey));
+        Assertions.assertThrows(EMetadataNotFound.class, () -> dal.loadConfigEntry(TEST_TENANT, missingKey, false));
     }
 
 
@@ -1753,14 +1760,14 @@ abstract class MetadataDalConfigTest implements IDalTestable {
                 .setConfigVersion(entry1.getConfigVersion())
                 .build();
 
-        var savedEntry = dal.loadConfigEntry(TEST_TENANT, key1);
-        var savedEntryT2 = dal.loadConfigEntry(ALT_TEST_TENANT, key1);
+        var savedEntry = dal.loadConfigEntry(TEST_TENANT, key1, false);
+        var savedEntryT2 = dal.loadConfigEntry(ALT_TEST_TENANT, key1, false);
 
         Assertions.assertEquals(entry1, savedEntry);
         Assertions.assertEquals(entry1T2, savedEntryT2);
 
-        var savedEntries = dal.loadConfigEntries(TEST_TENANT, List.of(key1));
-        var savedEntriesT2 = dal.loadConfigEntries(ALT_TEST_TENANT, List.of(key1));
+        var savedEntries = dal.loadConfigEntries(TEST_TENANT, List.of(key1), false);
+        var savedEntriesT2 = dal.loadConfigEntries(ALT_TEST_TENANT, List.of(key1), false);
 
         Assertions.assertEquals(List.of(entry1), savedEntries);
         Assertions.assertEquals(List.of(entry1T2), savedEntriesT2);

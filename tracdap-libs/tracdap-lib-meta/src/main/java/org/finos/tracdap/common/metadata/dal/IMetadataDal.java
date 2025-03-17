@@ -71,9 +71,9 @@ public interface IMetadataDal {
 
     void saveConfigEntries(String tenant, List<ConfigEntry> configEntries);
 
-    List<ConfigEntry> loadConfigEntries(String tenant, List<ConfigEntry> configKeys);
+    List<ConfigEntry> loadConfigEntries(String tenant, List<ConfigEntry> configKeys, boolean includeDeleted);
 
-    ConfigEntry loadConfigEntry(String tenant, ConfigEntry configKey);
+    ConfigEntry loadConfigEntry(String tenant, ConfigEntry configKey, boolean includeDeleted);
 
     List<ConfigEntry> listConfigEntries(String tenant, String configClass, boolean includeDeleted);
 
