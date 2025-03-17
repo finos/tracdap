@@ -15,18 +15,22 @@
  * limitations under the License.
  */
 
-import org.finos.tracdap.api.TracAdminApiGrpc;
-import org.finos.tracdap.api.TracMetadataApiGrpc;
+import org.finos.tracdap.api.*;
 import org.finos.tracdap.api.internal.TrustedMetadataApiGrpc;
+import org.finos.tracdap.common.metadata.MetadataCodec;
+import org.finos.tracdap.metadata.ObjectType;
 import org.finos.tracdap.svc.admin.TracAdminService;
 import org.finos.tracdap.svc.meta.TracMetadataService;
 import org.finos.tracdap.test.helpers.PlatformTest;
+import org.finos.tracdap.test.meta.SampleMetadata;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 import static org.finos.tracdap.test.meta.SampleMetadata.TEST_TENANT;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 
 abstract class AdminConfigApiTest {
@@ -82,5 +86,34 @@ abstract class AdminConfigApiTest {
     @Test
     void test1() {
 
+        var configObj = SampleMetadata.dummyDefinitionForType(ObjectType.CUSTOM);
+
+        var writeRequest = ConfigWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setConfigClass("test1")
+                .setConfigKey("entry1")
+                .setDefinition(configObj)
+                .build();
+
+        var configEntry = adminApi.createConfigObject(writeRequest);
+        var configDetails = configEntry.getDetails();
+
+        assertEquals("test1", configEntry.getConfigClass());
+        assertEquals("entry1", configEntry.getConfigKey());
+        assertEquals(1, configEntry.getConfigVersion());
+        assertTrue(configEntry.getIsLatestConfig());
+
+        assertEquals(ObjectType.CUSTOM, configDetails.getObjectType());
+
+        var readRequest = ConfigReadRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setEntry(configEntry)
+                .build();
+
+        var rtConfigTag = adminApi.readConfigObject(readRequest);
+
+        assertEquals(configObj, rtConfigTag.getDefinition());
+        assertEquals(MetadataCodec.encodeValue("test1"), rtConfigTag.getAttrsOrDefault("trac_config_class", null));
+        assertEquals(MetadataCodec.encodeValue("entry1"), rtConfigTag.getAttrsOrDefault("trac_config_key", null));
     }
 }
