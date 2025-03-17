@@ -41,6 +41,7 @@ public class SampleMetadata {
     public static final boolean KEEP_ORIGINAL_TAG_VERSION = false;
 
     public static final String TEST_TENANT = "ACME_CORP";
+    public static final String ALT_TEST_TENANT = "ALT_CORP";
 
 
     private static final Random random = new Random(Instant.now().getEpochSecond());

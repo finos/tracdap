@@ -52,7 +52,7 @@ ext.enableBuildTimePlugins(["sql"], ext.OPTIONAL)
 // Bring DDL files into main JAR as resources
 processResources {
 
-    from "${project(':tracdap-svc-meta').projectDir.path}/src/schema"
+    from "${project(':tracdap-lib-meta').projectDir.path}/src/schema"
 }
 
 distributions {

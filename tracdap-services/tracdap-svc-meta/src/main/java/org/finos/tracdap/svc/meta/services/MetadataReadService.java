@@ -27,8 +27,8 @@ import org.finos.tracdap.metadata.ResourceType;
 import org.finos.tracdap.metadata.TagSelector;
 import org.finos.tracdap.metadata.ObjectType;
 import org.finos.tracdap.metadata.Tag;
+import org.finos.tracdap.common.metadata.dal.IMetadataDal;
 import org.finos.tracdap.svc.meta.TracMetadataService;
-import org.finos.tracdap.svc.meta.dal.IMetadataDal;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

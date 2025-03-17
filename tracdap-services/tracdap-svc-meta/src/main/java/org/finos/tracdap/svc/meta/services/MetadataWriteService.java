@@ -23,20 +23,16 @@ import org.finos.tracdap.api.MetadataWriteBatchResponse;
 import org.finos.tracdap.api.MetadataWriteRequest;
 import org.finos.tracdap.common.grpc.RequestMetadata;
 import org.finos.tracdap.common.grpc.UserMetadata;
-import org.finos.tracdap.metadata.*;
-import org.finos.tracdap.common.metadata.MetadataCodec;
-import org.finos.tracdap.common.metadata.MetadataConstants;
+import org.finos.tracdap.common.metadata.dal.IMetadataDal;
+import org.finos.tracdap.common.metadata.dal.MetadataBatchUpdate;
+import org.finos.tracdap.common.metadata.tag.ObjectUpdateLogic;
 import org.finos.tracdap.common.validation.Validator;
-import org.finos.tracdap.svc.meta.dal.IMetadataDal;
-import org.finos.tracdap.svc.meta.dal.MetadataBatchUpdate;
+import org.finos.tracdap.metadata.*;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
-
-import static org.finos.tracdap.common.metadata.MetadataConstants.OBJECT_FIRST_VERSION;
-import static org.finos.tracdap.common.metadata.MetadataConstants.TAG_FIRST_VERSION;
 
 
 public class MetadataWriteService {
@@ -174,7 +170,7 @@ public class MetadataWriteService {
 
             var objectId = UUID.fromString(request.getPriorVersion().getObjectId());
 
-            var preallocatedObject = buildNewObject(
+            var preallocatedObject = ObjectUpdateLogic.buildNewObject(
                     objectId, request.getDefinition(), request.getTagUpdatesList(),
                     requestMetadata, userMetadata);
 
@@ -196,7 +192,7 @@ public class MetadataWriteService {
             // There's nothing special about them though, so this is fine for now
             var objectId = UUID.randomUUID();
 
-            var newObject = buildNewObject(
+            var newObject = ObjectUpdateLogic.buildNewObject(
                     objectId, request.getDefinition(), request.getTagUpdatesList(),
                     requestMetadata, userMetadata);
 
@@ -231,7 +227,7 @@ public class MetadataWriteService {
                     request.getDefinition(),
                     priorVersion.getDefinition());
 
-            var newObject = buildNewVersion(
+            var newObject = ObjectUpdateLogic.buildNewVersion(
                     priorVersion, request.getDefinition(), request.getTagUpdatesList(),
                     requestMetadata, userMetadata);
 
@@ -259,7 +255,7 @@ public class MetadataWriteService {
             var request = requests.get(i);
             var priorTag = priorTags.get(i);
 
-            var newTag = buildNewTag(
+            var newTag = ObjectUpdateLogic.buildNewTag(
                     priorTag, request.getTagUpdatesList(),
                     requestMetadata, userMetadata);
 
@@ -267,133 +263,5 @@ public class MetadataWriteService {
         }
 
         return newTags;
-    }
-
-    private Tag buildNewObject(
-            UUID objectId, ObjectDefinition definition, List<TagUpdate> tagUpdates,
-            RequestMetadata requestMetadata, UserMetadata userMetadata) {
-
-        var newHeader = TagHeader.newBuilder()
-                .setObjectType(definition.getObjectType())
-                .setObjectId(objectId.toString())
-                .setObjectVersion(OBJECT_FIRST_VERSION)
-                .setObjectTimestamp(MetadataCodec.encodeDatetime(requestMetadata.requestTimestamp()))
-                .setTagVersion(TAG_FIRST_VERSION)
-                .setTagTimestamp(MetadataCodec.encodeDatetime(requestMetadata.requestTimestamp()))
-                .setIsLatestTag(true)
-                .setIsLatestObject(true)
-                .build();
-
-        var newTag = Tag.newBuilder()
-                .setHeader(newHeader)
-                .setDefinition(definition)
-                .build();
-
-        newTag = TagUpdateService.applyTagUpdates(newTag, tagUpdates);
-
-        // Apply the common controlled trac_ tags for newly created objects
-
-        var createAttrs = commonCreateAttrs(requestMetadata, userMetadata);
-        var updateAttrs = commonUpdateAttrs(requestMetadata, userMetadata);
-
-        newTag = TagUpdateService.applyTagUpdates(newTag, createAttrs);
-        newTag = TagUpdateService.applyTagUpdates(newTag, updateAttrs);
-
-        return newTag;
-    }
-
-    private Tag buildNewVersion(
-            Tag priorTag, ObjectDefinition definition, List<TagUpdate> tagUpdates,
-            RequestMetadata requestMetadata, UserMetadata userMetadata) {
-
-        var oldHeader = priorTag.getHeader();
-
-        var newHeader = oldHeader.toBuilder()
-                .setObjectVersion(oldHeader.getObjectVersion() + 1)
-                .setObjectTimestamp(MetadataCodec.encodeDatetime(requestMetadata.requestTimestamp()))
-                .setTagVersion(TAG_FIRST_VERSION)
-                .setTagTimestamp(MetadataCodec.encodeDatetime(requestMetadata.requestTimestamp()))
-                .setIsLatestTag(true)
-                .setIsLatestObject(true)
-                .build();
-
-        var newTag = priorTag.toBuilder()
-                .setHeader(newHeader)
-                .setDefinition(definition)
-                .build();
-
-        // Apply the common controlled trac_ tags for updated objects
-
-        var commonAttrs = commonUpdateAttrs(requestMetadata, userMetadata);
-
-        newTag = TagUpdateService.applyTagUpdates(newTag, tagUpdates);
-        newTag = TagUpdateService.applyTagUpdates(newTag, commonAttrs);
-
-        return newTag;
-    }
-
-    private static Tag buildNewTag(
-            Tag priorTag, List<TagUpdate> tagUpdates,
-            RequestMetadata requestMetadata, UserMetadata userMetadata) {
-
-        // TODO: Record user info for tag-only updates
-        // Audit history for object revisions is most important
-        // Audit for tag updates will be needed too at some point
-
-        var oldHeader = priorTag.getHeader();
-
-        var newHeader = oldHeader.toBuilder()
-                .setTagVersion(oldHeader.getTagVersion() + 1)
-                .setTagTimestamp(MetadataCodec.encodeDatetime(requestMetadata.requestTimestamp()))
-                .setIsLatestTag(true)
-                .build();
-
-        var newTag = priorTag.toBuilder()
-                .setHeader(newHeader)
-                .build();
-
-        newTag = TagUpdateService.applyTagUpdates(newTag, tagUpdates);
-
-        return newTag;
-    }
-
-    private static List<TagUpdate> commonCreateAttrs(RequestMetadata requestMetadata, UserMetadata userMetadata) {
-
-        var createTimeAttr = TagUpdate.newBuilder()
-                .setAttrName(MetadataConstants.TRAC_CREATE_TIME)
-                .setValue(MetadataCodec.encodeValue(requestMetadata.requestTimestamp()))
-                .build();
-
-        var createUserIdAttr = TagUpdate.newBuilder()
-                .setAttrName(MetadataConstants.TRAC_CREATE_USER_ID)
-                .setValue(MetadataCodec.encodeValue(userMetadata.userId()))
-                .build();
-
-        var createUserNameAttr = TagUpdate.newBuilder()
-                .setAttrName(MetadataConstants.TRAC_CREATE_USER_NAME)
-                .setValue(MetadataCodec.encodeValue(userMetadata.userName()))
-                .build();
-
-        return List.of(createTimeAttr, createUserIdAttr, createUserNameAttr);
-    }
-
-    private static List<TagUpdate> commonUpdateAttrs(RequestMetadata requestMetadata, UserMetadata userMetadata) {
-
-        var updateTimeAttr = TagUpdate.newBuilder()
-                .setAttrName(MetadataConstants.TRAC_UPDATE_TIME)
-                .setValue(MetadataCodec.encodeValue(requestMetadata.requestTimestamp()))
-                .build();
-
-        var updateUserIdAttr = TagUpdate.newBuilder()
-                .setAttrName(MetadataConstants.TRAC_UPDATE_USER_ID)
-                .setValue(MetadataCodec.encodeValue(userMetadata.userId()))
-                .build();
-
-        var updateUserNameAttr = TagUpdate.newBuilder()
-                .setAttrName(MetadataConstants.TRAC_UPDATE_USER_NAME)
-                .setValue(MetadataCodec.encodeValue(userMetadata.userName()))
-                .build();
-
-        return List.of(updateTimeAttr, updateUserIdAttr, updateUserNameAttr);
     }
 }

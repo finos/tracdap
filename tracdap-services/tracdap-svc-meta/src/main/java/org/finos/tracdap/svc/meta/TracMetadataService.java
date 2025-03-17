@@ -30,7 +30,7 @@ import org.finos.tracdap.common.service.TracServiceBase;
 import org.finos.tracdap.common.util.InterfaceLogging;
 import org.finos.tracdap.common.validation.ValidationConcern;
 import org.finos.tracdap.config.PlatformConfig;
-import org.finos.tracdap.svc.meta.dal.IMetadataDal;
+import org.finos.tracdap.common.metadata.dal.IMetadataDal;
 import org.finos.tracdap.svc.meta.services.MetadataReadService;
 import org.finos.tracdap.svc.meta.services.MetadataSearchService;
 import org.finos.tracdap.svc.meta.services.MetadataWriteService;

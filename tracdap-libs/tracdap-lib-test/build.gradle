@@ -31,8 +31,9 @@ dependencies {
     api project(":tracdap-api-services")
 
     api project(':tracdap-lib-common')
-    api project(':tracdap-lib-db')
+    api project(':tracdap-lib-meta')
     api project(':tracdap-lib-data')
+    api project(':tracdap-lib-db')
 
     // Include the proto extension test files
     api project(':tracdap-lib-test-proto')
@@ -69,3 +70,9 @@ dependencies {
 // This dependency ensures resources are always processed, even for partial builds
 
 compileJava.dependsOn(processResources)
+
+// Bring DDL files into test JAR as resources
+processResources {
+
+    from "${project(':tracdap-lib-meta').projectDir.path}/src/schema"
+}

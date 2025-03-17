@@ -1,0 +1,63 @@
+/*
+ * Licensed to the Fintech Open Source Foundation (FINOS) under one or
+ * more contributor license agreements. See the NOTICE file distributed
+ * with this work for additional information regarding copyright ownership.
+ * FINOS licenses this file to you under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with the
+ * License. You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+plugins {
+    id "java-library"
+}
+
+apply from: "${rootProject.projectDir.path}/gradle/base-java.gradle"
+
+
+description = "TRAC D.A.P. metadata library, interfaces and core functionality for working with TRAC metadata"
+
+dependencies {
+
+    api project(':tracdap-api-metadata')
+
+    // TRAC library dependencies
+    implementation project(':tracdap-lib-common')
+    implementation project(':tracdap-lib-db')
+
+    testImplementation project(':tracdap-lib-test')
+
+    // Use Flyway to deploy schemas in test cases
+    testImplementation group: 'org.flywaydb', name: 'flyway-core', version: "$flyway_version"
+
+    // Always pull in the H2 JDBC driver as a test dependency, since it used for unit tests
+    testImplementation group: 'com.h2database', name: 'h2', version: "$h2_version"
+}
+
+
+// Compiling dependent targets does not require processResources to be executed by default
+// E.g. running tests from the IDE will not trigger processResources - this can cause confusion!
+// This dependency ensures resources are always processed, even for partial builds
+
+compileJava.dependsOn(processResources)
+
+
+// Expose test classes as a test suite available to re-use in storage plugins
+
+configurations {
+    testSuite {
+        extendsFrom(testImplementation)
+    }
+}
+
+task testJar(type: Jar) {
+    archiveClassifier.set('test')
+    from sourceSets.test.output
+}
