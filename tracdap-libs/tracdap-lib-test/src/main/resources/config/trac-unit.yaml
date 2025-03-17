@@ -109,6 +109,9 @@ services:
   orchestrator:
     port: 9103
 
+  admin:
+    port: 9104
+
 
 deployment:
   layout: SANDBOX

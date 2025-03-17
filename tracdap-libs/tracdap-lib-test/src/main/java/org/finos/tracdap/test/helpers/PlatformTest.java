@@ -17,6 +17,7 @@
 
 package org.finos.tracdap.test.helpers;
 
+import org.finos.tracdap.api.TracAdminApiGrpc;
 import org.finos.tracdap.api.TracDataApiGrpc;
 import org.finos.tracdap.api.TracMetadataApiGrpc;
 import org.finos.tracdap.api.TracOrchestratorApiGrpc;
@@ -78,6 +79,7 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
     private static final String META_SVC_CLASS = "TracMetadataService";
     private static final String DATA_SVC_CLASS = "TracDataService";
     private static final String ORCH_SVC_CLASS = "TracOrchestratorService";
+    private static final String ADMIN_SVC_CLASS = "TracAdminService";
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
@@ -127,15 +129,23 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
     }
 
     public boolean hasMetaSvc() {
-        return serviceClasses.stream().anyMatch(c -> c.getSimpleName().equals(META_SVC_CLASS));
+        return hasService(META_SVC_CLASS);
     }
 
     public boolean hasDataSvc() {
-        return serviceClasses.stream().anyMatch(c -> c.getSimpleName().equals(DATA_SVC_CLASS));
+        return hasService(DATA_SVC_CLASS);
     }
 
     public boolean hasOrchSvc() {
-        return serviceClasses.stream().anyMatch(c -> c.getSimpleName().equals(ORCH_SVC_CLASS));
+        return hasService(ORCH_SVC_CLASS);
+    }
+
+    public boolean hasAdminSvc() {
+        return hasService(ADMIN_SVC_CLASS);
+    }
+
+    public boolean hasService(String serviceClassName) {
+        return serviceClasses.stream().anyMatch(c -> c.getSimpleName().equals(serviceClassName));
     }
 
     public static class Builder {
@@ -185,6 +195,7 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
     private ManagedChannel metaChannel;
     private ManagedChannel dataChannel;
     private ManagedChannel orchChannel;
+    private ManagedChannel adminChannel;
 
     public TracMetadataApiGrpc.TracMetadataApiFutureStub metaClientFuture() {
         var client = TracMetadataApiGrpc.newFutureStub(metaChannel);
@@ -213,6 +224,11 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
 
     public TracOrchestratorApiGrpc.TracOrchestratorApiBlockingStub orchClientBlocking() {
         var client = TracOrchestratorApiGrpc.newBlockingStub(orchChannel);
+        return clientConcerns.configureClient(client);
+    }
+
+    public TracAdminApiGrpc.TracAdminApiBlockingStub adminClientBlocking() {
+        var client = TracAdminApiGrpc.newBlockingStub(adminChannel);
         return clientConcerns.configureClient(client);
     }
 
@@ -549,6 +565,9 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
 
         if (hasOrchSvc())
             orchChannel = channelForService(platformConfig, ConfigKeys.ORCHESTRATOR_SERVICE_KEY);
+
+        if (hasAdminSvc())
+            adminChannel = channelForService(platformConfig, ConfigKeys.ADMIN_SERVICE_KEY);
     }
 
     void stopClients() throws Exception {
@@ -561,6 +580,9 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
 
         if (metaChannel != null)
             metaChannel.shutdown().awaitTermination(10, TimeUnit.SECONDS);
+
+        if (adminChannel != null)
+            adminChannel.shutdown().awaitTermination(10, TimeUnit.SECONDS);
     }
 
     ManagedChannel channelForService(PlatformConfig platformConfig, String serviceKey) {
