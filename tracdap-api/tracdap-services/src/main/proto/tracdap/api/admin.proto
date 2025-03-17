@@ -1,0 +1,108 @@
+/*
+ * Licensed to the Fintech Open Source Foundation (FINOS) under one or
+ * more contributor license agreements. See the NOTICE file distributed
+ * with this work for additional information regarding copyright ownership.
+ * FINOS licenses this file to you under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with the
+ * License. You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+syntax = "proto3";
+package tracdap.api;
+
+option java_package = "org.finos.tracdap.api";
+option java_outer_classname = "AdminServiceProto";
+option java_multiple_files = true;
+
+import "tracdap/metadata/common.proto";
+import "tracdap/metadata/config.proto";
+import "tracdap/metadata/object_id.proto";
+import "tracdap/metadata/object.proto";
+import "tracdap/metadata/tag.proto";
+
+import "google/api/annotations.proto";
+
+
+service TracAdminApi {
+
+    rpc createConfigObject(ConfigWriteRequest) returns (metadata.ConfigEntry);
+
+    rpc updateConfigObject(ConfigWriteRequest) returns (metadata.ConfigEntry);
+
+    rpc deleteConfigObject(ConfigWriteRequest) returns (metadata.ConfigEntry);
+
+    rpc readConfigObject(ConfigReadRequest) returns (metadata.Tag);
+
+    rpc readConfigBatch(ConfigReadBatchRequest) returns (ConfigReadBatchResponse);
+
+    rpc listConfigKeys(ConfigListRequest) returns (ConfigListResponse);
+}
+
+
+/**
+ * Request to create or update a config object in the TRAC metadata store.
+ *
+ * @see TracAdminApi
+ */
+message ConfigWriteRequest {
+
+    /**
+     * Tenant code for the requested operation, always required.
+     */
+    string tenant = 1;
+
+    string configClass = 2;
+
+    string configKey = 3;
+
+    optional metadata.ConfigEntry priorVersion = 4;
+
+    optional metadata.ObjectDefinition definition = 5;
+};
+
+message ConfigReadRequest {
+
+    /**
+     * Tenant code for the requested operation, always required.
+     */
+    string tenant = 1;
+
+    metadata.ConfigEntry entry = 2;
+}
+
+message ConfigReadBatchRequest {
+
+    string tenant = 1;
+
+    repeated metadata.ConfigEntry entries = 2;
+}
+
+message ConfigReadBatchResponse {
+
+    repeated metadata.Tag entries = 1;
+}
+
+message ConfigListRequest {
+
+    /**
+     * Tenant code for the requested operation, always required.
+     */
+    string tenant = 1;
+
+    string configClass = 2;
+
+    bool showDeleted = 3;
+}
+
+message ConfigListResponse{
+
+    repeated metadata.ConfigEntry entries = 1;
+}
