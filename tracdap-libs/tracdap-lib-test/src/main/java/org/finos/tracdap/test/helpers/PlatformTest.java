@@ -67,6 +67,7 @@ import java.util.function.Function;
 public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
 
     public static final Map<String, String> SERVICE_KEYS = Map.of(
+            "TracPlatformGateway", ConfigKeys.GATEWAY_SERVICE_KEY,
             "TracMetadataService", ConfigKeys.METADATA_SERVICE_KEY,
             "TracDataService", ConfigKeys.DATA_SERVICE_KEY,
             "TracOrchestratorService", ConfigKeys.ORCHESTRATOR_SERVICE_KEY,
