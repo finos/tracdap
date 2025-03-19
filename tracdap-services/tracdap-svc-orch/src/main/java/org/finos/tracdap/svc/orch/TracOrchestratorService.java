@@ -150,7 +150,7 @@ public class TracOrchestratorService extends TracServiceBase {
 
             var jobCache = jobCacheManager.getCache(JOB_CACHE_NAME, JobState.class);
 
-            var jobProcessor = new JobProcessor(platformConfig, metaClient, commonConcerns, jobExecutor);
+            var jobProcessor = new JobProcessor(platformConfig, metaClient, commonConcerns, jobExecutor, configManager);
 
             jobManager = new JobManager(platformConfig, jobProcessor, jobCache, serviceGroup);
 

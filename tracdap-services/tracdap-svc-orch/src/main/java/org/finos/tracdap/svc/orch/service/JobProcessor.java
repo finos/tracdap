@@ -24,6 +24,9 @@ import org.finos.tracdap.api.MetadataWriteRequest;
 import org.finos.tracdap.api.internal.RuntimeJobStatus;
 import org.finos.tracdap.api.internal.TrustedMetadataApiGrpc.TrustedMetadataApiBlockingStub;
 import org.finos.tracdap.common.cache.CacheEntry;
+import org.finos.tracdap.common.config.ConfigManager;
+import org.finos.tracdap.common.config.IConfigLoader;
+import org.finos.tracdap.common.config.ISecretLoader;
 import org.finos.tracdap.common.exception.*;
 import org.finos.tracdap.common.exec.*;
 import org.finos.tracdap.common.grpc.RequestMetadata;
@@ -69,13 +72,14 @@ public class JobProcessor {
             PlatformConfig platformConfig,
             TrustedMetadataApiBlockingStub metaClient,
             GrpcConcern commonConcerns,
-            IJobExecutor<?> jobExecutor) {
+            IJobExecutor<?> jobExecutor,
+            ConfigManager configManager) {
 
         this.platformConfig = platformConfig;
         this.metaClient = metaClient;
         this.executor = jobExecutor;
 
-        this.lifecycle = new JobProcessorHelpers(platformConfig, metaClient, commonConcerns);
+        this.lifecycle = new JobProcessorHelpers(platformConfig, metaClient, commonConcerns, configManager);
     }
 
     public JobState newJob(JobRequest request, GrpcClientState clientState) {
