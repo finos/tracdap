@@ -20,6 +20,7 @@ package org.finos.tracdap.svc.orch.service;
 import io.grpc.stub.AbstractStub;
 import org.finos.tracdap.api.*;
 import org.finos.tracdap.api.internal.TrustedMetadataApiGrpc;
+import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.metadata.MetadataBundle;
 import org.finos.tracdap.common.metadata.MetadataCodec;
@@ -54,16 +55,19 @@ public class JobProcessorHelpers {
     private final PlatformConfig platformConfig;
     private final TrustedMetadataApiGrpc.TrustedMetadataApiBlockingStub metaClient;
     private final GrpcConcern commonConcerns;
+    private final ConfigManager configManager;
 
 
     public JobProcessorHelpers(
             PlatformConfig platformConfig,
             TrustedMetadataApiGrpc.TrustedMetadataApiBlockingStub metaClient,
-            GrpcConcern commonConcerns) {
+            GrpcConcern commonConcerns,
+            ConfigManager configManager) {
 
         this.platformConfig = platformConfig;
         this.metaClient = metaClient;
         this.commonConcerns = commonConcerns;
+        this.configManager = configManager;
     }
 
     /**
@@ -307,10 +311,28 @@ public class JobProcessorHelpers {
             storageConfig = storageUpdate.build();
         }
 
-        jobState.sysConfig = RuntimeConfig.newBuilder()
-                .setStorage(storageConfig)
-                .putAllRepositories(platformConfig.getRepositoriesMap())
-                .build();
+        var sysConfig = RuntimeConfig.newBuilder();
+        sysConfig.setStorage(storageConfig);
+
+        for (var repoEntry : platformConfig.getRepositoriesMap().entrySet()) {
+
+            var repoKey = repoEntry.getKey();
+            var repoConfig = repoEntry.getValue().toBuilder();
+
+            for (var secretEntry : repoConfig.getSecretsMap().entrySet()) {
+
+                var propKey = secretEntry.getKey();
+                var secretKey = secretEntry.getValue();
+                var secret = configManager.loadPassword(secretKey);
+
+                repoConfig.putProperties(propKey, secret);
+            }
+
+            repoConfig.clearSecrets();
+            sysConfig.putRepositories(repoKey, repoConfig.build());
+        }
+
+        jobState.sysConfig = sysConfig.build();
 
         return jobState;
     }
