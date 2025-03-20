@@ -25,6 +25,7 @@ import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.metadata.MetadataUtil;
 import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.metadata.ImportModelJob;
+import org.finos.tracdap.svc.admin.TracAdminService;
 import org.finos.tracdap.svc.data.TracDataService;
 import org.finos.tracdap.svc.meta.TracMetadataService;
 import org.finos.tracdap.svc.orch.TracOrchestratorService;
@@ -48,6 +49,7 @@ public abstract class ImportModelTest {
 
     private static final String TEST_TENANT = "ACME_CORP";
     private static final String E2E_CONFIG = "config/trac-e2e.yaml";
+    private static final String E2E_RESOURCES = "config/trac-e2e-resources.yaml";
 
     // Test model import using different repo types
     // This will test the E2E model loading mechanism
@@ -67,11 +69,12 @@ public abstract class ImportModelTest {
     @RegisterExtension
     public static final PlatformTest platform = PlatformTest.forConfig(E2E_CONFIG)
             .runDbDeploy(true)
-            .addTenant(TEST_TENANT)
+            .bootstrapTenant(TEST_TENANT, E2E_RESOURCES)
             .prepareLocalExecutor(true)
             .startService(TracMetadataService.class)
             .startService(TracDataService.class)
             .startService(TracOrchestratorService.class)
+            .startService(TracAdminService.class)
             .build();
 
     private static final Logger log = LoggerFactory.getLogger(ImportModelTest.class);

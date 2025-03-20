@@ -26,6 +26,7 @@ import org.finos.tracdap.metadata.CopyStatus;
 import org.finos.tracdap.metadata.ObjectDefinition;
 import org.finos.tracdap.metadata.ObjectType;
 import org.finos.tracdap.metadata.TagSelector;
+import org.finos.tracdap.svc.admin.TracAdminService;
 import org.finos.tracdap.svc.data.TracDataService;
 import org.finos.tracdap.svc.meta.TracMetadataService;
 import org.finos.tracdap.test.data.DataApiTestHelpers;
@@ -58,7 +59,9 @@ import static org.finos.tracdap.test.concurrent.ConcurrentTestHelpers.waitFor;
 abstract class FileRoundTripTest  {
 
     public static final String TRAC_CONFIG_UNIT = "config/trac-unit.yaml";
+    public static final String TRAC_RESOURCES_UNIT = "config/trac-unit-resources.yaml";
     public static final String TRAC_CONFIG_ENV_VAR = "TRAC_CONFIG_FILE";
+    public static final String TRAC_RESOURCES_ENV_VAR = "TRAC_RESOURCES_FILE";
     public static final String TEST_TENANT = "ACME_CORP";
     public static final Duration TEST_TIMEOUT = Duration.ofSeconds(20);
 
@@ -74,9 +77,10 @@ abstract class FileRoundTripTest  {
         @RegisterExtension
         public static final PlatformTest platform = PlatformTest.forConfig(TRAC_CONFIG_UNIT)
                 .runDbDeploy(true)
-                .addTenant(TEST_TENANT)
+                .bootstrapTenant(TEST_TENANT, TRAC_RESOURCES_UNIT)
                 .startService(TracMetadataService.class)
                 .startService(TracDataService.class)
+                .startService(TracAdminService.class)
                 .build();
 
         @BeforeAll
@@ -99,15 +103,20 @@ abstract class FileRoundTripTest  {
     static class IntegrationTest extends FileRoundTripTest {
 
         // Slow unit tests count as integration, so fall back to using the unit test config
-        private static final String TRAC_CONFIG_ENV_FILE = System.getenv(TRAC_CONFIG_ENV_VAR) != null
+        private static final String TRAC_CONFIG_FILE = System.getenv(TRAC_CONFIG_ENV_VAR) != null
                 ? System.getenv(TRAC_CONFIG_ENV_VAR)
                 : TRAC_CONFIG_UNIT;
 
+        private static final String TRAC_RESOURCES_FILE = System.getenv(TRAC_RESOURCES_ENV_VAR) != null
+                ? System.getenv(TRAC_RESOURCES_ENV_VAR)
+                : TRAC_RESOURCES_UNIT;
+
         @RegisterExtension
-        public static final PlatformTest platform = PlatformTest.forConfig(TRAC_CONFIG_ENV_FILE)
+        public static final PlatformTest platform = PlatformTest.forConfig(TRAC_CONFIG_FILE)
                 .runDbDeploy(true)
                 .manageDataPrefix(true)
-                .addTenant(TEST_TENANT)
+                .bootstrapTenant(TEST_TENANT, TRAC_RESOURCES_FILE)
+                .startService(TracAdminService.class)
                 .startService(TracMetadataService.class)
                 .startService(TracDataService.class)
                 .build();

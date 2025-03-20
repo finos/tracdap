@@ -27,6 +27,7 @@ import org.finos.tracdap.common.metadata.MetadataUtil;
 import org.finos.tracdap.common.metadata.TypeSystem;
 import org.finos.tracdap.common.util.ResourceHelpers;
 import org.finos.tracdap.metadata.*;
+import org.finos.tracdap.svc.admin.TracAdminService;
 import org.finos.tracdap.svc.data.TracDataService;
 import org.finos.tracdap.svc.meta.TracMetadataService;
 import org.finos.tracdap.svc.orch.TracOrchestratorService;
@@ -46,6 +47,7 @@ import java.util.UUID;
 public class JobValidationTest {
 
     public static final String TRAC_CONFIG_UNIT = "config/trac-unit.yaml";
+    public static final String TRAC_CONFIG_UNIT_RESOURCES = "config/trac-unit-resources.yaml";
     public static final String TEST_TENANT = "ACME_CORP";
 
     private static final byte[] BASIC_CSV_CONTENT = ResourceHelpers.loadResourceAsBytes(SampleData.BASIC_CSV_DATA_RESOURCE);
@@ -63,7 +65,8 @@ public class JobValidationTest {
     @RegisterExtension
     public static final PlatformTest platform = PlatformTest.forConfig(TRAC_CONFIG_UNIT)
             .runDbDeploy(true)
-            .addTenant(TEST_TENANT)
+            .bootstrapTenant(TEST_TENANT, TRAC_CONFIG_UNIT_RESOURCES)
+            .startService(TracAdminService.class)
             .startService(TracMetadataService.class)
             .startService(TracDataService.class)
             .startService(TracOrchestratorService.class)

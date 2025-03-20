@@ -29,6 +29,7 @@ import org.finos.tracdap.common.data.util.ByteSeekableChannel;
 import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.metadata.ImportModelJob;
 import org.finos.tracdap.metadata.RunModelJob;
+import org.finos.tracdap.svc.admin.TracAdminService;
 import org.finos.tracdap.svc.data.TracDataService;
 import org.finos.tracdap.svc.meta.TracMetadataService;
 import org.finos.tracdap.svc.orch.TracOrchestratorService;
@@ -72,6 +73,7 @@ public abstract class DataRoundTripTest {
 
     private static final String TEST_TENANT = "ACME_CORP";
     private static final String E2E_CONFIG = "config/trac-e2e.yaml";
+    private static final String E2E_RESOURCES = "config/trac-e2e-resources.yaml";
 
     // Pandas / NumPy native dates and timestamps are encoded as 64-bit nanoseconds around the Unix epoch
     private static final LocalDateTime MIN_PANDAS_TIMESTAMP = LocalDateTime
@@ -111,12 +113,13 @@ public abstract class DataRoundTripTest {
     @RegisterExtension
     public final PlatformTest platform = PlatformTest.forConfig(E2E_CONFIG)
             .runDbDeploy(true)
-            .addTenant(TEST_TENANT)
+            .bootstrapTenant(TEST_TENANT, E2E_RESOURCES)
             .storageFormat(storageFormat())
             .prepareLocalExecutor(true)
             .startService(TracMetadataService.class)
             .startService(TracDataService.class)
             .startService(TracOrchestratorService.class)
+            .startService(TracAdminService.class)
             .build();
 
     static BufferAllocator ALLOCATOR;

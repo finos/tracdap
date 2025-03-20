@@ -23,6 +23,7 @@ import org.finos.tracdap.common.metadata.MetadataUtil;
 import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.metadata.ImportModelJob;
 import org.finos.tracdap.metadata.RunFlowJob;
+import org.finos.tracdap.svc.admin.TracAdminService;
 import org.finos.tracdap.svc.data.TracDataService;
 import org.finos.tracdap.svc.meta.TracMetadataService;
 import org.finos.tracdap.svc.orch.TracOrchestratorService;
@@ -56,6 +57,7 @@ public class RunFlowTest {
 
     private static final String TEST_TENANT = "ACME_CORP";
     private static final String E2E_CONFIG = "config/trac-e2e.yaml";
+    private static final String E2E_RESOURCES = "config/trac-e2e-resources.yaml";
 
     private static final String LOANS_INPUT_PATH = "examples/models/python/data/inputs/loan_final313_100_shortform.csv";
     private static final String CURRENCY_INPUT_PATH = "examples/models/python/data/inputs/currency_data_sample.csv";
@@ -72,11 +74,12 @@ public class RunFlowTest {
     @RegisterExtension
     public static final PlatformTest platform = PlatformTest.forConfig(E2E_CONFIG)
             .runDbDeploy(true)
-            .addTenant(TEST_TENANT)
+            .bootstrapTenant(TEST_TENANT, E2E_RESOURCES)
             .prepareLocalExecutor(true)
             .startService(TracMetadataService.class)
             .startService(TracDataService.class)
             .startService(TracOrchestratorService.class)
+            .startService(TracAdminService.class)
             .build();
 
     private final Logger log = LoggerFactory.getLogger(getClass());
