@@ -5,7 +5,7 @@
 # (the "License"); you may not use this file except in compliance with the
 # License. You may obtain a copy of the License at
 #
-#     https://www.apache.org/licenses/LICENSE-2.0
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -13,38 +13,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-config:
-  secret.type: PKCS12
-  secret.url: secrets.pfx
+defaultBucket: STORAGE_INTEGRATION
+defaultFormat: ARROW_FILE
 
-# Environment settings are verified in one of the test cases so they need to match
-# MetadataReadApiTest platformInfo()
-platformInfo:
-  environment: TEST_ENVIRONMENT
-  production: false
-  deploymentInfo:
-    region: UK
+resources:
 
-metadata:
-  format: PROTO
-  database:
-    protocol: JDBC
+  STORAGE_INTEGRATION:
+    resourceType: INTERNAL_STORAGE
+    protocol: GCS
     properties:
-      dialect: MARIADB
-      jdbcUrl: //metadb:3306/trac
-      mariadb.user: trac_admin
-      pool.size: 2
-      pool.overflow: 5
-    secrets:
-      mariadb.password: metadb_secret
+      region: ${TRAC_GCP_REGION}
+      project: ${TRAC_GCP_PROJECT}
+      bucket: ${TRAC_GCP_BUCKET}
+      prefix: int_storage_${TRAC_TEST_ID}/
 
-services:
-
-  metadata:
-    port: 8081
-
-  admin:
-    port: 8084
-
-deployment:
-  layout: SANDBOX
+  UNIT_TEST_REPO:
+    resourceType: MODEL_REPOSITORY
+    protocol: git
+    properties:
+      repoUrl: ${CURRENT_GIT_ORIGIN}

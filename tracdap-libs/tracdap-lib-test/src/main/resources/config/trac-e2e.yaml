@@ -45,26 +45,6 @@ storage:
   defaultBucket: UNIT_TEST_STORAGE
   defaultFormat: ${TRAC_STORAGE_FORMAT}
 
-  buckets:
-
-    UNIT_TEST_STORAGE:
-      protocol: LOCAL
-      properties:
-        rootPath: ${TRAC_STORAGE_DIR}
-
-
-repositories:
-
-  TRAC_LOCAL_REPO:
-    protocol: local
-    properties:
-      repoUrl: ${TRAC_LOCAL_REPO}
-
-  TRAC_GIT_REPO:
-    protocol: git
-    properties:
-      repoUrl: ${TRAC_GIT_REPO}
-
 
 executor:
   protocol: LOCAL
@@ -100,6 +80,9 @@ services:
 
   orchestrator:
     port: 9203
+
+  admin:
+    port: 9204
 
 
 deployment:
