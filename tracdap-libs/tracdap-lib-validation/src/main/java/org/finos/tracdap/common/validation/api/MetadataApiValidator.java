@@ -560,7 +560,7 @@ public class MetadataApiValidator {
 
         return ctx.push(CCR_APPLICATION)
                 .apply(CommonValidators::required)
-                .apply(CommonValidators::resourceKey)
+                .apply(CommonValidators::configKey)
                 .pop();
     }
 }
