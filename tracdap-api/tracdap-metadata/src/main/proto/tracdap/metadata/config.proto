@@ -54,6 +54,18 @@ message ConfigEntry {
 
 
 /**
+ * Enumeration of available config types
+ */
+enum ConfigType {
+
+  CONFIG_TYPE_NOT_SET = 0;
+
+  /// A key-value properties map, follows the convention used for .properties files
+  PROPERTIES = 1;
+}
+
+
+/**
  * Summary content of a config entry.
  *
  * @see ConfigEntry
@@ -65,6 +77,22 @@ message ConfigDetails {
 
   /// Type of the metadata object referred to by this config entry.
   ObjectType objectType = 2;
+
+  /// Indicate the config type (for CONFIG objects only)
+  optional ConfigType configType = 3;
 }
 
 
+/**
+ * Definition of an individual config entry
+ */
+message ConfigDefinition {
+
+  /// The type of this config entry
+  ConfigType configType = 1;
+
+  /// The map of config properties (only available for PROPERTIES config entries)
+  map<string,string> properties = 2;
+
+
+}
