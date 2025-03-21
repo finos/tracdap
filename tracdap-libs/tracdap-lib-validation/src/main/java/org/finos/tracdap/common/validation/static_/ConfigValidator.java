@@ -157,7 +157,7 @@ public class ConfigValidator {
                 .pop();
 
         ctx = ctx.pushMap(CDEF_PROPERTIES)
-                .applyIf(msg.getConfigType() != ConfigType.PROPERTIES, CommonValidators::omitted)
+                .apply(CommonValidators.ifAndOnlyIf(msg.getConfigType() == ConfigType.PROPERTIES, "configType == PROPERTIES"))
                 .applyMapKeys(CommonValidators::required)
                 .applyMapKeys(CommonValidators::propertyKey)
                 .applyMapKeys(CommonValidators::notTracReserved)
