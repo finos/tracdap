@@ -81,4 +81,12 @@ public class MetadataTrustedApiValidator {
     public static ValidationContext readBatch(MetadataBatchRequest msg, ValidationContext ctx) {
         return MetadataApiValidator.readBatch(msg, ctx);
     }
+
+    // listConfigEntries on trusted API is a convenience method for internal read-only access
+    // It has the same semantics as the equivalent call on the admin API
+
+    @Validator(method = "listConfigEntries")
+    public static ValidationContext listConfigEntries(ConfigListRequest msg, ValidationContext ctx) {
+        return AdminApiValidator.listConfigEntries(msg, ctx);
+    }
 }
