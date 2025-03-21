@@ -541,9 +541,9 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
             var tenantId = tenants.getTenantId(conn, tenant);
 
             long[] configPk = search.searchConfigKeys(conn, tenantId, configClass, includeDeleted);
-            var configStub = readBatch.readConfigStub(conn, tenantId, configPk);
+            var configEntry = readBatch.readConfigEntry(conn, tenantId, configPk);
 
-            return buildConfigStub(configClass, configStub);
+            return buildConfigEntry(configClass, configEntry);
 
         }
         catch (SQLException error) {
@@ -809,17 +809,18 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
         return result;
     }
 
-    private List<ConfigEntry> buildConfigStub(String configClass, KeyedItems<String> keyedStubs) {
+    private List<ConfigEntry> buildConfigEntry(String configClass, KeyedItems<ConfigDetails> keyedDetails) {
 
-        var result = new ArrayList<ConfigEntry>(keyedStubs.keys.length);
+        var result = new ArrayList<ConfigEntry>(keyedDetails.keys.length);
 
-        for (int i = 0; i < keyedStubs.keys.length; i++) {
+        for (int i = 0; i < keyedDetails.keys.length; i++) {
 
-            var version = keyedStubs.versions[i];
-            var timestamp = keyedStubs.timestamps[i];
-            var latest = keyedStubs.isLatest[i];
-            var deleted = keyedStubs.deleted[i];
-            var configKey = keyedStubs.items[i];
+            var version = keyedDetails.versions[i];
+            var timestamp = keyedDetails.timestamps[i];
+            var latest = keyedDetails.isLatest[i];
+            var deleted = keyedDetails.deleted[i];
+            var details = keyedDetails.items[i];
+            var configKey = keyedDetails.configKeys[i];
 
             var entry = ConfigEntry.newBuilder()
                     .setConfigClass(configClass)
@@ -828,6 +829,7 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
                     .setConfigTimestamp(MetadataCodec.encodeDatetime(timestamp))
                     .setIsLatestConfig(latest)
                     .setConfigDeleted(deleted)
+                    .setDetails(details)
                     .build();
 
             result.add(entry);

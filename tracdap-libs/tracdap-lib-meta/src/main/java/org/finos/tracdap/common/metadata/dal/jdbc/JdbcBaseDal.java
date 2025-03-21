@@ -125,13 +125,21 @@ class JdbcBaseDal {
         final boolean[] isLatest;
         final boolean[] deleted;
 
-        KeyedItems(long[] keys, int[] versions, Instant[] timestamps, TItem[] items, boolean[] isLatest, boolean[] deleted) {
+        // For listConfigEntries
+        final String[] configKeys;
+
+        KeyedItems(long[] keys, int[] versions, Instant[] timestamps, TItem[] items, boolean[] isLatest, boolean[] deleted, String[] configKeys) {
             this.keys = keys;
             this.versions = versions;
             this.timestamps = timestamps;
             this.items = items;
             this.isLatest = isLatest;
             this.deleted = deleted;
+            this.configKeys = configKeys;
+        }
+
+        KeyedItems(long[] keys, int[] versions, Instant[] timestamps, TItem[] items, boolean[] isLatest, boolean[] deleted) {
+            this(keys, versions, timestamps, items, isLatest, deleted, null);
         }
 
         KeyedItems(long[] keys, int[] versions, Instant[] timestamps, TItem[] items, boolean[] isLatest) {
