@@ -652,11 +652,11 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
                     .setDefinition(configObject)
                     .build();
 
-            var configEntry = adminClient.createConfigObject(writeRequest);
+            var writeResponse = adminClient.createConfigObject(writeRequest);
 
             log.info("Created config entry: config class = {}, config key = {}",
-                    configEntry.getConfigClass(),
-                    configEntry.getConfigKey());
+                    writeResponse.getEntry().getConfigClass(),
+                    writeResponse.getEntry().getConfigKey());
         }
 
         for (var resource : bootstrap.getResourcesMap().entrySet()) {
@@ -673,11 +673,11 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
                     .setDefinition(resourceObject)
                     .build();
 
-            var resourceEntry = adminClient.createConfigObject(writeRequest);
+            var writeResponse = adminClient.createConfigObject(writeRequest);
 
             log.info("Created resource entry: config class = {}, config key = {}",
-                    resourceEntry.getConfigClass(),
-                    resourceEntry.getConfigKey());
+                    writeResponse.getEntry().getConfigClass(),
+                    writeResponse.getEntry().getConfigKey());
         }
 
         // Allow some time for config changes to propagate
