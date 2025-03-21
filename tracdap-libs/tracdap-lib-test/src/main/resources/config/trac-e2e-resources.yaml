@@ -13,8 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-defaultBucket: UNIT_TEST_STORAGE
-defaultFormat: ${TRAC_STORAGE_FORMAT}
+resourceClass: trac_resources
 
 resources:
 

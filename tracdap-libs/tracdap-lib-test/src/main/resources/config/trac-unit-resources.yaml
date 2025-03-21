@@ -1,6 +1,5 @@
 
-defaultBucket: UNIT_TEST_STORAGE
-defaultFormat: ARROW_FILE
+resourceClass: trac_resources
 
 resources:
 
