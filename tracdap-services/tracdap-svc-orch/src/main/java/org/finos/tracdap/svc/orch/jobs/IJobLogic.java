@@ -19,9 +19,9 @@ package org.finos.tracdap.svc.orch.jobs;
 
 import org.finos.tracdap.api.MetadataWriteRequest;
 import org.finos.tracdap.api.internal.RuntimeJobResult;
+import org.finos.tracdap.common.config.IDynamicResources;
 import org.finos.tracdap.common.metadata.MetadataBundle;
 import org.finos.tracdap.config.JobConfig;
-import org.finos.tracdap.config.PlatformConfig;
 import org.finos.tracdap.metadata.*;
 
 import java.util.List;
@@ -30,9 +30,9 @@ import java.util.Map;
 
 public interface IJobLogic {
 
-    JobDefinition applyTransform(JobDefinition job, MetadataBundle metadata, PlatformConfig platformConfig);
+    JobDefinition applyTransform(JobDefinition job, MetadataBundle metadata, IDynamicResources resources);
 
-    MetadataBundle applyMetadataTransform(JobDefinition job, MetadataBundle metadata, PlatformConfig platformConfig);
+    MetadataBundle applyMetadataTransform(JobDefinition job, MetadataBundle metadata, IDynamicResources resources);
 
     List<TagSelector> requiredMetadata(JobDefinition job);
 

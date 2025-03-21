@@ -19,11 +19,11 @@ package org.finos.tracdap.svc.orch.jobs;
 
 import org.finos.tracdap.api.MetadataWriteRequest;
 import org.finos.tracdap.api.internal.RuntimeJobResult;
+import org.finos.tracdap.common.config.IDynamicResources;
 import org.finos.tracdap.common.exception.EExecutorValidation;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.metadata.MetadataBundle;
 import org.finos.tracdap.config.JobConfig;
-import org.finos.tracdap.config.PlatformConfig;
 import org.finos.tracdap.metadata.*;
 
 import java.net.URI;
@@ -37,7 +37,7 @@ import static org.finos.tracdap.common.metadata.MetadataConstants.*;
 public class ImportModelJob implements IJobLogic {
 
     @Override
-    public JobDefinition applyTransform(JobDefinition job, MetadataBundle metadata, PlatformConfig platformConfig) {
+    public JobDefinition applyTransform(JobDefinition job, MetadataBundle metadata, IDynamicResources resources) {
 
         // Fill in package and packageGroup properties for models using Git repos
 
@@ -48,14 +48,10 @@ public class ImportModelJob implements IJobLogic {
         if (!job.getImportModel().getPackage().isBlank())
             return job;
 
+        // Validation on resources is already performed by the job consistency validator
+        // getStrictResource() will throw if there is an unexpected error (e..g. config sync issues)
         var repoKey = job.getImportModel().getRepository();
-
-        if (!platformConfig.containsRepositories(repoKey)) {
-            var message = String.format("Import job refers to model repository [%s] which is not defined in the platform configuration", repoKey);
-            throw new EExecutorValidation(message);
-        }
-
-        var repoConfig = platformConfig.getRepositoriesOrThrow(repoKey);
+        var repoConfig = resources.getStrictEntry(repoKey, ResourceType.MODEL_REPOSITORY);
 
         if (!repoConfig.getProtocol().equalsIgnoreCase("git"))
             return job;
@@ -83,7 +79,8 @@ public class ImportModelJob implements IJobLogic {
     }
 
     @Override
-    public MetadataBundle applyMetadataTransform(JobDefinition job, MetadataBundle metadata, PlatformConfig platformConfig) {
+    public MetadataBundle applyMetadataTransform(JobDefinition job, MetadataBundle metadata, IDynamicResources resources) {
+
         return metadata;
     }
 
