@@ -49,15 +49,14 @@ public class MetadataConstants {
             ObjectType.STORAGE,
             ObjectType.CUSTOM,
             ObjectType.MODEL,
-            ObjectType.FLOW);
+            ObjectType.FLOW,
+            ObjectType.CONFIG,
+            ObjectType.RESOURCE);
 
     // Valid identifiers are made up of alphanumeric characters, numbers and the underscore, not starting with a number
     // Use \\A - \\Z to match the whole input
     // ^...$ would allow matches like "my_var\n_gotcha"
     public static final Pattern VALID_IDENTIFIER = Pattern.compile("\\A[a-zA-Z_]\\w*\\Z");
-
-    // Resource keys are similar to identifiers but can also include hyphens
-    public static final Pattern VALID_RESOURCE_KEY = Pattern.compile("\\A[a-zA-Z_\\-][a-zA-Z0-9_\\-]*\\Z");
 
     // Identifiers starting trac_ are reserved for use by the TRAC platform
     // Identifiers starting _ are also reserved by convention, for private / protected / system variables
@@ -93,4 +92,7 @@ public class MetadataConstants {
     public static final String TRAC_MODEL_VERSION = "trac_model_version";
     public static final String TRAC_MODEL_ENTRY_POINT = "trac_model_entry_point";
     public static final String TRAC_MODEL_PATH = "trac_model_path";
+
+    public static final String TRAC_CONFIG_CLASS = "trac_config_class";
+    public static final String TRAC_CONFIG_KEY = "trac_config_key";
 }
