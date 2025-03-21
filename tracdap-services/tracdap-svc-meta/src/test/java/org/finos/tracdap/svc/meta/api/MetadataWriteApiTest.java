@@ -597,7 +597,7 @@ abstract class MetadataWriteApiTest {
     // Versioned types, as listed in MetadataConstants.VERSIONED_OBJECT_TYPES
     @ParameterizedTest
     @EnumSource(value = ObjectType.class, mode = EnumSource.Mode.INCLUDE,
-                names = {"DATA", "FILE", "STORAGE", "SCHEMA", "CUSTOM", "MODEL", "FLOW"})
+                names = {"DATA", "FILE", "STORAGE", "SCHEMA", "CUSTOM", "MODEL", "FLOW", "CONFIG", "RESOURCE"})
     void updateObject_trustedTypesOk(ObjectType objectType) {
 
         updateObject_ok(objectType, request -> trustedApi.updateObject(request));
@@ -605,8 +605,11 @@ abstract class MetadataWriteApiTest {
 
     @ParameterizedTest
     @EnumSource(value = ObjectType.class, mode = EnumSource.Mode.INCLUDE,
-            names = {"DATA", "FILE", "STORAGE", "SCHEMA", "CUSTOM", "MODEL"})
+            names = {"DATA", "FILE", "STORAGE", "SCHEMA", "CUSTOM", "MODEL","RESOURCE"})
     void updateObject_trustedTypesBadVersion(ObjectType objectType) {
+
+        // NOTE: Object type CONFIG can be added here when other configType options are added
+        // Currently there is no way to make a bad version update, bc only one configType is available
 
         // FLOW has no versioning constraints, so not included in the bad versions test
 
@@ -661,7 +664,7 @@ abstract class MetadataWriteApiTest {
     // Versioned types that are not publicly writable
     @ParameterizedTest
     @EnumSource(value = ObjectType.class, mode = EnumSource.Mode.INCLUDE,
-                names = {"DATA", "FILE", "STORAGE", "MODEL"})
+                names = {"DATA", "FILE", "STORAGE", "MODEL", "CONFIG", "RESOURCE"})
     void updateObject_publicTypesNotAllowed(ObjectType objectType) {
 
         var v1SavedTag = updateObject_prepareV1(objectType);
@@ -685,7 +688,7 @@ abstract class MetadataWriteApiTest {
     @EnumSource(value = ObjectType.class, mode = EnumSource.Mode.EXCLUDE,
                 names = {"OBJECT_TYPE_NOT_SET", "UNRECOGNIZED",
                         "DATA", "FILE", "STORAGE", "SCHEMA", "CUSTOM",
-                        "MODEL", "FLOW"})
+                        "MODEL", "FLOW", "CONFIG", "RESOURCE"})
     void updateObject_versionsNotSupported(ObjectType objectType) {
 
         var v1SavedTag = updateObject_prepareV1(objectType);
