@@ -17,8 +17,13 @@
 
 package org.finos.tracdap.svc.data;
 
+import org.finos.tracdap.api.ConfigListRequest;
 import org.finos.tracdap.api.DataServiceProto;
+import org.finos.tracdap.api.MetadataBatchRequest;
+import org.finos.tracdap.api.internal.InternalMessagingProto;
 import org.finos.tracdap.api.internal.TrustedMetadataApiGrpc;
+import org.finos.tracdap.common.metadata.MetadataCodec;
+import org.finos.tracdap.common.metadata.MetadataConstants;
 import org.finos.tracdap.common.middleware.GrpcConcern;
 import org.finos.tracdap.common.netty.*;
 import org.finos.tracdap.common.config.ConfigKeys;
@@ -38,6 +43,7 @@ import org.finos.tracdap.common.validation.ValidationConcern;
 import org.finos.tracdap.config.PlatformConfig;
 import org.finos.tracdap.config.ServiceConfig;
 import org.finos.tracdap.config.StorageConfig;
+import org.finos.tracdap.svc.data.api.MessageProcessor;
 import org.finos.tracdap.svc.data.api.TracDataApi;
 import org.finos.tracdap.svc.data.service.DataService;
 import org.finos.tracdap.svc.data.service.FileService;
@@ -58,6 +64,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 
 public class TracDataService extends TracServiceBase {
@@ -73,6 +80,8 @@ public class TracDataService extends TracServiceBase {
     private EventLoopGroup bossGroup;
     private EventLoopGroup serviceGroup;
     private ExecutorService offloadExecutor;
+    private ManagedChannel metaClientChanel;
+    private ManagedChannel metaBlockingChanel;
     private StorageManager storage;
     private Server server;
 
@@ -142,6 +151,15 @@ public class TracDataService extends TracServiceBase {
 
             var eventLoopResolver = new EventLoopResolver(serviceGroup, offloadTracking);
 
+            // Common framework for cross-cutting concerns
+            var commonConcerns = buildCommonConcerns();
+
+            metaClientChanel = prepareMetadataClientChannel(platformConfig, clientChannelType);
+            var metaClient = prepareMetadataClient(eventLoopResolver, commonConcerns);
+
+            metaBlockingChanel = prepareBlockingClientChannel(platformConfig, clientChannelType);
+            var metaClientBlocking = prepareMetadataClientBlocking(commonConcerns, metaBlockingChanel);
+
             // TODO: Review arrow allocator config, for root and child allocators
 
             var arrowAllocatorConfig = RootAllocator
@@ -164,22 +182,22 @@ public class TracDataService extends TracServiceBase {
             }
 
             var formats = new CodecManager(pluginManager, configManager);
-            storage = new StorageManager(pluginManager, configManager);
-            storage.initStorage(platformConfig.getStorage(), formats, serviceGroup);
+            storage = new StorageManager(pluginManager, configManager, formats, serviceGroup);
 
             var tenantConfig = platformConfig.getTenantsMap();
 
+            for (var tenant : tenantConfig.keySet())
+                loadStorageResources(metaClientBlocking, tenant);
+
+            // TODO: Config checks need to happen after dynamic resources are added for a tenant
             // Check default storage and format are available
-            checkDefaultStorageAndFormat(storage, formats, storageConfig);
-
-            // Common framework for cross-cutting concerns
-            var commonConcerns = buildCommonConcerns();
-
-            var metaClient = prepareMetadataClient(platformConfig, clientChannelType, eventLoopResolver, commonConcerns);
+            // checkDefaultStorageAndFormat(storage, formats, storageConfig);
 
             var fileSvc = new FileService(storageConfig, tenantConfig, storage, metaClient);
             var dataSvc = new DataService(storageConfig, tenantConfig, storage, formats, metaClient);
             var dataApi = new TracDataApi(dataSvc, fileSvc, eventLoopResolver, arrowAllocator, commonConcerns);
+
+            var messageProcessor = new MessageProcessor(storage, metaClientBlocking, offloadExecutor);
 
             var serverBuilder = NettyServerBuilder
                     .forPort(serviceConfig.getPort())
@@ -191,7 +209,8 @@ public class TracDataService extends TracServiceBase {
                     .directExecutor()
 
                     // Services
-                    .addService(dataApi);
+                    .addService(dataApi)
+                    .addService(messageProcessor);
 
             // Apply common concerns
             this.server =  commonConcerns
@@ -214,7 +233,10 @@ public class TracDataService extends TracServiceBase {
         var commonConcerns = TracServiceConfig.coreConcerns(TracDataService.class);
 
         // Validation concern for the APIs being served
-        var validationConcern = new ValidationConcern(DataServiceProto.getDescriptor());
+        var validationConcern = new ValidationConcern(
+                DataServiceProto.getDescriptor(),
+                InternalMessagingProto.getDescriptor());
+        
         commonConcerns = commonConcerns.addAfter(TracServiceConfig.TRAC_PROTOCOL, validationConcern);
 
         // Additional cross-cutting concerns configured by extensions
@@ -223,6 +245,89 @@ public class TracDataService extends TracServiceBase {
         }
 
         return commonConcerns.build();
+    }
+
+    private ManagedChannel
+    prepareMetadataClientChannel(PlatformConfig platformConfig, Class<? extends io.netty.channel.Channel> channelType) {
+
+        var metadataTarget = RoutingUtils.serviceTarget(platformConfig, ConfigKeys.METADATA_SERVICE_KEY);
+
+        log.info("Using metadata service at [{}:{}]",
+                metadataTarget.getHost(), metadataTarget.getPort());
+
+        return metaClientChanel = NettyChannelBuilder
+                .forAddress(metadataTarget.getHost(), metadataTarget.getPort())
+                .channelType(channelType)
+                .eventLoopGroup(serviceGroup)
+                .directExecutor()
+                .offloadExecutor(offloadExecutor)
+                .usePlaintext()
+                .build();
+    }
+
+    private ManagedChannel
+    prepareBlockingClientChannel(PlatformConfig platformConfig, Class<? extends io.netty.channel.Channel> channelType) {
+
+        var metadataTarget = RoutingUtils.serviceTarget(platformConfig, ConfigKeys.METADATA_SERVICE_KEY);
+
+        log.info("Using (blocking) metadata service at [{}:{}]",
+                metadataTarget.getHost(), metadataTarget.getPort());
+
+        return metaClientChanel = NettyChannelBuilder
+                .forAddress(metadataTarget.getHost(), metadataTarget.getPort())
+                .channelType(channelType)
+                .eventLoopGroup(serviceGroup)
+                .executor(offloadExecutor)
+                .usePlaintext()
+                .build();
+    }
+
+
+    private TrustedMetadataApiGrpc.TrustedMetadataApiFutureStub
+    prepareMetadataClient(EventLoopResolver eventLoopResolver, GrpcConcern commonConcerns) {
+
+        var client = TrustedMetadataApiGrpc.newFutureStub(metaClientChanel)
+                .withInterceptors(new EventLoopInterceptor(eventLoopResolver));
+
+        return commonConcerns.configureClient(client);
+    }
+
+    private TrustedMetadataApiGrpc.TrustedMetadataApiBlockingStub
+    prepareMetadataClientBlocking(GrpcConcern commonConcerns, ManagedChannel separateChannel) {
+
+        var client = TrustedMetadataApiGrpc.newBlockingStub(separateChannel);
+        return commonConcerns.configureClient(client);
+    }
+
+    private void loadStorageResources(
+            TrustedMetadataApiGrpc.TrustedMetadataApiBlockingStub metadataClient, String tenant) {
+
+        var configList = ConfigListRequest.newBuilder()
+                .setTenant(tenant)
+                .setConfigClass(ConfigKeys.TRAC_RESOURCES)
+                .build();
+
+        var listing = metadataClient.listConfigEntries(configList);
+
+        var selectors = listing.getEntriesList().stream()
+                .map(entry -> entry.getDetails().getObjectSelector())
+                .collect(Collectors.toList());
+
+        var batchRequest = MetadataBatchRequest.newBuilder()
+                .setTenant(tenant)
+                .addAllSelector(selectors)
+                .build();
+
+        var resourceObjects = metadataClient.readBatch(batchRequest);
+
+        for (var resourceObject : resourceObjects.getTagList()) {
+
+            var resourceKeyAttr = resourceObject.getAttrsOrThrow(MetadataConstants.TRAC_CONFIG_KEY);
+            var resourceKey = MetadataCodec.decodeStringValue(resourceKeyAttr);
+            var resourceDef = resourceObject.getDefinition().getResource();
+
+            storage.addStorage(resourceKey, resourceDef);
+        }
     }
 
     private void checkDefaultStorageAndFormat(IStorageManager storage, ICodecManager formats, StorageConfig config) {
@@ -247,33 +352,6 @@ public class TracDataService extends TracServiceBase {
         }
     }
 
-    private TrustedMetadataApiGrpc.TrustedMetadataApiFutureStub
-    prepareMetadataClient(
-            PlatformConfig platformConfig,
-            Class<? extends io.netty.channel.Channel> channelType,
-            EventLoopResolver eventLoopResolver,
-            GrpcConcern commonConcerns) {
-
-        var metadataTarget = RoutingUtils.serviceTarget(platformConfig, ConfigKeys.METADATA_SERVICE_KEY);
-
-        log.info("Using metadata service at [{}:{}]",
-                metadataTarget.getHost(), metadataTarget.getPort());
-
-        var clientChannel = NettyChannelBuilder
-                .forAddress(metadataTarget.getHost(), metadataTarget.getPort())
-                .channelType(channelType)
-                .eventLoopGroup(serviceGroup)
-                .directExecutor()
-                .offloadExecutor(offloadExecutor)
-                .usePlaintext()
-                .build();
-
-        var client = TrustedMetadataApiGrpc.newFutureStub(clientChannel)
-                .withInterceptors(new EventLoopInterceptor(eventLoopResolver));
-
-        return commonConcerns.configureClient(client);
-    }
-
     @Override
     protected int doShutdown(Duration shutdownTimeout) {
 
@@ -282,6 +360,18 @@ public class TracDataService extends TracServiceBase {
         var serverDown = shutdownResource("Data service server", deadline, remaining -> {
 
             server.shutdown();
+            return server.awaitTermination(remaining.toMillis(), TimeUnit.MILLISECONDS);
+        });
+
+        var clientDown = shutdownResource("Metadata client", deadline, remaining -> {
+
+            metaClientChanel.shutdown();
+            return server.awaitTermination(remaining.toMillis(), TimeUnit.MILLISECONDS);
+        });
+
+        var blockingClientDown = shutdownResource("Metadata client (blocking)", deadline, remaining -> {
+
+            metaBlockingChanel.shutdown();
             return server.awaitTermination(remaining.toMillis(), TimeUnit.MILLISECONDS);
         });
 
@@ -309,7 +399,7 @@ public class TracDataService extends TracServiceBase {
             return bossGroup.awaitTermination(remaining.toMillis(), TimeUnit.MILLISECONDS);
         });
 
-        if (serverDown && storageDown && offloadDown &&  workersDown && bossDown)
+        if (serverDown && clientDown && blockingClientDown && storageDown && offloadDown &&  workersDown && bossDown)
             return 0;
 
         if (!serverDown)
