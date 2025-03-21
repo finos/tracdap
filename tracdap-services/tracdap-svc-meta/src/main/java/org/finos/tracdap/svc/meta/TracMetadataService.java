@@ -18,9 +18,11 @@
 package org.finos.tracdap.svc.meta;
 
 import org.finos.tracdap.api.MetadataServiceProto;
+import org.finos.tracdap.api.internal.InternalMessagingProto;
 import org.finos.tracdap.api.internal.MetadataTrustedProto;
 import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.config.ConfigManager;
+import org.finos.tracdap.common.config.DynamicConfig;
 import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.common.middleware.GrpcConcern;
 import org.finos.tracdap.common.netty.NettyHelpers;
@@ -31,6 +33,7 @@ import org.finos.tracdap.common.util.InterfaceLogging;
 import org.finos.tracdap.common.validation.ValidationConcern;
 import org.finos.tracdap.config.PlatformConfig;
 import org.finos.tracdap.common.metadata.dal.IMetadataDal;
+import org.finos.tracdap.svc.meta.api.MessageProcessor;
 import org.finos.tracdap.svc.meta.services.MetadataReadService;
 import org.finos.tracdap.svc.meta.services.MetadataSearchService;
 import org.finos.tracdap.svc.meta.services.MetadataWriteService;
@@ -116,12 +119,14 @@ public class TracMetadataService extends TracServiceBase {
             // Set up services and APIs
             var dalWithLogging = InterfaceLogging.wrap(dal, IMetadataDal.class);
 
-            var readService = new MetadataReadService(dalWithLogging, platformConfig);
+            var resources = new DynamicConfig.Resources();
+            var readService = new MetadataReadService(dalWithLogging, platformConfig, resources);
             var writeService = new MetadataWriteService(dalWithLogging);
             var searchService = new MetadataSearchService(dalWithLogging);
 
             var publicApi = new TracMetadataApi(readService, writeService, searchService);
             var trustedApi = new TrustedMetadataApi(readService, writeService, searchService);
+            var messageProcessor = new MessageProcessor(resources, dal);
 
             // Common framework for cross-cutting concerns
             var commonConcerns = buildCommonConcerns();
@@ -137,7 +142,8 @@ public class TracMetadataService extends TracServiceBase {
                     .forPort(servicePort)
                     .executor(executor)
                     .addService(publicApi)
-                    .addService(trustedApi);
+                    .addService(trustedApi)
+                    .addService(messageProcessor);
 
             // Apply common concerns
             this.server = commonConcerns
@@ -179,7 +185,11 @@ public class TracMetadataService extends TracServiceBase {
         var commonConcerns = TracServiceConfig.coreConcerns(TracMetadataService.class);
 
         // Validation concern for the APIs being served
-        var validationConcern = new ValidationConcern(MetadataServiceProto.getDescriptor(), MetadataTrustedProto.getDescriptor());
+        var validationConcern = new ValidationConcern(
+                MetadataServiceProto.getDescriptor(),
+                MetadataTrustedProto.getDescriptor(),
+                InternalMessagingProto.getDescriptor());
+
         commonConcerns = commonConcerns.addAfter(TracServiceConfig.TRAC_PROTOCOL, validationConcern);
 
         // Additional cross-cutting concerns configured by extensions

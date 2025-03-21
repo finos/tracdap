@@ -18,15 +18,12 @@
 package org.finos.tracdap.svc.meta.services;
 
 import org.finos.tracdap.api.*;
+import org.finos.tracdap.common.config.IDynamicResources;
 import org.finos.tracdap.common.exception.EResourceNotFound;
 import org.finos.tracdap.common.exception.ETenantNotFound;
 import org.finos.tracdap.common.util.VersionInfo;
 import org.finos.tracdap.config.PlatformConfig;
-import org.finos.tracdap.config.PluginConfig;
-import org.finos.tracdap.metadata.ResourceType;
-import org.finos.tracdap.metadata.TagSelector;
-import org.finos.tracdap.metadata.ObjectType;
-import org.finos.tracdap.metadata.Tag;
+import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.common.metadata.dal.IMetadataDal;
 import org.finos.tracdap.svc.meta.TracMetadataService;
 import org.slf4j.Logger;
@@ -44,10 +41,12 @@ public class MetadataReadService {
 
     private final IMetadataDal dal;
     private final PlatformConfig platformConfig;
+    private final IDynamicResources resources;
 
-    public MetadataReadService(IMetadataDal dal, PlatformConfig platformConfig) {
+    public MetadataReadService(IMetadataDal dal, PlatformConfig platformConfig, IDynamicResources resources) {
         this.dal = dal;
         this.platformConfig = platformConfig;
+        this.resources = resources;
     }
 
     // Literally all the read logic is in the DAL at present!
@@ -102,23 +101,10 @@ public class MetadataReadService {
         // Explicit check is required because resources currently come from platform config
         checkTenantExists(tenantCode);
 
-        var response = ListResourcesResponse.newBuilder();
+        var matchingResources = resources.getMatchingEntries(resource -> resource.getResourceType() == resourceType);
 
-        if (resourceType == ResourceType.MODEL_REPOSITORY) {
-            for (var repoEntry : platformConfig.getRepositoriesMap().entrySet()) {
-                response.addResources(buildResourceInfo(resourceType, repoEntry.getKey(), repoEntry.getValue()));
-            }
-        }
-        else if (resourceType == ResourceType.INTERNAL_STORAGE) {
-            for (var storageEntry : platformConfig.getStorage().getBucketsMap().entrySet()) {
-                response.addResources(buildResourceInfo(resourceType, storageEntry.getKey(), storageEntry.getValue()));
-            }
-        }
-        else {
-            var message = String.format("Unknown resource type: ['%s]'", resourceType.name());
-            log.error(message);
-            throw new EResourceNotFound(message);
-        }
+        var response = ListResourcesResponse.newBuilder();
+        matchingResources.forEach((key, value) -> response.addResources(buildResourceInfo(key, value)));
 
         return response.build();
     }
@@ -128,36 +114,9 @@ public class MetadataReadService {
         // Explicit check is required because resources currently come from platform config
         checkTenantExists(tenantCode);
 
-        PluginConfig pluginConfig;
+        var resource = resources.getStrictEntry(resourceKey, resourceType);
 
-        if (resourceType == ResourceType.MODEL_REPOSITORY) {
-
-            if (!this.platformConfig.containsRepositories(resourceKey)){
-                var message = String.format("Model repository not found: [%s]", resourceKey);
-                log.error(message);
-                throw new EResourceNotFound(message);
-            }
-
-            pluginConfig = this.platformConfig.getRepositoriesOrThrow(resourceKey);
-        }
-        else if (resourceType == ResourceType.INTERNAL_STORAGE) {
-
-            if (!this.platformConfig.getStorage().containsBuckets(resourceKey)) {
-                var message = String.format("Storage location not found: [%s]", resourceKey);
-                log.error(message);
-                throw new EResourceNotFound(message);
-            }
-
-            pluginConfig = this.platformConfig.getStorage().getBucketsOrThrow(resourceKey);
-        }
-        else {
-
-            var message = String.format("Unknown resource type: ['%s]'", resourceType.name());
-            log.error(message);
-            throw new EResourceNotFound(message);
-        }
-
-        return buildResourceInfo(resourceType, resourceKey, pluginConfig).build();
+        return buildResourceInfo(resourceKey, resource).build();
     }
 
     private void checkTenantExists(String tenantCode) {
@@ -173,14 +132,13 @@ public class MetadataReadService {
     }
 
     private ResourceInfoResponse.Builder buildResourceInfo(
-            ResourceType resourceType, String resourceKey,
-            PluginConfig pluginConfig) {
+            String resourceKey, ResourceDefinition resource) {
 
         return ResourceInfoResponse.newBuilder()
-                .setResourceType(resourceType)
+                .setResourceType(resource.getResourceType())
                 .setResourceKey(resourceKey)
-                .setProtocol(pluginConfig.getProtocol())
-                .putAllProperties(pluginConfig.getPublicPropertiesMap());
+                .setProtocol(resource.getProtocol())
+                .putAllProperties(resource.getPublicPropertiesMap());
     }
 
     public Tag readObject(String tenant, TagSelector selector) {
