@@ -17,6 +17,7 @@
 
 package org.finos.tracdap.test.helpers;
 
+import org.finos.tracdap.api.ConfigWriteRequest;
 import org.finos.tracdap.api.TracAdminApiGrpc;
 import org.finos.tracdap.api.TracDataApiGrpc;
 import org.finos.tracdap.api.TracMetadataApiGrpc;
@@ -32,7 +33,10 @@ import org.finos.tracdap.common.plugin.PluginManager;
 import org.finos.tracdap.common.service.TracServiceBase;
 import org.finos.tracdap.common.startup.StandardArgs;
 import org.finos.tracdap.common.util.RoutingUtils;
+import org.finos.tracdap.config.DynamicConfig;
 import org.finos.tracdap.config.PlatformConfig;
+import org.finos.tracdap.metadata.ObjectDefinition;
+import org.finos.tracdap.metadata.ObjectType;
 import org.finos.tracdap.tools.deploy.metadb.DeployMetaDB;
 import org.finos.tracdap.tools.secrets.SecretTool;
 import org.finos.tracdap.test.config.ConfigHelpers;
@@ -86,15 +90,10 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
     private static final String VENV_ENV_VAR = "VIRTUAL_ENV";
     private static final String TRAC_RUNTIME_DIST_DIR = "tracdap-runtime/python/build/dist";
 
-    private static final String META_SVC_CLASS = "TracMetadataService";
-    private static final String DATA_SVC_CLASS = "TracDataService";
-    private static final String ORCH_SVC_CLASS = "TracOrchestratorService";
-    private static final String ADMIN_SVC_CLASS = "TracAdminService";
-
     private final Logger log = LoggerFactory.getLogger(getClass());
 
     private final String testConfig;
-    private final List<String> tenants;
+    private final Map<String, String> tenants;
     private final String storageFormat;
 
     private final boolean runDbDeploy;
@@ -107,7 +106,7 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
     private final List<Consumer<PlatformTest>> preStartActions;
 
     private PlatformTest(
-            String testConfig, String secretKey, List<String> tenants, String storageFormat,
+            String testConfig, String secretKey, Map<String, String> tenants, String storageFormat,
             boolean runDbDeploy, boolean manageDataPrefix, boolean localExecutor,
             List<Class<? extends TracServiceBase>> serviceClasses, Map<String, String> serviceKeys,
             GrpcConcern clientConcerns, List<Consumer<PlatformTest>> preStartActions) {
@@ -141,31 +140,11 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         return builder;
     }
 
-    public boolean hasMetaSvc() {
-        return hasService(META_SVC_CLASS);
-    }
-
-    public boolean hasDataSvc() {
-        return hasService(DATA_SVC_CLASS);
-    }
-
-    public boolean hasOrchSvc() {
-        return hasService(ORCH_SVC_CLASS);
-    }
-
-    public boolean hasAdminSvc() {
-        return hasService(ADMIN_SVC_CLASS);
-    }
-
-    public boolean hasService(String serviceClassName) {
-        return serviceClasses.stream().anyMatch(c -> c.getSimpleName().equals(serviceClassName));
-    }
-
     public static class Builder {
 
         private String testConfig;
         private String secretKey;
-        private final List<String> tenants = new ArrayList<>();
+        private final Map<String, String> tenants = new HashMap<>();
         private String storageFormat = DEFAULT_STORAGE_FORMAT;
         private boolean runDbDeploy = false;
         private boolean manageDataPrefix = false;
@@ -177,7 +156,8 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
 
         // Should client concerns be pre-configured? If so what is the right configuration for testing?
 
-        public Builder addTenant(String testTenant) { this.tenants.add(testTenant); return this; }
+        public Builder addTenant(String testTenant) { this.tenants.put(testTenant, null); return this; }
+        public Builder bootstrapTenant(String testTenant, String bootstrapConfig) { this.tenants.put(testTenant, bootstrapConfig); return this; }
         public Builder storageFormat(String storageFormat) { this.storageFormat = storageFormat; return this; }
         public Builder runDbDeploy(boolean runDbDeploy) { this.runDbDeploy = runDbDeploy; return this; }
         public Builder manageDataPrefix(boolean manageDataPrefix) { this.manageDataPrefix = manageDataPrefix; return this; }
@@ -220,6 +200,10 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
     private PluginManager pluginManager;
     private ConfigManager configManager;
     private PlatformConfig platformConfig;
+
+    public boolean hasService(String serviceKey) {
+        return serviceKeys.containsValue(serviceKey);
+    }
 
     public <TClient extends AbstractStub<TClient>> TClient
     createClient(String serviceKey, Function<Channel, TClient> clientFactory) {
@@ -304,6 +288,8 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
 
         startServices();
         startClients();
+
+        loadDynamicConfig();
     }
 
     @Override
@@ -391,7 +377,22 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
             }
         }
 
-        var configInputs = List.of(testConfig);
+        // Mark all services that are being started as enabled
+        for (var serviceKey : serviceKeys.values()) {
+            var substitutionKey = String.format("${%s_ENABLED}", serviceKey);
+            substitutions.put(substitutionKey, "true");
+        }
+
+        // Disable any core services that are in the config but not started for the current test
+        for (var serviceKey : SERVICE_KEYS.values()) {
+            var substitutionKey = String.format("${%s_ENABLED}", serviceKey);
+            if (!substitutions.containsKey(substitutionKey))
+                substitutions.put(substitutionKey, "false");
+        }
+
+        var configInputs = new ArrayList<String>();
+        configInputs.add(testConfig);
+        tenants.values().stream().filter(Objects::nonNull).forEach(configInputs::add);
         var configOutputs = ConfigHelpers.prepareConfig(configInputs, workingDir, substitutions);
         platformConfigUrl = configOutputs.get(0);
 
@@ -473,7 +474,7 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         var databaseTasks = new ArrayList<StandardArgs.Task>();
         databaseTasks.add(StandardArgs.task(DeployMetaDB.DEPLOY_SCHEMA_TASK, "", ""));
 
-        for (var tenant : tenants) {
+        for (var tenant : tenants.keySet()) {
 
             // Run both add and alter tenant tasks as part of the standard setup
             // (just to run both tasks, not strictly necessary)
@@ -508,11 +509,11 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
 
         // TODO: Allow running whole-platform tests over different backend configurations
 
-        if (hasDataSvc()) {
+        if (hasService(ConfigKeys.DATA_SERVICE_KEY)) {
             Files.createDirectory(workingDir.resolve("unit_test_storage"));
         }
 
-        if (hasOrchSvc() && localExecutor) {
+        if (hasService(ConfigKeys.ORCHESTRATOR_SERVICE_KEY) && localExecutor) {
 
             var venvDir = executorDir.resolve("venv").normalize();
 
@@ -611,5 +612,75 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         builder.directExecutor();
 
         return builder.build();
+    }
+
+    private void loadDynamicConfig() throws Exception {
+
+        if (tenants.values().stream().allMatch(Objects::isNull))
+            return;
+
+        if (!hasService(ConfigKeys.ADMIN_SERVICE_KEY))
+            throw new ETracInternal("Admin service is required to bootstrap tenant config");
+
+        var adminClient = createClient(ConfigKeys.ADMIN_SERVICE_KEY, TracAdminApiGrpc::newBlockingStub);
+
+        for (var bootstrapEntry : tenants.entrySet()) {
+            if (bootstrapEntry.getValue() != null)
+                loadDynamicConfig(bootstrapEntry.getKey(), bootstrapEntry.getValue(), adminClient);
+        }
+    }
+
+    private void loadDynamicConfig(String tenant, String configPath, TracAdminApiGrpc.TracAdminApiBlockingStub adminClient) throws Exception {
+
+        // Assuming config path is in the same dir as the root config file
+        var configSep = configPath.lastIndexOf("/");
+        var configFile = configPath.substring(configSep + 1);
+
+        var bootstrap = configManager.loadConfigObject(configFile, DynamicConfig.class);
+
+        for (var config : bootstrap.getConfigMap().entrySet()) {
+
+            var configObject = ObjectDefinition.newBuilder()
+                    .setObjectType(ObjectType.CONFIG)
+                    .setConfig(config.getValue())
+                    .build();
+
+            var writeRequest = ConfigWriteRequest.newBuilder()
+                    .setTenant(tenant)
+                    .setConfigClass(bootstrap.getConfigClass())
+                    .setConfigKey(config.getKey())
+                    .setDefinition(configObject)
+                    .build();
+
+            var configEntry = adminClient.createConfigObject(writeRequest);
+
+            log.info("Created config entry: config class = {}, config key = {}",
+                    configEntry.getConfigClass(),
+                    configEntry.getConfigKey());
+        }
+
+        for (var resource : bootstrap.getResourcesMap().entrySet()) {
+
+            var resourceObject = ObjectDefinition.newBuilder()
+                    .setObjectType(ObjectType.RESOURCE)
+                    .setResource(resource.getValue())
+                    .build();
+
+            var writeRequest = ConfigWriteRequest.newBuilder()
+                    .setTenant(tenant)
+                    .setConfigClass(bootstrap.getResourceClass())
+                    .setConfigKey(resource.getKey())
+                    .setDefinition(resourceObject)
+                    .build();
+
+            var resourceEntry = adminClient.createConfigObject(writeRequest);
+
+            log.info("Created resource entry: config class = {}, config key = {}",
+                    resourceEntry.getConfigClass(),
+                    resourceEntry.getConfigKey());
+        }
+
+        // Allow some time for config changes to propagate
+        Thread.sleep(100);
     }
 }
