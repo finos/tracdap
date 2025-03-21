@@ -22,6 +22,7 @@ import org.finos.tracdap.common.validation.core.ValidationContext;
 import org.finos.tracdap.common.validation.core.ValidationType;
 import org.finos.tracdap.common.validation.core.Validator;
 import org.finos.tracdap.metadata.ModelDefinition;
+import org.finos.tracdap.metadata.ResourceType;
 
 import static org.finos.tracdap.common.validation.core.ValidatorUtils.field;
 
@@ -64,10 +65,19 @@ public class ModelConsistencyValidator {
     public static ValidationContext isKnownModelRepo(String repoName, ValidationContext ctx) {
 
         var resources = ctx.getResources();
-        var repos = resources.getRepositoriesMap();
+        var repoResource = resources.getEntry(repoName);
 
-        if (!repos.containsKey(repoName))
-            return ctx.error("Model repository [" + repoName + "] is not available in the TRAC platform");
+        if (repoResource == null) {
+            var error = String.format("Model repository [%s] is not available in the TRAC platform", repoName);
+            return ctx.error(error);
+        }
+
+        if (repoResource.getResourceType() != ResourceType.MODEL_REPOSITORY) {
+            var error = String.format(
+                    "Model repository [%s] is not a valid repository (this resource is configured as a [%s]",
+                    repoName, repoResource.getResourceType());
+            return ctx.error(error);
+        }
 
         return ctx;
     }
