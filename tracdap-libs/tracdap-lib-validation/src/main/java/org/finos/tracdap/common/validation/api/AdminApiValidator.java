@@ -169,22 +169,6 @@ public class AdminApiValidator {
     @Validator(method = "readConfigObject")
     public static ValidationContext readConfigObject(ConfigReadRequest msg, ValidationContext ctx) {
 
-        ctx = ctx.push(CRB_TENANT)
-                .apply(CommonValidators::required)
-                .apply(CommonValidators::identifier)
-                .pop();
-
-        ctx = ctx.pushRepeated(CRB_ENTRIES)
-                .apply(CommonValidators::required)
-                .applyRepeated(ConfigValidator::configEntry, ConfigEntry.class)
-                .pop();
-
-        return ctx;
-    }
-
-    @Validator(method = "readConfigBatch")
-    public static ValidationContext readConfigBatch(ConfigReadBatchRequest msg, ValidationContext ctx) {
-
         ctx = ctx.push(CRR_TENANT)
                 .apply(CommonValidators::required)
                 .apply(CommonValidators::identifier)
@@ -193,6 +177,22 @@ public class AdminApiValidator {
         ctx = ctx.push(CRR_ENTRY)
                 .apply(CommonValidators::required)
                 .applyRegistered()
+                .pop();
+
+        return ctx;
+    }
+
+    @Validator(method = "readConfigBatch")
+    public static ValidationContext readConfigBatch(ConfigReadBatchRequest msg, ValidationContext ctx) {
+
+        ctx = ctx.push(CRB_TENANT)
+                .apply(CommonValidators::required)
+                .apply(CommonValidators::identifier)
+                .pop();
+
+        ctx = ctx.pushRepeated(CRB_ENTRIES)
+                .apply(CommonValidators::required)
+                .applyRepeated(ConfigValidator::configEntry, ConfigEntry.class)
                 .pop();
 
         return ctx;
