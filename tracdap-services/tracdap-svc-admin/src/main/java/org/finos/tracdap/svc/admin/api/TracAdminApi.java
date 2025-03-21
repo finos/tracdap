@@ -18,8 +18,6 @@
 package org.finos.tracdap.svc.admin.api;
 
 import org.finos.tracdap.api.*;
-import org.finos.tracdap.metadata.ConfigEntry;
-import org.finos.tracdap.metadata.Tag;
 import org.finos.tracdap.svc.admin.services.ConfigService;
 
 import io.grpc.stub.StreamObserver;
@@ -34,7 +32,7 @@ public class TracAdminApi extends TracAdminApiGrpc.TracAdminApiImplBase {
     }
 
     @Override
-    public void createConfigObject(ConfigWriteRequest request, StreamObserver<ConfigEntry> response) {
+    public void createConfigObject(ConfigWriteRequest request, StreamObserver<ConfigWriteResponse> response) {
 
         try {
             var result = configService.createConfigObject(request);
@@ -47,7 +45,7 @@ public class TracAdminApi extends TracAdminApiGrpc.TracAdminApiImplBase {
     }
 
     @Override
-    public void updateConfigObject(ConfigWriteRequest request, StreamObserver<ConfigEntry> response) {
+    public void updateConfigObject(ConfigWriteRequest request, StreamObserver<ConfigWriteResponse> response) {
 
         try {
             var result = configService.updateConfigObject(request);
@@ -60,7 +58,7 @@ public class TracAdminApi extends TracAdminApiGrpc.TracAdminApiImplBase {
     }
 
     @Override
-    public void deleteConfigObject(ConfigWriteRequest request, StreamObserver<ConfigEntry> response) {
+    public void deleteConfigObject(ConfigWriteRequest request, StreamObserver<ConfigWriteResponse> response) {
 
         try {
             var result = configService.deleteConfigObject(request);
@@ -73,7 +71,7 @@ public class TracAdminApi extends TracAdminApiGrpc.TracAdminApiImplBase {
     }
 
     @Override
-    public void readConfigObject(ConfigReadRequest request, StreamObserver<Tag> response) {
+    public void readConfigObject(ConfigReadRequest request, StreamObserver<ConfigReadResponse> response) {
 
         try {
             var result = configService.readConfigObject(request);
@@ -99,10 +97,10 @@ public class TracAdminApi extends TracAdminApiGrpc.TracAdminApiImplBase {
     }
 
     @Override
-    public void listConfigKeys(ConfigListRequest request, StreamObserver<ConfigListResponse> response) {
+    public void listConfigEntries(ConfigListRequest request, StreamObserver<ConfigListResponse> response) {
 
         try {
-            var result = configService.listConfigKeys(request);
+            var result = configService.listConfigEntries(request);
             response.onNext(result);
             response.onCompleted();
         }

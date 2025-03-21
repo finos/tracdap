@@ -18,6 +18,8 @@
 package org.finos.tracdap.svc.admin.services;
 
 import org.finos.tracdap.api.*;
+import org.finos.tracdap.api.internal.ConfigUpdate;
+import org.finos.tracdap.api.internal.ConfigUpdateType;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.grpc.RequestMetadata;
 import org.finos.tracdap.common.grpc.UserMetadata;
@@ -46,19 +48,21 @@ public class ConfigService {
 
     private final Validator validator;
     private final IMetadataDal dal;
+    private final NotifierService notifier;
 
-    public ConfigService(IMetadataDal dal) {
+    public ConfigService(IMetadataDal dal, NotifierService notifier) {
         this.validator = new Validator();
         this.dal = dal;
+        this.notifier = notifier;
     }
 
-    public ConfigEntry createConfigObject(ConfigWriteRequest request) {
+    public ConfigWriteResponse createConfigObject(ConfigWriteRequest request) {
 
         var result = createConfigObjects(request.getTenant(), List.of(request));
         return result.get(0);
     }
 
-    public List<ConfigEntry> createConfigObjects(String tenant, List<ConfigWriteRequest> requests) {
+    public List<ConfigWriteResponse> createConfigObjects(String tenant, List<ConfigWriteRequest> requests) {
 
         // Get request and user metadata from the current gRPC context
         var requestMetadata = RequestMetadata.get(Context.current());
@@ -77,16 +81,21 @@ public class ConfigService {
         var batch = new MetadataBatchUpdate(null, null, objects, null, null, entries);
         dal.saveBatchUpdate(tenant, batch);
 
-        return entries;
+        // Notify services of a config change
+        sendNotifications(tenant, ConfigUpdateType.CREATE, entries);
+
+        return entries.stream()
+                .map(e -> ConfigWriteResponse.newBuilder().setEntry(e).build())
+                .collect(Collectors.toList());
     }
 
-    public ConfigEntry updateConfigObject(ConfigWriteRequest request) {
+    public ConfigWriteResponse updateConfigObject(ConfigWriteRequest request) {
 
         var result = updateConfigObjects(request.getTenant(), List.of(request));
         return result.get(0);
     }
 
-    public List<ConfigEntry> updateConfigObjects(String tenant, List<ConfigWriteRequest> requests) {
+    public List<ConfigWriteResponse> updateConfigObjects(String tenant, List<ConfigWriteRequest> requests) {
 
         // Get request and user metadata from the current gRPC context
         var requestMetadata = RequestMetadata.get(Context.current());
@@ -94,7 +103,7 @@ public class ConfigService {
 
         // A prior entry / object should exist for every update request
         // Do not allow prior entries that are deleted, those can be re-created using createConfigObject
-        var priorKeys = requests.stream().map(ConfigWriteRequest::getPriorVersion).collect(Collectors.toList());
+        var priorKeys = requests.stream().map(ConfigWriteRequest::getPriorEntry).collect(Collectors.toList());
         var priorEntries = dal.loadConfigEntries(tenant, priorKeys, /* includeDeleted = */ false);
         var priorSelectors = priorEntries.stream().map(entry -> entry.getDetails().getObjectSelector()).collect(Collectors.toList());
         var priorObjects = dal.loadObjects(tenant, priorSelectors);
@@ -110,16 +119,21 @@ public class ConfigService {
         var batch = new MetadataBatchUpdate(null, null, null, objects, null, entries);
         dal.saveBatchUpdate(tenant, batch);
 
-        return entries;
+        // Notify services of a config change
+        sendNotifications(tenant, ConfigUpdateType.UPDATE, entries);
+
+        return entries.stream()
+                .map(e -> ConfigWriteResponse.newBuilder().setEntry(e).build())
+                .collect(Collectors.toList());
     }
 
-    public ConfigEntry deleteConfigObject(ConfigWriteRequest request) {
+    public ConfigWriteResponse deleteConfigObject(ConfigWriteRequest request) {
 
         var result = deleteConfigObjects(request.getTenant(), List.of(request));
         return result.get(0);
     }
 
-    public List<ConfigEntry> deleteConfigObjects(String tenant, List<ConfigWriteRequest> requests) {
+    public List<ConfigWriteResponse> deleteConfigObjects(String tenant, List<ConfigWriteRequest> requests) {
 
         // Get request and user metadata from the current gRPC context
         var requestMetadata = RequestMetadata.get(Context.current());
@@ -127,7 +141,7 @@ public class ConfigService {
 
         // A prior entry / object should exist for every update request
         // Do not allow prior entries that are already deleted
-        var priorKeys = requests.stream().map(ConfigWriteRequest::getPriorVersion).collect(Collectors.toList());
+        var priorKeys = requests.stream().map(ConfigWriteRequest::getPriorEntry).collect(Collectors.toList());
         var priorEntries = dal.loadConfigEntries(tenant, priorKeys, /* includeDeleted = */ false);
         var priorSelectors = priorEntries.stream().map(entry -> entry.getDetails().getObjectSelector()).collect(Collectors.toList());
 
@@ -139,15 +153,25 @@ public class ConfigService {
         var batch = new MetadataBatchUpdate(null, null, null, null, tags, entries);
         dal.saveBatchUpdate(tenant, batch);
 
-        return entries;
+        // Notify services of a config change
+        sendNotifications(tenant, ConfigUpdateType.DELETE, entries);
+
+        return entries.stream()
+                .map(e -> ConfigWriteResponse.newBuilder().setEntry(e).build())
+                .collect(Collectors.toList());
     }
 
-    public Tag readConfigObject(ConfigReadRequest request) {
+    public ConfigReadResponse readConfigObject(ConfigReadRequest request) {
 
         var entry = dal.loadConfigEntry(request.getTenant(), request.getEntry(), /* includeDeleted = */ false);
         var selector = entry.getDetails().getObjectSelector();
+        var tag = dal.loadObject(request.getTenant(), selector);
 
-        return dal.loadObject(request.getTenant(), selector);
+        return ConfigReadResponse.newBuilder()
+                .setEntry(entry)
+                .setDefinition(tag.getDefinition())
+                .putAllAttrs(tag.getAttrsMap())
+                .build();
     }
 
     public ConfigReadBatchResponse readConfigBatch(ConfigReadBatchRequest request) {
@@ -156,28 +180,52 @@ public class ConfigService {
         var selectors = entries.stream().map(entry -> entry.getDetails().getObjectSelector()).collect(Collectors.toList());
         var tags = dal.loadObjects(request.getTenant(), selectors);
 
+        var results = new ArrayList<ConfigReadResponse>(request.getEntriesCount());
+
+        for (int i = 0; i < request.getEntriesCount(); i++) {
+
+            var result = ConfigReadResponse.newBuilder()
+                    .setEntry(entries.get(i))
+                    .setDefinition(tags.get(i).getDefinition())
+                    .putAllAttrs(tags.get(i).getAttrsMap())
+                    .build();
+
+            results.add(result);
+        }
+
         return ConfigReadBatchResponse.newBuilder()
-                .addAllEntries(tags)
+                .addAllEntries(results)
                 .build();
     }
 
-    public ConfigListResponse listConfigKeys(ConfigListRequest request) {
+    public ConfigListResponse listConfigEntries(ConfigListRequest request) {
 
         var entries = dal.listConfigEntries(
                 request.getTenant(),
                 request.getConfigClass(),
-                request.getShowDeleted());
+                request.getIncludeDeleted());
 
-        return ConfigListResponse.newBuilder()
-                .addAllEntries(entries)
-                .build();
+        // Config entries are not filtered at the DAL level
+        // To make the API more user-friendly, filtering is applied here after entries are loaded
+        // The assumption is that the list of entries is small, and they are mostly accessed by key
+
+        var filter = entries.stream();
+
+        if (request.hasConfigType())
+            filter = filter.filter(e -> e.getDetails().getConfigType() == request.getConfigType());
+
+        if (request.hasResourceType())
+            filter = filter.filter(e -> e.getDetails().getResourceType() == request.getResourceType());
+
+        var response = ConfigListResponse.newBuilder();
+        filter.forEach(response::addEntries);
+
+        return response.build();
     }
 
     private List<Tag> newObjects(
             List<ConfigWriteRequest> requests,
             RequestMetadata requestMetadata, UserMetadata userMetadata) {
-
-        var configAttrs = List.<TagUpdate>of();  // Allow config attrs to propagate from previous version
 
         var newObjects = new ArrayList<Tag>(requests.size());
 
@@ -185,6 +233,11 @@ public class ConfigService {
 
             // TODO: Centralize allocation of object IDs
             var objectId = UUID.randomUUID();
+
+            var configAttrs = List.of(
+                    TagUpdate.newBuilder().setAttrName("trac_config_class").setValue(MetadataCodec.encodeValue(request.getConfigClass())).build(),
+                    TagUpdate.newBuilder().setAttrName("trac_config_key").setValue(MetadataCodec.encodeValue(request.getConfigKey())).build()
+            );
 
             var newObject = ObjectUpdateLogic.buildNewObject(
                     objectId, request.getDefinition(), configAttrs,
@@ -287,7 +340,7 @@ public class ConfigService {
             var request = requests.get(i);
             var object = objects.get(i);
 
-            var priorEntry = request.getPriorVersion();
+            var priorEntry = request.getPriorEntry();
             var entry = updateEntry(priorEntry, object, timestamp);
 
             entries.add(entry);
@@ -323,7 +376,7 @@ public class ConfigService {
 
         for (var request : requests) {
 
-            var priorEntry = request.getPriorVersion();
+            var priorEntry = request.getPriorEntry();
             var entry = deleteEntry(priorEntry, timestamp);
 
             entries.add(entry);
@@ -351,6 +404,14 @@ public class ConfigService {
                 .setObjectSelector(selector)
                 .setObjectType(configObject.getDefinition().getObjectType());
 
+        if (configObject.getDefinition().getObjectType() == ObjectType.CONFIG) {
+            builder.setConfigType(configObject.getDefinition().getConfig().getConfigType());
+        }
+
+        if (configObject.getDefinition().getObjectType() == ObjectType.RESOURCE) {
+            builder.setResourceType(configObject.getDefinition().getResource().getResourceType());
+        }
+
         return builder.build();
     }
 
@@ -367,6 +428,20 @@ public class ConfigService {
             var priorDefinition = priorVersions.get(i).getDefinition();
 
             validator.validateVersion(currentDefinition, priorDefinition);
+        }
+    }
+
+    private void sendNotifications(String tenant, ConfigUpdateType updateType, List<ConfigEntry> entries) {
+
+        for (var entry : entries) {
+
+            var configUpdate = ConfigUpdate.newBuilder()
+                    .setTenant(tenant)
+                    .setUpdateType(updateType)
+                    .setConfigEntry(entry)
+                    .build();
+
+            notifier.configUpdate(configUpdate);
         }
     }
 }

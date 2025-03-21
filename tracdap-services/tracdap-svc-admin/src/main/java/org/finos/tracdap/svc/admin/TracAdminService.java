@@ -18,6 +18,7 @@
 package org.finos.tracdap.svc.admin;
 
 import org.finos.tracdap.api.AdminServiceProto;
+import org.finos.tracdap.api.internal.InternalMessagingProto;
 import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.exception.EStartup;
@@ -29,12 +30,14 @@ import org.finos.tracdap.common.service.TracServiceBase;
 import org.finos.tracdap.common.service.TracServiceConfig;
 import org.finos.tracdap.common.validation.ValidationConcern;
 import org.finos.tracdap.config.PlatformConfig;
+import org.finos.tracdap.svc.admin.api.MessageProcessor;
 import org.finos.tracdap.svc.admin.api.TracAdminApi;
 
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
 
 import org.finos.tracdap.svc.admin.services.ConfigService;
+import org.finos.tracdap.svc.admin.services.NotifierService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -73,6 +76,9 @@ public class TracAdminService extends TracServiceBase {
             var serviceConfig = platformConfig.getServicesOrThrow(ConfigKeys.ADMIN_SERVICE_KEY);
             var servicePort = serviceConfig.getPort();
 
+            // Common framework for cross-cutting concerns
+            var commonConcerns = buildCommonConcerns();
+
             var executor = NettyHelpers.threadPoolExecutor("admin-svc", 10, 10);
             this.executor = executor;
             executor.prestartAllCoreThreads();
@@ -83,17 +89,16 @@ public class TracAdminService extends TracServiceBase {
             dal = pluginManager.createService(IMetadataDal.class, metaDbConfig, configManager);
             dal.start();
 
-            var configService = new ConfigService(dal);
+            var notifierService = new NotifierService(platformConfig, commonConcerns, executor);
+            var configService = new ConfigService(dal, notifierService);
 
             var adminApi = new TracAdminApi(configService);
-
-            // Common framework for cross-cutting concerns
-            var commonConcerns = buildCommonConcerns();
 
             var serverBuilder = ServerBuilder
                     .forPort(servicePort)
                     .executor(executor)
-                    .addService(adminApi);
+                    .addService(adminApi)
+                    .addService(new MessageProcessor());
 
             // Apply common concerns
             this.server = commonConcerns
@@ -129,7 +134,10 @@ public class TracAdminService extends TracServiceBase {
         var commonConcerns = TracServiceConfig.coreConcerns(TracAdminService.class);
 
         // Validation concern for the APIs being served
-        var validationConcern = new ValidationConcern(AdminServiceProto.getDescriptor());
+        var validationConcern = new ValidationConcern(
+                AdminServiceProto.getDescriptor(),
+                InternalMessagingProto.getDescriptor());
+
         commonConcerns = commonConcerns.addAfter(TracServiceConfig.TRAC_PROTOCOL, validationConcern);
 
         // Additional cross-cutting concerns configured by extensions
