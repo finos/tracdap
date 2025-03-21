@@ -267,7 +267,7 @@ public class AdminApiValidator {
 
     private static ValidationContext sameObjectType(ObjectDefinition definition, TagSelector priorSelector, ValidationContext ctx) {
 
-        if (definition.getObjectType() == priorSelector.getObjectType()) {
+        if (definition.getObjectType() != priorSelector.getObjectType()) {
 
             var error = String.format(
                     "Prior object type [%s] does not match supplied object type [%s]",
