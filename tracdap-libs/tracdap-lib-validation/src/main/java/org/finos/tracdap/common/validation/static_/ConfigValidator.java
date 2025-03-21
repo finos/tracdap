@@ -17,14 +17,13 @@
 
 package org.finos.tracdap.common.validation.static_;
 
+import org.finos.tracdap.common.validation.ValidationConstants;
 import org.finos.tracdap.common.validation.core.ValidationContext;
 import org.finos.tracdap.common.validation.core.ValidationType;
 import org.finos.tracdap.common.validation.core.Validator;
-import org.finos.tracdap.metadata.ConfigDetails;
-import org.finos.tracdap.metadata.ConfigEntry;
+import org.finos.tracdap.metadata.*;
 
 import com.google.protobuf.Descriptors;
-import org.finos.tracdap.metadata.ObjectType;
 
 import static org.finos.tracdap.common.validation.core.ValidatorUtils.field;
 
@@ -44,6 +43,12 @@ public class ConfigValidator {
     private static final Descriptors.Descriptor CONFIG_DETAILS;
     private static final Descriptors.FieldDescriptor CD_OBJECT_SELECTOR;
     private static final Descriptors.FieldDescriptor CD_OBJECT_TYPE;
+    private static final Descriptors.FieldDescriptor CD_CONFIG_TYPE;
+    private static final Descriptors.FieldDescriptor CD_RESOURCE_TYPE;
+
+    private static final Descriptors.Descriptor CONFIG_DEFINITION;
+    private static final Descriptors.FieldDescriptor CDEF_CONFIG_TYPE;
+    private static final Descriptors.FieldDescriptor CDEF_PROPERTIES;
 
     static {
         CONFIG_ENTRY = ConfigEntry.getDescriptor();
@@ -58,6 +63,12 @@ public class ConfigValidator {
         CONFIG_DETAILS = ConfigDetails.getDescriptor();
         CD_OBJECT_SELECTOR = field(CONFIG_DETAILS, ConfigDetails.OBJECTSELECTOR_FIELD_NUMBER);
         CD_OBJECT_TYPE = field(CONFIG_DETAILS, ConfigDetails.OBJECTTYPE_FIELD_NUMBER);
+        CD_CONFIG_TYPE = field(CONFIG_DETAILS, ConfigDetails.CONFIGTYPE_FIELD_NUMBER);
+        CD_RESOURCE_TYPE = field(CONFIG_DETAILS, ConfigDetails.RESOURCETYPE_FIELD_NUMBER);
+
+        CONFIG_DEFINITION = ConfigDefinition.getDescriptor();
+        CDEF_CONFIG_TYPE = field(CONFIG_DEFINITION, ConfigDefinition.CONFIGTYPE_FIELD_NUMBER);
+        CDEF_PROPERTIES = field(CONFIG_DEFINITION, ConfigDefinition.PROPERTIES_FIELD_NUMBER);
     }
 
     @Validator
@@ -65,12 +76,12 @@ public class ConfigValidator {
 
         ctx = ctx.push(CE_CONFIG_CLASS)
                 .apply(CommonValidators::required)
-                .apply(CommonValidators::identifier)
+                .apply(CommonValidators::configKey)
                 .pop();
 
         ctx = ctx.push(CE_CONFIG_KEY)
                 .apply(CommonValidators::required)
-                .apply(CommonValidators::identifier)
+                .apply(CommonValidators::configKey)
                 .pop();
 
         ctx = ctx.push(CE_CONFIG_VERSION)
@@ -104,13 +115,54 @@ public class ConfigValidator {
 
         ctx = ctx.push(CD_OBJECT_SELECTOR)
                 .apply(CommonValidators::optional)
+                .apply(ObjectIdValidator::selectorType, TagSelector.class, msg.getObjectType())
                 .applyRegistered()
                 .pop();
 
-        // TODO: Not restricting selector type = object type, bc selector type can be CONFIG
         ctx = ctx.push(CD_OBJECT_TYPE)
                 .apply(CommonValidators::required)
                 .apply(CommonValidators::recognizedEnum, ObjectType.class)
+                .apply(ConfigValidator::configObjectType, ObjectType.class)
+                .pop();
+
+        ctx = ctx.push(CD_CONFIG_TYPE)
+                .apply(CommonValidators.ifAndOnlyIf(msg.getObjectType() == ObjectType.CONFIG, "objectType == CONFIG"))
+                .apply(CommonValidators::nonZeroEnum, ConfigType.class)
+                .pop();
+
+        ctx = ctx.push(CD_RESOURCE_TYPE)
+                .apply(CommonValidators.ifAndOnlyIf(msg.getObjectType() == ObjectType.RESOURCE, "objectType == RESOURCE"))
+                .apply(CommonValidators::nonZeroEnum, ConfigType.class)
+                .pop();
+
+        return ctx;
+    }
+
+    private static ValidationContext configObjectType(ObjectType objectType, ValidationContext ctx) {
+
+        if (!ValidationConstants.CONFIG_OBJECT_TYPES.contains(objectType)) {
+            var err = String.format("Object type [%s] is not a config object", objectType.name());
+            return ctx.error(err);
+        }
+
+        return ctx;
+    }
+
+    @Validator
+    public static ValidationContext configDefinition(ConfigDefinition msg, ValidationContext ctx) {
+
+        ctx = ctx.push(CDEF_CONFIG_TYPE)
+                .apply(CommonValidators::required)
+                .apply(CommonValidators::nonZeroEnum, ConfigType.class)
+                .pop();
+
+        ctx = ctx.pushMap(CDEF_PROPERTIES)
+                .applyIf(msg.getConfigType() != ConfigType.PROPERTIES, CommonValidators::omitted)
+                .applyMapKeys(CommonValidators::required)
+                .applyMapKeys(CommonValidators::propertyKey)
+                .applyMapKeys(CommonValidators::notTracReserved)
+                .apply(CommonValidators::caseInsensitiveDuplicates)
+                .applyMapValues(CommonValidators::required)
                 .pop();
 
         return ctx;
