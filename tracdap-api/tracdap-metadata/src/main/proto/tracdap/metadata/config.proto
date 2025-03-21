@@ -23,6 +23,7 @@ option java_multiple_files = true;
 
 import "tracdap/metadata/type.proto";
 import "tracdap/metadata/object_id.proto";
+import "tracdap/metadata/resource.proto";
 
 
 /**
@@ -80,6 +81,9 @@ message ConfigDetails {
 
   /// Indicate the config type (for CONFIG objects only)
   optional ConfigType configType = 3;
+
+  /// Indicate the resource type (for RESOURCE objects only)
+  optional ResourceType resourceType = 4;
 }
 
 
@@ -93,6 +97,4 @@ message ConfigDefinition {
 
   /// The map of config properties (only available for PROPERTIES config entries)
   map<string,string> properties = 2;
-
-
 }
