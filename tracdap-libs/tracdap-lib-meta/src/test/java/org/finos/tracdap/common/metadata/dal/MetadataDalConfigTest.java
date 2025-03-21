@@ -1708,7 +1708,9 @@ abstract class MetadataDalConfigTest implements IDalTestable {
 
         dal.saveConfigEntries(TEST_TENANT, List.of(entry1));
 
-        Assertions.assertThrows(EMetadataNotFound.class, () -> dal.listConfigEntries(TEST_TENANT, "testListConfigEntries_unknown_alt", false));
+        var noEntries = dal.listConfigEntries(TEST_TENANT, "testListConfigEntries_unknown_alt", false);
+
+        Assertions.assertEquals(0, noEntries.size());
     }
 
 

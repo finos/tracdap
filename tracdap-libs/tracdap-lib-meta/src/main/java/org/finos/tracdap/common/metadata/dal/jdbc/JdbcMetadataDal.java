@@ -541,10 +541,6 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
             var tenantId = tenants.getTenantId(conn, tenant);
 
             long[] configPk = search.searchConfigKeys(conn, tenantId, configClass, includeDeleted);
-
-            if (configPk.length == 0)
-                throw new JdbcException(JdbcErrorCode.NO_DATA);
-
             var configStub = readBatch.readConfigStub(conn, tenantId, configPk);
 
             return buildConfigStub(configClass, configStub);
@@ -552,7 +548,6 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
         }
         catch (SQLException error) {
 
-            JdbcError.configClassNotFound(error, dialect, configClass);
             throw JdbcError.catchAll(error, dialect);
         }
     }
