@@ -67,7 +67,7 @@ public class RestDataApiTest {
     public static final String LARGE_TEST_FILE = "tracdap-services/tracdap-svc-data/src/test/resources/large_csv_data_100000.csv";
 
     public static final String TRAC_CONFIG_UNIT = "config/trac-unit.yaml";
-    public static final String TRAC_CONFIG_UNIT_RESOURCES = "trac-unit-resources.yaml";
+    public static final String TRAC_CONFIG_UNIT_RESOURCES = "config/trac-unit-resources.yaml";
 
     public static final long UPLOAD_CHUNK_SIZE = 2 * 1024 * 1024;
 
