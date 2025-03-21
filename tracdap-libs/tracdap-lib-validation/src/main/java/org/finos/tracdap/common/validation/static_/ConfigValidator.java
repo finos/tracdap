@@ -132,7 +132,7 @@ public class ConfigValidator {
 
         ctx = ctx.push(CD_RESOURCE_TYPE)
                 .apply(CommonValidators.ifAndOnlyIf(msg.getObjectType() == ObjectType.RESOURCE, "objectType == RESOURCE"))
-                .apply(CommonValidators::nonZeroEnum, ConfigType.class)
+                .apply(CommonValidators::nonZeroEnum, ResourceType.class)
                 .pop();
 
         return ctx;
