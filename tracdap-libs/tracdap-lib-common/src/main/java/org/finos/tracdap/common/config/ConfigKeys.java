@@ -40,4 +40,8 @@ public class ConfigKeys {
     public static final String GATEWAY_ROUTE_NAME = "gateway.route.name";
     public static final String GATEWAY_ROUTE_PREFIX = "gateway.route.prefix";
     public static final String NETWORK_IDLE_TIMEOUT = "network.idleTimeout";
+
+    // Well-known config classes
+    public static final String TRAC_CONFIG = "trac_config";
+    public static final String TRAC_RESOURCES = "trac_resources";
 }
