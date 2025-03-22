@@ -40,6 +40,7 @@ export function addStorage() {
         definition: {
             objectType: tracdap.ObjectType.RESOURCE,
             resource: {
+                resourceType: tracdap.ResourceType.INTERNAL_STORAGE,
                 protocol: "LOCAL",
                 properties: {
                     rootPath: `${pwd}/data/storage1`
