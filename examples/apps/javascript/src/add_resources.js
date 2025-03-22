@@ -24,12 +24,26 @@ const adminTransport = tracdap.setup.transportForTarget(tracdap.api.TracAdminApi
 // Create a TRAC API instance for the admin API
 const adminApi = new tracdap.api.TracAdminApi(adminTransport);
 
+import fs from "fs";
 
-export function addStorage() {
+
+async function createDirectory(storageDir) {
+
+    return new Promise((resolve, reject) => {
+
+        fs.mkdir(storageDir, {recursive: true}, (err, data) => {
+
+            if (err)
+                reject(err);
+            else
+                resolve(data);
+        });
+    });
+}
+
+async function addStorage(storageDir) {
 
     // Use the admin API to create a storage resource
-
-    const pwd = process.cwd();
 
     const request = tracdap.api.ConfigWriteRequest.create({
 
@@ -43,7 +57,7 @@ export function addStorage() {
                 resourceType: tracdap.ResourceType.INTERNAL_STORAGE,
                 protocol: "LOCAL",
                 properties: {
-                    rootPath: `${pwd}/data/storage1`
+                    rootPath: storageDir
                 }
             }
         }
@@ -62,7 +76,10 @@ export async function main() {
 
     console.log("Adding a storage resource for STORAGE1...");
 
-    const resource = await addStorage();
+    const storageDir = `${process.cwd()}/data/storage1`;
+    await createDirectory(storageDir);
+
+    const resource = await addStorage(storageDir);
 
     console.log(JSON.stringify(resource, null, 2));
 }
