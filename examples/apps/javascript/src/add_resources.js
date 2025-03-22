@@ -51,7 +51,8 @@ export function addStorage() {
 
     return adminApi.createConfigObject(request).then(resource => {
 
-        console.log(`Created storage resource ${resource.configKey} version ${resource.configVersion}`);
+        console.log(`Created storage resource ${resource.entry.configKey} version ${resource.entry.configVersion}`);
+        console.log(`Storage path is ${request.definition.resource.properties["rootPath"]}`)
 
         return resource;
     });
