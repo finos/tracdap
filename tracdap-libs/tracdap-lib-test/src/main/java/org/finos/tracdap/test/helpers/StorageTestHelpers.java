@@ -22,10 +22,12 @@ import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.plugin.PluginManager;
 import org.finos.tracdap.common.storage.IFileStorage;
 import org.finos.tracdap.common.storage.IStorageManager;
-import org.finos.tracdap.config.PlatformConfig;
+import org.finos.tracdap.config.DynamicConfig;
 
 import io.netty.channel.EventLoopGroup;
 import org.apache.arrow.memory.RootAllocator;
+import org.finos.tracdap.config.PluginConfig;
+import org.finos.tracdap.metadata.ResourceType;
 
 import java.time.Duration;
 
@@ -38,27 +40,34 @@ public class StorageTestHelpers {
     public static void createStoragePrefix(
             ConfigManager config,
             PluginManager plugins,
-            EventLoopGroup elg)
+            EventLoopGroup elg,
+            String dynamicConfigPath)
             throws Exception {
 
         // Assuming "prefix" is common across all bucket storage implementations
         // Create a storage instance with the prefix removed, then do rmdir on the prefix
 
-        var platformConfig = config.loadRootConfigObject(PlatformConfig.class);
+        var configSep = dynamicConfigPath.lastIndexOf("/");
+        var configFile = dynamicConfigPath.substring(configSep + 1);
+        var dynamicConfig = config.loadConfigObject(configFile, DynamicConfig.class);
+
         var execCtx = new DataContext(elg.next(), new RootAllocator());
 
-        for (var storageBucket : platformConfig.getStorage().getBucketsMap().entrySet()) {
+        for (var resource : dynamicConfig.getResourcesMap().entrySet()) {
 
-            if (!storageBucket.getValue().containsProperties("prefix"))
+            if (resource.getValue().getResourceType() != ResourceType.INTERNAL_STORAGE)
                 continue;
 
-            var storageConfig = storageBucket.getValue()
-                    .toBuilder()
-                    .putProperties(IStorageManager.PROP_STORAGE_KEY, storageBucket.getKey())
+            if (!resource.getValue().containsProperties("prefix"))
+                continue;
+
+            var storageConfig = PluginConfig.newBuilder()
+                    .setProtocol(resource.getValue().getProtocol())
+                    .putProperties(IStorageManager.PROP_STORAGE_KEY, resource.getKey())
                     .removeProperties("prefix")
                     .build();
 
-            var prefix = storageBucket.getValue().getPropertiesOrThrow("prefix");
+            var prefix = resource.getValue().getPropertiesOrThrow("prefix");
 
             try (var storage = plugins.createService(IFileStorage.class, storageConfig, config)) {
 
@@ -74,27 +83,34 @@ public class StorageTestHelpers {
     public static void deleteStoragePrefix(
             ConfigManager config,
             PluginManager plugins,
-            EventLoopGroup elg)
+            EventLoopGroup elg,
+            String dynamicConfigPath)
             throws Exception {
 
         // Assuming "prefix" is common across all bucket storage implementations
         // Create a storage instance with the prefix removed, then do rmdir on the prefix
 
-        var platformConfig = config.loadRootConfigObject(PlatformConfig.class);
+        var configSep = dynamicConfigPath.lastIndexOf("/");
+        var configFile = dynamicConfigPath.substring(configSep + 1);
+        var dynamicConfig = config.loadConfigObject(configFile, DynamicConfig.class);
+
         var execCtx = new DataContext(elg.next(), new RootAllocator());
 
-        for (var storageBucket : platformConfig.getStorage().getBucketsMap().entrySet()) {
+        for (var resource : dynamicConfig.getResourcesMap().entrySet()) {
 
-            if (!storageBucket.getValue().containsProperties("prefix"))
+            if (resource.getValue().getResourceType() != ResourceType.INTERNAL_STORAGE)
                 continue;
 
-            var storageConfig = storageBucket.getValue()
-                    .toBuilder()
-                    .putProperties(IStorageManager.PROP_STORAGE_KEY, storageBucket.getKey())
+            if (!resource.getValue().containsProperties("prefix"))
+                continue;
+
+            var storageConfig = PluginConfig.newBuilder()
+                    .setProtocol(resource.getValue().getProtocol())
+                    .putProperties(IStorageManager.PROP_STORAGE_KEY, resource.getKey())
                     .removeProperties("prefix")
                     .build();
 
-            var prefix = storageBucket.getValue().getPropertiesOrThrow("prefix");
+            var prefix = resource.getValue().getPropertiesOrThrow("prefix");
 
             try (var storage = plugins.createService(IFileStorage.class, storageConfig, config)) {
 

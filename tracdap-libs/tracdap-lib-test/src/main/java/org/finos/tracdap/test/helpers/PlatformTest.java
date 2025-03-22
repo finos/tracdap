@@ -491,7 +491,10 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
 
         var elg = new NioEventLoopGroup(2);
 
-        StorageTestHelpers.createStoragePrefix(configManager, pluginManager, elg);
+        for (var bootstrapEntry : tenants.entrySet()) {
+            if (bootstrapEntry.getValue() != null)
+                StorageTestHelpers.createStoragePrefix(configManager, pluginManager, elg, bootstrapEntry.getValue());
+        }
 
         elg.shutdownGracefully();
     }
@@ -500,7 +503,10 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
 
         var elg = new NioEventLoopGroup(2);
 
-        StorageTestHelpers.deleteStoragePrefix(configManager, pluginManager, elg);
+        for (var bootstrapEntry : tenants.entrySet()) {
+            if (bootstrapEntry.getValue() != null)
+                StorageTestHelpers.deleteStoragePrefix(configManager, pluginManager, elg, bootstrapEntry.getValue());
+        }
 
         elg.shutdownGracefully();
     }
