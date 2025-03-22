@@ -43,6 +43,7 @@ import org.finos.tracdap.common.validation.ValidationConcern;
 import org.finos.tracdap.config.PlatformConfig;
 import org.finos.tracdap.config.ServiceConfig;
 import org.finos.tracdap.config.StorageConfig;
+import org.finos.tracdap.metadata.ResourceType;
 import org.finos.tracdap.svc.data.api.MessageProcessor;
 import org.finos.tracdap.svc.data.api.TracDataApi;
 import org.finos.tracdap.svc.data.service.DataService;
@@ -306,6 +307,7 @@ public class TracDataService extends TracServiceBase {
         var configList = ConfigListRequest.newBuilder()
                 .setTenant(tenant)
                 .setConfigClass(ConfigKeys.TRAC_RESOURCES)
+                .setResourceType(ResourceType.INTERNAL_STORAGE)
                 .build();
 
         var clientState = commonConcerns.prepareClientCall(Context.ROOT);
