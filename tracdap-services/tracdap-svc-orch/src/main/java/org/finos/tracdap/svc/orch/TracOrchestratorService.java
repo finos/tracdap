@@ -182,7 +182,7 @@ public class TracOrchestratorService extends TracServiceBase {
 
                     // The main service
                     .addService(new TracOrchestratorApi(jobManager, jobProcessor, commonConcerns))
-                    .addService(new MessageProcessor(resources, metaClient));
+                    .addService(new MessageProcessor(metaClient, commonConcerns, resources));
 
             // Apply common concerns
             this.server = commonConcerns

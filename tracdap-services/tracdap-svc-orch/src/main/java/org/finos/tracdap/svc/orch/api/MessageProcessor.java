@@ -35,17 +35,17 @@ public class MessageProcessor extends InternalMessagingApiGrpc.InternalMessaging
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
-    private final DynamicConfig.Resources resources;
-    private final GrpcConcern commonConcerns;
     private final TrustedMetadataApiGrpc.TrustedMetadataApiBlockingStub metadataApi;
+    private final GrpcConcern commonConcerns;
+    private final DynamicConfig.Resources resources;
 
     public MessageProcessor(
-            DynamicConfig.Resources resources, GrpcConcern commonConcerns,
-            TrustedMetadataApiGrpc.TrustedMetadataApiBlockingStub metadataApi) {
+            TrustedMetadataApiGrpc.TrustedMetadataApiBlockingStub metadataApi,
+            GrpcConcern commonConcerns, DynamicConfig.Resources resources) {
 
-        this.resources = resources;
-        this.commonConcerns = commonConcerns;
         this.metadataApi = metadataApi;
+        this.commonConcerns = commonConcerns;
+        this.resources = resources;
     }
 
     @Override
