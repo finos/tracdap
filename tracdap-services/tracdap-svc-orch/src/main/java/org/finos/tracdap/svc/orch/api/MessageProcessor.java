@@ -17,11 +17,13 @@
 
 package org.finos.tracdap.svc.orch.api;
 
+import io.grpc.Context;
 import org.finos.tracdap.api.MetadataReadRequest;
 import org.finos.tracdap.api.internal.*;
 import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.config.DynamicConfig;
 import org.finos.tracdap.common.exception.EUnexpected;
+import org.finos.tracdap.common.middleware.GrpcConcern;
 import org.finos.tracdap.metadata.ResourceDefinition;
 
 import io.grpc.stub.StreamObserver;
@@ -33,15 +35,17 @@ public class MessageProcessor extends InternalMessagingApiGrpc.InternalMessaging
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
+    private final TrustedMetadataApiGrpc.TrustedMetadataApiBlockingStub metadataApi;
+    private final GrpcConcern commonConcerns;
     private final DynamicConfig.Resources resources;
-    private final TrustedMetadataApiGrpc.TrustedMetadataApiBlockingStub metadataAp;
 
     public MessageProcessor(
-            DynamicConfig.Resources resources,
-            TrustedMetadataApiGrpc.TrustedMetadataApiBlockingStub metadataApi) {
+            TrustedMetadataApiGrpc.TrustedMetadataApiBlockingStub metadataApi,
+            GrpcConcern commonConcerns, DynamicConfig.Resources resources) {
 
+        this.metadataApi = metadataApi;
+        this.commonConcerns = commonConcerns;
         this.resources = resources;
-        this.metadataAp = metadataApi;
     }
 
     @Override
@@ -101,7 +105,11 @@ public class MessageProcessor extends InternalMessagingApiGrpc.InternalMessaging
                 .setSelector(request.getConfigEntry().getDetails().getObjectSelector())
                 .build();
 
-        var configObject = metadataAp.readObject(readRequest);
+        // Apply common concerns using the current gRPC context
+        var clientState = commonConcerns.prepareClientCall(Context.current());
+        var client = clientState.configureClient(metadataApi);
+
+        var configObject = client.readObject(readRequest);
 
         return configObject.getDefinition().getResource();
     }
