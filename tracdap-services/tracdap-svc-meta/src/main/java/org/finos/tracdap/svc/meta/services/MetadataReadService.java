@@ -19,7 +19,6 @@ package org.finos.tracdap.svc.meta.services;
 
 import org.finos.tracdap.api.*;
 import org.finos.tracdap.common.config.IDynamicResources;
-import org.finos.tracdap.common.exception.EResourceNotFound;
 import org.finos.tracdap.common.exception.ETenantNotFound;
 import org.finos.tracdap.common.util.VersionInfo;
 import org.finos.tracdap.config.PlatformConfig;
@@ -79,21 +78,6 @@ public class MetadataReadService {
         return ListTenantsResponse.newBuilder()
             .addAllTenants(tenantInfoList)
             .build();
-    }
-
-    public ClientConfigResponse clientConfig(ClientConfigRequest request) {
-
-        if (!platformConfig.containsClientConfig(request.getApplication())) {
-            var message = String.format("Unknown client application: [%s]", request.getApplication());
-            log.error(message);
-            throw new EResourceNotFound(message);
-        }
-
-        var clientConfig = platformConfig.getClientConfigOrThrow(request.getApplication());
-
-        return ClientConfigResponse.newBuilder()
-                .putAllProperties(clientConfig.getPropertiesMap())
-                .build();
     }
 
     public ListResourcesResponse listResources(String tenantCode, ResourceType resourceType) {

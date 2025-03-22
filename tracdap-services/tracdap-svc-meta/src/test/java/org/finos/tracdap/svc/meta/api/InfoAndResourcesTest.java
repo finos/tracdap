@@ -326,41 +326,4 @@ abstract class InfoAndResourcesTest {
         var e = Assertions.assertThrows(StatusRuntimeException.class, () -> readApi.resourceInfo(request));
         Assertions.assertEquals(Status.Code.INVALID_ARGUMENT, e.getStatus().getCode());
     }
-
-    @Test
-    void getClientConfig_ok() {
-
-        var request = ClientConfigRequest.newBuilder()
-                .setApplication("client_app")
-                .build();
-
-        var response = readApi.clientConfig(request);
-
-        Assertions.assertEquals(1, response.getPropertiesCount());
-        Assertions.assertTrue(response.containsProperties("unit.test.property"));
-        Assertions.assertEquals("value1", response.getPropertiesOrThrow("unit.test.property"));
-    }
-
-    @Test
-    void getClientConfig_appInvalid() {
-
-        var request = ClientConfigRequest.newBuilder()
-                .setApplication("%%%client-app")
-                .build();
-
-        var e = Assertions.assertThrows(StatusRuntimeException.class, () -> readApi.clientConfig(request));
-        Assertions.assertEquals(Status.Code.INVALID_ARGUMENT, e.getStatus().getCode());
-    }
-
-    @Test
-    void getClientConfig_appNotFound() {
-
-        var request = ClientConfigRequest.newBuilder()
-                .setApplication("unknown_app")
-                .build();
-
-        var e = Assertions.assertThrows(StatusRuntimeException.class, () -> readApi.clientConfig(request));
-        Assertions.assertEquals(Status.Code.NOT_FOUND, e.getStatus().getCode());
-    }
-
 }
