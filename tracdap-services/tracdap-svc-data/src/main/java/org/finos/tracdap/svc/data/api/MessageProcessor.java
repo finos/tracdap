@@ -17,10 +17,12 @@
 
 package org.finos.tracdap.svc.data.api;
 
+import io.grpc.Context;
 import org.finos.tracdap.api.MetadataReadRequest;
 import org.finos.tracdap.api.internal.*;
 import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.exception.EUnexpected;
+import org.finos.tracdap.common.middleware.GrpcConcern;
 import org.finos.tracdap.common.storage.StorageManager;
 import org.finos.tracdap.metadata.ResourceDefinition;
 import org.finos.tracdap.metadata.ResourceType;
@@ -36,25 +38,32 @@ public class MessageProcessor extends InternalMessagingApiGrpc.InternalMessaging
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
-    private final StorageManager storageManager;
     private final TrustedMetadataApiGrpc.TrustedMetadataApiBlockingStub metadataApi;
     private final ExecutorService offloadExecutor;
+    private final GrpcConcern commonConcerns;
+    private final StorageManager storageManager;
 
     public MessageProcessor(
-            StorageManager storageManager,
             TrustedMetadataApiGrpc.TrustedMetadataApiBlockingStub metadataApi,
-            ExecutorService offloadExecutor) {
+            ExecutorService offloadExecutor, GrpcConcern commonConcerns,
+            StorageManager storageManager) {
 
-        this.storageManager = storageManager;
         this.metadataApi = metadataApi;
         this.offloadExecutor = offloadExecutor;
+        this.commonConcerns = commonConcerns;
+        this.storageManager = storageManager;
     }
 
     @Override
     public void configUpdate(ConfigUpdate request, StreamObserver<ReceivedStatus> response) {
 
+        // This call will return immediately and close the server call context
+        // Create a forked context, which can live for the duration of the client call
+        var callCtx = Context.current().fork();
+
         // Do not execute config updates on the primary event loop!
-        offloadExecutor.execute(() -> configUpdateOffloaded(request, response));
+        var callExecutor = callCtx.fixedContextExecutor(offloadExecutor);
+        callExecutor.execute(() -> configUpdateOffloaded(request, response));
     }
 
     public void configUpdateOffloaded(ConfigUpdate request, StreamObserver<ReceivedStatus> response) {
@@ -114,7 +123,11 @@ public class MessageProcessor extends InternalMessagingApiGrpc.InternalMessaging
                 .setSelector(request.getConfigEntry().getDetails().getObjectSelector())
                 .build();
 
-        var configObject = metadataApi.readObject(readRequest);
+        // Apply common concerns using the current gRPC context
+        var clientState = commonConcerns.prepareClientCall(Context.current());
+        var client = clientState.configureClient(metadataApi);
+
+        var configObject = client.readObject(readRequest);
 
         return configObject.getDefinition().getResource();
     }
