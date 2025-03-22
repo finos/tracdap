@@ -13,8 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-defaultBucket: STORAGE_INTEGRATION
-defaultFormat: ARROW_FILE
+resourceClass: trac_resources
 
 resources:
 
