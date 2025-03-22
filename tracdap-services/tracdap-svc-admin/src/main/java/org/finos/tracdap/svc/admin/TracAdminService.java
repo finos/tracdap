@@ -89,7 +89,7 @@ public class TracAdminService extends TracServiceBase {
             dal = pluginManager.createService(IMetadataDal.class, metaDbConfig, configManager);
             dal.start();
 
-            var notifierService = new NotifierService(platformConfig, commonConcerns, executor);
+            var notifierService = new NotifierService(platformConfig, commonConcerns);
             var configService = new ConfigService(dal, notifierService);
 
             var adminApi = new TracAdminApi(configService);

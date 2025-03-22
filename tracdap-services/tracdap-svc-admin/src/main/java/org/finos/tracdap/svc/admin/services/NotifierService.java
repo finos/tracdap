@@ -35,18 +35,17 @@ import org.slf4j.LoggerFactory;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
-import java.util.concurrent.ExecutorService;
 
 
 public class NotifierService {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
-    private final ExecutorService executor;
+    GrpcConcern commonConcerns;
     private final Map<String, InternalMessagingApiGrpc.InternalMessagingApiFutureStub> services;
 
-    public NotifierService(PlatformConfig platformConfig, GrpcConcern commonConcerns, ExecutorService executor) {
-        this.executor = executor;
+    public NotifierService(PlatformConfig platformConfig, GrpcConcern commonConcerns) {
+        this.commonConcerns = commonConcerns;
         this.services = buildServiceNotifierMap(platformConfig, commonConcerns);
     }
 
@@ -110,6 +109,10 @@ public class NotifierService {
 
         var callCtx = Context.current().fork();
 
+        // Client state only depends on the context, so can be prepared once for all notifiers
+
+        var clientState = commonConcerns.prepareClientCall(callCtx);
+
         for (var serviceEntry : services.entrySet()) {
 
             var serviceKey = serviceEntry.getKey();
@@ -120,7 +123,10 @@ public class NotifierService {
             // Instead, use a future for each update and call back on the same forked context
 
             callCtx.run(() -> {
-                var result = service.configUpdate(update);
+
+                var client = clientState.configureClient(service);
+                var result = client.configUpdate(update);
+
                 result.addListener(() -> configUpdateResult(serviceKey, update, result), callCtx::run);
             });
         }
