@@ -43,7 +43,9 @@ const enumMapping = {
     "SearchOperator": "tracdap.metadata.SearchOperator",
     "LogicalOperator": "tracdap.metadata.LogicalOperator",
     "TagOperation": "tracdap.metadata.TagOperation",
-    "JobStatusCode": "tracdap.metadata.JobStatusCode"
+    "JobStatusCode": "tracdap.metadata.JobStatusCode",
+    "ConfigType": "tracdap.metadata.ConfigType",
+    "ResourceType": "tracdap.metadata.ResourceType"
 }
 
 const basicTypeMapping = {
