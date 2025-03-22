@@ -78,6 +78,7 @@ abstract class AdminConfigApiTest {
                 .runDbDeploy(false)
                 .addTenant(TEST_TENANT)
                 .startService(TracAdminService.class)
+                .startService(TracAdminService.class)
                 .build();
 
         @BeforeEach
