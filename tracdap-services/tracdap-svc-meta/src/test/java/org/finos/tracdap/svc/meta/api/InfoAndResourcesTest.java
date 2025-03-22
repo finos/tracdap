@@ -331,7 +331,7 @@ abstract class InfoAndResourcesTest {
     void getClientConfig_ok() {
 
         var request = ClientConfigRequest.newBuilder()
-                .setApplication("client-app")
+                .setApplication("client_app")
                 .build();
 
         var response = readApi.clientConfig(request);
@@ -356,7 +356,7 @@ abstract class InfoAndResourcesTest {
     void getClientConfig_appNotFound() {
 
         var request = ClientConfigRequest.newBuilder()
-                .setApplication("unknown-app")
+                .setApplication("unknown_app")
                 .build();
 
         var e = Assertions.assertThrows(StatusRuntimeException.class, () -> readApi.clientConfig(request));

@@ -87,6 +87,6 @@ deployment:
 
 clientConfig:
 
-  client-app:
+  client_app:
     properties:
       unit.test.property: value1
