@@ -27,6 +27,7 @@ import org.finos.tracdap.common.util.RoutingUtils;
 import org.finos.tracdap.config.PlatformConfig;
 
 import com.google.common.util.concurrent.ListenableFuture;
+import io.grpc.Context;
 import io.grpc.ManagedChannelBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -104,22 +105,24 @@ public class NotifierService {
         // Once the metadata store is updated the change is "committed"
         // In the worst case if hot updates fail, services will see the new config on next refresh
 
-        // Client calls started in the current (blocking) context use the gRPC context from the server call
-        // So calls started inside the server's stack frame will appear cancelled when the stack unwinds
+        // The current context will close and cancel pending requests when the server call returns
+        // So, fork the context and use that fork to execute the async client calls
 
-        executor.execute(() -> configUpdateOffloaded(update));
-    }
-
-    private void configUpdateOffloaded(ConfigUpdate update) {
+        var callCtx = Context.current().fork();
 
         for (var serviceEntry : services.entrySet()) {
 
             var serviceKey = serviceEntry.getKey();
             var service = serviceEntry.getValue();
 
-            var result = service.configUpdate(update);
+            // The notifier typically sends out a lot of requests all at once
+            // Although they are small, waiting on them all could still starve the thread pool
+            // Instead, use a future for each update and call back on the same forked context
 
-            result.addListener(() -> configUpdateResult(serviceKey, update, result), Runnable::run);
+            callCtx.run(() -> {
+                var result = service.configUpdate(update);
+                result.addListener(() -> configUpdateResult(serviceKey, update, result), callCtx::run);
+            });
         }
     }
 
