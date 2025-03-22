@@ -243,6 +243,20 @@ public class MetadataApiImpl {
         }
     }
 
+    void listConfigEntries(ConfigListRequest request, StreamObserver<ConfigListResponse> response) {
+
+        try {
+
+            var result = readService.listConfigEntries(request);
+
+            response.onNext(result);
+            response.onCompleted();
+        }
+        catch (Exception error) {
+            response.onError(error);
+        }
+    }
+
     void getObject(MetadataGetRequest request, StreamObserver<Tag> response) {
 
         try {
