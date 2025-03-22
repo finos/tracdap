@@ -328,7 +328,10 @@ public class TracOrchestratorService extends TracServiceBase {
                 .setConfigClass(ConfigKeys.TRAC_RESOURCES)
                 .build();
 
-        var listing = metaClient.listConfigEntries(configList);
+        var clientState = commonConcerns.prepareClientCall(Context.ROOT);
+        var client = clientState.configureClient(metaClient);
+
+        var listing = client.listConfigEntries(configList);
 
         var selectors = listing.getEntriesList().stream()
                 .map(entry -> entry.getDetails().getObjectSelector())
@@ -338,9 +341,6 @@ public class TracOrchestratorService extends TracServiceBase {
                 .setTenant(tenant)
                 .addAllSelector(selectors)
                 .build();
-
-        var clientState = commonConcerns.prepareClientCall(Context.ROOT);
-        var client = clientState.configureClient(metaClient);
 
         var resourceObjects = client.readBatch(batchRequest);
 
