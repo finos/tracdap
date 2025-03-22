@@ -17,16 +17,22 @@
 
 package org.finos.tracdap.svc.orch;
 
+import org.finos.tracdap.api.ConfigListRequest;
+import org.finos.tracdap.api.MetadataBatchRequest;
 import org.finos.tracdap.api.OrchestratorServiceProto;
+import org.finos.tracdap.api.internal.InternalMessagingProto;
 import org.finos.tracdap.api.internal.TrustedMetadataApiGrpc;
 import org.finos.tracdap.common.cache.IJobCacheManager;
 import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.config.ConfigManager;
+import org.finos.tracdap.common.config.DynamicConfig;
 import org.finos.tracdap.common.exec.BatchJobExecutor;
 import org.finos.tracdap.common.exec.IBatchExecutor;
 import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.common.exec.IJobExecutor;
 import org.finos.tracdap.common.grpc.*;
+import org.finos.tracdap.common.metadata.MetadataCodec;
+import org.finos.tracdap.common.metadata.MetadataConstants;
 import org.finos.tracdap.common.middleware.GrpcConcern;
 import org.finos.tracdap.common.plugin.PluginManager;
 import org.finos.tracdap.common.service.TracServiceConfig;
@@ -35,6 +41,8 @@ import org.finos.tracdap.common.util.RoutingUtils;
 import org.finos.tracdap.common.validation.ValidationConcern;
 import org.finos.tracdap.config.PlatformConfig;
 import org.finos.tracdap.config.ServiceConfig;
+import org.finos.tracdap.metadata.ResourceDefinition;
+import org.finos.tracdap.svc.orch.api.MessageProcessor;
 import org.finos.tracdap.svc.orch.api.TracOrchestratorApi;
 import org.finos.tracdap.svc.orch.service.JobManager;
 import org.finos.tracdap.svc.orch.service.JobProcessor;
@@ -58,6 +66,7 @@ import java.io.Serializable;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 
 public class TracOrchestratorService extends TracServiceBase {
@@ -136,6 +145,11 @@ public class TracOrchestratorService extends TracServiceBase {
 
             var metaClient = prepareMetadataClient(platformConfig, clientChannelFactory, commonConcerns);
 
+            var resources = new DynamicConfig.Resources();
+
+            for (var tenant : platformConfig.getTenantsMap().keySet())
+                loadResources(metaClient, tenant, resources);
+
             var batchExecutor = (IBatchExecutor<? extends Serializable>) pluginManager.createService(
                     IBatchExecutor.class,
                     platformConfig.getExecutor(),
@@ -150,7 +164,7 @@ public class TracOrchestratorService extends TracServiceBase {
 
             var jobCache = jobCacheManager.getCache(JOB_CACHE_NAME, JobState.class);
 
-            var jobProcessor = new JobProcessor(platformConfig, metaClient, commonConcerns, jobExecutor, configManager);
+            var jobProcessor = new JobProcessor(platformConfig, resources, metaClient, commonConcerns, jobExecutor, configManager);
 
             jobManager = new JobManager(platformConfig, jobProcessor, jobCache, serviceGroup);
 
@@ -167,7 +181,8 @@ public class TracOrchestratorService extends TracServiceBase {
                     .executor(serviceGroup)
 
                     // The main service
-                    .addService(new TracOrchestratorApi(jobManager, jobProcessor, commonConcerns));
+                    .addService(new TracOrchestratorApi(jobManager, jobProcessor, commonConcerns))
+                    .addService(new MessageProcessor(resources, metaClient));
 
             // Apply common concerns
             this.server = commonConcerns
@@ -250,7 +265,10 @@ public class TracOrchestratorService extends TracServiceBase {
         var commonConcerns = TracServiceConfig.coreConcerns(TracOrchestratorService.class);
 
         // Validation concern for the APIs being served
-        var validationConcern = new ValidationConcern(OrchestratorServiceProto.getDescriptor());
+        var validationConcern = new ValidationConcern(
+                OrchestratorServiceProto.getDescriptor(),
+                InternalMessagingProto.getDescriptor());
+
         commonConcerns = commonConcerns.addAfter(TracServiceConfig.TRAC_PROTOCOL, validationConcern);
 
         // Additional cross-cutting concerns configured by extensions
@@ -296,6 +314,37 @@ public class TracOrchestratorService extends TracServiceBase {
                     .usePlaintext();
 
             return clientChannelBuilder.build();
+        }
+    }
+
+    void loadResources(
+            TrustedMetadataApiGrpc.TrustedMetadataApiBlockingStub metaClient,
+            String tenant, DynamicConfig<ResourceDefinition> resources) {
+
+        var configList = ConfigListRequest.newBuilder()
+                .setTenant(tenant)
+                .setConfigClass(ConfigKeys.TRAC_RESOURCES)
+                .build();
+
+        var listing = metaClient.listConfigEntries(configList);
+
+        var selectors = listing.getEntriesList().stream()
+                .map(entry -> entry.getDetails().getObjectSelector())
+                .collect(Collectors.toList());
+
+        var batchRequest = MetadataBatchRequest.newBuilder()
+                .setTenant(tenant)
+                .addAllSelector(selectors)
+                .build();
+
+        var resourceObjects = metaClient.readBatch(batchRequest);
+
+        for (var resource : resourceObjects.getTagList()) {
+
+            var resourceKey = resource.getAttrsOrThrow(MetadataConstants.TRAC_CONFIG_KEY);
+            var resourceDef = resource.getDefinition().getResource();
+
+            resources.addEntry(MetadataCodec.decodeStringValue(resourceKey), resourceDef);
         }
     }
 }
