@@ -93,6 +93,31 @@ public class MetadataReadService {
         return response.build();
     }
 
+    public ConfigListResponse listConfigEntries(ConfigListRequest request) {
+
+        var entries = dal.listConfigEntries(
+                request.getTenant(),
+                request.getConfigClass(),
+                request.getIncludeDeleted());
+
+        // Config entries are not filtered at the DAL level
+        // To make the API more user-friendly, filtering is applied here after entries are loaded
+        // The assumption is that the list of entries is small, and they are mostly accessed by key
+
+        var filter = entries.stream();
+
+        if (request.hasConfigType())
+            filter = filter.filter(e -> e.getDetails().getConfigType() == request.getConfigType());
+
+        if (request.hasResourceType())
+            filter = filter.filter(e -> e.getDetails().getResourceType() == request.getResourceType());
+
+        var response = ConfigListResponse.newBuilder();
+        filter.forEach(response::addEntries);
+
+        return response.build();
+    }
+
     public ResourceInfoResponse resourceInfo(String tenantCode, ResourceType resourceType, String resourceKey) {
 
         // Explicit check is required because resources currently come from platform config

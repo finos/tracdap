@@ -94,4 +94,10 @@ public class TrustedMetadataApi extends TrustedMetadataApiGrpc.TrustedMetadataAp
 
         apiImpl.search(request, response);
     }
+
+    @Override
+    public void listConfigEntries(ConfigListRequest request, StreamObserver<ConfigListResponse> responseObserver) {
+
+        apiImpl.listConfigEntries(request, responseObserver);
+    }
 }
