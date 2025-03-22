@@ -17,17 +17,17 @@
 
 package org.finos.tracdap.common.validation;
 
+import org.finos.tracdap.common.config.IDynamicResources;
 import org.finos.tracdap.common.exception.EConsistencyValidation;
 import org.finos.tracdap.common.exception.EInputValidation;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.exception.EVersionValidation;
+import org.finos.tracdap.common.metadata.MetadataBundle;
 import org.finos.tracdap.common.validation.core.*;
 import org.finos.tracdap.common.validation.core.impl.ValidationResult;
 
 import com.google.protobuf.Descriptors;
 import com.google.protobuf.Message;
-import org.finos.tracdap.common.metadata.MetadataBundle;
-import org.finos.tracdap.config.PlatformConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -62,7 +62,7 @@ public class Validator {
     }
 
     public <TMsg extends Message>
-    void validateConsistency(TMsg message, MetadataBundle metadata, PlatformConfig resources) {
+    void validateConsistency(TMsg message, MetadataBundle metadata, IDynamicResources resources) {
 
         var ctx = ValidationContext.forConsistency(message, metadata, resources);
         doValidation(ctx);

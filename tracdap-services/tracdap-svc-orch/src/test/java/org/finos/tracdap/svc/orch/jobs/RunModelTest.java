@@ -22,6 +22,7 @@ import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.metadata.MetadataUtil;
 import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.metadata.RunModelJob;
+import org.finos.tracdap.svc.admin.TracAdminService;
 import org.finos.tracdap.svc.data.TracDataService;
 import org.finos.tracdap.svc.meta.TracMetadataService;
 import org.finos.tracdap.svc.orch.TracOrchestratorService;
@@ -53,6 +54,7 @@ public class RunModelTest {
 
     private static final String TEST_TENANT = "ACME_CORP";
     private static final String E2E_CONFIG = "config/trac-e2e.yaml";
+    private static final String E2E_RESOURCES = "config/trac-e2e-resources.yaml";
     private static final String INPUT_PATH = "examples/models/python/data/inputs/loan_final313_100_shortform.csv";
 
     // Only test E2E run model using the local repo
@@ -64,11 +66,12 @@ public class RunModelTest {
     @RegisterExtension
     public static final PlatformTest platform = PlatformTest.forConfig(E2E_CONFIG)
             .runDbDeploy(true)
-            .addTenant(TEST_TENANT)
+            .bootstrapTenant(TEST_TENANT, E2E_RESOURCES)
             .prepareLocalExecutor(true)
             .startService(TracMetadataService.class)
             .startService(TracDataService.class)
             .startService(TracOrchestratorService.class)
+            .startService(TracAdminService.class)
             .build();
 
     private final Logger log = LoggerFactory.getLogger(getClass());

@@ -40,6 +40,8 @@ enum ObjectType {
   STORAGE = 7;
   SCHEMA = 8;
   RESULT = 9;
+  CONFIG = 10;
+  RESOURCE = 11;
 }
 
 

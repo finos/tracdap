@@ -22,6 +22,7 @@ import io.grpc.StatusRuntimeException;
 import org.finos.tracdap.api.*;
 import org.finos.tracdap.common.util.VersionInfo;
 import org.finos.tracdap.metadata.ResourceType;
+import org.finos.tracdap.svc.admin.TracAdminService;
 import org.finos.tracdap.svc.meta.TracMetadataService;
 import org.finos.tracdap.test.helpers.PlatformTest;
 import org.junit.jupiter.api.*;
@@ -33,6 +34,7 @@ import static org.finos.tracdap.test.meta.SampleMetadata.TEST_TENANT;
 abstract class InfoAndResourcesTest {
 
     public static final String TRAC_CONFIG_UNIT = "config/trac-unit.yaml";
+    public static final String TRAC_CONFIG_UNIT_RESOURCES = "config/trac-unit-resources.yaml";
     public static final String TRAC_CONFIG_ENV_VAR = "TRAC_CONFIG_FILE";
 
     protected TracMetadataApiGrpc.TracMetadataApiBlockingStub readApi;
@@ -43,8 +45,9 @@ abstract class InfoAndResourcesTest {
         @RegisterExtension
         private static final PlatformTest platform = PlatformTest.forConfig(TRAC_CONFIG_UNIT)
                 .runDbDeploy(true)
-                .addTenant(TEST_TENANT)
+                .bootstrapTenant(TEST_TENANT, TRAC_CONFIG_UNIT_RESOURCES)
                 .startService(TracMetadataService.class)
+                .startService(TracAdminService.class)
                 .build();
 
         @BeforeEach
@@ -66,8 +69,9 @@ abstract class InfoAndResourcesTest {
         @RegisterExtension
         private static final PlatformTest platform = PlatformTest.forConfig(TRAC_CONFIG_ENV_FILE)
                 .runDbDeploy(false)
-                .addTenant(TEST_TENANT)
+                .bootstrapTenant(TEST_TENANT, TRAC_CONFIG_UNIT_RESOURCES)
                 .startService(TracMetadataService.class)
+                .startService(TracAdminService.class)
                 .build();
 
         @BeforeEach
@@ -322,41 +326,4 @@ abstract class InfoAndResourcesTest {
         var e = Assertions.assertThrows(StatusRuntimeException.class, () -> readApi.resourceInfo(request));
         Assertions.assertEquals(Status.Code.INVALID_ARGUMENT, e.getStatus().getCode());
     }
-
-    @Test
-    void getClientConfig_ok() {
-
-        var request = ClientConfigRequest.newBuilder()
-                .setApplication("client-app")
-                .build();
-
-        var response = readApi.clientConfig(request);
-
-        Assertions.assertEquals(1, response.getPropertiesCount());
-        Assertions.assertTrue(response.containsProperties("unit.test.property"));
-        Assertions.assertEquals("value1", response.getPropertiesOrThrow("unit.test.property"));
-    }
-
-    @Test
-    void getClientConfig_appInvalid() {
-
-        var request = ClientConfigRequest.newBuilder()
-                .setApplication("%%%client-app")
-                .build();
-
-        var e = Assertions.assertThrows(StatusRuntimeException.class, () -> readApi.clientConfig(request));
-        Assertions.assertEquals(Status.Code.INVALID_ARGUMENT, e.getStatus().getCode());
-    }
-
-    @Test
-    void getClientConfig_appNotFound() {
-
-        var request = ClientConfigRequest.newBuilder()
-                .setApplication("unknown-app")
-                .build();
-
-        var e = Assertions.assertThrows(StatusRuntimeException.class, () -> readApi.clientConfig(request));
-        Assertions.assertEquals(Status.Code.NOT_FOUND, e.getStatus().getCode());
-    }
-
 }

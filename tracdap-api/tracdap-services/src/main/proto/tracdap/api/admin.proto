@@ -1,0 +1,183 @@
+/*
+ * Licensed to the Fintech Open Source Foundation (FINOS) under one or
+ * more contributor license agreements. See the NOTICE file distributed
+ * with this work for additional information regarding copyright ownership.
+ * FINOS licenses this file to you under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with the
+ * License. You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+syntax = "proto3";
+package tracdap.api;
+
+option java_package = "org.finos.tracdap.api";
+option java_outer_classname = "AdminServiceProto";
+option java_multiple_files = true;
+
+import "tracdap/metadata/common.proto";
+import "tracdap/metadata/config.proto";
+import "tracdap/metadata/resource.proto";
+import "tracdap/metadata/object_id.proto";
+import "tracdap/metadata/object.proto";
+import "tracdap/metadata/type.proto";
+
+import "google/api/annotations.proto";
+
+
+/**
+ * Public API for performing admin functions, such as managing tenants and configuration.
+ */
+service TracAdminApi {
+
+    /// Create a new config entry and store the associated object definition
+    rpc createConfigObject(ConfigWriteRequest) returns (ConfigWriteResponse);
+
+    /// Update an existing config entry and store the associated object definition
+    rpc updateConfigObject(ConfigWriteRequest) returns (ConfigWriteResponse);
+
+    /// Delete an existing config entry
+    rpc deleteConfigObject(ConfigWriteRequest) returns (ConfigWriteResponse);
+
+    /// Read an individual config entry
+    rpc readConfigObject(ConfigReadRequest) returns (ConfigReadResponse);
+
+    /// Read a batch of config entries
+    rpc readConfigBatch(ConfigReadBatchRequest) returns (ConfigReadBatchResponse);
+
+    /// List available config entries, with optional filter criteria
+    rpc listConfigEntries(ConfigListRequest) returns (ConfigListResponse);
+}
+
+
+/**
+ * Request to create or update a config entry in the TRAC metadata store.
+ *
+ * @see TracAdminApi
+ */
+message ConfigWriteRequest {
+
+    /// Tenant code for the requested operation, always required.
+    string tenant = 1;
+
+    /// The config class associated with this config entry.
+    string configClass = 2;
+
+    /// The config key associated with this config entry.
+    string configKey = 3;
+
+    /// For update and delete operations, the prior config entry that is being modified.
+    optional metadata.ConfigEntry priorEntry = 4;
+
+    /// For create and update operations, the config object definition to store.
+    optional metadata.ObjectDefinition definition = 5;
+};
+
+/**
+ * Result of creating or updating a config entry in the TRAC metadata store.
+ *
+ * @see TracAdminApi
+ */
+message ConfigWriteResponse {
+
+    /// The config entry that was created or modified by the write operation.
+    metadata.ConfigEntry entry = 1;
+}
+
+
+/**
+ * Request to read a config entry from the TRAC metadata store.
+ *
+ * @see TracAdminApi
+ */
+message ConfigReadRequest {
+
+    /// Tenant code for the requested operation, always required.
+    string tenant = 1;
+
+    /// The config entry that is being requested.
+    metadata.ConfigEntry entry = 2;
+}
+
+/**
+ * Result of reading a config entry from the TRAC metadata store.
+ *
+ * @see TracAdminApi
+ */
+message ConfigReadResponse {
+
+    /// The config entry, including the details block.
+    metadata.ConfigEntry entry = 1;
+
+    /// Definition of the config entry.
+    metadata.ObjectDefinition definition = 2;
+
+    /// Tag attributes associated with the config entry.
+    map<string, metadata.Value> attrs = 3;
+}
+
+/**
+ * Request to read a batch of config entries from the TRAC metadata store.
+ *
+ * @see TracAdminApi
+ */
+message ConfigReadBatchRequest {
+
+    /// Tenant code for the requested operation, always required.
+    string tenant = 1;
+
+    /// A list of config entries to request (cannot be empty).
+    repeated metadata.ConfigEntry entries = 2;
+}
+
+/**
+ * Result of reading a batch of config entries from the TRAC metadata store.
+ *
+ * @see TracAdminApi
+ */
+message ConfigReadBatchResponse {
+
+    /// The config entries, in the same order they were requested.
+    repeated ConfigReadResponse entries = 1;
+}
+
+/**
+ * List config entries available in the TRAC metadata store.
+ *
+ * @see TracAdminApi
+ */
+message ConfigListRequest {
+
+    /// Tenant code for the requested operation, always required.
+    string tenant = 1;
+
+    /// Config class to list entries for.
+    string configClass = 2;
+
+    /// Whether to include deleted entries in the response.
+    bool includeDeleted = 3;
+
+    /// Limit the response to CONFIG objects of the specified type (optional).
+    optional metadata.ConfigType configType = 4;
+
+    /// Limit the response to RESOURCE objects of the specified type (optional).
+    optional metadata.ResourceType resourceType = 5;
+}
+
+/**
+ * Result of listing config entries available in the TRAC metadata store.
+ *
+ * @see TracAdminApi
+ */
+message ConfigListResponse{
+
+    /// The list of available config entries matching the filter criteria.
+    repeated metadata.ConfigEntry entries = 1;
+}

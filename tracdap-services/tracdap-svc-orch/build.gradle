@@ -62,6 +62,7 @@ dependencies {
     testImplementation project(':tracdap-lib-test')
     testImplementation project(':tracdap-svc-meta')
     testImplementation project(':tracdap-svc-data')
+    testImplementation project(':tracdap-svc-admin')
 
     // Migration support for JUnit 4 Rules, provided by gRPC for managing test service instances
     testImplementation group: 'org.junit.jupiter', name: 'junit-jupiter-migrationsupport', version: "$junit_version"

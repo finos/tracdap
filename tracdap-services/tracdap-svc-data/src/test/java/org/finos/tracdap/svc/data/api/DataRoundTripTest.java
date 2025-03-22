@@ -23,6 +23,7 @@ import org.finos.tracdap.common.async.Flows;
 import org.finos.tracdap.common.data.IExecutionContext;
 import org.finos.tracdap.common.util.ResourceHelpers;
 import org.finos.tracdap.metadata.*;
+import org.finos.tracdap.svc.admin.TracAdminService;
 import org.finos.tracdap.svc.data.TracDataService;
 import org.finos.tracdap.svc.meta.TracMetadataService;
 import org.finos.tracdap.test.data.DataApiTestHelpers;
@@ -59,7 +60,9 @@ import static org.finos.tracdap.test.concurrent.ConcurrentTestHelpers.waitFor;
 abstract class DataRoundTripTest {
 
     public static final String TRAC_CONFIG_UNIT = "config/trac-unit.yaml";
+    public static final String TRAC_RESOURCES_UNIT = "config/trac-unit-resources.yaml";
     public static final String TRAC_CONFIG_ENV_VAR = "TRAC_CONFIG_FILE";
+    public static final String TRAC_RESOURCES_ENV_VAR = "TRAC_RESOURCES_FILE";
     public static final String TEST_TENANT = "ACME_CORP";
 
     protected static EventLoopGroup elg;
@@ -72,9 +75,10 @@ abstract class DataRoundTripTest {
         @RegisterExtension
         public static final PlatformTest platform = PlatformTest.forConfig(TRAC_CONFIG_UNIT)
                 .runDbDeploy(true)
-                .addTenant(TEST_TENANT)
+                .bootstrapTenant(TEST_TENANT, TRAC_RESOURCES_UNIT)
                 .startService(TracMetadataService.class)
                 .startService(TracDataService.class)
+                .startService(TracAdminService.class)
                 .build();
 
         @BeforeAll
@@ -95,13 +99,15 @@ abstract class DataRoundTripTest {
     @Tag("all-platforms")
     static class IntegrationTest extends DataRoundTripTest {
 
-        private static final String TRAC_CONFIG_ENV_FILE = System.getenv(TRAC_CONFIG_ENV_VAR);
+        private static final String TRAC_CONFIG_FILE = System.getenv(TRAC_CONFIG_ENV_VAR);
+        private static final String TRAC_RESOURCES_FILE = System.getenv(TRAC_RESOURCES_ENV_VAR);
 
         @RegisterExtension
-        public static final PlatformTest platform = PlatformTest.forConfig(TRAC_CONFIG_ENV_FILE)
+        public static final PlatformTest platform = PlatformTest.forConfig(TRAC_CONFIG_FILE)
                 .runDbDeploy(true)
                 .manageDataPrefix(true)
-                .addTenant(TEST_TENANT)
+                .bootstrapTenant(TEST_TENANT, TRAC_RESOURCES_FILE)
+                .startService(TracAdminService.class)
                 .startService(TracMetadataService.class)
                 .startService(TracDataService.class)
                 .build();

@@ -31,6 +31,8 @@ import "tracdap/metadata/job.proto";
 import "tracdap/metadata/file.proto";
 import "tracdap/metadata/custom.proto";
 import "tracdap/metadata/storage.proto";
+import "tracdap/metadata/config.proto";
+import "tracdap/metadata/resource.proto";
 
 
 /**
@@ -78,6 +80,8 @@ message ObjectDefinition {
         StorageDefinition storage = 8;
         SchemaDefinition schema = 9;
         ResultDefinition result = 10;
+        ConfigDefinition config = 11;
+        ResourceDefinition resource = 12;
     }
 
     map<string, Value> objectProps = 100;

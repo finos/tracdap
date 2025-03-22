@@ -49,6 +49,7 @@
     tracdap.api.TracMetadataApi._serviceName = "tracdap.api.TracMetadataApi";
     tracdap.api.TracDataApi._serviceName = "tracdap.api.TracDataApi";
     tracdap.api.TracOrchestratorApi._serviceName = "tracdap.api.TracOrchestratorApi";
+    tracdap.api.TracAdminApi._serviceName = "tracdap.api.TracAdminApi";
 
     grpc.MethodType.CLIENT_STREAMING = "CLIENT_STREAMING";
     grpc.MethodType.BIDI_STREAMING = "BIDI_STREAMING";
@@ -145,6 +146,32 @@
      * @returns {tracdap.api.TracOrchestratorApi}
      */
     Object.defineProperty($root.tracdap.api.TracOrchestratorApi.prototype.cancel = function cancel() {
+
+        if (this.rpcImpl) {
+            this.rpcImpl = null;
+        }
+        return this;
+
+    }, "name", { value: "cancel" });
+
+
+    /**
+     * Cancel an existing stream.
+     *
+     * <p>A request can only be cancelled before the complete request has been sent.
+     * Cancelling a request after it is fully sent has no effect.</p>
+     *
+     * <p>For unary requests and download streams (server streaming),
+     * the entire request is sent in a single message so these request cannot be cancelled.
+     * For upload (client streaming) and bidirectional streams,
+     * the request can be any time before .end() is called.</p>
+     *
+     * @function cancel
+     * @memberof tracdap.api.TracAdminApi
+     * @instance
+     * @returns {tracdap.api.TracAdminApi}
+     */
+    Object.defineProperty($root.tracdap.api.TracAdminApi.prototype.cancel = function cancel() {
 
         if (this.rpcImpl) {
             this.rpcImpl = null;

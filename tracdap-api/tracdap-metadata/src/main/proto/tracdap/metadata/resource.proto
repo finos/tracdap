@@ -22,7 +22,6 @@ option java_package = "org.finos.tracdap.metadata";
 option java_multiple_files = true;
 
 import "tracdap/metadata/object_id.proto";
-import "tracdap/metadata/object.proto";
 
 
 /**
@@ -32,13 +31,43 @@ enum ResourceType {
 
   RESOURCE_TYPE_NOT_SET = 0;
 
-  /// Model repository, which can be a source or binary repository
-  MODEL_REPOSITORY = 1;
-
   /// Storage location for data held internally by the TRAC platform
-  INTERNAL_STORAGE = 2;
+  INTERNAL_STORAGE = 1;
 
-  // Storage location for upstream / downstream integration points (not available yet in the resource API)
-  reserved "EXTERNAL_STORAGE";
-  reserved 3;
+  // Storage location for upstream / downstream integration points
+  EXTERNAL_STORAGE = 2;
+
+  /// Model repository, which can be a source or binary repository
+  MODEL_REPOSITORY = 3;
+}
+
+/**
+ * Definition of a platform resource
+ */
+message ResourceDefinition {
+
+  /// The type of this resource
+  ResourceType resourceType = 1;
+
+  /// The protocol used to communicate with this resource (usually corresponds to a TRAC plugin)
+  string protocol = 2;
+
+  /// Optional sub-protocol, to further distinguish the behavior of resources within a protocol
+  optional string subProtocol = 3;
+
+  /// Configuration properties for this resource, made visible to client applications
+  map<string, string> publicProperties = 4;
+
+  /// Configuration properties for this resource, not visible to client applications
+  map<string, string> properties = 5;
+
+  /**
+   * Configuration properties that are stored as secrets using TRAC's secret handling mechanism
+   *
+   * Only the secret alias is stored in metadata, handling of secret storage is delegated to the
+   * configured secrets plugin. Secret values may be sent by clients when resource definitions are
+   * created / updated, in which case they will be written to the configured secret store and
+   * metadata values will be replaced with an alias.
+   */
+  map<string, string> secrets = 6;
 }

@@ -549,7 +549,7 @@ abstract class MetadataDalConfigTest implements IDalTestable {
     }
 
     @Test
-    void testLoadConfigEntries_asOf() {
+    void testLoadConfigEntries_asOf() throws Exception {
 
         var testTimestamp = MetadataCodec.encodeDatetime(Instant.now());
 
@@ -590,6 +590,8 @@ abstract class MetadataDalConfigTest implements IDalTestable {
                 .build();
 
         dal.saveConfigEntries(TEST_TENANT, List.of(entry1, entry2));
+
+        Thread.sleep(2);
 
         var testTimestamp2 = MetadataCodec.encodeDatetime(Instant.now());
         var selector1V2 = selector1.toBuilder().setObjectVersion(2).build();
@@ -699,7 +701,7 @@ abstract class MetadataDalConfigTest implements IDalTestable {
     }
 
     @Test
-    void testLoadConfigEntries_mixed() {
+    void testLoadConfigEntries_mixed() throws Exception {
 
         var testTimestamp = MetadataCodec.encodeDatetime(Instant.now());
 
@@ -740,6 +742,8 @@ abstract class MetadataDalConfigTest implements IDalTestable {
                 .build();
 
         dal.saveConfigEntries(TEST_TENANT, List.of(entry1, entry2));
+
+        Thread.sleep(2);
 
         var testTimestamp2 = MetadataCodec.encodeDatetime(Instant.now());
 
@@ -1100,7 +1104,7 @@ abstract class MetadataDalConfigTest implements IDalTestable {
     }
 
     @Test
-    void testLoadConfigEntry_asOf() {
+    void testLoadConfigEntry_asOf() throws Exception {
 
         var testTimestamp = MetadataCodec.encodeDatetime(Instant.now());
 
@@ -1123,6 +1127,8 @@ abstract class MetadataDalConfigTest implements IDalTestable {
                 .build();
 
         dal.saveConfigEntries(TEST_TENANT, List.of(entry1));
+
+        Thread.sleep(2);
 
         var testTimestamp2 = MetadataCodec.encodeDatetime(Instant.now());
         var selector1V2 = selector1.toBuilder().setObjectVersion(2).build();
@@ -1702,7 +1708,9 @@ abstract class MetadataDalConfigTest implements IDalTestable {
 
         dal.saveConfigEntries(TEST_TENANT, List.of(entry1));
 
-        Assertions.assertThrows(EMetadataNotFound.class, () -> dal.listConfigEntries(TEST_TENANT, "testListConfigEntries_unknown_alt", false));
+        var noEntries = dal.listConfigEntries(TEST_TENANT, "testListConfigEntries_unknown_alt", false);
+
+        Assertions.assertEquals(0, noEntries.size());
     }
 
 

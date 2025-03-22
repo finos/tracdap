@@ -60,6 +60,8 @@ public class SampleMetadata {
             case STORAGE: return dummyStorageDef();
             case SCHEMA: return dummySchemaDef();
             case RESULT: return dummyResultDef();
+            case CONFIG: return dummyConfigDef();
+            case RESOURCE: return dummyResourceDef();
 
             default:
                 throw new RuntimeException("No dummy data available for object type " + objectType.name());
@@ -87,6 +89,8 @@ public class SampleMetadata {
             case STORAGE: return nextStorageDef(definition);
             case SCHEMA: return nextSchemaDef(definition);
             case FILE: return nextFileDef(definition);
+            case CONFIG: return nextConfigDef(definition);
+            case RESOURCE: return nextResourceDef(definition);
 
             case FLOW:
             case JOB:
@@ -115,6 +119,8 @@ public class SampleMetadata {
             case STORAGE: return nextBadStorageDef(definition);
             case SCHEMA: return nextBadSchemaDef(definition);
             case FILE: return nextBadFileDef(definition);
+            case CONFIG: return nextBadConfigDef(definition);
+            case RESOURCE: return nextBadResourceDef(definition);
 
             case FLOW:
             case JOB:
@@ -475,6 +481,70 @@ public class SampleMetadata {
                 .setStatusCode(JobStatusCode.SUCCEEDED)
                 .setStatusMessage("Job completed in [42] seconds")
                 .setLogFileId(logFileSelector))
+                .build();
+    }
+
+    public static ObjectDefinition dummyConfigDef() {
+
+        return ObjectDefinition.newBuilder()
+                .setObjectType(ObjectType.CONFIG)
+                .setConfig(ConfigDefinition.newBuilder()
+                        .setConfigType(ConfigType.PROPERTIES)
+                        .putProperties("acme.rocket.fuel", "nuclear")
+                        .putProperties("acme.rocket.payload", "habitation_pod")
+                        .putProperties("acme.rocket.crew_compliment", "6")
+                        .putProperties("acme.rocket.destination", "proxima_centauri"))
+                .build();
+    }
+
+    public static ObjectDefinition nextConfigDef(ObjectDefinition origDef) {
+
+        return origDef.toBuilder()
+                .setConfig(origDef.getConfig().toBuilder()
+                .putProperties("acme.rocket.crew_compliment", "7"))
+                .build();
+    }
+
+    public static ObjectDefinition nextBadConfigDef(ObjectDefinition origDef) {
+
+        return origDef.toBuilder()
+                .setConfig(origDef.getConfig().toBuilder()
+                .setConfigType(ConfigType.CONFIG_TYPE_NOT_SET))
+                .build();
+    }
+
+    public static ObjectDefinition dummyResourceDef() {
+
+        return ObjectDefinition.newBuilder()
+                .setObjectType(ObjectType.RESOURCE)
+                .setResource(ResourceDefinition.newBuilder()
+                .setResourceType(ResourceType.MODEL_REPOSITORY)
+                .setProtocol("git")
+                .setSubProtocol("github_app")
+                .putPublicProperties("friendlyName", "TRAC DAP Repository")
+                .putProperties("reopUrl", "https://github.com/finos/tracdap")
+                .putSecrets("secret1", "secret_alias"))
+                .build();
+    }
+
+    public static ObjectDefinition nextResourceDef(ObjectDefinition origDef) {
+
+        return origDef.toBuilder()
+                .setResource(origDef.getResource().toBuilder()
+                .setSubProtocol("github_oauth")
+                .putProperties("reopUrl", "https://github.com/finos/tracdap-migrated")
+                .putSecrets("secret1", "updated_secret_alias"))
+                .build();
+    }
+
+    public static ObjectDefinition nextBadResourceDef(ObjectDefinition origDef) {
+
+        return origDef.toBuilder()
+                .setResource(origDef.getResource().toBuilder()
+                .setResourceType(ResourceType.INTERNAL_STORAGE)
+                .setProtocol("S3")
+                .putPublicProperties("friendlyName", "Now this resource is an S3 bucket")
+                .putProperties("bucketName", "expecting-a-model-repo"))
                 .build();
     }
 

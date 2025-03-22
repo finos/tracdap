@@ -17,6 +17,9 @@
 
 package org.finos.tracdap.common.validation;
 
+import org.finos.tracdap.common.metadata.MetadataConstants;
+import org.finos.tracdap.metadata.ObjectType;
+
 import java.util.List;
 import java.util.regex.Pattern;
 
@@ -77,4 +80,15 @@ public class ValidationConstants {
     // If these criteria are too restrictive we made need to relax this later
     public static final Pattern MODEL_VERSION = Pattern.compile("\\A\\p{Alnum}[\\w-.]*\\Z");
     public static final int LABEL_LENGTH_LIMIT = 4096;
+
+    // List of object types that represent config and can be used with the config objects API
+    public static final List<ObjectType> CONFIG_OBJECT_TYPES = List.of(
+            ObjectType.CONFIG, ObjectType.RESOURCE);
+
+    // Limit config keys to valid identifiers for now
+    public static final Pattern CONFIG_KEY = MetadataConstants.VALID_IDENTIFIER;
+
+    // Property keys can also use dotted syntax
+    public static final Pattern PROPERTY_KEY = Pattern.compile(
+            "\\A[a-zA-Z][a-zA-Z0-9_\\-]*(\\.[a-zA-Z][a-zA-Z0-9_\\-]*)*\\Z");
 }

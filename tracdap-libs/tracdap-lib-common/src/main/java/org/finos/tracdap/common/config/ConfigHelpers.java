@@ -18,6 +18,8 @@
 package org.finos.tracdap.common.config;
 
 import org.finos.tracdap.common.exception.EStartup;
+import org.finos.tracdap.config.PluginConfig;
+import org.finos.tracdap.metadata.ResourceDefinition;
 
 import java.util.Map;
 import java.util.Properties;
@@ -27,6 +29,16 @@ public class ConfigHelpers {
 
     private static final String BOOLEAN_TRUE = Boolean.TRUE.toString();
     private static final String BOOLEAN_FALSE = Boolean.FALSE.toString();
+
+    public static PluginConfig resourceToPluginConfig(ResourceDefinition resource) {
+
+        return PluginConfig.newBuilder()
+                .setProtocol(resource.getProtocol())
+                .putAllProperties(resource.getPublicPropertiesMap())
+                .putAllProperties(resource.getPropertiesMap())
+                .putAllSecrets(resource.getSecretsMap())
+                .build();
+    }
 
     public static String readString(String context, Properties properties, String key) {
         return readString(context, properties, key, true);

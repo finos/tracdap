@@ -39,8 +39,12 @@ metadata:
       mariadb.password: metadb_secret
 
 services:
+
   metadata:
     port: 8081
+
+  admin:
+    port: 8084
 
 deployment:
   layout: SANDBOX

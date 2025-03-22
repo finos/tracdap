@@ -89,6 +89,7 @@ jobs:
         run: |
           cd build/dist/current
           
+          bin/tracdap-svc-admin start
           bin/tracdap-svc-meta start
           bin/tracdap-svc-data start
           bin/tracdap-gateway start
@@ -126,6 +127,7 @@ jobs:
           bin/tracdap-gateway stop
           bin/tracdap-svc-data stop
           bin/tracdap-svc-meta stop
+          bin/tracdap-svc-admin stop
   
 
   slow-tests:
@@ -294,6 +296,7 @@ jobs:
               INSTALL_SCRIPT: ".github/scripts/int-storage-s3-install.sh",
               SETUP_SCRIPT: ".github/scripts/int-storage-s3-setup.sh",
               TRAC_CONFIG_FILE: '.github/config/int-storage-s3.yaml',
+              TRAC_RESOURCES_FILE: '.github/config/int-storage-s3-resources.yaml',
               TRAC_SECRET_KEY: short-lived-secret,
               PYTHON_TESTS: int_storage_aws*.py,
               JAVA_TESTS: int-storage }
@@ -308,6 +311,7 @@ jobs:
               INSTALL_SCRIPT: ".github/scripts/int-storage-gcs-install.sh",
               SETUP_SCRIPT: ".github/scripts/int-storage-gcs-setup.sh",
               TRAC_CONFIG_FILE: '.github/config/int-storage-gcs.yaml',
+              TRAC_RESOURCES_FILE: '.github/config/int-storage-gcs-resources.yaml',
               TRAC_SECRET_KEY: short-lived-secret,
               PYTHON_TESTS: int_storage_gcp*.py,
               JAVA_TESTS: int-storage }
@@ -320,6 +324,7 @@ jobs:
               INSTALL_SCRIPT: ".github/scripts/int-storage-azure-install.sh",
               SETUP_SCRIPT: ".github/scripts/int-storage-azure-setup.sh",
               TRAC_CONFIG_FILE: '.github/config/int-storage-azure.yaml',
+              TRAC_RESOURCES_FILE: ".github/config/int-storage-azure-resources.yaml",
               TRAC_SECRET_KEY: short-lived-secret,
               PYTHON_TESTS: int_storage_azure*.py,
               JAVA_TESTS: int-storage }

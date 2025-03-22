@@ -475,12 +475,12 @@ class JdbcReadBatchImpl {
         return fetchConfigEntry(conn, tenantId, configEntry.length, mappingStage);
     }
 
-    public JdbcBaseDal.KeyedItems<String>
-    readConfigStub(Connection conn, short tenantId, long[] configPk) throws SQLException {
+    public JdbcBaseDal.KeyedItems<ConfigDetails>
+    readConfigEntry(Connection conn, short tenantId, long[] configPk) throws SQLException {
 
         var mappingStage = insertPk(conn, configPk);
 
-        return fetchConfigStub(conn, tenantId, configPk.length, mappingStage);
+        return fetchConfigEntry(conn, tenantId, configPk.length, mappingStage);
     }
 
     private JdbcBaseDal.KeyedItems<ConfigDetails>
@@ -488,7 +488,7 @@ class JdbcReadBatchImpl {
     throws SQLException {
 
         var query =
-                "select config_pk, config_version, config_timestamp, config_is_latest, config_deleted, details\n" +
+                "select cfg.config_pk, cfg.config_key, cfg.config_version, cfg.config_timestamp, cfg.config_is_latest, cfg.config_deleted, cfg.details\n" +
                 "from config_entry cfg\n" +
                 "join key_mapping km\n" +
                 "  on cfg.config_pk = km.pk\n" +
@@ -506,6 +506,7 @@ class JdbcReadBatchImpl {
             try (var rs = stmt.executeQuery()) {
 
                 long[] pks = new long[length];
+                String[] keys =  new String[length];
                 int[] versions = new int[length];
                 Instant[] timestamps = new Instant[length];
                 boolean[] latest = new boolean[length];
@@ -518,19 +519,21 @@ class JdbcReadBatchImpl {
                         throw new JdbcException(JdbcErrorCode.NO_DATA);
 
                     var cfgPk = rs.getLong(1);
-                    var cfgVersion = rs.getInt(2);
-                    var sqlTimestamp = rs.getTimestamp(3);
+                    var cfgKey = rs.getString(2);
+                    var cfgVersion = rs.getInt(3);
+                    var sqlTimestamp = rs.getTimestamp(4);
                     var cfgTimestamp = sqlTimestamp.toInstant();
-                    var cfgLatest = rs.getBoolean(4);
-                    var cfgDeleted = rs.getBoolean(5);
+                    var cfgLatest = rs.getBoolean(5);
+                    var cfgDeleted = rs.getBoolean(6);
 
                     // TODO: Encode / decode helper, type = protobuf | json ?
-                    var detailsEncoded = rs.getBytes(6);
+                    var detailsEncoded = rs.getBytes(7);
                     var detailsDecoded = cfgDeleted
                             ? ConfigDetails.getDefaultInstance()
                             : ConfigDetails.parseFrom(detailsEncoded);
 
                     pks[i] = cfgPk;
+                    keys[i] = cfgKey;
                     versions[i] = cfgVersion;
                     timestamps[i] = cfgTimestamp;
                     latest[i] = cfgLatest;
@@ -541,7 +544,7 @@ class JdbcReadBatchImpl {
                 if (rs.next())
                     throw new JdbcException(JdbcErrorCode.TOO_MANY_ROWS);
 
-                return new JdbcBaseDal.KeyedItems<>(pks, versions, timestamps, details, latest, deleted);
+                return new JdbcBaseDal.KeyedItems<>(pks, versions, timestamps, details, latest, deleted, keys);
             }
             catch (InvalidProtocolBufferException e) {
                 throw new JdbcException(JdbcErrorCode.INVALID_CONFIG_ENTRY);

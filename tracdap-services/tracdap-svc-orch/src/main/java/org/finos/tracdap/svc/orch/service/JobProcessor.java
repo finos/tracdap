@@ -25,8 +25,7 @@ import org.finos.tracdap.api.internal.RuntimeJobStatus;
 import org.finos.tracdap.api.internal.TrustedMetadataApiGrpc.TrustedMetadataApiBlockingStub;
 import org.finos.tracdap.common.cache.CacheEntry;
 import org.finos.tracdap.common.config.ConfigManager;
-import org.finos.tracdap.common.config.IConfigLoader;
-import org.finos.tracdap.common.config.ISecretLoader;
+import org.finos.tracdap.common.config.IDynamicResources;
 import org.finos.tracdap.common.exception.*;
 import org.finos.tracdap.common.exec.*;
 import org.finos.tracdap.common.grpc.RequestMetadata;
@@ -59,7 +58,7 @@ public class JobProcessor {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
-    private final PlatformConfig platformConfig;
+    private final IDynamicResources resources;
     private final TrustedMetadataApiBlockingStub metaClient;
     private final IJobExecutor<?> executor;
     private final Validator validator = new Validator();
@@ -70,16 +69,17 @@ public class JobProcessor {
 
     public JobProcessor(
             PlatformConfig platformConfig,
+            IDynamicResources resources,
             TrustedMetadataApiBlockingStub metaClient,
             GrpcConcern commonConcerns,
             IJobExecutor<?> jobExecutor,
             ConfigManager configManager) {
 
-        this.platformConfig = platformConfig;
+        this.resources = resources;
         this.metaClient = metaClient;
         this.executor = jobExecutor;
 
-        this.lifecycle = new JobProcessorHelpers(platformConfig, metaClient, commonConcerns, configManager);
+        this.lifecycle = new JobProcessorHelpers(platformConfig, resources, metaClient, commonConcerns, configManager);
     }
 
     public JobState newJob(JobRequest request, GrpcClientState clientState) {
@@ -137,7 +137,7 @@ public class JobProcessor {
 
             // Semantic validation (job consistency)
             var metadata = new MetadataBundle(newState.resources, newState.resourceMapping);
-            validator.validateConsistency(newState.definition, metadata, platformConfig);
+            validator.validateConsistency(newState.definition, metadata, resources);
 
             newState.tracStatus = JobStatusCode.VALIDATED;
 

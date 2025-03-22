@@ -21,6 +21,7 @@ import org.finos.tracdap.api.*;
 import org.finos.tracdap.common.async.Flows;
 import org.finos.tracdap.gateway.TracPlatformGateway;
 import org.finos.tracdap.metadata.TagHeader;
+import org.finos.tracdap.svc.admin.TracAdminService;
 import org.finos.tracdap.svc.data.TracDataService;
 import org.finos.tracdap.svc.meta.TracMetadataService;
 import org.finos.tracdap.test.data.DataApiTestHelpers;
@@ -66,13 +67,15 @@ public class RestDataApiTest {
     public static final String LARGE_TEST_FILE = "tracdap-services/tracdap-svc-data/src/test/resources/large_csv_data_100000.csv";
 
     public static final String TRAC_CONFIG_UNIT = "config/trac-unit.yaml";
+    public static final String TRAC_CONFIG_UNIT_RESOURCES = "config/trac-unit-resources.yaml";
 
     public static final long UPLOAD_CHUNK_SIZE = 2 * 1024 * 1024;
 
     @RegisterExtension
     public static final PlatformTest platform = PlatformTest.forConfig(TRAC_CONFIG_UNIT)
             .runDbDeploy(true)
-            .addTenant(TEST_TENANT)
+            .bootstrapTenant(TEST_TENANT, TRAC_CONFIG_UNIT_RESOURCES)
+            .startService(TracAdminService.class)
             .startService(TracMetadataService.class)
             .startService(TracDataService.class)
             .startService(TracPlatformGateway.class)

@@ -17,6 +17,7 @@
 
 package org.finos.tracdap.gateway.builders;
 
+import org.finos.tracdap.api.AdminServiceProto;
 import org.finos.tracdap.api.DataServiceProto;
 import org.finos.tracdap.api.MetadataServiceProto;
 import org.finos.tracdap.api.OrchestratorServiceProto;
@@ -39,17 +40,20 @@ public class ServiceInfo {
             Map.entry(ConfigKeys.GATEWAY_SERVICE_KEY, "TRAC Platform Gateway"),
             Map.entry(ConfigKeys.METADATA_SERVICE_KEY, "TRAC Metadata Service"),
             Map.entry(ConfigKeys.DATA_SERVICE_KEY, "TRAC Data Service"),
-            Map.entry(ConfigKeys.ORCHESTRATOR_SERVICE_KEY, "TRAC Orchestrator Service"));
+            Map.entry(ConfigKeys.ORCHESTRATOR_SERVICE_KEY, "TRAC Orchestrator Service"),
+            Map.entry(ConfigKeys.ADMIN_SERVICE_KEY, "TRAC Admin Service"));
 
     public static final Map<String, String> SERVICE_PREFIX_DEFAULTS = Map.ofEntries(
             Map.entry(ConfigKeys.METADATA_SERVICE_KEY, "/trac-meta/"),
             Map.entry(ConfigKeys.DATA_SERVICE_KEY, "/trac-data/"),
-            Map.entry(ConfigKeys.ORCHESTRATOR_SERVICE_KEY, "/trac-orch/"));
+            Map.entry(ConfigKeys.ORCHESTRATOR_SERVICE_KEY, "/trac-orch/"),
+            Map.entry(ConfigKeys.ADMIN_SERVICE_KEY, "/trac-admin/"));
 
     private static final Map<String, Descriptors.ServiceDescriptor> SERVICE_DESCRIPTORS = Map.ofEntries(
             Map.entry(ConfigKeys.METADATA_SERVICE_KEY, serviceDescriptor(MetadataServiceProto.getDescriptor(), "TracMetadataApi")),
             Map.entry(ConfigKeys.DATA_SERVICE_KEY, serviceDescriptor(DataServiceProto.getDescriptor(), "TracDataApi")),
-            Map.entry(ConfigKeys.ORCHESTRATOR_SERVICE_KEY, serviceDescriptor(OrchestratorServiceProto.getDescriptor(), "TracOrchestratorApi")));
+            Map.entry(ConfigKeys.ORCHESTRATOR_SERVICE_KEY, serviceDescriptor(OrchestratorServiceProto.getDescriptor(), "TracOrchestratorApi")),
+            Map.entry(ConfigKeys.ADMIN_SERVICE_KEY, serviceDescriptor(AdminServiceProto.getDescriptor(), "TracAdminApi")));
 
     private static final String API_V1_PREFIX = "api/v1/";
 

@@ -83,6 +83,8 @@ dependencies {
 
     // Use Flyway to deploy schemas in test cases
     testImplementation group: 'org.flywaydb', name: 'flyway-core', version: "$flyway_version"
+
+    testImplementation project(":tracdap-svc-admin")
 }
 
 // Add any plugin dependencies enabled at build time

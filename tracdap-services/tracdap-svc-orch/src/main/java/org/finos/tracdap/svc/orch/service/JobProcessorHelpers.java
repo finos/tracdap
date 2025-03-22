@@ -17,21 +17,21 @@
 
 package org.finos.tracdap.svc.orch.service;
 
-import io.grpc.stub.AbstractStub;
 import org.finos.tracdap.api.*;
 import org.finos.tracdap.api.internal.TrustedMetadataApiGrpc;
+import org.finos.tracdap.common.config.ConfigHelpers;
 import org.finos.tracdap.common.config.ConfigManager;
+import org.finos.tracdap.common.config.IDynamicResources;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.metadata.MetadataBundle;
 import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.metadata.MetadataUtil;
 import org.finos.tracdap.common.middleware.GrpcConcern;
-import org.finos.tracdap.config.JobConfig;
-import org.finos.tracdap.config.PlatformConfig;
-import org.finos.tracdap.config.RuntimeConfig;
+import org.finos.tracdap.config.*;
 import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.svc.orch.jobs.JobLogic;
 
+import io.grpc.stub.AbstractStub;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -53,6 +53,7 @@ public class JobProcessorHelpers {
     private final Logger log = LoggerFactory.getLogger(JobProcessorHelpers.class);
 
     private final PlatformConfig platformConfig;
+    private final IDynamicResources resources;
     private final TrustedMetadataApiGrpc.TrustedMetadataApiBlockingStub metaClient;
     private final GrpcConcern commonConcerns;
     private final ConfigManager configManager;
@@ -60,11 +61,13 @@ public class JobProcessorHelpers {
 
     public JobProcessorHelpers(
             PlatformConfig platformConfig,
+            IDynamicResources resources,
             TrustedMetadataApiGrpc.TrustedMetadataApiBlockingStub metaClient,
             GrpcConcern commonConcerns,
             ConfigManager configManager) {
 
         this.platformConfig = platformConfig;
+        this.resources = resources;
         this.metaClient = metaClient;
         this.commonConcerns = commonConcerns;
         this.configManager = configManager;
@@ -99,9 +102,9 @@ public class JobProcessorHelpers {
         var logic = JobLogic.forJobType(jobState.jobType);
         var metadata = new MetadataBundle(jobState.resources, jobState.resourceMapping);
 
-        jobState.definition = logic.applyTransform(jobState.definition, metadata, platformConfig);
+        jobState.definition = logic.applyTransform(jobState.definition, metadata, resources);
 
-        var updatedMetadata = logic.applyMetadataTransform(jobState.definition, metadata, platformConfig);
+        var updatedMetadata = logic.applyMetadataTransform(jobState.definition, metadata, resources);
         jobState.resources = updatedMetadata.getResources();
         jobState.resourceMapping = updatedMetadata.getResourceMapping();
 
@@ -293,48 +296,70 @@ public class JobProcessorHelpers {
                 .putAllResultMapping(jobState.resultMapping)
                 .build();
 
-        var storageConfig = platformConfig.getStorage();
+        var sysConfig = RuntimeConfig.newBuilder();
+        var storageConfig = StorageConfig.newBuilder();
 
-        // Pass down tenant storage overrides if they are configured (the runtime doesn't know about tenants atm)
-        if (platformConfig.containsTenants(jobState.tenant)) {
+        var internalStorage = resources.getMatchingEntries(
+                resource -> resource.getResourceType() == ResourceType.INTERNAL_STORAGE);
 
-            var tenantConfig = platformConfig.getTenantsOrThrow(jobState.tenant);
-
-            var storageUpdate = storageConfig.toBuilder();
-
-            if (tenantConfig.hasDefaultBucket())
-                storageUpdate.setDefaultBucket(tenantConfig.getDefaultBucket());
-
-            if (tenantConfig.hasDefaultFormat())
-                storageUpdate.setDefaultFormat(tenantConfig.getDefaultFormat());
-
-            storageConfig = storageUpdate.build();
+        for (var storageEntry : internalStorage.entrySet()) {
+            var storageKey = storageEntry.getKey();
+            var storage = translateResourceConfig(storageEntry.getValue());
+            storageConfig.putBuckets(storageKey, storage);
         }
 
-        var sysConfig = RuntimeConfig.newBuilder();
+        var externalStorage = resources.getMatchingEntries(
+                resource -> resource.getResourceType() == ResourceType.EXTERNAL_STORAGE);
+
+        for (var storageEntry : externalStorage.entrySet()) {
+            var storageKey = storageEntry.getKey();
+            var storage = translateResourceConfig(storageEntry.getValue());
+            storageConfig.putExternal(storageKey, storage);
+        }
+
+        // Default storage / format still on platform config file for now
+        if (platformConfig.containsTenants(jobState.tenant)) {
+            var tenantConfig = platformConfig.getTenantsOrThrow(jobState.tenant);
+            storageConfig.setDefaultBucket(tenantConfig.getDefaultBucket());
+            storageConfig.setDefaultFormat(tenantConfig.getDefaultFormat());
+        }
+        else {
+            storageConfig.setDefaultBucket(platformConfig.getStorage().getDefaultBucket());
+            storageConfig.setDefaultFormat(platformConfig.getStorage().getDefaultFormat());
+        }
+
         sysConfig.setStorage(storageConfig);
 
-        for (var repoEntry : platformConfig.getRepositoriesMap().entrySet()) {
+        var repositories = resources.getMatchingEntries(
+                resource -> resource.getResourceType() == ResourceType.MODEL_REPOSITORY);
 
+        for (var repoEntry : repositories.entrySet()) {
             var repoKey = repoEntry.getKey();
-            var repoConfig = repoEntry.getValue().toBuilder();
-
-            for (var secretEntry : repoConfig.getSecretsMap().entrySet()) {
-
-                var propKey = secretEntry.getKey();
-                var secretKey = secretEntry.getValue();
-                var secret = configManager.loadPassword(secretKey);
-
-                repoConfig.putProperties(propKey, secret);
-            }
-
-            repoConfig.clearSecrets();
-            sysConfig.putRepositories(repoKey, repoConfig.build());
+            var repoConfig = translateResourceConfig(repoEntry.getValue());
+            sysConfig.putRepositories(repoKey, repoConfig);
         }
 
         jobState.sysConfig = sysConfig.build();
 
         return jobState;
+    }
+
+    private PluginConfig translateResourceConfig(ResourceDefinition resource) {
+
+        var pluginConfig = ConfigHelpers.resourceToPluginConfig(resource).toBuilder();
+
+        for (var secretEntry : pluginConfig.getSecretsMap().entrySet()) {
+
+            var propKey = secretEntry.getKey();
+            var secretKey = secretEntry.getValue();
+            var secret = configManager.loadPassword(secretKey);
+
+            pluginConfig.putProperties(propKey, secret);
+        }
+
+        pluginConfig.clearSecrets();
+
+        return pluginConfig.build();
     }
 
     JobState saveInitialMetadata(JobState jobState) {

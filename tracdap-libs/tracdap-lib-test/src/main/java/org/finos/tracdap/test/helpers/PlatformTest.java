@@ -17,12 +17,15 @@
 
 package org.finos.tracdap.test.helpers;
 
+import org.finos.tracdap.api.ConfigWriteRequest;
+import org.finos.tracdap.api.TracAdminApiGrpc;
 import org.finos.tracdap.api.TracDataApiGrpc;
 import org.finos.tracdap.api.TracMetadataApiGrpc;
 import org.finos.tracdap.api.TracOrchestratorApiGrpc;
 import org.finos.tracdap.api.internal.TrustedMetadataApiGrpc;
 import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.config.ConfigManager;
+import org.finos.tracdap.common.exception.ETracInternal;
 import org.finos.tracdap.common.middleware.CommonConcerns;
 import org.finos.tracdap.common.middleware.CommonGrpcConcerns;
 import org.finos.tracdap.common.middleware.GrpcConcern;
@@ -30,12 +33,16 @@ import org.finos.tracdap.common.plugin.PluginManager;
 import org.finos.tracdap.common.service.TracServiceBase;
 import org.finos.tracdap.common.startup.StandardArgs;
 import org.finos.tracdap.common.util.RoutingUtils;
+import org.finos.tracdap.config.DynamicConfig;
 import org.finos.tracdap.config.PlatformConfig;
+import org.finos.tracdap.metadata.ObjectDefinition;
+import org.finos.tracdap.metadata.ObjectType;
 import org.finos.tracdap.tools.deploy.metadb.DeployMetaDB;
 import org.finos.tracdap.tools.secrets.SecretTool;
 import org.finos.tracdap.test.config.ConfigHelpers;
 
 import io.grpc.*;
+import io.grpc.stub.AbstractStub;
 import io.grpc.netty.NettyChannelBuilder;
 import io.netty.channel.nio.NioEventLoopGroup;
 import org.slf4j.Logger;
@@ -58,9 +65,17 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
+import java.util.function.Function;
 
 
 public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
+
+    public static final Map<String, String> SERVICE_KEYS = Map.of(
+            "TracPlatformGateway", ConfigKeys.GATEWAY_SERVICE_KEY,
+            "TracMetadataService", ConfigKeys.METADATA_SERVICE_KEY,
+            "TracDataService", ConfigKeys.DATA_SERVICE_KEY,
+            "TracOrchestratorService", ConfigKeys.ORCHESTRATOR_SERVICE_KEY,
+            "TracAdminService", ConfigKeys.ADMIN_SERVICE_KEY);
 
     public static final String TRAC_EXEC_DIR = "TRAC_EXEC_DIR";
     public static final String STORAGE_ROOT_DIR = "storage_root";
@@ -75,14 +90,10 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
     private static final String VENV_ENV_VAR = "VIRTUAL_ENV";
     private static final String TRAC_RUNTIME_DIST_DIR = "tracdap-runtime/python/build/dist";
 
-    private static final String META_SVC_CLASS = "TracMetadataService";
-    private static final String DATA_SVC_CLASS = "TracDataService";
-    private static final String ORCH_SVC_CLASS = "TracOrchestratorService";
-
     private final Logger log = LoggerFactory.getLogger(getClass());
 
     private final String testConfig;
-    private final List<String> tenants;
+    private final Map<String, String> tenants;
     private final String storageFormat;
 
     private final boolean runDbDeploy;
@@ -90,14 +101,14 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
     private final boolean localExecutor;
 
     private final List<Class<? extends TracServiceBase>> serviceClasses;
-    private final List<TracServiceBase> services;
+    private final Map<String, String> serviceKeys;
     private final GrpcConcern clientConcerns;
     private final List<Consumer<PlatformTest>> preStartActions;
 
     private PlatformTest(
-            String testConfig, String secretKey, List<String> tenants, String storageFormat,
+            String testConfig, String secretKey, Map<String, String> tenants, String storageFormat,
             boolean runDbDeploy, boolean manageDataPrefix, boolean localExecutor,
-            List<Class<? extends TracServiceBase>> serviceClasses,
+            List<Class<? extends TracServiceBase>> serviceClasses, Map<String, String> serviceKeys,
             GrpcConcern clientConcerns, List<Consumer<PlatformTest>> preStartActions) {
 
         this.testConfig = testConfig;
@@ -107,12 +118,15 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         this.manageDataPrefix = manageDataPrefix;
         this.localExecutor = localExecutor;
         this.serviceClasses = serviceClasses;
-        this.services = new ArrayList<>(serviceClasses.size());
+        this.serviceKeys = serviceKeys;
         this.clientConcerns = clientConcerns;
         this.preStartActions = preStartActions;
 
         // Secret key can be set here, otherwise it is discovered later
         this.secretKey = secretKey;
+
+        this.services = new ArrayList<>(serviceClasses.size());
+        this.serviceChannels = new HashMap<>(serviceClasses.size());
     }
 
     public static Builder forConfig(String testConfig) {
@@ -126,23 +140,11 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         return builder;
     }
 
-    public boolean hasMetaSvc() {
-        return serviceClasses.stream().anyMatch(c -> c.getSimpleName().equals(META_SVC_CLASS));
-    }
-
-    public boolean hasDataSvc() {
-        return serviceClasses.stream().anyMatch(c -> c.getSimpleName().equals(DATA_SVC_CLASS));
-    }
-
-    public boolean hasOrchSvc() {
-        return serviceClasses.stream().anyMatch(c -> c.getSimpleName().equals(ORCH_SVC_CLASS));
-    }
-
     public static class Builder {
 
         private String testConfig;
         private String secretKey;
-        private final List<String> tenants = new ArrayList<>();
+        private final Map<String, String> tenants = new HashMap<>();
         private String storageFormat = DEFAULT_STORAGE_FORMAT;
         private boolean runDbDeploy = false;
         private boolean manageDataPrefix = false;
@@ -150,15 +152,18 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         private final List<Class<? extends TracServiceBase>> serviceClasses = new ArrayList<>();
         private final CommonConcerns<GrpcConcern> clientConcerns = new CommonGrpcConcerns("client_concerns");
         private final List<Consumer<PlatformTest>> preStartActions = new ArrayList<>();
+        private final Map<String, String> serviceKeys = new HashMap<>();
 
         // Should client concerns be pre-configured? If so what is the right configuration for testing?
 
-        public Builder addTenant(String testTenant) { this.tenants.add(testTenant); return this; }
+        public Builder addTenant(String testTenant) { this.tenants.put(testTenant, null); return this; }
+        public Builder bootstrapTenant(String testTenant, String bootstrapConfig) { this.tenants.put(testTenant, bootstrapConfig); return this; }
         public Builder storageFormat(String storageFormat) { this.storageFormat = storageFormat; return this; }
         public Builder runDbDeploy(boolean runDbDeploy) { this.runDbDeploy = runDbDeploy; return this; }
         public Builder manageDataPrefix(boolean manageDataPrefix) { this.manageDataPrefix = manageDataPrefix; return this; }
         public Builder prepareLocalExecutor(boolean localExecutor) { this.localExecutor = localExecutor; return this; }
-        public Builder startService(Class<? extends TracServiceBase> serviceClass) { this.serviceClasses.add(serviceClass); return this; }
+        public Builder startService(Class<? extends TracServiceBase> serviceClass) { addService(serviceClass, null); return this; }
+        public Builder startService(Class<? extends TracServiceBase> serviceClass, String serviceKey) { addService(serviceClass, serviceKey); return this; }
         public Builder clientConcern(GrpcConcern concern) { clientConcerns.addLast(concern); return this; }
         public Builder preStartAction(Consumer<PlatformTest> action) { this.preStartActions.add(action); return this; }
 
@@ -167,9 +172,23 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
             return new PlatformTest(
                     testConfig, secretKey, tenants, storageFormat,
                     runDbDeploy, manageDataPrefix, localExecutor,
-                    serviceClasses, clientConcerns.build(), preStartActions);
+                    serviceClasses, serviceKeys,
+                    clientConcerns.build(), preStartActions);
+        }
+
+        private void addService(Class<? extends TracServiceBase> serviceClass, String serviceKey) {
+            serviceClasses.add(serviceClass);
+            if (serviceKey != null && !serviceKey.isEmpty())
+                serviceKeys.put(serviceClass.getSimpleName(), serviceKey);
+            else if (SERVICE_KEYS.containsKey(serviceClass.getSimpleName()))
+                serviceKeys.put(serviceClass.getSimpleName(), SERVICE_KEYS.get(serviceClass.getSimpleName()));
+            else
+                throw new ETracInternal("Service key not provided for service class [" + serviceClass.getSimpleName() + "]");
         }
     }
+
+    private final List<TracServiceBase> services;
+    private final Map<String, ManagedChannel> serviceChannels;
 
     private String testId;
     private Path workingDir;
@@ -182,37 +201,46 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
     private ConfigManager configManager;
     private PlatformConfig platformConfig;
 
-    private ManagedChannel metaChannel;
-    private ManagedChannel dataChannel;
-    private ManagedChannel orchChannel;
+    public boolean hasService(String serviceKey) {
+        return serviceKeys.containsValue(serviceKey);
+    }
+
+    public <TClient extends AbstractStub<TClient>> TClient
+    createClient(String serviceKey, Function<Channel, TClient> clientFactory) {
+        if (!serviceChannels.containsKey(serviceKey))
+            throw new ETracInternal("Client not started for service key [" + serviceKey + "]");
+        var channel = serviceChannels.get(serviceKey);
+        var client = clientFactory.apply(channel);
+        return clientConcerns.configureClient(client);
+    }
 
     public TracMetadataApiGrpc.TracMetadataApiFutureStub metaClientFuture() {
-        var client = TracMetadataApiGrpc.newFutureStub(metaChannel);
-        return clientConcerns.configureClient(client);
+        return createClient(ConfigKeys.METADATA_SERVICE_KEY, TracMetadataApiGrpc::newFutureStub);
     }
 
     public TracMetadataApiGrpc.TracMetadataApiBlockingStub metaClientBlocking() {
-        var client = TracMetadataApiGrpc.newBlockingStub(metaChannel);
-        return clientConcerns.configureClient(client);
+        return createClient(ConfigKeys.METADATA_SERVICE_KEY, TracMetadataApiGrpc::newBlockingStub);
     }
 
     public TrustedMetadataApiGrpc.TrustedMetadataApiBlockingStub metaClientTrustedBlocking() {
-        var client = TrustedMetadataApiGrpc.newBlockingStub(metaChannel);
-        return clientConcerns.configureClient(client);
+        return createClient(ConfigKeys.METADATA_SERVICE_KEY, TrustedMetadataApiGrpc::newBlockingStub);
     }
 
     public TracDataApiGrpc.TracDataApiStub dataClient() {
-        var client = TracDataApiGrpc.newStub(dataChannel);
-        return clientConcerns.configureClient(client);
+        return createClient(ConfigKeys.DATA_SERVICE_KEY, TracDataApiGrpc::newStub);
     }
 
     public TracDataApiGrpc.TracDataApiBlockingStub dataClientBlocking() {
-        var client = TracDataApiGrpc.newBlockingStub(dataChannel);
-        return clientConcerns.configureClient(client);
+        return createClient(ConfigKeys.DATA_SERVICE_KEY, TracDataApiGrpc::newBlockingStub);
     }
 
     public TracOrchestratorApiGrpc.TracOrchestratorApiBlockingStub orchClientBlocking() {
-        var client = TracOrchestratorApiGrpc.newBlockingStub(orchChannel);
+        return createClient(ConfigKeys.ORCHESTRATOR_SERVICE_KEY, TracOrchestratorApiGrpc::newBlockingStub);
+    }
+
+    public TracAdminApiGrpc.TracAdminApiBlockingStub adminClientBlocking() {
+        var channel = serviceChannels.get(ConfigKeys.METADATA_SERVICE_KEY);
+        var client = TracAdminApiGrpc.newBlockingStub(channel);
         return clientConcerns.configureClient(client);
     }
 
@@ -260,6 +288,8 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
 
         startServices();
         startClients();
+
+        loadDynamicConfig();
     }
 
     @Override
@@ -347,7 +377,22 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
             }
         }
 
-        var configInputs = List.of(testConfig);
+        // Mark all services that are being started as enabled
+        for (var serviceKey : serviceKeys.values()) {
+            var substitutionKey = String.format("${%s_ENABLED}", serviceKey);
+            substitutions.put(substitutionKey, "true");
+        }
+
+        // Disable any core services that are in the config but not started for the current test
+        for (var serviceKey : SERVICE_KEYS.values()) {
+            var substitutionKey = String.format("${%s_ENABLED}", serviceKey);
+            if (!substitutions.containsKey(substitutionKey))
+                substitutions.put(substitutionKey, "false");
+        }
+
+        var configInputs = new ArrayList<String>();
+        configInputs.add(testConfig);
+        tenants.values().stream().filter(Objects::nonNull).forEach(configInputs::add);
         var configOutputs = ConfigHelpers.prepareConfig(configInputs, workingDir, substitutions);
         platformConfigUrl = configOutputs.get(0);
 
@@ -429,7 +474,7 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         var databaseTasks = new ArrayList<StandardArgs.Task>();
         databaseTasks.add(StandardArgs.task(DeployMetaDB.DEPLOY_SCHEMA_TASK, "", ""));
 
-        for (var tenant : tenants) {
+        for (var tenant : tenants.keySet()) {
 
             // Run both add and alter tenant tasks as part of the standard setup
             // (just to run both tasks, not strictly necessary)
@@ -446,7 +491,10 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
 
         var elg = new NioEventLoopGroup(2);
 
-        StorageTestHelpers.createStoragePrefix(configManager, pluginManager, elg);
+        for (var bootstrapEntry : tenants.entrySet()) {
+            if (bootstrapEntry.getValue() != null)
+                StorageTestHelpers.createStoragePrefix(configManager, pluginManager, elg, bootstrapEntry.getValue());
+        }
 
         elg.shutdownGracefully();
     }
@@ -455,7 +503,10 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
 
         var elg = new NioEventLoopGroup(2);
 
-        StorageTestHelpers.deleteStoragePrefix(configManager, pluginManager, elg);
+        for (var bootstrapEntry : tenants.entrySet()) {
+            if (bootstrapEntry.getValue() != null)
+                StorageTestHelpers.deleteStoragePrefix(configManager, pluginManager, elg, bootstrapEntry.getValue());
+        }
 
         elg.shutdownGracefully();
     }
@@ -464,11 +515,11 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
 
         // TODO: Allow running whole-platform tests over different backend configurations
 
-        if (hasDataSvc()) {
+        if (hasService(ConfigKeys.DATA_SERVICE_KEY)) {
             Files.createDirectory(workingDir.resolve("unit_test_storage"));
         }
 
-        if (hasOrchSvc() && localExecutor) {
+        if (hasService(ConfigKeys.ORCHESTRATOR_SERVICE_KEY) && localExecutor) {
 
             var venvDir = executorDir.resolve("venv").normalize();
 
@@ -524,14 +575,10 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
 
     void stopServices() {
 
-        var iter = services.listIterator();
-
-        while (iter.hasNext()) {
-
+        for (var i = services.iterator(); i.hasNext(); i.remove()) {
             try {
-                var service = iter.next();
+                var service = i.next();
                 service.stop();
-                iter.remove();
             }
             catch (Exception e) {
                 log.error("Error stopping service: {}", e.getMessage(), e);
@@ -541,26 +588,24 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
 
     void startClients() {
 
-        if (hasMetaSvc())
-            metaChannel = channelForService(platformConfig, ConfigKeys.METADATA_SERVICE_KEY);
-
-        if (hasDataSvc())
-            dataChannel = channelForService(platformConfig, ConfigKeys.DATA_SERVICE_KEY);
-
-        if (hasOrchSvc())
-            orchChannel = channelForService(platformConfig, ConfigKeys.ORCHESTRATOR_SERVICE_KEY);
+        for (var serviceClass : serviceClasses) {
+            var serviceKey = serviceKeys.get(serviceClass.getSimpleName());
+            var channel = channelForService(platformConfig, serviceKey);
+            serviceChannels.put(serviceKey, channel);
+        }
     }
 
-    void stopClients() throws Exception {
+    void stopClients() {
 
-        if (orchChannel != null)
-            orchChannel.shutdown().awaitTermination(10, TimeUnit.SECONDS);
-
-        if (dataChannel != null)
-            dataChannel.shutdown().awaitTermination(10, TimeUnit.SECONDS);
-
-        if (metaChannel != null)
-            metaChannel.shutdown().awaitTermination(10, TimeUnit.SECONDS);
+        for (var i = serviceChannels.entrySet().iterator(); i.hasNext(); i.remove()) {
+            try {
+                var channel = i.next().getValue();
+                channel.shutdown().awaitTermination(10, TimeUnit.SECONDS);
+            }
+            catch (Exception e) {
+                log.error("Error stopping client: {}", e.getMessage(), e);
+            }
+        }
     }
 
     ManagedChannel channelForService(PlatformConfig platformConfig, String serviceKey) {
@@ -573,5 +618,75 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         builder.directExecutor();
 
         return builder.build();
+    }
+
+    private void loadDynamicConfig() throws Exception {
+
+        if (tenants.values().stream().allMatch(Objects::isNull))
+            return;
+
+        if (!hasService(ConfigKeys.ADMIN_SERVICE_KEY))
+            throw new ETracInternal("Admin service is required to bootstrap tenant config");
+
+        var adminClient = createClient(ConfigKeys.ADMIN_SERVICE_KEY, TracAdminApiGrpc::newBlockingStub);
+
+        for (var bootstrapEntry : tenants.entrySet()) {
+            if (bootstrapEntry.getValue() != null)
+                loadDynamicConfig(bootstrapEntry.getKey(), bootstrapEntry.getValue(), adminClient);
+        }
+    }
+
+    private void loadDynamicConfig(String tenant, String configPath, TracAdminApiGrpc.TracAdminApiBlockingStub adminClient) throws Exception {
+
+        // Assuming config path is in the same dir as the root config file
+        var configSep = configPath.lastIndexOf("/");
+        var configFile = configPath.substring(configSep + 1);
+
+        var bootstrap = configManager.loadConfigObject(configFile, DynamicConfig.class);
+
+        for (var config : bootstrap.getConfigMap().entrySet()) {
+
+            var configObject = ObjectDefinition.newBuilder()
+                    .setObjectType(ObjectType.CONFIG)
+                    .setConfig(config.getValue())
+                    .build();
+
+            var writeRequest = ConfigWriteRequest.newBuilder()
+                    .setTenant(tenant)
+                    .setConfigClass(bootstrap.getConfigClass())
+                    .setConfigKey(config.getKey())
+                    .setDefinition(configObject)
+                    .build();
+
+            var writeResponse = adminClient.createConfigObject(writeRequest);
+
+            log.info("Created config entry: config class = {}, config key = {}",
+                    writeResponse.getEntry().getConfigClass(),
+                    writeResponse.getEntry().getConfigKey());
+        }
+
+        for (var resource : bootstrap.getResourcesMap().entrySet()) {
+
+            var resourceObject = ObjectDefinition.newBuilder()
+                    .setObjectType(ObjectType.RESOURCE)
+                    .setResource(resource.getValue())
+                    .build();
+
+            var writeRequest = ConfigWriteRequest.newBuilder()
+                    .setTenant(tenant)
+                    .setConfigClass(bootstrap.getResourceClass())
+                    .setConfigKey(resource.getKey())
+                    .setDefinition(resourceObject)
+                    .build();
+
+            var writeResponse = adminClient.createConfigObject(writeRequest);
+
+            log.info("Created resource entry: config class = {}, config key = {}",
+                    writeResponse.getEntry().getConfigClass(),
+                    writeResponse.getEntry().getConfigKey());
+        }
+
+        // Allow some time for config changes to propagate
+        Thread.sleep(100);
     }
 }

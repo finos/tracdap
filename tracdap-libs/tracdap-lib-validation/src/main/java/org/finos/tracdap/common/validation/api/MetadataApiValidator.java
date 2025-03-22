@@ -83,9 +83,6 @@ public class MetadataApiValidator {
     private static final Descriptors.FieldDescriptor RIR_RESOURCE_TYPE;
     private static final Descriptors.FieldDescriptor RIR_RESOURCE_KEY;
 
-    private static final Descriptors.Descriptor CLIENT_CONFIG_REQUEST;
-    private static final Descriptors.FieldDescriptor CCR_APPLICATION;
-
     static {
 
         METADATA_WRITE_REQUEST = MetadataWriteRequest.getDescriptor();
@@ -130,9 +127,6 @@ public class MetadataApiValidator {
         RIR_TENANT = field(RESOURCE_INFO_REQUEST, ResourceInfoRequest.TENANT_FIELD_NUMBER);
         RIR_RESOURCE_TYPE = field(RESOURCE_INFO_REQUEST, ResourceInfoRequest.RESOURCETYPE_FIELD_NUMBER);
         RIR_RESOURCE_KEY = field(RESOURCE_INFO_REQUEST, ResourceInfoRequest.RESOURCEKEY_FIELD_NUMBER);
-
-        CLIENT_CONFIG_REQUEST = ClientConfigRequest.getDescriptor();
-        CCR_APPLICATION = field(CLIENT_CONFIG_REQUEST, ClientConfigRequest.APPLICATION_FIELD_NUMBER);
     }
 
     @Validator(method = "createObject")
@@ -553,14 +547,5 @@ public class MetadataApiValidator {
                 .pop();
 
         return ctx;
-    }
-
-    @Validator(method = "clientConfig")
-    public static ValidationContext clientConfig(ClientConfigRequest msg, ValidationContext ctx) {
-
-        return ctx.push(CCR_APPLICATION)
-                .apply(CommonValidators::required)
-                .apply(CommonValidators::resourceKey)
-                .pop();
     }
 }

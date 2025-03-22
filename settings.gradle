@@ -63,15 +63,17 @@ project(":tracdap-lib-test-proto").projectDir = file("tracdap-libs/tracdap-lib-t
 
 // Java services
 
+include 'tracdap-gateway'
 include 'tracdap-svc-meta'
 include 'tracdap-svc-data'
 include 'tracdap-svc-orch'
-include 'tracdap-gateway'
+include 'tracdap-svc-admin'
 
+project(":tracdap-gateway").projectDir = file("tracdap-services/tracdap-gateway")
 project(":tracdap-svc-meta").projectDir = file("tracdap-services/tracdap-svc-meta")
 project(":tracdap-svc-data").projectDir = file("tracdap-services/tracdap-svc-data")
 project(":tracdap-svc-orch").projectDir = file("tracdap-services/tracdap-svc-orch")
-project(":tracdap-gateway").projectDir = file("tracdap-services/tracdap-gateway")
+project(":tracdap-svc-admin").projectDir = file("tracdap-services/tracdap-svc-admin")
 
 
 

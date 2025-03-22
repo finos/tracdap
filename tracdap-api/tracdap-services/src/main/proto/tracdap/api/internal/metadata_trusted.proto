@@ -24,7 +24,9 @@ option java_multiple_files = true;
 
 import "tracdap/metadata/object_id.proto";
 import "tracdap/metadata/tag.proto";
+import "tracdap/metadata/config.proto";
 import "tracdap/api/metadata.proto";
+import "tracdap/api/admin.proto";
 
 import "google/api/annotations.proto";
 
@@ -185,4 +187,11 @@ service TrustedMetadataApi {
       body: "searchParams"
     };
   }
+
+  /**
+   * Support listing config entries directly through the metadata API.
+   *
+   * This is for internal read-only access to config, without needing the admin API.
+   */
+  rpc listConfigEntries(ConfigListRequest) returns (ConfigListResponse);
 };

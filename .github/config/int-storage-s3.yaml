@@ -45,25 +45,6 @@ storage:
   defaultBucket: STORAGE_INTEGRATION
   defaultFormat: ARROW_FILE
 
-  buckets:
-
-    STORAGE_INTEGRATION:
-      protocol: S3
-      properties:
-        region: ${TRAC_AWS_REGION}
-        bucket: ${TRAC_AWS_BUCKET}
-        prefix: int_storage_${TRAC_TEST_ID}/
-        credentials: ${TRAC_AWS_CREDENTIALS}
-        accessKeyId: ${TRAC_AWS_ACCESS_KEY_ID}
-        secretAccessKey: ${TRAC_AWS_SECRET_ACCESS_KEY}
-
-
-repositories:
-  UNIT_TEST_REPO:
-    protocol: git
-    properties:
-      repoUrl: ${CURRENT_GIT_ORIGIN}
-
 
 executor:
   protocol: LOCAL
@@ -78,13 +59,20 @@ jobCache:
 services:
 
   metadata:
+    enabled: ${metadata_ENABLED}
     port: 8081
 
   data:
+    enabled: ${data_ENABLED}
     port: 8082
 
   orchestrator:
+    enabled: ${orchestrator_ENABLED}
     port: 8083
+
+  admin:
+    enabled: ${admin_ENABLED}
+    port: 8084
 
 deployment:
   layout: SANDBOX

@@ -320,11 +320,18 @@ public class CommonValidators {
                 "is not a valid identifier", value, ctx);
     }
 
-    public static ValidationContext resourceKey(String value, ValidationContext ctx) {
+    public static ValidationContext configKey(String value, ValidationContext ctx) {
 
         return regexMatch(
-                MetadataConstants.VALID_RESOURCE_KEY, true,
-                "is not a valid resource key", value, ctx);
+                ValidationConstants.CONFIG_KEY, true,
+                "is not a valid config key", value, ctx);
+    }
+
+    public static ValidationContext propertyKey(String value, ValidationContext ctx) {
+
+        return regexMatch(
+                ValidationConstants.PROPERTY_KEY, true,
+                "is not a valid property key", value, ctx);
     }
 
     public static ValidationContext notTracReserved(String value, ValidationContext ctx) {
