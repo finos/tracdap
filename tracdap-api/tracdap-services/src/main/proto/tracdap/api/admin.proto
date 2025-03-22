@@ -38,22 +38,52 @@ import "google/api/annotations.proto";
 service TracAdminApi {
 
     /// Create a new config entry and store the associated object definition
-    rpc createConfigObject(ConfigWriteRequest) returns (ConfigWriteResponse);
+    rpc createConfigObject(ConfigWriteRequest) returns (ConfigWriteResponse) {
+        option (google.api.http) = {
+            post: "/{tenant}/create-config-object"
+            body: "*"
+        };
+    }
 
     /// Update an existing config entry and store the associated object definition
-    rpc updateConfigObject(ConfigWriteRequest) returns (ConfigWriteResponse);
+    rpc updateConfigObject(ConfigWriteRequest) returns (ConfigWriteResponse) {
+        option (google.api.http) = {
+            post: "/{tenant}/update-config-object"
+            body: "*"
+        };
+    }
 
     /// Delete an existing config entry
-    rpc deleteConfigObject(ConfigWriteRequest) returns (ConfigWriteResponse);
+    rpc deleteConfigObject(ConfigWriteRequest) returns (ConfigWriteResponse) {
+        option (google.api.http) = {
+            post: "/{tenant}/delete-config-object"
+            body: "*"
+        };
+    }
 
     /// Read an individual config entry
-    rpc readConfigObject(ConfigReadRequest) returns (ConfigReadResponse);
+    rpc readConfigObject(ConfigReadRequest) returns (ConfigReadResponse) {
+        option (google.api.http) = {
+            post: "/{tenant}/read-config-object"
+            body: "*"
+        };
+    }
 
     /// Read a batch of config entries
-    rpc readConfigBatch(ConfigReadBatchRequest) returns (ConfigReadBatchResponse);
+    rpc readConfigBatch(ConfigReadBatchRequest) returns (ConfigReadBatchResponse) {
+        option (google.api.http) = {
+            post: "/{tenant}/read-config-batch"
+            body: "*"
+        };
+    }
 
     /// List available config entries, with optional filter criteria
-    rpc listConfigEntries(ConfigListRequest) returns (ConfigListResponse);
+    rpc listConfigEntries(ConfigListRequest) returns (ConfigListResponse) {
+        option (google.api.http) = {
+            post: "/{tenant}/list-config-entries"
+            body: "*"
+        };
+    }
 }
 
 
