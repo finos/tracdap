@@ -80,6 +80,7 @@ public class TracDataService extends TracServiceBase {
     private EventLoopGroup bossGroup;
     private EventLoopGroup serviceGroup;
     private ExecutorService offloadExecutor;
+    private GrpcConcern commonConcerns;
     private ManagedChannel metaClientChanel;
     private ManagedChannel metaBlockingChanel;
     private StorageManager storage;
@@ -152,7 +153,7 @@ public class TracDataService extends TracServiceBase {
             var eventLoopResolver = new EventLoopResolver(serviceGroup, offloadTracking);
 
             // Common framework for cross-cutting concerns
-            var commonConcerns = buildCommonConcerns();
+            commonConcerns = buildCommonConcerns();
 
             metaClientChanel = prepareMetadataClientChannel(platformConfig, clientChannelType);
             var metaClient = prepareMetadataClient(eventLoopResolver, commonConcerns);
@@ -318,7 +319,10 @@ public class TracDataService extends TracServiceBase {
                 .addAllSelector(selectors)
                 .build();
 
-        var resourceObjects = metadataClient.readBatch(batchRequest);
+        var clientState = commonConcerns.prepareClientCall(Context.ROOT);
+        var client = clientState.configureClient(metadataClient);
+
+        var resourceObjects = client.readBatch(batchRequest);
 
         for (var resourceObject : resourceObjects.getTagList()) {
 

@@ -17,6 +17,7 @@
 
 package org.finos.tracdap.svc.orch;
 
+import io.grpc.Context;
 import org.finos.tracdap.api.ConfigListRequest;
 import org.finos.tracdap.api.MetadataBatchRequest;
 import org.finos.tracdap.api.OrchestratorServiceProto;
@@ -85,6 +86,7 @@ public class TracOrchestratorService extends TracServiceBase {
 
     private Server server;
     private ManagedChannel clientChannel;
+    private GrpcConcern commonConcerns;
 
     private IJobExecutor<?> jobExecutor;
     private IJobCacheManager jobCacheManager;
@@ -141,7 +143,7 @@ public class TracOrchestratorService extends TracServiceBase {
             serviceGroup = new NioEventLoopGroup(CONCURRENT_REQUESTS, new DefaultThreadFactory("orch-svc"));
 
             // Common framework for cross-cutting concerns
-            var commonConcerns = buildCommonConcerns();
+            commonConcerns = buildCommonConcerns();
 
             var metaClient = prepareMetadataClient(platformConfig, clientChannelFactory, commonConcerns);
 
@@ -337,7 +339,10 @@ public class TracOrchestratorService extends TracServiceBase {
                 .addAllSelector(selectors)
                 .build();
 
-        var resourceObjects = metaClient.readBatch(batchRequest);
+        var clientState = commonConcerns.prepareClientCall(Context.ROOT);
+        var client = clientState.configureClient(metaClient);
+
+        var resourceObjects = client.readBatch(batchRequest);
 
         for (var resource : resourceObjects.getTagList()) {
 
