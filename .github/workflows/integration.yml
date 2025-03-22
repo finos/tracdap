@@ -80,6 +80,9 @@ jobs:
           echo SECRET_KEY=xHjFeFlo$k= >> etc/env.sh
           sed -i "s#/path/to#${deploy_dir}#g" etc/trac-platform.yaml
           
+          # For dynamic resources, add_resources example will want to create storage here 
+          mkdir -p examples/apps/javascript/data/storage1
+          
           bin/secret-tool run --task init_secrets
           bin/secret-tool run --task create_root_auth_key EC 256
           bin/deploy-metadb run --task deploy_schema
