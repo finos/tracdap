@@ -30,9 +30,9 @@ if (!global.hasOwnProperty("fetch")) {
 
 
 const ALL_EXAMPLES = [
-    "add_resources",
     "hello_world",
     "metadata_mojo",
+    "add_resources",
     "using_data",
     "arrow",
     "streaming",
