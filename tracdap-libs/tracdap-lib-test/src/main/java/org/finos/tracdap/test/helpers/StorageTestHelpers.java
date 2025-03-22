@@ -64,6 +64,7 @@ public class StorageTestHelpers {
             var storageConfig = PluginConfig.newBuilder()
                     .setProtocol(resource.getValue().getProtocol())
                     .putProperties(IStorageManager.PROP_STORAGE_KEY, resource.getKey())
+                    .putAllProperties(resource.getValue().getPropertiesMap())
                     .removeProperties("prefix")
                     .build();
 
