@@ -33,6 +33,7 @@ import org.finos.tracdap.common.util.InterfaceLogging;
 import org.finos.tracdap.common.validation.ValidationConcern;
 import org.finos.tracdap.config.PlatformConfig;
 import org.finos.tracdap.common.metadata.dal.IMetadataDal;
+import org.finos.tracdap.metadata.ResourceDefinition;
 import org.finos.tracdap.svc.meta.api.MessageProcessor;
 import org.finos.tracdap.svc.meta.services.MetadataReadService;
 import org.finos.tracdap.svc.meta.services.MetadataSearchService;
@@ -51,6 +52,7 @@ import java.time.Duration;
 import java.time.temporal.ChronoUnit;
 import java.util.Properties;
 import java.util.concurrent.*;
+import java.util.stream.Collectors;
 
 
 public class TracMetadataService extends TracServiceBase {
@@ -119,7 +121,13 @@ public class TracMetadataService extends TracServiceBase {
             // Set up services and APIs
             var dalWithLogging = InterfaceLogging.wrap(dal, IMetadataDal.class);
 
+            // Load existing resources from the metadata store
+            var tenants = dal.listTenants();
             var resources = new DynamicConfig.Resources();
+
+            for (var tenant : tenants)
+                loadResources(tenant.getTenantCode(), resources);
+
             var readService = new MetadataReadService(dalWithLogging, platformConfig, resources);
             var writeService = new MetadataWriteService(dalWithLogging);
             var searchService = new MetadataSearchService(dalWithLogging);
@@ -265,6 +273,25 @@ public class TracMetadataService extends TracServiceBase {
             var message = "Config property must be an integer: " + propKey + ", got value '" + propValue + "'";
             log.error(message);
             throw new EStartup(message);
+        }
+    }
+
+    void loadResources(String tenant, DynamicConfig<ResourceDefinition> resources) {
+
+        var configEntries = dal.listConfigEntries(tenant, ConfigKeys.TRAC_RESOURCES, false);
+
+        var selectors = configEntries.stream()
+                .map(entry -> entry.getDetails().getObjectSelector())
+                .collect(Collectors.toList());
+
+        var resourceObjects = dal.loadObjects(tenant, selectors);
+
+        for (int i = 0; i < configEntries.size(); i++) {
+
+            var resourceKey = configEntries.get(i).getConfigKey();
+            var resourceDef = resourceObjects.get(i).getDefinition().getResource();
+
+            resources.addEntry(resourceKey, resourceDef);
         }
     }
 }
