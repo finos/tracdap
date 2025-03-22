@@ -31,7 +31,7 @@ metadata:
     properties:
       dialect: H2
       # Set the path to your H2 metadata file here
-      jdbcUrl: /path/to/metadata/trac.meta
+      jdbcUrl: /path/to/metadata/trac.meta;AUTO_SERVER=TRUE
       h2.user: trac
       h2.pass: trac
       h2.schema: public
