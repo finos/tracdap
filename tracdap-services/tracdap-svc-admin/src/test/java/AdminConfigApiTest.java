@@ -25,7 +25,6 @@ import org.finos.tracdap.metadata.ConfigEntry;
 import org.finos.tracdap.metadata.ObjectType;
 import org.finos.tracdap.metadata.ResourceType;
 import org.finos.tracdap.svc.admin.TracAdminService;
-import org.finos.tracdap.svc.meta.TracMetadataService;
 import org.finos.tracdap.test.helpers.PlatformTest;
 import org.finos.tracdap.test.meta.SampleMetadata;
 
@@ -43,8 +42,6 @@ abstract class AdminConfigApiTest {
     public static final String TRAC_CONFIG_UNIT = "config/trac-unit.yaml";
     public static final String TRAC_CONFIG_ENV_VAR = "TRAC_CONFIG_FILE";
 
-    protected TracMetadataApiGrpc.TracMetadataApiBlockingStub metaApi;
-    protected TrustedMetadataApiGrpc.TrustedMetadataApiBlockingStub trustedApi;
     protected TracAdminApiGrpc.TracAdminApiBlockingStub adminApi;
 
     // Include this test case as a unit test
@@ -54,14 +51,11 @@ abstract class AdminConfigApiTest {
         public static final PlatformTest platform = PlatformTest.forConfig(TRAC_CONFIG_UNIT)
                 .runDbDeploy(true)
                 .addTenant(TEST_TENANT)
-                .startService(TracMetadataService.class)
                 .startService(TracAdminService.class)
                 .build();
 
         @BeforeEach
         void setup() {
-            metaApi = platform.createClient(ConfigKeys.METADATA_SERVICE_KEY, TracMetadataApiGrpc::newBlockingStub);
-            trustedApi = platform.createClient(ConfigKeys.METADATA_SERVICE_KEY, TrustedMetadataApiGrpc::newBlockingStub);
             adminApi = platform.createClient(ConfigKeys.ADMIN_SERVICE_KEY, TracAdminApiGrpc::newBlockingStub);
         }
     }
@@ -78,13 +72,10 @@ abstract class AdminConfigApiTest {
                 .runDbDeploy(false)
                 .addTenant(TEST_TENANT)
                 .startService(TracAdminService.class)
-                .startService(TracAdminService.class)
                 .build();
 
         @BeforeEach
         void setup() {
-            metaApi = platform.createClient(ConfigKeys.METADATA_SERVICE_KEY, TracMetadataApiGrpc::newBlockingStub);
-            trustedApi = platform.createClient(ConfigKeys.METADATA_SERVICE_KEY, TrustedMetadataApiGrpc::newBlockingStub);
             adminApi = platform.createClient(ConfigKeys.ADMIN_SERVICE_KEY, TracAdminApiGrpc::newBlockingStub);
         }
     }
