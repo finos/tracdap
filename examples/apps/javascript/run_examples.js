@@ -32,6 +32,7 @@ if (!global.hasOwnProperty("fetch")) {
 const ALL_EXAMPLES = [
     "hello_world",
     "metadata_mojo",
+    "add_resources",
     "using_data",
     "arrow",
     "streaming",
