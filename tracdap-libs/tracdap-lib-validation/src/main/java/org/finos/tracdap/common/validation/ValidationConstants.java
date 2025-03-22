@@ -17,6 +17,7 @@
 
 package org.finos.tracdap.common.validation;
 
+import org.finos.tracdap.common.metadata.MetadataConstants;
 import org.finos.tracdap.metadata.ObjectType;
 
 import java.util.List;
@@ -84,8 +85,8 @@ public class ValidationConstants {
     public static final List<ObjectType> CONFIG_OBJECT_TYPES = List.of(
             ObjectType.CONFIG, ObjectType.RESOURCE);
 
-    // Config keys are similar to identifiers but can also include hyphens
-    public static final Pattern CONFIG_KEY = Pattern.compile("\\A[a-zA-Z_\\-][a-zA-Z0-9_\\-]*\\Z");
+    // Limit config keys to valid identifiers for now
+    public static final Pattern CONFIG_KEY = MetadataConstants.VALID_IDENTIFIER;
 
     // Property keys can also use dotted syntax
     public static final Pattern PROPERTY_KEY = Pattern.compile(
