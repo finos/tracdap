@@ -257,14 +257,14 @@ public class TracDataService extends TracServiceBase {
         log.info("Using metadata service at [{}:{}]",
                 metadataTarget.getHost(), metadataTarget.getPort());
 
-        return metaClientChanel = NettyChannelBuilder
+        var metaClientChanel = NettyChannelBuilder
                 .forAddress(metadataTarget.getHost(), metadataTarget.getPort())
                 .channelType(channelType)
                 .eventLoopGroup(serviceGroup)
                 .directExecutor()
-                .offloadExecutor(offloadExecutor)
-                .usePlaintext()
-                .build();
+                .offloadExecutor(offloadExecutor);
+
+        return commonConcerns.configureClientChannel(metaClientChanel).build();
     }
 
     private ManagedChannel
@@ -275,13 +275,13 @@ public class TracDataService extends TracServiceBase {
         log.info("Using (blocking) metadata service at [{}:{}]",
                 metadataTarget.getHost(), metadataTarget.getPort());
 
-        return metaClientChanel = NettyChannelBuilder
+        var metaClientChanel = NettyChannelBuilder
                 .forAddress(metadataTarget.getHost(), metadataTarget.getPort())
                 .channelType(channelType)
                 .eventLoopGroup(serviceGroup)
-                .executor(offloadExecutor)
-                .usePlaintext()
-                .build();
+                .executor(offloadExecutor);
+
+        return commonConcerns.configureClientChannel(metaClientChanel).build();
     }
 
 

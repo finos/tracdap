@@ -312,10 +312,9 @@ public class TracOrchestratorService extends TracServiceBase {
                     .forAddress(host, port)
                     .channelType(channelType)
                     .eventLoopGroup(nettyGroup)
-                    .executor(serviceGroup)
-                    .usePlaintext();
+                    .executor(serviceGroup);
 
-            return clientChannelBuilder.build();
+            return commonConcerns.configureClientChannel(clientChannelBuilder).build();
         }
     }
 

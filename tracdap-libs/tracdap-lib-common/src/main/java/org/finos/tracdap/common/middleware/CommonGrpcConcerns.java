@@ -17,6 +17,7 @@
 
 package org.finos.tracdap.common.middleware;
 
+import io.grpc.ManagedChannelBuilder;
 import org.finos.tracdap.common.exception.EUnexpected;
 
 import io.grpc.Context;
@@ -73,6 +74,18 @@ public class CommonGrpcConcerns extends CommonConcerns<GrpcConcern> implements G
         }
 
         return clientStub;
+    }
+
+    @Override
+    public ManagedChannelBuilder<? extends ManagedChannelBuilder<?>>
+    configureClientChannel(ManagedChannelBuilder<? extends ManagedChannelBuilder<?>> channelBuilder) {
+
+        for (var stageName : stageOrder) {
+            var stage = stages.get(stageName);
+            channelBuilder = stage.configureClientChannel(channelBuilder);
+        }
+
+        return channelBuilder;
     }
 
     @Override
