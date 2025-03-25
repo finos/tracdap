@@ -264,6 +264,7 @@ public class LocalBatchExecutor implements IBatchExecutor<LocalBatchState> {
 
             var env = pb.environment();
             env.put(VENV_ENV_VAR, tracRuntimeVenv.toString());
+            env.putAll(batchConfig.getEnvironment());
 
             if (batchConfig.isRedirectOutput()) {
 

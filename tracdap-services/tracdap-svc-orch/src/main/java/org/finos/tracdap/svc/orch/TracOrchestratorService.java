@@ -157,7 +157,7 @@ public class TracOrchestratorService extends TracServiceBase {
                     platformConfig.getExecutor(),
                     configManager);
 
-            jobExecutor = new BatchJobExecutor<>(batchExecutor);
+            jobExecutor = new BatchJobExecutor<>(batchExecutor, platformConfig.getExecutor());
 
             jobCacheManager = pluginManager.createService(
                     IJobCacheManager.class,

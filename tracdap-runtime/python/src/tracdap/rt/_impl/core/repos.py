@@ -38,6 +38,13 @@ class RepositoryManager:
 
             try:
 
+                # Add global properties related to the repo protocol
+                related_props = {
+                    k: v for (k, v) in sys_config.properties.items()
+                    if k.startswith(f"{repo_config.protocol}.")}
+
+                repo_config.properties.update(related_props)
+
                 self._repos[repo_name] = plugins.PluginManager.load_plugin(IModelRepository, repo_config)
 
             except ex.EPluginNotAvailable as e:

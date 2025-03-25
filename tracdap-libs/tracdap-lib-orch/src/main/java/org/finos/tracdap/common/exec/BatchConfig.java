@@ -20,7 +20,9 @@ package org.finos.tracdap.common.exec;
 import org.finos.tracdap.common.exception.ETracInternal;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class BatchConfig {
 
@@ -31,12 +33,16 @@ public class BatchConfig {
     private LaunchArg stdOut;
     private LaunchArg stdErr;
 
+    private final Map<String, String> environment;
+
     private BatchConfig(LaunchCmd launchCmd, List<LaunchArg> launchArgs, boolean redirectOutput, LaunchArg stdOut, LaunchArg stdErr) {
         this.launchCmd = launchCmd;
         this.launchArgs = launchArgs;
         this.redirectOutput = redirectOutput;
         this.stdOut = stdOut;
         this.stdErr = stdErr;
+
+        this.environment = new HashMap<>();
     }
 
     public static BatchConfig forCommand(LaunchCmd launchCmd, List<LaunchArg> launchArgs) {
@@ -61,6 +67,10 @@ public class BatchConfig {
         this.stdErr = stdErr;
     }
 
+    void addEnvironmentVariable(String key, String value) {
+        environment.put(key, value);
+    }
+
     public LaunchCmd getLaunchCmd() {
         return launchCmd;
     }
@@ -79,5 +89,9 @@ public class BatchConfig {
 
     public LaunchArg getStdErr() {
         return stdErr;
+    }
+
+    public Map<String, String> getEnvironment() {
+        return environment;
     }
 }
