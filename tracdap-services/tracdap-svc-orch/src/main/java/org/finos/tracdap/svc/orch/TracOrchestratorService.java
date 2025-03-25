@@ -315,7 +315,7 @@ public class TracOrchestratorService extends TracServiceBase {
                     .executor(serviceGroup)
                     .usePlaintext();
 
-            return clientChannelBuilder.build();
+            return commonConcerns.configureClientChannel(clientChannelBuilder).build();
         }
     }
 

@@ -86,10 +86,11 @@ public class NotifierService {
 
         var target = RoutingUtils.serviceTarget(platformConfig, serviceKey);
 
-        var clientChannel = ManagedChannelBuilder
+        var clientChannelBuilder = ManagedChannelBuilder
                 .forAddress(target.getHost(), target.getPort())
-                .usePlaintext()
-                .build();
+                .usePlaintext();
+
+        var clientChannel = commonConcerns.configureClientChannel(clientChannelBuilder).build();
 
         var notifier = InternalMessagingApiGrpc.newFutureStub(clientChannel);
 
