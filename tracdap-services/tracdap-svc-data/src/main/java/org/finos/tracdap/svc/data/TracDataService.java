@@ -262,8 +262,7 @@ public class TracDataService extends TracServiceBase {
                 .channelType(channelType)
                 .eventLoopGroup(serviceGroup)
                 .directExecutor()
-                .offloadExecutor(offloadExecutor)
-                .usePlaintext();
+                .offloadExecutor(offloadExecutor);
 
         return commonConcerns.configureClientChannel(metaClientChanel).build();
     }
@@ -280,8 +279,7 @@ public class TracDataService extends TracServiceBase {
                 .forAddress(metadataTarget.getHost(), metadataTarget.getPort())
                 .channelType(channelType)
                 .eventLoopGroup(serviceGroup)
-                .executor(offloadExecutor)
-                .usePlaintext();
+                .executor(offloadExecutor);
 
         return commonConcerns.configureClientChannel(metaClientChanel).build();
     }

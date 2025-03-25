@@ -17,6 +17,7 @@
 
 package org.finos.tracdap.common.service;
 
+import io.grpc.ManagedChannelBuilder;
 import org.finos.tracdap.common.middleware.CommonConcerns;
 import org.finos.tracdap.common.middleware.CommonGrpcConcerns;
 import org.finos.tracdap.common.middleware.GrpcConcern;
@@ -68,6 +69,14 @@ public class TracServiceConfig {
             return clientStub
                     .withCompression(ClientCompressionInterceptor.COMPRESSION_TYPE)
                     .withInterceptors(new ClientCompressionInterceptor());
+        }
+
+        @Override
+        public ManagedChannelBuilder<? extends ManagedChannelBuilder<?>>
+        configureClientChannel(ManagedChannelBuilder<? extends ManagedChannelBuilder<?>> channelBuilder) {
+
+            // Fallback default - use common concerns to set up transport security
+            return channelBuilder.usePlaintext();
         }
     }
 
