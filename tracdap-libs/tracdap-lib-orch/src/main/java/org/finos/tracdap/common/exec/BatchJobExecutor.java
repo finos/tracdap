@@ -25,10 +25,7 @@ import org.finos.tracdap.common.grpc.ClientCompressionInterceptor;
 import org.finos.tracdap.common.grpc.GrpcChannelFactory;
 import org.finos.tracdap.common.grpc.ClientLoggingInterceptor;
 import org.finos.tracdap.common.metadata.MetadataUtil;
-import org.finos.tracdap.config.JobConfig;
-import org.finos.tracdap.config.JobResult;
-import org.finos.tracdap.config.RuntimeConfig;
-import org.finos.tracdap.config.ServiceConfig;
+import org.finos.tracdap.config.*;
 import org.finos.tracdap.metadata.JobStatusCode;
 import org.finos.tracdap.metadata.TagHeader;
 
@@ -41,12 +38,17 @@ import org.slf4j.LoggerFactory;
 import java.io.Serializable;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Flow;
 import java.util.regex.Pattern;
 
 
 public class BatchJobExecutor<TBatchState extends Serializable> implements IJobExecutor<BatchJobState<TBatchState>> {
+
+    public static final Pattern RUNTIME_ENV_KEY = Pattern.compile("runtime\\.env\\.(\\w+)");
+    public static final Pattern RUNTIME_PROP_KEY = Pattern.compile("runtime\\.(\\w+)");
 
     private static final short DEFAULT_RUNTIME_API_PORT = 9000;
 
@@ -54,12 +56,14 @@ public class BatchJobExecutor<TBatchState extends Serializable> implements IJobE
 
     private final Logger log = LoggerFactory.getLogger(getClass());
     private final IBatchExecutor<TBatchState> batchExecutor;
+    private final PluginConfig executorConfig;
     private final ConfigParser configParser;
 
     private GrpcChannelFactory channelFactory;
 
-    public BatchJobExecutor(IBatchExecutor<TBatchState> batchExecutor) {
+    public BatchJobExecutor(IBatchExecutor<TBatchState> batchExecutor, PluginConfig executorConfig) {
         this.batchExecutor = batchExecutor;
+        this.executorConfig = executorConfig;
         this.configParser = new ConfigParser();
     }
 
@@ -96,6 +100,10 @@ public class BatchJobExecutor<TBatchState extends Serializable> implements IJobE
         try {
 
             var batchSysConfig = sysConfig.toBuilder();
+            var batchEnvironment = new HashMap<String, String>();
+
+            // Add settings from this executor's config
+            addRuntimeSettings(batchSysConfig, batchEnvironment);
 
             var runtimeApiEnabled = batchExecutor.hasFeature(IBatchExecutor.Feature.EXPOSE_PORT);
             var storageMappingEnabled = batchExecutor.hasFeature(IBatchExecutor.Feature.STORAGE_MAPPING);
@@ -149,6 +157,8 @@ public class BatchJobExecutor<TBatchState extends Serializable> implements IJobE
                         LaunchArg.path("log", "trac_rt_stdout.log"),
                         LaunchArg.path("log", "trac_rt_stderr.log"));
             }
+
+            batchEnvironment.forEach(batchConfig::addEnvironmentVariable);
 
             batchState = batchExecutor.submitBatch(batchKey, batchState, batchConfig);
 
@@ -247,6 +257,26 @@ public class BatchJobExecutor<TBatchState extends Serializable> implements IJobE
         }
 
         return jobStatus;
+    }
+
+    private void addRuntimeSettings(RuntimeConfig.Builder config, Map<String, String> environment) {
+
+        for (var property : executorConfig.getPropertiesMap().entrySet()) {
+
+            var envMatch = RUNTIME_ENV_KEY.matcher(property.getKey());
+            var propMatch = RUNTIME_PROP_KEY.matcher(property.getKey());
+
+            if (envMatch.matches()) {
+                var envKey = envMatch.group(1);
+                var envValue = property.getValue();
+                environment.put(envKey, envValue);
+            }
+            else if (propMatch.matches()) {
+                var propKey = propMatch.group(1);
+                var propValue = property.getValue();
+                config.putProperties(propKey, propValue);
+            }
+        }
     }
 
     private RuntimeJobStatus getStatusFromApi(BatchJobState<TBatchState> jobState) {
