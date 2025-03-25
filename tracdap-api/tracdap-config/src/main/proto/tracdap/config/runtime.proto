@@ -35,6 +35,8 @@ message RuntimeConfig {
   SparkSettings sparkSettings = 5;
 
   ServiceConfig runtimeApi = 6;
+
+  map<string, string> properties = 7;
 }
 
 message SparkSettings {
