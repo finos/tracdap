@@ -48,7 +48,7 @@ import java.util.regex.Pattern;
 public class BatchJobExecutor<TBatchState extends Serializable> implements IJobExecutor<BatchJobState<TBatchState>> {
 
     public static final Pattern RUNTIME_ENV_KEY = Pattern.compile("runtime\\.env\\.(\\w+)");
-    public static final Pattern RUNTIME_PROP_KEY = Pattern.compile("runtime\\.(\\w+)");
+    public static final Pattern RUNTIME_PROP_KEY = Pattern.compile("runtime\\.((\\w+\\.)*\\w+)");
 
     private static final short DEFAULT_RUNTIME_API_PORT = 9000;
 
