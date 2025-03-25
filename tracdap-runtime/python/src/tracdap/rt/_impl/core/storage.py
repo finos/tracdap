@@ -81,7 +81,7 @@ class StorageManager:
         self.__file_storage: tp.Dict[str, IFileStorage] = dict()
         self.__data_storage: tp.Dict[str, IDataStorage] = dict()
         self.__external: tp.List[str] = list()
-        self.__settings = sys_config.storage
+        self.__sys_config = sys_config
 
         for storage_key, storage_config in sys_config.storage.buckets.items():
             self.create_storage(storage_key, storage_config)
@@ -93,12 +93,19 @@ class StorageManager:
             self.create_storage(storage_key, storage_config)
 
     def default_storage_key(self):
-        return self.__settings.defaultBucket
+        return self.__sys_config.storage.defaultBucket
 
     def default_storage_format(self):
-        return self.__settings.defaultFormat
+        return self.__sys_config.storage.defaultFormat
 
     def create_storage(self, storage_key: str, storage_config: _cfg.PluginConfig):
+
+        # Add global properties related to the storage protocol
+        related_props = {
+            k: v for (k, v) in self.__sys_config.properties.items()
+            if k.startswith(f"{storage_config.protocol}.")}
+
+        storage_config.properties.update(related_props)
 
         if plugins.PluginManager.is_plugin_available(IStorageProvider, storage_config.protocol):
             self._create_storage_from_provider(storage_key, storage_config)
