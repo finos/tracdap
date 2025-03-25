@@ -18,6 +18,7 @@
 package org.finos.tracdap.common.middleware;
 
 import io.grpc.Context;
+import io.grpc.ManagedChannelBuilder;
 import io.grpc.ServerBuilder;
 import io.grpc.stub.AbstractStub;
 
@@ -35,6 +36,9 @@ public interface GrpcConcern extends GrpcServerConfig, GrpcClientConfig, BaseCon
     configureClient(TStub clientStub) {
         return clientStub;
     }
+
+    default ManagedChannelBuilder<? extends ManagedChannelBuilder<?>>
+    configureClientChannel(ManagedChannelBuilder<? extends ManagedChannelBuilder<?>> channelBuilder) { return channelBuilder; }
 
     default GrpcClientState prepareClientCall(Context callContext) {
         return NOOP_CLIENT_CONFIG;
