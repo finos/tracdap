@@ -19,7 +19,7 @@ package org.finos.tracdap.svc.meta;
 
 import org.finos.tracdap.api.MetadataServiceProto;
 import org.finos.tracdap.api.internal.InternalMessagingProto;
-import org.finos.tracdap.api.internal.MetadataTrustedProto;
+import org.finos.tracdap.api.internal.InternalMetadataProto;
 import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.config.DynamicConfig;
@@ -43,7 +43,7 @@ import io.grpc.Server;
 import io.grpc.ServerBuilder;
 
 import org.finos.tracdap.svc.meta.api.TracMetadataApi;
-import org.finos.tracdap.svc.meta.api.TrustedMetadataApi;
+import org.finos.tracdap.svc.meta.api.InternalMetadataApi;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -133,7 +133,7 @@ public class TracMetadataService extends TracServiceBase {
             var searchService = new MetadataSearchService(dalWithLogging);
 
             var publicApi = new TracMetadataApi(readService, writeService, searchService);
-            var trustedApi = new TrustedMetadataApi(readService, writeService, searchService);
+            var internalApi = new InternalMetadataApi(readService, writeService, searchService);
             var messageProcessor = new MessageProcessor(resources, dal);
 
             // Common framework for cross-cutting concerns
@@ -150,7 +150,7 @@ public class TracMetadataService extends TracServiceBase {
                     .forPort(servicePort)
                     .executor(executor)
                     .addService(publicApi)
-                    .addService(trustedApi)
+                    .addService(internalApi)
                     .addService(messageProcessor);
 
             // Apply common concerns
@@ -195,7 +195,7 @@ public class TracMetadataService extends TracServiceBase {
         // Validation concern for the APIs being served
         var validationConcern = new ValidationConcern(
                 MetadataServiceProto.getDescriptor(),
-                MetadataTrustedProto.getDescriptor(),
+                InternalMetadataProto.getDescriptor(),
                 InternalMessagingProto.getDescriptor());
 
         commonConcerns = commonConcerns.addAfter(TracServiceConfig.TRAC_PROTOCOL, validationConcern);

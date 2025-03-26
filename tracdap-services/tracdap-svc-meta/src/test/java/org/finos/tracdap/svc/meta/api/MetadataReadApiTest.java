@@ -18,7 +18,7 @@
 package org.finos.tracdap.svc.meta.api;
 
 import org.finos.tracdap.api.*;
-import org.finos.tracdap.api.internal.TrustedMetadataApiGrpc;
+import org.finos.tracdap.api.internal.InternalMetadataApiGrpc;
 import org.finos.tracdap.common.metadata.MetadataConstants;
 import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.common.metadata.MetadataCodec;
@@ -50,7 +50,7 @@ abstract class MetadataReadApiTest {
     public static final String TRAC_CONFIG_ENV_VAR = "TRAC_CONFIG_FILE";
 
     protected TracMetadataApiGrpc.TracMetadataApiBlockingStub readApi;
-    protected TrustedMetadataApiGrpc.TrustedMetadataApiBlockingStub writeApi;
+    protected InternalMetadataApiGrpc.InternalMetadataApiBlockingStub writeApi;
 
     // Include this test case as a unit test
     static class UnitTest extends MetadataReadApiTest {
@@ -65,7 +65,7 @@ abstract class MetadataReadApiTest {
         @BeforeEach
         void setup() {
             readApi = platform.metaClientBlocking();
-            writeApi = platform.metaClientTrustedBlocking();
+            writeApi = platform.metaClientInternalBlocking();
         }
     }
 
@@ -86,7 +86,7 @@ abstract class MetadataReadApiTest {
         @BeforeEach
         void setup() {
             readApi = platform.metaClientBlocking();
-            writeApi = platform.metaClientTrustedBlocking();
+            writeApi = platform.metaClientInternalBlocking();
         }
     }
 

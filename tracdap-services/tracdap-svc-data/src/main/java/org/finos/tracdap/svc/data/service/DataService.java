@@ -18,7 +18,7 @@
 package org.finos.tracdap.svc.data.service;
 
 import org.finos.tracdap.api.*;
-import org.finos.tracdap.api.internal.TrustedMetadataApiGrpc;
+import org.finos.tracdap.api.internal.InternalMetadataApiGrpc;
 import org.finos.tracdap.common.async.Futures;
 import org.finos.tracdap.common.data.ArrowSchema;
 import org.finos.tracdap.common.data.DataPipeline;
@@ -66,7 +66,7 @@ public class DataService {
     private final Map<String, TenantConfig> tenantConfig;
     private final IStorageManager storageManager;
     private final ICodecManager codecManager;
-    private final TrustedMetadataApiGrpc.TrustedMetadataApiFutureStub metaClient;
+    private final InternalMetadataApiGrpc.InternalMetadataApiFutureStub metaClient;
 
     private final Validator validator = new Validator();
     private final Random random = new Random();
@@ -76,7 +76,7 @@ public class DataService {
             Map<String, TenantConfig> tenantConfig,
             IStorageManager storageManager,
             ICodecManager codecManager,
-            TrustedMetadataApiGrpc.TrustedMetadataApiFutureStub metaClient) {
+            InternalMetadataApiGrpc.InternalMetadataApiFutureStub metaClient) {
 
         this.storageConfig = storageConfig;
         this.tenantConfig = tenantConfig;

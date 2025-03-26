@@ -21,7 +21,7 @@ import org.finos.tracdap.api.ConfigListRequest;
 import org.finos.tracdap.api.DataServiceProto;
 import org.finos.tracdap.api.MetadataBatchRequest;
 import org.finos.tracdap.api.internal.InternalMessagingProto;
-import org.finos.tracdap.api.internal.TrustedMetadataApiGrpc;
+import org.finos.tracdap.api.internal.InternalMetadataApiGrpc;
 import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.metadata.MetadataConstants;
 import org.finos.tracdap.common.middleware.GrpcConcern;
@@ -285,24 +285,24 @@ public class TracDataService extends TracServiceBase {
     }
 
 
-    private TrustedMetadataApiGrpc.TrustedMetadataApiFutureStub
+    private InternalMetadataApiGrpc.InternalMetadataApiFutureStub
     prepareMetadataClient(EventLoopResolver eventLoopResolver, GrpcConcern commonConcerns) {
 
-        var client = TrustedMetadataApiGrpc.newFutureStub(metaClientChanel)
+        var client = InternalMetadataApiGrpc.newFutureStub(metaClientChanel)
                 .withInterceptors(new EventLoopInterceptor(eventLoopResolver));
 
         return commonConcerns.configureClient(client);
     }
 
-    private TrustedMetadataApiGrpc.TrustedMetadataApiBlockingStub
+    private InternalMetadataApiGrpc.InternalMetadataApiBlockingStub
     prepareMetadataClientBlocking(GrpcConcern commonConcerns, ManagedChannel separateChannel) {
 
-        var client = TrustedMetadataApiGrpc.newBlockingStub(separateChannel);
+        var client = InternalMetadataApiGrpc.newBlockingStub(separateChannel);
         return commonConcerns.configureClient(client);
     }
 
     private void loadStorageResources(
-            TrustedMetadataApiGrpc.TrustedMetadataApiBlockingStub metadataClient, String tenant) {
+            InternalMetadataApiGrpc.InternalMetadataApiBlockingStub metadataClient, String tenant) {
 
         var configList = ConfigListRequest.newBuilder()
                 .setTenant(tenant)

@@ -18,53 +18,53 @@
 package org.finos.tracdap.common.validation.api;
 
 import org.finos.tracdap.api.*;
-import org.finos.tracdap.api.internal.MetadataTrustedProto;
-import org.finos.tracdap.api.internal.TrustedMetadataApiGrpc;
+import org.finos.tracdap.api.internal.InternalMetadataProto;
+import org.finos.tracdap.api.internal.InternalMetadataApiGrpc;
 import org.finos.tracdap.common.validation.core.ValidationContext;
 import org.finos.tracdap.common.validation.core.ValidationType;
 import org.finos.tracdap.common.validation.core.Validator;
 
 
-@Validator(type = ValidationType.STATIC, serviceFile = MetadataTrustedProto.class, serviceName = TrustedMetadataApiGrpc.SERVICE_NAME)
-public class MetadataTrustedApiValidator {
+@Validator(type = ValidationType.STATIC, serviceFile = InternalMetadataProto.class, serviceName = InternalMetadataApiGrpc.SERVICE_NAME)
+public class InternalMetadataApiValidator {
 
-    // Let's not introduce validation differences between the trusted and regular metadata API
+    // Let's not introduce validation differences between the public and internal metadata API
     // Ideally, they should be made into the same API, with differences managed by permissions
     // Or at the very least, two instances of the same API with different settings
-    // Currently, the check for what can be done via the trusted/untrusted API is in the service implementation
+    // Currently, the check for what can be done via the public/internal API is in the service implementation
     // So, validation only needs to worry about what is a semantically valid request
     // This avoids mixing semantics with authorisation
 
-    // Based on this thinking, trusted API validator is just a wrapper on untrusted API validator
+    // Based on this thinking, internal API validator is just a wrapper on public API validator
 
     @Validator(method = "createObject")
     public static ValidationContext createObject(MetadataWriteRequest msg, ValidationContext ctx) {
-        return MetadataApiValidator.createObject(msg, ctx, MetadataApiValidator.TRUSTED_API, null);
+        return MetadataApiValidator.createObject(msg, ctx, MetadataApiValidator.INTERNAL_API, null);
     }
 
     @Validator(method = "updateObject")
     public static ValidationContext updateObject(MetadataWriteRequest msg, ValidationContext ctx) {
-        return MetadataApiValidator.updateObject(msg, ctx, MetadataApiValidator.TRUSTED_API, null);
+        return MetadataApiValidator.updateObject(msg, ctx, MetadataApiValidator.INTERNAL_API, null);
     }
 
     @Validator(method = "updateTag")
     public static ValidationContext updateTag(MetadataWriteRequest msg, ValidationContext ctx) {
-        return MetadataApiValidator.updateTag(msg, ctx, MetadataApiValidator.TRUSTED_API, null);
+        return MetadataApiValidator.updateTag(msg, ctx, MetadataApiValidator.INTERNAL_API, null);
     }
 
     @Validator(method = "preallocateId")
     public static ValidationContext preallocateId(MetadataWriteRequest msg, ValidationContext ctx) {
-        return MetadataApiValidator.preallocateId(msg, ctx);  // always a trusted call
+        return MetadataApiValidator.preallocateId(msg, ctx);  // always an internal call
     }
 
     @Validator(method = "createPreallocatedObject")
     public static ValidationContext createPreallocatedObject(MetadataWriteRequest msg, ValidationContext ctx) {
-        return MetadataApiValidator.createPreallocatedObject(msg, ctx);  // always a trusted call
+        return MetadataApiValidator.createPreallocatedObject(msg, ctx);  // always an internal call
     }
 
     @Validator(method = "writeBatch")
     public static ValidationContext writeBatch(MetadataWriteBatchRequest msg, ValidationContext ctx) {
-        return MetadataApiValidator.writeBatch(msg, ctx, MetadataApiValidator.TRUSTED_API);
+        return MetadataApiValidator.writeBatch(msg, ctx, MetadataApiValidator.INTERNAL_API);
     }
 
     @Validator(method = "readObject")
@@ -82,7 +82,7 @@ public class MetadataTrustedApiValidator {
         return MetadataApiValidator.readBatch(msg, ctx);
     }
 
-    // listConfigEntries on trusted API is a convenience method for internal read-only access
+    // listConfigEntries on internal API is a convenience method for internal read-only access
     // It has the same semantics as the equivalent call on the admin API
 
     @Validator(method = "listConfigEntries")

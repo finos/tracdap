@@ -35,12 +35,12 @@ public class MessageProcessor extends InternalMessagingApiGrpc.InternalMessaging
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
-    private final TrustedMetadataApiGrpc.TrustedMetadataApiBlockingStub metadataApi;
+    private final InternalMetadataApiGrpc.InternalMetadataApiBlockingStub metadataApi;
     private final GrpcConcern commonConcerns;
     private final DynamicConfig.Resources resources;
 
     public MessageProcessor(
-            TrustedMetadataApiGrpc.TrustedMetadataApiBlockingStub metadataApi,
+            InternalMetadataApiGrpc.InternalMetadataApiBlockingStub metadataApi,
             GrpcConcern commonConcerns, DynamicConfig.Resources resources) {
 
         this.metadataApi = metadataApi;

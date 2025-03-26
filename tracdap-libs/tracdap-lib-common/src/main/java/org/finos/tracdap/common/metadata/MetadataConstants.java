@@ -32,7 +32,7 @@ public class MetadataConstants {
 
     // A limited set of object types can be created directly by clients
     // Everything else can only be created by the TRAC platform
-    // I.e. TRAC components have to make trusted calls to the metadata service
+    // I.e. TRAC components have to make calls to the internal metadata API
     public static final List<ObjectType> PUBLIC_WRITABLE_OBJECT_TYPES = Arrays.asList(
             ObjectType.SCHEMA,
             ObjectType.FLOW,

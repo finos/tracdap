@@ -18,7 +18,7 @@
 package org.finos.tracdap.svc.orch.service;
 
 import org.finos.tracdap.api.*;
-import org.finos.tracdap.api.internal.TrustedMetadataApiGrpc;
+import org.finos.tracdap.api.internal.InternalMetadataApiGrpc;
 import org.finos.tracdap.common.config.ConfigHelpers;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.config.IDynamicResources;
@@ -54,7 +54,7 @@ public class JobProcessorHelpers {
 
     private final PlatformConfig platformConfig;
     private final IDynamicResources resources;
-    private final TrustedMetadataApiGrpc.TrustedMetadataApiBlockingStub metaClient;
+    private final InternalMetadataApiGrpc.InternalMetadataApiBlockingStub metaClient;
     private final GrpcConcern commonConcerns;
     private final ConfigManager configManager;
 
@@ -62,7 +62,7 @@ public class JobProcessorHelpers {
     public JobProcessorHelpers(
             PlatformConfig platformConfig,
             IDynamicResources resources,
-            TrustedMetadataApiGrpc.TrustedMetadataApiBlockingStub metaClient,
+            InternalMetadataApiGrpc.InternalMetadataApiBlockingStub metaClient,
             GrpcConcern commonConcerns,
             ConfigManager configManager) {
 
@@ -186,7 +186,7 @@ public class JobProcessorHelpers {
     JobState allocateResultIds(JobState jobState) {
 
         // TODO: Single job timestamp - requires changes in meta svc for this to actually be used
-        // meta svc must accept object timestamps as out-of-band gRPC metadata for trusted API calls
+        // meta svc must accept object timestamps as gRPC metadata for internal API calls
         var jobTimestamp = Instant.now();
 
         var newResultIds = new HashMap<String, MetadataWriteRequest>();

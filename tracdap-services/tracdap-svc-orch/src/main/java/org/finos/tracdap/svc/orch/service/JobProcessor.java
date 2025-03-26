@@ -22,7 +22,7 @@ import org.finos.tracdap.api.JobRequest;
 import org.finos.tracdap.api.JobStatus;
 import org.finos.tracdap.api.MetadataWriteRequest;
 import org.finos.tracdap.api.internal.RuntimeJobStatus;
-import org.finos.tracdap.api.internal.TrustedMetadataApiGrpc.TrustedMetadataApiBlockingStub;
+import org.finos.tracdap.api.internal.InternalMetadataApiGrpc.InternalMetadataApiBlockingStub;
 import org.finos.tracdap.common.cache.CacheEntry;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.config.IDynamicResources;
@@ -59,7 +59,7 @@ public class JobProcessor {
     private final Logger log = LoggerFactory.getLogger(getClass());
 
     private final IDynamicResources resources;
-    private final TrustedMetadataApiBlockingStub metaClient;
+    private final InternalMetadataApiBlockingStub metaClient;
     private final IJobExecutor<?> executor;
     private final Validator validator = new Validator();
 
@@ -70,7 +70,7 @@ public class JobProcessor {
     public JobProcessor(
             PlatformConfig platformConfig,
             IDynamicResources resources,
-            TrustedMetadataApiBlockingStub metaClient,
+            InternalMetadataApiBlockingStub metaClient,
             GrpcConcern commonConcerns,
             IJobExecutor<?> jobExecutor,
             ConfigManager configManager) {

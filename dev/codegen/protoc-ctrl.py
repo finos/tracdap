@@ -47,9 +47,7 @@ logging.basicConfig(format=logging_format, level=logging.INFO)
 _log = logging.getLogger(SCRIPT_NAME)
 
 
-PUBLIC_API_EXCLUSIONS = [
-    re.compile(r".*[/\\]internal$"),
-    re.compile(r".*_trusted\.proto$")]
+PUBLIC_API_EXCLUSIONS = [re.compile(r".*[/\\]internal$")]
 
 
 def is_public_api(path: pathlib.Path):

@@ -18,7 +18,7 @@
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import org.finos.tracdap.api.*;
-import org.finos.tracdap.api.internal.TrustedMetadataApiGrpc;
+import org.finos.tracdap.api.internal.InternalMetadataApiGrpc;
 import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.metadata.ConfigEntry;
