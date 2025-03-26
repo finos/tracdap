@@ -37,8 +37,9 @@ import static org.finos.tracdap.common.validation.core.ValidatorUtils.field;
 @Validator(type = ValidationType.STATIC, serviceFile = MetadataServiceProto.class, serviceName = TracMetadataApiGrpc.SERVICE_NAME)
 public class MetadataApiValidator {
 
-    public static final boolean PUBLIC_API = false;
-    public static final boolean TRUSTED_API = true;
+    // Define two API trust levels
+    public static final boolean PUBLIC_API = true;
+    public static final boolean INTERNAL_API = false;
 
     private static final Descriptors.Descriptor METADATA_WRITE_REQUEST;
     private static final Descriptors.FieldDescriptor MWR_TENANT;
@@ -210,7 +211,7 @@ public class MetadataApiValidator {
 
     private static ValidationContext preallocateId(MetadataWriteRequest msg, ValidationContext ctx, String expectedTenant) {
 
-        ctx = createOrUpdate(ctx, false, TRUSTED_API, expectedTenant);
+        ctx = createOrUpdate(ctx, false, INTERNAL_API, expectedTenant);
 
         ctx = ctx.push(MWR_PRIOR_VERSION)
                 .apply(CommonValidators::omitted)
@@ -230,7 +231,7 @@ public class MetadataApiValidator {
 
     private static ValidationContext createPreallocatedObject(MetadataWriteRequest msg, ValidationContext ctx, String expectedTenantd) {
 
-        ctx = createOrUpdate(ctx, false, TRUSTED_API, expectedTenantd);
+        ctx = createOrUpdate(ctx, false, INTERNAL_API, expectedTenantd);
 
         // Do not use the regular tag selector validator (ObjectIdValidator::tagSelector)
         // The regular validator will enforce object and tag version > 0
@@ -329,8 +330,8 @@ public class MetadataApiValidator {
 
         ctx = ctx.pushRepeated(MWR_ATTRS)
                 .applyRepeated(TagUpdateValidator::tagUpdate, TagUpdate.class)
-                // Only allow reserved attrs for requests on the trusted API
-                .applyRepeated(TagUpdateValidator::reservedAttrs, TagUpdate.class, (apiTrust == TRUSTED_API))
+                // Only allow reserved attrs for requests on the internal API
+                .applyRepeated(TagUpdateValidator::reservedAttrs, TagUpdate.class, (apiTrust == INTERNAL_API))
                 .pop();
 
         return ctx;

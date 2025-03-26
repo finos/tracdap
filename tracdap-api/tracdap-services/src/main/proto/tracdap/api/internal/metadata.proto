@@ -107,7 +107,7 @@ service InternalMetadataApi {
    *
    * This call behaves similarly to the equivalent public API call. However,
    * the createObject, updateObject and updateTag request types take their
-   * semantics from the trusted API instead of the public one. It is also
+   * semantics from the internal API instead of the public one. It is also
    * possible to include preallocateId and createPreallocatedObject in the
    * batch request.
    *

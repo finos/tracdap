@@ -133,7 +133,7 @@ public class TracMetadataService extends TracServiceBase {
             var searchService = new MetadataSearchService(dalWithLogging);
 
             var publicApi = new TracMetadataApi(readService, writeService, searchService);
-            var trustedApi = new InternalMetadataApi(readService, writeService, searchService);
+            var internalApi = new InternalMetadataApi(readService, writeService, searchService);
             var messageProcessor = new MessageProcessor(resources, dal);
 
             // Common framework for cross-cutting concerns
@@ -150,7 +150,7 @@ public class TracMetadataService extends TracServiceBase {
                     .forPort(servicePort)
                     .executor(executor)
                     .addService(publicApi)
-                    .addService(trustedApi)
+                    .addService(internalApi)
                     .addService(messageProcessor);
 
             // Apply common concerns

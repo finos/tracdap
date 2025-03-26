@@ -186,7 +186,7 @@ public class JobProcessorHelpers {
     JobState allocateResultIds(JobState jobState) {
 
         // TODO: Single job timestamp - requires changes in meta svc for this to actually be used
-        // meta svc must accept object timestamps as out-of-band gRPC metadata for trusted API calls
+        // meta svc must accept object timestamps as gRPC metadata for internal API calls
         var jobTimestamp = Instant.now();
 
         var newResultIds = new HashMap<String, MetadataWriteRequest>();
