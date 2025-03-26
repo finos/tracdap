@@ -19,7 +19,7 @@ syntax = "proto3";
 package tracdap.api.internal;
 
 option java_package = "org.finos.tracdap.api.internal";
-option java_outer_classname = "MetadataTrustedProto";
+option java_outer_classname = "InternalMetadataProto";
 option java_multiple_files = true;
 
 import "tracdap/metadata/object_id.proto";
@@ -31,7 +31,7 @@ import "tracdap/api/admin.proto";
 import "google/api/annotations.proto";
 
 /**
- * Trusted API reading, writing and searching for objects in the TRAC metadata store.
+ * Internal API for reading, writing and searching objects in the TRAC metadata store.
  *
  * This API is only available to other components of the TRAC platform, it is
  * not exposed to clients via the platform gateway.

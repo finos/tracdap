@@ -19,7 +19,7 @@ package org.finos.tracdap.svc.meta;
 
 import org.finos.tracdap.api.MetadataServiceProto;
 import org.finos.tracdap.api.internal.InternalMessagingProto;
-import org.finos.tracdap.api.internal.MetadataTrustedProto;
+import org.finos.tracdap.api.internal.InternalMetadataProto;
 import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.config.DynamicConfig;
@@ -195,7 +195,7 @@ public class TracMetadataService extends TracServiceBase {
         // Validation concern for the APIs being served
         var validationConcern = new ValidationConcern(
                 MetadataServiceProto.getDescriptor(),
-                MetadataTrustedProto.getDescriptor(),
+                InternalMetadataProto.getDescriptor(),
                 InternalMessagingProto.getDescriptor());
 
         commonConcerns = commonConcerns.addAfter(TracServiceConfig.TRAC_PROTOCOL, validationConcern);
