@@ -65,7 +65,7 @@ abstract class MetadataReadApiTest {
         @BeforeEach
         void setup() {
             readApi = platform.metaClientBlocking();
-            writeApi = platform.metaClientTrustedBlocking();
+            writeApi = platform.metaClientInternalBlocking();
         }
     }
 
@@ -86,7 +86,7 @@ abstract class MetadataReadApiTest {
         @BeforeEach
         void setup() {
             readApi = platform.metaClientBlocking();
-            writeApi = platform.metaClientTrustedBlocking();
+            writeApi = platform.metaClientInternalBlocking();
         }
     }
 

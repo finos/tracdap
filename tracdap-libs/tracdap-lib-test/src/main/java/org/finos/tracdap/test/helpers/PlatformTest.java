@@ -222,7 +222,7 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         return createClient(ConfigKeys.METADATA_SERVICE_KEY, TracMetadataApiGrpc::newBlockingStub);
     }
 
-    public InternalMetadataApiGrpc.InternalMetadataApiBlockingStub metaClientTrustedBlocking() {
+    public InternalMetadataApiGrpc.InternalMetadataApiBlockingStub metaClientInternalBlocking() {
         return createClient(ConfigKeys.METADATA_SERVICE_KEY, InternalMetadataApiGrpc::newBlockingStub);
     }
 

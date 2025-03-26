@@ -75,7 +75,7 @@ public class JobValidationTest {
     @BeforeAll
     static void setupClass() {
 
-        metaClient = platform.metaClientTrustedBlocking();
+        metaClient = platform.metaClientInternalBlocking();
         dataClient = platform.dataClientBlocking();
         orchClient = platform.orchClientBlocking();
 

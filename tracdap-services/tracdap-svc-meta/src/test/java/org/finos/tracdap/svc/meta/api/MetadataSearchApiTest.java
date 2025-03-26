@@ -74,7 +74,7 @@ abstract class MetadataSearchApiTest {
         @BeforeEach
         void setup() {
             searchApi = platform.metaClientBlocking();
-            writeApi = platform.metaClientTrustedBlocking();
+            writeApi = platform.metaClientInternalBlocking();
         }
     }
 
@@ -95,7 +95,7 @@ abstract class MetadataSearchApiTest {
         @BeforeEach
         void setup() {
             searchApi = platform.metaClientBlocking();
-            writeApi = platform.metaClientTrustedBlocking();
+            writeApi = platform.metaClientInternalBlocking();
         }
     }
 
