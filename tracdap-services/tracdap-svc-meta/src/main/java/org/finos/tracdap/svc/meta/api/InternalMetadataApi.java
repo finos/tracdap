@@ -18,7 +18,7 @@
 package org.finos.tracdap.svc.meta.api;
 
 import org.finos.tracdap.api.*;
-import org.finos.tracdap.api.internal.TrustedMetadataApiGrpc;
+import org.finos.tracdap.api.internal.InternalMetadataApiGrpc;
 import org.finos.tracdap.metadata.Tag;
 import org.finos.tracdap.metadata.TagHeader;
 import org.finos.tracdap.svc.meta.services.MetadataConstants;
@@ -29,11 +29,11 @@ import org.finos.tracdap.svc.meta.services.MetadataWriteService;
 import io.grpc.stub.StreamObserver;
 
 
-public class TrustedMetadataApi extends TrustedMetadataApiGrpc.TrustedMetadataApiImplBase {
+public class InternalMetadataApi extends InternalMetadataApiGrpc.InternalMetadataApiImplBase {
 
     private final MetadataApiImpl apiImpl;
 
-    public TrustedMetadataApi(
+    public InternalMetadataApi(
             MetadataReadService readService,
             MetadataWriteService writeService,
             MetadataSearchService searchService) {

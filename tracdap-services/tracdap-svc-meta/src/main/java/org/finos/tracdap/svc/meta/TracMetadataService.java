@@ -43,7 +43,7 @@ import io.grpc.Server;
 import io.grpc.ServerBuilder;
 
 import org.finos.tracdap.svc.meta.api.TracMetadataApi;
-import org.finos.tracdap.svc.meta.api.TrustedMetadataApi;
+import org.finos.tracdap.svc.meta.api.InternalMetadataApi;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -133,7 +133,7 @@ public class TracMetadataService extends TracServiceBase {
             var searchService = new MetadataSearchService(dalWithLogging);
 
             var publicApi = new TracMetadataApi(readService, writeService, searchService);
-            var trustedApi = new TrustedMetadataApi(readService, writeService, searchService);
+            var trustedApi = new InternalMetadataApi(readService, writeService, searchService);
             var messageProcessor = new MessageProcessor(resources, dal);
 
             // Common framework for cross-cutting concerns

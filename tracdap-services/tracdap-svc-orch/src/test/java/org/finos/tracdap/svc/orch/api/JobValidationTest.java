@@ -21,7 +21,7 @@ import com.google.protobuf.UnsafeByteOperations;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import org.finos.tracdap.api.*;
-import org.finos.tracdap.api.internal.TrustedMetadataApiGrpc;
+import org.finos.tracdap.api.internal.InternalMetadataApiGrpc;
 import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.metadata.MetadataUtil;
 import org.finos.tracdap.common.metadata.TypeSystem;
@@ -54,7 +54,7 @@ public class JobValidationTest {
     private static final byte[] BASIC_CSV_CONTENT_V2 = ResourceHelpers.loadResourceAsBytes(SampleData.BASIC_CSV_DATA_RESOURCE_V2);
     private static final byte[] ALT_CSV_CONTENT = ResourceHelpers.loadResourceAsBytes(SampleData.ALT_CSV_DATA_RESOURCE);
 
-    protected static TrustedMetadataApiGrpc.TrustedMetadataApiBlockingStub metaClient;
+    protected static InternalMetadataApiGrpc.InternalMetadataApiBlockingStub metaClient;
     protected static TracDataApiGrpc.TracDataApiBlockingStub dataClient;
     protected static TracOrchestratorApiGrpc.TracOrchestratorApiBlockingStub orchClient;
 

@@ -22,7 +22,7 @@ import org.finos.tracdap.api.ConfigListRequest;
 import org.finos.tracdap.api.MetadataBatchRequest;
 import org.finos.tracdap.api.OrchestratorServiceProto;
 import org.finos.tracdap.api.internal.InternalMessagingProto;
-import org.finos.tracdap.api.internal.TrustedMetadataApiGrpc;
+import org.finos.tracdap.api.internal.InternalMetadataApiGrpc;
 import org.finos.tracdap.common.cache.IJobCacheManager;
 import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.config.ConfigManager;
@@ -281,7 +281,7 @@ public class TracOrchestratorService extends TracServiceBase {
         return commonConcerns.build();
     }
 
-    private TrustedMetadataApiGrpc.TrustedMetadataApiBlockingStub prepareMetadataClient(
+    private InternalMetadataApiGrpc.InternalMetadataApiBlockingStub prepareMetadataClient(
             PlatformConfig platformConfig, GrpcChannelFactory channelFactory,
             GrpcConcern commonConcerns) {
 
@@ -292,7 +292,7 @@ public class TracOrchestratorService extends TracServiceBase {
 
         clientChannel = channelFactory.createChannel(metadataTarget.getHost(), metadataTarget.getPort());
 
-        var metadataClient = TrustedMetadataApiGrpc.newBlockingStub(clientChannel);
+        var metadataClient = InternalMetadataApiGrpc.newBlockingStub(clientChannel);
 
         return commonConcerns.configureClient(metadataClient);
     }
@@ -320,7 +320,7 @@ public class TracOrchestratorService extends TracServiceBase {
     }
 
     void loadResources(
-            TrustedMetadataApiGrpc.TrustedMetadataApiBlockingStub metaClient,
+            InternalMetadataApiGrpc.InternalMetadataApiBlockingStub metaClient,
             String tenant, DynamicConfig<ResourceDefinition> resources) {
 
         var configList = ConfigListRequest.newBuilder()

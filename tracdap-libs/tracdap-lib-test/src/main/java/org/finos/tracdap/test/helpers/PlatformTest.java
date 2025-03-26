@@ -22,7 +22,7 @@ import org.finos.tracdap.api.TracAdminApiGrpc;
 import org.finos.tracdap.api.TracDataApiGrpc;
 import org.finos.tracdap.api.TracMetadataApiGrpc;
 import org.finos.tracdap.api.TracOrchestratorApiGrpc;
-import org.finos.tracdap.api.internal.TrustedMetadataApiGrpc;
+import org.finos.tracdap.api.internal.InternalMetadataApiGrpc;
 import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.exception.ETracInternal;
@@ -222,8 +222,8 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         return createClient(ConfigKeys.METADATA_SERVICE_KEY, TracMetadataApiGrpc::newBlockingStub);
     }
 
-    public TrustedMetadataApiGrpc.TrustedMetadataApiBlockingStub metaClientTrustedBlocking() {
-        return createClient(ConfigKeys.METADATA_SERVICE_KEY, TrustedMetadataApiGrpc::newBlockingStub);
+    public InternalMetadataApiGrpc.InternalMetadataApiBlockingStub metaClientTrustedBlocking() {
+        return createClient(ConfigKeys.METADATA_SERVICE_KEY, InternalMetadataApiGrpc::newBlockingStub);
     }
 
     public TracDataApiGrpc.TracDataApiStub dataClient() {

@@ -18,7 +18,7 @@
 package org.finos.tracdap.svc.orch.service;
 
 import org.finos.tracdap.api.*;
-import org.finos.tracdap.api.internal.TrustedMetadataApiGrpc;
+import org.finos.tracdap.api.internal.InternalMetadataApiGrpc;
 import org.finos.tracdap.common.config.ConfigHelpers;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.config.IDynamicResources;
@@ -54,7 +54,7 @@ public class JobProcessorHelpers {
 
     private final PlatformConfig platformConfig;
     private final IDynamicResources resources;
-    private final TrustedMetadataApiGrpc.TrustedMetadataApiBlockingStub metaClient;
+    private final InternalMetadataApiGrpc.InternalMetadataApiBlockingStub metaClient;
     private final GrpcConcern commonConcerns;
     private final ConfigManager configManager;
 
@@ -62,7 +62,7 @@ public class JobProcessorHelpers {
     public JobProcessorHelpers(
             PlatformConfig platformConfig,
             IDynamicResources resources,
-            TrustedMetadataApiGrpc.TrustedMetadataApiBlockingStub metaClient,
+            InternalMetadataApiGrpc.InternalMetadataApiBlockingStub metaClient,
             GrpcConcern commonConcerns,
             ConfigManager configManager) {
 

@@ -38,13 +38,13 @@ public class MessageProcessor extends InternalMessagingApiGrpc.InternalMessaging
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
-    private final TrustedMetadataApiGrpc.TrustedMetadataApiBlockingStub metadataApi;
+    private final InternalMetadataApiGrpc.InternalMetadataApiBlockingStub metadataApi;
     private final ExecutorService offloadExecutor;
     private final GrpcConcern commonConcerns;
     private final StorageManager storageManager;
 
     public MessageProcessor(
-            TrustedMetadataApiGrpc.TrustedMetadataApiBlockingStub metadataApi,
+            InternalMetadataApiGrpc.InternalMetadataApiBlockingStub metadataApi,
             ExecutorService offloadExecutor, GrpcConcern commonConcerns,
             StorageManager storageManager) {
 

@@ -44,7 +44,7 @@ import "google/api/annotations.proto";
  *
  * @see TracMetadataApi
  */
-service TrustedMetadataApi {
+service InternalMetadataApi {
 
   /**
    * Create a new object in the TRAC metadata store.

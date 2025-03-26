@@ -19,13 +19,13 @@ package org.finos.tracdap.common.validation.api;
 
 import org.finos.tracdap.api.*;
 import org.finos.tracdap.api.internal.MetadataTrustedProto;
-import org.finos.tracdap.api.internal.TrustedMetadataApiGrpc;
+import org.finos.tracdap.api.internal.InternalMetadataApiGrpc;
 import org.finos.tracdap.common.validation.core.ValidationContext;
 import org.finos.tracdap.common.validation.core.ValidationType;
 import org.finos.tracdap.common.validation.core.Validator;
 
 
-@Validator(type = ValidationType.STATIC, serviceFile = MetadataTrustedProto.class, serviceName = TrustedMetadataApiGrpc.SERVICE_NAME)
+@Validator(type = ValidationType.STATIC, serviceFile = MetadataTrustedProto.class, serviceName = InternalMetadataApiGrpc.SERVICE_NAME)
 public class MetadataTrustedApiValidator {
 
     // Let's not introduce validation differences between the trusted and regular metadata API

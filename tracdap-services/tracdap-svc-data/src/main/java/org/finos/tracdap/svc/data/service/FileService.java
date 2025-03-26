@@ -18,7 +18,7 @@
 package org.finos.tracdap.svc.data.service;
 
 
-import org.finos.tracdap.api.internal.TrustedMetadataApiGrpc.TrustedMetadataApiFutureStub;
+import org.finos.tracdap.api.internal.InternalMetadataApiGrpc.InternalMetadataApiFutureStub;
 import org.finos.tracdap.common.async.Futures;
 import org.finos.tracdap.common.data.IDataContext;
 import org.finos.tracdap.common.exception.EMetadataDuplicate;
@@ -69,7 +69,7 @@ public class FileService {
     private final StorageConfig storageConfig;
     private final Map<String, TenantConfig> tenantConfig;
     private final IStorageManager storageManager;
-    private final TrustedMetadataApiFutureStub metaApi;
+    private final InternalMetadataApiFutureStub metaApi;
 
     private final Validator validator = new Validator();
     private final Random random = new Random();
@@ -78,7 +78,7 @@ public class FileService {
             StorageConfig storageConfig,
             Map<String, TenantConfig> tenantConfig,
             IStorageManager storageManager,
-            TrustedMetadataApiFutureStub metaApi) {
+            InternalMetadataApiFutureStub metaApi) {
 
         this.storageConfig = storageConfig;
         this.tenantConfig = tenantConfig;
