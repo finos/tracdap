@@ -29,10 +29,13 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.finos.tracdap.common.metadata.MetadataConstants.PUBLIC_WRITABLE_OBJECT_TYPES;
-import static org.finos.tracdap.svc.meta.services.MetadataConstants.PUBLIC_API;
 
 
-public class MetadataApiImpl {
+class MetadataApiImpl {
+
+    // Define two API trust levels
+    public static final boolean PUBLIC_API = true;
+    public static final boolean INTERNAL_API = false;
 
     private final MetadataReadService readService;
     private final MetadataWriteService writeService;

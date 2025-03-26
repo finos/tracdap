@@ -21,7 +21,6 @@ import org.finos.tracdap.api.*;
 import org.finos.tracdap.api.internal.InternalMetadataApiGrpc;
 import org.finos.tracdap.metadata.Tag;
 import org.finos.tracdap.metadata.TagHeader;
-import org.finos.tracdap.svc.meta.services.MetadataConstants;
 import org.finos.tracdap.svc.meta.services.MetadataReadService;
 import org.finos.tracdap.svc.meta.services.MetadataSearchService;
 import org.finos.tracdap.svc.meta.services.MetadataWriteService;
@@ -38,7 +37,7 @@ public class InternalMetadataApi extends InternalMetadataApiGrpc.InternalMetadat
             MetadataWriteService writeService,
             MetadataSearchService searchService) {
 
-        apiImpl = new MetadataApiImpl(readService, writeService, searchService, MetadataConstants.TRUSTED_API);
+        apiImpl = new MetadataApiImpl(readService, writeService, searchService, MetadataApiImpl.INTERNAL_API);
     }
 
     @Override
