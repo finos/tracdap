@@ -33,14 +33,13 @@ import "google/api/annotations.proto";
 /**
  * Internal API for reading, writing and searching objects in the TRAC metadata store.
  *
- * This API is only available to other components of the TRAC platform, it is
- * not exposed to clients via the platform gateway.
+ * This API is only available to other components of the TRAC platform using gRPC,
+ * it is not exposed to clients via the gateway and REST mappings are not provided.
  *
  * Most of the calls in this interface are identical to their public equivalents.
  * Extra calls are available for pre-allocating objects, a facility which is not
  * available to clients of the platform. Restrictions on the creation of certain
- * object types and manipulation of controlled tag attributes are lifted. Methods
- * for performing HTTP GET requests of RESTFUL resources are not duplicated.
+ * object types and manipulation of controlled tag attributes are lifted.
  *
  * @see TracMetadataApi
  */
@@ -54,12 +53,7 @@ service InternalMetadataApi {
    *
    * @see TracMetadataApi.createObject()
    */
-  rpc createObject (MetadataWriteRequest) returns (metadata.TagHeader) {
-    option (google.api.http) = {
-      post: "/{tenant}/trusted/create-object"
-      body: "*"
-    };
-  }
+  rpc createObject (MetadataWriteRequest) returns (metadata.TagHeader);
 
   /**
    * Update an existing object in the TRAC metadata store.
@@ -70,12 +64,7 @@ service InternalMetadataApi {
    *
    * @see TracMetadataApi.updateObject()
    */
-  rpc updateObject (MetadataWriteRequest) returns (metadata.TagHeader) {
-    option (google.api.http) = {
-      post: "/{tenant}/trusted/update-object"
-      body: "*"
-    };
-  }
+  rpc updateObject (MetadataWriteRequest) returns (metadata.TagHeader);
 
   /**
    * Update the tag for an existing object in the TRAC metadata store.
@@ -84,12 +73,7 @@ service InternalMetadataApi {
    *
    * @see TracMetadataApi.updateTag()
    */
-  rpc updateTag (MetadataWriteRequest) returns (metadata.TagHeader) {
-    option (google.api.http) = {
-      post: "/{tenant}/trusted/update-tag"
-      body: "*"
-    };
-  }
+  rpc updateTag (MetadataWriteRequest) returns (metadata.TagHeader);
 
   /**
    * Preallocate an object ID for an object that will be created later.
@@ -102,12 +86,7 @@ service InternalMetadataApi {
    * an ID and encounters an error before that ID is used, the orphan ID is just
    * ignored.
    */
-  rpc preallocateId (MetadataWriteRequest) returns (metadata.TagHeader) {
-    option (google.api.http) = {
-      post: "/{tenant}/trusted/preallocate"
-      body: "*"
-    };
-  }
+  rpc preallocateId (MetadataWriteRequest) returns (metadata.TagHeader);
 
   /**
    * Create an object using an ID that was previously preallocated.
@@ -121,12 +100,7 @@ service InternalMetadataApi {
    * Using a preallocated ID twice, attempting to save to an unknown ID or the
    * ID of another object that already exists are also errors.
    */
-  rpc createPreallocatedObject (MetadataWriteRequest) returns (metadata.TagHeader) {
-    option (google.api.http) = {
-      post: "/{tenant}/trusted/create-preallocated"
-      body: "*"
-    };
-  }
+  rpc createPreallocatedObject (MetadataWriteRequest) returns (metadata.TagHeader);
 
   /**
    * Perform a batch of write operations on the TRAC metadata store.
@@ -139,12 +113,7 @@ service InternalMetadataApi {
    *
    * @see TracMetadataApi.writeBatch()
    */
-  rpc writeBatch (MetadataWriteBatchRequest) returns (MetadataWriteBatchResponse) {
-    option (google.api.http) = {
-      post: "/{tenant}/trusted/write-batch"
-      body: "*"
-    };
-  }
+  rpc writeBatch (MetadataWriteBatchRequest) returns (MetadataWriteBatchResponse);
 
   /**
    * Read a single object from the TRAC metadata store using a tag selector.
@@ -153,12 +122,7 @@ service InternalMetadataApi {
    *
    * @see TracMetadataApi.readObject()
    */
-  rpc readObject(MetadataReadRequest) returns (metadata.Tag) {
-    option (google.api.http) = {
-      post: "/{tenant}/trusted/read-object"
-      body: "selector"
-    };
-  }
+  rpc readObject(MetadataReadRequest) returns (metadata.Tag);
 
   /**
    * Read multiple objects from the TRAC metadata store using tag selectors.
@@ -167,12 +131,7 @@ service InternalMetadataApi {
    *
    * @see TracMetadataApi.readBatch()
    */
-  rpc readBatch(MetadataBatchRequest) returns (MetadataBatchResponse) {
-    option (google.api.http) = {
-      post: "/{tenant}/trusted/read-batch"
-      body: "selector"
-    };
-  }
+  rpc readBatch(MetadataBatchRequest) returns (MetadataBatchResponse);
 
   /**
    * Perform a search against the TRAC metadata store.
@@ -181,12 +140,7 @@ service InternalMetadataApi {
    *
    * @see TracMetadataApi.search()
    */
-  rpc search(MetadataSearchRequest) returns (MetadataSearchResponse) {
-    option (google.api.http) = {
-      post: "/{tenant}/trusted/search"
-      body: "searchParams"
-    };
-  }
+  rpc search(MetadataSearchRequest) returns (MetadataSearchResponse);
 
   /**
    * Support listing config entries directly through the metadata API.
