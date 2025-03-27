@@ -82,8 +82,32 @@ public class InternalMetadataApiValidator {
         return MetadataApiValidator.readBatch(msg, ctx);
     }
 
-    // listConfigEntries on internal API is a convenience method for internal read-only access
-    // It has the same semantics as the equivalent call on the admin API
+    // Internal config API is a mirror of the API on admin service
+
+    @Validator(method = "createConfigObject")
+    public static ValidationContext createConfigObject(ConfigWriteRequest msg, ValidationContext ctx) {
+        return AdminApiValidator.createConfigObject(msg, ctx);
+    }
+
+    @Validator(method = "updateConfigObject")
+    public static ValidationContext updateConfigObject(ConfigWriteRequest msg, ValidationContext ctx) {
+        return AdminApiValidator.updateConfigObject(msg, ctx);
+    }
+
+    @Validator(method = "deleteConfigObject")
+    public static ValidationContext deleteConfigObject(ConfigWriteRequest msg, ValidationContext ctx) {
+        return AdminApiValidator.deleteConfigObject(msg, ctx);
+    }
+
+    @Validator(method = "readConfigEntry")
+    public static ValidationContext readConfigEntry(ConfigReadRequest msg, ValidationContext ctx) {
+        return AdminApiValidator.readConfigObject(msg, ctx);
+    }
+
+    @Validator(method = "readConfigBatch")
+    public static ValidationContext readConfigBatch(ConfigReadBatchRequest msg, ValidationContext ctx) {
+        return AdminApiValidator.readConfigBatch(msg, ctx);
+    }
 
     @Validator(method = "listConfigEntries")
     public static ValidationContext listConfigEntries(ConfigListRequest msg, ValidationContext ctx) {
