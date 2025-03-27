@@ -21,9 +21,7 @@ import io.grpc.stub.StreamObserver;
 import org.finos.tracdap.api.*;
 import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.common.exception.EAuthorization;
-import org.finos.tracdap.svc.meta.services.MetadataReadService;
-import org.finos.tracdap.svc.meta.services.MetadataSearchService;
-import org.finos.tracdap.svc.meta.services.MetadataWriteService;
+import org.finos.tracdap.svc.meta.services.*;
 
 import java.util.List;
 import java.util.UUID;
@@ -40,6 +38,7 @@ class MetadataApiImpl {
     private final MetadataReadService readService;
     private final MetadataWriteService writeService;
     private final MetadataSearchService searchService;
+    private final ConfigService configService;
 
     private final boolean apiTrustLevel;
 
@@ -47,11 +46,13 @@ class MetadataApiImpl {
             MetadataReadService readService,
             MetadataWriteService writeService,
             MetadataSearchService searchService,
+            ConfigService configService,
             boolean apiTrustLevel) {
 
         this.readService = readService;
         this.writeService = writeService;
         this.searchService = searchService;
+        this.configService = configService;
 
         this.apiTrustLevel = apiTrustLevel;
     }
@@ -246,20 +247,6 @@ class MetadataApiImpl {
         }
     }
 
-    void listConfigEntries(ConfigListRequest request, StreamObserver<ConfigListResponse> response) {
-
-        try {
-
-            var result = readService.listConfigEntries(request);
-
-            response.onNext(result);
-            response.onCompleted();
-        }
-        catch (Exception error) {
-            response.onError(error);
-        }
-    }
-
     void getObject(MetadataGetRequest request, StreamObserver<Tag> response) {
 
         try {
@@ -329,6 +316,96 @@ class MetadataApiImpl {
 
         for (var rq : requestsList) {
             validateObjectType(rq.getObjectType());
+        }
+    }
+
+    // -----------------------------------------------------------------------------------------------------------------
+    //   CONFIG OBJECTS
+    // -----------------------------------------------------------------------------------------------------------------
+
+    void createConfigObject(ConfigWriteRequest request, StreamObserver<ConfigWriteResponse> response) {
+
+        try {
+
+            var result = configService.createConfigObject(request);
+
+            response.onNext(result);
+            response.onCompleted();
+        }
+        catch (Exception error) {
+            response.onError(error);
+        }
+    }
+
+    void updateConfigObject(ConfigWriteRequest request, StreamObserver<ConfigWriteResponse> response) {
+
+        try {
+
+            var result = configService.updateConfigObject(request);
+
+            response.onNext(result);
+            response.onCompleted();
+        }
+        catch (Exception error) {
+            response.onError(error);
+        }
+    }
+
+
+    void deleteConfigObject(ConfigWriteRequest request, StreamObserver<ConfigWriteResponse> response) {
+
+        try {
+
+            var result = configService.deleteConfigObject(request);
+
+            response.onNext(result);
+            response.onCompleted();
+        }
+        catch (Exception error) {
+            response.onError(error);
+        }
+    }
+
+    void readConfigEntry(ConfigReadRequest request, StreamObserver<ConfigReadResponse> response) {
+
+
+        try {
+
+            var result = configService.readConfigObject(request);
+
+            response.onNext(result);
+            response.onCompleted();
+        }
+        catch (Exception error) {
+            response.onError(error);
+        }
+    }
+
+    void readConfigBatch(ConfigReadBatchRequest request, StreamObserver<ConfigReadBatchResponse> response) {
+
+        try {
+
+            var result = configService.readConfigBatch(request);
+
+            response.onNext(result);
+            response.onCompleted();
+        }
+        catch (Exception error) {
+            response.onError(error);
+        }
+    }
+
+    void listConfigEntries(ConfigListRequest request, StreamObserver<ConfigListResponse> response) {
+
+        try {
+
+            var result = configService.listConfigEntries(request);
+
+            response.onNext(result);
+            response.onCompleted();
+        }
+        catch (Exception error) {
+            response.onError(error);
         }
     }
 }
