@@ -257,7 +257,7 @@ public class TracDataService extends TracServiceBase {
         log.info("Using metadata service at [{}:{}]",
                 metadataTarget.getHost(), metadataTarget.getPort());
 
-        return metaClientChanel = NettyChannelBuilder
+        return NettyChannelBuilder
                 .forAddress(metadataTarget.getHost(), metadataTarget.getPort())
                 .channelType(channelType)
                 .eventLoopGroup(serviceGroup)
@@ -275,7 +275,7 @@ public class TracDataService extends TracServiceBase {
         log.info("Using (blocking) metadata service at [{}:{}]",
                 metadataTarget.getHost(), metadataTarget.getPort());
 
-        return metaClientChanel = NettyChannelBuilder
+        return NettyChannelBuilder
                 .forAddress(metadataTarget.getHost(), metadataTarget.getPort())
                 .channelType(channelType)
                 .eventLoopGroup(serviceGroup)
