@@ -21,9 +21,7 @@ import org.finos.tracdap.api.*;
 import org.finos.tracdap.api.internal.InternalMetadataApiGrpc;
 import org.finos.tracdap.metadata.Tag;
 import org.finos.tracdap.metadata.TagHeader;
-import org.finos.tracdap.svc.meta.services.MetadataReadService;
-import org.finos.tracdap.svc.meta.services.MetadataSearchService;
-import org.finos.tracdap.svc.meta.services.MetadataWriteService;
+import org.finos.tracdap.svc.meta.services.*;
 
 import io.grpc.stub.StreamObserver;
 
@@ -35,9 +33,10 @@ public class InternalMetadataApi extends InternalMetadataApiGrpc.InternalMetadat
     public InternalMetadataApi(
             MetadataReadService readService,
             MetadataWriteService writeService,
-            MetadataSearchService searchService) {
+            MetadataSearchService searchService,
+            ConfigService configService) {
 
-        apiImpl = new MetadataApiImpl(readService, writeService, searchService, MetadataApiImpl.INTERNAL_API);
+        apiImpl = new MetadataApiImpl(readService, writeService, searchService, configService, MetadataApiImpl.INTERNAL_API);
     }
 
     @Override
@@ -95,8 +94,38 @@ public class InternalMetadataApi extends InternalMetadataApiGrpc.InternalMetadat
     }
 
     @Override
-    public void listConfigEntries(ConfigListRequest request, StreamObserver<ConfigListResponse> responseObserver) {
+    public void createConfigObject(ConfigWriteRequest request, StreamObserver<ConfigWriteResponse> response) {
 
-        apiImpl.listConfigEntries(request, responseObserver);
+        apiImpl.createConfigObject(request, response);
+    }
+
+    @Override
+    public void updateConfigObject(ConfigWriteRequest request, StreamObserver<ConfigWriteResponse> response) {
+
+        apiImpl.updateConfigObject(request, response);
+    }
+
+    @Override
+    public void deleteConfigObject(ConfigWriteRequest request, StreamObserver<ConfigWriteResponse> response) {
+
+        apiImpl.deleteConfigObject(request, response);
+    }
+
+    @Override
+    public void readConfigEntry(ConfigReadRequest request, StreamObserver<ConfigReadResponse> response) {
+
+        apiImpl.readConfigEntry(request, response);
+    }
+
+    @Override
+    public void readConfigBatch(ConfigReadBatchRequest request, StreamObserver<ConfigReadBatchResponse> response) {
+
+        apiImpl.readConfigBatch(request, response);
+    }
+
+    @Override
+    public void listConfigEntries(ConfigListRequest request, StreamObserver<ConfigListResponse> response) {
+
+        apiImpl.listConfigEntries(request, response);
     }
 }
