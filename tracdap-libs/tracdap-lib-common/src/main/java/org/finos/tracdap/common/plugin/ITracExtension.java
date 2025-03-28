@@ -55,4 +55,9 @@ public interface ITracExtension {
 
         return gatewayConcerns;
     }
+
+    @SuppressWarnings("unused")
+    default void runStartupLogic(PluginRegistry registry) {
+
+    }
 }
