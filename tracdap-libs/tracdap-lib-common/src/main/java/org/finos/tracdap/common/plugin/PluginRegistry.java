@@ -17,6 +17,7 @@
 
 package org.finos.tracdap.common.plugin;
 
+import org.finos.tracdap.common.exception.ETracInternal;
 import org.finos.tracdap.common.exception.EUnexpected;
 
 import java.util.Map;
@@ -32,12 +33,12 @@ public class PluginRegistry {
         registry = new ConcurrentHashMap<>();
     }
 
-    public <T> void registerSingleton(Class<T> pluginClass, T instance) {
+    public <T> void addSingleton(Class<T> pluginClass, T instance) {
         var key = new Key(pluginClass, null);
         registry.put(key, instance);
     }
 
-    public <T> void registerNamedInstance(Class<T> pluginClass, String namedKey, T instance) {
+    public <T> void addNamedInstance(Class<T> pluginClass, String namedKey, T instance) {
         var key = new Key(pluginClass, namedKey);
         registry.put(key, instance);
     }
@@ -45,8 +46,10 @@ public class PluginRegistry {
     public <T> T getSingleton(Class<T> pluginClass) {
         var key = new Key(pluginClass, null);
         var instance = registry.get(key);
-        if (instance == null)
-            return null;
+        if (instance == null) {
+            var error = String.format("Singleton instance not found for type [%s]", pluginClass.getSimpleName());
+            throw new ETracInternal(error);
+        }
         if (!pluginClass.isInstance(instance))
             throw new EUnexpected();
         return pluginClass.cast(instance);
@@ -55,8 +58,12 @@ public class PluginRegistry {
     public <T> T getNamedInstance(Class<T> pluginClass, String namedKey) {
         var key = new Key(pluginClass, namedKey);
         var instance = registry.get(key);
-        if (instance == null)
-            return null;
+        if (instance == null) {
+            var error = String.format(
+                    "Named instance not found for type [%s] with key [%s]",
+                    pluginClass.getSimpleName(), namedKey);
+            throw new ETracInternal(error);
+        }
         if (!pluginClass.isInstance(instance))
             throw new EUnexpected();
         return pluginClass.cast(instance);

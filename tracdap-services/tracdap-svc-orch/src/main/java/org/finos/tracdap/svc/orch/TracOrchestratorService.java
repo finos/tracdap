@@ -103,8 +103,8 @@ public class TracOrchestratorService extends TracServiceBase {
         this.configManager = configManager;
         this.registry = new PluginRegistry();
 
-        registry.registerSingleton(PluginManager.class, pluginManager);
-        registry.registerSingleton(ConfigManager.class, configManager);
+        registry.addSingleton(PluginManager.class, pluginManager);
+        registry.addSingleton(ConfigManager.class, configManager);
     }
 
     @Override
@@ -146,7 +146,7 @@ public class TracOrchestratorService extends TracServiceBase {
 
             // Main executor for requests and background tasks
             serviceGroup = new NioEventLoopGroup(CONCURRENT_REQUESTS, new DefaultThreadFactory("orch-svc"));
-            registry.registerSingleton(ScheduledExecutorService.class, serviceGroup);
+            registry.addSingleton(ScheduledExecutorService.class, serviceGroup);
 
             // Common framework for cross-cutting concerns
             commonConcerns = buildCommonConcerns();
@@ -154,8 +154,8 @@ public class TracOrchestratorService extends TracServiceBase {
             // Metadata client
             var clientChannelFactory = new ClientChannelFactory(clientChannelType);
             var metaClient = prepareMetadataClient(platformConfig, clientChannelFactory, commonConcerns);
-            registry.registerSingleton(GrpcChannelFactory.class, clientChannelFactory);
-            registry.registerSingleton(InternalMetadataApiGrpc.InternalMetadataApiBlockingStub.class, metaClient);
+            registry.addSingleton(GrpcChannelFactory.class, clientChannelFactory);
+            registry.addSingleton(InternalMetadataApiGrpc.InternalMetadataApiBlockingStub.class, metaClient);
 
             // Load dynamic config and resources
             var resources = new DynamicConfig.Resources();
@@ -174,17 +174,17 @@ public class TracOrchestratorService extends TracServiceBase {
                     platformConfig.getJobCache(),
                     configManager);
 
-            registry.registerSingleton(IBatchExecutor.class, batchExecutor);
-            registry.registerSingleton(IJobCacheManager.class, jobCacheManager);
+            registry.addSingleton(IBatchExecutor.class, batchExecutor);
+            registry.addSingleton(IJobCacheManager.class, jobCacheManager);
 
             // Create service objects
             var jobExecutor = new JobExecutor<>(platformConfig.getExecutor(), registry);
             var jobProcessor = new JobProcessor(platformConfig, resources, commonConcerns, registry);
             var jobManager = new JobManager(platformConfig, registry);
 
-            registry.registerSingleton(IJobExecutor.class, jobExecutor);
-            registry.registerSingleton(JobProcessor.class, jobProcessor);
-            registry.registerSingleton(JobManager.class, jobManager);
+            registry.addSingleton(IJobExecutor.class, jobExecutor);
+            registry.addSingleton(JobProcessor.class, jobProcessor);
+            registry.addSingleton(JobManager.class, jobManager);
 
             // Run extensions startup logic
             for (var extension : pluginManager.getExtensions())
