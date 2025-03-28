@@ -49,7 +49,6 @@ dependencies {
     implementation project(':tracdap-api-services')
 
     // TRAC library dependencies
-    implementation project(':tracdap-lib-meta')
     implementation project(':tracdap-lib-common')
     implementation project(':tracdap-lib-validation')
 
