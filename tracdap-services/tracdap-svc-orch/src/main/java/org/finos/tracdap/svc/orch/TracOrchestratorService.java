@@ -30,7 +30,6 @@ import org.finos.tracdap.common.config.DynamicConfig;
 import org.finos.tracdap.svc.orch.service.JobExecutor;
 import org.finos.tracdap.common.exec.IBatchExecutor;
 import org.finos.tracdap.common.exception.EStartup;
-import org.finos.tracdap.svc.orch.service.IJobExecutor;
 import org.finos.tracdap.common.grpc.*;
 import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.metadata.MetadataConstants;
@@ -178,12 +177,13 @@ public class TracOrchestratorService extends TracServiceBase {
             registry.addSingleton(IJobCacheManager.class, jobCacheManager);
 
             // Create service objects
-            var jobExecutor = new JobExecutor<>(platformConfig.getExecutor(), registry);
-            var jobProcessor = new JobProcessor(platformConfig, resources, commonConcerns, registry);
-            var jobManager = new JobManager(platformConfig, registry);
+            var jobExecutor = new JobExecutor<>(registry);
+            registry.addSingleton(JobExecutor.class, jobExecutor);
 
-            registry.addSingleton(IJobExecutor.class, jobExecutor);
+            var jobProcessor = new JobProcessor(platformConfig, resources, commonConcerns, registry);
             registry.addSingleton(JobProcessor.class, jobProcessor);
+
+            var jobManager = new JobManager(platformConfig, registry);
             registry.addSingleton(JobManager.class, jobManager);
 
             // Run extensions startup logic

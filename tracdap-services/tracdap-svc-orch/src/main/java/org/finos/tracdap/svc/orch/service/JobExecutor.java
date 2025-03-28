@@ -40,31 +40,24 @@ import org.slf4j.LoggerFactory;
 import java.io.Serializable;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.Flow;
 import java.util.regex.Pattern;
 
 
 public class JobExecutor<TBatchState extends Serializable> implements IJobExecutor<JobExecutorState<TBatchState>> {
 
-    public static final Pattern RUNTIME_ENV_KEY = Pattern.compile("runtime\\.env\\.(\\w+)");
-    public static final Pattern RUNTIME_PROP_KEY = Pattern.compile("runtime\\.((\\w+\\.)*\\w+)");
-
     private static final short DEFAULT_RUNTIME_API_PORT = 9000;
 
     private static final Pattern TRAC_ERROR_LINE = Pattern.compile("tracdap.rt.exceptions.(E\\w+): (.+)");
 
     private final Logger log = LoggerFactory.getLogger(getClass());
-    private final PluginConfig executorConfig;
     private final IBatchExecutor<TBatchState> batchExecutor;
     private final GrpcChannelFactory channelFactory;
     private final ConfigParser configParser;
 
     @SuppressWarnings("unchecked")
-    public JobExecutor(PluginConfig executorConfig, PluginRegistry registry) {
-        this.executorConfig = executorConfig;
+    public JobExecutor(PluginRegistry registry) {
         this.batchExecutor = (IBatchExecutor<TBatchState>) registry.getSingleton(IBatchExecutor.class);
         this.channelFactory = registry.getSingleton(GrpcChannelFactory.class);
         this.configParser = new ConfigParser();
@@ -92,10 +85,6 @@ public class JobExecutor<TBatchState extends Serializable> implements IJobExecut
         try {
 
             var batchSysConfig = sysConfig.toBuilder();
-            var batchEnvironment = new HashMap<String, String>();
-
-            // Add settings from this executor's config
-            addRuntimeSettings(batchSysConfig, batchEnvironment);
 
             var runtimeApiEnabled = batchExecutor.hasFeature(IBatchExecutor.Feature.EXPOSE_PORT);
             var storageMappingEnabled = batchExecutor.hasFeature(IBatchExecutor.Feature.STORAGE_MAPPING);
@@ -149,8 +138,6 @@ public class JobExecutor<TBatchState extends Serializable> implements IJobExecut
                         LaunchArg.path("log", "trac_rt_stdout.log"),
                         LaunchArg.path("log", "trac_rt_stderr.log"));
             }
-
-            batchEnvironment.forEach(batchConfig::addEnvironmentVariable);
 
             batchState = batchExecutor.submitBatch(batchKey, batchState, batchConfig);
 
@@ -249,26 +236,6 @@ public class JobExecutor<TBatchState extends Serializable> implements IJobExecut
         }
 
         return jobStatus;
-    }
-
-    private void addRuntimeSettings(RuntimeConfig.Builder config, Map<String, String> environment) {
-
-        for (var property : executorConfig.getPropertiesMap().entrySet()) {
-
-            var envMatch = RUNTIME_ENV_KEY.matcher(property.getKey());
-            var propMatch = RUNTIME_PROP_KEY.matcher(property.getKey());
-
-            if (envMatch.matches()) {
-                var envKey = envMatch.group(1);
-                var envValue = property.getValue();
-                environment.put(envKey, envValue);
-            }
-            else if (propMatch.matches()) {
-                var propKey = propMatch.group(1);
-                var propValue = property.getValue();
-                config.putProperties(propKey, propValue);
-            }
-        }
     }
 
     private RuntimeJobStatus getStatusFromApi(JobExecutorState<TBatchState> jobState) {
