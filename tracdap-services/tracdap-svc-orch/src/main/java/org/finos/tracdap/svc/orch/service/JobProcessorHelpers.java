@@ -27,6 +27,7 @@ import org.finos.tracdap.common.metadata.MetadataBundle;
 import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.metadata.MetadataUtil;
 import org.finos.tracdap.common.middleware.GrpcConcern;
+import org.finos.tracdap.common.plugin.PluginRegistry;
 import org.finos.tracdap.config.*;
 import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.svc.orch.jobs.JobLogic;
@@ -54,23 +55,24 @@ public class JobProcessorHelpers {
 
     private final PlatformConfig platformConfig;
     private final IDynamicResources resources;
-    private final InternalMetadataApiGrpc.InternalMetadataApiBlockingStub metaClient;
     private final GrpcConcern commonConcerns;
+
+    private final InternalMetadataApiGrpc.InternalMetadataApiBlockingStub metaClient;
     private final ConfigManager configManager;
 
 
     public JobProcessorHelpers(
             PlatformConfig platformConfig,
             IDynamicResources resources,
-            InternalMetadataApiGrpc.InternalMetadataApiBlockingStub metaClient,
             GrpcConcern commonConcerns,
-            ConfigManager configManager) {
+            PluginRegistry registry) {
 
         this.platformConfig = platformConfig;
         this.resources = resources;
-        this.metaClient = metaClient;
         this.commonConcerns = commonConcerns;
-        this.configManager = configManager;
+
+        this.metaClient = registry.getSingleton(InternalMetadataApiGrpc.InternalMetadataApiBlockingStub.class);
+        this.configManager = registry.getSingleton(ConfigManager.class);
     }
 
     /**

@@ -18,10 +18,12 @@
 package org.finos.tracdap.svc.orch.service;
 
 import org.finos.tracdap.api.internal.RuntimeJobStatus;
+import org.finos.tracdap.common.cache.IJobCacheManager;
 import org.finos.tracdap.common.exception.*;
 import org.finos.tracdap.common.cache.CacheEntry;
 import org.finos.tracdap.common.cache.IJobCache;
 import org.finos.tracdap.common.metadata.MetadataUtil;
+import org.finos.tracdap.common.plugin.PluginRegistry;
 import org.finos.tracdap.config.PlatformConfig;
 import org.finos.tracdap.config.PluginConfig;
 import org.finos.tracdap.metadata.JobStatusCode;
@@ -46,6 +48,8 @@ import java.util.stream.Collectors;
 
 
 public class JobManager {
+
+    public static final String JOB_CACHE_NAME = "TRAC_JOB_STATE";
 
     public static final Duration STARTUP_DELAY = Duration.of(10, ChronoUnit.SECONDS);
     public static final Duration SCHEDULED_REMOVAL_DURATION = Duration.of(2, ChronoUnit.MINUTES);
@@ -82,15 +86,13 @@ public class JobManager {
     private final AtomicInteger cachePollErrorCount = new AtomicInteger(0);
     private final AtomicInteger executorPollErrorCount = new AtomicInteger(0);
 
-    public JobManager(
-            PlatformConfig config,
-            JobProcessor processor,
-            IJobCache<JobState> cache,
-            ScheduledExecutorService javaExecutor) {
+    public JobManager(PlatformConfig config, PluginRegistry registry) {
 
-        this.processor = processor;
-        this.cache = cache;
-        this.javaExecutor = javaExecutor;
+        this.processor = registry.getSingleton(JobProcessor.class);
+        this.javaExecutor = registry.getSingleton(ScheduledExecutorService.class);
+
+        var cacheManager = registry.getSingleton(IJobCacheManager.class);
+        this.cache = cacheManager.getCache(JOB_CACHE_NAME, JobState.class);
 
         cachePollInterval = Duration.ofSeconds(readIntegerProperty(config.getJobCache(), POLL_INTERVAL_CONFIG_KEY, DEFAULT_CACHE_POLL_INTERVAL));
         cacheTicketDuration = Duration.ofSeconds(readIntegerProperty(config.getJobCache(), TICKET_DURATION_CONFI_KEY, DEFAULT_CACHE_TICKET_DURATION));

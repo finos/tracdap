@@ -15,16 +15,18 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.exec;
+package org.finos.tracdap.svc.orch.service;
 
 import org.finos.tracdap.api.internal.*;
 import org.finos.tracdap.common.config.ConfigFormat;
 import org.finos.tracdap.common.config.ConfigParser;
 import org.finos.tracdap.common.exception.*;
+import org.finos.tracdap.common.exec.*;
 import org.finos.tracdap.common.grpc.ClientCompressionInterceptor;
 import org.finos.tracdap.common.grpc.GrpcChannelFactory;
 import org.finos.tracdap.common.grpc.ClientLoggingInterceptor;
 import org.finos.tracdap.common.metadata.MetadataUtil;
+import org.finos.tracdap.common.plugin.PluginRegistry;
 import org.finos.tracdap.config.*;
 import org.finos.tracdap.metadata.JobStatusCode;
 import org.finos.tracdap.metadata.TagHeader;
@@ -38,17 +40,12 @@ import org.slf4j.LoggerFactory;
 import java.io.Serializable;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.Flow;
 import java.util.regex.Pattern;
 
 
-public class BatchJobExecutor<TBatchState extends Serializable> implements IJobExecutor<BatchJobState<TBatchState>> {
-
-    public static final Pattern RUNTIME_ENV_KEY = Pattern.compile("runtime\\.env\\.(\\w+)");
-    public static final Pattern RUNTIME_PROP_KEY = Pattern.compile("runtime\\.((\\w+\\.)*\\w+)");
+public class JobExecutor<TBatchState extends Serializable> implements IJobExecutor<JobExecutorState<TBatchState>> {
 
     private static final short DEFAULT_RUNTIME_API_PORT = 9000;
 
@@ -56,41 +53,29 @@ public class BatchJobExecutor<TBatchState extends Serializable> implements IJobE
 
     private final Logger log = LoggerFactory.getLogger(getClass());
     private final IBatchExecutor<TBatchState> batchExecutor;
-    private final PluginConfig executorConfig;
+    private final GrpcChannelFactory channelFactory;
     private final ConfigParser configParser;
 
-    private GrpcChannelFactory channelFactory;
-
-    public BatchJobExecutor(IBatchExecutor<TBatchState> batchExecutor, PluginConfig executorConfig) {
-        this.batchExecutor = batchExecutor;
-        this.executorConfig = executorConfig;
+    @SuppressWarnings("unchecked")
+    public JobExecutor(PluginRegistry registry) {
+        this.batchExecutor = (IBatchExecutor<TBatchState>) registry.getSingleton(IBatchExecutor.class);
+        this.channelFactory = registry.getSingleton(GrpcChannelFactory.class);
         this.configParser = new ConfigParser();
     }
 
     @Override
-    public void start(GrpcChannelFactory channelFactory) {
-        this.channelFactory = channelFactory;
-        batchExecutor.start();
-    }
-
-    @Override
-    public void stop() {
-        batchExecutor.stop();
-    }
-
-    @Override
     @SuppressWarnings("unchecked")
-    public Class<BatchJobState<TBatchState>> stateClass() {
-        return (Class<BatchJobState<TBatchState>>) (Object) BatchJobState.class;
+    public Class<JobExecutorState<TBatchState>> stateClass() {
+        return (Class<JobExecutorState<TBatchState>>) (Object) JobExecutorState.class;
     }
 
     @Override
-    public BatchJobState<TBatchState> submitJob() {
+    public JobExecutorState<TBatchState> submitJob() {
         throw new ETracInternal("Not implemented yet");
     }
 
     @Override
-    public BatchJobState<TBatchState> submitOneshotJob(TagHeader jobId, JobConfig jobConfig, RuntimeConfig sysConfig) {
+    public JobExecutorState<TBatchState> submitOneshotJob(TagHeader jobId, JobConfig jobConfig, RuntimeConfig sysConfig) {
 
         // If an error occurs before the batch state is created, then there is nothing to clean up
 
@@ -100,10 +85,6 @@ public class BatchJobExecutor<TBatchState extends Serializable> implements IJobE
         try {
 
             var batchSysConfig = sysConfig.toBuilder();
-            var batchEnvironment = new HashMap<String, String>();
-
-            // Add settings from this executor's config
-            addRuntimeSettings(batchSysConfig, batchEnvironment);
 
             var runtimeApiEnabled = batchExecutor.hasFeature(IBatchExecutor.Feature.EXPOSE_PORT);
             var storageMappingEnabled = batchExecutor.hasFeature(IBatchExecutor.Feature.STORAGE_MAPPING);
@@ -158,11 +139,9 @@ public class BatchJobExecutor<TBatchState extends Serializable> implements IJobE
                         LaunchArg.path("log", "trac_rt_stderr.log"));
             }
 
-            batchEnvironment.forEach(batchConfig::addEnvironmentVariable);
-
             batchState = batchExecutor.submitBatch(batchKey, batchState, batchConfig);
 
-            var jobState = new BatchJobState<TBatchState>();
+            var jobState = new JobExecutorState<TBatchState>();
             jobState.batchKey = batchKey;
             jobState.batchState = batchState;
             jobState.runtimeApiEnabled = runtimeApiEnabled;
@@ -193,18 +172,18 @@ public class BatchJobExecutor<TBatchState extends Serializable> implements IJobE
     }
 
     @Override
-    public BatchJobState<TBatchState> submitExternalJob() {
+    public JobExecutorState<TBatchState> submitExternalJob() {
         throw new ETracInternal("Not implemented yet");
     }
 
     @Override
-    public BatchJobState<TBatchState> cancelJob(BatchJobState<TBatchState> jobState) {
+    public JobExecutorState<TBatchState> cancelJob(JobExecutorState<TBatchState> jobState) {
         jobState.batchState = batchExecutor.cancelBatch(jobState.batchKey, jobState.batchState);
         return jobState;
     }
 
     @Override
-    public void deleteJob(BatchJobState<TBatchState> jobState) {
+    public void deleteJob(JobExecutorState<TBatchState> jobState) {
         batchExecutor.deleteBatch(jobState.batchKey, jobState.batchState);
     }
 
@@ -214,7 +193,7 @@ public class BatchJobExecutor<TBatchState extends Serializable> implements IJobE
     }
 
     @Override
-    public RuntimeJobStatus getJobStatus(BatchJobState<TBatchState> jobState) {
+    public RuntimeJobStatus getJobStatus(JobExecutorState<TBatchState> jobState) {
 
         var batchStatus = batchExecutor.getBatchStatus(jobState.batchKey, jobState.batchState);
 
@@ -259,27 +238,7 @@ public class BatchJobExecutor<TBatchState extends Serializable> implements IJobE
         return jobStatus;
     }
 
-    private void addRuntimeSettings(RuntimeConfig.Builder config, Map<String, String> environment) {
-
-        for (var property : executorConfig.getPropertiesMap().entrySet()) {
-
-            var envMatch = RUNTIME_ENV_KEY.matcher(property.getKey());
-            var propMatch = RUNTIME_PROP_KEY.matcher(property.getKey());
-
-            if (envMatch.matches()) {
-                var envKey = envMatch.group(1);
-                var envValue = property.getValue();
-                environment.put(envKey, envValue);
-            }
-            else if (propMatch.matches()) {
-                var propKey = propMatch.group(1);
-                var propValue = property.getValue();
-                config.putProperties(propKey, propValue);
-            }
-        }
-    }
-
-    private RuntimeJobStatus getStatusFromApi(BatchJobState<TBatchState> jobState) {
+    private RuntimeJobStatus getStatusFromApi(JobExecutorState<TBatchState> jobState) {
 
         var runtimeApiAddress = getRuntimeApiAddress(jobState);
         var runtimeChannel = (ManagedChannel) null;
@@ -306,7 +265,7 @@ public class BatchJobExecutor<TBatchState extends Serializable> implements IJobE
         }
     }
 
-    private void updateStatusFromLogs(BatchJobState<TBatchState> jobState, RuntimeJobStatus.Builder batchJobStatus) {
+    private void updateStatusFromLogs(JobExecutorState<TBatchState> jobState, RuntimeJobStatus.Builder batchJobStatus) {
 
         // If a log file is available, fetch it and look for a TRAC exception message
         // If the error log is not available, fall back on the basic batch status
@@ -365,12 +324,12 @@ public class BatchJobExecutor<TBatchState extends Serializable> implements IJobE
     }
 
     @Override
-    public Flow.Publisher<RuntimeJobStatus> followJobStatus(BatchJobState<TBatchState> jobState) {
+    public Flow.Publisher<RuntimeJobStatus> followJobStatus(JobExecutorState<TBatchState> jobState) {
         throw new ETracInternal("Not implemented yet");
     }
 
     @Override
-    public RuntimeJobResult getJobResult(BatchJobState<TBatchState> jobState) {
+    public RuntimeJobResult getJobResult(JobExecutorState<TBatchState> jobState) {
 
         var batchStatus = batchExecutor.getBatchStatus(jobState.batchKey, jobState.batchState);
         var batchCode = batchStatus.getStatusCode();
@@ -389,7 +348,7 @@ public class BatchJobExecutor<TBatchState extends Serializable> implements IJobE
         throw new ETracInternal(message);
     }
 
-    private RuntimeJobResult getResultFromApi(BatchJobState<TBatchState> jobState) {
+    private RuntimeJobResult getResultFromApi(JobExecutorState<TBatchState> jobState) {
 
         var runtimeApiAddress = getRuntimeApiAddress(jobState);
         var runtimeChannel = (ManagedChannel) null;
@@ -416,7 +375,7 @@ public class BatchJobExecutor<TBatchState extends Serializable> implements IJobE
         }
     }
 
-    private RuntimeJobResult getResultFromResultFile(BatchJobState<TBatchState> jobState) {
+    private RuntimeJobResult getResultFromResultFile(JobExecutorState<TBatchState> jobState) {
 
         var resultFile = String.format("job_result_%s.json", jobState.batchKey);
 
@@ -447,7 +406,7 @@ public class BatchJobExecutor<TBatchState extends Serializable> implements IJobE
         }
     }
 
-    private InetSocketAddress getRuntimeApiAddress(BatchJobState<TBatchState> jobState) {
+    private InetSocketAddress getRuntimeApiAddress(JobExecutorState<TBatchState> jobState) {
 
         var runtimeApiAddress = batchExecutor.getBatchAddress(jobState.batchKey, jobState.batchState);
 
@@ -470,7 +429,7 @@ public class BatchJobExecutor<TBatchState extends Serializable> implements IJobE
                 .newBlockingStub(clientChannel)
                 .withCompression(ClientCompressionInterceptor.COMPRESSION_TYPE)
                 .withInterceptors(new ClientCompressionInterceptor())
-                .withInterceptors(new ClientLoggingInterceptor(BatchJobExecutor.class));
+                .withInterceptors(new ClientLoggingInterceptor(JobExecutor.class));
     }
 
     private JobStatusCode mapStatusCode(BatchStatusCode batchStatusCode) {

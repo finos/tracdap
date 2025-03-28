@@ -27,13 +27,13 @@ import org.finos.tracdap.common.cache.CacheEntry;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.config.IDynamicResources;
 import org.finos.tracdap.common.exception.*;
-import org.finos.tracdap.common.exec.*;
 import org.finos.tracdap.common.grpc.RequestMetadata;
 import org.finos.tracdap.common.grpc.UserMetadata;
 import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.metadata.MetadataUtil;
 import org.finos.tracdap.common.middleware.GrpcClientState;
 import org.finos.tracdap.common.middleware.GrpcConcern;
+import org.finos.tracdap.common.plugin.PluginRegistry;
 import org.finos.tracdap.common.validation.Validator;
 import org.finos.tracdap.common.metadata.MetadataBundle;
 import org.finos.tracdap.config.PlatformConfig;
@@ -70,16 +70,14 @@ public class JobProcessor {
     public JobProcessor(
             PlatformConfig platformConfig,
             IDynamicResources resources,
-            InternalMetadataApiBlockingStub metaClient,
             GrpcConcern commonConcerns,
-            IJobExecutor<?> jobExecutor,
-            ConfigManager configManager) {
+            PluginRegistry registry) {
 
         this.resources = resources;
-        this.metaClient = metaClient;
-        this.executor = jobExecutor;
+        this.metaClient = registry.getSingleton(InternalMetadataApiBlockingStub.class);
+        this.executor = registry.getSingleton(JobExecutor.class);
 
-        this.lifecycle = new JobProcessorHelpers(platformConfig, resources, metaClient, commonConcerns, configManager);
+        this.lifecycle = new JobProcessorHelpers(platformConfig, resources, commonConcerns, registry);
     }
 
     public JobState newJob(JobRequest request, GrpcClientState clientState) {

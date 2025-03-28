@@ -24,6 +24,7 @@ import org.finos.tracdap.common.exception.ECacheNotFound;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.metadata.MetadataUtil;
 import org.finos.tracdap.common.middleware.GrpcConcern;
+import org.finos.tracdap.common.plugin.PluginRegistry;
 import org.finos.tracdap.svc.orch.service.JobManager;
 import org.finos.tracdap.svc.orch.service.JobProcessor;
 
@@ -41,10 +42,10 @@ public class TracOrchestratorApi extends TracOrchestratorApiGrpc.TracOrchestrato
     private final GrpcConcern commonConcerns;
 
 
-    public TracOrchestratorApi(JobManager jobManager, JobProcessor jobProcessor, GrpcConcern commonConcerns) {
+    public TracOrchestratorApi(PluginRegistry registry, GrpcConcern commonConcerns) {
 
-        this.jobManager = jobManager;
-        this.jobProcessor = jobProcessor;
+        this.jobManager = registry.getSingleton(JobManager.class);
+        this.jobProcessor = registry.getSingleton(JobProcessor.class);
         this.commonConcerns = commonConcerns;
     }
 

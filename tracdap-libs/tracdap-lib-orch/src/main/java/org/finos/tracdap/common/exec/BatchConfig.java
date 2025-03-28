@@ -49,7 +49,7 @@ public class BatchConfig {
         return new BatchConfig(launchCmd, launchArgs, false, null, null);
     }
 
-    void addExtraArgs(List<LaunchArg> extraArgs) {
+    public void addExtraArgs(List<LaunchArg> extraArgs) {
 
         var newLaunchArgs = new ArrayList<>(launchArgs);
         newLaunchArgs.addAll(extraArgs);
@@ -57,7 +57,7 @@ public class BatchConfig {
         this.launchArgs = newLaunchArgs;
     }
 
-    void addLoggingRedirect(LaunchArg stdOut, LaunchArg stdErr) {
+    public void addLoggingRedirect(LaunchArg stdOut, LaunchArg stdErr) {
 
         if (stdOut.getArgType() != LaunchArgType.PATH || stdErr.getArgType() != LaunchArgType.PATH)
             throw new ETracInternal("Batch config for stdOut and stdErr must have arg type PATH");
@@ -67,7 +67,7 @@ public class BatchConfig {
         this.stdErr = stdErr;
     }
 
-    void addEnvironmentVariable(String key, String value) {
+    public void addEnvironmentVariable(String key, String value) {
         environment.put(key, value);
     }
 

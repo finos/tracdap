@@ -15,12 +15,12 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.exec;
+package org.finos.tracdap.svc.orch.service;
 
 import java.io.Serializable;
 
 
-public class BatchJobState<TBatchState extends Serializable> implements Serializable {
+public class JobExecutorState<TBatchState extends Serializable> implements Serializable {
 
     String batchKey;
     TBatchState batchState;

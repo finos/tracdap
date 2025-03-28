@@ -24,6 +24,7 @@ import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.config.DynamicConfig;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.middleware.GrpcConcern;
+import org.finos.tracdap.common.plugin.PluginRegistry;
 import org.finos.tracdap.metadata.ResourceDefinition;
 
 import io.grpc.stub.StreamObserver;
@@ -39,11 +40,9 @@ public class MessageProcessor extends InternalMessagingApiGrpc.InternalMessaging
     private final GrpcConcern commonConcerns;
     private final DynamicConfig.Resources resources;
 
-    public MessageProcessor(
-            InternalMetadataApiGrpc.InternalMetadataApiBlockingStub metadataApi,
-            GrpcConcern commonConcerns, DynamicConfig.Resources resources) {
+    public MessageProcessor(PluginRegistry registry, GrpcConcern commonConcerns, DynamicConfig.Resources resources) {
 
-        this.metadataApi = metadataApi;
+        this.metadataApi = registry.getSingleton(InternalMetadataApiGrpc.InternalMetadataApiBlockingStub.class);
         this.commonConcerns = commonConcerns;
         this.resources = resources;
     }
