@@ -27,15 +27,16 @@ import org.finos.tracdap.common.cache.IJobCacheManager;
 import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.config.DynamicConfig;
-import org.finos.tracdap.common.exec.BatchJobExecutor;
+import org.finos.tracdap.svc.orch.service.JobExecutor;
 import org.finos.tracdap.common.exec.IBatchExecutor;
 import org.finos.tracdap.common.exception.EStartup;
-import org.finos.tracdap.common.exec.IJobExecutor;
+import org.finos.tracdap.svc.orch.service.IJobExecutor;
 import org.finos.tracdap.common.grpc.*;
 import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.metadata.MetadataConstants;
 import org.finos.tracdap.common.middleware.GrpcConcern;
 import org.finos.tracdap.common.plugin.PluginManager;
+import org.finos.tracdap.common.plugin.PluginRegistry;
 import org.finos.tracdap.common.service.TracServiceConfig;
 import org.finos.tracdap.common.service.TracServiceBase;
 import org.finos.tracdap.common.util.RoutingUtils;
@@ -47,7 +48,6 @@ import org.finos.tracdap.svc.orch.api.MessageProcessor;
 import org.finos.tracdap.svc.orch.api.TracOrchestratorApi;
 import org.finos.tracdap.svc.orch.service.JobManager;
 import org.finos.tracdap.svc.orch.service.JobProcessor;
-import org.finos.tracdap.svc.orch.service.JobState;
 
 import io.grpc.ManagedChannel;
 import io.grpc.Server;
@@ -66,19 +66,20 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 
 public class TracOrchestratorService extends TracServiceBase {
 
-    private static final String JOB_CACHE_NAME = "TRAC_JOB_STATE";
     private static final int CONCURRENT_REQUESTS = 30;
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
     private final PluginManager pluginManager;
     private final ConfigManager configManager;
+    private final PluginRegistry registry;
 
     private EventLoopGroup bossGroup;
     private EventLoopGroup nettyGroup;
@@ -88,8 +89,7 @@ public class TracOrchestratorService extends TracServiceBase {
     private ManagedChannel clientChannel;
     private GrpcConcern commonConcerns;
 
-    private IJobExecutor<?> jobExecutor;
-    private IJobCacheManager jobCacheManager;
+    private IBatchExecutor<? extends Serializable> batchExecutor;
     private JobManager jobManager;
 
     public static void main(String[] args) {
@@ -101,6 +101,10 @@ public class TracOrchestratorService extends TracServiceBase {
 
         this.pluginManager = pluginManager;
         this.configManager = configManager;
+        this.registry = new PluginRegistry();
+
+        registry.registerSingleton(PluginManager.class, pluginManager);
+        registry.registerSingleton(ConfigManager.class, configManager);
     }
 
     @Override
@@ -136,43 +140,65 @@ public class TracOrchestratorService extends TracServiceBase {
 
             var channelType = NioServerSocketChannel.class;
             var clientChannelType = NioSocketChannel.class;
-            var clientChannelFactory = new ClientChannelFactory(clientChannelType);
 
             bossGroup = new NioEventLoopGroup(1, new DefaultThreadFactory("orch-boss"));
             nettyGroup = new NioEventLoopGroup(2, new DefaultThreadFactory("orch-netty"));
+
+            // Main executor for requests and background tasks
             serviceGroup = new NioEventLoopGroup(CONCURRENT_REQUESTS, new DefaultThreadFactory("orch-svc"));
+            registry.registerSingleton(ScheduledExecutorService.class, serviceGroup);
 
             // Common framework for cross-cutting concerns
             commonConcerns = buildCommonConcerns();
 
+            // Metadata client
+            var clientChannelFactory = new ClientChannelFactory(clientChannelType);
             var metaClient = prepareMetadataClient(platformConfig, clientChannelFactory, commonConcerns);
+            registry.registerSingleton(GrpcChannelFactory.class, clientChannelFactory);
+            registry.registerSingleton(InternalMetadataApiGrpc.InternalMetadataApiBlockingStub.class, metaClient);
 
+            // Load dynamic config and resources
             var resources = new DynamicConfig.Resources();
 
             for (var tenant : platformConfig.getTenantsMap().keySet())
                 loadResources(metaClient, tenant, resources);
 
+            // Load plugins
             var batchExecutor = (IBatchExecutor<? extends Serializable>) pluginManager.createService(
                     IBatchExecutor.class,
                     platformConfig.getExecutor(),
                     configManager);
 
-            jobExecutor = new BatchJobExecutor<>(batchExecutor, platformConfig.getExecutor());
-
-            jobCacheManager = pluginManager.createService(
+            var jobCacheManager = pluginManager.createService(
                     IJobCacheManager.class,
                     platformConfig.getJobCache(),
                     configManager);
 
-            var jobCache = jobCacheManager.getCache(JOB_CACHE_NAME, JobState.class);
+            registry.registerSingleton(IBatchExecutor.class, batchExecutor);
+            registry.registerSingleton(IJobCacheManager.class, jobCacheManager);
 
-            var jobProcessor = new JobProcessor(platformConfig, resources, metaClient, commonConcerns, jobExecutor, configManager);
+            // Create service objects
+            var jobExecutor = new JobExecutor<>(platformConfig.getExecutor(), registry);
+            var jobProcessor = new JobProcessor(platformConfig, resources, commonConcerns, registry);
+            var jobManager = new JobManager(platformConfig, registry);
 
-            jobManager = new JobManager(platformConfig, jobProcessor, jobCache, serviceGroup);
+            registry.registerSingleton(IJobExecutor.class, jobExecutor);
+            registry.registerSingleton(JobProcessor.class, jobProcessor);
+            registry.registerSingleton(JobManager.class, jobManager);
 
-            jobExecutor.start(clientChannelFactory);
-            jobManager.start();
+            // Run extensions startup logic
+            for (var extension : pluginManager.getExtensions())
+                extension.runStartupLogic(registry);
 
+            // Store references for shutdown
+            this.batchExecutor = (IBatchExecutor<? extends Serializable>) registry.getSingleton(IBatchExecutor.class);
+            this.jobManager = registry.getSingleton(JobManager.class);
+
+            // Start internal services
+            this.batchExecutor.start();
+            this.jobManager.start();
+
+            // Build the main server
             var serverBuilder = NettyServerBuilder
                     .forPort(serviceConfig.getPort())
 
@@ -183,8 +209,8 @@ public class TracOrchestratorService extends TracServiceBase {
                     .executor(serviceGroup)
 
                     // The main service
-                    .addService(new TracOrchestratorApi(jobManager, jobProcessor, commonConcerns))
-                    .addService(new MessageProcessor(metaClient, commonConcerns, resources));
+                    .addService(new TracOrchestratorApi(registry, commonConcerns))
+                    .addService(new MessageProcessor(registry, commonConcerns, resources));
 
             // Apply common concerns
             this.server = commonConcerns
@@ -221,7 +247,7 @@ public class TracOrchestratorService extends TracServiceBase {
 
         var executorDown = shutdownResource("Executor service", deadline, remainingTime -> {
 
-            jobExecutor.stop();
+            batchExecutor.stop();
             return true;
         });
 

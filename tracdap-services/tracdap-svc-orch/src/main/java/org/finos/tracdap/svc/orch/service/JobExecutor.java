@@ -26,6 +26,7 @@ import org.finos.tracdap.common.grpc.ClientCompressionInterceptor;
 import org.finos.tracdap.common.grpc.GrpcChannelFactory;
 import org.finos.tracdap.common.grpc.ClientLoggingInterceptor;
 import org.finos.tracdap.common.metadata.MetadataUtil;
+import org.finos.tracdap.common.plugin.PluginRegistry;
 import org.finos.tracdap.config.*;
 import org.finos.tracdap.metadata.JobStatusCode;
 import org.finos.tracdap.metadata.TagHeader;
@@ -56,27 +57,17 @@ public class JobExecutor<TBatchState extends Serializable> implements IJobExecut
     private static final Pattern TRAC_ERROR_LINE = Pattern.compile("tracdap.rt.exceptions.(E\\w+): (.+)");
 
     private final Logger log = LoggerFactory.getLogger(getClass());
-    private final IBatchExecutor<TBatchState> batchExecutor;
     private final PluginConfig executorConfig;
+    private final IBatchExecutor<TBatchState> batchExecutor;
+    private final GrpcChannelFactory channelFactory;
     private final ConfigParser configParser;
 
-    private GrpcChannelFactory channelFactory;
-
-    public JobExecutor(IBatchExecutor<TBatchState> batchExecutor, PluginConfig executorConfig) {
-        this.batchExecutor = batchExecutor;
+    @SuppressWarnings("unchecked")
+    public JobExecutor(PluginConfig executorConfig, PluginRegistry registry) {
         this.executorConfig = executorConfig;
+        this.batchExecutor = (IBatchExecutor<TBatchState>) registry.getSingleton(IBatchExecutor.class);
+        this.channelFactory = registry.getSingleton(GrpcChannelFactory.class);
         this.configParser = new ConfigParser();
-    }
-
-    @Override
-    public void start(GrpcChannelFactory channelFactory) {
-        this.channelFactory = channelFactory;
-        batchExecutor.start();
-    }
-
-    @Override
-    public void stop() {
-        batchExecutor.stop();
     }
 
     @Override

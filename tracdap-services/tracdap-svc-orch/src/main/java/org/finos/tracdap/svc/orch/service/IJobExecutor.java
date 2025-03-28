@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.exec;
+package org.finos.tracdap.svc.orch.service;
 
 import org.finos.tracdap.api.internal.RuntimeJobResult;
 import org.finos.tracdap.api.internal.RuntimeJobStatus;
@@ -30,9 +30,6 @@ import java.util.concurrent.Flow;
 
 
 public interface IJobExecutor<TState extends Serializable> {
-
-    void start(GrpcChannelFactory channelFactory);
-    void stop();
 
     Class<TState> stateClass();
 
