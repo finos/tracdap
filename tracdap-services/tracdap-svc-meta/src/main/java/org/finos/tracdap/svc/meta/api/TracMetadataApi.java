@@ -20,9 +20,7 @@ package org.finos.tracdap.svc.meta.api;
 import org.finos.tracdap.api.*;
 import org.finos.tracdap.metadata.Tag;
 import org.finos.tracdap.metadata.TagHeader;
-import org.finos.tracdap.svc.meta.services.MetadataReadService;
-import org.finos.tracdap.svc.meta.services.MetadataSearchService;
-import org.finos.tracdap.svc.meta.services.MetadataWriteService;
+import org.finos.tracdap.svc.meta.services.*;
 
 import io.grpc.stub.StreamObserver;
 
@@ -34,9 +32,10 @@ public class TracMetadataApi extends TracMetadataApiGrpc.TracMetadataApiImplBase
     public TracMetadataApi(
             MetadataReadService readService,
             MetadataWriteService writeService,
-            MetadataSearchService searchService) {
+            MetadataSearchService searchService,
+            ConfigService configService) {
 
-        apiImpl = new MetadataApiImpl(readService, writeService, searchService, MetadataApiImpl.PUBLIC_API);
+        apiImpl = new MetadataApiImpl(readService, writeService, searchService, configService, MetadataApiImpl.PUBLIC_API);
     }
 
     @Override

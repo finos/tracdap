@@ -30,7 +30,7 @@ metadata:
     protocol: JDBC
     properties:
       dialect: H2
-      jdbcUrl: ${TRAC_DIR}/trac.meta;AUTO_SERVER=TRUE
+      jdbcUrl: ${TRAC_DIR}/trac.meta
       h2.user: trac
       h2.pass: trac
       h2.schema: public

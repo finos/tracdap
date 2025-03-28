@@ -17,17 +17,20 @@
 
 package org.finos.tracdap.svc.admin;
 
+import io.grpc.ManagedChannel;
+import io.grpc.ManagedChannelBuilder;
 import org.finos.tracdap.api.AdminServiceProto;
 import org.finos.tracdap.api.internal.InternalMessagingProto;
+import org.finos.tracdap.api.internal.InternalMetadataApiGrpc;
 import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.exception.EStartup;
-import org.finos.tracdap.common.metadata.dal.IMetadataDal;
 import org.finos.tracdap.common.middleware.GrpcConcern;
 import org.finos.tracdap.common.netty.NettyHelpers;
 import org.finos.tracdap.common.plugin.PluginManager;
 import org.finos.tracdap.common.service.TracServiceBase;
 import org.finos.tracdap.common.service.TracServiceConfig;
+import org.finos.tracdap.common.util.RoutingUtils;
 import org.finos.tracdap.common.validation.ValidationConcern;
 import org.finos.tracdap.config.PlatformConfig;
 import org.finos.tracdap.svc.admin.api.MessageProcessor;
@@ -55,7 +58,6 @@ public class TracAdminService extends TracServiceBase {
     private final ConfigManager configManager;
 
     private ExecutorService executor;
-    private IMetadataDal dal;
     private Server server;
 
 
@@ -84,13 +86,11 @@ public class TracAdminService extends TracServiceBase {
             executor.prestartAllCoreThreads();
             executor.allowCoreThreadTimeOut(false);
 
-            // Load the DAL service using the plugin loader mechanism
-            var metaDbConfig = platformConfig.getMetadata().getDatabase();
-            dal = pluginManager.createService(IMetadataDal.class, metaDbConfig, configManager);
-            dal.start();
+            var clientChannel = prepareClientChannel(platformConfig);
+            var metadataClient = prepareMetadataClient(commonConcerns, clientChannel);
 
             var notifierService = new NotifierService(platformConfig, commonConcerns);
-            var configService = new ConfigService(dal, notifierService);
+            var configService = new ConfigService(metadataClient, commonConcerns, notifierService);
 
             var adminApi = new TracAdminApi(configService);
 
@@ -124,7 +124,6 @@ public class TracAdminService extends TracServiceBase {
         if (!server.isTerminated())
             server.shutdownNow();
 
-        dal.stop();
         executor.shutdown();
 
         return 0;
@@ -146,5 +145,26 @@ public class TracAdminService extends TracServiceBase {
         }
 
         return commonConcerns.build();
+    }
+
+    private ManagedChannel
+    prepareClientChannel(PlatformConfig platformConfig) {
+
+        var metadataTarget = RoutingUtils.serviceTarget(platformConfig, ConfigKeys.METADATA_SERVICE_KEY);
+
+        log.info("Using (blocking) metadata service at [{}:{}]",
+                metadataTarget.getHost(), metadataTarget.getPort());
+
+        return ManagedChannelBuilder
+                .forAddress(metadataTarget.getHost(), metadataTarget.getPort())
+                .usePlaintext()
+                .build();
+    }
+
+    private InternalMetadataApiGrpc.InternalMetadataApiBlockingStub
+    prepareMetadataClient(GrpcConcern commonConcerns, ManagedChannel separateChannel) {
+
+        var client = InternalMetadataApiGrpc.newBlockingStub(separateChannel);
+        return commonConcerns.configureClient(client);
     }
 }

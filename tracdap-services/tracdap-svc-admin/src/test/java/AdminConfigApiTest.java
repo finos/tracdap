@@ -18,13 +18,13 @@
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import org.finos.tracdap.api.*;
-import org.finos.tracdap.api.internal.InternalMetadataApiGrpc;
 import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.metadata.ConfigEntry;
 import org.finos.tracdap.metadata.ObjectType;
 import org.finos.tracdap.metadata.ResourceType;
 import org.finos.tracdap.svc.admin.TracAdminService;
+import org.finos.tracdap.svc.meta.TracMetadataService;
 import org.finos.tracdap.test.helpers.PlatformTest;
 import org.finos.tracdap.test.meta.SampleMetadata;
 
@@ -52,6 +52,7 @@ abstract class AdminConfigApiTest {
                 .runDbDeploy(true)
                 .addTenant(TEST_TENANT)
                 .startService(TracAdminService.class)
+                .startService(TracMetadataService.class)
                 .build();
 
         @BeforeEach
@@ -72,6 +73,7 @@ abstract class AdminConfigApiTest {
                 .runDbDeploy(false)
                 .addTenant(TEST_TENANT)
                 .startService(TracAdminService.class)
+                .startService(TracMetadataService.class)
                 .build();
 
         @BeforeEach

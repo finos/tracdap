@@ -35,6 +35,7 @@ import org.finos.tracdap.config.PlatformConfig;
 import org.finos.tracdap.common.metadata.dal.IMetadataDal;
 import org.finos.tracdap.metadata.ResourceDefinition;
 import org.finos.tracdap.svc.meta.api.MessageProcessor;
+import org.finos.tracdap.svc.meta.services.ConfigService;
 import org.finos.tracdap.svc.meta.services.MetadataReadService;
 import org.finos.tracdap.svc.meta.services.MetadataSearchService;
 import org.finos.tracdap.svc.meta.services.MetadataWriteService;
@@ -131,9 +132,10 @@ public class TracMetadataService extends TracServiceBase {
             var readService = new MetadataReadService(dalWithLogging, platformConfig, resources);
             var writeService = new MetadataWriteService(dalWithLogging);
             var searchService = new MetadataSearchService(dalWithLogging);
+            var configService = new ConfigService(dalWithLogging);
 
-            var publicApi = new TracMetadataApi(readService, writeService, searchService);
-            var internalApi = new InternalMetadataApi(readService, writeService, searchService);
+            var publicApi = new TracMetadataApi(readService, writeService, searchService, configService);
+            var internalApi = new InternalMetadataApi(readService, writeService, searchService, configService);
             var messageProcessor = new MessageProcessor(resources, dal);
 
             // Common framework for cross-cutting concerns
