@@ -105,7 +105,13 @@ class GitRepository(IModelRepository):
                 else:
                     e = e.__cause__
 
-            message = f"Failed to check out [{model_def.repository}]: {str(error)}"
+            # Try to sanitize error messages from urllib3
+            if isinstance(error, urllib3.exceptions.HTTPError):
+                detail = self._clean_urllib3_error(error)
+            else:
+                detail = str(error)
+
+            message = f"Failed to check out [{model_def.repository}]: {detail}"
 
             self._log.error(message)
             raise ex.EModelRepo(message) from error
@@ -290,6 +296,20 @@ class GitRepository(IModelRepository):
     def _ref_key(key):
         return bytes(key, "ascii")
 
+    @classmethod
+    def _clean_urllib3_error(cls, error: urllib3.exceptions.HTTPError):
+
+        match = cls._URLLIB3_ERROR_PATTERN.match(str(error))
+
+        # Best efforts to clean up the message, fall back on str(error)
+        if match:
+            return match.group(1)
+        else:
+            return str(error)
+
+    # Error message format is like this:
+    # <pkg.ClassName object at 0xXXXXXXX>: Message
+    _URLLIB3_ERROR_PATTERN = re.compile(r"<[^>]*>: (.*)")
 
 # Register plugin
 plugins.PluginManager.register_plugin(IModelRepository, GitRepository, ["git"])
