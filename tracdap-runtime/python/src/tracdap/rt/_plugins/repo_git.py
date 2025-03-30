@@ -23,6 +23,7 @@ import time
 import dulwich.repo as git_repo
 import dulwich.client as git_client
 import dulwich.index as git_index
+import urllib3.exceptions  # noqa
 
 import tracdap.rt.metadata as meta
 import tracdap.rt.exceptions as ex
@@ -75,20 +76,45 @@ class GitRepository(IModelRepository):
 
     def do_checkout(self, model_def: meta.ModelDefinition, checkout_dir: pathlib.Path) -> pathlib.Path:
 
-        self._log.info(
-            f"Git checkout: repo = [{model_def.repository}], " +
-            f"group = [{model_def.packageGroup}], package = [{model_def.package}], version = [{model_def.version}]")
+        try:
 
-        self._log.info(f"Checkout location: [{checkout_dir}]")
+            self._log.info(
+                f"Git checkout: repo = [{model_def.repository}], " +
+                f"group = [{model_def.packageGroup}], package = [{model_def.package}], version = [{model_def.version}]")
 
-        if self._native_git:
-            package_path = self._do_native_checkout(model_def, checkout_dir)
-        else:
-            package_path = self._do_python_checkout(model_def, checkout_dir)
+            self._log.info(f"Checkout location: [{checkout_dir}]")
 
-        self._log.info(f"Git checkout succeeded for {model_def.package} {model_def.version}")
+            if self._native_git:
+                package_path = self._do_native_checkout(model_def, checkout_dir)
+            else:
+                package_path = self._do_python_checkout(model_def, checkout_dir)
 
-        return package_path
+            self._log.info(f"Git checkout succeeded for {model_def.package} {model_def.version}")
+
+            return package_path
+
+        except Exception as e:
+
+            error = e
+
+            # For retry failures, try to find the original cause
+            while e.__cause__ is not None:
+                if isinstance(e, urllib3.exceptions.MaxRetryError):
+                    error = e.__cause__
+                    break
+                else:
+                    e = e.__cause__
+
+            # Try to sanitize error messages from urllib3
+            if isinstance(error, urllib3.exceptions.HTTPError):
+                detail = self._clean_urllib3_error(error)
+            else:
+                detail = str(error)
+
+            message = f"Failed to check out [{model_def.repository}]: {detail}"
+
+            self._log.error(message)
+            raise ex.EModelRepo(message) from error
 
     def _do_native_checkout(self, model_def: meta.ModelDefinition, checkout_dir: pathlib.Path) -> pathlib.Path:
 
@@ -150,9 +176,14 @@ class GitRepository(IModelRepository):
                 for line in cmd_err:
                     self._log.info(line)
 
-            else:
+            elif cmd_err:
+
                 for line in cmd_err:
                     self._log.error(line)
+
+                raise ex.EModelRepo(cmd_err[-1])
+
+            else:
 
                 error_msg = f"Git checkout failed for {model_def.package} {model_def.version}"
                 self._log.error(error_msg)
@@ -265,6 +296,20 @@ class GitRepository(IModelRepository):
     def _ref_key(key):
         return bytes(key, "ascii")
 
+    @classmethod
+    def _clean_urllib3_error(cls, error: urllib3.exceptions.HTTPError):
+
+        match = cls._URLLIB3_ERROR_PATTERN.match(str(error))
+
+        # Best efforts to clean up the message, fall back on str(error)
+        if match:
+            return match.group(1)
+        else:
+            return str(error)
+
+    # Error message format is like this:
+    # <pkg.ClassName object at 0xXXXXXXX>: Message
+    _URLLIB3_ERROR_PATTERN = re.compile(r"<[^>]*>: (.*)")
 
 # Register plugin
 plugins.PluginManager.register_plugin(IModelRepository, GitRepository, ["git"])
