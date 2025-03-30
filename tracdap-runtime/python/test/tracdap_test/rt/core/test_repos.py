@@ -21,6 +21,7 @@ import subprocess as sp
 
 import tracdap.rt.metadata as meta
 import tracdap.rt.config as config
+import tracdap.rt.exceptions as ex
 import tracdap.rt.ext.plugins as plugins
 import tracdap.rt._impl.core.logging as log  # noqa
 import tracdap.rt._impl.core.models as models  # noqa
@@ -119,6 +120,7 @@ class ModelRepositoriesTest(unittest.TestCase):
 
         self._test_checkout_git_native(checkout_key)
 
+
     def _test_checkout_git_native(self, checkout_key):
 
         sys_config = config.RuntimeConfig()
@@ -149,6 +151,34 @@ class ModelRepositoriesTest(unittest.TestCase):
         safe_package_dir = util.windows_unc_path(package_dir)
 
         self.assertTrue(safe_package_dir.joinpath("tutorial/hello_world.py").exists())
+
+    def test_checkout_git_native_failure(self):
+
+        sys_config = config.RuntimeConfig()
+        sys_config.repositories["git_test"] = config.PluginConfig(
+            protocol="git",
+            properties={
+                "repoUrl": "https://github.noexist/finos/tracdap",
+                "nativeGit": "true"})
+
+        model_def = meta.ModelDefinition(
+            language="python",
+            repository="git_test",
+            packageGroup="finos",
+            package="tracdap",
+            version="v0.6.0",
+            entryPoint="tutorial.hello_world.HelloWorldModel",
+            path="examples/models/python/src"
+        )
+
+        repo_mgr = repos.RepositoryManager(sys_config)
+        repo = repo_mgr.get_repository("git_test")
+
+        checkout_dir = self.scratch_dir.joinpath(model_def.repository, "git_native_failure")
+        safe_checkout_dir = util.windows_unc_path(checkout_dir)
+        safe_checkout_dir.mkdir(mode=0o750, parents=True, exist_ok=False)
+
+        self.assertRaises(ex.EModelRepo, lambda: repo.do_checkout(model_def, checkout_dir))
 
     def test_checkout_git_python(self):
 
@@ -197,6 +227,33 @@ class ModelRepositoriesTest(unittest.TestCase):
         safe_package_dir = util.windows_unc_path(package_dir)
 
         self.assertTrue(safe_package_dir.joinpath("tutorial/hello_world.py").exists())
+
+    def test_checkout_git_python_failure(self):
+
+        sys_config = config.RuntimeConfig()
+        sys_config.repositories["git_test"] = config.PluginConfig(
+            protocol="git",
+            properties={
+                "repoUrl": "https://github.noexist/finos/tracdap"})
+
+        model_def = meta.ModelDefinition(
+            language="python",
+            repository="git_test",
+            packageGroup="finos",
+            package="tracdap",
+            version="v0.6.0",
+            entryPoint="tutorial.hello_world.HelloWorldModel",
+            path="examples/models/python/src"
+        )
+
+        repo_mgr = repos.RepositoryManager(sys_config)
+        repo = repo_mgr.get_repository("git_test")
+
+        checkout_dir = self.scratch_dir.joinpath(model_def.repository, "git_native_failure")
+        safe_checkout_dir = util.windows_unc_path(checkout_dir)
+        safe_checkout_dir.mkdir(mode=0o750, parents=True, exist_ok=False)
+
+        self.assertRaises(ex.EModelRepo, lambda: repo.do_checkout(model_def, checkout_dir))
 
     def test_checkout_pypi(self):
 
