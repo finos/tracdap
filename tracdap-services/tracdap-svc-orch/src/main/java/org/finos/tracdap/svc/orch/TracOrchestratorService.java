@@ -27,6 +27,7 @@ import org.finos.tracdap.common.cache.IJobCacheManager;
 import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.config.DynamicConfig;
+import org.finos.tracdap.common.config.IDynamicResources;
 import org.finos.tracdap.svc.orch.service.JobExecutor;
 import org.finos.tracdap.common.exec.IBatchExecutor;
 import org.finos.tracdap.common.exception.EStartup;
@@ -149,6 +150,7 @@ public class TracOrchestratorService extends TracServiceBase {
 
             // Common framework for cross-cutting concerns
             commonConcerns = buildCommonConcerns();
+            registry.addSingleton(GrpcConcern.class, commonConcerns);
 
             // Metadata client
             var clientChannelFactory = new ClientChannelFactory(clientChannelType);
@@ -158,6 +160,7 @@ public class TracOrchestratorService extends TracServiceBase {
 
             // Load dynamic config and resources
             var resources = new DynamicConfig.Resources();
+            registry.addSingleton(IDynamicResources.class, resources);
 
             for (var tenant : platformConfig.getTenantsMap().keySet())
                 loadResources(metaClient, tenant, resources);
