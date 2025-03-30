@@ -244,7 +244,7 @@ class ModelRepositoriesTest(unittest.TestCase):
         repo_mgr = repos.RepositoryManager(sys_config)
         repo = repo_mgr.get_repository("git_test")
 
-        checkout_dir = self.scratch_dir.joinpath(model_def.repository, "git_native_failure")
+        checkout_dir = self.scratch_dir.joinpath(model_def.repository, "git_python_failure")
         safe_checkout_dir = util.windows_unc_path(checkout_dir)
         safe_checkout_dir.mkdir(mode=0o750, parents=True, exist_ok=False)
 
