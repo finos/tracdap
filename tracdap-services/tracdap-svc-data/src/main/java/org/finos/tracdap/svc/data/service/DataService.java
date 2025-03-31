@@ -333,48 +333,75 @@ public class DataService {
                 .getCopies(copyIndex);
     }
 
-    private CompletionStage<Void> preallocateIds(DataWriteRequest request, RequestState state) {
+    private CompletionStage<RequestState> preallocateIds(DataWriteRequest request, RequestState state) {
 
         var client = state.clientConfig.configureClient(metaClient);
 
-        var preAllocDataReq = MetadataBuilders.preallocateRequest(request.getTenant(), ObjectType.DATA);
-        var preAllocStorageReq = MetadataBuilders.preallocateRequest(request.getTenant(), ObjectType.STORAGE);
+        var dataIdReq = MetadataBuilders.preallocateRequest(request.getTenant(), ObjectType.DATA);
+        var storageIdReq = MetadataBuilders.preallocateRequest(request.getTenant(), ObjectType.STORAGE);
 
-        return CompletableFuture.completedFuture(0)
+        var batchReq = MetadataWriteBatchRequest.newBuilder()
+                .setTenant(request.getTenant())
+                .addPreallocateIds(dataIdReq)
+                .addPreallocateIds(storageIdReq)
+                .build();
 
-                .thenCompose(x -> Futures.javaFuture(client.preallocateId(preAllocDataReq)))
-                .thenAccept(dataId -> state.preAllocDataId = dataId)
+        return Futures
+                .javaFuture(client.writeBatch(batchReq))
+                .thenApply(batchResp -> recordPreallocateIds(batchResp, state));
+    }
 
-                .thenCompose(x -> Futures.javaFuture(client.preallocateId(preAllocStorageReq)))
-                .thenAccept(storageId -> state.preAllocStorageId = storageId);
+    private RequestState recordPreallocateIds(MetadataWriteBatchResponse batchResponse, RequestState state) {
+
+        var dataId0 = batchResponse.getPreallocateIds(0);
+        var storageId9 = batchResponse.getPreallocateIds(1);
+
+        state.preAllocDataId = dataId0;
+        state.preAllocStorageId = storageId9;
+
+        return state;
     }
 
     private CompletionStage<TagHeader> saveMetadata(DataWriteRequest request, RequestState state) {
 
         var client = state.clientConfig.configureClient(metaClient);
 
+        var priorDataId = selectorFor(state.preAllocDataId);
         var priorStorageId = selectorFor(state.preAllocStorageId);
+
+        var dataReq = MetadataBuilders.buildCreateObjectReq(request.getTenant(), priorDataId, state.data, state.dataTags);
         var storageReq = MetadataBuilders.buildCreateObjectReq(request.getTenant(), priorStorageId, state.storage, state.storageTags);
 
-        var priorDataId = selectorFor(state.preAllocDataId);
-        var dataReq = MetadataBuilders.buildCreateObjectReq(request.getTenant(), priorDataId, state.data, state.dataTags);
+        var batchReq = MetadataWriteBatchRequest.newBuilder()
+                .setTenant(request.getTenant())
+                .addCreatePreallocatedObjects(dataReq)
+                .addCreatePreallocatedObjects(storageReq)
+                .build();
 
-        return Futures.javaFuture(client.createPreallocatedObject(storageReq))
-                .thenCompose(x -> Futures.javaFuture(client.createPreallocatedObject(dataReq)));
+        return Futures
+                .javaFuture(client.writeBatch(batchReq))
+                .thenApply(batchResp -> batchResp.getCreatePreallocatedObjects(0));
     }
 
     private CompletionStage<TagHeader> saveMetadata(DataWriteRequest request, RequestState state, RequestState prior) {
 
         var client = state.clientConfig.configureClient(metaClient);
 
+        var priorDataId = selectorFor(prior.dataId);
         var priorStorageId = selectorFor(prior.storageId);
+
+        var dataReq = MetadataBuilders.buildCreateObjectReq(request.getTenant(), priorDataId, state.data, state.dataTags);
         var storageReq = MetadataBuilders.buildCreateObjectReq(request.getTenant(), priorStorageId, state.storage, state.storageTags);
 
-        var priorDataId = selectorFor(prior.dataId);
-        var dataReq = MetadataBuilders.buildCreateObjectReq(request.getTenant(), priorDataId, state.data, state.dataTags);
+        var batchReq = MetadataWriteBatchRequest.newBuilder()
+                .setTenant(request.getTenant())
+                .addUpdateObjects(dataReq)
+                .addUpdateObjects(storageReq)
+                .build();
 
-        return Futures.javaFuture(client.updateObject(storageReq))
-                .thenCompose(x -> Futures.javaFuture(client.updateObject(dataReq)));
+        return Futures
+                .javaFuture(client.writeBatch(batchReq))
+                .thenApply(batchResp -> batchResp.getUpdateObjects(0));
     }
 
     private RequestState buildMetadata(DataWriteRequest request, RequestState state, OffsetDateTime objectTimestamp) {
