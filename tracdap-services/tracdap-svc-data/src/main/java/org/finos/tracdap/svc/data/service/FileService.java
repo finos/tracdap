@@ -18,6 +18,9 @@
 package org.finos.tracdap.svc.data.service;
 
 
+import org.finos.tracdap.api.FileWriteRequest;
+import org.finos.tracdap.api.MetadataWriteBatchRequest;
+import org.finos.tracdap.api.MetadataWriteBatchResponse;
 import org.finos.tracdap.api.internal.InternalMetadataApiGrpc.InternalMetadataApiFutureStub;
 import org.finos.tracdap.common.async.Futures;
 import org.finos.tracdap.common.data.IDataContext;
@@ -87,6 +90,7 @@ public class FileService {
     }
 
     public CompletionStage<TagHeader> createFile(
+            FileWriteRequest request,
             String tenant, List<TagUpdate> tags,
             String name, String mimeType, Long expectedSize,
             Flow.Publisher<ArrowBuf> contentStream,
@@ -94,12 +98,12 @@ public class FileService {
             RequestMetadata requestMetadata,
             GrpcClientConfig clientConfig) {
 
-        var state = new RequestState();
-        state.requestMetadata = requestMetadata;
-        state.clientConfig = clientConfig;
+        var initialState = new RequestState();
+        initialState.requestMetadata = requestMetadata;
+        initialState.clientConfig = clientConfig;
 
-        state.fileTags = tags;           // File tags requested by the client
-        state.storageTags = List.of();   // Storage tags is empty to start with
+        initialState.fileTags = tags;           // File tags requested by the client
+        initialState.storageTags = List.of();   // Storage tags is empty to start with
 
         // Currently tenant config is optional for single-tenant deployments, fall back to global defaults
         var bucket = tenantConfig.containsKey(tenant) && tenantConfig.get(tenant).hasDefaultBucket()
@@ -109,49 +113,36 @@ public class FileService {
         // This timestamp is set in the storage definition to timestamp storage incarnations/copies
         // It is also used in the physical storage path
 
-        var client = state.clientConfig.configureClient(metaApi);
-
         // TODO: Simplify
-        var objectTimestamp = state.requestMetadata.requestTimestamp().toInstant();
+        var objectTimestamp = initialState.requestMetadata.requestTimestamp().toInstant();
 
-        return CompletableFuture.completedFuture(null)
+        return CompletableFuture.completedFuture(initialState)
 
-                // Call meta svc to preallocate file object ID
-                .thenApply(x -> preallocateRequest(tenant, ObjectType.FILE))
-                .thenCompose(req -> Futures.javaFuture(client.preallocateId(req)))
-                .thenAccept(fileId -> state.preAllocFileId = fileId)
-
-                // Preallocate ID comes back with version 0, bump to get ID for first real version
-                .thenAccept(x -> state.fileId = bumpVersion(state.preAllocFileId))
-
-                // Also pre-allocate for storage
-                .thenApply(x -> preallocateRequest(tenant, ObjectType.STORAGE))
-                .thenCompose(req -> Futures.javaFuture(client.preallocateId(req)))
-                .thenAccept(storageId -> state.preAllocStorageId = storageId)
-                .thenAccept(x -> state.storageId = bumpVersion(state.preAllocStorageId))
+                // Call meta svc to preallocate file and storage IDs
+                .thenCompose(state -> preallocateIds(request, state))
 
                 // Build definition objects
-                .thenAccept(x -> state.file = createFileDef(state.fileId, name, mimeType, state.storageId))
-                .thenAccept(x -> state.storage = createStorageDef(
+                .thenAccept(x -> initialState.file = createFileDef(initialState.fileId, name, mimeType, initialState.storageId))
+                .thenAccept(x -> initialState.storage = createStorageDef(
                         bucket,  objectTimestamp,
-                        state.fileId, name, mimeType))
+                        initialState.fileId, name, mimeType))
 
                 // Write file content stream to the storage layer
                 .thenCompose(x -> writeDataItem(
-                        state.storage,
-                        state.file.getDataItem(),
+                        initialState.storage,
+                        initialState.file.getDataItem(),
                         contentStream, dataCtx))
 
                 // Check and record size from storage in file definition
                 .thenApply(size -> checkSize(size, expectedSize))
-                .thenAccept(size -> state.file = recordSize(size, state.file))
+                .thenAccept(size -> initialState.file = recordSize(size, initialState.file))
 
                 // Add controlled tag attrs (must be done after file size is known)
-                .thenAccept(x -> state.fileTags = createFileAttrs(state.fileTags, state.file))
-                .thenAccept(x -> state.storageTags = createStorageAttrs(state.storageTags, state.fileId))
+                .thenAccept(x -> initialState.fileTags = createFileAttrs(initialState.fileTags, initialState.file))
+                .thenAccept(x -> initialState.storageTags = createStorageAttrs(initialState.storageTags, initialState.fileId))
 
                 // Save all metadata
-                .thenCompose(x -> saveMetadata(tenant, state));
+                .thenCompose(x -> saveMetadata(tenant, initialState));
     }
 
     public CompletionStage<TagHeader> updateFile(
@@ -239,6 +230,39 @@ public class FileService {
                 .thenAccept(byteStream -> byteStream.subscribe(content))
 
                 .exceptionally(error -> Helpers.reportError(error, definition, content));
+    }
+
+    private CompletionStage<RequestState> preallocateIds(FileWriteRequest request, RequestState state) {
+
+        var client = state.clientConfig.configureClient(metaApi);
+
+        var fileIdReq = MetadataBuilders.preallocateRequest(request.getTenant(), ObjectType.FILE);
+        var storageIdReq = MetadataBuilders.preallocateRequest(request.getTenant(), ObjectType.STORAGE);
+
+        var batchReq = MetadataWriteBatchRequest.newBuilder()
+                .setTenant(request.getTenant())
+                .addPreallocateIds(fileIdReq)
+                .addPreallocateIds(storageIdReq)
+                .build();
+
+        return Futures
+                .javaFuture(client.writeBatch(batchReq))
+                .thenApply(batchResp -> recordPreallocateIds(batchResp, state));
+    }
+
+    private RequestState recordPreallocateIds(MetadataWriteBatchResponse batchResponse, RequestState state) {
+
+        var fileId0 = batchResponse.getPreallocateIds(0);
+        var storageId9 = batchResponse.getPreallocateIds(1);
+        var timestamp = state.requestMetadata.requestTimestamp().toInstant();
+
+        state.preAllocFileId = fileId0;
+        state.preAllocStorageId = storageId9;
+
+        state.fileId = MetadataUtil.nextObjectVersion(fileId0, timestamp);
+        state.storageId = MetadataUtil.nextObjectVersion(storageId9, timestamp);
+
+        return state;
     }
 
     private CompletionStage<Void> loadMetadata(String tenant, TagSelector fileSelector, RequestState state) {

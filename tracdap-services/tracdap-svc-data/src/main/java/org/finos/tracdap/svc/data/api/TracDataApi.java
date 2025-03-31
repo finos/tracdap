@@ -181,6 +181,7 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
 
         firstMessage
                 .thenCompose(req -> fileService.createFile(
+                        req,
                         req.getTenant(),
                         req.getTagUpdatesList(),
                         req.getName(),
