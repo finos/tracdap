@@ -295,28 +295,42 @@ public class FileService {
 
         var client = state.clientConfig.configureClient(metaApi);
 
+        var priorFileId = selectorFor(state.preAllocFileId);
         var priorStorageId = selectorFor(state.preAllocStorageId);
+
+        var fileReq = buildCreateObjectReq(tenant, priorFileId, state.file, state.fileTags);
         var storageReq = buildCreateObjectReq(tenant, priorStorageId, state.storage, state.storageTags);
 
-        var priorFileId = selectorFor(state.preAllocFileId);
-        var fileReq = buildCreateObjectReq(tenant, priorFileId, state.file, state.fileTags);
+        var batchReq = MetadataWriteBatchRequest.newBuilder()
+                .setTenant(tenant)
+                .addCreatePreallocatedObjects(fileReq)
+                .addCreatePreallocatedObjects(storageReq)
+                .build();
 
-        return Futures.javaFuture(client.createPreallocatedObject(storageReq))
-                .thenCompose(x -> Futures.javaFuture(client.createPreallocatedObject(fileReq)));
+        return Futures
+                .javaFuture(client.writeBatch(batchReq))
+                .thenApply(resp -> resp.getCreatePreallocatedObjects(0));
     }
 
     private CompletionStage<TagHeader> saveMetadata(String tenant, RequestState state, RequestState prior) {
 
         var client = state.clientConfig.configureClient(metaApi);
 
+        var priorFileId = selectorFor(prior.fileId);
         var priorStorageId = selectorFor(prior.storageId);
+
+        var fileReq = buildCreateObjectReq(tenant, priorFileId, state.file, state.fileTags);
         var storageReq = buildCreateObjectReq(tenant, priorStorageId, state.storage, state.storageTags);
 
-        var priorFileId = selectorFor(prior.fileId);
-        var fileReq = buildCreateObjectReq(tenant, priorFileId, state.file, state.fileTags);
+        var batchReq = MetadataWriteBatchRequest.newBuilder()
+                .setTenant(tenant)
+                .addUpdateObjects(fileReq)
+                .addUpdateObjects(storageReq)
+                .build();
 
-        return Futures.javaFuture(client.updateObject(storageReq))
-                .thenCompose(x -> Futures.javaFuture(client.updateObject(fileReq)));
+        return Futures
+                .javaFuture(client.writeBatch(batchReq))
+                .thenApply(resp -> resp.getUpdateObjects(0));
     }
 
     private CompletionStage<Long> writeDataItem(
