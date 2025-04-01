@@ -92,49 +92,43 @@ public class DataService {
             RequestMetadata requestMetadata,
             GrpcClientConfig clientConfig) {
 
-        var state = new RequestState();
-        state.requestMetadata = requestMetadata;
-        state.clientConfig = clientConfig;
-
-        var objectTimestamp = requestMetadata.requestTimestamp();
+        var initialState = new RequestState();
+        initialState.requestMetadata = requestMetadata;
+        initialState.clientConfig = clientConfig;
 
         // Look up the requested data codec
         // If the codec is unknown the request will fail right away
         var codec = codecManager.getCodec(request.getFormat());
         var codecOptions = Map.<String, String>of();
 
-        return CompletableFuture.completedFuture(null)
+        return CompletableFuture.completedFuture(initialState)
 
                 // Resolve a concrete schema to use for this save operation
                 // This may fail if it refers to missing or incompatible external objects
-                .thenCompose(x -> resolveSchema(request, state))
+                .thenCompose(state -> resolveSchema(request, state))
 
                 // Preallocate IDs for the new objects
                 // (this should always succeed, so long as the metadata service is up)
-                .thenCompose(x -> preallocateIds(request, state))
+                .thenCompose(state -> preallocateIds(request, state))
 
                 // Build metadata objects for the dataset that will be saved
-                .thenApply(x -> buildMetadata(request, state, objectTimestamp))
+                .thenApply(state -> buildMetadata(request, state))
 
                 // Decode the data content stream and write it to the storage layer
                 // This is where the main data processing streams are executed
                 // When this future completes, the data processing stream has completed (or failed)
-                .thenCompose(x -> decodeAndSave(
-                        state.schema, contentStream,
-                        codec, codecOptions,
-                        state.copy, dataCtx))
-
-                // A quick sanity check that the data was written successfully
-                // .thenApply(rowsSaved -> checkRows(request, rowsSaved))
+                .thenCompose(state -> decodeAndSave(
+                        state, contentStream,
+                        codec, codecOptions, dataCtx))
 
                 // Update metadata objects with results from data processing
                 // (currently just size, but could also include other basic stats)
                 // Metadata tags are also built here
-                .thenAccept(rowsSaved -> finalizeMetadata(state, rowsSaved))
+                .thenApply(state -> finalizeMetadata(request, state))
 
                 // Save metadata to the metadata store
                 // This effectively "commits" the dataset by making it visible
-                .thenCompose(x -> saveMetadata(request, state));
+                .thenCompose(state -> saveMetadata(request, state));
     }
 
     public CompletionStage<TagHeader> updateDataset(
@@ -144,56 +138,49 @@ public class DataService {
             RequestMetadata requestMetadata,
             GrpcClientConfig clientConfig) {
 
-        var state = new RequestState();
-        state.requestMetadata = requestMetadata;
-        state.clientConfig = clientConfig;
+        var initialState = new RequestState();
+        initialState.requestMetadata = requestMetadata;
+        initialState.clientConfig = clientConfig;
 
-        var prior = new RequestState();
-        prior.clientConfig = state.clientConfig;
-
-        var objectTimestamp = requestMetadata.requestTimestamp();
+        var priorState = new RequestState();
+        priorState.clientConfig = clientConfig;
 
         // Look up the requested data codec
         // If the codec is unknown the request will fail right away
         var codec = codecManager.getCodec(request.getFormat());
         var codecOptions = Map.<String, String>of();
 
-        return CompletableFuture.completedFuture(null)
+        return CompletableFuture.completedFuture(priorState)
 
                 // Load metadata for the prior version (DATA, STORAGE, SCHEMA if external)
-                .thenCompose(x -> loadMetadata(request.getTenant(), request.getPriorVersion(), prior))
+                .thenCompose(prior -> loadMetadata(request.getTenant(), request.getPriorVersion(), prior))
 
-                // Resolve a concrete schema to use for this save operation
-                // This may fail if it refers to missing or incompatible external objects
-                .thenCompose(x -> resolveSchema(request, state))
+                .thenCompose(prior -> resolveSchema(request, initialState, prior))
 
                 // Build metadata objects for the dataset that will be saved
-                .thenApply(x -> buildUpdateMetadata(request, state, prior, objectTimestamp))
+                .thenApply(state -> buildUpdateMetadata(request, state, priorState))
 
                 // Validate schema version update
                 // No need to validate data version update here, since data RW service is creating it!
                 // Metadata service will validate the update though
-                .thenAccept(x -> validator.validateVersion(state.data, prior.data))
+                .thenApply(state -> { validator.validateVersion(state.data, priorState.data); return state; })
 
                 // Decode the data content stream and write it to the storage layer
                 // This is where the main data processing streams are executed
                 // When this future completes, the data processing stream has completed (or failed)
-                .thenCompose(x -> decodeAndSave(
-                        state.schema, contentStream,
+                .thenCompose(state -> decodeAndSave(
+                        state, contentStream,
                         codec, codecOptions,
-                        state.copy, dataCtx))
-
-                // A quick sanity check that the data was written successfully
-                // .thenApply(rowsSaved -> checkRows(request, rowsSaved))
+                        dataCtx))
 
                 // Update metadata objects with results from data processing
                 // (currently just size, but could also include other basic stats)
                 // Metadata tags are also built here
-                .thenAccept(rowsSaved -> finalizeUpdateMetadata(state, rowsSaved))
+                .thenApply(state -> finalizeUpdateMetadata(request, state))
 
                 // Save metadata to the metadata store
                 // This effectively "commits" the dataset by making it visible
-                .thenCompose(x -> saveMetadata(request, state, prior));
+                .thenCompose(state -> saveMetadata(request, state, priorState));
 
     }
 
@@ -237,7 +224,33 @@ public class DataService {
                 .exceptionally(error -> Helpers.reportError(error, schema, contentStream));
     }
 
-    private CompletionStage<Void> loadMetadata(String tenant, TagSelector dataSelector, RequestState state) {
+    private CompletionStage<RequestState> preallocateIds(DataWriteRequest request, RequestState state) {
+
+        var client = state.clientConfig.configureClient(metaClient);
+
+        var dataIdReq = MetadataBuilders.preallocateRequest(request.getTenant(), ObjectType.DATA);
+        var storageIdReq = MetadataBuilders.preallocateRequest(request.getTenant(), ObjectType.STORAGE);
+
+        var batchReq = MetadataWriteBatchRequest.newBuilder()
+                .setTenant(request.getTenant())
+                .addPreallocateIds(dataIdReq)
+                .addPreallocateIds(storageIdReq)
+                .build();
+
+        return Futures
+                .javaFuture(client.writeBatch(batchReq))
+                .thenApply(batchResp -> recordPreallocateIds(batchResp, state));
+    }
+
+    private RequestState recordPreallocateIds(MetadataWriteBatchResponse batchResponse, RequestState state) {
+
+        state.preAllocDataId = batchResponse.getPreallocateIds(0);
+        state.preAllocStorageId = batchResponse.getPreallocateIds(1);
+
+        return state;
+    }
+
+    private CompletionStage<RequestState> loadMetadata(String tenant, TagSelector dataSelector, RequestState state) {
 
         var client = state.clientConfig.configureClient(metaClient);
         var request = MetadataBuilders.requestForSelector(tenant, dataSelector);
@@ -252,13 +265,13 @@ public class DataService {
                     : loadStorageAndEmbeddedSchema(tenant, state));
     }
 
-    private CompletionStage<Void> loadStorageAndExternalSchema(String tenant, RequestState state) {
+    private CompletionStage<RequestState> loadStorageAndExternalSchema(String tenant, RequestState state) {
 
         var client = state.clientConfig.configureClient(metaClient);
         var request = MetadataBuilders.requestForBatch(tenant, state.data.getStorageId(), state.data.getSchemaId());
 
         return Futures.javaFuture(client.readBatch(request))
-                .thenAccept(response -> {
+                .thenApply(response -> {
 
                     var storageTag = response.getTag(0);
                     var schemaTag = response.getTag(1);
@@ -268,40 +281,55 @@ public class DataService {
 
                     // Schema comes from the external object
                     state.schema = schemaTag.getDefinition().getSchema();
+
+                    return state;
                 });
     }
 
-    private CompletionStage<Void> loadStorageAndEmbeddedSchema(String tenant, RequestState state) {
+    private CompletionStage<RequestState> loadStorageAndEmbeddedSchema(String tenant, RequestState state) {
 
         var client = state.clientConfig.configureClient(metaClient);
         var request = MetadataBuilders.requestForSelector(tenant, state.data.getStorageId());
 
         return Futures.javaFuture(client.readObject(request))
-                .thenAccept(tag -> {
+                .thenApply(tag -> {
 
                     state.storageId = tag.getHeader();
                     state.storage = tag.getDefinition().getStorage();
 
                     // A schema is still needed! Take a reference to the embedded schema object
                     state.schema = state.data.getSchema();
+
+                    return state;
                 });
     }
 
-    private CompletionStage<SchemaDefinition> resolveSchema(DataWriteRequest request, RequestState state) {
+    private CompletionStage<RequestState> resolveSchema(DataWriteRequest request, RequestState state) {
+
+        return resolveSchema(request, state, null);
+    }
+
+    private CompletionStage<RequestState> resolveSchema(DataWriteRequest request, RequestState state, RequestState prior) {
 
         var client = state.clientConfig.configureClient(metaClient);
 
         if (request.hasSchema()) {
             state.schema = request.getSchema();
-            return CompletableFuture.completedFuture(state.schema);
+            return CompletableFuture.completedFuture(state);
         }
 
         if (request.hasSchemaId()) {
 
+            // If prior version used the same external schema, no need to reload
+            if (prior != null && request.getSchemaId().equals(prior.data.getSchemaId())) {
+                state.schema = prior.schema;
+                return CompletableFuture.completedFuture(state);
+            }
+
             var schemaReq = MetadataBuilders.requestForSelector(request.getTenant(), request.getSchemaId());
 
             return Futures.javaFuture(client.readObject(schemaReq))
-                    .thenApply(tag -> state.schema = tag.getDefinition().getSchema());
+                    .thenApply(tag -> { state.schema = tag.getDefinition().getSchema(); return state; });
         }
 
         throw new EUnexpected();
@@ -331,35 +359,6 @@ public class DataService {
                 .getDataItemsOrThrow(dataItem)
                 .getIncarnations(incarnationIndex)
                 .getCopies(copyIndex);
-    }
-
-    private CompletionStage<RequestState> preallocateIds(DataWriteRequest request, RequestState state) {
-
-        var client = state.clientConfig.configureClient(metaClient);
-
-        var dataIdReq = MetadataBuilders.preallocateRequest(request.getTenant(), ObjectType.DATA);
-        var storageIdReq = MetadataBuilders.preallocateRequest(request.getTenant(), ObjectType.STORAGE);
-
-        var batchReq = MetadataWriteBatchRequest.newBuilder()
-                .setTenant(request.getTenant())
-                .addPreallocateIds(dataIdReq)
-                .addPreallocateIds(storageIdReq)
-                .build();
-
-        return Futures
-                .javaFuture(client.writeBatch(batchReq))
-                .thenApply(batchResp -> recordPreallocateIds(batchResp, state));
-    }
-
-    private RequestState recordPreallocateIds(MetadataWriteBatchResponse batchResponse, RequestState state) {
-
-        var dataId0 = batchResponse.getPreallocateIds(0);
-        var storageId9 = batchResponse.getPreallocateIds(1);
-
-        state.preAllocDataId = dataId0;
-        state.preAllocStorageId = storageId9;
-
-        return state;
     }
 
     private CompletionStage<TagHeader> saveMetadata(DataWriteRequest request, RequestState state) {
@@ -404,10 +403,7 @@ public class DataService {
                 .thenApply(batchResp -> batchResp.getUpdateObjects(0));
     }
 
-    private RequestState buildMetadata(DataWriteRequest request, RequestState state, OffsetDateTime objectTimestamp) {
-
-        state.dataTags = request.getTagUpdatesList();  // File tags requested by the client
-        state.storageTags = List.of();                 // Storage tags is empty to start with
+    private RequestState buildMetadata(DataWriteRequest request, RequestState state) {
 
         state.dataId = MetadataBuilders.bumpVersion(state.preAllocDataId);
         state.storageId = MetadataBuilders.bumpVersion(state.preAllocStorageId);
@@ -418,9 +414,10 @@ public class DataService {
 
         var dataItem = buildDataItem(state);
         var storagePath = buildStoragePath(state);
+        var timestamp = state.requestMetadata.requestTimestamp();
 
         var dataDef = createDataDef(request, state, dataItem);
-        var storageDef = createStorageDef(request.getTenant(), dataItem, storagePath, objectTimestamp);
+        var storageDef = createStorageDef(request.getTenant(), dataItem, storagePath, timestamp);
 
         state.data = dataDef;
         state.storage = storageDef;
@@ -433,12 +430,7 @@ public class DataService {
         return state;
     }
 
-    private RequestState buildUpdateMetadata(
-            DataWriteRequest request, RequestState state, RequestState prior,
-            OffsetDateTime objectTimestamp) {
-
-        state.dataTags = request.getTagUpdatesList();  // File tags requested by the client
-        state.storageTags = List.of();                 // Storage tags is empty to start with
+    private RequestState buildUpdateMetadata(DataWriteRequest request, RequestState state, RequestState prior) {
 
         state.dataId = MetadataBuilders.bumpVersion(prior.dataId);
         state.storageId = MetadataBuilders.bumpVersion(prior.storageId);
@@ -460,6 +452,7 @@ public class DataService {
 
         var dataItem = buildDataItem(state);
         var storagePath = buildStoragePath(state);
+        var timestamp = state.requestMetadata.requestTimestamp();
 
         // We are going to add this data item to the storage definition
         // If the item already exists in storage, then the file object must have been superseded
@@ -476,7 +469,7 @@ public class DataService {
         }
 
         state.data = updateDataDef(request, state, dataItem, prior.data);
-        state.storage = updateStorageDef(request.getTenant(), prior.storage, dataItem, storagePath, objectTimestamp);
+        state.storage = updateStorageDef(request.getTenant(), prior.storage, dataItem, storagePath, timestamp);
 
         state.copy = state.storage
                 .getDataItemsOrThrow(dataItem)
@@ -648,14 +641,26 @@ public class DataService {
     }
 
 
-    private void finalizeMetadata(RequestState state, long rowsSaved) {
+    private RequestState finalizeMetadata(DataWriteRequest request, RequestState state) {
 
+        // Client can set uncontrolled tags on the dataset, but not the storage object
+        // Controlled tags are added to the storage object
+        state.dataTags = request.getTagUpdatesList();
         state.storageTags = controlledStorageAttrs(state.dataId);
+
+        // TODO: Add controlled tags to DATA objects, e.g. trac_data_rows, trac_data_size
+
+        return state;
     }
 
-    private void finalizeUpdateMetadata(RequestState state, long rowsSaved) {
+    private RequestState finalizeUpdateMetadata(DataWriteRequest request, RequestState state) {
 
-        // Currently, a no-op
+        // Client can update uncontrolled tags on the dataset
+        // Controlled tags for storage do not change on update
+        state.dataTags = request.getTagUpdatesList();
+        state.storageTags = List.of();
+
+        return state;
     }
 
     private static List<TagUpdate> controlledStorageAttrs(TagHeader dataId) {
@@ -674,43 +679,46 @@ public class DataService {
     }
 
     private void loadAndEncode(
-            RequestState request, Flow.Subscriber<ArrowBuf> contentStream,
+            RequestState state, Flow.Subscriber<ArrowBuf> contentStream,
             ICodec codec, Map<String, String> codecOptions,
             IDataContext dataCtx) {
 
-        var requiredSchema = ArrowSchema.tracToArrow(request.schema);
+        var arrowSchema = ArrowSchema.tracToArrow(state.schema);
 
-        var storageKey = request.copy.getStorageKey();
+        var storageKey = state.copy.getStorageKey();
         var storage = storageManager.getDataStorage(storageKey);
-        var encoder = codec.getEncoder(dataCtx.arrowAllocator(), requiredSchema, codecOptions);
+        var encoder = codec.getEncoder(dataCtx.arrowAllocator(), arrowSchema, codecOptions);
 
-        var pipeline = storage.pipelineReader(request.copy, requiredSchema, dataCtx, request.offset, request.limit);
+        var pipeline = storage.pipelineReader(state.copy, arrowSchema, dataCtx, state.offset, state.limit);
         pipeline.addStage(encoder);
         pipeline.addSink(contentStream);
 
         pipeline.execute();
     }
 
-    private CompletionStage<Long> decodeAndSave(
-            SchemaDefinition schema, Flow.Publisher<ArrowBuf> contentStream,
+    private CompletionStage<RequestState> decodeAndSave(
+            RequestState state, Flow.Publisher<ArrowBuf> contentStream,
             ICodec codec, Map<String, String> codecOptions,
-            StorageCopy copy,
             IDataContext dataCtx) {
 
-        var requiredSchema = ArrowSchema.tracToArrow(schema);
+        var arrowSchema = ArrowSchema.tracToArrow(state.schema);
+
+        var storageKey = state.copy.getStorageKey();
+        var storage = storageManager.getDataStorage(storageKey);
+        var decoder = codec.getDecoder(dataCtx.arrowAllocator(), arrowSchema, codecOptions);
 
         var signal = new CompletableFuture<Long>();
-
-        var storageKey = copy.getStorageKey();
-        var storage = storageManager.getDataStorage(storageKey);
-        var decoder = codec.getDecoder(dataCtx.arrowAllocator(), requiredSchema, codecOptions);
-
         var pipeline = DataPipeline.forSource(contentStream, dataCtx);
         pipeline.addStage(decoder);
-        pipeline = storage.pipelineWriter(copy, requiredSchema, dataCtx, pipeline, signal);
+        pipeline = storage.pipelineWriter(state.copy, arrowSchema, dataCtx, pipeline, signal);
 
         pipeline.execute();
 
-        return signal;
+        return signal.thenApply(rowsSaved -> recordSaveResult(rowsSaved, state));
+    }
+
+    private RequestState recordSaveResult(long rowsSaved, RequestState state) {
+
+        return state;
     }
 }
