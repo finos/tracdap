@@ -181,13 +181,10 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
 
         firstMessage
                 .thenCompose(req -> fileService.createFile(
-                        req,
+                        req, requestMetadata,
                         req.getTenant(),
                         req.getTagUpdatesList(),
-                        req.getName(),
-                        req.getMimeType(),
-                        req.hasSize() ? req.getSize() : null,
-                        dataStream, dataContext, requestMetadata, clientConfig))
+                        dataStream, dataContext, clientConfig))
                 .thenAccept(upload::succeeded)
                 .exceptionally(upload::failed);
 
@@ -218,13 +215,10 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
 
         firstMessage
                 .thenCompose(req -> fileService.updateFile(
+                        req,  requestMetadata,
                         req.getTenant(),
                         req.getTagUpdatesList(),
-                        req.getPriorVersion(),
-                        req.getName(),
-                        req.getMimeType(),
-                        req.hasSize() ? req.getSize() : null,
-                        dataStream, dataContext, requestMetadata, clientConfig))
+                        dataStream, dataContext, clientConfig))
                 .thenAccept(upload::succeeded)
                 .exceptionally(upload::failed);
 
@@ -267,10 +261,9 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
 
         download.start(request)
                 .thenAccept(req -> fileService.readFile(
-                        request.getTenant(),
-                        request.getSelector(),
+                        request, requestMetadata,
                         firstMessage, dataStream,
-                        dataContext, requestMetadata, clientConfig))
+                        dataContext, clientConfig))
                 .exceptionally(download::failed);
     }
 
@@ -321,9 +314,9 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
 
         download.start(request)
                 .thenAccept(req -> fileService.readFile(
-                        request.getTenant(), selector,
+                        request, requestMetadata,
                         firstMessage, dataStream,
-                        dataContext, requestMetadata, clientConfig))
+                        dataContext, clientConfig))
                 .exceptionally(download::failed);
     }
 
