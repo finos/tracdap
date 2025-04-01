@@ -152,28 +152,6 @@ public class FileService {
     }
 
     public void readFile(
-            DownloadRequest request,
-            RequestMetadata requestMetadata,
-            CompletableFuture<FileDefinition> definition,
-            Flow.Subscriber<ArrowBuf> content,
-            IDataContext dataCtx,
-            GrpcClientConfig clientConfig) {
-
-        var fileSelector = TagSelector.newBuilder()
-                .setObjectType(request.getObjectType())
-                .setObjectId(request.getObjectId())
-                .setObjectVersion(request.getObjectVersion())
-                .setLatestTag(true);
-
-        var fileRequest = FileReadRequest.newBuilder()
-                .setTenant(request.getTenant())
-                .setSelector(fileSelector)
-                .build();
-
-        readFile(fileRequest, requestMetadata, definition, content, dataCtx, clientConfig);
-    }
-
-    public void readFile(
             FileReadRequest request,
             RequestMetadata requestMetadata,
             CompletableFuture<FileDefinition> definition,

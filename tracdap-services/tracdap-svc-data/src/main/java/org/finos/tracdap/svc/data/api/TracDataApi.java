@@ -292,7 +292,7 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
     }
 
     private void downloadFile(
-            DownloadRequest request, TagSelector selector,
+            DownloadRequest downloadRequest, TagSelector selector,
             GrpcDownloadSink<DownloadResponse, DownloadResponse.Builder> download) {
 
         var requestMetadata = RequestMetadata.get(Context.current());
@@ -308,8 +308,14 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
 
         var dataStream = download.dataStream(DownloadResponse.Builder::setContent);
 
-        download.start(request)
-                .thenAccept(req -> fileService.readFile(
+        // Translate into a regular file read request for the service layer
+        var readRequest = FileReadRequest.newBuilder()
+                .setTenant(downloadRequest.getTenant())
+                .setSelector(selector)
+                .build();
+
+        download.start(readRequest)
+                .thenAccept(request -> fileService.readFile(
                         request, requestMetadata,
                         firstMessage, dataStream,
                         dataContext, clientConfig))
