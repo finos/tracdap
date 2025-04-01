@@ -372,13 +372,13 @@ public class TracDataService extends TracServiceBase {
         var clientDown = shutdownResource("Metadata client", deadline, remaining -> {
 
             metaClientChanel.shutdown();
-            return server.awaitTermination(remaining.toMillis(), TimeUnit.MILLISECONDS);
+            return metaClientChanel.awaitTermination(remaining.toMillis(), TimeUnit.MILLISECONDS);
         });
 
         var blockingClientDown = shutdownResource("Metadata client (blocking)", deadline, remaining -> {
 
             metaBlockingChanel.shutdown();
-            return server.awaitTermination(remaining.toMillis(), TimeUnit.MILLISECONDS);
+            return metaBlockingChanel.awaitTermination(remaining.toMillis(), TimeUnit.MILLISECONDS);
         });
 
         var storageDown = shutdownResource("Storage service", deadline, remaining -> {
