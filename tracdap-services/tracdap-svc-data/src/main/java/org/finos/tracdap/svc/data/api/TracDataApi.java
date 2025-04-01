@@ -180,13 +180,9 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
         var dataStream = upload.dataStream(FileWriteRequest::getContent, dataContext.arrowAllocator());
 
         firstMessage
-                .thenCompose(req -> fileService.createFile(
-                        req.getTenant(),
-                        req.getTagUpdatesList(),
-                        req.getName(),
-                        req.getMimeType(),
-                        req.hasSize() ? req.getSize() : null,
-                        dataStream, dataContext, requestMetadata, clientConfig))
+                .thenCompose(request -> fileService.createFile(
+                        request, requestMetadata,
+                        dataStream, dataContext, clientConfig))
                 .thenAccept(upload::succeeded)
                 .exceptionally(upload::failed);
 
@@ -216,14 +212,9 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
         var dataStream = upload.dataStream(FileWriteRequest::getContent, dataContext.arrowAllocator());
 
         firstMessage
-                .thenCompose(req -> fileService.updateFile(
-                        req.getTenant(),
-                        req.getTagUpdatesList(),
-                        req.getPriorVersion(),
-                        req.getName(),
-                        req.getMimeType(),
-                        req.hasSize() ? req.getSize() : null,
-                        dataStream, dataContext, requestMetadata, clientConfig))
+                .thenCompose(request -> fileService.updateFile(
+                        request,  requestMetadata,
+                        dataStream, dataContext, clientConfig))
                 .thenAccept(upload::succeeded)
                 .exceptionally(upload::failed);
 
@@ -266,10 +257,9 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
 
         download.start(request)
                 .thenAccept(req -> fileService.readFile(
-                        request.getTenant(),
-                        request.getSelector(),
+                        request, requestMetadata,
                         firstMessage, dataStream,
-                        dataContext, requestMetadata, clientConfig))
+                        dataContext, clientConfig))
                 .exceptionally(download::failed);
     }
 
@@ -302,7 +292,7 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
     }
 
     private void downloadFile(
-            DownloadRequest request, TagSelector selector,
+            DownloadRequest downloadRequest, TagSelector selector,
             GrpcDownloadSink<DownloadResponse, DownloadResponse.Builder> download) {
 
         var requestMetadata = RequestMetadata.get(Context.current());
@@ -318,11 +308,17 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
 
         var dataStream = download.dataStream(DownloadResponse.Builder::setContent);
 
-        download.start(request)
-                .thenAccept(req -> fileService.readFile(
-                        request.getTenant(), selector,
+        // Translate into a regular file read request for the service layer
+        var readRequest = FileReadRequest.newBuilder()
+                .setTenant(downloadRequest.getTenant())
+                .setSelector(selector)
+                .build();
+
+        download.start(readRequest)
+                .thenAccept(request -> fileService.readFile(
+                        request, requestMetadata,
                         firstMessage, dataStream,
-                        dataContext, requestMetadata, clientConfig))
+                        dataContext, clientConfig))
                 .exceptionally(download::failed);
     }
 
