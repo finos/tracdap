@@ -90,7 +90,6 @@ public class FileService {
     public CompletionStage<TagHeader> createFile(
             FileWriteRequest request,
             RequestMetadata requestMetadata,
-            String tenant, List<TagUpdate> tags,
             Flow.Publisher<ArrowBuf> contentStream,
             IDataContext dataCtx,
             GrpcClientConfig clientConfig) {
@@ -98,9 +97,6 @@ public class FileService {
         var initialState = new RequestState();
         initialState.requestMetadata = requestMetadata;
         initialState.clientConfig = clientConfig;
-
-        initialState.fileTags = tags;           // File tags requested by the client
-        initialState.storageTags = List.of();   // Storage tags is empty to start with
 
         return CompletableFuture.completedFuture(initialState)
 
@@ -113,18 +109,16 @@ public class FileService {
                 // Write file content stream to the storage layer
                 .thenCompose(state -> writeFileContent(request, state, contentStream, dataCtx))
 
-                // Add controlled tag attrs (must be done after file size is known)
-                .thenAccept(x -> initialState.fileTags = createFileAttrs(initialState.fileTags, initialState.file))
-                .thenAccept(x -> initialState.storageTags = createStorageAttrs(initialState.storageTags, initialState.fileId))
+                // Build new tag attrs (must be done after file size is known)
+                .thenApply(state -> buildCreateAttrs(request, state))
 
                 // Save all metadata
-                .thenCompose(x -> saveMetadata(tenant, initialState));
+                .thenCompose(state -> saveMetadata(request, state));
     }
 
     public CompletionStage<TagHeader> updateFile(
             FileWriteRequest request,
             RequestMetadata requestMetadata,
-            String tenant, List<TagUpdate> tags,
             Flow.Publisher<ArrowBuf> contentStream,
             IDataContext dataCtx,
             GrpcClientConfig clientConfig) {
@@ -133,19 +127,16 @@ public class FileService {
         initialState.requestMetadata = requestMetadata;
         initialState.clientConfig = clientConfig;
 
-        initialState.fileTags = tags;           // File tags requested by the client
-        initialState.storageTags = List.of();   // Storage tags is empty to start with
-
         var priorState = new RequestState();
         priorState.clientConfig = initialState.clientConfig;
 
         return CompletableFuture.completedFuture(priorState)
 
                 // Load all metadata (file and storage) into prior state
-                .thenCompose(state -> loadMetadata(request.getTenant(), request.getPriorVersion(), state))
+                .thenCompose(prior -> loadMetadata(request.getTenant(), request.getPriorVersion(), prior))
 
                 // Build updated object definitions (file and storage)
-                .thenApply(state -> updateMetadata(request, state, initialState))
+                .thenApply(prior -> updateMetadata(request, initialState, prior))
 
                 // Run version validator
                 .thenApply(state ->  { validator.validateVersion(state.file, priorState.file); return state; })
@@ -153,13 +144,11 @@ public class FileService {
                 // Write file content stream to the storage layer
                 .thenCompose(state -> writeFileContent(request, state, contentStream, dataCtx))
 
-                // Add controlled tag attrs (must be done after file size is known)
-                .thenAccept(x -> initialState.fileTags = updateFileAttrs(initialState.fileTags, initialState.file))
-
-                // Storage attrs do not require an explicit update
+                // Build updated tag attrs (must be done after file size is known)
+                .thenApply(state -> buildUpdateAttrs(request, state))
 
                 // Save all metadata
-                .thenCompose(x -> saveMetadata(tenant, initialState, priorState));
+                .thenCompose(state -> saveMetadata(request, state, priorState));
     }
 
     public void readFile(
@@ -192,17 +181,18 @@ public class FileService {
             IDataContext dataCtx,
             GrpcClientConfig clientConfig) {
 
-        var state = new RequestState();
-        state.requestMetadata = requestMetadata;
-        state.clientConfig = clientConfig;
+        var initialState = new RequestState();
+        initialState.requestMetadata = requestMetadata;
+        initialState.clientConfig = clientConfig;
 
-        CompletableFuture.completedFuture(null)
+        CompletableFuture.completedFuture(initialState)
 
-                .thenCompose(x -> loadMetadata(request.getTenant(), request.getSelector(), state))
+                .thenCompose(state -> loadMetadata(request.getTenant(), request.getSelector(), state))
 
-                .thenAccept(x -> definition.complete(state.file))
+                .thenApply(state -> { definition.complete(state.file); return state; })
 
-                .thenApply(x -> readFileContent(state.file, state.storage, dataCtx))
+                .thenApply(state -> readFileContent(state.file, state.storage, dataCtx))
+
                 .thenAccept(byteStream -> byteStream.subscribe(content))
 
                 .exceptionally(error -> Helpers.reportError(error, definition, content));
@@ -228,15 +218,8 @@ public class FileService {
 
     private RequestState recordPreallocateIds(MetadataWriteBatchResponse batchResponse, RequestState state) {
 
-        var fileId0 = batchResponse.getPreallocateIds(0);
-        var storageId9 = batchResponse.getPreallocateIds(1);
-        var timestamp = state.requestMetadata.requestTimestamp().toInstant();
-
-        state.preAllocFileId = fileId0;
-        state.preAllocStorageId = storageId9;
-
-        state.fileId = MetadataUtil.nextObjectVersion(fileId0, timestamp);
-        state.storageId = MetadataUtil.nextObjectVersion(storageId9, timestamp);
+        state.preAllocFileId = batchResponse.getPreallocateIds(0);
+        state.preAllocStorageId = batchResponse.getPreallocateIds(1);
 
         return state;
     }
@@ -267,13 +250,14 @@ public class FileService {
                 });
     }
 
-    private CompletionStage<TagHeader> saveMetadata(String tenant, RequestState state) {
+    private CompletionStage<TagHeader> saveMetadata(FileWriteRequest request, RequestState state) {
 
         var client = state.clientConfig.configureClient(metaApi);
 
         var priorFileId = selectorFor(state.preAllocFileId);
         var priorStorageId = selectorFor(state.preAllocStorageId);
 
+        var tenant = request.getTenant();
         var fileReq = buildCreateObjectReq(tenant, priorFileId, state.file, state.fileTags);
         var storageReq = buildCreateObjectReq(tenant, priorStorageId, state.storage, state.storageTags);
 
@@ -288,13 +272,14 @@ public class FileService {
                 .thenApply(resp -> resp.getCreatePreallocatedObjects(0));
     }
 
-    private CompletionStage<TagHeader> saveMetadata(String tenant, RequestState state, RequestState prior) {
+    private CompletionStage<TagHeader> saveMetadata(FileWriteRequest request, RequestState state, RequestState prior) {
 
         var client = state.clientConfig.configureClient(metaApi);
 
         var priorFileId = selectorFor(prior.fileId);
         var priorStorageId = selectorFor(prior.storageId);
 
+        var tenant = request.getTenant();
         var fileReq = buildCreateObjectReq(tenant, priorFileId, state.file, state.fileTags);
         var storageReq = buildCreateObjectReq(tenant, priorStorageId, state.storage, state.storageTags);
 
@@ -408,18 +393,23 @@ public class FileService {
         var timestamp = state.requestMetadata.requestTimestamp().toInstant();
         var storageKey = selectStorage(request.getTenant());
 
-        state.file= createFileDef(
-                state.fileId, state.storageId,
+        state.fileId = MetadataUtil.nextObjectVersion(state.preAllocFileId, timestamp);
+        state.storageId = MetadataUtil.nextObjectVersion(state.preAllocStorageId, timestamp);
+
+        state.file = buildFileDef(
+                FileDefinition.newBuilder(),
+                state.fileId, selectorForLatest(state.storageId),
                 request.getName(), request.getMimeType());
 
-        state.storage = createStorageDef(
-                storageKey,  timestamp, state.fileId,
+        state.storage = buildStorageDef(
+                StorageDefinition.newBuilder(),
+                state.fileId, timestamp, storageKey,
                 request.getName(), request.getMimeType());
 
         return state;
     }
 
-    private RequestState updateMetadata(FileWriteRequest request, RequestState prior, RequestState state) {
+    private RequestState updateMetadata(FileWriteRequest request, RequestState state, RequestState prior) {
 
         var timestamp = state.requestMetadata.requestTimestamp().toInstant();
         var storageKey = selectStorage(request.getTenant());
@@ -427,38 +417,28 @@ public class FileService {
         state.fileId = MetadataUtil.nextObjectVersion(prior.fileId, timestamp);
         state.storageId = MetadataUtil.nextObjectVersion(prior.storageId, timestamp);
 
-        state.file = updateFileDef(prior.file, state.fileId, request.getName(), request.getMimeType());
+        state.file = buildFileDef(
+                prior.file.toBuilder(),
+                state.fileId, prior.file.getStorageId(),
+                request.getName(), request.getMimeType());
 
-        state.storage =  updateStorageDef(
-                prior.storage, storageKey, timestamp, state.fileId,
+        state.storage = buildStorageDef(
+                prior.storage.toBuilder(),
+                state.fileId, timestamp, storageKey,
                 request.getName(), request.getMimeType());
 
         return state;
     }
 
-    private FileDefinition createFileDef(
-            TagHeader fileId, TagHeader storageId,
-            String fileName, String mimeType) {
-
-        return buildFileDef(FileDefinition.newBuilder(), fileId, fileName, mimeType, selectorForLatest(storageId));
-    }
-
-    private FileDefinition updateFileDef(
-            FileDefinition priorFile,
-            TagHeader fileHeader, String fileName, String mimeType) {
-
-        return buildFileDef(priorFile.toBuilder(), fileHeader, fileName, mimeType, priorFile.getStorageId());
-    }
-
     private FileDefinition buildFileDef(
             FileDefinition.Builder fileDef,
-            TagHeader fileHeader, String fileName, String mimeType,
-            TagSelector storageId) {
+            TagHeader fileId, TagSelector storageId,
+            String fileName, String mimeType) {
 
-        var fileId = UUID.fromString(fileHeader.getObjectId());
-        var fileVersion = fileHeader.getObjectVersion();
+        var fileUuid = UUID.fromString(fileId.getObjectId());
+        var fileVersion = fileId.getObjectVersion();
 
-        var dataItem = String.format(FILE_DATA_ITEM_TEMPLATE, fileId, fileVersion);
+        var dataItem = String.format(FILE_DATA_ITEM_TEMPLATE, fileUuid, fileVersion);
 
         var extension = fileName.contains(".")
                 ? fileName.substring(fileName.lastIndexOf(".") + 1)
@@ -474,32 +454,15 @@ public class FileService {
                 .build();
     }
 
-    private StorageDefinition createStorageDef(
-            String storageKey, Instant storageTimestamp,
-            TagHeader fileHeader, String fileName, String mimeType) {
-
-        return buildStorageDef(
-                StorageDefinition.newBuilder(), storageKey, storageTimestamp,
-                fileHeader, fileName, mimeType);
-    }
-
-    private StorageDefinition updateStorageDef(
-            StorageDefinition priorStorage, String storageKey, Instant storageTimestamp,
-            TagHeader fileHeader, String fileName, String mimeType) {
-
-        return buildStorageDef(
-                priorStorage.toBuilder(), storageKey, storageTimestamp,
-                fileHeader, fileName, mimeType);
-    }
-
     private StorageDefinition buildStorageDef(
-            StorageDefinition.Builder storageDef, String storageKey, Instant storageTimestamp,
-            TagHeader fileHeader, String fileName, String mimeType) {
+            StorageDefinition.Builder storageDef,
+            TagHeader fileId, Instant storageTimestamp, String storageKey,
+            String fileName, String mimeType) {
 
-        var fileId = UUID.fromString(fileHeader.getObjectId());
-        var fileVersion = fileHeader.getObjectVersion();
+        var fileUuid = UUID.fromString(fileId.getObjectId());
+        var fileVersion = fileId.getObjectVersion();
 
-        var dataItem = String.format(FILE_DATA_ITEM_TEMPLATE, fileId, fileVersion);
+        var dataItem = String.format(FILE_DATA_ITEM_TEMPLATE, fileUuid, fileVersion);
 
         // We are going to add this data item to the storage definition
         // If the item already exists in storage, then the file object must have been superseded
@@ -530,7 +493,7 @@ public class FileService {
         var storageSuffixBytes = random.nextInt(1 << 24);
         var storageSuffix = String.format(FILE_STORAGE_PATH_SUFFIX_TEMPLATE, storageSuffixBytes);
 
-        var storagePath = String.format(FILE_STORAGE_PATH_TEMPLATE, fileId, fileVersion, storageSuffix, fileName);
+        var storagePath = String.format(FILE_STORAGE_PATH_TEMPLATE, fileUuid, fileVersion, storageSuffix, fileName);
 
         var storageEncodedTimestamp = MetadataCodec.encodeDatetime(storageTimestamp);
 
@@ -566,7 +529,40 @@ public class FileService {
                 : storageConfig.getDefaultBucket();
     }
 
-    private List<TagUpdate> createFileAttrs(List<TagUpdate> tags, FileDefinition fileDef) {
+    private RequestState buildCreateAttrs(FileWriteRequest request, RequestState state) {
+
+        var controlledFileAttrs = createFileAttrs(state.file);
+        var controlledStorageAttrs = createStorageAttrs(state.fileId);
+
+        // File object has user-supplied attrs + controlled attrs
+        state.fileTags = Stream.concat(
+                request.getTagUpdatesList().stream(),
+                controlledFileAttrs.stream())
+                .collect(Collectors.toList());
+
+        // Storage object just has controlled attrs
+        state.storageTags = controlledStorageAttrs;
+
+        return state;
+    }
+
+    private RequestState buildUpdateAttrs(FileWriteRequest request, RequestState state) {
+
+        var controlledFileAttrs = updateFileAttrs(state.file);
+
+        // File object has user-supplied attrs + controlled attrs
+        state.fileTags = Stream.concat(
+                request.getTagUpdatesList().stream(),
+                controlledFileAttrs.stream())
+                .collect(Collectors.toList());
+
+        // Storage attrs do not change across versions
+        state.storageTags = List.of();
+
+        return state;
+    }
+
+    private List<TagUpdate> createFileAttrs(FileDefinition fileDef) {
 
         var nameAttr = TagUpdate.newBuilder()
                 .setAttrName(TRAC_FILE_NAME_ATTR)
@@ -592,12 +588,25 @@ public class FileService {
                 .setValue(MetadataCodec.encodeValue(fileDef.getSize()))
                 .build();
 
-        var fileAttrs = List.of(nameAttr, extensionAttr, mimeTypeAttr, sizeAttr);
-
-        return Stream.concat(tags.stream(), fileAttrs.stream()).collect(Collectors.toList());
+        return List.of(nameAttr, extensionAttr, mimeTypeAttr, sizeAttr);
     }
 
-    private List<TagUpdate> updateFileAttrs(List<TagUpdate> tags, FileDefinition fileDef) {
+    private List<TagUpdate> createStorageAttrs(TagHeader fileId) {
+
+        // TODO: Special metadata Value type for handling tag selectors
+        var selector = selectorForLatest(fileId);
+        var storageObjectAttr = MetadataUtil.objectKey(selector);
+
+        var storageForAttr = TagUpdate.newBuilder()
+                .setAttrName(TRAC_STORAGE_OBJECT_ATTR)
+                .setOperation(TagOperation.CREATE_ATTR)
+                .setValue(MetadataCodec.encodeValue(storageObjectAttr))
+                .build();
+
+        return List.of(storageForAttr);
+    }
+
+    private List<TagUpdate> updateFileAttrs(FileDefinition fileDef) {
 
         // Extension and mime type are not allowed to change between file versions
 
@@ -613,25 +622,6 @@ public class FileService {
                 .setValue(MetadataCodec.encodeValue(fileDef.getSize()))
                 .build();
 
-        var fileAttrs = List.of(nameAttr, sizeAttr);
-
-        return Stream.concat(tags.stream(), fileAttrs.stream()).collect(Collectors.toList());
-    }
-
-    private List<TagUpdate> createStorageAttrs(List<TagUpdate> tags, TagHeader objectId) {
-
-        // TODO: Special metadata Value type for handling tag selectors
-        var selector = selectorForLatest(objectId);
-        var storageObjectAttr = MetadataUtil.objectKey(selector);
-
-        var storageForAttr = TagUpdate.newBuilder()
-                .setAttrName(TRAC_STORAGE_OBJECT_ATTR)
-                .setOperation(TagOperation.CREATE_ATTR)
-                .setValue(MetadataCodec.encodeValue(storageObjectAttr))
-                .build();
-
-        var storageAttrs= List.of(storageForAttr);
-
-        return Stream.concat(tags.stream(), storageAttrs.stream()).collect(Collectors.toList());
+        return List.of(nameAttr, sizeAttr);
     }
 }

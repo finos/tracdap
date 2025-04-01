@@ -180,10 +180,8 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
         var dataStream = upload.dataStream(FileWriteRequest::getContent, dataContext.arrowAllocator());
 
         firstMessage
-                .thenCompose(req -> fileService.createFile(
-                        req, requestMetadata,
-                        req.getTenant(),
-                        req.getTagUpdatesList(),
+                .thenCompose(request -> fileService.createFile(
+                        request, requestMetadata,
                         dataStream, dataContext, clientConfig))
                 .thenAccept(upload::succeeded)
                 .exceptionally(upload::failed);
@@ -214,10 +212,8 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
         var dataStream = upload.dataStream(FileWriteRequest::getContent, dataContext.arrowAllocator());
 
         firstMessage
-                .thenCompose(req -> fileService.updateFile(
-                        req,  requestMetadata,
-                        req.getTenant(),
-                        req.getTagUpdatesList(),
+                .thenCompose(request -> fileService.updateFile(
+                        request,  requestMetadata,
                         dataStream, dataContext, clientConfig))
                 .thenAccept(upload::succeeded)
                 .exceptionally(upload::failed);
