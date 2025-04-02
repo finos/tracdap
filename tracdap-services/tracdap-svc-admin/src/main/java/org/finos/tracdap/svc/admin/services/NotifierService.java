@@ -17,6 +17,7 @@
 
 package org.finos.tracdap.svc.admin.services;
 
+import io.grpc.ManagedChannel;
 import org.finos.tracdap.api.internal.ConfigUpdate;
 import org.finos.tracdap.api.internal.InternalMessagingApiGrpc;
 import org.finos.tracdap.api.internal.ReceivedStatus;
@@ -32,9 +33,8 @@ import io.grpc.ManagedChannelBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Properties;
+import java.util.*;
+import java.util.concurrent.TimeUnit;
 
 
 public class NotifierService {
@@ -42,11 +42,27 @@ public class NotifierService {
     private final Logger log = LoggerFactory.getLogger(getClass());
 
     GrpcConcern commonConcerns;
+    private final List<ManagedChannel> channels;
     private final Map<String, InternalMessagingApiGrpc.InternalMessagingApiFutureStub> services;
 
     public NotifierService(PlatformConfig platformConfig, GrpcConcern commonConcerns) {
         this.commonConcerns = commonConcerns;
+        this.channels = new ArrayList<>();
         this.services = buildServiceNotifierMap(platformConfig, commonConcerns);
+    }
+
+    public void shutdown() {
+        channels.forEach(ManagedChannel::shutdown);
+    }
+
+    public boolean awaitTermination(long timeout, TimeUnit unit) throws InterruptedException {
+
+        boolean ok = true;
+
+        for (var channel : channels)
+            ok &= channel.awaitTermination(timeout, unit);
+
+        return ok;
     }
 
     private Map<String, InternalMessagingApiGrpc.InternalMessagingApiFutureStub>
@@ -90,6 +106,8 @@ public class NotifierService {
                 .forAddress(target.getHost(), target.getPort())
                 .usePlaintext()
                 .build();
+
+        channels.add(clientChannel);
 
         var notifier = InternalMessagingApiGrpc.newFutureStub(clientChannel);
 

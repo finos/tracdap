@@ -50,6 +50,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.time.Duration;
+import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Properties;
 import java.util.concurrent.*;
@@ -178,16 +179,30 @@ public class TracMetadataService extends TracServiceBase {
         // Wait for the server to drain
         // Once there are no active requests, clean up internal resources
 
-        server.shutdown();
-        server.awaitTermination(shutdownTimeout.getSeconds(), TimeUnit.SECONDS);
+        var deadline = Instant.now().plus(shutdownTimeout);
+
+        var serverDown = shutdownResource("Data service server", deadline, remaining -> {
+
+            server.shutdown();
+            return server.awaitTermination(remaining.toMillis(), TimeUnit.MILLISECONDS);
+        });
+
+        // Request / await is not available on the DAL!
+        dal.stop();
+
+        var executorDown = shutdownResource("Executor thread pool)", deadline, remaining -> {
+
+            executor.shutdown();
+            return executor.awaitTermination(remaining.toMillis(), TimeUnit.MILLISECONDS);
+        });
+
+        if (serverDown && executorDown)
+            return 0;
 
         if (!server.isTerminated())
             server.shutdownNow();
 
-        dal.stop();
-        executor.shutdown();
-
-        return 0;
+        return -1;
     }
 
     private GrpcConcern buildCommonConcerns() {
