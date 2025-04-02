@@ -16,7 +16,7 @@
 config:
   logging: trac-logging.xml
   secret.type: PKCS12
-  secret.url: trac-unit.pfx
+  secret.url: trac-e2e.pfx
 
 
 platformInfo:
