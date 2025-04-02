@@ -17,10 +17,13 @@
 
 package org.finos.tracdap.common.config;
 
-import org.finos.tracdap.common.config.local.JksSecretLoader;
+import org.finos.tracdap.common.exception.ETracInternal;
+import org.finos.tracdap.common.secrets.ISecretService;
+import org.finos.tracdap.common.secrets.jks.JksSecretLoader;
 import org.finos.tracdap.common.exception.EConfigLoad;
 import org.finos.tracdap.common.plugin.IPluginManager;
 import org.finos.tracdap.common.exception.EStartup;
+import org.finos.tracdap.common.secrets.jks.JksSecretService;
 import org.finos.tracdap.common.startup.Startup;
 import org.finos.tracdap.common.startup.StartupLog;
 import org.finos.tracdap.common.startup.StartupSequence;
@@ -127,6 +130,17 @@ public class ConfigManager {
         StartupLog.log(this, Level.INFO, String.format("Using secrets: [%s] %s", secretType, secretUrl));
 
         this.secrets = secretLoaderForProtocol(secretType, configMap);
+    }
+
+    public ISecretService getSecrets() {
+
+        // TODO: Secret service needs to separated from config manager
+        // It should be handled separately, once the main config manager is available
+
+        if (this.secrets instanceof JksSecretService)
+            return (ISecretService) this.secrets;
+
+        throw new ETracInternal("Secret service is not available");
     }
 
     public ISecretLoader getUserDb() {

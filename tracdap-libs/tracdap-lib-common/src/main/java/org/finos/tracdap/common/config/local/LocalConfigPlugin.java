@@ -22,6 +22,7 @@ import org.finos.tracdap.common.config.ISecretLoader;
 import org.finos.tracdap.common.exception.EPluginNotAvailable;
 import org.finos.tracdap.common.plugin.PluginServiceInfo;
 import org.finos.tracdap.common.plugin.TracPlugin;
+import org.finos.tracdap.common.secrets.jks.JksSecretService;
 
 import java.util.List;
 import java.util.Properties;
@@ -55,7 +56,7 @@ public class LocalConfigPlugin extends TracPlugin {
             return (T) new LocalConfigLoader();
 
         if (serviceName.equals(JKS_SECRET_LOADER))
-            return (T) new JksSecretLoader(properties);
+            return (T) new JksSecretService(properties);
 
         var message = String.format("Plugin [%s] does not support the service [%s]", pluginName(), serviceName);
         throw new EPluginNotAvailable(message);

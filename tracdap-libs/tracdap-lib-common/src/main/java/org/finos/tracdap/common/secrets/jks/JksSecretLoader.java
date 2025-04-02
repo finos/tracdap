@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.config.local;
+package org.finos.tracdap.common.secrets.jks;
 
 import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.config.ConfigManager;
@@ -36,10 +36,10 @@ public class JksSecretLoader implements ISecretLoader {
 
     public static final String DEFAULT_KEYSTORE_TYPE = "PKCS12";
 
-    private final Properties properties;
-    private KeyStore keystore;
-    private boolean ready;
-    String secretKey;
+    protected final Properties properties;
+    protected KeyStore keystore;
+    protected boolean ready;
+    protected String secretKey;
 
     public JksSecretLoader(Properties properties) {
 
