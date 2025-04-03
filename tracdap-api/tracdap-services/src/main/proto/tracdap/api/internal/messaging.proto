@@ -53,6 +53,8 @@ message ConfigUpdate{
   ConfigUpdateType updateType = 2;
 
   metadata.ConfigEntry configEntry = 3;
+
+  bool secretsUpdated = 4;
 }
 
 enum ConfigUpdateType {

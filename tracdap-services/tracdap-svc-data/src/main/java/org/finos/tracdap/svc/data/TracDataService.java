@@ -199,7 +199,9 @@ public class TracDataService extends TracServiceBase {
             var dataSvc = new DataService(storageConfig, tenantConfig, storage, formats, metaClient);
             var dataApi = new TracDataApi(dataSvc, fileSvc, eventLoopResolver, arrowAllocator, commonConcerns);
 
-            var messageProcessor = new MessageProcessor(metaClientBlocking, offloadExecutor, commonConcerns, storage);
+            var messageProcessor = new MessageProcessor(
+                    metaClientBlocking, offloadExecutor, commonConcerns,
+                    storage, configManager.getSecrets());
 
             var serverBuilder = NettyServerBuilder
                     .forPort(serviceConfig.getPort())
