@@ -58,6 +58,19 @@ public class JksSecretService extends JksSecretLoader implements ISecretService 
     }
 
     @Override
+    public void deleteSecret(String secretName) {
+
+        try {
+            CryptoHelpers.deleteEntry(keystore, secretName);
+        }
+        catch (EConfigLoad e) {
+            var message = String.format("Password could not be saved to the key store: [%s] %s", secretName, e.getMessage());
+            StartupLog.log(this, Level.ERROR, message);
+            throw new EConfigLoad(message, e);
+        }
+    }
+
+    @Override
     public void commit() {
 
         try {

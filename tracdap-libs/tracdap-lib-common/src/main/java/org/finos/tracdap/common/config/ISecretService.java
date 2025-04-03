@@ -28,5 +28,7 @@ public interface ISecretService extends ISecretLoader {
 
     String storePassword(String secretName, String password);
 
+    void deleteSecret(String secretName);
+
     void commit();
 }
