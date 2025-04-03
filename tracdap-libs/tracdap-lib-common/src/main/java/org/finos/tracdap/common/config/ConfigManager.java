@@ -122,24 +122,22 @@ public class ConfigManager {
 
         if (secretType == null || secretType.isBlank()) {
             StartupLog.log(this, Level.INFO, "Using secrets: [none]");
-            return;
+            this.secrets = new NoSecrets();
+        }
+        else {
+            StartupLog.log(this, Level.INFO, String.format("Using secrets: [%s] %s", secretType, secretUrl));
+            this.secrets = secretLoaderForProtocol(secretType, configMap);
         }
 
-        StartupLog.log(this, Level.INFO, String.format("Using secrets: [%s] %s", secretType, secretUrl));
-
-        this.secrets = secretLoaderForProtocol(secretType, configMap);
         this.configSecrets = secrets.scope(ConfigKeys.CONFIG_SCOPE);
     }
 
     public boolean hasSecrets() {
 
-        return this.secrets != null;
+        return ! (this.secrets instanceof NoSecrets);
     }
 
     public ISecretService getSecrets() {
-
-        if (this.secrets == null)
-            throw new EConfig("Secret service is not available");
 
         return this.secrets;
     }
