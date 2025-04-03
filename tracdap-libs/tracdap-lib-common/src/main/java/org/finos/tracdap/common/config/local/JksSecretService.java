@@ -17,11 +17,9 @@
 
 package org.finos.tracdap.common.config.local;
 
-import org.finos.tracdap.common.config.CryptoHelpers;
+import org.finos.tracdap.common.config.*;
 import org.finos.tracdap.common.exception.EConfigLoad;
 import org.finos.tracdap.common.exception.EStartup;
-import org.finos.tracdap.common.config.ISecretService;
-import org.finos.tracdap.common.config.ScopedSecretService;
 import org.finos.tracdap.common.startup.StartupLog;
 import org.slf4j.event.Level;
 
@@ -49,7 +47,6 @@ public class JksSecretService extends JksSecretLoader implements ISecretService 
     public String storePassword(String secretName, String password) {
 
         try {
-            System.out.println("Saving secret: " + secretName);
             CryptoHelpers.writeTextEntry(keystore, secretKey, secretName, password);
             return secretName;
         }

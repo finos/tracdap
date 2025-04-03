@@ -22,8 +22,8 @@ public interface ISecretService extends ISecretLoader {
 
     ISecretService scope(String scope);
 
-    default ISecretService namedScope(String scopeKey, String scopeValue) {
-        return scope(scopeKey).scope(scopeValue);
+    default ISecretService namedScope(String scopeName, String scope) {
+        return scope(scopeName).scope(scope);
     }
 
     String storePassword(String secretName, String password);

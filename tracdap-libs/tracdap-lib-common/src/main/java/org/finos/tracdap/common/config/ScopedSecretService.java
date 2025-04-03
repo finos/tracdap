@@ -17,40 +17,18 @@
 
 package org.finos.tracdap.common.config;
 
-import java.security.PrivateKey;
-import java.security.PublicKey;
 
-
-public class ScopedSecretService implements ISecretService {
-
-    private static final char SCOPE_SEPARATOR = '/';
-    private static final String ROOT_SCOPE = String.valueOf(SCOPE_SEPARATOR);
+public class ScopedSecretService extends ScopedSecretLoader implements ISecretService {
 
     private final ISecretService delegate;
-    private final String scope;
 
     public static ISecretService rootScope(ISecretService delegate) {
         return new ScopedSecretService(delegate, ROOT_SCOPE);
     }
 
-    private ScopedSecretService(ISecretService delegate, String scope) {
+    protected ScopedSecretService(ISecretService delegate, String scope) {
+        super(delegate, scope);
         this.delegate = delegate;
-        this.scope = scope;
-    }
-
-    @Override
-    public void init(ConfigManager configManager) {
-        delegate.init(configManager);
-    }
-
-    @Override
-    public void commit() {
-        delegate.commit();
-    }
-
-    @Override
-    public void reload() {
-        delegate.reload();
     }
 
     @Override
@@ -60,44 +38,12 @@ public class ScopedSecretService implements ISecretService {
     }
 
     @Override
-    public boolean hasSecret(String secretName) {
-        return delegate.hasSecret(translateScope(secretName));
-    }
-
-    @Override
-    public boolean hasAttr(String secretName, String attrName) {
-        return delegate.hasAttr(translateScope(secretName), attrName);
-    }
-
-    @Override
     public String storePassword(String secretName, String password) {
         return delegate.storePassword(translateScope(secretName), password);
     }
 
     @Override
-    public String loadPassword(String secretName) {
-        return delegate.loadPassword(translateScope(secretName));
-    }
-
-    @Override
-    public String loadAttr(String secretName, String attrName) {
-        return delegate.loadAttr(translateScope(secretName), attrName);
-    }
-
-    @Override
-    public PublicKey loadPublicKey(String secretName) {
-        return delegate.loadPublicKey(translateScope(secretName));
-    }
-
-    @Override
-    public PrivateKey loadPrivateKey(String secretName) {
-        return delegate.loadPrivateKey(translateScope(secretName));
-    }
-
-    private String translateScope(String secretName) {
-        if (scope.isEmpty() || scope.charAt(scope.length() - 1) == SCOPE_SEPARATOR)
-            return scope + secretName;
-        else
-            return scope + SCOPE_SEPARATOR + secretName;
+    public void commit() {
+        delegate.commit();
     }
 }

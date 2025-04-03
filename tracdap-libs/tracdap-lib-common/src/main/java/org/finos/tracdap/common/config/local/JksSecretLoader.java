@@ -17,10 +17,7 @@
 
 package org.finos.tracdap.common.config.local;
 
-import org.finos.tracdap.common.config.ConfigKeys;
-import org.finos.tracdap.common.config.ConfigManager;
-import org.finos.tracdap.common.config.CryptoHelpers;
-import org.finos.tracdap.common.config.ISecretLoader;
+import org.finos.tracdap.common.config.*;
 import org.finos.tracdap.common.exception.*;
 import org.finos.tracdap.common.startup.StartupLog;
 import org.slf4j.event.Level;
@@ -121,6 +118,11 @@ public class JksSecretLoader implements ISecretLoader {
             StartupLog.log(this, Level.ERROR, message);
             throw new EStartup(message);
         }
+    }
+
+    @Override
+    public ISecretLoader scope(String scope) {
+        return ScopedSecretLoader.rootScope(this).scope(scope);
     }
 
     @Override
