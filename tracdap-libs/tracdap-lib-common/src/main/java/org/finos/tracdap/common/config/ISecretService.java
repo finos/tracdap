@@ -20,6 +20,8 @@ package org.finos.tracdap.common.config;
 
 public interface ISecretService extends ISecretLoader {
 
+    void init(ConfigManager configManager, boolean createIfMissing);
+
     ISecretService scope(String scope);
 
     default ISecretService namedScope(String scopeName, String scope) {

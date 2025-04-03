@@ -17,7 +17,6 @@
 
 package org.finos.tracdap.common.config;
 
-import org.finos.tracdap.common.config.local.JksSecretLoader;
 import org.finos.tracdap.common.exception.EConfig;
 import org.finos.tracdap.common.exception.EConfigLoad;
 import org.finos.tracdap.common.plugin.IPluginManager;

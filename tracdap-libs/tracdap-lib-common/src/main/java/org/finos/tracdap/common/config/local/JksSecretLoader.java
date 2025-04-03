@@ -39,9 +39,8 @@ public class JksSecretLoader implements ISecretLoader {
     protected final String keystoreKey;
     protected final KeyStore keystore;
 
-    protected boolean ready;
-    protected String secretKey;
     protected ConfigManager configManager;
+    protected boolean ready;
 
     public JksSecretLoader(Properties properties) {
 
@@ -74,8 +73,8 @@ public class JksSecretLoader implements ISecretLoader {
             throw new EStartup(message);
         }
 
+        this.configManager = null;
         this.ready = false;
-        this.secretKey = null;
     }
 
     @Override
@@ -102,7 +101,6 @@ public class JksSecretLoader implements ISecretLoader {
 
                 keystore.load(stream, keystoreKey.toCharArray());
                 ready = true;
-                this.secretKey = keystoreKey;
             }
         }
         catch (IOException e) {
@@ -142,7 +140,7 @@ public class JksSecretLoader implements ISecretLoader {
     public String loadPassword(String secretName) {
 
         try {
-            return CryptoHelpers.readTextEntry(keystore, secretKey, secretName);
+            return CryptoHelpers.readTextEntry(keystore, keystoreKey, secretName);
         }
         catch (EConfigLoad e) {
             var message = String.format("Password could not be retrieved from the key store: [%s] %s", secretName, e.getMessage());
@@ -171,7 +169,7 @@ public class JksSecretLoader implements ISecretLoader {
     public String loadAttr(String secretName, String attrName) {
 
         try {
-            return CryptoHelpers.readAttribute(keystore, secretKey, secretName, attrName);
+            return CryptoHelpers.readAttribute(keystore, keystoreKey, secretName, attrName);
         }
         catch (EConfigLoad e) {
 
@@ -187,7 +185,7 @@ public class JksSecretLoader implements ISecretLoader {
     public PublicKey loadPublicKey(String secretName) {
 
         try {
-            var base64 = CryptoHelpers.readTextEntry(keystore, secretKey, secretName);
+            var base64 = CryptoHelpers.readTextEntry(keystore, keystoreKey, secretName);
             return CryptoHelpers.decodePublicKey(base64, false);
         }
         catch (EConfigLoad e) {
@@ -201,7 +199,7 @@ public class JksSecretLoader implements ISecretLoader {
     public PrivateKey loadPrivateKey(String secretName) {
 
         try {
-            var base64 = CryptoHelpers.readTextEntry(keystore, secretKey, secretName);
+            var base64 = CryptoHelpers.readTextEntry(keystore, keystoreKey, secretName);
             return CryptoHelpers.decodePrivateKey(base64, false);
         }
         catch (EConfigLoad e) {

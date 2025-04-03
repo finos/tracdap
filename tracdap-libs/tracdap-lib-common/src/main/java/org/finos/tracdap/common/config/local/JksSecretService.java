@@ -26,6 +26,8 @@ import org.slf4j.event.Level;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.URI;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
 import java.security.cert.CertificateException;
@@ -39,6 +41,36 @@ public class JksSecretService extends JksSecretLoader implements ISecretService 
     }
 
     @Override
+    public void init(ConfigManager configManager, boolean createIfMissing) {
+
+        if (Files.exists(Path.of(keystoreUrl)) || !createIfMissing) {
+
+            init(configManager);
+            return;
+        }
+
+        try {
+
+            this.keystore.load(null, keystoreKey.toCharArray());
+
+            this.configManager = configManager;
+            this.ready = true;
+        }
+        catch (IOException e) {
+            // Inner error is more meaningful if keystore cannot be read
+            var error = e.getCause() != null ? e.getCause() : e;
+            var message = String.format("Failed to create keystore [%s]: %s", keystoreUrl, error.getMessage());
+            StartupLog.log(this, Level.ERROR, message);
+            throw new EStartup(message);
+        }
+        catch (NoSuchAlgorithmException | CertificateException e) {
+            var message = String.format("Failed to open keystore [%s]: %s", keystoreUrl, e.getMessage());
+            StartupLog.log(this, Level.ERROR, message);
+            throw new EStartup(message);
+        }
+    }
+
+    @Override
     public ISecretService scope(String scope) {
         return ScopedSecretService.rootScope(this).scope(scope);
     }
@@ -47,7 +79,7 @@ public class JksSecretService extends JksSecretLoader implements ISecretService 
     public String storePassword(String secretName, String password) {
 
         try {
-            CryptoHelpers.writeTextEntry(keystore, secretKey, secretName, password);
+            CryptoHelpers.writeTextEntry(keystore, keystoreKey, secretName, password);
             return secretName;
         }
         catch (EConfigLoad e) {
