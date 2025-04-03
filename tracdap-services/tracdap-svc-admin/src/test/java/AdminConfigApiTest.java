@@ -39,7 +39,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 abstract class AdminConfigApiTest {
 
-    public static final String TRAC_CONFIG_UNIT = "config/trac-unit.yaml";
+    public static final String TRAC_CONFIG_UNIT = "config/trac-unit-secrets.yaml";
     public static final String TRAC_CONFIG_ENV_VAR = "TRAC_CONFIG_FILE";
 
     protected TracAdminApiGrpc.TracAdminApiBlockingStub adminApi;
@@ -118,6 +118,47 @@ abstract class AdminConfigApiTest {
     }
 
     @Test
+    void createAndReadMasked() {
+
+        var configObj = SampleMetadata.dummyDefinitionForType(ObjectType.RESOURCE);
+
+        // Expect the config API to mask secrets on round trip
+        var maskedResource = configObj.getResource().toBuilder();
+        for (var secret : configObj.getResource().getSecretsMap().keySet())
+            maskedResource.putSecrets(secret, "");
+        var maskedResourceObj = configObj.toBuilder().setResource(maskedResource).build();
+
+        var writeRequest = ConfigWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setConfigClass("createAndReadMasked")
+                .setConfigKey("entry1")
+                .setDefinition(configObj)
+                .build();
+
+        var writeResponse = adminApi.createConfigObject(writeRequest);
+        var configEntry = writeResponse.getEntry();
+        var configDetails = configEntry.getDetails();
+
+        assertEquals("createAndReadMasked", configEntry.getConfigClass());
+        assertEquals("entry1", configEntry.getConfigKey());
+        assertEquals(1, configEntry.getConfigVersion());
+        assertTrue(configEntry.getIsLatestConfig());
+
+        assertEquals(ObjectType.RESOURCE, configDetails.getObjectType());
+
+        var readRequest = ConfigReadRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setEntry(configEntry)
+                .build();
+
+        var rtConfig = adminApi.readConfigObject(readRequest);
+
+        assertEquals(maskedResourceObj, rtConfig.getDefinition());
+        assertEquals(MetadataCodec.encodeValue("createAndReadMasked"), rtConfig.getAttrsOrDefault("trac_config_class", null));
+        assertEquals(MetadataCodec.encodeValue("entry1"), rtConfig.getAttrsOrDefault("trac_config_key", null));
+    }
+
+    @Test
     void updateAndRead() {
 
         var configObj = SampleMetadata.dummyDefinitionForType(ObjectType.CONFIG);
@@ -163,6 +204,66 @@ abstract class AdminConfigApiTest {
 
         assertEquals(configObj2, rtConfig.getDefinition());
         assertNotEquals(configObj, rtConfig.getDefinition());
+    }
+
+    @Test
+    void updateAndReadMasked() {
+
+        var configObj = SampleMetadata.dummyDefinitionForType(ObjectType.RESOURCE);
+
+        // Expect the config API to mask secrets on round trip
+        var maskedResource = configObj.getResource().toBuilder();
+        for (var secret : configObj.getResource().getSecretsMap().keySet())
+            maskedResource.putSecrets(secret, "");
+        var maskedResourceObj = configObj.toBuilder().setResource(maskedResource).build();
+
+        var writeRequest = ConfigWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setConfigClass("updateAndReadMasked")
+                .setConfigKey("entry1")
+                .setDefinition(configObj)
+                .build();
+
+        var writeResponse = adminApi.createConfigObject(writeRequest);
+        var configEntry = writeResponse.getEntry();
+
+        var configObj2 = SampleMetadata.dummyVersionForType(configObj);
+
+        // Expect the config API to mask secrets on round trip
+        var maskedResource2 = configObj2.getResource().toBuilder();
+        for (var secret : configObj2.getResource().getSecretsMap().keySet())
+            maskedResource2.putSecrets(secret, "");
+        var maskedResourceObj2 = configObj2.toBuilder().setResource(maskedResource2).build();
+
+        var writeRequest2 = ConfigWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setConfigClass("updateAndReadMasked")
+                .setConfigKey("entry1")
+                .setPriorEntry(configEntry)
+                .setDefinition(configObj2)
+                .build();
+
+        var writeResponse2 = adminApi.updateConfigObject(writeRequest2);
+        var configEntry2 = writeResponse2.getEntry();
+
+        var configDetails = configEntry2.getDetails();
+
+        assertEquals("updateAndReadMasked", configEntry.getConfigClass());
+        assertEquals("entry1", configEntry.getConfigKey());
+        assertEquals(1, configEntry.getConfigVersion());
+        assertTrue(configEntry.getIsLatestConfig());
+
+        assertEquals(ObjectType.RESOURCE, configDetails.getObjectType());
+
+        var readRequest = ConfigReadRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setEntry(configEntry2)
+                .build();
+
+        var rtConfig = adminApi.readConfigObject(readRequest);
+
+        assertEquals(maskedResourceObj2, rtConfig.getDefinition());
+        assertNotEquals(maskedResourceObj, rtConfig.getDefinition());
     }
 
     @Test
@@ -237,6 +338,12 @@ abstract class AdminConfigApiTest {
 
         var resourceObj = SampleMetadata.dummyDefinitionForType(ObjectType.RESOURCE);
 
+        // Expect the config API to mask secrets on round trip
+        var maskedResource = resourceObj.getResource().toBuilder();
+        for (var secret : resourceObj.getResource().getSecretsMap().keySet())
+            maskedResource.putSecrets(secret, "");
+        var maskedResourceObj = resourceObj.toBuilder().setResource(maskedResource).build();
+
         var resourceWriteRequest = ConfigWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setConfigClass("deleteAndCreateDifferent")
@@ -247,14 +354,13 @@ abstract class AdminConfigApiTest {
         var resourceWriteResponse = adminApi.createConfigObject(resourceWriteRequest);
         var resourceEntry = resourceWriteResponse.getEntry();
 
-
         var readRequest = ConfigReadRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setEntry(resourceEntry)
                 .build();
 
         var rtResource = adminApi.readConfigObject(readRequest);
-        assertEquals(resourceObj, rtResource.getDefinition());
+        assertEquals(maskedResourceObj, rtResource.getDefinition());
     }
 
     @Test
