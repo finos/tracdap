@@ -18,11 +18,10 @@
 package org.finos.tracdap.common.config.local;
 
 import org.finos.tracdap.common.config.IConfigLoader;
-import org.finos.tracdap.common.config.ISecretLoader;
+import org.finos.tracdap.common.config.ISecretService;
 import org.finos.tracdap.common.exception.EPluginNotAvailable;
 import org.finos.tracdap.common.plugin.PluginServiceInfo;
 import org.finos.tracdap.common.plugin.TracPlugin;
-import org.finos.tracdap.common.secrets.jks.JksSecretService;
 
 import java.util.List;
 import java.util.Properties;
@@ -36,7 +35,7 @@ public class LocalConfigPlugin extends TracPlugin {
 
     private static final List<PluginServiceInfo> serviceInfo = List.of(
             new PluginServiceInfo(IConfigLoader.class, FILE_LOADER, List.of("LOCAL", "file")),
-            new PluginServiceInfo(ISecretLoader.class, JKS_SECRET_LOADER, List.of("PKCS12", "JCEKS")));
+            new PluginServiceInfo(ISecretService.class, JKS_SECRET_LOADER, List.of("PKCS12", "JCEKS", "JKS")));
 
 
     @Override
