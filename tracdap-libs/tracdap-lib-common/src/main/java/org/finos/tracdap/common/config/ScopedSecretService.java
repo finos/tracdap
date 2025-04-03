@@ -32,6 +32,11 @@ public class ScopedSecretService extends ScopedSecretLoader implements ISecretSe
     }
 
     @Override
+    public void init(ConfigManager configManager, boolean createIfMissing) {
+        delegate.init(configManager, createIfMissing);
+    }
+
+    @Override
     public ISecretService scope(String scope) {
         var childScope = translateScope(scope);
         return new ScopedSecretService(delegate, childScope);
