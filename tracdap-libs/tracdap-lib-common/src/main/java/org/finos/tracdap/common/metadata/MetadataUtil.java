@@ -18,6 +18,8 @@
 package org.finos.tracdap.common.metadata;
 
 import org.finos.tracdap.common.exception.EUnexpected;
+import org.finos.tracdap.metadata.ObjectDefinition;
+import org.finos.tracdap.metadata.ObjectType;
 import org.finos.tracdap.metadata.TagHeader;
 import org.finos.tracdap.metadata.TagSelector;
 
@@ -136,5 +138,28 @@ public class MetadataUtil {
                     selector.getObjectId());
 
         throw new EUnexpected();
+    }
+
+    public static ObjectDefinition applyConfigMasking(ObjectDefinition object) {
+
+        // Metadata objects do not actually contain any sensitive configuration data
+        // The "secrets" are just aliases that must be looked up in the secret service
+        // Also these alias follow a standard pattern and can be easily inferred
+
+        // Masking the secret aliases is mostly done for convenience / presentation
+        // Sending updates back to the API will preserve existing secrets by default
+
+        if (object.getObjectType() == ObjectType.RESOURCE) {
+
+            var resource = object.getResource().toBuilder();
+
+            for (var secret : resource.getSecretsMap().keySet()) {
+                resource.putSecrets(secret, "");
+            }
+
+            return object.toBuilder().setResource(resource).build();
+        }
+
+        return object;
     }
 }
