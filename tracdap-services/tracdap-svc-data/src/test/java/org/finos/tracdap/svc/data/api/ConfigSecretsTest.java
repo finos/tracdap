@@ -53,7 +53,7 @@ import static org.finos.tracdap.test.concurrent.ConcurrentTestHelpers.waitFor;
 
 public class ConfigSecretsTest {
 
-    public static final String TRAC_CONFIG_SECRET = "config/trac-units-secrets.yaml";
+    public static final String TRAC_CONFIG_SECRET = "config/trac-unit-secrets.yaml";
     public static final String TRAC_RESOURCES_SECRET = "config/trac-unit-secrets-resources.yaml";
     public static final String TEST_TENANT = "ACME_CORP";
 
