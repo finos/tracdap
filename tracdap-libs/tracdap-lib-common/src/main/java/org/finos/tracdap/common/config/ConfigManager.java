@@ -17,13 +17,11 @@
 
 package org.finos.tracdap.common.config;
 
-import org.finos.tracdap.common.exception.ETracInternal;
-import org.finos.tracdap.common.secrets.ISecretService;
-import org.finos.tracdap.common.secrets.jks.JksSecretLoader;
+import org.finos.tracdap.common.config.local.JksSecretLoader;
+import org.finos.tracdap.common.exception.EConfig;
 import org.finos.tracdap.common.exception.EConfigLoad;
 import org.finos.tracdap.common.plugin.IPluginManager;
 import org.finos.tracdap.common.exception.EStartup;
-import org.finos.tracdap.common.secrets.jks.JksSecretService;
 import org.finos.tracdap.common.startup.Startup;
 import org.finos.tracdap.common.startup.StartupLog;
 import org.finos.tracdap.common.startup.StartupSequence;
@@ -81,7 +79,8 @@ public class ConfigManager {
     private final URI rootConfigDir;
 
     private final String secretKey;
-    private ISecretLoader secrets = null;
+    private ISecretService secrets = null;
+    private ISecretLoader configSecrets = null;
 
     private byte[] rootConfigCache = null;
 
@@ -130,17 +129,20 @@ public class ConfigManager {
         StartupLog.log(this, Level.INFO, String.format("Using secrets: [%s] %s", secretType, secretUrl));
 
         this.secrets = secretLoaderForProtocol(secretType, configMap);
+        this.configSecrets = secrets.scope(ConfigKeys.CONFIG_SCOPE);
+    }
+
+    public boolean hasSecrets() {
+
+        return this.secrets != null;
     }
 
     public ISecretService getSecrets() {
 
-        // TODO: Secret service needs to separated from config manager
-        // It should be handled separately, once the main config manager is available
+        if (this.secrets == null)
+            throw new EConfig("Secret service is not available");
 
-        if (this.secrets instanceof JksSecretService)
-            return (ISecretService) this.secrets;
-
-        throw new ETracInternal("Secret service is not available");
+        return this.secrets;
     }
 
     public ISecretLoader getUserDb() {
@@ -345,47 +347,49 @@ public class ConfigManager {
         return loadRootConfigObject(configClass, /* leniency = */ false);
     }
 
+    // Convenience methods for accessing secrets from the config scope
+
     public boolean hasSecret(String secretName) {
 
         // If secrets are not enabled, hasSecret() should always return false
-        if (secrets == null) {
+        if (configSecrets == null) {
             return false;
         }
 
-        return secrets.hasSecret(secretName);
+        return configSecrets.hasSecret(secretName);
     }
 
     public String loadPassword(String secretName) {
 
-        if (secrets == null) {
+        if (configSecrets == null) {
             var message = String.format("Secrets are not enabled, to use secrets set secret.type in [%s]", rootConfigFile);
             StartupLog.log(this, Level.ERROR, message);
             throw new EStartup(message);
         }
 
-        return secrets.loadPassword(secretName);
+        return configSecrets.loadPassword(secretName);
     }
 
     public PublicKey loadPublicKey(String secretName) {
 
-        if (secrets == null) {
+        if (configSecrets == null) {
             var message = String.format("Secrets are not enabled, to use secrets set secret.type in [%s]", rootConfigFile);
             StartupLog.log(this, Level.ERROR, message);
             throw new EStartup(message);
         }
 
-        return secrets.loadPublicKey(secretName);
+        return configSecrets.loadPublicKey(secretName);
     }
 
     public PrivateKey loadPrivateKey(String secretName) {
 
-        if (secrets == null) {
+        if (configSecrets == null) {
             var message = String.format("Secrets are not enabled, to use secrets set secret.type in [%s]", rootConfigFile);
             StartupLog.log(this, Level.ERROR, message);
             throw new EStartup(message);
         }
 
-        return secrets.loadPrivateKey(secretName);
+        return configSecrets.loadPrivateKey(secretName);
     }
 
 
@@ -525,9 +529,9 @@ public class ConfigManager {
         return plugins.createConfigService(IConfigLoader.class, protocol, new Properties());
     }
 
-    private ISecretLoader secretLoaderForProtocol(String protocol, Map<String, String> configMap) {
+    private ISecretService secretLoaderForProtocol(String protocol, Map<String, String> configMap) {
 
-        if (!plugins.isServiceAvailable(ISecretLoader.class, protocol)) {
+        if (!plugins.isServiceAvailable(ISecretService.class, protocol)) {
 
             var message = String.format("No secret loader available for protocol [%s]", protocol);
 
@@ -536,7 +540,7 @@ public class ConfigManager {
         }
 
         var secretProps = buildSecretProps(configMap);
-        var secretLoader = plugins.createConfigService(ISecretLoader.class, protocol, secretProps);
+        var secretLoader = plugins.createConfigService(ISecretService.class, protocol, secretProps);
         secretLoader.init(this);
 
         return secretLoader;

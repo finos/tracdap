@@ -44,4 +44,9 @@ public class ConfigKeys {
     // Well-known config classes
     public static final String TRAC_CONFIG = "trac_config";
     public static final String TRAC_RESOURCES = "trac_resources";
+
+    // Secret scopes
+    public static final String CONFIG_SCOPE = "config";
+    public static final String TENANT_SCOPE = "tenants";
+    public static final String RESOURCE_SCOPE = "resources";
 }

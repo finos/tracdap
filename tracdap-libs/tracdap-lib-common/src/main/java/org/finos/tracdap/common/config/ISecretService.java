@@ -15,9 +15,7 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.secrets;
-
-import org.finos.tracdap.common.config.ISecretLoader;
+package org.finos.tracdap.common.config;
 
 
 public interface ISecretService extends ISecretLoader {
@@ -28,5 +26,9 @@ public interface ISecretService extends ISecretLoader {
         return scope(scopeKey).scope(scopeValue);
     }
 
-    void storePassword(String secretName, String password);
+    String storePassword(String secretName, String password);
+
+    void commit();
+
+    void reload();
 }

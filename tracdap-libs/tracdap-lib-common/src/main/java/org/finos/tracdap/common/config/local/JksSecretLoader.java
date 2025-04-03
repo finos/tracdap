@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.secrets.jks;
+package org.finos.tracdap.common.config.local;
 
 import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.config.ConfigManager;
@@ -37,15 +37,48 @@ public class JksSecretLoader implements ISecretLoader {
     public static final String DEFAULT_KEYSTORE_TYPE = "PKCS12";
 
     protected final Properties properties;
-    protected KeyStore keystore;
+    protected final String keystoreType;
+    protected final String keystoreUrl;
+    protected final String keystoreKey;
+    protected final KeyStore keystore;
+
     protected boolean ready;
     protected String secretKey;
+    protected ConfigManager configManager;
 
     public JksSecretLoader(Properties properties) {
 
         this.properties = properties;
-        this.keystore = null;
+        this.keystoreType = properties.getProperty(ConfigKeys.SECRET_TYPE_KEY, DEFAULT_KEYSTORE_TYPE);
+        this.keystoreUrl = properties.getProperty(ConfigKeys.SECRET_URL_KEY);
+        this.keystoreKey = properties.getProperty(ConfigKeys.SECRET_KEY_KEY);
+
+        StartupLog.log(this, Level.INFO, "Initializing JKS secret loader...");
+
+        if (keystoreUrl == null || keystoreUrl.isBlank()) {
+            var message = String.format("JKS secrets need %s in the main config file", ConfigKeys.SECRET_URL_KEY);
+            StartupLog.log(this, Level.ERROR, message);
+            throw new EStartup(message);
+        }
+
+        if (keystoreKey == null || keystoreKey.isBlank()) {
+            var template = "JKS secrets need a secret key, use --secret-key or set %s in the environment";
+            var message = String.format(template, ConfigKeys.SECRET_KEY_ENV);
+            StartupLog.log(this, Level.ERROR, message);
+            throw new EStartup(message);
+        }
+
+        try {
+            this.keystore = KeyStore.getInstance(keystoreType);
+        }
+        catch (KeyStoreException e) {
+            var message = String.format("Keystore type is not supported: [%s]", keystoreType);
+            StartupLog.log(this, Level.ERROR, message);
+            throw new EStartup(message);
+        }
+
         this.ready = false;
+        this.secretKey = null;
     }
 
     @Override
@@ -56,28 +89,15 @@ public class JksSecretLoader implements ISecretLoader {
             throw new EStartup("JKS secret loader initialized twice");
         }
 
-        var keystoreType = properties.getProperty(ConfigKeys.SECRET_TYPE_KEY, DEFAULT_KEYSTORE_TYPE);
-        var keystoreUrl = properties.getProperty(ConfigKeys.SECRET_URL_KEY);
-        var keystoreKey = properties.getProperty(ConfigKeys.SECRET_KEY_KEY);
+        this.configManager = configManager;
+
+        reload();
+    }
+
+    protected void reload() {
 
         try {
 
-            StartupLog.log(this, Level.INFO, "Initializing JKS secret loader...");
-
-            if (keystoreUrl == null || keystoreUrl.isBlank()) {
-                var message = String.format("JKS secrets need %s in the main config file", ConfigKeys.SECRET_URL_KEY);
-                StartupLog.log(this, Level.ERROR, message);
-                throw new EStartup(message);
-            }
-
-            if (keystoreKey == null || keystoreKey.isBlank()) {
-                var template = "JKS secrets need a secret key, use --secret-key or set %s in the environment";
-                var message = String.format(template, ConfigKeys.SECRET_KEY_ENV);
-                StartupLog.log(this, Level.ERROR, message);
-                throw new EStartup(message);
-            }
-
-            this.keystore = KeyStore.getInstance(keystoreType);
             var keystoreBytes = configManager.loadBinaryConfig(keystoreUrl);
 
             try (var stream = new ByteArrayInputStream(keystoreBytes)) {
@@ -86,11 +106,6 @@ public class JksSecretLoader implements ISecretLoader {
                 ready = true;
                 this.secretKey = keystoreKey;
             }
-        }
-        catch (KeyStoreException e) {
-            var message = String.format("Keystore type is not supported: [%s]", keystoreType);
-            StartupLog.log(this, Level.ERROR, message);
-            throw new EStartup(message);
         }
         catch (IOException e) {
             // Inner error is more meaningful if keystore cannot be read

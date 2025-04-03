@@ -15,9 +15,7 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.secrets;
-
-import org.finos.tracdap.common.config.ConfigManager;
+package org.finos.tracdap.common.config;
 
 import java.security.PrivateKey;
 import java.security.PublicKey;
@@ -25,7 +23,8 @@ import java.security.PublicKey;
 
 public class ScopedSecretService implements ISecretService {
 
-    private static final String ROOT_SCOPE = "/";
+    private static final char SCOPE_SEPARATOR = '/';
+    private static final String ROOT_SCOPE = String.valueOf(SCOPE_SEPARATOR);
 
     private final ISecretService delegate;
     private final String scope;
@@ -45,6 +44,16 @@ public class ScopedSecretService implements ISecretService {
     }
 
     @Override
+    public void commit() {
+        delegate.commit();
+    }
+
+    @Override
+    public void reload() {
+        delegate.reload();
+    }
+
+    @Override
     public ISecretService scope(String scope) {
         var childScope = translateScope(scope);
         return new ScopedSecretService(delegate, childScope);
@@ -61,8 +70,8 @@ public class ScopedSecretService implements ISecretService {
     }
 
     @Override
-    public void storePassword(String secretName, String password) {
-        delegate.storePassword(translateScope(secretName), password);
+    public String storePassword(String secretName, String password) {
+        return delegate.storePassword(translateScope(secretName), password);
     }
 
     @Override
@@ -86,6 +95,9 @@ public class ScopedSecretService implements ISecretService {
     }
 
     private String translateScope(String secretName) {
-        return scope + "/" + secretName;
+        if (scope.isEmpty() || scope.charAt(scope.length() - 1) == SCOPE_SEPARATOR)
+            return scope + secretName;
+        else
+            return scope + SCOPE_SEPARATOR + secretName;
     }
 }
