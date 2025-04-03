@@ -246,6 +246,9 @@ public class ConfigService {
             return request.toBuilder().setDefinition(secureObject).build();
         }
 
+        // Other object types are not processed for secrets
+        secretsUpdated.setResult(false);
+
         return request;
     }
 
