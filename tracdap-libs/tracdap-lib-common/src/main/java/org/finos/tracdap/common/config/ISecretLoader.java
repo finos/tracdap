@@ -51,6 +51,37 @@ public interface ISecretLoader {
     void init(ConfigManager configManager);
 
     /**
+     * Reload secrets from the secret source.
+     *
+     * <p>This method will invalidate any stale / cached secrets so they will be re-read
+     * from the secret source. The exact timing of reads may vary between implementations,
+     * some implementations may not read secrets until they are requested.
+     */
+    void reload();
+
+    /**
+     * Provide a child secret loader restricted to the given scope.
+     *
+     * @param scope The scope for the child secret loader
+     * @return A child secret loader restricted to the given scope
+     */
+    ISecretLoader scope(String scope);
+
+    /**
+     * Convenience method for working with named scopes.
+     *
+     * <p>For example, /tenants/ACME is a named tenant scope
+     *
+     * @param scopeName Name of the scope (a static outer scope)
+     * @param scope Named scope
+     *
+     * @return A child secret loader restricted to the named scope
+     */
+    default ISecretLoader namedScope(String scopeName, String scope) {
+        return scope(scopeName).scope(scope);
+    }
+
+    /**
      * Test whether a secret with the given name exists in the secret store
      *
      * @param secretName The name of the secret to check for

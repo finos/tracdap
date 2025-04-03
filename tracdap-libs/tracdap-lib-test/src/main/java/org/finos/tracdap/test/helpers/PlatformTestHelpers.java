@@ -42,8 +42,9 @@ public class PlatformTestHelpers {
         var startup = Startup.useConfigFile(SecretTool.class, workingDir, configPath.toString(), keystoreKey);
         startup.runStartupSequence(/* useSecrets = */ false);
 
+        var plugins = startup.getPlugins();
         var config = startup.getConfig();
-        var secretTool = new SecretTool(config, keystoreKey);
+        var secretTool = new SecretTool(plugins, config, keystoreKey);
 
         secretTool.runTasks(tasks);
     }

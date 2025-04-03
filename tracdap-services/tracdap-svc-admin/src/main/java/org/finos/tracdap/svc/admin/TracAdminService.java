@@ -46,6 +46,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 
@@ -58,6 +59,8 @@ public class TracAdminService extends TracServiceBase {
     private final ConfigManager configManager;
 
     private ExecutorService executor;
+    private ManagedChannel clientChannel;
+    private NotifierService notifier;
     private Server server;
 
 
@@ -89,8 +92,9 @@ public class TracAdminService extends TracServiceBase {
             var clientChannel = prepareClientChannel(platformConfig);
             var metadataClient = prepareMetadataClient(commonConcerns, clientChannel);
 
+            var secretService = configManager.getSecrets();
             var notifierService = new NotifierService(platformConfig, commonConcerns);
-            var configService = new ConfigService(metadataClient, commonConcerns, notifierService);
+            var configService = new ConfigService(metadataClient, commonConcerns, secretService, notifierService);
 
             var adminApi = new TracAdminApi(configService);
 
@@ -105,6 +109,9 @@ public class TracAdminService extends TracServiceBase {
                     .configureServer(serverBuilder)
                     .build();
 
+            this.clientChannel = clientChannel;
+            this.notifier = notifierService;
+
             // Good to go, let's start!
             this.server.start();
         }
@@ -118,16 +125,41 @@ public class TracAdminService extends TracServiceBase {
     @Override
     protected int doShutdown(Duration shutdownTimeout) throws InterruptedException {
 
-        server.shutdown();
-        server.awaitTermination(shutdownTimeout.getSeconds(), TimeUnit.SECONDS);
+        var deadline = Instant.now().plus(shutdownTimeout);
 
-        if (!server.isTerminated())
+        var serverDown = shutdownResource("Data service server", deadline, remaining -> {
+
+            server.shutdown();
+            return server.awaitTermination(remaining.toMillis(), TimeUnit.MILLISECONDS);
+        });
+
+        var clientDown = shutdownResource("Metadata client", deadline, remaining -> {
+
+            clientChannel.shutdown();
+            return clientChannel.awaitTermination(remaining.toMillis(), TimeUnit.MILLISECONDS);
+        });
+
+        var notifierDown = shutdownResource("Notifier service", deadline, remainingTime -> {
+
+            notifier.shutdown();
+            return notifier.awaitTermination(remainingTime.toMillis(), TimeUnit.MILLISECONDS);
+        });
+
+        var executorDown = shutdownResource("Executor thread pool)", deadline, remaining -> {
+
+            executor.shutdown();
+            return executor.awaitTermination(remaining.toMillis(), TimeUnit.MILLISECONDS);
+        });
+
+        if (serverDown && clientDown && notifierDown && executorDown)
+            return 0;
+
+        if (!serverDown)
             server.shutdownNow();
 
-        executor.shutdown();
-
-        return 0;
+        return -1;
     }
+
     private GrpcConcern buildCommonConcerns() {
 
         var commonConcerns = TracServiceConfig.coreConcerns(TracAdminService.class);

@@ -21,10 +21,12 @@ package org.finos.tracdap.tools.secrets;
 import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.config.CryptoHelpers;
+import org.finos.tracdap.common.config.ISecretService;
+import org.finos.tracdap.common.exception.EConfigLoad;
 import org.finos.tracdap.common.exception.EStartup;
+import org.finos.tracdap.common.plugin.PluginManager;
 import org.finos.tracdap.common.startup.StandardArgs;
 import org.finos.tracdap.common.startup.Startup;
-import org.finos.tracdap.config.PlatformConfig;
 import org.finos.tracdap.config._ConfigFile;
 
 import org.slf4j.Logger;
@@ -38,8 +40,9 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.security.*;
-import java.util.Base64;
 import java.util.List;
+import java.util.Map;
+import java.util.Properties;
 import java.util.Scanner;
 
 
@@ -52,22 +55,15 @@ public class SecretTool {
     public final static String CREATE_ROOT_AUTH_KEY = "create_root_auth_key";
     public final static String ROTATE_ROOT_AUTH_KEY = "rotate_root_auth_key";
 
-    public final static String INIT_TRAC_USERS = "init_trac_users";
-    public final static String ADD_USER = "add_user";
-    public final static String DELETE_USER = "delete_user";
-
     private final static List<StandardArgs.Task> AUTH_TOOL_TASKS = List.of(
             StandardArgs.task(INIT_SECRETS, "Initialize the secrets store"),
             StandardArgs.task(ADD_SECRET, List.of("alias"), "Add a secret to the secret store (you will be prompted for the secret)"),
             StandardArgs.task(DELETE_SECRET, List.of("alias"), "Delete a secret from the secret store"),
-            StandardArgs.task(CREATE_ROOT_AUTH_KEY, List.of("ALGORITHM", "BITS"), "Create the root signing key for authentication tokens"),
-            StandardArgs.task(INIT_TRAC_USERS, "Create a new TRAC user database (only required if SSO is not deployed)"),
-            StandardArgs.task(ADD_USER, "Add a new user to the TRAC user database"),
-            StandardArgs.task(DELETE_USER, "USER_ID", "Delete a user from the TRAC user database"));
+            StandardArgs.task(CREATE_ROOT_AUTH_KEY, List.of("ALGORITHM", "BITS"), "Create the root signing key for authentication tokens"));
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
-    private final ConfigManager configManager;
+    private final ISecretService secrets;
 
     private final Path keystorePath;
     private final String secretType;
@@ -79,14 +75,14 @@ public class SecretTool {
      * @param configManager A prepared instance of ConfigManager
      * @param secretKey Master key for reading / writing the secret store
      */
-    public SecretTool(ConfigManager configManager, String secretKey) {
+    public SecretTool(PluginManager pluginManager, ConfigManager configManager, String secretKey) {
 
-        this.configManager = configManager;
-        this.secretKey = secretKey;
+        this.secrets = prepareSecrets(pluginManager, configManager, secretKey);
 
         var rootConfig = configManager.loadRootConfigObject(_ConfigFile.class, /* leniency = */ true);
         var secretType = rootConfig.getConfigOrDefault(ConfigKeys.SECRET_TYPE_KEY, "");
         var secretUrl = rootConfig.getConfigOrDefault(ConfigKeys.SECRET_URL_KEY, "");
+        this.secretKey = secretKey;
 
         if (!secretType.equalsIgnoreCase("PKCS12") && secretUrl.isBlank()) {
             var message = "To use auth-tool, set secret.type = PKCS12 and specify a secrets file";
@@ -108,6 +104,52 @@ public class SecretTool {
         log.info("Using local keystore: [{}]", keystorePath);
     }
 
+    public ISecretService prepareSecrets(PluginManager pluginManager, ConfigManager configManager, String secretKey) {
+
+        var rootConfig = configManager.loadRootConfigObject(_ConfigFile.class, /* leniency = */ true);
+        var configMap = rootConfig.getConfigMap();
+        var protocol = configMap.getOrDefault(ConfigKeys.SECRET_TYPE_KEY, "");
+
+        if (protocol == null || protocol.isBlank()) {
+            var message = "No secret service has been configured";
+            log.error(message);
+            throw new EConfigLoad(message);
+        }
+
+        if (!pluginManager.isServiceAvailable(ISecretService.class, protocol)) {
+            var message = String.format("No secret service available for protocol [%s]", protocol);
+            log.error(message);
+            throw new EConfigLoad(message);
+        }
+
+        var secretProps = buildSecretProps(configMap, secretKey);
+        var secretService = pluginManager.createConfigService(ISecretService.class, protocol, secretProps);
+
+        secretService.init(configManager, /* createIfMissing = */ true);
+
+        return secretService.scope(ConfigKeys.CONFIG_SCOPE);
+    }
+
+    private Properties buildSecretProps(Map<String, String> configMap, String secretKey) {
+
+        // These props are needed for JKS secrets
+        // Cloud platforms would normally use IAM to access the secret store
+        // But, any set of props can be used, with keys like secret.*
+
+        var secretProps = new Properties();
+
+        for (var secretEntry : configMap.entrySet()) {
+            if (secretEntry.getKey().startsWith("secret.") && secretEntry.getValue() != null)
+                secretProps.put(secretEntry.getKey(), secretEntry.getValue());
+        }
+
+        if (secretKey != null && !secretKey.isBlank()) {
+            secretProps.put(ConfigKeys.SECRET_KEY_KEY, secretKey);
+        }
+
+        return secretProps;
+    }
+
     public void runTasks(List<StandardArgs.Task> tasks) {
 
         try {
@@ -127,15 +169,6 @@ public class SecretTool {
                 else if (CREATE_ROOT_AUTH_KEY.equals(task.getTaskName()))
                     createRootAuthKey(task.getTaskArg(0), task.getTaskArg(1));
 
-                else if (INIT_TRAC_USERS.equals(task.getTaskName()))
-                    initTracUsers();
-
-                else if (ADD_USER.equals(task.getTaskName()))
-                    addTracUser();
-
-                else if (DELETE_USER.equals(task.getTaskName()))
-                    deleteTracUser(task.getTaskArg());
-
                 else
                     throw new EStartup(String.format("Unknown task: [%s]", task.getTaskName()));
             }
@@ -152,31 +185,26 @@ public class SecretTool {
 
     private void initSecrets() {
 
-        var keystore = JksHelpers.loadKeystore(secretType, keystorePath, secretKey, true);
-        JksHelpers.saveKeystore(keystorePath, secretKey, keystore);
+        secrets.commit();
     }
 
     private void addSecret(String alias) {
 
         var secret = consoleReadPassword("Enter secret for [%s]: ", alias);
 
-        var keystore = JksHelpers.loadKeystore(secretType, keystorePath, secretKey, true);
-
-        CryptoHelpers.writeTextEntry(keystore, secretKey, alias, secret);
-
-        JksHelpers.saveKeystore(keystorePath, secretKey, keystore);
+        secrets.storePassword(alias, secret);
+        secrets.commit();
     }
 
     private void deleteSecret(String alias) {
 
-        var keystore = JksHelpers.loadKeystore(secretType, keystorePath, secretKey, true);
-
-        CryptoHelpers.deleteEntry(keystore, alias);
-
-        JksHelpers.saveKeystore(keystorePath, secretKey, keystore);
+        secrets.deleteSecret(alias);
+        secrets.commit();
     }
 
     private void createRootAuthKey(String algorithm, String bits) {
+
+        // TODO: Move to secret service, or remove
 
         try {
 
@@ -202,93 +230,6 @@ public class SecretTool {
             log.error(message);
             throw new EStartup(message, e);
         }
-    }
-
-    private void initTracUsers() {
-
-        var config = configManager.loadRootConfigObject(PlatformConfig.class);
-
-        if (!config.containsConfig(ConfigKeys.USER_DB_TYPE)) {
-            var template = "TRAC user database is not enabled (set config key [%s] to turn it on)";
-            var message = String.format(template, ConfigKeys.USER_DB_TYPE);
-            log.error(message);
-            throw new EStartup(message);
-        }
-
-        if (!config.containsConfig(ConfigKeys.USER_DB_URL)) {
-            var message = "Missing required config key [" + ConfigKeys.USER_DB_URL + "]";
-            log.error(message);
-            throw new EStartup(message);
-        }
-
-        if (!config.containsConfig(ConfigKeys.USER_DB_KEY)) {
-            var message = "Missing required config key [" + ConfigKeys.USER_DB_KEY + "]";
-            log.error(message);
-            throw new EStartup(message);
-        }
-
-        var secrets = JksHelpers.loadKeystore(secretType, keystorePath, secretKey, false);
-        var userDbSecret = config.getConfigOrThrow(ConfigKeys.USER_DB_KEY);
-
-        if (!CryptoHelpers.containsEntry(secrets, userDbSecret)) {
-
-            var random = new SecureRandom();
-            var secretBytes = new byte[16];
-            random.nextBytes(secretBytes);
-
-            var b64 = Base64.getEncoder().withoutPadding();
-            var userDbKey = b64.encodeToString(secretBytes);
-
-            CryptoHelpers.writeTextEntry(secrets, secretKey, userDbSecret, userDbKey);
-            JksHelpers.saveKeystore(keystorePath, secretKey, secrets);
-        }
-
-        var userManager = getUserManager();
-        userManager.initTracUsers();
-    }
-
-    private void addTracUser() {
-
-        var userId = consoleReadLine("Enter user ID: ").trim();
-        var userName = consoleReadLine("Enter full name for [%s]: ", userId).trim();
-        var password = consoleReadPassword("Enter password for [%s]: ", userId);
-
-        var random = new SecureRandom();
-        var salt = new byte[16];
-        random.nextBytes(salt);
-
-        var hash = CryptoHelpers.encodeSSHA512(password, salt);
-
-        var userManager = getUserManager();
-        userManager.addUser(userId, userName, hash);
-    }
-
-    private void deleteTracUser(String userId) {
-
-        var userManager = getUserManager();
-        userManager.deleteUser(userId);
-    }
-
-    private IUserManager getUserManager() {
-
-        var config = configManager.loadRootConfigObject(PlatformConfig.class);
-
-        if (!config.containsConfig(ConfigKeys.USER_DB_TYPE)) {
-            var template = "TRAC user database is not enabled (set config key [%s] to turn it on)";
-            var message = String.format(template, ConfigKeys.USER_DB_TYPE);
-            log.error(message);
-            throw new EStartup(message);
-        }
-
-        var userDbType = config.getConfigOrThrow(ConfigKeys.USER_DB_TYPE);
-
-        if (userDbType.equals("JKS") || userDbType.equals("PKCS12"))
-            return new JksUserManager(configManager);
-
-        if (userDbType.equals("H2"))
-            return new SqlUserManager(configManager);
-
-        throw new EStartup(String.format("Unsupported user DB type: [%s]", userDbType));
     }
 
     private void writeKeysToFiles(KeyPair keyPair, Path configDir) {
@@ -355,7 +296,7 @@ public class SecretTool {
     }
 
     /**
-     * Entry point for the AuthTool utility.
+     * Entry point for the SecretTool utility.
      *
      * @param args Command line args
      */
@@ -369,11 +310,12 @@ public class SecretTool {
             var startup = Startup.useCommandLine(SecretTool.class, args, AUTH_TOOL_TASKS);
             startup.runStartupSequence(/* useSecrets = */ false);
 
+            var plugins = startup.getPlugins();
             var config = startup.getConfig();
             var tasks = startup.getArgs().getTasks();
             var secretKey = startup.getArgs().getSecretKey();
 
-            var tool = new SecretTool(config, secretKey);
+            var tool = new SecretTool(plugins, config, secretKey);
             tool.runTasks(tasks);
 
             System.exit(0);
@@ -396,5 +338,4 @@ public class SecretTool {
             System.exit(-1);
         }
     }
-
 }

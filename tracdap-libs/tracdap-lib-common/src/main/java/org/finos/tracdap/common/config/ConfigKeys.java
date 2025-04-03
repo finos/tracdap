@@ -25,9 +25,6 @@ public class ConfigKeys {
     public static final String SECRET_URL_KEY = "secret.url";
     public static final String SECRET_KEY_KEY = "secret.key";
     public static final String SECRET_KEY_ENV = "TRAC_SECRET_KEY";
-    public static final String USER_DB_TYPE = "users.type";
-    public static final String USER_DB_URL = "users.url";
-    public static final String USER_DB_KEY = "users.key";
 
     // Service keys
     public static final String GATEWAY_SERVICE_KEY = "gateway";
@@ -44,4 +41,9 @@ public class ConfigKeys {
     // Well-known config classes
     public static final String TRAC_CONFIG = "trac_config";
     public static final String TRAC_RESOURCES = "trac_resources";
+
+    // Secret scopes
+    public static final String CONFIG_SCOPE = "config";
+    public static final String TENANT_SCOPE = "tenants";
+    public static final String RESOURCE_SCOPE = "resources";
 }

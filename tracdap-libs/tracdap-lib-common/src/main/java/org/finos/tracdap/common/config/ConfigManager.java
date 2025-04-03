@@ -17,7 +17,7 @@
 
 package org.finos.tracdap.common.config;
 
-import org.finos.tracdap.common.config.local.JksSecretLoader;
+import org.finos.tracdap.common.exception.EConfig;
 import org.finos.tracdap.common.exception.EConfigLoad;
 import org.finos.tracdap.common.plugin.IPluginManager;
 import org.finos.tracdap.common.exception.EStartup;
@@ -78,7 +78,8 @@ public class ConfigManager {
     private final URI rootConfigDir;
 
     private final String secretKey;
-    private ISecretLoader secrets = null;
+    private ISecretService secrets = null;
+    private ISecretLoader configSecrets = null;
 
     private byte[] rootConfigCache = null;
 
@@ -121,47 +122,24 @@ public class ConfigManager {
 
         if (secretType == null || secretType.isBlank()) {
             StartupLog.log(this, Level.INFO, "Using secrets: [none]");
-            return;
+            this.secrets = new NoSecrets();
+        }
+        else {
+            StartupLog.log(this, Level.INFO, String.format("Using secrets: [%s] %s", secretType, secretUrl));
+            this.secrets = secretLoaderForProtocol(secretType, configMap);
         }
 
-        StartupLog.log(this, Level.INFO, String.format("Using secrets: [%s] %s", secretType, secretUrl));
-
-        this.secrets = secretLoaderForProtocol(secretType, configMap);
+        this.configSecrets = secrets.scope(ConfigKeys.CONFIG_SCOPE);
     }
 
-    public ISecretLoader getUserDb() {
+    public boolean hasSecrets() {
 
-        var config = loadRootConfigObject(_ConfigFile.class, /* leniency = */ true);
+        return ! (this.secrets instanceof NoSecrets);
+    }
 
-        if (!config.containsConfig(ConfigKeys.USER_DB_TYPE)) {
-            var template = "TRAC user database is not enabled (set config key [%s] to turn it on)";
-            var message = String.format(template, ConfigKeys.USER_DB_TYPE);
-            throw new EStartup(message);
-        }
+    public ISecretService getSecrets() {
 
-        if (!config.containsConfig(ConfigKeys.USER_DB_URL)) {
-            var message = "Missing required config key [" + ConfigKeys.USER_DB_URL + "]";
-            throw new EStartup(message);
-        }
-
-        var userDbType = config.getConfigOrThrow(ConfigKeys.USER_DB_TYPE);
-        var userDbUrl = config.getConfigOrThrow(ConfigKeys.USER_DB_URL);
-        var userDbSecret = config.getConfigOrDefault(ConfigKeys.USER_DB_KEY, "");
-
-        var userDbPath = Paths.get(resolveConfigFile(URI.create(userDbUrl)));
-        var userDbKey = userDbSecret.isEmpty()
-                ? secretKey
-                : loadPassword(userDbSecret);
-
-        var userDbProps = new Properties();
-        userDbProps.put(ConfigKeys.SECRET_TYPE_KEY, userDbType);
-        userDbProps.put(ConfigKeys.SECRET_URL_KEY, userDbPath.toString());
-        userDbProps.put(ConfigKeys.SECRET_KEY_KEY, userDbKey);
-
-        var userDb = new JksSecretLoader(userDbProps);
-        userDb.init(this);
-
-        return userDb;
+        return this.secrets;
     }
 
     /**
@@ -331,47 +309,57 @@ public class ConfigManager {
         return loadRootConfigObject(configClass, /* leniency = */ false);
     }
 
+    // Convenience methods for accessing secrets from the config scope
+
     public boolean hasSecret(String secretName) {
 
         // If secrets are not enabled, hasSecret() should always return false
-        if (secrets == null) {
+        if (configSecrets == null) {
             return false;
         }
 
-        return secrets.hasSecret(secretName);
+        return scopeLoader(secretName).hasSecret(secretName);
     }
 
     public String loadPassword(String secretName) {
 
-        if (secrets == null) {
+        if (configSecrets == null) {
             var message = String.format("Secrets are not enabled, to use secrets set secret.type in [%s]", rootConfigFile);
             StartupLog.log(this, Level.ERROR, message);
             throw new EStartup(message);
         }
 
-        return secrets.loadPassword(secretName);
+        return scopeLoader(secretName).loadPassword(secretName);
     }
 
     public PublicKey loadPublicKey(String secretName) {
 
-        if (secrets == null) {
+        if (configSecrets == null) {
             var message = String.format("Secrets are not enabled, to use secrets set secret.type in [%s]", rootConfigFile);
             StartupLog.log(this, Level.ERROR, message);
             throw new EStartup(message);
         }
 
-        return secrets.loadPublicKey(secretName);
+        return scopeLoader(secretName).loadPublicKey(secretName);
     }
 
     public PrivateKey loadPrivateKey(String secretName) {
 
-        if (secrets == null) {
+        if (configSecrets == null) {
             var message = String.format("Secrets are not enabled, to use secrets set secret.type in [%s]", rootConfigFile);
             StartupLog.log(this, Level.ERROR, message);
             throw new EStartup(message);
         }
 
-        return secrets.loadPrivateKey(secretName);
+        return scopeLoader(secretName).loadPrivateKey(secretName);
+    }
+
+    private ISecretLoader scopeLoader(String secretName) {
+
+        if(secretName.startsWith(ScopedSecretLoader.ROOT_SCOPE))
+            return this.secrets;
+        else
+            return this.configSecrets;
     }
 
 
@@ -511,9 +499,9 @@ public class ConfigManager {
         return plugins.createConfigService(IConfigLoader.class, protocol, new Properties());
     }
 
-    private ISecretLoader secretLoaderForProtocol(String protocol, Map<String, String> configMap) {
+    private ISecretService secretLoaderForProtocol(String protocol, Map<String, String> configMap) {
 
-        if (!plugins.isServiceAvailable(ISecretLoader.class, protocol)) {
+        if (!plugins.isServiceAvailable(ISecretService.class, protocol)) {
 
             var message = String.format("No secret loader available for protocol [%s]", protocol);
 
@@ -522,7 +510,7 @@ public class ConfigManager {
         }
 
         var secretProps = buildSecretProps(configMap);
-        var secretLoader = plugins.createConfigService(ISecretLoader.class, protocol, secretProps);
+        var secretLoader = plugins.createConfigService(ISecretService.class, protocol, secretProps);
         secretLoader.init(this);
 
         return secretLoader;

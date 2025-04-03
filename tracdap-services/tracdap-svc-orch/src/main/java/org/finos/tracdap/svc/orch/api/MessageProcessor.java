@@ -21,7 +21,9 @@ import io.grpc.Context;
 import org.finos.tracdap.api.MetadataReadRequest;
 import org.finos.tracdap.api.internal.*;
 import org.finos.tracdap.common.config.ConfigKeys;
+import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.config.DynamicConfig;
+import org.finos.tracdap.common.config.ISecretLoader;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.middleware.GrpcConcern;
 import org.finos.tracdap.common.plugin.PluginRegistry;
@@ -37,12 +39,17 @@ public class MessageProcessor extends InternalMessagingApiGrpc.InternalMessaging
     private final Logger log = LoggerFactory.getLogger(getClass());
 
     private final InternalMetadataApiGrpc.InternalMetadataApiBlockingStub metadataApi;
+    private final ISecretLoader secrets;
     private final GrpcConcern commonConcerns;
     private final DynamicConfig.Resources resources;
 
-    public MessageProcessor(PluginRegistry registry, GrpcConcern commonConcerns, DynamicConfig.Resources resources) {
+    public MessageProcessor(
+            PluginRegistry registry, GrpcConcern commonConcerns,
+            DynamicConfig.Resources resources) {
 
         this.metadataApi = registry.getSingleton(InternalMetadataApiGrpc.InternalMetadataApiBlockingStub.class);
+        this.secrets = registry.getSingleton(ConfigManager.class).getSecrets();
+
         this.commonConcerns = commonConcerns;
         this.resources = resources;
     }
@@ -50,8 +57,21 @@ public class MessageProcessor extends InternalMessagingApiGrpc.InternalMessaging
     @Override
     public void  configUpdate(ConfigUpdate request, StreamObserver<ReceivedStatus> response) {
 
-        log.info("Processing config update");
-        log.info(request.toString());
+        log.info("Received config update: tenant = {}, config class = {}, config key = {}",
+                request.getTenant(),
+                request.getConfigEntry().getConfigClass(),
+                request.getConfigEntry().getConfigKey());
+
+        // If secrets have changed as part of this update, make sure they are reloaded
+        if (request.getSecretsUpdated()) {
+
+            var secretScope = secrets
+                    .namedScope(ConfigKeys.TENANT_SCOPE, request.getTenant())
+                    .scope(request.getConfigEntry().getConfigClass())
+                    .scope(request.getConfigEntry().getConfigKey());
+
+            secretScope.reload();
+        }
 
         var entry = request.getConfigEntry();
         ReceivedStatus status;

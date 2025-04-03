@@ -15,14 +15,22 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.tools.secrets;
+package org.finos.tracdap.common.config;
 
 
-public interface IUserManager {
+public interface ISecretService extends ISecretLoader {
 
-    void initTracUsers();
+    void init(ConfigManager configManager, boolean createIfMissing);
 
-    void addUser(String userId, String userName, String passwordHash);
+    ISecretService scope(String scope);
 
-    void deleteUser(String userId);
+    default ISecretService namedScope(String scopeName, String scope) {
+        return scope(scopeName).scope(scope);
+    }
+
+    String storePassword(String secretName, String password);
+
+    void deleteSecret(String secretName);
+
+    void commit();
 }

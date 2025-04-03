@@ -18,7 +18,7 @@
 package org.finos.tracdap.common.config.local;
 
 import org.finos.tracdap.common.config.IConfigLoader;
-import org.finos.tracdap.common.config.ISecretLoader;
+import org.finos.tracdap.common.config.ISecretService;
 import org.finos.tracdap.common.exception.EPluginNotAvailable;
 import org.finos.tracdap.common.plugin.PluginServiceInfo;
 import org.finos.tracdap.common.plugin.TracPlugin;
@@ -35,7 +35,7 @@ public class LocalConfigPlugin extends TracPlugin {
 
     private static final List<PluginServiceInfo> serviceInfo = List.of(
             new PluginServiceInfo(IConfigLoader.class, FILE_LOADER, List.of("LOCAL", "file")),
-            new PluginServiceInfo(ISecretLoader.class, JKS_SECRET_LOADER, List.of("PKCS12", "JCEKS")));
+            new PluginServiceInfo(ISecretService.class, JKS_SECRET_LOADER, List.of("PKCS12", "JCEKS", "JKS")));
 
 
     @Override
@@ -55,7 +55,7 @@ public class LocalConfigPlugin extends TracPlugin {
             return (T) new LocalConfigLoader();
 
         if (serviceName.equals(JKS_SECRET_LOADER))
-            return (T) new JksSecretLoader(properties);
+            return (T) new JksSecretService(properties);
 
         var message = String.format("Plugin [%s] does not support the service [%s]", pluginName(), serviceName);
         throw new EPluginNotAvailable(message);
