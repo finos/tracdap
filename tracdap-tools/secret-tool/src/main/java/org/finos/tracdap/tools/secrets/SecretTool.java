@@ -77,8 +77,7 @@ public class SecretTool {
      */
     public SecretTool(PluginManager pluginManager, ConfigManager configManager, String secretKey) {
 
-        this.secrets = prepareSecrets(pluginManager, configManager);
-
+        this.secrets = prepareSecrets(pluginManager, configManager, secretKey);
 
         var rootConfig = configManager.loadRootConfigObject(_ConfigFile.class, /* leniency = */ true);
         var secretType = rootConfig.getConfigOrDefault(ConfigKeys.SECRET_TYPE_KEY, "");
@@ -105,7 +104,7 @@ public class SecretTool {
         log.info("Using local keystore: [{}]", keystorePath);
     }
 
-    public ISecretService prepareSecrets(PluginManager pluginManager, ConfigManager configManager) {
+    public ISecretService prepareSecrets(PluginManager pluginManager, ConfigManager configManager, String secretKey) {
 
         var rootConfig = configManager.loadRootConfigObject(_ConfigFile.class, /* leniency = */ true);
         var configMap = rootConfig.getConfigMap();
@@ -123,7 +122,7 @@ public class SecretTool {
             throw new EConfigLoad(message);
         }
 
-        var secretProps = buildSecretProps(configMap);
+        var secretProps = buildSecretProps(configMap, secretKey);
         var secretService = pluginManager.createConfigService(ISecretService.class, protocol, secretProps);
 
         secretService.init(configManager, /* createIfMissing = */ true);
@@ -131,7 +130,7 @@ public class SecretTool {
         return secretService.scope(ConfigKeys.CONFIG_SCOPE);
     }
 
-    private Properties buildSecretProps(Map<String, String> configMap) {
+    private Properties buildSecretProps(Map<String, String> configMap, String secretKey) {
 
         // These props are needed for JKS secrets
         // Cloud platforms would normally use IAM to access the secret store
