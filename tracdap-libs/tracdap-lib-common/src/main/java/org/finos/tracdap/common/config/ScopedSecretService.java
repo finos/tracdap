@@ -43,6 +43,11 @@ public class ScopedSecretService extends ScopedSecretLoader implements ISecretSe
     }
 
     @Override
+    public void deleteSecret(String secretName) {
+        delegate.deleteSecret(translateScope(secretName));
+    }
+
+    @Override
     public void commit() {
         delegate.commit();
     }
