@@ -318,7 +318,7 @@ public class ConfigManager {
             return false;
         }
 
-        return configSecrets.hasSecret(secretName);
+        return scopeLoader(secretName).hasSecret(secretName);
     }
 
     public String loadPassword(String secretName) {
@@ -329,7 +329,7 @@ public class ConfigManager {
             throw new EStartup(message);
         }
 
-        return configSecrets.loadPassword(secretName);
+        return scopeLoader(secretName).loadPassword(secretName);
     }
 
     public PublicKey loadPublicKey(String secretName) {
@@ -340,7 +340,7 @@ public class ConfigManager {
             throw new EStartup(message);
         }
 
-        return configSecrets.loadPublicKey(secretName);
+        return scopeLoader(secretName).loadPublicKey(secretName);
     }
 
     public PrivateKey loadPrivateKey(String secretName) {
@@ -351,7 +351,15 @@ public class ConfigManager {
             throw new EStartup(message);
         }
 
-        return configSecrets.loadPrivateKey(secretName);
+        return scopeLoader(secretName).loadPrivateKey(secretName);
+    }
+
+    private ISecretLoader scopeLoader(String secretName) {
+
+        if(secretName.startsWith(ScopedSecretLoader.ROOT_SCOPE))
+            return this.secrets;
+        else
+            return this.configSecrets;
     }
 
 
