@@ -51,6 +51,15 @@ public interface ISecretLoader {
     void init(ConfigManager configManager);
 
     /**
+     * Reload secrets from the secret source.
+     *
+     * <p>This method will invalidate any stale / cached secrets so they will be re-read
+     * from the secret source. The exact timing of reads may vary between implementations,
+     * some implementations may not read secrets until they are requested.
+     */
+    void reload();
+
+    /**
      * Test whether a secret with the given name exists in the secret store
      *
      * @param secretName The name of the secret to check for

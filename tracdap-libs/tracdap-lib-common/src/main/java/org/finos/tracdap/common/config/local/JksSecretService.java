@@ -85,10 +85,4 @@ public class JksSecretService extends JksSecretLoader implements ISecretService 
             throw new EStartup(message);
         }
     }
-
-    @Override
-    public void reload() {
-
-        super.reload();
-    }
 }

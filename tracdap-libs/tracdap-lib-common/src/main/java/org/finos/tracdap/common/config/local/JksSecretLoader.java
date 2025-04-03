@@ -94,7 +94,8 @@ public class JksSecretLoader implements ISecretLoader {
         reload();
     }
 
-    protected void reload() {
+    @Override
+    public void reload() {
 
         try {
 
