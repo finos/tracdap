@@ -6,8 +6,8 @@ choices. Suggestions / discussion are very welcome!
 1. Ease of use (in order of priority)
 
     * For end users
-    * For application developers
     * For modellers
+    * For application developers
     * For platform administrators
     * For platform developers
     
