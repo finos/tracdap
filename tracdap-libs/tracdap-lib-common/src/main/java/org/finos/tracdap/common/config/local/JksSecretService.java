@@ -26,8 +26,6 @@ import org.slf4j.event.Level;
 
 import java.io.IOException;
 import java.net.URI;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
 import java.security.cert.CertificateException;
@@ -47,9 +45,7 @@ public class JksSecretService extends JksSecretLoader implements ISecretService 
     @Override
     public void init(ConfigManager configManager, boolean createIfMissing) {
 
-        var keystorePath = configManager.resolveConfigFile(URI.create(keystoreUrl));
-
-        if (Files.exists(Path.of(keystorePath)) || !createIfMissing) {
+        if (configManager.hasConfig(keystoreUrl) || !createIfMissing) {
 
             init(configManager);
             return;
@@ -58,6 +54,7 @@ public class JksSecretService extends JksSecretLoader implements ISecretService 
         try {
 
             this.keystore.load(null, keystoreKey.toCharArray());
+            this.commit();
 
             this.configManager = configManager;
             this.ready = true;
