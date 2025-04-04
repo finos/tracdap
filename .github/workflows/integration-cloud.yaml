@@ -112,11 +112,10 @@ jobs:
       - name: Build Java
         run: ./gradlew testClasses --parallel
 
-      # Auth tool will also create the secrets file if it doesn't exist
+      # Secret tool will create the secrets file if it doesn't exist
       - name: Prepare secrets
         run: |
           ./gradlew secret-tool:run --args="--config ${{ env.TRAC_CONFIG_FILE }} --task init_secrets"
-          ./gradlew secret-tool:run --args="--config ${{ env.TRAC_CONFIG_FILE }} --task create_root_auth_key EC 256"
 
       # No need to prepare DB, it is done by the platform test setup
 

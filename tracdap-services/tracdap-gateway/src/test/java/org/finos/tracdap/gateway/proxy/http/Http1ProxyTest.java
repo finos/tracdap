@@ -70,10 +70,6 @@ public class Http1ProxyTest {
         var configFile = Http1ProxyTest.class.getResource(HTTP1_PROXY_TEST_CONFIG);
         Assertions.assertNotNull(configFile);
 
-        var authTasks = new ArrayList<StandardArgs.Task>();
-        authTasks.add(StandardArgs.task(SecretTool.CREATE_ROOT_AUTH_KEY, List.of("EC", "256"), ""));
-        PlatformTestHelpers.runSecretTool(rootDir, configFile, secretKey, authTasks);
-
 
         // Gradle sometimes runs tests out of the sub-project folder instead of the root
         // Find the top level root dir, we need it as a base for content, config files etc.

@@ -127,9 +127,9 @@ public class JksSecretLoader implements ISecretLoader {
     public boolean hasSecret(String secretName) {
 
         try {
-            return keystore.containsAlias(secretName);
+            return CryptoHelpers.containsEntry(keystore, secretName);
         }
-        catch (GeneralSecurityException e) {
+        catch (EConfigLoad e) {
             var message = String.format("Secret could not be found in the key store: [%s] %s", secretName, e.getMessage());
             StartupLog.log(this, Level.ERROR, message);
             throw new EConfigLoad(message);

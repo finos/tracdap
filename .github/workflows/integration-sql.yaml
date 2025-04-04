@@ -71,13 +71,11 @@ jobs:
       - name: Build
         run: ./gradlew trac-svc-meta:testClasses --parallel
 
-      # Auth tool will also create the secrets file if it doesn't exist
+      # Secret tool will create the secrets file if it doesn't exist
       - name: Prepare secrets
         env: ${{ fromJson( inputs.matrix ) }}
         run: |
           ./gradlew secret-tool:run --args="--config ${{ env.TRAC_CONFIG_FILE }} --task init_secrets"
-          ./gradlew secret-tool:run --args="--config ${{ env.TRAC_CONFIG_FILE }} --task create_root_auth_key EC 256"
-
           echo "${DB_SECRET}" | ./gradlew secret-tool:run --args="--config ${{ env.TRAC_CONFIG_FILE }} --task add_secret metadb_secret"
 
       # The name and description of the test tenant are verified in one of the test cases so they need to match
