@@ -47,7 +47,9 @@ public class JksSecretService extends JksSecretLoader implements ISecretService 
     @Override
     public void init(ConfigManager configManager, boolean createIfMissing) {
 
-        if (Files.exists(Path.of(keystoreUrl)) || !createIfMissing) {
+        var keystorePath = configManager.resolveConfigFile(URI.create(keystoreUrl));
+
+        if (Files.exists(Path.of(keystorePath)) || !createIfMissing) {
 
             init(configManager);
             return;
