@@ -202,6 +202,10 @@ def set_trac_version():
 
     raw_version = output.decode('utf-8').strip()
 
+    # Change -SNAPSHOT versions to something Python will accept
+    if raw_version.endswith("-SNAPSHOT"):
+        raw_version = raw_version.replace("-SNAPSHOT", "-dev")
+
     # Using Python's Version class normalises the version according to PEP440
     trac_version = packaging.version.Version(raw_version)
 

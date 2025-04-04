@@ -26,21 +26,35 @@ build_version_tag=`git describe --tags --match "v[0-9]*" 2>/dev/null`
 prior_version_tag=`git describe --tags --match "v[0-9]*" --abbrev=0 2>/dev/null`
 prior_version_found=$?
 
-
 if [ -n "${TRAC_EXPLICIT_VERSION_NUMBER}" ]; then
 
+  # Explicit version number supplied externally
   version_number=${TRAC_EXPLICIT_VERSION_NUMBER}
 
 elif [ ${exact_version_found} = 0 ]; then
 
+  # Exact version number found from a tag on the current commit
   version_number=`echo ${exact_version_tag} | sed s/^v//`
 
 elif [ ${prior_version_found} = 0 ]; then
 
-  prior_version=`echo ${prior_version_tag} | sed s/^v//`
-  build_version=`echo ${build_version_tag} | sed s/^v//`
-  build_suffix=`echo ${build_version} | sed "s/${prior_version}-//"`
-  version_number="${prior_version}+dev${build_suffix}"
+  # Generate a -SNAPSHOT version for the next primary version number
+
+  if [ `echo "${prior_version_tag}" | grep -E "^v\d+\.\d+\.\d+$"` ]; then
+      # Whole version number, bump patch for next patch version
+      next_patch_version=`echo "${prior_version_tag}" | awk -F. '{$NF=$NF+1; print}' OFS=.`
+  else
+      # Pre-release, e.g. -rc.1, remove suffix for next patch version
+      next_patch_version=`echo "${prior_version_tag}" | sed "s/-.*$//"`
+  fi
+
+  # Next patch version exists but is not in the revision history -> release branch exists
+  if [ `git tag | grep "^${next_patch_version}$"` ]; then
+      next_minor_version=`echo "${next_patch_version}" | awk -F. '{$2=$2+1; $3=0; print}' OFS=.`
+      version_number=${next_minor_version}-SNAPSHOT
+  else
+      version_number=${next_patch_version}-SNAPSHOT
+  fi
 
 else
 
