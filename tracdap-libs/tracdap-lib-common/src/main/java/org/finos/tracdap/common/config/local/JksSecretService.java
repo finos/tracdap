@@ -26,8 +26,6 @@ import org.slf4j.event.Level;
 
 import java.io.IOException;
 import java.net.URI;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
 import java.security.cert.CertificateException;
@@ -47,7 +45,12 @@ public class JksSecretService extends JksSecretLoader implements ISecretService 
     @Override
     public void init(ConfigManager configManager, boolean createIfMissing) {
 
-        if (Files.exists(Path.of(keystoreUrl)) || !createIfMissing) {
+        if (ready) {
+            StartupLog.log(this, Level.ERROR, "JKS secret service initialized twice");
+            throw new EStartup("JKS secret service initialized twice");
+        }
+
+        if (configManager.hasConfig(keystoreUrl) || !createIfMissing) {
 
             init(configManager);
             return;
@@ -55,9 +58,11 @@ public class JksSecretService extends JksSecretLoader implements ISecretService 
 
         try {
 
-            this.keystore.load(null, keystoreKey.toCharArray());
-
             this.configManager = configManager;
+
+            this.keystore.load(null, keystoreKey.toCharArray());
+            this.commit();
+
             this.ready = true;
         }
         catch (IOException e) {

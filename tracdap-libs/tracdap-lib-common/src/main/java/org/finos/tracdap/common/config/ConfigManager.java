@@ -172,6 +172,26 @@ public class ConfigManager {
 
 
     /**
+     * Check whether a config file with the given URL exists
+     *
+     * <p>Config URLs may be relative or absolute. Relative URLs are resolved relative to the
+     * root config directory, absolute URLs may either be a local file path or a full URL
+     * including a protocol. Absolute URLs can use a different protocol from the root config
+     * file, so long as a config loader is available that can handle that protocol and the required
+     * access has been set up.</p>
+     *
+     * @param configUrl URL of the config file to check for
+     * @return True if the file is available from the underlying config store, false otherwise
+     * @throws EStartup The requested config file could not be checked for any reason
+     */
+    public boolean hasConfig(String configUrl) {
+
+        var parsed = parseUrl(configUrl);
+        var resolved = resolveUrl(parsed);
+        return checkUrl(resolved);
+    }
+
+    /**
      * Load a config file as an array of bytes
      *
      * <p>Config URLs may be relative or absolute. Relative URLs are resolved relative to the
@@ -467,6 +487,20 @@ public class ConfigManager {
                 return url;
             }
         }
+    }
+
+    private boolean checkUrl(URI absoluteUrl) {
+
+        // Display relative URLs in the log if possible
+        var relativeUrl = rootConfigDir.relativize(absoluteUrl);
+
+        var message = String.format("Checking for config file: [%s]", relativeUrl);
+        StartupLog.log(this, Level.INFO, message);
+
+        var protocol = absoluteUrl.getScheme();
+        var loader = configLoaderForProtocol(protocol);
+
+        return loader.hasFile(absoluteUrl);
     }
 
     private byte[] loadUrl(URI absoluteUrl) {

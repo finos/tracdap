@@ -44,6 +44,14 @@ import java.net.URI;
 public interface IConfigLoader {
 
     /**
+     * Check whether a given config file exists.
+     *
+     * @param configUrl The config file to check
+     * @return True if the file exists, false otherwise
+     */
+    boolean hasFile(URI configUrl);
+
+    /**
      * Use the loader to load a text file.
      *
      * <p>The supplied configUrl will always be an absolute URL.

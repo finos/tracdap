@@ -36,6 +36,16 @@ public class TestConfigLoader implements IConfigLoader {
     }
 
     @Override
+    public boolean hasFile(URI uri) {
+
+        // Match the logic of loadBinaryFile()
+        var relativePath = uri.getPath().substring(1);
+        var absolutePath = tempDir.resolve(relativePath);
+
+        return Files.exists(absolutePath);
+    }
+
+    @Override
     public byte[] loadBinaryFile(URI uri) {
 
         var relativePath = uri.getPath().substring(1);  // Ignore leading slash on path component
