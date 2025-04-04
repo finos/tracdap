@@ -45,6 +45,11 @@ public class JksSecretService extends JksSecretLoader implements ISecretService 
     @Override
     public void init(ConfigManager configManager, boolean createIfMissing) {
 
+        if (ready) {
+            StartupLog.log(this, Level.ERROR, "JKS secret service initialized twice");
+            throw new EStartup("JKS secret service initialized twice");
+        }
+
         if (configManager.hasConfig(keystoreUrl) || !createIfMissing) {
 
             init(configManager);
@@ -53,10 +58,11 @@ public class JksSecretService extends JksSecretLoader implements ISecretService 
 
         try {
 
+            this.configManager = configManager;
+
             this.keystore.load(null, keystoreKey.toCharArray());
             this.commit();
 
-            this.configManager = configManager;
             this.ready = true;
         }
         catch (IOException e) {
