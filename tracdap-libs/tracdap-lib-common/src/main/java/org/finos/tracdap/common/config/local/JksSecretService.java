@@ -23,7 +23,6 @@ import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.common.startup.StartupLog;
 import org.slf4j.event.Level;
 
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Files;
@@ -108,10 +107,13 @@ public class JksSecretService extends JksSecretLoader implements ISecretService 
         try {
 
             var keystorePath = configManager.resolveConfigFile(URI.create(keystoreUrl));
+            var tempPath = keystorePath.getPath() + "~upd";
 
-            try (var stream = new FileOutputStream(keystorePath.getPath())) {
+            try (var stream = LocalConfigLock.exclusiveWriteStream(tempPath, /* truncate = */ true)) {
                 keystore.store(stream, keystoreKey.toCharArray());
             }
+
+            LocalConfigLock.exclusiveMove(tempPath, keystorePath.getPath());
         }
         catch (IOException e) {
             // Inner error is more meaningful if keystore cannot be read
@@ -119,12 +121,12 @@ public class JksSecretService extends JksSecretLoader implements ISecretService 
             var errorDetail = error.getMessage() + " (this normally means the secret key is wrong)";
             var message = String.format("Failed to save keystore [%s]: %s", keystoreUrl, errorDetail);
             StartupLog.log(this, Level.ERROR, message);
-            throw new EStartup(message);
+            throw new EStartup(message, e);
         }
         catch (NoSuchAlgorithmException | CertificateException | KeyStoreException e) {
             var message = String.format("Failed to save keystore [%s]: %s", keystoreUrl, e.getMessage());
             StartupLog.log(this, Level.ERROR, message);
-            throw new EStartup(message);
+            throw new EStartup(message, e);
         }
     }
 }

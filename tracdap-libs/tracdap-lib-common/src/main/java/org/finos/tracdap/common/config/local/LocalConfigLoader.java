@@ -23,6 +23,7 @@ import org.finos.tracdap.common.exception.ETracInternal;
 
 import java.io.IOException;
 import java.net.URI;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 
@@ -44,12 +45,14 @@ public class LocalConfigLoader implements IConfigLoader {
 
         var ERROR_MSG_TEMPLATE = "Failed to load config file: %2$s [%1$s]";
 
-        Path path = null;
+        Path path = Paths.get(uri);;
 
-        try {
+        try (var channel = LocalConfigLock.sharedReadChannel(path)) {
 
-            path = Paths.get(uri);
-            return Files.readAllBytes(path);
+            var buffer = ByteBuffer.allocate((int) channel.size());
+            channel.read(buffer);
+
+            return buffer.array();
         }
         catch (IllegalArgumentException e) {
 
