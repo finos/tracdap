@@ -30,7 +30,6 @@ import org.finos.tracdap.config._ConfigFile;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.net.URI;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -61,24 +60,6 @@ public class SecretTool {
     public SecretTool(PluginManager pluginManager, ConfigManager configManager, String secretKey) {
 
         this.secrets = prepareSecrets(pluginManager, configManager, secretKey);
-
-        var rootConfig = configManager.loadRootConfigObject(_ConfigFile.class, /* leniency = */ true);
-        var secretType = rootConfig.getConfigOrDefault(ConfigKeys.SECRET_TYPE_KEY, "");
-        var secretUrl = rootConfig.getConfigOrDefault(ConfigKeys.SECRET_URL_KEY, "");
-
-        if (!secretType.equalsIgnoreCase("PKCS12") && secretUrl.isBlank()) {
-            var message = "To use auth-tool, set secret.type = PKCS12 and specify a secrets file";
-            log.error(message);
-            throw new EStartup(message);
-        }
-
-        var keystoreUrl = configManager.resolveConfigFile(URI.create(secretUrl));
-
-        if (keystoreUrl.getScheme() != null && !keystoreUrl.getScheme().equals("file")) {
-            var message = "To use auth-tool, Secrets file must be on a local disk";
-            log.error(message);
-            throw new EStartup(message);
-        }
     }
 
     public ISecretService prepareSecrets(PluginManager pluginManager, ConfigManager configManager, String secretKey) {
