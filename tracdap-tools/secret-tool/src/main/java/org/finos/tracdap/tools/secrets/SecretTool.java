@@ -17,10 +17,8 @@
 
 package org.finos.tracdap.tools.secrets;
 
-
 import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.config.ConfigManager;
-import org.finos.tracdap.common.config.CryptoHelpers;
 import org.finos.tracdap.common.config.ISecretService;
 import org.finos.tracdap.common.exception.EConfigLoad;
 import org.finos.tracdap.common.exception.EStartup;
@@ -32,14 +30,7 @@ import org.finos.tracdap.config._ConfigFile;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
 import java.net.URI;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardOpenOption;
-import java.security.*;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -52,22 +43,14 @@ public class SecretTool {
     public final static String ADD_SECRET = "add_secret";
     public final static String DELETE_SECRET = "delete_secret";
 
-    public final static String CREATE_ROOT_AUTH_KEY = "create_root_auth_key";
-    public final static String ROTATE_ROOT_AUTH_KEY = "rotate_root_auth_key";
-
     private final static List<StandardArgs.Task> AUTH_TOOL_TASKS = List.of(
             StandardArgs.task(INIT_SECRETS, "Initialize the secrets store"),
             StandardArgs.task(ADD_SECRET, List.of("alias"), "Add a secret to the secret store (you will be prompted for the secret)"),
-            StandardArgs.task(DELETE_SECRET, List.of("alias"), "Delete a secret from the secret store"),
-            StandardArgs.task(CREATE_ROOT_AUTH_KEY, List.of("ALGORITHM", "BITS"), "Create the root signing key for authentication tokens"));
+            StandardArgs.task(DELETE_SECRET, List.of("alias"), "Delete a secret from the secret store"));
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
     private final ISecretService secrets;
-
-    private final Path keystorePath;
-    private final String secretType;
-    private final String secretKey;
 
 
     /**
@@ -82,7 +65,6 @@ public class SecretTool {
         var rootConfig = configManager.loadRootConfigObject(_ConfigFile.class, /* leniency = */ true);
         var secretType = rootConfig.getConfigOrDefault(ConfigKeys.SECRET_TYPE_KEY, "");
         var secretUrl = rootConfig.getConfigOrDefault(ConfigKeys.SECRET_URL_KEY, "");
-        this.secretKey = secretKey;
 
         if (!secretType.equalsIgnoreCase("PKCS12") && secretUrl.isBlank()) {
             var message = "To use auth-tool, set secret.type = PKCS12 and specify a secrets file";
@@ -97,11 +79,6 @@ public class SecretTool {
             log.error(message);
             throw new EStartup(message);
         }
-
-        this.keystorePath = Paths.get(keystoreUrl);
-        this.secretType = secretType;
-
-        log.info("Using local keystore: [{}]", keystorePath);
     }
 
     public ISecretService prepareSecrets(PluginManager pluginManager, ConfigManager configManager, String secretKey) {
@@ -166,9 +143,6 @@ public class SecretTool {
                 else if (DELETE_SECRET.equals(task.getTaskName()))
                     deleteSecret(task.getTaskArg(0));
 
-                else if (CREATE_ROOT_AUTH_KEY.equals(task.getTaskName()))
-                    createRootAuthKey(task.getTaskArg(0), task.getTaskArg(1));
-
                 else
                     throw new EStartup(String.format("Unknown task: [%s]", task.getTaskName()));
             }
@@ -200,85 +174,6 @@ public class SecretTool {
 
         secrets.deleteSecret(alias);
         secrets.commit();
-    }
-
-    private void createRootAuthKey(String algorithm, String bits) {
-
-        // TODO: Move to secret service, or remove
-
-        try {
-
-            var keySize = Integer.parseInt(bits);
-            var keyGen = KeyPairGenerator.getInstance(algorithm);
-            var random = SecureRandom.getInstance("SHA1PRNG");
-
-            keyGen.initialize(keySize, random);
-
-            var keyPair = keyGen.generateKeyPair();
-
-            var keystore = JksHelpers.loadKeystore(secretType, keystorePath, secretKey, true);
-            JksHelpers.writeKeysToKeystore(keystore, secretKey, keyPair);
-            JksHelpers.saveKeystore(keystorePath, secretKey, keystore);
-        }
-        catch (NumberFormatException e) {
-            var message = String.format("Key size is not an integer [%s]", bits);
-            log.error(message);
-            throw new EStartup(message, e);
-        }
-        catch (NoSuchAlgorithmException e) {
-            var message = String.format("Unknown signing algorithm [%s]", algorithm);
-            log.error(message);
-            throw new EStartup(message, e);
-        }
-    }
-
-    private void writeKeysToFiles(KeyPair keyPair, Path configDir) {
-
-        try {
-
-            log.info("Signing key will be saved in the config directory: [{}]", configDir);
-
-            var armoredPublicKey = CryptoHelpers.encodePublicKey(keyPair.getPublic(), true);
-            var armoredPrivateKey = CryptoHelpers.encodePrivateKey(keyPair.getPrivate(), true);
-
-            var publicKeyPath = configDir.resolve(JksHelpers.TRAC_AUTH_PUBLIC_KEY + ".pem");
-            var privateKeyPath = configDir.resolve(JksHelpers.TRAC_AUTH_PRIVATE_KEY + ".pem");
-
-            if (Files.exists(publicKeyPath))
-                log.error("Key file already exists: {}", publicKeyPath);
-
-            if (Files.exists(privateKeyPath))
-                log.error("Key file already exists: {}", privateKeyPath);
-
-            if (Files.exists(publicKeyPath) || Files.exists(privateKeyPath))
-                throw new EStartup("Key files already exist, please move them and try again (auth-tool will not delete or replace key files)");
-
-            Files.write(publicKeyPath, armoredPublicKey.getBytes(StandardCharsets.UTF_8), StandardOpenOption.WRITE, StandardOpenOption.CREATE_NEW);
-            Files.write(privateKeyPath, armoredPrivateKey.getBytes(StandardCharsets.UTF_8), StandardOpenOption.WRITE, StandardOpenOption.CREATE_NEW);
-        }
-        catch (IOException e) {
-
-            var innerError = (e.getCause() instanceof UnrecoverableEntryException)
-                    ? e.getCause() : e;
-
-            var message = String.format("There was a problem saving the keys: %s", innerError.getMessage());
-            log.error(message);
-            throw new EStartup(message, innerError);
-        }
-    }
-
-    private String consoleReadLine(String prompt, Object... args) {
-
-        var console = System.console();
-
-        if (console != null)
-            return console.readLine(prompt, args);
-
-        else {
-            System.out.printf(prompt, args);
-            var scanner = new Scanner(System.in);
-            return scanner.nextLine();
-        }
     }
 
     private String consoleReadPassword(String prompt, Object... args) {
