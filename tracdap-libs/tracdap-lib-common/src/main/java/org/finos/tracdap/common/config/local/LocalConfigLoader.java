@@ -34,6 +34,12 @@ import java.nio.file.*;
 public class LocalConfigLoader implements IConfigLoader {
 
     @Override
+    public boolean hasFile(URI configUrl) {
+
+        return Files.exists(Paths.get(configUrl));
+    }
+
+    @Override
     public String loadTextFile(URI url) {
 
         var bytes = loadBinaryFile(url);
