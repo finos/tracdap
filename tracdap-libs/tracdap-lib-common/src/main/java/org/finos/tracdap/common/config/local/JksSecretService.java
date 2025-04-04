@@ -21,6 +21,7 @@ import org.finos.tracdap.common.config.*;
 import org.finos.tracdap.common.exception.EConfigLoad;
 import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.common.startup.StartupLog;
+
 import org.slf4j.event.Level;
 
 import java.io.IOException;
@@ -31,12 +32,16 @@ import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
 import java.security.cert.CertificateException;
 import java.util.Properties;
+import java.util.Random;
 
 
 public class JksSecretService extends JksSecretLoader implements ISecretService {
 
+    private final Random random;
+
     public JksSecretService(Properties properties) {
         super(properties);
+        this.random = new Random(System.currentTimeMillis());
     }
 
     @Override
@@ -107,12 +112,16 @@ public class JksSecretService extends JksSecretLoader implements ISecretService 
         try {
 
             var keystorePath = configManager.resolveConfigFile(URI.create(keystoreUrl));
-            var tempPath = keystorePath.getPath() + "~upd";
+
+            // Avoid conflicts on temporary files used for updates
+            var tempSuffix = "~upd." + Math.abs(random.nextLong());
+            var tempPath = keystorePath.getPath() + tempSuffix;
 
             try (var stream = LocalConfigLock.exclusiveWriteStream(tempPath, /* truncate = */ true)) {
                 keystore.store(stream, keystoreKey.toCharArray());
             }
 
+            // Exclusive move locks on the target file
             LocalConfigLock.exclusiveMove(tempPath, keystorePath.getPath());
         }
         catch (IOException e) {

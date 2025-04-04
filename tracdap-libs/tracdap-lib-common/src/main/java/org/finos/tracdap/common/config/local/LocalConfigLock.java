@@ -18,16 +18,13 @@
 package org.finos.tracdap.common.config.local;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.channels.Channels;
 import java.nio.channels.FileChannel;
+import java.nio.channels.FileLock;
 import java.nio.file.*;
 import java.time.Duration;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
+import java.time.Instant;
 
 
 public class LocalConfigLock {
@@ -35,34 +32,29 @@ public class LocalConfigLock {
     // These utilities provide a degree of safety around read / write locks for local (JKS) secrets
     // JKS secret service writes to the secret store, notifications trigger reads which can cause contention
     // Enterprise deployments are expected to use a plugin to integrate a dedicated secret management solution
-    // It may still be appropriate to use local loaders for both config and secrets, which are read only
+    // The local config loader is read-only, so locking will only occur if JKS secret service is being used
 
     private static final Duration LOCK_TIMEOUT = Duration.ofSeconds(1);
-
-    static InputStream sharedReadStream(String path) throws IOException  {
-
-        return sharedReadStream(Paths.get(path));
-    }
-
-    static InputStream sharedReadStream(Path path) throws IOException  {
-
-        var channel = sharedReadChannel(path);
-        return Channels.newInputStream(channel);
-    }
+    private static final Duration LOCK_RETRY = Duration.ofMillis(50);
 
     static FileChannel sharedReadChannel(Path path) throws IOException {
 
+        Instant deadline = Instant.now().plus(LOCK_TIMEOUT);
+        FileChannel channel;
+        FileLock lock;
+
         try {
 
-            var channel = FileChannel.open(path, StandardOpenOption.READ);
-            var lock = CompletableFuture.supplyAsync(() -> {
-                try {
-                    return channel.lock(0, Long.MAX_VALUE, true);
-                }
-                catch (IOException e) {
-                    throw new CompletionException(e);
-                }
-            }).orTimeout(LOCK_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS).get();
+            channel = FileChannel.open(path, StandardOpenOption.READ);
+
+            do {
+
+                lock = channel.tryLock(0, Long.MAX_VALUE, true);
+
+                if (lock == null)
+                    Thread.sleep(LOCK_RETRY.toMillis());
+
+            } while (lock == null && Instant.now().isBefore(deadline));
 
             if (lock == null) {
                 channel.close();
@@ -71,7 +63,7 @@ public class LocalConfigLock {
 
             return channel;
         }
-        catch (InterruptedException | ExecutionException e) {
+        catch (InterruptedException e) {
 
             throw new IOException(String.format("Failed to acquire read lock: [%s]", path), e);
         }
@@ -90,29 +82,33 @@ public class LocalConfigLock {
 
     static FileChannel exclusiveWriteChannel(Path path, boolean truncate) throws IOException  {
 
+        Instant deadline = Instant.now().plus(LOCK_TIMEOUT);
+        FileChannel channel;
+        FileLock lock;
+
+        var options = truncate
+                ? new OpenOption [] {
+                StandardOpenOption.READ,
+                StandardOpenOption.WRITE,
+                StandardOpenOption.CREATE,
+                StandardOpenOption.TRUNCATE_EXISTING }
+                : new OpenOption [] {
+                StandardOpenOption.READ,
+                StandardOpenOption.WRITE,
+                StandardOpenOption.CREATE };
+
         try {
 
-            var options = truncate
-                ? new OpenOption [] {
-                    StandardOpenOption.READ,
-                    StandardOpenOption.WRITE,
-                    StandardOpenOption.CREATE,
-                    StandardOpenOption.TRUNCATE_EXISTING }
-                : new OpenOption [] {
-                    StandardOpenOption.READ,
-                    StandardOpenOption.WRITE,
-                    StandardOpenOption.CREATE };
+            channel = FileChannel.open(path,options);
 
-            var channel = FileChannel.open(path,options);
+            do {
 
-            var lock = CompletableFuture.supplyAsync(() -> {
-                try {
-                    return channel.lock(0, Long.MAX_VALUE, false);
-                }
-                catch (IOException e) {
-                    throw new CompletionException(e);
-                }
-            }).orTimeout(LOCK_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS).get();
+                lock = channel.tryLock(0, Long.MAX_VALUE, false);
+
+                if (lock == null)
+                    Thread.sleep(LOCK_RETRY.toMillis());
+
+            } while (lock == null && Instant.now().isBefore(deadline));
 
             if (lock == null) {
                 channel.close();
@@ -121,7 +117,7 @@ public class LocalConfigLock {
 
             return channel;
         }
-        catch (InterruptedException | ExecutionException e) {
+        catch (InterruptedException e) {
 
             throw new IOException(String.format("Failed to acquire write lock: [%s]", path), e);
         }
@@ -132,25 +128,29 @@ public class LocalConfigLock {
         exclusiveMove(Paths.get(source), Paths.get(target));
     }
 
-    static void exclusiveMove(Path source, Path target) throws IOException  {
+    static void exclusiveMove(Path source, Path target) throws IOException {
 
         try (var channel = FileChannel.open(target, StandardOpenOption.WRITE, StandardOpenOption.CREATE)) {
 
-            var lock = CompletableFuture.supplyAsync(() -> {
-                try {
-                    return channel.lock(0, Long.MAX_VALUE, false);
-                }
-                catch (IOException e) {
-                    throw new CompletionException(e);
-                }
-            }).orTimeout(LOCK_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS).get();
+            Instant deadline = Instant.now().plus(LOCK_TIMEOUT);
+            FileLock lock;
 
-            if (lock != null) {
-                Files.copy(source, target, StandardCopyOption.REPLACE_EXISTING);
-                Files.delete(source);
-            }
+            do {
+
+                lock = channel.tryLock(0, Long.MAX_VALUE, false);
+
+                if (lock == null)
+                    Thread.sleep(LOCK_RETRY.toMillis());
+
+            } while (lock == null && Instant.now().isBefore(deadline));
+
+            if (lock == null)
+                throw new IOException(String.format("Failed to acquire write lock: [%s]", target));
+
+            Files.copy(source, target, StandardCopyOption.REPLACE_EXISTING);
+            Files.delete(source);
         }
-        catch (InterruptedException | ExecutionException e) {
+        catch (InterruptedException e) {
 
             throw new IOException(String.format("Failed to acquire write lock: [%s]", target), e);
         }
