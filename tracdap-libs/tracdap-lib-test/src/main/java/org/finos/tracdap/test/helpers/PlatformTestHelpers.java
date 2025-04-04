@@ -23,6 +23,7 @@ import org.finos.tracdap.common.plugin.PluginManager;
 import org.finos.tracdap.common.service.TracServiceBase;
 import org.finos.tracdap.common.startup.StandardArgs;
 import org.finos.tracdap.common.startup.Startup;
+import org.finos.tracdap.common.startup.StartupSequence;
 import org.finos.tracdap.tools.secrets.SecretTool;
 import org.finos.tracdap.tools.deploy.metadb.DeployMetaDB;
 
@@ -34,28 +35,45 @@ import java.util.List;
 
 public class PlatformTestHelpers {
 
+    @FunctionalInterface
+    public interface LauncherFunction<T> {
+
+        T launch(StartupSequence startup);
+    }
+
+    public interface Launcher<T> {
+
+        T launch(LauncherFunction<T> launcher);
+    }
+
+    public static <T> Launcher<T> prepare(Class<T> toolClass, Path workingDir, URL configPath, String keystoreKey) {
+
+        return prepare(toolClass, workingDir, configPath, keystoreKey, true);
+    }
+
+    public static <T> Launcher<T> prepare(Class<T> toolClass, Path workingDir, URL configPath, String keystoreKey, boolean useSecrets) {
+
+        var startup = Startup.useConfigFile(toolClass, workingDir, configPath.toString(), keystoreKey);
+        startup.runStartupSequence(useSecrets);
+
+        return launcher -> launcher.launch(startup);
+    }
+
     public static void runSecretTool(Path workingDir, URL configPath, String keystoreKey, List<StandardArgs.Task> tasks) {
 
         // Do not use secrets during start up for the secret tool
         // The secret tool is often used to create the secrets file
 
-        var startup = Startup.useConfigFile(SecretTool.class, workingDir, configPath.toString(), keystoreKey);
-        startup.runStartupSequence(/* useSecrets = */ false);
-
-        var plugins = startup.getPlugins();
-        var config = startup.getConfig();
-        var secretTool = new SecretTool(plugins, config, keystoreKey);
+        var launcher = prepare(SecretTool.class, workingDir, configPath, keystoreKey, /* useSecrets = */ false);
+        var secretTool = launcher.launch(startup -> new SecretTool(startup.getPlugins(), startup.getConfig(), keystoreKey));
 
         secretTool.runTasks(tasks);
     }
 
     public static void runDbDeploy(Path workingDir, URL configPath, String keystoreKey, List<StandardArgs.Task> tasks) {
 
-        var startup = Startup.useConfigFile(DeployMetaDB.class, workingDir, configPath.toString(), keystoreKey);
-        startup.runStartupSequence();
-
-        var config = startup.getConfig();
-        var deployDb = new DeployMetaDB(config);
+        var launcher = prepare(DeployMetaDB.class, workingDir, configPath, keystoreKey);
+        var deployDb = launcher.launch(startup -> new DeployMetaDB(startup.getConfig()));
 
         deployDb.runDeployment(tasks);
     }
