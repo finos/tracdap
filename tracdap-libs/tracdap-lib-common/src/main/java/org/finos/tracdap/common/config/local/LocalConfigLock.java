@@ -69,37 +69,29 @@ public class LocalConfigLock {
         }
     }
 
-    static OutputStream exclusiveWriteStream(String path, boolean truncate) throws IOException  {
+    static OutputStream exclusiveWriteStream(String path) throws IOException  {
 
-        return exclusiveWriteStream(Paths.get(path), truncate);
+        return exclusiveWriteStream(Paths.get(path));
     }
 
-    static OutputStream exclusiveWriteStream(Path path, boolean truncate) throws IOException  {
+    static OutputStream exclusiveWriteStream(Path path) throws IOException  {
 
-        var channel = exclusiveWriteChannel(path, truncate);
+        var channel = exclusiveWriteChannel(path);
         return Channels.newOutputStream(channel);
     }
 
-    static FileChannel exclusiveWriteChannel(Path path, boolean truncate) throws IOException  {
+    static FileChannel exclusiveWriteChannel(Path path) throws IOException  {
 
         Instant deadline = Instant.now().plus(LOCK_TIMEOUT);
         FileChannel channel;
         FileLock lock;
 
-        var options = truncate
-                ? new OpenOption [] {
-                StandardOpenOption.READ,
-                StandardOpenOption.WRITE,
-                StandardOpenOption.CREATE,
-                StandardOpenOption.TRUNCATE_EXISTING }
-                : new OpenOption [] {
-                StandardOpenOption.READ,
-                StandardOpenOption.WRITE,
-                StandardOpenOption.CREATE };
-
         try {
 
-            channel = FileChannel.open(path,options);
+            channel = FileChannel.open(path,
+                    StandardOpenOption.READ,
+                    StandardOpenOption.WRITE,
+                    StandardOpenOption.CREATE );
 
             do {
 

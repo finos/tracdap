@@ -117,7 +117,7 @@ public class JksSecretService extends JksSecretLoader implements ISecretService 
             var tempSuffix = "~upd." + Math.abs(random.nextLong());
             var tempPath = keystorePath.getPath() + tempSuffix;
 
-            try (var stream = LocalConfigLock.exclusiveWriteStream(tempPath, /* truncate = */ true)) {
+            try (var stream = LocalConfigLock.exclusiveWriteStream(tempPath)) {
                 keystore.store(stream, keystoreKey.toCharArray());
             }
 
