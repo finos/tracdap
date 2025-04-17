@@ -15,16 +15,17 @@
 
 ALLOWED_LICENSES="Apache Software License"
 ALLOWED_LICENSES="${ALLOWED_LICENSES};Apache 2.0"
-ALLOWED_LICENSES="${ALLOWED_LICENSES};MIT"
 ALLOWED_LICENSES="${ALLOWED_LICENSES};MIT License"
 ALLOWED_LICENSES="${ALLOWED_LICENSES};MIT No Attribution License (MIT-0)"
 ALLOWED_LICENSES="${ALLOWED_LICENSES};BSD License"
 ALLOWED_LICENSES="${ALLOWED_LICENSES};BSD-3-Clause"
 ALLOWED_LICENSES="${ALLOWED_LICENSES};3-Clause BSD License;"
 ALLOWED_LICENSES="${ALLOWED_LICENSES};Python Software Foundation License"
-ALLOWED_LICENSES="${ALLOWED_LICENSES};Python-2.0"
 ALLOWED_LICENSES="${ALLOWED_LICENSES};ISC License (ISCL)"
 ALLOWED_LICENSES="${ALLOWED_LICENSES};The Unlicense (Unlicense)"
+
+# License for greenlet is specified this way
+ALLOWED_LICENSES="${ALLOWED_LICENSES};MIT AND Python-2.0"
 
 # The "certifi" package is a dependency of Python Safety, licensed under MPL 2.0
 # It is OK to use since the compliance tools are not distributed
