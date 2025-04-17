@@ -332,8 +332,6 @@ public class JobProcessorHelpers {
             storageConfig.setDefaultFormat(platformConfig.getStorage().getDefaultFormat());
         }
 
-        // TODO: Filter storage resources to just what the job requires
-
         sysConfig.setStorage(storageConfig);
 
         var repositories = resources.getMatchingEntries(
@@ -357,6 +355,18 @@ public class JobProcessorHelpers {
 
     private boolean jobUsesRepository(String repoKey, JobState jobState) {
 
+        // This method filters repo resources for the currently known job types
+        // TODO: Generic resource filtering in the IJobLogic interface
+
+        // Import model jobs can refer to repositories directly
+        if (jobState.jobType == JobType.IMPORT_MODEL) {
+            var importModelJob = jobState.definition.getImportModel();
+            if (importModelJob.getRepository().equals(repoKey)) {
+                return true;
+            }
+        }
+
+        // Check if any resources refer to the repo key
         for (var object : jobState.resources.values()) {
             if (object.getObjectType() == ObjectType.MODEL) {
                 if (object.getModel().getRepository().equals(repoKey)) {
