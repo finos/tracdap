@@ -22,6 +22,7 @@ import org.finos.tracdap.api.internal.ConfigUpdate;
 import org.finos.tracdap.api.internal.ConfigUpdateType;
 import org.finos.tracdap.api.internal.InternalMetadataApiGrpc;
 import org.finos.tracdap.common.config.ConfigKeys;
+import org.finos.tracdap.common.exception.EConfigParse;
 import org.finos.tracdap.common.metadata.MetadataUtil;
 import org.finos.tracdap.common.middleware.GrpcConcern;
 
@@ -236,7 +237,7 @@ public class ConfigService {
 
         if (objectType == ObjectType.RESOURCE) {
 
-            var secureResource = processSecrets(
+            var secureResource = processResourceSecrets(
                     request.getDefinition().getResource(),
                     prior.getDefinition().getResource(),
                     secrets, secretsUpdated);
@@ -245,14 +246,16 @@ public class ConfigService {
 
             return request.toBuilder().setDefinition(secureObject).build();
         }
+        else {
 
-        // Other object types are not processed for secrets
-        secretsUpdated.setResult(false);
+            // Other object types are not processed for secrets
+            secretsUpdated.setResult(false);
 
-        return request;
+            return request;
+        }
     }
 
-    private ResourceDefinition processSecrets(
+    private ResourceDefinition processResourceSecrets(
             ResourceDefinition newResource, ResourceDefinition oldResource,
             ISecretService secrets, SimpleResult<Boolean> secretsUpdated) {
 
@@ -265,18 +268,34 @@ public class ConfigService {
 
             if (secretValue != null && !secretValue.isEmpty()) {
 
+                // Secret value is supplied - update the secret store
                 var secretAlias = secrets.storePassword(secretKey, secretValue);
                 secureResource.putSecrets(secretKey, secretAlias);
 
                 if (!secretsUpdated.isDone())
                     secretsUpdated.setResult(true);
             }
+            else if (oldResource.containsSecrets(secretKey)) {
+
+                // If secret value is blank and a previous version exists, carry the secret over
+                var secretAlias = oldResource.getSecretsOrThrow(secretKey);
+                secureResource.putSecrets(secretKey, secretAlias);
+            }
+            else {
+
+                // Do not allow setting blank secrets
+                var message = String.format("No value supplied for config secret [%s]", secretKey);
+                log.error(message);
+                throw new EConfigParse(message);
+            }
         }
 
         for (var secretKey : oldResource.getSecretsMap().keySet()) {
             if (!newResource.containsSecrets(secretKey)) {
 
-                secrets.deleteSecret(secretKey);
+                // Delete any secrets that have been removed since the prior version
+                var secretAlias = oldResource.getSecretsOrThrow(secretKey);
+                secrets.deleteSecret(secretAlias);
 
                 if (!secretsUpdated.isDone())
                     secretsUpdated.setResult(true);

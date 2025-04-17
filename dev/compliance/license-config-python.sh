@@ -24,6 +24,9 @@ ALLOWED_LICENSES="${ALLOWED_LICENSES};Python Software Foundation License"
 ALLOWED_LICENSES="${ALLOWED_LICENSES};ISC License (ISCL)"
 ALLOWED_LICENSES="${ALLOWED_LICENSES};The Unlicense (Unlicense)"
 
+# License for greenlet is specified this way
+ALLOWED_LICENSES="${ALLOWED_LICENSES};MIT AND Python-2.0"
+
 # The "certifi" package is a dependency of Python Safety, licensed under MPL 2.0
 # It is OK to use since the compliance tools are not distributed
 # So, we can exclude the package from our license report
