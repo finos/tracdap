@@ -82,8 +82,10 @@ packaging >= 23.0
 
 # Compliance dependencies
 
-# Safety 3.3 introduces a GPL dependency, excluding for now
-safety >= 3.2, < 3.3
+# Safety 3.3.0 introduces a GPL dependency, fixed in 3.3.1
+# Safety uses marhmallow, which has breaking API changes in 4.0
+safety != 3.3.0
+marshmallow < 4.0
 
 # Series 3.x does not work with Python 3.11
 # Series 4.x does not work with Python 3.7
