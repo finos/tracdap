@@ -332,20 +332,40 @@ public class JobProcessorHelpers {
             storageConfig.setDefaultFormat(platformConfig.getStorage().getDefaultFormat());
         }
 
+        // TODO: Filter storage resources to just what the job requires
+
         sysConfig.setStorage(storageConfig);
 
         var repositories = resources.getMatchingEntries(
                 resource -> resource.getResourceType() == ResourceType.MODEL_REPOSITORY);
 
         for (var repoEntry : repositories.entrySet()) {
+
             var repoKey = repoEntry.getKey();
-            var repoConfig = translateResourceConfig(repoKey, repoEntry.getValue(), jobState);
-            sysConfig.putRepositories(repoKey, repoConfig);
+
+            // Only translate repositories required for the job
+            if (jobUsesRepository(repoKey, jobState)) {
+                var repoConfig = translateResourceConfig(repoKey, repoEntry.getValue(), jobState);
+                sysConfig.putRepositories(repoKey, repoConfig);
+            }
         }
 
         jobState.sysConfig = sysConfig.build();
 
         return jobState;
+    }
+
+    private boolean jobUsesRepository(String repoKey, JobState jobState) {
+
+        for (var object : jobState.resources.values()) {
+            if (object.getObjectType() == ObjectType.MODEL) {
+                if (object.getModel().getRepository().equals(repoKey)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     private PluginConfig translateResourceConfig(String resourceKey, ResourceDefinition resource, JobState jobState) {
