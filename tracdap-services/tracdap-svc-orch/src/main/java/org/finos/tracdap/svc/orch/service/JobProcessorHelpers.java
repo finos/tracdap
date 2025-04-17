@@ -20,8 +20,10 @@ package org.finos.tracdap.svc.orch.service;
 import org.finos.tracdap.api.*;
 import org.finos.tracdap.api.internal.InternalMetadataApiGrpc;
 import org.finos.tracdap.common.config.ConfigHelpers;
+import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.config.IDynamicResources;
+import org.finos.tracdap.common.exception.EConsistencyValidation;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.metadata.MetadataBundle;
 import org.finos.tracdap.common.metadata.MetadataCodec;
@@ -306,7 +308,7 @@ public class JobProcessorHelpers {
 
         for (var storageEntry : internalStorage.entrySet()) {
             var storageKey = storageEntry.getKey();
-            var storage = translateResourceConfig(storageEntry.getValue());
+            var storage = translateResourceConfig(storageKey, storageEntry.getValue(), jobState);
             storageConfig.putBuckets(storageKey, storage);
         }
 
@@ -315,7 +317,7 @@ public class JobProcessorHelpers {
 
         for (var storageEntry : externalStorage.entrySet()) {
             var storageKey = storageEntry.getKey();
-            var storage = translateResourceConfig(storageEntry.getValue());
+            var storage = translateResourceConfig(storageKey, storageEntry.getValue(), jobState);
             storageConfig.putExternal(storageKey, storage);
         }
 
@@ -337,7 +339,7 @@ public class JobProcessorHelpers {
 
         for (var repoEntry : repositories.entrySet()) {
             var repoKey = repoEntry.getKey();
-            var repoConfig = translateResourceConfig(repoEntry.getValue());
+            var repoConfig = translateResourceConfig(repoKey, repoEntry.getValue(), jobState);
             sysConfig.putRepositories(repoKey, repoConfig);
         }
 
@@ -346,17 +348,31 @@ public class JobProcessorHelpers {
         return jobState;
     }
 
-    private PluginConfig translateResourceConfig(ResourceDefinition resource) {
+    private PluginConfig translateResourceConfig(String resourceKey, ResourceDefinition resource, JobState jobState) {
 
         var pluginConfig = ConfigHelpers.resourceToPluginConfig(resource).toBuilder();
 
+        var tenantScope = String.format("/%s/%s/", ConfigKeys.TENANT_SCOPE, jobState.tenant);
+
         for (var secretEntry : pluginConfig.getSecretsMap().entrySet()) {
 
-            var propKey = secretEntry.getKey();
-            var secretKey = secretEntry.getValue();
-            var secret = configManager.loadPassword(secretKey);
+            var propertyName = secretEntry.getKey();
+            var secretAlias = secretEntry.getValue();
 
-            pluginConfig.putProperties(propKey, secret);
+            // Secret loader will not load the secret if the alias is not valid
+            // This handling provides more meaningful errors
+            if (secretAlias.isBlank() || !secretAlias.startsWith(tenantScope)) {
+
+                var message = String.format("Resource configuration for [%s] is not valid", resourceKey);
+                var detail = String.format("Inconsistent secret alias for [%s]", propertyName);
+
+                log.error("{}: {}", message, detail);
+                throw new EConsistencyValidation(message);
+            }
+
+            var secret = configManager.loadPassword(secretAlias);
+
+            pluginConfig.putProperties(propertyName, secret);
         }
 
         pluginConfig.clearSecrets();
