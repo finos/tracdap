@@ -362,6 +362,10 @@ public class TracOrchestratorService extends TracServiceBase {
 
         var listing = client.listConfigEntries(configList);
 
+        // For a bootstrap setup, do no fetch resources if none are configured yet
+        if (listing.getEntriesCount() == 0)
+            return;
+
         var selectors = listing.getEntriesList().stream()
                 .map(entry -> entry.getDetails().getObjectSelector())
                 .collect(Collectors.toList());
