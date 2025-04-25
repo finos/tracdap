@@ -185,6 +185,11 @@ class DataView:
             return DataView(_meta.ObjectType.DATA, trac_schema, parts = dict())
 
     @staticmethod
+    def for_arrow_schema(arrow_schema: pa.Schema):
+        trac_schema = DataMapping.arrow_to_trac_schema(arrow_schema)
+        return DataView(_meta.ObjectType.DATA, trac_schema, arrow_schema, dict())
+
+    @staticmethod
     def for_file_item(file_item: DataItem):
         return DataView(file_item.object_type, file_item=file_item)
 
