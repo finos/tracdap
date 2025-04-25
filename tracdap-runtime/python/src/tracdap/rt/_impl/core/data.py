@@ -340,7 +340,13 @@ class DataMapping:
     def trac_to_arrow_field(cls, trac_field: _meta.FieldSchema):
 
         arrow_type = cls.trac_to_arrow_basic_type(trac_field.fieldType)
-        nullable = not trac_field.notNull if trac_field.notNull is not None else not trac_field.businessKey
+
+        # For categorical fields, use an unordered dictionary with int32 index
+        # TRAC does not (currently) support ordered dictionary encoding
+        if trac_field.categorical:
+            arrow_type = pa.dictionary(pa.int32(), arrow_type, False)
+
+        nullable = not (trac_field.notNull or trac_field.businessKey)
 
         return pa.field(trac_field.fieldName, arrow_type, nullable)
 
@@ -374,7 +380,7 @@ class DataMapping:
             label=label,
             businessKey=False,
             notNull=not field.nullable,
-            categorical=False)
+            categorical=pa.types.is_dictionary(field.type))
 
     @classmethod
     def arrow_to_trac_type(cls, arrow_type: pa.DataType) -> _meta.BasicType:
@@ -389,6 +395,12 @@ class DataMapping:
 
         if pa.types.is_timestamp(arrow_type):
             return _meta.BasicType.DATETIME
+
+        # The basic type for a dictionary-encoded field is its value type
+        if pa.types.is_dictionary(arrow_type):
+            if not isinstance(arrow_type, pa.DictionaryType):
+                raise _ex.ETracInternal(f"Invalid dictionary type [{arrow_type}]")
+            return cls.arrow_to_trac_type(arrow_type.value_type)
 
         raise _ex.ETracInternal(f"No data type mapping available for Arrow type [{arrow_type}]")
 
