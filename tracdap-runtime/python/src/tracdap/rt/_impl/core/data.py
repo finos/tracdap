@@ -264,8 +264,8 @@ class DataMapping:
         pa.date64(): _meta.BasicType.DATE
     }
 
-    @staticmethod
-    def arrow_to_python_type(arrow_type: pa.DataType) -> type:
+    @classmethod
+    def arrow_to_python_type(cls, arrow_type: pa.DataType) -> type:
 
         if pa.types.is_boolean(arrow_type):
             return bool
@@ -287,6 +287,11 @@ class DataMapping:
 
         if pa.types.is_timestamp(arrow_type):
             return dt.datetime
+
+        # The python type for a dictionary-encoded field is its value type
+        if pa.types.is_dictionary(arrow_type):
+            if isinstance(arrow_type, pa.DictionaryType):
+                return cls.arrow_to_python_type(arrow_type.value_type)
 
         raise _ex.ETracInternal(f"No Python type mapping available for Arrow type [{arrow_type}]")
 
@@ -403,9 +408,8 @@ class DataMapping:
 
         # The basic type for a dictionary-encoded field is its value type
         if pa.types.is_dictionary(arrow_type):
-            if not isinstance(arrow_type, pa.DictionaryType):
-                raise _ex.ETracInternal(f"Invalid dictionary type [{arrow_type}]")
-            return cls.arrow_to_trac_type(arrow_type.value_type)
+            if isinstance(arrow_type, pa.DictionaryType):
+                return cls.arrow_to_trac_type(arrow_type.value_type)
 
         raise _ex.ETracInternal(f"No data type mapping available for Arrow type [{arrow_type}]")
 
