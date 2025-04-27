@@ -65,12 +65,12 @@ class TracContextTest(unittest.TestCase):
         "id": ["acc001", "acc002"],
         "loan_amount": [decimal.Decimal("1500000.00"), decimal.Decimal("1349374.83")],
         "total_pymnt": [decimal.Decimal("1650000.00"), decimal.Decimal("1563864.37")],
-        "region": ["LONDON", "SOUTH_WEST"],
+        "region": pd.Categorical(["LONDON", "SOUTH_WEST"], categories=["LONDON", "SOUTH_WEST"]),
         "loan_condition_cat": [1, 4]
     })
 
     RESULT_DATA = pd.DataFrame({
-        "region": ["LONDON", "SOUTH_WEST"],
+        "region": pd.Categorical(["LONDON", "SOUTH_WEST"], categories=["LONDON", "SOUTH_WEST"]),
         "gross_profit": [decimal.Decimal("150000.00"), decimal.Decimal("214489.54")]
     })
 
