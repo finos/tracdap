@@ -967,6 +967,9 @@ class DataConformance:
         if pa.types.is_timestamp(field.type):
             return cls._coerce_timestamp(vector, field)
 
+        if pa.types.is_dictionary(field.type):
+            return cls._coerce_dictionary(vector, field)
+
         error_message = cls._format_error(cls.__E_WRONG_DATA_TYPE, vector, field)
         cls.__log.error(error_message)
         raise _ex.EDataConformance(error_message)
@@ -1208,6 +1211,49 @@ class DataConformance:
             scaled_vector = pc.multiply_checked(int64_vector, scaling_vector)  # noqa
 
         return pc.cast(scaled_vector, field.type)
+
+    @classmethod
+    def _coerce_dictionary(cls, vector: pa.Array, field: pa.Field):
+
+        try:
+
+            if not isinstance(field.type, pa.DictionaryType):
+                raise _ex.EUnexpected()
+
+            field_type: pa.DictionaryType = field.type
+
+            if pa.types.is_dictionary(vector.type):
+
+                if not isinstance(vector.type, pa.DictionaryType):
+                    raise _ex.EUnexpected()
+
+                vector_type: pa.DictionaryType = vector.type
+
+                # Conditions for coercing a dictionary:
+                # 1. Value types are the same
+                # 2. Index types are the same, or target index type is wider
+                # 3. Ordering is the same, or ordered can be cast to unordered
+
+                if vector_type.value_type == field_type.value_type:
+                    if vector_type.index_type.bit_width <= field_type.index_type.bit_width:
+                        if vector_type.ordered == field_type.ordered or not field_type.ordered:
+                            return pc.cast(vector, field.type)
+
+            # Allow coercion to dictionary-encode a vector of the expected value type
+            # the value type must be an exact match, coercion of the values not currently supported
+
+            if vector.type == field_type.value_type and not field_type.ordered:
+                return vector.dictionary_encode().cast(field.type)
+
+            error_message = cls._format_error(cls.__E_WRONG_DATA_TYPE, vector, field)
+            cls.__log.error(error_message)
+            raise _ex.EDataConformance(error_message)
+
+        except pa.ArrowInvalid as e:
+
+            error_message = cls._format_error(cls.__E_DATA_LOSS_DID_OCCUR, vector, field, e)
+            cls.__log.error(error_message)
+            raise _ex.EDataConformance(error_message) from e
 
     @classmethod
     def _format_error(cls, error_template: str, vector: pa.Array, field: pa.Field, e: Exception = None):
