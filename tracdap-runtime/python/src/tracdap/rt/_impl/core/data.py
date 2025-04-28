@@ -939,12 +939,18 @@ class DataConformance:
     @classmethod
     def _coerce_vector(cls, vector: pa.Array, field: pa.Field, pandas_type=None) -> pa.Array:
 
+        # Handle null vector
         if pa.types.is_null(vector.type):
-
             if field.nullable:
                 return pa.nulls(size=len(vector), type=field.type)
             else:
                 raise _ex.EDataConformance(f"All null values in non-null field [{field.name}]")
+
+        # If the vector is dict-encoded but the expected result is not, decode the dictionary
+        if pa.types.is_dictionary(vector.type) and not pa.types.is_dictionary(field.type):
+            if isinstance(vector, pa.DictionaryArray):
+                dict_vector: pa.DictionaryArray = vector
+                vector = dict_vector.dictionary_decode()
 
         if pa.types.is_boolean(field.type):
             return cls._coerce_boolean(vector, field)
@@ -1245,6 +1251,9 @@ class DataConformance:
             if vector.type == field_type.value_type and not field_type.ordered:
                 return vector.dictionary_encode().cast(field.type)
 
+            # TODO: Support coercion of value types
+
+            # Fallthrough - coercion was not possible
             error_message = cls._format_error(cls.__E_WRONG_DATA_TYPE, vector, field)
             cls.__log.error(error_message)
             raise _ex.EDataConformance(error_message)
