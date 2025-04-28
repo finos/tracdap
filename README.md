@@ -47,11 +47,11 @@ https://github.com/finos/tracdap/actions/workflows/packaging.yml)
 https://tracdap.finos.org/en/stable/?badge=stable)
 
 
-The current release series (0.7) contains the core capabilities needed to build and run models,
+The current release series (0.8) contains the core capabilities needed to build and run models,
 both for local development and in a hosted environment. It also contains the platform services
 and APIs needed to build client applications and system-to-system integrations.
 
-Metadata compatibility is guaranteed within each release series (e.g. 0.7.x). Minor changes may
+Metadata compatibility is guaranteed within each release series (e.g. 0.8.x). Minor changes may
 occur between release series, mostly for internal structures and removal of deprecated APIs.
 The metadata model will be frozen at version 1.0 after which it may be added to but no fields
 will be removed or change. Configuration formats are subject to change between versions and
