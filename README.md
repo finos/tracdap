@@ -19,6 +19,10 @@ in association with [FINOS](https://www.finos.org/)
 and is available to download and use for free under the
 [Apache License, Version 2.0](https://www.apache.org/licenses/LICENSE-2.0).
 
+A community edition of TRAC, which is based on the TRAC D.A.P. framework, is available for free
+under an Apache + Commons Clause license. You can
+[download the community edition from Docker Hub](https://hub.docker.com/r/fintrac/trac-sandbox).
+
 ## Documentation and Packages
 
 Documentation for TRAC D.A.P. is available at [tracdap.finos.org](https://tracdap.finos.org).
