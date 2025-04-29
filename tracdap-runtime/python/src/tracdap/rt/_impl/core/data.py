@@ -264,6 +264,7 @@ class DataMapping:
         pa.date64(): _meta.BasicType.DATE
     }
 
+    CATEGORICAL_CONFIG_KEY = "trac.runtime.categorical"
     __categorical_enabled = False
 
     @classmethod
