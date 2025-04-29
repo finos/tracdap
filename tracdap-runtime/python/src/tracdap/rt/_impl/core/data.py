@@ -264,6 +264,8 @@ class DataMapping:
         pa.date64(): _meta.BasicType.DATE
     }
 
+    # For now, categorical handling is disabled by default and enabled by this setting
+    # The default will change to "true" for the 0.9 release
     CATEGORICAL_CONFIG_KEY = "trac.runtime.categorical"
     __categorical_enabled = False
 
