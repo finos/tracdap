@@ -787,6 +787,10 @@ class DataConformance:
         "Field [{field_name}] cannot be converted from {vector_type} to {field_type}, " + \
         "source and target have different time zones"
 
+    __E_WRONG_CATEGORICAL_TYPE = \
+        "Field [{field_name}] categorical types do not match" + \
+        "(expected {field_type}, got {vector_type})"
+
     @classmethod
     def column_filter(cls, columns: tp.List[str], schema: tp.Optional[pa.Schema]) -> tp.Optional[tp.List[str]]:
 
@@ -1228,6 +1232,7 @@ class DataConformance:
 
             field_type: pa.DictionaryType = field.type
 
+            # Supplied vector is a dictionary (but the dictionary type is not an exact match)
             if pa.types.is_dictionary(vector.type):
 
                 if not isinstance(vector.type, pa.DictionaryType):
@@ -1235,28 +1240,57 @@ class DataConformance:
 
                 vector_type: pa.DictionaryType = vector.type
 
-                # Conditions for coercing a dictionary:
-                # 1. Value types are the same
-                # 2. Index types are the same, or target index type is wider
-                # 3. Ordering is the same, or ordered can be cast to unordered
+                # Do not allow coercion to a smaller index type or from unordered to ordered
+                if (vector_type.index_type.bit_width > field_type.index_type.bit_width) or \
+                   (field_type.ordered and not vector_type.ordered):
 
+                    error_message = cls._format_error(cls.__E_WRONG_DATA_TYPE, vector, field)
+                    cls.__log.error(error_message)
+                    raise _ex.EDataConformance(error_message)
+
+                # Value types are the same - basic cast should succeed
                 if vector_type.value_type == field_type.value_type:
-                    if vector_type.index_type.bit_width <= field_type.index_type.bit_width:
-                        if vector_type.ordered == field_type.ordered or not field_type.ordered:
-                            return pc.cast(vector, field.type)
+                    return pc.cast(vector, field.type)
 
-            # Allow coercion to dictionary-encode a vector of the expected value type
-            # the value type must be an exact match, coercion of the values not currently supported
+                # Value types differ - try to coerce the underlying dictionary
+                elif isinstance(vector, pa.DictionaryArray):
+                    try:
+                        values_field = pa.field(field.name, field_type.value_type, field.nullable)
+                        values_vector = cls._coerce_vector(vector.dictionary, values_field)
+                        dict_vector = pa.DictionaryArray.from_arrays(vector.indices, values_vector, ordered=field_type.ordered)  # noqa
+                        return pc.cast(dict_vector, field.type)
+                    # Handle errors converting the value type
+                    except _ex.EDataConformance as e:
+                        error_message = cls._format_error(cls.__E_WRONG_CATEGORICAL_TYPE, vector, field)
+                        cls.__log.error(error_message)
+                        raise _ex.EDataConformance(error_message) from e
 
-            if vector.type == field_type.value_type and not field_type.ordered:
+                # Special handling for chunked dictionaries
+                elif isinstance(vector, pa.ChunkedArray):
+                    chunks = [cls._coerce_dictionary(chunk, field) for chunk in vector.chunks]
+                    return pa.chunked_array(chunks)
+
+                # Vector type not recognized, coercion is not possible
+                else:
+                    error_message = cls._format_error(cls.__E_WRONG_DATA_TYPE, vector, field)
+                    cls.__log.error(error_message)
+                    raise _ex.EDataConformance(error_message)
+
+            # Supplied vector matches the dictionary value type - perform dictionary encoding
+            elif vector.type == field_type.value_type and not field_type.ordered:
                 return vector.dictionary_encode().cast(field.type)
 
-            # TODO: Support coercion of value types
-
-            # Fallthrough - coercion was not possible
-            error_message = cls._format_error(cls.__E_WRONG_DATA_TYPE, vector, field)
-            cls.__log.error(error_message)
-            raise _ex.EDataConformance(error_message)
+            # Fallback option - try to coerce the value type first, then perform dictionary encoding
+            else:
+                try:
+                    values_field = pa.field(field.name, field_type.value_type, field.nullable)
+                    values_vector = cls._coerce_vector(vector, values_field)
+                    return values_vector.dictionary_encode().cast(field.type)
+                # Handle errors converting the value type
+                except _ex.EDataConformance as e:
+                    error_message = cls._format_error(cls.__E_WRONG_CATEGORICAL_TYPE, vector, field)
+                    cls.__log.error(error_message)
+                    raise _ex.EDataConformance(error_message) from e
 
         except pa.ArrowInvalid as e:
 
