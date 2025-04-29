@@ -185,6 +185,11 @@ class DataView:
             return DataView(_meta.ObjectType.DATA, trac_schema, parts = dict())
 
     @staticmethod
+    def for_arrow_schema(arrow_schema: pa.Schema):
+        trac_schema = DataMapping.arrow_to_trac_schema(arrow_schema)
+        return DataView(_meta.ObjectType.DATA, trac_schema, arrow_schema, dict())
+
+    @staticmethod
     def for_file_item(file_item: DataItem):
         return DataView(file_item.object_type, file_item=file_item)
 
@@ -259,8 +264,17 @@ class DataMapping:
         pa.date64(): _meta.BasicType.DATE
     }
 
-    @staticmethod
-    def arrow_to_python_type(arrow_type: pa.DataType) -> type:
+    # For now, categorical handling is disabled by default and enabled by this setting
+    # The default will change to "true" for the 0.9 release
+    CATEGORICAL_CONFIG_KEY = "trac.runtime.categorical"
+    __categorical_enabled = False
+
+    @classmethod
+    def enable_categorical(cls, enabled: bool):
+        cls.__categorical_enabled = enabled
+
+    @classmethod
+    def arrow_to_python_type(cls, arrow_type: pa.DataType) -> type:
 
         if pa.types.is_boolean(arrow_type):
             return bool
@@ -282,6 +296,11 @@ class DataMapping:
 
         if pa.types.is_timestamp(arrow_type):
             return dt.datetime
+
+        # The python type for a dictionary-encoded field is its value type
+        if pa.types.is_dictionary(arrow_type):
+            if isinstance(arrow_type, pa.DictionaryType):
+                return cls.arrow_to_python_type(arrow_type.value_type)
 
         raise _ex.ETracInternal(f"No Python type mapping available for Arrow type [{arrow_type}]")
 
@@ -340,7 +359,13 @@ class DataMapping:
     def trac_to_arrow_field(cls, trac_field: _meta.FieldSchema):
 
         arrow_type = cls.trac_to_arrow_basic_type(trac_field.fieldType)
-        nullable = not trac_field.notNull if trac_field.notNull is not None else not trac_field.businessKey
+
+        # Categorical data uses an unordered dictionary with int32 index, ordered encoding not (currently) supported
+        # For legacy compatability, only use dictionary encoding if the categorical feature is enabled
+        if trac_field.categorical and cls.__categorical_enabled:
+            arrow_type = pa.dictionary(pa.int32(), arrow_type, False)
+
+        nullable = not (trac_field.notNull or trac_field.businessKey)
 
         return pa.field(trac_field.fieldName, arrow_type, nullable)
 
@@ -369,12 +394,15 @@ class DataMapping:
         field_type = cls.arrow_to_trac_type(field.type)
         label = field.metadata["label"] if field.metadata and "label" in field.metadata else field.name
 
+        # When converting Arrow -> TRAC, always set the categorical flag for dictionary encoded fields
+        # This affects dynamic imports and is informational only (physical layout is controlled by Arrow schemas)
+
         return _meta.FieldSchema(
             field.name, field_index, field_type,
             label=label,
             businessKey=False,
             notNull=not field.nullable,
-            categorical=False)
+            categorical=pa.types.is_dictionary(field.type))
 
     @classmethod
     def arrow_to_trac_type(cls, arrow_type: pa.DataType) -> _meta.BasicType:
@@ -389,6 +417,11 @@ class DataMapping:
 
         if pa.types.is_timestamp(arrow_type):
             return _meta.BasicType.DATETIME
+
+        # The basic type for a dictionary-encoded field is its value type
+        if pa.types.is_dictionary(arrow_type):
+            if isinstance(arrow_type, pa.DictionaryType):
+                return cls.arrow_to_trac_type(arrow_type.value_type)
 
         raise _ex.ETracInternal(f"No data type mapping available for Arrow type [{arrow_type}]")
 
@@ -766,6 +799,10 @@ class DataConformance:
         "Field [{field_name}] cannot be converted from {vector_type} to {field_type}, " + \
         "source and target have different time zones"
 
+    __E_WRONG_CATEGORICAL_TYPE = \
+        "Field [{field_name}] categorical types do not match" + \
+        "(expected {field_type}, got {vector_type})"
+
     @classmethod
     def column_filter(cls, columns: tp.List[str], schema: tp.Optional[pa.Schema]) -> tp.Optional[tp.List[str]]:
 
@@ -918,12 +955,18 @@ class DataConformance:
     @classmethod
     def _coerce_vector(cls, vector: pa.Array, field: pa.Field, pandas_type=None) -> pa.Array:
 
+        # Handle null vector
         if pa.types.is_null(vector.type):
-
             if field.nullable:
                 return pa.nulls(size=len(vector), type=field.type)
             else:
                 raise _ex.EDataConformance(f"All null values in non-null field [{field.name}]")
+
+        # If the vector is dict-encoded but the expected result is not, decode the dictionary
+        if pa.types.is_dictionary(vector.type) and not pa.types.is_dictionary(field.type):
+            if isinstance(vector, pa.DictionaryArray):
+                dict_vector: pa.DictionaryArray = vector
+                vector = dict_vector.dictionary_decode()
 
         if pa.types.is_boolean(field.type):
             return cls._coerce_boolean(vector, field)
@@ -945,6 +988,9 @@ class DataConformance:
 
         if pa.types.is_timestamp(field.type):
             return cls._coerce_timestamp(vector, field)
+
+        if pa.types.is_dictionary(field.type):
+            return cls._coerce_dictionary(vector, field)
 
         error_message = cls._format_error(cls.__E_WRONG_DATA_TYPE, vector, field)
         cls.__log.error(error_message)
@@ -1187,6 +1233,82 @@ class DataConformance:
             scaled_vector = pc.multiply_checked(int64_vector, scaling_vector)  # noqa
 
         return pc.cast(scaled_vector, field.type)
+
+    @classmethod
+    def _coerce_dictionary(cls, vector: pa.Array, field: pa.Field):
+
+        try:
+
+            if not isinstance(field.type, pa.DictionaryType):
+                raise _ex.EUnexpected()
+
+            field_type: pa.DictionaryType = field.type
+
+            # Supplied vector is a dictionary (but the dictionary type is not an exact match)
+            if pa.types.is_dictionary(vector.type):
+
+                if not isinstance(vector.type, pa.DictionaryType):
+                    raise _ex.EUnexpected()
+
+                vector_type: pa.DictionaryType = vector.type
+
+                # Do not allow coercion to a smaller index type or from unordered to ordered
+                if (vector_type.index_type.bit_width > field_type.index_type.bit_width) or \
+                   (field_type.ordered and not vector_type.ordered):
+
+                    error_message = cls._format_error(cls.__E_WRONG_DATA_TYPE, vector, field)
+                    cls.__log.error(error_message)
+                    raise _ex.EDataConformance(error_message)
+
+                # Value types are the same - basic cast should succeed
+                if vector_type.value_type == field_type.value_type:
+                    return pc.cast(vector, field.type)
+
+                # Value types differ - try to coerce the underlying dictionary
+                elif isinstance(vector, pa.DictionaryArray):
+                    try:
+                        values_field = pa.field(field.name, field_type.value_type, field.nullable)
+                        values_vector = cls._coerce_vector(vector.dictionary, values_field)
+                        dict_vector = pa.DictionaryArray.from_arrays(vector.indices, values_vector, ordered=field_type.ordered)  # noqa
+                        return pc.cast(dict_vector, field.type)
+                    # Handle errors converting the value type
+                    except _ex.EDataConformance as e:
+                        error_message = cls._format_error(cls.__E_WRONG_CATEGORICAL_TYPE, vector, field)
+                        cls.__log.error(error_message)
+                        raise _ex.EDataConformance(error_message) from e
+
+                # Special handling for chunked dictionaries
+                elif isinstance(vector, pa.ChunkedArray):
+                    chunks = [cls._coerce_dictionary(chunk, field) for chunk in vector.chunks]
+                    return pa.chunked_array(chunks)
+
+                # Vector type not recognized, coercion is not possible
+                else:
+                    error_message = cls._format_error(cls.__E_WRONG_DATA_TYPE, vector, field)
+                    cls.__log.error(error_message)
+                    raise _ex.EDataConformance(error_message)
+
+            # Supplied vector matches the dictionary value type - perform dictionary encoding
+            elif vector.type == field_type.value_type and not field_type.ordered:
+                return vector.dictionary_encode().cast(field.type)
+
+            # Fallback option - try to coerce the value type first, then perform dictionary encoding
+            else:
+                try:
+                    values_field = pa.field(field.name, field_type.value_type, field.nullable)
+                    values_vector = cls._coerce_vector(vector, values_field)
+                    return values_vector.dictionary_encode().cast(field.type)
+                # Handle errors converting the value type
+                except _ex.EDataConformance as e:
+                    error_message = cls._format_error(cls.__E_WRONG_CATEGORICAL_TYPE, vector, field)
+                    cls.__log.error(error_message)
+                    raise _ex.EDataConformance(error_message) from e
+
+        except pa.ArrowInvalid as e:
+
+            error_message = cls._format_error(cls.__E_DATA_LOSS_DID_OCCUR, vector, field, e)
+            cls.__log.error(error_message)
+            raise _ex.EDataConformance(error_message) from e
 
     @classmethod
     def _format_error(cls, error_template: str, vector: pa.Array, field: pa.Field, e: Exception = None):

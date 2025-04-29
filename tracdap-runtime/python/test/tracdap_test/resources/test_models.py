@@ -62,7 +62,7 @@ class TestModel(trac.TracModel):
             trac.F("loan_amount", trac.BasicType.DECIMAL, label="Principal loan amount", format_code="CCY:EUR"),
             trac.F("total_pymnt", trac.BasicType.DECIMAL, label="Total amount repaid", format_code="CCY:EUR"),
             trac.F("region", trac.BasicType.STRING, label="Customer home region", categorical=True),
-            trac.F("loan_condition_cat", trac.BasicType.INTEGER, label="Loan condition category", categorical=True))
+            trac.F("loan_condition_cat", trac.BasicType.INTEGER, label="Loan condition category"))
 
         return {"customer_loans": customer_loans}
 

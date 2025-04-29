@@ -69,12 +69,17 @@ public class SampleData {
                     .setFieldOrder(4)
                     .setFieldType(BasicType.STRING))
             .addFields(FieldSchema.newBuilder()
-                    .setFieldName("date_field")
+                    .setFieldName("categorical_field")
                     .setFieldOrder(5)
+                    .setFieldType(BasicType.STRING)
+                    .setCategorical(true))
+            .addFields(FieldSchema.newBuilder()
+                    .setFieldName("date_field")
+                    .setFieldOrder(6)
                     .setFieldType(BasicType.DATE))
             .addFields(FieldSchema.newBuilder()
                     .setFieldName("datetime_field")
-                    .setFieldOrder(6)
+                    .setFieldOrder(7)
                     .setFieldType(BasicType.DATETIME)))
             .build();
 
@@ -83,7 +88,7 @@ public class SampleData {
             .setTable(BASIC_TABLE_SCHEMA.getTable().toBuilder()
             .addFields(FieldSchema.newBuilder()
                     .setFieldName("extra_string_field")
-                    .setFieldOrder(7)
+                    .setFieldOrder(8)
                     .setFieldType(BasicType.STRING)))
             .build();
 
@@ -190,14 +195,14 @@ public class SampleData {
 
         for (var field : BASIC_TABLE_SCHEMA.getTable().getFieldsList()) {
 
-            var javaValues = generateJavaValues(field.getFieldType(), 10);
+            var javaValues = generateJavaValues(field.getFieldType(), field.getCategorical(), 10);
             javaData.put(field.getFieldName(), javaValues);
         }
 
         return convertData(BASIC_TABLE_SCHEMA, javaData, 10, arrowAllocator);
     }
 
-    public static List<Object> generateJavaValues(BasicType basicType, int n) {
+    public static List<Object> generateJavaValues(BasicType basicType, boolean categorical, int n) {
 
         // NOTE: These values should match the pre-saved basic test files in resources/sample_data of -lib-test
 
@@ -225,9 +230,17 @@ public class SampleData {
                         .collect(Collectors.toList());
 
             case STRING:
-                return IntStream.range(0, n)
-                        .mapToObj(i -> "Hello world " + i)
-                        .collect(Collectors.toList());
+                if (categorical) {
+                    var categories = new String[] {"RED", "BLUE", "GREEN"};
+                    return IntStream.range(0, n)
+                            .mapToObj(i -> categories[i % categories.length])
+                            .collect(Collectors.toList());
+                }
+                else {
+                    return IntStream.range(0, n)
+                            .mapToObj(i -> "Hello world " + i)
+                            .collect(Collectors.toList());
+                }
 
             case DATE:
                 return IntStream.range(0, n)
