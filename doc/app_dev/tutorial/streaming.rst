@@ -64,9 +64,9 @@ except that the content can be empty.
 .. literalinclude:: ../../../examples/apps/javascript/src/streaming.js
     :language: JavaScript
     :class: container
-    :lines: 50 - 64
+    :lines: 51 - 65
     :linenos:
-    :lineno-start: 50
+    :lineno-start: 51
 
 Now let's create the streaming source. The example code uses the *fs* module from Node.js
 to create an input stream, then passes the stream into the upload function:
@@ -74,9 +74,9 @@ to create an input stream, then passes the stream into the upload function:
 .. literalinclude:: ../../../examples/apps/javascript/src/streaming.js
     :language: JavaScript
     :class: container
-    :lines: 161 - 162
+    :lines: 162 - 163
     :linenos:
-    :lineno-start: 161
+    :lineno-start: 162
 
 In a browser application, your source is most likely to be an HTML file input control.
 The file input control supports streaming using the
@@ -112,9 +112,9 @@ in a single stream.
 .. literalinclude:: ../../../examples/apps/javascript/src/streaming.js
     :language: JavaScript
     :class: container
-    :lines: 65 - 74
+    :lines: 66 - 75
     :linenos:
-    :lineno-start: 65
+    :lineno-start: 66
 
 After creating the stream, start by sending the initial message.
 This will start the streaming upload operation.
@@ -124,9 +124,9 @@ so we can use this to complete the promise.
 .. literalinclude:: ../../../examples/apps/javascript/src/streaming.js
     :language: JavaScript
     :class: container
-    :lines: 75 - 81
+    :lines: 76 - 82
     :linenos:
-    :lineno-start: 75
+    :lineno-start: 76
 
 Now the upload stream is open, we need to relay data from the source stream.
 To do this we can handle the "data" event on the source stream which supplies
@@ -137,9 +137,9 @@ The "end" event signals that the source stream is complete.
 .. literalinclude:: ../../../examples/apps/javascript/src/streaming.js
     :language: JavaScript
     :class: container
-    :lines: 82 - 95
+    :lines: 83 - 96
     :linenos:
-    :lineno-start: 82
+    :lineno-start: 83
 
 The last thing is to handle any errors that occur on the source stream.
 These are different from errors in the upload stream, which were handled earlier by *.catch(reject)*.
@@ -152,9 +152,9 @@ Instead we want to reject the promise explicitly, to pass on the error informati
 .. literalinclude:: ../../../examples/apps/javascript/src/streaming.js
     :language: JavaScript
     :class: container
-    :lines: 96 - 105
+    :lines: 97 - 106
     :linenos:
-    :lineno-start: 96
+    :lineno-start: 97
 
 Streaming download
 ------------------
@@ -177,9 +177,9 @@ This is exactly the same as the request used to call
 .. literalinclude:: ../../../examples/apps/javascript/src/streaming.js
     :language: JavaScript
     :class: container
-    :lines: 111 - 117
+    :lines: 112 - 118
     :linenos:
-    :lineno-start: 111
+    :lineno-start: 112
 
 Since we are going to collect the response data into a single message,
 we can set up the streaming operation as a promise just like the upload operation.
@@ -189,9 +189,9 @@ If there are any errors during the operation, the promise will be rejected.
 .. literalinclude:: ../../../examples/apps/javascript/src/streaming.js
     :language: JavaScript
     :class: container
-    :lines: 123 - 128
+    :lines: 124 - 129
     :linenos:
-    :lineno-start: 123
+    :lineno-start: 124
 
 The next step is to set up event handlers for the download stream.
 There are three events to process: "data", "end" and "error".
@@ -209,9 +209,9 @@ utility function to aggregate them into a single
 .. literalinclude:: ../../../examples/apps/javascript/src/streaming.js
     :language: JavaScript
     :class: container
-    :lines: 130 - 143
+    :lines: 131 - 144
     :linenos:
-    :lineno-start: 130
+    :lineno-start: 131
 
 Now everything is ready, the final step is to make an API call to start
 the download stream. Since we are using stream event processing, we need
@@ -221,9 +221,9 @@ handlers, to prevent JavaScript warnings about unhandled results / errors.
 .. literalinclude:: ../../../examples/apps/javascript/src/streaming.js
     :language: JavaScript
     :class: container
-    :lines: 145 - 154
+    :lines: 146 - 155
     :linenos:
-    :lineno-start: 145
+    :lineno-start: 146
 
 .. note::
 
