@@ -81,7 +81,6 @@ jobs:
           sed -i "s#/path/to#${deploy_dir}#g" etc/trac-platform.yaml
           
           bin/secret-tool run --task init_secrets
-          bin/secret-tool run --task create_root_auth_key EC 256
           bin/deploy-metadb run --task deploy_schema
           bin/deploy-metadb run --task add_tenant ACME_CORP "ACME Rockets always get the Coyote!"
 
