@@ -1539,8 +1539,8 @@ abstract class DataOperationsTest {
         // Codec should fail to parse an integer value
         var badSchema = BASIC_SCHEMA_V2.toBuilder()
                 .setTable(BASIC_SCHEMA_V2.getTable().toBuilder()
-                .removeFields(7)
-                .addFields(7, BASIC_SCHEMA_V2.getTable().getFields(7).toBuilder()
+                .removeFields(8)
+                .addFields(8, BASIC_SCHEMA_V2.getTable().getFields(8).toBuilder()
                 .setFieldType(BasicType.INTEGER)))
                 .build();
 
@@ -1571,7 +1571,7 @@ abstract class DataOperationsTest {
         // Removing a field that exists in V1 would fail version validation upfront
         var badSchema = BASIC_SCHEMA_V2.toBuilder()
                 .setTable(BASIC_SCHEMA_V2.getTable().toBuilder()
-                .removeFields(7))
+                .removeFields(8))
                 .build();
 
         var v2Request = BASIC_UPDATE_DATASET_REQUEST.toBuilder()
