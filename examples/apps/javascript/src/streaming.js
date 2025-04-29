@@ -41,6 +41,7 @@ export async function saveStreamingData(csvStream) {
                 { fieldName: "float_field", fieldType: tracdap.FLOAT },
                 { fieldName: "decimal_field", fieldType: tracdap.DECIMAL },
                 { fieldName: "string_field", fieldType: tracdap.STRING },
+                { fieldName: "categorical_field", fieldType: tracdap.STRING, categorical: true },
                 { fieldName: "date_field", fieldType: tracdap.DATE },
                 { fieldName: "datetime_field", fieldType: tracdap.DATETIME }
             ]
