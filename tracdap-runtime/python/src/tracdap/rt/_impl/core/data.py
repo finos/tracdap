@@ -264,6 +264,12 @@ class DataMapping:
         pa.date64(): _meta.BasicType.DATE
     }
 
+    __categorical_enabled = False
+
+    @classmethod
+    def enable_categorical(cls, enabled: bool):
+        cls.__categorical_enabled = enabled
+
     @classmethod
     def arrow_to_python_type(cls, arrow_type: pa.DataType) -> type:
 
@@ -351,9 +357,9 @@ class DataMapping:
 
         arrow_type = cls.trac_to_arrow_basic_type(trac_field.fieldType)
 
-        # For categorical fields, use an unordered dictionary with int32 index
-        # TRAC does not (currently) support ordered dictionary encoding
-        if trac_field.categorical:
+        # Categorical data uses an unordered dictionary with int32 index, ordered encoding not (currently) supported
+        # For legacy compatability, only use dictionary encoding if the categorical feature is enabled
+        if trac_field.categorical and cls.__categorical_enabled:
             arrow_type = pa.dictionary(pa.int32(), arrow_type, False)
 
         nullable = not (trac_field.notNull or trac_field.businessKey)
