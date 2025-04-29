@@ -394,6 +394,9 @@ class DataMapping:
         field_type = cls.arrow_to_trac_type(field.type)
         label = field.metadata["label"] if field.metadata and "label" in field.metadata else field.name
 
+        # When converting Arrow -> TRAC, always set the categorical flag for dictionary encoded fields
+        # This affects dynamic imports and is informational only (physical layout is controlled by Arrow schemas)
+
         return _meta.FieldSchema(
             field.name, field_index, field_type,
             label=label,
