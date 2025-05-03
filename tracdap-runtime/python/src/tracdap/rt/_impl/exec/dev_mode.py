@@ -218,13 +218,13 @@ class DevModeTranslator:
         return job_config, job_def
 
     @classmethod
-    def _add_job_resource(
+    def _add_job_metadata(
             cls, job_config: _cfg.JobConfig,
             obj_id: _meta.TagHeader, obj: _meta.ObjectDefinition) \
             -> _cfg.JobConfig:
 
         obj_key = _util.object_key(obj_id)
-        job_config.resources[obj_key] = obj
+        job_config.objects[obj_key] = obj
 
         return job_config
 
@@ -346,7 +346,7 @@ class DevModeTranslator:
 
             model_id, model_obj = self._generate_model_for_class(model_class)
             job_detail.model = _util.selector_for(model_id)
-            job_config = self._add_job_resource(job_config, model_id, model_obj)
+            job_config = self._add_job_metadata(job_config, model_id, model_obj)
 
         # Otherwise look for models specified as a single string, and take that as the entry point
         else:
@@ -355,7 +355,7 @@ class DevModeTranslator:
             if hasattr(job_detail, "model") and isinstance(job_detail.model, str):
                 model_id, model_obj = self._generate_model_for_entry_point(job_detail.model)  # noqa
                 job_detail.model = _util.selector_for(model_id)
-                job_config = self._add_job_resource(job_config, model_id, model_obj)
+                job_config = self._add_job_metadata(job_config, model_id, model_obj)
 
             elif hasattr(job_detail, "model") and isinstance(job_detail.model, _meta.TagSelector):
                 if job_detail.model.objectType == _meta.ObjectType.OBJECT_TYPE_NOT_SET:
@@ -369,7 +369,7 @@ class DevModeTranslator:
                     if isinstance(model_detail, str):
                         model_id, model_obj = self._generate_model_for_entry_point(model_detail)
                         job_detail.models[model_key] = _util.selector_for(model_id)
-                        job_config = self._add_job_resource(job_config, model_id, model_obj)
+                        job_config = self._add_job_metadata(job_config, model_id, model_obj)
 
         return job_config, job_def
 
@@ -446,8 +446,8 @@ class DevModeTranslator:
         job_def.runFlow.flow = _util.selector_for(flow_id)
 
         job_config = copy.copy(job_config)
-        job_config.resources = copy.copy(job_config.resources)
-        job_config = self._add_job_resource(job_config, flow_id, flow_obj)
+        job_config.objects = copy.copy(job_config.objects)
+        job_config = self._add_job_metadata(job_config, flow_id, flow_obj)
 
         return job_config, job_def
 
@@ -727,10 +727,10 @@ class DevModeTranslator:
 
         if hasattr(job_detail, "model"):
             model_key = _util.object_key(job_detail.model)
-            model_or_flow = job_config.resources[model_key].model
+            model_or_flow = job_config.objects[model_key].model
         elif hasattr(job_detail, "flow"):
             flow_key = _util.object_key(job_detail.flow)
-            model_or_flow = job_config.resources[flow_key].flow
+            model_or_flow = job_config.objects[flow_key].flow
         else:
             model_or_flow = None
 
@@ -798,35 +798,35 @@ class DevModeTranslator:
 
         job_inputs = job_detail.inputs
         job_outputs = job_detail.outputs
-        job_resources = job_config.resources
+        job_metadata = job_config.objects
 
         for input_key, input_value in job_inputs.items():
-            if not (isinstance(input_value, str) and input_value in job_resources):
+            if not (isinstance(input_value, str) and input_value in job_metadata):
 
                 model_input = required_inputs[input_key]
 
                 if model_input.objectType == _meta.ObjectType.DATA:
                     schema = model_input.schema if model_input and not model_input.dynamic else None
-                    input_id = self._process_data_socket(input_key, input_value, schema, job_resources, new_unique_file=False)
+                    input_id = self._process_data_socket(input_key, input_value, schema, job_metadata, new_unique_file=False)
                 elif model_input.objectType == _meta.ObjectType.FILE:
                     file_type = model_input.fileType
-                    input_id = self._process_file_socket(input_key, input_value, file_type, job_resources, new_unique_file=False)
+                    input_id = self._process_file_socket(input_key, input_value, file_type, job_metadata, new_unique_file=False)
                 else:
                     raise _ex.EUnexpected()
 
                 job_inputs[input_key] = _util.selector_for(input_id)
 
         for output_key, output_value in job_outputs.items():
-            if not (isinstance(output_value, str) and output_value in job_resources):
+            if not (isinstance(output_value, str) and output_value in job_metadata):
 
                 model_output = required_outputs[output_key]
 
                 if model_output.objectType == _meta.ObjectType.DATA:
                     schema = model_output.schema if model_output and not model_output.dynamic else None
-                    output_id = self._process_data_socket(output_key, output_value, schema, job_resources, new_unique_file=True)
+                    output_id = self._process_data_socket(output_key, output_value, schema, job_metadata, new_unique_file=True)
                 elif model_output.objectType == _meta.ObjectType.FILE:
                     file_type = model_output.fileType
-                    output_id = self._process_file_socket(output_key, output_value, file_type, job_resources, new_unique_file=True)
+                    output_id = self._process_file_socket(output_key, output_value, file_type, job_metadata, new_unique_file=True)
                 else:
                     raise _ex.EUnexpected()
 
@@ -836,7 +836,7 @@ class DevModeTranslator:
 
     def _process_data_socket(
             self, data_key, data_value, schema: tp.Optional[_meta.SchemaDefinition],
-            resources: tp.Dict[str, _meta.ObjectDefinition], new_unique_file=False) \
+            job_metadata: tp.Dict[str, _meta.ObjectDefinition], new_unique_file=False) \
             -> _meta.TagHeader:
 
         data_id = _util.new_object_id(_meta.ObjectType.DATA)
@@ -886,14 +886,14 @@ class DevModeTranslator:
             storage_id, storage_key, storage_path, storage_format,
             data_item, incarnation_index)
 
-        resources[_util.object_key(data_id)] = data_obj
-        resources[_util.object_key(storage_id)] = storage_obj
+        job_metadata[_util.object_key(data_id)] = data_obj
+        job_metadata[_util.object_key(storage_id)] = storage_obj
 
         return data_id
 
     def _process_file_socket(
             self, file_key, file_value, file_type: _meta.FileType,
-            resources: tp.Dict[str, _meta.ObjectDefinition], new_unique_file=False) \
+            job_metadata: tp.Dict[str, _meta.ObjectDefinition], new_unique_file=False) \
             -> _meta.TagHeader:
 
         file_id = _util.new_object_id(_meta.ObjectType.FILE)
@@ -938,8 +938,8 @@ class DevModeTranslator:
             storage_id, storage_key, storage_path, storage_format,
             data_item, incarnation_index=1)
 
-        resources[_util.object_key(file_id)] = file_obj
-        resources[_util.object_key(storage_id)] = storage_obj
+        job_metadata[_util.object_key(file_id)] = file_obj
+        job_metadata[_util.object_key(storage_id)] = storage_obj
 
         return file_id
 
