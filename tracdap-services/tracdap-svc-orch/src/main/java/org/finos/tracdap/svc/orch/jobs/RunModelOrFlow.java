@@ -231,15 +231,15 @@ public abstract class RunModelOrFlow {
         var mappedOutputKey = MetadataUtil.objectKey(priorOutputSelector);
         String outputKey;
 
-        if (jobConfig.containsResourceMapping(mappedOutputKey)) {
-            var outputId = jobConfig.getResourceMappingOrDefault(mappedOutputKey, null);
+        if (jobConfig.containsObjectMapping(mappedOutputKey)) {
+            var outputId = jobConfig.getObjectMappingOrDefault(mappedOutputKey, null);
             var outputSelector = MetadataUtil.selectorFor(outputId);
             outputKey = MetadataUtil.objectKey(outputSelector);
         }
         else
             outputKey = mappedOutputKey;
 
-        var outputObj = jobConfig.getResourcesOrThrow(outputKey);
+        var outputObj = jobConfig.getObjectsOrThrow(outputKey);
 
         TagSelector storageSelector;
 
@@ -252,9 +252,9 @@ public abstract class RunModelOrFlow {
 
         var storageKey = MetadataUtil.objectKey(storageSelector);
 
-        if (jobConfig.containsResourceMapping(storageKey)) {
+        if (jobConfig.containsObjectMapping(storageKey)) {
 
-            var storageId = jobConfig.getResourceMappingOrDefault(storageKey, null);
+            var storageId = jobConfig.getObjectMappingOrDefault(storageKey, null);
             return MetadataUtil.selectorFor(storageId);
         }
         else

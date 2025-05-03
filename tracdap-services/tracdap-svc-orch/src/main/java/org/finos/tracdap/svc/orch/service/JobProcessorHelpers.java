@@ -295,8 +295,8 @@ public class JobProcessorHelpers {
         // Do not set jobId, it is not available yet
         jobState.jobConfig = JobConfig.newBuilder()
                 .setJob(jobState.definition)
-                .putAllResources(jobState.resources)
-                .putAllResourceMapping(jobState.resourceMapping)
+                .putAllObjects(jobState.resources)
+                .putAllObjectMapping(jobState.resourceMapping)
                 .putAllResultMapping(jobState.resultMapping)
                 .build();
 

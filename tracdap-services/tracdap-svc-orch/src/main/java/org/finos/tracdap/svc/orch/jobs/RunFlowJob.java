@@ -161,13 +161,13 @@ public class RunFlowJob extends RunModelOrFlow implements IJobLogic {
         var runFlow = jobConfig.getJob().getRunFlow();
 
         var flowKey = MetadataUtil.objectKey(runFlow.getFlow());
-        var flowId = jobConfig.getResourceMappingMap().get(flowKey);
-        var flowDef = jobConfig.getResourcesMap().get(MetadataUtil.objectKey(flowId)).getFlow();
+        var flowId = jobConfig.getObjectMappingMap().get(flowKey);
+        var flowDef = jobConfig.getObjectsMap().get(MetadataUtil.objectKey(flowId)).getFlow();
 
         var outputFlowNodes = getFlowOutputNodes(
                 jobConfig.getJob().getRunFlow().getFlow(),
-                jobConfig.getResourcesMap(),
-                jobConfig.getResourceMappingMap()
+                jobConfig.getObjectsMap(),
+                jobConfig.getObjectMappingMap()
         );
 
         var perNodeOutputAttrs = outputFlowNodes.entrySet().stream()
