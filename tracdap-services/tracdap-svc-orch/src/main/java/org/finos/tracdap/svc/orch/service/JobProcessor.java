@@ -24,7 +24,6 @@ import org.finos.tracdap.api.MetadataWriteRequest;
 import org.finos.tracdap.api.internal.RuntimeJobStatus;
 import org.finos.tracdap.api.internal.InternalMetadataApiGrpc.InternalMetadataApiBlockingStub;
 import org.finos.tracdap.common.cache.CacheEntry;
-import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.config.IDynamicResources;
 import org.finos.tracdap.common.exception.*;
 import org.finos.tracdap.common.grpc.RequestMetadata;
@@ -134,7 +133,7 @@ public class JobProcessor {
             newState = lifecycle.loadResources(newState);
 
             // Semantic validation (job consistency)
-            var metadata = new MetadataBundle(newState.resources, newState.resourceMapping);
+            var metadata = new MetadataBundle(newState.objects, newState.objectMapping);
             validator.validateConsistency(newState.definition, metadata, resources);
 
             newState.tracStatus = JobStatusCode.VALIDATED;

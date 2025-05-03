@@ -27,11 +27,7 @@ import org.finos.tracdap.common.middleware.GrpcClientConfig;
 import org.finos.tracdap.common.middleware.GrpcClientState;
 import org.finos.tracdap.config.JobConfig;
 import org.finos.tracdap.config.RuntimeConfig;
-import org.finos.tracdap.metadata.JobDefinition;
-import org.finos.tracdap.metadata.JobType;
-import org.finos.tracdap.metadata.JobStatusCode;
-import org.finos.tracdap.metadata.ObjectDefinition;
-import org.finos.tracdap.metadata.TagHeader;
+import org.finos.tracdap.metadata.*;
 
 import java.io.*;
 import java.util.HashMap;
@@ -70,10 +66,11 @@ public class JobState implements Serializable, Cloneable {
     String errorDetail;
     int retries;
 
-    // Job definition and resources, built up by the job logic
-    JobDefinition definition;
-    Map<String, ObjectDefinition> resources = new HashMap<>();
-    Map<String, TagHeader> resourceMapping = new HashMap<>();
+    // Job definition and referenced metadata, built up by the job logic
+    JobDefinition definition;;
+    Map<String, TagHeader> objectMapping = new HashMap<>();
+    Map<String, ObjectDefinition> objects = new HashMap<>();
+    Map<String, Tag> tags = new HashMap<>();
     Map<String, TagHeader> resultMapping = new HashMap<>();
 
     // Input / output config files for communicating with the runtime
@@ -93,8 +90,10 @@ public class JobState implements Serializable, Cloneable {
 
             var clone = (JobState) super.clone();
 
-            clone.resources = new HashMap<>(this.resources);
-            clone.resourceMapping = new HashMap<>(this.resourceMapping);
+            clone.objectMapping = new HashMap<>(this.objectMapping);
+            clone.objects = new HashMap<>(this.objects);
+            clone.tags = new HashMap<>(this.tags);
+
             clone.resultMapping = new HashMap<>(this.resultMapping);
 
             return clone;

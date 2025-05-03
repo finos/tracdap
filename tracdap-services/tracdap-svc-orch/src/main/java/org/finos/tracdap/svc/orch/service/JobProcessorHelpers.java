@@ -104,13 +104,13 @@ public class JobProcessorHelpers {
     JobState applyTransform(JobState jobState) {
 
         var logic = JobLogic.forJobType(jobState.jobType);
-        var metadata = new MetadataBundle(jobState.resources, jobState.resourceMapping);
+        var metadata = new MetadataBundle(jobState.objects, jobState.objectMapping);
 
         jobState.definition = logic.applyTransform(jobState.definition, metadata, resources);
 
         var updatedMetadata = logic.applyMetadataTransform(jobState.definition, metadata, resources);
-        jobState.resources = updatedMetadata.getResources();
-        jobState.resourceMapping = updatedMetadata.getResourceMapping();
+        jobState.objects = updatedMetadata.getResources();
+        jobState.objectMapping = updatedMetadata.getResourceMapping();
 
         return jobState;
     }
@@ -173,12 +173,12 @@ public class JobProcessorHelpers {
             mappings.put(mappingKey, resourceTag.getHeader());
         }
 
-        jobState.resources.putAll(resources);
-        jobState.resourceMapping.putAll(mappings);
+        jobState.objects.putAll(resources);
+        jobState.objectMapping.putAll(mappings);
 
         var extraResources = jobLogic.requiredMetadata(resources).stream()
-                .filter(selector -> !jobState.resources.containsKey(MetadataUtil.objectKey(selector)))
-                .filter(selector -> !jobState.resourceMapping.containsKey(MetadataUtil.objectKey(selector)))
+                .filter(selector -> !jobState.objects.containsKey(MetadataUtil.objectKey(selector)))
+                .filter(selector -> !jobState.objectMapping.containsKey(MetadataUtil.objectKey(selector)))
                 .collect(Collectors.toList());
 
         if (!extraResources.isEmpty())
@@ -211,11 +211,11 @@ public class JobProcessorHelpers {
 
         var priorResultIds = jobLogic.priorResultIds(
                 jobState.definition,
-                jobState.resources, jobState.resourceMapping);
+                jobState.objects, jobState.objectMapping);
 
         var jobResultIds = jobLogic.newResultIds(
                 jobState.tenant, jobState.definition,
-                jobState.resources, jobState.resourceMapping);
+                jobState.objects, jobState.objectMapping);
 
         newResultIds.put(JOB_RESULT_KEY, resultId);
         newResultIds.put(JOB_LOG_FILE_KEY, logFileId);
@@ -279,7 +279,7 @@ public class JobProcessorHelpers {
 
         jobState.definition = jobLogic.setResultIds(
                 jobState.definition, jobState.resultMapping,
-                jobState.resources, jobState.resourceMapping);
+                jobState.objects, jobState.objectMapping);
 
         return jobState;
     }
@@ -295,8 +295,8 @@ public class JobProcessorHelpers {
         // Do not set jobId, it is not available yet
         jobState.jobConfig = JobConfig.newBuilder()
                 .setJob(jobState.definition)
-                .putAllObjects(jobState.resources)
-                .putAllObjectMapping(jobState.resourceMapping)
+                .putAllObjects(jobState.objects)
+                .putAllObjectMapping(jobState.objectMapping)
                 .putAllResultMapping(jobState.resultMapping)
                 .build();
 
@@ -367,7 +367,7 @@ public class JobProcessorHelpers {
         }
 
         // Check if any resources refer to the repo key
-        for (var object : jobState.resources.values()) {
+        for (var object : jobState.objects.values()) {
             if (object.getObjectType() == ObjectType.MODEL) {
                 if (object.getModel().getRepository().equals(repoKey)) {
                     return true;
