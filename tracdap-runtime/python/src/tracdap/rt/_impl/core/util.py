@@ -111,21 +111,21 @@ def get_job_resource(
         job_config: cfg.JobConfig,
         optional: bool = False):
 
-    resource_key = object_key(selector)
-    resource_id = job_config.resourceMapping.get(resource_key)
+    obj_key = object_key(selector)
+    obj_id = job_config.objectMapping.get(obj_key)
 
-    if resource_id is not None:
-        resource_key = object_key(resource_id)
+    if obj_id is not None:
+        obj_key = object_key(obj_id)
 
-    resource = job_config.resources.get(resource_key)
+    obj = job_config.objects.get(obj_key)
 
-    if resource is not None:
-        return resource
+    if obj is not None:
+        return obj
 
     if optional:
         return None
 
-    err = f"Missing required {selector.objectType.name} resource [{object_key(selector)}]"
+    err = f"Missing required {selector.objectType.name} object [{object_key(selector)}]"
     raise ex.ERuntimeValidation(err)
 
 
