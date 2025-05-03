@@ -128,7 +128,7 @@ class CoreJobsTest(unittest.TestCase):
             # Make the input dataset use an external schema
 
             input_id = job_config.job.runModel.inputs["customer_loans"]
-            input_data_def = util.get_job_resource(input_id, job_config)
+            input_data_def = util.get_job_metadata(input_id, job_config)
 
             input_schema_id = util.new_object_id(meta.ObjectType.SCHEMA)
             input_schema = meta.ObjectDefinition(meta.ObjectType.SCHEMA, schema=input_data_def.data.schema)

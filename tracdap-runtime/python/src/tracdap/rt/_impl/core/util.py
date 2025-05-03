@@ -106,10 +106,11 @@ def selector_for_latest(object_id: meta.TagHeader) -> meta.TagSelector:
         latestTag=True)
 
 
-def get_job_resource(
+def get_job_metadata(
         selector: tp.Union[meta.TagHeader, meta.TagSelector],
         job_config: cfg.JobConfig,
-        optional: bool = False):
+        optional: bool = False) \
+        -> tp.Optional[meta.ObjectDefinition]:
 
     obj_key = object_key(selector)
     obj_id = job_config.objectMapping.get(obj_key)

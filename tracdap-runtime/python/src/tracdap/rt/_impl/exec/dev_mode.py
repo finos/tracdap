@@ -472,7 +472,7 @@ class DevModeTranslator:
         for model_name, model_node in model_nodes.items():
 
             model_selector = job_def.runFlow.models[model_name]
-            model_obj = _util.get_job_resource(model_selector, job_config)
+            model_obj = _util.get_job_metadata(model_selector, job_config)
 
             model_inputs = set(model_obj.model.inputs.keys())
             model_outputs = set(model_obj.model.outputs.keys())
@@ -540,7 +540,7 @@ class DevModeTranslator:
                 # Generate node param sockets needed by the model
                 if node_name in job.models:
                     model_selector = job.models[node_name]
-                    model_obj = _util.get_job_resource(model_selector, job_config)
+                    model_obj = _util.get_job_metadata(model_selector, job_config)
                     for param_name in model_obj.model.parameters:
                         add_param_to_flow(node_name, param_name)
                         if param_name not in node.parameters:
@@ -622,7 +622,7 @@ class DevModeTranslator:
         for target in targets:
 
             model_selector = job_def.runFlow.models.get(target.node)
-            model_obj = _util.get_job_resource(model_selector, job_config)
+            model_obj = _util.get_job_metadata(model_selector, job_config)
             model_param = model_obj.model.parameters.get(target.socket)
             model_params.append(model_param)
 
@@ -659,7 +659,7 @@ class DevModeTranslator:
         for target in targets:
 
             model_selector = job_def.runFlow.models.get(target.node)
-            model_obj = _util.get_job_resource(model_selector, job_config)
+            model_obj = _util.get_job_metadata(model_selector, job_config)
             model_input = model_obj.model.inputs.get(target.socket)
             model_inputs.append(model_input)
 
@@ -694,7 +694,7 @@ class DevModeTranslator:
         for source in sources:
 
             model_selector = job_def.runFlow.models.get(source.node)
-            model_obj = _util.get_job_resource(model_selector, job_config)
+            model_obj = _util.get_job_metadata(model_selector, job_config)
             model_input = model_obj.model.outputs.get(source.socket)
             model_outputs.append(model_input)
 
@@ -784,12 +784,12 @@ class DevModeTranslator:
         job_detail = self._get_job_detail(job_def)
 
         if hasattr(job_detail, "model"):
-            model_obj = _util.get_job_resource(job_detail.model, job_config)
+            model_obj = _util.get_job_metadata(job_detail.model, job_config)
             required_inputs = model_obj.model.inputs
             required_outputs = model_obj.model.outputs
 
         elif hasattr(job_detail, "flow"):
-            flow_obj = _util.get_job_resource(job_detail.flow, job_config)
+            flow_obj = _util.get_job_metadata(job_detail.flow, job_config)
             required_inputs = flow_obj.flow.inputs
             required_outputs = flow_obj.flow.outputs
 
