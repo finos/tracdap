@@ -104,7 +104,7 @@ public class JobProcessorHelpers {
     JobState applyTransform(JobState jobState) {
 
         var logic = JobLogic.forJobType(jobState.jobType);
-        var metadata = new MetadataBundle(jobState.objects, jobState.objectMapping);
+        var metadata = new MetadataBundle(jobState.objectMapping, jobState.objects, jobState.tags);
 
         jobState.definition = logic.applyTransform(jobState.definition, metadata, resources);
 
@@ -115,27 +115,27 @@ public class JobProcessorHelpers {
         return jobState;
     }
 
-    JobState loadResources(JobState jobState) {
+    JobState loadMetadata(JobState jobState) {
 
         var jobLogic = JobLogic.forJobType(jobState.jobType);
-        var resources = jobLogic.requiredMetadata(jobState.definition);
+        var selectors = jobLogic.requiredMetadata(jobState.definition);
 
-        if (resources.isEmpty()) {
+        if (selectors.isEmpty()) {
             log.info("No additional metadata required");
             return jobState;
         }
 
-        return loadResources(jobState, resources);
+        return loadMetadata(jobState, selectors);
     }
 
-    JobState loadResources(JobState jobState, List<TagSelector> resources) {
+    JobState loadMetadata(JobState jobState, List<TagSelector> selectors) {
 
         log.info("Loading additional required metadata...");
 
-        var orderedKeys = new ArrayList<String>(resources.size());
-        var orderedSelectors = new ArrayList<TagSelector>(resources.size());
+        var orderedKeys = new ArrayList<String>(selectors.size());
+        var orderedSelectors = new ArrayList<TagSelector>(selectors.size());
 
-        for (var selector : resources) {
+        for (var selector : selectors) {
             orderedKeys.add(MetadataUtil.objectKey(selector));
             orderedSelectors.add(selector);
         }
@@ -148,41 +148,47 @@ public class JobProcessorHelpers {
         var client = configureClient(metaClient, jobState);
         var batchResponse = client.readBatch(batchRequest);
 
-        return loadResourcesResponse(jobState, orderedKeys, batchResponse);
+        return loadMetadataResponse(jobState, orderedKeys, batchResponse);
     }
 
-    JobState loadResourcesResponse(
-            JobState jobState, List<String> mappingKeys,
+    JobState loadMetadataResponse(
+            JobState jobState, List<String> orderedKeys,
             MetadataBatchResponse batchResponse) {
 
-        if (batchResponse.getTagCount() != mappingKeys.size())
+        if (batchResponse.getTagCount() != orderedKeys.size())
             throw new EUnexpected();
 
         var jobLogic = JobLogic.forJobType(jobState.jobType);
 
-        var resources = new HashMap<String, ObjectDefinition>(mappingKeys.size());
-        var mappings = new HashMap<String, TagHeader>(mappingKeys.size());
+        var objectMapping = new HashMap<String, TagHeader>(orderedKeys.size());
+        var objects = new HashMap<String, ObjectDefinition>(orderedKeys.size());;
+        var tags = new HashMap<String, Tag>(orderedKeys.size());
 
-        for (var resourceIndex = 0; resourceIndex < mappingKeys.size(); resourceIndex++) {
+        for (var i = 0; i < orderedKeys.size(); i++) {
 
-            var resourceTag = batchResponse.getTag(resourceIndex);
-            var resourceKey = MetadataUtil.objectKey(resourceTag.getHeader());
-            var mappingKey = mappingKeys.get(resourceIndex);
+            var orderedKey = orderedKeys.get(i);
+            var orderedTag = batchResponse.getTag(i);
 
-            resources.put(resourceKey, resourceTag.getDefinition());
-            mappings.put(mappingKey, resourceTag.getHeader());
+            var objectKey = MetadataUtil.objectKey(orderedTag.getHeader());
+            var object_ = orderedTag.getDefinition();
+            var tag = orderedTag.toBuilder().clearDefinition().build();
+
+            objectMapping.put(orderedKey, tag.getHeader());
+            objects.put(objectKey, object_);
+            tags.put(objectKey, tag);
         }
 
-        jobState.objects.putAll(resources);
-        jobState.objectMapping.putAll(mappings);
+        jobState.objectMapping.putAll(objectMapping);
+        jobState.objects.putAll(objects);
+        jobState.tags.putAll(tags);
 
-        var extraResources = jobLogic.requiredMetadata(resources).stream()
+        var extraResources = jobLogic.requiredMetadata(objects).stream()
                 .filter(selector -> !jobState.objects.containsKey(MetadataUtil.objectKey(selector)))
                 .filter(selector -> !jobState.objectMapping.containsKey(MetadataUtil.objectKey(selector)))
                 .collect(Collectors.toList());
 
         if (!extraResources.isEmpty())
-            return loadResources(jobState, extraResources);
+            return loadMetadata(jobState, extraResources);
 
         return jobState;
     }

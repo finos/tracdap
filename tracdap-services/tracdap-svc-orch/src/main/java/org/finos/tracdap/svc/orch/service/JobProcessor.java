@@ -130,10 +130,10 @@ public class JobProcessor {
         try {
 
             // Load in all the resources referenced by the job
-            newState = lifecycle.loadResources(newState);
+            newState = lifecycle.loadMetadata(newState);
 
             // Semantic validation (job consistency)
-            var metadata = new MetadataBundle(newState.objects, newState.objectMapping);
+            var metadata = new MetadataBundle(newState.objectMapping, newState.objects, newState.tags);
             validator.validateConsistency(newState.definition, metadata, resources);
 
             newState.tracStatus = JobStatusCode.VALIDATED;

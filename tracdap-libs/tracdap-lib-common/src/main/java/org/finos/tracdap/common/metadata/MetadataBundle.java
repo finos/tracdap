@@ -19,10 +19,7 @@ package org.finos.tracdap.common.metadata;
 
 import org.finos.tracdap.common.exception.ETracInternal;
 import org.finos.tracdap.common.exception.EUnexpected;
-import org.finos.tracdap.metadata.ObjectDefinition;
-import org.finos.tracdap.metadata.ObjectType;
-import org.finos.tracdap.metadata.TagHeader;
-import org.finos.tracdap.metadata.TagSelector;
+import org.finos.tracdap.metadata.*;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -37,12 +34,18 @@ public class MetadataBundle {
             .setTagVersion(0)
             .build();
 
-    public final Map<String, ObjectDefinition> objects;
     public final Map<String, TagHeader> objectMapping;
+    public final Map<String, ObjectDefinition> objects;
+    public final Map<String, Tag> tags;
 
-    public MetadataBundle(Map<String, ObjectDefinition> objects, Map<String, TagHeader> objectMapping) {
-        this.objects = objects;
+    public MetadataBundle(
+            Map<String, TagHeader> objectMapping,
+            Map<String, ObjectDefinition> objects,
+            Map<String, Tag> tags) {
+
         this.objectMapping = objectMapping;
+        this.objects = objects;
+        this.tags = tags;
     }
 
     public Map<String, ObjectDefinition> getObjects() {
@@ -97,6 +100,6 @@ public class MetadataBundle {
             newResources.put(objectKey, update.getValue());
         }
 
-        return new MetadataBundle(newResources, objectMapping);
+        return new MetadataBundle(objectMapping, newResources, tags);
     }
 }
