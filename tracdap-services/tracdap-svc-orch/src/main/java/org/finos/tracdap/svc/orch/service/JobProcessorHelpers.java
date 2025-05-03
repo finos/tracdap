@@ -109,8 +109,8 @@ public class JobProcessorHelpers {
         jobState.definition = logic.applyTransform(jobState.definition, metadata, resources);
 
         var updatedMetadata = logic.applyMetadataTransform(jobState.definition, metadata, resources);
-        jobState.objects = updatedMetadata.getResources();
-        jobState.objectMapping = updatedMetadata.getResourceMapping();
+        jobState.objects = updatedMetadata.getObjects();
+        jobState.objectMapping = updatedMetadata.getObjectMapping();
 
         return jobState;
     }
