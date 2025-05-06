@@ -14,15 +14,17 @@
 #  limitations under the License.
 
 import copy
+import dataclasses as dc  # noqa
 import datetime
 import abc
 import io
 import pathlib
 import random
-import dataclasses as dc  # noqa
+import typing as tp
 
 import tracdap.rt.api as _api
-import tracdap.rt.config as _config
+import tracdap.rt.metadata as _meta
+import tracdap.rt.config as _cfg
 import tracdap.rt.exceptions as _ex
 import tracdap.rt._impl.exec.context as _ctx
 import tracdap.rt._impl.exec.graph_builder as _graph
@@ -217,26 +219,26 @@ class RuntimeOutputsFunc(NodeFunction[JobOutputs]):
         return self.node.outputs
 
 
-class BuildJobResultFunc(NodeFunction[_config.JobResult]):
+class BuildJobResultFunc(NodeFunction[_cfg.JobResult]):
 
     def __init__(self, node: BuildJobResultNode):
         super().__init__()
         self.node = node
 
-    def _execute(self, ctx: NodeContext) -> _config.JobResult:
+    def _execute(self, ctx: NodeContext) -> _cfg.JobResult:
 
-        job_result = _config.JobResult()
+        job_result = _cfg.JobResult()
         job_result.jobId = self.node.job_id
-        job_result.statusCode = meta.JobStatusCode.SUCCEEDED
+        job_result.statusCode = _meta.JobStatusCode.SUCCEEDED
 
         if self.node.result_id is not None:
 
-            result_def = meta.ResultDefinition()
+            result_def = _meta.ResultDefinition()
             result_def.jobId = _util.selector_for(self.node.job_id)
-            result_def.statusCode = meta.JobStatusCode.SUCCEEDED
+            result_def.statusCode = _meta.JobStatusCode.SUCCEEDED
 
             result_key = _util.object_key(self.node.result_id)
-            result_obj = meta.ObjectDefinition(objectType=meta.ObjectType.RESULT, result=result_def)
+            result_obj = _meta.ObjectDefinition(objectType=_meta.ObjectType.RESULT, result=result_def)
 
             job_result.results[result_key] = result_obj
 
@@ -281,12 +283,12 @@ class DataViewFunc(NodeFunction[_data.DataView]):
             return _data.DataView.create_empty(root_item.object_type)
 
         # Handle file data views
-        if root_item.object_type == meta.ObjectType.FILE:
+        if root_item.object_type == _meta.ObjectType.FILE:
             return _data.DataView.for_file_item(root_item)
 
         # TODO: Generalize processing across DataView / DataItem types
 
-        if root_item.schema_type == meta.SchemaType.STRUCT:
+        if root_item.schema_type == _meta.SchemaType.STRUCT:
             view = _data.DataView.for_trac_schema(self.node.schema)
             view.parts[root_part_key] = [root_item]
             return view
@@ -319,7 +321,7 @@ class DataItemFunc(NodeFunction[_data.DataItem]):
             return _data.DataItem.create_empty(data_view.object_type)
 
         # Handle file data views
-        if data_view.object_type == meta.ObjectType.FILE:
+        if data_view.object_type == _meta.ObjectType.FILE:
             return data_view.file_item
 
         # TODO: Support selecting data item described by self.node
@@ -349,13 +351,13 @@ class DataResultFunc(NodeFunction[ObjectBundle]):
             return result_bundle
 
         if self.node.data_key is not None:
-            result_bundle[self.node.data_key] = meta.ObjectDefinition(objectType=meta.ObjectType.DATA, data=data_spec.data_def)
+            result_bundle[self.node.data_key] = _meta.ObjectDefinition(objectType=_meta.ObjectType.DATA, data=data_spec.data_def)
 
         if self.node.file_key is not None:
-            result_bundle[self.node.file_key] = meta.ObjectDefinition(objectType=meta.ObjectType.FILE, file=data_spec.file_def)
+            result_bundle[self.node.file_key] = _meta.ObjectDefinition(objectType=_meta.ObjectType.FILE, file=data_spec.file_def)
 
         if self.node.storage_key is not None:
-            result_bundle[self.node.storage_key] = meta.ObjectDefinition(objectType=meta.ObjectType.STORAGE, storage=data_spec.storage_def)
+            result_bundle[self.node.storage_key] = _meta.ObjectDefinition(objectType=_meta.ObjectType.STORAGE, storage=data_spec.storage_def)
 
         return result_bundle
 
@@ -394,7 +396,7 @@ class DynamicDataSpecFunc(NodeFunction[_data.DataSpec]):
 
         object_timestamp = datetime.datetime.now(datetime.timezone.utc)
 
-        part_key = meta.PartKey("part-root", meta.PartType.PART_ROOT)
+        part_key = _meta.PartKey("part-root", _meta.PartType.PART_ROOT)
         snap_index = 0
         delta_index = 0
 
@@ -404,11 +406,11 @@ class DynamicDataSpecFunc(NodeFunction[_data.DataSpec]):
             data_type, data_id.objectId,
             part_key.opaqueKey, snap_index, delta_index)
 
-        delta = meta.DataDefinition.Delta(delta_index, data_item)
-        snap = meta.DataDefinition.Snap(snap_index, [delta])
-        part = meta.DataDefinition.Part(part_key, snap)
+        delta = _meta.DataDefinition.Delta(delta_index, data_item)
+        snap = _meta.DataDefinition.Snap(snap_index, [delta])
+        part = _meta.DataDefinition.Part(part_key, snap)
 
-        data_def = meta.DataDefinition()
+        data_def = _meta.DataDefinition()
         data_def.storageId = _util.selector_for_latest(storage_id)
         data_def.schema = data_view.trac_schema
         data_def.parts[part_key.opaqueKey] = part
@@ -422,20 +424,20 @@ class DynamicDataSpecFunc(NodeFunction[_data.DataSpec]):
             part_key.opaqueKey, snap_index, delta_index,
             storage_suffix_bytes)
 
-        storage_copy = meta.StorageCopy(
+        storage_copy = _meta.StorageCopy(
             storage_key, storage_path, storage_format,
-            copyStatus=meta.CopyStatus.COPY_AVAILABLE,
-            copyTimestamp=meta.DatetimeValue(object_timestamp.isoformat()))
+            copyStatus=_meta.CopyStatus.COPY_AVAILABLE,
+            copyTimestamp=_meta.DatetimeValue(object_timestamp.isoformat()))
 
-        storage_incarnation = meta.StorageIncarnation(
+        storage_incarnation = _meta.StorageIncarnation(
             [storage_copy],
             incarnationIndex=0,
-            incarnationTimestamp=meta.DatetimeValue(object_timestamp.isoformat()),
-            incarnationStatus=meta.IncarnationStatus.INCARNATION_AVAILABLE)
+            incarnationTimestamp=_meta.DatetimeValue(object_timestamp.isoformat()),
+            incarnationStatus=_meta.IncarnationStatus.INCARNATION_AVAILABLE)
 
-        storage_item = meta.StorageItem([storage_incarnation])
+        storage_item = _meta.StorageItem([storage_incarnation])
 
-        storage_def = meta.StorageDefinition()
+        storage_def = _meta.StorageDefinition()
         storage_def.dataItems[data_item] = storage_item
 
         # Dynamic data def will always use an embedded schema (this is no ID for an external schema)
@@ -458,7 +460,7 @@ class _LoadSaveDataFunc(abc.ABC):
         else:
             raise _ex.EUnexpected()
 
-    def _choose_copy(self, data_item: str, storage_def: meta.StorageDefinition) -> meta.StorageCopy:
+    def _choose_copy(self, data_item: str, storage_def: _meta.StorageDefinition) -> _meta.StorageCopy:
 
         # Metadata should be checked for consistency before a job is accepted
         # An error here indicates a validation gap
@@ -469,15 +471,15 @@ class _LoadSaveDataFunc(abc.ABC):
             raise _ex.EValidationGap()
 
         incarnation = next(filter(
-            lambda i: i.incarnationStatus == meta.IncarnationStatus.INCARNATION_AVAILABLE,
+            lambda i: i.incarnationStatus == _meta.IncarnationStatus.INCARNATION_AVAILABLE,
             reversed(storage_info.incarnations)), None)
 
         if incarnation is None:
             raise _ex.EValidationGap()
 
         copy_ = next(filter(
-            lambda c: c.copyStatus == meta.CopyStatus.COPY_AVAILABLE
-            and self.storage.has_data_storage(c.storageKey),
+            lambda c: c.copyStatus == _meta.CopyStatus.COPY_AVAILABLE
+                      and self.storage.has_data_storage(c.storageKey),
             incarnation.copies), None)
 
         if copy_ is None:
@@ -643,9 +645,9 @@ class SaveDataFunc(_LoadSaveDataFunc, NodeFunction[_data.DataSpec]):
 
         return data_spec
 
-def _model_def_for_import(import_details: meta.ImportModelJob):
+def _model_def_for_import(import_details: _meta.ImportModelJob):
 
-    return meta.ModelDefinition(
+    return _meta.ModelDefinition(
         language=import_details.language,
         repository=import_details.repository,
         packageGroup=import_details.packageGroup,
@@ -655,21 +657,21 @@ def _model_def_for_import(import_details: meta.ImportModelJob):
         path=import_details.path)
 
 
-class ImportModelFunc(NodeFunction[meta.ObjectDefinition]):
+class ImportModelFunc(NodeFunction[_meta.ObjectDefinition]):
 
     def __init__(self, node: ImportModelNode, models: _models.ModelLoader):
         super().__init__()
         self.node = node
         self._models = models
 
-    def _execute(self, ctx: NodeContext) -> meta.ObjectDefinition:
+    def _execute(self, ctx: NodeContext) -> _meta.ObjectDefinition:
 
         model_stub = _model_def_for_import(self.node.import_details)
 
         model_class = self._models.load_model_class(self.node.model_scope, model_stub)
         model_def = self._models.scan_model(model_stub, model_class)
 
-        return meta.ObjectDefinition(meta.ObjectType.MODEL, model=model_def)
+        return _meta.ObjectDefinition(_meta.ObjectType.MODEL, model=model_def)
 
 
 class RunModelFunc(NodeFunction[Bundle[_data.DataView]]):
@@ -709,7 +711,7 @@ class RunModelFunc(NodeFunction[Bundle[_data.DataView]]):
         storage_map = {}
 
         if self.node.storage_access:
-            write_access = True if self.node.model_def.modelType == meta.ModelType.DATA_EXPORT_MODEL else False
+            write_access = True if self.node.model_def.modelType == _meta.ModelType.DATA_EXPORT_MODEL else False
             for storage_key in self.node.storage_access:
                 if self.storage_manager.has_file_storage(storage_key, external=True):
                     storage_impl = self.storage_manager.get_file_storage(storage_key, external=True)
@@ -729,7 +731,7 @@ class RunModelFunc(NodeFunction[Bundle[_data.DataView]]):
 
         # Run the model against the mapped local context
 
-        if model_def.modelType in [meta.ModelType.DATA_IMPORT_MODEL, meta.ModelType.DATA_EXPORT_MODEL]:
+        if model_def.modelType in [_meta.ModelType.DATA_IMPORT_MODEL, _meta.ModelType.DATA_EXPORT_MODEL]:
             trac_ctx = _ctx.TracDataContextImpl(
                 self.node.model_def, self.model_class,
                 local_ctx, dynamic_outputs, storage_map,
