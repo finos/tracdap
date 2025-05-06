@@ -13,18 +13,18 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import typing as tp
-import dataclasses as dc
+import typing as _tp
+import dataclasses as _dc
 
 import tracdap.rt._impl.core.data as _data
-import tracdap.rt.metadata as meta
-import tracdap.rt.config as cfg
+import tracdap.rt.metadata as _meta
+import tracdap.rt.config as _cfg
 
 
-_T = tp.TypeVar('_T')
+_T = _tp.TypeVar('_T')
 
 
-@dc.dataclass(frozen=True)
+@_dc.dataclass(frozen=True)
 class NodeNamespace:
 
     __ROOT = None
@@ -36,7 +36,7 @@ class NodeNamespace:
         return cls.__ROOT
 
     name: str
-    parent: "tp.Optional[NodeNamespace]" = dc.field(default_factory=lambda: NodeNamespace.root())
+    parent: "_tp.Optional[NodeNamespace]" = _dc.field(default_factory=lambda: NodeNamespace.root())
 
     def __str__(self):
         if self is self.__ROOT:
@@ -56,17 +56,17 @@ class NodeNamespace:
             return [self.name] + self.parent.components()
 
 
-@dc.dataclass(frozen=True)
-class NodeId(tp.Generic[_T]):
+@_dc.dataclass(frozen=True)
+class NodeId(_tp.Generic[_T]):
 
     @staticmethod
-    def of(name: str, namespace: NodeNamespace, result_type: tp.Type[_T]) -> "NodeId[_T]":
+    def of(name: str, namespace: NodeNamespace, result_type: _tp.Type[_T]) -> "NodeId[_T]":
         return NodeId(name, namespace, result_type)
 
     name: str
     namespace: NodeNamespace
 
-    result_type: tp.Type[_T] = dc.field(default=type(None), init=True, compare=False, hash=False)
+    result_type: _tp.Type[_T] = _dc.field(default=type(None), init=True, compare=False, hash=False)
 
     def __str__(self):
         return f"{self.name} / {self.namespace}"
@@ -75,14 +75,14 @@ class NodeId(tp.Generic[_T]):
         return f"{self.name} / {repr(self.namespace)}"
 
 
-@dc.dataclass(frozen=True)
+@_dc.dataclass(frozen=True)
 class DependencyType:
 
     immediate: bool = True
     tolerant: bool = False
 
-    HARD: "tp.ClassVar[DependencyType]"
-    TOLERANT: "tp.ClassVar[DependencyType]"
+    HARD: "_tp.ClassVar[DependencyType]"
+    TOLERANT: "_tp.ClassVar[DependencyType]"
 
 
 DependencyType.HARD = DependencyType(immediate=True, tolerant=False)
@@ -91,31 +91,31 @@ DependencyType.TOLERANT = DependencyType(immediate=True, tolerant=True)
 DependencyType.DELAYED = DependencyType(immediate=False, tolerant=False)
 
 
-@dc.dataclass(frozen=True)
+@_dc.dataclass(frozen=True)
 class Dependency:
 
     node_id: NodeId
     dependency_type: DependencyType
 
 
-@dc.dataclass(frozen=True)
-class Node(tp.Generic[_T]):
+@_dc.dataclass(frozen=True)
+class Node(_tp.Generic[_T]):
 
     """A node in the TRAC execution graph"""
 
     id: NodeId[_T]
     """ID of this node"""
 
-    dependencies: tp.Dict[NodeId, DependencyType] = dc.field(init=False, default_factory=dict)
+    dependencies: _tp.Dict[NodeId, DependencyType] = _dc.field(init=False, default_factory=dict)
     """Set of node IDs that are dependencies for this node"""
 
-    bundle_result: bool = dc.field(init=False, default=False)
+    bundle_result: bool = _dc.field(init=False, default=False)
     """Flag indicating whether the result of this node is a bundle"""
 
-    bundle_namespace: tp.Optional[NodeNamespace] = dc.field(init=False, default=None)
+    bundle_namespace: _tp.Optional[NodeNamespace] = _dc.field(init=False, default=None)
     """If the result is a bundle, indicates the namespace that the bundle will be unpacked into"""
 
-    def _node_dependencies(self) -> tp.Dict[NodeId, DependencyType]:
+    def _node_dependencies(self) -> _tp.Dict[NodeId, DependencyType]:
         return {}
 
 
@@ -129,11 +129,11 @@ def _node_type(node_class):
 
     class NodeBuilder(Node):
 
-        explicit_deps: dc.InitVar[tp.List[NodeId]] = None
+        explicit_deps: _dc.InitVar[_tp.List[NodeId]] = None
 
-        bundle: dc.InitVar[NodeNamespace] = None
+        bundle: _dc.InitVar[NodeNamespace] = None
 
-        def __post_init__(self, explicit_deps: tp.List[NodeId], bundle: NodeNamespace):
+        def __post_init__(self, explicit_deps: _tp.List[NodeId], bundle: NodeNamespace):
             dependencies = self._node_dependencies()
             if explicit_deps:
                 dependencies.update({dep_id: DependencyType.HARD for dep_id in explicit_deps})
@@ -148,37 +148,37 @@ def _node_type(node_class):
 
     node_class.__annotations__.update(NodeBuilder.__annotations__)
 
-    return dc.dataclass(frozen=True)(node_class)
+    return _dc.dataclass(frozen=True)(node_class)
 
 
-NodeMap = tp.Dict[NodeId, Node]
+NodeMap = _tp.Dict[NodeId, Node]
 
 
-@dc.dataclass(frozen=True)
+@_dc.dataclass(frozen=True)
 class Graph:
 
     nodes: NodeMap
     root_id: NodeId
 
 
-@dc.dataclass(frozen=False)
+@_dc.dataclass(frozen=False)
 class GraphSection:
 
     nodes: NodeMap
-    inputs: tp.Set[NodeId] = dc.field(default_factory=set)
-    outputs: tp.Set[NodeId] = dc.field(default_factory=set)
-    must_run: tp.List[NodeId] = dc.field(default_factory=list)
+    inputs: _tp.Set[NodeId] = _dc.field(default_factory=set)
+    outputs: _tp.Set[NodeId] = _dc.field(default_factory=set)
+    must_run: _tp.List[NodeId] = _dc.field(default_factory=list)
 
 
-Bundle: tp.Generic[_T] = tp.Dict[str, _T]
-ObjectBundle = Bundle[meta.ObjectDefinition]
+Bundle: _tp.Generic[_T] = _tp.Dict[str, _T]
+ObjectBundle = Bundle[_meta.ObjectDefinition]
 
 
-@dc.dataclass(frozen=True)
+@_dc.dataclass(frozen=True)
 class JobOutputs:
 
-    objects: tp.Dict[str, NodeId[meta.ObjectDefinition]] = dc.field(default_factory=dict)
-    bundles: tp.List[NodeId[ObjectBundle]] = dc.field(default_factory=list)
+    objects: _tp.Dict[str, NodeId[_meta.ObjectDefinition]] = _dc.field(default_factory=dict)
+    bundles: _tp.List[NodeId[ObjectBundle]] = _dc.field(default_factory=list)
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -206,18 +206,18 @@ class BundleItemNode(MappingNode[_T]):
     bundle_id: NodeId[Bundle[_T]]
     bundle_item: str
 
-    def _node_dependencies(self) -> tp.Dict[NodeId, DependencyType]:
+    def _node_dependencies(self) -> _tp.Dict[NodeId, DependencyType]:
         return {self.bundle_id: DependencyType.HARD}
 
 
 @_node_type
-class ContextPushNode(Node[Bundle[tp.Any]]):
+class ContextPushNode(Node[Bundle[_tp.Any]]):
 
     """Push a new execution context onto the stack"""
 
     namespace: NodeNamespace
 
-    mapping: tp.Dict[NodeId, NodeId] = dc.field(default_factory=dict)
+    mapping: _tp.Dict[NodeId, NodeId] = _dc.field(default_factory=dict)
     """Mapping of node IDs from the inner to the outer context (i.e. keys are in the context being pushed)"""
 
     def _node_dependencies(self):
@@ -226,11 +226,11 @@ class ContextPushNode(Node[Bundle[tp.Any]]):
 
 
 @_node_type
-class ContextPopNode(Node[Bundle[tp.Any]]):
+class ContextPopNode(Node[Bundle[_tp.Any]]):
 
     namespace: NodeNamespace
 
-    mapping: tp.Dict[NodeId, NodeId] = dc.field(default_factory=dict)
+    mapping: _tp.Dict[NodeId, NodeId] = _dc.field(default_factory=dict)
     """Mapping of node IDs from the inner to the outer context (i.e. keys are in the context being popped)"""
 
     def _node_dependencies(self):
@@ -245,7 +245,7 @@ class IdentityNode(MappingNode[_T]):
 
     src_id: NodeId[_T]
 
-    def _node_dependencies(self) -> tp.Dict[NodeId, DependencyType]:
+    def _node_dependencies(self) -> _tp.Dict[NodeId, DependencyType]:
         return {self.src_id: DependencyType.HARD}
 
 
@@ -257,7 +257,7 @@ class KeyedItemNode(MappingNode[_T]):
     src_id: NodeId[Bundle[_T]]
     src_item: str
 
-    def _node_dependencies(self) -> tp.Dict[NodeId, DependencyType]:
+    def _node_dependencies(self) -> _tp.Dict[NodeId, DependencyType]:
         return {self.src_id: DependencyType.HARD}
 
 
@@ -266,22 +266,22 @@ class DynamicDataSpecNode(Node[_data.DataSpec]):
 
     data_view_id: NodeId[_data.DataView]
 
-    data_obj_id: meta.TagHeader
-    storage_obj_id: meta.TagHeader
+    data_obj_id: _meta.TagHeader
+    storage_obj_id: _meta.TagHeader
 
-    prior_data_spec: tp.Optional[_data.DataSpec]
+    prior_data_spec: _tp.Optional[_data.DataSpec]
 
-    def _node_dependencies(self) -> tp.Dict[NodeId, DependencyType]:
+    def _node_dependencies(self) -> _tp.Dict[NodeId, DependencyType]:
         return {self.data_view_id: DependencyType.HARD}
 
 
 @_node_type
 class DataViewNode(Node[_data.DataView]):
 
-    schema: meta.SchemaDefinition
+    schema: _meta.SchemaDefinition
     root_item: NodeId[_data.DataItem]
 
-    def _node_dependencies(self) -> tp.Dict[NodeId, DependencyType]:
+    def _node_dependencies(self) -> _tp.Dict[NodeId, DependencyType]:
         return {self.root_item: DependencyType.HARD}
 
 
@@ -292,7 +292,7 @@ class DataItemNode(MappingNode[_data.DataItem]):
 
     data_view_id: NodeId[_data.DataView]
 
-    def _node_dependencies(self) -> tp.Dict[NodeId, DependencyType]:
+    def _node_dependencies(self) -> _tp.Dict[NodeId, DependencyType]:
         return {self.data_view_id: DependencyType.HARD}
 
 
@@ -309,7 +309,7 @@ class DataResultNode(Node[ObjectBundle]):
     file_key: str = None
     storage_key: str = None
 
-    def _node_dependencies(self) -> tp.Dict[NodeId, DependencyType]:
+    def _node_dependencies(self) -> _tp.Dict[NodeId, DependencyType]:
         return {self.data_save_id: DependencyType.HARD}
 
 
@@ -321,10 +321,10 @@ class LoadDataNode(Node[_data.DataItem]):
     The latest incarnation of the item will be loaded from any available copy
     """
 
-    spec_id: tp.Optional[NodeId[_data.DataSpec]] = None
-    spec: tp.Optional[_data.DataSpec] = None
+    spec_id: _tp.Optional[NodeId[_data.DataSpec]] = None
+    spec: _tp.Optional[_data.DataSpec] = None
 
-    def _node_dependencies(self) -> tp.Dict[NodeId, DependencyType]:
+    def _node_dependencies(self) -> _tp.Dict[NodeId, DependencyType]:
         deps = dict()
         if self.spec_id is not None:
             deps[self.spec_id] = DependencyType.HARD
@@ -340,10 +340,10 @@ class SaveDataNode(Node[_data.DataSpec]):
 
     data_item_id: NodeId[_data.DataItem]
 
-    spec_id: tp.Optional[NodeId[_data.DataSpec]] = None
-    spec: tp.Optional[_data.DataSpec] = None
+    spec_id: _tp.Optional[NodeId[_data.DataSpec]] = None
+    spec: _tp.Optional[_data.DataSpec] = None
 
-    def _node_dependencies(self) -> tp.Dict[NodeId, DependencyType]:
+    def _node_dependencies(self) -> _tp.Dict[NodeId, DependencyType]:
         deps = {self.data_item_id: DependencyType.HARD}
         if self.spec_id is not None:
             deps[self.spec_id] = DependencyType.HARD
@@ -351,22 +351,22 @@ class SaveDataNode(Node[_data.DataSpec]):
 
 
 @_node_type
-class ImportModelNode(Node[meta.ObjectDefinition]):
+class ImportModelNode(Node[_meta.ObjectDefinition]):
 
     model_scope: str
-    import_details: meta.ImportModelJob
+    import_details: _meta.ImportModelJob
 
 
 @_node_type
 class RunModelNode(Node[Bundle[_data.DataView]]):
 
     model_scope: str
-    model_def: meta.ModelDefinition
-    parameter_ids: tp.FrozenSet[NodeId]
-    input_ids: tp.FrozenSet[NodeId]
-    storage_access: tp.Optional[tp.List[str]] = None
+    model_def: _meta.ModelDefinition
+    parameter_ids: _tp.FrozenSet[NodeId]
+    input_ids: _tp.FrozenSet[NodeId]
+    storage_access: _tp.Optional[_tp.List[str]] = None
 
-    def _node_dependencies(self) -> tp.Dict[NodeId, DependencyType]:
+    def _node_dependencies(self) -> _tp.Dict[NodeId, DependencyType]:
         return {dep_id: DependencyType.HARD for dep_id in [*self.parameter_ids, *self.input_ids]}
 
 
@@ -375,7 +375,7 @@ class RunModelResultNode(Node[None]):
 
     model_id: NodeId
 
-    def _node_dependencies(self) -> tp.Dict[NodeId, DependencyType]:
+    def _node_dependencies(self) -> _tp.Dict[NodeId, DependencyType]:
         return {self.model_id: DependencyType.HARD}
 
 
@@ -384,21 +384,21 @@ class RuntimeOutputsNode(Node[JobOutputs]):
 
     outputs: JobOutputs
 
-    def _node_dependencies(self) -> tp.Dict[NodeId, DependencyType]:
+    def _node_dependencies(self) -> _tp.Dict[NodeId, DependencyType]:
         dep_ids = [*self.outputs.bundles, *self.outputs.objects.values()]
         return {node_id: DependencyType.HARD for node_id in dep_ids}
 
 
 @_node_type
-class BuildJobResultNode(Node[cfg.JobResult]):
+class BuildJobResultNode(Node[_cfg.JobResult]):
 
-    result_id: meta.TagHeader
-    job_id: meta.TagHeader
+    result_id: _meta.TagHeader
+    job_id: _meta.TagHeader
 
     outputs: JobOutputs
-    runtime_outputs: tp.Optional[NodeId[JobOutputs]] = None
+    runtime_outputs: _tp.Optional[NodeId[JobOutputs]] = None
 
-    def _node_dependencies(self) -> tp.Dict[NodeId, DependencyType]:
+    def _node_dependencies(self) -> _tp.Dict[NodeId, DependencyType]:
         dep_ids = [*self.outputs.bundles, *self.outputs.objects.values()]
         if self.runtime_outputs is not None:
             dep_ids.append(self.runtime_outputs)
@@ -406,9 +406,9 @@ class BuildJobResultNode(Node[cfg.JobResult]):
 
 
 @_node_type
-class ChildJobNode(Node[cfg.JobResult]):
+class ChildJobNode(Node[_cfg.JobResult]):
 
-    job_id: meta.TagHeader
-    job_def: meta.JobDefinition
+    job_id: _meta.TagHeader
+    job_def: _meta.JobDefinition
 
     graph: Graph
