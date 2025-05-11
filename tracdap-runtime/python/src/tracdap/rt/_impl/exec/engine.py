@@ -286,26 +286,14 @@ class TracEngine(_actors.Actor):
         job_state = self._jobs[job_key]
         job_state.log.error(f"Recording job as failed: {job_key}")
 
+        result_id = job_state.job_config.resultId
+        result_def = _meta.ResultDefinition()
+        result_def.jobId = _util.selector_for(job_state.job_id)
+        result_def.statusCode = _meta.JobStatusCode.FAILED
+        result_def.statusMessage = str(error)
+
+        job_state.job_result = _cfg.JobResult(result_id, result_def)
         job_state.job_error = error
-
-        # Create a failed result so there is something to report
-        result_id = job_state.job_config.resultMapping.get("trac_job_result")
-
-        if result_id is not None:
-
-            job_state.job_result = _cfg.JobResult(
-                jobId=job_state.job_id,
-                statusCode=_meta.JobStatusCode.FAILED,
-                statusMessage=str(error))
-
-            result_def = _meta.ResultDefinition()
-            result_def.jobId = _util.selector_for(job_state.job_id)
-            result_def.statusCode = _meta.JobStatusCode.FAILED
-
-            result_key = _util.object_key(result_id)
-            result_obj = _meta.ObjectDefinition(objectType=_meta.ObjectType.RESULT, result=result_def)
-
-            job_state.job_result.results[result_key] = result_obj
 
         for monitor_id in job_state.monitors:
             self.actors().send(monitor_id, "job_failed", error)
@@ -403,24 +391,28 @@ class TracEngine(_actors.Actor):
 
         job_result = _cfg.JobResult()
         job_result.jobId = job_state.job_id
+        job_result.resultId = job_state.job_config.resultId
+        job_result.result = _meta.ResultDefinition()
+        job_result.result.jobId = _util.selector_for(job_state.job_id)
 
         if job_state.actor_id is not None:
-            job_result.statusCode = _meta.JobStatusCode.RUNNING
+            job_result.result.statusCode = _meta.JobStatusCode.RUNNING
 
         elif job_state.job_result is not None:
-            job_result.statusCode = job_state.job_result.statusCode
-            job_result.statusMessage = job_state.job_result.statusMessage
+            job_result.result.statusCode = job_state.job_result.result.statusCode
+            job_result.result.statusMessage = job_state.job_result.result.statusMessage
             if details:
-                job_result.results = job_state.job_result.results or dict()
+                job_result.objectIds = job_state.job_result.objectIds or list()
+                job_result.objects = job_state.job_result.objects or dict()
 
         elif job_state.job_error is not None:
-            job_result.statusCode = _meta.JobStatusCode.FAILED
-            job_result.statusMessage = str(job_state.job_error.args[0])
+            job_result.result.statusCode = _meta.JobStatusCode.FAILED
+            job_result.result.statusMessage = str(job_state.job_error.args[0])
 
         else:
             # Alternatively return UNKNOWN status or throw an error here
-            job_result.statusCode = _meta.JobStatusCode.FAILED
-            job_result.statusMessage = "No details available"
+            job_result.result.statusCode = _meta.JobStatusCode.FAILED
+            job_result.result.statusMessage = "No details available"
 
         return job_result
 
@@ -529,6 +521,7 @@ class JobProcessor(_actors.Actor):
         graph.pending_nodes.update(graph.nodes.keys())
 
         self.actors().spawn(FunctionResolver(self._resolver, self._log_provider, graph))
+
         if self.actors().sender != self.actors().id and self.actors().sender != self.actors().parent:
             self.actors().stop(self.actors().sender)
 
@@ -536,6 +529,7 @@ class JobProcessor(_actors.Actor):
     def resolve_functions_succeeded(self, graph: _EngineContext):
 
         self.actors().spawn(GraphProcessor(graph, self._resolver, self._log_provider))
+
         if self.actors().sender != self.actors().id and self.actors().sender != self.actors().parent:
             self.actors().stop(self.actors().sender)
 
@@ -1307,8 +1301,5 @@ class NodeCallbackImpl(_func.NodeCallback):
         self.__actor_ctx = actor_ctx
         self.__node_id = node_id
 
-    def send_graph_updates(
-            self, new_nodes: tp.Dict[NodeId, _graph.Node],
-            new_deps: tp.Dict[NodeId, tp.List[_graph.Dependency]]):
-
-        self.__actor_ctx.send_parent("update_graph", self.__node_id, new_nodes, new_deps)
+    def send_graph_update(self, update: _graph.GraphUpdate):
+        self.__actor_ctx.send_parent("update_graph", self.__node_id, update)
