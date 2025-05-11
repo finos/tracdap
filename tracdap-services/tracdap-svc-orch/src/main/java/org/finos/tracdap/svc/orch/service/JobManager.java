@@ -312,12 +312,12 @@ public class JobManager {
             for (var i = 0; i < runningJobs.size(); i++) {
 
                 var job = runningJobs.get(i);
-                var pollResult = pollResults.get(i);
+                var runtimeStatus = pollResults.get(i);
                 var priorStatus = job.value().runtimeStatus;
 
-                if (priorStatus == null || pollResult.getStatusCode() != priorStatus.getStatusCode()) {
+                if (priorStatus == null || runtimeStatus.getStatusCode() != priorStatus.getStatusCode()) {
 
-                    var operation = getNextOperation(job, pollResult);
+                    var operation = getNextOperation(job, runtimeStatus);
                     javaExecutor.submit(() -> processJobOperation(operation));
                 }
             }
@@ -462,7 +462,7 @@ public class JobManager {
         return operation;
     }
 
-    private JobOperation getNextOperation(CacheEntry<JobState> cacheEntry, RuntimeJobStatus pollResult) {
+    private JobOperation getNextOperation(CacheEntry<JobState> cacheEntry, RuntimeJobStatus runtimeStatus) {
 
         var operation = new JobOperation();
         operation.jobKey = cacheEntry.key();
@@ -473,7 +473,7 @@ public class JobManager {
         if (STATUS_FOR_RUNNING_JOBS.contains(cacheEntry.status())) {
 
             operation.operationName = "record_job_status";
-            operation.operation = state -> processor.recordJobStatus(state, pollResult);
+            operation.operation = state -> processor.recordJobStatus(state, runtimeStatus);
         }
         else {
 
