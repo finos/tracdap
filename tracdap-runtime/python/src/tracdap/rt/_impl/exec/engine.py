@@ -543,19 +543,27 @@ class JobProcessor(_actors.Actor):
         # This will be the last message in the job log file
         self._log.error(f"Job failed [{self.job_key}]")
 
-        job_id = self.job_config.jobId
-        result_id = self.job_config.resultId
-        result_def = _meta.ResultDefinition()
-        result_def.jobId = _util.selector_for(job_id)
-        result_def.statusCode = _meta.JobStatusCode.FAILED
-        result_def.statusMessage = str(error)
-
-        job_result = _cfg.JobResult(job_id, result_id, result_def)
-
-        self._save_job_log_file(job_result)
-
         self.actors().stop(self.actors().sender)
-        self.actors().send_parent("job_failed", self.job_key, error, job_result)
+
+        # For top level jobs, build a failed job result and save the log file
+        if self.job_config is not None:
+
+            job_id = self.job_config.jobId
+            result_id = self.job_config.resultId
+            result_def = _meta.ResultDefinition()
+            result_def.jobId = _util.selector_for(job_id)
+            result_def.statusCode = _meta.JobStatusCode.FAILED
+            result_def.statusMessage = str(error)
+            job_result = _cfg.JobResult(job_id, result_id, result_def)
+
+            self._save_job_log_file(job_result)
+
+            self.actors().send_parent("job_failed", self.job_key, error, job_result)
+
+        # For child jobs, just send the error response
+        # Result and log file will be handled in the top level job
+        else:
+            self.actors().send_parent("job_failed", self.job_key, error)
 
     def _save_job_log_file(self, job_result: _cfg.JobResult):
 
