@@ -171,12 +171,7 @@ class GraphBuilder:
         main_section = GraphSection(nodes={import_id: import_node})
 
         # RESULT will have a single (unnamed) output
-        output_keys = []
-        output_ids = [import_id]
-
-        result_section = self.build_job_result(
-            output_keys, output_ids,
-            explicit_deps=[job_push_id, *main_section.must_run])
+        result_section = self.build_job_result([import_id], explicit_deps=[job_push_id, *main_section.must_run])
 
         return self._join_sections(main_section, result_section)
 
@@ -338,14 +333,18 @@ class GraphBuilder:
 
         # Build job-level metadata outputs
 
-        output_keys = list(required_outputs.keys())
-
         output_ids = list(
             nid for nid, n in main_section.nodes.items()
             if nid.result_type == GraphOutput or isinstance(n, SaveDataNode))
 
+        # Map the SAVE nodes to their corresponding named output keys
+        output_keys = dict(
+            (nid, nid.name.replace(":SAVE", ""))
+            for nid, n in output_section.nodes.items()
+            if isinstance(n, SaveDataNode))
+
         result_section = self.build_job_result(
-            output_keys, output_ids,
+            output_ids, output_keys,
             explicit_deps=[job_push_id, *main_section.must_run])
 
         return self._join_sections(main_section, result_section)
@@ -841,27 +840,6 @@ class GraphBuilder:
             model_type = model_def.modelType.name
             self._error(_ex.EJobValidation(f"Job type [{job_type}] cannot use model type [{model_type}]"))
 
-    def build_job_result(
-            self, output_keys: _tp.List[str],
-            output_ids: _tp.List[NodeId[JOB_OUTPUT_TYPE]],
-            explicit_deps: _tp.Optional[_tp.List[NodeId]] = None) \
-            -> GraphSection:
-
-        named_outputs = dict((oid.name, oid) for oid in filter(lambda oid: oid in output_keys, output_ids))
-        unnamed_outputs = list(filter(lambda oid: oid.name not in output_keys, output_ids))
-
-        result_node_id = NodeId.of("trac_job_result", self._job_namespace, _cfg.JobResult)
-        result_node = JobResultNode(
-            result_node_id,
-            self._job_config.jobId,
-            self._job_config.resultId,
-            named_outputs, unnamed_outputs,
-            explicit_deps=explicit_deps)
-
-        result_nodes = {result_node_id: result_node}
-
-        return GraphSection(result_nodes, inputs=set(output_ids), must_run=[result_node_id])
-
     @staticmethod
     def build_context_push(
             namespace: NodeNamespace, input_mapping: _tp.Dict[str, NodeId],
@@ -927,6 +905,31 @@ class GraphBuilder:
             inputs={*pop_mapping.keys()},
             outputs={*pop_mapping.values()},
             must_run=[pop_id])
+
+    def build_job_result(
+            self, output_ids: _tp.List[NodeId[JOB_OUTPUT_TYPE]],
+            output_keys: _tp.Optional[_tp.Dict[NodeId, str]] = None,
+            explicit_deps: _tp.Optional[_tp.List[NodeId]] = None) \
+            -> GraphSection:
+
+        if output_keys:
+            named_outputs = dict((output_keys[oid], oid) for oid in filter(lambda oid: oid in output_keys, output_ids))
+            unnamed_outputs = list(filter(lambda oid: oid not in output_keys, output_ids))
+        else:
+            named_outputs = dict()
+            unnamed_outputs = output_ids
+
+        result_node_id = NodeId.of("trac_job_result", self._job_namespace, _cfg.JobResult)
+        result_node = JobResultNode(
+            result_node_id,
+            self._job_config.jobId,
+            self._job_config.resultId,
+            named_outputs, unnamed_outputs,
+            explicit_deps=explicit_deps)
+
+        result_nodes = {result_node_id: result_node}
+
+        return GraphSection(result_nodes, inputs=set(output_ids), must_run=[result_node_id])
 
     def build_dynamic_outputs(self, source_id: NodeId, output_names: _tp.List[str]) -> GraphUpdate:
 
