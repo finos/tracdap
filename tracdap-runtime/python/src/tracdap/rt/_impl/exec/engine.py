@@ -323,10 +323,7 @@ class TracEngine(_actors.Actor):
 
         # Record output metadata if required (not needed for local runs or when using API server)
         if job_state.parent_key is None and job_state.result_spec.save_result:
-
-            if "trac_job_log_file" in job_state.job_config.resultMapping:
-                self._save_job_log_file(job_key, job_state)
-
+            self._save_job_log_file(job_key, job_state)
             self._save_job_result(job_key, job_state)
 
         # Stop any monitors that were created directly by the engine
@@ -347,13 +344,20 @@ class TracEngine(_actors.Actor):
 
         # Saving log files could go into a separate actor, perhaps a job monitor along with _save_job_result()
 
-        file_id = job_state.job_config.resultMapping["trac_job_log_file"]
-        storage_id = job_state.job_config.resultMapping["trac_job_log_file:STORAGE"]
+        # TODO: Use preallocated IDs from the job config
+        file_id = _util.new_object_id(_meta.ObjectType.FILE)
+        storage_id = _util.new_object_id(_meta.ObjectType.STORAGE)
 
+        file_name = "trac_job_log_file"
         file_type = _meta.FileType("TXT", "text/plain")
-        file_def, storage_def = _graph.GraphBuilder.build_output_file_and_storage(
-            "trac_job_log_file", file_type,
-            self._sys_config, job_state.job_config)
+
+        file_spec = _data.build_file_spec(
+            file_id, storage_id,
+            file_name, file_type,
+            self._sys_config.storage)
+
+        file_def = file_spec.definition
+        storage_def = file_spec.storage
 
         storage_item = storage_def.dataItems[file_def.dataItem].incarnations[0].copies[0]
         storage = self._storage.get_file_storage(storage_item.storageKey)
@@ -362,15 +366,16 @@ class TracEngine(_actors.Actor):
             stream.write(job_state.log_buffer.getbuffer())
             file_def.size = stream.tell()
 
-        result_id = job_state.job_config.resultMapping["trac_job_result"]
-        result_def = job_state.job_result.results[_util.object_key(result_id)].result
+        result_def = job_state.job_result.result
         result_def.logFileId = _util.selector_for(file_id)
 
         file_obj = _meta.ObjectDefinition(objectType=_meta.ObjectType.FILE, file=file_def)
         storage_obj = _meta.ObjectDefinition(objectType=_meta.ObjectType.STORAGE, storage=storage_def)
 
-        job_state.job_result.results[_util.object_key(file_id)] = file_obj
-        job_state.job_result.results[_util.object_key(storage_id)] = storage_obj
+        job_state.job_result.objectIds.append(file_id)
+        job_state.job_result.objectIds.append(storage_id)
+        job_state.job_result.objects[_util.object_key(file_id)] = file_obj
+        job_state.job_result.objects[_util.object_key(storage_id)] = storage_obj
 
     def _save_job_result(self, job_key: str, job_state: _JobState):
 
