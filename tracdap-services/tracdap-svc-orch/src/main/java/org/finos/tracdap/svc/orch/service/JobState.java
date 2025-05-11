@@ -30,7 +30,9 @@ import org.finos.tracdap.config.RuntimeConfig;
 import org.finos.tracdap.metadata.*;
 
 import java.io.*;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 
@@ -71,17 +73,23 @@ public class JobState implements Serializable, Cloneable {
     Map<String, TagHeader> objectMapping = new HashMap<>();
     Map<String, ObjectDefinition> objects = new HashMap<>();
     Map<String, Tag> tags = new HashMap<>();
-    Map<String, TagHeader> resultMapping = new HashMap<>();
+
+    TagHeader resultId;
+    List<TagHeader> preallocatedIds = new ArrayList<>();
 
     // Input / output config files for communicating with the runtime
     JobConfig jobConfig;
     RuntimeConfig sysConfig;
 
-    RuntimeJobStatus executorStatus;
-    RuntimeJobResult executorResult;
-
     // Executor state data
     Serializable executorState;
+
+    // Status and result received back from the runtime
+    RuntimeJobStatus runtimeStatus;
+    RuntimeJobResult runtimeResult;
+
+    // Final result after post-processing
+    RuntimeJobResult jobResult;
 
     @Override
     public JobState clone() {
@@ -93,8 +101,7 @@ public class JobState implements Serializable, Cloneable {
             clone.objectMapping = new HashMap<>(this.objectMapping);
             clone.objects = new HashMap<>(this.objects);
             clone.tags = new HashMap<>(this.tags);
-
-            clone.resultMapping = new HashMap<>(this.resultMapping);
+            clone.preallocatedIds = new ArrayList<>(this.preallocatedIds);
 
             return clone;
         }

@@ -313,7 +313,7 @@ public class JobManager {
 
                 var job = runningJobs.get(i);
                 var pollResult = pollResults.get(i);
-                var priorStatus = job.value().executorStatus;
+                var priorStatus = job.value().runtimeStatus;
 
                 if (priorStatus == null || pollResult.getStatusCode() != priorStatus.getStatusCode()) {
 
