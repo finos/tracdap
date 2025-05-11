@@ -385,6 +385,7 @@ public class JobExecutor<TBatchState extends Serializable> implements IJobExecut
             var batchResult = configParser.parseConfig(batchResultBytes, ConfigFormat.JSON, JobResult.class);
 
             var runtimeResult = RuntimeJobResult.newBuilder()
+                    .setJobId(batchResult.getJobId())
                     .setResultId(batchResult.getResultId())
                     .setResult(batchResult.getResult())
                     .addAllObjectIds(batchResult.getObjectIdsList())
