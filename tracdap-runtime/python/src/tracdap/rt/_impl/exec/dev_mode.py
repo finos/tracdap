@@ -229,16 +229,18 @@ class DevModeTranslator:
         return job_config
 
     @classmethod
-    def _process_job_id(cls, job_config: _cfg.JobConfig):
+    def _process_job_id(cls, job_config: _cfg.JobConfig) -> _cfg.JobConfig:
 
         job_id = _util.new_object_id(_meta.ObjectType.JOB)
+        result_id = _util.new_object_id(_meta.ObjectType.RESULT)
 
         cls._log.info(f"Assigning job ID = [{_util.object_key(job_id)}]")
+        cls._log.info(f"Assigning result ID = [{_util.object_key(result_id)}]")
 
-        translated_config = copy.copy(job_config)
-        translated_config.jobId = job_id
+        job_config.jobId = job_id
+        job_config.resultId = result_id
 
-        return translated_config
+        return job_config
 
     @classmethod
     def _process_job_type(cls, job_def: _meta.JobDefinition):
