@@ -197,6 +197,17 @@ public class ObjectIdValidator {
         return ctx;
     }
 
+    public static ValidationContext headerType(TagHeader header, ObjectType requiredType, ValidationContext ctx) {
+
+        if (!header.getObjectType().equals(requiredType)) {
+            var err = String.format("Wrong object type in [%s] header: expected [%s], got [%s]",
+                    ctx.fieldName(), requiredType, header.getObjectType());
+            return ctx.error(err);
+        }
+
+        return ctx;
+    }
+
     public static ValidationContext selectorType(TagSelector selector, ObjectType requiredType, ValidationContext ctx) {
 
         if (!selector.getObjectType().equals(requiredType)) {
