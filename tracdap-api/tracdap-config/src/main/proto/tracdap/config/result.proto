@@ -35,10 +35,11 @@ message JobResultAttrs {
 
 message JobResult {
 
-  metadata.TagHeader resultId = 1;
-  metadata.ResultDefinition result = 2;
+  metadata.TagHeader jobId = 1;
+  metadata.TagHeader resultId = 2;
+  metadata.ResultDefinition result = 3;
 
-  repeated metadata.TagHeader objectIds = 3;
-  map<string, metadata.ObjectDefinition> objects = 4;
-  map<string, JobResultAttrs> attrs = 5;
+  repeated metadata.TagHeader objectIds = 4;
+  map<string, metadata.ObjectDefinition> objects = 5;
+  map<string, JobResultAttrs> attrs = 6;
 }
