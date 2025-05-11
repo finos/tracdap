@@ -39,5 +39,7 @@ message JobConfig {
     map<string, metadata.ObjectDefinition> objects = 4;
     map<string, metadata.Tag> tags = 5;
 
-    map<string, metadata.TagHeader> resultMapping = 6;
+    // Preallocated IDs for job outputs
+    metadata.TagHeader resultId = 6;
+    repeated metadata.TagHeader preallocatedIds = 7;
 }
