@@ -71,6 +71,19 @@ def new_object_id(object_type: meta.ObjectType) -> meta.TagHeader:
         tagTimestamp=meta.DatetimeValue(timestamp.isoformat()))
 
 
+def new_object_version(prior_id: meta.TagHeader) -> meta.TagHeader:
+
+    timestamp = dt.datetime.now(dt.UTC)
+
+    return meta.TagHeader(
+        objectType=prior_id.objectType,
+        objectId=prior_id.objectId,
+        objectVersion=prior_id.objectVersion + 1,
+        objectTimestamp=meta.DatetimeValue(timestamp.isoformat()),
+        tagVersion=1,
+        tagTimestamp=meta.DatetimeValue(timestamp.isoformat()))
+
+
 def object_key(object_id: tp.Union[meta.TagHeader, meta.TagSelector]) -> str:
 
     if isinstance(object_id, meta.TagHeader):

@@ -973,7 +973,8 @@ class GraphBuilder:
         preallocated_ids = self._preallocated_ids.get(object_type)
 
         if preallocated_ids:
-            return preallocated_ids.pop()
+            # Preallocated IDs have objectVersion = 0, use a new version to get objectVersion = 1
+            return _util.new_object_version(preallocated_ids.pop())
         else:
             return _util.new_object_id(object_type)
 
