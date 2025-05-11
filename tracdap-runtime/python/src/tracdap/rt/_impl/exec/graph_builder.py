@@ -60,6 +60,9 @@ class GraphBuilder:
 
         self._errors = list()
 
+    def unallocated_ids(self) -> _tp.Dict[_meta.ObjectType, _meta.TagHeader]:
+        return self._preallocated_ids
+
     def _child_builder(self, job_id: _meta.TagHeader) -> "GraphBuilder":
 
         builder = GraphBuilder(self._sys_config, self._job_config)
