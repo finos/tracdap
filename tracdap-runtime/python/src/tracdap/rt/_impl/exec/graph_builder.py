@@ -13,7 +13,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import datetime as _dt
+import itertools as _itr
 import typing as _tp
 
 import tracdap.rt.metadata as _meta
@@ -37,6 +37,14 @@ class GraphBuilder:
 
     __JOB_BUILD_FUNC = _tp.Callable[[_meta.JobDefinition, NodeId], GraphSection]
 
+    @classmethod
+    def dynamic(cls, context: GraphContext) -> "GraphBuilder":
+
+        sys_config = _cfg.RuntimeConfig(storage=context.storage_config)
+        job_config = _cfg.JobConfig(context.job_id)
+
+        return GraphBuilder(sys_config, job_config)
+
     def __init__(self, sys_config: _cfg.RuntimeConfig, job_config: _cfg.JobConfig):
 
         self._sys_config = sys_config
@@ -45,13 +53,21 @@ class GraphBuilder:
         self._job_key = _util.object_key(job_config.jobId)
         self._job_namespace = NodeNamespace(self._job_key)
 
-        self._errors = []
+        # Dictionary of object type to preallocated IDs
+        self._preallocated_ids = dict(
+            (k, list(v)) for k, v in _itr.groupby(
+            job_config.preallocatedIds, lambda oid: oid.objectType))
+
+        self._errors = list()
 
     def _child_builder(self, job_id: _meta.TagHeader) -> "GraphBuilder":
 
         builder = GraphBuilder(self._sys_config, self._job_config)
         builder._job_key = _util.object_key(job_id)
         builder._job_namespace = NodeNamespace(builder._job_key)
+
+        # Do not share preallocated IDs with the child graph
+        builder._preallocated_ids = dict()
 
         return builder
 
@@ -60,41 +76,46 @@ class GraphBuilder:
         try:
 
             if job_def.jobType == _meta.JobType.IMPORT_MODEL:
-                return self.build_standard_job(job_def, self.build_import_model_job)
+                graph = self.build_standard_job(job_def, self.build_import_model_job)
 
-            if job_def.jobType == _meta.JobType.RUN_MODEL:
-                return self.build_standard_job(job_def, self.build_run_model_job)
+            elif job_def.jobType == _meta.JobType.RUN_MODEL:
+                graph = self.build_standard_job(job_def, self.build_run_model_job)
 
-            if job_def.jobType == _meta.JobType.RUN_FLOW:
-                return self.build_standard_job(job_def, self.build_run_flow_job)
+            elif job_def.jobType == _meta.JobType.RUN_FLOW:
+                graph = self.build_standard_job(job_def, self.build_run_flow_job)
 
-            if job_def.jobType in [_meta.JobType.IMPORT_DATA, _meta.JobType.EXPORT_DATA]:
-                return self.build_standard_job(job_def, self.build_import_export_data_job)
+            elif job_def.jobType in [_meta.JobType.IMPORT_DATA, _meta.JobType.EXPORT_DATA]:
+                graph = self.build_standard_job(job_def, self.build_import_export_data_job)
 
-            if job_def.jobType == _meta.JobType.JOB_GROUP:
-                return self.build_standard_job(job_def, self.build_job_group)
+            elif job_def.jobType == _meta.JobType.JOB_GROUP:
+                graph = self.build_standard_job(job_def, self.build_job_group)
 
-            self._error(_ex.EJobValidation(f"Job type [{job_def.jobType.name}] is not supported yet"))
+            else:
+                self._error(_ex.EJobValidation(f"Job type [{job_def.jobType.name}] is not supported yet"))
+                raise self._error_summary()
+
+            if any(self._errors):
+                raise self._error_summary()
+            else:
+                return graph
 
         except Exception as e:
 
             # If there are recorded, errors, assume unhandled exceptions are a result of those
             # Only report the recorded errors, to reduce noise
             if any(self._errors):
-                pass
+                raise self._error_summary()
 
             # If no errors are recorded, an exception here would be a bug
             raise _ex.ETracInternal(f"Unexpected error preparing the job execution graph") from e
 
-        finally:
+    def _error_summary(self) -> Exception:
 
-            if any(self._errors):
-
-                if len(self._errors) == 1:
-                    raise self._errors[0]
-                else:
-                    err_text = "\n".join(map(str, self._errors))
-                    raise _ex.EJobValidation("Invalid job configuration\n" + err_text)
+        if len(self._errors) == 1:
+            return self._errors[0]
+        else:
+            err_text = "\n".join(map(str, self._errors))
+            return _ex.EJobValidation("Invalid job configuration\n" + err_text)
 
     def build_standard_job(self, job_def: _meta.JobDefinition, build_func: __JOB_BUILD_FUNC):
 
@@ -118,7 +139,7 @@ class GraphBuilder:
 
         pop_node = ContextPopNode(
             pop_id, self._job_namespace, pop_mapping,
-            explicit_deps=main_section.must_run,
+            explicit_deps=[push_id, *main_section.must_run],
             bundle=NodeNamespace.root())
 
         global_result_node = BundleItemNode(global_result_id, pop_id, self._job_key)
@@ -133,24 +154,28 @@ class GraphBuilder:
 
     def build_import_model_job(self, job_def: _meta.JobDefinition, job_push_id: NodeId) -> GraphSection:
 
-        # Main section: run the model import
+        # TRAC object ID for the new model
+        model_id = self._allocate_id(_meta.ObjectType.MODEL)
 
-        # TODO: Import model job should pre-allocate an ID, then model ID comes from job_config.resultMapping
-        new_model_id = _util.new_object_id(_meta.ObjectType.MODEL)
-        new_model_key = _util.object_key(new_model_id)
-
-        model_scope = self._job_key
         import_details = job_def.importModel
+        import_scope = self._job_key
 
-        import_id = NodeId.of("trac_import_model", self._job_namespace, _meta.ObjectDefinition)
-        import_node = ImportModelNode(import_id, model_scope, import_details, explicit_deps=[job_push_id])
+        # Graph node ID for the import operation
+        import_id = NodeId.of("trac_import_model", self._job_namespace, GraphOutput)
+
+        import_node = ImportModelNode(
+            import_id, model_id,
+            import_details, import_scope,
+            explicit_deps=[job_push_id])
 
         main_section = GraphSection(nodes={import_id: import_node})
 
-        # Build job-level metadata outputs
+        # RESULT will have a single (unnamed) output
+        output_keys = []
+        output_ids = [import_id]
 
-        result_section = self.build_job_results(
-            objects={new_model_key: import_id},
+        result_section = self.build_job_result(
+            output_keys, output_ids,
             explicit_deps=[job_push_id, *main_section.must_run])
 
         return self._join_sections(main_section, result_section)
@@ -256,7 +281,7 @@ class GraphBuilder:
 
     def build_child_job(self, child_job_def: _meta.JobDefinition, explicit_deps) -> Node[_cfg.JobResult]:
 
-        child_job_id = _util.new_object_id(_meta.ObjectType.JOB)
+        child_job_id = self._allocate_id(_meta.ObjectType.JOB)
 
         child_builder = self._child_builder(child_job_id)
         child_graph = child_builder.build_job(child_job_def)
@@ -288,7 +313,7 @@ class GraphBuilder:
 
         provided_params = job_details.parameters
         provided_inputs = job_details.inputs
-        provided_outputs = job_details.outputs
+        prior_outputs = job_details.priorOutputs
 
         params_section = self.build_job_parameters(
             required_params, provided_params,
@@ -306,19 +331,21 @@ class GraphBuilder:
             explicit_deps=[job_push_id])
 
         output_section = self.build_job_outputs(
-            required_outputs, provided_outputs,
+            required_outputs, prior_outputs,
             explicit_deps=[job_push_id])
 
         main_section = self._join_sections(params_section, input_section, exec_section, output_section)
 
         # Build job-level metadata outputs
 
-        data_result_ids = list(
-            nid for nid, n in main_section.nodes.items()
-            if isinstance(n, DataResultNode))
+        output_keys = list(required_outputs.keys())
 
-        result_section = self.build_job_results(
-            bundles=data_result_ids,
+        output_ids = list(
+            nid for nid, n in main_section.nodes.items()
+            if nid.result_type == GraphOutput or isinstance(n, SaveDataNode))
+
+        result_section = self.build_job_result(
+            output_keys, output_ids,
             explicit_deps=[job_push_id, *main_section.must_run])
 
         return self._join_sections(main_section, result_section)
@@ -433,315 +460,112 @@ class GraphBuilder:
     def build_job_outputs(
             self,
             required_outputs: _tp.Dict[str, _meta.ModelOutputSchema],
-            supplied_outputs: _tp.Dict[str, _meta.TagSelector],
+            prior_outputs: _tp.Dict[str, _meta.TagSelector],
             explicit_deps: _tp.Optional[_tp.List[NodeId]] = None) \
             -> GraphSection:
 
         nodes = {}
-        inputs = set()
+        section_inputs = set()
 
-        for output_name, output_def in required_outputs.items():
+        for output_name, model_output in required_outputs.items():
 
             # Output data view must already exist in the namespace, it is an input to the save operation
             data_view_id = NodeId.of(output_name, self._job_namespace, _data.DataView)
-            inputs.add(data_view_id)
+            section_inputs.add(data_view_id)
 
             # Backwards compatibility with pre 0.8 versions
             output_type = _meta.ObjectType.DATA \
-                if output_def.objectType == _meta.ObjectType.OBJECT_TYPE_NOT_SET \
-                else output_def.objectType
+                if model_output.objectType == _meta.ObjectType.OBJECT_TYPE_NOT_SET \
+                else model_output.objectType
 
-            output_selector = supplied_outputs.get(output_name)
+            # Check for prior outputs
+            prior_selector = prior_outputs.get(output_name)
 
-            if output_selector is None:
-                if output_def.optional:
-                    optional_info = "(configuration is required for all optional outputs, in case they are produced)"
-                    self._error(_ex.EJobValidation(f"Missing optional output: [{output_name}] {optional_info}"))
-                    continue
-                else:
-                    self._error(_ex.EJobValidation(f"Missing required output: [{output_name}]"))
-                    continue
-
-            elif output_type == _meta.ObjectType.DATA:
-                self._build_data_output(output_name, output_selector, data_view_id, nodes, explicit_deps)
+            if output_type == _meta.ObjectType.DATA:
+                self._build_data_output(output_name, model_output, data_view_id, nodes, prior_selector, explicit_deps)
 
             elif output_type == _meta.ObjectType.FILE:
-                self._build_file_output(output_name, output_def, output_selector, data_view_id, nodes, explicit_deps)
+                self._build_file_output(output_name, model_output, data_view_id, nodes, prior_selector, explicit_deps)
 
             else:
                 self._error(_ex.EJobValidation(f"Invalid output type [{output_type.name}] for input [{output_name}]"))
 
-        return GraphSection(nodes, inputs=inputs)
+        return GraphSection(nodes, inputs=section_inputs)
 
-    def _build_data_output(self, output_name, output_selector, data_view_id, nodes, explicit_deps):
+    def _build_data_output(self, output_name, model_output, data_view_id, nodes, prior_selector, explicit_deps):
 
         # Map one data item from each view, since outputs are single part/delta
         data_item_id = NodeId(f"{output_name}:ITEM", self._job_namespace, _data.DataItem)
         nodes[data_item_id] = DataItemNode(data_item_id, data_view_id)
 
-        data_obj = _util.get_job_metadata(output_selector, self._job_config, optional=True)
+        # Look up the prior output spec if one exists
+        prior_spec = self._find_prior_spec(output_name, nodes) if prior_selector is not None else None
 
-        if data_obj is not None:
+        # TRAC object IDs for the output
+        data_id = self._allocate_id(_meta.ObjectType.DATA)
+        storage_id = self._allocate_id(_meta.ObjectType.STORAGE)
 
-            # If data def for the output has been built in advance, use a static data spec
+        # Graph node ID for the save operation
+        data_save_id = NodeId.of(f"{output_name}:SAVE", self._job_namespace, _data.DataSpec)
 
-            data_def = data_obj.data
-            storage_def = _util.get_job_metadata(data_def.storageId, self._job_config).storage
+        if model_output.dynamic:
 
-            if data_def.schemaId:
-                schema_def = _util.get_job_metadata(data_def.schemaId, self._job_config).schema
-            else:
-                schema_def = data_def.schema
-
-            root_part_opaque_key = 'part-root'  # TODO: Central part names / constants
-            data_item = data_def.parts[root_part_opaque_key].snap.deltas[0].dataItem
-            data_spec = _data.DataSpec.create_data_spec(data_item, data_def, storage_def, schema_def)
-
-            # Create a physical save operation for the data item
-            data_save_id = NodeId.of(f"{output_name}:SAVE", self._job_namespace, _data.DataSpec)
-            nodes[data_save_id] = SaveDataNode(data_save_id, data_item_id, spec=data_spec)
-
-            output_key = output_name
-            storage_key = output_name + ":STORAGE"
-
-        else:
-
-            # If output data def for an output was not supplied in the job, create a dynamic data spec
-            # Dynamic data def will always use an embedded schema (this is no ID for an external schema)
-
-            mapped_output_key = output_name
-            mapped_storage_key = output_name + ":STORAGE"
-
-            data_id = self._job_config.resultMapping[mapped_output_key]
-            storage_id = self._job_config.resultMapping[mapped_storage_key]
-
-            data_spec_id = NodeId.of(f"{output_name}:SPEC", self._job_namespace, _data.DataSpec)
-            nodes[data_spec_id] = DynamicDataSpecNode(
+            # For dynamic outputs, an extra graph node is needed to assemble the schema information
+            # This will call build_data_spec() at runtime, once the schema is known
+            data_spec_id = NodeId.of(f"{output_name}:DYNAMIC_SCHEMA", self._job_namespace, _data.DataSpec)
+            nodes[data_spec_id] = DataSpecNode(
                 data_spec_id, data_view_id,
                 data_id, storage_id,
-                prior_data_spec=None,
+                self._sys_config.storage,
+                prior_data_spec=prior_spec,
                 explicit_deps=explicit_deps)
 
-            # Create a physical save operation for the data item
-            data_save_id = NodeId.of(f"{output_name}:SAVE", self._job_namespace, _data.DataSpec)
+            # Save operation uses the dynamically produced schema info
             nodes[data_save_id] = SaveDataNode(data_save_id, data_item_id, spec_id=data_spec_id)
-
-            output_key = _util.object_key(data_id)
-            storage_key = _util.object_key(storage_id)
-
-        data_result_id = NodeId.of(f"{output_name}:RESULT", self._job_namespace, ObjectBundle)
-        nodes[data_result_id] = DataResultNode(
-            data_result_id, output_name, data_save_id,
-            data_key=output_key,
-            storage_key=storage_key)
-
-    def _build_file_output(self, output_name, output_def, output_selector, file_view_id, nodes, explicit_deps):
-
-        mapped_output_key = output_name
-        mapped_storage_key = output_name + ":STORAGE"
-
-        file_obj = _util.get_job_metadata(output_selector, self._job_config, optional=True)
-
-        if file_obj is not None:
-
-            # Definitions already exist (generated by dev mode translator)
-
-            file_def = _util.get_job_metadata(output_selector, self._job_config).file
-            storage_def = _util.get_job_metadata(file_def.storageId, self._job_config).storage
-
-            resolved_output_key = mapped_output_key
-            resolved_storage_key = mapped_storage_key
 
         else:
 
-            # Create new definitions (default behavior for jobs sent from the platform)
+            # If the output is not dynamic, a data spec can be built ahead of time
+            data_spec = _data.build_data_spec(
+                data_id, storage_id,
+                model_output.schema,
+                self._sys_config.storage,
+                prior_data_spec=prior_spec)
 
-            output_id = self._job_config.resultMapping[mapped_output_key]
-            storage_id = self._job_config.resultMapping[mapped_storage_key]
+            # Save operation uses the statically produced schema info
+            nodes[data_save_id] = SaveDataNode(data_save_id, data_item_id, spec=data_spec)
 
-            file_type = output_def.fileType
-            timestamp = _dt.datetime.fromisoformat(output_id.objectTimestamp.isoDatetime)
-            data_item = f"file/{output_id.objectId}/version-{output_id.objectVersion}"
-            storage_key = self._sys_config.storage.defaultBucket
-            storage_path = f"file/FILE-{output_id.objectId}/version-{output_id.objectVersion}/{output_name}.{file_type.extension}"
+    def _build_file_output(self, output_name, output_def, file_view_id, nodes, prior_selector, explicit_deps):
 
-            file_def = self.build_file_def(output_name, file_type, storage_id, data_item)
-            storage_def = self.build_storage_def(data_item, storage_key, storage_path, file_type.mimeType, timestamp)
-
-            resolved_output_key = _util.object_key(output_id)
-            resolved_storage_key = _util.object_key(storage_id)
-
-        # Required object defs are available, now build the graph nodes
-
+        # Map file item from view
         file_item_id = NodeId(f"{output_name}:ITEM", self._job_namespace, _data.DataItem)
         nodes[file_item_id] = DataItemNode(file_item_id, file_view_id, explicit_deps=explicit_deps)
 
-        file_spec = _data.DataSpec.create_file_spec(file_def.dataItem, file_def, storage_def)
+        # Look up the prior output spec if one exists
+        prior_spec = self._find_prior_spec(output_name, nodes) if prior_selector is not None else None
+
+        # TRAC object IDs for the output
+        file_id = self._allocate_id(_meta.ObjectType.FILE)
+        storage_id = self._allocate_id(_meta.ObjectType.STORAGE)
+
+        # File spec can always be built ahead of time (no equivalent of dynamic schemas)
+        file_spec = _data.build_file_spec(
+            file_id, storage_id,
+            output_name, output_def.fileType,
+            self._sys_config.storage,
+            prior_file_spec=prior_spec)
+
+        # Graph node for the save operation
         file_save_id = NodeId.of(f"{output_name}:SAVE", self._job_namespace, _data.DataSpec)
         nodes[file_save_id] = SaveDataNode(file_save_id, file_item_id, spec=file_spec)
 
-        data_result_id = NodeId.of(f"{output_name}:RESULT", self._job_namespace, ObjectBundle)
-        nodes[data_result_id] = DataResultNode(
-            data_result_id, output_name, file_save_id,
-            file_key=resolved_output_key,
-            storage_key=resolved_storage_key)
+    def _find_prior_spec(self, output_name, nodes):
 
-    @classmethod
-    def build_output_file_and_storage(cls, output_key, file_type: _meta.FileType, sys_config: _cfg.RuntimeConfig, job_config: _cfg.JobConfig):
+        # TODO: Work is needed to wire in prior outputs before the exec section of the graph
 
-        # TODO: Review and de-dupe building of output metadata
-        # Responsibility for assigning outputs could perhaps move from orchestrator to runtime
-
-        output_storage_key = f"{output_key}:STORAGE"
-
-        output_id = job_config.resultMapping[output_key]
-        output_storage_id = job_config.resultMapping[output_storage_key]
-
-        timestamp = _dt.datetime.fromisoformat(output_id.objectTimestamp.isoDatetime)
-        data_item = f"file/{output_id.objectId}/version-{output_id.objectVersion}"
-        storage_key = sys_config.storage.defaultBucket
-        storage_path = f"file/FILE-{output_id.objectId}/version-{output_id.objectVersion}/{output_key}.{file_type.extension}"
-
-        file_def = cls.build_file_def(output_key, file_type, output_storage_id, data_item)
-        storage_def = cls.build_storage_def(data_item, storage_key, storage_path, file_type.mimeType, timestamp)
-
-        return file_def, storage_def
-
-    @classmethod
-    def build_runtime_outputs(cls, output_names: _tp.List[str], job_namespace: NodeNamespace):
-
-        # This method is called dynamically during job execution
-        # So it cannot use stateful information like self._job_config or self._job_namespace
-
-        # TODO: Factor out common logic with regular job outputs (including static / dynamic)
-
-        nodes = {}
-        inputs = set()
-        outputs = list()
-
-        for output_name in output_names:
-
-            # Output data view must already exist in the namespace
-            data_view_id = NodeId.of(output_name, job_namespace, _data.DataView)
-            data_spec_id = NodeId.of(f"{output_name}:SPEC", job_namespace, _data.DataSpec)
-
-            mapped_output_key = output_name
-            mapped_storage_key = output_name + ":STORAGE"
-
-            data_id = _util.new_object_id(_meta.ObjectType.DATA)
-            storage_id = _util.new_object_id(_meta.ObjectType.STORAGE)
-
-            data_spec_node = DynamicDataSpecNode(
-                data_spec_id, data_view_id,
-                data_id, storage_id,
-                prior_data_spec=None)
-
-            output_key = _util.object_key(data_id)
-            storage_key = _util.object_key(storage_id)
-
-            # Map one data item from each view, since outputs are single part/delta
-            data_item_id = NodeId(f"{output_name}:ITEM", job_namespace, _data.DataItem)
-            data_item_node = DataItemNode(data_item_id, data_view_id)
-
-            # Create a physical save operation for the data item
-            data_save_id = NodeId.of(f"{output_name}:SAVE", job_namespace, _data.DataSpec)
-            data_save_node = SaveDataNode(data_save_id, data_item_id, spec_id=data_spec_id)
-
-            data_result_id = NodeId.of(f"{output_name}:RESULT", job_namespace, ObjectBundle)
-            data_result_node = DataResultNode(
-                data_result_id, output_name, data_save_id,
-                output_key, storage_key)
-
-            nodes[data_spec_id] = data_spec_node
-            nodes[data_item_id] = data_item_node
-            nodes[data_save_id] = data_save_node
-            nodes[data_result_id] = data_result_node
-
-            # Job-level data view is an input to the save operation
-            inputs.add(data_view_id)
-            outputs.append(data_result_id)
-
-        runtime_outputs = JobOutputs(bundles=outputs)
-        runtime_outputs_id = NodeId.of("trac_runtime_outputs", job_namespace, JobOutputs)
-        runtime_outputs_node = RuntimeOutputsNode(runtime_outputs_id, runtime_outputs)
-
-        nodes[runtime_outputs_id] = runtime_outputs_node
-
-        return GraphSection(nodes, inputs=inputs, outputs={runtime_outputs_id})
-
-    @classmethod
-    def build_file_def(cls, file_name, file_type, storage_id, data_item):
-
-        file_def = _meta.FileDefinition()
-        file_def.name = f"{file_name}.{file_type.extension}"
-        file_def.extension = file_type.extension
-        file_def.mimeType = file_type.mimeType
-        file_def.storageId = _util.selector_for_latest(storage_id)
-        file_def.dataItem = data_item
-        file_def.size = 0
-
-        return file_def
-
-    @classmethod
-    def build_storage_def(
-            cls, data_item: str,
-            storage_key, storage_path, storage_format,
-            timestamp: _dt.datetime):
-
-        first_incarnation = 0
-
-        storage_copy = _meta.StorageCopy(
-            storage_key, storage_path, storage_format,
-            copyStatus=_meta.CopyStatus.COPY_AVAILABLE,
-            copyTimestamp=_meta.DatetimeValue(timestamp.isoformat()))
-
-        storage_incarnation = _meta.StorageIncarnation(
-            [storage_copy],
-            incarnationIndex=first_incarnation,
-            incarnationTimestamp=_meta.DatetimeValue(timestamp.isoformat()),
-            incarnationStatus=_meta.IncarnationStatus.INCARNATION_AVAILABLE)
-
-        storage_item = _meta.StorageItem([storage_incarnation])
-
-        storage_def = _meta.StorageDefinition()
-        storage_def.dataItems[data_item] = storage_item
-
-        return storage_def
-
-    def build_job_results(
-            self,
-            objects: _tp.Dict[str, NodeId[_meta.ObjectDefinition]] = None,
-            bundles: _tp.List[NodeId[ObjectBundle]] = None,
-            explicit_deps: _tp.Optional[_tp.List[NodeId]] = None) \
-            -> GraphSection:
-
-        result_id = self._job_config.resultMapping.get("trac_job_result")
-        result_node_id = NodeId.of("trac_job_result", self._job_namespace, _cfg.JobResult)
-
-        if objects is not None:
-
-            results_inputs = set(objects.values())
-
-            build_result_node = BuildJobResultNode(
-                result_node_id, result_id, self._job_config.jobId,
-                outputs=JobOutputs(objects=objects),
-                explicit_deps=explicit_deps)
-
-        elif bundles is not None:
-
-            results_inputs = set(bundles)
-
-            build_result_node = BuildJobResultNode(
-                result_node_id, result_id, self._job_config.jobId,
-                outputs=JobOutputs(bundles=bundles),
-                explicit_deps=explicit_deps)
-
-        else:
-            raise _ex.EUnexpected()
-
-        result_nodes = {result_node_id: build_result_node}
-
-        return GraphSection(result_nodes, inputs=results_inputs, must_run=[result_node_id])
+        prior_spec_id = NodeId.of(f"{output_name}:PRIOR_SCHEMA", self._job_namespace, _data.DataSpec)
+        prior_spec_node: StaticValueNode[_data.DataSpec] = nodes.get(prior_spec_id)
+        return prior_spec_node.value
 
     def build_model_or_flow_with_context(
             self, namespace: NodeNamespace, model_or_flow_name: str,
@@ -789,6 +613,9 @@ class GraphBuilder:
             message = f"Invalid job config, expected model or flow, got [{model_or_flow.objectType}]"
             self._error(_ex.EJobValidation(message))
 
+            # Allow building to continue for better error reporting
+            return GraphSection(dict())
+
     def build_model(
             self, namespace: NodeNamespace,
             job_def: _meta.JobDefinition,
@@ -829,16 +656,19 @@ class GraphBuilder:
         model_name = model_def.entryPoint.split(".")[-1]  # TODO: Check unique model name
         model_id = NodeId(model_name, namespace, Bundle[_data.DataView])
 
+        # Used to set up a dynamic builder at runtime if dynamic graph updates are needed
+        context = GraphContext(
+            self._job_config.jobId,
+            self._job_namespace, namespace,
+            self._sys_config.storage)
+
         model_node = RunModelNode(
-            model_id, model_scope, model_def,
+            model_id, model_def, model_scope,
             frozenset(parameter_ids), frozenset(input_ids),
             explicit_deps=explicit_deps, bundle=model_id.namespace,
-            storage_access=storage_access)
+            storage_access=storage_access, graph_context=context)
 
-        model_result_id = NodeId(f"{model_name}:RESULT", namespace)
-        model_result_node = RunModelResultNode(model_result_id, model_id)
-
-        nodes = {model_id: model_node, model_result_id: model_result_node}
+        nodes = {model_id: model_node}
 
         # Create nodes for each model output
         # The model node itself outputs a bundle (dictionary of named outputs)
@@ -851,7 +681,7 @@ class GraphBuilder:
             nodes[output_id] = BundleItemNode(output_id, model_id, output_id.name)
 
         # Assemble a graph to include the model and its outputs
-        return GraphSection(nodes, inputs={*parameter_ids, *input_ids}, outputs=output_ids, must_run=[model_result_id])
+        return GraphSection(nodes, inputs={*parameter_ids, *input_ids}, outputs=output_ids, must_run=[model_id])
 
     def build_flow(
             self, namespace: NodeNamespace,
@@ -978,6 +808,9 @@ class GraphBuilder:
 
         self._error(_ex.EJobValidation(f"Flow node [{node_name}] has invalid node type [{node.nodeType}]"))
 
+        # Allow building to continue for better error reporting
+        return GraphSection(dict())
+
     def check_model_compatibility(
             self, model_selector: _meta.TagSelector,
             model_def: _meta.ModelDefinition, node_name: str, flow_node: _meta.FlowNode):
@@ -1007,6 +840,27 @@ class GraphBuilder:
             job_type = job_def.jobType.name
             model_type = model_def.modelType.name
             self._error(_ex.EJobValidation(f"Job type [{job_type}] cannot use model type [{model_type}]"))
+
+    def build_job_result(
+            self, output_keys: _tp.List[str],
+            output_ids: _tp.List[NodeId[JOB_OUTPUT_TYPE]],
+            explicit_deps: _tp.Optional[_tp.List[NodeId]] = None) \
+            -> GraphSection:
+
+        named_outputs = dict((oid.name, oid) for oid in filter(lambda oid: oid in output_keys, output_ids))
+        unnamed_outputs = list(filter(lambda oid: oid.name not in output_keys, output_ids))
+
+        result_node_id = NodeId.of("trac_job_result", self._job_namespace, _cfg.JobResult)
+        result_node = JobResultNode(
+            result_node_id,
+            self._job_config.jobId,
+            self._job_config.resultId,
+            named_outputs, unnamed_outputs,
+            explicit_deps=explicit_deps)
+
+        result_nodes = {result_node_id: result_node}
+
+        return GraphSection(result_nodes, inputs=set(output_ids), must_run=[result_node_id])
 
     @staticmethod
     def build_context_push(
@@ -1053,8 +907,14 @@ class GraphBuilder:
             for output_name, outer_id
             in output_mapping.items()}
 
+        push_id = NodeId("trac_ctx_push", namespace, Bundle[_tp.Any])
+        explicit_deps = [push_id, *explicit_deps] if explicit_deps else [push_id]
+
         pop_id = NodeId("trac_ctx_pop", namespace, Bundle[_tp.Any])
-        pop_node = ContextPopNode(pop_id, namespace, pop_mapping, explicit_deps, bundle=pop_id.namespace.parent)
+        pop_node = ContextPopNode(
+            pop_id, namespace, pop_mapping,
+            explicit_deps=explicit_deps,
+            bundle=pop_id.namespace.parent)
 
         nodes = {pop_id: pop_node}
 
@@ -1067,6 +927,55 @@ class GraphBuilder:
             inputs={*pop_mapping.keys()},
             outputs={*pop_mapping.values()},
             must_run=[pop_id])
+
+    def build_dynamic_outputs(self, source_id: NodeId, output_names: _tp.List[str]) -> GraphUpdate:
+
+        nodes = dict()
+        dependencies = dict()
+
+        # All dynamic outputs are DATA with dynamic schemas for now
+        dynamic_schema = _meta.ModelOutputSchema(
+            objectType=_meta.ObjectType.DATA,
+            schema=None, dynamic=True)
+
+        for output_name in output_names:
+
+            # Node to extract dynamic outputs from the source node (a model or flow output bundle)
+            output_id = NodeId.of(output_name, source_id.namespace, _data.DataView)
+            output_node = BundleItemNode(output_id, source_id, output_name)
+            nodes[output_id] = output_node
+
+            # All dynamic outputs are DATA for now
+            self._build_data_output(
+                output_name, dynamic_schema,
+                output_id, nodes,
+                prior_selector=None,
+                explicit_deps=[source_id])
+
+        named_outputs = dict(
+            (nid.name, nid) for nid, n in nodes.items()
+            if nid.result_type == GraphOutput or isinstance(n, SaveDataNode))
+
+        dynamic_outputs_id = NodeId.of("trac_dynamic_outputs", source_id.namespace, DynamicOutputsNode)
+        dynamic_outputs_node = DynamicOutputsNode(
+            dynamic_outputs_id, named_outputs,
+            explicit_deps=[source_id])
+
+        job_result_id = NodeId.of("trac_job_result", self._job_namespace, _cfg.JobResult)
+
+        nodes[dynamic_outputs_id] = dynamic_outputs_node
+        dependencies[job_result_id] = [Dependency(dynamic_outputs_id, DependencyType.HARD)]
+
+        return GraphUpdate(nodes, dependencies)
+
+    def _allocate_id(self, object_type: _meta.ObjectType):
+
+        preallocated_ids = self._preallocated_ids.get(object_type)
+
+        if preallocated_ids:
+            return preallocated_ids.pop()
+        else:
+            return _util.new_object_id(object_type)
 
     def _join_sections(self, *sections: GraphSection, allow_partial_inputs: bool = False):
 
