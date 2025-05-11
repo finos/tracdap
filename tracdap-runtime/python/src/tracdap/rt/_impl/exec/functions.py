@@ -13,13 +13,10 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import copy
-import dataclasses as dc  # noqa
-import datetime
 import abc
+import copy
 import io
 import pathlib
-import random
 import typing as tp
 
 import tracdap.rt.api as _api
@@ -68,7 +65,7 @@ class NodeContext:
 class NodeCallback:
 
     @abc.abstractmethod
-    def send_graph_updates(self, new_nodes: tp.Dict[NodeId, Node], new_deps: tp.Dict[NodeId, tp.List[Dependency]]):
+    def send_graph_update(self, update: _graph.GraphUpdate):
         pass
 
 
@@ -122,6 +119,9 @@ class NodeFunction(tp.Generic[_T]):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
+# STATIC VALUES
+# -------------
+
 class NoopFunc(NodeFunction[None]):
 
     def __init__(self, node: NoopNode):
@@ -142,6 +142,9 @@ class StaticValueFunc(NodeFunction[_T]):
         return self.node.value
 
 
+# MAPPING OPERATIONS
+# ------------------
+
 class IdentityFunc(NodeFunction[_T]):
 
     def __init__(self, node: IdentityNode[_T]):
@@ -150,6 +153,18 @@ class IdentityFunc(NodeFunction[_T]):
 
     def _execute(self, ctx: NodeContext) -> _T:
         return _ctx_lookup(self.node.src_id, ctx)
+
+
+class KeyedItemFunc(NodeFunction[_T]):
+
+    def __init__(self, node: KeyedItemNode[_T]):
+        super().__init__()
+        self.node = node
+
+    def _execute(self, ctx: NodeContext) -> _T:
+        src_node_result = _ctx_lookup(self.node.src_id, ctx)
+        src_item = src_node_result.get(self.node.src_item)
+        return src_item
 
 
 class _ContextPushPopFunc(NodeFunction[Bundle[tp.Any]], abc.ABC):
@@ -197,74 +212,26 @@ class ContextPopFunc(_ContextPushPopFunc):
         super(ContextPopFunc, self).__init__(node, self._POP)
 
 
-class KeyedItemFunc(NodeFunction[_T]):
+# DATA HANDLING
+# -------------
 
-    def __init__(self, node: KeyedItemNode[_T]):
+class DataSpecFunc(NodeFunction[_data.DataSpec]):
+
+    def __init__(self, node: DataSpecNode):
         super().__init__()
         self.node = node
 
-    def _execute(self, ctx: NodeContext) -> _T:
-        src_node_result = _ctx_lookup(self.node.src_id, ctx)
-        src_item = src_node_result.get(self.node.src_item)
-        return src_item
+    def _execute(self, ctx: NodeContext) -> _data.DataSpec:
 
+        # Get the schema from runtime data
+        data_view = _ctx_lookup(self.node.data_view_id, ctx)
+        trac_schema = data_view.trac_schema
 
-class RuntimeOutputsFunc(NodeFunction[JobOutputs]):
-
-    def __init__(self, node: RuntimeOutputsNode):
-        super().__init__()
-        self.node = node
-
-    def _execute(self, ctx: NodeContext) -> JobOutputs:
-        return self.node.outputs
-
-
-class BuildJobResultFunc(NodeFunction[_cfg.JobResult]):
-
-    def __init__(self, node: BuildJobResultNode):
-        super().__init__()
-        self.node = node
-
-    def _execute(self, ctx: NodeContext) -> _cfg.JobResult:
-
-        job_result = _cfg.JobResult()
-        job_result.jobId = self.node.job_id
-        job_result.statusCode = _meta.JobStatusCode.SUCCEEDED
-
-        if self.node.result_id is not None:
-
-            result_def = _meta.ResultDefinition()
-            result_def.jobId = _util.selector_for(self.node.job_id)
-            result_def.statusCode = _meta.JobStatusCode.SUCCEEDED
-
-            result_key = _util.object_key(self.node.result_id)
-            result_obj = _meta.ObjectDefinition(objectType=_meta.ObjectType.RESULT, result=result_def)
-
-            job_result.results[result_key] = result_obj
-
-        # TODO: Handle individual failed results
-
-        for obj_key, node_id in self.node.outputs.objects.items():
-            obj_def = _ctx_lookup(node_id, ctx)
-            job_result.results[obj_key] = obj_def
-
-        for bundle_id in self.node.outputs.bundles:
-            bundle = _ctx_lookup(bundle_id, ctx)
-            job_result.results.update(bundle.items())
-
-        if self.node.runtime_outputs is not None:
-
-            runtime_outputs = _ctx_lookup(self.node.runtime_outputs, ctx)
-
-            for obj_key, node_id in runtime_outputs.objects.items():
-                obj_def = _ctx_lookup(node_id, ctx)
-                job_result.results[obj_key] = obj_def
-
-            for bundle_id in runtime_outputs.bundles:
-                bundle = _ctx_lookup(bundle_id, ctx)
-                job_result.results.update(bundle.items())
-
-        return job_result
+        # Common logic for building a data spec is part of the data module
+        return _data.build_data_spec(
+            self.node.data_obj_id, self.node.storage_obj_id,
+            trac_schema, self.node.storage_config,
+            self.node.prior_data_spec)
 
 
 class DataViewFunc(NodeFunction[_data.DataView]):
@@ -334,117 +301,6 @@ class DataItemFunc(NodeFunction[_data.DataItem]):
         return delta
 
 
-class DataResultFunc(NodeFunction[ObjectBundle]):
-
-    def __init__(self, node: DataResultNode):
-        super().__init__()
-        self.node = node
-
-    def _execute(self, ctx: NodeContext) -> ObjectBundle:
-
-        data_spec = _ctx_lookup(self.node.data_save_id, ctx)
-
-        result_bundle = dict()
-
-        # Do not record output metadata for optional outputs that are empty
-        if data_spec.is_empty():
-            return result_bundle
-
-        if self.node.data_key is not None:
-            result_bundle[self.node.data_key] = _meta.ObjectDefinition(objectType=_meta.ObjectType.DATA, data=data_spec.data_def)
-
-        if self.node.file_key is not None:
-            result_bundle[self.node.file_key] = _meta.ObjectDefinition(objectType=_meta.ObjectType.FILE, file=data_spec.file_def)
-
-        if self.node.storage_key is not None:
-            result_bundle[self.node.storage_key] = _meta.ObjectDefinition(objectType=_meta.ObjectType.STORAGE, storage=data_spec.storage_def)
-
-        return result_bundle
-
-
-class DynamicDataSpecFunc(NodeFunction[_data.DataSpec]):
-
-    DATA_ITEM_TEMPLATE = "data/{}/{}/{}/snap-{:d}/delta-{:d}"
-    STORAGE_PATH_TEMPLATE = "data/{}/{}/{}/snap-{:d}/delta-{:d}-x{:0>6x}"
-
-    RANDOM = random.Random()
-    RANDOM.seed()
-
-    def __init__(self, node: DynamicDataSpecNode, storage: _storage.StorageManager):
-        super().__init__()
-        self.node = node
-        self.storage = storage
-
-    def _execute(self, ctx: NodeContext) -> _data.DataSpec:
-
-        # When data def for an output was not supplied in the job, this function creates a dynamic data spec
-
-        if self.node.prior_data_spec is not None:
-            raise _ex.ETracInternal("Data updates not supported yet")
-
-        data_view = _ctx_lookup(self.node.data_view_id, ctx)
-
-        data_id = self.node.data_obj_id
-        storage_id = self.node.storage_obj_id
-
-        # TODO: pass the object timestamp in from somewhere
-
-        # Note that datetime.utcnow() creates a datetime with no zone
-        # datetime.now(utc) creates a datetime with an explicit UTC zone
-        # The latter is more precise, also missing zones are rejected by validation
-        # (lenient validation might infer the zone, this should be limited to front-facing APIs)
-
-        object_timestamp = datetime.datetime.now(datetime.timezone.utc)
-
-        part_key = _meta.PartKey("part-root", _meta.PartType.PART_ROOT)
-        snap_index = 0
-        delta_index = 0
-
-        data_type = data_view.trac_schema.schemaType.name.lower()
-
-        data_item = self.DATA_ITEM_TEMPLATE.format(
-            data_type, data_id.objectId,
-            part_key.opaqueKey, snap_index, delta_index)
-
-        delta = _meta.DataDefinition.Delta(delta_index, data_item)
-        snap = _meta.DataDefinition.Snap(snap_index, [delta])
-        part = _meta.DataDefinition.Part(part_key, snap)
-
-        data_def = _meta.DataDefinition()
-        data_def.storageId = _util.selector_for_latest(storage_id)
-        data_def.schema = data_view.trac_schema
-        data_def.parts[part_key.opaqueKey] = part
-
-        storage_key = self.storage.default_storage_key()
-        storage_format = self.storage.default_storage_format()
-        storage_suffix_bytes = random.randint(0, 1 << 24)
-
-        storage_path = self.DATA_ITEM_TEMPLATE.format(
-            data_type, data_id.objectId,
-            part_key.opaqueKey, snap_index, delta_index,
-            storage_suffix_bytes)
-
-        storage_copy = _meta.StorageCopy(
-            storage_key, storage_path, storage_format,
-            copyStatus=_meta.CopyStatus.COPY_AVAILABLE,
-            copyTimestamp=_meta.DatetimeValue(object_timestamp.isoformat()))
-
-        storage_incarnation = _meta.StorageIncarnation(
-            [storage_copy],
-            incarnationIndex=0,
-            incarnationTimestamp=_meta.DatetimeValue(object_timestamp.isoformat()),
-            incarnationStatus=_meta.IncarnationStatus.INCARNATION_AVAILABLE)
-
-        storage_item = _meta.StorageItem([storage_incarnation])
-
-        storage_def = _meta.StorageDefinition()
-        storage_def.dataItems[data_item] = storage_item
-
-        # Dynamic data def will always use an embedded schema (this is no ID for an external schema)
-
-        return _data.DataSpec.create_data_spec(data_item, data_def, storage_def, schema_def=None)
-
-
 class _LoadSaveDataFunc(abc.ABC):
 
     def __init__(self, storage: _storage.StorageManager):
@@ -497,7 +353,7 @@ class LoadDataFunc( _LoadSaveDataFunc, NodeFunction[_data.DataItem],):
     def _execute(self, ctx: NodeContext) -> _data.DataItem:
 
         data_spec = self._choose_data_spec(self.node.spec_id, self.node.spec, ctx)
-        data_copy = self._choose_copy(data_spec.data_item, data_spec.storage_def)
+        data_copy = self._choose_copy(data_spec.data_item, data_spec.storage)
 
         if data_spec.object_type == _api.ObjectType.FILE:
             return self._load_file(data_copy)
@@ -524,12 +380,12 @@ class LoadDataFunc( _LoadSaveDataFunc, NodeFunction[_data.DataItem],):
 
     def _load_table(self, data_spec, data_copy):
 
-        trac_schema = data_spec.schema_def if data_spec.schema_def else data_spec.data_def.schema
+        trac_schema = data_spec.schema if data_spec.schema else data_spec.definition.schema
         arrow_schema = _data.DataMapping.trac_to_arrow_schema(trac_schema) if trac_schema else None
 
         storage_options = dict(
             (opt_key, _types.MetadataCodec.decode_value(opt_value))
-            for opt_key, opt_value in data_spec.storage_def.storageOptions.items())
+            for opt_key, opt_value in data_spec.storage.storageOptions.items())
 
         storage = self.storage.get_data_storage(data_copy.storageKey)
 
@@ -563,7 +419,7 @@ class SaveDataFunc(_LoadSaveDataFunc, NodeFunction[_data.DataSpec]):
 
         # Metadata already exists as data_spec but may not contain schema, row count, file size etc.
         data_spec = self._choose_data_spec(self.node.spec_id, self.node.spec, ctx)
-        data_copy = self._choose_copy(data_spec.data_item, data_spec.storage_def)
+        data_copy = self._choose_copy(data_spec.data_item, data_spec.storage)
 
         # Do not save empty outputs (optional outputs that were not produced)
         if data_item.is_empty():
@@ -605,7 +461,7 @@ class SaveDataFunc(_LoadSaveDataFunc, NodeFunction[_data.DataSpec]):
 
         # Decode options (metadata values) from the storage definition
         options = dict()
-        for opt_key, opt_value in data_spec.storage_def.storageOptions.items():
+        for opt_key, opt_value in data_spec.storage.storageOptions.items():
             options[opt_key] = _types.MetadataCodec.decode_value(opt_value)
 
         storage = self.storage.get_data_storage(data_copy.storageKey)
@@ -617,8 +473,8 @@ class SaveDataFunc(_LoadSaveDataFunc, NodeFunction[_data.DataSpec]):
         data_spec = copy.deepcopy(data_spec)
         # TODO: Save row count in metadata
 
-        if data_spec.data_def.schema is None and data_spec.data_def.schemaId is None:
-            data_spec.data_def.schema = _data.DataMapping.arrow_to_trac_schema(data_item.table.schema)
+        if data_spec.definition.schema is None and data_spec.definition.schemaId is None:
+            data_spec.definition.schema = _data.DataMapping.arrow_to_trac_schema(data_item.table.schema)
 
         return data_spec
 
@@ -640,38 +496,48 @@ class SaveDataFunc(_LoadSaveDataFunc, NodeFunction[_data.DataSpec]):
 
         data_spec = copy.deepcopy(data_spec)
 
-        if data_spec.data_def.schema is None and data_spec.data_def.schemaId is None:
-            data_spec.data_def.schema = data_item.trac_schema
+        if data_spec.definition.schema is None and data_spec.definition.schemaId is None:
+            data_spec.definition.schema = data_item.trac_schema
 
         return data_spec
 
-def _model_def_for_import(import_details: _meta.ImportModelJob):
 
-    return _meta.ModelDefinition(
-        language=import_details.language,
-        repository=import_details.repository,
-        packageGroup=import_details.packageGroup,
-        package=import_details.package,
-        version=import_details.version,
-        entryPoint=import_details.entryPoint,
-        path=import_details.path)
+# MODEL EXECUTION
+# ---------------
 
-
-class ImportModelFunc(NodeFunction[_meta.ObjectDefinition]):
+class ImportModelFunc(NodeFunction[GraphOutput]):
 
     def __init__(self, node: ImportModelNode, models: _models.ModelLoader):
         super().__init__()
         self.node = node
         self._models = models
 
-    def _execute(self, ctx: NodeContext) -> _meta.ObjectDefinition:
+    def _execute(self, ctx: NodeContext) -> GraphOutput:
 
-        model_stub = _model_def_for_import(self.node.import_details)
+        model_id = self.node.model_id
 
-        model_class = self._models.load_model_class(self.node.model_scope, model_stub)
+        model_stub = self._build_model_stub(self.node.import_details)
+        model_class = self._models.load_model_class(self.node.import_scope, model_stub)
         model_def = self._models.scan_model(model_stub, model_class)
+        model_obj = _meta.ObjectDefinition(_meta.ObjectType.MODEL, model=model_def)
 
-        return _meta.ObjectDefinition(_meta.ObjectType.MODEL, model=model_def)
+        model_attrs = [
+            _meta.TagUpdate(_meta.TagOperation.CREATE_OR_REPLACE_ATTR, attr_name, attr_value)
+            for attr_name, attr_value in model_def.staticAttributes.items()]
+
+        return GraphOutput(model_id, model_obj, model_attrs)
+
+    @staticmethod
+    def _build_model_stub(import_details: _meta.ImportModelJob):
+
+        return _meta.ModelDefinition(
+            language=import_details.language,
+            repository=import_details.repository,
+            packageGroup=import_details.packageGroup,
+            package=import_details.package,
+            version=import_details.version,
+            entryPoint=import_details.entryPoint,
+            path=import_details.path)
 
 
 class RunModelFunc(NodeFunction[Bundle[_data.DataView]]):
@@ -743,7 +609,8 @@ class RunModelFunc(NodeFunction[Bundle[_data.DataView]]):
                 self.checkout_directory, self.log_provider)
 
         try:
-            model = self.model_class()
+            model = object.__new__(self.model_class)
+            model.__init__()
             model.run_model(trac_ctx)
         except _ex.ETrac:
             raise
@@ -752,56 +619,152 @@ class RunModelFunc(NodeFunction[Bundle[_data.DataView]]):
             msg = f"There was an unhandled error in the model: {str(e)}{details}"
             raise _ex.EModelExec(msg) from e
 
-        # Check required outputs are present and build the results bundle
-
-        model_name = self.model_class.__name__
+        # Buidl a result bundle for the defined model outputs
         results: Bundle[_data.DataView] = dict()
-        new_nodes = dict()
-        new_deps = dict()
 
         for output_name, output_schema in model_def.outputs.items():
+            output: _data.DataView = local_ctx.get(output_name)
+            if (output is None or output.is_empty()) and not output_schema.optional:
+                raise _ex.ERuntimeValidation(f"Missing required output [{output_name}] from model [{self.model_class.__name__}]")
+            results[output_name] = output or _data.DataView.create_empty()
 
-            result: _data.DataView = local_ctx.get(output_name)
+        # Add dynamic outputs to the model result bundle
+        for output_name in dynamic_outputs:
+            output: _data.DataView = local_ctx.get(output_name)
+            if output is None or output.is_empty():
+                raise _ex.ERuntimeValidation(f"No data provided for [{output_name}] from model [{self.model_class.__name__}]")
+            results[output_name] = output
 
-            if result is None or result.is_empty():
-
-                if not output_schema.optional:
-                    raise _ex.ERuntimeValidation(f"Missing required output [{output_name}] from model [{model_name}]")
-
-                # Create a placeholder for optional outputs that were not emitted
-                elif result is None:
-                    result = _data.DataView.create_empty()
-
-            results[output_name] = result
-
-        if dynamic_outputs:
-
-            for output_name in dynamic_outputs:
-
-                result: _data.DataView = local_ctx.get(output_name)
-
-                if result is None or result.is_empty():
-                    raise _ex.ERuntimeValidation(f"No data provided for [{output_name}] from model [{model_name}]")
-
-                results[output_name] = result
-
-                result_node_id = NodeId.of(output_name, self.node.id.namespace, _data.DataView)
-                result_node = BundleItemNode(result_node_id, self.node.id, output_name)
-
-                new_nodes[result_node_id] = result_node
-
-            output_section = _graph.GraphBuilder.build_runtime_outputs(dynamic_outputs, self.node.id.namespace)
-            new_nodes.update(output_section.nodes)
-
-            ctx_id = NodeId.of("trac_job_result", self.node.id.namespace, result_type=None)
-            new_deps[ctx_id] = list(_graph.Dependency(nid, _graph.DependencyType.HARD) for nid in output_section.outputs)
-
-            self.node_callback.send_graph_updates(new_nodes, new_deps)
+        # Send a graph update to include the dynamic outputs in the job result
+        if any(dynamic_outputs):
+            builder = _graph.GraphBuilder.dynamic(self.node.graph_context)
+            update = builder.build_dynamic_outputs(self.node.id, dynamic_outputs)
+            self.node_callback.send_graph_update(update)
 
         return results
 
 
-class ChildJobFunction(NodeFunction[None]):
+# RESULTS PROCESSING
+# ------------------
+
+class JobResultFunc(NodeFunction[_cfg.JobResult]):
+
+    def __init__(self, node: JobResultNode):
+        super().__init__()
+        self.node = node
+
+    def _execute(self, ctx: NodeContext) -> _cfg.JobResult:
+
+        result_def = _meta.ResultDefinition()
+        result_def.jobId = _util.selector_for(self.node.job_id)
+
+        job_result = _cfg.JobResult()
+        job_result.jobId = self.node.job_id
+        job_result.resultId = self.node.result_id
+        job_result.result = result_def
+
+        self._process_named_outputs(self.node.named_outputs, ctx, job_result)
+        self._process_unnamed_outputs(self.node.unnamed_outputs, ctx, job_result)
+
+        # TODO: Handle individual failed results
+
+        result_def.statusCode = _meta.JobStatusCode.SUCCEEDED
+
+        return job_result
+
+    def _process_named_outputs(self, named_outputs, ctx: NodeContext, job_result: _cfg.JobResult):
+
+        for output_name, output_id in named_outputs.items():
+
+            output = _ctx_lookup(output_id, ctx)
+
+            if output_id.result_type == GraphOutput:
+                self._process_graph_output(output_name, output, job_result)
+
+            elif output_id.result_type == _data.DataSpec:
+                self._process_data_spec(output_name, output, job_result)
+
+            else:
+                raise _ex.EUnexpected()
+
+    def _process_unnamed_outputs(self, unnamed_outputs, ctx: NodeContext, job_result: _cfg.JobResult):
+
+        for output_id in unnamed_outputs:
+
+            output = _ctx_lookup(output_id, ctx)
+
+            if output_id.result_type == GraphOutput:
+                self._process_graph_output(None, output, job_result)
+
+            elif output_id.result_type == _data.DataSpec:
+                self._process_data_spec(None, output, job_result)
+
+            else:
+                raise _ex.EUnexpected()
+
+    @staticmethod
+    def _process_graph_output(output_name: tp.Optional[str], output: GraphOutput, job_result: _cfg.JobResult):
+
+        output_key = _util.object_key(output.objectId)
+
+        job_result.objectIds.append(output.objectId)
+        job_result.objects[output_key] = output.definition
+
+        if output.attrs is not None:
+            job_result.attrs[output_key] = _cfg.JobResultAttrs(output.attrs)
+
+        if output_name is not None:
+            job_result.result.outputs[output_name] = _util.selector_for(output.objectId)
+
+    @staticmethod
+    def _process_data_spec(output_name: tp.Optional[str], data_spec: _data.DataSpec, job_result: _cfg.JobResult):
+
+        # Do not record results for optional outputs that were not produced
+        if data_spec.is_empty():
+            return
+
+        output_id = data_spec.primary_id
+        output_key = _util.object_key(output_id)
+        output_def = data_spec.definition
+
+        if data_spec.object_type == _meta.ObjectType.DATA:
+            output_obj = _meta.ObjectDefinition(data_spec.object_type, data=output_def)
+        elif data_spec.object_type == _meta.ObjectType.FILE:
+            output_obj = _meta.ObjectDefinition(data_spec.object_type, file=output_def)
+        else:
+            raise _ex.EUnexpected()
+
+        storage_id = data_spec.storage_id
+        storage_key = _util.object_key(storage_id)
+        storage_def = data_spec.storage
+        storage_obj = _meta.ObjectDefinition(objectType=_meta.ObjectType.STORAGE, storage=storage_def)
+
+        job_result.objectIds.append(output_id)
+        job_result.objectIds.append(storage_id)
+        job_result.objects[output_key] = output_obj
+        job_result.objects[storage_key] = storage_obj
+
+        # Currently, jobs do not ever produce external schemas
+
+        if output_name is not None:
+            job_result.result.outputs[output_name] = _util.selector_for(output_id)
+
+
+class DynamicOutputsFunc(NodeFunction[DynamicOutputsNode]):
+
+    def __init__(self, node: DynamicOutputsNode):
+        super().__init__()
+        self.node = node
+
+    def _execute(self, ctx: NodeContext) -> DynamicOutputsNode:
+        return self.node
+
+
+# MISC NODE TYPES
+# ---------------
+
+
+class ChildJobFunc(NodeFunction[None]):
 
     def __init__(self, node: ChildJobNode):
         super().__init__()
@@ -868,9 +831,6 @@ class FunctionResolver:
     def resolve_save_data(self, node: SaveDataNode):
         return SaveDataFunc(node, self._storage)
 
-    def resolve_dynamic_data_spec(self, node: DynamicDataSpecNode):
-        return DynamicDataSpecFunc(node, self._storage)
-
     def resolve_import_model_node(self, node: ImportModelNode):
         return ImportModelFunc(node, self._models)
 
@@ -886,27 +846,25 @@ class FunctionResolver:
 
     __basic_node_mapping: tp.Dict[Node.__class__, NodeFunction.__class__] = {
 
-        ContextPushNode: ContextPushFunc,
-        ContextPopNode: ContextPopFunc,
+        NoopNode: NoopFunc,
+        StaticValueNode: StaticValueFunc,
         IdentityNode: IdentityFunc,
         KeyedItemNode: KeyedItemFunc,
+        ContextPushNode: ContextPushFunc,
+        ContextPopNode: ContextPopFunc,
+        DataSpecNode: DataSpecFunc,
         DataViewNode: DataViewFunc,
         DataItemNode: DataItemFunc,
-        BuildJobResultNode: BuildJobResultFunc,
-        DataResultNode: DataResultFunc,
-        StaticValueNode: StaticValueFunc,
-        RuntimeOutputsNode: RuntimeOutputsFunc,
-        ChildJobNode: ChildJobFunction,
+        JobResultNode: JobResultFunc,
+        DynamicOutputsNode: DynamicOutputsFunc,
+        ChildJobNode: ChildJobFunc,
         BundleItemNode: NoopFunc,
-        NoopNode: NoopFunc,
-        RunModelResultNode: NoopFunc
     }
 
     __node_mapping: tp.Dict[Node.__class__, __ResolveFunc] = {
 
         LoadDataNode: resolve_load_data,
         SaveDataNode: resolve_save_data,
-        DynamicDataSpecNode: resolve_dynamic_data_spec,
         RunModelNode: resolve_run_model_node,
         ImportModelNode: resolve_import_model_node
     }
