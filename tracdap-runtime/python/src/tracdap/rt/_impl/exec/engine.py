@@ -709,23 +709,21 @@ class GraphProcessor(_actors.Actor):
         self.check_job_status(do_submit=False)
 
     @_actors.Message
-    def update_graph(
-            self, requestor_id: NodeId,
-            new_nodes: tp.Dict[NodeId, _graph.Node],
-            new_deps: tp.Dict[NodeId, tp.List[_graph.Dependency]]):
+    def update_graph(self, requestor_id: NodeId, update: _graph.GraphUpdate):
 
         new_graph = cp.copy(self.graph)
         new_graph.nodes = cp.copy(new_graph.nodes)
 
         # Attempt to insert a duplicate node is always an error
-        node_collision = list(filter(lambda nid: nid in self.graph.nodes, new_nodes))
+        node_collision = list(filter(lambda nid: nid in self.graph.nodes, update.nodes))
 
         # Only allow adding deps to pending nodes for now (adding deps to active nodes will require more work)
-        dep_collision = list(filter(lambda nid: nid not in self.graph.pending_nodes, new_deps))
+        dep_collision = list(filter(lambda nid: nid not in self.graph.pending_nodes, update.dependencies))
 
+        # Only allow adding deps to new nodes (deps to existing nodes should not be part of an update)
         dep_invalid = list(filter(
-            lambda dds: any(filter(lambda dd: dd.node_id not in new_nodes, dds)),
-            new_deps.values()))
+            lambda ds: any(filter(lambda d: d.node_id not in update.nodes, ds)),
+            update.dependencies.values()))
 
         if any(node_collision) or any(dep_collision) or any(dep_invalid):
 
@@ -741,18 +739,20 @@ class GraphProcessor(_actors.Actor):
             requestor.error = _ex.ETracInternal("Node collision during graph update")
             new_graph.nodes[requestor_id] = requestor
 
+            self.graph = new_graph
+
             return
 
         new_graph.pending_nodes = cp.copy(new_graph.pending_nodes)
 
-        for node_id, node in new_nodes.items():
+        for node_id, node in update.nodes.items():
             self._graph_logger.log_node_add(node)
             node_func = self._resolver.resolve_node(node)
             new_node = _EngineNode(node, node_func)
             new_graph.nodes[node_id] = new_node
             new_graph.pending_nodes.add(node_id)
 
-        for node_id, deps in new_deps.items():
+        for node_id, deps in update.dependencies.items():
             engine_node = cp.copy(new_graph.nodes[node_id])
             engine_node.dependencies = cp.copy(engine_node.dependencies)
             for dep in deps:
