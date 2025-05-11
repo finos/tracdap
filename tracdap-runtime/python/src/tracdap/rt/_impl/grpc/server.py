@@ -305,8 +305,8 @@ class GetJobStatusRequest(ApiRequest[runtime_pb2.RuntimeJobInfoRequest, runtime_
         else:
             self._response = runtime_pb2.RuntimeJobStatus(
                 jobId=codec.encode(job_details.jobId),
-                statusCode=codec.encode(job_details.statusCode),
-                statusMessage=codec.encode(job_details.statusMessage))
+                statusCode=codec.encode(job_details.result.statusCode),
+                statusMessage=codec.encode(job_details.result.statusMessage))
 
         self._mark_complete()
 
@@ -336,12 +336,12 @@ class GetJobResultRequest(ApiRequest[runtime_pb2.RuntimeJobInfoRequest, runtime_
 
         else:
 
-            encoded_results = dict((k, codec.encode(v)) for k, v in job_details.results.items())
-
             self._response = runtime_pb2.RuntimeJobResult(
                 jobId=codec.encode(job_details.jobId),
-                statusCode=codec.encode(job_details.statusCode),
-                statusMessage=codec.encode(job_details.statusMessage),
-                results=encoded_results)
+                resultId=codec.encode(job_details.resultId),
+                result=codec.encode(job_details.result),
+                objectIds=codec.encode(job_details.objectIds),
+                objects=codec.encode(job_details.objects),
+                attrs=codec.encode(job_details.attrs))
 
         self._mark_complete()
