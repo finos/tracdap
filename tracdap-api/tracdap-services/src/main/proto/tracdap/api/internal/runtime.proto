@@ -9,6 +9,7 @@ option java_multiple_files = true;
 import "tracdap/metadata/object_id.proto";
 import "tracdap/metadata/job.proto";
 import "tracdap/metadata/object.proto";
+import "tracdap/metadata/tag_update.proto";
 
 import "google/api/annotations.proto";
 
@@ -61,12 +62,17 @@ message RuntimeJobStatus {
   string errorDetail = 4;
 }
 
+message RuntimeJobResultAttrs {
+
+  repeated metadata.TagUpdate attrs = 1;
+}
+
 message RuntimeJobResult {
 
-  metadata.TagHeader jobId = 1;
+  metadata.TagHeader resultId = 1;
+  metadata.ResultDefinition result = 2;
 
-  metadata.JobStatusCode statusCode = 2;
-  string statusMessage = 3;
-
-  map<string, metadata.ObjectDefinition> results = 4;
+  repeated metadata.TagHeader objectIds = 3;
+  map<string, metadata.ObjectDefinition> objects = 4;
+  map<string, RuntimeJobResultAttrs> attrs = 5;
 }
