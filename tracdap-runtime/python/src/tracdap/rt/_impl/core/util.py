@@ -16,6 +16,7 @@
 import datetime as dt
 import pathlib
 import platform
+import re
 
 import typing as tp
 import uuid
@@ -30,6 +31,7 @@ import traceback as tb
 __IS_WINDOWS = platform.system() == "Windows"
 __FIRST_MODEL_FRAME_NAME = "run_model"
 __FIRST_MODEL_FRAME_TEST_NAME = "_callTestMethod"
+__OBJ_KEY_PATTERN = re.compile(r"([A-Z]+)-(.*)-v(\d+)")
 
 
 def is_windows():
@@ -139,8 +141,35 @@ def get_job_metadata(
     if optional:
         return None
 
-    err = f"Missing required {selector.objectType.name} object [{object_key(selector)}]"
+    err = f"Missing required {selector.objectType.name} object for [{object_key(selector)}]"
     raise ex.ERuntimeValidation(err)
+
+
+def get_job_mapping(
+        selector: tp.Union[meta.TagHeader, meta.TagSelector],
+        job_config: cfg.JobConfig) \
+        -> meta.TagHeader:
+
+    obj_key = object_key(selector)
+    obj_id = job_config.objectMapping.get(obj_key)
+
+    if obj_id is not None:
+        return obj_id
+
+    obj_key_match = __OBJ_KEY_PATTERN.match(obj_key)
+
+    if not obj_key_match:
+        err = f"Missing required {selector.objectType.name} ID for [{object_key(selector)}]"
+        raise ex.ERuntimeValidation(err)
+
+    obj_type = obj_key_match.group(1)
+    obj_id = obj_key_match.group(2)
+    obj_ver = obj_key_match.group(3)
+    obj_ts = job_config.jobId.objectTimestamp
+
+    return meta.TagHeader(
+        meta.ObjectType.__members__[obj_type], obj_id,
+        int(obj_ver), obj_ts, 1, obj_ts)
 
 
 def get_origin(metaclass: type):
