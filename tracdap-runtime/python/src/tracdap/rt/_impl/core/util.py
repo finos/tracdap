@@ -62,7 +62,7 @@ def format_file_size(size: int) -> str:
 
 def new_object_id(object_type: meta.ObjectType) -> meta.TagHeader:
 
-    timestamp = dt.datetime.now(dt.UTC)
+    timestamp = dt.datetime.now(dt.timezone.utc)
 
     return meta.TagHeader(
         objectType=object_type,
@@ -75,7 +75,7 @@ def new_object_id(object_type: meta.ObjectType) -> meta.TagHeader:
 
 def new_object_version(prior_id: meta.TagHeader) -> meta.TagHeader:
 
-    timestamp = dt.datetime.now(dt.UTC)
+    timestamp = dt.datetime.now(dt.timezone.utc)
 
     return meta.TagHeader(
         objectType=prior_id.objectType,
