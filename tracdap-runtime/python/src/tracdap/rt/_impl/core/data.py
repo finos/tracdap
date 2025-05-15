@@ -179,12 +179,12 @@ class StorageLayout:
 
 class BaseLayout(StorageLayout):
 
-    __DATA_ITEM_TEMPLATE = "data//{}/{}/snap-{:d}/delta-{:d}"
+    __DATA_ITEM_TEMPLATE = "data//{}/{}/{}/snap-{:d}/delta-{:d}"
     __FILE_ITEM_TEMPLATE = "file/{}/version-{}"
 
     @abc.abstractmethod
     def _data_storage_path(
-            self, data_id: _meta.TagHeader, context_key: str,
+            self, data_id: _meta.TagHeader, context_key: str, trac_schema: _meta.SchemaDefinition,
             part_key: _meta.PartKey, snap_index: int, delta_index: int, storage_format: str,
             prior_copy: tp.Optional[_meta.StorageCopy]):
         pass
@@ -204,7 +204,8 @@ class BaseLayout(StorageLayout):
         snap_index = 0
 
         data_item = self.__DATA_ITEM_TEMPLATE.format(
-            data_id.objectId, part_key.opaqueKey, snap_index, 0)
+            trac_schema.schemaType.name.lower(), data_id.objectId,
+            part_key.opaqueKey, snap_index, 0)
 
         # Blank data definition with no parts
         new_data_def = _meta.DataDefinition(
@@ -216,7 +217,7 @@ class BaseLayout(StorageLayout):
         # Take default location from the storage config
         storage_key = storage_config.defaultBucket
         storage_format = "JSON" if trac_schema.schemaType == _meta.SchemaType.STRUCT else storage_config.defaultFormat
-        storage_path = self._data_storage_path(data_id, context_key, part_key, snap_index, 0, storage_format, prior_copy=None)
+        storage_path = self._data_storage_path(data_id, context_key, trac_schema, part_key, snap_index, 0, storage_format, prior_copy=None)
 
         storage_copy = _meta.StorageCopy(
             storageKey=storage_key,
@@ -244,7 +245,8 @@ class BaseLayout(StorageLayout):
         snap_index = prior_spec.primary_id.objectVersion  # snap index is zero-based
 
         data_item = self.__DATA_ITEM_TEMPLATE.format(
-            data_id.objectId, part_key.opaqueKey, snap_index, 0)
+            trac_schema.schemaType.name.lower(), data_id.objectId,
+            part_key.opaqueKey, snap_index, 0)
 
         data_def = self._add_new_snap(prior_spec.definition, data_item, part_key, snap_index)
 
@@ -256,7 +258,7 @@ class BaseLayout(StorageLayout):
 
         storage_key = prior_copy.storageKey
         storage_format = prior_copy.storageFormat
-        storage_path = self._data_storage_path(data_id, context_key, part_key, snap_index, 0, storage_format, prior_copy)
+        storage_path = self._data_storage_path(data_id, context_key, trac_schema, part_key, snap_index, 0, storage_format, prior_copy)
 
         storage_copy = _meta.StorageCopy(
             storageKey=storage_key,
@@ -409,8 +411,8 @@ class BaseLayout(StorageLayout):
 
 class ObjectIdLayout(BaseLayout):
 
-    __DATA_STORAGE_TEMPLATE = "data/DATA-{}/{}/snap-{:d}/delta-{:d}-x{:0>6x}/"
-    __FILE_STORAGE_TEMPLATE = "file/FILE-{}/version-{:d}/{}.{}"
+    __DATA_STORAGE_TEMPLATE = "data/{}/{}/{}/snap-{:d}/delta-{:d}-x{:0>6x}"
+    __FILE_STORAGE_TEMPLATE = "file/{}/version-{:d}-x{:0>6x}/{}.{}"
 
     def __init__(self):
         self.__random = random.Random()
@@ -420,21 +422,24 @@ class ObjectIdLayout(BaseLayout):
         return _meta.StorageLayout.OBJECT_ID_LAYOUT
 
     def _data_storage_path(
-            self, data_id, context_key,
+            self, data_id, context_key, trac_schema,
             part_key, snap_index, delta_index,
             storage_format, prior_copy):
 
-        storage_suffix_bytes = self.__random.randint(0, 1 << 24)
+        schema_type = trac_schema.schemaType.name.lower()
+        version_suffix = self.__random.randint(0, 1 << 24)
 
         return self.__DATA_STORAGE_TEMPLATE.format(
-            data_id.objectId,
+            schema_type, data_id.objectId,
             part_key.opaqueKey, snap_index, delta_index,
-            storage_suffix_bytes, storage_format.lower())
+            version_suffix)
 
     def _file_storage_path(self, file_id, file_def, prior_copy):
 
+        version_suffix = self.__random.randint(0, 1 << 24)
+
         return self.__FILE_STORAGE_TEMPLATE.format(
-            file_id.objectId, file_id.objectVersion,
+            file_id.objectId, file_id.objectVersion, version_suffix,
             file_def.name, file_def.extension.lower())
 
 
