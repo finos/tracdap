@@ -295,6 +295,7 @@ class DataSpecNode(Node[_data.DataSpec]):
 
     data_obj_id: _meta.TagHeader
     storage_obj_id: _meta.TagHeader
+    context_key: str
 
     storage_config: _cfg.StorageConfig
 

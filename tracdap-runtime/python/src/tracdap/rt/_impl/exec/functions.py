@@ -230,7 +230,8 @@ class DataSpecFunc(NodeFunction[_data.DataSpec]):
         # Common logic for building a data spec is part of the data module
         return _data.build_data_spec(
             self.node.data_obj_id, self.node.storage_obj_id,
-            trac_schema, self.node.storage_config,
+            self.node.context_key, trac_schema,
+            self.node.storage_config,
             self.node.prior_data_spec)
 
 
