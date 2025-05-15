@@ -876,7 +876,8 @@ class DevModeTranslator:
         elif is_output:
             self._log.info(f"No prior data for output [{data_key}]")
         else:
-            raise _ex.EJobValidation(f"No data found for input [{data_key}]: {storage_path}")
+            # This is allowed for some scenarios, e.g. inside a job group
+            self._log.warning(f"No data found for input [{data_key}]")
 
         part_key = _meta.PartKey(opaqueKey="part-root", partType=_meta.PartType.PART_ROOT)
         snap_index = version - 1 if version > 0 else 0
@@ -936,7 +937,8 @@ class DevModeTranslator:
         elif is_output:
             self._log.info(f"No prior data for output [{file_key}]")
         else:
-            raise _ex.EJobValidation(f"No data found for input [{file_key}]: {storage_path}")
+            # This is allowed for some scenarios, e.g. inside a job group
+            self._log.warning(f"No data found for input [{file_key}]")
 
         storage = self._storage_manager.get_file_storage(storage_key)
         file_size = storage.size(storage_path) if storage.exists(storage_path) else 0
