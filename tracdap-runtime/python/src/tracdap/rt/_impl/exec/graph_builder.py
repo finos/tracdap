@@ -56,7 +56,8 @@ class GraphBuilder:
         # Dictionary of object type to preallocated IDs
         self._preallocated_ids = dict(
             (k, list(v)) for k, v in _itr.groupby(
-            job_config.preallocatedIds, lambda oid: oid.objectType))
+                sorted(job_config.preallocatedIds, key=lambda oid: oid.objectType.value),
+                lambda oid: oid.objectType))
 
         self._errors = list()
 
