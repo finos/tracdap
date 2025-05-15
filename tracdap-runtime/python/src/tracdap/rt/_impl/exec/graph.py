@@ -195,10 +195,10 @@ class GraphOutput:
     attrs: _tp.List[_meta.TagUpdate] = _dc.field(default_factory=list)
 
 
-Bundle: _tp.TypeAlias = _tp.Dict[str, _T]
-ObjectBundle: _tp.TypeAlias = Bundle[_meta.ObjectDefinition]
+Bundle = _tp.Dict[str, _T]
+ObjectBundle = Bundle[_meta.ObjectDefinition]
 
-JOB_OUTPUT_TYPE: _tp.TypeAlias = _tp.Union[GraphOutput, _data.DataSpec]
+JOB_OUTPUT_TYPE = _tp.Union[GraphOutput, _data.DataSpec]
 
 
 # ----------------------------------------------------------------------------------------------------------------------
