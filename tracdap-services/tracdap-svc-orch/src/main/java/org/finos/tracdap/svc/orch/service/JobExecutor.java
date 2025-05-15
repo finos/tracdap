@@ -384,12 +384,20 @@ public class JobExecutor<TBatchState extends Serializable> implements IJobExecut
             var batchResultBytes = batchExecutor.getOutputFile(jobState.batchKey, jobState.batchState, "result", resultFile);
             var batchResult = configParser.parseConfig(batchResultBytes, ConfigFormat.JSON, JobResult.class);
 
-            return RuntimeJobResult.newBuilder()
+            var runtimeResult = RuntimeJobResult.newBuilder()
                     .setJobId(batchResult.getJobId())
-                    .setStatusCode(batchResult.getStatusCode())
-                    .setStatusMessage(batchResult.getStatusMessage())
-                    .putAllResults(batchResult.getResultsMap())
-                    .build();
+                    .setResultId(batchResult.getResultId())
+                    .setResult(batchResult.getResult())
+                    .addAllObjectIds(batchResult.getObjectIdsList())
+                    .putAllObjects(batchResult.getObjectsMap());
+
+            for (var entry : batchResult.getAttrsMap().entrySet()) {
+                var objectKey = entry.getKey();
+                var attrs = entry.getValue().getAttrsList();
+                runtimeResult.putAttrs(objectKey, RuntimeJobResultAttrs.newBuilder().addAllAttrs(attrs).build());
+            }
+
+            return runtimeResult.build();
         }
         catch (EConfigParse parseError) {
 

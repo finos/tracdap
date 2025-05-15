@@ -24,7 +24,6 @@ import org.finos.tracdap.api.MetadataWriteRequest;
 import org.finos.tracdap.api.internal.RuntimeJobStatus;
 import org.finos.tracdap.api.internal.InternalMetadataApiGrpc.InternalMetadataApiBlockingStub;
 import org.finos.tracdap.common.cache.CacheEntry;
-import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.config.IDynamicResources;
 import org.finos.tracdap.common.exception.*;
 import org.finos.tracdap.common.grpc.RequestMetadata;
@@ -131,11 +130,15 @@ public class JobProcessor {
         try {
 
             // Load in all the resources referenced by the job
-            newState = lifecycle.loadResources(newState);
+            newState = lifecycle.loadMetadata(newState);
 
             // Semantic validation (job consistency)
-            var metadata = new MetadataBundle(newState.resources, newState.resourceMapping);
+            var metadata = new MetadataBundle(newState.objectMapping, newState.objects, newState.tags);
             validator.validateConsistency(newState.definition, metadata, resources);
+
+            // Apply any transformations specific to the job type
+            // Including this step during validation will catch more errors before jobs are submitted
+            newState = lifecycle.applyTransform(newState);
 
             newState.tracStatus = JobStatusCode.VALIDATED;
 
@@ -157,18 +160,14 @@ public class JobProcessor {
 
         var newState = jobState.clone();
 
-        // Apply any transformations specific to the job type
-        newState = lifecycle.applyTransform(newState);
+        // The job definition was prepared in assembleAndValidate() - write it to the metadata store
+        newState = lifecycle.saveJobDefinition(newState);
 
-        // Result IDs are needed in order to generate the job instruction
-        // They are also updated in the job definition that is being created
-        newState = lifecycle.allocateResultIds(newState);
+        // Preallocate IDs that will be used by the runtime for output objects
+        newState = lifecycle.preallocateObjectIds(newState);
 
         // Create the job instruction - this is what will go to the executor
         newState = lifecycle.buildJobConfig(newState);
-
-        // The job definition is ready - write it to the metadata store
-        newState = lifecycle.saveInitialMetadata(newState);
 
         newState.tracStatus = JobStatusCode.QUEUED;
         newState.cacheStatus = CacheStatus.QUEUED_IN_TRAC;
@@ -222,8 +221,8 @@ public class JobProcessor {
         newState.tracStatus = JobStatusCode.SUBMITTED;
         newState.cacheStatus = CacheStatus.SENT_TO_EXECUTOR;
         newState.executorState = executorState;
-        newState.executorStatus = null;
-        newState.executorResult = null;
+        newState.runtimeStatus = null;
+        newState.runtimeResult = null;
 
         return newState;
     }
@@ -268,14 +267,14 @@ public class JobProcessor {
         return jobStatusList;
     }
 
-    public JobState recordJobStatus(JobState jobState, RuntimeJobStatus executorStatus) {
+    public JobState recordJobStatus(JobState jobState, RuntimeJobStatus runtimeStatus) {
 
         var newState = jobState.clone();
-        newState.executorStatus = executorStatus;
+        newState.runtimeStatus = runtimeStatus;
 
         log.info("Job status received from executor: [{}]", newState.jobKey);
 
-        switch (executorStatus.getStatusCode()) {
+        switch (runtimeStatus.getStatusCode()) {
 
             // Initial state, executor has not updated
 
@@ -314,11 +313,11 @@ public class JobProcessor {
             case FAILED:
                 newState.tracStatus = JobStatusCode.FAILED;
                 newState.cacheStatus = CacheStatus.EXECUTOR_FAILED;
-                newState.statusMessage = executorStatus.getStatusMessage();
-                newState.errorDetail = executorStatus.getErrorDetail();
+                newState.statusMessage = runtimeStatus.getStatusMessage();
+                newState.errorDetail = runtimeStatus.getErrorDetail();
 
-                log.error("Execution failed for [{}]: {}", newState.jobKey, executorStatus.getStatusMessage());
-                log.error("Error detail for [{}]\n{}", newState.jobKey, executorStatus.getErrorDetail());
+                log.error("Execution failed for [{}]: {}", newState.jobKey, runtimeStatus.getStatusMessage());
+                log.error("Error detail for [{}]\n{}", newState.jobKey, runtimeStatus.getErrorDetail());
 
                 return newState;
 
@@ -366,32 +365,25 @@ public class JobProcessor {
 
         try {
 
-            var executorResult = jobExecutor.getJobResult(executorState);
-
-            // If the validator is extended to cover the config interface,
-            // The top level job result could be validated directly
-
-            for (var result : executorResult.getResultsMap().entrySet()) {
-
-                log.info("Validating job result: [{}] item [{}]", jobState.jobKey, result.getKey());
-                validator.validateFixedObject(result.getValue());
-            }
+            var runtimeResult = jobExecutor.getJobResult(executorState);
 
             var newState = jobState.clone();
-            newState.executorResult = executorResult;
-            newState.tracStatus = JobStatusCode.SUCCEEDED;
+            newState.runtimeResult = runtimeResult;
+            newState.tracStatus = JobStatusCode.FINISHING;
             newState.cacheStatus = CacheStatus.RESULTS_RECEIVED;
 
             return newState;
         }
-        catch (EValidation e) {
+        catch (ETrac e) {
 
-            // Parsing and validation failures mean the job has definitely failed
-            // Handle these as part of the result processing
-            // These are not executor / communication errors and should not be retried
+            // Failed to retrieve or decode the result from the runtime
+            // Store the error state and handle as part of the result processing
 
-            var errorMessage = e.getMessage();
-            var shortMessage = errorMessage.lines().findFirst().orElse("No details available");
+            // TODO: It may be possible to retry for some error conditions
+
+            var shortMessage = e instanceof ETracPublic
+                    ? e.getMessage().lines().findFirst().orElse("No details available")
+                    : "No details available";
 
             var newState = jobState.clone();
             newState.tracStatus = JobStatusCode.FAILED;
@@ -408,9 +400,8 @@ public class JobProcessor {
 
         var newState = jobState.clone();
 
-        // TRAC job status must already be set before calling lifecycle
-
         lifecycle.processJobResult(newState);
+        lifecycle.saveJobResult(newState);
 
         newState.cacheStatus = CacheStatus.RESULTS_SAVED;
 
@@ -439,8 +430,8 @@ public class JobProcessor {
         var newState = jobState.clone();
         newState.cacheStatus = CacheStatus.READY_TO_REMOVE;
         newState.executorState = null;
-        newState.executorStatus = null;
-        newState.executorResult = null;
+        newState.runtimeStatus = null;
+        newState.runtimeResult = null;
 
         return newState;
     }
@@ -460,6 +451,7 @@ public class JobProcessor {
         newState.statusMessage = errorMessage;
 
         lifecycle.processJobResult(newState);
+        lifecycle.saveJobResult(newState);
 
         newState.cacheStatus = CacheStatus.READY_TO_REMOVE;
 

@@ -27,14 +27,12 @@ import org.finos.tracdap.common.middleware.GrpcClientConfig;
 import org.finos.tracdap.common.middleware.GrpcClientState;
 import org.finos.tracdap.config.JobConfig;
 import org.finos.tracdap.config.RuntimeConfig;
-import org.finos.tracdap.metadata.JobDefinition;
-import org.finos.tracdap.metadata.JobType;
-import org.finos.tracdap.metadata.JobStatusCode;
-import org.finos.tracdap.metadata.ObjectDefinition;
-import org.finos.tracdap.metadata.TagHeader;
+import org.finos.tracdap.metadata.*;
 
 import java.io.*;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 
@@ -70,21 +68,28 @@ public class JobState implements Serializable, Cloneable {
     String errorDetail;
     int retries;
 
-    // Job definition and resources, built up by the job logic
-    JobDefinition definition;
-    Map<String, ObjectDefinition> resources = new HashMap<>();
-    Map<String, TagHeader> resourceMapping = new HashMap<>();
-    Map<String, TagHeader> resultMapping = new HashMap<>();
+    // Job definition and referenced metadata, built up by the job logic
+    JobDefinition definition;;
+    Map<String, TagHeader> objectMapping = new HashMap<>();
+    Map<String, ObjectDefinition> objects = new HashMap<>();
+    Map<String, Tag> tags = new HashMap<>();
+
+    TagHeader resultId;
+    List<TagHeader> preallocatedIds = new ArrayList<>();
 
     // Input / output config files for communicating with the runtime
     JobConfig jobConfig;
     RuntimeConfig sysConfig;
 
-    RuntimeJobStatus executorStatus;
-    RuntimeJobResult executorResult;
-
     // Executor state data
     Serializable executorState;
+
+    // Status and result received back from the runtime
+    RuntimeJobStatus runtimeStatus;
+    RuntimeJobResult runtimeResult;
+
+    // Final result after post-processing
+    RuntimeJobResult jobResult;
 
     @Override
     public JobState clone() {
@@ -93,9 +98,10 @@ public class JobState implements Serializable, Cloneable {
 
             var clone = (JobState) super.clone();
 
-            clone.resources = new HashMap<>(this.resources);
-            clone.resourceMapping = new HashMap<>(this.resourceMapping);
-            clone.resultMapping = new HashMap<>(this.resultMapping);
+            clone.objectMapping = new HashMap<>(this.objectMapping);
+            clone.objects = new HashMap<>(this.objects);
+            clone.tags = new HashMap<>(this.tags);
+            clone.preallocatedIds = new ArrayList<>(this.preallocatedIds);
 
             return clone;
         }

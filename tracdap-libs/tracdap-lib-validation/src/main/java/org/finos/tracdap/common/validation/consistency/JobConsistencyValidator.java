@@ -114,7 +114,7 @@ public class JobConsistencyValidator {
     public static ValidationContext runModelJob(RunModelJob job, ValidationContext ctx) {
 
         var metadata = ctx.getMetadataBundle();
-        var modelObj = metadata.getResource(job.getModel());
+        var modelObj = metadata.getObject(job.getModel());
 
         if (modelObj == null) {
             var message = "Required metadata is not available for [" + MetadataUtil.objectKey(job.getModel()) + "]";
@@ -191,7 +191,7 @@ public class JobConsistencyValidator {
 
     private static ValidationContext flowAvailable(TagSelector flowSelector, ValidationContext ctx) {
 
-        var flowObj = ctx.getMetadataBundle().getResource(flowSelector);
+        var flowObj = ctx.getMetadataBundle().getObject(flowSelector);
 
         if (flowObj == null)
             return ctx.error(String.format("Flow definition is not available for [%s]", MetadataUtil.objectKey(flowSelector)));
@@ -391,7 +391,7 @@ public class JobConsistencyValidator {
     // Input comes from the job definition
     private static ValidationContext inputMatchesSchema(String inputName, TagSelector inputSelector, ModelInputSchema inputDef, ValidationContext ctx) {
 
-        var inputObject = ctx.getMetadataBundle().getResource(inputSelector);
+        var inputObject = ctx.getMetadataBundle().getObject(inputSelector);
 
         if (inputObject == null) {
 
@@ -474,7 +474,7 @@ public class JobConsistencyValidator {
     // Output comes from the job definition
     private static ValidationContext outputMatchesSchema(String outputName, TagSelector outputSelector, ModelOutputSchema outputDef, ValidationContext ctx) {
 
-        var outputObject = ctx.getMetadataBundle().getResource(outputSelector);
+        var outputObject = ctx.getMetadataBundle().getObject(outputSelector);
 
         if (outputObject == null) {
 
@@ -652,7 +652,7 @@ public class JobConsistencyValidator {
 
         if (dataset.hasSchemaId()) {
 
-            var schema = resources.getResource(dataset.getSchemaId());
+            var schema = resources.getObject(dataset.getSchemaId());
 
             // Metadata should be loaded before the validator runs (partial validation not available at present)
             if (schema == null)
@@ -712,7 +712,7 @@ public class JobConsistencyValidator {
 
     private static ValidationContext modelNode(String modelKey, TagSelector modelSelector, Node<NodeMetadata> node, GraphSection<NodeMetadata> graph, ValidationContext ctx) {
 
-        var modelObj = ctx.getMetadataBundle().getResource(modelSelector);
+        var modelObj = ctx.getMetadataBundle().getObject(modelSelector);
 
         // Metadata should be loaded before the validator runs (partial validation not available at present)
         if (modelObj == null)

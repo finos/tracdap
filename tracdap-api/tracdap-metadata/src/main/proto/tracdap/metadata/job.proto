@@ -119,6 +119,8 @@ message ResultDefinition {
   string statusMessage = 3;
 
   TagSelector logFileId = 4;
+
+  map<string, TagSelector> outputs = 5;
 }
 
 /**

@@ -17,7 +17,6 @@
 
 package org.finos.tracdap.svc.orch.jobs;
 
-import org.finos.tracdap.api.MetadataWriteRequest;
 import org.finos.tracdap.api.internal.RuntimeJobResult;
 import org.finos.tracdap.common.config.IDynamicResources;
 import org.finos.tracdap.common.exception.EUnexpected;
@@ -35,7 +34,24 @@ import java.util.stream.Collectors;
 public class RunFlowJob extends RunModelOrFlow implements IJobLogic {
 
     @Override
-    public JobDefinition applyTransform(JobDefinition job, MetadataBundle metadata, IDynamicResources resources) {
+    public List<TagSelector> requiredMetadata(JobDefinition job) {
+
+        if (job.getJobType() != JobType.RUN_FLOW)
+            throw new EUnexpected();
+
+        var runFlow = job.getRunFlow();
+
+        var resources = new ArrayList<TagSelector>(runFlow.getInputsCount() + runFlow.getModelsCount() + 1);
+        resources.add(runFlow.getFlow());
+        resources.addAll(runFlow.getInputsMap().values());
+        resources.addAll(runFlow.getModelsMap().values());
+        resources.addAll(runFlow.getPriorOutputsMap().values());
+
+        return resources;
+    }
+
+    @Override
+    public JobDefinition applyJobTransform(JobDefinition job, MetadataBundle metadata, IDynamicResources resources) {
 
         // No transformations currently required
         return job;
@@ -64,121 +80,33 @@ public class RunFlowJob extends RunModelOrFlow implements IJobLogic {
     }
 
     @Override
-    public List<TagSelector> requiredMetadata(JobDefinition job) {
+    public Map<ObjectType, Integer> expectedOutputs(JobDefinition job, MetadataBundle metadata) {
 
-        if (job.getJobType() != JobType.RUN_FLOW)
-            throw new EUnexpected();
+        var runFlowJob = job.getRunFlow();
 
-        var runFlow = job.getRunFlow();
+        var flowObj = metadata.getObject(runFlowJob.getFlow());
+        var flow = flowObj.getFlow();
 
-        var resources = new ArrayList<TagSelector>(runFlow.getInputsCount() + runFlow.getModelsCount() + 1);
-        resources.add(runFlow.getFlow());
-        resources.addAll(runFlow.getInputsMap().values());
-        resources.addAll(runFlow.getModelsMap().values());
-        resources.addAll(runFlow.getPriorOutputsMap().values());
-
-        return resources;
+        return expectedOutputs(flow.getOutputsMap(), runFlowJob.getPriorOutputsMap());
     }
 
     @Override
-    public Map<String, MetadataWriteRequest> newResultIds(
-            String tenant, JobDefinition job,
-            Map<String, ObjectDefinition> resources,
-            Map<String, TagHeader> resourceMapping) {
-
-        var runFlow = job.getRunFlow();
-
-        var flowKey = MetadataUtil.objectKey(runFlow.getFlow());
-        var flowId = resourceMapping.get(flowKey);
-        var flowDef = resources.get(MetadataUtil.objectKey(flowId)).getFlow();
-
-        var outputFlowNodes = getFlowOutputNodes(runFlow.getFlow(), resources, resourceMapping);
-        var outputs = getFlowOutputs(outputFlowNodes, flowDef);
-
-        return newResultIds(tenant, outputs, runFlow.getPriorOutputsMap());
-    }
-
-    @Override
-    public Map<String, TagHeader> priorResultIds(
-            JobDefinition job,
-            Map<String, ObjectDefinition> resources,
-            Map<String, TagHeader> resourceMapping) {
-
-        var runFlow = job.getRunFlow();
-
-        var outputFlowNodes = getFlowOutputNodes(runFlow.getFlow(), resources, resourceMapping);
-        var outputs = getFlowOutputNames(outputFlowNodes);
-
-        return priorResultIds(outputs, runFlow.getPriorOutputsMap(), resources, resourceMapping);
-    }
-
-    private static Set<String> getFlowOutputNames(Map<String, FlowNode> outputFlowNodes) {
-        return new HashSet<>(outputFlowNodes.keySet());
-    }
-
-    private static Map<String, ModelOutputSchema> getFlowOutputs(Map<String, FlowNode> outputFlowNodes, FlowDefinition flow) {
-
-        return outputFlowNodes.entrySet().stream()
-                .collect(Collectors.toMap(Map.Entry::getKey, e -> flow.getOutputsOrThrow(e.getKey())));
-    }
-
-    private static Map<String, FlowNode> getFlowOutputNodes(
-            TagSelector flowSelector,
-            Map<String, ObjectDefinition> resources,
-            Map<String, TagHeader> resourceMapping) {
-        var flowKey = MetadataUtil.objectKey(flowSelector);
-        var flowId = resourceMapping.get(flowKey);
-        var flowDef = resources.get(MetadataUtil.objectKey(flowId)).getFlow();
-
-        return flowDef.getNodesMap().entrySet().stream()
-                .filter(nodeEntry -> nodeEntry.getValue().getNodeType() == FlowNodeType.OUTPUT_NODE)
-                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-    }
-
-    @Override
-    public JobDefinition setResultIds(
-            JobDefinition job, Map<String, TagHeader> resultMapping,
-            Map<String, ObjectDefinition> resources,
-            Map<String, TagHeader> resourceMapping) {
-
-        var outputFlowNodes = getFlowOutputNodes(job.getRunFlow().getFlow(), resources, resourceMapping);
-        var flowOutputNames = getFlowOutputNames(outputFlowNodes);
-
-        var flowOutputSelectors = setResultIds(flowOutputNames, resultMapping);
-
-        var runFlow = job.getRunFlow().toBuilder()
-                .clearOutputs()
-                .putAllOutputs(flowOutputSelectors);
-
-        return job.toBuilder()
-                .setRunFlow(runFlow)
-                .build();
-    }
-
-    @Override
-    public List<MetadataWriteRequest> buildResultMetadata(String tenant, JobConfig jobConfig, RuntimeJobResult jobResult) {
+    public RuntimeJobResult processResult(JobConfig jobConfig, RuntimeJobResult runtimeResult, Map<String, TagHeader> resultIds) {
 
         var runFlow = jobConfig.getJob().getRunFlow();
 
         var flowKey = MetadataUtil.objectKey(runFlow.getFlow());
-        var flowId = jobConfig.getResourceMappingMap().get(flowKey);
-        var flowDef = jobConfig.getResourcesMap().get(MetadataUtil.objectKey(flowId)).getFlow();
+        var flowId = jobConfig.getObjectMappingMap().get(flowKey);
+        var flowDef = jobConfig.getObjectsMap().get(MetadataUtil.objectKey(flowId)).getFlow();
 
-        var outputFlowNodes = getFlowOutputNodes(
-                jobConfig.getJob().getRunFlow().getFlow(),
-                jobConfig.getResourcesMap(),
-                jobConfig.getResourceMappingMap()
-        );
+        var perNodeAttrs = flowDef.getNodesMap().entrySet().stream()
+                .filter(entry -> entry.getValue().getNodeType() == FlowNodeType.OUTPUT_NODE)
+                .collect(Collectors.toMap(Map.Entry::getKey, entry -> entry.getValue().getNodeAttrsList()));
 
-        var perNodeOutputAttrs = outputFlowNodes.entrySet().stream()
-                .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().getNodeAttrsList()));
-
-        return buildResultMetadata(
-                tenant, jobConfig, jobResult,
+        return processResult(
+                runtimeResult,
                 flowDef.getOutputsMap(),
-                runFlow.getOutputsMap(),
-                runFlow.getPriorOutputsMap(),
                 runFlow.getOutputAttrsList(),
-                perNodeOutputAttrs);
+                perNodeAttrs, resultIds);
     }
 }

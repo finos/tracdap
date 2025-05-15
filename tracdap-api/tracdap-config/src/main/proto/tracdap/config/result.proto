@@ -28,7 +28,7 @@ import "tracdap/metadata/job.proto";
 import "tracdap/metadata/tag_update.proto";
 
 
-message TagUpdateList {
+message JobResultAttrs {
 
   repeated metadata.TagUpdate attrs = 1;
 }
@@ -36,15 +36,10 @@ message TagUpdateList {
 message JobResult {
 
   metadata.TagHeader jobId = 1;
+  metadata.TagHeader resultId = 2;
+  metadata.ResultDefinition result = 3;
 
-  metadata.JobStatusCode statusCode = 2;
-  string statusMessage = 3;
-
-  map<string, metadata.ObjectDefinition> results = 4;
-
-  // Separate explicit attrs not passed back by any job type
-  // Reserve the field though, it's likely we'll need it in future
-  // map<string, TagUpdateList> attrs = 5;
-  reserved "attrs";
-  reserved 5;
+  repeated metadata.TagHeader objectIds = 4;
+  map<string, metadata.ObjectDefinition> objects = 5;
+  map<string, JobResultAttrs> attrs = 6;
 }

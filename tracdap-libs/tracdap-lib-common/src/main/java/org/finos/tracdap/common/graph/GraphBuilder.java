@@ -80,7 +80,7 @@ public class GraphBuilder {
         if (metadataBundle == null)
             throw new ETracInternal("Metadata bundle is needed to build a job graph");
 
-        var flowObj = metadataBundle.getResource(job.getFlow());
+        var flowObj = metadataBundle.getObject(job.getFlow());
 
         if (flowObj == null || flowObj.getObjectType() != ObjectType.FLOW)
             throw new ETracInternal("Metadata bundle does not contain the flow object");
@@ -367,7 +367,7 @@ public class GraphBuilder {
         if (runtimeSelector == null)
             return node;
 
-        var runtimeObject = metadataBundle.getResource(runtimeSelector);
+        var runtimeObject = metadataBundle.getObject(runtimeSelector);
 
         if (runtimeObject == null)
             return node;

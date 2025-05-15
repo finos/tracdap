@@ -22,6 +22,8 @@ option java_package = "org.finos.tracdap.config";
 option java_outer_classname = "CommonConfigProto";
 option java_multiple_files = true;
 
+import "tracdap/metadata/storage.proto";
+
 
 message _ConfigFile {
 
@@ -55,6 +57,7 @@ message StorageConfig {
 
   string defaultBucket = 2;
   string defaultFormat = 3;
+  metadata.StorageLayout defaultLayout = 5;
 }
 
 

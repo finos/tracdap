@@ -19,10 +19,7 @@ package org.finos.tracdap.common.metadata;
 
 import org.finos.tracdap.common.exception.ETracInternal;
 import org.finos.tracdap.common.exception.EUnexpected;
-import org.finos.tracdap.metadata.ObjectDefinition;
-import org.finos.tracdap.metadata.ObjectType;
-import org.finos.tracdap.metadata.TagHeader;
-import org.finos.tracdap.metadata.TagSelector;
+import org.finos.tracdap.metadata.*;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -37,33 +34,39 @@ public class MetadataBundle {
             .setTagVersion(0)
             .build();
 
-    public final Map<String, ObjectDefinition> resources;
-    public final Map<String, TagHeader> resourceMapping;
+    public final Map<String, TagHeader> objectMapping;
+    public final Map<String, ObjectDefinition> objects;
+    public final Map<String, Tag> tags;
 
-    public MetadataBundle(Map<String, ObjectDefinition> resources, Map<String, TagHeader> resourceMapping) {
-        this.resources = resources;
-        this.resourceMapping = resourceMapping;
+    public MetadataBundle(
+            Map<String, TagHeader> objectMapping,
+            Map<String, ObjectDefinition> objects,
+            Map<String, Tag> tags) {
+
+        this.objectMapping = objectMapping;
+        this.objects = objects;
+        this.tags = tags;
     }
 
-    public Map<String, ObjectDefinition> getResources() {
-        return resources;
+    public Map<String, ObjectDefinition> getObjects() {
+        return objects;
     }
 
-    public Map<String, TagHeader> getResourceMapping() {
-        return resourceMapping;
+    public Map<String, TagHeader> getObjectMapping() {
+        return objectMapping;
     }
 
-    public ObjectDefinition getResource(TagSelector selector) {
+    public ObjectDefinition getObject(TagSelector selector) {
 
         var selectorKey = MetadataUtil.objectKey(selector);
 
         // Selector mappings are optional, fall back on using the selector key
-        var objectId = resourceMapping.getOrDefault(selectorKey, NO_MAPPING);
+        var objectId = objectMapping.getOrDefault(selectorKey, NO_MAPPING);
         var objectKey = objectId == NO_MAPPING
                 ? selectorKey
                 : MetadataUtil.objectKey(objectId);
 
-        var object = resources.get(objectKey);
+        var object = objects.get(objectKey);
 
         if (object.getObjectType() != selector.getObjectType())
             throw new EUnexpected();
@@ -81,22 +84,22 @@ public class MetadataBundle {
 
     public MetadataBundle withUpdates(Map<String, ObjectDefinition> updates) {
 
-        var newResources = new HashMap<>(resources);
+        var newResources = new HashMap<>(objects);
 
         for (var update : updates.entrySet()) {
 
             // Selector mappings are optional, fall back on using the selector key
-            var objectId = resourceMapping.getOrDefault(update.getKey(), NO_MAPPING);
+            var objectId = objectMapping.getOrDefault(update.getKey(), NO_MAPPING);
             var objectKey = objectId == NO_MAPPING
                     ? update.getKey()
                     : MetadataUtil.objectKey(objectId);
 
-            if (!resources.containsKey(objectKey))
+            if (!objects.containsKey(objectKey))
                 throw new ETracInternal("Attempt to update unknown object: [" + objectKey + "]");
 
             newResources.put(objectKey, update.getValue());
         }
 
-        return new MetadataBundle(newResources, resourceMapping);
+        return new MetadataBundle(objectMapping, newResources, tags);
     }
 }

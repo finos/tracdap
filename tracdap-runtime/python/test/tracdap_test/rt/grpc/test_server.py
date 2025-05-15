@@ -147,5 +147,5 @@ class RuntimeApiServerTest(unittest.TestCase):
                 response: runtime_pb2.RuntimeJobResult = client.getJobResult(request)
 
                 self.assertEqual(job_id.objectId, response.jobId.objectId)
-                self.assertEqual(meta.JobStatusCode.SUCCEEDED.value, response.statusCode)
-                self.assertTrue(len(response.results) > 0)
+                self.assertEqual(meta.JobStatusCode.SUCCEEDED.value, response.result.statusCode)
+                self.assertTrue(len(response.objects) > 0)

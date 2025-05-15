@@ -17,14 +17,13 @@
 
 package org.finos.tracdap.common.exception;
 
+public class EJobResult extends EJob {
 
-public class EJobFailure extends EJob {
-
-    public EJobFailure(String message, Throwable cause) {
+    public EJobResult(String message, Throwable cause) {
         super(message, cause);
     }
 
-    public EJobFailure(String message) {
+    public EJobResult(String message) {
         super(message);
     }
 }

@@ -22,9 +22,10 @@ import tracdap.rt.metadata as metadata
 import tracdap.rt_gen.grpc.tracdap.metadata.type_pb2 as type_pb2
 import tracdap.rt_gen.grpc.tracdap.metadata.object_id_pb2 as object_id_pb2
 import tracdap.rt_gen.grpc.tracdap.metadata.object_pb2 as object_pb2
-from tracdap.rt_gen.grpc.tracdap.metadata import model_pb2
+import tracdap.rt_gen.grpc.tracdap.metadata.model_pb2 as model_pb2
 import tracdap.rt_gen.grpc.tracdap.metadata.data_pb2 as data_pb2
 import tracdap.rt_gen.grpc.tracdap.metadata.storage_pb2 as storage_pb2
+import tracdap.rt_gen.grpc.tracdap.metadata.job_pb2 as job_pb2
 
 from google.protobuf import message as _message
 
@@ -55,7 +56,8 @@ __METADATA_MAPPING = {
     metadata.StorageDefinition: storage_pb2.StorageDefinition,
     metadata.StorageIncarnation: storage_pb2.StorageIncarnation,
     metadata.StorageCopy: storage_pb2.StorageCopy,
-    metadata.StorageItem: storage_pb2.StorageItem
+    metadata.StorageItem: storage_pb2.StorageItem,
+    metadata.ResultDefinition: job_pb2.ResultDefinition
 }
 
 

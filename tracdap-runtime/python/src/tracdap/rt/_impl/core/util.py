@@ -16,6 +16,7 @@
 import datetime as dt
 import pathlib
 import platform
+import re
 
 import typing as tp
 import uuid
@@ -30,6 +31,7 @@ import traceback as tb
 __IS_WINDOWS = platform.system() == "Windows"
 __FIRST_MODEL_FRAME_NAME = "run_model"
 __FIRST_MODEL_FRAME_TEST_NAME = "_callTestMethod"
+__OBJ_KEY_PATTERN = re.compile(r"([A-Z]+)-(.*)-v(\d+)")
 
 
 def is_windows():
@@ -60,12 +62,25 @@ def format_file_size(size: int) -> str:
 
 def new_object_id(object_type: meta.ObjectType) -> meta.TagHeader:
 
-    timestamp = dt.datetime.utcnow()
+    timestamp = dt.datetime.now(dt.timezone.utc)
 
     return meta.TagHeader(
         objectType=object_type,
         objectId=str(uuid.uuid4()),
         objectVersion=1,
+        objectTimestamp=meta.DatetimeValue(timestamp.isoformat()),
+        tagVersion=1,
+        tagTimestamp=meta.DatetimeValue(timestamp.isoformat()))
+
+
+def new_object_version(prior_id: meta.TagHeader) -> meta.TagHeader:
+
+    timestamp = dt.datetime.now(dt.timezone.utc)
+
+    return meta.TagHeader(
+        objectType=prior_id.objectType,
+        objectId=prior_id.objectId,
+        objectVersion=prior_id.objectVersion + 1,
         objectTimestamp=meta.DatetimeValue(timestamp.isoformat()),
         tagVersion=1,
         tagTimestamp=meta.DatetimeValue(timestamp.isoformat()))
@@ -106,27 +121,55 @@ def selector_for_latest(object_id: meta.TagHeader) -> meta.TagSelector:
         latestTag=True)
 
 
-def get_job_resource(
+def get_job_metadata(
         selector: tp.Union[meta.TagHeader, meta.TagSelector],
         job_config: cfg.JobConfig,
-        optional: bool = False):
+        optional: bool = False) \
+        -> tp.Optional[meta.ObjectDefinition]:
 
-    resource_key = object_key(selector)
-    resource_id = job_config.resourceMapping.get(resource_key)
+    obj_key = object_key(selector)
+    obj_id = job_config.objectMapping.get(obj_key)
 
-    if resource_id is not None:
-        resource_key = object_key(resource_id)
+    if obj_id is not None:
+        obj_key = object_key(obj_id)
 
-    resource = job_config.resources.get(resource_key)
+    obj = job_config.objects.get(obj_key)
 
-    if resource is not None:
-        return resource
+    if obj is not None:
+        return obj
 
     if optional:
         return None
 
-    err = f"Missing required {selector.objectType.name} resource [{object_key(selector)}]"
+    err = f"Missing required {selector.objectType.name} object for [{object_key(selector)}]"
     raise ex.ERuntimeValidation(err)
+
+
+def get_job_mapping(
+        selector: tp.Union[meta.TagHeader, meta.TagSelector],
+        job_config: cfg.JobConfig) \
+        -> meta.TagHeader:
+
+    obj_key = object_key(selector)
+    obj_id = job_config.objectMapping.get(obj_key)
+
+    if obj_id is not None:
+        return obj_id
+
+    obj_key_match = __OBJ_KEY_PATTERN.match(obj_key)
+
+    if not obj_key_match:
+        err = f"Missing required {selector.objectType.name} ID for [{object_key(selector)}]"
+        raise ex.ERuntimeValidation(err)
+
+    obj_type = obj_key_match.group(1)
+    obj_id = obj_key_match.group(2)
+    obj_ver = obj_key_match.group(3)
+    obj_ts = job_config.jobId.objectTimestamp
+
+    return meta.TagHeader(
+        meta.ObjectType.__members__[obj_type], obj_id,
+        int(obj_ver), obj_ts, 1, obj_ts)
 
 
 def get_origin(metaclass: type):

@@ -496,7 +496,11 @@ public class RunFlowTest {
         // Might need to be updated if there are logging changes in the runtime
         Assertions.assertTrue(logFileContent.contains(MetadataUtil.objectKey(jobId)));
         Assertions.assertTrue(logFileContent.contains("START RunModel"));
-        Assertions.assertTrue(logFileContent.contains("Recording job as successful"));
+
+        // This should be the last line in the job log, it is the last message from the job processor
+        // Higher level messages (from the engine and runtime classes) are not part of the recorded job log
+        var successLine = String.format("Job succeeded [%s]", MetadataUtil.objectKey(jobId));
+        Assertions.assertTrue(logFileContent.contains(successLine));
     }
 
     @Test @Order(6)

@@ -19,17 +19,22 @@ package org.finos.tracdap.svc.orch.service;
 
 import org.finos.tracdap.api.*;
 import org.finos.tracdap.api.internal.InternalMetadataApiGrpc;
+import org.finos.tracdap.api.internal.RuntimeJobResult;
+import org.finos.tracdap.api.internal.RuntimeJobResultAttrs;
 import org.finos.tracdap.common.config.ConfigHelpers;
 import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.config.IDynamicResources;
 import org.finos.tracdap.common.exception.EConsistencyValidation;
+import org.finos.tracdap.common.exception.EJobResult;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.metadata.MetadataBundle;
 import org.finos.tracdap.common.metadata.MetadataCodec;
+import org.finos.tracdap.common.metadata.MetadataConstants;
 import org.finos.tracdap.common.metadata.MetadataUtil;
 import org.finos.tracdap.common.middleware.GrpcConcern;
 import org.finos.tracdap.common.plugin.PluginRegistry;
+import org.finos.tracdap.common.validation.Validator;
 import org.finos.tracdap.config.*;
 import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.svc.orch.jobs.JobLogic;
@@ -40,18 +45,14 @@ import org.slf4j.LoggerFactory;
 
 import java.time.Instant;
 import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static org.finos.tracdap.common.metadata.MetadataCodec.encodeValue;
 import static org.finos.tracdap.common.metadata.MetadataConstants.*;
-import static org.finos.tracdap.common.metadata.MetadataUtil.selectorFor;
 
 
 public class JobProcessorHelpers {
-
-    private static final String JOB_RESULT_KEY = "trac_job_result";
-    private static final String JOB_LOG_FILE_KEY = "trac_job_log_file";
-    private static final String JOB_LOG_STORAGE_KEY = "trac_job_log_file:STORAGE";
 
     private final Logger log = LoggerFactory.getLogger(JobProcessorHelpers.class);
 
@@ -61,6 +62,8 @@ public class JobProcessorHelpers {
 
     private final InternalMetadataApiGrpc.InternalMetadataApiBlockingStub metaClient;
     private final ConfigManager configManager;
+
+    private final Validator validator = new Validator();
 
 
     public JobProcessorHelpers(
@@ -77,65 +80,27 @@ public class JobProcessorHelpers {
         this.configManager = registry.getSingleton(ConfigManager.class);
     }
 
-    /**
-     * Add a request without sending it.
-     */
-    private static void addUpdateToWriteBatch(MetadataWriteBatchRequest.Builder builder, MetadataWriteRequest update) {
-        if (!update.hasDefinition()) {
-            builder.addUpdateTags(update);
-        } else if (!update.hasPriorVersion()) {
-            builder.addCreateObjects(update);
-        } else if (update.getPriorVersion().getObjectVersion() < OBJECT_FIRST_VERSION) {
-            builder.addCreatePreallocatedObjects(update);
-        } else {
-            builder.addUpdateObjects(update);
-        }
-    }
-
-    /**
-     * Remove tenant from write request.
-     * Necessary when you want to add the request to a batch write request.
-     */
-    private static MetadataWriteRequest scrapTenant(MetadataWriteRequest request) {
-        return MetadataWriteRequest.newBuilder(request)
-                .clearTenant().build();
-    }
-
-    JobState applyTransform(JobState jobState) {
-
-        var logic = JobLogic.forJobType(jobState.jobType);
-        var metadata = new MetadataBundle(jobState.resources, jobState.resourceMapping);
-
-        jobState.definition = logic.applyTransform(jobState.definition, metadata, resources);
-
-        var updatedMetadata = logic.applyMetadataTransform(jobState.definition, metadata, resources);
-        jobState.resources = updatedMetadata.getResources();
-        jobState.resourceMapping = updatedMetadata.getResourceMapping();
-
-        return jobState;
-    }
-
-    JobState loadResources(JobState jobState) {
+    JobState loadMetadata(JobState jobState) {
 
         var jobLogic = JobLogic.forJobType(jobState.jobType);
-        var resources = jobLogic.requiredMetadata(jobState.definition);
+        var selectors = jobLogic.requiredMetadata(jobState.definition);
 
-        if (resources.isEmpty()) {
+        if (selectors.isEmpty()) {
             log.info("No additional metadata required");
             return jobState;
         }
 
-        return loadResources(jobState, resources);
+        return loadMetadata(jobState, selectors);
     }
 
-    JobState loadResources(JobState jobState, List<TagSelector> resources) {
+    private JobState loadMetadata(JobState jobState, List<TagSelector> selectors) {
 
         log.info("Loading additional required metadata...");
 
-        var orderedKeys = new ArrayList<String>(resources.size());
-        var orderedSelectors = new ArrayList<TagSelector>(resources.size());
+        var orderedKeys = new ArrayList<String>(selectors.size());
+        var orderedSelectors = new ArrayList<TagSelector>(selectors.size());
 
-        for (var selector : resources) {
+        for (var selector : selectors) {
             orderedKeys.add(MetadataUtil.objectKey(selector));
             orderedSelectors.add(selector);
         }
@@ -148,156 +113,191 @@ public class JobProcessorHelpers {
         var client = configureClient(metaClient, jobState);
         var batchResponse = client.readBatch(batchRequest);
 
-        return loadResourcesResponse(jobState, orderedKeys, batchResponse);
+        return loadMetadataResponse(jobState, orderedKeys, batchResponse);
     }
 
-    JobState loadResourcesResponse(
-            JobState jobState, List<String> mappingKeys,
+    private JobState loadMetadataResponse(
+            JobState jobState, List<String> orderedKeys,
             MetadataBatchResponse batchResponse) {
 
-        if (batchResponse.getTagCount() != mappingKeys.size())
+        if (batchResponse.getTagCount() != orderedKeys.size())
             throw new EUnexpected();
 
-        var jobLogic = JobLogic.forJobType(jobState.jobType);
+        var objectMapping = new HashMap<String, TagHeader>(orderedKeys.size());
+        var objects = new HashMap<String, ObjectDefinition>(orderedKeys.size());
+        var tags = new HashMap<String, Tag>(orderedKeys.size());
 
-        var resources = new HashMap<String, ObjectDefinition>(mappingKeys.size());
-        var mappings = new HashMap<String, TagHeader>(mappingKeys.size());
+        for (var i = 0; i < orderedKeys.size(); i++) {
 
-        for (var resourceIndex = 0; resourceIndex < mappingKeys.size(); resourceIndex++) {
+            var orderedKey = orderedKeys.get(i);
+            var orderedTag = batchResponse.getTag(i);
 
-            var resourceTag = batchResponse.getTag(resourceIndex);
-            var resourceKey = MetadataUtil.objectKey(resourceTag.getHeader());
-            var mappingKey = mappingKeys.get(resourceIndex);
+            var objectKey = MetadataUtil.objectKey(orderedTag.getHeader());
+            var object_ = orderedTag.getDefinition();
+            var tag = orderedTag.toBuilder().clearDefinition().build();
 
-            resources.put(resourceKey, resourceTag.getDefinition());
-            mappings.put(mappingKey, resourceTag.getHeader());
+            objectMapping.put(orderedKey, tag.getHeader());
+            objects.put(objectKey, object_);
+            tags.put(objectKey, tag);
         }
 
-        jobState.resources.putAll(resources);
-        jobState.resourceMapping.putAll(mappings);
+        jobState.objectMapping.putAll(objectMapping);
+        jobState.objects.putAll(objects);
+        jobState.tags.putAll(tags);
 
-        var extraResources = jobLogic.requiredMetadata(resources).stream()
-                .filter(selector -> !jobState.resources.containsKey(MetadataUtil.objectKey(selector)))
-                .filter(selector -> !jobState.resourceMapping.containsKey(MetadataUtil.objectKey(selector)))
+        var dependencies = loadMetadataDependencies(batchResponse.getTagList());
+
+        var missingDependencies = dependencies.stream()
+                .filter(selector -> !jobState.objects.containsKey(MetadataUtil.objectKey(selector)))
+                .filter(selector -> !jobState.objectMapping.containsKey(MetadataUtil.objectKey(selector)))
                 .collect(Collectors.toList());
 
-        if (!extraResources.isEmpty())
-            return loadResources(jobState, extraResources);
+        if (!missingDependencies.isEmpty())
+            return loadMetadata(jobState, missingDependencies);
 
         return jobState;
     }
 
-    JobState allocateResultIds(JobState jobState) {
+    private List<TagSelector> loadMetadataDependencies(List<Tag> tags) {
 
-        // TODO: Single job timestamp - requires changes in meta svc for this to actually be used
-        // meta svc must accept object timestamps as gRPC metadata for internal API calls
-        var jobTimestamp = Instant.now();
+        var dependencies = new ArrayList<TagSelector>();
 
-        var newResultIds = new HashMap<String, MetadataWriteRequest>();
+        for (var tag : tags) {
 
-        var resultId = MetadataWriteRequest.newBuilder()
-                .setObjectType(ObjectType.RESULT)
-                .build();
+            var obj = tag.getDefinition();
 
-        var logFileId = MetadataWriteRequest.newBuilder()
-                .setObjectType(ObjectType.FILE)
-                .build();
+            if (obj.getObjectType() == ObjectType.DATA) {
 
-        var logStorageId = MetadataWriteRequest.newBuilder()
-                .setObjectType(ObjectType.STORAGE)
-                .build();
+                var dataDef = obj.getData();
+                dependencies.add(dataDef.getStorageId());
 
-        var jobLogic = JobLogic.forJobType(jobState.jobType);
+                if (dataDef.hasSchemaId())
+                    dependencies.add(dataDef.getSchemaId());
+            }
 
-        var priorResultIds = jobLogic.priorResultIds(
-                jobState.definition,
-                jobState.resources, jobState.resourceMapping);
+            else if (obj.getObjectType() == ObjectType.FILE) {
 
-        var jobResultIds = jobLogic.newResultIds(
-                jobState.tenant, jobState.definition,
-                jobState.resources, jobState.resourceMapping);
-
-        newResultIds.put(JOB_RESULT_KEY, resultId);
-        newResultIds.put(JOB_LOG_FILE_KEY, logFileId);
-        newResultIds.put(JOB_LOG_STORAGE_KEY, logStorageId);
-        newResultIds.putAll(jobResultIds);
-
-        for (var priorId : priorResultIds.entrySet()) {
-
-            var nextId = MetadataUtil.nextObjectVersion(priorId.getValue(), jobTimestamp);
-            jobState.resultMapping.put(priorId.getKey(), nextId);
+                var fileDef = obj.getFile();
+                dependencies.add(fileDef.getStorageId());
+            }
         }
 
-        jobState = allocateResultIds(jobState, jobTimestamp, newResultIds);
-
-        return setResultIds(jobState);
+        return dependencies;
     }
 
-    JobState allocateResultIds(
-            JobState jobState, Instant jobTimestamp,
-            Map<String, MetadataWriteRequest> newResultIds) {
+    JobState applyTransform(JobState jobState) {
 
-        if (newResultIds.isEmpty()) {
-            return jobState;
-        }
+        var jobLogic = JobLogic.forJobType(jobState.jobType);
+        var metadata = new MetadataBundle(jobState.objectMapping, jobState.objects, jobState.tags);
 
-        var keys = new ArrayList<>(newResultIds.keySet());
-        var requests = new ArrayList<MetadataWriteRequest>();
+        jobState.definition = jobLogic.applyJobTransform(jobState.definition, metadata, resources);
 
-        for (var key : keys) {
-            var request = newResultIds.get(key);
-            request = scrapTenant(request);
+        var updatedMetadata = jobLogic.applyMetadataTransform(jobState.definition, metadata, resources);
+        jobState.objects = updatedMetadata.getObjects();
+        jobState.objectMapping = updatedMetadata.getObjectMapping();
 
-            requests.add(request);
-        }
+        return jobState;
+    }
 
-        var request = MetadataWriteBatchRequest.newBuilder()
-                .setTenant(jobState.tenant)
-                .addAllPreallocateIds(requests)
-                .build();
+    JobState saveJobDefinition(JobState jobState) {
 
         var client = configureClient(metaClient, jobState);
 
-        var preallocatedIds = client.writeBatch(request)
-                .getPreallocateIdsList();
+        // Preallocate result ID - needed as part of job definition
 
-        for (int i = 0; i < keys.size(); i++) {
-            var resultKey = keys.get(i);
-            var preallocatedId = preallocatedIds.get(i);
+        var resultIdRequest = MetadataWriteRequest.newBuilder()
+                .setTenant(jobState.tenant)
+                .setObjectType(ObjectType.RESULT)
+                .build();
 
-            var resultId = MetadataUtil.nextObjectVersion(preallocatedId, jobTimestamp);
+        // Use version 1 of the RESULT ID (preallocated version is 0)
+        var resultPreallocated = client.preallocateId(resultIdRequest);
+        var resultId = MetadataUtil.nextObjectVersion(resultPreallocated, Instant.now());
 
-            jobState.resultMapping.put(resultKey, resultId);
-        }
-
-        return jobState;
-    }
-
-    JobState setResultIds(JobState jobState) {
-
-        var jobLogic = JobLogic.forJobType(jobState.jobType);
-
-        jobState.definition = jobLogic.setResultIds(
-                jobState.definition, jobState.resultMapping,
-                jobState.resources, jobState.resourceMapping);
-
-        return jobState;
-    }
-
-    JobState buildJobConfig(JobState jobState) {
-
-        var resultId = jobState.resultMapping.get(JOB_RESULT_KEY);
-
+        jobState.resultId = resultId;
         jobState.definition = jobState.definition.toBuilder()
                 .setResultId(MetadataUtil.selectorFor(resultId))
                 .build();
 
-        // Do not set jobId, it is not available yet
-        jobState.jobConfig = JobConfig.newBuilder()
+        // Save job definition
+
+        var jobObj = ObjectDefinition.newBuilder()
+                .setObjectType(ObjectType.JOB)
                 .setJob(jobState.definition)
-                .putAllResources(jobState.resources)
-                .putAllResourceMapping(jobState.resourceMapping)
-                .putAllResultMapping(jobState.resultMapping)
+                .build();
+
+        var ctrlJobAttrs = List.of(
+                TagUpdate.newBuilder()
+                        .setAttrName(TRAC_JOB_TYPE_ATTR)
+                        .setValue(MetadataCodec.encodeValue(jobState.jobType.toString()))
+                        .build(),
+                TagUpdate.newBuilder()
+                        .setAttrName(TRAC_JOB_STATUS_ATTR)
+                        .setValue(MetadataCodec.encodeValue(jobState.tracStatus.toString()))
+                        .build());
+
+        var freeJobAttrs = jobState.jobRequest.getJobAttrsList();
+
+        var jobWriteReq = MetadataWriteRequest.newBuilder()
+                .setTenant(jobState.tenant)
+                .setObjectType(ObjectType.JOB)
+                .setDefinition(jobObj)
+                .addAllTagUpdates(ctrlJobAttrs)
+                .addAllTagUpdates(freeJobAttrs)
+                .build();
+
+        jobState.jobId = client.createObject(jobWriteReq);
+
+        return jobState;
+    }
+
+    JobState preallocateObjectIds(JobState jobState) {
+
+        var batchRequest = MetadataWriteBatchRequest.newBuilder().setTenant(jobState.tenant);
+
+        // IDs required for the job log file
+        batchRequest.addPreallocateIds(preallocate(ObjectType.FILE));
+        batchRequest.addPreallocateIds(preallocate(ObjectType.STORAGE));
+
+        // Add required IDs based on the job type
+        var jobLogic = JobLogic.forJobType(jobState.jobType);
+        var metadata = new MetadataBundle(jobState.objectMapping, jobState.objects, jobState.tags);
+        var requiredIds = jobLogic.expectedOutputs(jobState.definition, metadata);
+
+        for (var requirement : requiredIds.entrySet()) {
+
+            var objectType = requirement.getKey();
+            var count = requirement.getValue();
+
+            for (var i = 0; i < count; i++) {
+                var request = MetadataWriteRequest.newBuilder().setObjectType(objectType);
+                batchRequest.addPreallocateIds(request);
+            }
+        }
+
+        // Allocate all the IDs in a single batch
+        var metadataClient = configureClient(metaClient, jobState);
+        var batchResponse = metadataClient.writeBatch(batchRequest.build());
+
+        jobState.preallocatedIds = batchResponse.getPreallocateIdsList();
+
+        return jobState;
+    }
+
+    private MetadataWriteRequest.Builder preallocate(ObjectType objectType) {
+        return MetadataWriteRequest.newBuilder().setObjectType(objectType);
+    }
+
+    JobState buildJobConfig(JobState jobState) {
+
+        jobState.jobConfig = JobConfig.newBuilder()
+                .setJobId(jobState.jobId)
+                .setJob(jobState.definition)
+                .putAllObjectMapping(jobState.objectMapping)
+                .putAllObjects(jobState.objects)
+                .putAllTags(jobState.tags)
+                .setResultId(jobState.resultId)
+                .addAllPreallocatedIds(jobState.preallocatedIds)
                 .build();
 
         var sysConfig = RuntimeConfig.newBuilder();
@@ -367,7 +367,7 @@ public class JobProcessorHelpers {
         }
 
         // Check if any resources refer to the repo key
-        for (var object : jobState.resources.values()) {
+        for (var object : jobState.objects.values()) {
             if (object.getObjectType() == ObjectType.MODEL) {
                 if (object.getModel().getRepository().equals(repoKey)) {
                     return true;
@@ -410,208 +410,288 @@ public class JobProcessorHelpers {
         return pluginConfig.build();
     }
 
-    JobState saveInitialMetadata(JobState jobState) {
-
-        var jobObj = ObjectDefinition.newBuilder()
-                .setObjectType(ObjectType.JOB)
-                .setJob(jobState.definition)
-                .build();
-
-        var ctrlJobAttrs = List.of(
-                TagUpdate.newBuilder()
-                        .setAttrName(TRAC_JOB_TYPE_ATTR)
-                        .setValue(MetadataCodec.encodeValue(jobState.jobType.toString()))
-                        .build(),
-                TagUpdate.newBuilder()
-                        .setAttrName(TRAC_JOB_STATUS_ATTR)
-                        .setValue(MetadataCodec.encodeValue(jobState.tracStatus.toString()))
-                        .build());
-
-        var freeJobAttrs = jobState.jobRequest.getJobAttrsList();
-
-        var jobWriteReq = MetadataWriteRequest.newBuilder()
-                .setTenant(jobState.tenant)
-                .setObjectType(ObjectType.JOB)
-                .setDefinition(jobObj)
-                .addAllTagUpdates(ctrlJobAttrs)
-                .addAllTagUpdates(freeJobAttrs)
-                .build();
-
-        var client = configureClient(metaClient, jobState);
-
-        var jobId = client.createObject(jobWriteReq);
-
-        jobState.jobId = jobId;
-
-        jobState.jobConfig = jobState.jobConfig
-                .toBuilder()
-                .setJobId(jobId)
-                .build();
-
-        return jobState;
-    }
 
     void processJobResult(JobState jobState) {
 
-        log.info("Record job result [{}]: {}", jobState.jobKey, jobState.tracStatus);
+        if (jobState.tracStatus != JobStatusCode.FINISHING || jobState.runtimeResult == null) {
 
-        var batchUpdate = MetadataWriteBatchRequest.newBuilder();
-        batchUpdate.setTenant(jobState.tenant);
+            var result = ResultDefinition.newBuilder().setJobId(MetadataUtil.selectorFor(jobState.jobId));
 
-        var commonUpdates = buildCommonResults(jobState);
+            if (jobState.tracStatus == JobStatusCode.FAILED || jobState.tracStatus == JobStatusCode.CANCELLED)
+                result.setStatusCode(jobState.tracStatus);
+            else
+                result.setStatusCode(JobStatusCode.FAILED);
+
+            if (jobState.statusMessage != null && !jobState.statusMessage.isEmpty())
+                result.setStatusMessage(jobState.statusMessage);
+            else
+                result.setStatusMessage("No details available");
+
+            var jobResult = RuntimeJobResult.newBuilder()
+                    .setJobId(jobState.jobId)
+                    .setResultId(jobState.resultId)
+                    .setResult(result);
+
+            jobState.jobResult = jobResult.build();
+            jobState.tracStatus = jobResult.getResult().getStatusCode();
+
+            return;
+        }
+
+        // A result is available and ready to be processed
+        var runtimeResult = jobState.runtimeResult;
+
+        // Apply validation to the runtime result - partially consistent results will be rejected
+        // This is safest, but has the potential to lose useful error info in some cases
+        validator.validateFixedObject(runtimeResult);
+
+        var resultIds = buildResultLookup(runtimeResult);
 
         var jobLogic = JobLogic.forJobType(jobState.jobType);
-        var jobUpdates = jobState.tracStatus == JobStatusCode.SUCCEEDED
-                ? jobLogic.buildResultMetadata(jobState.tenant, jobState.jobConfig, jobState.executorResult)
-                : List.<MetadataWriteRequest>of();
+        var jobResult = jobLogic.processResult(jobState.jobConfig, runtimeResult, resultIds);
 
-        for (var update : commonUpdates) {
-            addUpdateToWriteBatch(batchUpdate, update);
+        var finalResult = addCommonOutputs(jobResult, runtimeResult, resultIds, jobState);
+
+        // Unexpected outputs from the runtime will not be consumed by the results processing logic
+        // So long as all the expected outputs are available, treat this as a warning
+        if (finalResult.getObjectIdsCount() < runtimeResult.getObjectIdsCount() ||
+            finalResult.getObjectsCount() < runtimeResult.getObjectsCount() ||
+            finalResult.getAttrsCount() < runtimeResult.getAttrsCount()) {
+
+            log.warn("Job result included unexpected outputs, which have been ignored [{}]", jobState.jobKey);
         }
 
-        for (var update : jobUpdates) {
-            var update_ = applyJobAttrs(jobState, scrapTenant(update));
-            addUpdateToWriteBatch(batchUpdate, update_);
+        jobState.jobResult = finalResult;
+
+        // Copy final result status to the job state (used for status polling in the orchestrator API)
+        jobState.tracStatus = finalResult.getResult().getStatusCode();
+        jobState.statusMessage = finalResult.getResult().getStatusMessage();
+    }
+
+    private RuntimeJobResult addCommonOutputs(
+            RuntimeJobResult jobResult, RuntimeJobResult runtimeResult,
+            Map<String, TagHeader> resultIds, JobState jobState) {
+
+        var resultDef = runtimeResult.getResult().toBuilder();
+
+        // If status is not a completed status, set status to failed
+
+        if (resultDef.getStatusCode() != JobStatusCode.SUCCEEDED &&
+            resultDef.getStatusCode() != JobStatusCode.FAILED &&
+            resultDef.getStatusCode() != JobStatusCode.CANCELLED) {
+
+            resultDef.setStatusCode(JobStatusCode.FAILED);
+
+            if (jobState.statusMessage != null && !jobState.statusMessage.isEmpty())
+                resultDef.setStatusMessage(jobState.statusMessage);
+            else
+                resultDef.setStatusMessage("No details available");
         }
 
-        var batch = batchUpdate.build();
-        var batchNotEmpty = isAnyToSend(batch);
+        // Include the main RESULT object
 
-        if (batchNotEmpty) {
-            var metadataClient = configureClient(metaClient, jobState);
-            metadataClient.writeBatch(batch);
-        }
-    }
+        var finalResult = jobResult.toBuilder()
+                .setResultId(runtimeResult.getResultId())
+                .setResult(resultDef);
 
-    List<MetadataWriteRequest> buildCommonResults(JobState jobState) {
+        // Add FILE and STORAGE objects for the job log
 
-        var commonResults = new ArrayList<MetadataWriteRequest>();
+        var logFileSelector = runtimeResult.getResult().getLogFileId();
+        var logFileId = resultIds.get(logFileSelector.getObjectId());
+        var logFileKey = logFileId != null ? MetadataUtil.objectKey(logFileId) : null;
 
-        var jobUpdate = jobState.tracStatus == JobStatusCode.SUCCEEDED
-                ? buildJobSucceededUpdate(jobState)
-                : buildJobFailedUpdate(jobState);
+        checkResultAvailable(logFileSelector, logFileKey, runtimeResult);
 
-        commonResults.add(scrapTenant(jobUpdate));
+        var logFileDef = runtimeResult.getObjectsOrThrow(logFileKey);
 
-        // For severe error cases, the result object may not be available
-        // Then no additional objects can be recorded
-        if (jobState.executorResult == null)
-            return commonResults;
+        var logStorageSelector = logFileDef.getFile().getStorageId();
+        var logStorageId = resultIds.get(logStorageSelector.getObjectId());
+        var logStorageKey = logStorageId != null ? MetadataUtil.objectKey(logStorageId) : null;
 
-        if (jobState.resultMapping.containsKey(JOB_RESULT_KEY)) {
+        checkResultAvailable(logStorageSelector, logStorageKey, runtimeResult);
 
-            var resultId = jobState.resultMapping.get(JOB_RESULT_KEY);
-            var resultKey = resultId != null ? MetadataUtil.objectKey(resultId) : null;
+        var logStorageDef = runtimeResult.getObjectsOrThrow(logStorageKey);
 
-            if (resultKey != null && jobState.executorResult.containsResults(resultKey)) {
+        finalResult.addObjectIds(logFileId);
+        finalResult.addObjectIds(logStorageId);
+        finalResult.putObjects(logFileKey, logFileDef);
+        finalResult.putObjects(logStorageKey, logStorageDef);
 
-                var resultObj = jobState.executorResult.getResultsOrThrow(MetadataUtil.objectKey(resultId));
-                var resultUpdate = MetadataWriteRequest.newBuilder()
-                        .setObjectType(ObjectType.RESULT)
-                        .setPriorVersion(MetadataUtil.preallocated(resultId))
-                        .setDefinition(resultObj)
-                        .build();
 
-                commonResults.add(resultUpdate);
-            }
-        }
+        // Include controlled job attrs on all outputs
 
-        if (jobState.resultMapping.containsKey(JOB_LOG_FILE_KEY)) {
+        for (var objectId : finalResult.getObjectIdsList()) {
 
-            var logFileId = jobState.resultMapping.get(JOB_LOG_FILE_KEY);
-            var logStorageId = jobState.resultMapping.get(JOB_LOG_STORAGE_KEY);
-            var logFileKey = logFileId != null ? MetadataUtil.objectKey(logFileId) : null;
-            var logStorageKey = logStorageId != null ? MetadataUtil.objectKey(logStorageId) : null;
+            var objectKey = MetadataUtil.objectKey(objectId);
 
-            if (logFileKey != null && jobState.executorResult.containsResults(logFileKey) &&
-                logStorageKey != null && jobState.executorResult.containsResults(logStorageKey)) {
+            var attrs = finalResult
+                    .getAttrsOrDefault(objectKey, RuntimeJobResultAttrs.getDefaultInstance())
+                    .toBuilder();
 
-                var logFileObj = jobState.executorResult.getResultsOrThrow(MetadataUtil.objectKey(logFileId));
-                var logFileUpdate = MetadataWriteRequest.newBuilder()
-                        .setObjectType(ObjectType.FILE)
-                        .setPriorVersion(MetadataUtil.preallocated(logFileId))
-                        .setDefinition(logFileObj)
-                        .build();
-
-                var logStorageObj = jobState.executorResult.getResultsOrThrow(MetadataUtil.objectKey(logStorageId));
-                var logStorageUpdate = MetadataWriteRequest.newBuilder()
-                        .setObjectType(ObjectType.STORAGE)
-                        .setPriorVersion(MetadataUtil.preallocated(logStorageId))
-                        .setDefinition(logStorageObj)
-                        .build();
-
-                commonResults.add(applyJobAttrs(jobState, logFileUpdate));
-                commonResults.add(applyJobAttrs(jobState, logStorageUpdate));
-            }
-
-        }
-
-        return commonResults;
-    }
-
-    private static boolean isAnyToSend(MetadataWriteBatchRequest request) {
-
-        return request.getCreatePreallocatedObjectsCount() > 0 ||
-                request.getCreateObjectsCount() > 0 ||
-                request.getUpdateObjectsCount() > 0 ||
-                request.getUpdateTagsCount() > 0;
-    }
-
-    private MetadataWriteRequest buildJobSucceededUpdate(JobState jobState) {
-
-        var attrUpdates = List.of(
-                TagUpdate.newBuilder()
-                        .setAttrName(TRAC_JOB_STATUS_ATTR)
-                        .setValue(encodeValue(jobState.tracStatus.toString()))
-                        .build());
-
-        return MetadataWriteRequest.newBuilder()
-                .setTenant(jobState.tenant)
-                .setObjectType(ObjectType.JOB)
-                .setPriorVersion(selectorFor(jobState.jobId))
-                .addAllTagUpdates(attrUpdates)
-                .build();
-    }
-
-    private MetadataWriteRequest buildJobFailedUpdate(JobState jobState) {
-
-        var attrUpdates = List.of(
-                TagUpdate.newBuilder()
-                        .setAttrName(TRAC_JOB_STATUS_ATTR)
-                        .setValue(encodeValue(jobState.tracStatus.toString()))
-                        .build(),
-                TagUpdate.newBuilder()
-                        .setAttrName(TRAC_JOB_ERROR_MESSAGE_ATTR)
-                        .setValue(encodeValue(jobState.statusMessage))
-                        .build());
-
-        return MetadataWriteRequest.newBuilder()
-                .setTenant(jobState.tenant)
-                .setObjectType(ObjectType.JOB)
-                .setPriorVersion(selectorFor(jobState.jobId))
-                .addAllTagUpdates(attrUpdates)
-                .build();
-    }
-
-    private MetadataWriteRequest applyJobAttrs(JobState jobState, MetadataWriteRequest request) {
-
-        if (!request.hasDefinition())
-            return request;
-
-        var builder = request.toBuilder();
-
-        builder.addTagUpdates(TagUpdate.newBuilder()
-                .setAttrName(TRAC_UPDATE_JOB)
-                .setValue(MetadataCodec.encodeValue(jobState.jobKey)));
-
-        if (!request.hasPriorVersion() || request.getPriorVersion().getObjectVersion() == 0) {
-
-            builder.addTagUpdates(TagUpdate.newBuilder()
-                    .setAttrName(TRAC_CREATE_JOB)
+            attrs.addAttrs(TagUpdate.newBuilder()
+                    .setAttrName(TRAC_UPDATE_JOB)
                     .setValue(MetadataCodec.encodeValue(jobState.jobKey)));
+
+
+            if (objectId.getObjectVersion() == MetadataConstants.OBJECT_FIRST_VERSION) {
+
+                attrs.addAttrs(TagUpdate.newBuilder()
+                        .setAttrName(TRAC_CREATE_JOB)
+                        .setValue(MetadataCodec.encodeValue(jobState.jobKey)));
+            }
+
+            finalResult.putAttrs(objectKey, attrs.build());
         }
 
-        return builder.build();
+        return finalResult.build();
+    }
+
+    private void checkResultAvailable(TagSelector selector, String outputKey, RuntimeJobResult jobResult) {
+
+        var displayKey = MetadataUtil.objectKey(selector);
+
+        if (outputKey == null)
+            throw new EJobResult(String.format("Missing object ID in job result: [%s]", displayKey));
+
+        if (!jobResult.containsObjects(outputKey))
+            throw new EJobResult(String.format("Missing definition in job result: [%s]", displayKey));
+    }
+
+    private Map<String, TagHeader> buildResultLookup(RuntimeJobResult runtimeResult) {
+
+        var duplicates = new HashSet<String>();
+
+        var resultLookup = runtimeResult
+                .getObjectIdsList().stream()
+                .collect(Collectors.toMap(TagHeader::getObjectId, Function.identity(),
+                (id1, id2) -> { duplicates.add(MetadataUtil.objectKey(id2)); return id1; }));
+
+        if (!duplicates.isEmpty()) {
+
+            if (duplicates.size() == 1) {
+                var duplicateKey = duplicates.stream().findAny().get();
+                throw new EJobResult(String.format("Duplicate object ID in job result: [%s]", duplicateKey));
+            }
+            else {
+                throw new EJobResult(String.format("Job result contains %d duplicate object IDs", duplicates.size()));
+            }
+        }
+
+        return resultLookup;
+    }
+
+    void saveJobResult(JobState jobState) {
+
+        var jobResult = jobState.jobResult;
+
+        // Lookup for preallocated IDs, used to decide which objects are new and which are pre-alloc
+        var preallocatedIds = jobState.jobConfig.getPreallocatedIdsList().stream()
+                .map(TagHeader::getObjectId)
+                .collect(Collectors.toSet());
+
+        // Collect metadata updates to send in a single batch
+        var preallocated = new ArrayList<MetadataWriteRequest>();
+        var newObjects = new ArrayList<MetadataWriteRequest>();
+        var newVersions = new ArrayList<MetadataWriteRequest>();
+        var newTags = new ArrayList<MetadataWriteRequest>();
+
+        // Update tags on the original job object
+        var jobAttrs = jobAttrs(jobResult.getResult());
+
+        var jobWriteReq = MetadataWriteRequest.newBuilder()
+                .setObjectType(ObjectType.JOB)
+                .setPriorVersion(MetadataUtil.selectorFor(jobState.jobId))
+                .addAllTagUpdates(jobAttrs)
+                .build();
+
+        newTags.add(jobWriteReq);
+
+        // Create the result object
+        var resultObj = ObjectDefinition.newBuilder()
+                .setObjectType(ObjectType.RESULT)
+                .setResult(jobResult.getResult());
+
+        var resultWriteReq = MetadataWriteRequest.newBuilder()
+                .setObjectType(ObjectType.RESULT)
+                .setPriorVersion(MetadataUtil.preallocated(jobResult.getResultId()))
+                .setDefinition(resultObj)
+                .build();
+
+        // RESULT is always preallocated
+        preallocated.add(resultWriteReq);
+
+        // Add the individual objects created by the job
+        for (var objectId : jobResult.getObjectIdsList()) {
+
+            var objectKey = MetadataUtil.objectKey(objectId);
+
+            if (!jobResult.containsObjects(objectKey))
+                throw new EJobResult(String.format("Missing definition in job result: [%s]", objectKey));
+
+            var definition = jobResult.getObjectsOrThrow(objectKey);
+
+            var writeRequest = MetadataWriteRequest.newBuilder()
+                    .setObjectType(objectId.getObjectType())
+                    .setDefinition(definition);
+
+            if (jobResult.containsAttrs(objectKey)) {
+                var attrs = jobResult.getAttrsOrThrow(objectKey);
+                writeRequest.addAllTagUpdates(attrs.getAttrsList());
+            }
+
+            if (preallocatedIds.contains(objectId.getObjectId())) {
+                writeRequest.setPriorVersion(MetadataUtil.preallocated(objectId));
+                preallocated.add(writeRequest.build());
+            }
+            else if (objectId.getObjectVersion() > MetadataConstants.OBJECT_FIRST_VERSION) {
+                writeRequest.setPriorVersion(MetadataUtil.priorVersion(objectId));
+                newVersions.add(writeRequest.build());
+            }
+            else {
+                newObjects.add(writeRequest.build());
+            }
+        }
+
+        // Send metadata updates as a single batch
+        var batchRequest = MetadataWriteBatchRequest.newBuilder()
+                .setTenant(jobState.tenant)
+                .addAllCreatePreallocatedObjects(preallocated)
+                .addAllCreateObjects(newObjects)
+                .addAllUpdateObjects(newVersions)
+                .addAllUpdateTags(newTags)
+                .build();
+
+        var metadataClient = configureClient(metaClient, jobState);
+        var batchResponse = metadataClient.writeBatch(batchRequest);
+
+        log.info("RESULT SAVED: {} object(s) created, {} object(s) updated, {} tag(s) updated",
+                batchResponse.getCreateObjectsCount() + batchResponse.getCreatePreallocatedObjectsCount(),
+                batchResponse.getUpdateObjectsCount(),
+                batchResponse.getUpdateTagsCount());
+    }
+
+    private List<TagUpdate> jobAttrs(ResultDefinition result) {
+
+        if (result.getStatusCode() == JobStatusCode.SUCCEEDED) {
+
+            return List.of(
+                    TagUpdate.newBuilder()
+                            .setAttrName(TRAC_JOB_STATUS_ATTR)
+                            .setValue(encodeValue(result.getStatusCode().toString()))
+                            .build());
+        }
+        else {
+
+            return List.of(
+                    TagUpdate.newBuilder()
+                            .setAttrName(TRAC_JOB_STATUS_ATTR)
+                            .setValue(encodeValue(result.getStatusCode().toString()))
+                            .build(),
+                    TagUpdate.newBuilder()
+                            .setAttrName(TRAC_JOB_ERROR_MESSAGE_ATTR)
+                            .setValue(encodeValue(result.getStatusMessage()))
+                            .build());
+        }
     }
 
     <TStub extends AbstractStub<TStub>>

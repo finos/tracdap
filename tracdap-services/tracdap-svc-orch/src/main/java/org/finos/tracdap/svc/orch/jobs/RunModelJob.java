@@ -17,7 +17,6 @@
 
 package org.finos.tracdap.svc.orch.jobs;
 
-import org.finos.tracdap.api.MetadataWriteRequest;
 import org.finos.tracdap.api.internal.RuntimeJobResult;
 import org.finos.tracdap.common.config.IDynamicResources;
 import org.finos.tracdap.common.exception.EUnexpected;
@@ -32,19 +31,6 @@ import java.util.Map;
 
 
 public class RunModelJob extends RunModelOrFlow implements IJobLogic {
-
-    @Override
-    public JobDefinition applyTransform(JobDefinition job, MetadataBundle metadata, IDynamicResources resources) {
-
-        // No transformations currently required
-        return job;
-    }
-
-    @Override
-    public MetadataBundle applyMetadataTransform(JobDefinition job, MetadataBundle metadata, IDynamicResources resources) {
-
-        return metadata;
-    }
 
     @Override
     public List<TagSelector> requiredMetadata(JobDefinition job) {
@@ -63,75 +49,42 @@ public class RunModelJob extends RunModelOrFlow implements IJobLogic {
     }
 
     @Override
-    public Map<String, MetadataWriteRequest> newResultIds(
-            String tenant, JobDefinition job,
-            Map<String, ObjectDefinition> resources,
-            Map<String, TagHeader> resourceMapping) {
+    public JobDefinition applyJobTransform(JobDefinition job, MetadataBundle metadata, IDynamicResources resources) {
 
-        var runModel = job.getRunModel();
-
-        var modelKey = MetadataUtil.objectKey(runModel.getModel());
-        var modelId = resourceMapping.get(modelKey);
-        var modelDef = resources.get(MetadataUtil.objectKey(modelId)).getModel();
-
-        return newResultIds(
-                tenant, modelDef.getOutputsMap(),
-                runModel.getPriorOutputsMap());
+        // No transformations currently required
+        return job;
     }
 
     @Override
-    public Map<String, TagHeader> priorResultIds(
-            JobDefinition job,
-            Map<String, ObjectDefinition> resources,
-            Map<String, TagHeader> resourceMapping) {
+    public MetadataBundle applyMetadataTransform(JobDefinition job, MetadataBundle metadata, IDynamicResources resources) {
 
-        var runModel = job.getRunModel();
-
-        var modelKey = MetadataUtil.objectKey(runModel.getModel());
-        var modelId = resourceMapping.get(modelKey);
-        var modelDef = resources.get(MetadataUtil.objectKey(modelId)).getModel();
-
-        return priorResultIds(
-                modelDef.getOutputsMap().keySet(), runModel.getPriorOutputsMap(),
-                resources, resourceMapping);
+        return metadata;
     }
 
     @Override
-    public JobDefinition setResultIds(
-            JobDefinition job, Map<String, TagHeader> resultMapping,
-            Map<String, ObjectDefinition> resources,
-            Map<String, TagHeader> resourceMapping) {
+    public Map<ObjectType, Integer> expectedOutputs(JobDefinition job, MetadataBundle metadata) {
 
-        var modelKey = MetadataUtil.objectKey(job.getRunModel().getModel());
-        var modelId = resourceMapping.get(modelKey);
-        var modelDef = resources.get(MetadataUtil.objectKey(modelId)).getModel();
+        var runModelJob = job.getRunModel();
 
-        var modelOutputs = setResultIds(modelDef.getOutputsMap().keySet(), resultMapping);
+        var modelObj = metadata.getObject(runModelJob.getModel());
+        var model = modelObj.getModel();
 
-        var runModel = job.getRunModel().toBuilder()
-                .clearOutputs()
-                .putAllOutputs(modelOutputs);
-
-        return job.toBuilder()
-                .setRunModel(runModel)
-                .build();
+        return expectedOutputs(model.getOutputsMap(), runModelJob.getPriorOutputsMap());
     }
 
     @Override
-    public List<MetadataWriteRequest> buildResultMetadata(String tenant, JobConfig jobConfig, RuntimeJobResult jobResult) {
+    public RuntimeJobResult processResult(JobConfig jobConfig, RuntimeJobResult runtimeResult, Map<String, TagHeader> resultIds) {
 
         var runModel = jobConfig.getJob().getRunModel();
 
         var modelKey = MetadataUtil.objectKey(runModel.getModel());
-        var modelId = jobConfig.getResourceMappingMap().get(modelKey);
-        var modelDef = jobConfig.getResourcesMap().get(MetadataUtil.objectKey(modelId)).getModel();
+        var modelId = jobConfig.getObjectMappingMap().get(modelKey);
+        var modelDef = jobConfig.getObjectsMap().get(MetadataUtil.objectKey(modelId)).getModel();
 
-        return buildResultMetadata(
-                tenant, jobConfig, jobResult,
+        return processResult(
+                runtimeResult,
                 modelDef.getOutputsMap(),
-                runModel.getOutputsMap(),
-                runModel.getPriorOutputsMap(),
                 runModel.getOutputAttrsList(),
-                Map.of());
+                Map.of(), resultIds);
     }
 }

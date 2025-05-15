@@ -17,18 +17,20 @@
 
 package org.finos.tracdap.svc.orch.jobs;
 
-import org.finos.tracdap.api.MetadataWriteRequest;
 import org.finos.tracdap.api.internal.RuntimeJobResult;
+import org.finos.tracdap.api.internal.RuntimeJobResultAttrs;
 import org.finos.tracdap.common.config.IDynamicResources;
 import org.finos.tracdap.common.exception.EExecutorValidation;
-import org.finos.tracdap.common.exception.EUnexpected;
+import org.finos.tracdap.common.exception.EJobResult;
 import org.finos.tracdap.common.metadata.MetadataBundle;
+import org.finos.tracdap.common.metadata.MetadataUtil;
 import org.finos.tracdap.config.JobConfig;
 import org.finos.tracdap.metadata.*;
 
 import java.net.URI;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import static org.finos.tracdap.common.metadata.MetadataCodec.encodeValue;
 import static org.finos.tracdap.common.metadata.MetadataConstants.*;
@@ -37,7 +39,15 @@ import static org.finos.tracdap.common.metadata.MetadataConstants.*;
 public class ImportModelJob implements IJobLogic {
 
     @Override
-    public JobDefinition applyTransform(JobDefinition job, MetadataBundle metadata, IDynamicResources resources) {
+    public List<TagSelector> requiredMetadata(JobDefinition job) {
+
+        // No extra metadata needed for an import_model job
+
+        return List.of();
+    }
+
+    @Override
+    public JobDefinition applyJobTransform(JobDefinition job, MetadataBundle metadata, IDynamicResources resources) {
 
         // Fill in package and packageGroup properties for models using Git repos
 
@@ -85,122 +95,86 @@ public class ImportModelJob implements IJobLogic {
     }
 
     @Override
-    public List<TagSelector> requiredMetadata(JobDefinition job) {
+    public Map<ObjectType, Integer> expectedOutputs(JobDefinition job, MetadataBundle metadata) {
 
-        // No extra metadata needed for an import_model job
-
-        return List.of();
+        // Allocate a single ID for the new model
+        return Map.of(ObjectType.MODEL, 1);
     }
 
     @Override
-    public List<TagSelector> requiredMetadata(
-            Map<String, ObjectDefinition> newResources) {
+    public RuntimeJobResult processResult(JobConfig jobConfig, RuntimeJobResult runtimeResult, Map<String, TagHeader> resultIds) {
 
-        // No extra metadata needed for an import_model job
+        var modelIds = resultIds.values().stream()
+                .filter(objectId -> objectId.getObjectType() == ObjectType.MODEL)
+                .collect(Collectors.toList());
 
-        return List.of();
-    }
+        if (modelIds.isEmpty())
+            throw new EJobResult("Job result does not contain any MODEL objects");
 
-    @Override
-    public Map<String, MetadataWriteRequest> newResultIds(
-            String tenant, JobDefinition job,
-            Map<String, ObjectDefinition> resources,
-            Map<String, TagHeader> resourceMapping) {
+        if (modelIds.size() > 1)
+            throw new EJobResult("Job result contains more than one MODEL object");
 
-        return Map.of();  // not currently used
-    }
+        var modelId = modelIds.get(0);
+        var modelKey = MetadataUtil.objectKey(modelId);
 
-    @Override
-    public Map<String, TagHeader> priorResultIds(
-            JobDefinition job,
-            Map<String, ObjectDefinition> resources,
-            Map<String, TagHeader> resourceMapping) {
+        if (!runtimeResult.containsObjects(modelKey))
+            throw new EJobResult(String.format("Missing definition in job result: [%s]", modelKey));
 
-        // Model updates not supported yet
-
-        return Map.of();
-    }
-
-    @Override
-    public JobDefinition setResultIds(
-            JobDefinition job,
-            Map<String, TagHeader> resultMapping,
-            Map<String, ObjectDefinition> resources,
-            Map<String, TagHeader> resourceMapping) {
-
-        return job;
-    }
-
-    @Override
-    public List<MetadataWriteRequest> buildResultMetadata(String tenant, JobConfig jobConfig, RuntimeJobResult jobResult) {
-
-        var modelKeyMaybe = jobResult.getResultsMap().entrySet()
-                .stream()
-                .filter(entry -> entry.getValue().getObjectType() == ObjectType.MODEL)
-                .map(Map.Entry::getKey)
-                .findFirst();
-
-        if (modelKeyMaybe.isEmpty())
-            throw new EUnexpected();
-
-        var modelKey = modelKeyMaybe.get();
-        var modelObj = jobResult.getResultsOrThrow(modelKey);
-        var modelDef = modelObj.getModel();
-
-        var modelReq = MetadataWriteRequest.newBuilder()
-                .setTenant(tenant)
-                .setObjectType(ObjectType.MODEL)
-                .setDefinition(modelObj);
-
-        // Add attrs defined in the model code
-        for (var staticAttr : modelDef.getStaticAttributesMap().entrySet()) {
-
-            modelReq.addTagUpdates(TagUpdate.newBuilder()
-                    .setOperation(TagOperation.CREATE_OR_REPLACE_ATTR)
-                    .setAttrName(staticAttr.getKey())
-                    .setValue(staticAttr.getValue()));
-        }
+        var modelObj = runtimeResult.getObjectsOrThrow(modelKey);
+        var modelAttrs = runtimeResult.getAttrsOrDefault(modelKey, RuntimeJobResultAttrs.getDefaultInstance()).toBuilder();
 
         // Add attrs defined in the job
         var suppliedAttrs = jobConfig.getJob().getImportModel().getModelAttrsList();
-        modelReq.addAllTagUpdates(suppliedAttrs);
+        modelAttrs.addAllAttrs(suppliedAttrs);
 
         // Add controlled attrs for models
+        var modelDef = modelObj.getModel();
 
-        modelReq.addTagUpdates(TagUpdate.newBuilder()
+        modelAttrs.addAttrs(TagUpdate.newBuilder()
                 .setAttrName(TRAC_MODEL_LANGUAGE)
-                .setValue(encodeValue(modelDef.getLanguage())));
+                .setValue(encodeValue(modelDef.getLanguage()))
+                .build());
 
-        modelReq.addTagUpdates(TagUpdate.newBuilder()
+        modelAttrs.addAttrs(TagUpdate.newBuilder()
                 .setAttrName(TRAC_MODEL_REPOSITORY)
-                .setValue(encodeValue(modelDef.getRepository())));
+                .setValue(encodeValue(modelDef.getRepository()))
+                .build());
 
         if (modelDef.hasPackageGroup()) {
 
-            modelReq.addTagUpdates(TagUpdate.newBuilder()
+            modelAttrs.addAttrs(TagUpdate.newBuilder()
                     .setAttrName(TRAC_MODEL_PACKAGE_GROUP)
-                    .setValue(encodeValue(modelDef.getPackageGroup())));
+                    .setValue(encodeValue(modelDef.getPackageGroup()))
+                    .build());
         }
 
-        modelReq.addTagUpdates(TagUpdate.newBuilder()
+        modelAttrs.addAttrs(TagUpdate.newBuilder()
                 .setAttrName(TRAC_MODEL_PACKAGE)
-                .setValue(encodeValue(modelDef.getPackage())));
+                .setValue(encodeValue(modelDef.getPackage()))
+                .build());
 
-        modelReq.addTagUpdates(TagUpdate.newBuilder()
+        modelAttrs.addAttrs(TagUpdate.newBuilder()
                 .setAttrName(TRAC_MODEL_VERSION)
-                .setValue(encodeValue(modelDef.getVersion())));
+                .setValue(encodeValue(modelDef.getVersion()))
+                .build());
 
-        modelReq.addTagUpdates(TagUpdate.newBuilder()
+        modelAttrs.addAttrs(TagUpdate.newBuilder()
                 .setAttrName(TRAC_MODEL_ENTRY_POINT)
-                .setValue(encodeValue(modelDef.getEntryPoint())));
+                .setValue(encodeValue(modelDef.getEntryPoint()))
+                .build());
 
         if (modelDef.hasPath()) {
 
-            modelReq.addTagUpdates(TagUpdate.newBuilder()
+            modelAttrs.addAttrs(TagUpdate.newBuilder()
                     .setAttrName(TRAC_MODEL_PATH)
-                    .setValue(encodeValue(modelDef.getPath())));
+                    .setValue(encodeValue(modelDef.getPath()))
+                    .build());
         }
 
-        return List.of(modelReq.build());
+        return RuntimeJobResult.newBuilder()
+                .addObjectIds(modelId)
+                .putObjects(modelKey, modelObj)
+                .putAttrs(modelKey, modelAttrs.build())
+                .build();
     }
 }

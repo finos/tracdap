@@ -58,6 +58,13 @@ enum IncarnationStatus {
   INCARNATION_EXPUNGED = 2;
 }
 
+enum StorageLayout {
+
+  OBJECT_ID_LAYOUT = 0;
+
+  DEVELOPER_LAYOUT = 1;
+}
+
 /**
  * Define physical storage for an individual copy of a data item
  *
@@ -119,4 +126,6 @@ message StorageDefinition {
   reserved 2;
 
   map<string, Value> storageOptions = 3;
+
+  StorageLayout layout = 4;
 }

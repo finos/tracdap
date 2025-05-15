@@ -17,7 +17,6 @@
 
 package org.finos.tracdap.svc.orch.jobs;
 
-import org.finos.tracdap.api.MetadataWriteRequest;
 import org.finos.tracdap.api.internal.RuntimeJobResult;
 import org.finos.tracdap.common.config.IDynamicResources;
 import org.finos.tracdap.common.metadata.MetadataBundle;
@@ -28,30 +27,64 @@ import java.util.List;
 import java.util.Map;
 
 
+/**
+ * Interface to provide specialized job logic for each job type
+ */
 public interface IJobLogic {
 
-    JobDefinition applyTransform(JobDefinition job, MetadataBundle metadata, IDynamicResources resources);
-
-    MetadataBundle applyMetadataTransform(JobDefinition job, MetadataBundle metadata, IDynamicResources resources);
-
+    /**
+     * Provide a list of metadata objects required for the job to execute
+     *
+     * <p>Only objects directly referenced in the job definition should be returned by this method.
+     * The orchestrator framework will resolve secondary dependencies. The supplied job definition
+     * must match the job type of the job logic class.
+     *
+     * @param job The job definition to check metadata for
+     * @return A list of selectors for the required metadata objects.
+     */
     List<TagSelector> requiredMetadata(JobDefinition job);
 
-    List<TagSelector> requiredMetadata(Map<String, ObjectDefinition> newResources);
+    /**
+     * Apply transformations to the job definition before sending it to the executor.
+     *
+     * @param job The original job definition, as supplied by the client
+     * @param metadata A bundle containing the metadata referenced in the job definition
+     * @param resources The set of resources referenced in the job metadata
+     * @return The transformed job definition, which will be sent to the runtime for execution
+     */
+    JobDefinition applyJobTransform(JobDefinition job, MetadataBundle metadata, IDynamicResources resources);
 
-    Map<String, TagHeader> priorResultIds(
-            JobDefinition job,
-            Map<String, ObjectDefinition> resources,
-            Map<String, TagHeader> resourceMapping);
+    /**
+     * Apply transformations to the metadata bundle for a job before sending it to the executor.
+     *
+     * @param job The original job definition being considered
+     * @param metadata A bundle containing the original metadata loaded from the metadata store
+     * @param resources The set of resources referenced in the job metadata
+     * @return The transformed metadata bundle, which will be sent to the runtime for execution
+     */
+    MetadataBundle applyMetadataTransform(JobDefinition job, MetadataBundle metadata, IDynamicResources resources);
 
-    Map<String, MetadataWriteRequest> newResultIds(
-            String tenant, JobDefinition job,
-            Map<String, ObjectDefinition> resources,
-            Map<String, TagHeader> resourceMapping);
+    /**
+     * Provide a count of expected outputs for each object type (used to preallocate object IDs)
+     *
+     * @param job The job definition being considered
+     * @param metadata A bundle containing the metadata referenced in the job definition
+     * @return Map describing the expected number of outputs for each object type
+     */
+    Map<ObjectType, Integer> expectedOutputs(JobDefinition job, MetadataBundle metadata);
 
-    JobDefinition setResultIds(
-            JobDefinition job, Map<String, TagHeader> resultMapping,
-            Map<String, ObjectDefinition> resources,
-            Map<String, TagHeader> resourceMapping);
-
-    List<MetadataWriteRequest> buildResultMetadata(String tenant, JobConfig jobConfig, RuntimeJobResult jobResult);
+    /**
+     * Perform post-processing on the job result received from the model runtime.
+     *
+     * <p>Post-processing should include filtering and validating the outputs (i.e. only
+     * expected, consistent outputs are retained). Job logic is also responsible for adding
+     * any specialised attributes to the output objects, e.g. for models the trac_model_xxx
+     * attributes which are taken from the model definition.
+     *
+     * @param jobConfig The original job config sent for execution
+     * @param runtimeResult The raw result received from the model runtime
+     * @param resultIds Map of un-versioned IDs to the object IDs received from the runtime
+     * @return The processed result that will be used for saving output objects
+     */
+    RuntimeJobResult processResult(JobConfig jobConfig, RuntimeJobResult runtimeResult, Map<String, TagHeader> resultIds);
 }

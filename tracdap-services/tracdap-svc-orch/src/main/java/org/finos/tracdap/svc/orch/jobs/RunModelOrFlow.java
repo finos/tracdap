@@ -17,12 +17,11 @@
 
 package org.finos.tracdap.svc.orch.jobs;
 
-
-import org.finos.tracdap.api.MetadataWriteRequest;
 import org.finos.tracdap.api.internal.RuntimeJobResult;
-import org.finos.tracdap.common.exception.EConsistencyValidation;
+import org.finos.tracdap.api.internal.RuntimeJobResultAttrs;
+import org.finos.tracdap.common.exception.EJobResult;
+import org.finos.tracdap.common.exception.ETracInternal;
 import org.finos.tracdap.common.exception.EUnexpected;
-import org.finos.tracdap.config.JobConfig;
 import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.metadata.MetadataConstants;
@@ -33,243 +32,140 @@ import java.util.*;
 
 public abstract class RunModelOrFlow {
 
-    public List<TagSelector> requiredMetadata(Map<String, ObjectDefinition> newResources) {
 
-        var resources = new ArrayList<TagSelector>();
+    protected Map<ObjectType, Integer> expectedOutputs(
+            Map<String, ModelOutputSchema> outputs,
+            Map<String, TagSelector> priorOutputs) {
 
-        for (var obj : newResources.values()) {
+        var requiredIds = new HashMap<ObjectType, Integer>();
 
-            if (obj.getObjectType() == ObjectType.DATA) {
+        for (var output : outputs.entrySet()) {
 
-                var dataDef = obj.getData();
-                resources.add(dataDef.getStorageId());
-
-                if (dataDef.hasSchemaId())
-                    resources.add(dataDef.getSchemaId());
-            }
-
-            else if (obj.getObjectType() == ObjectType.FILE) {
-
-                var fileDef = obj.getFile();
-                resources.add(fileDef.getStorageId());
-            }
-        }
-
-        return resources;
-    }
-
-    public Map<String, MetadataWriteRequest> newResultIds(
-            String tenant, Map<String, ModelOutputSchema> outputRequirements,
-            Map<String, TagSelector> priorOutputsMap) {
-
-        var resultMapping = new HashMap<String, MetadataWriteRequest>();
-
-        for (var output : outputRequirements.entrySet()) {
-
-            if (priorOutputsMap.containsKey(output.getKey()))
+            if (priorOutputs.containsKey(output.getKey()))
                 continue;
 
-            var outputKey = output.getKey();
-            var storageKey = String.format("%s:%s", outputKey, ObjectType.STORAGE);
+            var outputType = output.getValue().getObjectType();
 
-            var outputReq = MetadataWriteRequest.newBuilder()
-                    .setTenant(tenant)
-                    .setObjectType(output.getValue().getObjectType())
-                    .build();
-
-            var storageReq = MetadataWriteRequest.newBuilder()
-                    .setTenant(tenant)
-                    .setObjectType(ObjectType.STORAGE)
-                    .build();
-
-            resultMapping.put(outputKey, outputReq);
-            resultMapping.put(storageKey, storageReq);
+            if (outputType == ObjectType.DATA) {
+                requiredIds.compute(ObjectType.DATA, (key, value) -> value == null ? 1 : value + 1);
+                requiredIds.compute(ObjectType.STORAGE, (key, value) -> value == null ? 1 : value + 1);
+            }
+            else if (outputType == ObjectType.FILE) {
+                requiredIds.compute(ObjectType.FILE, (key, value) -> value == null ? 1 : value + 1);
+                requiredIds.compute(ObjectType.STORAGE, (key, value) -> value == null ? 1 : value + 1);
+            }
+            else {
+                throw new EUnexpected();  // TODO
+            }
         }
 
-        return resultMapping;
+        return requiredIds;
     }
 
-    public Map<String, TagHeader> priorResultIds(
-            Set<String> outputKeys, Map<String, TagSelector> priorOutputsMap,
-            Map<String, ObjectDefinition> resources, Map<String, TagHeader> resourceMapping) {
+    protected RuntimeJobResult processResult(
+            RuntimeJobResult runtimeResult, Map<String, ModelOutputSchema> expectedOutputs,
+            List<TagUpdate> jobAttrs, Map<String, List<TagUpdate>> perNodeAttrs,
+            Map<String, TagHeader> resultIds) {
 
-        var resultMapping = new HashMap<String, TagHeader>();
-
-        for (var outputKey : outputKeys) {
-
-            var priorOutput = priorOutputsMap.getOrDefault(outputKey, null);
-
-            if (priorOutput == null)
-                continue;
-
-            var priorOutputKey = MetadataUtil.objectKey(priorOutput);
-            var priorOutputId = resourceMapping.get(priorOutputKey);
-            var priorOutputDef = resources.get(MetadataUtil.objectKey(priorOutputId));
-
-            TagSelector priorStorageSelector;
-
-            if (priorOutputDef.getObjectType() == ObjectType.DATA)
-                priorStorageSelector = priorOutputDef.getData().getStorageId();
-            else if (priorOutputDef.getObjectType() == ObjectType.FILE)
-                priorStorageSelector = priorOutputDef.getFile().getStorageId();
-            else
-                throw new EUnexpected();
-
-            var priorStorageKey = MetadataUtil.objectKey(priorStorageSelector);
-            var priorStorageId = resourceMapping.get(priorStorageKey);
-
-            var storageKey = String.format("%s:%s", outputKey, ObjectType.STORAGE);
-
-            resultMapping.put(outputKey, priorOutputId);
-            resultMapping.put(storageKey, priorStorageId);
-        }
-
-        return resultMapping;
-    }
-
-    public Map<String, TagSelector> setResultIds(
-            Set<String> outputKeys,
-            Map<String, TagHeader> resultMapping) {
-
-        var outputSelectors = new HashMap<String, TagSelector>();
-
-        for (var outputKey : outputKeys) {
-
-            var outputId = resultMapping.get(outputKey);
-            var outputSelector = MetadataUtil.selectorFor(outputId);
-            outputSelectors.put(outputKey, outputSelector);
-        }
-
-        return outputSelectors;
-    }
-
-    public List<MetadataWriteRequest> buildResultMetadata(
-            String tenant, JobConfig jobConfig, RuntimeJobResult jobResult,
-            Map<String, ModelOutputSchema> expectedOutputs,
-            Map<String, TagSelector> outputs, Map<String, TagSelector> priorOutputs,
-            List<TagUpdate> outputAttrs, Map<String, List<TagUpdate>> perNodeOutputAttrs) {
-
-        var updates = new ArrayList<MetadataWriteRequest>();
+        var jobResult = RuntimeJobResult.newBuilder();
 
         for (var output: expectedOutputs.entrySet()) {
 
             var outputName = output.getKey();
-            var outputDef = output.getValue();
+            var modelOutput = output.getValue();
 
-            var outputId = jobConfig.getResultMappingOrThrow(outputName);
-            var outputKey = MetadataUtil.objectKey(outputId);
+            // Ignore optional outputs that were not produced
+            if (modelOutput.getOptional() & !runtimeResult.getResult().containsOutputs(outputName))
+                continue;
 
-            if (!jobResult.containsResults(outputKey)) {
-                if (outputDef.getOptional())
-                    continue;
-                else
-                    throw new EConsistencyValidation(String.format("Missing required output [%s]", outputName));
-            }
-
-            // TODO: Preallocated IDs for storage outputs
-
-            var storageMapping = outputName + ":STORAGE";
-            var storageId = jobConfig.getResultMappingOrThrow(storageMapping);
-            var storageKey = MetadataUtil.objectKey(storageId);
-
-            var outputObj = jobResult.getResultsOrThrow(outputKey);
-            var storageObj = jobResult.getResultsOrThrow(storageKey);
-
-            var priorOutputSelector = priorOutputs.containsKey(outputName)
-                    ? priorOutputs.get(outputName)
-                    : MetadataUtil.preallocated(outputs.get(outputName));
-
-            var priorStorageSelector = priorOutputs.containsKey(outputName)
-                    ? priorStorageSelector(priorOutputSelector, jobConfig)
-                    : preallocatedStorageSelector(outputObj);
-
-            var controlledAttrs = List.of(
-                    TagUpdate.newBuilder()
-                    .setAttrName("trac_job_output")
-                    .setValue(MetadataCodec.encodeValue(outputName))
-                    .build());
-
-            var nodeOutputAttrs = perNodeOutputAttrs.get(outputName);
-            if (nodeOutputAttrs == null) {
-                nodeOutputAttrs = List.of();
-            }
-
-            var outputUpdate = MetadataWriteRequest.newBuilder()
-                    .setTenant(tenant)
-                    .setObjectType(outputObj.getObjectType())
-                    .setPriorVersion(priorOutputSelector)
-                    .setDefinition(outputObj)
-                    .addAllTagUpdates(controlledAttrs)
-                    .addAllTagUpdates(outputAttrs)
-                    .addAllTagUpdates(nodeOutputAttrs)
-                    .build();
-
-            updates.add(outputUpdate);
-
-            var storageAttrs = List.of(
-                    TagUpdate.newBuilder()
-                    .setAttrName(MetadataConstants.TRAC_STORAGE_OBJECT_ATTR)
-                    .setValue(MetadataCodec.encodeValue(outputKey))
-                    .build());
-
-            var storageUpdate = MetadataWriteRequest.newBuilder()
-                    .setTenant(tenant)
-                    .setObjectType(storageObj.getObjectType())
-                    .setPriorVersion(priorStorageSelector)
-                    .setDefinition(storageObj)
-                    .addAllTagUpdates(storageAttrs)
-                    .build();
-
-            updates.add(storageUpdate);
+            processOutput(
+                    outputName, runtimeResult, resultIds,
+                    jobAttrs, perNodeAttrs,
+                    jobResult);
         }
 
-        return updates;
+        return jobResult.build();
     }
 
-    private TagSelector priorStorageSelector(TagSelector priorOutputSelector, JobConfig jobConfig) {
+    private void processOutput(
+            String outputName, RuntimeJobResult runtimeResult, Map<String, TagHeader> resultIds,
+            List<TagUpdate> jobAttrs, Map<String, List<TagUpdate>> perNodeAttrs,
+            RuntimeJobResult.Builder jobResult) {
 
-        var mappedOutputKey = MetadataUtil.objectKey(priorOutputSelector);
-        String outputKey;
+        // Look up the result objects
 
-        if (jobConfig.containsResourceMapping(mappedOutputKey)) {
-            var outputId = jobConfig.getResourceMappingOrDefault(mappedOutputKey, null);
-            var outputSelector = MetadataUtil.selectorFor(outputId);
-            outputKey = MetadataUtil.objectKey(outputSelector);
-        }
-        else
-            outputKey = mappedOutputKey;
+        var result = runtimeResult.getResult();
 
-        var outputObj = jobConfig.getResourcesOrThrow(outputKey);
+        if (!result.containsOutputs(outputName))
+            throw new EJobResult(String.format("Missing required output [%s]", outputName));
 
-        TagSelector storageSelector;
+        var outputSelector = result.getOutputsOrThrow(outputName);
+        var outputId = resultIds.get(outputSelector.getObjectId());
+        var outputKey = outputId != null ? MetadataUtil.objectKey(outputId) : null;
 
-        if (outputObj.getObjectType() == ObjectType.DATA)
-            storageSelector = outputObj.getData().getStorageId();
-        else if (outputObj.getObjectType() == ObjectType.FILE)
-            storageSelector = outputObj.getFile().getStorageId();
-        else
-            throw new EUnexpected();
+        checkResultAvailable(outputSelector, outputKey, runtimeResult);
 
-        var storageKey = MetadataUtil.objectKey(storageSelector);
+        var outputDef = runtimeResult.getObjectsOrThrow(outputKey);
+        var outputAttrs = runtimeResult.getAttrsOrDefault(outputKey, RuntimeJobResultAttrs.getDefaultInstance()).toBuilder();
 
-        if (jobConfig.containsResourceMapping(storageKey)) {
+        var storageSelector = getStorageKey(outputDef);
+        var storageId = resultIds.get(storageSelector.getObjectId());
+        var storageKey = storageId != null ? MetadataUtil.objectKey(storageId) : null;
 
-            var storageId = jobConfig.getResourceMappingOrDefault(storageKey, null);
-            return MetadataUtil.selectorFor(storageId);
-        }
-        else
-            return storageSelector;
+        checkResultAvailable(storageSelector, storageKey, runtimeResult);
+
+        var storageDef = runtimeResult.getObjectsOrThrow(storageKey);
+        var storageAttrs = runtimeResult.getAttrsOrDefault(outputKey, RuntimeJobResultAttrs.getDefaultInstance()).toBuilder();
+
+        // Add user attrs (job level and flow node attrs)
+
+        outputAttrs.addAllAttrs(jobAttrs);
+
+        if (perNodeAttrs.containsKey(outputName))
+            outputAttrs.addAllAttrs(perNodeAttrs.get(outputName));
+
+        // Add controlled attrs
+
+        outputAttrs.addAttrs(TagUpdate.newBuilder()
+                .setAttrName("trac_job_output")
+                .setValue(MetadataCodec.encodeValue(outputName))
+                .build());
+
+        storageAttrs.addAttrs(TagUpdate.newBuilder()
+                .setAttrName(MetadataConstants.TRAC_STORAGE_OBJECT_ATTR)
+                .setValue(MetadataCodec.encodeValue(outputKey))
+                .build());
+
+        // Add objects to the job result
+
+        jobResult.addObjectIds(outputId);
+        jobResult.putObjects(outputKey, outputDef);
+        jobResult.putAttrs(outputKey, outputAttrs.build());
+
+        jobResult.addObjectIds(storageId);
+        jobResult.putObjects(storageKey, storageDef);
+        jobResult.putAttrs(storageKey, storageAttrs.build());
     }
 
-    private TagSelector preallocatedStorageSelector(ObjectDefinition outputObj) {
+    private void checkResultAvailable(TagSelector selector, String outputKey, RuntimeJobResult jobResult) {
 
-        if (outputObj.getObjectType() == ObjectType.DATA)
-            return MetadataUtil.preallocated(outputObj.getData().getStorageId());
+        var displayKey = MetadataUtil.objectKey(selector);
 
-        else if (outputObj.getObjectType() == ObjectType.FILE)
-            return  MetadataUtil.preallocated(outputObj.getFile().getStorageId());
+        if (outputKey == null)
+            throw new EJobResult(String.format("Missing object ID in job result: [%s]", displayKey));
 
-        else
-            throw new EUnexpected();
+        if (!jobResult.containsObjects(outputKey))
+            throw new EJobResult(String.format("Missing definition in job result: [%s]", displayKey));
+    }
+
+    private TagSelector getStorageKey(ObjectDefinition outputDef) {
+
+        if (outputDef.getObjectType() == ObjectType.DATA)
+            return outputDef.getData().getStorageId();
+
+        if (outputDef.getObjectType() == ObjectType.FILE)
+            return outputDef.getFile().getStorageId();
+
+        throw new ETracInternal(String.format("Unsupported job output type [%s]", outputDef.getObjectType().name()));
     }
 }
