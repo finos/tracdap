@@ -179,7 +179,7 @@ class StorageLayout:
 
 class BaseLayout(StorageLayout):
 
-    __DATA_ITEM_TEMPLATE = "data//{}/{}/{}/snap-{:d}/delta-{:d}"
+    __DATA_ITEM_TEMPLATE = "data/{}/{}/{}/snap-{:d}/delta-{:d}"
     __FILE_ITEM_TEMPLATE = "file/{}/version-{}"
 
     @abc.abstractmethod
@@ -210,7 +210,7 @@ class BaseLayout(StorageLayout):
         # Blank data definition with no parts
         new_data_def = _meta.DataDefinition(
             schema=trac_schema,
-            storageId=_util.selector_for(storage_id))
+            storageId=_util.selector_for_latest(storage_id))
 
         data_def = self._add_new_snap(new_data_def, data_item, part_key, snap_index)
 
