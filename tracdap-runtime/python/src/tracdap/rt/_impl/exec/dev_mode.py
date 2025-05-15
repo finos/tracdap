@@ -87,6 +87,7 @@ class DevModeTranslator:
             config_mgr: _cfg_p.ConfigManager):
 
         storage_config = copy.deepcopy(sys_config.storage)
+        storage_config.defaultLayout = _meta.StorageLayout.DEVELOPER_LAYOUT
 
         for bucket_key, bucket_config in storage_config.buckets.items():
             storage_config.buckets[bucket_key] = cls._resolve_storage_location(
@@ -788,69 +789,66 @@ class DevModeTranslator:
         if hasattr(job_detail, "model"):
             model_obj = _util.get_job_metadata(job_detail.model, job_config)
             required_inputs = model_obj.model.inputs
-            required_outputs = model_obj.model.outputs
+            expected_outputs = model_obj.model.outputs
 
         elif hasattr(job_detail, "flow"):
             flow_obj = _util.get_job_metadata(job_detail.flow, job_config)
             required_inputs = flow_obj.flow.inputs
-            required_outputs = flow_obj.flow.outputs
+            expected_outputs = flow_obj.flow.outputs
 
         else:
             return job_config, job_def
 
+        job_metadata = job_config.objects
         job_inputs = job_detail.inputs
         job_outputs = job_detail.outputs
-        job_metadata = job_config.objects
+        job_prior_outputs = job_detail.priorOutputs
 
-        for input_key, input_value in job_inputs.items():
-            if not (isinstance(input_value, str) and input_value in job_metadata):
+        for key, schema in required_inputs.items():
+            if key not in job_inputs:
+                if not schema.optional:
+                    raise _ex.EJobValidation(f"Missing required input [{key}]")
+                continue
+            supplied_input = job_inputs.pop(key) if key in job_inputs else None
+            input_selector = self._process_socket(key, schema, supplied_input, job_metadata, is_output=False)
+            if input_selector is not None:
+                job_inputs[key] = input_selector
 
-                model_input = required_inputs[input_key]
-
-                if model_input.objectType == _meta.ObjectType.DATA:
-                    schema = model_input.schema if model_input and not model_input.dynamic else None
-                    input_id = self._process_data_socket(input_key, input_value, schema, job_metadata, new_unique_file=False)
-                elif model_input.objectType == _meta.ObjectType.FILE:
-                    file_type = model_input.fileType
-                    input_id = self._process_file_socket(input_key, input_value, file_type, job_metadata, new_unique_file=False)
-                else:
-                    raise _ex.EUnexpected()
-
-                job_inputs[input_key] = _util.selector_for(input_id)
-
-        for output_key, output_value in job_outputs.items():
-            if not (isinstance(output_value, str) and output_value in job_metadata):
-
-                model_output = required_outputs[output_key]
-
-                if model_output.objectType == _meta.ObjectType.DATA:
-                    schema = model_output.schema if model_output and not model_output.dynamic else None
-                    output_id = self._process_data_socket(output_key, output_value, schema, job_metadata, new_unique_file=True)
-                elif model_output.objectType == _meta.ObjectType.FILE:
-                    file_type = model_output.fileType
-                    output_id = self._process_file_socket(output_key, output_value, file_type, job_metadata, new_unique_file=True)
-                else:
-                    raise _ex.EUnexpected()
-
-                job_outputs[output_key] = _util.selector_for(output_id)
+        for key, schema in expected_outputs.items():
+            if key not in job_outputs:
+                raise _ex.EJobValidation(f"Missing required output [{key}]")
+            supplied_output = job_outputs.pop(key)
+            output_selector = self._process_socket(key, schema, supplied_output, job_metadata, is_output=True)
+            if output_selector is not None:
+                job_prior_outputs[key] = output_selector
 
         return job_config, job_def
 
+    def _process_socket(self, key, socket, supplied_value, job_metadata, is_output) -> _meta.TagSelector:
+
+        if socket.objectType == _meta.ObjectType.DATA:
+            schema = socket.schema if socket and not socket.dynamic else None
+            return self._process_data_socket(key, supplied_value, schema, job_metadata, is_output)
+
+        elif socket.objectType == _meta.ObjectType.FILE:
+            file_type = socket.fileType
+            return self._process_file_socket(key, supplied_value, file_type, job_metadata, is_output)
+
+        else:
+            raise _ex.EUnexpected()
+
     def _process_data_socket(
             self, data_key, data_value, schema: tp.Optional[_meta.SchemaDefinition],
-            job_metadata: tp.Dict[str, _meta.ObjectDefinition], new_unique_file=False) \
-            -> _meta.TagHeader:
+            job_metadata: tp.Dict[str, _meta.ObjectDefinition], is_output: bool)\
+            -> _meta.TagSelector:
 
         data_id = _util.new_object_id(_meta.ObjectType.DATA)
         storage_id = _util.new_object_id(_meta.ObjectType.STORAGE)
-
-        self._log.info(f"Generating data definition for [{data_key}] with ID = [{_util.object_key(data_id)}]")
 
         if isinstance(data_value, str):
             storage_path = data_value
             storage_key = self._sys_config.storage.defaultBucket
             storage_format = self.infer_format(storage_path, self._sys_config.storage, schema)
-            snap_version = 1
 
         elif isinstance(data_value, dict):
 
@@ -861,27 +859,35 @@ class DevModeTranslator:
 
             storage_key = data_value.get("storageKey") or self._sys_config.storage.defaultBucket
             storage_format = data_value.get("format") or self.infer_format(storage_path, self._sys_config.storage, schema)
-            snap_version = 1
 
         else:
             raise _ex.EConfigParse(f"Invalid configuration for input '{data_key}'")
 
-        # For unique outputs, increment the snap number to find a new unique snap
-        # These are not incarnations, bc likely in dev mode model code and inputs are changing
-        # Incarnations are for recreation of a dataset using the exact same code path and inputs
+        # Scan for existing versions using hte DEVELOPER storage layout
 
-        if new_unique_file:
-            storage_path, snap_version = self._new_unique_file(data_key, storage_key, storage_path, snap_version)
+        self._log.info(f"Looking for {'output' if is_output else 'input'} [{data_key}]...")
+
+        storage_path, version = self._find_latest_version(storage_key, storage_path)
+        data_id.objectVersion = version
+
+        if version > 0:
+            self._log.info(f"Found {'output' if is_output else 'input'} [{data_key}] version {version}")
+            self._log.info(f"Generating {'prior' if is_output else 'data'} definition for [{data_key}] with ID = [{_util.object_key(data_id)}]")
+        elif is_output:
+            self._log.info(f"No prior data for output [{data_key}]")
+        else:
+            raise _ex.EJobValidation(f"No data found for input [{data_key}]: {storage_path}")
 
         part_key = _meta.PartKey(opaqueKey="part-root", partType=_meta.PartType.PART_ROOT)
-        delta_index = 1
-        incarnation_index = 1
+        snap_index = version - 1 if version > 0 else 0
+        delta_index = 0
+        incarnation_index = 0
 
         # This is also defined in functions.DynamicDataSpecFunc, maybe centralize?
-        data_item = f"data/table/{data_id.objectId}/{part_key.opaqueKey}/snap-{snap_version}/delta-{delta_index}"
+        data_item = f"data/table/{data_id.objectId}/{part_key.opaqueKey}/snap-{snap_index}/delta-{delta_index}"
 
         data_obj = self._generate_data_definition(
-            part_key, snap_version, delta_index, data_item,
+            part_key, snap_index, delta_index, data_item,
             schema, storage_id)
 
         storage_obj = self._generate_storage_definition(
@@ -891,17 +897,15 @@ class DevModeTranslator:
         job_metadata[_util.object_key(data_id)] = data_obj
         job_metadata[_util.object_key(storage_id)] = storage_obj
 
-        return data_id
+        return _util.selector_for(data_id)
 
     def _process_file_socket(
             self, file_key, file_value, file_type: _meta.FileType,
-            job_metadata: tp.Dict[str, _meta.ObjectDefinition], new_unique_file=False) \
-            -> _meta.TagHeader:
+            job_metadata: tp.Dict[str, _meta.ObjectDefinition], is_output: bool) \
+            -> tp.Optional[_meta.TagSelector]:
 
         file_id = _util.new_object_id(_meta.ObjectType.FILE)
         storage_id = _util.new_object_id(_meta.ObjectType.STORAGE)
-
-        self._log.info(f"Generating file definition for [{file_key}] with ID = [{_util.object_key(file_id)}]")
 
         if isinstance(file_value, str):
 
@@ -919,17 +923,27 @@ class DevModeTranslator:
         else:
             raise _ex.EConfigParse(f"Invalid configuration for input '{file_key}'")
 
-        storage_format = "application/x-binary"
-        file_version = 1
+        # Scan for existing versions using hte DEVELOPER storage layout
 
-        if new_unique_file:
-            storage_path, file_version = self._new_unique_file(file_key, storage_key, storage_path, file_version)
-            file_size = 0
+        self._log.info(f"Looking for {'output' if is_output else 'input'} [{file_key}]...")
+
+        storage_path, version = self._find_latest_version(storage_key, storage_path)
+        file_id.objectVersion = version
+
+        if version > 0:
+            self._log.info(f"Found {'output' if is_output else 'input'} [{file_key}] version {version}")
+            self._log.info(f"Generating {'prior' if is_output else 'file'} definition for [{file_key}] with ID = [{_util.object_key(file_id)}]")
+        elif is_output:
+            self._log.info(f"No prior data for output [{file_key}]")
         else:
-            storage = self._storage_manager.get_file_storage(storage_key)
-            file_size = storage.size(storage_path)
+            raise _ex.EJobValidation(f"No data found for input [{file_key}]: {storage_path}")
 
-        data_item = f"file/{file_id.objectId}/version-{file_version}"
+        storage = self._storage_manager.get_file_storage(storage_key)
+        file_size = storage.size(storage_path) if storage.exists(storage_path) else 0
+
+        storage_format = "application/x-binary"
+
+        data_item = f"file/{file_id.objectId}/version-{version}"
         file_name = f"{file_key}.{file_type.extension}"
 
         file_obj = self._generate_file_definition(
@@ -938,12 +952,12 @@ class DevModeTranslator:
 
         storage_obj = self._generate_storage_definition(
             storage_id, storage_key, storage_path, storage_format,
-            data_item, incarnation_index=1)
+            data_item, incarnation_index=0)
 
         job_metadata[_util.object_key(file_id)] = file_obj
         job_metadata[_util.object_key(storage_id)] = storage_obj
 
-        return file_id
+        return _util.selector_for(file_id)
 
     @staticmethod
     def infer_format(storage_path: str, storage_config: _cfg.StorageConfig, schema: tp.Optional[_meta.SchemaDefinition]):
@@ -962,25 +976,28 @@ class DevModeTranslator:
         else:
             return storage_config.defaultFormat
 
-    def _new_unique_file(self, socket_name, storage_key, storage_path, version):
+    def _find_latest_version(self, storage_key, storage_path):
 
-        x_storage = self._storage_manager.get_file_storage(storage_key)
-        x_orig_path = pathlib.PurePath(storage_path)
-        x_name = x_orig_path.name
+        storage = self._storage_manager.get_file_storage(storage_key)
+        orig_path = pathlib.PurePath(storage_path)
+        version = 0
 
-        if x_storage.exists(str(x_orig_path.parent)):
-            listing = x_storage.ls(str(x_orig_path.parent))
-            existing_files = list(map(lambda stat: stat.file_name, listing))
-        else:
-            existing_files = []
+        if not storage.exists(str(orig_path.parent)):
+            return storage_path, version
 
-        while x_name in existing_files:
+        listing = storage.ls(str(orig_path.parent))
+        existing_files = list(map(lambda stat: stat.file_name, listing))
 
-            version += 1
-            x_name = f"{x_orig_path.stem}-{version}{x_orig_path.suffix}"
-            storage_path = str(x_orig_path.parent.joinpath(x_name))
+        next_version = version + 1
+        next_name = f"{orig_path.stem}{orig_path.suffix}"
 
-        self._log.info(f"Output for [{socket_name}] will be version {version}")
+        while next_name in existing_files:
+
+            storage_path = str(orig_path.parent.joinpath(next_name))
+            version = next_version
+
+            next_version = version + 1
+            next_name = f"{orig_path.stem}-{next_version}{orig_path.suffix}"
 
         return storage_path, version
 
@@ -1045,6 +1062,7 @@ class DevModeTranslator:
 
         storage_def = _meta.StorageDefinition()
         storage_def.dataItems[data_item] = storage_item
+        storage_def.layout = _meta.StorageLayout.DEVELOPER_LAYOUT
 
         if storage_format.lower() == "csv":
             storage_def.storageOptions["lenient_csv_parser"] = _types.MetadataCodec.encode_value(True)
