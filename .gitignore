@@ -41,6 +41,7 @@
 /examples/models/python/data/primary/**
 /examples/models/python/data/generated/**
 /examples/models/python/data/exports/**
+/examples/models/python/data/Dev Outputs/**
 !/examples/models/python/data/exports/.keep
 /examples/apps/javascript/node_modules/**
 
