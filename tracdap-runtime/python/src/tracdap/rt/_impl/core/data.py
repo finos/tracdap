@@ -454,7 +454,7 @@ class DevelopmentLayout(BaseLayout):
         return _meta.StorageLayout.DEVELOPER_LAYOUT
 
     def _data_storage_path(
-            self, data_id, context_key,
+            self, data_id, context_key, trac_schema,
             part_key, snap_index, delta_index,
             storage_format, prior_copy):
 
