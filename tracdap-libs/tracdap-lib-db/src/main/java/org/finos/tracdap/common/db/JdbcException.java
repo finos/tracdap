@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.metadata.dal.jdbc;
+package org.finos.tracdap.common.db;
 
 import java.sql.SQLException;
 
@@ -24,7 +24,7 @@ public class JdbcException extends SQLException {
 
     public static final String SYNTHETIC_ERROR = "SYNTHETIC_ERROR";
 
-    JdbcException(JdbcErrorCode errorCode) {
+    public JdbcException(JdbcErrorCode errorCode) {
         super(errorCode.name(), SYNTHETIC_ERROR, errorCode.ordinal());
     }
 }
