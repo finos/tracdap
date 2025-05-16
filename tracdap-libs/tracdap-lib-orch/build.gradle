@@ -31,6 +31,8 @@ dependencies {
     api project(':tracdap-api-services')
     api project(':tracdap-lib-common')
 
+    implementation project(':tracdap-lib-db')
+
     testImplementation project(':tracdap-lib-test')
 }
 
