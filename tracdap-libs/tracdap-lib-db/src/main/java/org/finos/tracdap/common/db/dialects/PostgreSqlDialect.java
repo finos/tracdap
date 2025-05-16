@@ -15,14 +15,13 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.metadata.dal.jdbc.dialects;
+package org.finos.tracdap.common.db.dialects;
 
 import org.finos.tracdap.common.db.JdbcDialect;
-import org.finos.tracdap.common.metadata.dal.jdbc.JdbcErrorCode;
+import org.finos.tracdap.common.db.JdbcErrorCode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Types;
 import java.util.Map;
@@ -34,16 +33,7 @@ public class PostgreSqlDialect extends Dialect {
             Map.entry(23505, JdbcErrorCode.INSERT_DUPLICATE),
             Map.entry(23503, JdbcErrorCode.INSERT_MISSING_FK));
 
-    private static final String CREATE_KEY_MAPPING_FILE = "jdbc/postgresql/key_mapping.ddl";
-    private static final String MAPPING_TABLE_NAME = "key_mapping";
-
     private final Logger log = LoggerFactory.getLogger(getClass());
-    private final String createKeyMapping;
-
-    PostgreSqlDialect() {
-
-        createKeyMapping = loadKeyMappingDdl(CREATE_KEY_MAPPING_FILE);
-    }
 
     @Override
     public JdbcDialect dialectCode() {
@@ -60,22 +50,9 @@ public class PostgreSqlDialect extends Dialect {
             return dialectErrorCodes.getOrDefault(errorCode, JdbcErrorCode.UNKNOWN_ERROR_CODE);
         }
         catch (NumberFormatException e) {
-            log.error("PostgreSQL error state is not an integer error code: [{}]", errorCodeString);
+            log.error("Postgresql error state is not an integer error code: [{}]", errorCodeString);
             return JdbcErrorCode.UNKNOWN_ERROR_CODE;
         }
-    }
-    @Override
-    public void prepareMappingTable(Connection conn) throws SQLException {
-
-        // Postgres temporary table uses "on commit drop" so no need to drop explicitly
-        try (var stmt = conn.createStatement()) {
-            stmt.execute(createKeyMapping);
-        }
-    }
-
-    @Override
-    public String mappingTableName() {
-        return MAPPING_TABLE_NAME;
     }
 
     @Override

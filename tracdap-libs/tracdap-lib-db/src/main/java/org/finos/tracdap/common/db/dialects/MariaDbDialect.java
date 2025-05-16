@@ -15,26 +15,23 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.metadata.dal.jdbc.dialects;
+package org.finos.tracdap.common.db.dialects;
 
 import org.finos.tracdap.common.db.JdbcDialect;
-import org.finos.tracdap.common.metadata.dal.jdbc.JdbcErrorCode;
-
-import java.sql.Connection;
-import java.sql.SQLException;
 
 
-public interface IDialect {
+public class MariaDbDialect extends MySqlDialect {
 
-    JdbcDialect dialectCode();
+    // MariaDB dialect is based on the MySQL dialect.
+    // Error codes are the same as MySQL so those can be reused.
 
-    JdbcErrorCode mapErrorCode(SQLException e);
+    // It is also important to use the correct connectors for MySQL / MariaDB as
+    // there are differences in the binary protocol. E.g. sub-second precision in
+    // timestamps is implemented differently, using the wrong driver will truncate
+    // fractional parts of a second.
 
-    void prepareMappingTable(Connection conn) throws SQLException;
-
-    String mappingTableName();
-
-    boolean supportsGeneratedKeys();
-
-    int booleanType();
+    @Override
+    public JdbcDialect dialectCode() {
+        return JdbcDialect.MARIADB;
+    }
 }

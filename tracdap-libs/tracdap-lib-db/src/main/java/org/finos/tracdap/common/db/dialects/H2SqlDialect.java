@@ -15,32 +15,39 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.metadata.dal.jdbc.dialects;
+package org.finos.tracdap.common.db.dialects;
 
 import org.finos.tracdap.common.db.JdbcDialect;
+import org.finos.tracdap.common.db.JdbcErrorCode;
+
+import java.sql.SQLException;
+import java.sql.Types;
+import java.util.Map;
 
 
-public class MariaDbDialect extends MySqlDialect {
+public class H2SqlDialect extends Dialect {
 
-    // MariaDB dialect is based on the MySQL dialect.
-
-    // MariaDB has a few differences that necessitate having separate DDL files.
-    // This includes a separate DDL for the key mapping table. Error codes are
-    // the same as MySQL so those can be reused.
-
-    // It is also important to use the correct connectors for MySQL / MariaDB as
-    // there are differences in the binary protocol. E.g. sub-second precision in
-    // timestamps is implemented differently, using the wrong driver will truncate
-    // fractional parts of a second.
-
-    private static final String CREATE_KEY_MAPPING_FILE = "jdbc/mariadb/key_mapping.ddl";
-
-    MariaDbDialect() {
-        super(CREATE_KEY_MAPPING_FILE);
-    }
+    private static final Map<Integer, JdbcErrorCode> dialectErrorCodes = Map.ofEntries(
+            Map.entry(23505, JdbcErrorCode.INSERT_DUPLICATE),
+            Map.entry(1452, JdbcErrorCode.INSERT_MISSING_FK));
 
     @Override
     public JdbcDialect dialectCode() {
-        return JdbcDialect.MARIADB;
+        return JdbcDialect.H2;
+    }
+
+    @Override
+    public JdbcErrorCode mapDialectErrorCode(SQLException error) {
+        return dialectErrorCodes.getOrDefault(error.getErrorCode(), JdbcErrorCode.UNKNOWN_ERROR_CODE);
+    }
+
+    @Override
+    public boolean supportsGeneratedKeys() {
+        return true;
+    }
+
+    @Override
+    public int booleanType() {
+        return Types.BOOLEAN;
     }
 }

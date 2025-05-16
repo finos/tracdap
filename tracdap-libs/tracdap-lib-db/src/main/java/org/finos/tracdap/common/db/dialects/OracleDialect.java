@@ -15,61 +15,29 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.metadata.dal.jdbc.dialects;
+package org.finos.tracdap.common.db.dialects;
 
 import org.finos.tracdap.common.db.JdbcDialect;
-import org.finos.tracdap.common.metadata.dal.jdbc.JdbcErrorCode;
+import org.finos.tracdap.common.db.JdbcErrorCode;
 
-import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Types;
 import java.util.Map;
 
-
-public class MySqlDialect extends Dialect {
+public class OracleDialect extends Dialect {
 
     private static final Map<Integer, JdbcErrorCode> dialectErrorCodes = Map.ofEntries(
-            Map.entry(1062, JdbcErrorCode.INSERT_DUPLICATE),
-            Map.entry(1452, JdbcErrorCode.INSERT_MISSING_FK));
-
-    private static final String DROP_KEY_MAPPING_DDL = "drop temporary table if exists key_mapping;";
-    private static final String CREATE_KEY_MAPPING_FILE = "jdbc/mysql/key_mapping.ddl";
-    private static final String MAPPING_TABLE_NAME = "key_mapping";
-
-    private final String createKeyMapping;
-
-    MySqlDialect() {
-
-        this(CREATE_KEY_MAPPING_FILE);
-    }
-
-    protected MySqlDialect(String keyMappingDdl) {
-
-        createKeyMapping = loadKeyMappingDdl(keyMappingDdl);
-    }
+            Map.entry(1, JdbcErrorCode.INSERT_DUPLICATE),  // ORA-00001: unique constraint violated
+            Map.entry(2291, JdbcErrorCode.INSERT_MISSING_FK));  // ORA-02291: integrity constraint violated - parent key not found
 
     @Override
     public JdbcDialect dialectCode() {
-        return JdbcDialect.MYSQL;
+        return JdbcDialect.ORACLE;
     }
 
     @Override
     public JdbcErrorCode mapDialectErrorCode(SQLException error) {
         return dialectErrorCodes.getOrDefault(error.getErrorCode(), JdbcErrorCode.UNKNOWN_ERROR_CODE);
-    }
-
-    @Override
-    public void prepareMappingTable(Connection conn) throws SQLException {
-
-        try (var stmt = conn.createStatement()) {
-            stmt.execute(DROP_KEY_MAPPING_DDL);
-            stmt.execute(createKeyMapping);
-        }
-    }
-
-    @Override
-    public String mappingTableName() {
-        return MAPPING_TABLE_NAME;
     }
 
     @Override
@@ -79,6 +47,7 @@ public class MySqlDialect extends Dialect {
 
     @Override
     public int booleanType() {
-        return Types.BOOLEAN;
+        // Oracle does not have a BOOLEAN type, we use NUMBER(1) with true = 1, false = 0
+        return Types.NUMERIC;
     }
 }

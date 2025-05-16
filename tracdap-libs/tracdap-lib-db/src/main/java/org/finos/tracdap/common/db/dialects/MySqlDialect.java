@@ -15,42 +15,30 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.metadata.dal.jdbc.dialects;
+package org.finos.tracdap.common.db.dialects;
 
 import org.finos.tracdap.common.db.JdbcDialect;
-import org.finos.tracdap.common.metadata.dal.jdbc.JdbcErrorCode;
+import org.finos.tracdap.common.db.JdbcErrorCode;
 
-import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Types;
 import java.util.Map;
 
-public class OracleDialect extends Dialect {
+
+public class MySqlDialect extends Dialect {
 
     private static final Map<Integer, JdbcErrorCode> dialectErrorCodes = Map.ofEntries(
-            Map.entry(1, JdbcErrorCode.INSERT_DUPLICATE),  // ORA-00001: unique constraint violated
-            Map.entry(2291, JdbcErrorCode.INSERT_MISSING_FK));  // ORA-02291: integrity constraint violated - parent key not found
-
-    private static final String MAPPING_TABLE_NAME = "key_mapping";
+            Map.entry(1062, JdbcErrorCode.INSERT_DUPLICATE),
+            Map.entry(1452, JdbcErrorCode.INSERT_MISSING_FK));
 
     @Override
     public JdbcDialect dialectCode() {
-        return JdbcDialect.ORACLE;
+        return JdbcDialect.MYSQL;
     }
 
     @Override
     public JdbcErrorCode mapDialectErrorCode(SQLException error) {
         return dialectErrorCodes.getOrDefault(error.getErrorCode(), JdbcErrorCode.UNKNOWN_ERROR_CODE);
-    }
-
-    @Override
-    public void prepareMappingTable(Connection conn) {
-        // NO-OP, global temporary table deployed as part of Oracle schema
-    }
-
-    @Override
-    public String mappingTableName() {
-        return MAPPING_TABLE_NAME;
     }
 
     @Override
@@ -60,7 +48,6 @@ public class OracleDialect extends Dialect {
 
     @Override
     public int booleanType() {
-        // Oracle does not have a BOOLEAN type, we use NUMBER(1) with true = 1, false = 0
-        return Types.NUMERIC;
+        return Types.BOOLEAN;
     }
 }

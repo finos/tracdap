@@ -15,12 +15,11 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.metadata.dal.jdbc.dialects;
+package org.finos.tracdap.common.db.dialects;
 
 import org.finos.tracdap.common.db.JdbcDialect;
-import org.finos.tracdap.common.metadata.dal.jdbc.JdbcErrorCode;
+import org.finos.tracdap.common.db.JdbcErrorCode;
 
-import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Types;
 import java.util.Map;
@@ -33,17 +32,6 @@ public class SqlServerDialect extends Dialect {
             Map.entry(2627, JdbcErrorCode.INSERT_DUPLICATE),
             Map.entry(547, JdbcErrorCode.INSERT_MISSING_FK));
 
-    private static final String DROP_KEY_MAPPING_DDL = "drop table if exists #key_mapping;";
-    private static final String CREATE_KEY_MAPPING_FILE = "jdbc/sqlserver/key_mapping.ddl";
-    private static final String MAPPING_TABLE_NAME = "#key_mapping";
-
-    private final String createKeyMapping;
-
-    SqlServerDialect() {
-
-        createKeyMapping = loadKeyMappingDdl(CREATE_KEY_MAPPING_FILE);
-    }
-
     @Override
     public JdbcDialect dialectCode() {
         return JdbcDialect.SQLSERVER;
@@ -52,20 +40,6 @@ public class SqlServerDialect extends Dialect {
     @Override
     public JdbcErrorCode mapDialectErrorCode(SQLException error) {
         return dialectErrorCodes.getOrDefault(error.getErrorCode(), JdbcErrorCode.UNKNOWN_ERROR_CODE);
-    }
-
-    @Override
-    public void prepareMappingTable(Connection conn) throws SQLException {
-
-        try (var stmt = conn.createStatement()) {
-            stmt.execute(DROP_KEY_MAPPING_DDL);
-            stmt.execute(createKeyMapping);
-        }
-    }
-
-    @Override
-    public String mappingTableName() {
-        return MAPPING_TABLE_NAME;
     }
 
     @Override

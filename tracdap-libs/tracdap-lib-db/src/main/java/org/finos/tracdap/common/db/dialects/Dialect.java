@@ -15,17 +15,13 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.metadata.dal.jdbc.dialects;
+package org.finos.tracdap.common.db.dialects;
 
 import org.finos.tracdap.common.db.JdbcDialect;
-import org.finos.tracdap.common.metadata.dal.jdbc.JdbcErrorCode;
-import org.finos.tracdap.common.metadata.dal.jdbc.JdbcException;
+import org.finos.tracdap.common.db.JdbcErrorCode;
+import org.finos.tracdap.common.db.JdbcException;
 import org.finos.tracdap.common.exception.EStartup;
-import org.finos.tracdap.common.exception.ETracInternal;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
 import java.sql.SQLException;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -38,23 +34,28 @@ public abstract class Dialect implements IDialect {
 
         switch (dialect) {
 
-            case H2: return new H2SqlDialect();
-            case MYSQL: return new MySqlDialect();
-            case MARIADB: return new MariaDbDialect();
-            case POSTGRESQL: return new PostgreSqlDialect();
-            case SQLSERVER: return new SqlServerDialect();
-            case ORACLE: return new OracleDialect();
+            case H2:
+                return new H2SqlDialect();
+            case MYSQL:
+                return new MySqlDialect();
+            case MARIADB:
+                return new MariaDbDialect();
+            case POSTGRESQL:
+                return new PostgreSqlDialect();
+            case SQLSERVER:
+                return new SqlServerDialect();
+            case ORACLE:
+                return new OracleDialect();
 
-            default: throw new EStartup("Unsupported JDBC dialect: " + dialect.name());
+            default:
+                throw new EStartup("Unsupported JDBC dialect: " + dialect.name());
         }
     }
-
 
     // Generate error mappings for all synthetic error codes
     private static final Map<Integer, JdbcErrorCode> syntheticErrorCodes = Stream
             .of(JdbcErrorCode.values())
             .collect(Collectors.toMap(Enum::ordinal, error -> error));
-
 
     @Override
     public final JdbcErrorCode mapErrorCode(SQLException error) {
@@ -66,26 +67,4 @@ public abstract class Dialect implements IDialect {
     }
 
     protected abstract JdbcErrorCode mapDialectErrorCode(SQLException error);
-
-
-    protected String loadKeyMappingDdl(String keyMappingDdl) {
-
-        var classLoader = getClass().getClassLoader();
-
-        try (var stream = classLoader.getResourceAsStream(keyMappingDdl)) {
-
-            if (stream == null) {
-                var message = String.format("Internal startup error (DAL, JDBC, %s - missing DDL resource for key mapping", dialectCode());
-                throw new ETracInternal(message);
-            }
-
-            try (var rawReader = new InputStreamReader(stream); var reader = new BufferedReader(rawReader)) {
-                return reader.lines().collect(Collectors.joining(System.lineSeparator()));
-            }
-        }
-        catch (IOException e) {
-            var message = String.format("Internal startup error (DAL, JDBC, %s - error preparing DDL resource for key mapping", dialectCode());
-            throw new ETracInternal(message);
-        }
-    }
 }
