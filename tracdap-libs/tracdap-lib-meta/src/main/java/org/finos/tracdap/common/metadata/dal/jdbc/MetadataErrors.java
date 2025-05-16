@@ -17,8 +17,9 @@
 
 package org.finos.tracdap.common.metadata.dal.jdbc;
 
+import org.finos.tracdap.common.db.JdbcErrorCode;
+import org.finos.tracdap.common.db.dialects.IDialect;
 import org.finos.tracdap.common.exception.ETracInternal;
-import org.finos.tracdap.common.metadata.dal.jdbc.dialects.IDialect;
 import org.finos.tracdap.common.exception.EMetadataDuplicate;
 import org.finos.tracdap.common.exception.EMetadataNotFound;
 import org.finos.tracdap.common.exception.EMetadataWrongType;
@@ -27,7 +28,7 @@ import java.sql.SQLException;
 import java.text.MessageFormat;
 
 
-class JdbcError {
+class MetadataErrors {
 
     static final String MISSING_ITEM = "Metadata not found for {0} [{1}] (version = {2}, tag = {3})";
     static final String MISSING_ITEM_MULTIPLE = "Metadata not found for one or more items";
@@ -115,9 +116,13 @@ class JdbcError {
 
     static void wrongObjectType(SQLException error, IDialect dialect, JdbcMetadataDal.ObjectParts parts) {
 
-        var code = dialect.mapErrorCode(error);
+        if (!(error instanceof MetadataException))
+            return;
 
-        if (code != JdbcErrorCode.WRONG_OBJECT_TYPE)
+        var metadataError = (MetadataException) error;
+        var code = metadataError.getErrorCode();
+
+        if (code != MetadataErrorCode.WRONG_OBJECT_TYPE.ordinal())
             return;
 
         if (parts.objectId.length != 1)
@@ -336,6 +341,12 @@ class JdbcError {
     }
 
     static ETracInternal catchAll(SQLException error, IDialect dialect) {
+
+        if (error instanceof MetadataException) {
+            var metadataError = (MetadataException) error;
+            var message = MessageFormat.format(UNHANDLED_ERROR, metadataError.getMessage());
+            return new ETracInternal(message, error);
+        }
 
         var code = dialect.mapErrorCode(error);
 
