@@ -17,10 +17,13 @@
 
 package org.finos.tracdap.common.metadata.dal.jdbc;
 
+
 import org.finos.tracdap.metadata.*;
-import org.finos.tracdap.common.metadata.MetadataCodec;
+import org.finos.tracdap.common.db.JdbcErrorCode;
+import org.finos.tracdap.common.db.JdbcException;
 import org.finos.tracdap.common.exception.EValidationGap;
-import org.finos.tracdap.common.metadata.dal.jdbc.JdbcBaseDal.KeyedItem;
+import org.finos.tracdap.common.metadata.MetadataCodec;
+
 import com.google.protobuf.InvalidProtocolBufferException;
 
 import java.sql.Connection;
@@ -181,7 +184,7 @@ class JdbcReadImpl {
             return new KeyedItem<>(defPk, objectVersion, objectTimestamp, defDecoded, objectIsLatest);
         }
         catch (InvalidProtocolBufferException e) {
-            throw new JdbcException(JdbcErrorCode.INVALID_OBJECT_DEFINITION);
+            throw new MetadataException(MetadataErrorCode.INVALID_OBJECT_DEFINITION);
         }
     }
 
@@ -351,7 +354,7 @@ class JdbcReadImpl {
         }
     }
 
-    public JdbcBaseDal.KeyedItem<ConfigDetails>
+    public KeyedItem<ConfigDetails>
     readConfigEntry(Connection conn, short tenantId, ConfigEntry configEntry, Instant configTimestamp, boolean includeDeleted) throws SQLException {
 
         // Explicit check for a config key with no selection criteria (no need to add to the SQL)
@@ -403,7 +406,7 @@ class JdbcReadImpl {
         }
     }
 
-    private JdbcBaseDal.KeyedItem<ConfigDetails>
+    private KeyedItem<ConfigDetails>
     fetchConfigEntry(PreparedStatement stmt) throws SQLException {
 
         try (var rs = stmt.executeQuery()) {
@@ -428,7 +431,7 @@ class JdbcReadImpl {
             return new KeyedItem<>(cfgPk, cfgVersion, cfgTimestamp, cfgDecoded, cfgIsLatest, cfgDeleted);
         }
         catch (InvalidProtocolBufferException e) {
-            throw new JdbcException(JdbcErrorCode.INVALID_CONFIG_ENTRY);
+            throw new MetadataException(MetadataErrorCode.INVALID_CONFIG_ENTRY);
         }
     }
 }

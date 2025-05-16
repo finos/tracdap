@@ -18,9 +18,11 @@
 package org.finos.tracdap.common.metadata.dal.jdbc;
 
 import org.finos.tracdap.metadata.*;
-import org.finos.tracdap.common.metadata.MetadataCodec;
+import org.finos.tracdap.common.db.JdbcErrorCode;
+import org.finos.tracdap.common.db.JdbcException;
+import org.finos.tracdap.common.db.dialects.IDialect;
 import org.finos.tracdap.common.exception.EValidationGap;
-import org.finos.tracdap.common.metadata.dal.jdbc.dialects.IDialect;
+import org.finos.tracdap.common.metadata.MetadataCodec;
 
 import com.google.protobuf.InvalidProtocolBufferException;
 
@@ -44,7 +46,7 @@ class JdbcReadBatchImpl {
         this.mappingStage = new AtomicInteger();
     }
 
-    JdbcBaseDal.KeyedItems<ObjectType>
+    KeyedItems<ObjectType>
     readObjectTypeById(Connection conn, short tenantId, UUID[] objectId) throws SQLException {
 
         var mappingStage = insertIdForMapping(conn, objectId);
@@ -59,7 +61,7 @@ class JdbcReadBatchImpl {
                 "  and km.mapping_stage = ?\n" +
                 "order by km.ordering";
 
-        query = query.replaceFirst("key_mapping", dialect.mappingTableName());
+        query = query.replaceFirst("key_mapping", JdbcDialects.mappingTableName(dialect));
 
         try (var stmt = conn.prepareStatement(query)) {
 
@@ -87,12 +89,12 @@ class JdbcReadBatchImpl {
                 if (rs.next())
                     throw new JdbcException(JdbcErrorCode.TOO_MANY_ROWS);
 
-                return new JdbcBaseDal.KeyedItems<>(keys, types);
+                return new KeyedItems<>(keys, types);
             }
         }
     }
 
-    JdbcBaseDal.KeyedItems<ObjectDefinition>
+    KeyedItems<ObjectDefinition>
     readDefinition(Connection conn, short tenantId, long[] objectFk, TagSelector[] selector) throws SQLException {
 
         var mappingStage = insertObjectSelectors(conn, objectFk, selector);
@@ -101,7 +103,7 @@ class JdbcReadBatchImpl {
         return fetchDefinition(conn, tenantId, objectFk.length, mappingStage);
     }
 
-    private JdbcBaseDal.KeyedItems<ObjectDefinition>
+    private KeyedItems<ObjectDefinition>
     fetchDefinition(
             Connection conn, short tenantId,
             int length, int mappingStage)
@@ -116,7 +118,7 @@ class JdbcReadBatchImpl {
                 "  and km.mapping_stage = ?\n" +
                 "order by km.ordering";
 
-        query = query.replaceFirst("key_mapping", dialect.mappingTableName());
+        query = query.replaceFirst("key_mapping", JdbcDialects.mappingTableName(dialect));
 
         try (var stmt = conn.prepareStatement(query)) {
 
@@ -156,16 +158,16 @@ class JdbcReadBatchImpl {
                 if (rs.next())
                     throw new JdbcException(JdbcErrorCode.TOO_MANY_ROWS);
 
-                return new JdbcBaseDal.KeyedItems<>(pks, versions, timestamps, defs, objectsIsLatest);
+                return new KeyedItems<>(pks, versions, timestamps, defs, objectsIsLatest);
             }
             catch (InvalidProtocolBufferException e) {
-                throw new JdbcException(JdbcErrorCode.INVALID_OBJECT_DEFINITION);
+                throw new MetadataException(MetadataErrorCode.INVALID_OBJECT_DEFINITION);
             }
 
         }
     }
 
-    JdbcBaseDal.KeyedItems<Tag.Builder>
+    KeyedItems<Tag.Builder>
     readTag(Connection conn, short tenantId, long[] definitionFk, TagSelector[] selector) throws SQLException {
 
         var mappingStage = insertTagSelectors(conn, definitionFk, selector);
@@ -177,7 +179,7 @@ class JdbcReadBatchImpl {
         return applyTagAttrs(tagRecords, attrs);
     }
 
-    JdbcBaseDal.KeyedItems<Tag.Builder>
+    KeyedItems<Tag.Builder>
     readTagWithHeader(Connection conn, short tenantId, long[] tagPk) throws SQLException {
 
         var mappingStage = insertPk(conn, tagPk);
@@ -190,7 +192,7 @@ class JdbcReadBatchImpl {
         return applyTagAttrs(tagRecords, partialHeaders, attrs);
     }
 
-    private JdbcBaseDal.KeyedItems<Void>
+    private KeyedItems<Void>
     fetchTagRecord(Connection conn, short tenantId, int length, int mappingStage) throws SQLException {
 
         // Tag records contain no attributes, we only need pks and versions
@@ -205,7 +207,7 @@ class JdbcReadBatchImpl {
                 "  and km.mapping_stage = ?\n" +
                 "order by km.ordering";
 
-        query = query.replaceFirst("key_mapping", dialect.mappingTableName());
+        query = query.replaceFirst("key_mapping", JdbcDialects.mappingTableName(dialect));
 
         try (var stmt = conn.prepareStatement(query)) {
 
@@ -240,12 +242,12 @@ class JdbcReadBatchImpl {
                     throw new JdbcException(JdbcErrorCode.TOO_MANY_ROWS);
 
                 // Tag record requires only PK and version info
-                return new JdbcBaseDal.KeyedItems<>(pks, versions, timestamps, null, tagsIsLatest);
+                return new KeyedItems<>(pks, versions, timestamps, null, tagsIsLatest);
             }
         }
     }
 
-    private JdbcBaseDal.KeyedItems<TagHeader>
+    private KeyedItems<TagHeader>
     fetchTagHeader(Connection conn, short tenantId, int length, int mappingStage) throws SQLException {
 
         // Data to build the full header is in the object and definition tables
@@ -274,7 +276,7 @@ class JdbcReadBatchImpl {
                 "  and km.mapping_stage = ?\n" +
                 "order by km.ordering";
 
-        query = query.replaceFirst("key_mapping", dialect.mappingTableName());
+        query = query.replaceFirst("key_mapping", JdbcDialects.mappingTableName(dialect));
 
         try (var stmt = conn.prepareStatement(query)) {
 
@@ -318,7 +320,7 @@ class JdbcReadBatchImpl {
                 if (rs.next())
                     throw new JdbcException(JdbcErrorCode.TOO_MANY_ROWS);
 
-                return new JdbcBaseDal.KeyedItems<>(pks, headers);
+                return new KeyedItems<>(pks, headers);
             }
         }
     }
@@ -340,7 +342,7 @@ class JdbcReadBatchImpl {
                 "  and km.mapping_stage = ?\n" +
                 "order by km.ordering, ta.attr_name, ta.attr_index";
 
-        query = query.replaceFirst("key_mapping", dialect.mappingTableName());
+        query = query.replaceFirst("key_mapping", JdbcDialects.mappingTableName(dialect));
 
         try (var stmt = conn.prepareStatement(query)) {
 
@@ -427,8 +429,8 @@ class JdbcReadBatchImpl {
         }
     }
 
-    private JdbcBaseDal.KeyedItems<Tag.Builder>
-    applyTagAttrs(JdbcBaseDal.KeyedItems<Void> tagRecords, Map<String, Value>[] attrs) {
+    private KeyedItems<Tag.Builder>
+    applyTagAttrs(KeyedItems<Void> tagRecords, Map<String, Value>[] attrs) {
 
         var tags = new Tag.Builder[tagRecords.keys.length];
 
@@ -438,11 +440,11 @@ class JdbcReadBatchImpl {
                     .putAllAttrs(attrs[i]);
         }
 
-        return new JdbcBaseDal.KeyedItems<>(tagRecords.keys, tagRecords.versions, tagRecords.timestamps, tags, tagRecords.isLatest);
+        return new KeyedItems<>(tagRecords.keys, tagRecords.versions, tagRecords.timestamps, tags, tagRecords.isLatest);
     }
 
-    private JdbcBaseDal.KeyedItems<Tag.Builder>
-    applyTagAttrs(JdbcBaseDal.KeyedItems<Void> tagRecords, JdbcBaseDal.KeyedItems<TagHeader> headers, Map<String, Value>[] attrs) {
+    private KeyedItems<Tag.Builder>
+    applyTagAttrs(KeyedItems<Void> tagRecords, KeyedItems<TagHeader> headers, Map<String, Value>[] attrs) {
 
         var tags = new Tag.Builder[headers.keys.length];
 
@@ -463,10 +465,10 @@ class JdbcReadBatchImpl {
                     .putAllAttrs(attrs[i]);
         }
 
-        return new JdbcBaseDal.KeyedItems<>(headers.keys, tagRecords.versions, tagRecords.timestamps, tags, tagRecords.isLatest);
+        return new KeyedItems<>(headers.keys, tagRecords.versions, tagRecords.timestamps, tags, tagRecords.isLatest);
     }
 
-    public JdbcBaseDal.KeyedItems<ConfigDetails>
+    public KeyedItems<ConfigDetails>
     readConfigEntry(Connection conn, short tenantId, ConfigEntry[] configEntry, Instant[] configTimestamp, boolean includeDeleted) throws SQLException {
 
         var mappingStage = insertConfigEntries(conn, configEntry, configTimestamp);
@@ -475,7 +477,7 @@ class JdbcReadBatchImpl {
         return fetchConfigEntry(conn, tenantId, configEntry.length, mappingStage);
     }
 
-    public JdbcBaseDal.KeyedItems<ConfigDetails>
+    public KeyedItems<ConfigDetails>
     readConfigEntry(Connection conn, short tenantId, long[] configPk) throws SQLException {
 
         var mappingStage = insertPk(conn, configPk);
@@ -483,7 +485,7 @@ class JdbcReadBatchImpl {
         return fetchConfigEntry(conn, tenantId, configPk.length, mappingStage);
     }
 
-    private JdbcBaseDal.KeyedItems<ConfigDetails>
+    private KeyedItems<ConfigDetails>
     fetchConfigEntry(Connection conn, short tenantId, int length, int mappingStage)
     throws SQLException {
 
@@ -496,7 +498,7 @@ class JdbcReadBatchImpl {
                 "  and km.mapping_stage = ?\n" +
                 "order by km.ordering";
 
-        query = query.replaceFirst("key_mapping", dialect.mappingTableName());
+        query = query.replaceFirst("key_mapping", JdbcDialects.mappingTableName(dialect));
 
         try (var stmt = conn.prepareStatement(query)) {
 
@@ -544,15 +546,15 @@ class JdbcReadBatchImpl {
                 if (rs.next())
                     throw new JdbcException(JdbcErrorCode.TOO_MANY_ROWS);
 
-                return new JdbcBaseDal.KeyedItems<>(pks, versions, timestamps, details, latest, deleted, keys);
+                return new KeyedItems<>(pks, versions, timestamps, details, latest, deleted, keys);
             }
             catch (InvalidProtocolBufferException e) {
-                throw new JdbcException(JdbcErrorCode.INVALID_CONFIG_ENTRY);
+                throw new MetadataException(MetadataErrorCode.INVALID_CONFIG_ENTRY);
             }
         }
     }
 
-    private JdbcBaseDal.KeyedItems<String>
+    private KeyedItems<String>
     fetchConfigStub(Connection conn, short tenantId, int length, int mappingStage) throws SQLException {
 
         var query =
@@ -564,7 +566,7 @@ class JdbcReadBatchImpl {
                 "  and km.mapping_stage = ?\n" +
                 "order by km.ordering";
 
-        query = query.replaceFirst("key_mapping", dialect.mappingTableName());
+        query = query.replaceFirst("key_mapping", JdbcDialects.mappingTableName(dialect));
 
         try (var stmt = conn.prepareStatement(query)) {
 
@@ -604,7 +606,7 @@ class JdbcReadBatchImpl {
                 if (rs.next())
                     throw new JdbcException(JdbcErrorCode.TOO_MANY_ROWS);
 
-                return new JdbcBaseDal.KeyedItems<>(pks, versions, timestamps, keys, latest, deleted);
+                return new KeyedItems<>(pks, versions, timestamps, keys, latest, deleted);
             }
         }
     }
@@ -660,7 +662,7 @@ class JdbcReadBatchImpl {
                 "where mapping_stage = ?\n" +
                 "order by ordering";
 
-        query = query.replaceFirst("key_mapping", dialect.mappingTableName());
+        query = query.replaceFirst("key_mapping", JdbcDialects.mappingTableName(dialect));
 
         try (var stmt = conn.prepareStatement(query)) {
 
@@ -702,7 +704,7 @@ class JdbcReadBatchImpl {
                 "insert into key_mapping (pk, mapping_stage, ordering)\n" +
                 "values (?, ?, ?)";
 
-        query = query.replaceFirst("key_mapping", dialect.mappingTableName());
+        query = query.replaceFirst("key_mapping", JdbcDialects.mappingTableName(dialect));
 
         try (var stmt = conn.prepareStatement(query)) {
 
@@ -734,7 +736,7 @@ class JdbcReadBatchImpl {
                 "insert into key_mapping (id_hi, id_lo, mapping_stage, ordering)\n" +
                 "values (?, ?, ?, ?)";
 
-        query = query.replaceFirst("key_mapping", dialect.mappingTableName());
+        query = query.replaceFirst("key_mapping", JdbcDialects.mappingTableName(dialect));
 
         try (var stmt = conn.prepareStatement(query)) {
 
@@ -768,7 +770,7 @@ class JdbcReadBatchImpl {
                 "  and oid.object_id_lo = key_mapping.id_lo)\n" +
                 "where mapping_stage = ?";
 
-        query = query.replaceAll("key_mapping", dialect.mappingTableName());
+        query = query.replaceAll("key_mapping", JdbcDialects.mappingTableName(dialect));
 
         try (var stmt = conn.prepareStatement(query))  {
 
@@ -791,7 +793,7 @@ class JdbcReadBatchImpl {
                 "  mapping_stage, ordering)\n" +
                 "values (?, ?, ?, ?, ?, ?)";
 
-        query = query.replaceFirst("key_mapping", dialect.mappingTableName());
+        query = query.replaceFirst("key_mapping", JdbcDialects.mappingTableName(dialect));
 
         try (var stmt = conn.prepareStatement(query)) {
 
@@ -852,7 +854,7 @@ class JdbcReadBatchImpl {
                 "    (key_mapping.is_latest is not null and def.object_is_latest = key_mapping.is_latest)))\n" +
                 "where mapping_stage = ?";
 
-        query = query.replaceAll("key_mapping", dialect.mappingTableName());
+        query = query.replaceAll("key_mapping", JdbcDialects.mappingTableName(dialect));
 
         try (var stmt = conn.prepareStatement(query)) {
 
@@ -875,7 +877,7 @@ class JdbcReadBatchImpl {
                 "  mapping_stage, ordering)\n" +
                 "values (?, ?, ?, ?, ?, ?)";
 
-        query = query.replaceFirst("key_mapping", dialect.mappingTableName());
+        query = query.replaceFirst("key_mapping", JdbcDialects.mappingTableName(dialect));
 
         try (var stmt = conn.prepareStatement(query)) {
 
@@ -936,7 +938,7 @@ class JdbcReadBatchImpl {
                 "    (key_mapping.is_latest is not null and tag.tag_is_latest = key_mapping.is_latest)))\n" +
                 "where mapping_stage = ?";
 
-        query = query.replaceAll("key_mapping", dialect.mappingTableName());
+        query = query.replaceAll("key_mapping", JdbcDialects.mappingTableName(dialect));
 
         try (var stmt = conn.prepareStatement(query)) {
 
@@ -955,7 +957,7 @@ class JdbcReadBatchImpl {
         var query = "insert into key_mapping (fk, ver, mapping_stage, ordering)\n" +
                 "values (?, ?, ?, ?)";
 
-        query = query.replaceFirst("key_mapping", dialect.mappingTableName());
+        query = query.replaceFirst("key_mapping", JdbcDialects.mappingTableName(dialect));
 
         try (var stmt = conn.prepareStatement(query)) {
 
@@ -990,7 +992,7 @@ class JdbcReadBatchImpl {
                 "  and def.object_version = key_mapping.ver)\n" +
                 "where mapping_stage = ?";
 
-        query = query.replaceAll("key_mapping", dialect.mappingTableName());
+        query = query.replaceAll("key_mapping", JdbcDialects.mappingTableName(dialect));
 
         try (var stmt = conn.prepareStatement(query))  {
 
@@ -1011,7 +1013,7 @@ class JdbcReadBatchImpl {
                 "  and tag.tag_version = key_mapping.ver)\n" +
                 "where mapping_stage = ?";
 
-        query = query.replaceAll("key_mapping", dialect.mappingTableName());
+        query = query.replaceAll("key_mapping", JdbcDialects.mappingTableName(dialect));
 
         try (var stmt = conn.prepareStatement(query))  {
 
@@ -1044,7 +1046,7 @@ class JdbcReadBatchImpl {
                 "  and t2.tag_pk = key_mapping.pk)\n" +
                 "where mapping_stage = ?";
 
-        query = query.replaceAll("key_mapping", dialect.mappingTableName());
+        query = query.replaceAll("key_mapping", JdbcDialects.mappingTableName(dialect));
 
         try (var stmt = conn.prepareStatement(query)) {
 
@@ -1067,7 +1069,7 @@ class JdbcReadBatchImpl {
                 "  mapping_stage, ordering)\n" +
                 "values (?, ?, ?, ?, ?, ?, ?)";
 
-        query = query.replaceFirst("key_mapping", dialect.mappingTableName());
+        query = query.replaceFirst("key_mapping", JdbcDialects.mappingTableName(dialect));
 
         try (var stmt = conn.prepareStatement(query)) {
 
@@ -1140,7 +1142,7 @@ class JdbcReadBatchImpl {
 
                 "where mapping_stage = ?";
 
-        query = query.replaceAll("key_mapping", dialect.mappingTableName());
+        query = query.replaceAll("key_mapping", JdbcDialects.mappingTableName(dialect));
 
         try (var stmt = conn.prepareStatement(query))  {
 
@@ -1172,7 +1174,7 @@ class JdbcReadBatchImpl {
 
                 "where mapping_stage = ?";
 
-        query = query.replaceAll("key_mapping", dialect.mappingTableName());
+        query = query.replaceAll("key_mapping", JdbcDialects.mappingTableName(dialect));
 
         try (var stmt = conn.prepareStatement(query))  {
 
