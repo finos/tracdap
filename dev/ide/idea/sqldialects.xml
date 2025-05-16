@@ -1,12 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="SqlDialectMappings">
-    <file url="file://$PROJECT_DIR$/tracdap-libs/tracdap-lib-meta/src/main/java/org/finos/tracdap/common/metadata/dal/jdbc/dialects/H2SqlDialect.java" dialect="H2" />
-    <file url="file://$PROJECT_DIR$/tracdap-libs/tracdap-lib-meta/src/main/java/org/finos/tracdap/common/metadata/dal/jdbc/dialects/MariaDbDialect.java" dialect="MariaDB" />
-    <file url="file://$PROJECT_DIR$/tracdap-libs/tracdap-lib-meta/src/main/java/org/finos/tracdap/common/metadata/dal/jdbc/dialects/MySqlDialect.java" dialect="MySQL" />
-    <file url="file://$PROJECT_DIR$/tracdap-libs/tracdap-lib-meta/src/main/java/org/finos/tracdap/common/metadata/dal/jdbc/dialects/OracleDialect.java" dialect="Oracle" />
-    <file url="file://$PROJECT_DIR$/tracdap-libs/tracdap-lib-meta/src/main/java/org/finos/tracdap/common/metadata/dal/jdbc/dialects/PostgreSqlDialect.java" dialect="PostgreSQL" />
-    <file url="file://$PROJECT_DIR$/tracdap-libs/tracdap-lib-meta/src/main/java/org/finos/tracdap/common/metadata/dal/jdbc/dialects/SqlServerDialect.java" dialect="TSQL" />
     <file url="file://$PROJECT_DIR$/tracdap-libs/tracdap-lib-meta/src/main/resources/jdbc/h2" dialect="H2" />
     <file url="file://$PROJECT_DIR$/tracdap-libs/tracdap-lib-meta/src/main/resources/jdbc/mariadb" dialect="MariaDB" />
     <file url="file://$PROJECT_DIR$/tracdap-libs/tracdap-lib-meta/src/main/resources/jdbc/mysql" dialect="MySQL" />
