@@ -24,7 +24,7 @@ apply from: "${rootProject.projectDir.path}/gradle/functions.gradle"
 apply from: "${rootProject.projectDir.path}/gradle/plugins.gradle"
 
 
-description = "Deploy tool for the TRAC D.A.P. metadata store (SQL backend)"
+description = "Deploy tools for the TRAC D.A.P. (SQL components)"
 
 // Put tools into a separate package group
 group = "org.finos.tracdap.tools"
@@ -53,6 +53,7 @@ ext.enableBuildTimePlugins(["sql"], ext.OPTIONAL)
 processResources {
 
     from "${project(':tracdap-lib-meta').projectDir.path}/src/schema"
+    from "${project(':tracdap-lib-orch').projectDir.path}/src/schema"
 }
 
 distributions {

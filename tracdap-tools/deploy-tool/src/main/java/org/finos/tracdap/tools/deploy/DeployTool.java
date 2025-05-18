@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.tools.deploy.metadb;
+package org.finos.tracdap.tools.deploy;
 
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.exception.ETracPublic;
@@ -37,10 +37,13 @@ import java.util.List;
 /**
  * Deployment tool to manage the TRAC metadata database
  */
-public class DeployMetaDB {
+public class DeployTool {
 
     /** Task name for deploying the schema **/
     public final static String DEPLOY_SCHEMA_TASK = "deploy_schema";
+
+    /** Task name for deploying the job cache schema **/
+    public final static String DEPLOY_CACHE_SCHEMA_TASK = "deploy_cache_schema";
 
     /** Task name for adding a tenant **/
     public final static String ADD_TENANT_TASK = "add_tenant";
@@ -50,8 +53,11 @@ public class DeployMetaDB {
 
     private final static String SCHEMA_LOCATION = "classpath:%s/rollout";
 
+    private final static String CACHE_SCHEMA_LOCATION = "classpath:cache/%s/rollout";
+
     private final static List<StandardArgs.Task> METADB_TASKS = List.of(
             StandardArgs.task(DEPLOY_SCHEMA_TASK, "Deploy/update metadata database with the latest physical schema"),
+            StandardArgs.task(DEPLOY_CACHE_SCHEMA_TASK, "Deploy/update job cache database with the latest physical schema"),
             StandardArgs.task(ADD_TENANT_TASK, List.of("CODE", "DESCRIPTION"), "Add a new tenant to the metadata database"),
             StandardArgs.task(ALTER_TENANT_TASK, List.of("CODE", "DESCRIPTION"), "Alter the description for an existing tenant"));
 
@@ -63,7 +69,7 @@ public class DeployMetaDB {
      *
      * @param configManager A prepared instance of ConfigManager
      */
-    public DeployMetaDB(ConfigManager configManager) {
+    public DeployTool(ConfigManager configManager) {
 
         this.log = LoggerFactory.getLogger(getClass());
         this.configManager = configManager;
@@ -86,8 +92,11 @@ public class DeployMetaDB {
         // Pick up DB deploy scripts depending on the SQL dialect
         var scriptsLocation = String.format(SCHEMA_LOCATION, dialect.name().toLowerCase());
 
+        var cacheScriptsLocation = String.format(CACHE_SCHEMA_LOCATION, dialect.name().toLowerCase());
+
         log.info("SQL Dialect: " + dialect);
         log.info("Scripts location: " + scriptsLocation);
+        log.info("Cache scripts location: " + scriptsLocation);
 
         try {
 
@@ -95,6 +104,9 @@ public class DeployMetaDB {
 
                 if (DEPLOY_SCHEMA_TASK.equals(task.getTaskName()))
                     deploySchema(dataSource, scriptsLocation);
+
+                if (DEPLOY_CACHE_SCHEMA_TASK.equals(task.getTaskName()))
+                    deployCacheSchema(dataSource, cacheScriptsLocation);
 
                 else if (ADD_TENANT_TASK.equals(task.getTaskName()))
                     addTenant(dataSource, task.getTaskArg(0), task.getTaskArg(1));
@@ -121,6 +133,20 @@ public class DeployMetaDB {
         var flyway = Flyway.configure()
                 .dataSource(dataSource)
                 .locations(scriptsLocation)
+                .sqlMigrationPrefix("")
+                .sqlMigrationSuffixes(".sql", ".ddl", ".dml")
+                .load();
+
+        flyway.migrate();
+    }
+
+    private void deployCacheSchema(DataSource dataSource, String cacheScriptsLocation) {
+
+        log.info("Running task: Deploy cache schema...");
+
+        var flyway = Flyway.configure()
+                .dataSource(dataSource)
+                .locations(cacheScriptsLocation)
                 .sqlMigrationPrefix("")
                 .sqlMigrationSuffixes(".sql", ".ddl", ".dml")
                 .load();
@@ -214,13 +240,13 @@ public class DeployMetaDB {
 
         try {
 
-            var startup = Startup.useCommandLine(DeployMetaDB.class, args, METADB_TASKS);
+            var startup = Startup.useCommandLine(DeployTool.class, args, METADB_TASKS);
             startup.runStartupSequence();
 
             var config = startup.getConfig();
             var tasks = startup.getArgs().getTasks();
 
-            var deploy = new DeployMetaDB(config);
+            var deploy = new DeployTool(config);
             deploy.runDeployment(tasks);
 
             System.exit(0);
