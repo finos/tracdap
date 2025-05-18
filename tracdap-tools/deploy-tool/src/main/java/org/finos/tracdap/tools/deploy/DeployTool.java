@@ -18,6 +18,7 @@
 package org.finos.tracdap.tools.deploy;
 
 import org.finos.tracdap.common.config.ConfigManager;
+import org.finos.tracdap.common.db.JdbcDialect;
 import org.finos.tracdap.common.exception.ETracPublic;
 import org.finos.tracdap.common.startup.StandardArgs;
 import org.finos.tracdap.common.db.JdbcSetup;
@@ -90,8 +91,14 @@ public class DeployTool {
         var scriptsLocation = String.format(SCHEMA_LOCATION, metadDbDialect.name().toLowerCase());
 
         var cacheConfig = platformConfig.getJobCache();
-        var cacheDialect = JdbcSetup.getSqlDialect(cacheConfig);
-        var cacheScriptsLocation = String.format(CACHE_SCHEMA_LOCATION, cacheDialect.name().toLowerCase());
+        String cacheScriptsLocation;
+        if (cacheConfig.getProtocol().equals("SQL") || cacheConfig.getProtocol().equals("JDBC")) {
+            var cacheDialect = JdbcSetup.getSqlDialect(cacheConfig);
+            cacheScriptsLocation = String.format(CACHE_SCHEMA_LOCATION, cacheDialect.name().toLowerCase());
+        }
+        else {
+            cacheScriptsLocation = null;
+        }
 
         DataSource metadbSource = null;
         DataSource cacheSource = null;
