@@ -81,8 +81,8 @@ jobs:
           sed -i "s#/path/to#${deploy_dir}#g" etc/trac-platform.yaml
           
           bin/secret-tool run --task init_secrets
-          bin/deploy-metadb run --task deploy_schema
-          bin/deploy-metadb run --task add_tenant ACME_CORP "ACME Rockets always get the Coyote!"
+          bin/deploy-tool run --task deploy_schema
+          bin/deploy-tool run --task add_tenant ACME_CORP "ACME Rockets always get the Coyote!"
 
       - name: Platform - Start
         run: |
