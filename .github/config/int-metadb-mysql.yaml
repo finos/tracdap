@@ -38,6 +38,17 @@ metadata:
     secrets:
       mysql.password: metadb_secret
 
+jobCache:
+  protocol: JDBC
+  properties:
+    dialect: MYSQL
+    jdbcUrl: //metadb:3306/trac
+    mysql.user: trac_admin
+    pool.size: 2
+    pool.overflow: 5
+  secrets:
+    mysql.password: metadb_secret
+
 services:
 
   metadata:

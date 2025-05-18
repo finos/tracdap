@@ -18,8 +18,10 @@
 package org.finos.tracdap.common.orch;
 
 import org.finos.tracdap.common.cache.IJobCacheManager;
+import org.finos.tracdap.common.cache.jdbc.JdbcJobCacheManager;
 import org.finos.tracdap.common.cache.local.LocalJobCacheManager;
 import org.finos.tracdap.common.config.ConfigManager;
+import org.finos.tracdap.common.db.JdbcSetup;
 import org.finos.tracdap.common.exception.EPluginNotAvailable;
 import org.finos.tracdap.common.exec.IBatchExecutor;
 import org.finos.tracdap.common.exec.local.LocalBatchExecutor;
@@ -36,10 +38,12 @@ public class CoreOrchestratorPlugin extends TracPlugin {
 
     private static final String LOCAL_EXECUTOR_NAME = "LOCAL_EXECUTOR";
     private static final String LOCAL_JOB_CACHE_NAME = "LOCAL_JOB_CACHE";
+    private static final String JDBC_JOB_CACHE_NAME = "JDBC_JIB_CACHE";
 
     private static final List<PluginServiceInfo> psi = List.of(
             new PluginServiceInfo(IBatchExecutor.class, LOCAL_EXECUTOR_NAME, List.of("LOCAL")),
-            new PluginServiceInfo(IJobCacheManager.class, LOCAL_JOB_CACHE_NAME, List.of("LOCAL")));
+            new PluginServiceInfo(IJobCacheManager.class, LOCAL_JOB_CACHE_NAME, List.of("LOCAL")),
+            new PluginServiceInfo(IJobCacheManager.class, JDBC_JOB_CACHE_NAME, List.of("JDBC", "SQL")));
 
 
     @Override
@@ -57,8 +61,18 @@ public class CoreOrchestratorPlugin extends TracPlugin {
 
         switch (serviceName) {
 
-            case LOCAL_EXECUTOR_NAME: return (T) new LocalBatchExecutor(properties);
-            case LOCAL_JOB_CACHE_NAME: return (T) new LocalJobCacheManager();
+            case LOCAL_EXECUTOR_NAME:
+                return (T) new LocalBatchExecutor(properties);
+
+            case LOCAL_JOB_CACHE_NAME:
+                return (T) new LocalJobCacheManager();
+
+            case JDBC_JOB_CACHE_NAME:
+
+                var dialect = JdbcSetup.getSqlDialect(properties);
+                var datasource = JdbcSetup.createDatasource(properties);
+
+                return (T) new JdbcJobCacheManager(datasource, dialect);
 
             default:
 

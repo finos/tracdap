@@ -17,6 +17,7 @@
 
 package org.finos.tracdap.common.metadata.dal.jdbc;
 
+import org.finos.tracdap.common.db.JdbcBaseDal;
 import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.common.db.JdbcDialect;
 import org.finos.tracdap.common.db.JdbcSetup;
@@ -91,6 +92,10 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
     public List<TenantInfo> listTenants() {
 
         return wrapTransaction(tenants::listTenants);
+    }
+
+    void prepareMappingTable(Connection conn) throws SQLException {
+        JdbcDialects.prepareMappingTable(conn, dialect);
     }
 
 
@@ -186,9 +191,9 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
         }
         catch (SQLException error) {
 
-            JdbcError.duplicateObjectId(error, dialect, parts);
+            MetadataErrors.duplicateObjectId(error, dialect, parts);
 
-            throw JdbcError.catchAll(error, dialect);
+            throw MetadataErrors.catchAll(error, dialect);
         }
     }
 
@@ -209,11 +214,11 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
         }
         catch (SQLException error) {
 
-            JdbcError.idNotPreallocated(error, dialect, parts);
-            JdbcError.idAlreadyInUse(error, dialect, parts);
-            JdbcError.wrongObjectType(error, dialect, parts);
+            MetadataErrors.idNotPreallocated(error, dialect, parts);
+            MetadataErrors.idAlreadyInUse(error, dialect, parts);
+            MetadataErrors.wrongObjectType(error, dialect, parts);
 
-            throw JdbcError.catchAll(error, dialect);
+            throw MetadataErrors.catchAll(error, dialect);
         }
     }
 
@@ -232,9 +237,9 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
         }
         catch (SQLException error) {
 
-            JdbcError.duplicateObjectId(error, dialect, parts);
+            MetadataErrors.duplicateObjectId(error, dialect, parts);
 
-            throw JdbcError.catchAll(error, dialect);
+            throw MetadataErrors.catchAll(error, dialect);
         }
     }
 
@@ -257,11 +262,11 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
         }
         catch (SQLException error) {
 
-            JdbcError.priorVersionMissing(error, dialect, parts);
-            JdbcError.versionSuperseded(error, dialect, parts);
-            JdbcError.wrongObjectType(error, dialect, parts);
+            MetadataErrors.priorVersionMissing(error, dialect, parts);
+            MetadataErrors.versionSuperseded(error, dialect, parts);
+            MetadataErrors.wrongObjectType(error, dialect, parts);
 
-            throw JdbcError.catchAll(error, dialect);
+            throw MetadataErrors.catchAll(error, dialect);
         }
     }
 
@@ -284,11 +289,11 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
         }
         catch (SQLException error) {
 
-            JdbcError.priorTagMissing(error, dialect, parts);
-            JdbcError.tagSuperseded(error, dialect, parts);
-            JdbcError.wrongObjectType(error, dialect, parts);
+            MetadataErrors.priorTagMissing(error, dialect, parts);
+            MetadataErrors.tagSuperseded(error, dialect, parts);
+            MetadataErrors.wrongObjectType(error, dialect, parts);
 
-            throw JdbcError.catchAll(error, dialect);
+            throw MetadataErrors.catchAll(error, dialect);
         }
     }
 
@@ -331,10 +336,10 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
         }
         catch (SQLException error) {
 
-            JdbcError.objectNotFound(error, dialect, parts, false, false);
-            JdbcError.wrongObjectType(error, dialect, parts);
+            MetadataErrors.objectNotFound(error, dialect, parts, false, false);
+            MetadataErrors.wrongObjectType(error, dialect, parts);
 
-            throw JdbcError.catchAll(error, dialect);
+            throw MetadataErrors.catchAll(error, dialect);
         }
     }
 
@@ -390,10 +395,10 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
         }
         catch (SQLException error) {
 
-            JdbcError.objectNotFound(error, dialect, parts, priorVersions, priorTags);
-            JdbcError.wrongObjectType(error, dialect, parts);
+            MetadataErrors.objectNotFound(error, dialect, parts, priorVersions, priorTags);
+            MetadataErrors.wrongObjectType(error, dialect, parts);
 
-            throw JdbcError.catchAll(error, dialect);
+            throw MetadataErrors.catchAll(error, dialect);
         }
     }
 
@@ -426,7 +431,7 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
         }
         catch (SQLException error) {
 
-            throw JdbcError.catchAll(error, dialect);
+            throw MetadataErrors.catchAll(error, dialect);
         }
     }
 
@@ -491,10 +496,10 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
         }
         catch (SQLException error) {
 
-            JdbcError.priorConfigMissing(error, dialect, parts);
-            JdbcError.duplicateConfig(error, dialect, parts);
+            MetadataErrors.priorConfigMissing(error, dialect, parts);
+            MetadataErrors.duplicateConfig(error, dialect, parts);
 
-            throw JdbcError.catchAll(error, dialect);
+            throw MetadataErrors.catchAll(error, dialect);
         }
     }
 
@@ -511,8 +516,8 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
         }
         catch (SQLException error) {
 
-            JdbcError.configNotFound(error, dialect, parts);
-            throw JdbcError.catchAll(error, dialect);
+            MetadataErrors.configNotFound(error, dialect, parts);
+            throw MetadataErrors.catchAll(error, dialect);
         }
     }
 
@@ -529,8 +534,8 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
         }
         catch (SQLException error) {
 
-            JdbcError.configNotFound(error, dialect, parts);
-            throw JdbcError.catchAll(error, dialect);
+            MetadataErrors.configNotFound(error, dialect, parts);
+            throw MetadataErrors.catchAll(error, dialect);
         }
     }
 
@@ -548,7 +553,7 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
         }
         catch (SQLException error) {
 
-            throw JdbcError.catchAll(error, dialect);
+            throw MetadataErrors.catchAll(error, dialect);
         }
     }
 
@@ -691,17 +696,17 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
     // CHECK OBJECT TYPES
     // -----------------------------------------------------------------------------------------------------------------
 
-    private void checkObjectTypes(ObjectParts parts, KeyedItems<ObjectType> existingTypes) throws JdbcException {
+    private void checkObjectTypes(ObjectParts parts, KeyedItems<ObjectType> existingTypes) throws MetadataException {
 
         for (int i = 0; i < parts.objectType.length; i++)
             if (parts.objectType[i] != existingTypes.items[i])
-                throw new JdbcException(JdbcErrorCode.WRONG_OBJECT_TYPE);
+                throw new MetadataException(MetadataErrorCode.WRONG_OBJECT_TYPE);
     }
 
-    private void checkObjectType(ObjectParts parts, KeyedItem<ObjectType> existingType) throws JdbcException {
+    private void checkObjectType(ObjectParts parts, KeyedItem<ObjectType> existingType) throws MetadataException {
 
         if (parts.objectType[0] != existingType.item)
-            throw new JdbcException(JdbcErrorCode.WRONG_OBJECT_TYPE);
+            throw new MetadataException(MetadataErrorCode.WRONG_OBJECT_TYPE);
     }
 
 

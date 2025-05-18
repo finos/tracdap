@@ -18,9 +18,11 @@
 package org.finos.tracdap.common.metadata.dal.jdbc;
 
 import org.finos.tracdap.metadata.*;
-import org.finos.tracdap.common.metadata.TypeSystem;
+import org.finos.tracdap.common.db.JdbcErrorCode;
+import org.finos.tracdap.common.db.JdbcException;
+import org.finos.tracdap.common.db.dialects.IDialect;
 import org.finos.tracdap.common.exception.ETracInternal;
-import org.finos.tracdap.common.metadata.dal.jdbc.dialects.IDialect;
+import org.finos.tracdap.common.metadata.TypeSystem;
 
 import java.sql.*;
 import java.time.Instant;

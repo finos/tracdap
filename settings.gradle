@@ -79,10 +79,10 @@ project(":tracdap-svc-admin").projectDir = file("tracdap-services/tracdap-svc-ad
 
 // Tools and utilities
 
-include 'deploy-metadb'
+include 'deploy-tool'
 include 'secret-tool'
 
-project(":deploy-metadb").projectDir = file("tracdap-tools/deploy-metadb")
+project(":deploy-tool").projectDir = file("tracdap-tools/deploy-tool")
 project(":secret-tool").projectDir = file("tracdap-tools/secret-tool")
 
 

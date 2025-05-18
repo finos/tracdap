@@ -18,10 +18,10 @@
 package org.finos.tracdap.common.cache.local;
 
 import org.finos.tracdap.common.cache.CacheEntry;
+import org.finos.tracdap.common.cache.CacheHelpers;
 import org.finos.tracdap.common.cache.CacheTicket;
 import org.finos.tracdap.common.cache.IJobCache;
 import org.finos.tracdap.common.exception.*;
-import org.finos.tracdap.common.metadata.MetadataConstants;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -29,7 +29,6 @@ import org.slf4j.LoggerFactory;
 import java.io.*;
 import java.time.Duration;
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -38,9 +37,6 @@ import java.util.concurrent.ConcurrentMap;
 
 
 public class LocalJobCache<TValue extends Serializable> implements IJobCache<TValue> {
-
-    public static final Duration DEFAULT_TICKET_DURATION = Duration.of(30, ChronoUnit.SECONDS);
-    public static final Duration MAX_TICKET_DURATION = Duration.of(5, ChronoUnit.MINUTES);
 
     private static final int FIRST_REVISION = 0;
 
@@ -59,9 +55,9 @@ public class LocalJobCache<TValue extends Serializable> implements IJobCache<TVa
     @Override
     public CacheTicket openNewTicket(String key, Duration duration) {
 
-        checkKey(key);
-        checkDuration(duration);
-        checkMaxDuration(key, duration);
+        CacheHelpers.checkKey(key);
+        CacheHelpers.checkDuration(duration);
+        CacheHelpers.checkMaxDuration(key, duration);
 
         var grantTime = Instant.now();
         var ticket = CacheTicket.forDuration(this, key, FIRST_REVISION, grantTime, duration);
@@ -92,10 +88,10 @@ public class LocalJobCache<TValue extends Serializable> implements IJobCache<TVa
     @Override
     public CacheTicket openTicket(String key, int revision, Duration duration) {
 
-        checkKey(key);
-        checkRevision(revision);
-        checkDuration(duration);
-        checkMaxDuration(key, duration);
+        CacheHelpers.checkKey(key);
+        CacheHelpers.checkRevision(revision);
+        CacheHelpers.checkDuration(duration);
+        CacheHelpers.checkMaxDuration(key, duration);
 
         var grantTime = Instant.now();
         var ticket = CacheTicket.forDuration(this, key, revision, grantTime, duration);
@@ -130,7 +126,7 @@ public class LocalJobCache<TValue extends Serializable> implements IJobCache<TVa
     @Override
     public void closeTicket(CacheTicket ticket) {
 
-        checkTicket(ticket);
+        CacheHelpers.checkTicket(ticket);
 
         _cache.computeIfPresent(ticket.key(), (_key, priorEntry) -> {
 
@@ -152,9 +148,9 @@ public class LocalJobCache<TValue extends Serializable> implements IJobCache<TVa
 
         var commitTime = Instant.now();
 
-        checkValidTicket(ticket, "create", commitTime);
-        checkValidStatus(ticket, status);
-        checkValidValue(ticket, value);
+        CacheHelpers.checkValidTicket(ticket, "create", commitTime);
+        CacheHelpers.checkValidStatus(ticket, status);
+        CacheHelpers.checkValidValue(ticket, value);
 
         var added = _cache.compute(ticket.key(), (_key, _entry) -> {
 
@@ -171,7 +167,7 @@ public class LocalJobCache<TValue extends Serializable> implements IJobCache<TVa
             newEntry.revision = ticket.revision() + 1;
             newEntry.lastActivity = commitTime;
             newEntry.status = status;
-            newEntry.encodedValue = encodeValue(value);
+            newEntry.encodedValue = CacheHelpers.encodeValue(value);
 
             return newEntry;
         });
@@ -184,9 +180,9 @@ public class LocalJobCache<TValue extends Serializable> implements IJobCache<TVa
 
         var commitTime = Instant.now();
 
-        checkValidTicket(ticket, "update", commitTime);
-        checkValidStatus(ticket, status);
-        checkValidValue(ticket, value);
+        CacheHelpers.checkValidTicket(ticket, "update", commitTime);
+        CacheHelpers. checkValidStatus(ticket, status);
+        CacheHelpers.checkValidValue(ticket, value);
 
         var updated = _cache.compute(ticket.key(), (_key, _entry) -> {
 
@@ -202,7 +198,7 @@ public class LocalJobCache<TValue extends Serializable> implements IJobCache<TVa
             newEntry.revision += 1;
             newEntry.lastActivity = commitTime;
             newEntry.status = status;
-            newEntry.encodedValue = encodeValue(value);
+            newEntry.encodedValue = CacheHelpers.encodeValue(value);
 
             return newEntry;
         });
@@ -215,7 +211,7 @@ public class LocalJobCache<TValue extends Serializable> implements IJobCache<TVa
 
         var commitTime = Instant.now();
 
-        checkValidTicket(ticket, "remove", commitTime);
+        CacheHelpers.checkValidTicket(ticket, "remove", commitTime);
 
         _cache.compute(ticket.key(), (_key, _entry) -> {
 
@@ -239,7 +235,7 @@ public class LocalJobCache<TValue extends Serializable> implements IJobCache<TVa
 
         var accessTime = Instant.now();
 
-        checkValidTicket(ticket, "get", accessTime);
+        CacheHelpers.checkValidTicket(ticket, "get", accessTime);
 
         var entry = _cache.get(ticket.key());
 
@@ -251,7 +247,7 @@ public class LocalJobCache<TValue extends Serializable> implements IJobCache<TVa
             throw new ECacheNotFound(message);
         }
 
-        var cacheValue = decodeValue(entry.encodedValue);
+        var cacheValue = CacheHelpers.<TValue>decodeValue(entry.encodedValue);
 
         return CacheEntry.forValue(ticket.key(), entry.revision, entry.status, cacheValue);
     }
@@ -265,7 +261,7 @@ public class LocalJobCache<TValue extends Serializable> implements IJobCache<TVa
             return Optional.empty();
 
         try {
-            var cacheValue = decodeValue(entry.encodedValue);
+            var cacheValue = CacheHelpers.<TValue>decodeValue(entry.encodedValue);
             return Optional.of(CacheEntry.forValue(key, entry.revision, entry.status, cacheValue));
         }
         catch (ECacheCorruption cacheError) {
@@ -300,7 +296,7 @@ public class LocalJobCache<TValue extends Serializable> implements IJobCache<TVa
             // Client code can decide how to handle these errors, bad values can still be updated or removed
 
             try {
-                var cacheValue = decodeValue(_entry.encodedValue);
+                var cacheValue = CacheHelpers.<TValue>decodeValue(_entry.encodedValue);
                 var result = CacheEntry.forValue(_key, _entry.revision, _entry.status, cacheValue);
                 results.add(result);
             }
@@ -313,149 +309,12 @@ public class LocalJobCache<TValue extends Serializable> implements IJobCache<TVa
         return results;
     }
 
-    private void checkValidTicket(CacheTicket ticket, String operation, Instant operationTime) {
-
-        if (ticket == null)
-            throw new ETracInternal("Cache ticket is null");
-
-        if (ticket.missing()) {
-            var message = String.format("Cannot %s [%s], item is not in the cache", operation, ticket.key());
-            log.error(message);
-            throw new ECacheTicket(message);
-        }
-
-        if (ticket.superseded()) {
-            var message = String.format("Cannot %s [%s], ticket has been superseded", operation, ticket.key());
-            log.error(message);
-            throw new ECacheTicket(message);
-        }
-
-        if (operationTime.isAfter(ticket.expiry())) {
-            var message = String.format("Failed to %s [%s], ticket has expired", operation, ticket.key());
-            log.error(message);
-            throw new ECacheTicket(message);
-        }
-    }
-
-    private void checkValidStatus(CacheTicket ticket, String status) {
-
-        if (status == null)
-            throw new ETracInternal(String.format("Cache ticket status is null for [%s]", ticket.key()));
-
-        if (!MetadataConstants.VALID_IDENTIFIER.matcher(status).matches()) {
-            var message = String.format("Cannot set status [%s] for [%s] (status must be a valid identifier)", status, ticket.key());
-            log.error(message);
-            throw new ECacheOperation(message);
-        }
-
-        if (MetadataConstants.TRAC_RESERVED_IDENTIFIER.matcher(status).matches()) {
-            var message = String.format("Cannot set status [%s] for [%s] (status cannot be a reserved identifier)r", status, ticket.key());
-            log.error(message);
-            throw new ECacheOperation(message);
-        }
-    }
-
-    private void checkValidValue(CacheTicket ticket, TValue value) {
-
-        if (value == null)
-            throw new ETracInternal(String.format("Cache value is null for [%s]", ticket.key()));
-    }
-
     private void checkEntryMatchesTicket(LocalJobCacheEntry entry, CacheTicket ticket, String operation) {
 
         if (entry == null || entry.ticket != ticket) {
             var message = String.format("Cannot %s [%s], ticket is not recognized", operation, ticket.key());
             log.error(message);
             throw new ECacheTicket(message);
-        }
-    }
-
-    private void checkKey(String key) {
-
-        if (key == null)
-            throw new IllegalArgumentException(new NullPointerException());
-
-        if (!VALID_KEY.matcher(key).matches())
-            throw new IllegalArgumentException();
-
-        if (MetadataConstants.TRAC_RESERVED_IDENTIFIER.matcher(key).matches())
-            throw new IllegalArgumentException();
-    }
-
-    private void checkRevision(int revision) {
-
-        if (revision < 0)
-            throw new IllegalArgumentException();
-    }
-
-    private void checkDuration(Duration duration) {
-
-        if (duration == null)
-            throw new IllegalArgumentException(new NullPointerException());
-
-        if (duration.isZero() || duration.isNegative())
-            throw new IllegalArgumentException();
-    }
-
-    private void checkTicket(CacheTicket ticket) {
-
-        if (ticket == null)
-            throw new IllegalArgumentException(new NullPointerException());
-    }
-
-    private void checkMaxDuration(String key, Duration duration) {
-
-        if (duration.compareTo(MAX_TICKET_DURATION) > 0) {
-
-            var message = String.format(
-                    "Requested ticket duration of [%s] for [%s] exceeds the maximum grant time",
-                    duration, key);
-
-            throw new ECacheTicket(message);
-        }
-    }
-
-    private byte[] encodeValue(TValue value) {
-
-        try (var stream = new ZCByteArrayOutputStream(); var serialize = new ObjectOutputStream(stream)) {
-
-            serialize.writeObject(value);
-            serialize.flush();
-
-            return stream.toByteArray();
-        }
-        catch (IOException e) {
-            throw new EUnexpected(e);
-        }
-    }
-
-    @SuppressWarnings("unchecked")
-    private TValue decodeValue(byte[] encodedValue) throws ECacheCorruption {
-
-        try (var stream = new ByteArrayInputStream(encodedValue); var deserialize = new ObjectInputStream(stream)) {
-
-            var object = deserialize.readObject();
-
-            return (TValue) object;
-        }
-        catch (InvalidClassException e) {
-            var message = "The job cache references an old code version for class [" + e.classname + "]";
-            throw new ECacheCorruption(message, e);
-        }
-        catch (ClassNotFoundException e) {
-            var message = "The job cache references code for an unknown class [" + e.getMessage() + "]";
-            throw new ECacheCorruption(message, e);
-        }
-        catch (IOException e) {
-            var message = "The job cache contains a corrupt entry that cannot be decoded";
-            throw new ECacheCorruption(message, e);
-        }
-    }
-
-    private static class ZCByteArrayOutputStream extends ByteArrayOutputStream {
-        @Override
-        public byte[] toByteArray() {
-            return this.buf;
         }
     }
 }

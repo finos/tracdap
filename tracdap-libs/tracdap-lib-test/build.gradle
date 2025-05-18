@@ -39,7 +39,7 @@ dependencies {
     api project(':tracdap-lib-test-proto')
 
     // Give tests access to the deploy tools to set up services for integration
-    api project(':deploy-metadb')
+    api project(':deploy-tool')
     api project(':secret-tool')
 
     // Use Jupiter API to define test extensions

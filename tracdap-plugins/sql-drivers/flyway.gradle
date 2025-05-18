@@ -28,7 +28,7 @@ sourceSets {
 
 dependencies {
 
-    // Additional dependencies for Flyway, used by the deploy-metadb tool
+    // Additional dependencies for Flyway, used by deploy-tool
     // Only pull in the specialized driver JAR, not flyway-core and the dependency tree
 
     mysqlRuntimeOnly (group: 'org.flywaydb', name: 'flyway-mysql', version: "$flyway_version") {

@@ -301,7 +301,7 @@ Setup tools
 -----------
 
 TRAC D.A.P. comes with a few tools to simplify the deployment. There are two we need to use for a
-sandbox setup, *secret-tool* and *deploy-metadb*.
+sandbox setup, *secret-tool* and *deploy-tool*.
 
 **Secret Tool**
 
@@ -359,10 +359,10 @@ can be altered later but the tenant code cannot.
         .. code-block:: shell
 
             cd /opt/trac/current
-            bin/deploy-metadb run --task deploy_schema
-            bin/deploy-metadb run --task add_tenant ACME_CORP "ACME Supplies Inc."
+            bin/deploy-tool run --task deploy_schema
+            bin/deploy-tool run --task add_tenant ACME_CORP "ACME Supplies Inc."
 
-            bin/deploy-metadb run --task alter_tenant ACME_CORP "ACME Mega Supplies Inc."
+            bin/deploy-tool run --task alter_tenant ACME_CORP "ACME Mega Supplies Inc."
 
     .. tab-item:: Windows
         :sync: platform_windows
@@ -370,10 +370,10 @@ can be altered later but the tenant code cannot.
         .. code-block:: batch
 
             cd /d C:\trac\tracdap-sandbox-<version>
-            bin\deploy-metadb.bat run --task deploy_schema
-            bin\deploy-metadb.bat run --task add_tenant ACME_CORP "ACME Supplies Inc."
+            bin\deploy-tool.bat run --task deploy_schema
+            bin\deploy-tool.bat run --task add_tenant ACME_CORP "ACME Supplies Inc."
 
-            bin\deploy-metadb.bat run --task alter_tenant ACME_CORP "ACME Mega Supplies Inc."
+            bin\deploy-tool.bat run --task alter_tenant ACME_CORP "ACME Mega Supplies Inc."
 
 
 Start the services

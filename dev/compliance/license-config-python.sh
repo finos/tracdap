@@ -29,6 +29,9 @@ ALLOWED_LICENSES="${ALLOWED_LICENSES};The Unlicense (Unlicense)"
 # License for greenlet is specified this way
 ALLOWED_LICENSES="${ALLOWED_LICENSES};MIT AND Python-2.0"
 
+# License for cryptography package is specified this way
+ALLOWED_LICENSES="${ALLOWED_LICENSES};Apache-2.0 OR BSD-3-Clause"
+
 # The "certifi" package is a dependency of Python Safety, licensed under MPL 2.0
 # It is OK to use since the compliance tools are not distributed
 # So, we can exclude the package from our license report

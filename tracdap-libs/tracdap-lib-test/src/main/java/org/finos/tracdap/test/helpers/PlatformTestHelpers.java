@@ -25,7 +25,7 @@ import org.finos.tracdap.common.startup.StandardArgs;
 import org.finos.tracdap.common.startup.Startup;
 import org.finos.tracdap.common.startup.StartupSequence;
 import org.finos.tracdap.tools.secrets.SecretTool;
-import org.finos.tracdap.tools.deploy.metadb.DeployMetaDB;
+import org.finos.tracdap.tools.deploy.DeployTool;
 
 import java.lang.reflect.InvocationTargetException;
 import java.net.URL;
@@ -70,10 +70,10 @@ public class PlatformTestHelpers {
         secretTool.runTasks(tasks);
     }
 
-    public static void runDbDeploy(Path workingDir, URL configPath, String keystoreKey, List<StandardArgs.Task> tasks) {
+    public static void runDeployTool(Path workingDir, URL configPath, String keystoreKey, List<StandardArgs.Task> tasks) {
 
-        var launcher = prepare(DeployMetaDB.class, workingDir, configPath, keystoreKey);
-        var deployDb = launcher.launch(startup -> new DeployMetaDB(startup.getConfig()));
+        var launcher = prepare(DeployTool.class, workingDir, configPath, keystoreKey);
+        var deployDb = launcher.launch(startup -> new DeployTool(startup.getConfig()));
 
         deployDb.runDeployment(tasks);
     }

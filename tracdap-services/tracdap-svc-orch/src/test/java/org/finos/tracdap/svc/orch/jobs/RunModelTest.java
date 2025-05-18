@@ -66,6 +66,7 @@ public class RunModelTest {
     @RegisterExtension
     public static final PlatformTest platform = PlatformTest.forConfig(E2E_CONFIG)
             .runDbDeploy(true)
+            .runCacheDeploy(true)
             .bootstrapTenant(TEST_TENANT, E2E_RESOURCES)
             .prepareLocalExecutor(true)
             .startService(TracMetadataService.class)

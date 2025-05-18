@@ -82,7 +82,7 @@ jobs:
       # MetadataReapApiTest listTenants()
       - name: Prepare database
         run: |
-          ./gradlew deploy-metadb:run --args="\
+          ./gradlew deploy-tool:run --args="\
           --config ${{ env.TRAC_CONFIG_FILE }} \
           --secret-key ${{ env.TRAC_SECRET_KEY }} \
           --task deploy_schema \
@@ -91,6 +91,75 @@ jobs:
 
       - name: Integration tests
         run: ./gradlew integration -DintegrationTags="int-metadb"
+
+      # If the tests fail, make the output available for download
+      - name: Store failed test results
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: junit-test-results
+          path: build/modules/*/reports/**
+          retention-days: 7
+
+  int-cache:
+
+    name: int-cache-java-${{ inputs.dialect }}
+
+    env:
+      BUILD_sql_${{ inputs.dialect }}: true
+      TRAC_CONFIG_FILE: ".github/config/int-metadb-${{ inputs.dialect }}.yaml"
+      TRAC_SECRET_KEY: "testing_secret"
+
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    container:
+      image: ubuntu:latest
+
+    services:
+
+      metadb:
+
+        image: ${{ inputs.db_image }}
+        ports:
+          - ${{ inputs.db_port }}:${{ inputs.db_port }}
+        options: ${{ inputs.db_options }}
+
+        # DB container needs various env vars defined in the matrix
+        env: ${{ fromJson( inputs.matrix ) }}
+
+    steps:
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: ${{ env.JAVA_DISTRIBUTION }}
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - name: Build
+        run: ./gradlew trac-svc-meta:testClasses --parallel
+
+      # Secret tool will create the secrets file if it doesn't exist
+      - name: Prepare secrets
+        env: ${{ fromJson( inputs.matrix ) }}
+        run: |
+          ./gradlew secret-tool:run --args="--config ${{ env.TRAC_CONFIG_FILE }} --task init_secrets"
+          echo "${DB_SECRET}" | ./gradlew secret-tool:run --args="--config ${{ env.TRAC_CONFIG_FILE }} --task add_secret metadb_secret"
+
+      # The name and description of the test tenant are verified in one of the test cases so they need to match
+      # MetadataReapApiTest listTenants()
+      - name: Prepare database
+        run: |
+          ./gradlew deploy-tool:run --args="\
+          --config ${{ env.TRAC_CONFIG_FILE }} \
+          --secret-key ${{ env.TRAC_SECRET_KEY }} \
+          --task deploy_cache_schema"
+
+      - name: Integration tests
+        run: ./gradlew integration -DintegrationTags="int-cache"
 
       # If the tests fail, make the output available for download
       - name: Store failed test results

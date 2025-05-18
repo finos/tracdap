@@ -50,7 +50,7 @@ import java.util.stream.Collectors;
  * available task is passed in with a parameter then tasks with this name
  * will accept a parameter, otherwise they will not.</p>
  *
- * <p>For an example of task processing, look in trac-tools/deploy-metadb.</p>
+ * <p>For an example of task processing, look in trac-tools/deploy-tool.</p>
  *
  * @see ConfigManager
  */
