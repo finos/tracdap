@@ -564,11 +564,15 @@ public class JdbcJobCache <TValue extends Serializable> extends JdbcBaseDal impl
 
     private long entryPk(Connection conn, String entry) throws SQLException {
 
-        var query = "select entry_pk from cache_entry where entry = ?";
+        var query =
+                "select entry_pk from cache_entry\n" +
+                "where cache_name = ?\n" +
+                "and entry = ?";
 
         try (var stmt = conn.prepareStatement(query)) {
 
-            stmt.setString(1, entry);
+            stmt.setString(1, cacheName);
+            stmt.setString(2, entry);
 
             try (var rs = stmt.executeQuery()) {
                 return readPk(rs);
@@ -595,8 +599,8 @@ public class JdbcJobCache <TValue extends Serializable> extends JdbcBaseDal impl
         try (var stmt = conn.prepareStatement(query)) {
 
             stmt.setString(1, cacheName);
-            stmt.setString(1, entry);
-            stmt.setInt(2, revision);
+            stmt.setString(2, entry);
+            stmt.setInt(3, revision);
 
             try (var rs = stmt.executeQuery()) {
                 return readPk(rs);
