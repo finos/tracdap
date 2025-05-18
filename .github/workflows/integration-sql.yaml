@@ -30,9 +30,9 @@ env:
 
 jobs:
 
-  int-metadb:
+  int-sql:
 
-    name: int-metadb-java-${{ inputs.dialect }}
+    name: int-sql-java-${{ inputs.dialect }}
 
     env:
       BUILD_sql_${{ inputs.dialect }}: true
@@ -90,7 +90,7 @@ jobs:
           --task add_tenant ALT_CORP 'Alt test tenant [ALT_CORP]'"
 
       - name: Integration tests
-        run: ./gradlew integration -DintegrationTags="int-metadb"
+        run: ./gradlew integration -DintegrationTags="int-sql"
 
       # If the tests fail, make the output available for download
       - name: Store failed test results

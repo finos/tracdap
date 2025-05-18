@@ -63,7 +63,7 @@ abstract class AdminConfigApiTest {
 
     // Include this test case for integration against different database backends
     @org.junit.jupiter.api.Tag("integration")
-    @org.junit.jupiter.api.Tag("int-metadb")
+    @org.junit.jupiter.api.Tag("int-sql")
     static class IntegrationTest extends AdminConfigApiTest {
 
         private static final String TRAC_CONFIG_ENV_FILE = System.getenv(TRAC_CONFIG_ENV_VAR);

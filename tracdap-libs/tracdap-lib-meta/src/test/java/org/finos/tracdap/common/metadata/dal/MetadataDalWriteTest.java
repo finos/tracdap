@@ -53,7 +53,7 @@ abstract class MetadataDalWriteTest implements IDalTestable {
     static class UnitTest extends MetadataDalWriteTest {}
 
     @Tag("integration")
-    @Tag("int-metadb")
+    @Tag("int-sql")
     @ExtendWith(JdbcIntegration.class)
     static class IntegrationTest extends MetadataDalWriteTest {}
 

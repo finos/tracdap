@@ -55,7 +55,7 @@ abstract class MetadataDalConfigTest implements IDalTestable {
     static class UnitTest extends MetadataDalConfigTest {}
 
     @Tag("integration")
-    @Tag("int-metadb")
+    @Tag("int-sql")
     @ExtendWith(JdbcIntegration.class)
     static class IntegrationTest extends MetadataDalConfigTest {}
 
