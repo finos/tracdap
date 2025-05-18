@@ -32,7 +32,7 @@ group = "org.finos.tracdap.tools"
 ext.addVersionInfo(sourceSets.getByName("main"), "TRAC Deploy Meta DB")
 
 application {
-    mainClass.set("org.finos.tracdap.tools.deploy.metadb.DeployMetaDB")
+    mainClass.set("org.finos.tracdap.tools.deploy.DeployTool")
     tasks.run.workingDir = rootProject.projectDir
 }
 
