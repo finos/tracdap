@@ -22,10 +22,8 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 
 
-public final class CacheTicket implements AutoCloseable {
+public class CacheTicket implements AutoCloseable {
 
-    public static final int FIRST_REVISION = 0;
-    public static final Duration DEFAULT_DURATION = Duration.of(30, ChronoUnit.SECONDS);
     public static final Duration MAX_DURATION = Duration.of(5, ChronoUnit.MINUTES);
 
     private static final Instant NO_EXPIRY = Instant.MAX;
@@ -57,7 +55,7 @@ public final class CacheTicket implements AutoCloseable {
         return new CacheTicket(cache, key, revision, grantTime, grantTime.plus(grantDuration), false, false);
     }
 
-    private CacheTicket(
+    protected CacheTicket(
             IJobCache<?> cache,
             String key, int iteration,
             Instant grantTime, Instant expiry,
