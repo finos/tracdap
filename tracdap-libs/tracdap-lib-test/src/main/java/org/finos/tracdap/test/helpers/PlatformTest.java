@@ -97,6 +97,7 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
     private final String storageFormat;
 
     private final boolean runDbDeploy;
+    private final boolean runCacheDeploy;
     private final boolean manageDataPrefix;
     private final boolean localExecutor;
 
@@ -107,7 +108,7 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
 
     private PlatformTest(
             String testConfig, String secretKey, Map<String, String> tenants, String storageFormat,
-            boolean runDbDeploy, boolean manageDataPrefix, boolean localExecutor,
+            boolean runDbDeploy, boolean runCacheDeploy, boolean manageDataPrefix, boolean localExecutor,
             List<Class<? extends TracServiceBase>> serviceClasses, Map<String, String> serviceKeys,
             GrpcConcern clientConcerns, List<Consumer<PlatformTest>> preStartActions) {
 
@@ -115,6 +116,7 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         this.tenants = tenants;
         this.storageFormat = storageFormat;
         this.runDbDeploy = runDbDeploy;
+        this.runCacheDeploy = runCacheDeploy;
         this.manageDataPrefix = manageDataPrefix;
         this.localExecutor = localExecutor;
         this.serviceClasses = serviceClasses;
@@ -147,6 +149,7 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         private final Map<String, String> tenants = new HashMap<>();
         private String storageFormat = DEFAULT_STORAGE_FORMAT;
         private boolean runDbDeploy = false;
+        private boolean runCacheDeploy = false;
         private boolean manageDataPrefix = false;
         private boolean localExecutor = false;
         private final List<Class<? extends TracServiceBase>> serviceClasses = new ArrayList<>();
@@ -160,6 +163,7 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         public Builder bootstrapTenant(String testTenant, String bootstrapConfig) { this.tenants.put(testTenant, bootstrapConfig); return this; }
         public Builder storageFormat(String storageFormat) { this.storageFormat = storageFormat; return this; }
         public Builder runDbDeploy(boolean runDbDeploy) { this.runDbDeploy = runDbDeploy; return this; }
+        public Builder runCacheDeploy(boolean runCacheDeploy) { this.runCacheDeploy = runCacheDeploy; return this; }
         public Builder manageDataPrefix(boolean manageDataPrefix) { this.manageDataPrefix = manageDataPrefix; return this; }
         public Builder prepareLocalExecutor(boolean localExecutor) { this.localExecutor = localExecutor; return this; }
         public Builder startService(Class<? extends TracServiceBase> serviceClass) { addService(serviceClass, null); return this; }
@@ -171,7 +175,7 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
 
             return new PlatformTest(
                     testConfig, secretKey, tenants, storageFormat,
-                    runDbDeploy, manageDataPrefix, localExecutor,
+                    runDbDeploy, runCacheDeploy, manageDataPrefix, localExecutor,
                     serviceClasses, serviceKeys,
                     clientConcerns.build(), preStartActions);
         }
@@ -280,6 +284,9 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
 
         if (runDbDeploy)
             prepareDatabase();
+
+        if (runCacheDeploy)
+            prepareCacheDatabase();
 
         prepareDataAndExecutor();
 
@@ -483,6 +490,16 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
             databaseTasks.add(StandardArgs.task(DeployTool.ADD_TENANT_TASK, List.of(tenant, description), ""));
             databaseTasks.add(StandardArgs.task(DeployTool.ALTER_TENANT_TASK, List.of(tenant, description), ""));
         }
+
+        PlatformTestHelpers.runDbDeploy(workingDir, platformConfigUrl, secretKey, databaseTasks);
+    }
+
+    void prepareCacheDatabase() {
+
+        log.info("Deploy cache database schema...");
+
+        var databaseTasks = new ArrayList<StandardArgs.Task>();
+        databaseTasks.add(StandardArgs.task(DeployTool.DEPLOY_CACHE_SCHEMA_TASK, "", ""));
 
         PlatformTestHelpers.runDbDeploy(workingDir, platformConfigUrl, secretKey, databaseTasks);
     }
