@@ -18,7 +18,6 @@
 package org.finos.tracdap.tools.deploy;
 
 import org.finos.tracdap.common.config.ConfigManager;
-import org.finos.tracdap.common.db.JdbcDialect;
 import org.finos.tracdap.common.exception.ETracPublic;
 import org.finos.tracdap.common.startup.StandardArgs;
 import org.finos.tracdap.common.db.JdbcSetup;
@@ -104,7 +103,7 @@ public class DeployTool {
         DataSource cacheSource = null;
 
         log.info("MetaDB script location: " + scriptsLocation);
-        log.info("Job cache script location: " + scriptsLocation);
+        log.info("Job cache script location: " + cacheScriptsLocation);
 
         try {
 

@@ -39,6 +39,7 @@ metadata:
       mysql.password: metadb_secret
 
 jobCache:
+  protocol: JDBC
   properties:
     dialect: MYSQL
     jdbcUrl: //metadb:3306/trac
