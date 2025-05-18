@@ -1781,7 +1781,7 @@ public abstract class JobCacheTestSuite {
         value2.stringVar = "move along";
 
         try (var ticket = CacheTicket.forDuration(cache, key, revision, Instant.now(), TICKET_TIMEOUT)) {
-            Assertions.assertThrows(ECacheTicket.class, () -> cache.createEntry(ticket, status2, value2));
+            Assertions.assertThrows(ECacheTicket.class, () -> cache.updateEntry(ticket, status2, value2));
         }
     }
 
