@@ -70,7 +70,7 @@ public class PlatformTestHelpers {
         secretTool.runTasks(tasks);
     }
 
-    public static void runDbDeploy(Path workingDir, URL configPath, String keystoreKey, List<StandardArgs.Task> tasks) {
+    public static void runDeployTool(Path workingDir, URL configPath, String keystoreKey, List<StandardArgs.Task> tasks) {
 
         var launcher = prepare(DeployTool.class, workingDir, configPath, keystoreKey);
         var deployDb = launcher.launch(startup -> new DeployTool(startup.getConfig()));

@@ -491,7 +491,7 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
             databaseTasks.add(StandardArgs.task(DeployTool.ALTER_TENANT_TASK, List.of(tenant, description), ""));
         }
 
-        PlatformTestHelpers.runDbDeploy(workingDir, platformConfigUrl, secretKey, databaseTasks);
+        PlatformTestHelpers.runDeployTool(workingDir, platformConfigUrl, secretKey, databaseTasks);
     }
 
     void prepareCacheDatabase() {
@@ -501,7 +501,7 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         var databaseTasks = new ArrayList<StandardArgs.Task>();
         databaseTasks.add(StandardArgs.task(DeployTool.DEPLOY_CACHE_SCHEMA_TASK, "", ""));
 
-        PlatformTestHelpers.runDbDeploy(workingDir, platformConfigUrl, secretKey, databaseTasks);
+        PlatformTestHelpers.runDeployTool(workingDir, platformConfigUrl, secretKey, databaseTasks);
     }
 
     void prepareDataPrefix() throws Exception {
