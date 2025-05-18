@@ -42,7 +42,7 @@ import java.util.stream.IntStream;
 
 public class JdbcJobCache <TValue extends Serializable> extends JdbcBaseDal implements IJobCache<TValue> {
 
-    private static final int NEW_ENTRY_REVISION = 0;
+    private static final int FIRST_REVISION = 0;
 
     private final String cacheName;
 
@@ -60,7 +60,7 @@ public class JdbcJobCache <TValue extends Serializable> extends JdbcBaseDal impl
         CacheHelpers.checkMaxDuration(key, duration);
 
         return wrapTransaction(conn -> {
-            return openTicket(key, NEW_ENTRY_REVISION, duration, true, conn);
+            return openTicket(key, FIRST_REVISION, duration, true, conn);
         });
     }
 
