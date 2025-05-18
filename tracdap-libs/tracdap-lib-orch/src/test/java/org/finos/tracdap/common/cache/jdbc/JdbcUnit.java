@@ -33,7 +33,7 @@ import java.util.UUID;
 
 public class JdbcUnit implements BeforeAllCallback, AfterAllCallback {
 
-    private static final String SCRIPT_LOCATION = "tracdap-libs/tracdap-lib-orch/src/schema/h2/rollout";
+    private static final String SCRIPT_LOCATION = "tracdap-libs/tracdap-lib-orch/src/schema/cache/h2/rollout";
 
     private static final String JDBC_URL_TEMPLATE = "mem:%s;DB_CLOSE_DELAY=-1";
 
