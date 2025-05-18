@@ -105,7 +105,7 @@ public class DeployTool {
                 if (DEPLOY_SCHEMA_TASK.equals(task.getTaskName()))
                     deploySchema(dataSource, scriptsLocation);
 
-                if (DEPLOY_CACHE_SCHEMA_TASK.equals(task.getTaskName()))
+                else if (DEPLOY_CACHE_SCHEMA_TASK.equals(task.getTaskName()))
                     deployCacheSchema(dataSource, cacheScriptsLocation);
 
                 else if (ADD_TENANT_TASK.equals(task.getTaskName()))
