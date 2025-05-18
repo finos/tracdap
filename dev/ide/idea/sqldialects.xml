@@ -12,7 +12,11 @@
     <file url="file://$PROJECT_DIR$/tracdap-libs/tracdap-lib-meta/src/schema/oracle" dialect="Oracle" />
     <file url="file://$PROJECT_DIR$/tracdap-libs/tracdap-lib-meta/src/schema/postgresql" dialect="PostgreSQL" />
     <file url="file://$PROJECT_DIR$/tracdap-libs/tracdap-lib-meta/src/schema/sqlserver" dialect="TSQL" />
-    <file url="file://$PROJECT_DIR$/tracdap-libs/tracdap-lib-orch/src/schema/h2" dialect="H2" />
+    <file url="file://$PROJECT_DIR$/tracdap-libs/tracdap-lib-orch/src/schema/cache/h2" dialect="H2" />
+    <file url="file://$PROJECT_DIR$/tracdap-libs/tracdap-lib-orch/src/schema/cache/mariadb" dialect="MariaDB" />
+    <file url="file://$PROJECT_DIR$/tracdap-libs/tracdap-lib-orch/src/schema/cache/mysql" dialect="MySQL" />
+    <file url="file://$PROJECT_DIR$/tracdap-libs/tracdap-lib-orch/src/schema/cache/postgresql" dialect="PostgreSQL" />
+    <file url="file://$PROJECT_DIR$/tracdap-libs/tracdap-lib-orch/src/schema/cache/sqlserver" dialect="TSQL" />
     <file url="PROJECT" dialect="SQL92" />
   </component>
 </project>
