@@ -37,7 +37,7 @@ import org.finos.tracdap.config.DynamicConfig;
 import org.finos.tracdap.config.PlatformConfig;
 import org.finos.tracdap.metadata.ObjectDefinition;
 import org.finos.tracdap.metadata.ObjectType;
-import org.finos.tracdap.tools.deploy.metadb.DeployMetaDB;
+import org.finos.tracdap.tools.deploy.DeployTool;
 import org.finos.tracdap.tools.secrets.SecretTool;
 import org.finos.tracdap.test.config.ConfigHelpers;
 
@@ -472,7 +472,7 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         log.info("Deploy database schema...");
 
         var databaseTasks = new ArrayList<StandardArgs.Task>();
-        databaseTasks.add(StandardArgs.task(DeployMetaDB.DEPLOY_SCHEMA_TASK, "", ""));
+        databaseTasks.add(StandardArgs.task(DeployTool.DEPLOY_SCHEMA_TASK, "", ""));
 
         for (var tenant : tenants.keySet()) {
 
@@ -480,8 +480,8 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
             // (just to run both tasks, not strictly necessary)
 
             var description = "Test tenant [" + tenant + "]";
-            databaseTasks.add(StandardArgs.task(DeployMetaDB.ADD_TENANT_TASK, List.of(tenant, description), ""));
-            databaseTasks.add(StandardArgs.task(DeployMetaDB.ALTER_TENANT_TASK, List.of(tenant, description), ""));
+            databaseTasks.add(StandardArgs.task(DeployTool.ADD_TENANT_TASK, List.of(tenant, description), ""));
+            databaseTasks.add(StandardArgs.task(DeployTool.ALTER_TENANT_TASK, List.of(tenant, description), ""));
         }
 
         PlatformTestHelpers.runDbDeploy(workingDir, platformConfigUrl, secretKey, databaseTasks);
