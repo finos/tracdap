@@ -34,6 +34,12 @@ dependencies {
     implementation project(':tracdap-lib-db')
 
     testImplementation project(':tracdap-lib-test')
+
+    // Use Flyway to deploy schemas in test cases
+    testImplementation group: 'org.flywaydb', name: 'flyway-core', version: "$flyway_version"
+
+    // Always pull in the H2 JDBC driver as a test dependency, since it used for unit tests
+    testImplementation group: 'com.h2database', name: 'h2', version: "$h2_version"
 }
 
 // Compiling dependent targets does not require processResources to be executed by default
