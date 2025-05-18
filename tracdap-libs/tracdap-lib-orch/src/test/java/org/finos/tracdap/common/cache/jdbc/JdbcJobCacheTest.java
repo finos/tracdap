@@ -19,6 +19,7 @@ package org.finos.tracdap.common.cache.jdbc;
 
 import org.finos.tracdap.common.cache.JobCacheTestSuite;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.extension.ExtendWith;
 
 abstract class JdbcJobCacheTest extends JobCacheTestSuite {
@@ -35,4 +36,17 @@ abstract class JdbcJobCacheTest extends JobCacheTestSuite {
         }
     }
 
+    @Tag("integration")
+    @Tag("int-sql")
+    @ExtendWith(JdbcIntegration.class)
+    static class IntegrationTest extends JdbcJobCacheTest {
+
+        private static JdbcJobCacheManager cacheManager;
+
+        @BeforeAll
+        static void createLocalCache() {
+
+            cache = cacheManager.getCache("dummy_state_cache", DummyState.class);
+        }
+    }
 }

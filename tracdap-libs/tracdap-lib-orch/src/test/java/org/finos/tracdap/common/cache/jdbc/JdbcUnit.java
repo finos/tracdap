@@ -37,7 +37,6 @@ public class JdbcUnit implements BeforeAllCallback, AfterAllCallback {
 
     private static final String JDBC_URL_TEMPLATE = "mem:%s;DB_CLOSE_DELAY=-1";
 
-    private Properties properties;
     private DataSource source;
 
     @Override
@@ -46,7 +45,7 @@ public class JdbcUnit implements BeforeAllCallback, AfterAllCallback {
         var dbId = UUID.randomUUID();
         var jdbcUrl = String.format(JDBC_URL_TEMPLATE, dbId);
 
-        properties = new Properties();
+        var properties = new Properties();
         properties.setProperty("jdbcUrl", jdbcUrl);
         properties.setProperty("dialect", "H2");
         properties.setProperty("h2.user", "trac");
@@ -95,11 +94,13 @@ public class JdbcUnit implements BeforeAllCallback, AfterAllCallback {
                 JdbcSetup.destroyDatasource(source);
                 source = null;
             }
+
+            throw e;
         }
     }
 
     @Override
-    public void afterAll(ExtensionContext extensionContext) throws Exception {
+    public void afterAll(ExtensionContext extensionContext) {
 
         if (source != null) {
             JdbcSetup.destroyDatasource(source);
