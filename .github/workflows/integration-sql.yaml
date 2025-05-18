@@ -82,7 +82,7 @@ jobs:
       # MetadataReapApiTest listTenants()
       - name: Prepare database
         run: |
-          ./gradlew deploy-metadb:run --args="\
+          ./gradlew deploy-tool:run --args="\
           --config ${{ env.TRAC_CONFIG_FILE }} \
           --secret-key ${{ env.TRAC_SECRET_KEY }} \
           --task deploy_schema \
