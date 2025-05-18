@@ -24,6 +24,7 @@ import org.finos.tracdap.common.db.JdbcSetup;
 import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.common.startup.Startup;
 import org.finos.tracdap.config.PlatformConfig;
+import org.finos.tracdap.config.PluginConfig;
 
 import org.flywaydb.core.Flyway;
 import org.slf4j.Logger;
@@ -85,34 +86,42 @@ public class DeployTool {
         var platformConfig = configManager.loadRootConfigObject(PlatformConfig.class);
 
         var metaDbConfig = platformConfig.getMetadata().getDatabase();
+        var metadDbDialect = JdbcSetup.getSqlDialect(metaDbConfig);
+        var scriptsLocation = String.format(SCHEMA_LOCATION, metadDbDialect.name().toLowerCase());
 
-        var dialect = JdbcSetup.getSqlDialect(metaDbConfig);
-        var dataSource = JdbcSetup.createDatasource(configManager, metaDbConfig);
+        var cacheConfig = platformConfig.getJobCache();
+        var cacheDialect = JdbcSetup.getSqlDialect(cacheConfig);
+        var cacheScriptsLocation = String.format(CACHE_SCHEMA_LOCATION, cacheDialect.name().toLowerCase());
 
-        // Pick up DB deploy scripts depending on the SQL dialect
-        var scriptsLocation = String.format(SCHEMA_LOCATION, dialect.name().toLowerCase());
+        DataSource metadbSource = null;
+        DataSource cacheSource = null;
 
-        var cacheScriptsLocation = String.format(CACHE_SCHEMA_LOCATION, dialect.name().toLowerCase());
-
-        log.info("SQL Dialect: " + dialect);
-        log.info("Scripts location: " + scriptsLocation);
-        log.info("Cache scripts location: " + scriptsLocation);
+        log.info("MetaDB script location: " + scriptsLocation);
+        log.info("Job cache script location: " + scriptsLocation);
 
         try {
 
             for (var task : tasks) {
 
-                if (DEPLOY_SCHEMA_TASK.equals(task.getTaskName()))
-                    deploySchema(dataSource, scriptsLocation);
+                if (DEPLOY_SCHEMA_TASK.equals(task.getTaskName())) {
+                    metadbSource = createSource(metadbSource, metaDbConfig);
+                    deploySchema(metadbSource, scriptsLocation);
+                }
 
-                else if (DEPLOY_CACHE_SCHEMA_TASK.equals(task.getTaskName()))
-                    deployCacheSchema(dataSource, cacheScriptsLocation);
+                else if (DEPLOY_CACHE_SCHEMA_TASK.equals(task.getTaskName())) {
+                    cacheSource = createSource(cacheSource, cacheConfig);
+                    deployCacheSchema(cacheSource, cacheScriptsLocation);
+                }
 
-                else if (ADD_TENANT_TASK.equals(task.getTaskName()))
-                    addTenant(dataSource, task.getTaskArg(0), task.getTaskArg(1));
+                else if (ADD_TENANT_TASK.equals(task.getTaskName())) {
+                    metadbSource = createSource(metadbSource, metaDbConfig);
+                    addTenant(metadbSource, task.getTaskArg(0), task.getTaskArg(1));
+                }
 
-                else if (ALTER_TENANT_TASK.equals(task.getTaskName()))
-                    alterTenant(dataSource, task.getTaskArg(0), task.getTaskArg(1));
+                else if (ALTER_TENANT_TASK.equals(task.getTaskName())) {
+                    metadbSource = createSource(metadbSource, metaDbConfig);
+                    alterTenant(metadbSource, task.getTaskArg(0), task.getTaskArg(1));
+                }
 
                 else
                     throw new EStartup(String.format("Unknown task: [%s]", task.getTaskName()));
@@ -122,8 +131,20 @@ public class DeployTool {
         }
         finally {
 
-            JdbcSetup.destroyDatasource(dataSource);
+            if (metadbSource != null)
+                JdbcSetup.destroyDatasource(metadbSource);
+
+            if (cacheSource != null)
+                JdbcSetup.destroyDatasource(cacheSource);
         }
+    }
+
+    private DataSource createSource(DataSource dataSource, PluginConfig pluginConfig) {
+
+        if (dataSource != null)
+            return dataSource;
+
+        return JdbcSetup.createDatasource(configManager, pluginConfig);
     }
 
     private void deploySchema(DataSource dataSource, String scriptsLocation) {
