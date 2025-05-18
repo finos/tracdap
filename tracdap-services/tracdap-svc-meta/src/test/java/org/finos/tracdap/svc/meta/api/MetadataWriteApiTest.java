@@ -73,7 +73,7 @@ abstract class MetadataWriteApiTest {
 
     // Include this test case for integration against different database backends
     @org.junit.jupiter.api.Tag("integration")
-    @org.junit.jupiter.api.Tag("int-sql")
+    @org.junit.jupiter.api.Tag("int-metadb")
     static class IntegrationTest extends MetadataWriteApiTest {
 
         private static final String TRAC_CONFIG_ENV_FILE = System.getenv(TRAC_CONFIG_ENV_VAR);

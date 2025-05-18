@@ -60,7 +60,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
     static class UnitTest extends MetadataDalSearchTest {}
 
     @org.junit.jupiter.api.Tag("integration")
-    @org.junit.jupiter.api.Tag("int-sql")
+    @org.junit.jupiter.api.Tag("int-metadb")
     @ExtendWith(JdbcIntegration.class)
     static class IntegrationTest extends MetadataDalSearchTest {}
 

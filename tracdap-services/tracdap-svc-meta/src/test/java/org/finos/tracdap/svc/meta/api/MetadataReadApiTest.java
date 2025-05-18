@@ -71,7 +71,7 @@ abstract class MetadataReadApiTest {
 
     // Include this test case for integration against different database backends
     @Tag("integration")
-    @Tag("int-sql")
+    @Tag("int-metadb")
     static class IntegrationTest extends MetadataReadApiTest {
 
         private static final String TRAC_CONFIG_ENV_FILE = System.getenv(TRAC_CONFIG_ENV_VAR);

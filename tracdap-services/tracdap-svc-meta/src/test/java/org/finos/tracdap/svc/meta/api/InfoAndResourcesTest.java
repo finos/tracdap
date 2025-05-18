@@ -61,7 +61,7 @@ abstract class InfoAndResourcesTest {
     // When resources move to being managed as metadata objects, this will need to be enabled
     @Disabled
     @Tag("integration")
-    @Tag("int-sql")
+    @Tag("int-metadb")
     static class IntegrationTest extends InfoAndResourcesTest {
 
         private static final String TRAC_CONFIG_ENV_FILE = System.getenv(TRAC_CONFIG_ENV_VAR);
