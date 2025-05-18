@@ -37,7 +37,7 @@ abstract class JdbcJobCacheTest extends JobCacheTestSuite {
     }
 
     @Tag("integration")
-    @Tag("int-sql")
+    @Tag("int-cache")
     @ExtendWith(JdbcIntegration.class)
     static class IntegrationTest extends JdbcJobCacheTest {
 
