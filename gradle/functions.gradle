@@ -77,6 +77,10 @@ def isFeatureEnabled(String key) {
     def env = System.getenv()
     def buildKey = (String) "BUILD_${key}"
 
+    // Do not add build-time plugin dependencies in dist builds
+    if (env.containsKey("BUILD_TRAC_DIST") && Boolean.parseBoolean(env.get("BUILD_TRAC_DIST")))
+        return false
+
     if (env.containsKey(buildKey) && Boolean.parseBoolean(env.get(buildKey)))
         return true
 
