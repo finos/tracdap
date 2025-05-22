@@ -96,6 +96,7 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
     private final Map<String, String> tenants;
     private final String storageFormat;
 
+    private final boolean staticSetup;
     private final boolean runDbDeploy;
     private final boolean runCacheDeploy;
     private final boolean manageDataPrefix;
@@ -108,13 +109,14 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
 
     private PlatformTest(
             String testConfig, String secretKey, Map<String, String> tenants, String storageFormat,
-            boolean runDbDeploy, boolean runCacheDeploy, boolean manageDataPrefix, boolean localExecutor,
+            boolean staticSetup, boolean runDbDeploy, boolean runCacheDeploy, boolean manageDataPrefix, boolean localExecutor,
             List<Class<? extends TracServiceBase>> serviceClasses, Map<String, String> serviceKeys,
             GrpcConcern clientConcerns, List<Consumer<PlatformTest>> preStartActions) {
 
         this.testConfig = testConfig;
         this.tenants = tenants;
         this.storageFormat = storageFormat;
+        this.staticSetup = staticSetup;
         this.runDbDeploy = runDbDeploy;
         this.runCacheDeploy = runCacheDeploy;
         this.manageDataPrefix = manageDataPrefix;
@@ -148,6 +150,7 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         private String secretKey;
         private final Map<String, String> tenants = new HashMap<>();
         private String storageFormat = DEFAULT_STORAGE_FORMAT;
+        private boolean staticSetup = false;
         private boolean runDbDeploy = false;
         private boolean runCacheDeploy = false;
         private boolean manageDataPrefix = false;
@@ -162,6 +165,7 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         public Builder addTenant(String testTenant) { this.tenants.put(testTenant, null); return this; }
         public Builder bootstrapTenant(String testTenant, String bootstrapConfig) { this.tenants.put(testTenant, bootstrapConfig); return this; }
         public Builder storageFormat(String storageFormat) { this.storageFormat = storageFormat; return this; }
+        public Builder staticSetup(boolean staticSetup) { this.staticSetup = staticSetup; return this;}
         public Builder runDbDeploy(boolean runDbDeploy) { this.runDbDeploy = runDbDeploy; return this; }
         public Builder runCacheDeploy(boolean runCacheDeploy) { this.runCacheDeploy = runCacheDeploy; return this; }
         public Builder manageDataPrefix(boolean manageDataPrefix) { this.manageDataPrefix = manageDataPrefix; return this; }
@@ -175,7 +179,7 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
 
             return new PlatformTest(
                     testConfig, secretKey, tenants, storageFormat,
-                    runDbDeploy, runCacheDeploy, manageDataPrefix, localExecutor,
+                    staticSetup, runDbDeploy, runCacheDeploy, manageDataPrefix, localExecutor,
                     serviceClasses, serviceKeys,
                     clientConcerns.build(), preStartActions);
         }
@@ -275,6 +279,36 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
     @Override
     public void beforeAll(ExtensionContext context) throws Exception {
 
+        if (staticSetup)
+            prepareStatic();
+        else
+            prepareEverything();
+
+        startServices();
+        startClients();
+
+        if (!staticSetup)
+            loadDynamicConfig();
+    }
+
+    @Override
+    public void afterAll(ExtensionContext context) throws Exception {
+
+        stopClients();
+        stopServices();
+
+        if (!staticSetup)
+            cleanupEverything();
+    }
+
+    public void prepareStatic() {
+
+        findStaticDirectories();
+        loadPluginsAndConfig();
+    }
+
+    public void prepareEverything() throws Exception {
+
         setTestId();
         findDirectories();
         createTestConfig();
@@ -292,18 +326,9 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
 
         if (manageDataPrefix)
             prepareDataPrefix();
-
-        startServices();
-        startClients();
-
-        loadDynamicConfig();
     }
 
-    @Override
-    public void afterAll(ExtensionContext context) throws Exception {
-
-        stopClients();
-        stopServices();
+    public void cleanupEverything() throws Exception {
 
         if (manageDataPrefix)
             cleanupDataPrefix();
@@ -311,12 +336,77 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         cleanupDirectories();
     }
 
+    public void startServices() {
+
+        for (var serviceClass : serviceClasses) {
+            var service = PlatformTestHelpers.startService(serviceClass, workingDir, platformConfigUrl, secretKey);
+            services.add(service);
+        }
+    }
+
+    public void  stopServices() {
+
+        for (var i = services.iterator(); i.hasNext(); i.remove()) {
+            try {
+                var service = i.next();
+                service.stop();
+            }
+            catch (Exception e) {
+                log.error("Error stopping service: {}", e.getMessage(), e);
+            }
+        }
+    }
+
+    public void startClients() {
+
+        for (var serviceClass : serviceClasses) {
+            var serviceKey = serviceKeys.get(serviceClass.getSimpleName());
+            var channel = channelForService(platformConfig, serviceKey);
+            serviceChannels.put(serviceKey, channel);
+        }
+    }
+
+    public void stopClients() {
+
+        for (var i = serviceChannels.entrySet().iterator(); i.hasNext(); i.remove()) {
+            try {
+                var channel = i.next().getValue();
+                channel.shutdown().awaitTermination(10, TimeUnit.SECONDS);
+            }
+            catch (Exception e) {
+                log.error("Error stopping client: {}", e.getMessage(), e);
+            }
+        }
+    }
+
+    public void loadDynamicConfig() throws Exception {
+
+        if (tenants.values().stream().allMatch(Objects::isNull))
+            return;
+
+        if (!hasService(ConfigKeys.ADMIN_SERVICE_KEY))
+            throw new ETracInternal("Admin service is required to bootstrap tenant config");
+
+        var adminClient = createClient(ConfigKeys.ADMIN_SERVICE_KEY, TracAdminApiGrpc::newBlockingStub);
+
+        for (var bootstrapEntry : tenants.entrySet()) {
+            if (bootstrapEntry.getValue() != null)
+                loadDynamicConfig(bootstrapEntry.getKey(), bootstrapEntry.getValue(), adminClient);
+        }
+    }
+
+
     void setTestId() {
 
         var timestamp = DateTimeFormatter.ISO_INSTANT.format(Instant.now()).replace(':', '.');
         var random = new Random().nextLong();
 
         testId = String.format("%s_0x%h", timestamp, random);
+    }
+
+    void findStaticDirectories() {
+
+        workingDir = Paths.get(".");
     }
 
     void findDirectories() throws Exception {
@@ -582,49 +672,6 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         }
     }
 
-    void startServices() {
-
-        for (var serviceClass : serviceClasses) {
-            var service = PlatformTestHelpers.startService(serviceClass, workingDir, platformConfigUrl, secretKey);
-            services.add(service);
-        }
-    }
-
-    void stopServices() {
-
-        for (var i = services.iterator(); i.hasNext(); i.remove()) {
-            try {
-                var service = i.next();
-                service.stop();
-            }
-            catch (Exception e) {
-                log.error("Error stopping service: {}", e.getMessage(), e);
-            }
-        }
-    }
-
-    void startClients() {
-
-        for (var serviceClass : serviceClasses) {
-            var serviceKey = serviceKeys.get(serviceClass.getSimpleName());
-            var channel = channelForService(platformConfig, serviceKey);
-            serviceChannels.put(serviceKey, channel);
-        }
-    }
-
-    void stopClients() {
-
-        for (var i = serviceChannels.entrySet().iterator(); i.hasNext(); i.remove()) {
-            try {
-                var channel = i.next().getValue();
-                channel.shutdown().awaitTermination(10, TimeUnit.SECONDS);
-            }
-            catch (Exception e) {
-                log.error("Error stopping client: {}", e.getMessage(), e);
-            }
-        }
-    }
-
     ManagedChannel channelForService(PlatformConfig platformConfig, String serviceKey) {
 
         var serviceTarget = RoutingUtils.serviceTarget(platformConfig, serviceKey);
@@ -635,22 +682,6 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         builder.directExecutor();
 
         return builder.build();
-    }
-
-    private void loadDynamicConfig() throws Exception {
-
-        if (tenants.values().stream().allMatch(Objects::isNull))
-            return;
-
-        if (!hasService(ConfigKeys.ADMIN_SERVICE_KEY))
-            throw new ETracInternal("Admin service is required to bootstrap tenant config");
-
-        var adminClient = createClient(ConfigKeys.ADMIN_SERVICE_KEY, TracAdminApiGrpc::newBlockingStub);
-
-        for (var bootstrapEntry : tenants.entrySet()) {
-            if (bootstrapEntry.getValue() != null)
-                loadDynamicConfig(bootstrapEntry.getKey(), bootstrapEntry.getValue(), adminClient);
-        }
     }
 
     private void loadDynamicConfig(String tenant, String configPath, TracAdminApiGrpc.TracAdminApiBlockingStub adminClient) throws Exception {
