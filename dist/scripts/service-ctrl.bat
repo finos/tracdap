@@ -46,17 +46,17 @@ if "%CONFIG_FILE%" == "" (set CONFIG_FILE=%CONFIG_DIR%<DEFAULT_CONFIG_FILE>)
 if "%ENV_FILE%" == "" (set ENV_FILE=%CONFIG_DIR%env.bat)
 
 @rem Set up the default folder structure (this can be overridden in env.sh if required)
-set PLUGINS_DIR=%APP_HOME%plugins\\
-set PLUGINS_EXT_DIR=%APP_HOME%plugins_ext\\
-set LOG_DIR=%APP_HOME%log\\
-set RUN_DIR=%APP_HOME%run\\
-set PID_DIR=%RUN_DIR%
+if "%CONFIG_DIR%" == "" (set LOG_DIR=%APP_HOME%log\\)
+if "%CONFIG_DIR%" == "" (set RUN_DIR=%APP_HOME%run\\)
+if "%CONFIG_DIR%" == "" (set PID_DIR=%RUN_DIR%)
 
+if "%PLUGINS_DIR%" == "" (set PLUGINS_DIR=%APP_HOME%plugins\\)
 if "%PLUGINS_ENABLED%" == "" (set PLUGINS_ENABLED=true)
+if "%PLUGINS_EXT_DIR%" == "" (set PLUGINS_EXT_DIR=%APP_HOME%plugins_ext\\)
 if "%PLUGINS_EXT_ENABLED%" == "" (set PLUGINS_EXT_ENABLED=false)
 
-set STARTUP_WAIT_TIME=3
-set SHUTDOWN_WAIT_TIME=30
+if "%STARTUP_WAIT_TIME%" == "" (set STARTUP_WAIT_TIME=3)
+if "%SHUTDOWN_WAIT_TIME%" == "" (set SHUTDOWN_WAIT_TIME=30)
 
 @rem Any variables set before this point can be overridden by the env file
 if exist "%ENV_FILE%" (

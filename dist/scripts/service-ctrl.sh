@@ -47,17 +47,17 @@ CONFIG_FILE="\${CONFIG_FILE:=\${CONFIG_DIR}/<DEFAULT_CONFIG_FILE>}"
 ENV_FILE="\${ENV_FILE:=\${CONFIG_DIR}/env.sh}"
 
 # Set up the default folder structure (this can be overridden in env.sh if required)
-PLUGINS_DIR="\${APP_HOME}/plugins"
-PLUGINS_EXT_DIR="\${APP_HOME}/plugins_ext"
-LOG_DIR="\${APP_HOME}/log"
-RUN_DIR="\${APP_HOME}/run"
-PID_DIR="\${RUN_DIR}"
+LOG_DIR="\${LOG_DIR:=\${APP_HOME}/log}"
+RUN_DIR="\${RUN_DIR:=\${APP_HOME}/run}"
+PID_DIR="\${PID_DIR:=\${RUN_DIR}}"
 
+PLUGINS_DIR="\${PLUGINS_DIR:={APP_HOME}/plugins}"
 PLUGINS_ENABLED="\${PLUGINS_ENABLED:=true}"
+PLUGINS_EXT_DIR="\${PLUGINS_EXT_DIR:=\${APP_HOME}/plugins_ext}"
 PLUGINS_EXT_ENABLED="\${PLUGINS_EXT_ENABLED:=false}"
 
-STARTUP_WAIT_TIME=3
-SHUTDOWN_WAIT_TIME=30
+STARTUP_WAIT_TIME="\${STARTUP_WAIT_TIME:=3}"
+SHUTDOWN_WAIT_TIME="\${SHUTDOWN_WAIT_TIME:=30}"
 
 # Any variables set before this point can be overridden by the env file
 if [ -f "\${ENV_FILE}" ]; then
