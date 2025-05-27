@@ -218,7 +218,13 @@ run() {
     CWD=`pwd`
     cd "\${RUN_DIR}"
     "\${JAVA_CMD}" \${JAVA_OPTS} \$APPLICATION_CLASS --config "\${CONFIG_FILE}" "\$@"
+    RUN_RESULT=\$?
     cd "\${CWD}"
+
+    if [ \$RUN_RESULT -ne 0 ]; then
+        echo "\${APPLICATION_NAME} failed to start"
+        exit \$RUN_RESULT
+    fi
 }
 
 start() {
