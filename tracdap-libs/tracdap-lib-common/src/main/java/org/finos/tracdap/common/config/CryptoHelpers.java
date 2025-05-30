@@ -278,10 +278,9 @@ public class CryptoHelpers {
             if (mime) {
 
                 var base64 = key
-                        .replace("-----BEGIN PUBLIC KEY-----", "")
-                        .replaceAll("\\r", "")
-                        .replaceAll("\\n", "")
-                        .replace("-----END PUBLIC KEY-----", "");
+                        .replaceAll("-----BEGIN (.*)-----", "")
+                        .replaceAll("-----END (.*)-----", "")
+                        .replaceAll("\\s+", "");
 
                 encoded = Base64.getMimeDecoder().decode(base64);
             } else {
@@ -327,10 +326,9 @@ public class CryptoHelpers {
             if (mime) {
 
                 var base64 = key
-                        .replace("-----BEGIN PRIVATE KEY-----", "")
-                        .replaceAll("\\r", "")
-                        .replaceAll("\\n", "")
-                        .replace("-----END PRIVATE KEY-----", "");
+                        .replaceAll("-----BEGIN (.*)-----", "")
+                        .replaceAll("-----END (.*)-----", "")
+                        .replaceAll("\\s+", "");
 
                 encoded = Base64.getMimeDecoder().decode(base64);
             } else {
