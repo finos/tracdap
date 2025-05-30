@@ -15,29 +15,24 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.config;
+package org.finos.tracdap.common.config.local;
 
 import org.finos.tracdap.common.exception.EConfigLoad;
-import org.finos.tracdap.common.exception.ETracInternal;
-import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.startup.StartupLog;
 
 import org.slf4j.event.Level;
 
 import javax.crypto.SecretKeyFactory;
 import javax.crypto.spec.PBEKeySpec;
-import java.nio.charset.StandardCharsets;
 import java.security.*;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
-import java.util.Arrays;
 import java.util.Base64;
 import java.util.List;
-import java.util.Map;
 
 
-public class CryptoHelpers {
+public class JksHelpers {
 
     public static void writeTextEntry(
             KeyStore keystore, String secretKey,
@@ -58,20 +53,6 @@ public class CryptoHelpers {
         catch (IllegalArgumentException | GeneralSecurityException e) {
             var message = String.format("Failed to write secret [%s]: %s", alias, e.getMessage());
             throw new EConfigLoad(message, e);
-        }
-    }
-
-    public static void writeTextEntry(
-            KeyStore keystore, String secretKey,
-            String alias, String text, Map<String, String> attributes)
-            throws EConfigLoad {
-
-        writeTextEntry(keystore, secretKey, alias, text);
-
-        for (var attr : attributes.entrySet()) {
-
-            var attrAlias = alias + "$" + attr.getKey();
-            writeTextEntry(keystore, secretKey, attrAlias, attr.getValue());
         }
     }
 
@@ -114,13 +95,13 @@ public class CryptoHelpers {
 
             if (entry == null) {
                 var message = String.format("Secret is not present in the store: [%s]", alias);
-                StartupLog.log(CryptoHelpers.class, Level.ERROR, message);
+                StartupLog.log(JksHelpers.class, Level.ERROR, message);
                 throw new EConfigLoad(message);
             }
 
             if (!(entry instanceof KeyStore.SecretKeyEntry)) {
                 var message = String.format("Secret is not a secret key: [%s] is %s", alias, entry.getClass().getSimpleName());
-                StartupLog.log(CryptoHelpers.class, Level.ERROR, message);
+                StartupLog.log(JksHelpers.class, Level.ERROR, message);
                 throw new EConfigLoad(message);
             }
 
@@ -140,29 +121,6 @@ public class CryptoHelpers {
             var message = String.format("Failed to read secret [%s]: %s", alias, e.getMessage());
             throw new EConfigLoad(message, e);
         }
-    }
-
-    public static boolean containsAttribute(
-            KeyStore keystore, String alias, String attrName)
-            throws EConfigLoad {
-
-        try {
-            var attrAlias = alias + "$" + attrName;
-            return keystore.containsAlias(attrAlias);
-        }
-        catch (GeneralSecurityException e) {
-            var message = String.format("Failed to read secret [%s]: %s", alias, e.getMessage());
-            throw new EConfigLoad(message, e);
-        }
-    }
-
-    public static String readAttribute(
-            KeyStore keystore, String secretKey,
-            String alias, String attrName)
-            throws EConfigLoad {
-
-        var attrAlias = alias + "$" + attrName;
-        return readTextEntry(keystore, secretKey, attrAlias);
     }
 
     public static String encodePublicKey(PublicKey key, boolean mime) {

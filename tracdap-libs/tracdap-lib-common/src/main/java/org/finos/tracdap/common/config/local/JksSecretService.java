@@ -88,7 +88,7 @@ public class JksSecretService extends JksSecretLoader implements ISecretService 
     public String storePassword(String secretName, String password) {
 
         try {
-            CryptoHelpers.writeTextEntry(keystore, keystoreKey, secretName, password);
+            JksHelpers.writeTextEntry(keystore, keystoreKey, secretName, password);
             return secretName;
         }
         catch (EConfigLoad e) {
@@ -102,7 +102,7 @@ public class JksSecretService extends JksSecretLoader implements ISecretService 
     public void deleteSecret(String secretName) {
 
         try {
-            CryptoHelpers.deleteEntry(keystore, secretName);
+            JksHelpers.deleteEntry(keystore, secretName);
         }
         catch (EConfigLoad e) {
             var message = String.format("Password could not be saved to the key store: [%s] %s", secretName, e.getMessage());

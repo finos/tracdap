@@ -15,10 +15,9 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.config;
+package org.finos.tracdap.common.config.local;
 
 import org.finos.tracdap.common.exception.EConfigLoad;
-import org.finos.tracdap.common.exception.ETracInternal;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -26,7 +25,7 @@ import java.security.KeyPairGenerator;
 import java.security.KeyStore;
 import java.security.SecureRandom;
 
-public class CryptoHelpersTest {
+public class JksHelpersTest {
 
     @Test
     void roundTrip_password() throws Exception {
@@ -37,8 +36,8 @@ public class CryptoHelpersTest {
 
         var payload = "A bilge rat and a parrot";
 
-        CryptoHelpers.writeTextEntry(keystore, secretKey, "my_secret", payload);
-        var rtPayload = CryptoHelpers.readTextEntry(keystore, secretKey, "my_secret");
+        JksHelpers.writeTextEntry(keystore, secretKey, "my_secret", payload);
+        var rtPayload = JksHelpers.readTextEntry(keystore, secretKey, "my_secret");
 
         Assertions.assertEquals(payload, rtPayload);
     }
@@ -55,8 +54,8 @@ public class CryptoHelpersTest {
         var keyPair = keyGen.generateKeyPair();
 
         var publicKey = keyPair.getPublic();
-        var encoded = CryptoHelpers.encodePublicKey(publicKey, false);
-        var rtPublicKey = CryptoHelpers.decodePublicKey(encoded, false);
+        var encoded = JksHelpers.encodePublicKey(publicKey, false);
+        var rtPublicKey = JksHelpers.decodePublicKey(encoded, false);
 
         Assertions.assertEquals(publicKey, rtPublicKey);
     }
@@ -73,8 +72,8 @@ public class CryptoHelpersTest {
         var keyPair = keyGen.generateKeyPair();
 
         var privateKey = keyPair.getPrivate();
-        var encoded = CryptoHelpers.encodePrivateKey(privateKey, false);
-        var rtPrivateKey = CryptoHelpers.decodePrivateKey(encoded, false);
+        var encoded = JksHelpers.encodePrivateKey(privateKey, false);
+        var rtPrivateKey = JksHelpers.decodePrivateKey(encoded, false);
 
         Assertions.assertEquals(privateKey, rtPrivateKey);
     }
@@ -91,8 +90,8 @@ public class CryptoHelpersTest {
         var keyPair = keyGen.generateKeyPair();
 
         var publicKey = keyPair.getPublic();
-        var encoded = CryptoHelpers.encodePublicKey(publicKey, true);
-        var rtPublicKey = CryptoHelpers.decodePublicKey(encoded, true);
+        var encoded = JksHelpers.encodePublicKey(publicKey, true);
+        var rtPublicKey = JksHelpers.decodePublicKey(encoded, true);
 
         Assertions.assertEquals(publicKey, rtPublicKey);
     }
@@ -109,8 +108,8 @@ public class CryptoHelpersTest {
         var keyPair = keyGen.generateKeyPair();
 
         var privateKey = keyPair.getPrivate();
-        var encoded = CryptoHelpers.encodePrivateKey(privateKey, true);
-        var rtPrivateKey = CryptoHelpers.decodePrivateKey(encoded,  true);
+        var encoded = JksHelpers.encodePrivateKey(privateKey, true);
+        var rtPrivateKey = JksHelpers.decodePrivateKey(encoded,  true);
 
         Assertions.assertEquals(privateKey, rtPrivateKey);
     }
@@ -132,17 +131,17 @@ public class CryptoHelpersTest {
 
         var publicKey = keyPair.getPublic();
         var privateKey = keyPair.getPrivate();
-        var encodedPublic = CryptoHelpers.encodePublicKey(publicKey, false);
-        var encodedPrivate = CryptoHelpers.encodePrivateKey(privateKey, false);
+        var encodedPublic = JksHelpers.encodePublicKey(publicKey, false);
+        var encodedPrivate = JksHelpers.encodePrivateKey(privateKey, false);
 
-        CryptoHelpers.writeTextEntry(keystore, secretKey, "public_key", encodedPublic);
-        CryptoHelpers.writeTextEntry(keystore, secretKey, "private_key", encodedPrivate);
+        JksHelpers.writeTextEntry(keystore, secretKey, "public_key", encodedPublic);
+        JksHelpers.writeTextEntry(keystore, secretKey, "private_key", encodedPrivate);
 
-        var rtEncodedPublic = CryptoHelpers.readTextEntry(keystore, secretKey, "public_key");
-        var rtEncodedPrivate = CryptoHelpers.readTextEntry(keystore, secretKey, "private_key");
+        var rtEncodedPublic = JksHelpers.readTextEntry(keystore, secretKey, "public_key");
+        var rtEncodedPrivate = JksHelpers.readTextEntry(keystore, secretKey, "private_key");
 
-        var rtPublicKey = CryptoHelpers.decodePublicKey(rtEncodedPublic, false);
-        var rtPrivateKey = CryptoHelpers.decodePrivateKey(rtEncodedPrivate, false);
+        var rtPublicKey = JksHelpers.decodePublicKey(rtEncodedPublic, false);
+        var rtPrivateKey = JksHelpers.decodePrivateKey(rtEncodedPrivate, false);
 
         Assertions.assertEquals(publicKey, rtPublicKey);
         Assertions.assertEquals(privateKey, rtPrivateKey);
@@ -160,20 +159,20 @@ public class CryptoHelpersTest {
 
         var payload = "A bilge rat and a parrot";
 
-        CryptoHelpers.writeTextEntry(keystore, secretKey, "my_secret", payload);
+        JksHelpers.writeTextEntry(keystore, secretKey, "my_secret", payload);
 
         Assertions.assertThrows(EConfigLoad.class, () ->
-                CryptoHelpers.readTextEntry(keystore, secretKey, "different_secret"));
+                JksHelpers.readTextEntry(keystore, secretKey, "different_secret"));
     }
 
     @Test
     void decodeGarbled() {
 
-        Assertions.assertThrows(EConfigLoad.class, () ->  CryptoHelpers.decodePublicKey("asdfpasdfasef", false));
-        Assertions.assertThrows(EConfigLoad.class, () -> CryptoHelpers.decodePrivateKey("asdfasdfasdf", false));
+        Assertions.assertThrows(EConfigLoad.class, () ->  JksHelpers.decodePublicKey("asdfpasdfasef", false));
+        Assertions.assertThrows(EConfigLoad.class, () -> JksHelpers.decodePrivateKey("asdfasdfasdf", false));
 
-        Assertions.assertThrows(EConfigLoad.class, () ->  CryptoHelpers.decodePublicKey("asdfpasdfasef", true));
-        Assertions.assertThrows(EConfigLoad.class, () -> CryptoHelpers.decodePrivateKey("asdfasdfasdf", true));
+        Assertions.assertThrows(EConfigLoad.class, () ->  JksHelpers.decodePublicKey("asdfpasdfasef", true));
+        Assertions.assertThrows(EConfigLoad.class, () -> JksHelpers.decodePrivateKey("asdfasdfasdf", true));
     }
 
     @Test
@@ -188,13 +187,13 @@ public class CryptoHelpersTest {
         var keyPair = keyGen.generateKeyPair();
 
         var publicKey = keyPair.getPublic();
-        var publicEncoded = CryptoHelpers.encodePublicKey(publicKey, false);
+        var publicEncoded = JksHelpers.encodePublicKey(publicKey, false);
 
         var privateKey = keyPair.getPrivate();
-        var privateEncoded = CryptoHelpers.encodePrivateKey(privateKey, false);
+        var privateEncoded = JksHelpers.encodePrivateKey(privateKey, false);
 
-        Assertions.assertThrows(EConfigLoad.class, () ->  CryptoHelpers.decodePublicKey(privateEncoded, false));
-        Assertions.assertThrows(EConfigLoad.class, () -> CryptoHelpers.decodePrivateKey(publicEncoded, false));
+        Assertions.assertThrows(EConfigLoad.class, () ->  JksHelpers.decodePublicKey(privateEncoded, false));
+        Assertions.assertThrows(EConfigLoad.class, () -> JksHelpers.decodePrivateKey(publicEncoded, false));
     }
 
     @Test
@@ -209,12 +208,12 @@ public class CryptoHelpersTest {
         var keyPair = keyGen.generateKeyPair();
 
         var publicKey = keyPair.getPublic();
-        var publicEncoded = CryptoHelpers.encodePublicKey(publicKey, true);
+        var publicEncoded = JksHelpers.encodePublicKey(publicKey, true);
 
         var privateKey = keyPair.getPrivate();
-        var privateEncoded = CryptoHelpers.encodePrivateKey(privateKey, true);
+        var privateEncoded = JksHelpers.encodePrivateKey(privateKey, true);
 
-        Assertions.assertThrows(EConfigLoad.class, () ->  CryptoHelpers.decodePublicKey(publicEncoded, false));
-        Assertions.assertThrows(EConfigLoad.class, () -> CryptoHelpers.decodePrivateKey(privateEncoded, false));
+        Assertions.assertThrows(EConfigLoad.class, () ->  JksHelpers.decodePublicKey(publicEncoded, false));
+        Assertions.assertThrows(EConfigLoad.class, () -> JksHelpers.decodePrivateKey(privateEncoded, false));
     }
 }
