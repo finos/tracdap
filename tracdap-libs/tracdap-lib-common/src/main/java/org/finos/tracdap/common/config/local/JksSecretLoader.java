@@ -150,38 +150,6 @@ public class JksSecretLoader implements ISecretLoader {
     }
 
     @Override
-    public boolean hasAttr(String secretName, String attrName) {
-
-        try {
-            return CryptoHelpers.containsAttribute(keystore, secretName, attrName);
-        }
-        catch (EConfigLoad e) {
-
-            var message = String.format("Password could not be retrieved from the key store: [%s, %s] %s",
-                    secretName, attrName, e.getMessage());
-
-            StartupLog.log(this, Level.ERROR, message);
-            throw new EConfigLoad(message, e);
-        }
-    }
-
-    @Override
-    public String loadAttr(String secretName, String attrName) {
-
-        try {
-            return CryptoHelpers.readAttribute(keystore, keystoreKey, secretName, attrName);
-        }
-        catch (EConfigLoad e) {
-
-            var message = String.format("Attribute could not be retrieved from the key store: [%s, %s] %s",
-                    secretName, attrName, e.getMessage());
-
-            StartupLog.log(this, Level.ERROR, message);
-            throw new EConfigLoad(message, e);
-        }
-    }
-
-    @Override
     public PublicKey loadPublicKey(String secretName) {
 
         try {

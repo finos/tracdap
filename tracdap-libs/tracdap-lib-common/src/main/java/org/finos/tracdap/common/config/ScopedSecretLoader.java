@@ -60,18 +60,8 @@ public class ScopedSecretLoader implements ISecretLoader {
     }
 
     @Override
-    public boolean hasAttr(String secretName, String attrName) {
-        return delegate.hasAttr(translateScope(secretName), attrName);
-    }
-
-    @Override
     public String loadPassword(String secretName) {
         return delegate.loadPassword(translateScope(secretName));
-    }
-
-    @Override
-    public String loadAttr(String secretName, String attrName) {
-        return delegate.loadAttr(translateScope(secretName), attrName);
     }
 
     @Override
