@@ -29,28 +29,6 @@ import java.security.SecureRandom;
 public class CryptoHelpersTest {
 
     @Test
-    void passwordHashing() {
-
-        var password = "aKpeLiBuh-as£ASDF";
-
-        var random = new SecureRandom();
-        var salt = new byte[16];
-        random.nextBytes(salt);
-
-        var hash = CryptoHelpers.encodeSSHA512(password, salt);
-
-        Assertions.assertTrue(CryptoHelpers.validateSSHA512(hash, password));
-        Assertions.assertFalse(CryptoHelpers.validateSSHA512(hash, "wrong_password"));
-    }
-
-    @Test
-    void passwordHashing_invalid() {
-
-        Assertions.assertThrows(ETracInternal.class, () ->
-                CryptoHelpers.validateSSHA512("invalid_hash", "any_password"));
-    }
-
-    @Test
     void roundTrip_password() throws Exception {
 
         var secretKey = "qdierj-ejcuw-ejcude";

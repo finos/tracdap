@@ -165,61 +165,6 @@ public class CryptoHelpers {
         return readTextEntry(keystore, secretKey, attrAlias);
     }
 
-    public static String encodeSSHA512(String password, byte[] salt) {
-
-        // Output hash string in Modular Crypt Format
-        // https://en.wikipedia.org/wiki/Crypt_(C)
-
-        try {
-
-            var hasher = MessageDigest.getInstance("SHA-512");
-            hasher.update(password.getBytes(StandardCharsets.UTF_8));
-            hasher.update(salt);
-
-            var scheme = 6;
-            var hash = hasher.digest();
-
-            var b64 = Base64.getEncoder().withoutPadding();
-            var encodedSalt = b64.encodeToString(salt);
-            var encodedHash = b64.encodeToString(hash);
-
-            return String.format("$%d$%s$%s", scheme, encodedSalt, encodedHash);
-        }
-        catch (NoSuchAlgorithmException e) {
-            throw new EUnexpected(e);
-        }
-    }
-
-    public static boolean validateSSHA512(String phc, String password) {
-
-        try {
-
-            var phcSections = phc.split("\\$");
-
-            if (phcSections.length != 4 || !"6".equals(phcSections[1]))
-                throw new ETracInternal("Invalid password hash");
-
-            var encodedSalt = phcSections[2];
-            var encodedHash = phcSections[3];
-
-            var b64 = Base64.getDecoder();
-            var originalSalt = b64.decode(encodedSalt);
-            var originalHash = b64.decode(encodedHash);
-
-            var hasher = MessageDigest.getInstance("SHA-512");
-            hasher.update(password.getBytes(StandardCharsets.UTF_8));
-            hasher.update(originalSalt);
-
-            var hash = hasher.digest();
-
-            return Arrays.equals(hash, originalHash);
-        }
-        catch (NoSuchAlgorithmException e) {
-            throw new EUnexpected(e);
-        }
-    }
-
-
     public static String encodePublicKey(PublicKey key, boolean mime) {
 
         try {
