@@ -57,17 +57,7 @@ class NoSecrets implements ISecretLoader, ISecretService {
     }
 
     @Override
-    public boolean hasAttr(String secretName, String attrName) {
-        return false;
-    }
-
-    @Override
     public String loadPassword(String secretName) {
-        throw new EConfig(NO_SECRETS);
-    }
-
-    @Override
-    public String loadAttr(String secretName, String attrName) {
         throw new EConfig(NO_SECRETS);
     }
 

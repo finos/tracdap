@@ -127,7 +127,7 @@ public class JksSecretLoader implements ISecretLoader {
     public boolean hasSecret(String secretName) {
 
         try {
-            return CryptoHelpers.containsEntry(keystore, secretName);
+            return JksHelpers.containsEntry(keystore, secretName);
         }
         catch (EConfigLoad e) {
             var message = String.format("Secret could not be found in the key store: [%s] %s", secretName, e.getMessage());
@@ -140,7 +140,7 @@ public class JksSecretLoader implements ISecretLoader {
     public String loadPassword(String secretName) {
 
         try {
-            return CryptoHelpers.readTextEntry(keystore, keystoreKey, secretName);
+            return JksHelpers.readTextEntry(keystore, keystoreKey, secretName);
         }
         catch (EConfigLoad e) {
             var message = String.format("Password could not be retrieved from the key store: [%s] %s", secretName, e.getMessage());
@@ -150,43 +150,11 @@ public class JksSecretLoader implements ISecretLoader {
     }
 
     @Override
-    public boolean hasAttr(String secretName, String attrName) {
-
-        try {
-            return CryptoHelpers.containsAttribute(keystore, secretName, attrName);
-        }
-        catch (EConfigLoad e) {
-
-            var message = String.format("Password could not be retrieved from the key store: [%s, %s] %s",
-                    secretName, attrName, e.getMessage());
-
-            StartupLog.log(this, Level.ERROR, message);
-            throw new EConfigLoad(message, e);
-        }
-    }
-
-    @Override
-    public String loadAttr(String secretName, String attrName) {
-
-        try {
-            return CryptoHelpers.readAttribute(keystore, keystoreKey, secretName, attrName);
-        }
-        catch (EConfigLoad e) {
-
-            var message = String.format("Attribute could not be retrieved from the key store: [%s, %s] %s",
-                    secretName, attrName, e.getMessage());
-
-            StartupLog.log(this, Level.ERROR, message);
-            throw new EConfigLoad(message, e);
-        }
-    }
-
-    @Override
     public PublicKey loadPublicKey(String secretName) {
 
         try {
-            var base64 = CryptoHelpers.readTextEntry(keystore, keystoreKey, secretName);
-            return CryptoHelpers.decodePublicKey(base64, false);
+            var base64 = JksHelpers.readTextEntry(keystore, keystoreKey, secretName);
+            return JksHelpers.decodePublicKey(base64, false);
         }
         catch (EConfigLoad e) {
             var message = String.format("Public key could not be retrieved from the key store: [%s] %s", secretName, e.getMessage());
@@ -199,8 +167,8 @@ public class JksSecretLoader implements ISecretLoader {
     public PrivateKey loadPrivateKey(String secretName) {
 
         try {
-            var base64 = CryptoHelpers.readTextEntry(keystore, keystoreKey, secretName);
-            return CryptoHelpers.decodePrivateKey(base64, false);
+            var base64 = JksHelpers.readTextEntry(keystore, keystoreKey, secretName);
+            return JksHelpers.decodePrivateKey(base64, false);
         }
         catch (EConfigLoad e) {
             var message = String.format("Private key could not be retrieved from the key store: [%s] %s", secretName, e.getMessage());
