@@ -17,17 +17,21 @@
 
 package org.finos.tracdap.common.storage;
 
+import org.finos.tracdap.common.config.ConfigDefaults;
 import org.finos.tracdap.common.config.ConfigHelpers;
+import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.codec.ICodecManager;
 import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.common.exception.EStorageConfig;
 import org.finos.tracdap.common.plugin.IPluginManager;
 import org.finos.tracdap.config.PluginConfig;
+import org.finos.tracdap.config.TenantConfig;
 import org.finos.tracdap.metadata.ResourceDefinition;
 
 import io.netty.channel.EventLoopGroup;
 
+import org.finos.tracdap.metadata.StorageLayout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -44,7 +48,11 @@ public class StorageManager implements IStorageManager, AutoCloseable {
     private final ICodecManager formats;
     private final EventLoopGroup eventLoopGroup;
 
+
     private final Map<String, StorageBackend> storage;
+    private String defaultLocation;
+    private String defaultFormat;
+    private StorageLayout defaultLayout;
 
     public StorageManager(
             IPluginManager plugins, ConfigManager configManager,
@@ -56,6 +64,48 @@ public class StorageManager implements IStorageManager, AutoCloseable {
         this.eventLoopGroup = eventLoopGroup;
 
         this.storage = new ConcurrentHashMap<>();
+        this.defaultLocation = null;
+        this.defaultFormat = ConfigDefaults.STORAGE_DEFAULT_FORMAT;
+        this.defaultLayout = ConfigDefaults.STORAGE_DEFAULT_LAYOUT;
+    }
+
+    public void updateStorageDefaults(TenantConfig tenantConfig) {
+
+        var defaultLocation = ConfigHelpers.readString(
+                "storage defaults", tenantConfig.getPropertiesMap(),
+                ConfigKeys.STORAGE_DEFAULT_LOCATION, false);
+
+        var defaultFormat = ConfigHelpers.readStringOrDefault(
+                "storage defaults", tenantConfig.getPropertiesMap(),
+                ConfigKeys.STORAGE_DEFAULT_FORMAT,
+                ConfigDefaults.STORAGE_DEFAULT_FORMAT);
+
+        var defaultLayout = ConfigHelpers.readStringOrDefault(
+                "storage defaults", tenantConfig.getPropertiesMap(),
+                ConfigKeys.STORAGE_DEFAULT_LAYOUT,
+                ConfigDefaults.STORAGE_DEFAULT_LAYOUT.name());
+
+        this.defaultLocation = defaultLocation;
+        this.defaultFormat = defaultFormat;
+        this.defaultLayout = StorageLayout.valueOf(defaultLayout);
+    }
+
+    @Override
+    public String defaultLocation() {
+        if (defaultLocation == null || defaultLocation.isEmpty()) {
+            throw new EStorageConfig("Default storage location is not configured");
+        }
+        return defaultLocation;
+    }
+
+    @Override
+    public String defaultFormat() {
+        return defaultFormat;
+    }
+
+    @Override
+    public StorageLayout defaultLayout() {
+        return defaultLayout;
     }
 
     public void addStorage(String storageKey, ResourceDefinition resourceConfig) {
@@ -94,10 +144,6 @@ public class StorageManager implements IStorageManager, AutoCloseable {
 
         if (previousBackend != null)
             stopStorageBackend(storageKey, previousBackend);
-    }
-
-    public List<String> listStorageKeys() {
-        return List.copyOf(storage.keySet());
     }
 
     @Override
