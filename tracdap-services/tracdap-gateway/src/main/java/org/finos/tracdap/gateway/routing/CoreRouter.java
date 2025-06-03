@@ -201,16 +201,28 @@ abstract class CoreRouter extends ChannelDuplexHandler {
         }
         else {
 
-            log.error("PROXY CONNECT FAILED: conn = {}, target = {} {}", connId, targetConfig.getHost(), targetConfig.getPort(), future.cause());
-
-            reportProxyRouteError(ctx, future.cause(), CoreRouterLink.WRITE_DIRECTION);
+            if (future.cause() != null) {
+                log.error(
+                        "PROXY CONNECT FAILED: conn = {}, target = {} {}, {}",
+                        connId, targetConfig.getHost(), targetConfig.getPort(), future.cause().getMessage(),
+                        future.cause());
+            }
+            else {
+                log.error(
+                        "PROXY CONNECT FAILED: conn = {}, target = {} {}, {}",
+                        connId, targetConfig.getHost(), targetConfig.getPort(), "No details available");
+            }
 
             while (!target.outboundQueue.isEmpty()) {
                 var queuedMsg = target.outboundQueue.poll();
                 ReferenceCountUtil.release(queuedMsg);
             }
 
+            // No need to close the target channel, it did not ever open
+            // Remove the target, so closing the router does not try to clean it up
             targets.remove(target.routeIndex);
+
+            reportProxyRouteError(ctx, future.cause(), CoreRouterLink.WRITE_DIRECTION);
         }
     }
 
