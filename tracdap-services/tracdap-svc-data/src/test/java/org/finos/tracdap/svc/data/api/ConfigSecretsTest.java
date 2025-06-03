@@ -53,9 +53,12 @@ import static org.finos.tracdap.test.concurrent.ConcurrentTestHelpers.waitFor;
 
 public class ConfigSecretsTest {
 
-    public static final String TRAC_CONFIG_SECRET = "config/trac-unit-secrets.yaml";
-    public static final String TRAC_RESOURCES_SECRET = "config/trac-unit-secrets-resources.yaml";
+    public static final String TRAC_CONFIG_SECRET = "config/trac-secrets.yaml";
+    public static final String TRAC_TENANTS_SECRET = "config/trac-secrets-tenants.yaml";
+    public static final String TRAC_RESOURCES_SECRET = "config/trac-secrets-resources.yaml";
+    public static final String TRAC_RESOURCES2_SECRET = "config/trac-secrets-resources.yaml";
     public static final String TEST_TENANT = "ACME_CORP";
+    public static final String TEST_TENANT2 = "SOME_OTHER_CORP";
 
     private static final Duration TEST_TIMEOUT = Duration.ofSeconds(20);
 
@@ -65,9 +68,10 @@ public class ConfigSecretsTest {
     protected static TracDataApiGrpc.TracDataApiStub dataClient;
 
     @RegisterExtension
-    public static final PlatformTest platform = PlatformTest.forConfig(TRAC_CONFIG_SECRET)
+    public static final PlatformTest platform = PlatformTest.forConfig(TRAC_CONFIG_SECRET, List.of(TRAC_TENANTS_SECRET))
             .runDbDeploy(true)
             .bootstrapTenant(TEST_TENANT, TRAC_RESOURCES_SECRET)
+            .bootstrapTenant(TEST_TENANT2, TRAC_RESOURCES2_SECRET)
             .startService(TracMetadataService.class)
             .startService(TracDataService.class)
             .startService(TracAdminService.class)

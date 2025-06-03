@@ -38,6 +38,7 @@ import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 import java.time.Duration;
+import java.util.List;
 
 import static org.finos.tracdap.test.data.DataApiTestHelpers.readRequest;
 import static org.finos.tracdap.test.concurrent.ConcurrentTestHelpers.resultOf;
@@ -46,12 +47,12 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 
-abstract class TenantSeparationTest {
+class TenantSeparationTest {
 
-    public static final String TRAC_CONFIG_UNIT = "config/trac-unit.yaml";
-    public static final String TRAC_RESOURCES_UNIT = "config/trac-unit-resources.yaml";
-    public static final String TRAC_CONFIG_ENV_VAR = "TRAC_CONFIG_FILE";
-    public static final String TRAC_RESOURCES_ENV_VAR = "TRAC_RESOURCES_FILE";
+    public static final String TRAC_CONFIG_UNIT = "config/trac-secrets.yaml";
+    public static final String TRAC_TENANTS_UNIT = "config/trac-secrets-tenants.yaml";
+    public static final String TRAC_RESOURCES = "config/trac-secrets-resources.yaml";
+    public static final String TRAC_RESOURCES2 = "config/trac-secrets-resources.yaml";
     public static final String TEST_TENANT = "ACME_CORP";
     public static final String TEST_TENANT_2 = "SOME_OTHER_CORP";
     public static final Duration TEST_TIMEOUT = Duration.ofSeconds(20);
@@ -61,71 +62,27 @@ abstract class TenantSeparationTest {
     protected TracMetadataApiGrpc.TracMetadataApiFutureStub metaClient;
     protected TracDataApiGrpc.TracDataApiStub dataClient;
 
+    @RegisterExtension
+    public static final PlatformTest platform = PlatformTest.forConfig(TRAC_CONFIG_UNIT, List.of(TRAC_TENANTS_UNIT))
+            .runDbDeploy(true)
+            .bootstrapTenant(TEST_TENANT, TRAC_RESOURCES)
+            .bootstrapTenant(TEST_TENANT_2, TRAC_RESOURCES2)
+            .startService(TracMetadataService.class)
+            .startService(TracDataService.class)
+            .startService(TracAdminService.class)
+            .build();
 
-    // Include this test case as a unit test
-    static class UnitTest extends TenantSeparationTest {
-
-        @RegisterExtension
-        public static final PlatformTest platform = PlatformTest.forConfig(TRAC_CONFIG_UNIT)
-                .runDbDeploy(true)
-                .bootstrapTenant(TEST_TENANT, TRAC_RESOURCES_UNIT)
-                .addTenant(TEST_TENANT_2)
-                .startService(TracMetadataService.class)
-                .startService(TracDataService.class)
-                .startService(TracAdminService.class)
-                .build();
-
-        @BeforeAll
-        static void setupClass() {
-            elg = new NioEventLoopGroup(2);
-        }
-
-        @BeforeEach
-        void setup() {
-            execContext = new DataContext(elg.next(), new RootAllocator());
-            metaClient = platform.metaClientFuture();
-            dataClient = platform.dataClient();
-        }
+    @BeforeAll
+    static void setupClass() {
+        elg = new NioEventLoopGroup(2);
     }
 
-    // Include this test case for integration against different storage backends
-    @Tag("integration")
-    @Tag("int-storage")
-    @Tag("all-platforms")
-    static class IntegrationTest extends TenantSeparationTest {
-
-        private static final String TRAC_CONFIG_FILE = System.getenv(TRAC_CONFIG_ENV_VAR);
-        private static final String TRAC_RESOURCES_FILE = System.getenv(TRAC_RESOURCES_ENV_VAR);
-
-        @RegisterExtension
-        public static final PlatformTest platform = PlatformTest.forConfig(TRAC_CONFIG_FILE)
-                .runDbDeploy(true)
-                .manageDataPrefix(true)
-                .bootstrapTenant(TEST_TENANT, TRAC_RESOURCES_FILE)
-                .addTenant(TEST_TENANT_2)
-                .startService(TracAdminService.class)
-                .startService(TracMetadataService.class)
-                .startService(TracDataService.class)
-                .build();
-
-        @BeforeAll
-        static void setupClass() {
-            elg = new NioEventLoopGroup(2);
-        }
-
-        @AfterAll
-        static void tearDownClass() {
-            elg.shutdownGracefully();
-        }
-
-        @BeforeEach
-        void setup() {
-            execContext = new DataContext(elg.next(), new RootAllocator());
-            metaClient = platform.metaClientFuture();
-            dataClient = platform.dataClient();
-        }
+    @BeforeEach
+    void setup() {
+        execContext = new DataContext(elg.next(), new RootAllocator());
+        metaClient = platform.metaClientFuture();
+        dataClient = platform.dataClient();
     }
-
 
     @Test
     void testCreateFile_tenantOmitted() {
