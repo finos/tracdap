@@ -17,7 +17,7 @@
 
 package org.finos.tracdap.common.exec;
 
-import org.finos.tracdap.config.StorageConfig;
+import org.finos.tracdap.config.TenantConfig;
 
 import java.io.Serializable;
 import java.net.InetSocketAddress;
@@ -60,5 +60,5 @@ public interface IBatchExecutor<TState extends Serializable> {
     // Optional feature - storage mapping
     TState configureBatchStorage(
             String batchKey, TState batchState,
-            StorageConfig storageConfig, Consumer<StorageConfig> storageUpdate);
+            TenantConfig tenantConfig, Consumer<TenantConfig> storageUpdate);
 }
