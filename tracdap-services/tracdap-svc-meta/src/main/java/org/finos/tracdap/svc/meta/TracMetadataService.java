@@ -22,7 +22,6 @@ import org.finos.tracdap.api.internal.InternalMessagingProto;
 import org.finos.tracdap.api.internal.InternalMetadataProto;
 import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.config.ConfigManager;
-import org.finos.tracdap.common.config.DynamicConfig;
 import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.common.middleware.GrpcConcern;
 import org.finos.tracdap.common.netty.NettyHelpers;
@@ -33,8 +32,6 @@ import org.finos.tracdap.common.util.InterfaceLogging;
 import org.finos.tracdap.common.validation.ValidationConcern;
 import org.finos.tracdap.config.PlatformConfig;
 import org.finos.tracdap.common.metadata.dal.IMetadataDal;
-import org.finos.tracdap.metadata.ResourceDefinition;
-import org.finos.tracdap.svc.meta.api.MessageProcessor;
 import org.finos.tracdap.svc.meta.services.ConfigService;
 import org.finos.tracdap.svc.meta.services.MetadataReadService;
 import org.finos.tracdap.svc.meta.services.MetadataSearchService;
@@ -54,7 +51,6 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Properties;
 import java.util.concurrent.*;
-import java.util.stream.Collectors;
 
 
 public class TracMetadataService extends TracServiceBase {
@@ -123,21 +119,13 @@ public class TracMetadataService extends TracServiceBase {
             // Set up services and APIs
             var dalWithLogging = InterfaceLogging.wrap(dal, IMetadataDal.class);
 
-            // Load existing resources from the metadata store
-            var tenants = dal.listTenants();
-            var resources = new DynamicConfig.Resources();
-
-            for (var tenant : tenants)
-                loadResources(tenant.getTenantCode(), resources);
-
-            var readService = new MetadataReadService(dalWithLogging, platformConfig, resources);
+            var readService = new MetadataReadService(dalWithLogging, platformConfig);
             var writeService = new MetadataWriteService(dalWithLogging);
             var searchService = new MetadataSearchService(dalWithLogging);
             var configService = new ConfigService(dalWithLogging);
 
             var publicApi = new TracMetadataApi(readService, writeService, searchService, configService);
             var internalApi = new InternalMetadataApi(readService, writeService, searchService, configService);
-            var messageProcessor = new MessageProcessor(resources, dal);
 
             // Common framework for cross-cutting concerns
             var commonConcerns = buildCommonConcerns();
@@ -153,8 +141,7 @@ public class TracMetadataService extends TracServiceBase {
                     .forPort(servicePort)
                     .executor(executor)
                     .addService(publicApi)
-                    .addService(internalApi)
-                    .addService(messageProcessor);
+                    .addService(internalApi);
 
             // Apply common concerns
             this.server = commonConcerns
@@ -290,25 +277,6 @@ public class TracMetadataService extends TracServiceBase {
             var message = "Config property must be an integer: " + propKey + ", got value '" + propValue + "'";
             log.error(message);
             throw new EStartup(message);
-        }
-    }
-
-    void loadResources(String tenant, DynamicConfig<ResourceDefinition> resources) {
-
-        var configEntries = dal.listConfigEntries(tenant, ConfigKeys.TRAC_RESOURCES, false);
-
-        var selectors = configEntries.stream()
-                .map(entry -> entry.getDetails().getObjectSelector())
-                .collect(Collectors.toList());
-
-        var resourceObjects = dal.loadObjects(tenant, selectors);
-
-        for (int i = 0; i < configEntries.size(); i++) {
-
-            var resourceKey = configEntries.get(i).getConfigKey();
-            var resourceDef = resourceObjects.get(i).getDefinition().getResource();
-
-            resources.addEntry(resourceKey, resourceDef);
         }
     }
 }
