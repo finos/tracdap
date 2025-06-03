@@ -19,6 +19,7 @@ package org.finos.tracdap.svc.data.service;
 
 import org.finos.tracdap.api.*;
 import org.finos.tracdap.api.internal.InternalMetadataApiGrpc;
+import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.common.async.Futures;
 import org.finos.tracdap.common.data.ArrowSchema;
 import org.finos.tracdap.common.data.DataPipeline;
@@ -34,9 +35,6 @@ import org.finos.tracdap.common.metadata.MetadataUtil;
 import org.finos.tracdap.common.metadata.PartKeys;
 import org.finos.tracdap.common.storage.IStorageManager;
 import org.finos.tracdap.common.validation.Validator;
-import org.finos.tracdap.config.StorageConfig;
-import org.finos.tracdap.config.TenantConfig;
-import org.finos.tracdap.metadata.*;
 
 import org.apache.arrow.memory.ArrowBuf;
 import org.slf4j.Logger;
@@ -62,8 +60,6 @@ public class DataService {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
-    private final StorageConfig storageConfig;
-    private final Map<String, TenantConfig> tenantConfig;
     private final IStorageManager storageManager;
     private final ICodecManager codecManager;
     private final InternalMetadataApiGrpc.InternalMetadataApiFutureStub metaClient;
@@ -72,14 +68,10 @@ public class DataService {
     private final Random random = new Random();
 
     public DataService(
-            StorageConfig storageConfig,
-            Map<String, TenantConfig> tenantConfig,
             IStorageManager storageManager,
             ICodecManager codecManager,
             InternalMetadataApiGrpc.InternalMetadataApiFutureStub metaClient) {
 
-        this.storageConfig = storageConfig;
-        this.tenantConfig = tenantConfig;
         this.storageManager = storageManager;
         this.codecManager = codecManager;
         this.metaClient = metaClient;
@@ -417,7 +409,7 @@ public class DataService {
         var timestamp = state.requestMetadata.requestTimestamp();
 
         var dataDef = createDataDef(request, state, dataItem);
-        var storageDef = createStorageDef(request.getTenant(), dataItem, storagePath, timestamp);
+        var storageDef = createStorageDef( dataItem, storagePath, timestamp);
 
         state.data = dataDef;
         state.storage = storageDef;
@@ -469,7 +461,7 @@ public class DataService {
         }
 
         state.data = updateDataDef(request, state, dataItem, prior.data);
-        state.storage = updateStorageDef(request.getTenant(), prior.storage, dataItem, storagePath, timestamp);
+        state.storage = updateStorageDef(prior.storage, dataItem, storagePath, timestamp);
 
         state.copy = state.storage
                 .getDataItemsOrThrow(dataItem)
@@ -578,10 +570,10 @@ public class DataService {
     }
 
     private StorageDefinition createStorageDef(
-            String tenant, String dataItem, String storagePath,
+            String dataItem, String storagePath,
             OffsetDateTime objectTimestamp) {
 
-        var storageItem = buildStorageItem(tenant, storagePath, objectTimestamp);
+        var storageItem = buildStorageItem(storagePath, objectTimestamp);
 
         return StorageDefinition.newBuilder()
                 .putDataItems(dataItem, storageItem)
@@ -589,34 +581,21 @@ public class DataService {
     }
 
     private StorageDefinition updateStorageDef(
-            String tenant, StorageDefinition priorDef,
+            StorageDefinition priorDef,
             String dataItem, String storagePath,
             OffsetDateTime objectTimestamp) {
 
-        var storageItem = buildStorageItem(tenant, storagePath, objectTimestamp);
+        var storageItem = buildStorageItem(storagePath, objectTimestamp);
 
         return priorDef.toBuilder()
                 .putDataItems(dataItem, storageItem)
                 .build();
     }
 
-    private StorageItem buildStorageItem(String tenant, String storagePath, OffsetDateTime objectTimestamp) {
+    private StorageItem buildStorageItem(String storagePath, OffsetDateTime objectTimestamp) {
 
-        // Currently tenant config is optional for single-tenant deployments, fall back to global defaults
-
-        var storageBucket = storageConfig.getDefaultBucket();
-        var storageFormat = storageConfig.getDefaultFormat();
-
-        if (tenantConfig.containsKey(tenant)) {
-
-            var tenantDefaults = tenantConfig.get(tenant);
-
-            if (tenantDefaults.hasDefaultBucket())
-                storageBucket = tenantDefaults.getDefaultBucket();
-
-            if (tenantDefaults.hasDefaultFormat())
-                storageFormat = tenantDefaults.getDefaultFormat();
-        }
+        var location = storageManager.defaultLocation();
+        var format = storageManager.defaultFormat();
 
         // For the time being, data has one incarnation and a single storage copy
 
@@ -625,9 +604,9 @@ public class DataService {
         var copy = StorageCopy.newBuilder()
                 .setCopyStatus(CopyStatus.COPY_AVAILABLE)
                 .setCopyTimestamp(MetadataCodec.encodeDatetime(objectTimestamp))
-                .setStorageKey(storageBucket)
+                .setStorageKey(location)
                 .setStoragePath(storagePath)
-                .setStorageFormat(storageFormat);
+                .setStorageFormat(format);
 
         var incarnation = StorageIncarnation.newBuilder()
                 .setIncarnationStatus(IncarnationStatus.INCARNATION_AVAILABLE)

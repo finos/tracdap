@@ -22,28 +22,27 @@ import org.finos.tracdap.api.DataServiceProto;
 import org.finos.tracdap.api.MetadataBatchRequest;
 import org.finos.tracdap.api.internal.InternalMessagingProto;
 import org.finos.tracdap.api.internal.InternalMetadataApiGrpc;
-import org.finos.tracdap.common.metadata.MetadataCodec;
-import org.finos.tracdap.common.metadata.MetadataConstants;
+import org.finos.tracdap.config.PlatformConfig;
+import org.finos.tracdap.config.ServiceConfig;
+import org.finos.tracdap.config.TenantConfig;
+import org.finos.tracdap.config.TenantConfigMap;
+import org.finos.tracdap.metadata.ConfigDetails;
+import org.finos.tracdap.metadata.ConfigEntry;
+import org.finos.tracdap.metadata.ResourceType;
+import org.finos.tracdap.common.config.ConfigHelpers;
 import org.finos.tracdap.common.middleware.GrpcConcern;
 import org.finos.tracdap.common.netty.*;
 import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.codec.CodecManager;
 import org.finos.tracdap.common.codec.ICodecManager;
 import org.finos.tracdap.common.config.ConfigManager;
-import org.finos.tracdap.common.exception.EPluginNotAvailable;
 import org.finos.tracdap.common.exception.EStartup;
-import org.finos.tracdap.common.exception.EStorageConfig;
 import org.finos.tracdap.common.plugin.PluginManager;
 import org.finos.tracdap.common.service.TracServiceConfig;
 import org.finos.tracdap.common.service.TracServiceBase;
-import org.finos.tracdap.common.storage.IStorageManager;
 import org.finos.tracdap.common.storage.StorageManager;
 import org.finos.tracdap.common.util.RoutingUtils;
 import org.finos.tracdap.common.validation.ValidationConcern;
-import org.finos.tracdap.config.PlatformConfig;
-import org.finos.tracdap.config.ServiceConfig;
-import org.finos.tracdap.config.StorageConfig;
-import org.finos.tracdap.metadata.ResourceType;
 import org.finos.tracdap.svc.data.api.MessageProcessor;
 import org.finos.tracdap.svc.data.api.TracDataApi;
 import org.finos.tracdap.svc.data.service.DataService;
@@ -57,6 +56,7 @@ import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import org.apache.arrow.memory.RootAllocator;
 import org.apache.arrow.memory.netty.NettyAllocationManager;
+import org.finos.tracdap.svc.data.service.TenantServices;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -84,7 +84,9 @@ public class TracDataService extends TracServiceBase {
     private GrpcConcern commonConcerns;
     private ManagedChannel metaClientChanel;
     private ManagedChannel metaBlockingChanel;
-    private StorageManager storage;
+    private InternalMetadataApiGrpc.InternalMetadataApiFutureStub metaClient;
+    private InternalMetadataApiGrpc.InternalMetadataApiBlockingStub metaClientBlocking;
+    private TenantServices.Map services;
     private Server server;
 
     public static void main(String[] args) {
@@ -102,14 +104,16 @@ public class TracDataService extends TracServiceBase {
 
         PlatformConfig platformConfig;
         ServiceConfig serviceConfig;
-        StorageConfig storageConfig;
+        TenantConfigMap tenantConfigMap;
 
         try {
             log.info("Loading TRAC platform config...");
 
             platformConfig = configManager.loadRootConfigObject(PlatformConfig.class);
             serviceConfig = platformConfig.getServicesOrThrow(ConfigKeys.DATA_SERVICE_KEY);
-            storageConfig = platformConfig.getStorage();
+
+            var tenantConfigUrl = ConfigHelpers.readString("tenant config file", platformConfig.getConfigMap(), ConfigKeys.TENANTS_CONFIG_KEY);
+            tenantConfigMap = configManager.loadConfigObject(tenantConfigUrl, TenantConfigMap.class);
 
             // TODO: Config validation
 
@@ -157,10 +161,10 @@ public class TracDataService extends TracServiceBase {
             commonConcerns = buildCommonConcerns();
 
             metaClientChanel = prepareMetadataClientChannel(platformConfig, clientChannelType);
-            var metaClient = prepareMetadataClient(eventLoopResolver, commonConcerns);
+            metaClient = prepareMetadataClient(eventLoopResolver, commonConcerns);
 
             metaBlockingChanel = prepareBlockingClientChannel(platformConfig, clientChannelType);
-            var metaClientBlocking = prepareMetadataClientBlocking(commonConcerns, metaBlockingChanel);
+            metaClientBlocking = prepareMetadataClientBlocking(commonConcerns, metaBlockingChanel);
 
             // TODO: Review arrow allocator config, for root and child allocators
 
@@ -184,24 +188,10 @@ public class TracDataService extends TracServiceBase {
             }
 
             var formats = new CodecManager(pluginManager, configManager);
-            storage = new StorageManager(pluginManager, configManager, formats, serviceGroup);
+            services = buildTenantServiceMap(tenantConfigMap, formats);
 
-            var tenantConfig = platformConfig.getTenantsMap();
-
-            for (var tenant : tenantConfig.keySet())
-                loadStorageResources(metaClientBlocking, tenant);
-
-            // TODO: Config checks need to happen after dynamic resources are added for a tenant
-            // Check default storage and format are available
-            // checkDefaultStorageAndFormat(storage, formats, storageConfig);
-
-            var fileSvc = new FileService(storageConfig, tenantConfig, storage, metaClient);
-            var dataSvc = new DataService(storageConfig, tenantConfig, storage, formats, metaClient);
-            var dataApi = new TracDataApi(dataSvc, fileSvc, eventLoopResolver, arrowAllocator, commonConcerns);
-
-            var messageProcessor = new MessageProcessor(
-                    metaClientBlocking, offloadExecutor, commonConcerns,
-                    storage, configManager.getSecrets());
+            var dataApi = new TracDataApi(services, eventLoopResolver, arrowAllocator, commonConcerns);
+            var messageProcessor = new MessageProcessor(services, metaClientBlocking, commonConcerns, offloadExecutor);
 
             var serverBuilder = NettyServerBuilder
                     .forPort(serviceConfig.getPort())
@@ -303,8 +293,58 @@ public class TracDataService extends TracServiceBase {
         return commonConcerns.configureClient(client);
     }
 
-    private void loadStorageResources(
-            InternalMetadataApiGrpc.InternalMetadataApiBlockingStub metadataClient, String tenant) {
+
+    private TenantServices.Map buildTenantServiceMap(TenantConfigMap tenantConfigMap, ICodecManager formats) {
+
+        var services = TenantServices.create();
+
+        for (var tenantConfigEntry : tenantConfigMap.getTenantsMap().entrySet()) {
+
+            var tenantCode = tenantConfigEntry.getKey();
+            var tenantConfig = tenantConfigEntry.getValue();
+            var tenantServices = buildTenantServices(tenantCode, tenantConfig, formats);
+
+            if (!services.addTenant(tenantCode, tenantServices)) {
+                log.warn("Failed to add tenant services for [{}]", tenantCode);
+                doShutdownTenant(tenantCode, tenantServices);
+            }
+        }
+
+        return services;
+    }
+
+    private TenantServices buildTenantServices(String tenantCode, TenantConfig tenantConfig, ICodecManager formats) {
+
+        log.info("Prepare tenant services: [{}]", tenantCode);
+
+        var secrets = configManager.getSecrets()
+                .scope(ConfigKeys.TENANT_SCOPE)
+                .scope(tenantCode);
+
+        var storageManager = buildTenantStorage(tenantCode, tenantConfig, formats);
+
+        var dataService = new DataService(storageManager, formats, metaClient);
+        var fileService = new FileService(storageManager, metaClient);
+
+        return new TenantServices(
+                tenantConfig,
+                dataService, fileService,
+                storageManager, secrets);
+    }
+
+    private StorageManager buildTenantStorage(String tenant, TenantConfig tenantConfig, ICodecManager formats) {
+
+        var storageManager = new StorageManager(pluginManager, configManager, formats, serviceGroup);
+
+        // Set default properties from tenant-level config
+        storageManager.updateStorageDefaults(tenantConfig);
+
+        // Add storage resources defined in the tenants config file
+        for (var resourceEntry : tenantConfig.getResourcesMap().entrySet()) {
+            if (resourceEntry.getValue().getResourceType() == ResourceType.INTERNAL_STORAGE) {
+                storageManager.addStorage(resourceEntry.getKey(), resourceEntry.getValue());
+            }
+        }
 
         var configList = ConfigListRequest.newBuilder()
                 .setTenant(tenant)
@@ -313,55 +353,48 @@ public class TracDataService extends TracServiceBase {
                 .build();
 
         var clientState = commonConcerns.prepareClientCall(Context.ROOT);
-        var client = clientState.configureClient(metadataClient);
-
+        var client = clientState.configureClient(metaClientBlocking);
 
         var listing = client.listConfigEntries(configList);
 
-        // For a bootstrap setup, do no fetch resources if none are configured yet
-        if (listing.getEntriesCount() == 0)
-            return;
-
-        var selectors = listing.getEntriesList().stream()
-                .map(entry -> entry.getDetails().getObjectSelector())
+        var duplicateEntries = listing.getEntriesList().stream()
+                .map(ConfigEntry::getConfigKey)
+                .filter(tenantConfig::containsResources)
                 .collect(Collectors.toList());
 
-        var batchRequest = MetadataBatchRequest.newBuilder()
-                .setTenant(tenant)
-                .addAllSelector(selectors)
-                .build();
-        var resourceObjects = client.readBatch(batchRequest);
-
-        for (var resourceObject : resourceObjects.getTagList()) {
-
-            var resourceKeyAttr = resourceObject.getAttrsOrThrow(MetadataConstants.TRAC_CONFIG_KEY);
-            var resourceKey = MetadataCodec.decodeStringValue(resourceKeyAttr);
-            var resourceDef = resourceObject.getDefinition().getResource();
-
-            storage.addStorage(resourceKey, resourceDef);
+        if (!duplicateEntries.isEmpty()) {
+            log.warn("Dynamic config ignored for statically defined resources: {}", String.join(", ", duplicateEntries));
         }
-    }
 
-    private void checkDefaultStorageAndFormat(IStorageManager storage, ICodecManager formats, StorageConfig config) {
+        var filteredEntries = listing.getEntriesList().stream()
+                .filter(entry -> !tenantConfig.containsResources( entry.getConfigKey()))
+                .collect(Collectors.toList());
 
-        try {
+        // Do not make an API call if there are no dynamic resources
+        if (!filteredEntries.isEmpty()) {
 
-            storage.getFileStorage(config.getDefaultBucket());
-            storage.getDataStorage(config.getDefaultBucket());
-            formats.getCodec(config.getDefaultFormat());
+            var filteredIds = filteredEntries.stream()
+                    .map(ConfigEntry::getDetails)
+                    .map(ConfigDetails::getObjectSelector)
+                    .collect(Collectors.toList());
+
+            var batchRequest = MetadataBatchRequest.newBuilder()
+                    .setTenant(tenant)
+                    .addAllSelector(filteredIds)
+                    .build();
+
+            var resourceObjects = client.readBatch(batchRequest);
+
+            for (int i = 0; i < filteredIds.size(); i++) {
+
+                var resourceKey = filteredEntries.get(i).getConfigKey();
+                var resourceDef = resourceObjects.getTag(i).getDefinition().getResource();
+
+                storageManager.addStorage(resourceKey, resourceDef);
+            }
         }
-        catch (EStorageConfig e) {
 
-            var msg = String.format("Storage not configured for default storage key: [%s]", config.getDefaultBucket());
-            log.error(msg);
-            throw new EStartup(msg, e);
-        }
-        catch (EPluginNotAvailable e) {
-
-            var msg = String.format("Codec not available for default storage format: [%s]", config.getDefaultFormat());
-            log.error(msg);
-            throw new EStartup(msg, e);
-        }
+        return storageManager;
     }
 
     @Override
@@ -375,6 +408,12 @@ public class TracDataService extends TracServiceBase {
             return server.awaitTermination(remaining.toMillis(), TimeUnit.MILLISECONDS);
         });
 
+        var storageDown = shutdownResource("tenant services", deadline, remaining -> {
+
+            services.closeAllTenants(this::doShutdownTenant);
+            return true;
+        });
+
         var clientDown = shutdownResource("Metadata client", deadline, remaining -> {
 
             metaClientChanel.shutdown();
@@ -385,12 +424,6 @@ public class TracDataService extends TracServiceBase {
 
             metaBlockingChanel.shutdown();
             return metaBlockingChanel.awaitTermination(remaining.toMillis(), TimeUnit.MILLISECONDS);
-        });
-
-        var storageDown = shutdownResource("Storage service", deadline, remaining -> {
-
-            storage.close();
-            return true;
         });
 
         var workersDown = shutdownResource("Service thread pool", deadline, remaining -> {
@@ -418,5 +451,12 @@ public class TracDataService extends TracServiceBase {
             server.shutdownNow();
 
         return -1;
+    }
+
+    private void doShutdownTenant(String tenantCode, TenantServices tenantServices) {
+
+        log.info("Shut down tenant services: [{}]", tenantCode);
+
+        tenantServices.getStorageManager().close();
     }
 }

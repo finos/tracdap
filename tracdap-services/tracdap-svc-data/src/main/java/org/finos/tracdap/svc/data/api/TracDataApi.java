@@ -33,6 +33,7 @@ import org.finos.tracdap.svc.data.service.FileService;
 import io.grpc.Context;
 import io.grpc.stub.StreamObserver;
 import org.apache.arrow.memory.BufferAllocator;
+import org.finos.tracdap.svc.data.service.TenantServices;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -44,8 +45,7 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
-    private final DataService dataRwService;
-    private final FileService fileService;
+    private final TenantServices.Map services;
 
     private final EventLoopResolver eventLoopResolver;
     private final BufferAllocator rootAllocator;
@@ -56,12 +56,13 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
 
 
     public TracDataApi(
-            DataService dataRwService, FileService fileService,
-            EventLoopResolver eventLoopResolver, BufferAllocator allocator,
+            TenantServices.Map services,
+            EventLoopResolver eventLoopResolver,
+            BufferAllocator allocator,
             GrpcConcern commonConcerns) {
 
-        this.dataRwService = dataRwService;
-        this.fileService = fileService;
+        this.services = services;
+
         this.eventLoopResolver = eventLoopResolver;
         this.rootAllocator = allocator;
         this.commonConcerns = commonConcerns;
@@ -89,7 +90,7 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
         var dataStream = upload.dataStream(DataWriteRequest::getContent, dataContext.arrowAllocator());
 
         firstMessage
-                .thenCompose(req -> dataRwService.createDataset(req, dataStream, dataContext, requestMetadata, clientConfig))
+                .thenCompose(req -> tenantDataService(req).createDataset(req, dataStream, dataContext, requestMetadata, clientConfig))
                 .thenAccept(upload::succeeded)
                 .exceptionally(upload::failed);
 
@@ -119,7 +120,7 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
         var dataStream = upload.dataStream(DataWriteRequest::getContent, dataContext.arrowAllocator());
 
         firstMessage
-                .thenCompose(req -> dataRwService.updateDataset(req, dataStream, dataContext, requestMetadata, clientConfig))
+                .thenCompose(req -> tenantDataService(req).updateDataset(req, dataStream, dataContext, requestMetadata, clientConfig))
                 .thenAccept(upload::succeeded)
                 .exceptionally(upload::failed);
 
@@ -162,7 +163,7 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
         var dataStream = download.dataStream(DataReadResponse.Builder::setContent);
 
         download.start(request)
-                .thenAccept(req -> dataRwService.readDataset(req, firstMessage, dataStream, dataContext, requestMetadata, clientConfig))
+                .thenAccept(req -> tenantDataService(req).readDataset(req, firstMessage, dataStream, dataContext, requestMetadata, clientConfig))
                 .exceptionally(download::failed);
     }
 
@@ -180,7 +181,7 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
         var dataStream = upload.dataStream(FileWriteRequest::getContent, dataContext.arrowAllocator());
 
         firstMessage
-                .thenCompose(request -> fileService.createFile(
+                .thenCompose(request -> tenantFileService(request).createFile(
                         request, requestMetadata,
                         dataStream, dataContext, clientConfig))
                 .thenAccept(upload::succeeded)
@@ -212,7 +213,7 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
         var dataStream = upload.dataStream(FileWriteRequest::getContent, dataContext.arrowAllocator());
 
         firstMessage
-                .thenCompose(request -> fileService.updateFile(
+                .thenCompose(request -> tenantFileService(request).updateFile(
                         request,  requestMetadata,
                         dataStream, dataContext, clientConfig))
                 .thenAccept(upload::succeeded)
@@ -256,7 +257,7 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
         var dataStream = download.dataStream(FileReadResponse.Builder::setContent);
 
         download.start(request)
-                .thenAccept(req -> fileService.readFile(
+                .thenAccept(req -> tenantFileService(req).readFile(
                         request, requestMetadata,
                         firstMessage, dataStream,
                         dataContext, clientConfig))
@@ -315,7 +316,7 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
                 .build();
 
         download.start(readRequest)
-                .thenAccept(request -> fileService.readFile(
+                .thenAccept(request -> tenantFileService(request).readFile(
                         request, requestMetadata,
                         firstMessage, dataStream,
                         dataContext, clientConfig))
@@ -368,5 +369,25 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
                         LoggingHelpers.formatFileSize(peak),
                         LoggingHelpers.formatFileSize(retained));
         }
+    }
+
+    private DataService tenantDataService(DataWriteRequest request) {
+
+        return services.lookupTenant(request.getTenant()).getDataService();
+    }
+
+    private DataService tenantDataService(DataReadRequest request) {
+
+        return services.lookupTenant(request.getTenant()).getDataService();
+    }
+
+    private FileService tenantFileService(FileWriteRequest request) {
+
+        return services.lookupTenant(request.getTenant()).getFileService();
+    }
+
+    private FileService tenantFileService(FileReadRequest request) {
+
+        return services.lookupTenant(request.getTenant()).getFileService();
     }
 }

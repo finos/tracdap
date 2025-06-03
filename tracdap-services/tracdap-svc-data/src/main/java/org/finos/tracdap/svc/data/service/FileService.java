@@ -20,6 +20,7 @@ package org.finos.tracdap.svc.data.service;
 
 import org.finos.tracdap.api.*;
 import org.finos.tracdap.api.internal.InternalMetadataApiGrpc.InternalMetadataApiFutureStub;
+import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.common.async.Futures;
 import org.finos.tracdap.common.data.IDataContext;
 import org.finos.tracdap.common.exception.EMetadataDuplicate;
@@ -31,9 +32,6 @@ import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.storage.IFileStorage;
 import org.finos.tracdap.common.storage.IStorageManager;
 import org.finos.tracdap.common.validation.Validator;
-import org.finos.tracdap.config.StorageConfig;
-import org.finos.tracdap.config.TenantConfig;
-import org.finos.tracdap.metadata.*;
 
 import org.apache.arrow.memory.ArrowBuf;
 
@@ -42,7 +40,6 @@ import org.slf4j.LoggerFactory;
 
 import java.time.Instant;
 import java.util.List;
-import java.util.Map;
 import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -67,8 +64,6 @@ public class FileService {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
-    private final StorageConfig storageConfig;
-    private final Map<String, TenantConfig> tenantConfig;
     private final IStorageManager storageManager;
     private final InternalMetadataApiFutureStub metaApi;
 
@@ -76,13 +71,9 @@ public class FileService {
     private final Random random = new Random();
 
     public FileService(
-            StorageConfig storageConfig,
-            Map<String, TenantConfig> tenantConfig,
             IStorageManager storageManager,
             InternalMetadataApiFutureStub metaApi) {
 
-        this.storageConfig = storageConfig;
-        this.tenantConfig = tenantConfig;
         this.storageManager = storageManager;
         this.metaApi = metaApi;
     }
@@ -369,7 +360,7 @@ public class FileService {
     private RequestState createMetadata(FileWriteRequest request, RequestState state) {
 
         var timestamp = state.requestMetadata.requestTimestamp().toInstant();
-        var storageKey = selectStorage(request.getTenant());
+        var storageKey = storageManager.defaultLocation();
 
         state.fileId = MetadataUtil.nextObjectVersion(state.preAllocFileId, timestamp);
         state.storageId = MetadataUtil.nextObjectVersion(state.preAllocStorageId, timestamp);
@@ -390,7 +381,7 @@ public class FileService {
     private RequestState updateMetadata(FileWriteRequest request, RequestState state, RequestState prior) {
 
         var timestamp = state.requestMetadata.requestTimestamp().toInstant();
-        var storageKey = selectStorage(request.getTenant());
+        var storageKey = storageManager.defaultLocation();
 
         state.fileId = MetadataUtil.nextObjectVersion(prior.fileId, timestamp);
         state.storageId = MetadataUtil.nextObjectVersion(prior.storageId, timestamp);
@@ -497,14 +488,6 @@ public class FileService {
         return storageDef
                 .putDataItems(dataItem, storageItem)
                 .build();
-    }
-
-    private String selectStorage(String tenant) {
-
-        // Currently tenant config is optional for single-tenant deployments, fall back to global defaults
-        return tenantConfig.containsKey(tenant) && tenantConfig.get(tenant).hasDefaultBucket()
-                ? tenantConfig.get(tenant).getDefaultBucket()
-                : storageConfig.getDefaultBucket();
     }
 
     private RequestState buildCreateAttrs(FileWriteRequest request, RequestState state) {
