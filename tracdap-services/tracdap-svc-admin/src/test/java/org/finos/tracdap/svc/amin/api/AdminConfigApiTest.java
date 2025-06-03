@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-import io.grpc.Status;
+package org.finos.tracdap.svc.amin.api;import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import org.finos.tracdap.api.*;
 import org.finos.tracdap.common.config.ConfigKeys;
