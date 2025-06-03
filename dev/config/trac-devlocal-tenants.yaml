@@ -1,0 +1,26 @@
+
+tenants:
+
+  ACME_CORP:
+
+    displayName: ACME Industrial Supplies Inc.
+
+    properties:
+      storage.defaults.location: STORAGE1
+      storage.defaults.format: ARROW_FILE
+      storage.defaults.layout: OBJECT_ID_LAYOUT
+
+    resources:
+
+      STORAGE1:
+        resourceType: INTERNAL_STORAGE
+        protocol: LOCAL
+        properties:
+          rootPath: ./build/run
+
+      # Add your own repositories in here to load models into TRAC
+      example_repo:
+        resourceType: MODEL_REPOSITORY
+        protocol: git
+        properties:
+          repoUrl: https://github.com/finos/tracdap
