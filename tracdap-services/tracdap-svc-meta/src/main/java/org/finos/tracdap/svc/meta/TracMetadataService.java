@@ -32,6 +32,7 @@ import org.finos.tracdap.common.util.InterfaceLogging;
 import org.finos.tracdap.common.validation.ValidationConcern;
 import org.finos.tracdap.config.PlatformConfig;
 import org.finos.tracdap.common.metadata.dal.IMetadataDal;
+import org.finos.tracdap.svc.meta.api.MessageProcessor;
 import org.finos.tracdap.svc.meta.services.ConfigService;
 import org.finos.tracdap.svc.meta.services.MetadataReadService;
 import org.finos.tracdap.svc.meta.services.MetadataSearchService;
@@ -126,6 +127,7 @@ public class TracMetadataService extends TracServiceBase {
 
             var publicApi = new TracMetadataApi(readService, writeService, searchService, configService);
             var internalApi = new InternalMetadataApi(readService, writeService, searchService, configService);
+            var messageProcessor = new MessageProcessor();
 
             // Common framework for cross-cutting concerns
             var commonConcerns = buildCommonConcerns();
@@ -141,7 +143,8 @@ public class TracMetadataService extends TracServiceBase {
                     .forPort(servicePort)
                     .executor(executor)
                     .addService(publicApi)
-                    .addService(internalApi);
+                    .addService(internalApi)
+                    .addService(messageProcessor);
 
             // Apply common concerns
             this.server = commonConcerns
