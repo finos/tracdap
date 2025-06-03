@@ -15,25 +15,30 @@
  * limitations under the License.
  */
 
+
 syntax = 'proto3';
 package tracdap.config;
 
 option java_package = "org.finos.tracdap.config";
-option java_outer_classname = "RuntimeConfigProto";
+option java_outer_classname = "TenantConfigProto";
 option java_multiple_files = true;
 
-import "tracdap/config/common.proto";
-import "tracdap/config/tenant.proto";
+import "tracdap/metadata/config.proto";
+import "tracdap/metadata/resource.proto";
 
 
-message RuntimeConfig {
+message TenantConfigMap {
 
-  map<string, string> config = 1;
+  map<string, TenantConfig> tenants = 1;
+}
+
+message TenantConfig {
+
+  string displayName = 1;
 
   map<string, string> properties = 2;
   map<string, string> secrets = 3;
 
-  TenantConfig tenant = 4;
-
-  optional ServiceConfig runtimeApi = 5;
+  map<string, metadata.ConfigDefinition> config = 4;
+  map<string, metadata.ResourceDefinition> resources = 5;
 }
