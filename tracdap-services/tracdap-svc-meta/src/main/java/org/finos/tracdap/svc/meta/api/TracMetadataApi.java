@@ -51,18 +51,6 @@ public class TracMetadataApi extends TracMetadataApiGrpc.TracMetadataApiImplBase
     }
 
     @Override
-    public void listResources(ListResourcesRequest request, StreamObserver<ListResourcesResponse> response) {
-
-        apiImpl.listResources(request, response);
-    }
-
-    @Override
-    public void resourceInfo(ResourceInfoRequest request, StreamObserver<ResourceInfoResponse> response) {
-
-        apiImpl.resourceInfo(request, response);
-    }
-
-    @Override
     public void writeBatch(MetadataWriteBatchRequest request, StreamObserver<MetadataWriteBatchResponse> response) {
 
         apiImpl.writeBatch(request, response);
