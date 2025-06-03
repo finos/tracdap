@@ -18,7 +18,7 @@
 package org.finos.tracdap.svc.orch.test;
 
 import org.finos.tracdap.common.exec.*;
-import org.finos.tracdap.config.StorageConfig;
+import org.finos.tracdap.config.TenantConfig;
 
 import java.net.InetSocketAddress;
 import java.util.function.Consumer;
@@ -94,7 +94,7 @@ public class UnitTestExecutor implements IBatchExecutor<UnitTestExecutorState> {
     @Override
     public UnitTestExecutorState configureBatchStorage(
             String batchKey, UnitTestExecutorState batchState,
-            StorageConfig storageConfig, Consumer<StorageConfig> storageUpdate) {
+            TenantConfig tenantConfig, Consumer<TenantConfig> tenantConfigUpdate) {
         
         return null;
     }
