@@ -17,6 +17,8 @@
 
 package org.finos.tracdap.common.config;
 
+import org.finos.tracdap.metadata.StorageLayout;
+
 
 public class ConfigDefaults {
 
@@ -28,4 +30,7 @@ public class ConfigDefaults {
     // For now, here are some config defaults!
 
     public static final int NETWORK_IDLE_TIMEOUT = 30;  // seconds
+
+    public static final String STORAGE_DEFAULT_FORMAT = "ARROW_FILE";
+    public static final StorageLayout STORAGE_DEFAULT_LAYOUT = StorageLayout.OBJECT_ID_LAYOUT;
 }
