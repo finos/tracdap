@@ -47,7 +47,7 @@ import java.util.UUID;
 public class JobValidationTest {
 
     public static final String TRAC_CONFIG_UNIT = "config/trac-unit.yaml";
-    public static final String TRAC_CONFIG_UNIT_RESOURCES = "config/trac-unit-resources.yaml";
+    public static final String TRAC_TENANTS_UNIT = "config/trac-unit-tenants.yaml";
     public static final String TEST_TENANT = "ACME_CORP";
 
     private static final byte[] BASIC_CSV_CONTENT = ResourceHelpers.loadResourceAsBytes(SampleData.BASIC_CSV_DATA_RESOURCE);
@@ -63,9 +63,9 @@ public class JobValidationTest {
     protected static TagSelector altDataSelector;
 
     @RegisterExtension
-    public static final PlatformTest platform = PlatformTest.forConfig(TRAC_CONFIG_UNIT)
+    public static final PlatformTest platform = PlatformTest.forConfig(TRAC_CONFIG_UNIT, List.of(TRAC_TENANTS_UNIT))
             .runDbDeploy(true)
-            .bootstrapTenant(TEST_TENANT, TRAC_CONFIG_UNIT_RESOURCES)
+            .addTenant(TEST_TENANT)
             .startService(TracAdminService.class)
             .startService(TracMetadataService.class)
             .startService(TracDataService.class)
