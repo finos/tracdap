@@ -43,6 +43,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.List;
 import java.util.Random;
 import java.util.UUID;
 
@@ -56,9 +57,10 @@ public class RestProxyTest {
     public static final long TEST_TIMEOUT = 10 * 1000;  // 10 second timeout
 
     public static final String TRAC_CONFIG_UNIT = "config/trac-unit.yaml";
+    public static final String TRAC_TENANTS_UNIT = "config/trac-unit-tenants.yaml";
 
     @RegisterExtension
-    public static final PlatformTest platform = PlatformTest.forConfig(TRAC_CONFIG_UNIT)
+    public static final PlatformTest platform = PlatformTest.forConfig(TRAC_CONFIG_UNIT, List.of(TRAC_TENANTS_UNIT))
             .runDbDeploy(true)
             .addTenant(TEST_TENANT)
             .startService(TracMetadataService.class)

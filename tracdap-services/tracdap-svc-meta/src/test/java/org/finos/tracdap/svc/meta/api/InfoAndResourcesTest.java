@@ -25,14 +25,17 @@ import org.finos.tracdap.test.helpers.PlatformTest;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
+import java.util.List;
+
 import static org.finos.tracdap.test.meta.SampleMetadata.TEST_TENANT;
 
 
 abstract class InfoAndResourcesTest {
 
     public static final String TRAC_CONFIG_UNIT = "config/trac-unit.yaml";
-    public static final String TRAC_CONFIG_UNIT_RESOURCES = "config/trac-unit-resources.yaml";
+    public static final String TRAC_TENANTS_UNIT = "config/trac-unit-tenants.yaml";
     public static final String TRAC_CONFIG_ENV_VAR = "TRAC_CONFIG_FILE";
+    public static final String TRAC_TENANTS_ENV_VAR = "TRAC_TENANTS_FILE";
 
     protected TracMetadataApiGrpc.TracMetadataApiBlockingStub readApi;
 
@@ -40,9 +43,9 @@ abstract class InfoAndResourcesTest {
     static class UnitTest extends InfoAndResourcesTest {
 
         @RegisterExtension
-        private static final PlatformTest platform = PlatformTest.forConfig(TRAC_CONFIG_UNIT)
+        private static final PlatformTest platform = PlatformTest.forConfig(TRAC_CONFIG_UNIT, List.of(TRAC_TENANTS_UNIT))
                 .runDbDeploy(true)
-                .bootstrapTenant(TEST_TENANT, TRAC_CONFIG_UNIT_RESOURCES)
+                .addTenant(TEST_TENANT)
                 .startService(TracMetadataService.class)
                 .startService(TracAdminService.class)
                 .build();
@@ -62,11 +65,12 @@ abstract class InfoAndResourcesTest {
     static class IntegrationTest extends InfoAndResourcesTest {
 
         private static final String TRAC_CONFIG_ENV_FILE = System.getenv(TRAC_CONFIG_ENV_VAR);
+        private static final String TRAC_TENANTS_ENV_FILE = System.getenv(TRAC_TENANTS_ENV_VAR);
 
         @RegisterExtension
-        private static final PlatformTest platform = PlatformTest.forConfig(TRAC_CONFIG_ENV_FILE)
+        private static final PlatformTest platform = PlatformTest.forConfig(TRAC_CONFIG_ENV_FILE, List.of(TRAC_TENANTS_ENV_FILE))
                 .runDbDeploy(false)
-                .bootstrapTenant(TEST_TENANT, TRAC_CONFIG_UNIT_RESOURCES)
+                .addTenant(TEST_TENANT)
                 .startService(TracMetadataService.class)
                 .startService(TracAdminService.class)
                 .build();
