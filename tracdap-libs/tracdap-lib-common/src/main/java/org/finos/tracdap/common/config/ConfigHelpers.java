@@ -40,22 +40,34 @@ public class ConfigHelpers {
                 .build();
     }
 
-    public static String readString(String context, Properties properties, String key) {
-        return readString(context, properties, key, true);
-    }
-
     public static String readString(String context, Map<String, String> propertiesMap, String key) {
-        var properties = new Properties();
-        properties.putAll(propertiesMap);
-        return readString(context, properties, key, true);
+        return readString(context, propertiesMap, key, true);
     }
 
-    public static String readStringOrDefault(String context, Properties properties, String key, String defaultValue) {
-        var configValue = readString(context, properties, key, false);
+    public static String readString(String context, Map<String, String> propertiesMap, String key, boolean required) {
+
+        var rawValue = propertiesMap.get(key);
+
+        if (rawValue == null || rawValue.isEmpty()) {
+            if (required)
+                throw new EStartup(String.format("Missing required property [%s] for [%s]", key, context));
+            else
+                return null;
+        }
+
+        return rawValue.trim();
+    }
+
+    public static String readStringOrDefault(String context, Map<String, String> propertiesMap, String key, String defaultValue) {
+        var configValue = readString(context, propertiesMap, key, false);
         if (configValue == null || configValue.isEmpty())
             return defaultValue;
         else
             return configValue;
+    }
+
+    public static String readString(String context, Properties properties, String key) {
+        return readString(context, properties, key, true);
     }
 
     public static String readString(String context, Properties properties, String key, boolean required) {
@@ -70,6 +82,14 @@ public class ConfigHelpers {
         }
 
         return rawValue.trim();
+    }
+
+    public static String readStringOrDefault(String context, Properties properties, String key, String defaultValue) {
+        var configValue = readString(context, properties, key, false);
+        if (configValue == null || configValue.isEmpty())
+            return defaultValue;
+        else
+            return configValue;
     }
 
     public static int readInt(String context, Properties properties, String key, int defaultValue) {
