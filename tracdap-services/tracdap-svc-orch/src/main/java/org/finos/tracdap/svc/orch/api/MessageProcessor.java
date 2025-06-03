@@ -17,18 +17,16 @@
 
 package org.finos.tracdap.svc.orch.api;
 
-import io.grpc.Context;
 import org.finos.tracdap.api.MetadataReadRequest;
 import org.finos.tracdap.api.internal.*;
+import org.finos.tracdap.metadata.ResourceDefinition;
 import org.finos.tracdap.common.config.ConfigKeys;
-import org.finos.tracdap.common.config.ConfigManager;
-import org.finos.tracdap.common.config.DynamicConfig;
-import org.finos.tracdap.common.config.ISecretLoader;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.middleware.GrpcConcern;
 import org.finos.tracdap.common.plugin.PluginRegistry;
-import org.finos.tracdap.metadata.ResourceDefinition;
+import org.finos.tracdap.svc.orch.service.TenantResources;
 
+import io.grpc.Context;
 import io.grpc.stub.StreamObserver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -39,19 +37,17 @@ public class MessageProcessor extends InternalMessagingApiGrpc.InternalMessaging
     private final Logger log = LoggerFactory.getLogger(getClass());
 
     private final InternalMetadataApiGrpc.InternalMetadataApiBlockingStub metadataApi;
-    private final ISecretLoader secrets;
     private final GrpcConcern commonConcerns;
-    private final DynamicConfig.Resources resources;
+
+    private final TenantResources.Map services;
 
     public MessageProcessor(
             PluginRegistry registry, GrpcConcern commonConcerns,
-            DynamicConfig.Resources resources) {
+            TenantResources.Map services) {
 
         this.metadataApi = registry.getSingleton(InternalMetadataApiGrpc.InternalMetadataApiBlockingStub.class);
-        this.secrets = registry.getSingleton(ConfigManager.class).getSecrets();
-
         this.commonConcerns = commonConcerns;
-        this.resources = resources;
+        this.services = services;
     }
 
     @Override
@@ -62,15 +58,11 @@ public class MessageProcessor extends InternalMessagingApiGrpc.InternalMessaging
                 request.getConfigEntry().getConfigClass(),
                 request.getConfigEntry().getConfigKey());
 
+        var tenantServices = services.lookupTenant(request.getTenant());
+
         // If secrets have changed as part of this update, make sure they are reloaded
         if (request.getSecretsUpdated()) {
-
-            var secretScope = secrets
-                    .namedScope(ConfigKeys.TENANT_SCOPE, request.getTenant())
-                    .scope(request.getConfigEntry().getConfigClass())
-                    .scope(request.getConfigEntry().getConfigKey());
-
-            secretScope.reload();
+            tenantServices.getSecrets().reload();
         }
 
         var entry = request.getConfigEntry();
@@ -84,16 +76,16 @@ public class MessageProcessor extends InternalMessagingApiGrpc.InternalMessaging
 
                 case CREATE:
                     storageResource = fetchResource(request);
-                    resources.addEntry(entry.getConfigKey(), storageResource);
+                    tenantServices.getResources().addEntry(entry.getConfigKey(), storageResource);
                     break;
 
                 case UPDATE:
                     storageResource = fetchResource(request);
-                    resources.updateEntry(entry.getConfigKey(), storageResource);
+                    tenantServices.getResources().updateEntry(entry.getConfigKey(), storageResource);
                     break;
 
                 case DELETE:
-                    resources.removeEntry(entry.getConfigKey());
+                    tenantServices.getResources().removeEntry(entry.getConfigKey());
                     break;
 
                 default:

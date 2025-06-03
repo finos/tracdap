@@ -106,8 +106,8 @@ public class JobExecutor<TBatchState extends Serializable> implements IJobExecut
             if (storageMappingEnabled) {
 
                 batchState = batchExecutor.configureBatchStorage(
-                        batchKey, batchState, sysConfig.getStorage(),
-                        batchSysConfig::mergeStorage);
+                        batchKey, batchState, sysConfig.getTenant(),
+                        batchSysConfig::mergeTenant);
             }
 
             var jobConfigJson = configParser.quoteConfig(jobConfig, ConfigFormat.JSON);
