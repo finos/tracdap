@@ -20,8 +20,8 @@ package org.finos.tracdap.common.metadata.test;
 import org.finos.tracdap.common.db.JdbcDialect;
 import org.finos.tracdap.common.db.JdbcSetup;
 import org.finos.tracdap.common.util.InterfaceLogging;
-import org.finos.tracdap.common.metadata.dal.IMetadataDal;
-import org.finos.tracdap.common.metadata.dal.jdbc.JdbcMetadataDal;
+import org.finos.tracdap.common.metadata.store.IMetadataStore;
+import org.finos.tracdap.common.metadata.store.jdbc.JdbcMetadataStore;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.extension.AfterEachCallback;
@@ -47,7 +47,7 @@ public class JdbcUnit implements BeforeAllCallback, BeforeEachCallback, AfterEac
 
     private Properties properties;
     private DataSource source;
-    private JdbcMetadataDal dal;
+    private JdbcMetadataStore dal;
 
     @Override
     public void beforeAll(ExtensionContext context) throws Exception {
@@ -115,19 +115,19 @@ public class JdbcUnit implements BeforeAllCallback, BeforeEachCallback, AfterEac
 
         var testClass = context.getTestClass();
 
-        if (testClass.isEmpty() || !IDalTestable.class.isAssignableFrom(testClass.get()))
+        if (testClass.isEmpty() || !IMetadataStoreTest.class.isAssignableFrom(testClass.get()))
             Assertions.fail("JUnit extension for DAL testing requires the test class to implement IDalTestable");
 
         source = JdbcSetup.createDatasource(properties);
-        dal = new JdbcMetadataDal(JdbcDialect.H2, source);
+        dal = new JdbcMetadataStore(JdbcDialect.H2, source);
         dal.start();
 
-        var dalWithLogging = InterfaceLogging.wrap(dal, IMetadataDal.class);
+        var dalWithLogging = InterfaceLogging.wrap(dal, IMetadataStore.class);
         var testInstance = context.getTestInstance();
 
         if (testInstance.isPresent()) {
-            var testCase = (IDalTestable) testInstance.get();
-            testCase.setDal(dalWithLogging);
+            var testCase = (IMetadataStoreTest) testInstance.get();
+            testCase.setStore(dalWithLogging);
         }
     }
 

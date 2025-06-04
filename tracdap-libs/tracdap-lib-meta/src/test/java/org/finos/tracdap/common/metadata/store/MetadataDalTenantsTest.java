@@ -15,10 +15,10 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.metadata.dal;
+package org.finos.tracdap.common.metadata.store;
 
 import org.finos.tracdap.common.exception.ETenantNotFound;
-import org.finos.tracdap.common.metadata.test.IDalTestable;
+import org.finos.tracdap.common.metadata.test.IMetadataStoreTest;
 import org.finos.tracdap.common.metadata.test.JdbcIntegration;
 import org.finos.tracdap.common.metadata.test.JdbcUnit;
 
@@ -32,12 +32,12 @@ import static org.finos.tracdap.test.meta.SampleMetadata.*;
 import static org.finos.tracdap.test.meta.SampleMetadata.TEST_TENANT;
 
 
-abstract class MetadataDalTenantsTest implements IDalTestable {
+abstract class MetadataDalTenantsTest implements IMetadataStoreTest {
 
-    private IMetadataDal dal;
+    private IMetadataStore store;
 
-    public void setDal(IMetadataDal dal) {
-        this.dal = dal;
+    public void setStore(IMetadataStore store) {
+        this.store = store;
     }
 
     @ExtendWith(JdbcUnit.class)
@@ -53,7 +53,7 @@ abstract class MetadataDalTenantsTest implements IDalTestable {
     @Test
     void listTenants() {
 
-        var listing = dal.listTenants();
+        var listing = store.listTenants();
 
         Assertions.assertEquals(2, listing.size());
         Assertions.assertTrue(listing.stream().anyMatch(tenant -> tenant.getTenantCode().equals(TEST_TENANT)));
@@ -63,15 +63,15 @@ abstract class MetadataDalTenantsTest implements IDalTestable {
     @Test
     void updateTenant_ok() {
 
-        var listing = dal.listTenants();
+        var listing = store.listTenants();
         var originalTenant = listing.get(0);
 
         Assertions.assertNotEquals("New display name", originalTenant.getDescription());
 
         var modifiedTenant = originalTenant.toBuilder().setDescription("New display name").build();
-        dal.updateTenant(modifiedTenant);
+        store.updateTenant(modifiedTenant);
 
-        var updatedListing = dal.listTenants();
+        var updatedListing = store.listTenants();
 
         var updatedTenant = updatedListing.stream()
                 .filter(t -> t.getTenantCode().equals(originalTenant.getTenantCode()))
@@ -89,6 +89,6 @@ abstract class MetadataDalTenantsTest implements IDalTestable {
                 .setDescription("New display name")
                 .build();
 
-        Assertions.assertThrows(ETenantNotFound.class, () -> dal.updateTenant(modifiedTenant));
+        Assertions.assertThrows(ETenantNotFound.class, () -> store.updateTenant(modifiedTenant));
     }
 }

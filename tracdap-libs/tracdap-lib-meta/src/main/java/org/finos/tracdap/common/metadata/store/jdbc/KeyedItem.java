@@ -15,12 +15,33 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.metadata.test;
+package org.finos.tracdap.common.metadata.store.jdbc;
 
-import org.finos.tracdap.common.metadata.dal.IMetadataDal;
+import java.time.Instant;
 
+class KeyedItem<TItem> {
 
-public interface IDalTestable {
+    final long key;
+    final int version;
+    final Instant timestamp;
+    final TItem item;
+    final boolean isLatest;
+    final boolean deleted;
 
-    void setDal(IMetadataDal dal);
+    KeyedItem(long key, int version, Instant timestamp, TItem item, boolean isLatest, boolean deleted) {
+        this.key = key;
+        this.version = version;
+        this.timestamp = timestamp;
+        this.item = item;
+        this.isLatest = isLatest;
+        this.deleted = deleted;
+    }
+
+    KeyedItem(long key, int version, Instant timestamp, TItem item, boolean isLatest) {
+        this(key, version, timestamp, item, isLatest, false);
+    }
+
+    KeyedItem(long key, TItem item) {
+        this(key, 0, null, item, false);
+    }
 }

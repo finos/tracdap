@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.metadata.dal;
+package org.finos.tracdap.common.metadata.store;
 
 import org.finos.tracdap.metadata.*;
 
@@ -23,7 +23,7 @@ import java.util.List;
 import java.util.UUID;
 
 
-public interface IMetadataDal {
+public interface IMetadataStore {
 
     void start();
 

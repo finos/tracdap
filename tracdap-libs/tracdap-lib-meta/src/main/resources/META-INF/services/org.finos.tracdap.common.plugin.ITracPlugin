@@ -14,4 +14,4 @@
 # limitations under the License.
 
 # Core metadata plugin supplies JDBC metadata DAL
-org.finos.tracdap.common.metadata.dal.MetadataDalPlugin
+org.finos.tracdap.common.metadata.store.CoreMetadataPlugin

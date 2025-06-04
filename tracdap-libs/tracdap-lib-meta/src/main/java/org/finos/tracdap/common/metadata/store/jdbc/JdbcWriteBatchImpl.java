@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.metadata.dal.jdbc;
+package org.finos.tracdap.common.metadata.store.jdbc;
 
 import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.common.db.JdbcErrorCode;
@@ -39,7 +39,7 @@ class JdbcWriteBatchImpl {
         this.readBatch = readBatch;
     }
 
-    long[] writeObjectId(Connection conn, short tenantId, JdbcMetadataDal.ObjectParts parts) throws SQLException {
+    long[] writeObjectId(Connection conn, short tenantId, JdbcMetadataStore.ObjectParts parts) throws SQLException {
 
         var query =
                 "insert into object_id (\n" +
@@ -75,7 +75,7 @@ class JdbcWriteBatchImpl {
         }
     }
 
-    long[] writeObjectDefinition(Connection conn, short tenantId, long[] objectPk, JdbcMetadataDal.ObjectParts parts) throws SQLException {
+    long[] writeObjectDefinition(Connection conn, short tenantId, long[] objectPk, JdbcMetadataStore.ObjectParts parts) throws SQLException {
 
         var query =
                 "insert into object_definition (\n" +
@@ -125,7 +125,7 @@ class JdbcWriteBatchImpl {
         }
     }
 
-    long[] writeTagRecord(Connection conn, short tenantId, long[] definitionPk, JdbcMetadataDal.ObjectParts parts) throws SQLException {
+    long[] writeTagRecord(Connection conn, short tenantId, long[] definitionPk, JdbcMetadataStore.ObjectParts parts) throws SQLException {
 
         var query =
                 "insert into tag (\n" +
@@ -167,7 +167,7 @@ class JdbcWriteBatchImpl {
         }
     }
 
-    void writeTagAttrs(Connection conn, short tenantId, long[] tagPk, JdbcMetadataDal.ObjectParts parts) throws SQLException {
+    void writeTagAttrs(Connection conn, short tenantId, long[] tagPk, JdbcMetadataStore.ObjectParts parts) throws SQLException {
 
         var query =
                 "insert into tag_attr (\n" +
@@ -270,7 +270,7 @@ class JdbcWriteBatchImpl {
         return rootValue.getArrayValue().getItemsList();
     }
 
-    void writeConfigEntry(Connection conn, short tenantId, JdbcMetadataDal.ObjectParts parts) throws SQLException {
+    void writeConfigEntry(Connection conn, short tenantId, JdbcMetadataStore.ObjectParts parts) throws SQLException {
 
         var query =
                 "insert into config_entry (\n" +
@@ -311,7 +311,7 @@ class JdbcWriteBatchImpl {
         }
     }
 
-    void closeObjectDefinition(Connection conn, short tenantId, long[] objectPk, JdbcMetadataDal.ObjectParts parts) throws SQLException {
+    void closeObjectDefinition(Connection conn, short tenantId, long[] objectPk, JdbcMetadataStore.ObjectParts parts) throws SQLException {
 
         var query =
                 "update object_definition \n" +
@@ -327,7 +327,7 @@ class JdbcWriteBatchImpl {
         }
     }
 
-    void closeTagRecord(Connection conn, short tenantId, long[] definitionPk, JdbcMetadataDal.ObjectParts parts) throws SQLException {
+    void closeTagRecord(Connection conn, short tenantId, long[] definitionPk, JdbcMetadataStore.ObjectParts parts) throws SQLException {
 
         var query =
                 "update tag \n" +
@@ -343,7 +343,7 @@ class JdbcWriteBatchImpl {
         }
     }
 
-    void closeConfigEntry(Connection conn, short tenantId, long[] configPk, JdbcMetadataDal.ObjectParts parts) throws SQLException {
+    void closeConfigEntry(Connection conn, short tenantId, long[] configPk, JdbcMetadataStore.ObjectParts parts) throws SQLException {
 
         var query =
                 "update config_entry \n" +

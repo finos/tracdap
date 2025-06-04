@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.metadata.dal.jdbc;
+package org.finos.tracdap.common.metadata.store.jdbc;
 
 import java.sql.PreparedStatement;
 import java.sql.SQLException;

@@ -15,16 +15,12 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.metadata.dal.jdbc;
+package org.finos.tracdap.common.metadata.test;
 
-public enum MetadataErrorCode {
+import org.finos.tracdap.common.metadata.store.IMetadataStore;
 
-    UNKNOWN_ERROR_CODE,
 
-    // Object type of a metadata item does not match what is stored / expected
-    WRONG_OBJECT_TYPE,
+public interface IMetadataStoreTest {
 
-    // The definition of a metadata item could not be understood
-    INVALID_OBJECT_DEFINITION,
-    INVALID_CONFIG_ENTRY
+    void setStore(IMetadataStore store);
 }

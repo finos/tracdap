@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.metadata.dal.jdbc;
+package org.finos.tracdap.common.metadata.store.jdbc;
 
 import org.finos.tracdap.common.exception.ETracInternal;
 import org.finos.tracdap.common.exception.EValidationGap;

@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.metadata.dal;
+package org.finos.tracdap.common.metadata.store;
 
 import org.finos.tracdap.metadata.BasicType;
 import org.finos.tracdap.metadata.ObjectType;
@@ -26,7 +26,7 @@ import java.time.*;
 import java.util.Collections;
 import java.util.UUID;
 
-import org.finos.tracdap.common.metadata.test.IDalTestable;
+import org.finos.tracdap.common.metadata.test.IMetadataStoreTest;
 import org.finos.tracdap.common.metadata.test.JdbcUnit;
 import org.finos.tracdap.common.metadata.test.JdbcIntegration;
 
@@ -42,12 +42,12 @@ import static org.finos.tracdap.test.meta.SampleMetadata.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 
-abstract class MetadataDalEncodingTest implements IDalTestable {
+abstract class MetadataDalEncodingTest implements IMetadataStoreTest {
 
-    private IMetadataDal dal;
+    private IMetadataStore store;
 
-    public void setDal(IMetadataDal dal) {
-        this.dal = dal;
+    public void setStore(IMetadataStore store) {
+        this.store = store;
     }
 
     @ExtendWith(JdbcUnit.class)
@@ -65,8 +65,8 @@ abstract class MetadataDalEncodingTest implements IDalTestable {
         var origTag = dummyTag(origDef, INCLUDE_HEADER);
         var origId = UUID.fromString(origTag.getHeader().getObjectId());
 
-        dal.saveNewObjects(TEST_TENANT, Collections.singletonList(origTag));
-        var result = dal.loadObject(TEST_TENANT, ObjectType.DATA, origId, 1, 1);
+        store.saveNewObjects(TEST_TENANT, Collections.singletonList(origTag));
+        var result = store.loadObject(TEST_TENANT, ObjectType.DATA, origId, 1, 1);
 
         assertEquals(origTag, result);
     }
@@ -79,8 +79,8 @@ abstract class MetadataDalEncodingTest implements IDalTestable {
         var origTag = dummyTagForObjectType(objectType);
         var origId = UUID.fromString(origTag.getHeader().getObjectId());
 
-        dal.saveNewObjects(TEST_TENANT, Collections.singletonList(origTag));
-        var result = dal.loadObject(TEST_TENANT, objectType, origId, 1, 1);
+        store.saveNewObjects(TEST_TENANT, Collections.singletonList(origTag));
+        var result = store.loadObject(TEST_TENANT, objectType, origId, 1, 1);
 
         assertEquals(origTag, result);
     }
@@ -101,8 +101,8 @@ abstract class MetadataDalEncodingTest implements IDalTestable {
                 .putAttrs(attrName, MetadataCodec.encodeNativeObject(attrValue))
                 .build();
 
-        dal.saveNewObjects(TEST_TENANT, Collections.singletonList(testTag));
-        var result = dal.loadObject(TEST_TENANT, ObjectType.DATA, origId, 1, 1);
+        store.saveNewObjects(TEST_TENANT, Collections.singletonList(testTag));
+        var result = store.loadObject(TEST_TENANT, ObjectType.DATA, origId, 1, 1);
 
         assertEquals(testTag, result);
     }

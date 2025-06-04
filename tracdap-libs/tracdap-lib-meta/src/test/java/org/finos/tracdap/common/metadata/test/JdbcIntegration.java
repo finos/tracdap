@@ -24,8 +24,8 @@ import org.finos.tracdap.common.startup.Startup;
 import org.finos.tracdap.common.util.InterfaceLogging;
 import org.finos.tracdap.config.PlatformConfig;
 import org.finos.tracdap.config.PluginConfig;
-import org.finos.tracdap.common.metadata.dal.IMetadataDal;
-import org.finos.tracdap.common.metadata.dal.jdbc.JdbcMetadataDal;
+import org.finos.tracdap.common.metadata.store.IMetadataStore;
+import org.finos.tracdap.common.metadata.store.jdbc.JdbcMetadataStore;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.extension.AfterEachCallback;
 import org.junit.jupiter.api.extension.BeforeAllCallback;
@@ -42,7 +42,7 @@ public class JdbcIntegration implements BeforeAllCallback, BeforeEachCallback, A
 
     private ConfigManager configManager;
     private PluginConfig metaDbConfig;
-    private JdbcMetadataDal dal;
+    private JdbcMetadataStore dal;
 
     @Override
     public void beforeAll(ExtensionContext context) {
@@ -69,21 +69,21 @@ public class JdbcIntegration implements BeforeAllCallback, BeforeEachCallback, A
 
         var testClass = context.getTestClass();
 
-        if (testClass.isEmpty() || !IDalTestable.class.isAssignableFrom(testClass.get()))
+        if (testClass.isEmpty() || !IMetadataStoreTest.class.isAssignableFrom(testClass.get()))
             Assertions.fail("JUnit extension for DAL testing requires the test class to implement IDalTestable");
 
         var dialect = JdbcSetup.getSqlDialect(metaDbConfig);
         var source = JdbcSetup.createDatasource(configManager, metaDbConfig);
 
-        dal = new JdbcMetadataDal(dialect, source);
+        dal = new JdbcMetadataStore(dialect, source);
         dal.start();
 
-        var dalWithLogging = InterfaceLogging.wrap(dal, IMetadataDal.class);
+        var dalWithLogging = InterfaceLogging.wrap(dal, IMetadataStore.class);
         var testInstance = context.getTestInstance();
 
         if (testInstance.isPresent()) {
-            var testCase = (IDalTestable) testInstance.get();
-            testCase.setDal(dalWithLogging);
+            var testCase = (IMetadataStoreTest) testInstance.get();
+            testCase.setStore(dalWithLogging);
         }
     }
 

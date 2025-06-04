@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.metadata.dal.jdbc;
+package org.finos.tracdap.common.metadata.store.jdbc;
 
 import org.finos.tracdap.common.db.JdbcErrorCode;
 import org.finos.tracdap.common.db.JdbcException;
@@ -102,11 +102,12 @@ class JdbcTenantImpl {
                 var description = rs.getString(2);
 
                 var tenantInfo = TenantInfo.newBuilder()
-                        .setTenantCode(tenantCode)
-                        .setDescription(description)
-                        .build();
+                        .setTenantCode(tenantCode);
 
-                tenants.add(tenantInfo);
+                if (!rs.wasNull())
+                    tenantInfo.setDescription(description);
+
+                tenants.add(tenantInfo.build());
             }
 
             return tenants;

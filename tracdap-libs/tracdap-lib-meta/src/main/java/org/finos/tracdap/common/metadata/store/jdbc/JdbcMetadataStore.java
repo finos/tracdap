@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.metadata.dal.jdbc;
+package org.finos.tracdap.common.metadata.store.jdbc;
 
 import org.finos.tracdap.common.db.JdbcBaseDal;
 import org.finos.tracdap.metadata.*;
@@ -23,9 +23,9 @@ import org.finos.tracdap.common.db.JdbcDialect;
 import org.finos.tracdap.common.db.JdbcSetup;
 import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.exception.EStartup;
-import org.finos.tracdap.common.metadata.dal.IMetadataDal;
+import org.finos.tracdap.common.metadata.store.IMetadataStore;
 
-import org.finos.tracdap.common.metadata.dal.MetadataBatchUpdate;
+import org.finos.tracdap.common.metadata.store.MetadataBatchUpdate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -40,7 +40,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 
-public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
+public class JdbcMetadataStore extends JdbcBaseDal implements IMetadataStore {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
@@ -53,7 +53,7 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
     private final JdbcSearchImpl search;
 
 
-    public JdbcMetadataDal(JdbcDialect dialect, DataSource dataSource) {
+    public JdbcMetadataStore(JdbcDialect dialect, DataSource dataSource) {
 
         super(dataSource, dialect);
 
@@ -75,7 +75,7 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
         }
         catch (SQLException e) {
 
-            var message = "Error connecting to metadata database: " + e.getMessage();
+            var message = "Error connecting to metadata store: " + e.getMessage();
             log.error(message, e);
 
             throw new EStartup(message, e);

@@ -15,33 +15,16 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.metadata.dal.jdbc;
+package org.finos.tracdap.common.metadata.store.jdbc;
 
-import java.time.Instant;
+public enum MetadataErrorCode {
 
-class KeyedItem<TItem> {
+    UNKNOWN_ERROR_CODE,
 
-    final long key;
-    final int version;
-    final Instant timestamp;
-    final TItem item;
-    final boolean isLatest;
-    final boolean deleted;
+    // Object type of a metadata item does not match what is stored / expected
+    WRONG_OBJECT_TYPE,
 
-    KeyedItem(long key, int version, Instant timestamp, TItem item, boolean isLatest, boolean deleted) {
-        this.key = key;
-        this.version = version;
-        this.timestamp = timestamp;
-        this.item = item;
-        this.isLatest = isLatest;
-        this.deleted = deleted;
-    }
-
-    KeyedItem(long key, int version, Instant timestamp, TItem item, boolean isLatest) {
-        this(key, version, timestamp, item, isLatest, false);
-    }
-
-    KeyedItem(long key, TItem item) {
-        this(key, 0, null, item, false);
-    }
+    // The definition of a metadata item could not be understood
+    INVALID_OBJECT_DEFINITION,
+    INVALID_CONFIG_ENTRY
 }

@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.metadata.dal.jdbc;
+package org.finos.tracdap.common.metadata.store.jdbc;
 
 import org.finos.tracdap.common.db.JdbcErrorCode;
 import org.finos.tracdap.common.db.dialects.IDialect;
@@ -66,7 +66,7 @@ class MetadataErrors {
     static final String UNHANDLED_ERROR = "Unhandled SQL Error code: {0}";
 
     static void objectNotFound(
-            SQLException error, IDialect dialect, JdbcMetadataDal.ObjectParts parts,
+            SQLException error, IDialect dialect, JdbcMetadataStore.ObjectParts parts,
             boolean priorVersions, boolean priorTags) {
 
         var multipleItemMessage =
@@ -114,7 +114,7 @@ class MetadataErrors {
         throw new EMetadataNotFound(message, error);
     }
 
-    static void wrongObjectType(SQLException error, IDialect dialect, JdbcMetadataDal.ObjectParts parts) {
+    static void wrongObjectType(SQLException error, IDialect dialect, JdbcMetadataStore.ObjectParts parts) {
 
         if (!(error instanceof MetadataException))
             return;
@@ -135,7 +135,7 @@ class MetadataErrors {
         throw new EMetadataWrongType(message, error);
     }
 
-    static void duplicateObjectId(SQLException error, IDialect dialect, JdbcMetadataDal.ObjectParts parts) {
+    static void duplicateObjectId(SQLException error, IDialect dialect, JdbcMetadataStore.ObjectParts parts) {
 
         var code = dialect.mapErrorCode(error);
 
@@ -152,7 +152,7 @@ class MetadataErrors {
         throw new EMetadataDuplicate(message, error);
     }
 
-    static void idNotPreallocated(SQLException error, IDialect dialect, JdbcMetadataDal.ObjectParts parts) {
+    static void idNotPreallocated(SQLException error, IDialect dialect, JdbcMetadataStore.ObjectParts parts) {
 
         var code = dialect.mapErrorCode(error);
 
@@ -169,7 +169,7 @@ class MetadataErrors {
         throw new EMetadataNotFound(message, error);
     }
 
-    static void idAlreadyInUse(SQLException error, IDialect dialect, JdbcMetadataDal.ObjectParts parts) {
+    static void idAlreadyInUse(SQLException error, IDialect dialect, JdbcMetadataStore.ObjectParts parts) {
 
         var code = dialect.mapErrorCode(error);
 
@@ -186,7 +186,7 @@ class MetadataErrors {
         throw new EMetadataDuplicate(message, error);
     }
 
-    static void priorVersionMissing(SQLException error, IDialect dialect, JdbcMetadataDal.ObjectParts parts) {
+    static void priorVersionMissing(SQLException error, IDialect dialect, JdbcMetadataStore.ObjectParts parts) {
 
         var code = dialect.mapErrorCode(error);
 
@@ -204,7 +204,7 @@ class MetadataErrors {
         throw new EMetadataNotFound(message, error);
     }
 
-    static void versionSuperseded(SQLException error, IDialect dialect, JdbcMetadataDal.ObjectParts parts) {
+    static void versionSuperseded(SQLException error, IDialect dialect, JdbcMetadataStore.ObjectParts parts) {
 
         var code = dialect.mapErrorCode(error);
 
@@ -222,7 +222,7 @@ class MetadataErrors {
         throw new EMetadataDuplicate(message, error);
     }
 
-    static void priorTagMissing(SQLException error, IDialect dialect, JdbcMetadataDal.ObjectParts parts) {
+    static void priorTagMissing(SQLException error, IDialect dialect, JdbcMetadataStore.ObjectParts parts) {
 
         var code = dialect.mapErrorCode(error);
 
@@ -241,7 +241,7 @@ class MetadataErrors {
         throw new EMetadataNotFound(message, error);
     }
 
-    static void tagSuperseded(SQLException error, IDialect dialect, JdbcMetadataDal.ObjectParts parts) {
+    static void tagSuperseded(SQLException error, IDialect dialect, JdbcMetadataStore.ObjectParts parts) {
 
         var code = dialect.mapErrorCode(error);
 
@@ -261,7 +261,7 @@ class MetadataErrors {
     }
 
     static void configNotFound(
-            SQLException error, IDialect dialect, JdbcMetadataDal.ObjectParts parts) {
+            SQLException error, IDialect dialect, JdbcMetadataStore.ObjectParts parts) {
 
         var code = dialect.mapErrorCode(error);
 
@@ -300,7 +300,7 @@ class MetadataErrors {
         throw new EMetadataNotFound(message, error);
     }
 
-    static void duplicateConfig(SQLException error, IDialect dialect, JdbcMetadataDal.ObjectParts parts) {
+    static void duplicateConfig(SQLException error, IDialect dialect, JdbcMetadataStore.ObjectParts parts) {
 
         var code = dialect.mapErrorCode(error);
 
@@ -320,7 +320,7 @@ class MetadataErrors {
         throw new EMetadataDuplicate(message, error);
     }
 
-    static void priorConfigMissing(SQLException error, IDialect dialect, JdbcMetadataDal.ObjectParts parts) {
+    static void priorConfigMissing(SQLException error, IDialect dialect, JdbcMetadataStore.ObjectParts parts) {
 
         var code = dialect.mapErrorCode(error);
 

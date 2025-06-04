@@ -15,27 +15,27 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.metadata.dal;
+package org.finos.tracdap.common.metadata.store;
 
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.db.JdbcSetup;
 import org.finos.tracdap.common.exception.EPluginNotAvailable;
 import org.finos.tracdap.common.plugin.PluginServiceInfo;
 import org.finos.tracdap.common.plugin.TracPlugin;
-import org.finos.tracdap.common.metadata.dal.jdbc.JdbcMetadataDal;
+import org.finos.tracdap.common.metadata.store.jdbc.JdbcMetadataStore;
 
 import java.util.List;
 import java.util.Properties;
 
 
-public class MetadataDalPlugin extends TracPlugin {
+public class CoreMetadataPlugin extends TracPlugin {
 
     private static final String PLUGIN_NAME = "CORE_METADATA";
 
-    private static final String JDBC_METADATA_DAL = "JDBC_METADATA_DAL";
+    private static final String JDBC_METADATA_STORE = "JDBC_METADATA_STORE";
 
     private static final List<PluginServiceInfo> serviceInfo = List.of(
-            new PluginServiceInfo(IMetadataDal.class, JDBC_METADATA_DAL, List.of("JDBC", "SQL")));
+            new PluginServiceInfo(IMetadataStore.class, JDBC_METADATA_STORE, List.of("JDBC", "SQL")));
 
     @Override
     public String pluginName() {
@@ -51,12 +51,12 @@ public class MetadataDalPlugin extends TracPlugin {
     @SuppressWarnings("unchecked")
     protected <T> T createService(String serviceName, Properties properties, ConfigManager configManager) {
 
-        if (JDBC_METADATA_DAL.equals(serviceName)) {
+        if (JDBC_METADATA_STORE.equals(serviceName)) {
 
             var dialect = JdbcSetup.getSqlDialect(properties);
             var datasource = JdbcSetup.createDatasource(properties);
 
-            return (T) new JdbcMetadataDal(dialect, datasource);
+            return (T) new JdbcMetadataStore(dialect, datasource);
         }
 
         // Should never happen, protected by PluginManager
