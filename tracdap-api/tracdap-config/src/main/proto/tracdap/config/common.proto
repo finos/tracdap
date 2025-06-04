@@ -49,18 +49,6 @@ message PlatformInfo {
 }
 
 
-message StorageConfig {
-
-  // TODO: Rename "buckets" as "internal" for 0.7
-  map<string, PluginConfig> buckets = 1;
-  map<string, PluginConfig> external = 4;
-
-  string defaultBucket = 2;
-  string defaultFormat = 3;
-  metadata.StorageLayout defaultLayout = 5;
-}
-
-
 message ServiceConfig {
 
   optional bool enabled = 1;

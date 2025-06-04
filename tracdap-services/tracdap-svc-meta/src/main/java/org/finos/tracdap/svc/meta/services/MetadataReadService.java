@@ -18,15 +18,11 @@
 package org.finos.tracdap.svc.meta.services;
 
 import org.finos.tracdap.api.*;
-import org.finos.tracdap.common.config.IDynamicResources;
-import org.finos.tracdap.common.exception.ETenantNotFound;
 import org.finos.tracdap.common.util.VersionInfo;
 import org.finos.tracdap.config.PlatformConfig;
 import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.common.metadata.dal.IMetadataDal;
 import org.finos.tracdap.svc.meta.TracMetadataService;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.util.List;
 import java.util.UUID;
@@ -36,16 +32,12 @@ public class MetadataReadService {
 
     private static final String ENVIRONMENT_NOT_SET = "ENVIRONMENT_NOT_SET";
 
-    private final Logger log = LoggerFactory.getLogger(getClass());
-
     private final IMetadataDal dal;
     private final PlatformConfig platformConfig;
-    private final IDynamicResources resources;
 
-    public MetadataReadService(IMetadataDal dal, PlatformConfig platformConfig, IDynamicResources resources) {
+    public MetadataReadService(IMetadataDal dal, PlatformConfig platformConfig) {
         this.dal = dal;
         this.platformConfig = platformConfig;
-        this.resources = resources;
     }
 
     // Literally all the read logic is in the DAL at present!
@@ -78,76 +70,6 @@ public class MetadataReadService {
         return ListTenantsResponse.newBuilder()
             .addAllTenants(tenantInfoList)
             .build();
-    }
-
-    public ListResourcesResponse listResources(String tenantCode, ResourceType resourceType) {
-
-        // Explicit check is required because resources currently come from platform config
-        checkTenantExists(tenantCode);
-
-        var matchingResources = resources.getMatchingEntries(resource -> resource.getResourceType() == resourceType);
-
-        var response = ListResourcesResponse.newBuilder();
-        matchingResources.forEach((key, value) -> response.addResources(buildResourceInfo(key, value)));
-
-        return response.build();
-    }
-
-    public ConfigListResponse listConfigEntries(ConfigListRequest request) {
-
-        var entries = dal.listConfigEntries(
-                request.getTenant(),
-                request.getConfigClass(),
-                request.getIncludeDeleted());
-
-        // Config entries are not filtered at the DAL level
-        // To make the API more user-friendly, filtering is applied here after entries are loaded
-        // The assumption is that the list of entries is small, and they are mostly accessed by key
-
-        var filter = entries.stream();
-
-        if (request.hasConfigType())
-            filter = filter.filter(e -> e.getDetails().getConfigType() == request.getConfigType());
-
-        if (request.hasResourceType())
-            filter = filter.filter(e -> e.getDetails().getResourceType() == request.getResourceType());
-
-        var response = ConfigListResponse.newBuilder();
-        filter.forEach(response::addEntries);
-
-        return response.build();
-    }
-
-    public ResourceInfoResponse resourceInfo(String tenantCode, ResourceType resourceType, String resourceKey) {
-
-        // Explicit check is required because resources currently come from platform config
-        checkTenantExists(tenantCode);
-
-        var resource = resources.getStrictEntry(resourceKey, resourceType);
-
-        return buildResourceInfo(resourceKey, resource).build();
-    }
-
-    private void checkTenantExists(String tenantCode) {
-
-        var tenants = dal.listTenants();
-
-        var requiredTenant = tenants.stream()
-                .filter(tenant -> tenant.getTenantCode().equals(tenantCode))
-                .findFirst();
-
-        if (requiredTenant.isEmpty())
-            throw new ETenantNotFound("Tenant not found: [" + tenantCode + "]");
-    }
-
-    private ResourceInfoResponse.Builder buildResourceInfo(
-            String resourceKey, ResourceDefinition resource) {
-
-        return ResourceInfoResponse.newBuilder()
-                .setResourceType(resource.getResourceType())
-                .setResourceKey(resourceKey)
-                .setProtocol(resource.getProtocol())
-                .putAllProperties(resource.getPublicPropertiesMap());
     }
 
     public Tag readObject(String tenant, TagSelector selector) {

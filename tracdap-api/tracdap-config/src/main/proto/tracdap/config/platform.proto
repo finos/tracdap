@@ -24,6 +24,7 @@ option java_multiple_files = true;
 
 import "tracdap/metadata/common.proto";
 import "tracdap/config/common.proto";
+import "tracdap/config/tenant.proto";
 
 import "google/protobuf/any.proto";
 
@@ -31,30 +32,18 @@ import "google/protobuf/any.proto";
 message PlatformConfig {
 
   map<string, string> config = 1;
-
   PlatformInfo platformInfo = 2;
 
-  MetadataConfig metadata = 6;
+  MetadataConfig metadata = 3;
+  PluginConfig jobCache = 4;
+  PluginConfig executor = 5;
 
-  StorageConfig storage = 7;
+  GatewayConfig gateway = 6;
 
-  map<string, PluginConfig> repositories = 8;
+  map<string, ServiceConfig> services = 10;
+  DeploymentConfig deployment = 11;
 
-  PluginConfig executor = 9;
-
-  PluginConfig jobCache = 12;
-
-  map<string, TenantConfig> tenants = 10;
-
-  GatewayConfig gateway = 13;
-
-  map<string, ServiceConfig> services = 4;
-
-  DeploymentConfig deployment = 14;
-
-  map<string, ClientConfig> clientConfig = 15;
-
-  map<string, google.protobuf.Any> extensions = 16;
+  map<string, google.protobuf.Any> extensions = 20;
 }
 
 
@@ -64,14 +53,6 @@ message MetadataConfig {
 
   metadata.MetadataFormat format = 2;
 }
-
-
-message TenantConfig {
-
-  optional string defaultBucket = 1;
-  optional string defaultFormat = 2;
-}
-
 
 message GatewayConfig {
 
@@ -131,9 +112,4 @@ enum DeploymentLayout {
   SANDBOX = 1;
   HOSTED = 2;
   CUSTOM = 3;
-}
-
-message ClientConfig {
-
-  map<string, string> properties = 1;
 }

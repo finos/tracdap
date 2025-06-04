@@ -49,6 +49,7 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.List;
 
 import static org.finos.tracdap.test.concurrent.ConcurrentTestHelpers.getResultOf;
 import static org.finos.tracdap.test.concurrent.ConcurrentTestHelpers.waitFor;
@@ -67,14 +68,14 @@ public class RestDataApiTest {
     public static final String LARGE_TEST_FILE = "tracdap-services/tracdap-svc-data/src/test/resources/large_csv_data_100000.csv";
 
     public static final String TRAC_CONFIG_UNIT = "config/trac-unit.yaml";
-    public static final String TRAC_CONFIG_UNIT_RESOURCES = "config/trac-unit-resources.yaml";
+    public static final String TRAC_TENANTS_UNIT = "config/trac-unit-tenants.yaml";
 
     public static final long UPLOAD_CHUNK_SIZE = 2 * 1024 * 1024;
 
     @RegisterExtension
-    public static final PlatformTest platform = PlatformTest.forConfig(TRAC_CONFIG_UNIT)
+    public static final PlatformTest platform = PlatformTest.forConfig(TRAC_CONFIG_UNIT, List.of(TRAC_TENANTS_UNIT))
             .runDbDeploy(true)
-            .bootstrapTenant(TEST_TENANT, TRAC_CONFIG_UNIT_RESOURCES)
+            .addTenant(TEST_TENANT)
             .startService(TracAdminService.class)
             .startService(TracMetadataService.class)
             .startService(TracDataService.class)

@@ -93,6 +93,7 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
     private final Logger log = LoggerFactory.getLogger(getClass());
 
     private final String testConfig;
+    private final List<String> extraConfigFiles;
     private final Map<String, String> tenants;
     private final String storageFormat;
 
@@ -108,12 +109,13 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
     private final List<Consumer<PlatformTest>> preStartActions;
 
     private PlatformTest(
-            String testConfig, String secretKey, Map<String, String> tenants, String storageFormat,
+            String testConfig, List<String> extraConfigFiles, String secretKey, Map<String, String> tenants, String storageFormat,
             boolean staticSetup, boolean runDbDeploy, boolean runCacheDeploy, boolean manageDataPrefix, boolean localExecutor,
             List<Class<? extends TracServiceBase>> serviceClasses, Map<String, String> serviceKeys,
             GrpcConcern clientConcerns, List<Consumer<PlatformTest>> preStartActions) {
 
         this.testConfig = testConfig;
+        this.extraConfigFiles = extraConfigFiles;
         this.tenants = tenants;
         this.storageFormat = storageFormat;
         this.staticSetup = staticSetup;
@@ -134,12 +136,17 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
     }
 
     public static Builder forConfig(String testConfig) {
-        return forConfig(testConfig, "");
+        return forConfig(testConfig, List.of(), "");
     }
 
-    public static Builder forConfig(String testConfig, String secretKey) {
+    public static Builder forConfig(String testConfig, List<String> extraConfigFiles) {
+        return forConfig(testConfig, extraConfigFiles, "");
+    }
+
+    public static Builder forConfig(String testConfig, List<String> extraConfigFiles, String secretKey) {
         var builder = new Builder();
         builder.testConfig = testConfig;
+        builder.extraConfigFiles = extraConfigFiles;
         builder.secretKey = secretKey;
         return builder;
     }
@@ -147,6 +154,7 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
     public static class Builder {
 
         private String testConfig;
+        private List<String> extraConfigFiles = new ArrayList<>();
         private String secretKey;
         private final Map<String, String> tenants = new HashMap<>();
         private String storageFormat = DEFAULT_STORAGE_FORMAT;
@@ -178,7 +186,7 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         public PlatformTest build() {
 
             return new PlatformTest(
-                    testConfig, secretKey, tenants, storageFormat,
+                    testConfig, extraConfigFiles, secretKey, tenants, storageFormat,
                     staticSetup, runDbDeploy, runCacheDeploy, manageDataPrefix, localExecutor,
                     serviceClasses, serviceKeys,
                     clientConcerns.build(), preStartActions);
@@ -489,6 +497,7 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
 
         var configInputs = new ArrayList<String>();
         configInputs.add(testConfig);
+        configInputs.addAll(extraConfigFiles);
         tenants.values().stream().filter(Objects::nonNull).forEach(configInputs::add);
         var configOutputs = ConfigHelpers.prepareConfig(configInputs, workingDir, substitutions);
         platformConfigUrl = configOutputs.get(0);
@@ -597,24 +606,14 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
     void prepareDataPrefix() throws Exception {
 
         var elg = new NioEventLoopGroup(2);
-
-        for (var bootstrapEntry : tenants.entrySet()) {
-            if (bootstrapEntry.getValue() != null)
-                StorageTestHelpers.createStoragePrefix(configManager, pluginManager, elg, bootstrapEntry.getValue());
-        }
-
+        StorageTestHelpers.createStoragePrefix(configManager, pluginManager, elg);
         elg.shutdownGracefully();
     }
 
     void cleanupDataPrefix() throws Exception {
 
         var elg = new NioEventLoopGroup(2);
-
-        for (var bootstrapEntry : tenants.entrySet()) {
-            if (bootstrapEntry.getValue() != null)
-                StorageTestHelpers.deleteStoragePrefix(configManager, pluginManager, elg, bootstrapEntry.getValue());
-        }
-
+        StorageTestHelpers.deleteStoragePrefix(configManager, pluginManager, elg);
         elg.shutdownGracefully();
     }
 

@@ -1,0 +1,49 @@
+
+tenants:
+
+  ACME_CORP:
+
+    displayName: ACME Projectiles Inc.
+
+    properties:
+      storage.default.location: UNIT_TEST_STORAGE
+      storage.default.format: ARROW_FILE
+      storage.default.layout: OBJECT_ID_LAYOUT
+
+    resources:
+
+      UNIT_TEST_STORAGE:
+        resourceType: INTERNAL_STORAGE
+        protocol: LOCAL
+        publicProperties:
+          unit_test_property: storage_value_1
+          unit-test.property: storage-value.1
+        properties:
+          rootPath: ${TRAC_STORAGE_DIR}
+
+      ANOTHER_TEST_STORAGE:
+        resourceType: INTERNAL_STORAGE
+        protocol: LOCAL
+        publicProperties:
+          unit_test_property: storage_value_2
+          unit-test.property: storage-value.2
+        properties:
+          rootPath: ${TRAC_STORAGE_DIR}
+
+      UNIT_TEST_REPO:
+        resourceType: MODEL_REPOSITORY
+        protocol: LOCAL
+        publicProperties:
+          unit_test_property: repo_value_1
+          unit-test.property: repo-value.1
+        properties:
+          repoUrl: ${TRAC_LOCAL_REPO}
+
+      ANOTHER_TEST_REPO:
+        resourceType: MODEL_REPOSITORY
+        protocol: LOCAL
+        publicProperties:
+          unit_test_property: repo_value_2
+          unit-test.property: repo-value.2
+        properties:
+          repoUrl: ${TRAC_LOCAL_REPO}

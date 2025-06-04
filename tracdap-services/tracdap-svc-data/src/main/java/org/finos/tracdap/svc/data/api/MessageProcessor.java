@@ -17,18 +17,18 @@
 
 package org.finos.tracdap.svc.data.api;
 
-import io.grpc.Context;
 import org.finos.tracdap.api.MetadataReadRequest;
 import org.finos.tracdap.api.internal.*;
-import org.finos.tracdap.common.config.ConfigKeys;
-import org.finos.tracdap.common.config.ISecretLoader;
-import org.finos.tracdap.common.exception.EUnexpected;
-import org.finos.tracdap.common.middleware.GrpcConcern;
-import org.finos.tracdap.common.storage.StorageManager;
 import org.finos.tracdap.metadata.ResourceDefinition;
 import org.finos.tracdap.metadata.ResourceType;
+import org.finos.tracdap.common.config.ConfigKeys;
+import org.finos.tracdap.common.exception.EUnexpected;
+import org.finos.tracdap.common.middleware.GrpcConcern;
+import org.finos.tracdap.svc.data.service.TenantServices;
 
+import io.grpc.Context;
 import io.grpc.stub.StreamObserver;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -39,22 +39,22 @@ public class MessageProcessor extends InternalMessagingApiGrpc.InternalMessaging
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
+    private final TenantServices.Map services;
+
     private final InternalMetadataApiGrpc.InternalMetadataApiBlockingStub metadataApi;
-    private final ExecutorService offloadExecutor;
     private final GrpcConcern commonConcerns;
-    private final StorageManager storageManager;
-    private final ISecretLoader secrets;
+    private final ExecutorService offloadExecutor;
 
     public MessageProcessor(
+            TenantServices.Map services,
             InternalMetadataApiGrpc.InternalMetadataApiBlockingStub metadataApi,
-            ExecutorService offloadExecutor, GrpcConcern commonConcerns,
-            StorageManager storageManager, ISecretLoader secrets) {
+            GrpcConcern commonConcerns, ExecutorService offloadExecutor) {
+
+        this.services = services;
 
         this.metadataApi = metadataApi;
-        this.offloadExecutor = offloadExecutor;
         this.commonConcerns = commonConcerns;
-        this.storageManager = storageManager;
-        this.secrets = secrets;
+        this.offloadExecutor = offloadExecutor;
     }
 
     @Override
@@ -76,15 +76,11 @@ public class MessageProcessor extends InternalMessagingApiGrpc.InternalMessaging
                 request.getConfigEntry().getConfigClass(),
                 request.getConfigEntry().getConfigKey());
 
+        var tenantServices = services.lookupTenant(request.getTenant());
+
         // If secrets have changed as part of this update, make sure they are reloaded
         if (request.getSecretsUpdated()) {
-
-            var secretScope = secrets
-                    .namedScope(ConfigKeys.TENANT_SCOPE, request.getTenant())
-                    .scope(request.getConfigEntry().getConfigClass())
-                    .scope(request.getConfigEntry().getConfigKey());
-
-            secretScope.reload();
+            tenantServices.getSecrets().reload();
         }
 
         var entry = request.getConfigEntry();
@@ -99,16 +95,16 @@ public class MessageProcessor extends InternalMessagingApiGrpc.InternalMessaging
 
             case CREATE:
                 storageResource = fetchResource(request);
-                storageManager.addStorage(entry.getConfigKey(), storageResource);
+                tenantServices.getStorageManager().addStorage(entry.getConfigKey(), storageResource);
                 break;
 
             case UPDATE:
                 storageResource = fetchResource(request);
-                storageManager.updateStorage(entry.getConfigKey(), storageResource);
+                tenantServices.getStorageManager().updateStorage(entry.getConfigKey(), storageResource);
                 break;
 
             case DELETE:
-                storageManager.removeStorage(entry.getConfigKey());
+                tenantServices.getStorageManager().removeStorage(entry.getConfigKey());
                 break;
 
             default:

@@ -25,6 +25,7 @@ import tracdap.rt._impl.runtime as runtime  # noqa
 import tracdap.rt._impl.core.type_system as types  # noqa
 import tracdap.rt._impl.core.util as util  # noqa
 import tracdap.rt._impl.exec.dev_mode as dev_mode  # noqa
+import tracdap.rt.ext.plugins as plugins
 
 
 class CoreJobsTest(unittest.TestCase):
@@ -32,6 +33,7 @@ class CoreJobsTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         log.configure_logging()
+        plugins.PluginManager.register_core_plugins()
 
     def setUp(self) -> None:
 
@@ -42,24 +44,21 @@ class CoreJobsTest(unittest.TestCase):
             .joinpath("../../../../../../..") \
             .resolve()
 
-        repos = {
-            "unit_test_repo": cfg.PluginConfig(
-                protocol="local",
-                properties={"repoUrl": str(current_repo_url)})
-        }
+        sys_config = cfg.RuntimeConfig()
+        sys_config.properties["storage.default.location"] = "storage_1"
+        sys_config.properties["storage.default.format"] = "CSV"
 
-        storage = cfg.StorageConfig(
-            buckets={
-                "storage_1": cfg.PluginConfig(
-                    protocol="LOCAL",
-                    properties={"rootPath": str(current_repo_url.joinpath("examples/models/python/data"))}
-                )
-            },
-            defaultBucket="storage_1",
-            defaultFormat="CSV"
-        )
+        sys_config.resources["storage_1"] = meta.ResourceDefinition(
+            resourceType=meta.ResourceType.INTERNAL_STORAGE,
+            protocol="LOCAL",
+            properties={"rootPath": str(current_repo_url.joinpath("examples/models/python/data"))})
 
-        self.sys_config = cfg.RuntimeConfig(repositories=repos, storage=storage)
+        sys_config.resources["unit_test_repo"] = meta.ResourceDefinition(
+            resourceType=meta.ResourceType.MODEL_REPOSITORY,
+            protocol="local",
+            properties={"repoUrl": str(current_repo_url)})
+
+        self.sys_config = sys_config
 
     def test_import_model_job(self):
 

@@ -24,7 +24,6 @@ import org.finos.tracdap.api.MetadataWriteRequest;
 import org.finos.tracdap.api.internal.RuntimeJobStatus;
 import org.finos.tracdap.api.internal.InternalMetadataApiGrpc.InternalMetadataApiBlockingStub;
 import org.finos.tracdap.common.cache.CacheEntry;
-import org.finos.tracdap.common.config.IDynamicResources;
 import org.finos.tracdap.common.exception.*;
 import org.finos.tracdap.common.grpc.RequestMetadata;
 import org.finos.tracdap.common.grpc.UserMetadata;
@@ -35,7 +34,6 @@ import org.finos.tracdap.common.middleware.GrpcConcern;
 import org.finos.tracdap.common.plugin.PluginRegistry;
 import org.finos.tracdap.common.validation.Validator;
 import org.finos.tracdap.common.metadata.MetadataBundle;
-import org.finos.tracdap.config.PlatformConfig;
 import org.finos.tracdap.metadata.JobStatusCode;
 import org.finos.tracdap.metadata.ObjectType;
 import org.finos.tracdap.metadata.TagUpdate;
@@ -57,7 +55,7 @@ public class JobProcessor {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
-    private final IDynamicResources resources;
+    private final TenantResources.Map resources;
     private final InternalMetadataApiBlockingStub metaClient;
     private final IJobExecutor<?> executor;
     private final Validator validator = new Validator();
@@ -67,8 +65,7 @@ public class JobProcessor {
 
 
     public JobProcessor(
-            PlatformConfig platformConfig,
-            IDynamicResources resources,
+            TenantResources.Map resources,
             GrpcConcern commonConcerns,
             PluginRegistry registry) {
 
@@ -76,7 +73,7 @@ public class JobProcessor {
         this.metaClient = registry.getSingleton(InternalMetadataApiBlockingStub.class);
         this.executor = registry.getSingleton(JobExecutor.class);
 
-        this.lifecycle = new JobProcessorHelpers(platformConfig, resources, commonConcerns, registry);
+        this.lifecycle = new JobProcessorHelpers(resources, commonConcerns, registry);
     }
 
     public JobState newJob(JobRequest request, GrpcClientState clientState) {
@@ -128,6 +125,8 @@ public class JobProcessor {
         var newState = jobState.clone();
 
         try {
+
+            var resources = this.resources.lookupTenant(newState.tenant).getResources();
 
             // Load in all the resources referenced by the job
             newState = lifecycle.loadMetadata(newState);

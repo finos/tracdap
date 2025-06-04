@@ -45,6 +45,19 @@ except ModuleNotFoundError:
 _T = tp.TypeVar('_T')
 
 
+class ConfigKeys:
+
+    STORAGE_DEFAULT_LOCATION = "storage.default.location"
+    STORAGE_DEFAULT_FORMAT = "storage.default.format"
+    STORAGE_DEFAULT_LAYOUT = "storage.default.layout"
+
+
+class ConfigKDefaults:
+
+    STORAGE_DEFAULT_FORMAT = "CSV"
+    STORAGE_DEFAULT_LAYOUT = "OBJECT_ID_LAYOUT"
+
+
 class ConfigManager:
 
     @classmethod

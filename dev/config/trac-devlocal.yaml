@@ -14,6 +14,7 @@
 # limitations under the License.
 
 config:
+  tenants: trac-devlocal-tenants.yaml
   logging: trac-logging.xml
   secret.type: PKCS12
   secret.url: secrets.p12
@@ -38,26 +39,8 @@ metadata:
       pool.overflow: 50
 
 
-storage:
-
-  defaultBucket: STORAGE1
-  defaultFormat: ARROW_FILE
-
-  buckets:
-
-    STORAGE1:
-      protocol: LOCAL
-      properties:
-        rootPath: ./build/run
-
-
-repositories:
-
-  # Add your own repositories in here to load models into TRAC
-  example_repo:
-    protocol: git
-    properties:
-      repoUrl: https://github.com/finos/tracdap
+jobCache:
+  protocol: LOCAL
 
 
 executor:
@@ -68,29 +51,26 @@ executor:
     venvPath: C:\Dev\trac\venv
 
 
-jobCache:
-  protocol: LOCAL
-
-
 gateway:
 
-  # Routing for the TRAC services will be configured automatically
-  # To add custom routes, uncomment this configuration and modify as required
+# Routing for the TRAC services will be configured automatically
+# To add custom routes, uncomment this configuration and modify as required
 
-  #  routes:
-  #
-  #    - routeName: Local Development Server
-  #      routeType: HTTP
-  #
-  #      match:
-  #        host: localhost
-  #        path: /local=app/
-  #
-  #      target:
-  #        scheme: http
-  #        host: localhost
-  #        port: 3000
-  #        path: /
+#  routes:
+#
+#    - routeName: Local Development Server
+#      routeType: HTTP
+#
+#      match:
+#        host: localhost
+#        path: /local=app/
+#
+#      target:
+#        scheme: http
+#        host: localhost
+#        port: 3000
+#        path: /
+
 
 services:
 

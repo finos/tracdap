@@ -57,7 +57,7 @@ public class RunFlowTest {
 
     private static final String TEST_TENANT = "ACME_CORP";
     private static final String E2E_CONFIG = "config/trac-e2e.yaml";
-    private static final String E2E_RESOURCES = "config/trac-e2e-resources.yaml";
+    private static final String E2E_TENANTS = "config/trac-e2e-tenants.yaml";
 
     private static final String LOANS_INPUT_PATH = "examples/models/python/data/inputs/loan_final313_100_shortform.csv";
     private static final String CURRENCY_INPUT_PATH = "examples/models/python/data/inputs/currency_data_sample.csv";
@@ -72,10 +72,10 @@ public class RunFlowTest {
 
 
     @RegisterExtension
-    public static final PlatformTest platform = PlatformTest.forConfig(E2E_CONFIG)
+    public static final PlatformTest platform = PlatformTest.forConfig(E2E_CONFIG, List.of(E2E_TENANTS))
             .runDbDeploy(true)
             .runCacheDeploy(true)
-            .bootstrapTenant(TEST_TENANT, E2E_RESOURCES)
+            .addTenant(TEST_TENANT)
             .prepareLocalExecutor(true)
             .startService(TracMetadataService.class)
             .startService(TracDataService.class)

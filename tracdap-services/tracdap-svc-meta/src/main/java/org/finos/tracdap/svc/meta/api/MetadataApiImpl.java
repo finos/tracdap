@@ -83,30 +83,6 @@ class MetadataApiImpl {
         }
     }
 
-    void listResources(ListResourcesRequest request, StreamObserver<ListResourcesResponse> response) {
-
-        try {
-            var result = readService.listResources(request.getTenant(), request.getResourceType());
-            response.onNext(result);
-            response.onCompleted();
-        }
-        catch (Exception error) {
-            response.onError(error);
-        }
-    }
-
-    void resourceInfo(ResourceInfoRequest request, StreamObserver<ResourceInfoResponse> response) {
-
-        try {
-            var result = readService.resourceInfo(request.getTenant(), request.getResourceType(), request.getResourceKey());
-            response.onNext(result);
-            response.onCompleted();
-        }
-        catch (Exception error) {
-            response.onError(error);
-        }
-    }
-
     void createObject(MetadataWriteRequest request, StreamObserver<TagHeader> response) {
 
         try {

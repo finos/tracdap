@@ -1,14 +1,15 @@
 
+properties:
+  storage.default.location: NOT_USED
 
-storage:
+resources:
 
-  external:
-
-    data_integration:
-      protocol: SQL
-      properties:
-        dialect: POSTGRESQL
-        driver.python: alchemy
-        alchemy.url: postgresql+pg8000://metadb:5432/trac
-        alchemy.username: trac_admin
-        alchemy.password: DB_SECRET
+  data_integration:
+    resourceType: EXTERNAL_STORAGE
+    protocol: SQL
+    properties:
+      dialect: POSTGRESQL
+      driver.python: alchemy
+      alchemy.url: postgresql+pg8000://metadb:5432/trac
+      alchemy.username: trac_admin
+      alchemy.password: DB_SECRET

@@ -46,8 +46,12 @@ class TestExtConfigLoader(IConfigLoader):
 
     STATIC_SYS_KEY = "sys_config_HuX-7"
     STATIC_SYS_OBJ = {
-        "repositories": {
+        "properties": {
+            "storage.default.location": "STORAGE_NOT_USED"
+        },
+        "resources": {
             "TEST_EXT_REPO": {
+                "resourceType": "MODEL_REPOSITORY",
                 "protocol": "local",
                 "properties": {"repoUrl": "/tmp/wherever"}
             }

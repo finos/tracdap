@@ -14,6 +14,7 @@
 # limitations under the License.
 
 config:
+  tenants: int-storage-gcs-tenants.yaml
   secret.type: PKCS12
   secret.url: secrets.p12
 
@@ -40,20 +41,14 @@ metadata:
       pool.overflow: 5
 
 
-storage:
-
-  defaultBucket: STORAGE_INTEGRATION
-  defaultFormat: ARROW_FILE
+jobCache:
+  protocol: LOCAL
 
 
 executor:
   protocol: LOCAL
   properties:
     venvPath: ${TRAC_EXEC_DIR}/venv
-
-
-jobCache:
-  protocol: LOCAL
 
 
 services:

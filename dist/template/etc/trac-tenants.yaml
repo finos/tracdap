@@ -1,0 +1,25 @@
+
+tenants:
+  ACME_CORP:
+
+    displayName: ACME Industrial Supplies Inc.
+
+    properties:
+      storage.default.location: STORAGE1
+      storage.default.format: ARROW_FILE
+
+    resources:
+
+      STORAGE1:
+        resourceType: INTERNAL_STORAGE
+        protocol: LOCAL
+        properties:
+          # Set the path to your local storage location here
+          rootPath: /path/to/data/storage1
+
+      # Add your own repositories in here to load models into TRAC
+      trac_repo:
+        resourceType: MODEL_REPOSITORY
+        protocol: git
+        properties:
+          repoUrl: https://github.com/finos/tracdap

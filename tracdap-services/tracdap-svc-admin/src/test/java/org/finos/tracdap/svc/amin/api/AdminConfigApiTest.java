@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-import io.grpc.Status;
+package org.finos.tracdap.svc.amin.api;import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import org.finos.tracdap.api.*;
 import org.finos.tracdap.common.config.ConfigKeys;
@@ -32,6 +32,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
+import java.util.List;
+
 import static org.finos.tracdap.test.meta.SampleMetadata.TEST_TENANT;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -39,7 +41,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 abstract class AdminConfigApiTest {
 
-    public static final String TRAC_CONFIG_UNIT = "config/trac-unit-secrets.yaml";
+    public static final String TRAC_CONFIG_SECRETS = "config/trac-secrets.yaml";
+    public static final String TRAC_TENANTS_SECRETS = "config/trac-secrets-tenants.yaml";
     public static final String TRAC_CONFIG_ENV_VAR = "TRAC_CONFIG_FILE";
 
     protected TracAdminApiGrpc.TracAdminApiBlockingStub adminApi;
@@ -48,7 +51,7 @@ abstract class AdminConfigApiTest {
     static class UnitTest extends AdminConfigApiTest {
 
         @RegisterExtension
-        public static final PlatformTest platform = PlatformTest.forConfig(TRAC_CONFIG_UNIT)
+        public static final PlatformTest platform = PlatformTest.forConfig(TRAC_CONFIG_SECRETS, List.of(TRAC_TENANTS_SECRETS))
                 .runDbDeploy(true)
                 .addTenant(TEST_TENANT)
                 .startService(TracAdminService.class)

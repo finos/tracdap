@@ -19,6 +19,7 @@ import uuid
 from tracdap_test.rt.suites.file_storage_suite import *
 
 import tracdap.rt.config as cfg
+import tracdap.rt.metadata as meta
 import tracdap.rt.ext.plugins as plugins
 import tracdap.rt._impl.core.util as util  # noqa
 import tracdap.rt._impl.core.storage as storage  # noqa
@@ -44,14 +45,18 @@ class GcsArrowStorageTest(unittest.TestCase, FileOperationsTestSuite, FileReadWr
     def setUpClass(cls) -> None:
 
         suite_properties = cls._properties_from_env()
-        suite_storage_config = cfg.PluginConfig(protocol="GCS", properties=suite_properties)
+        suite_storage_config = meta.ResourceDefinition(
+            resourceType=meta.ResourceType.INTERNAL_STORAGE,
+            protocol="GCS", properties=suite_properties)
 
         cls.suite_storage = cls._storage_from_config(suite_storage_config, "tracdap_ci_storage_setup")
         cls.suite_storage.mkdir(cls.suite_storage_prefix)
 
         test_properties = cls._properties_from_env()
         test_properties["prefix"] = cls.suite_storage_prefix
-        test_storage_config = cfg.PluginConfig(protocol="GCS", properties=test_properties)
+        test_storage_config = meta.ResourceDefinition(
+            resourceType=meta.ResourceType.INTERNAL_STORAGE,
+            protocol="GCS", properties=test_properties)
 
         cls.storage = cls._storage_from_config(test_storage_config, "tracdap_ci_storage")
 
@@ -79,11 +84,11 @@ class GcsArrowStorageTest(unittest.TestCase, FileOperationsTestSuite, FileReadWr
         return properties
 
     @staticmethod
-    def _storage_from_config(storage_config: cfg.PluginConfig, storage_key: str):
+    def _storage_from_config(storage_config: meta.ResourceDefinition, storage_key: str):
 
         sys_config = cfg.RuntimeConfig()
-        sys_config.storage = cfg.StorageConfig()
-        sys_config.storage.buckets[storage_key] = storage_config
+        sys_config.properties["storage.default.location"] = storage_key
+        sys_config.resources[storage_key] = storage_config
 
         manager = storage.StorageManager(sys_config)
 
@@ -99,14 +104,18 @@ class GcsFsspecStorageTest(unittest.TestCase, FileOperationsTestSuite, FileReadW
     def setUpClass(cls) -> None:
 
         suite_properties = cls._properties_from_env()
-        suite_config = cfg.PluginConfig(protocol="GCS", properties=suite_properties)
+        suite_config = meta.ResourceDefinition(
+            resourceType=meta.ResourceType.INTERNAL_STORAGE,
+            protocol="GCS", properties=suite_properties)
 
         cls.suite_storage = cls._storage_from_config(suite_config, "tracdap_ci_storage_setup")
         cls.suite_storage.mkdir(cls.suite_storage_prefix)
 
         test_properties = cls._properties_from_env()
         test_properties["prefix"] = cls.suite_storage_prefix
-        test_config = cfg.PluginConfig(protocol="GCS", properties=test_properties)
+        test_config = meta.ResourceDefinition(
+            resourceType=meta.ResourceType.INTERNAL_STORAGE,
+            protocol="GCS", properties=test_properties)
 
         cls.storage = cls._storage_from_config(test_config, "tracdap_ci_storage")
 
@@ -134,11 +143,11 @@ class GcsFsspecStorageTest(unittest.TestCase, FileOperationsTestSuite, FileReadW
         return properties
 
     @staticmethod
-    def _storage_from_config(storage_config: cfg.PluginConfig, storage_key: str):
+    def _storage_from_config(storage_config: meta.ResourceDefinition, storage_key: str):
 
         sys_config = cfg.RuntimeConfig()
-        sys_config.storage = cfg.StorageConfig()
-        sys_config.storage.buckets[storage_key] = storage_config
+        sys_config.properties["storage.default.location"] = storage_key
+        sys_config.resources[storage_key] = storage_config
 
         manager = storage.StorageManager(sys_config)
 

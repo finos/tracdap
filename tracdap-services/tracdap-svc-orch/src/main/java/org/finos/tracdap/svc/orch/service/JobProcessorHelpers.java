@@ -21,10 +21,8 @@ import org.finos.tracdap.api.*;
 import org.finos.tracdap.api.internal.InternalMetadataApiGrpc;
 import org.finos.tracdap.api.internal.RuntimeJobResult;
 import org.finos.tracdap.api.internal.RuntimeJobResultAttrs;
-import org.finos.tracdap.common.config.ConfigHelpers;
 import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.config.ConfigManager;
-import org.finos.tracdap.common.config.IDynamicResources;
 import org.finos.tracdap.common.exception.EConsistencyValidation;
 import org.finos.tracdap.common.exception.EJobResult;
 import org.finos.tracdap.common.exception.EUnexpected;
@@ -56,23 +54,20 @@ public class JobProcessorHelpers {
 
     private final Logger log = LoggerFactory.getLogger(JobProcessorHelpers.class);
 
-    private final PlatformConfig platformConfig;
-    private final IDynamicResources resources;
+    private final InternalMetadataApiGrpc.InternalMetadataApiBlockingStub metaClient;
     private final GrpcConcern commonConcerns;
 
-    private final InternalMetadataApiGrpc.InternalMetadataApiBlockingStub metaClient;
-    private final ConfigManager configManager;
+    private final TenantResources.Map resources;
 
+    private final ConfigManager configManager;
     private final Validator validator = new Validator();
 
 
     public JobProcessorHelpers(
-            PlatformConfig platformConfig,
-            IDynamicResources resources,
+            TenantResources.Map resources,
             GrpcConcern commonConcerns,
             PluginRegistry registry) {
 
-        this.platformConfig = platformConfig;
         this.resources = resources;
         this.commonConcerns = commonConcerns;
 
@@ -190,9 +185,11 @@ public class JobProcessorHelpers {
         var jobLogic = JobLogic.forJobType(jobState.jobType);
         var metadata = new MetadataBundle(jobState.objectMapping, jobState.objects, jobState.tags);
 
-        jobState.definition = jobLogic.applyJobTransform(jobState.definition, metadata, resources);
+        var tenantResources = resources.lookupTenant(jobState.tenant).getResources();
 
-        var updatedMetadata = jobLogic.applyMetadataTransform(jobState.definition, metadata, resources);
+        jobState.definition = jobLogic.applyJobTransform(jobState.definition, metadata, tenantResources);
+
+        var updatedMetadata = jobLogic.applyMetadataTransform(jobState.definition, metadata, tenantResources);
         jobState.objects = updatedMetadata.getObjects();
         jobState.objectMapping = updatedMetadata.getObjectMapping();
 
@@ -301,40 +298,36 @@ public class JobProcessorHelpers {
                 .build();
 
         var sysConfig = RuntimeConfig.newBuilder();
-        var storageConfig = StorageConfig.newBuilder();
 
-        var internalStorage = resources.getMatchingEntries(
+        var tenantConfig = resources.lookupTenant(jobState.tenant).getStaticConfig();
+        var dynamicResources = resources.lookupTenant(jobState.tenant).getResources();
+
+        // Bring across tenant-level storage props (dyanmic tenant props may also be needed later)
+        for (var propertyEntry : tenantConfig.getPropertiesMap().entrySet()) {
+            if (propertyEntry.getKey().startsWith("storage.")) {
+                sysConfig.putProperties(propertyEntry.getKey(), propertyEntry.getValue());
+            }
+        }
+
+        var internalStorage = dynamicResources.getMatchingEntries(
                 resource -> resource.getResourceType() == ResourceType.INTERNAL_STORAGE);
 
         for (var storageEntry : internalStorage.entrySet()) {
             var storageKey = storageEntry.getKey();
             var storage = translateResourceConfig(storageKey, storageEntry.getValue(), jobState);
-            storageConfig.putBuckets(storageKey, storage);
+            sysConfig.putResources(storageKey, storage);
         }
 
-        var externalStorage = resources.getMatchingEntries(
+        var externalStorage = dynamicResources.getMatchingEntries(
                 resource -> resource.getResourceType() == ResourceType.EXTERNAL_STORAGE);
 
         for (var storageEntry : externalStorage.entrySet()) {
             var storageKey = storageEntry.getKey();
             var storage = translateResourceConfig(storageKey, storageEntry.getValue(), jobState);
-            storageConfig.putExternal(storageKey, storage);
+            sysConfig.putResources(storageKey, storage);
         }
 
-        // Default storage / format still on platform config file for now
-        if (platformConfig.containsTenants(jobState.tenant)) {
-            var tenantConfig = platformConfig.getTenantsOrThrow(jobState.tenant);
-            storageConfig.setDefaultBucket(tenantConfig.getDefaultBucket());
-            storageConfig.setDefaultFormat(tenantConfig.getDefaultFormat());
-        }
-        else {
-            storageConfig.setDefaultBucket(platformConfig.getStorage().getDefaultBucket());
-            storageConfig.setDefaultFormat(platformConfig.getStorage().getDefaultFormat());
-        }
-
-        sysConfig.setStorage(storageConfig);
-
-        var repositories = resources.getMatchingEntries(
+        var repositories = dynamicResources.getMatchingEntries(
                 resource -> resource.getResourceType() == ResourceType.MODEL_REPOSITORY);
 
         for (var repoEntry : repositories.entrySet()) {
@@ -344,7 +337,7 @@ public class JobProcessorHelpers {
             // Only translate repositories required for the job
             if (jobUsesRepository(repoKey, jobState)) {
                 var repoConfig = translateResourceConfig(repoKey, repoEntry.getValue(), jobState);
-                sysConfig.putRepositories(repoKey, repoConfig);
+                sysConfig.putResources(repoKey, repoConfig);
             }
         }
 
@@ -378,13 +371,13 @@ public class JobProcessorHelpers {
         return false;
     }
 
-    private PluginConfig translateResourceConfig(String resourceKey, ResourceDefinition resource, JobState jobState) {
+    private ResourceDefinition translateResourceConfig(String resourceKey, ResourceDefinition resource, JobState jobState) {
 
-        var pluginConfig = ConfigHelpers.resourceToPluginConfig(resource).toBuilder();
+        var translated = resource.toBuilder();
 
         var tenantScope = String.format("/%s/%s/", ConfigKeys.TENANT_SCOPE, jobState.tenant);
 
-        for (var secretEntry : pluginConfig.getSecretsMap().entrySet()) {
+        for (var secretEntry : translated.getSecretsMap().entrySet()) {
 
             var propertyName = secretEntry.getKey();
             var secretAlias = secretEntry.getValue();
@@ -402,12 +395,12 @@ public class JobProcessorHelpers {
 
             var secret = configManager.loadPassword(secretAlias);
 
-            pluginConfig.putProperties(propertyName, secret);
+            translated.putProperties(propertyName, secret);
         }
 
-        pluginConfig.clearSecrets();
+        translated.clearSecrets();
 
-        return pluginConfig.build();
+        return translated.build();
     }
 
 

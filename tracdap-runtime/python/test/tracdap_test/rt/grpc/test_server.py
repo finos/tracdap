@@ -41,13 +41,16 @@ class RuntimeApiServerTest(unittest.TestCase):
         runtimeApi=config.ServiceConfig(
             enabled=True,
             port=UNIT_TEST_API_PORT),
-        repositories={
-            "unit_test_repo": config.PluginConfig(
+        properties={
+            "storage.default.location": "STORAGE_NOT_USED"
+        },
+        resources={
+            "unit_test_repo": meta.ResourceDefinition(
+                resourceType=meta.ResourceType.MODEL_REPOSITORY,
                 protocol="local",
                 properties={
                     "repoUrl": str(_ROOT_DIR)
-                })},
-        storage=config.StorageConfig())
+                })})
 
     @classmethod
     def setUpClass(cls) -> None:

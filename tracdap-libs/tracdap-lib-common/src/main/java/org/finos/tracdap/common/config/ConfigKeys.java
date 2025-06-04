@@ -20,6 +20,7 @@ package org.finos.tracdap.common.config;
 public class ConfigKeys {
 
     // Secondary config keys
+    public static final String TENANTS_CONFIG_KEY = "tenants";
     public static final String LOGGING_CONFIG_KEY = "logging";
     public static final String SECRET_TYPE_KEY = "secret.type";
     public static final String SECRET_URL_KEY = "secret.url";
@@ -37,6 +38,11 @@ public class ConfigKeys {
     public static final String GATEWAY_ROUTE_NAME = "gateway.route.name";
     public static final String GATEWAY_ROUTE_PREFIX = "gateway.route.prefix";
     public static final String NETWORK_IDLE_TIMEOUT = "network.idleTimeout";
+
+    // Storage defaults
+    public static final String STORAGE_DEFAULT_LOCATION = "storage.default.location";
+    public static final String STORAGE_DEFAULT_FORMAT = "storage.default.format";
+    public static final String STORAGE_DEFAULT_LAYOUT = "storage.default.layout";
 
     // Well-known config classes
     public static final String TRAC_CONFIG = "trac_config";

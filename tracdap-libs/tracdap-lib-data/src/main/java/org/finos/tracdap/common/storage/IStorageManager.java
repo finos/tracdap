@@ -17,9 +17,15 @@
 
 package org.finos.tracdap.common.storage;
 
+import org.finos.tracdap.metadata.StorageLayout;
+
 public interface IStorageManager {
 
     String PROP_STORAGE_KEY = "TRAC_STORAGE_KEY";
+
+    String defaultLocation();
+    String defaultFormat();
+    StorageLayout defaultLayout();
 
     IDataStorage getDataStorage(String storageKey);
 

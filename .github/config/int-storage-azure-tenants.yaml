@@ -13,22 +13,27 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-resourceClass: trac_resources
+tenants:
+  ACME_CORP:
 
-resources:
-
-  STORAGE_INTEGRATION:
-    resourceType: INTERNAL_STORAGE
-    protocol: BLOB
     properties:
-      storageAccount: ${TRAC_AZURE_STORAGE_ACCOUNT}
-      container: ${TRAC_AZURE_CONTAINER}
-      prefix: int_storage_${TRAC_TEST_ID}/
-      credentials: ${TRAC_AZURE_CREDENTIALS}
-      accessKey: ${TRAC_AZURE_ACCESS_KEY}
+      storage.default.location: STORAGE_INTEGRATION
+      storage.default.format: ARROW_FILE
 
-  UNIT_TEST_REPO:
-    resourceType: MODEL_REPOSITORY
-    protocol: git
-    properties:
-      repoUrl: ${CURRENT_GIT_ORIGIN}
+    resources:
+
+      STORAGE_INTEGRATION:
+        resourceType: INTERNAL_STORAGE
+        protocol: BLOB
+        properties:
+          storageAccount: ${TRAC_AZURE_STORAGE_ACCOUNT}
+          container: ${TRAC_AZURE_CONTAINER}
+          prefix: int_storage_${TRAC_TEST_ID}/
+          credentials: ${TRAC_AZURE_CREDENTIALS}
+          accessKey: ${TRAC_AZURE_ACCESS_KEY}
+
+      UNIT_TEST_REPO:
+        resourceType: MODEL_REPOSITORY
+        protocol: git
+        properties:
+          repoUrl: ${CURRENT_GIT_ORIGIN}

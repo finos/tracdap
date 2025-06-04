@@ -1,0 +1,58 @@
+/*
+ * Licensed to the Fintech Open Source Foundation (FINOS) under one or
+ * more contributor license agreements. See the NOTICE file distributed
+ * with this work for additional information regarding copyright ownership.
+ * FINOS licenses this file to you under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with the
+ * License. You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.finos.tracdap.svc.orch.service;
+
+import org.finos.tracdap.common.config.DynamicConfig;
+import org.finos.tracdap.common.config.ISecretLoader;
+import org.finos.tracdap.common.service.TenantServicesMap;
+import org.finos.tracdap.config.TenantConfig;
+
+public class TenantResources {
+
+    public static class Map extends TenantServicesMap<TenantResources> {}
+
+    public static Map create() {
+        return new Map();
+    }
+
+    private final TenantConfig staticConfig;
+    private final ISecretLoader secrets;
+
+    private final DynamicConfig.Resources resources;
+
+    public TenantResources(
+            TenantConfig staticConfig, ISecretLoader secrets,
+            DynamicConfig.Resources resources) {
+
+        this.staticConfig = staticConfig;
+        this.secrets = secrets;
+        this.resources = resources;
+    }
+
+    public TenantConfig getStaticConfig() {
+        return staticConfig;
+    }
+
+    public ISecretLoader getSecrets() {
+        return secrets;
+    }
+
+    public DynamicConfig.Resources getResources() {
+        return resources;
+    }
+}

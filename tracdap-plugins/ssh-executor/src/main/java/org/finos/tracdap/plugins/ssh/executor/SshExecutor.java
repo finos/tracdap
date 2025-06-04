@@ -33,7 +33,7 @@ import org.apache.sshd.scp.client.ScpClient;
 import org.apache.sshd.scp.client.ScpClientCreator;
 import org.apache.sshd.scp.common.helpers.ScpTimestampCommandDetails;
 
-import org.finos.tracdap.config.StorageConfig;
+import org.finos.tracdap.config.RuntimeConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -535,7 +535,7 @@ public class SshExecutor implements IBatchExecutor<SshExecutorState> {
     @Override
     public SshExecutorState configureBatchStorage(
             String batchKey, SshExecutorState batchState,
-            StorageConfig storageConfig, Consumer<StorageConfig> storageUpdate) {
+            RuntimeConfig sysConfig, Consumer<RuntimeConfig> sysConfigUpdate) {
 
         // This should never be called, the executor does not advertise storage_mapping in its features
         throw new ETracInternal("SSH executor does not support storage_mapping");

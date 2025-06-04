@@ -17,77 +17,27 @@
 
 package org.finos.tracdap.svc.meta.api;
 
-import org.finos.tracdap.api.internal.*;
-import org.finos.tracdap.common.config.ConfigKeys;
-import org.finos.tracdap.common.config.DynamicConfig;
-import org.finos.tracdap.common.exception.EUnexpected;
-import org.finos.tracdap.common.metadata.dal.IMetadataDal;
-import org.finos.tracdap.metadata.ResourceDefinition;
-
 import io.grpc.stub.StreamObserver;
+import org.finos.tracdap.api.internal.ConfigUpdate;
+import org.finos.tracdap.api.internal.InternalMessagingApiGrpc;
+import org.finos.tracdap.api.internal.ReceivedCode;
+import org.finos.tracdap.api.internal.ReceivedStatus;
 
 
 public class MessageProcessor extends InternalMessagingApiGrpc.InternalMessagingApiImplBase {
 
-    private final DynamicConfig.Resources resources;
-    private final IMetadataDal dal;
-
-    public MessageProcessor(DynamicConfig.Resources resources, IMetadataDal dal) {
-        this.resources = resources;
-        this.dal = dal;
-    }
+    public MessageProcessor() {}
 
     @Override
-    public void  configUpdate(ConfigUpdate request, StreamObserver<ReceivedStatus> response) {
+    public void configUpdate(ConfigUpdate request, StreamObserver<ReceivedStatus> response) {
 
-        var entry = request.getConfigEntry();
-        ReceivedStatus status;
+        // Metadata service does not currently use any dynamic config
 
-        if (entry.getConfigClass().equals(ConfigKeys.TRAC_RESOURCES)) {
-
-            ResourceDefinition storageResource;
-
-            switch (request.getUpdateType()) {
-
-                case CREATE:
-                    storageResource = fetchResource(request);
-                    resources.addEntry(entry.getConfigKey(), storageResource);
-                    break;
-
-                case UPDATE:
-                    storageResource = fetchResource(request);
-                    resources.updateEntry(entry.getConfigKey(), storageResource);
-                    break;
-
-                case DELETE:
-                    resources.removeEntry(entry.getConfigKey());
-                    break;
-
-                default:
-                    throw new EUnexpected();
-            }
-
-            status = ReceivedStatus.newBuilder()
-                    .setCode(ReceivedCode.OK)
-                    .build();
-        }
-        else {
-
-            status = ReceivedStatus.newBuilder()
-                    .setCode(ReceivedCode.IGNORED)
-                    .build();
-        }
+        var status = ReceivedStatus.newBuilder()
+                .setCode(ReceivedCode.IGNORED)
+                .build();
 
         response.onNext(status);
         response.onCompleted();
-    }
-
-    private ResourceDefinition fetchResource(ConfigUpdate update) {
-
-        var tenant = update.getTenant();
-        var selector = update.getConfigEntry().getDetails().getObjectSelector();
-        var configObject = dal.loadObject(tenant, selector);
-
-        return configObject.getDefinition().getResource();
     }
 }

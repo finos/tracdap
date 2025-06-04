@@ -17,6 +17,7 @@ import tempfile
 import copy
 
 import tracdap.rt.config as _cfg
+import tracdap.rt.metadata as _meta
 import tracdap.rt.exceptions as _ex
 import tracdap.rt.ext.plugins as _plugins
 import tracdap.rt._impl.core.data as _data  # noqa
@@ -44,15 +45,16 @@ class LocalArrowImplStorageTest(unittest.TestCase, FileOperationsTestSuite, File
 
         cls.storage_root = tempfile.TemporaryDirectory()
 
-        test_storage_config = _cfg.PluginConfig(
+        test_storage_config = _meta.ResourceDefinition(
+            resourceType=_meta.ResourceType.INTERNAL_STORAGE,
             protocol="LOCAL",
             properties={
                 "rootPath": cls.storage_root.name,
                 "runtimeFs": "arrow"})
 
         sys_config = _cfg.RuntimeConfig()
-        sys_config.storage = _cfg.StorageConfig()
-        sys_config.storage.buckets["test_bucket"] = test_storage_config
+        sys_config.properties["storage.default.location"] = "test_bucket"
+        sys_config.resources["test_bucket"] = test_storage_config
 
         manager = _storage.StorageManager(sys_config)
 
@@ -74,15 +76,16 @@ class LocalPythonImplStorageTest(unittest.TestCase, FileOperationsTestSuite, Fil
 
         cls.storage_root = tempfile.TemporaryDirectory()
 
-        test_storage_config = _cfg.PluginConfig(
+        test_storage_config = _meta.ResourceDefinition(
+            resourceType=_meta.ResourceType.INTERNAL_STORAGE,
             protocol="LOCAL",
             properties={
                 "rootPath": cls.storage_root.name,
                 "runtimeFs": "python"})
 
         sys_config = _cfg.RuntimeConfig()
-        sys_config.storage = _cfg.StorageConfig()
-        sys_config.storage.buckets["test_bucket"] = test_storage_config
+        sys_config.properties["storage.default.location"] = "test_bucket"
+        sys_config.resources["test_bucket"] = test_storage_config
 
         manager = _storage.StorageManager(sys_config)
         cls.storage = manager.get_file_storage("test_bucket")
@@ -109,13 +112,14 @@ class LocalStorageTest(DataStorageTestSuite):
 
         cls.storage_root = tempfile.TemporaryDirectory()
 
-        bucket_config = _cfg.PluginConfig(
+        bucket_config = _meta.ResourceDefinition(
+            resourceType=_meta.ResourceType.INTERNAL_STORAGE,
             protocol="LOCAL",
             properties={"rootPath": cls.storage_root.name})
 
         sys_config = _cfg.RuntimeConfig()
-        sys_config.storage = _cfg.StorageConfig()
-        sys_config.storage.buckets["test_bucket"] = bucket_config
+        sys_config.properties["storage.default.location"] = "test_bucket"
+        sys_config.resources["test_bucket"] = bucket_config
 
         manager = _storage.StorageManager(sys_config)
         file_storage = manager.get_file_storage("test_bucket")
@@ -148,13 +152,14 @@ class LocalCsvFormatStorageTest(unittest.TestCase, LocalStorageTest):
         cls.storage = LocalStorageTest.make_storage()
         cls.storage_format = "CSV"
 
-        test_lib_storage_config = _cfg.PluginConfig(
+        test_lib_storage_config = _meta.ResourceDefinition(
+            resourceType=_meta.ResourceType.INTERNAL_STORAGE,
             protocol="LOCAL",
             properties={"rootPath": str(_TEST_DATA_DIR)})
 
         sys_config = _cfg.RuntimeConfig()
-        sys_config.storage = _cfg.StorageConfig()
-        sys_config.storage.buckets["test_csv_bucket"] = test_lib_storage_config
+        sys_config.properties["storage.default.location"] = "test_csv_bucket"
+        sys_config.resources["test_csv_bucket"] = test_lib_storage_config
 
         manager = _storage.StorageManager(sys_config)
         test_lib_data_storage = manager.get_data_storage("test_csv_bucket")
@@ -270,8 +275,8 @@ class LocalCsvFormatStorageTest(unittest.TestCase, LocalStorageTest):
         test_lib_storage_instance.properties["csv.datetime_format"] = "%d/%m/%Y %H:%M:%S"
 
         sys_config = _cfg.RuntimeConfig()
-        sys_config.storage = _cfg.StorageConfig()
-        sys_config.storage.buckets["test_csv_bucket"] = test_lib_storage_instance
+        sys_config.properties["storage.default.location"] = "test_csv_bucket"
+        sys_config.resources["test_csv_bucket"] = test_lib_storage_instance
 
         manager = _storage.StorageManager(sys_config)
         test_lib_data_storage = manager.get_data_storage("test_csv_bucket")
