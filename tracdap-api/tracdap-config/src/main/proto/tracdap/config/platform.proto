@@ -34,7 +34,7 @@ message PlatformConfig {
   map<string, string> config = 1;
   PlatformInfo platformInfo = 2;
 
-  PluginConfig metadata = 3;
+  PluginConfig metadataStore = 3;
   PluginConfig jobCache = 4;
   PluginConfig executor = 5;
 
