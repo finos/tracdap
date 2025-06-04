@@ -14,6 +14,7 @@
 # limitations under the License.
 
 config:
+  tenants: trac-tenants.yaml
   logging: trac-logging.xml
   secret.type: PKCS12
   secret.url: secrets.p12
@@ -39,27 +40,8 @@ metadata:
       pool.overflow: 50
 
 
-storage:
-
-  defaultBucket: STORAGE1
-  defaultFormat: ARROW_FILE
-
-  buckets:
-
-    STORAGE1:
-      protocol: LOCAL
-      properties:
-        # Set the path to your local storage location here
-        rootPath: /path/to/data/storage1
-
-
-repositories:
-
-  # Add your own repositories in here to load models into TRAC
-  trac_repo:
-    protocol: git
-    properties:
-      repoUrl: https://github.com/finos/tracdap
+jobCache:
+  protocol: LOCAL
 
 
 executor:
@@ -67,10 +49,6 @@ executor:
   properties:
     # Set this to the venv of your local TRAC execution environment
     venvPath: /path/to/venv
-
-
-jobCache:
-  protocol: LOCAL
 
 
 gateway:
