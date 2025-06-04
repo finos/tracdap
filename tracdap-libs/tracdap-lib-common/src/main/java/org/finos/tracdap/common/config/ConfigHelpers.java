@@ -35,6 +35,10 @@ public class ConfigHelpers {
     public static TenantConfigMap loadTenantConfigMap(ConfigManager configManager) {
 
         var platformConfig = configManager.loadRootConfigObject(PlatformConfig.class);
+        return loadTenantConfigMap(configManager, platformConfig);
+    }
+
+    public static TenantConfigMap loadTenantConfigMap(ConfigManager configManager, PlatformConfig platformConfig) {
 
         if (!platformConfig.containsConfig(ConfigKeys.TENANTS_CONFIG_KEY))
             return TenantConfigMap.getDefaultInstance();

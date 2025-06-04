@@ -120,9 +120,7 @@ public class TracOrchestratorService extends TracServiceBase {
 
             platformConfig = configManager.loadRootConfigObject(PlatformConfig.class);
             serviceConfig = platformConfig.getServicesOrThrow(ConfigKeys.ORCHESTRATOR_SERVICE_KEY);
-
-            var tenantConfigUrl = ConfigHelpers.readString("tenant config file", platformConfig.getConfigMap(), ConfigKeys.TENANTS_CONFIG_KEY);
-            tenantConfigMap = configManager.loadConfigObject(tenantConfigUrl, TenantConfigMap.class);
+            tenantConfigMap = ConfigHelpers.loadTenantConfigMap(configManager, platformConfig);
 
             // TODO: Config validation
 
