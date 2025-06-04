@@ -17,6 +17,7 @@
 
 package org.finos.tracdap.tools.deploy;
 
+import org.finos.tracdap.common.config.ConfigHelpers;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.exception.ETracPublic;
 import org.finos.tracdap.common.startup.StandardArgs;
@@ -35,6 +36,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.List;
 
@@ -53,8 +55,8 @@ public class DeployTool {
     /** Task name for adding a tenant **/
     public final static String ADD_TENANT_TASK = "add_tenant";
 
-    /** Task name for setting a tenant's description **/
-    public final static String ALTER_TENANT_TASK = "alter_tenant";
+    /** Task name for activating tenants from the tenants config file **/
+    public final static String ACTIVATE_TENANT_CONFIG_TASK = "activate_tenant_config";
 
     /** Task name for running native SQL against the database **/
     public final static String NATIVE_SQL_TASK = "native_sql";
@@ -66,12 +68,51 @@ public class DeployTool {
     private final static List<StandardArgs.Task> METADB_TASKS = List.of(
             StandardArgs.task(DEPLOY_SCHEMA_TASK, "Deploy/update metadata database with the latest physical schema"),
             StandardArgs.task(DEPLOY_CACHE_SCHEMA_TASK, "Deploy/update job cache database with the latest physical schema"),
-            StandardArgs.task(ADD_TENANT_TASK, List.of("CODE", "DESCRIPTION"), "Add a new tenant to the metadata database"),
-            StandardArgs.task(ALTER_TENANT_TASK, List.of("CODE", "DESCRIPTION"), "Alter the description for an existing tenant"),
+            StandardArgs.task(ADD_TENANT_TASK, List.of("CODE"), "Add a new tenant code in the metadata database"),
+            StandardArgs.task(ACTIVATE_TENANT_CONFIG_TASK, List.of("CODE"), "Activate any tenant codes found in the tenants config file"),
             StandardArgs.task(NATIVE_SQL_TASK, List.of("SQL_FILE"), "Load a native SQL file and run it against the database"));
 
     private final Logger log;
     private final ConfigManager configManager;
+
+    /**
+     * Entry point for the DeployMetaDB tool.
+     *
+     * @param args Command line args
+     */
+    public static void main(String[] args) {
+
+        try {
+
+            var startup = Startup.useCommandLine(DeployTool.class, args, METADB_TASKS);
+            startup.runStartupSequence();
+
+            var config = startup.getConfig();
+            var tasks = startup.getArgs().getTasks();
+
+            var deploy = new DeployTool(config);
+            deploy.runDeployment(tasks);
+
+            System.exit(0);
+        }
+        catch (EStartup e) {
+
+            if (e.isQuiet())
+                System.exit(e.getExitCode());
+
+            System.err.println("The service failed to start: " + e.getMessage());
+            e.printStackTrace(System.err);
+
+            System.exit(e.getExitCode());
+        }
+        catch (Exception e) {
+
+            System.err.println("There was an unexpected error on the main thread: " + e.getMessage());
+            e.printStackTrace(System.err);
+
+            System.exit(-1);
+        }
+    }
 
     /**
      * Construct a new instance of the deployment tool
@@ -128,9 +169,9 @@ public class DeployTool {
                     addTenant(dataSource, task.getTaskArg(0), task.getTaskArg(1));
                 }
 
-                else if (ALTER_TENANT_TASK.equals(task.getTaskName())) {
+                else if (ACTIVATE_TENANT_CONFIG_TASK.equals(task.getTaskName())) {
                     dataSource = createSource(databaseConfig);
-                    alterTenant(dataSource, task.getTaskArg(0), task.getTaskArg(1));
+                    activateTenantConfig(dataSource);
                 }
 
                 else if (NATIVE_SQL_TASK.equals(task.getTaskName())) {
@@ -194,40 +235,13 @@ public class DeployTool {
         flyway.migrate();
     }
 
-    private void addTenant(DataSource dataSource, String tenantCode, String description) {
+    private void addTenant(DataSource dataSource, String tenantCode) {
 
         log.info("Running task: Add tenant...");
-        log.info("New tenant code: [{}]", tenantCode);
-
-        var maxSelect = "select max(tenant_id) from tenant";
-        var insertTenant = "insert into tenant (tenant_id, tenant_code, description) values (?, ?, ?)";
-
-        short nextId;
 
         try (var conn = dataSource.getConnection()) {
 
-            try (var stmt = conn.prepareStatement(maxSelect); var rs = stmt.executeQuery()) {
-
-                if (rs.next()) {
-
-                    nextId = rs.getShort(1);
-
-                    if (rs.wasNull())
-                        nextId = 1;
-                    else
-                        nextId++;
-                }
-                else
-                    nextId = 1;
-            }
-
-            try (var stmt = conn.prepareStatement(insertTenant)) {
-
-                stmt.setShort(1, nextId);
-                stmt.setString(2, tenantCode);
-                stmt.setString(3, description);
-                stmt.execute();
-            }
+            addTenantCode(conn, tenantCode);
         }
         catch (SQLException e) {
 
@@ -235,33 +249,70 @@ public class DeployTool {
         }
     }
 
-    private void alterTenant(DataSource dataSource, String tenantCode, String description) {
+    private void activateTenantConfig(DataSource dataSource) {
 
-        log.info("Running task: Alter tenant...");
-        log.info("Tenant code: [{}]", tenantCode);
+        log.info("Running task: Activate tenant config...");
 
-        var selectTenant = "select tenant_id from tenant where tenant_code = ?";
-        var updateTenant = "update tenant set description = ? where tenant_id = ?";
-
-        short tenantId;
+        var tenantConfigMap = ConfigHelpers.loadTenantConfigMap(configManager);
 
         try (var conn = dataSource.getConnection()) {
 
-            try (var stmt = conn.prepareStatement(selectTenant)) {
+            for (var tenantCode : tenantConfigMap.getTenantsMap().keySet()) {
 
-                stmt.setString(1, tenantCode);
-
-                try (var rs = stmt.executeQuery()) {
-                    rs.next();
-                    tenantId = rs.getShort(1);
-                }
+                if (!checkTenantCodeExists(conn, tenantCode))
+                    addTenantCode(conn, tenantCode);
             }
+        }
+        catch (SQLException e) {
 
-            try (var stmt = conn.prepareStatement(updateTenant)) {
+            throw new ETracPublic("Failed to activate tenant config: " + e.getMessage(), e);
+        }
+    }
 
-                stmt.setString(1, description);
-                stmt.setShort(2, tenantId);
-                stmt.execute();
+    private void addTenantCode(Connection conn, String tenantCode) throws SQLException {
+
+        log.info("New tenant code: [{}]", tenantCode);
+
+        var findMaxId = "select max(tenant_id) from tenant";
+        var insertTenant = "insert into tenant (tenant_id, tenant_code, description) values (?, ?, ?)";
+
+        short nextId;
+
+        try (var stmt = conn.prepareStatement(findMaxId); var rs = stmt.executeQuery()) {
+
+            if (rs.next()) {
+
+                nextId = rs.getShort(1);
+
+                if (rs.wasNull())
+                    nextId = 1;
+                else
+                    nextId++;
+            }
+            else
+                nextId = 1;
+        }
+
+        try (var stmt = conn.prepareStatement(insertTenant)) {
+
+            stmt.setShort(1, nextId);
+            stmt.setString(2, tenantCode);
+            stmt.execute();
+        }
+    }
+
+    private boolean checkTenantCodeExists(Connection conn, String tenantCode) throws SQLException {
+
+        var findTenant = "select tenant_id from tenant where tenant_code = ?";
+
+        try (var stmt = conn.prepareStatement(findTenant)) {
+
+            stmt.setString(1, tenantCode);
+
+            try (var rs = stmt.executeQuery()) {
+
+                // True if a record exists
+                return rs.next();
             }
         }
         catch (SQLException e) {
@@ -287,45 +338,6 @@ public class DeployTool {
         catch (IOException e) {
 
             throw new ETracPublic("Failed to load native SQL: " + e.getMessage(), e);
-        }
-    }
-
-    /**
-     * Entry point for the DeployMetaDB tool.
-     *
-     * @param args Command line args
-     */
-    public static void main(String[] args) {
-
-        try {
-
-            var startup = Startup.useCommandLine(DeployTool.class, args, METADB_TASKS);
-            startup.runStartupSequence();
-
-            var config = startup.getConfig();
-            var tasks = startup.getArgs().getTasks();
-
-            var deploy = new DeployTool(config);
-            deploy.runDeployment(tasks);
-
-            System.exit(0);
-        }
-        catch (EStartup e) {
-
-            if (e.isQuiet())
-                System.exit(e.getExitCode());
-
-            System.err.println("The service failed to start: " + e.getMessage());
-            e.printStackTrace(System.err);
-
-            System.exit(e.getExitCode());
-        }
-        catch (Exception e) {
-
-            System.err.println("There was an unexpected error on the main thread: " + e.getMessage());
-            e.printStackTrace(System.err);
-
-            System.exit(-1);
         }
     }
 }
