@@ -26,20 +26,19 @@ platformInfo:
     region: UK
 
 metadata:
-  format: PROTO
-  database:
-    protocol: JDBC
-    properties:
-      dialect: SQLSERVER
-      jdbcUrl: //metadb:1433
-      sqlserver.databaseName: master
-      sqlserver.user: sa
-      sqlserver.encrypt: true
-      sqlserver.trustServerCertificate: true
-      pool.size: 2
-      pool.overflow: 5
-    secrets:
-      sqlserver.password: metadb_secret
+  protocol: JDBC
+  properties:
+    format: PROTO
+    dialect: SQLSERVER
+    jdbcUrl: //metadb:1433
+    sqlserver.databaseName: master
+    sqlserver.user: sa
+    sqlserver.encrypt: true
+    sqlserver.trustServerCertificate: true
+    pool.size: 2
+    pool.overflow: 5
+  secrets:
+    sqlserver.password: metadb_secret
 
 jobCache:
   protocol: JDBC

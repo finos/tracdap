@@ -26,17 +26,16 @@ platformInfo:
     region: UK
 
 metadata:
-  format: PROTO
-  database:
-    protocol: JDBC
-    properties:
-      dialect: POSTGRESQL
-      jdbcUrl: //metadb:5432/trac
-      postgresql.user: trac_admin
-      pool.size: 2
-      pool.overflow: 5
-    secrets:
-      postgresql.password: metadb_secret
+  protocol: JDBC
+  properties:
+    format: PROTO
+    dialect: POSTGRESQL
+    jdbcUrl: //metadb:5432/trac
+    postgresql.user: trac_admin
+    pool.size: 2
+    pool.overflow: 5
+  secrets:
+    postgresql.password: metadb_secret
 
 jobCache:
   protocol: JDBC
