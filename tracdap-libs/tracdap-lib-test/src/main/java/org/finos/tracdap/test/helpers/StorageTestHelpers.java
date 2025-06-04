@@ -17,16 +17,16 @@
 
 package org.finos.tracdap.test.helpers;
 
+import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.data.DataContext;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.plugin.PluginManager;
 import org.finos.tracdap.common.storage.IFileStorage;
 import org.finos.tracdap.common.storage.IStorageManager;
-import org.finos.tracdap.config.DynamicConfig;
+import org.finos.tracdap.config.*;
 
 import io.netty.channel.EventLoopGroup;
 import org.apache.arrow.memory.RootAllocator;
-import org.finos.tracdap.config.PluginConfig;
 import org.finos.tracdap.metadata.ResourceType;
 
 import java.time.Duration;
@@ -40,43 +40,45 @@ public class StorageTestHelpers {
     public static void createStoragePrefix(
             ConfigManager config,
             PluginManager plugins,
-            EventLoopGroup elg,
-            String dynamicConfigPath)
+            EventLoopGroup elg)
             throws Exception {
 
         // Assuming "prefix" is common across all bucket storage implementations
         // Create a storage instance with the prefix removed, then do rmdir on the prefix
 
-        var configSep = dynamicConfigPath.lastIndexOf("/");
-        var configFile = dynamicConfigPath.substring(configSep + 1);
-        var dynamicConfig = config.loadConfigObject(configFile, DynamicConfig.class);
+        var tenantsMap = loadTenantConfigMap(config);
+
+        if (tenantsMap == null)
+            return;
 
         var execCtx = new DataContext(elg.next(), new RootAllocator());
 
-        for (var resource : dynamicConfig.getResourcesMap().entrySet()) {
+        for (var tenantEntry: tenantsMap.getTenantsMap().entrySet()) {
+            for (var resource : tenantEntry.getValue().getResourcesMap().entrySet()) {
 
-            if (resource.getValue().getResourceType() != ResourceType.INTERNAL_STORAGE)
-                continue;
+                if (resource.getValue().getResourceType() != ResourceType.INTERNAL_STORAGE)
+                    continue;
 
-            if (!resource.getValue().containsProperties("prefix"))
-                continue;
+                if (!resource.getValue().containsProperties("prefix"))
+                    continue;
 
-            var storageConfig = PluginConfig.newBuilder()
-                    .setProtocol(resource.getValue().getProtocol())
-                    .putProperties(IStorageManager.PROP_STORAGE_KEY, resource.getKey())
-                    .putAllProperties(resource.getValue().getPropertiesMap())
-                    .removeProperties("prefix")
-                    .build();
+                var storageConfig = PluginConfig.newBuilder()
+                        .setProtocol(resource.getValue().getProtocol())
+                        .putProperties(IStorageManager.PROP_STORAGE_KEY, resource.getKey())
+                        .putAllProperties(resource.getValue().getPropertiesMap())
+                        .removeProperties("prefix")
+                        .build();
 
-            var prefix = resource.getValue().getPropertiesOrThrow("prefix");
+                var prefix = resource.getValue().getPropertiesOrThrow("prefix");
 
-            try (var storage = plugins.createService(IFileStorage.class, storageConfig, config)) {
+                try (var storage = plugins.createService(IFileStorage.class, storageConfig, config)) {
 
-                storage.start(elg);
+                    storage.start(elg);
 
-                var rmdir = storage.mkdir(prefix, true, execCtx);
-                waitFor(Duration.ofSeconds(30), rmdir);
-                getResultOf(rmdir);
+                    var rmdir = storage.mkdir(prefix, true, execCtx);
+                    waitFor(Duration.ofSeconds(30), rmdir);
+                    getResultOf(rmdir);
+                }
             }
         }
     }
@@ -84,45 +86,58 @@ public class StorageTestHelpers {
     public static void deleteStoragePrefix(
             ConfigManager config,
             PluginManager plugins,
-            EventLoopGroup elg,
-            String dynamicConfigPath)
+            EventLoopGroup elg)
             throws Exception {
 
         // Assuming "prefix" is common across all bucket storage implementations
         // Create a storage instance with the prefix removed, then do rmdir on the prefix
 
-        var configSep = dynamicConfigPath.lastIndexOf("/");
-        var configFile = dynamicConfigPath.substring(configSep + 1);
-        var dynamicConfig = config.loadConfigObject(configFile, DynamicConfig.class);
+        var tenantsMap = loadTenantConfigMap(config);
+
+        if (tenantsMap == null)
+            return;
 
         var execCtx = new DataContext(elg.next(), new RootAllocator());
 
-        for (var resource : dynamicConfig.getResourcesMap().entrySet()) {
+        for (var tenantEntry: tenantsMap.getTenantsMap().entrySet()) {
+            for (var resource : tenantEntry.getValue().getResourcesMap().entrySet()) {
 
-            if (resource.getValue().getResourceType() != ResourceType.INTERNAL_STORAGE)
-                continue;
+                if (resource.getValue().getResourceType() != ResourceType.INTERNAL_STORAGE)
+                    continue;
 
-            if (!resource.getValue().containsProperties("prefix"))
-                continue;
+                if (!resource.getValue().containsProperties("prefix"))
+                    continue;
 
-            var storageConfig = PluginConfig.newBuilder()
-                    .setProtocol(resource.getValue().getProtocol())
-                    .putProperties(IStorageManager.PROP_STORAGE_KEY, resource.getKey())
-                    .putAllProperties(resource.getValue().getPropertiesMap())
-                    .removeProperties("prefix")
-                    .build();
+                var storageConfig = PluginConfig.newBuilder()
+                        .setProtocol(resource.getValue().getProtocol())
+                        .putProperties(IStorageManager.PROP_STORAGE_KEY, resource.getKey())
+                        .putAllProperties(resource.getValue().getPropertiesMap())
+                        .removeProperties("prefix")
+                        .build();
 
-            var prefix = resource.getValue().getPropertiesOrThrow("prefix");
+                var prefix = resource.getValue().getPropertiesOrThrow("prefix");
 
-            try (var storage = plugins.createService(IFileStorage.class, storageConfig, config)) {
+                try (var storage = plugins.createService(IFileStorage.class, storageConfig, config)) {
 
-                storage.start(elg);
+                    storage.start(elg);
 
-                var rmdir = storage.rmdir(prefix, execCtx);
-                waitFor(Duration.ofSeconds(30), rmdir);
-                getResultOf(rmdir);
+                    var rmdir = storage.rmdir(prefix, execCtx);
+                    waitFor(Duration.ofSeconds(30), rmdir);
+                    getResultOf(rmdir);
+                }
             }
         }
+    }
+
+    private static TenantConfigMap loadTenantConfigMap(ConfigManager config) {
+
+        var platformConfig = config.loadRootConfigObject(PlatformConfig.class);
+
+        if (!platformConfig.containsConfig(ConfigKeys.TENANTS_CONFIG_KEY))
+            return null;
+
+        var tenantsUrl = platformConfig.getConfigOrThrow(ConfigKeys.TENANTS_CONFIG_KEY);
+        return config.loadConfigObject(tenantsUrl, TenantConfigMap.class);
     }
 
 }

@@ -606,24 +606,14 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
     void prepareDataPrefix() throws Exception {
 
         var elg = new NioEventLoopGroup(2);
-
-        for (var bootstrapEntry : tenants.entrySet()) {
-            if (bootstrapEntry.getValue() != null)
-                StorageTestHelpers.createStoragePrefix(configManager, pluginManager, elg, bootstrapEntry.getValue());
-        }
-
+        StorageTestHelpers.createStoragePrefix(configManager, pluginManager, elg);
         elg.shutdownGracefully();
     }
 
     void cleanupDataPrefix() throws Exception {
 
         var elg = new NioEventLoopGroup(2);
-
-        for (var bootstrapEntry : tenants.entrySet()) {
-            if (bootstrapEntry.getValue() != null)
-                StorageTestHelpers.deleteStoragePrefix(configManager, pluginManager, elg, bootstrapEntry.getValue());
-        }
-
+        StorageTestHelpers.deleteStoragePrefix(configManager, pluginManager, elg);
         elg.shutdownGracefully();
     }
 
