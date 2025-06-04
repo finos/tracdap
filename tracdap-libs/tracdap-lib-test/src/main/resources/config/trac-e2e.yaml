@@ -27,7 +27,7 @@ platformInfo:
     region: UK
 
 
-metadata:
+metadataStore:
   protocol: JDBC
   properties:
     format: PROTO

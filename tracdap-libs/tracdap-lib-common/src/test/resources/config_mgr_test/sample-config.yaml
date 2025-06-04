@@ -18,5 +18,5 @@ config:
   secret.type: pkcs12
   secret.url: secrets.p12
 
-metadata:
+metadataStore:
   protocol: JDBC
