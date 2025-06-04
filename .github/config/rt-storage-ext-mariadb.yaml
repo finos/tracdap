@@ -1,14 +1,16 @@
 
 
-storage:
+properties:
+  storage.default.location: NOT_USED
 
-  external:
+resources:
 
-    data_integration:
-      protocol: SQL
-      properties:
-        dialect: MARIADB
-        driver.python: alchemy
-        alchemy.url: mariadb+pymysql://metadb:3306/trac
-        alchemy.username: trac_admin
-        alchemy.password: DB_SECRET
+  data_integration:
+    resourceType: EXTERNAL_STORAGE
+    protocol: SQL
+    properties:
+      dialect: MARIADB
+      driver.python: alchemy
+      alchemy.url: mariadb+pymysql://metadb:3306/trac
+      alchemy.username: trac_admin
+      alchemy.password: DB_SECRET
