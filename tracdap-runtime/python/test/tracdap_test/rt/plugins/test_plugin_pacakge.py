@@ -18,6 +18,7 @@ import unittest
 import subprocess as sp
 
 import tracdap.rt.config as cfg
+import tracdap.rt.metadata as meta
 import tracdap.rt.exceptions as ex
 import tracdap.rt.launch as launch
 import tracdap.rt._impl.runtime as runtime
@@ -41,24 +42,19 @@ class ConfigParserTest(unittest.TestCase):
             .joinpath("../../../../../../..") \
             .resolve()
 
-        repos = {
-            "unit_test_repo": cfg.PluginConfig(
-                protocol="local",
-                properties={"repoUrl": str(current_repo_url)})
-        }
+        self.sys_config = cfg.RuntimeConfig()
+        self.sys_config.properties["storage.default.location"] = "storage_1"
+        self.sys_config.properties["storage.default.format"] = "CSV"
 
-        storage = cfg.StorageConfig(
-            buckets={
-                "storage_1": cfg.PluginConfig(
-                    protocol="LOCAL",
-                    properties={"rootPath": str(current_repo_url.joinpath("examples/models/python/data"))}
-                )
-            },
-            defaultBucket="storage_1",
-            defaultFormat="CSV"
-        )
+        self.sys_config.resources["unit_test_repo"] = meta.ResourceDefinition(
+            resourceType=meta.ResourceType.MODEL_REPOSITORY,
+            protocol="local",
+            properties={"repoUrl": str(current_repo_url)})
 
-        self.sys_config = cfg.RuntimeConfig(repositories=repos, storage=storage)
+        self.sys_config.resources["storage_1"] = meta.ResourceDefinition(
+            resourceType=meta.ResourceType.INTERNAL_STORAGE,
+            protocol="LOCAL",
+            properties={"rootPath": str(current_repo_url.joinpath("examples/models/python/data"))})
 
     def test_ext_config_loader_sys_ok(self):
 
@@ -68,7 +64,7 @@ class ConfigParserTest(unittest.TestCase):
         trac_runtime.pre_start()
 
         # Check that the sys config contains what came from the TEST EXT loader plugin
-        self.assertTrue("TEST_EXT_REPO" in trac_runtime._sys_config.repositories)
+        self.assertTrue("TEST_EXT_REPO" in trac_runtime._sys_config.resources)
 
     def test_ext_config_loader_sys_not_found(self):
 

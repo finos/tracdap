@@ -88,12 +88,13 @@ class ImportModelTest(unittest.TestCase):
             .joinpath("../../../../../..") \
             .resolve()
 
-        example_repo_config = config.PluginConfig(
+        example_repo_config = meta.ResourceDefinition(
+            resourceType=meta.ResourceType.MODEL_REPOSITORY,
             protocol="local",
             properties={"repoUrl": str(example_repo_url)})
 
         sys_config = config.RuntimeConfig()
-        sys_config.repositories["example_repo"] = example_repo_config
+        sys_config.resources["example_repo"] = example_repo_config
 
         stub_model_def = meta.ModelDefinition(
             language="python",
@@ -125,7 +126,9 @@ class ImportModelTest(unittest.TestCase):
         # Also, tests for remote repo types are integration tests
 
         sys_config = config.RuntimeConfig()
-        sys_config.repositories["trac_integrated"] = config.PluginConfig(protocol="integrated")
+        sys_config.resources["trac_integrated"] = meta.ResourceDefinition(
+            resourceType=meta.ResourceType.MODEL_REPOSITORY,
+            protocol="integrated")
 
         stub_model_def = meta.ModelDefinition(
             language="python",

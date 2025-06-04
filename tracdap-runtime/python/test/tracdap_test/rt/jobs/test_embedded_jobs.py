@@ -37,16 +37,19 @@ class EmbeddedJobsTest(unittest.TestCase):
     def test_embedded_job(self):
 
         sys_config = config.RuntimeConfig(
-            repositories={
-                "tutorials": config.PluginConfig(
+            properties={
+                "storage.default.location": "STORAGE_NOT_USED"
+            },
+            resources={
+                "tutorials": meta.ResourceDefinition(
+                    resourceType=meta.ResourceType.MODEL_REPOSITORY,
                     protocol="local",
                     properties={
                         "repoUrl": str(_ROOT_DIR.joinpath("examples/models/python"))
-                    })},
-            storage=config.StorageConfig())
+                    })})
 
         job_id = str(uuid.uuid4())
-        job_timestamp = meta.DatetimeValue(isoDatetime=dt.datetime.utcnow().isoformat())
+        job_timestamp = meta.DatetimeValue(isoDatetime=dt.datetime.now(dt.timezone.utc).isoformat())
         job_config = config.JobConfig(
             jobId=meta.TagHeader(meta.ObjectType.JOB, job_id, 1, job_timestamp, 1, job_timestamp),
             job=meta.JobDefinition(
@@ -64,13 +67,16 @@ class EmbeddedJobsTest(unittest.TestCase):
     def test_embedded_bad_shutdown(self):
 
         sys_config = config.RuntimeConfig(
-            repositories={
-                "tutorials": config.PluginConfig(
+            properties={
+                "storage.default.location": "STORAGE_NOT_USED"
+            },
+            resources={
+                "tutorials": meta.ResourceDefinition(
+                    resourceType=meta.ResourceType.MODEL_REPOSITORY,
                     protocol="local",
                     properties={
                         "repoUrl": str(_ROOT_DIR.joinpath("examples/models/python"))
-                    })},
-            storage=config.StorageConfig())
+                    })})
 
         try:
             rt = embed.create_runtime(sys_config)  # noqa
