@@ -26,10 +26,10 @@ import java.util.List;
 
 public class MetadataSearchService {
 
-    private final IMetadataDal dal;
+    private final IMetadataDal metadataStore;
 
-    public MetadataSearchService(IMetadataDal dal) {
-        this.dal = dal;
+    public MetadataSearchService(IMetadataDal metadataStore) {
+        this.metadataStore = metadataStore;
     }
 
     public List<Tag>
@@ -37,6 +37,6 @@ public class MetadataSearchService {
 
         // Validation currently in the API layer
 
-        return dal.search(tenant, searchParameters);
+        return metadataStore.search(tenant, searchParameters);
     }
 }

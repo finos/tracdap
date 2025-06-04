@@ -52,6 +52,7 @@ import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.HashMap;
 import java.util.Properties;
 import java.util.concurrent.*;
 
@@ -82,8 +83,8 @@ public class TracMetadataService extends TracServiceBase {
     private final PluginManager pluginManager;
     private final ConfigManager configManager;
 
+    private IMetadataDal metadataStore;
     private ExecutorService executor;
-    private IMetadataDal dal;
     private Server server;
 
     public static void main(String[] args) {
@@ -106,33 +107,28 @@ public class TracMetadataService extends TracServiceBase {
 
             // Load top level config files
             var platformConfig = configManager.loadRootConfigObject(PlatformConfig.class);
-
-            // Load the DAL service using the plugin loader mechanism
-            var metaDbConfig = platformConfig.getMetadataStore();
-            dal = pluginManager.createService(IMetadataDal.class, metaDbConfig, configManager);
-            dal.start();
-            var metaDbConfig = platformConfig.getMetadata().getDatabase();
             var tenantConfigMap = ConfigHelpers.loadTenantConfigMap(configManager, platformConfig);
 
-            // Metadata DB props contains config need for the executor pool size
-            var dalProps = new Properties();
-            dalProps.putAll(metaDbConfig.getPropertiesMap());
-            executor = createPrimaryExecutor(dalProps);
-
             // Load the DAL service using the plugin loader mechanism
-            dal = pluginManager.createService(IMetadataDal.class, metaDbConfig, configManager);
-            dal.start();
+            var metadataStoreConfig = platformConfig.getMetadataStore();
+            metadataStore = pluginManager.createService(IMetadataDal.class, metadataStoreConfig, configManager);
+            metadataStore.start();
 
             // Check and log the configured tenants
             checkDatabaseTenants(tenantConfigMap);
 
-            // Set up services and APIs
-            var dalWithLogging = InterfaceLogging.wrap(dal, IMetadataDal.class);
+            // Metadata DB props contains config need for the executor pool size
+            var dalProps = new Properties();
+            dalProps.putAll(metadataStoreConfig.getPropertiesMap());
+            executor = createPrimaryExecutor(dalProps);
 
-            var readService = new MetadataReadService(dalWithLogging, platformConfig, tenantConfigMap);
-            var writeService = new MetadataWriteService(dalWithLogging);
-            var searchService = new MetadataSearchService(dalWithLogging);
-            var configService = new ConfigService(dalWithLogging);
+            // Set up services and APIs
+            var metaStoreWithLogging = InterfaceLogging.wrap(metadataStore, IMetadataDal.class);
+
+            var readService = new MetadataReadService(metaStoreWithLogging, platformConfig, tenantConfigMap);
+            var writeService = new MetadataWriteService(metaStoreWithLogging);
+            var searchService = new MetadataSearchService(metaStoreWithLogging);
+            var configService = new ConfigService(metaStoreWithLogging);
 
             var publicApi = new TracMetadataApi(readService, writeService, searchService, configService);
             var internalApi = new InternalMetadataApi(readService, writeService, searchService, configService);
@@ -187,7 +183,7 @@ public class TracMetadataService extends TracServiceBase {
         });
 
         // Request / await is not available on the DAL!
-        dal.stop();
+        metadataStore.stop();
 
         var executorDown = shutdownResource("Executor thread pool)", deadline, remaining -> {
 
@@ -296,10 +292,10 @@ public class TracMetadataService extends TracServiceBase {
 
         log.info("Checking for active tenants...");
 
-        var databaseTenants = dal.listTenants();
+        var metadataTenants = metadataStore.listTenants();
         var configFileTenants = new HashMap<>(tenantConfig.getTenantsMap());
 
-        for (var tenantInfo : databaseTenants) {
+        for (var tenantInfo : metadataTenants) {
 
             var configFileEntry = configFileTenants.remove(tenantInfo.getTenantCode());
 
@@ -314,10 +310,10 @@ public class TracMetadataService extends TracServiceBase {
             }
         }
 
-        if (databaseTenants.isEmpty())
+        if (metadataTenants.isEmpty())
             log.warn("No active tenants found");
         else
-            log.info("Found {} active tenant(s)", databaseTenants.size());
+            log.info("Found {} active tenant(s)", metadataTenants.size());
 
         if (!configFileTenants.isEmpty()) {
             var inactiveTenants = String.join(",", configFileTenants.keySet());

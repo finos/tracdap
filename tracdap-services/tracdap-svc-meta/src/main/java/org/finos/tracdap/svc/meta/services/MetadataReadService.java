@@ -39,12 +39,12 @@ public class MetadataReadService {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
-    private final IMetadataDal dal;
+    private final IMetadataDal metadataStore;
     private final PlatformConfig platformConfig;
     private final TenantConfigMap tenantConfig;
 
-    public MetadataReadService(IMetadataDal dal, PlatformConfig platformConfig, TenantConfigMap tenantConfig) {
-        this.dal = dal;
+    public MetadataReadService(IMetadataDal metadataStore, PlatformConfig platformConfig, TenantConfigMap tenantConfig) {
+        this.metadataStore = metadataStore;
         this.platformConfig = platformConfig;
         this.tenantConfig = tenantConfig;
     }
@@ -74,12 +74,12 @@ public class MetadataReadService {
 
     public ListTenantsResponse listTenants() {
         
-        var databaseTenants = dal.listTenants();
+        var metadataTenants = metadataStore.listTenants();
         var configFileTenants = new HashMap<>(tenantConfig.getTenantsMap());
 
         var response = ListTenantsResponse.newBuilder();
 
-        for (var tenantInfo : databaseTenants) {
+        for (var tenantInfo : metadataTenants) {
 
             var configFileEntry = configFileTenants.remove(tenantInfo.getTenantCode());
             var processedEntry = tenantInfo.toBuilder();
@@ -105,12 +105,12 @@ public class MetadataReadService {
 
     public Tag readObject(String tenant, TagSelector selector) {
 
-        return dal.loadObject(tenant, selector);
+        return metadataStore.loadObject(tenant, selector);
     }
 
     public List<Tag> readObjects(String tenant, List<TagSelector> selectors) {
 
-        return dal.loadObjects(tenant, selectors);
+        return metadataStore.loadObjects(tenant, selectors);
     }
 
     public Tag loadTag(
@@ -124,7 +124,7 @@ public class MetadataReadService {
                 .setTagVersion(tagVersion)
                 .build();
 
-        return dal.loadObject(tenant, selector);
+        return metadataStore.loadObject(tenant, selector);
     }
 
     public Tag loadLatestTag(
@@ -138,7 +138,7 @@ public class MetadataReadService {
                 .setLatestTag(true)
                 .build();
 
-        return dal.loadObject(tenant, selector);
+        return metadataStore.loadObject(tenant, selector);
     }
 
     public Tag loadLatestObject(
@@ -152,6 +152,6 @@ public class MetadataReadService {
                 .setLatestTag(true)
                 .build();
 
-        return dal.loadObject(tenant, selector);
+        return metadataStore.loadObject(tenant, selector);
     }
 }
