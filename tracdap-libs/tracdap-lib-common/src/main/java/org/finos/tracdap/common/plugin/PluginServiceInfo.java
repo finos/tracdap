@@ -34,8 +34,8 @@ public class PluginServiceInfo {
     /** Standard service type for secret-loading services **/
     public static final String SECRETS_SERVICE_TYPE = "SECRETS";
 
-    /** Standard service type for the metadata DAL **/
-    public static final String METADATA_DAL_SERVICE_TYPE = "METADATA_DAL";
+    /** Standard service type for the metadata store **/
+    public static final String METADATA_STORE_SERVICE_TYPE = "METADATA_STORE";
 
     /** Standard service type for file storage services **/
     public static final String FILE_STORAGE_SERVICE_TYPE = "FILE_STORAGE";
