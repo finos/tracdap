@@ -27,7 +27,7 @@ platformInfo:
 
 
 # Stick with H2 database for storage integration testing
-metadata:
+metadataStore:
   protocol: JDBC
   properties:
     format: PROTO
