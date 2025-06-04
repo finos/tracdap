@@ -78,6 +78,7 @@ jobs:
           mkdir -p data/storage1
           
           echo SECRET_KEY=xHjFeFlo$k= >> etc/env.sh
+          sed -i "s#/path/to#${deploy_dir}#g" etc/trac-platform.yaml
           sed -i "s#/path/to#${deploy_dir}#g" etc/trac-tenants.yaml
           
           bin/secret-tool run --task init_secrets
