@@ -2,9 +2,7 @@
   "config": {
     "logging": "log-test.xml"
   },
-  "metadata": {
-    "database": {
-      "protocol": "JDBC"
-    }
+  "metadataStore": {
+    "protocol": "JDBC"
   }
 }

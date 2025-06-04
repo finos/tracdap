@@ -25,18 +25,17 @@ platformInfo:
   production: false
 
 
-metadata:
-  format: PROTO
-  database:
-    protocol: JDBC
-    properties:
-      dialect: H2
-      jdbcUrl: ./build/run/trac.meta
-      h2.user: trac
-      h2.pass: trac
-      h2.schema: public
-      pool.size: 10
-      pool.overflow: 50
+metadataStore:
+  protocol: JDBC
+  properties:
+    format: PROTO
+    dialect: H2
+    jdbcUrl: ./build/run/trac.meta
+    h2.user: trac
+    h2.pass: trac
+    h2.schema: public
+    pool.size: 10
+    pool.overflow: 50
 
 
 jobCache:

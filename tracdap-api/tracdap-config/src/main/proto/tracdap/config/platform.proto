@@ -34,7 +34,7 @@ message PlatformConfig {
   map<string, string> config = 1;
   PlatformInfo platformInfo = 2;
 
-  MetadataConfig metadata = 3;
+  PluginConfig metadataStore = 3;
   PluginConfig jobCache = 4;
   PluginConfig executor = 5;
 
@@ -44,14 +44,6 @@ message PlatformConfig {
   DeploymentConfig deployment = 11;
 
   map<string, google.protobuf.Any> extensions = 20;
-}
-
-
-message MetadataConfig {
-
-  PluginConfig database = 1;
-
-  metadata.MetadataFormat format = 2;
 }
 
 message GatewayConfig {
