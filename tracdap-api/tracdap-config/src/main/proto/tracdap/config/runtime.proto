@@ -22,8 +22,8 @@ option java_package = "org.finos.tracdap.config";
 option java_outer_classname = "RuntimeConfigProto";
 option java_multiple_files = true;
 
+import "tracdap/metadata/resource.proto";
 import "tracdap/config/common.proto";
-import "tracdap/config/tenant.proto";
 
 
 message RuntimeConfig {
@@ -33,7 +33,7 @@ message RuntimeConfig {
   map<string, string> properties = 2;
   map<string, string> secrets = 3;
 
-  TenantConfig tenant = 4;
+  map<string, metadata.ResourceDefinition> resources = 4;
 
   optional ServiceConfig runtimeApi = 5;
 }
