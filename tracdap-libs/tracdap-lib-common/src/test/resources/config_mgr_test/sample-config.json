@@ -3,8 +3,6 @@
     "logging": "log-test.xml"
   },
   "metadata": {
-    "database": {
-      "protocol": "JDBC"
-    }
+    "protocol": "JDBC"
   }
 }

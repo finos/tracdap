@@ -19,5 +19,4 @@ config:
   secret.url: secrets.p12
 
 metadata:
-  database:
-    protocol: JDBC
+  protocol: JDBC

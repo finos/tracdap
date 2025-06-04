@@ -69,7 +69,7 @@ public class ConfigParserTest {
         Assertions.assertNotNull(configObject);
         Assertions.assertInstanceOf(PlatformConfig.class, configObject);
 
-        var metaDbConfig = configObject.getMetadata().getDatabase();
+        var metaDbConfig = configObject.getMetadata();
 
         Assertions.assertInstanceOf(PluginConfig.class, metaDbConfig);
         Assertions.assertEquals("JDBC", metaDbConfig.getProtocol());
@@ -112,7 +112,7 @@ public class ConfigParserTest {
         Assertions.assertNotNull(configObject);
         Assertions.assertInstanceOf(PlatformConfig.class, configObject);
 
-        var metaDbConfig = configObject.getMetadata().getDatabase();
+        var metaDbConfig = configObject.getMetadata();
 
         Assertions.assertInstanceOf(PluginConfig.class, metaDbConfig);
         Assertions.assertEquals("JDBC", metaDbConfig.getProtocol());
