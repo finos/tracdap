@@ -297,8 +297,17 @@ public class JobProcessorHelpers {
                 .addAllPreallocatedIds(jobState.preallocatedIds)
                 .build();
 
-        var tenantConfig = resources.lookupTenant(jobState.tenant).getStaticConfig().toBuilder();
+        var sysConfig = RuntimeConfig.newBuilder();
+
+        var tenantConfig = resources.lookupTenant(jobState.tenant).getStaticConfig();
         var dynamicResources = resources.lookupTenant(jobState.tenant).getResources();
+
+        // Bring across tenant-level storage props (dyanmic tenant props may also be needed later)
+        for (var propertyEntry : tenantConfig.getPropertiesMap().entrySet()) {
+            if (propertyEntry.getKey().startsWith("storage.")) {
+                sysConfig.putProperties(propertyEntry.getKey(), propertyEntry.getValue());
+            }
+        }
 
         var internalStorage = dynamicResources.getMatchingEntries(
                 resource -> resource.getResourceType() == ResourceType.INTERNAL_STORAGE);
@@ -306,7 +315,7 @@ public class JobProcessorHelpers {
         for (var storageEntry : internalStorage.entrySet()) {
             var storageKey = storageEntry.getKey();
             var storage = translateResourceConfig(storageKey, storageEntry.getValue(), jobState);
-            tenantConfig.putResources(storageKey, storage);
+            sysConfig.putResources(storageKey, storage);
         }
 
         var externalStorage = dynamicResources.getMatchingEntries(
@@ -315,7 +324,7 @@ public class JobProcessorHelpers {
         for (var storageEntry : externalStorage.entrySet()) {
             var storageKey = storageEntry.getKey();
             var storage = translateResourceConfig(storageKey, storageEntry.getValue(), jobState);
-            tenantConfig.putResources(storageKey, storage);
+            sysConfig.putResources(storageKey, storage);
         }
 
         var repositories = dynamicResources.getMatchingEntries(
@@ -328,13 +337,11 @@ public class JobProcessorHelpers {
             // Only translate repositories required for the job
             if (jobUsesRepository(repoKey, jobState)) {
                 var repoConfig = translateResourceConfig(repoKey, repoEntry.getValue(), jobState);
-                tenantConfig.putResources(repoKey, repoConfig);
+                sysConfig.putResources(repoKey, repoConfig);
             }
         }
 
-        jobState.sysConfig = RuntimeConfig.newBuilder()
-            .setTenant(tenantConfig)
-            .build();
+        jobState.sysConfig = sysConfig.build();
 
         return jobState;
     }

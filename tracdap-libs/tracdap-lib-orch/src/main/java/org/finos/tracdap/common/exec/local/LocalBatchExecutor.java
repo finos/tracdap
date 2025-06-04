@@ -21,7 +21,7 @@ import org.finos.tracdap.common.exception.*;
 import org.finos.tracdap.common.exec.*;
 import org.finos.tracdap.common.metadata.MetadataConstants;
 
-import org.finos.tracdap.config.TenantConfig;
+import org.finos.tracdap.config.RuntimeConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -446,7 +446,7 @@ public class LocalBatchExecutor implements IBatchExecutor<LocalBatchState> {
     @Override
     public LocalBatchState configureBatchStorage(
             String batchKey, LocalBatchState batchState,
-            TenantConfig storageConfig, Consumer<TenantConfig> storageUpdate) {
+            RuntimeConfig sysConfig, Consumer<RuntimeConfig> sysConfigUpdate) {
 
         // This should never be called, the executor does not advertise storage_mapping in its features
         throw new ETracInternal("Local executor does not support storage_mapping");
