@@ -20,6 +20,7 @@ package org.finos.tracdap.svc.meta;
 import org.finos.tracdap.api.MetadataServiceProto;
 import org.finos.tracdap.api.internal.InternalMessagingProto;
 import org.finos.tracdap.api.internal.InternalMetadataProto;
+import org.finos.tracdap.common.config.ConfigHelpers;
 import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.exception.EStartup;
@@ -32,6 +33,7 @@ import org.finos.tracdap.common.util.InterfaceLogging;
 import org.finos.tracdap.common.validation.ValidationConcern;
 import org.finos.tracdap.config.PlatformConfig;
 import org.finos.tracdap.common.metadata.dal.IMetadataDal;
+import org.finos.tracdap.config.TenantConfigMap;
 import org.finos.tracdap.svc.meta.api.MessageProcessor;
 import org.finos.tracdap.svc.meta.services.ConfigService;
 import org.finos.tracdap.svc.meta.services.MetadataReadService;
@@ -102,25 +104,32 @@ public class TracMetadataService extends TracServiceBase {
 
         try {
 
-            // Use the -db library to set up a datasource
-            // Handles different SQL dialects and authentication mechanisms etc.
+            // Load top level config files
             var platformConfig = configManager.loadRootConfigObject(PlatformConfig.class);
 
             // Load the DAL service using the plugin loader mechanism
             var metaDbConfig = platformConfig.getMetadataStore();
             dal = pluginManager.createService(IMetadataDal.class, metaDbConfig, configManager);
             dal.start();
+            var metaDbConfig = platformConfig.getMetadata().getDatabase();
+            var tenantConfigMap = ConfigHelpers.loadTenantConfigMap(configManager, platformConfig);
 
             // Metadata DB props contains config need for the executor pool size
             var dalProps = new Properties();
             dalProps.putAll(metaDbConfig.getPropertiesMap());
-
             executor = createPrimaryExecutor(dalProps);
+
+            // Load the DAL service using the plugin loader mechanism
+            dal = pluginManager.createService(IMetadataDal.class, metaDbConfig, configManager);
+            dal.start();
+
+            // Check and log the configured tenants
+            checkDatabaseTenants(tenantConfigMap);
 
             // Set up services and APIs
             var dalWithLogging = InterfaceLogging.wrap(dal, IMetadataDal.class);
 
-            var readService = new MetadataReadService(dalWithLogging, platformConfig);
+            var readService = new MetadataReadService(dalWithLogging, platformConfig, tenantConfigMap);
             var writeService = new MetadataWriteService(dalWithLogging);
             var searchService = new MetadataSearchService(dalWithLogging);
             var configService = new ConfigService(dalWithLogging);
@@ -280,6 +289,39 @@ public class TracMetadataService extends TracServiceBase {
             var message = "Config property must be an integer: " + propKey + ", got value '" + propValue + "'";
             log.error(message);
             throw new EStartup(message);
+        }
+    }
+
+    private void checkDatabaseTenants(TenantConfigMap tenantConfig) {
+
+        log.info("Checking for active tenants...");
+
+        var databaseTenants = dal.listTenants();
+        var configFileTenants = new HashMap<>(tenantConfig.getTenantsMap());
+
+        for (var tenantInfo : databaseTenants) {
+
+            var configFileEntry = configFileTenants.remove(tenantInfo.getTenantCode());
+
+            if (configFileEntry != null && !configFileEntry.getDisplayName().isBlank()) {
+                log.info("{}: {}", tenantInfo.getTenantCode(), configFileEntry.getDisplayName());
+            }
+            else if (!tenantInfo.getDescription().isBlank()) {
+                log.info("{}: {}", tenantInfo.getTenantCode(), tenantInfo.getDescription());
+            }
+            else {
+                log.info("{}: Display name not set", tenantInfo.getTenantCode());
+            }
+        }
+
+        if (databaseTenants.isEmpty())
+            log.warn("No active tenants found");
+        else
+            log.info("Found {} active tenant(s)", databaseTenants.size());
+
+        if (!configFileTenants.isEmpty()) {
+            var inactiveTenants = String.join(",", configFileTenants.keySet());
+            log.warn("Some tenants are configured but not activated: [{}]", inactiveTenants);
         }
     }
 }
