@@ -111,7 +111,7 @@ abstract class DataOperationsTest {
         private static final String TRAC_TENANTS_FILE = System.getenv(TRAC_TENANTS_ENV_VAR);
 
         @RegisterExtension
-        public static final PlatformTest platform = PlatformTest.forConfig(TRAC_CONFIG_FILE)
+        public static final PlatformTest platform = PlatformTest.forConfig(TRAC_CONFIG_FILE, List.of(TRAC_TENANTS_FILE))
                 .runDbDeploy(true)
                 .addTenant(TEST_TENANT)
                 .manageDataPrefix(true)
