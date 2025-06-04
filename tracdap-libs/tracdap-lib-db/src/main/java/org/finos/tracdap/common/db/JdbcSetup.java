@@ -17,6 +17,7 @@
 
 package org.finos.tracdap.common.db;
 
+import org.finos.tracdap.common.config.ConfigHelpers;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.common.exception.ETracInternal;
@@ -141,9 +142,14 @@ public class JdbcSetup {
 
     private static String buildJdbcUrl(Properties rootProps, JdbcDialect dialect) {
 
-        var jdbcUrlFromConfig = rootProps.getProperty(JDBC_URL_PROPERTY);
+        var jdbcUrlFromConfig = ConfigHelpers.readString("database", rootProps, JDBC_URL_PROPERTY);
 
-        return String.format("jdbc:%s:%s", dialect.name().toLowerCase(), jdbcUrlFromConfig);
+        // Allow overriding the JDBC protocol with an explict JDBC URL
+        // E.g. some cloud providers supply their own DB drivers
+        if (jdbcUrlFromConfig.startsWith("jdbc:"))
+            return jdbcUrlFromConfig;
+        else
+            return String.format("jdbc:%s:%s", dialect.name().toLowerCase(), jdbcUrlFromConfig);
     }
 
     private static void copyDialectProperties(Properties rootProps, Properties hikariProps, JdbcDialect dialect) {
