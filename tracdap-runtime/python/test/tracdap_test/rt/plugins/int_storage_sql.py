@@ -46,8 +46,8 @@ class SqlDataStorageTest(unittest.TestCase, DataStorageSuite2):
 
         manager = _storage.StorageManager(sys_config)
 
-        config_key = next(iter(sys_config.storage.external.keys()))
-        config_block = sys_config.storage.external[config_key]
+        config_key = next(iter(sys_config.resources.keys()))
+        config_block = sys_config.resources[config_key]
         dialect = config_block.properties.get("dialect")
 
         cls.storage = manager.get_data_storage(config_key, external=True)
