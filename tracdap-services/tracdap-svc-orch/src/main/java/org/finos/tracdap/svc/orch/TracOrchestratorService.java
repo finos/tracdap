@@ -168,6 +168,7 @@ public class TracOrchestratorService extends TracServiceBase {
 
             // Load dynamic config and resources
             var resources = buildTenantResourcesMap(tenantConfigMap);
+            registry.addSingleton(TenantResources.Map.class, resources);
 
             // Load plugins
             var batchExecutor = (IBatchExecutor<? extends Serializable>) pluginManager.createService(
