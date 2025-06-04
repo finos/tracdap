@@ -31,6 +31,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.sql.DataSource;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.sql.SQLException;
 import java.util.List;
 
@@ -52,6 +56,9 @@ public class DeployTool {
     /** Task name for setting a tenant's description **/
     public final static String ALTER_TENANT_TASK = "alter_tenant";
 
+    /** Task name for running native SQL against the database **/
+    public final static String NATIVE_SQL_TASK = "native_sql";
+
     private final static String SCHEMA_LOCATION = "classpath:%s/rollout";
 
     private final static String CACHE_SCHEMA_LOCATION = "classpath:cache/%s/rollout";
@@ -60,7 +67,8 @@ public class DeployTool {
             StandardArgs.task(DEPLOY_SCHEMA_TASK, "Deploy/update metadata database with the latest physical schema"),
             StandardArgs.task(DEPLOY_CACHE_SCHEMA_TASK, "Deploy/update job cache database with the latest physical schema"),
             StandardArgs.task(ADD_TENANT_TASK, List.of("CODE", "DESCRIPTION"), "Add a new tenant to the metadata database"),
-            StandardArgs.task(ALTER_TENANT_TASK, List.of("CODE", "DESCRIPTION"), "Alter the description for an existing tenant"));
+            StandardArgs.task(ALTER_TENANT_TASK, List.of("CODE", "DESCRIPTION"), "Alter the description for an existing tenant"),
+            StandardArgs.task(NATIVE_SQL_TASK, List.of("SQL_FILE"), "Load a native SQL file and run it against the database"));
 
     private final Logger log;
     private final ConfigManager configManager;
@@ -102,8 +110,8 @@ public class DeployTool {
         DataSource metadbSource = null;
         DataSource cacheSource = null;
 
-        log.info("MetaDB script location: " + scriptsLocation);
-        log.info("Job cache script location: " + cacheScriptsLocation);
+        log.info("MetaDB script location: {}", scriptsLocation);
+        log.info("Job cache script location: {}", cacheScriptsLocation);
 
         try {
 
@@ -129,6 +137,11 @@ public class DeployTool {
                 else if (ALTER_TENANT_TASK.equals(task.getTaskName())) {
                     metadbSource = createSource(metadbSource, metaDbConfig);
                     alterTenant(metadbSource, task.getTaskArg(0), task.getTaskArg(1));
+                }
+
+                else if (NATIVE_SQL_TASK.equals(task.getTaskName())) {
+                    metadbSource = createSource(metadbSource, metaDbConfig);
+                    nativeSql(metadbSource, task.getTaskArg(0));
                 }
 
                 else
@@ -257,7 +270,26 @@ public class DeployTool {
 
             throw new ETracPublic("Failed to alter tenant: " + e.getMessage(), e);
         }
+    }
 
+    private void nativeSql(DataSource dataSource, String sqlFile) {
+
+        log.info("Running task: Native SQL...");
+
+        try (var conn = dataSource.getConnection(); var stmt = conn.createStatement()) {
+
+            var sqlScript = Files.readString(Paths.get(sqlFile), StandardCharsets.UTF_8);
+
+            stmt.execute(sqlScript);
+        }
+        catch (SQLException e) {
+
+            throw new ETracPublic("Failed to execute native SQL: " + e.getMessage(), e);
+        }
+        catch (IOException e) {
+
+            throw new ETracPublic("Failed to load native SQL: " + e.getMessage(), e);
+        }
     }
 
     /**
