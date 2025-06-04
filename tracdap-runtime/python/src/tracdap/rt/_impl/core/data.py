@@ -40,6 +40,7 @@ import tracdap.rt.api.experimental as _api
 import tracdap.rt.metadata as _meta
 import tracdap.rt.config as _cfg
 import tracdap.rt.exceptions as _ex
+import tracdap.rt._impl.core.config_parser as _cfg_p
 import tracdap.rt._impl.core.logging as _log
 import tracdap.rt._impl.core.util as _util
 
@@ -119,26 +120,29 @@ class DataSpec:
 
 class StorageLayout:
 
-    __LAYOUTS: "tp.Dict[_meta.StorageLayout, StorageLayout]" = dict()
+    __LAYOUTS: "tp.Dict[str, StorageLayout]" = dict()
 
     @classmethod
-    def select(cls, layout_key: _meta.StorageLayout) -> "StorageLayout":
+    def select(cls, layout_key: tp.Union[str, _meta.StorageLayout]) -> "StorageLayout":
 
         # Legacy compatibility - layout key not set in storage definition
-        if not layout_key or layout_key.value == 0:
-            layout_key = _meta.StorageLayout.OBJECT_ID_LAYOUT
+        if not layout_key or layout_key == "":
+            layout_key = _meta.StorageLayout.OBJECT_ID_LAYOUT.name
+
+        if isinstance(layout_key, _meta.StorageLayout):
+            layout_key = layout_key.name
 
         layout = cls.__LAYOUTS.get(layout_key)
 
         if layout is not None:
             return layout
 
-        if layout_key == _meta.StorageLayout.OBJECT_ID_LAYOUT:
+        if layout_key == _meta.StorageLayout.OBJECT_ID_LAYOUT.name:
             layout = ObjectIdLayout()
-        elif layout_key == _meta.StorageLayout.DEVELOPER_LAYOUT:
+        elif layout_key == _meta.StorageLayout.DEVELOPER_LAYOUT.name:
             layout = DevelopmentLayout()
         else:
-            raise _ex.ETracInternal(f"Unknown storage layout [{layout_key.name}]")
+            raise _ex.ETracInternal(f"Unknown storage layout [{layout_key}]")
 
         cls.__LAYOUTS[layout_key] = layout
 
@@ -152,7 +156,7 @@ class StorageLayout:
     def new_data_spec(
             self, data_id: _meta.TagHeader, storage_id: _meta.TagHeader,
             context_key: tp.Optional[str], trac_schema: _meta.SchemaDefinition,
-            storage_config: _cfg.StorageConfig) -> DataSpec:
+            sys_config: _cfg.RuntimeConfig) -> DataSpec:
         pass
 
     @abc.abstractmethod
@@ -166,7 +170,7 @@ class StorageLayout:
     def new_file_spec(
             self, file_id: _meta.TagHeader, storage_id: _meta.TagHeader,
             context_key: str, file_type: _meta.FileType,
-            storage_config: _cfg.StorageConfig) -> DataSpec:
+            sys_config: _cfg.RuntimeConfig) -> DataSpec:
         pass
 
     @abc.abstractmethod
@@ -198,7 +202,7 @@ class BaseLayout(StorageLayout):
     def new_data_spec(
             self, data_id: _meta.TagHeader, storage_id: _meta.TagHeader,
             context_key: tp.Optional[str], trac_schema: _meta.SchemaDefinition,
-            storage_config: _cfg.StorageConfig) -> DataSpec:
+            sys_config: _cfg.RuntimeConfig) -> DataSpec:
 
         part_key = _meta.PartKey("part-root", _meta.PartType.PART_ROOT)
         snap_index = 0
@@ -215,8 +219,11 @@ class BaseLayout(StorageLayout):
         data_def = self._add_new_snap(new_data_def, data_item, part_key, snap_index)
 
         # Take default location from the storage config
-        storage_key = storage_config.defaultBucket
-        storage_format = "JSON" if trac_schema.schemaType == _meta.SchemaType.STRUCT else storage_config.defaultFormat
+        storage_key = _util.read_property(sys_config.properties, _cfg_p.ConfigKeys.STORAGE_DEFAULT_LOCATION)
+        if trac_schema.schemaType == _meta.SchemaType.STRUCT:
+            storage_format = "JSON"
+        else:
+            storage_format = _util.read_property(sys_config.properties, _cfg_p.ConfigKeys.STORAGE_DEFAULT_FORMAT, "CSV")
         storage_path = self._data_storage_path(data_id, context_key, trac_schema, part_key, snap_index, 0, storage_format, prior_copy=None)
 
         storage_copy = _meta.StorageCopy(
@@ -276,7 +283,7 @@ class BaseLayout(StorageLayout):
     def new_file_spec(
             self, file_id: _meta.TagHeader, storage_id: _meta.TagHeader,
             context_key: str, file_type: _meta.FileType,
-            storage_config: _cfg.StorageConfig) -> DataSpec:
+            sys_config: _cfg.RuntimeConfig) -> DataSpec:
 
         data_item = self.__FILE_ITEM_TEMPLATE.format(file_id.objectId, file_id.objectVersion)
 
@@ -288,7 +295,7 @@ class BaseLayout(StorageLayout):
             storageId=_util.selector_for_latest(storage_id),
             size=0)
 
-        storage_key = storage_config.defaultBucket
+        storage_key = _util.read_property(sys_config.properties, _cfg_p.ConfigKeys.STORAGE_DEFAULT_LOCATION)
         storage_format = file_def.mimeType
         storage_path = self._file_storage_path(file_id, file_def, prior_copy=None)
 
@@ -494,14 +501,14 @@ class DevelopmentLayout(BaseLayout):
 def build_data_spec(
         data_id: _meta.TagHeader, storage_id: _meta.TagHeader,
         context_key: tp.Optional[str], trac_schema: _meta.SchemaDefinition,
-        storage_config: _cfg.StorageConfig,
+        sys_config: _cfg.RuntimeConfig,
         prior_spec: tp.Optional[DataSpec] = None) \
         -> DataSpec:
 
     if prior_spec is None:
-        layout_key = storage_config.defaultLayout
+        layout_key = _util.read_property(sys_config.properties, _cfg_p.ConfigKeys.STORAGE_DEFAULT_LAYOUT, _cfg_p.ConfigKDefaults.STORAGE_DEFAULT_LAYOUT)
         layout = StorageLayout.select(layout_key)
-        return layout.new_data_spec(data_id, storage_id, context_key, trac_schema, storage_config)
+        return layout.new_data_spec(data_id, storage_id, context_key, trac_schema, sys_config)
 
     else:
         layout_key = prior_spec.storage.layout
@@ -512,14 +519,14 @@ def build_data_spec(
 def build_file_spec(
         file_id: _meta.TagHeader, storage_id: _meta.TagHeader,
         context_key: tp.Optional[str],  file_type: _meta.FileType,
-        storage_config: _cfg.StorageConfig,
+        sys_config: _cfg.RuntimeConfig,
         prior_spec: tp.Optional[DataSpec] = None) \
         -> DataSpec:
 
     if prior_spec is None:
-        layout_key = storage_config.defaultLayout
+        layout_key = _util.read_property(sys_config.properties, _cfg_p.ConfigKeys.STORAGE_DEFAULT_LAYOUT, _cfg_p.ConfigKDefaults.STORAGE_DEFAULT_LAYOUT)
         layout = StorageLayout.select(layout_key)
-        return layout.new_file_spec(file_id, storage_id, context_key, file_type, storage_config)
+        return layout.new_file_spec(file_id, storage_id, context_key, file_type, sys_config)
 
     else:
         layout_key = prior_spec.storage.layout

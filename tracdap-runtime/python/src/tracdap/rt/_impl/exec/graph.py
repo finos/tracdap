@@ -161,7 +161,7 @@ class GraphContext:
     job_namespace: NodeNamespace
     ctx_namespace: NodeNamespace
 
-    storage_config: _cfg.StorageConfig
+    sys_config: _cfg.RuntimeConfig
 
 
 @_dc.dataclass(frozen=True)
@@ -297,7 +297,7 @@ class DataSpecNode(Node[_data.DataSpec]):
     storage_obj_id: _meta.TagHeader
     context_key: str
 
-    storage_config: _cfg.StorageConfig
+    sys_config: _cfg.RuntimeConfig
 
     prior_data_spec: _tp.Optional[_data.DataSpec]
 

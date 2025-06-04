@@ -40,7 +40,7 @@ class GraphBuilder:
     @classmethod
     def dynamic(cls, context: GraphContext) -> "GraphBuilder":
 
-        sys_config = _cfg.RuntimeConfig(storage=context.storage_config)
+        sys_config = context.sys_config
         job_config = _cfg.JobConfig(context.job_id)
 
         return GraphBuilder(sys_config, job_config)
@@ -523,7 +523,7 @@ class GraphBuilder:
             nodes[data_spec_id] = DataSpecNode(
                 data_spec_id, data_view_id,
                 data_id, storage_id, output_name,
-                self._sys_config.storage,
+                self._sys_config,
                 prior_data_spec=prior_spec,
                 explicit_deps=explicit_deps)
 
@@ -536,7 +536,7 @@ class GraphBuilder:
             data_spec = _data.build_data_spec(
                 data_id, storage_id, output_name,
                 output_schema.schema,
-                self._sys_config.storage,
+                self._sys_config,
                 prior_spec=prior_spec)
 
             # Save operation uses the statically produced schema info
@@ -597,7 +597,7 @@ class GraphBuilder:
         file_spec = _data.build_file_spec(
             file_id, storage_id,
             output_name, output_schema.fileType,
-            self._sys_config.storage,
+            self._sys_config,
             prior_spec=prior_spec)
 
         # Graph node for the save operation
@@ -709,7 +709,7 @@ class GraphBuilder:
         context = GraphContext(
             self._job_config.jobId,
             self._job_namespace, namespace,
-            self._sys_config.storage)
+            self._sys_config)
 
         model_node = RunModelNode(
             model_id, model_def, model_scope,

@@ -58,11 +58,6 @@ class DevModeTranslator:
 
         cls._log.info(f"Applying dev mode config translation to system config")
 
-        # TODO: In code gen, default object types to a new object unless the field is marked as optional
-        # This would match the general semantics of protobuf
-        if sys_config.storage is None:
-            sys_config.storage = _cfg.StorageConfig()
-
         sys_config = cls._add_integrated_repo(sys_config)
         sys_config = cls._process_storage(sys_config, config_mgr)
 
@@ -73,11 +68,12 @@ class DevModeTranslator:
 
         # Add the integrated model repo trac_integrated
 
-        integrated_repo_config = _cfg.PluginConfig(
+        integrated_repo_config = _meta.ResourceDefinition(
+            resourceType=_meta.ResourceType.MODEL_REPOSITORY,
             protocol="integrated",
             properties={})
 
-        sys_config.repositories["trac_integrated"] = integrated_repo_config
+        sys_config.resources["trac_integrated"] = integrated_repo_config
 
         return sys_config
 
@@ -86,24 +82,17 @@ class DevModeTranslator:
             cls, sys_config: _cfg.RuntimeConfig,
             config_mgr: _cfg_p.ConfigManager):
 
-        storage_config = copy.deepcopy(sys_config.storage)
-        storage_config.defaultLayout = _meta.StorageLayout.DEVELOPER_LAYOUT
+        sys_config.properties[_cfg_p.ConfigKeys.STORAGE_DEFAULT_LAYOUT] = _meta.StorageLayout.DEVELOPER_LAYOUT.name
 
-        for bucket_key, bucket_config in storage_config.buckets.items():
-            storage_config.buckets[bucket_key] = cls._resolve_storage_location(
-                bucket_key, bucket_config, config_mgr)
-
-        for bucket_key, bucket_config in storage_config.external.items():
-            storage_config.external[bucket_key] = cls._resolve_storage_location(
-                bucket_key, bucket_config, config_mgr)
-
-        sys_config = copy.copy(sys_config)
-        sys_config.storage = storage_config
+        for resource_key, resource in sys_config.resources.items():
+            if resource.resourceType in [_meta.ResourceType.INTERNAL_STORAGE, _meta.ResourceType.EXTERNAL_STORAGE]:
+                sys_config.resources[resource_key] = cls._resolve_storage_location(
+                resource_key, resource, config_mgr)
 
         return sys_config
 
     @classmethod
-    def _resolve_storage_location(cls, bucket_key, bucket_config, config_mgr: _cfg_p.ConfigManager):
+    def _resolve_storage_location(cls, bucket_key, bucket_config: _meta.ResourceDefinition, config_mgr: _cfg_p.ConfigManager):
 
         if bucket_config.protocol != "LOCAL":
             return bucket_config
@@ -847,8 +836,8 @@ class DevModeTranslator:
 
         if isinstance(data_value, str):
             storage_path = data_value
-            storage_key = self._sys_config.storage.defaultBucket
-            storage_format = self.infer_format(storage_path, self._sys_config.storage, schema)
+            storage_key = _util.read_property(self._sys_config.properties, _cfg_p.ConfigKeys.STORAGE_DEFAULT_LOCATION)
+            storage_format = self.infer_format(storage_path, self._sys_config, schema)
 
         elif isinstance(data_value, dict):
 
@@ -857,8 +846,8 @@ class DevModeTranslator:
             if not storage_path:
                 raise _ex.EConfigParse(f"Invalid configuration for input [{data_key}] (missing required value 'path'")
 
-            storage_key = data_value.get("storageKey") or self._sys_config.storage.defaultBucket
-            storage_format = data_value.get("format") or self.infer_format(storage_path, self._sys_config.storage, schema)
+            storage_key = data_value.get("storageKey") or _util.read_property(self._sys_config.properties, _cfg_p.ConfigKeys.STORAGE_DEFAULT_LOCATION)
+            storage_format = data_value.get("format") or self.infer_format(storage_path, self._sys_config, schema)
 
         else:
             raise _ex.EConfigParse(f"Invalid configuration for input '{data_key}'")
@@ -910,12 +899,12 @@ class DevModeTranslator:
 
         if isinstance(file_value, str):
 
-            storage_key = self._sys_config.storage.defaultBucket
+            storage_key = _util.read_property(self._sys_config.properties, _cfg_p.ConfigKeys.STORAGE_DEFAULT_LOCATION)
             storage_path = file_value
 
         elif isinstance(file_value, dict):
 
-            storage_key = file_value.get("storageKey") or self._sys_config.storage.defaultBucket
+            storage_key = file_value.get("storageKey") or _util.read_property(self._sys_config.properties, _cfg_p.ConfigKeys.STORAGE_DEFAULT_LOCATION)
             storage_path = file_value.get("path")
 
             if not storage_path:
@@ -962,7 +951,7 @@ class DevModeTranslator:
         return _util.selector_for(file_id)
 
     @staticmethod
-    def infer_format(storage_path: str, storage_config: _cfg.StorageConfig, schema: tp.Optional[_meta.SchemaDefinition]):
+    def infer_format(storage_path: str, sys_config: _cfg.RuntimeConfig, schema: tp.Optional[_meta.SchemaDefinition]):
 
         schema_type = schema.schemaType if schema and schema.schemaType else _meta.SchemaType.TABLE
 
@@ -976,7 +965,7 @@ class DevModeTranslator:
                 return extension[1:] if extension.startswith(".") else extension
 
         else:
-            return storage_config.defaultFormat
+            return _util.read_property(sys_config.properties, _cfg_p.ConfigKeys.STORAGE_DEFAULT_FORMAT, "CSV")
 
     def _find_latest_version(self, storage_key, storage_path):
 

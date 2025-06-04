@@ -296,3 +296,16 @@ def filter_model_stack_trace(full_stack: tb.StackSummary, checkout_directory: pa
         last_model_frame = first_model_frame + frame_index
 
     return full_stack[first_model_frame:last_model_frame+1]
+
+
+def read_property(properties: tp.Dict[str, str], key: str, default: tp.Optional[str] = None):
+
+    value = properties.get(key)
+
+    if value is not None:
+        return value
+
+    if default is not None:
+        return default
+
+    raise ex.EConfigParse(f"Missing required property: [{key}]")

@@ -29,6 +29,7 @@ import tracdap.rt.metadata as _meta
 import tracdap.rt.config as _cfg
 import tracdap.rt.exceptions as _ex
 import tracdap.rt.ext.plugins as plugins
+import tracdap.rt._impl.core.config_parser as _cfg_p
 import tracdap.rt._impl.core.data as _data
 import tracdap.rt._impl.core.logging as _logging
 import tracdap.rt._impl.core.util as _util
@@ -83,20 +84,23 @@ class StorageManager:
         self.__external: tp.List[str] = list()
         self.__sys_config = sys_config
 
-        for storage_key, storage_config in sys_config.storage.buckets.items():
-            self.create_storage(storage_key, storage_config)
+        self.__default_location = _util.read_property(sys_config.properties, _cfg_p.ConfigKeys.STORAGE_DEFAULT_LOCATION)
+        self.__default_format = _util.read_property(sys_config.properties, _cfg_p.ConfigKeys.STORAGE_DEFAULT_FORMAT, "CSV")
 
-        for storage_key, storage_config in sys_config.storage.external.items():
-            if storage_key in self.__file_storage or storage_key in self.__data_storage:
-                raise _ex.EConfig(f"Storage key [{storage_key}] is defined as both internal and external storage")
-            self.__external.append(storage_key)
-            self.create_storage(storage_key, storage_config)
+        for storage_key, storage_config in sys_config.resources.items():
+
+            if storage_config.resourceType == _meta.ResourceType.INTERNAL_STORAGE:
+                self.create_storage(storage_key, storage_config)
+
+            elif storage_config.resourceType == _meta.ResourceType.EXTERNAL_STORAGE:
+                self.__external.append(storage_key)
+                self.create_storage(storage_key, storage_config)
 
     def default_storage_key(self):
-        return self.__sys_config.storage.defaultBucket
+        return self.__default_location
 
     def default_storage_format(self):
-        return self.__sys_config.storage.defaultFormat
+        return self.__default_format
 
     def create_storage(self, storage_key: str, storage_config: _cfg.PluginConfig):
 

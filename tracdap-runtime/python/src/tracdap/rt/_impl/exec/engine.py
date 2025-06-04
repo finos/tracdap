@@ -584,7 +584,7 @@ class JobProcessor(_actors.Actor):
         file_spec = _data.build_file_spec(
             file_id, storage_id,
             file_name, file_type,
-            self._sys_config.storage)
+            self._sys_config)
 
         file_def = file_spec.definition
         storage_def = file_spec.storage

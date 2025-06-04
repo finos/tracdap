@@ -17,6 +17,7 @@ import typing as _tp
 
 import tracdap.rt.ext.plugins as plugins
 import tracdap.rt.config as cfg
+import tracdap.rt.metadata as meta
 import tracdap.rt.exceptions as ex
 import tracdap.rt._impl.core.logging as _logging
 
@@ -34,26 +35,27 @@ class RepositoryManager:
         # Initialize all repos in the system config
         # Any errors for missing repo types (plugins) will be raised during startup
 
-        for repo_name, repo_config in sys_config.repositories.items():
+        for resource_key, resource in sys_config.resources.items():
+            if resource.resourceType == meta.ResourceType.MODEL_REPOSITORY:
 
-            try:
+                try:
 
-                # Add global properties related to the repo protocol
-                related_props = {
-                    k: v for (k, v) in sys_config.properties.items()
-                    if k.startswith(f"{repo_config.protocol}.")}
+                    # Add global properties related to the repo protocol
+                    related_props = {
+                        k: v for (k, v) in sys_config.properties.items()
+                        if k.startswith(f"{resource.protocol}.")}
 
-                repo_config.properties.update(related_props)
+                    resource.properties.update(related_props)
 
-                self._repos[repo_name] = plugins.PluginManager.load_plugin(IModelRepository, repo_config)
+                    self._repos[resource_key] = plugins.PluginManager.load_plugin(IModelRepository, resource)
 
-            except ex.EPluginNotAvailable as e:
+                except ex.EPluginNotAvailable as e:
 
-                msg = f"Model repository type [{repo_config.protocol}] is not recognised" \
-                      + " (this could indicate a missing model repository plugin)"
+                    msg = f"Model repository type [{resource.protocol}] is not recognised" \
+                          + " (this could indicate a missing model repository plugin)"
 
-                self._log.error(msg)
-                raise ex.EStartup(msg) from e
+                    self._log.error(msg)
+                    raise ex.EStartup(msg) from e
 
     def get_repository(self, repo_name: str) -> IModelRepository:
 
