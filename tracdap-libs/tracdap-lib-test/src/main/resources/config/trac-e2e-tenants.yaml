@@ -13,24 +13,29 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-resourceClass: trac_resources
+tenants:
+  ACME_CORP:
 
-resources:
-
-  UNIT_TEST_STORAGE:
-    resourceType: INTERNAL_STORAGE
-    protocol: LOCAL
     properties:
-      rootPath: ${TRAC_STORAGE_DIR}
+      storage.default.location: UNIT_TEST_STORAGE
+      storage.default.format: ${TRAC_STORAGE_FORMAT}
 
-  TRAC_LOCAL_REPO:
-    resourceType: MODEL_REPOSITORY
-    protocol: local
-    properties:
-      repoUrl: ${TRAC_LOCAL_REPO}
+    resources:
 
-  TRAC_GIT_REPO:
-    resourceType: MODEL_REPOSITORY
-    protocol: git
-    properties:
-      repoUrl: ${TRAC_GIT_REPO}
+      UNIT_TEST_STORAGE:
+        resourceType: INTERNAL_STORAGE
+        protocol: LOCAL
+        properties:
+          rootPath: ${TRAC_STORAGE_DIR}
+
+      TRAC_LOCAL_REPO:
+        resourceType: MODEL_REPOSITORY
+        protocol: local
+        properties:
+          repoUrl: ${TRAC_LOCAL_REPO}
+
+      TRAC_GIT_REPO:
+        resourceType: MODEL_REPOSITORY
+        protocol: git
+        properties:
+          repoUrl: ${TRAC_GIT_REPO}

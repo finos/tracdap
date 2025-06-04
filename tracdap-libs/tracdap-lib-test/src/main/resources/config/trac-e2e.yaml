@@ -40,19 +40,6 @@ metadata:
       pool.overflow: 50
 
 
-storage:
-
-  defaultBucket: UNIT_TEST_STORAGE
-  defaultFormat: ${TRAC_STORAGE_FORMAT}
-
-
-executor:
-  protocol: LOCAL
-  properties:
-    venvPath: ${TRAC_EXEC_DIR}/venv
-    pollInterval: 1
-
-
 jobCache:
   protocol: JDBC
   properties:
@@ -63,6 +50,13 @@ jobCache:
     h2.schema: public
     pool.size: 10
     pool.overflow: 50
+
+
+executor:
+  protocol: LOCAL
+  properties:
+    venvPath: ${TRAC_EXEC_DIR}/venv
+    pollInterval: 1
 
 
 gateway:

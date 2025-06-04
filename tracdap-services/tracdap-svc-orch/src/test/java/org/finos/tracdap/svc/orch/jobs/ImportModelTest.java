@@ -49,7 +49,7 @@ public abstract class ImportModelTest {
 
     private static final String TEST_TENANT = "ACME_CORP";
     private static final String E2E_CONFIG = "config/trac-e2e.yaml";
-    private static final String E2E_RESOURCES = "config/trac-e2e-resources.yaml";
+    private static final String E2E_TENANTS = "config/trac-e2e-tenants.yaml";
 
     // Test model import using different repo types
     // This will test the E2E model loading mechanism
@@ -67,10 +67,10 @@ public abstract class ImportModelTest {
     }
 
     @RegisterExtension
-    public static final PlatformTest platform = PlatformTest.forConfig(E2E_CONFIG)
+    public static final PlatformTest platform = PlatformTest.forConfig(E2E_CONFIG, List.of(E2E_TENANTS))
             .runDbDeploy(true)
             .runCacheDeploy(true)
-            .bootstrapTenant(TEST_TENANT, E2E_RESOURCES)
+            .addTenant(TEST_TENANT)
             .prepareLocalExecutor(true)
             .startService(TracMetadataService.class)
             .startService(TracDataService.class)
