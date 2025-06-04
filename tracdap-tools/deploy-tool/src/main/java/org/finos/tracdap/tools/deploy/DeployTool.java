@@ -274,7 +274,7 @@ public class DeployTool {
         log.info("New tenant code: [{}]", tenantCode);
 
         var findMaxId = "select max(tenant_id) from tenant";
-        var insertTenant = "insert into tenant (tenant_id, tenant_code, description) values (?, ?, ?)";
+        var insertTenant = "insert into tenant (tenant_id, tenant_code) values (?, ?)";
 
         short nextId;
 
