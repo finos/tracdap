@@ -82,8 +82,8 @@ class GcsArrowStorageTest(unittest.TestCase, FileOperationsTestSuite, FileReadWr
     def _storage_from_config(storage_config: cfg.PluginConfig, storage_key: str):
 
         sys_config = cfg.RuntimeConfig()
-        sys_config.storage = cfg.StorageConfig()
-        sys_config.storage.buckets[storage_key] = storage_config
+        sys_config.properties["storage.default.location"] = storage_key
+        sys_config.resources[storage_key] = storage_config
 
         manager = storage.StorageManager(sys_config)
 
