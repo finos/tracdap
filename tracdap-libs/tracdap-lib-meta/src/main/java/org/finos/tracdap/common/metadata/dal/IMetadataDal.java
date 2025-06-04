@@ -31,6 +31,8 @@ public interface IMetadataDal {
 
     List<TenantInfo> listTenants();
 
+    void updateTenant(TenantInfo tenantInfo);
+
     void saveBatchUpdate(String tenant, MetadataBatchUpdate batchUpdate);
 
     void savePreallocatedIds(String tenant, List<TagHeader> ids);

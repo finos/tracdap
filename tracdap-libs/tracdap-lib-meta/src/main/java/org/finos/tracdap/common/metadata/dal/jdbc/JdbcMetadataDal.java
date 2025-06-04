@@ -88,14 +88,29 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
         JdbcSetup.destroyDatasource(dataSource);
     }
 
+    void prepareMappingTable(Connection conn) throws SQLException {
+        JdbcDialects.prepareMappingTable(conn, dialect);
+    }
+
+
+    // -----------------------------------------------------------------------------------------------------------------
+    // TENANT METHODS
+    // -----------------------------------------------------------------------------------------------------------------
+
+
     @Override
     public List<TenantInfo> listTenants() {
 
         return wrapTransaction(tenants::listTenants);
     }
 
-    void prepareMappingTable(Connection conn) throws SQLException {
-        JdbcDialects.prepareMappingTable(conn, dialect);
+    @Override
+    public void updateTenant(TenantInfo tenantInfo) {
+
+        wrapTransaction(conn -> {
+            var tenantId = tenants.getTenantId(conn, tenantInfo.getTenantCode());
+            tenants.updateTenant(conn, tenantId, tenantInfo.getDescription());
+        });
     }
 
 

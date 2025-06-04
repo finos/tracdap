@@ -17,6 +17,8 @@
 
 package org.finos.tracdap.common.metadata.dal.jdbc;
 
+import org.finos.tracdap.common.db.JdbcErrorCode;
+import org.finos.tracdap.common.db.JdbcException;
 import org.finos.tracdap.common.exception.ETenantNotFound;
 import org.finos.tracdap.metadata.TenantInfo;
 import org.slf4j.Logger;
@@ -108,6 +110,25 @@ class JdbcTenantImpl {
             }
 
             return tenants;
+        }
+    }
+
+    void updateTenant(Connection conn, short tenantId, String description) throws SQLException {
+
+        var query = "update tenant set description = ? where tenant_id = ?";
+
+        try (var stmt = conn.prepareStatement(query)) {
+
+            stmt.setString(1, description);
+            stmt.setShort(2, tenantId);
+
+            var rows = stmt.executeUpdate();
+
+            if (rows < 1)
+                throw new JdbcException(JdbcErrorCode.NO_DATA);
+
+            if (rows > 1)
+                throw new JdbcException(JdbcErrorCode.TOO_MANY_ROWS);
         }
     }
 }
