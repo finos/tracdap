@@ -585,9 +585,8 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
             // Run both add and alter tenant tasks as part of the standard setup
             // (just to run both tasks, not strictly necessary)
 
-            var description = "Test tenant [" + tenant + "]";
-            databaseTasks.add(StandardArgs.task(DeployTool.ADD_TENANT_TASK, List.of(tenant, description), ""));
-            databaseTasks.add(StandardArgs.task(DeployTool.ALTER_TENANT_TASK, List.of(tenant, description), ""));
+            var displayName = "Test tenant [" + tenant + "]";
+            databaseTasks.add(StandardArgs.task(DeployTool.ADD_TENANT_TASK, List.of(tenant, displayName), ""));
         }
 
         PlatformTestHelpers.runDeployTool(workingDir, platformConfigUrl, secretKey, databaseTasks);
