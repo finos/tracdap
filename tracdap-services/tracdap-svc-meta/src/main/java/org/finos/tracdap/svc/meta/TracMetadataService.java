@@ -107,7 +107,7 @@ public class TracMetadataService extends TracServiceBase {
             var platformConfig = configManager.loadRootConfigObject(PlatformConfig.class);
 
             // Load the DAL service using the plugin loader mechanism
-            var metaDbConfig = platformConfig.getMetadata().getDatabase();
+            var metaDbConfig = platformConfig.getMetadata();
             dal = pluginManager.createService(IMetadataDal.class, metaDbConfig, configManager);
             dal.start();
 

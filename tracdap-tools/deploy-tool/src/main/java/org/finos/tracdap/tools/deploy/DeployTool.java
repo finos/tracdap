@@ -93,7 +93,7 @@ public class DeployTool {
 
         var platformConfig = configManager.loadRootConfigObject(PlatformConfig.class);
 
-        var metaDbConfig = platformConfig.getMetadata().getDatabase();
+        var metaDbConfig = platformConfig.getMetadata();
         var metadDbDialect = JdbcSetup.getSqlDialect(metaDbConfig);
         var scriptsLocation = String.format(SCHEMA_LOCATION, metadDbDialect.name().toLowerCase());
 

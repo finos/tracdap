@@ -61,7 +61,7 @@ public class JdbcIntegration implements BeforeAllCallback, BeforeEachCallback, A
         configManager = Startup.quickConfig(workingDir, configFile, keystoreKey);
 
         var platformConfig = configManager.loadRootConfigObject(PlatformConfig.class);
-        metaDbConfig = platformConfig.getMetadata().getDatabase();
+        metaDbConfig = platformConfig.getMetadata();
     }
 
     @Override
