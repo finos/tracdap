@@ -22,7 +22,7 @@ import org.finos.tracdap.common.util.VersionInfo;
 import org.finos.tracdap.config.PlatformConfig;
 import org.finos.tracdap.config.TenantConfigMap;
 import org.finos.tracdap.metadata.*;
-import org.finos.tracdap.common.metadata.dal.IMetadataDal;
+import org.finos.tracdap.common.metadata.store.IMetadataStore;
 import org.finos.tracdap.svc.meta.TracMetadataService;
 
 import org.slf4j.Logger;
@@ -39,11 +39,11 @@ public class MetadataReadService {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
-    private final IMetadataDal metadataStore;
+    private final IMetadataStore metadataStore;
     private final PlatformConfig platformConfig;
     private final TenantConfigMap tenantConfig;
 
-    public MetadataReadService(IMetadataDal metadataStore, PlatformConfig platformConfig, TenantConfigMap tenantConfig) {
+    public MetadataReadService(IMetadataStore metadataStore, PlatformConfig platformConfig, TenantConfigMap tenantConfig) {
         this.metadataStore = metadataStore;
         this.platformConfig = platformConfig;
         this.tenantConfig = tenantConfig;

@@ -32,7 +32,7 @@ import org.finos.tracdap.common.service.TracServiceBase;
 import org.finos.tracdap.common.util.InterfaceLogging;
 import org.finos.tracdap.common.validation.ValidationConcern;
 import org.finos.tracdap.config.PlatformConfig;
-import org.finos.tracdap.common.metadata.dal.IMetadataDal;
+import org.finos.tracdap.common.metadata.store.IMetadataStore;
 import org.finos.tracdap.config.TenantConfigMap;
 import org.finos.tracdap.svc.meta.api.MessageProcessor;
 import org.finos.tracdap.svc.meta.services.ConfigService;
@@ -83,7 +83,7 @@ public class TracMetadataService extends TracServiceBase {
     private final PluginManager pluginManager;
     private final ConfigManager configManager;
 
-    private IMetadataDal metadataStore;
+    private IMetadataStore metadataStore;
     private ExecutorService executor;
     private Server server;
 
@@ -111,7 +111,7 @@ public class TracMetadataService extends TracServiceBase {
 
             // Load the DAL service using the plugin loader mechanism
             var metadataStoreConfig = platformConfig.getMetadataStore();
-            metadataStore = pluginManager.createService(IMetadataDal.class, metadataStoreConfig, configManager);
+            metadataStore = pluginManager.createService(IMetadataStore.class, metadataStoreConfig, configManager);
             metadataStore.start();
 
             // Check and log the configured tenants
@@ -123,7 +123,7 @@ public class TracMetadataService extends TracServiceBase {
             executor = createPrimaryExecutor(dalProps);
 
             // Set up services and APIs
-            var metaStoreWithLogging = InterfaceLogging.wrap(metadataStore, IMetadataDal.class);
+            var metaStoreWithLogging = InterfaceLogging.wrap(metadataStore, IMetadataStore.class);
 
             var readService = new MetadataReadService(metaStoreWithLogging, platformConfig, tenantConfigMap);
             var writeService = new MetadataWriteService(metaStoreWithLogging);

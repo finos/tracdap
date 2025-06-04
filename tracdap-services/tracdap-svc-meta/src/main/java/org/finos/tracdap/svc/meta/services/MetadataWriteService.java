@@ -23,8 +23,8 @@ import org.finos.tracdap.api.MetadataWriteBatchResponse;
 import org.finos.tracdap.api.MetadataWriteRequest;
 import org.finos.tracdap.common.grpc.RequestMetadata;
 import org.finos.tracdap.common.grpc.UserMetadata;
-import org.finos.tracdap.common.metadata.dal.IMetadataDal;
-import org.finos.tracdap.common.metadata.dal.MetadataBatchUpdate;
+import org.finos.tracdap.common.metadata.store.IMetadataStore;
+import org.finos.tracdap.common.metadata.store.MetadataBatchUpdate;
 import org.finos.tracdap.common.metadata.tag.ObjectUpdateLogic;
 import org.finos.tracdap.common.validation.Validator;
 import org.finos.tracdap.metadata.*;
@@ -38,9 +38,9 @@ import java.util.stream.Collectors;
 public class MetadataWriteService {
 
     private final Validator validator = new Validator();
-    private final IMetadataDal metadataStore;
+    private final IMetadataStore metadataStore;
 
-    public MetadataWriteService(IMetadataDal metadataStore) {
+    public MetadataWriteService(IMetadataStore metadataStore) {
         this.metadataStore = metadataStore;
     }
 
