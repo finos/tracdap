@@ -295,7 +295,7 @@ jobs:
               INSTALL_SCRIPT: ".github/scripts/int-storage-s3-install.sh",
               SETUP_SCRIPT: ".github/scripts/int-storage-s3-setup.sh",
               TRAC_CONFIG_FILE: '.github/config/int-storage-s3.yaml',
-              TRAC_RESOURCES_FILE: '.github/config/int-storage-s3-resources.yaml',
+              TRAC_TENANTS_FILE: '.github/config/int-storage-s3-tenants.yaml',
               TRAC_SECRET_KEY: short-lived-secret,
               PYTHON_TESTS: int_storage_aws*.py,
               JAVA_TESTS: int-storage }
@@ -310,7 +310,7 @@ jobs:
               INSTALL_SCRIPT: ".github/scripts/int-storage-gcs-install.sh",
               SETUP_SCRIPT: ".github/scripts/int-storage-gcs-setup.sh",
               TRAC_CONFIG_FILE: '.github/config/int-storage-gcs.yaml',
-              TRAC_RESOURCES_FILE: '.github/config/int-storage-gcs-resources.yaml',
+              TRAC_TENANTS_FILE: '.github/config/int-storage-gcs-tenants.yaml',
               TRAC_SECRET_KEY: short-lived-secret,
               PYTHON_TESTS: int_storage_gcp*.py,
               JAVA_TESTS: int-storage }
@@ -323,7 +323,7 @@ jobs:
               INSTALL_SCRIPT: ".github/scripts/int-storage-azure-install.sh",
               SETUP_SCRIPT: ".github/scripts/int-storage-azure-setup.sh",
               TRAC_CONFIG_FILE: '.github/config/int-storage-azure.yaml',
-              TRAC_RESOURCES_FILE: ".github/config/int-storage-azure-resources.yaml",
+              TRAC_TENANTS_FILE: ".github/config/int-storage-azure-tenants.yaml",
               TRAC_SECRET_KEY: short-lived-secret,
               PYTHON_TESTS: int_storage_azure*.py,
               JAVA_TESTS: int-storage }
