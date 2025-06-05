@@ -119,7 +119,7 @@ public class ConfigManager {
 
         var secretType = env.containsKey(ConfigKeys.TRAC_SECRET_TYPE)
                 ? env.get(ConfigKeys.TRAC_SECRET_TYPE)
-                : configMap.getOrDefault(ConfigKeys.SECRET_KEY_KEY, null);
+                : configMap.getOrDefault(ConfigKeys.SECRET_TYPE_KEY, null);
 
         var secretUrl = env.containsKey(ConfigKeys.TRAC_SECRET_URL)
                 ? env.get(ConfigKeys.TRAC_SECRET_URL)
