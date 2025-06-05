@@ -17,7 +17,6 @@
 
 package org.finos.tracdap.common.config;
 
-import org.finos.tracdap.common.exception.EConfig;
 import org.finos.tracdap.common.exception.EConfigLoad;
 import org.finos.tracdap.common.plugin.IPluginManager;
 import org.finos.tracdap.common.exception.EStartup;
@@ -36,7 +35,6 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.PrivateKey;
 import java.security.PublicKey;
-import java.util.Map;
 import java.util.Properties;
 
 
@@ -117,8 +115,22 @@ public class ConfigManager {
         var rootConfig = loadRootConfigObject(_ConfigFile.class, /* leniency = */ true);
         var configMap = rootConfig.getConfigMap();
 
-        var secretType = configMap.getOrDefault(ConfigKeys.SECRET_TYPE_KEY, "");
-        var secretUrl = configMap.getOrDefault(ConfigKeys.SECRET_URL_KEY, "");
+        var env = System.getenv();
+
+        var secretType = env.containsKey(ConfigKeys.TRAC_SECRET_TYPE)
+                ? env.get(ConfigKeys.TRAC_SECRET_TYPE)
+                : configMap.getOrDefault(ConfigKeys.SECRET_KEY_KEY, null);
+
+        var secretUrl = env.containsKey(ConfigKeys.TRAC_SECRET_URL)
+                ? env.get(ConfigKeys.TRAC_SECRET_URL)
+                : configMap.getOrDefault(ConfigKeys.SECRET_URL_KEY, null);
+
+        var secretKey = env.getOrDefault(ConfigKeys.TRAC_SECRET_KEY, this.secretKey);
+
+        var secretProps = new Properties();
+        if (secretType != null) secretProps.setProperty(ConfigKeys.SECRET_TYPE_KEY, secretType);
+        if (secretUrl != null) secretProps.setProperty(ConfigKeys.SECRET_URL_KEY, secretUrl);
+        if (secretKey != null) secretProps.setProperty(ConfigKeys.SECRET_KEY_KEY, secretKey);
 
         if (secretType == null || secretType.isBlank()) {
             StartupLog.log(this, Level.INFO, "Using secrets: [none]");
@@ -126,7 +138,7 @@ public class ConfigManager {
         }
         else {
             StartupLog.log(this, Level.INFO, String.format("Using secrets: [%s] %s", secretType, secretUrl));
-            this.secrets = secretLoaderForProtocol(secretType, configMap);
+            this.secrets = secretLoaderForProtocol(secretType, secretProps);
         }
 
         this.configSecrets = secrets.scope(ConfigKeys.CONFIG_SCOPE);
@@ -533,7 +545,7 @@ public class ConfigManager {
         return plugins.createConfigService(IConfigLoader.class, protocol, new Properties());
     }
 
-    private ISecretService secretLoaderForProtocol(String protocol, Map<String, String> configMap) {
+    private ISecretService secretLoaderForProtocol(String protocol, Properties secretProps) {
 
         if (!plugins.isServiceAvailable(ISecretService.class, protocol)) {
 
@@ -543,30 +555,9 @@ public class ConfigManager {
             throw new EConfigLoad(message);
         }
 
-        var secretProps = buildSecretProps(configMap);
         var secretLoader = plugins.createConfigService(ISecretService.class, protocol, secretProps);
         secretLoader.init(this);
 
         return secretLoader;
-    }
-
-    private Properties buildSecretProps(Map<String, String> configMap) {
-
-        // These props are needed for JKS secrets
-        // Cloud platforms would normally use IAM to access the secret store
-        // But, any set of props can be used, with keys like secret.*
-
-        var secretProps = new Properties();
-
-        for (var secretEntry : configMap.entrySet()) {
-            if (secretEntry.getKey().startsWith("secret.") && secretEntry.getValue() != null)
-                secretProps.put(secretEntry.getKey(), secretEntry.getValue());
-        }
-
-        if (secretKey != null && !secretKey.isBlank()) {
-            secretProps.put(ConfigKeys.SECRET_KEY_KEY, secretKey);
-        }
-
-        return secretProps;
     }
 }

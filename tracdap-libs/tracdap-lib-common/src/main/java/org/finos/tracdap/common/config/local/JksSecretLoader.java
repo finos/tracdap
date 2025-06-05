@@ -58,8 +58,8 @@ public class JksSecretLoader implements ISecretLoader {
         }
 
         if (keystoreKey == null || keystoreKey.isBlank()) {
-            var template = "JKS secrets need a secret key, use --secret-key or set %s in the environment";
-            var message = String.format(template, ConfigKeys.SECRET_KEY_ENV);
+            var template = "JKS secrets needs a secret key (set %s in the environment)";
+            var message = String.format(template, ConfigKeys.TRAC_SECRET_KEY);
             StartupLog.log(this, Level.ERROR, message);
             throw new EStartup(message);
         }
