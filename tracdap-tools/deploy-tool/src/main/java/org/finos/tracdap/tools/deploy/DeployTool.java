@@ -117,7 +117,7 @@ public class DeployTool {
                 }
 
                 else if (DEPLOY_CACHE_SCHEMA_TASK.equals(task.getTaskName())) {
-                    if (List.of("JDBC", "SQL").contains(jobCacheConfig.getProtocol().toUpperCase()))
+                    if (!List.of("JDBC", "SQL").contains(jobCacheConfig.getProtocol().toUpperCase()))
                         throw new EStartup("Cache schema cannot be deployed because the job cache is not configured to use SQL");
                     dataSource = createSource(databaseConfig);
                     deployCacheSchema(dataSource, databaseConfig);
