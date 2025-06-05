@@ -92,85 +92,78 @@ public class DeployTool {
     public void runDeployment(List<StandardArgs.Task> tasks) {
 
         var platformConfig = configManager.loadRootConfigObject(PlatformConfig.class);
+        var metadataStoreConfig = platformConfig.getMetadataStore();
+        var jobCacheConfig = platformConfig.getJobCache();
 
-        var metaDbConfig = platformConfig.getMetadataStore();
-        var metadDbDialect = JdbcSetup.getSqlDialect(metaDbConfig);
-        var scriptsLocation = String.format(SCHEMA_LOCATION, metadDbDialect.name().toLowerCase());
+        for (var task : tasks) {
 
-        var cacheConfig = platformConfig.getJobCache();
-        String cacheScriptsLocation;
-        if (cacheConfig.getProtocol().equals("SQL") || cacheConfig.getProtocol().equals("JDBC")) {
-            var cacheDialect = JdbcSetup.getSqlDialect(cacheConfig);
-            cacheScriptsLocation = String.format(CACHE_SCHEMA_LOCATION, cacheDialect.name().toLowerCase());
-        }
-        else {
-            cacheScriptsLocation = null;
-        }
+            // Config for the database component used at runtime
+            // Deploy cache schema uses jobCache config by default, everything else uses metadataStore
+            var runtimeConfig = DEPLOY_CACHE_SCHEMA_TASK.equals(task.getTaskName())
+                    ? jobCacheConfig : metadataStoreConfig;
 
-        DataSource metadbSource = null;
-        DataSource cacheSource = null;
+            // Allow config to be overridden for individual setup tasks
+            var databaseConfig = platformConfig.containsSetupTasks(task.getTaskName())
+                    ? platformConfig.getSetupTasksOrThrow(task.getTaskName())
+                    : runtimeConfig;
 
-        log.info("MetaDB script location: {}", scriptsLocation);
-        log.info("Job cache script location: {}", cacheScriptsLocation);
+            DataSource dataSource = null;
 
-        try {
-
-            for (var task : tasks) {
+            try {
 
                 if (DEPLOY_SCHEMA_TASK.equals(task.getTaskName())) {
-                    metadbSource = createSource(metadbSource, metaDbConfig);
-                    deploySchema(metadbSource, scriptsLocation);
+                    dataSource = createSource(databaseConfig);
+                    deploySchema(dataSource, databaseConfig);
                 }
 
                 else if (DEPLOY_CACHE_SCHEMA_TASK.equals(task.getTaskName())) {
-                    if (cacheScriptsLocation == null)
+                    if (!List.of("JDBC", "SQL").contains(jobCacheConfig.getProtocol().toUpperCase()))
                         throw new EStartup("Cache schema cannot be deployed because the job cache is not configured to use SQL");
-                    cacheSource = createSource(cacheSource, cacheConfig);
-                    deployCacheSchema(cacheSource, cacheScriptsLocation);
+                    dataSource = createSource(databaseConfig);
+                    deployCacheSchema(dataSource, databaseConfig);
                 }
 
                 else if (ADD_TENANT_TASK.equals(task.getTaskName())) {
-                    metadbSource = createSource(metadbSource, metaDbConfig);
-                    addTenant(metadbSource, task.getTaskArg(0), task.getTaskArg(1));
+                    dataSource = createSource(databaseConfig);
+                    addTenant(dataSource, task.getTaskArg(0), task.getTaskArg(1));
                 }
 
                 else if (ALTER_TENANT_TASK.equals(task.getTaskName())) {
-                    metadbSource = createSource(metadbSource, metaDbConfig);
-                    alterTenant(metadbSource, task.getTaskArg(0), task.getTaskArg(1));
+                    dataSource = createSource(databaseConfig);
+                    alterTenant(dataSource, task.getTaskArg(0), task.getTaskArg(1));
                 }
 
                 else if (NATIVE_SQL_TASK.equals(task.getTaskName())) {
-                    metadbSource = createSource(metadbSource, metaDbConfig);
-                    nativeSql(metadbSource, task.getTaskArg(0));
+                    dataSource = createSource(databaseConfig);
+                    nativeSql(dataSource, task.getTaskArg(0));
                 }
 
                 else
                     throw new EStartup(String.format("Unknown task: [%s]", task.getTaskName()));
             }
+            finally {
 
-            log.info("All tasks complete");
+                if (dataSource != null)
+                    JdbcSetup.destroyDatasource(dataSource);
+            }
         }
-        finally {
 
-            if (metadbSource != null)
-                JdbcSetup.destroyDatasource(metadbSource);
-
-            if (cacheSource != null)
-                JdbcSetup.destroyDatasource(cacheSource);
-        }
+        log.info("All tasks complete");
     }
 
-    private DataSource createSource(DataSource dataSource, PluginConfig pluginConfig) {
-
-        if (dataSource != null)
-            return dataSource;
+    private DataSource createSource(PluginConfig pluginConfig) {
 
         return JdbcSetup.createDatasource(configManager, pluginConfig);
     }
 
-    private void deploySchema(DataSource dataSource, String scriptsLocation) {
+    private void deploySchema(DataSource dataSource, PluginConfig databaseConfig) {
 
         log.info("Running task: Deploy schema...");
+
+        var dialect = JdbcSetup.getSqlDialect(databaseConfig);
+        var scriptsLocation = String.format(SCHEMA_LOCATION, dialect.name().toLowerCase());
+
+        log.info("Metadata store scripts location: {}", scriptsLocation);
 
         var flyway = Flyway.configure()
                 .dataSource(dataSource)
@@ -182,13 +175,18 @@ public class DeployTool {
         flyway.migrate();
     }
 
-    private void deployCacheSchema(DataSource dataSource, String cacheScriptsLocation) {
+    private void deployCacheSchema(DataSource dataSource, PluginConfig databaseConfig) {
 
         log.info("Running task: Deploy cache schema...");
 
+        var dialect = JdbcSetup.getSqlDialect(databaseConfig);
+        var scriptsLocation = String.format(CACHE_SCHEMA_LOCATION, dialect.name().toLowerCase());
+
+        log.info("Job cache scripts location: {}", scriptsLocation);
+
         var flyway = Flyway.configure()
                 .dataSource(dataSource)
-                .locations(cacheScriptsLocation)
+                .locations(scriptsLocation)
                 .sqlMigrationPrefix("")
                 .sqlMigrationSuffixes(".sql", ".ddl", ".dml")
                 .load();

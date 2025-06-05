@@ -17,6 +17,7 @@
 
 package org.finos.tracdap.tools.secrets;
 
+import org.finos.tracdap.common.config.ConfigHelpers;
 import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.config.ISecretService;
@@ -31,8 +32,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
-import java.util.Map;
-import java.util.Properties;
 import java.util.Scanner;
 
 
@@ -65,47 +64,27 @@ public class SecretTool {
     public ISecretService prepareSecrets(PluginManager pluginManager, ConfigManager configManager, String secretKey) {
 
         var rootConfig = configManager.loadRootConfigObject(_ConfigFile.class, /* leniency = */ true);
-        var configMap = rootConfig.getConfigMap();
-        var protocol = configMap.getOrDefault(ConfigKeys.SECRET_TYPE_KEY, "");
 
-        if (protocol == null || protocol.isBlank()) {
+        var secretProps = ConfigHelpers.buildSecretProperties(rootConfig.getConfigMap(), secretKey);
+        var secretType = ConfigHelpers.getSecretType(secretProps);
+
+        if (secretType == null || secretType.isBlank()) {
             var message = "No secret service has been configured";
             log.error(message);
             throw new EConfigLoad(message);
         }
 
-        if (!pluginManager.isServiceAvailable(ISecretService.class, protocol)) {
-            var message = String.format("No secret service available for protocol [%s]", protocol);
+        if (!pluginManager.isServiceAvailable(ISecretService.class, secretType)) {
+            var message = String.format("No secret service available for protocol [%s]", secretType);
             log.error(message);
             throw new EConfigLoad(message);
         }
 
-        var secretProps = buildSecretProps(configMap, secretKey);
-        var secretService = pluginManager.createConfigService(ISecretService.class, protocol, secretProps);
+        var secretService = pluginManager.createConfigService(ISecretService.class, secretType, secretProps);
 
         secretService.init(configManager, /* createIfMissing = */ true);
 
         return secretService.scope(ConfigKeys.CONFIG_SCOPE);
-    }
-
-    private Properties buildSecretProps(Map<String, String> configMap, String secretKey) {
-
-        // These props are needed for JKS secrets
-        // Cloud platforms would normally use IAM to access the secret store
-        // But, any set of props can be used, with keys like secret.*
-
-        var secretProps = new Properties();
-
-        for (var secretEntry : configMap.entrySet()) {
-            if (secretEntry.getKey().startsWith("secret.") && secretEntry.getValue() != null)
-                secretProps.put(secretEntry.getKey(), secretEntry.getValue());
-        }
-
-        if (secretKey != null && !secretKey.isBlank()) {
-            secretProps.put(ConfigKeys.SECRET_KEY_KEY, secretKey);
-        }
-
-        return secretProps;
     }
 
     public void runTasks(List<StandardArgs.Task> tasks) {

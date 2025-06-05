@@ -25,7 +25,10 @@ public class ConfigKeys {
     public static final String SECRET_TYPE_KEY = "secret.type";
     public static final String SECRET_URL_KEY = "secret.url";
     public static final String SECRET_KEY_KEY = "secret.key";
-    public static final String SECRET_KEY_ENV = "TRAC_SECRET_KEY";
+
+    public static final String TRAC_SECRET_TYPE = "TRAC_SECRET_TYPE";
+    public static final String TRAC_SECRET_URL = "TRAC_SECRET_URL";
+    public static final String TRAC_SECRET_KEY = "TRAC_SECRET_KEY";
 
     // Service keys
     public static final String GATEWAY_SERVICE_KEY = "gateway";

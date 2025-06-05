@@ -105,10 +105,6 @@ public class StandardArgsProcessor {
             var configFile = command.getOptionValue("config");
             var secretKey = command.getOptionValue("secret-key");
 
-            if (secretKey == null) {
-                secretKey = envVariables.get(ConfigKeys.SECRET_KEY_ENV);
-            }
-
             var tasks = usingTasks
                     ? processTasks(command, availableTasks)
                     : null;

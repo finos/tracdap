@@ -20,9 +20,7 @@ package org.finos.tracdap.common.startup;
 import org.finos.tracdap.common.exception.EStartup;
 import org.junit.jupiter.api.Test;
 
-import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -30,7 +28,6 @@ import static org.junit.jupiter.api.Assertions.*;
 class StandardArgsProcessorTest {
 
     private static final String APP_NAME = "Test App";
-    private static final String SECRET_KEY_ENV_VAR = "TRAC_SECRET_KEY";
 
     @Test
     void testArgs_ok() {
@@ -39,36 +36,6 @@ class StandardArgsProcessorTest {
         var commandArgs = command.split("\\s");
 
         var standardArgs = StandardArgsProcessor.processArgs(APP_NAME, commandArgs, null);
-
-        assertEquals(System.getProperty("user.dir"), standardArgs.getWorkingDir().toString());
-        assertEquals("etc/my_config.props", standardArgs.getConfigFile());
-        assertEquals("Mellon", standardArgs.getSecretKey());
-    }
-
-    @Test
-    void testArgs_envVariables_ok() {
-
-        Map<String, String> envVariables = Collections.singletonMap(SECRET_KEY_ENV_VAR, "Mellon");
-
-        var command = "--config etc/my_config.props";
-        var commandArgs = command.split("\\s");
-
-        var standardArgs = StandardArgsProcessor.processArgs(APP_NAME, commandArgs, envVariables);
-
-        assertEquals(System.getProperty("user.dir"), standardArgs.getWorkingDir().toString());
-        assertEquals("etc/my_config.props", standardArgs.getConfigFile());
-        assertEquals("Mellon", standardArgs.getSecretKey());
-    }
-
-    @Test
-    void testArgs_argsBeatEnvVariables_ok() {
-
-        Map<String, String> envVariables = Collections.singletonMap(SECRET_KEY_ENV_VAR, "Fruit");
-
-        var command = "--config etc/my_config.props --secret-key Mellon";
-        var commandArgs = command.split("\\s");
-
-        var standardArgs = StandardArgsProcessor.processArgs(APP_NAME, commandArgs, envVariables);
 
         assertEquals(System.getProperty("user.dir"), standardArgs.getWorkingDir().toString());
         assertEquals("etc/my_config.props", standardArgs.getConfigFile());

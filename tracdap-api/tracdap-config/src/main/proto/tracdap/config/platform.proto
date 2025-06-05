@@ -38,12 +38,12 @@ message PlatformConfig {
   PluginConfig jobCache = 4;
   PluginConfig executor = 5;
 
-  GatewayConfig gateway = 6;
-
   map<string, ServiceConfig> services = 10;
   DeploymentConfig deployment = 11;
+  GatewayConfig gateway = 12;
 
   map<string, google.protobuf.Any> extensions = 20;
+  map<string, PluginConfig> setupTasks = 21;
 }
 
 message GatewayConfig {
