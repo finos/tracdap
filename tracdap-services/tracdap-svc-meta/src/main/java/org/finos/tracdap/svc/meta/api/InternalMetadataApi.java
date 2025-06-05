@@ -40,6 +40,18 @@ public class InternalMetadataApi extends InternalMetadataApiGrpc.InternalMetadat
     }
 
     @Override
+    public void platformInfo(PlatformInfoRequest request, StreamObserver<PlatformInfoResponse> response) {
+
+        apiImpl.platformInfo(request, response);
+    }
+
+    @Override
+    public void listTenants(ListTenantsRequest request, StreamObserver<ListTenantsResponse> response) {
+
+        apiImpl.listTenants(request, response);
+    }
+
+    @Override
     public void writeBatch(MetadataWriteBatchRequest request, StreamObserver<MetadataWriteBatchResponse> response) {
 
         apiImpl.writeBatch(request, response);
