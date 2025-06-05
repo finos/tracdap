@@ -68,7 +68,7 @@ public class DeployTool {
     private final static List<StandardArgs.Task> METADB_TASKS = List.of(
             StandardArgs.task(DEPLOY_SCHEMA_TASK, "Deploy/update metadata database with the latest physical schema"),
             StandardArgs.task(DEPLOY_CACHE_SCHEMA_TASK, "Deploy/update job cache database with the latest physical schema"),
-            StandardArgs.task(ADD_TENANT_TASK, List.of("CODE"), "Add a new tenant code in the metadata database"),
+            StandardArgs.task(ADD_TENANT_TASK, List.of("CODE", "DISPLAY_NAME"), "Add a new tenant code in the metadata database"),
             StandardArgs.task(ACTIVATE_TENANT_CONFIG_TASK, List.of("CODE"), "Activate any tenant codes found in the tenants config file"),
             StandardArgs.task(NATIVE_SQL_TASK, List.of("SQL_FILE"), "Load a native SQL file and run it against the database"));
 
@@ -235,13 +235,13 @@ public class DeployTool {
         flyway.migrate();
     }
 
-    private void addTenant(DataSource dataSource, String tenantCode) {
+    private void addTenant(DataSource dataSource, String tenantCode, String displayName) {
 
         log.info("Running task: Add tenant...");
 
         try (var conn = dataSource.getConnection()) {
 
-            addTenantCode(conn, tenantCode);
+            addTenant(conn, tenantCode, displayName);
         }
         catch (SQLException e) {
 
@@ -259,8 +259,11 @@ public class DeployTool {
 
             for (var tenantCode : tenantConfigMap.getTenantsMap().keySet()) {
 
+                var tenantConfig = tenantConfigMap.getTenantsMap().get(tenantCode);
+                var displayName = tenantConfig.getPropertiesOrDefault("tenant.displayName", "");
+
                 if (!checkTenantCodeExists(conn, tenantCode))
-                    addTenantCode(conn, tenantCode);
+                    addTenant(conn, tenantCode, displayName);
             }
         }
         catch (SQLException e) {
@@ -269,12 +272,12 @@ public class DeployTool {
         }
     }
 
-    private void addTenantCode(Connection conn, String tenantCode) throws SQLException {
+    private void addTenant(Connection conn, String tenantCode, String displayName) throws SQLException {
 
         log.info("New tenant code: [{}]", tenantCode);
 
         var findMaxId = "select max(tenant_id) from tenant";
-        var insertTenant = "insert into tenant (tenant_id, tenant_code) values (?, ?)";
+        var insertTenant = "insert into tenant (tenant_id, tenant_code, description) values (?, ?, ?)";
 
         short nextId;
 
@@ -297,6 +300,12 @@ public class DeployTool {
 
             stmt.setShort(1, nextId);
             stmt.setString(2, tenantCode);
+
+            if (displayName != null && !displayName.isBlank())
+                stmt.setString(3, displayName);
+            else
+                stmt.setNull(3, java.sql.Types.VARCHAR);
+
             stmt.execute();
         }
     }
