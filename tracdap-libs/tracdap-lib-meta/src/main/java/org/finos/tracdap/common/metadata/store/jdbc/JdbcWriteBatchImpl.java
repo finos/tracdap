@@ -213,17 +213,9 @@ class JdbcWriteBatchImpl {
                         stmt.setNull(11, Types.DATE);
                         stmt.setNull(12, Types.TIMESTAMP);
 
-                        var attrTypeToIndex = Map.ofEntries(
-                                Map.entry(BasicType.BOOLEAN, 6),
-                                Map.entry(BasicType.INTEGER, 7),
-                                Map.entry(BasicType.FLOAT, 8),
-                                Map.entry(BasicType.STRING, 9),
-                                Map.entry(BasicType.DECIMAL, 10),
-                                Map.entry(BasicType.DATE, 11),
-                                Map.entry(BasicType.DATETIME, 12)
-                        );
+                        // Map attr type to a param index in the SQL statement
+                        var paramIndex = ATTR_TYPE_MAPPING[attrType.ordinal()];
 
-                        var paramIndex = attrTypeToIndex.get(attrType);
                         JdbcAttrHelpers.setAttrValue(stmt, paramIndex, attrType, attrValue);
 
                         stmt.addBatch();
@@ -235,6 +227,23 @@ class JdbcWriteBatchImpl {
 
             stmt.executeBatch();
         }
+    }
+
+    // Map of attr types in insert params for writeTagAttrs
+    private static final int[] ATTR_TYPE_MAPPING = buildAttrTypeMapping();
+
+    private static int[] buildAttrTypeMapping() {
+
+        var mapping = new int[BasicType.values().length];
+        mapping[BasicType.BOOLEAN.ordinal()] = 6;
+        mapping[BasicType.INTEGER.ordinal()] = 7;
+        mapping[BasicType.FLOAT.ordinal()] = 8;
+        mapping[BasicType.STRING.ordinal()] = 9;
+        mapping[BasicType.DECIMAL.ordinal()] = 10;
+        mapping[BasicType.DATE.ordinal()] = 11;
+        mapping[BasicType.DATETIME.ordinal()] = 12;
+
+        return mapping;
     }
 
     private BasicType attrBasicType(Value attrValue) {
