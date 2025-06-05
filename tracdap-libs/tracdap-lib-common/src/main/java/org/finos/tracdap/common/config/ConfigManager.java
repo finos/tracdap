@@ -113,24 +113,10 @@ public class ConfigManager {
     public void prepareSecrets() {
 
         var rootConfig = loadRootConfigObject(_ConfigFile.class, /* leniency = */ true);
-        var configMap = rootConfig.getConfigMap();
 
-        var env = System.getenv();
-
-        var secretType = env.containsKey(ConfigKeys.TRAC_SECRET_TYPE)
-                ? env.get(ConfigKeys.TRAC_SECRET_TYPE)
-                : configMap.getOrDefault(ConfigKeys.SECRET_TYPE_KEY, null);
-
-        var secretUrl = env.containsKey(ConfigKeys.TRAC_SECRET_URL)
-                ? env.get(ConfigKeys.TRAC_SECRET_URL)
-                : configMap.getOrDefault(ConfigKeys.SECRET_URL_KEY, null);
-
-        var secretKey = env.getOrDefault(ConfigKeys.TRAC_SECRET_KEY, this.secretKey);
-
-        var secretProps = new Properties();
-        if (secretType != null) secretProps.setProperty(ConfigKeys.SECRET_TYPE_KEY, secretType);
-        if (secretUrl != null) secretProps.setProperty(ConfigKeys.SECRET_URL_KEY, secretUrl);
-        if (secretKey != null) secretProps.setProperty(ConfigKeys.SECRET_KEY_KEY, secretKey);
+        var secretProps = ConfigHelpers.buildSecretProperties(rootConfig.getConfigMap(), this.secretKey);
+        var secretType = ConfigHelpers.getSecretType(secretProps);
+        var secretUrl = ConfigHelpers.getSecretUrl(secretProps);
 
         if (secretType == null || secretType.isBlank()) {
             StartupLog.log(this, Level.INFO, "Using secrets: [none]");
