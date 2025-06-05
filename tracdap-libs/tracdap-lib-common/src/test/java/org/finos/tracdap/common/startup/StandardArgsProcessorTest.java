@@ -28,7 +28,6 @@ import static org.junit.jupiter.api.Assertions.*;
 class StandardArgsProcessorTest {
 
     private static final String APP_NAME = "Test App";
-    private static final String SECRET_KEY_ENV_VAR = "TRAC_SECRET_KEY";
 
     @Test
     void testArgs_ok() {
