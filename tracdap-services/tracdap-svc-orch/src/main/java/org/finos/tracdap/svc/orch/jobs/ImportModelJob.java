@@ -19,12 +19,12 @@ package org.finos.tracdap.svc.orch.jobs;
 
 import org.finos.tracdap.api.internal.RuntimeJobResult;
 import org.finos.tracdap.api.internal.RuntimeJobResultAttrs;
-import org.finos.tracdap.common.config.IDynamicResources;
 import org.finos.tracdap.common.exception.EExecutorValidation;
 import org.finos.tracdap.common.exception.EJobResult;
 import org.finos.tracdap.common.metadata.MetadataBundle;
 import org.finos.tracdap.common.metadata.MetadataUtil;
 import org.finos.tracdap.config.JobConfig;
+import org.finos.tracdap.config.TenantConfig;
 import org.finos.tracdap.metadata.*;
 
 import java.net.URI;
@@ -47,7 +47,14 @@ public class ImportModelJob implements IJobLogic {
     }
 
     @Override
-    public JobDefinition applyJobTransform(JobDefinition job, MetadataBundle metadata, IDynamicResources resources) {
+    public List<String> requiredResources(JobDefinition job, MetadataBundle metadata, TenantConfig tenantConfig) {
+
+        var repoKey = job.getImportModel().getRepository();
+        return List.of(repoKey);
+    }
+
+    @Override
+    public JobDefinition applyJobTransform(JobDefinition job, MetadataBundle metadata, TenantConfig tenantConfig) {
 
         // Fill in package and packageGroup properties for models using Git repos
 
@@ -59,9 +66,8 @@ public class ImportModelJob implements IJobLogic {
             return job;
 
         // Validation on resources is already performed by the job consistency validator
-        // getStrictResource() will throw if there is an unexpected error (e..g. config sync issues)
         var repoKey = job.getImportModel().getRepository();
-        var repoConfig = resources.getStrictEntry(repoKey, ResourceType.MODEL_REPOSITORY);
+        var repoConfig = tenantConfig.getResourcesOrThrow(repoKey);
 
         if (!repoConfig.getProtocol().equalsIgnoreCase("git"))
             return job;
@@ -89,7 +95,7 @@ public class ImportModelJob implements IJobLogic {
     }
 
     @Override
-    public MetadataBundle applyMetadataTransform(JobDefinition job, MetadataBundle metadata, IDynamicResources resources) {
+    public MetadataBundle applyMetadataTransform(JobDefinition job, MetadataBundle metadata, TenantConfig tenantConfig) {
 
         return metadata;
     }

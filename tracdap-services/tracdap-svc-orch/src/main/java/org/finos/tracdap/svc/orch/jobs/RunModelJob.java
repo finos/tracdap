@@ -18,16 +18,15 @@
 package org.finos.tracdap.svc.orch.jobs;
 
 import org.finos.tracdap.api.internal.RuntimeJobResult;
-import org.finos.tracdap.common.config.IDynamicResources;
+import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.metadata.MetadataBundle;
 import org.finos.tracdap.common.metadata.MetadataUtil;
 import org.finos.tracdap.config.JobConfig;
+import org.finos.tracdap.config.TenantConfig;
 import org.finos.tracdap.metadata.*;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 
 public class RunModelJob extends RunModelOrFlow implements IJobLogic {
@@ -49,14 +48,30 @@ public class RunModelJob extends RunModelOrFlow implements IJobLogic {
     }
 
     @Override
-    public JobDefinition applyJobTransform(JobDefinition job, MetadataBundle metadata, IDynamicResources resources) {
+    public List<String> requiredResources(JobDefinition job, MetadataBundle metadata, TenantConfig tenantConfig) {
+
+        var resources = new HashSet<String>();
+
+        // Storage requirements are the same for model / flow jobs
+        addRequiredStorage(metadata, tenantConfig, resources);
+
+        // Include repo resource for the model
+        var modelObj = metadata.getObject(job.getRunModel().getModel());
+        var modelRepo = modelObj.getModel().getRepository();
+        resources.add(modelRepo);
+
+        return new ArrayList<>(resources);
+    }
+
+    @Override
+    public JobDefinition applyJobTransform(JobDefinition job, MetadataBundle metadata, TenantConfig tenantConfig) {
 
         // No transformations currently required
         return job;
     }
 
     @Override
-    public MetadataBundle applyMetadataTransform(JobDefinition job, MetadataBundle metadata, IDynamicResources resources) {
+    public MetadataBundle applyMetadataTransform(JobDefinition job, MetadataBundle metadata, TenantConfig tenantConfig) {
 
         return metadata;
     }

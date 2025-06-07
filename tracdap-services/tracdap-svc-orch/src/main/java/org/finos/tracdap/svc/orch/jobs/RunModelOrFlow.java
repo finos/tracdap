@@ -19,9 +19,12 @@ package org.finos.tracdap.svc.orch.jobs;
 
 import org.finos.tracdap.api.internal.RuntimeJobResult;
 import org.finos.tracdap.api.internal.RuntimeJobResultAttrs;
+import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.exception.EJobResult;
 import org.finos.tracdap.common.exception.ETracInternal;
 import org.finos.tracdap.common.exception.EUnexpected;
+import org.finos.tracdap.common.metadata.MetadataBundle;
+import org.finos.tracdap.config.TenantConfig;
 import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.metadata.MetadataConstants;
@@ -32,6 +35,26 @@ import java.util.*;
 
 public abstract class RunModelOrFlow {
 
+    protected void addRequiredStorage(MetadataBundle metadata, TenantConfig tenantConfig, Set<String> resources) {
+
+        // Default storage is always required for outputs
+        if (tenantConfig.containsProperties(ConfigKeys.STORAGE_DEFAULT_LOCATION)) {
+            var defaultStorage = tenantConfig.getPropertiesOrThrow(ConfigKeys.STORAGE_DEFAULT_LOCATION);
+            resources.add(defaultStorage);
+        }
+
+        // Add explicitly referenced storage locations
+        metadata.getObjects().values().stream()
+                .filter(obj -> obj.getObjectType() == ObjectType.STORAGE)
+                .forEach(obj -> obj.getStorage().getDataItemsMap().values()
+                .forEach(item -> item.getIncarnationsList().stream()
+                .filter(incarnation -> incarnation.getIncarnationStatus() == IncarnationStatus.INCARNATION_AVAILABLE)
+                .forEach(incarnation -> incarnation.getCopiesList().stream()
+                .filter(copy -> copy.getCopyStatus() == CopyStatus.COPY_AVAILABLE)
+                .map(StorageCopy::getStorageKey)
+                .forEach(resources::add))));
+
+    }
 
     protected Map<ObjectType, Integer> expectedOutputs(
             Map<String, ModelOutputSchema> outputs,

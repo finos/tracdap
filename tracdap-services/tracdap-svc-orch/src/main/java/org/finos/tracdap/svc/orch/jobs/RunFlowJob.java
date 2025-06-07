@@ -18,13 +18,14 @@
 package org.finos.tracdap.svc.orch.jobs;
 
 import org.finos.tracdap.api.internal.RuntimeJobResult;
-import org.finos.tracdap.common.config.IDynamicResources;
+import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.graph.GraphBuilder;
 import org.finos.tracdap.common.graph.NodeNamespace;
 import org.finos.tracdap.common.metadata.MetadataBundle;
 import org.finos.tracdap.common.metadata.MetadataUtil;
 import org.finos.tracdap.config.JobConfig;
+import org.finos.tracdap.config.TenantConfig;
 import org.finos.tracdap.metadata.*;
 
 import java.util.*;
@@ -51,14 +52,32 @@ public class RunFlowJob extends RunModelOrFlow implements IJobLogic {
     }
 
     @Override
-    public JobDefinition applyJobTransform(JobDefinition job, MetadataBundle metadata, IDynamicResources resources) {
+    public List<String> requiredResources(JobDefinition job, MetadataBundle metadata, TenantConfig tenantConfig) {
+
+        var resources = new HashSet<String>();
+
+        // Storage requirements are the same for model / flow jobs
+        addRequiredStorage(metadata, tenantConfig, resources);
+
+        // Add repos for all referenced models
+        metadata.getObjects().values().stream()
+                .filter(obj -> obj.getObjectType() == ObjectType.MODEL)
+                .map(ObjectDefinition::getModel)
+                .map(ModelDefinition::getRepository)
+                .forEach(resources::add);
+
+        return new ArrayList<>(resources);
+    }
+
+    @Override
+    public JobDefinition applyJobTransform(JobDefinition job, MetadataBundle metadata, TenantConfig tenantConfig) {
 
         // No transformations currently required
         return job;
     }
 
     @Override
-    public MetadataBundle applyMetadataTransform(JobDefinition job, MetadataBundle metadata, IDynamicResources resources) {
+    public MetadataBundle applyMetadataTransform(JobDefinition job, MetadataBundle metadata, TenantConfig tenantConfig) {
 
         // Running the graph builder will apply any required auto-wiring and type inference to the flow
         // This creates a strictly consistent flow that can be sent to the runtime
