@@ -32,6 +32,7 @@ import org.finos.tracdap.common.metadata.MetadataConstants;
 import org.finos.tracdap.common.metadata.MetadataUtil;
 import org.finos.tracdap.common.middleware.GrpcConcern;
 import org.finos.tracdap.common.plugin.PluginRegistry;
+import org.finos.tracdap.common.service.TenantConfigManager;
 import org.finos.tracdap.common.validation.Validator;
 import org.finos.tracdap.config.*;
 import org.finos.tracdap.metadata.*;
@@ -57,18 +58,18 @@ public class JobProcessorHelpers {
     private final InternalMetadataApiGrpc.InternalMetadataApiBlockingStub metaClient;
     private final GrpcConcern commonConcerns;
 
-    private final TenantResources.Map resources;
+    private final TenantConfigManager tenantState;
 
     private final ConfigManager configManager;
     private final Validator validator = new Validator();
 
 
     public JobProcessorHelpers(
-            TenantResources.Map resources,
+            TenantConfigManager tenantState,
             GrpcConcern commonConcerns,
             PluginRegistry registry) {
 
-        this.resources = resources;
+        this.tenantState = tenantState;
         this.commonConcerns = commonConcerns;
 
         this.metaClient = registry.getSingleton(InternalMetadataApiGrpc.InternalMetadataApiBlockingStub.class);
@@ -184,12 +185,12 @@ public class JobProcessorHelpers {
 
         var jobLogic = JobLogic.forJobType(jobState.jobType);
         var metadata = new MetadataBundle(jobState.objectMapping, jobState.objects, jobState.tags);
+        var tenantConfig = tenantState.getTenantConfig(jobState.tenant);
 
-        var tenantResources = resources.lookupTenant(jobState.tenant).getResources();
+        var updatedDefinition = jobLogic.applyJobTransform(jobState.definition, metadata, tenantConfig);
+        var updatedMetadata = jobLogic.applyMetadataTransform(updatedDefinition, metadata, tenantConfig);
 
-        jobState.definition = jobLogic.applyJobTransform(jobState.definition, metadata, tenantResources);
-
-        var updatedMetadata = jobLogic.applyMetadataTransform(jobState.definition, metadata, tenantResources);
+        jobState.definition = updatedDefinition;
         jobState.objects = updatedMetadata.getObjects();
         jobState.objectMapping = updatedMetadata.getObjectMapping();
 
@@ -287,6 +288,10 @@ public class JobProcessorHelpers {
 
     JobState buildJobConfig(JobState jobState) {
 
+        var jobLogic  = JobLogic.forJobType(jobState.jobType);
+        var metadata = new MetadataBundle(jobState.objectMapping, jobState.objects, jobState.tags);
+        var tenantConfig = tenantState.getTenantConfig(jobState.tenant);
+
         jobState.jobConfig = JobConfig.newBuilder()
                 .setJobId(jobState.jobId)
                 .setJob(jobState.definition)
@@ -297,78 +302,30 @@ public class JobProcessorHelpers {
                 .addAllPreallocatedIds(jobState.preallocatedIds)
                 .build();
 
+        var requiredResources = jobLogic.requiredResources(jobState.definition, metadata, tenantConfig);
+
         var sysConfig = RuntimeConfig.newBuilder();
+        sysConfig.putAllProperties(tenantConfig.getPropertiesMap());
 
-        var tenantConfig = resources.lookupTenant(jobState.tenant).getStaticConfig();
-        var dynamicResources = resources.lookupTenant(jobState.tenant).getResources();
+        for (var resourceKey : requiredResources) {
 
-        // Bring across tenant-level storage props (dyanmic tenant props may also be needed later)
-        for (var propertyEntry : tenantConfig.getPropertiesMap().entrySet()) {
-            if (propertyEntry.getKey().startsWith("storage.")) {
-                sysConfig.putProperties(propertyEntry.getKey(), propertyEntry.getValue());
+            if (tenantConfig.containsResources(resourceKey)) {
+                var resourceConfig = tenantConfig.getResourcesOrThrow(resourceKey);
+                var resource = translateResourceConfig(resourceKey, resourceConfig, jobState);
+                sysConfig.putResources(resourceKey, resource);
+            }
+            else {
+                // This condition should already be picked up during job consistency validation
+                var message = String.format("Required resource [%s] not found", resourceKey);
+                log.error(message);
+                throw new EConsistencyValidation(message);
             }
         }
 
-        var internalStorage = dynamicResources.getMatchingEntries(
-                resource -> resource.getResourceType() == ResourceType.INTERNAL_STORAGE);
-
-        for (var storageEntry : internalStorage.entrySet()) {
-            var storageKey = storageEntry.getKey();
-            var storage = translateResourceConfig(storageKey, storageEntry.getValue(), jobState);
-            sysConfig.putResources(storageKey, storage);
-        }
-
-        var externalStorage = dynamicResources.getMatchingEntries(
-                resource -> resource.getResourceType() == ResourceType.EXTERNAL_STORAGE);
-
-        for (var storageEntry : externalStorage.entrySet()) {
-            var storageKey = storageEntry.getKey();
-            var storage = translateResourceConfig(storageKey, storageEntry.getValue(), jobState);
-            sysConfig.putResources(storageKey, storage);
-        }
-
-        var repositories = dynamicResources.getMatchingEntries(
-                resource -> resource.getResourceType() == ResourceType.MODEL_REPOSITORY);
-
-        for (var repoEntry : repositories.entrySet()) {
-
-            var repoKey = repoEntry.getKey();
-
-            // Only translate repositories required for the job
-            if (jobUsesRepository(repoKey, jobState)) {
-                var repoConfig = translateResourceConfig(repoKey, repoEntry.getValue(), jobState);
-                sysConfig.putResources(repoKey, repoConfig);
-            }
-        }
 
         jobState.sysConfig = sysConfig.build();
 
         return jobState;
-    }
-
-    private boolean jobUsesRepository(String repoKey, JobState jobState) {
-
-        // This method filters repo resources for the currently known job types
-        // TODO: Generic resource filtering in the IJobLogic interface
-
-        // Import model jobs can refer to repositories directly
-        if (jobState.jobType == JobType.IMPORT_MODEL) {
-            var importModelJob = jobState.definition.getImportModel();
-            if (importModelJob.getRepository().equals(repoKey)) {
-                return true;
-            }
-        }
-
-        // Check if any resources refer to the repo key
-        for (var object : jobState.objects.values()) {
-            if (object.getObjectType() == ObjectType.MODEL) {
-                if (object.getModel().getRepository().equals(repoKey)) {
-                    return true;
-                }
-            }
-        }
-
-        return false;
     }
 
     private ResourceDefinition translateResourceConfig(String resourceKey, ResourceDefinition resource, JobState jobState) {

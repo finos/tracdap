@@ -32,6 +32,7 @@ import org.finos.tracdap.common.metadata.MetadataUtil;
 import org.finos.tracdap.common.middleware.GrpcClientState;
 import org.finos.tracdap.common.middleware.GrpcConcern;
 import org.finos.tracdap.common.plugin.PluginRegistry;
+import org.finos.tracdap.common.service.TenantConfigManager;
 import org.finos.tracdap.common.validation.Validator;
 import org.finos.tracdap.common.metadata.MetadataBundle;
 import org.finos.tracdap.metadata.JobStatusCode;
@@ -55,7 +56,7 @@ public class JobProcessor {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
-    private final TenantResources.Map resources;
+    private final TenantConfigManager tenantState;
     private final InternalMetadataApiBlockingStub metaClient;
     private final IJobExecutor<?> executor;
     private final Validator validator = new Validator();
@@ -65,15 +66,15 @@ public class JobProcessor {
 
 
     public JobProcessor(
-            TenantResources.Map resources,
+            TenantConfigManager tenantState,
             GrpcConcern commonConcerns,
             PluginRegistry registry) {
 
-        this.resources = resources;
+        this.tenantState = tenantState;
         this.metaClient = registry.getSingleton(InternalMetadataApiBlockingStub.class);
         this.executor = registry.getSingleton(JobExecutor.class);
 
-        this.lifecycle = new JobProcessorHelpers(resources, commonConcerns, registry);
+        this.lifecycle = new JobProcessorHelpers(tenantState, commonConcerns, registry);
     }
 
     public JobState newJob(JobRequest request, GrpcClientState clientState) {
@@ -126,14 +127,14 @@ public class JobProcessor {
 
         try {
 
-            var resources = this.resources.lookupTenant(newState.tenant).getResources();
+            var tenantConfig = tenantState.getTenantConfig(jobState.tenant);
 
             // Load in all the resources referenced by the job
             newState = lifecycle.loadMetadata(newState);
 
             // Semantic validation (job consistency)
             var metadata = new MetadataBundle(newState.objectMapping, newState.objects, newState.tags);
-            validator.validateConsistency(newState.definition, metadata, resources);
+            validator.validateConsistency(newState.definition, metadata, tenantConfig);
 
             // Apply any transformations specific to the job type
             // Including this step during validation will catch more errors before jobs are submitted
