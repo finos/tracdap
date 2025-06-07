@@ -19,6 +19,7 @@ package org.finos.tracdap.svc.orch.jobs;
 
 import org.finos.tracdap.api.internal.RuntimeJobResult;
 import org.finos.tracdap.api.internal.RuntimeJobResultAttrs;
+import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.exception.EExecutorValidation;
 import org.finos.tracdap.common.exception.EJobResult;
 import org.finos.tracdap.common.metadata.MetadataBundle;
@@ -50,7 +51,15 @@ public class ImportModelJob implements IJobLogic {
     public List<String> requiredResources(JobDefinition job, MetadataBundle metadata, TenantConfig tenantConfig) {
 
         var repoKey = job.getImportModel().getRepository();
-        return List.of(repoKey);
+
+        // Runtime expects to see the default storage resource
+        if (tenantConfig.containsProperties(ConfigKeys.STORAGE_DEFAULT_LOCATION)) {
+            var defaultStorage = tenantConfig.getPropertiesOrThrow(ConfigKeys.STORAGE_DEFAULT_LOCATION);
+            return List.of(repoKey, defaultStorage);
+        }
+        else {
+            return List.of(repoKey);
+        }
     }
 
     @Override
