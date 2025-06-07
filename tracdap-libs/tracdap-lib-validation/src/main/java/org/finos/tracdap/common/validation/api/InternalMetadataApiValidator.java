@@ -82,6 +82,16 @@ public class InternalMetadataApiValidator {
         return MetadataApiValidator.readBatch(msg, ctx);
     }
 
+    @Validator(method = "platformInfo")
+    public static ValidationContext platformInfo(PlatformInfoRequest msg, ValidationContext ctx) {
+        return MetadataApiValidator.platformInfo(msg, ctx);
+    }
+
+    @Validator(method = "listTenants")
+    public static ValidationContext listTenants(ListTenantsRequest msg, ValidationContext ctx) {
+        return MetadataApiValidator.listTenants(msg, ctx);
+    }
+
     // Internal config API is a mirror of the API on admin service
 
     @Validator(method = "createConfigObject")
