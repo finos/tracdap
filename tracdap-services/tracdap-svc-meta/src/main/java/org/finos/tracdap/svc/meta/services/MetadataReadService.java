@@ -18,7 +18,6 @@
 package org.finos.tracdap.svc.meta.services;
 
 import org.finos.tracdap.api.*;
-import org.finos.tracdap.common.config.ConfigHelpers;
 import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.util.VersionInfo;
 import org.finos.tracdap.config.PlatformConfig;
@@ -84,13 +83,10 @@ public class MetadataReadService {
         for (var tenantInfo : metadataTenants) {
 
             var configFileEntry = configFileTenants.remove(tenantInfo.getTenantCode());
-            var configDisplayName = ConfigHelpers.readString(
-                    tenantInfo.getTenantCode(), configFileEntry.getPropertiesMap(),
-                    ConfigKeys.TENANT_DISPLAY_NAME, false);
-
             var processedEntry = tenantInfo.toBuilder();
 
-            if (configDisplayName != null && !configDisplayName.isBlank()) {
+            if (configFileEntry != null && configFileEntry.containsProperties(ConfigKeys.TENANT_DISPLAY_NAME)) {
+                var configDisplayName = configFileEntry.getPropertiesOrThrow(ConfigKeys.TENANT_DISPLAY_NAME);
                 processedEntry.setDescription(configDisplayName);
             }
             else if (tenantInfo.getDescription().isBlank()) {
