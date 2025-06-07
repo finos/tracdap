@@ -33,7 +33,6 @@ import org.finos.tracdap.common.grpc.RequestMetadata;
 import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.metadata.MetadataUtil;
 import org.finos.tracdap.common.metadata.PartKeys;
-import org.finos.tracdap.common.storage.IStorageManager;
 import org.finos.tracdap.common.validation.Validator;
 
 import org.apache.arrow.memory.ArrowBuf;
@@ -60,7 +59,7 @@ public class DataService {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
-    private final IStorageManager storageManager;
+    private final TenantStorageManager storageManager;
     private final ICodecManager codecManager;
     private final InternalMetadataApiGrpc.InternalMetadataApiFutureStub metaClient;
 
@@ -68,7 +67,7 @@ public class DataService {
     private final Random random = new Random();
 
     public DataService(
-            IStorageManager storageManager,
+            TenantStorageManager storageManager,
             ICodecManager codecManager,
             InternalMetadataApiGrpc.InternalMetadataApiFutureStub metaClient) {
 
@@ -85,6 +84,7 @@ public class DataService {
             GrpcClientConfig clientConfig) {
 
         var initialState = new RequestState();
+        initialState.tenant = request.getTenant();
         initialState.requestMetadata = requestMetadata;
         initialState.clientConfig = clientConfig;
 
@@ -131,6 +131,7 @@ public class DataService {
             GrpcClientConfig clientConfig) {
 
         var initialState = new RequestState();
+        initialState.tenant = request.getTenant();
         initialState.requestMetadata = requestMetadata;
         initialState.clientConfig = clientConfig;
 
@@ -185,6 +186,7 @@ public class DataService {
             GrpcClientConfig clientConfig) {
 
         var state = new RequestState();
+        state.tenant = request.getTenant();
         state.requestMetadata = requestMetadata;
         state.clientConfig = clientConfig;
 
@@ -409,7 +411,7 @@ public class DataService {
         var timestamp = state.requestMetadata.requestTimestamp();
 
         var dataDef = createDataDef(request, state, dataItem);
-        var storageDef = createStorageDef( dataItem, storagePath, timestamp);
+        var storageDef = createStorageDef(state, dataItem, storagePath, timestamp);
 
         state.data = dataDef;
         state.storage = storageDef;
@@ -461,7 +463,7 @@ public class DataService {
         }
 
         state.data = updateDataDef(request, state, dataItem, prior.data);
-        state.storage = updateStorageDef(prior.storage, dataItem, storagePath, timestamp);
+        state.storage = updateStorageDef(state, dataItem, storagePath, timestamp, prior.storage);
 
         state.copy = state.storage
                 .getDataItemsOrThrow(dataItem)
@@ -570,10 +572,10 @@ public class DataService {
     }
 
     private StorageDefinition createStorageDef(
-            String dataItem, String storagePath,
-            OffsetDateTime objectTimestamp) {
+            RequestState state, String dataItem,
+            String storagePath, OffsetDateTime objectTimestamp) {
 
-        var storageItem = buildStorageItem(storagePath, objectTimestamp);
+        var storageItem = buildStorageItem(state, storagePath, objectTimestamp);
 
         return StorageDefinition.newBuilder()
                 .putDataItems(dataItem, storageItem)
@@ -581,21 +583,22 @@ public class DataService {
     }
 
     private StorageDefinition updateStorageDef(
-            StorageDefinition priorDef,
-            String dataItem, String storagePath,
-            OffsetDateTime objectTimestamp) {
+            RequestState state, String dataItem,
+            String storagePath, OffsetDateTime objectTimestamp,
+            StorageDefinition priorDef) {
 
-        var storageItem = buildStorageItem(storagePath, objectTimestamp);
+        var storageItem = buildStorageItem(state, storagePath, objectTimestamp);
 
         return priorDef.toBuilder()
                 .putDataItems(dataItem, storageItem)
                 .build();
     }
 
-    private StorageItem buildStorageItem(String storagePath, OffsetDateTime objectTimestamp) {
+    private StorageItem buildStorageItem(RequestState state, String storagePath, OffsetDateTime objectTimestamp) {
 
-        var location = storageManager.defaultLocation();
-        var format = storageManager.defaultFormat();
+        var tenantStorage = storageManager.getTenantStorage(state.tenant);
+        var location = tenantStorage.defaultLocation();
+        var format = tenantStorage.defaultFormat();
 
         // For the time being, data has one incarnation and a single storage copy
 
@@ -662,10 +665,11 @@ public class DataService {
             ICodec codec, Map<String, String> codecOptions,
             IDataContext dataCtx) {
 
-        var arrowSchema = ArrowSchema.tracToArrow(state.schema);
+        var storage = storageManager
+                .getTenantStorage(state.tenant)
+                .getDataStorage(state.copy.getStorageKey());
 
-        var storageKey = state.copy.getStorageKey();
-        var storage = storageManager.getDataStorage(storageKey);
+        var arrowSchema = ArrowSchema.tracToArrow(state.schema);
         var encoder = codec.getEncoder(dataCtx.arrowAllocator(), arrowSchema, codecOptions);
 
         var pipeline = storage.pipelineReader(state.copy, arrowSchema, dataCtx, state.offset, state.limit);
@@ -680,10 +684,11 @@ public class DataService {
             ICodec codec, Map<String, String> codecOptions,
             IDataContext dataCtx) {
 
-        var arrowSchema = ArrowSchema.tracToArrow(state.schema);
+        var storage = storageManager
+                .getTenantStorage(state.tenant)
+                .getDataStorage(state.copy.getStorageKey());
 
-        var storageKey = state.copy.getStorageKey();
-        var storage = storageManager.getDataStorage(storageKey);
+        var arrowSchema = ArrowSchema.tracToArrow(state.schema);
         var decoder = codec.getDecoder(dataCtx.arrowAllocator(), arrowSchema, codecOptions);
 
         var signal = new CompletableFuture<Long>();
