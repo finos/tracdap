@@ -48,6 +48,7 @@ public class ConfigKeys {
     public static final String STORAGE_DEFAULT_LAYOUT = "storage.default.layout";
 
     // Well-known config classes
+    public static final String TRAC_TENANT_CONFIG = "trac_tenant_config";
     public static final String TRAC_CONFIG = "trac_config";
     public static final String TRAC_RESOURCES = "trac_resources";
 

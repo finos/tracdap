@@ -15,28 +15,23 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.config;
+package org.finos.tracdap.common.service;
 
-import com.google.protobuf.Message;
-import java.util.Map;
+import org.finos.tracdap.config.TenantConfig;
+import org.finos.tracdap.metadata.ConfigEntry;
+import org.finos.tracdap.metadata.ObjectDefinition;
 
+public abstract class TenantState {
 
-public interface IDynamicConfig<T extends Message> {
+    protected abstract boolean configIsRelevant(ConfigEntry entry);
 
-    @FunctionalInterface
-    interface Condition<T> {
-        boolean checkCondition(T t);
-    }
+    protected abstract void tenantPropertiesUpdated(TenantConfig tenantConfig);
 
-    T getEntry(String configKey);
+    protected abstract void configCreated(ConfigEntry entry, ObjectDefinition definition);
 
-    T getStrictEntry(String configKey);
+    protected abstract void configUpdated(ConfigEntry entry, ObjectDefinition definition);
 
-    T getStrictEntry(String configKey, Condition<T> condition);
+    protected abstract void configDeleted(ConfigEntry entry);
 
-    T getStrictEntry(String configKey, Condition<T> condition, String conditionMessage);
-
-    Map<String, T> getAllEntries();
-
-    Map<String, T> getMatchingEntries(Condition<T> condition);
+    protected abstract void shutdown();
 }
