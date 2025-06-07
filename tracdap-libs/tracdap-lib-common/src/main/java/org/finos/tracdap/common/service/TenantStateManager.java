@@ -319,7 +319,6 @@ public abstract class TenantStateManager<TState extends TenantState> {
             TenantConfig staticConfig, TenantConfig.Builder liveConfig,
             ConfigDefinition metadataConfig) {
 
-        liveConfig.setDisplayName(staticConfig.getDisplayName());
         liveConfig.putAllProperties(staticConfig.getPropertiesMap());
         liveConfig.putAllSecrets(staticConfig.getSecretsMap());
 

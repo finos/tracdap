@@ -47,7 +47,6 @@ public class TenantConfigState extends TenantState {
         liveConfig.getAndUpdate(cfg -> cfg.toBuilder()
                 .clearProperties()
                 .clearSecrets()
-                .setDisplayName(tenantConfig.getDisplayName())
                 .putAllProperties(tenantConfig.getPropertiesMap())
                 .putAllSecrets(tenantConfig.getSecretsMap())
                 .build());
