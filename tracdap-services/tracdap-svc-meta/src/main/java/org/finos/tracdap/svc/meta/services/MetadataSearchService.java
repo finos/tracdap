@@ -19,17 +19,17 @@ package org.finos.tracdap.svc.meta.services;
 
 import org.finos.tracdap.metadata.Tag;
 import org.finos.tracdap.metadata.SearchParameters;
-import org.finos.tracdap.common.metadata.dal.IMetadataDal;
+import org.finos.tracdap.common.metadata.store.IMetadataStore;
 
 import java.util.List;
 
 
 public class MetadataSearchService {
 
-    private final IMetadataDal dal;
+    private final IMetadataStore metadataStore;
 
-    public MetadataSearchService(IMetadataDal dal) {
-        this.dal = dal;
+    public MetadataSearchService(IMetadataStore metadataStore) {
+        this.metadataStore = metadataStore;
     }
 
     public List<Tag>
@@ -37,6 +37,6 @@ public class MetadataSearchService {
 
         // Validation currently in the API layer
 
-        return dal.search(tenant, searchParameters);
+        return metadataStore.search(tenant, searchParameters);
     }
 }

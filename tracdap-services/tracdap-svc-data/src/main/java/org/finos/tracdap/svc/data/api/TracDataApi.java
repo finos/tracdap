@@ -18,6 +18,7 @@
 package org.finos.tracdap.svc.data.api;
 
 import org.finos.tracdap.api.*;
+import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.common.data.DataContext;
 import org.finos.tracdap.common.data.IDataContext;
 import org.finos.tracdap.common.data.pipeline.GrpcDownloadSink;
@@ -26,14 +27,12 @@ import org.finos.tracdap.common.grpc.RequestMetadata;
 import org.finos.tracdap.common.middleware.GrpcConcern;
 import org.finos.tracdap.common.netty.EventLoopResolver;
 import org.finos.tracdap.common.util.LoggingHelpers;
-import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.svc.data.service.DataService;
 import org.finos.tracdap.svc.data.service.FileService;
 
 import io.grpc.Context;
 import io.grpc.stub.StreamObserver;
 import org.apache.arrow.memory.BufferAllocator;
-import org.finos.tracdap.svc.data.service.TenantServices;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -45,7 +44,8 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
-    private final TenantServices.Map services;
+    private final DataService dataService;
+    private final FileService fileService;
 
     private final EventLoopResolver eventLoopResolver;
     private final BufferAllocator rootAllocator;
@@ -56,12 +56,13 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
 
 
     public TracDataApi(
-            TenantServices.Map services,
+            DataService dataService, FileService fileService,
             EventLoopResolver eventLoopResolver,
             BufferAllocator allocator,
             GrpcConcern commonConcerns) {
 
-        this.services = services;
+        this.dataService = dataService;
+        this.fileService = fileService;
 
         this.eventLoopResolver = eventLoopResolver;
         this.rootAllocator = allocator;
@@ -90,7 +91,7 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
         var dataStream = upload.dataStream(DataWriteRequest::getContent, dataContext.arrowAllocator());
 
         firstMessage
-                .thenCompose(req -> tenantDataService(req).createDataset(req, dataStream, dataContext, requestMetadata, clientConfig))
+                .thenCompose(req -> dataService.createDataset(req, dataStream, dataContext, requestMetadata, clientConfig))
                 .thenAccept(upload::succeeded)
                 .exceptionally(upload::failed);
 
@@ -120,7 +121,7 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
         var dataStream = upload.dataStream(DataWriteRequest::getContent, dataContext.arrowAllocator());
 
         firstMessage
-                .thenCompose(req -> tenantDataService(req).updateDataset(req, dataStream, dataContext, requestMetadata, clientConfig))
+                .thenCompose(req -> dataService.updateDataset(req, dataStream, dataContext, requestMetadata, clientConfig))
                 .thenAccept(upload::succeeded)
                 .exceptionally(upload::failed);
 
@@ -163,7 +164,7 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
         var dataStream = download.dataStream(DataReadResponse.Builder::setContent);
 
         download.start(request)
-                .thenAccept(req -> tenantDataService(req).readDataset(req, firstMessage, dataStream, dataContext, requestMetadata, clientConfig))
+                .thenAccept(req -> dataService.readDataset(req, firstMessage, dataStream, dataContext, requestMetadata, clientConfig))
                 .exceptionally(download::failed);
     }
 
@@ -181,7 +182,7 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
         var dataStream = upload.dataStream(FileWriteRequest::getContent, dataContext.arrowAllocator());
 
         firstMessage
-                .thenCompose(request -> tenantFileService(request).createFile(
+                .thenCompose(request -> fileService.createFile(
                         request, requestMetadata,
                         dataStream, dataContext, clientConfig))
                 .thenAccept(upload::succeeded)
@@ -213,7 +214,7 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
         var dataStream = upload.dataStream(FileWriteRequest::getContent, dataContext.arrowAllocator());
 
         firstMessage
-                .thenCompose(request -> tenantFileService(request).updateFile(
+                .thenCompose(request -> fileService.updateFile(
                         request,  requestMetadata,
                         dataStream, dataContext, clientConfig))
                 .thenAccept(upload::succeeded)
@@ -257,7 +258,7 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
         var dataStream = download.dataStream(FileReadResponse.Builder::setContent);
 
         download.start(request)
-                .thenAccept(req -> tenantFileService(req).readFile(
+                .thenAccept(req -> fileService.readFile(
                         request, requestMetadata,
                         firstMessage, dataStream,
                         dataContext, clientConfig))
@@ -316,7 +317,7 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
                 .build();
 
         download.start(readRequest)
-                .thenAccept(request -> tenantFileService(request).readFile(
+                .thenAccept(request -> fileService.readFile(
                         request, requestMetadata,
                         firstMessage, dataStream,
                         dataContext, clientConfig))
@@ -369,25 +370,5 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
                         LoggingHelpers.formatFileSize(peak),
                         LoggingHelpers.formatFileSize(retained));
         }
-    }
-
-    private DataService tenantDataService(DataWriteRequest request) {
-
-        return services.lookupTenant(request.getTenant()).getDataService();
-    }
-
-    private DataService tenantDataService(DataReadRequest request) {
-
-        return services.lookupTenant(request.getTenant()).getDataService();
-    }
-
-    private FileService tenantFileService(FileWriteRequest request) {
-
-        return services.lookupTenant(request.getTenant()).getFileService();
-    }
-
-    private FileService tenantFileService(FileReadRequest request) {
-
-        return services.lookupTenant(request.getTenant()).getFileService();
     }
 }

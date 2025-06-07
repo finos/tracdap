@@ -17,23 +17,17 @@
 
 package org.finos.tracdap.svc.orch;
 
-import io.grpc.Context;
-import org.finos.tracdap.api.ConfigListRequest;
-import org.finos.tracdap.api.MetadataBatchRequest;
 import org.finos.tracdap.api.OrchestratorServiceProto;
 import org.finos.tracdap.api.internal.InternalMessagingProto;
 import org.finos.tracdap.api.internal.InternalMetadataApiGrpc;
 import org.finos.tracdap.common.cache.IJobCacheManager;
 import org.finos.tracdap.common.config.*;
-import org.finos.tracdap.config.TenantConfig;
+import org.finos.tracdap.common.service.TenantConfigManager;
 import org.finos.tracdap.config.TenantConfigMap;
-import org.finos.tracdap.metadata.ConfigEntry;
 import org.finos.tracdap.svc.orch.service.JobExecutor;
 import org.finos.tracdap.common.exec.IBatchExecutor;
 import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.common.grpc.*;
-import org.finos.tracdap.common.metadata.MetadataCodec;
-import org.finos.tracdap.common.metadata.MetadataConstants;
 import org.finos.tracdap.common.middleware.GrpcConcern;
 import org.finos.tracdap.common.plugin.PluginManager;
 import org.finos.tracdap.common.plugin.PluginRegistry;
@@ -58,7 +52,6 @@ import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.util.concurrent.DefaultThreadFactory;
-import org.finos.tracdap.svc.orch.service.TenantResources;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -68,7 +61,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 
 
 public class TracOrchestratorService extends TracServiceBase {
@@ -120,9 +112,7 @@ public class TracOrchestratorService extends TracServiceBase {
 
             platformConfig = configManager.loadRootConfigObject(PlatformConfig.class);
             serviceConfig = platformConfig.getServicesOrThrow(ConfigKeys.ORCHESTRATOR_SERVICE_KEY);
-
-            var tenantConfigUrl = ConfigHelpers.readString("tenant config file", platformConfig.getConfigMap(), ConfigKeys.TENANTS_CONFIG_KEY);
-            tenantConfigMap = configManager.loadConfigObject(tenantConfigUrl, TenantConfigMap.class);
+            tenantConfigMap = ConfigHelpers.loadTenantConfigMap(configManager, platformConfig);
 
             // TODO: Config validation
 
@@ -164,11 +154,11 @@ public class TracOrchestratorService extends TracServiceBase {
             registry.addSingleton(GrpcChannelFactory.class, clientChannelFactory);
             registry.addSingleton(InternalMetadataApiGrpc.InternalMetadataApiBlockingStub.class, metaClient);
 
-
-
             // Load dynamic config and resources
-            var resources = buildTenantResourcesMap(tenantConfigMap);
-            registry.addSingleton(TenantResources.Map.class, resources);
+            var tenantState = new TenantConfigManager(tenantConfigMap, configManager, metaClient, commonConcerns);
+            tenantState.init();
+
+            registry.addSingleton(TenantConfigManager.class, tenantState);
 
             // Load plugins
             var batchExecutor = (IBatchExecutor<? extends Serializable>) pluginManager.createService(
@@ -188,7 +178,7 @@ public class TracOrchestratorService extends TracServiceBase {
             var jobExecutor = new JobExecutor<>(registry);
             registry.addSingleton(JobExecutor.class, jobExecutor);
 
-            var jobProcessor = new JobProcessor(resources, commonConcerns, registry);
+            var jobProcessor = new JobProcessor(tenantState, commonConcerns, registry);
             registry.addSingleton(JobProcessor.class, jobProcessor);
 
             var jobManager = new JobManager(platformConfig, registry);
@@ -218,7 +208,7 @@ public class TracOrchestratorService extends TracServiceBase {
 
                     // The main service
                     .addService(new TracOrchestratorApi(registry, commonConcerns))
-                    .addService(new MessageProcessor(registry, commonConcerns, resources));
+                    .addService(new MessageProcessor(tenantState));
 
             // Apply common concerns
             this.server = commonConcerns
@@ -350,94 +340,6 @@ public class TracOrchestratorService extends TracServiceBase {
                     .usePlaintext();
 
             return clientChannelBuilder.build();
-        }
-    }
-
-    private TenantResources.Map buildTenantResourcesMap(TenantConfigMap tenantConfigMap) {
-
-        var services = TenantResources.create();
-
-        for (var tenantConfigEntry : tenantConfigMap.getTenantsMap().entrySet()) {
-
-            var tenantCode = tenantConfigEntry.getKey();
-            var tenantConfig = tenantConfigEntry.getValue();
-            var tenantServices = buildTenantResources(tenantCode, tenantConfig);
-
-            if (!services.addTenant(tenantCode, tenantServices)) {
-                log.warn("Failed to add tenant resources for [{}]", tenantCode);
-            }
-        }
-
-        return services;
-    }
-
-    private TenantResources buildTenantResources(String tenantCode, TenantConfig tenantConfig) {
-
-        log.info("Prepare tenant resources: [{}]", tenantCode);
-
-        var secrets = configManager.getSecrets()
-                .scope(ConfigKeys.TENANT_SCOPE)
-                .scope(tenantCode);
-
-        var dynamicResources = new DynamicConfig.Resources();
-
-        for (var entry : tenantConfig.getResourcesMap().entrySet()) {
-            dynamicResources.addEntry(entry.getKey(), entry.getValue());
-        }
-
-        loadTenantResources(tenantCode, tenantConfig, dynamicResources);
-
-        return new TenantResources(tenantConfig, secrets, dynamicResources);
-    }
-
-    void loadTenantResources(
-            String tenantCode, TenantConfig tenantConfig,
-            DynamicConfig.Resources dynamicResources) {
-
-        var configList = ConfigListRequest.newBuilder()
-                .setTenant(tenantCode)
-                .setConfigClass(ConfigKeys.TRAC_RESOURCES)
-                .build();
-
-        var clientState = commonConcerns.prepareClientCall(Context.ROOT);
-        var client = clientState.configureClient(metaClient);
-
-        var listing = client.listConfigEntries(configList);
-
-        var duplicateEntries = listing.getEntriesList().stream()
-                .map(ConfigEntry::getConfigKey)
-                .filter(tenantConfig::containsResources)
-                .collect(Collectors.toList());
-
-        if (!duplicateEntries.isEmpty()) {
-            log.warn("Dynamic config ignored for statically defined resources: {}", String.join(", ", duplicateEntries));
-        }
-
-        var filteredEntries = listing.getEntriesList().stream()
-                .filter(entry -> !tenantConfig.containsResources( entry.getConfigKey()))
-                .collect(Collectors.toList());
-
-        // For a bootstrap setup, do no fetch resources if none are configured yet
-        if (!filteredEntries.isEmpty()) {
-
-            var selectors = filteredEntries.stream()
-                    .map(entry -> entry.getDetails().getObjectSelector())
-                    .collect(Collectors.toList());
-
-            var batchRequest = MetadataBatchRequest.newBuilder()
-                    .setTenant(tenantCode)
-                    .addAllSelector(selectors)
-                    .build();
-
-            var resourceObjects = client.readBatch(batchRequest);
-
-            for (var resource : resourceObjects.getTagList()) {
-
-                var resourceKey = resource.getAttrsOrThrow(MetadataConstants.TRAC_CONFIG_KEY);
-                var resourceDef = resource.getDefinition().getResource();
-
-                dynamicResources.addEntry(MetadataCodec.decodeStringValue(resourceKey), resourceDef);
-            }
         }
     }
 }

@@ -20,6 +20,7 @@ package org.finos.tracdap.svc.meta;
 import org.finos.tracdap.api.MetadataServiceProto;
 import org.finos.tracdap.api.internal.InternalMessagingProto;
 import org.finos.tracdap.api.internal.InternalMetadataProto;
+import org.finos.tracdap.common.config.ConfigHelpers;
 import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.exception.EStartup;
@@ -31,7 +32,8 @@ import org.finos.tracdap.common.service.TracServiceBase;
 import org.finos.tracdap.common.util.InterfaceLogging;
 import org.finos.tracdap.common.validation.ValidationConcern;
 import org.finos.tracdap.config.PlatformConfig;
-import org.finos.tracdap.common.metadata.dal.IMetadataDal;
+import org.finos.tracdap.common.metadata.store.IMetadataStore;
+import org.finos.tracdap.config.TenantConfigMap;
 import org.finos.tracdap.svc.meta.api.MessageProcessor;
 import org.finos.tracdap.svc.meta.services.ConfigService;
 import org.finos.tracdap.svc.meta.services.MetadataReadService;
@@ -50,6 +52,7 @@ import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.HashMap;
 import java.util.Properties;
 import java.util.concurrent.*;
 
@@ -80,8 +83,8 @@ public class TracMetadataService extends TracServiceBase {
     private final PluginManager pluginManager;
     private final ConfigManager configManager;
 
+    private IMetadataStore metadataStore;
     private ExecutorService executor;
-    private IMetadataDal dal;
     private Server server;
 
     public static void main(String[] args) {
@@ -102,28 +105,30 @@ public class TracMetadataService extends TracServiceBase {
 
         try {
 
-            // Use the -db library to set up a datasource
-            // Handles different SQL dialects and authentication mechanisms etc.
+            // Load top level config files
             var platformConfig = configManager.loadRootConfigObject(PlatformConfig.class);
+            var tenantConfigMap = ConfigHelpers.loadTenantConfigMap(configManager, platformConfig);
 
             // Load the DAL service using the plugin loader mechanism
-            var metaDbConfig = platformConfig.getMetadataStore();
-            dal = pluginManager.createService(IMetadataDal.class, metaDbConfig, configManager);
-            dal.start();
+            var metadataStoreConfig = platformConfig.getMetadataStore();
+            metadataStore = pluginManager.createService(IMetadataStore.class, metadataStoreConfig, configManager);
+            metadataStore.start();
+
+            // Check and log the configured tenants
+            checkDatabaseTenants(tenantConfigMap);
 
             // Metadata DB props contains config need for the executor pool size
             var dalProps = new Properties();
-            dalProps.putAll(metaDbConfig.getPropertiesMap());
-
+            dalProps.putAll(metadataStoreConfig.getPropertiesMap());
             executor = createPrimaryExecutor(dalProps);
 
             // Set up services and APIs
-            var dalWithLogging = InterfaceLogging.wrap(dal, IMetadataDal.class);
+            var metaStoreWithLogging = InterfaceLogging.wrap(metadataStore, IMetadataStore.class);
 
-            var readService = new MetadataReadService(dalWithLogging, platformConfig);
-            var writeService = new MetadataWriteService(dalWithLogging);
-            var searchService = new MetadataSearchService(dalWithLogging);
-            var configService = new ConfigService(dalWithLogging);
+            var readService = new MetadataReadService(metaStoreWithLogging, platformConfig, tenantConfigMap);
+            var writeService = new MetadataWriteService(metaStoreWithLogging);
+            var searchService = new MetadataSearchService(metaStoreWithLogging);
+            var configService = new ConfigService(metaStoreWithLogging);
 
             var publicApi = new TracMetadataApi(readService, writeService, searchService, configService);
             var internalApi = new InternalMetadataApi(readService, writeService, searchService, configService);
@@ -178,7 +183,7 @@ public class TracMetadataService extends TracServiceBase {
         });
 
         // Request / await is not available on the DAL!
-        dal.stop();
+        metadataStore.stop();
 
         var executorDown = shutdownResource("Executor thread pool)", deadline, remaining -> {
 
@@ -280,6 +285,40 @@ public class TracMetadataService extends TracServiceBase {
             var message = "Config property must be an integer: " + propKey + ", got value '" + propValue + "'";
             log.error(message);
             throw new EStartup(message);
+        }
+    }
+
+    private void checkDatabaseTenants(TenantConfigMap tenantConfig) {
+
+        log.info("Checking for active tenants...");
+
+        var metadataTenants = metadataStore.listTenants();
+        var configFileTenants = new HashMap<>(tenantConfig.getTenantsMap());
+
+        for (var tenantInfo : metadataTenants) {
+
+            var configFileEntry = configFileTenants.remove(tenantInfo.getTenantCode());
+
+            if (configFileEntry != null && configFileEntry.containsProperties(ConfigKeys.TENANT_DISPLAY_NAME)) {
+                var configDisplayName = configFileEntry.getPropertiesOrThrow(ConfigKeys.TENANT_DISPLAY_NAME);
+                log.info("{}: {}", tenantInfo.getTenantCode(), configDisplayName);
+            }
+            else if (!tenantInfo.getDescription().isBlank()) {
+                log.info("{}: {}", tenantInfo.getTenantCode(), tenantInfo.getDescription());
+            }
+            else {
+                log.info("{}: (display name not set)", tenantInfo.getTenantCode());
+            }
+        }
+
+        if (metadataTenants.isEmpty())
+            log.warn("No active tenants found");
+        else
+            log.info("Found {} active tenant(s)", metadataTenants.size());
+
+        if (!configFileTenants.isEmpty()) {
+            var inactiveTenants = String.join(",", configFileTenants.keySet());
+            log.warn("Some tenants are configured but not activated: [{}]", inactiveTenants);
         }
     }
 }

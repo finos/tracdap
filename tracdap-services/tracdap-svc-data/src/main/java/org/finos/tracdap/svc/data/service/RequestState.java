@@ -26,6 +26,7 @@ import java.util.List;
 
 class RequestState {
 
+    String tenant;
     RequestMetadata requestMetadata;
     GrpcClientConfig clientConfig;
 

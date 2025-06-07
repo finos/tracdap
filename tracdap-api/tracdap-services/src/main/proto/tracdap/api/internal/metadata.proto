@@ -44,6 +44,24 @@ import "tracdap/api/config.proto";
 service InternalMetadataApi {
 
   /**
+   * Get some general information about the TRAC platform.
+   *
+   * This call behaves identically to the equivalent public API call.
+   *
+   * @see TracMetadataApi.platformInfo()
+   */
+  rpc platformInfo(PlatformInfoRequest) returns (PlatformInfoResponse);
+
+  /**
+   * Get a list of tenants that the current user has access to.
+   *
+   * This call behaves identically to the equivalent public API call.
+   *
+   * @see TracMetadataApi.listTenants()
+   */
+  rpc listTenants(ListTenantsRequest) returns (ListTenantsResponse);
+
+  /**
    * Create a new object in the TRAC metadata store.
    *
    * This call behaves identically to the equivalent public API call, without the

@@ -17,7 +17,7 @@
 
 package org.finos.tracdap.common.validation.core;
 
-import org.finos.tracdap.common.config.IDynamicResources;
+import org.finos.tracdap.config.TenantConfig;
 import org.finos.tracdap.common.validation.core.impl.ValidationContextImpl;
 import org.finos.tracdap.common.validation.core.impl.ValidationFailure;
 import org.finos.tracdap.common.validation.core.impl.ValidationKey;
@@ -47,9 +47,9 @@ public interface ValidationContext {
         return ValidationContextImpl.forVersion(current, prior);
     }
 
-    static ValidationContext forConsistency(Message msg, MetadataBundle metadata, IDynamicResources resources) {
+    static ValidationContext forConsistency(Message msg, MetadataBundle metadata, TenantConfig tenantConfig) {
 
-        return ValidationContextImpl.forConsistency(msg, metadata, resources);
+        return ValidationContextImpl.forConsistency(msg, metadata, tenantConfig);
     }
 
     /**
@@ -60,11 +60,11 @@ public interface ValidationContext {
     MetadataBundle getMetadataBundle();
 
     /**
-     * Get the currently available resource configuration
+     * Get the tenant config associated with this validation context
      *
-     * @return The resources available in the current configuration
+     * @return The tenant config for the current configuration
      */
-    IDynamicResources getResources();
+    TenantConfig getTenantConfig();
 
     /**
      * Push a member field of the current object onto the validation stack

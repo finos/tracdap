@@ -30,7 +30,6 @@ import org.finos.tracdap.common.metadata.MetadataUtil;
 import org.finos.tracdap.common.exception.EDataSize;
 import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.storage.IFileStorage;
-import org.finos.tracdap.common.storage.IStorageManager;
 import org.finos.tracdap.common.validation.Validator;
 
 import org.apache.arrow.memory.ArrowBuf;
@@ -64,14 +63,14 @@ public class FileService {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
-    private final IStorageManager storageManager;
+    private final TenantStorageManager storageManager;
     private final InternalMetadataApiFutureStub metaApi;
 
     private final Validator validator = new Validator();
     private final Random random = new Random();
 
     public FileService(
-            IStorageManager storageManager,
+            TenantStorageManager storageManager,
             InternalMetadataApiFutureStub metaApi) {
 
         this.storageManager = storageManager;
@@ -86,6 +85,7 @@ public class FileService {
             GrpcClientConfig clientConfig) {
 
         var initialState = new RequestState();
+        initialState.tenant = request.getTenant();
         initialState.requestMetadata = requestMetadata;
         initialState.clientConfig = clientConfig;
 
@@ -115,6 +115,7 @@ public class FileService {
             GrpcClientConfig clientConfig) {
 
         var initialState = new RequestState();
+        initialState.tenant = request.getTenant();
         initialState.requestMetadata = requestMetadata;
         initialState.clientConfig = clientConfig;
 
@@ -151,6 +152,7 @@ public class FileService {
             GrpcClientConfig clientConfig) {
 
         var initialState = new RequestState();
+        initialState.tenant = request.getTenant();
         initialState.requestMetadata = requestMetadata;
         initialState.clientConfig = clientConfig;
 
@@ -160,7 +162,7 @@ public class FileService {
 
                 .thenApply(state -> { definition.complete(state.file); return state; })
 
-                .thenApply(state -> readFileContent(state.file, state.storage, dataCtx))
+                .thenApply(state -> readFileContent(state, dataCtx))
 
                 .thenAccept(byteStream -> byteStream.subscribe(content))
 
@@ -284,7 +286,9 @@ public class FileService {
 
         // Get the storage implementation for the storage key where this copy is being saved
 
-        var storage = storageManager.getFileStorage(copy.getStorageKey());
+        var storage = storageManager
+                .getTenantStorage(state.tenant)
+                .getFileStorage(copy.getStorageKey());
 
         // Create the parent directory where the item will be stored
 
@@ -336,11 +340,10 @@ public class FileService {
     }
 
     private Flow.Publisher<ArrowBuf> readFileContent(
-            FileDefinition fileDef, StorageDefinition storageDef,
-            IDataContext dataContext) {
+            RequestState state, IDataContext dataContext) {
 
-        var dataItem = fileDef.getDataItem();
-        var storageItem = storageDef.getDataItemsOrThrow(dataItem);
+        var dataItem = state.file.getDataItem();
+        var storageItem = state.storage.getDataItemsOrThrow(dataItem);
 
         var incarnation = storageItem.getIncarnations(0);
         var copy = incarnation.getCopies(0);
@@ -348,7 +351,10 @@ public class FileService {
         var storageKey = copy.getStorageKey();
         var storagePath = copy.getStoragePath();
 
-        var storage = storageManager.getFileStorage(storageKey);
+        var storage = storageManager
+                .getTenantStorage(state.tenant)
+                .getFileStorage(storageKey);
+
         return storage.reader(storagePath, dataContext);
     }
 
@@ -359,8 +365,9 @@ public class FileService {
 
     private RequestState createMetadata(FileWriteRequest request, RequestState state) {
 
+        var tenantStorage = storageManager.getTenantStorage(state.tenant);
+        var storageKey = tenantStorage.defaultLocation();
         var timestamp = state.requestMetadata.requestTimestamp().toInstant();
-        var storageKey = storageManager.defaultLocation();
 
         state.fileId = MetadataUtil.nextObjectVersion(state.preAllocFileId, timestamp);
         state.storageId = MetadataUtil.nextObjectVersion(state.preAllocStorageId, timestamp);
@@ -380,8 +387,9 @@ public class FileService {
 
     private RequestState updateMetadata(FileWriteRequest request, RequestState state, RequestState prior) {
 
+        var tenantStorage = storageManager.getTenantStorage(state.tenant);
+        var storageKey = tenantStorage.defaultLocation();
         var timestamp = state.requestMetadata.requestTimestamp().toInstant();
-        var storageKey = storageManager.defaultLocation();
 
         state.fileId = MetadataUtil.nextObjectVersion(prior.fileId, timestamp);
         state.storageId = MetadataUtil.nextObjectVersion(prior.storageId, timestamp);

@@ -51,6 +51,10 @@ public class ConfigKeys {
     public static final String TRAC_CONFIG = "trac_config";
     public static final String TRAC_RESOURCES = "trac_resources";
 
+    // Tenant-level config entry
+    public static final String TRAC_TENANT_CONFIG = "trac_tenant_config";
+    public static final String TENANT_DISPLAY_NAME = "tenant.displayName";
+
     // Secret scopes
     public static final String CONFIG_SCOPE = "config";
     public static final String TENANT_SCOPE = "tenants";

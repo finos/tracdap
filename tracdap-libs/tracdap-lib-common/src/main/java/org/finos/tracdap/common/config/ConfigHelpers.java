@@ -18,7 +18,9 @@
 package org.finos.tracdap.common.config;
 
 import org.finos.tracdap.common.exception.EStartup;
+import org.finos.tracdap.config.PlatformConfig;
 import org.finos.tracdap.config.PluginConfig;
+import org.finos.tracdap.config.TenantConfigMap;
 import org.finos.tracdap.metadata.ResourceDefinition;
 
 import java.util.Map;
@@ -29,6 +31,21 @@ public class ConfigHelpers {
 
     private static final String BOOLEAN_TRUE = Boolean.TRUE.toString();
     private static final String BOOLEAN_FALSE = Boolean.FALSE.toString();
+
+    public static TenantConfigMap loadTenantConfigMap(ConfigManager configManager) {
+
+        var platformConfig = configManager.loadRootConfigObject(PlatformConfig.class);
+        return loadTenantConfigMap(configManager, platformConfig);
+    }
+
+    public static TenantConfigMap loadTenantConfigMap(ConfigManager configManager, PlatformConfig platformConfig) {
+
+        if (!platformConfig.containsConfig(ConfigKeys.TENANTS_CONFIG_KEY))
+            return TenantConfigMap.getDefaultInstance();
+
+        var tenantConfigFile = platformConfig.getConfigOrThrow(ConfigKeys.TENANTS_CONFIG_KEY);
+        return configManager.loadConfigObject(tenantConfigFile, TenantConfigMap.class);
+    }
 
     public static PluginConfig resourceToPluginConfig(ResourceDefinition resource) {
 

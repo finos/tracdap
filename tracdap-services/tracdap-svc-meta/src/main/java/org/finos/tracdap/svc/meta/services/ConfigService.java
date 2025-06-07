@@ -18,14 +18,16 @@
 package org.finos.tracdap.svc.meta.services;
 
 import org.finos.tracdap.api.*;
+import org.finos.tracdap.common.config.ConfigHelpers;
+import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.grpc.RequestMetadata;
 import org.finos.tracdap.common.grpc.UserMetadata;
 import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.metadata.MetadataConstants;
 import org.finos.tracdap.common.metadata.MetadataUtil;
-import org.finos.tracdap.common.metadata.dal.IMetadataDal;
-import org.finos.tracdap.common.metadata.dal.MetadataBatchUpdate;
+import org.finos.tracdap.common.metadata.store.IMetadataStore;
+import org.finos.tracdap.common.metadata.store.MetadataBatchUpdate;
 import org.finos.tracdap.common.metadata.tag.ObjectUpdateLogic;
 import org.finos.tracdap.common.validation.Validator;
 import org.finos.tracdap.metadata.*;
@@ -45,11 +47,11 @@ public class ConfigService {
     private final Logger log = LoggerFactory.getLogger(getClass());
 
     private final Validator validator;
-    private final IMetadataDal dal;
+    private final IMetadataStore metadataStore;
 
-    public ConfigService(IMetadataDal dal) {
+    public ConfigService(IMetadataStore metadataStore) {
         this.validator = new Validator();
-        this.dal = dal;
+        this.metadataStore = metadataStore;
     }
 
     public ConfigWriteResponse createConfigObject(ConfigWriteRequest request) {
@@ -67,7 +69,7 @@ public class ConfigService {
         // Look for deleted entries, the API allows creating if an existing entry is deleted
         // All requests in a batch have the same config class (this is enforced in validation)
         var configClass = requests.get(0).getConfigClass();
-        var deletedEntries = dal.listConfigEntries(tenant, configClass, /* includeDeleted = */ true);
+        var deletedEntries = metadataStore.listConfigEntries(tenant, configClass, /* includeDeleted = */ true);
 
         // Build new metadata objects
         var objects = newObjects(requests, requestMetadata, userMetadata);
@@ -75,7 +77,10 @@ public class ConfigService {
 
         // Save to the DAL in a single batch
         var batch = new MetadataBatchUpdate(null, null, objects, null, null, entries);
-        dal.saveBatchUpdate(tenant, batch);
+        metadataStore.saveBatchUpdate(tenant, batch);
+
+        // Tenant display name needs special handling if it has changed
+        processTenantDisplayName(requests);
 
         return entries.stream()
                 .map(e -> ConfigWriteResponse.newBuilder().setEntry(e).build())
@@ -97,9 +102,9 @@ public class ConfigService {
         // A prior entry / object should exist for every update request
         // Do not allow prior entries that are deleted, those can be re-created using createConfigObject
         var priorKeys = requests.stream().map(ConfigWriteRequest::getPriorEntry).collect(Collectors.toList());
-        var priorEntries = dal.loadConfigEntries(tenant, priorKeys, /* includeDeleted = */ false);
+        var priorEntries = metadataStore.loadConfigEntries(tenant, priorKeys, /* includeDeleted = */ false);
         var priorSelectors = priorEntries.stream().map(entry -> entry.getDetails().getObjectSelector()).collect(Collectors.toList());
-        var priorObjects = dal.loadObjects(tenant, priorSelectors);
+        var priorObjects = metadataStore.loadObjects(tenant, priorSelectors);
 
         // Version semantics must apply to object definitions
         validateDefinitionUpdates(requests, priorObjects);
@@ -110,7 +115,10 @@ public class ConfigService {
 
         // Save to the DAL in a single batch
         var batch = new MetadataBatchUpdate(null, null, null, objects, null, entries);
-        dal.saveBatchUpdate(tenant, batch);
+        metadataStore.saveBatchUpdate(tenant, batch);
+
+        // Tenant display name needs special handling if it has changed
+        processTenantDisplayName(requests);
 
         return entries.stream()
                 .map(e -> ConfigWriteResponse.newBuilder().setEntry(e).build())
@@ -132,7 +140,7 @@ public class ConfigService {
         // A prior entry / object should exist for every update request
         // Do not allow prior entries that are already deleted
         var priorKeys = requests.stream().map(ConfigWriteRequest::getPriorEntry).collect(Collectors.toList());
-        var priorEntries = dal.loadConfigEntries(tenant, priorKeys, /* includeDeleted = */ false);
+        var priorEntries = metadataStore.loadConfigEntries(tenant, priorKeys, /* includeDeleted = */ false);
         var priorSelectors = priorEntries.stream().map(entry -> entry.getDetails().getObjectSelector()).collect(Collectors.toList());
 
         // Build new metadata objects with the deleted flag set
@@ -141,7 +149,10 @@ public class ConfigService {
 
         // Save to the DAL in a single batch
         var batch = new MetadataBatchUpdate(null, null, null, null, tags, entries);
-        dal.saveBatchUpdate(tenant, batch);
+        metadataStore.saveBatchUpdate(tenant, batch);
+
+        // Tenant display name needs special handling if it has changed
+        processTenantDisplayName(requests);
 
         return entries.stream()
                 .map(e -> ConfigWriteResponse.newBuilder().setEntry(e).build())
@@ -150,9 +161,9 @@ public class ConfigService {
 
     public ConfigReadResponse readConfigObject(ConfigReadRequest request) {
 
-        var entry = dal.loadConfigEntry(request.getTenant(), request.getEntry(), /* includeDeleted = */ false);
+        var entry = metadataStore.loadConfigEntry(request.getTenant(), request.getEntry(), /* includeDeleted = */ false);
         var selector = entry.getDetails().getObjectSelector();
-        var tag = dal.loadObject(request.getTenant(), selector);
+        var tag = metadataStore.loadObject(request.getTenant(), selector);
 
         return ConfigReadResponse.newBuilder()
                 .setEntry(entry)
@@ -163,9 +174,9 @@ public class ConfigService {
 
     public ConfigReadBatchResponse readConfigBatch(ConfigReadBatchRequest request) {
 
-        var entries = dal.loadConfigEntries(request.getTenant(), request.getEntriesList(), /* includeDeleted = */ false);
+        var entries = metadataStore.loadConfigEntries(request.getTenant(), request.getEntriesList(), /* includeDeleted = */ false);
         var selectors = entries.stream().map(entry -> entry.getDetails().getObjectSelector()).collect(Collectors.toList());
-        var tags = dal.loadObjects(request.getTenant(), selectors);
+        var tags = metadataStore.loadObjects(request.getTenant(), selectors);
 
         var results = new ArrayList<ConfigReadResponse>(request.getEntriesCount());
 
@@ -187,7 +198,7 @@ public class ConfigService {
 
     public ConfigListResponse listConfigEntries(ConfigListRequest request) {
 
-        var entries = dal.listConfigEntries(
+        var entries = metadataStore.listConfigEntries(
                 request.getTenant(),
                 request.getConfigClass(),
                 request.getIncludeDeleted());
@@ -416,5 +427,29 @@ public class ConfigService {
 
             validator.validateVersion(currentDefinition, priorDefinition);
         }
+    }
+
+    private void processTenantDisplayName(List<ConfigWriteRequest> configBatch) {
+
+        var tenantLevelConfig = configBatch.stream().filter(request ->
+                request.getConfigClass().equals(ConfigKeys.TRAC_CONFIG) &&
+                request.getConfigKey().equals(ConfigKeys.TRAC_TENANT_CONFIG))
+                .findFirst();
+
+        tenantLevelConfig.ifPresent(this::processTenantDisplayName);
+    }
+
+    private void processTenantDisplayName(ConfigWriteRequest request) {
+
+        var entry = request.getDefinition().getConfig();
+        var displayName = ConfigHelpers.readString(
+                request.getTenant(), entry.getPropertiesMap(),
+                ConfigKeys.TENANT_DISPLAY_NAME, false);
+
+        var tenantInfo = displayName != null
+                ? TenantInfo.newBuilder().setTenantCode(request.getTenant()).setDescription(displayName).build()
+                : TenantInfo.newBuilder().setTenantCode(request.getTenant()).build();
+
+        metadataStore.updateTenant(tenantInfo);
     }
 }

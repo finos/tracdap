@@ -1,0 +1,24 @@
+
+# Test resources for tenant 2 SOME_OTHER_CORP
+# Resource / config keys are isolated per tenant
+
+configClass: trac_config
+resourceClass: trac_resources
+
+config:
+
+  trac_tenant_config:
+    configType: PROPERTIES
+    properties:
+      storage.default.location: UNIT_TEST_STORAGE
+
+resources:
+
+  UNIT_TEST_STORAGE:
+    resourceType: INTERNAL_STORAGE
+    protocol: LOCAL
+    publicProperties:
+      unit_test_property: storage_value_1
+      unit-test.property: storage-value.1
+    secrets:
+      rootPath: ${TRAC_STORAGE_DIR}

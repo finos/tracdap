@@ -23,8 +23,8 @@ import org.finos.tracdap.api.MetadataWriteBatchResponse;
 import org.finos.tracdap.api.MetadataWriteRequest;
 import org.finos.tracdap.common.grpc.RequestMetadata;
 import org.finos.tracdap.common.grpc.UserMetadata;
-import org.finos.tracdap.common.metadata.dal.IMetadataDal;
-import org.finos.tracdap.common.metadata.dal.MetadataBatchUpdate;
+import org.finos.tracdap.common.metadata.store.IMetadataStore;
+import org.finos.tracdap.common.metadata.store.MetadataBatchUpdate;
 import org.finos.tracdap.common.metadata.tag.ObjectUpdateLogic;
 import org.finos.tracdap.common.validation.Validator;
 import org.finos.tracdap.metadata.*;
@@ -38,17 +38,17 @@ import java.util.stream.Collectors;
 public class MetadataWriteService {
 
     private final Validator validator = new Validator();
-    private final IMetadataDal dal;
+    private final IMetadataStore metadataStore;
 
-    public MetadataWriteService(IMetadataDal dal) {
-        this.dal = dal;
+    public MetadataWriteService(IMetadataStore metadataStore) {
+        this.metadataStore = metadataStore;
     }
 
     public TagHeader preallocateId(String tenant, MetadataWriteRequest request) {
 
         var newIds = processPreallocatedIds(List.of(request));
 
-        dal.savePreallocatedIds(tenant, newIds);
+        metadataStore.savePreallocatedIds(tenant, newIds);
 
         return newIds.get(0);
     }
@@ -61,7 +61,7 @@ public class MetadataWriteService {
 
         var preallocatedObjects = processPreallocatedObjects(List.of(request), requestMetadata, userMetadata);
 
-        dal.savePreallocatedObjects(tenant, preallocatedObjects);
+        metadataStore.savePreallocatedObjects(tenant, preallocatedObjects);
 
         return preallocatedObjects.get(0).getHeader();
     }
@@ -74,7 +74,7 @@ public class MetadataWriteService {
 
         var newObjects = processNewObjects(List.of(request), requestMetadata, userMetadata);
 
-        dal.saveNewObjects(tenant, newObjects);
+        metadataStore.saveNewObjects(tenant, newObjects);
 
         return newObjects.get(0).getHeader();
     }
@@ -87,7 +87,7 @@ public class MetadataWriteService {
 
         var newVersions = processNewVersions(tenant, List.of(request), requestMetadata, userMetadata);
 
-        dal.saveNewVersions(tenant, newVersions);
+        metadataStore.saveNewVersions(tenant, newVersions);
 
         return newVersions.get(0).getHeader();
     }
@@ -100,7 +100,7 @@ public class MetadataWriteService {
 
         var newTags = processNewTags(tenant, List.of(request), requestMetadata, userMetadata);
 
-        dal.saveNewTags(tenant, newTags);
+        metadataStore.saveNewTags(tenant, newTags);
 
         return newTags.get(0).getHeader();
     }
@@ -123,7 +123,7 @@ public class MetadataWriteService {
                 preallocatedIds, preallocatedObjects,
                 newObjects, newVersions, newTags);
 
-        dal.saveBatchUpdate(request.getTenant(), batchUpdate);
+        metadataStore.saveBatchUpdate(request.getTenant(), batchUpdate);
 
         var preallocatedObjectIds = preallocatedObjects.stream().map(Tag::getHeader).collect(Collectors.toList());
         var newObjectIds = newObjects.stream().map(Tag::getHeader).collect(Collectors.toList());
@@ -211,7 +211,7 @@ public class MetadataWriteService {
             return List.of();
 
         var priorIds = requests.stream().map(MetadataWriteRequest::getPriorVersion).collect(Collectors.toList());
-        var priorVersions = dal.loadPriorObjects(tenant, priorIds);
+        var priorVersions = metadataStore.loadPriorObjects(tenant, priorIds);
 
         var newVersions = new ArrayList<Tag>(requests.size());
 
@@ -246,7 +246,7 @@ public class MetadataWriteService {
             return List.of();
 
         var priorIds = requests.stream().map(MetadataWriteRequest::getPriorVersion).collect(Collectors.toList());
-        var priorTags = dal.loadPriorTags(tenant, priorIds);
+        var priorTags = metadataStore.loadPriorTags(tenant, priorIds);
 
         var newTags = new ArrayList<Tag>(requests.size());
 
