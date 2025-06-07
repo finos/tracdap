@@ -34,11 +34,9 @@ message TenantConfigMap {
 
 message TenantConfig {
 
-  string displayName = 1;
+  map<string, string> properties = 1;
+  map<string, string> secrets = 2;
 
-  map<string, string> properties = 2;
-  map<string, string> secrets = 3;
-
-  map<string, metadata.ConfigDefinition> config = 4;
-  map<string, metadata.ResourceDefinition> resources = 5;
+  map<string, metadata.ConfigDefinition> config = 3;
+  map<string, metadata.ResourceDefinition> resources = 4;
 }
