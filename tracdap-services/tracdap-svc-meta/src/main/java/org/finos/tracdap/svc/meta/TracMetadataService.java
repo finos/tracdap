@@ -298,9 +298,12 @@ public class TracMetadataService extends TracServiceBase {
         for (var tenantInfo : metadataTenants) {
 
             var configFileEntry = configFileTenants.remove(tenantInfo.getTenantCode());
+            var configDisplayName = ConfigHelpers.readString(
+                    tenantInfo.getTenantCode(), configFileEntry.getPropertiesMap(),
+                    ConfigKeys.TENANT_DISPLAY_NAME, false);
 
-            if (configFileEntry != null && !configFileEntry.getDisplayName().isBlank()) {
-                log.info("{}: {}", tenantInfo.getTenantCode(), configFileEntry.getDisplayName());
+            if (configDisplayName != null && !configDisplayName.isBlank()) {
+                log.info("{}: {}", tenantInfo.getTenantCode(), configDisplayName);
             }
             else if (!tenantInfo.getDescription().isBlank()) {
                 log.info("{}: {}", tenantInfo.getTenantCode(), tenantInfo.getDescription());

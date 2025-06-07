@@ -18,6 +18,8 @@
 package org.finos.tracdap.svc.meta.services;
 
 import org.finos.tracdap.api.*;
+import org.finos.tracdap.common.config.ConfigHelpers;
+import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.grpc.RequestMetadata;
 import org.finos.tracdap.common.grpc.UserMetadata;
@@ -77,6 +79,9 @@ public class ConfigService {
         var batch = new MetadataBatchUpdate(null, null, objects, null, null, entries);
         metadataStore.saveBatchUpdate(tenant, batch);
 
+        // Tenant display name needs special handling if it has changed
+        processTenantDisplayName(requests);
+
         return entries.stream()
                 .map(e -> ConfigWriteResponse.newBuilder().setEntry(e).build())
                 .collect(Collectors.toList());
@@ -112,6 +117,9 @@ public class ConfigService {
         var batch = new MetadataBatchUpdate(null, null, null, objects, null, entries);
         metadataStore.saveBatchUpdate(tenant, batch);
 
+        // Tenant display name needs special handling if it has changed
+        processTenantDisplayName(requests);
+
         return entries.stream()
                 .map(e -> ConfigWriteResponse.newBuilder().setEntry(e).build())
                 .collect(Collectors.toList());
@@ -142,6 +150,9 @@ public class ConfigService {
         // Save to the DAL in a single batch
         var batch = new MetadataBatchUpdate(null, null, null, null, tags, entries);
         metadataStore.saveBatchUpdate(tenant, batch);
+
+        // Tenant display name needs special handling if it has changed
+        processTenantDisplayName(requests);
 
         return entries.stream()
                 .map(e -> ConfigWriteResponse.newBuilder().setEntry(e).build())
@@ -416,5 +427,29 @@ public class ConfigService {
 
             validator.validateVersion(currentDefinition, priorDefinition);
         }
+    }
+
+    private void processTenantDisplayName(List<ConfigWriteRequest> configBatch) {
+
+        var tenantLevelConfig = configBatch.stream().filter(request ->
+                request.getConfigClass().equals(ConfigKeys.TRAC_CONFIG) &&
+                request.getConfigKey().equals(ConfigKeys.TRAC_TENANT_CONFIG))
+                .findFirst();
+
+        tenantLevelConfig.ifPresent(this::processTenantDisplayName);
+    }
+
+    private void processTenantDisplayName(ConfigWriteRequest request) {
+
+        var entry = request.getDefinition().getConfig();
+        var displayName = ConfigHelpers.readString(
+                request.getTenant(), entry.getPropertiesMap(),
+                ConfigKeys.TENANT_DISPLAY_NAME, false);
+
+        var tenantInfo = displayName != null
+                ? TenantInfo.newBuilder().setTenantCode(request.getTenant()).setDescription(displayName).build()
+                : TenantInfo.newBuilder().setTenantCode(request.getTenant()).build();
+
+        metadataStore.updateTenant(tenantInfo);
     }
 }
