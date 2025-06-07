@@ -17,43 +17,24 @@
 
 package org.finos.tracdap.svc.data.api;
 
-import org.finos.tracdap.api.MetadataReadRequest;
 import org.finos.tracdap.api.internal.*;
-import org.finos.tracdap.metadata.ResourceDefinition;
-import org.finos.tracdap.metadata.ResourceType;
-import org.finos.tracdap.common.config.ConfigKeys;
-import org.finos.tracdap.common.exception.EUnexpected;
-import org.finos.tracdap.common.middleware.GrpcConcern;
-import org.finos.tracdap.svc.data.service.TenantServices;
+import org.finos.tracdap.svc.data.service.TenantStorageManager;
 
 import io.grpc.Context;
 import io.grpc.stub.StreamObserver;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.util.concurrent.ExecutorService;
 
 
 public class MessageProcessor extends InternalMessagingApiGrpc.InternalMessagingApiImplBase {
 
-    private final Logger log = LoggerFactory.getLogger(getClass());
+    private final TenantStorageManager tenantState;
 
-    private final TenantServices.Map services;
-
-    private final InternalMetadataApiGrpc.InternalMetadataApiBlockingStub metadataApi;
-    private final GrpcConcern commonConcerns;
     private final ExecutorService offloadExecutor;
 
-    public MessageProcessor(
-            TenantServices.Map services,
-            InternalMetadataApiGrpc.InternalMetadataApiBlockingStub metadataApi,
-            GrpcConcern commonConcerns, ExecutorService offloadExecutor) {
+    public MessageProcessor(TenantStorageManager tenantState, ExecutorService offloadExecutor) {
 
-        this.services = services;
-
-        this.metadataApi = metadataApi;
-        this.commonConcerns = commonConcerns;
+        this.tenantState = tenantState;
         this.offloadExecutor = offloadExecutor;
     }
 
@@ -71,76 +52,9 @@ public class MessageProcessor extends InternalMessagingApiGrpc.InternalMessaging
 
     public void configUpdateOffloaded(ConfigUpdate request, StreamObserver<ReceivedStatus> response) {
 
-        log.info("Received config update: tenant = {}, config class = {}, config key = {}",
-                request.getTenant(),
-                request.getConfigEntry().getConfigClass(),
-                request.getConfigEntry().getConfigKey());
-
-        var tenantServices = services.lookupTenant(request.getTenant());
-
-        // If secrets have changed as part of this update, make sure they are reloaded
-        if (request.getSecretsUpdated()) {
-            tenantServices.getSecrets().reload();
-        }
-
-        var entry = request.getConfigEntry();
-        ReceivedStatus status;
-
-        if (entry.getConfigClass().equals(ConfigKeys.TRAC_RESOURCES) &&
-            entry.getDetails().getResourceType() == ResourceType.INTERNAL_STORAGE) {
-
-            ResourceDefinition storageResource;
-
-            switch (request.getUpdateType()) {
-
-            case CREATE:
-                storageResource = fetchResource(request);
-                tenantServices.getStorageManager().addStorage(entry.getConfigKey(), storageResource);
-                break;
-
-            case UPDATE:
-                storageResource = fetchResource(request);
-                tenantServices.getStorageManager().updateStorage(entry.getConfigKey(), storageResource);
-                break;
-
-            case DELETE:
-                tenantServices.getStorageManager().removeStorage(entry.getConfigKey());
-                break;
-
-            default:
-                throw new EUnexpected();
-            }
-
-            status = ReceivedStatus.newBuilder()
-                    .setCode(ReceivedCode.OK)
-                    .build();
-        }
-        else {
-
-            status = ReceivedStatus.newBuilder()
-                    .setCode(ReceivedCode.IGNORED)
-                    .build();
-        }
+        var status = tenantState.applyConfigUpdate(request);
 
         response.onNext(status);
         response.onCompleted();
-
-        log.info("Config update complete");
-    }
-
-    private ResourceDefinition fetchResource(ConfigUpdate request) {
-
-        var readRequest = MetadataReadRequest.newBuilder()
-                .setTenant(request.getTenant())
-                .setSelector(request.getConfigEntry().getDetails().getObjectSelector())
-                .build();
-
-        // Apply common concerns using the current gRPC context
-        var clientState = commonConcerns.prepareClientCall(Context.current());
-        var client = clientState.configureClient(metadataApi);
-
-        var configObject = client.readObject(readRequest);
-
-        return configObject.getDefinition().getResource();
     }
 }
