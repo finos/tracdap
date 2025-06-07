@@ -19,6 +19,7 @@ package org.finos.tracdap.common.service;
 
 import org.finos.tracdap.api.internal.InternalMetadataApiGrpc;
 import org.finos.tracdap.common.config.ConfigManager;
+import org.finos.tracdap.common.middleware.GrpcConcern;
 import org.finos.tracdap.config.TenantConfig;
 import org.finos.tracdap.config.TenantConfigMap;
 
@@ -27,9 +28,10 @@ public class TenantConfigManager extends TenantStateManager<TenantConfigState> {
 
     public TenantConfigManager(
             TenantConfigMap staticConfig, ConfigManager configManager,
-            InternalMetadataApiGrpc.InternalMetadataApiBlockingStub metaClient) {
+            InternalMetadataApiGrpc.InternalMetadataApiBlockingStub metaClient,
+            GrpcConcern clientConcern) {
 
-        super(staticConfig, configManager, metaClient);
+        super(staticConfig, configManager, metaClient, clientConcern);
     }
 
     public TenantConfig getTenantConfig(String tenantCode) {

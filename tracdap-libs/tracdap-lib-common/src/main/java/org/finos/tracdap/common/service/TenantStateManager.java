@@ -17,12 +17,14 @@
 
 package org.finos.tracdap.common.service;
 
+import io.grpc.Context;
 import org.finos.tracdap.api.*;
 import org.finos.tracdap.api.internal.*;
 import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.exception.ETenantNotFound;
 import org.finos.tracdap.common.exception.EUnexpected;
+import org.finos.tracdap.common.middleware.GrpcConcern;
 import org.finos.tracdap.config.TenantConfig;
 import org.finos.tracdap.config.TenantConfigMap;
 import org.finos.tracdap.metadata.ConfigDefinition;
@@ -44,18 +46,21 @@ public abstract class TenantStateManager<TState extends TenantState> {
 
     private final ConfigManager configManager;
     private final InternalMetadataApiGrpc.InternalMetadataApiBlockingStub metaClient;
+    private final GrpcConcern commonConcerns;
 
     protected abstract TState initTenant(String tenantCode, TenantConfig initialConfig);
 
     public TenantStateManager(
             TenantConfigMap staticConfigMap, ConfigManager configManager,
-            InternalMetadataApiGrpc.InternalMetadataApiBlockingStub metaClient) {
+            InternalMetadataApiGrpc.InternalMetadataApiBlockingStub metaClient,
+            GrpcConcern commonConcerns) {
 
         this.staticConfigMap = staticConfigMap;
         this.liveTenantMap = new ConcurrentHashMap<>();
 
         this.configManager = configManager;
         this.metaClient = metaClient;
+        this.commonConcerns = commonConcerns;
     }
 
     public TState getTenant(String tenantCode) {
@@ -238,12 +243,15 @@ public abstract class TenantStateManager<TState extends TenantState> {
 
     private List<ConfigReadResponse> fetchMetadataConfig(String tenantCode, String configClass) {
 
+        var clientState = commonConcerns.prepareClientCall(Context.ROOT);
+        var client = clientState.configureClient(metaClient);
+
         var listRequest = ConfigListRequest.newBuilder()
                 .setTenant(tenantCode)
                 .setConfigClass(configClass)
                 .build();
 
-        var listResponse = metaClient.listConfigEntries(listRequest);
+        var listResponse = client.listConfigEntries(listRequest);
 
         // Do not make a read request if there are no config entries
         if (listResponse.getEntriesCount() == 0)
@@ -253,12 +261,15 @@ public abstract class TenantStateManager<TState extends TenantState> {
                 .setTenant(tenantCode)
                 .addAllEntries(listResponse.getEntriesList());
 
-        var readResponse = metaClient.readConfigBatch(readRequest.build());
+        var readResponse = client.readConfigBatch(readRequest.build());
 
         return readResponse.getEntriesList();
     }
 
     private ConfigReadResponse fetchMetadataConfig(String tenantCode, String configClass, String configKey) {
+
+        var clientState = commonConcerns.prepareClientCall(Context.ROOT);
+        var client = clientState.configureClient(metaClient);
 
         var readRequest = ConfigReadRequest.newBuilder()
                 .setTenant(tenantCode)
@@ -268,7 +279,7 @@ public abstract class TenantStateManager<TState extends TenantState> {
                         .setIsLatestConfig(true))
                 .build();
 
-        return metaClient.readConfigEntry(readRequest);
+        return client.readConfigEntry(readRequest);
     }
 
     private ConfigReadResponse fetchMetadataConfig(ConfigUpdate update) {

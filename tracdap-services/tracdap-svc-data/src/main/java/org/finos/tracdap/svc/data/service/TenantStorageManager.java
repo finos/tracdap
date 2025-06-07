@@ -21,6 +21,7 @@ import io.netty.channel.EventLoopGroup;
 import org.finos.tracdap.api.internal.InternalMetadataApiGrpc;
 import org.finos.tracdap.common.codec.ICodecManager;
 import org.finos.tracdap.common.config.ConfigManager;
+import org.finos.tracdap.common.middleware.GrpcConcern;
 import org.finos.tracdap.common.plugin.PluginManager;
 import org.finos.tracdap.common.service.TenantStateManager;
 import org.finos.tracdap.common.storage.StorageManager;
@@ -37,9 +38,9 @@ public class TenantStorageManager extends TenantStateManager<TenantStorageState>
     public TenantStorageManager(
             PluginManager pluginManager, ConfigManager configManager, ICodecManager codecManager,
             EventLoopGroup eventLoopGroup, InternalMetadataApiGrpc.InternalMetadataApiBlockingStub metaClient,
-            TenantConfigMap staticConfigMap)  {
+            GrpcConcern commonConcerns, TenantConfigMap staticConfigMap)  {
 
-        super(staticConfigMap, configManager, metaClient);
+        super(staticConfigMap, configManager, metaClient, commonConcerns);
 
         this.pluginManager = pluginManager;
         this.configManager = configManager;
