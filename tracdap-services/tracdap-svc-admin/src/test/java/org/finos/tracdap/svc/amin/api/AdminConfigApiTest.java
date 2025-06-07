@@ -41,8 +41,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 abstract class AdminConfigApiTest {
 
-    public static final String TRAC_CONFIG_SECRETS = "config/trac-secrets.yaml";
-    public static final String TRAC_TENANTS_SECRETS = "config/trac-secrets-tenants.yaml";
+    public static final String TRAC_DYNAMIC_CONFIG = "config/trac-dynamic.yaml";
+    public static final String TRAC_DYNAMIC_RESOURCES = "config/trac-dynamic-resources.yaml";
     public static final String TRAC_CONFIG_ENV_VAR = "TRAC_CONFIG_FILE";
 
     protected TracAdminApiGrpc.TracAdminApiBlockingStub adminApi;
@@ -51,9 +51,9 @@ abstract class AdminConfigApiTest {
     static class UnitTest extends AdminConfigApiTest {
 
         @RegisterExtension
-        public static final PlatformTest platform = PlatformTest.forConfig(TRAC_CONFIG_SECRETS, List.of(TRAC_TENANTS_SECRETS))
+        public static final PlatformTest platform = PlatformTest.forConfig(TRAC_DYNAMIC_CONFIG)
                 .runDbDeploy(true)
-                .addTenant(TEST_TENANT)
+                .bootstrapTenant(TEST_TENANT, TRAC_DYNAMIC_RESOURCES)
                 .startService(TracAdminService.class)
                 .startService(TracMetadataService.class)
                 .build();

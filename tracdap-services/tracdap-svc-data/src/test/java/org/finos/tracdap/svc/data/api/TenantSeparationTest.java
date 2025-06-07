@@ -38,7 +38,6 @@ import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 import java.time.Duration;
-import java.util.List;
 
 import static org.finos.tracdap.test.data.DataApiTestHelpers.readRequest;
 import static org.finos.tracdap.test.concurrent.ConcurrentTestHelpers.resultOf;
@@ -49,10 +48,9 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class TenantSeparationTest {
 
-    public static final String TRAC_CONFIG_UNIT = "config/trac-secrets.yaml";
-    public static final String TRAC_TENANTS_UNIT = "config/trac-secrets-tenants.yaml";
-    public static final String TRAC_RESOURCES = "config/trac-secrets-resources.yaml";
-    public static final String TRAC_RESOURCES2 = "config/trac-secrets-resources.yaml";
+    public static final String TRAC_DYNAMIC_CONFIG = "config/trac-dynamic.yaml";
+    public static final String TRAC_DYNAMIC_RESOURCES = "config/trac-dynamic-resources.yaml";
+    public static final String TRAC_DYNAMIC_RESOURCES2 = "config/trac-dynamic-resources2.yaml";
     public static final String TEST_TENANT = "ACME_CORP";
     public static final String TEST_TENANT_2 = "SOME_OTHER_CORP";
     public static final Duration TEST_TIMEOUT = Duration.ofSeconds(20);
@@ -63,10 +61,10 @@ class TenantSeparationTest {
     protected TracDataApiGrpc.TracDataApiStub dataClient;
 
     @RegisterExtension
-    public static final PlatformTest platform = PlatformTest.forConfig(TRAC_CONFIG_UNIT, List.of(TRAC_TENANTS_UNIT))
+    public static final PlatformTest platform = PlatformTest.forConfig(TRAC_DYNAMIC_CONFIG)
             .runDbDeploy(true)
-            .bootstrapTenant(TEST_TENANT, TRAC_RESOURCES)
-            .bootstrapTenant(TEST_TENANT_2, TRAC_RESOURCES2)
+            .bootstrapTenant(TEST_TENANT, TRAC_DYNAMIC_RESOURCES)
+            .bootstrapTenant(TEST_TENANT_2, TRAC_DYNAMIC_RESOURCES2)
             .startService(TracMetadataService.class)
             .startService(TracDataService.class)
             .startService(TracAdminService.class)

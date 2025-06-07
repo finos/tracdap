@@ -1,5 +1,15 @@
 
+configClass: trac_config
 resourceClass: trac_resources
+
+config:
+
+  trac_tenant_config:
+    configType: PROPERTIES
+    properties:
+      storage.default.location: UNIT_TEST_STORAGE
+      storage.default.format: ARROW_FILE
+      storage.default.layout: OBJECT_ID_LAYOUT
 
 resources:
 

@@ -14,7 +14,6 @@
 # limitations under the License.
 
 config:
-  tenants: trac-secrets-tenants.yaml
   logging: trac-logging.xml
   secret.type: PKCS12
   secret.url: trac-secret.jks
