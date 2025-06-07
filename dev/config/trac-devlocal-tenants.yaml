@@ -3,9 +3,8 @@ tenants:
 
   ACME_CORP:
 
-    displayName: ACME Industrial Supplies Inc.
-
     properties:
+      tenant.displayName: ACME Industrial Supplies Inc.
       storage.defaults.location: STORAGE1
       storage.defaults.format: ARROW_FILE
       storage.defaults.layout: OBJECT_ID_LAYOUT
