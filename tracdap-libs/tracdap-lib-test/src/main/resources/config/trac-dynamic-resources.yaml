@@ -7,6 +7,7 @@ config:
   trac_tenant_config:
     configType: PROPERTIES
     properties:
+      tenant.displayName: ACME Projectiles Inc.
       storage.default.location: UNIT_TEST_STORAGE
       storage.default.format: ARROW_FILE
       storage.default.layout: OBJECT_ID_LAYOUT

@@ -25,8 +25,6 @@ import org.finos.tracdap.test.helpers.PlatformTest;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
-import java.util.List;
-
 import static org.finos.tracdap.test.meta.SampleMetadata.TEST_TENANT;
 
 
@@ -108,7 +106,7 @@ abstract class InfoAndResourcesTest {
 
         // Default description set up in org.finos.tracdap.test.helpers.PlatformTest
         // Also for integration tests, in the integration.yml workflow for GitHub actions
-        var expectedDescription = "Test tenant [" + TEST_TENANT + "]";
+        var expectedDescription = "ACME Projectiles Inc.";
         Assertions.assertEquals(expectedDescription, tenants.get(0).getDescription());
     }
 }
