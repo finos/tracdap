@@ -17,30 +17,22 @@
 
 package org.finos.tracdap.svc.data;
 
-import org.finos.tracdap.api.ConfigListRequest;
 import org.finos.tracdap.api.DataServiceProto;
-import org.finos.tracdap.api.MetadataBatchRequest;
 import org.finos.tracdap.api.internal.InternalMessagingProto;
 import org.finos.tracdap.api.internal.InternalMetadataApiGrpc;
 import org.finos.tracdap.config.PlatformConfig;
 import org.finos.tracdap.config.ServiceConfig;
-import org.finos.tracdap.config.TenantConfig;
 import org.finos.tracdap.config.TenantConfigMap;
-import org.finos.tracdap.metadata.ConfigDetails;
-import org.finos.tracdap.metadata.ConfigEntry;
-import org.finos.tracdap.metadata.ResourceType;
 import org.finos.tracdap.common.config.ConfigHelpers;
 import org.finos.tracdap.common.middleware.GrpcConcern;
 import org.finos.tracdap.common.netty.*;
 import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.codec.CodecManager;
-import org.finos.tracdap.common.codec.ICodecManager;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.common.plugin.PluginManager;
 import org.finos.tracdap.common.service.TracServiceConfig;
 import org.finos.tracdap.common.service.TracServiceBase;
-import org.finos.tracdap.common.storage.StorageManager;
 import org.finos.tracdap.common.util.RoutingUtils;
 import org.finos.tracdap.common.validation.ValidationConcern;
 import org.finos.tracdap.svc.data.api.MessageProcessor;
@@ -56,7 +48,7 @@ import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import org.apache.arrow.memory.RootAllocator;
 import org.apache.arrow.memory.netty.NettyAllocationManager;
-import org.finos.tracdap.svc.data.service.TenantServices;
+import org.finos.tracdap.svc.data.service.TenantStorageManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -65,7 +57,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 
 
 public class TracDataService extends TracServiceBase {
@@ -81,12 +72,9 @@ public class TracDataService extends TracServiceBase {
     private EventLoopGroup bossGroup;
     private EventLoopGroup serviceGroup;
     private ExecutorService offloadExecutor;
-    private GrpcConcern commonConcerns;
     private ManagedChannel metaClientChanel;
     private ManagedChannel metaBlockingChanel;
-    private InternalMetadataApiGrpc.InternalMetadataApiFutureStub metaClient;
-    private InternalMetadataApiGrpc.InternalMetadataApiBlockingStub metaClientBlocking;
-    private TenantServices.Map services;
+    private TenantStorageManager storageManager;
     private Server server;
 
     public static void main(String[] args) {
@@ -156,13 +144,13 @@ public class TracDataService extends TracServiceBase {
             var eventLoopResolver = new EventLoopResolver(serviceGroup, offloadTracking);
 
             // Common framework for cross-cutting concerns
-            commonConcerns = buildCommonConcerns();
+            var commonConcerns = buildCommonConcerns();
 
             metaClientChanel = prepareMetadataClientChannel(platformConfig, clientChannelType);
-            metaClient = prepareMetadataClient(eventLoopResolver, commonConcerns);
+            var metaClient = prepareMetadataClient(eventLoopResolver, commonConcerns);
 
             metaBlockingChanel = prepareBlockingClientChannel(platformConfig, clientChannelType);
-            metaClientBlocking = prepareMetadataClientBlocking(commonConcerns, metaBlockingChanel);
+            var metaClientBlocking = prepareMetadataClientBlocking(commonConcerns, metaBlockingChanel);
 
             // TODO: Review arrow allocator config, for root and child allocators
 
@@ -186,10 +174,20 @@ public class TracDataService extends TracServiceBase {
             }
 
             var formats = new CodecManager(pluginManager, configManager);
-            services = buildTenantServiceMap(tenantConfigMap, formats);
 
-            var dataApi = new TracDataApi(services, eventLoopResolver, arrowAllocator, commonConcerns);
-            var messageProcessor = new MessageProcessor(services, metaClientBlocking, commonConcerns, offloadExecutor);
+            storageManager = new TenantStorageManager(
+                    pluginManager, configManager, formats, serviceGroup,
+                    metaClientBlocking, commonConcerns,
+                    tenantConfigMap);
+
+            // Load config for all tenants and initialize storage
+            storageManager.init();
+
+            var dataService = new DataService(storageManager, formats, metaClient);
+            var fileService = new FileService(storageManager, metaClient);
+
+            var dataApi = new TracDataApi(dataService, fileService, eventLoopResolver, arrowAllocator, commonConcerns);
+            var messageProcessor = new MessageProcessor(storageManager, offloadExecutor);
 
             var serverBuilder = NettyServerBuilder
                     .forPort(serviceConfig.getPort())
@@ -291,110 +289,6 @@ public class TracDataService extends TracServiceBase {
         return commonConcerns.configureClient(client);
     }
 
-
-    private TenantServices.Map buildTenantServiceMap(TenantConfigMap tenantConfigMap, ICodecManager formats) {
-
-        var services = TenantServices.create();
-
-        for (var tenantConfigEntry : tenantConfigMap.getTenantsMap().entrySet()) {
-
-            var tenantCode = tenantConfigEntry.getKey();
-            var tenantConfig = tenantConfigEntry.getValue();
-            var tenantServices = buildTenantServices(tenantCode, tenantConfig, formats);
-
-            if (!services.addTenant(tenantCode, tenantServices)) {
-                log.warn("Failed to add tenant services for [{}]", tenantCode);
-                doShutdownTenant(tenantCode, tenantServices);
-            }
-        }
-
-        return services;
-    }
-
-    private TenantServices buildTenantServices(String tenantCode, TenantConfig tenantConfig, ICodecManager formats) {
-
-        log.info("Prepare tenant services: [{}]", tenantCode);
-
-        var secrets = configManager.getSecrets()
-                .scope(ConfigKeys.TENANT_SCOPE)
-                .scope(tenantCode);
-
-        var storageManager = buildTenantStorage(tenantCode, tenantConfig, formats);
-
-        var dataService = new DataService(storageManager, formats, metaClient);
-        var fileService = new FileService(storageManager, metaClient);
-
-        return new TenantServices(
-                tenantConfig,
-                dataService, fileService,
-                storageManager, secrets);
-    }
-
-    private StorageManager buildTenantStorage(String tenant, TenantConfig tenantConfig, ICodecManager formats) {
-
-        var storageManager = new StorageManager(pluginManager, configManager, formats, serviceGroup);
-
-        // Set default properties from tenant-level config
-        storageManager.updateStorageDefaults(tenantConfig);
-
-        // Add storage resources defined in the tenants config file
-        for (var resourceEntry : tenantConfig.getResourcesMap().entrySet()) {
-            if (resourceEntry.getValue().getResourceType() == ResourceType.INTERNAL_STORAGE) {
-                storageManager.addStorage(resourceEntry.getKey(), resourceEntry.getValue());
-            }
-        }
-
-        var configList = ConfigListRequest.newBuilder()
-                .setTenant(tenant)
-                .setConfigClass(ConfigKeys.TRAC_RESOURCES)
-                .setResourceType(ResourceType.INTERNAL_STORAGE)
-                .build();
-
-        var clientState = commonConcerns.prepareClientCall(Context.ROOT);
-        var client = clientState.configureClient(metaClientBlocking);
-
-        var listing = client.listConfigEntries(configList);
-
-        var duplicateEntries = listing.getEntriesList().stream()
-                .map(ConfigEntry::getConfigKey)
-                .filter(tenantConfig::containsResources)
-                .collect(Collectors.toList());
-
-        if (!duplicateEntries.isEmpty()) {
-            log.warn("Dynamic config ignored for statically defined resources: {}", String.join(", ", duplicateEntries));
-        }
-
-        var filteredEntries = listing.getEntriesList().stream()
-                .filter(entry -> !tenantConfig.containsResources( entry.getConfigKey()))
-                .collect(Collectors.toList());
-
-        // Do not make an API call if there are no dynamic resources
-        if (!filteredEntries.isEmpty()) {
-
-            var filteredIds = filteredEntries.stream()
-                    .map(ConfigEntry::getDetails)
-                    .map(ConfigDetails::getObjectSelector)
-                    .collect(Collectors.toList());
-
-            var batchRequest = MetadataBatchRequest.newBuilder()
-                    .setTenant(tenant)
-                    .addAllSelector(filteredIds)
-                    .build();
-
-            var resourceObjects = client.readBatch(batchRequest);
-
-            for (int i = 0; i < filteredIds.size(); i++) {
-
-                var resourceKey = filteredEntries.get(i).getConfigKey();
-                var resourceDef = resourceObjects.getTag(i).getDefinition().getResource();
-
-                storageManager.addStorage(resourceKey, resourceDef);
-            }
-        }
-
-        return storageManager;
-    }
-
     @Override
     protected int doShutdown(Duration shutdownTimeout) {
 
@@ -406,9 +300,9 @@ public class TracDataService extends TracServiceBase {
             return server.awaitTermination(remaining.toMillis(), TimeUnit.MILLISECONDS);
         });
 
-        var storageDown = shutdownResource("tenant services", deadline, remaining -> {
+        var storageDown = shutdownResource("Tenant storage services", deadline, remaining -> {
 
-            services.closeAllTenants(this::doShutdownTenant);
+            storageManager.shutdown();
             return true;
         });
 
@@ -449,12 +343,5 @@ public class TracDataService extends TracServiceBase {
             server.shutdownNow();
 
         return -1;
-    }
-
-    private void doShutdownTenant(String tenantCode, TenantServices tenantServices) {
-
-        log.info("Shut down tenant services: [{}]", tenantCode);
-
-        tenantServices.getStorageManager().close();
     }
 }
