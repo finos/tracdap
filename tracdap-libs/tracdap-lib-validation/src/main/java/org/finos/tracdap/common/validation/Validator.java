@@ -17,7 +17,7 @@
 
 package org.finos.tracdap.common.validation;
 
-import org.finos.tracdap.common.config.IDynamicResources;
+import org.finos.tracdap.config.TenantConfig;
 import org.finos.tracdap.common.exception.EConsistencyValidation;
 import org.finos.tracdap.common.exception.EInputValidation;
 import org.finos.tracdap.common.exception.EUnexpected;
@@ -62,9 +62,9 @@ public class Validator {
     }
 
     public <TMsg extends Message>
-    void validateConsistency(TMsg message, MetadataBundle metadata, IDynamicResources resources) {
+    void validateConsistency(TMsg message, MetadataBundle metadata, TenantConfig tenantConfig) {
 
-        var ctx = ValidationContext.forConsistency(message, metadata, resources);
+        var ctx = ValidationContext.forConsistency(message, metadata, tenantConfig);
         doValidation(ctx);
     }
 

@@ -17,7 +17,7 @@
 
 package org.finos.tracdap.common.validation.core.impl;
 
-import org.finos.tracdap.common.config.IDynamicResources;
+import org.finos.tracdap.config.TenantConfig;
 import org.finos.tracdap.common.exception.ETracInternal;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.validation.core.ValidationContext;
@@ -51,12 +51,12 @@ public class ValidationContextImpl implements ValidationContext {
     private final List<ValidationFailure> failures;
 
     private final MetadataBundle metadata;
-    private final IDynamicResources resources;
+    private final TenantConfig tenantConfig;
 
 
     private ValidationContextImpl(
             ValidationType validationType, ValidationLocation root, ValidationContextImpl priorCtx,
-            MetadataBundle metadata, IDynamicResources resources) {
+            MetadataBundle metadata, TenantConfig tenantConfig) {
 
         this.validationType = validationType;
         this.location = new Stack<>();
@@ -64,7 +64,7 @@ public class ValidationContextImpl implements ValidationContext {
 
         this.priorCtx = priorCtx;
         this.metadata = metadata;
-        this.resources = resources;
+        this.tenantConfig = tenantConfig;
 
         this.failures = new ArrayList<>();
     }
@@ -97,10 +97,10 @@ public class ValidationContextImpl implements ValidationContext {
         return new ValidationContextImpl(ValidationType.VERSION, currentRoot, priorCtx);
     }
 
-    public static ValidationContext forConsistency(Message msg, MetadataBundle metadata, IDynamicResources resources) {
+    public static ValidationContext forConsistency(Message msg, MetadataBundle metadata, TenantConfig tenantConfig) {
 
         var root = new ValidationLocation(null, msg, null, null);
-        return new ValidationContextImpl(ValidationType.CONSISTENCY, root, null, metadata, resources);
+        return new ValidationContextImpl(ValidationType.CONSISTENCY, root, null, metadata, tenantConfig);
     }
 
     @Override
@@ -109,8 +109,8 @@ public class ValidationContextImpl implements ValidationContext {
     }
 
     @Override
-    public IDynamicResources getResources() {
-        return this.resources;
+    public TenantConfig getTenantConfig() {
+        return this.tenantConfig;
     }
 
     @Override
@@ -128,7 +128,7 @@ public class ValidationContextImpl implements ValidationContext {
             throw new ETracInternal("Use push, pushRepeated and pushMap for regular, repeated and map fields respectively");
 
         var parentLoc = location.peek();
-        var msg = (Message) parentLoc.msg();
+        var msg = parentLoc.msg();
 
         var obj = map && getMapFunc != null
             ? getMapFunc.apply(msg)
@@ -727,7 +727,7 @@ public class ValidationContextImpl implements ValidationContext {
 
             for (var key : map.keySet()) {
 
-                var arg = argFunc != null ? argFunc.apply(key.toString()) : (U) null;
+                var arg = argFunc != null ? argFunc.apply(key.toString()) : null;
 
                 resultCtx = (ValidationContextImpl) resultCtx
                         .pushMapEntry(key, pushKey, false)
