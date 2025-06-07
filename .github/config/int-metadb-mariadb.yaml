@@ -14,7 +14,7 @@
 # limitations under the License.
 
 config:
-  tenants: trac-metadb-tenants.yaml
+  tenants: int-metadb-tenants.yaml
   secret.type: PKCS12
   secret.url: secrets.pfx
 
