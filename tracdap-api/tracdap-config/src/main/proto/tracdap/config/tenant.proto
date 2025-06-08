@@ -30,6 +30,8 @@ import "tracdap/metadata/resource.proto";
 message TenantConfigMap {
 
   map<string, TenantConfig> tenants = 1;
+
+  bool autoActivate = 2;
 }
 
 message TenantConfig {
