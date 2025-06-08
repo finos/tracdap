@@ -18,6 +18,7 @@
 package org.finos.tracdap.common.metadata.store.jdbc;
 
 import org.finos.tracdap.common.db.JdbcBaseDal;
+import org.finos.tracdap.common.db.JdbcErrorCode;
 import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.common.db.JdbcDialect;
 import org.finos.tracdap.common.db.JdbcSetup;
@@ -102,6 +103,30 @@ public class JdbcMetadataStore extends JdbcBaseDal implements IMetadataStore {
     public List<TenantInfo> listTenants() {
 
         return wrapTransaction(tenants::listTenants);
+    }
+
+    @Override
+    public void activateTenant(TenantInfo tenantInfo) {
+
+        wrapTransaction(conn -> { activateTenant(conn, tenantInfo); });
+    }
+
+    private void activateTenant(Connection conn, TenantInfo tenantInfo) throws SQLException {
+
+        try {
+            tenants.activateTenant(conn, tenantInfo.getTenantCode(), tenantInfo.getDescription());
+        }
+        catch (SQLException e) {
+
+            var errorCode = dialect.mapErrorCode(e);
+
+            if (errorCode == JdbcErrorCode.INSERT_DUPLICATE) {
+                log.warn("Tenant is already active: [{}]", tenantInfo.getTenantCode());
+                return;
+            }
+
+            throw e;
+        }
     }
 
     @Override
