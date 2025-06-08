@@ -75,6 +75,9 @@ class JdbcTenantImpl {
 
         if (tenantId == null) {
             loadTenantMap(conn);
+            synchronized (tenantLock) {
+                currentTenantMap = this.tenantMap;
+            }
             tenantId = currentTenantMap.getOrDefault(tenant, null);
         }
 
@@ -111,6 +114,42 @@ class JdbcTenantImpl {
             }
 
             return tenants;
+        }
+    }
+
+    void activateTenant(Connection conn, String tenantCode, String description) throws SQLException {
+
+        var findNextId = "select max(tenant_id) from tenant";
+        short nextId;
+
+        try (var stmt = conn.prepareStatement(findNextId); var rs = stmt.executeQuery()) {
+
+            if (rs.next()) {
+
+                nextId = rs.getShort(1);
+
+                if (rs.wasNull())
+                    nextId = 1;
+                else
+                    nextId++;
+            }
+            else
+                nextId = 1;
+        }
+
+        var query = "insert into tenant (tenant_id, tenant_code, description) values (?, ?, ?)";
+
+        try (var stmt = conn.prepareStatement(query)) {
+
+            stmt.setShort(1, nextId);
+            stmt.setString(2, tenantCode);
+
+            if (description != null)
+                stmt.setString(3, description);
+            else
+                stmt.setNull(3, java.sql.Types.VARCHAR);
+
+            stmt.executeUpdate();
         }
     }
 

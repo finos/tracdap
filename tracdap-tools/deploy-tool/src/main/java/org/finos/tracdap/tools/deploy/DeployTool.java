@@ -259,11 +259,8 @@ public class DeployTool {
 
             for (var tenantCode : tenantConfigMap.getTenantsMap().keySet()) {
 
-                var tenantConfig = tenantConfigMap.getTenantsMap().get(tenantCode);
-                var displayName = tenantConfig.getPropertiesOrDefault("tenant.displayName", "");
-
                 if (!checkTenantCodeExists(conn, tenantCode))
-                    addTenant(conn, tenantCode, displayName);
+                    addTenant(conn, tenantCode, null);
             }
         }
         catch (SQLException e) {

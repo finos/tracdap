@@ -1,4 +1,6 @@
 
+autoActivate: true
+
 tenants:
 
   ACME_CORP:

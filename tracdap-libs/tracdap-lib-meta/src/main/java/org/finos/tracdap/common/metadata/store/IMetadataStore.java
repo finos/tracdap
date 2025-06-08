@@ -31,6 +31,8 @@ public interface IMetadataStore {
 
     List<TenantInfo> listTenants();
 
+    void activateTenant(TenantInfo tenantInfo);
+
     void updateTenant(TenantInfo tenantInfo);
 
     void saveBatchUpdate(String tenant, MetadataBatchUpdate batchUpdate);

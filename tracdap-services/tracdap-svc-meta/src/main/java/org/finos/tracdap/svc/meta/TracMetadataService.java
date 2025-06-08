@@ -34,6 +34,7 @@ import org.finos.tracdap.common.validation.ValidationConcern;
 import org.finos.tracdap.config.PlatformConfig;
 import org.finos.tracdap.common.metadata.store.IMetadataStore;
 import org.finos.tracdap.config.TenantConfigMap;
+import org.finos.tracdap.metadata.TenantInfo;
 import org.finos.tracdap.svc.meta.api.MessageProcessor;
 import org.finos.tracdap.svc.meta.services.ConfigService;
 import org.finos.tracdap.svc.meta.services.MetadataReadService;
@@ -311,14 +312,34 @@ public class TracMetadataService extends TracServiceBase {
             }
         }
 
-        if (metadataTenants.isEmpty())
-            log.warn("No active tenants found");
-        else
-            log.info("Found {} active tenant(s)", metadataTenants.size());
+        var activeTenants = metadataTenants.size();
 
         if (!configFileTenants.isEmpty()) {
-            var inactiveTenants = String.join(",", configFileTenants.keySet());
-            log.warn("Some tenants are configured but not activated: [{}]", inactiveTenants);
+            if (tenantConfig.getAutoActivate()) {
+                log.info("Found {} new tenant(s), running auto activation...", configFileTenants.size());
+                configFileTenants.keySet().forEach(this::activateTenant);
+                activeTenants += configFileTenants.size();
+            }
+            else {
+                var inactiveTenants = String.join(",", configFileTenants.keySet());
+                log.warn("Some tenants are configured but not activated: [{}]", inactiveTenants);
+            }
         }
+
+        if (activeTenants > 0)
+            log.info("Found {} active tenant(s)", activeTenants);
+        else
+            log.warn("No active tenants found");
+    }
+
+    private void activateTenant(String tenantCode) {
+
+        log.info("Activate tenant: [{}]", tenantCode);
+
+        var tenantInfo = TenantInfo.newBuilder()
+                .setTenantCode(tenantCode)
+                .build();
+
+        metadataStore.activateTenant(tenantInfo);
     }
 }
