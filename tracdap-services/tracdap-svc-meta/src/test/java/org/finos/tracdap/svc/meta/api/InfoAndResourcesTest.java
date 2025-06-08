@@ -41,7 +41,6 @@ abstract class InfoAndResourcesTest {
         @RegisterExtension
         private static final PlatformTest platform = PlatformTest.forConfig(TRAC_CONFIG_UNIT)
                 .runDbDeploy(true)
-                .addTenant(TEST_TENANT)
                 .startService(TracMetadataService.class)
                 .startService(TracAdminService.class)
                 .build();
@@ -65,7 +64,6 @@ abstract class InfoAndResourcesTest {
         @RegisterExtension
         private static final PlatformTest platform = PlatformTest.forConfig(TRAC_CONFIG_ENV_FILE)
                 .runDbDeploy(false)
-                .addTenant(TEST_TENANT)
                 .startService(TracMetadataService.class)
                 .startService(TracAdminService.class)
                 .build();
