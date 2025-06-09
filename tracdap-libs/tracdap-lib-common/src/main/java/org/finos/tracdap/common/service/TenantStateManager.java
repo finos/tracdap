@@ -79,7 +79,10 @@ public abstract class TenantStateManager<TState extends TenantState> {
 
         log.info("Looking for active tenants...");
 
-        var liveTenantList = metaClient.listTenants(ListTenantsRequest.getDefaultInstance());
+        var clientState = commonConcerns.prepareClientCall(Context.ROOT);
+        var client = clientState.configureClient(metaClient);
+
+        var liveTenantList = client.listTenants(ListTenantsRequest.getDefaultInstance());
 
         for (var tenantInfo : liveTenantList.getTenantsList()) {
 
