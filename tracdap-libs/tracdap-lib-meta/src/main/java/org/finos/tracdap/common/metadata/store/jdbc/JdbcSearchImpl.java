@@ -41,8 +41,9 @@ class JdbcSearchImpl {
                 ? queryBuilder.buildPriorSearchQuery(tenantId, searchParameters)
                 : queryBuilder.buildSearchQuery(tenantId, searchParameters);
 
-        if (log.isDebugEnabled())
-            log.debug("Running search query: \n{}", query.getQuery());
+        if (log.isDebugEnabled()) {
+            log.debug("QUERY search: \n{}", query);
+        }
 
         try (var stmt = conn.prepareStatement(query.getQuery())) {
 

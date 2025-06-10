@@ -23,6 +23,8 @@ import org.finos.tracdap.common.db.JdbcException;
 import org.finos.tracdap.common.db.dialects.IDialect;
 import org.finos.tracdap.common.exception.ETracInternal;
 import org.finos.tracdap.common.metadata.TypeSystem;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.sql.*;
 import java.time.Instant;
@@ -30,6 +32,8 @@ import java.util.*;
 
 
 class JdbcWriteBatchImpl {
+
+    private final Logger log = LoggerFactory.getLogger(getClass());
 
     private final IDialect dialect;
     private final JdbcReadBatchImpl readBatch;
@@ -53,6 +57,10 @@ class JdbcWriteBatchImpl {
         // Only request generated key columns if the driver supports it
         var keySupport = dialect.supportsGeneratedKeys();
         var keyColumns = new String[] { "object_pk" };
+
+        if (log.isDebugEnabled()) {
+            log.debug("QUERY writeObjectId: \n{}", query);
+        }
 
         try (var stmt = keySupport ? conn.prepareStatement(query, keyColumns) : conn.prepareStatement(query)) {
 
@@ -93,6 +101,10 @@ class JdbcWriteBatchImpl {
         // Only request generated key columns if the driver supports it
         var keySupport = dialect.supportsGeneratedKeys();
         var keyColumns = new String[] { "definition_pk" };
+
+        if (log.isDebugEnabled()) {
+            log.debug("QUERY writeObjectDefinition: \n{}", query);
+        }
 
         try (var stmt = keySupport ? conn.prepareStatement(query, keyColumns) : conn.prepareStatement(query)) {
 
@@ -142,6 +154,10 @@ class JdbcWriteBatchImpl {
         var keySupport = dialect.supportsGeneratedKeys();
         var keyColumns = new String[] { "tag_pk" };
 
+        if (log.isDebugEnabled()) {
+            log.debug("QUERY writeTagRecord: \n{}", query);
+        }
+
         try (var stmt = keySupport ? conn.prepareStatement(query, keyColumns) : conn.prepareStatement(query)) {
 
             for (var i = 0; i < definitionPk.length; i++) {
@@ -185,6 +201,10 @@ class JdbcWriteBatchImpl {
                 "  attr_value_datetime\n" +
                 ")\n" +
                 "values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+
+        if (log.isDebugEnabled()) {
+            log.debug("QUERY writeTagAttrs: \n{}", query);
+        }
 
         try (var stmt = conn.prepareStatement(query, Statement.RETURN_GENERATED_KEYS)) {
 
@@ -296,6 +316,10 @@ class JdbcWriteBatchImpl {
                 ")\n" +
                 "values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
+        if (log.isDebugEnabled()) {
+            log.debug("QUERY writeConfigEntry: \n{}", query);
+        }
+
         try (var stmt = conn.prepareStatement(query)) {
 
             for (var i = 0; i < parts.configEntry.length; i++) {
@@ -331,6 +355,10 @@ class JdbcWriteBatchImpl {
                 "  and object_fk = ?\n" +
                 "  and object_is_latest = ?";
 
+        if (log.isDebugEnabled()) {
+            log.debug("QUERY closeObjectDefinition: \n{}", query);
+        }
+
         try (var stmt = conn.prepareStatement(query)) {
             closeRecord(stmt, tenantId, objectPk, parts.objectTimestamp);
         }
@@ -347,6 +375,10 @@ class JdbcWriteBatchImpl {
                 "  and definition_fk = ?\n" +
                 "  and tag_is_latest = ?";
 
+        if (log.isDebugEnabled()) {
+            log.debug("QUERY closeTagRecord: \n{}", query);
+        }
+
         try (var stmt = conn.prepareStatement(query)) {
             closeRecord(stmt, tenantId, definitionPk, parts.tagTimestamp);
         }
@@ -362,6 +394,10 @@ class JdbcWriteBatchImpl {
                 "where tenant_id = ?\n" +
                 "  and config_pk = ?\n" +
                 "  and config_is_latest = ?";
+
+        if (log.isDebugEnabled()) {
+            log.debug("QUERY closeConfigEntry: \n{}", query);
+        }
 
         try (var stmt = conn.prepareStatement(query)) {
 
