@@ -234,13 +234,25 @@ public class SearchValidator {
 
         var searchValueType = TypeSystem.descriptor(msg.getSearchValue());
 
-        if (msg.getOperator() == SearchOperator.IN && searchValueType.getBasicType() != BasicType.ARRAY) {
+        if (msg.getOperator() == SearchOperator.IN) {
 
-            var err = String.format(
-                    "Search operation [%s] requires an [%s] search value",
-                    msg.getOperator(), BasicType.ARRAY);
+            if (searchValueType.getBasicType() != BasicType.ARRAY) {
 
-            return ctx.error(err);
+                var err = String.format(
+                        "Search operation [%s] requires an [%s] search value",
+                        msg.getOperator(), BasicType.ARRAY);
+
+                return ctx.error(err);
+            }
+
+            if (msg.getSearchValue().getArrayValue().getItemsCount() == 0) {
+
+                var err = String.format(
+                        "Search operation [%s] requires at least one search value",
+                        msg.getOperator());
+
+                return ctx.error(err);
+            }
         }
 
         var searchValueBasicType = msg.getOperator() == SearchOperator.IN
