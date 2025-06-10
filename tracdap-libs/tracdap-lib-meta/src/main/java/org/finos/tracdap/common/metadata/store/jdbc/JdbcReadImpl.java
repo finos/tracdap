@@ -25,6 +25,8 @@ import org.finos.tracdap.common.exception.EValidationGap;
 import org.finos.tracdap.common.metadata.MetadataCodec;
 
 import com.google.protobuf.InvalidProtocolBufferException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -35,6 +37,8 @@ import java.util.*;
 
 class JdbcReadImpl {
 
+    private final Logger log = LoggerFactory.getLogger(getClass());
+
     KeyedItem<ObjectType>
     readObjectTypeById(Connection conn, short tenantId, UUID objectId) throws SQLException {
 
@@ -44,6 +48,10 @@ class JdbcReadImpl {
                 "where tenant_id = ?\n" +
                 "and object_id_hi = ?\n" +
                 "and object_id_lo = ?";
+
+        if (log.isDebugEnabled()) {
+            log.debug("QUERY readObjectTypeById: \n{}", query);
+        }
 
         try (var stmt = conn.prepareStatement(query)) {
 
@@ -101,6 +109,10 @@ class JdbcReadImpl {
                 "and object_fk = ?\n" +
                 "and object_version = ?";
 
+        if (log.isDebugEnabled()) {
+            log.debug("QUERY readDefinitionByVersion: \n{}", query);
+        }
+
         try (var stmt = conn.prepareStatement(query)) {
 
             stmt.setShort(1, tenantId);
@@ -124,6 +136,10 @@ class JdbcReadImpl {
                 "and object_fk = ?\n" +
                 "and object_timestamp <= ?\n" +
                 "and (object_superseded is null or object_superseded > ?)\n";
+
+        if (log.isDebugEnabled()) {
+            log.debug("QUERY readDefinitionByAsOf: \n{}", query);
+        }
 
         try (var stmt = conn.prepareStatement(query)) {
 
@@ -149,6 +165,10 @@ class JdbcReadImpl {
                 "where tenant_id = ?\n" +
                 "  and object_fk = ?\n" +
                 "  and object_is_latest = ?";
+
+        if (log.isDebugEnabled()) {
+            log.debug("QUERY readDefinitionByLatest: \n{}", query);
+        }
 
         try (var stmt = conn.prepareStatement(query)) {
 
@@ -218,6 +238,10 @@ class JdbcReadImpl {
                 "and definition_fk = ?\n" +
                 "and tag_version = ?";
 
+        if (log.isDebugEnabled()) {
+            log.debug("QUERY readTagRecordByVersion: \n{}", query);
+        }
+
         try (var stmt = conn.prepareStatement(query)) {
 
             stmt.setShort(1, tenantId);
@@ -242,6 +266,10 @@ class JdbcReadImpl {
                 "and tag_timestamp <= ?\n" +
                 "and (tag_superseded is null or tag_superseded > ?)\n";
 
+        if (log.isDebugEnabled()) {
+            log.debug("QUERY readTagRecordByAsOf: \n{}", query);
+        }
+
         try (var stmt = conn.prepareStatement(query)) {
 
             var sqlAsOf = java.sql.Timestamp.from(tagAsOf);
@@ -264,6 +292,10 @@ class JdbcReadImpl {
                 "where tenant_id = ?\n" +
                 "and definition_fk = ?\n" +
                 "and tag_is_latest = ?";
+
+        if (log.isDebugEnabled()) {
+            log.debug("QUERY readTagRecordByLatest: \n{}", query);
+        }
 
         try (var stmt = conn.prepareStatement(query)) {
 
@@ -304,6 +336,10 @@ class JdbcReadImpl {
                 "select * from tag_attr\n" +
                 "where tenant_id = ?\n" +
                 "and tag_fk = ?";
+
+        if (log.isDebugEnabled()) {
+            log.debug("QUERY readTagAttrs: \n{}", query);
+        }
 
         try (var stmt = conn.prepareStatement(query)) {
 
@@ -378,6 +414,10 @@ class JdbcReadImpl {
 
                 // Whether to filter deleted entries
                 (includeDeleted ? "" : "and config_deleted = ?\n");
+
+        if (log.isDebugEnabled()) {
+            log.debug("QUERY readConfigEntry: \n{}", query);
+        }
 
         try (var stmt = conn.prepareStatement(query)) {
 

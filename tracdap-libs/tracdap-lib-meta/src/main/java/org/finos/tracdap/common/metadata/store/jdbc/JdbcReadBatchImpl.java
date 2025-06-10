@@ -25,6 +25,8 @@ import org.finos.tracdap.common.exception.EValidationGap;
 import org.finos.tracdap.common.metadata.MetadataCodec;
 
 import com.google.protobuf.InvalidProtocolBufferException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.sql.Connection;
 import java.sql.SQLException;
@@ -37,6 +39,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 
 class JdbcReadBatchImpl {
+
+    private final Logger log = LoggerFactory.getLogger(getClass());
 
     private final IDialect dialect;
     private final AtomicInteger mappingStage;
@@ -62,6 +66,10 @@ class JdbcReadBatchImpl {
                 "order by km.ordering";
 
         query = query.replaceFirst("key_mapping", JdbcDialects.mappingTableName(dialect));
+
+        if (log.isDebugEnabled()) {
+            log.debug("QUERY readObjectTypeById: \n{}", query);
+        }
 
         try (var stmt = conn.prepareStatement(query)) {
 
@@ -119,6 +127,10 @@ class JdbcReadBatchImpl {
                 "order by km.ordering";
 
         query = query.replaceFirst("key_mapping", JdbcDialects.mappingTableName(dialect));
+
+        if (log.isDebugEnabled()) {
+            log.debug("QUERY fetchDefinition: \n{}", query);
+        }
 
         try (var stmt = conn.prepareStatement(query)) {
 
@@ -209,6 +221,10 @@ class JdbcReadBatchImpl {
 
         query = query.replaceFirst("key_mapping", JdbcDialects.mappingTableName(dialect));
 
+        if (log.isDebugEnabled()) {
+            log.debug("QUERY fetchTagRecord: \n{}", query);
+        }
+
         try (var stmt = conn.prepareStatement(query)) {
 
             stmt.setShort(1, tenantId);
@@ -278,6 +294,10 @@ class JdbcReadBatchImpl {
 
         query = query.replaceFirst("key_mapping", JdbcDialects.mappingTableName(dialect));
 
+        if (log.isDebugEnabled()) {
+            log.debug("QUERY fetchTagHeader: \n{}", query);
+        }
+
         try (var stmt = conn.prepareStatement(query)) {
 
             stmt.setShort(1, tenantId);
@@ -343,6 +363,10 @@ class JdbcReadBatchImpl {
                 "order by km.ordering, ta.attr_name, ta.attr_index";
 
         query = query.replaceFirst("key_mapping", JdbcDialects.mappingTableName(dialect));
+
+        if (log.isDebugEnabled()) {
+            log.debug("QUERY fetchTagAttrs: \n{}", query);
+        }
 
         try (var stmt = conn.prepareStatement(query)) {
 
@@ -500,6 +524,10 @@ class JdbcReadBatchImpl {
 
         query = query.replaceFirst("key_mapping", JdbcDialects.mappingTableName(dialect));
 
+        if (log.isDebugEnabled()) {
+            log.debug("QUERY fetchConfigEntry: \n{}", query);
+        }
+
         try (var stmt = conn.prepareStatement(query)) {
 
             stmt.setShort(1, tenantId);
@@ -567,6 +595,10 @@ class JdbcReadBatchImpl {
                 "order by km.ordering";
 
         query = query.replaceFirst("key_mapping", JdbcDialects.mappingTableName(dialect));
+
+        if (log.isDebugEnabled()) {
+            log.debug("QUERY fetchConfigStub: \n{}", query);
+        }
 
         try (var stmt = conn.prepareStatement(query)) {
 
@@ -664,6 +696,10 @@ class JdbcReadBatchImpl {
 
         query = query.replaceFirst("key_mapping", JdbcDialects.mappingTableName(dialect));
 
+        if (log.isDebugEnabled()) {
+            log.debug("QUERY fetchMappedPk: \n{}", query);
+        }
+
         try (var stmt = conn.prepareStatement(query)) {
 
             stmt.setInt(1, mappingStage);
@@ -706,6 +742,10 @@ class JdbcReadBatchImpl {
 
         query = query.replaceFirst("key_mapping", JdbcDialects.mappingTableName(dialect));
 
+        if (log.isDebugEnabled()) {
+            log.debug("QUERY insertPk: \n{}", query);
+        }
+
         try (var stmt = conn.prepareStatement(query)) {
 
             var mappingStage = nextMappingStage();
@@ -737,6 +777,10 @@ class JdbcReadBatchImpl {
                 "values (?, ?, ?, ?)";
 
         query = query.replaceFirst("key_mapping", JdbcDialects.mappingTableName(dialect));
+
+        if (log.isDebugEnabled()) {
+            log.debug("QUERY insertIdForMapping: \n{}", query);
+        }
 
         try (var stmt = conn.prepareStatement(query)) {
 
@@ -772,6 +816,10 @@ class JdbcReadBatchImpl {
 
         query = query.replaceAll("key_mapping", JdbcDialects.mappingTableName(dialect));
 
+        if (log.isDebugEnabled()) {
+            log.debug("QUERY mapObjectById: \n{}", query);
+        }
+
         try (var stmt = conn.prepareStatement(query))  {
 
             stmt.setShort(1, tenantId);
@@ -794,6 +842,10 @@ class JdbcReadBatchImpl {
                 "values (?, ?, ?, ?, ?, ?)";
 
         query = query.replaceFirst("key_mapping", JdbcDialects.mappingTableName(dialect));
+
+        if (log.isDebugEnabled()) {
+            log.debug("QUERY insertObjectSelectors: \n{}", query);
+        }
 
         try (var stmt = conn.prepareStatement(query)) {
 
@@ -856,6 +908,10 @@ class JdbcReadBatchImpl {
 
         query = query.replaceAll("key_mapping", JdbcDialects.mappingTableName(dialect));
 
+        if (log.isDebugEnabled()) {
+            log.debug("QUERY mapObjectSelectors: \n{}", query);
+        }
+
         try (var stmt = conn.prepareStatement(query)) {
 
             stmt.setShort(1, tenantId);
@@ -878,6 +934,10 @@ class JdbcReadBatchImpl {
                 "values (?, ?, ?, ?, ?, ?)";
 
         query = query.replaceFirst("key_mapping", JdbcDialects.mappingTableName(dialect));
+
+        if (log.isDebugEnabled()) {
+            log.debug("QUERY insertTagSelectors: \n{}", query);
+        }
 
         try (var stmt = conn.prepareStatement(query)) {
 
@@ -940,6 +1000,10 @@ class JdbcReadBatchImpl {
 
         query = query.replaceAll("key_mapping", JdbcDialects.mappingTableName(dialect));
 
+        if (log.isDebugEnabled()) {
+            log.debug("QUERY mapTagSelectors: \n{}", query);
+        }
+
         try (var stmt = conn.prepareStatement(query)) {
 
             stmt.setShort(1, tenantId);
@@ -958,6 +1022,10 @@ class JdbcReadBatchImpl {
                 "values (?, ?, ?, ?)";
 
         query = query.replaceFirst("key_mapping", JdbcDialects.mappingTableName(dialect));
+
+        if (log.isDebugEnabled()) {
+            log.debug("QUERY insertFkAndVersionForMapping: \n{}", query);
+        }
 
         try (var stmt = conn.prepareStatement(query)) {
 
@@ -994,6 +1062,10 @@ class JdbcReadBatchImpl {
 
         query = query.replaceAll("key_mapping", JdbcDialects.mappingTableName(dialect));
 
+        if (log.isDebugEnabled()) {
+            log.debug("QUERY mapDefinitionByVersion: \n{}", query);
+        }
+
         try (var stmt = conn.prepareStatement(query))  {
 
             stmt.setShort(1, tenantId);
@@ -1014,6 +1086,10 @@ class JdbcReadBatchImpl {
                 "where mapping_stage = ?";
 
         query = query.replaceAll("key_mapping", JdbcDialects.mappingTableName(dialect));
+
+        if (log.isDebugEnabled()) {
+            log.debug("QUERY mapTagByVersion: \n{}", query);
+        }
 
         try (var stmt = conn.prepareStatement(query))  {
 
@@ -1048,6 +1124,10 @@ class JdbcReadBatchImpl {
 
         query = query.replaceAll("key_mapping", JdbcDialects.mappingTableName(dialect));
 
+        if (log.isDebugEnabled()) {
+            log.debug("QUERY mapDefinitionByTagPk: \n{}", query);
+        }
+
         try (var stmt = conn.prepareStatement(query)) {
 
             stmt.setShort(1, tenantId);
@@ -1070,6 +1150,10 @@ class JdbcReadBatchImpl {
                 "values (?, ?, ?, ?, ?, ?, ?)";
 
         query = query.replaceFirst("key_mapping", JdbcDialects.mappingTableName(dialect));
+
+        if (log.isDebugEnabled()) {
+            log.debug("QUERY insertConfigEntries: \n{}", query);
+        }
 
         try (var stmt = conn.prepareStatement(query)) {
 
@@ -1144,6 +1228,10 @@ class JdbcReadBatchImpl {
 
         query = query.replaceAll("key_mapping", JdbcDialects.mappingTableName(dialect));
 
+        if (log.isDebugEnabled()) {
+            log.debug("QUERY mapConfigEntries: \n{}", query);
+        }
+
         try (var stmt = conn.prepareStatement(query))  {
 
             int nextParam = 1;
@@ -1175,6 +1263,10 @@ class JdbcReadBatchImpl {
                 "where mapping_stage = ?";
 
         query = query.replaceAll("key_mapping", JdbcDialects.mappingTableName(dialect));
+
+        if (log.isDebugEnabled()) {
+            log.debug("QUERY mapConfigEntriesByVersion: \n{}", query);
+        }
 
         try (var stmt = conn.prepareStatement(query))  {
 

@@ -47,6 +47,10 @@ class JdbcTenantImpl {
 
         var query = "select tenant_id, tenant_code from tenant";
 
+        if (log.isDebugEnabled()) {
+            log.debug("QUERY loadTenantMap: \n{}", query);
+        }
+
         try (var stmt = conn.prepareStatement(query); var rs = stmt.executeQuery()) {
 
             var newTenantMap = new HashMap<String, Short>();
@@ -95,6 +99,10 @@ class JdbcTenantImpl {
 
         var query = "select tenant_code, description from tenant";
 
+        if (log.isDebugEnabled()) {
+            log.debug("QUERY listTenants: \n{}", query);
+        }
+
         try (var stmt = conn.prepareStatement(query); var rs = stmt.executeQuery()) {
 
             var tenants = new ArrayList<TenantInfo>();
@@ -122,6 +130,10 @@ class JdbcTenantImpl {
         var findNextId = "select max(tenant_id) from tenant";
         short nextId;
 
+        if (log.isDebugEnabled()) {
+            log.debug("QUERY activateTenant: \n{}", findNextId);
+        }
+
         try (var stmt = conn.prepareStatement(findNextId); var rs = stmt.executeQuery()) {
 
             if (rs.next()) {
@@ -138,6 +150,10 @@ class JdbcTenantImpl {
         }
 
         var query = "insert into tenant (tenant_id, tenant_code, description) values (?, ?, ?)";
+
+        if (log.isDebugEnabled()) {
+            log.debug("QUERY activateTenant: \n{}", query);
+        }
 
         try (var stmt = conn.prepareStatement(query)) {
 
@@ -156,6 +172,10 @@ class JdbcTenantImpl {
     void updateTenant(Connection conn, short tenantId, String description) throws SQLException {
 
         var query = "update tenant set description = ? where tenant_id = ?";
+
+        if (log.isDebugEnabled()) {
+            log.debug("QUERY updateTenant: \n{}", query);
+        }
 
         try (var stmt = conn.prepareStatement(query)) {
 
