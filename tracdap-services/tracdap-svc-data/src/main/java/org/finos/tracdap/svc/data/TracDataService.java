@@ -18,6 +18,7 @@
 package org.finos.tracdap.svc.data;
 
 import org.finos.tracdap.api.DataServiceProto;
+import org.finos.tracdap.api.StorageServiceProto;
 import org.finos.tracdap.api.internal.InternalMessagingProto;
 import org.finos.tracdap.api.internal.InternalMetadataApiGrpc;
 import org.finos.tracdap.config.PlatformConfig;
@@ -37,6 +38,7 @@ import org.finos.tracdap.common.util.RoutingUtils;
 import org.finos.tracdap.common.validation.ValidationConcern;
 import org.finos.tracdap.svc.data.api.MessageProcessor;
 import org.finos.tracdap.svc.data.api.TracDataApi;
+import org.finos.tracdap.svc.data.api.TracStorageApi;
 import org.finos.tracdap.svc.data.service.DataService;
 import org.finos.tracdap.svc.data.service.FileService;
 
@@ -48,6 +50,7 @@ import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import org.apache.arrow.memory.RootAllocator;
 import org.apache.arrow.memory.netty.NettyAllocationManager;
+import org.finos.tracdap.svc.data.service.StorageService;
 import org.finos.tracdap.svc.data.service.TenantStorageManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -185,8 +188,10 @@ public class TracDataService extends TracServiceBase {
 
             var dataService = new DataService(storageManager, formats, metaClient);
             var fileService = new FileService(storageManager, metaClient);
+            var storageService = new StorageService(storageManager);
 
             var dataApi = new TracDataApi(dataService, fileService, eventLoopResolver, arrowAllocator, commonConcerns);
+            var storageApi = new TracStorageApi(storageService, eventLoopResolver, arrowAllocator);
             var messageProcessor = new MessageProcessor(storageManager, offloadExecutor);
 
             var serverBuilder = NettyServerBuilder
@@ -200,6 +205,7 @@ public class TracDataService extends TracServiceBase {
 
                     // Services
                     .addService(dataApi)
+                    .addService(storageApi)
                     .addService(messageProcessor);
 
             // Apply common concerns
@@ -225,6 +231,7 @@ public class TracDataService extends TracServiceBase {
         // Validation concern for the APIs being served
         var validationConcern = new ValidationConcern(
                 DataServiceProto.getDescriptor(),
+                StorageServiceProto.getDescriptor(),
                 InternalMessagingProto.getDescriptor());
         
         commonConcerns = commonConcerns.addAfter(TracServiceConfig.TRAC_PROTOCOL, validationConcern);

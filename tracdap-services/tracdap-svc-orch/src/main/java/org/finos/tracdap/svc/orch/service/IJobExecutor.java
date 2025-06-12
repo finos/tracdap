@@ -42,6 +42,4 @@ public interface IJobExecutor<TState extends Serializable> {
     List<RuntimeJobStatus> listJobs();
     RuntimeJobStatus getJobStatus(TState jobState);
     Flow.Publisher<RuntimeJobStatus> followJobStatus(TState jobState);
-
-    RuntimeJobResult getJobResult(TState jobState);
 }

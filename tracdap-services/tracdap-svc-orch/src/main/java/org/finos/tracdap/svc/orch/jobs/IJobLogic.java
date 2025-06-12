@@ -17,9 +17,9 @@
 
 package org.finos.tracdap.svc.orch.jobs;
 
-import org.finos.tracdap.api.internal.RuntimeJobResult;
 import org.finos.tracdap.common.metadata.MetadataBundle;
 import org.finos.tracdap.config.JobConfig;
+import org.finos.tracdap.config.JobResult;
 import org.finos.tracdap.config.TenantConfig;
 import org.finos.tracdap.metadata.*;
 
@@ -92,9 +92,9 @@ public interface IJobLogic {
      * attributes which are taken from the model definition.
      *
      * @param jobConfig The original job config sent for execution
-     * @param runtimeResult The raw result received from the model runtime
+     * @param jobResult The raw result received from the model runtime
      * @param resultIds Map of un-versioned IDs to the object IDs received from the runtime
      * @return The processed result that will be used for saving output objects
      */
-    RuntimeJobResult processResult(JobConfig jobConfig, RuntimeJobResult runtimeResult, Map<String, TagHeader> resultIds);
+    JobResult processResult(JobConfig jobConfig, JobResult jobResult, Map<String, TagHeader> resultIds);
 }

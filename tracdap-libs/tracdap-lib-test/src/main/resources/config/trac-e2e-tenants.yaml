@@ -22,6 +22,12 @@ tenants:
 
     resources:
 
+      trac_results:
+        resourceType: INTERNAL_STORAGE
+        protocol: LOCAL
+        properties:
+          rootPath: ${TRAC_RESULTS_DIR}
+
       UNIT_TEST_STORAGE:
         resourceType: INTERNAL_STORAGE
         protocol: LOCAL

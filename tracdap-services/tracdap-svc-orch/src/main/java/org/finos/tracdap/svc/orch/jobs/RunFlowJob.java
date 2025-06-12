@@ -17,14 +17,13 @@
 
 package org.finos.tracdap.svc.orch.jobs;
 
-import org.finos.tracdap.api.internal.RuntimeJobResult;
-import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.graph.GraphBuilder;
 import org.finos.tracdap.common.graph.NodeNamespace;
 import org.finos.tracdap.common.metadata.MetadataBundle;
 import org.finos.tracdap.common.metadata.MetadataUtil;
 import org.finos.tracdap.config.JobConfig;
+import org.finos.tracdap.config.JobResult;
 import org.finos.tracdap.config.TenantConfig;
 import org.finos.tracdap.metadata.*;
 
@@ -110,7 +109,7 @@ public class RunFlowJob extends RunModelOrFlow implements IJobLogic {
     }
 
     @Override
-    public RuntimeJobResult processResult(JobConfig jobConfig, RuntimeJobResult runtimeResult, Map<String, TagHeader> resultIds) {
+    public JobResult processResult(JobConfig jobConfig, JobResult jobResult, Map<String, TagHeader> resultIds) {
 
         var runFlow = jobConfig.getJob().getRunFlow();
 
@@ -123,7 +122,7 @@ public class RunFlowJob extends RunModelOrFlow implements IJobLogic {
                 .collect(Collectors.toMap(Map.Entry::getKey, entry -> entry.getValue().getNodeAttrsList()));
 
         return processResult(
-                runtimeResult,
+                jobResult,
                 flowDef.getOutputsMap(),
                 runFlow.getOutputAttrsList(),
                 perNodeAttrs, resultIds);

@@ -22,23 +22,16 @@ import org.finos.tracdap.common.config.ConfigFormat;
 import org.finos.tracdap.common.config.ConfigParser;
 import org.finos.tracdap.common.exception.*;
 import org.finos.tracdap.common.exec.*;
-import org.finos.tracdap.common.grpc.ClientCompressionInterceptor;
-import org.finos.tracdap.common.grpc.GrpcChannelFactory;
-import org.finos.tracdap.common.grpc.ClientLoggingInterceptor;
 import org.finos.tracdap.common.metadata.MetadataUtil;
 import org.finos.tracdap.common.plugin.PluginRegistry;
 import org.finos.tracdap.config.*;
 import org.finos.tracdap.metadata.JobStatusCode;
 import org.finos.tracdap.metadata.TagHeader;
 
-import io.grpc.Channel;
-import io.grpc.ManagedChannel;
-import io.grpc.StatusRuntimeException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.Serializable;
-import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.concurrent.Flow;
@@ -54,14 +47,13 @@ public class JobExecutor<TBatchState extends Serializable> implements IJobExecut
     private static final Pattern TRAC_ERROR_LINE = Pattern.compile("tracdap.rt.exceptions.(E\\w+): (.+)");
 
     private final Logger log = LoggerFactory.getLogger(getClass());
+
     private final IBatchExecutor<TBatchState> batchExecutor;
-    private final GrpcChannelFactory channelFactory;
     private final ConfigParser configParser;
 
     @SuppressWarnings("unchecked")
     public JobExecutor(PluginRegistry registry) {
         this.batchExecutor = (IBatchExecutor<TBatchState>) registry.getSingleton(IBatchExecutor.class);
-        this.channelFactory = registry.getSingleton(GrpcChannelFactory.class);
         this.configParser = new ConfigParser();
     }
 
@@ -205,23 +197,15 @@ public class JobExecutor<TBatchState extends Serializable> implements IJobExecut
 
         RuntimeJobStatus jobStatus;
 
-        // Prefer using the API server to get the job status, if it is available
-        if (jobState.runtimeApiEnabled && batchStatus.getStatusCode() == BatchStatusCode.RUNNING) {
+        // Build job status based on the batch status
+        var jobStatusBuilder = RuntimeJobStatus.newBuilder()
+                .setStatusCode(mapStatusCode(batchStatus.getStatusCode()))
+                .setStatusMessage(batchStatus.getStatusMessage());
 
-            jobStatus = getStatusFromApi(jobState);
-        }
-        else {
+        if (jobState.logVolumeEnabled && batchStatus.getStatusCode() == BatchStatusCode.FAILED)
+            updateStatusFromLogs(jobState, jobStatusBuilder);
 
-            // Otherwise build job status based on the batch status
-            var jobStatusBuilder = RuntimeJobStatus.newBuilder()
-                    .setStatusCode(mapStatusCode(batchStatus.getStatusCode()))
-                    .setStatusMessage(batchStatus.getStatusMessage());
-
-            if (jobState.logVolumeEnabled && batchStatus.getStatusCode() == BatchStatusCode.FAILED)
-                updateStatusFromLogs(jobState, jobStatusBuilder);
-
-            jobStatus = jobStatusBuilder.build();
-        }
+        jobStatus = jobStatusBuilder.build();
 
         if (jobStatus.getStatusCode() == JobStatusCode.SUCCEEDED ||
             jobStatus.getStatusCode() == JobStatusCode.FINISHING) {
@@ -242,33 +226,6 @@ public class JobExecutor<TBatchState extends Serializable> implements IJobExecut
         }
 
         return jobStatus;
-    }
-
-    private RuntimeJobStatus getStatusFromApi(JobExecutorState<TBatchState> jobState) {
-
-        var runtimeApiAddress = getRuntimeApiAddress(jobState);
-        var runtimeChannel = (ManagedChannel) null;
-
-        try {
-
-            runtimeChannel = channelFactory.createChannel(runtimeApiAddress);
-            var runtimeApi = getRuntimeApi(runtimeChannel);
-
-            var runtimeRequest = RuntimeJobInfoRequest.newBuilder()
-                    .setJobKey(jobState.batchKey)
-                    .build();
-
-            return runtimeApi.getJobStatus(runtimeRequest);
-        }
-        catch (StatusRuntimeException grpcError) {
-
-            log.error("Error getting job status for [{}]: {}", jobState.batchKey, grpcError.getMessage());
-            throw mapRuntimeApiError(grpcError);
-        }
-        finally {
-            if (runtimeChannel != null)
-                runtimeChannel.shutdown();
-        }
     }
 
     private void updateStatusFromLogs(JobExecutorState<TBatchState> jobState, RuntimeJobStatus.Builder batchJobStatus) {
@@ -334,118 +291,6 @@ public class JobExecutor<TBatchState extends Serializable> implements IJobExecut
         throw new ETracInternal("Not implemented yet");
     }
 
-    @Override
-    public RuntimeJobResult getJobResult(JobExecutorState<TBatchState> jobState) {
-
-        var batchStatus = batchExecutor.getBatchStatus(jobState.batchKey, jobState.batchState);
-        var batchCode = batchStatus.getStatusCode();
-
-        if (jobState.runtimeApiEnabled && batchCode == BatchStatusCode.RUNNING)
-            return getResultFromApi(jobState);
-
-        if (jobState.resultVolumeEnabled && (batchCode == BatchStatusCode.COMPLETE || batchCode== BatchStatusCode.SUCCEEDED))
-            return getResultFromResultFile(jobState);
-
-        // Currently results are not expected to be available if the job has failed
-        // In future we might give a job result for failed jobs using the error status info
-
-        var message = String.format("Job result is not available for [%s] (this is a bug)", jobState.batchKey);
-        log.error(message);
-        throw new ETracInternal(message);
-    }
-
-    private RuntimeJobResult getResultFromApi(JobExecutorState<TBatchState> jobState) {
-
-        var runtimeApiAddress = getRuntimeApiAddress(jobState);
-        var runtimeChannel = (ManagedChannel) null;
-
-        try {
-
-            runtimeChannel = channelFactory.createChannel(runtimeApiAddress);
-            var runtimeApi = getRuntimeApi(runtimeChannel);
-
-            var runtimeRequest = RuntimeJobInfoRequest.newBuilder()
-                    .setJobKey(jobState.batchKey)
-                    .build();
-
-            return runtimeApi.getJobResult(runtimeRequest);
-        }
-        catch (StatusRuntimeException grpcError) {
-
-            log.error("Error getting job result for [{}]: {}", jobState.batchKey, grpcError.getMessage());
-            throw mapRuntimeApiError(grpcError);
-        }
-        finally {
-            if (runtimeChannel != null)
-                runtimeChannel.shutdown();
-        }
-    }
-
-    private RuntimeJobResult getResultFromResultFile(JobExecutorState<TBatchState> jobState) {
-
-        var resultFile = String.format("job_result_%s.json", jobState.batchKey);
-
-        try {
-
-            var batchResultBytes = batchExecutor.getOutputFile(jobState.batchKey, jobState.batchState, "result", resultFile);
-            var batchResult = configParser.parseConfig(batchResultBytes, ConfigFormat.JSON, JobResult.class);
-
-            var runtimeResult = RuntimeJobResult.newBuilder()
-                    .setJobId(batchResult.getJobId())
-                    .setResultId(batchResult.getResultId())
-                    .setResult(batchResult.getResult())
-                    .addAllObjectIds(batchResult.getObjectIdsList())
-                    .putAllObjects(batchResult.getObjectsMap());
-
-            for (var entry : batchResult.getAttrsMap().entrySet()) {
-                var objectKey = entry.getKey();
-                var attrs = entry.getValue().getAttrsList();
-                runtimeResult.putAttrs(objectKey, RuntimeJobResultAttrs.newBuilder().addAllAttrs(attrs).build());
-            }
-
-            return runtimeResult.build();
-        }
-        catch (EConfigParse parseError) {
-
-            // Parsing and validation failures mean the job has definitely failed
-            // Handle these as part of the result processing
-            // These are not executor / communication errors and should not be retried
-
-            var errorMessage = parseError.getMessage();
-            var shortMessage = errorMessage.lines().findFirst().orElse("No details available");
-
-            log.error("Invalid job result recorded in [{}]: {}", resultFile, shortMessage, parseError);
-
-            throw new EExecutorFailure("Invalid job result: " + shortMessage, parseError);
-        }
-    }
-
-    private InetSocketAddress getRuntimeApiAddress(JobExecutorState<TBatchState> jobState) {
-
-        var runtimeApiAddress = batchExecutor.getBatchAddress(jobState.batchKey, jobState.batchState);
-
-        if (runtimeApiAddress == null) {
-
-            var warning = String.format(
-                    "Runtime API is not available for job [%s] (it should come up soon)",
-                    jobState.batchKey);
-
-            log.warn(warning);
-            throw new EExecutorTemporaryFailure(warning);
-        }
-
-        return runtimeApiAddress;
-    }
-
-    private TracRuntimeApiGrpc.TracRuntimeApiBlockingStub getRuntimeApi(Channel clientChannel) {
-
-        return TracRuntimeApiGrpc
-                .newBlockingStub(clientChannel)
-                .withCompression(ClientCompressionInterceptor.COMPRESSION_TYPE)
-                .withInterceptors(new ClientCompressionInterceptor())
-                .withInterceptors(new ClientLoggingInterceptor(JobExecutor.class));
-    }
-
     private JobStatusCode mapStatusCode(BatchStatusCode batchStatusCode) {
 
         switch (batchStatusCode) {
@@ -460,27 +305,6 @@ public class JobExecutor<TBatchState extends Serializable> implements IJobExecut
             case STATUS_UNKNOWN:
             default:
                 return JobStatusCode.UNRECOGNIZED;
-        }
-    }
-
-    private EExecutor mapRuntimeApiError(StatusRuntimeException grpcError) {
-
-        switch (grpcError.getStatus().getCode()) {
-
-            case UNAVAILABLE:
-            case DEADLINE_EXCEEDED:
-                throw new EExecutorTemporaryFailure(grpcError.getMessage(), grpcError);
-
-            case UNAUTHENTICATED:
-            case PERMISSION_DENIED:
-                throw new EExecutorAccess(grpcError.getMessage(), grpcError);
-
-            case INVALID_ARGUMENT:
-            case FAILED_PRECONDITION:
-                throw new EExecutorValidation(grpcError.getMessage(), grpcError);
-
-            default:
-                throw new EExecutorFailure(grpcError.getMessage(), grpcError);
         }
     }
 }

@@ -26,6 +26,7 @@ import org.finos.tracdap.common.grpc.UserMetadata;
 import org.finos.tracdap.common.middleware.GrpcClientConfig;
 import org.finos.tracdap.common.middleware.GrpcClientState;
 import org.finos.tracdap.config.JobConfig;
+import org.finos.tracdap.config.JobResult;
 import org.finos.tracdap.config.RuntimeConfig;
 import org.finos.tracdap.metadata.*;
 
@@ -78,18 +79,20 @@ public class JobState implements Serializable, Cloneable {
     List<TagHeader> preallocatedIds = new ArrayList<>();
 
     // Input / output config files for communicating with the runtime
-    JobConfig jobConfig;
     RuntimeConfig sysConfig;
+    JobConfig jobConfig;
 
     // Executor state data
     Serializable executorState;
 
     // Status and result received back from the runtime
     RuntimeJobStatus runtimeStatus;
-    RuntimeJobResult runtimeResult;
+
+    String jobResultPath;
+    JobResult runtimeResult;
 
     // Final result after post-processing
-    RuntimeJobResult jobResult;
+    JobResult jobResult;
 
     @Override
     public JobState clone() {
