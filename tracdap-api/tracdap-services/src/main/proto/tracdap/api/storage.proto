@@ -29,7 +29,7 @@ service TracStorageApi {
 
   rpc exists(StorageRequest) returns (StorageExistsResponse);
 
-  rpc size(StorageRequest) returns (StorageExistsResponse);
+  rpc size(StorageRequest) returns (StorageSizeResponse);
 
   rpc stat(StorageRequest) returns (StorageStatResponse);
 
@@ -95,12 +95,13 @@ message StorageLsResponse {
 
 message StorageReadResponse {
 
-  bytes content = 1;
+  FileStat stat = 1;
+  bytes content = 2;
 }
 
 message StorageOkResponse {
 
-  bool ok = 1;
+  FileStat stat = 1;
 }
 
 message FileStat {
