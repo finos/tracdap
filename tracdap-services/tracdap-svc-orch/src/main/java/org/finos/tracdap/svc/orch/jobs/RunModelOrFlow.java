@@ -17,13 +17,13 @@
 
 package org.finos.tracdap.svc.orch.jobs;
 
-import org.finos.tracdap.api.internal.RuntimeJobResult;
-import org.finos.tracdap.api.internal.RuntimeJobResultAttrs;
 import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.exception.EJobResult;
 import org.finos.tracdap.common.exception.ETracInternal;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.metadata.MetadataBundle;
+import org.finos.tracdap.config.JobResult;
+import org.finos.tracdap.config.JobResultAttrs;
 import org.finos.tracdap.config.TenantConfig;
 import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.common.metadata.MetadataCodec;
@@ -85,12 +85,12 @@ public abstract class RunModelOrFlow {
         return requiredIds;
     }
 
-    protected RuntimeJobResult processResult(
-            RuntimeJobResult runtimeResult, Map<String, ModelOutputSchema> expectedOutputs,
+    protected JobResult processResult(
+            JobResult jobResult, Map<String, ModelOutputSchema> expectedOutputs,
             List<TagUpdate> jobAttrs, Map<String, List<TagUpdate>> perNodeAttrs,
             Map<String, TagHeader> resultIds) {
 
-        var jobResult = RuntimeJobResult.newBuilder();
+        var processedResult = JobResult.newBuilder();
 
         for (var output: expectedOutputs.entrySet()) {
 
@@ -98,26 +98,26 @@ public abstract class RunModelOrFlow {
             var modelOutput = output.getValue();
 
             // Ignore optional outputs that were not produced
-            if (modelOutput.getOptional() & !runtimeResult.getResult().containsOutputs(outputName))
+            if (modelOutput.getOptional() & !jobResult.getResult().containsOutputs(outputName))
                 continue;
 
             processOutput(
-                    outputName, runtimeResult, resultIds,
+                    outputName, jobResult, resultIds,
                     jobAttrs, perNodeAttrs,
-                    jobResult);
+                    processedResult);
         }
 
-        return jobResult.build();
+        return processedResult.build();
     }
 
     private void processOutput(
-            String outputName, RuntimeJobResult runtimeResult, Map<String, TagHeader> resultIds,
+            String outputName, JobResult jobResult, Map<String, TagHeader> resultIds,
             List<TagUpdate> jobAttrs, Map<String, List<TagUpdate>> perNodeAttrs,
-            RuntimeJobResult.Builder jobResult) {
+            JobResult.Builder processedResult) {
 
         // Look up the result objects
 
-        var result = runtimeResult.getResult();
+        var result = jobResult.getResult();
 
         if (!result.containsOutputs(outputName))
             throw new EJobResult(String.format("Missing required output [%s]", outputName));
@@ -126,19 +126,19 @@ public abstract class RunModelOrFlow {
         var outputId = resultIds.get(outputSelector.getObjectId());
         var outputKey = outputId != null ? MetadataUtil.objectKey(outputId) : null;
 
-        checkResultAvailable(outputSelector, outputKey, runtimeResult);
+        checkResultAvailable(outputSelector, outputKey, jobResult);
 
-        var outputDef = runtimeResult.getObjectsOrThrow(outputKey);
-        var outputAttrs = runtimeResult.getAttrsOrDefault(outputKey, RuntimeJobResultAttrs.getDefaultInstance()).toBuilder();
+        var outputDef = jobResult.getObjectsOrThrow(outputKey);
+        var outputAttrs = jobResult.getAttrsOrDefault(outputKey, JobResultAttrs.getDefaultInstance()).toBuilder();
 
         var storageSelector = getStorageKey(outputDef);
         var storageId = resultIds.get(storageSelector.getObjectId());
         var storageKey = storageId != null ? MetadataUtil.objectKey(storageId) : null;
 
-        checkResultAvailable(storageSelector, storageKey, runtimeResult);
+        checkResultAvailable(storageSelector, storageKey, jobResult);
 
-        var storageDef = runtimeResult.getObjectsOrThrow(storageKey);
-        var storageAttrs = runtimeResult.getAttrsOrDefault(outputKey, RuntimeJobResultAttrs.getDefaultInstance()).toBuilder();
+        var storageDef = jobResult.getObjectsOrThrow(storageKey);
+        var storageAttrs = jobResult.getAttrsOrDefault(outputKey, JobResultAttrs.getDefaultInstance()).toBuilder();
 
         // Add user attrs (job level and flow node attrs)
 
@@ -161,16 +161,16 @@ public abstract class RunModelOrFlow {
 
         // Add objects to the job result
 
-        jobResult.addObjectIds(outputId);
-        jobResult.putObjects(outputKey, outputDef);
-        jobResult.putAttrs(outputKey, outputAttrs.build());
+        processedResult.addObjectIds(outputId);
+        processedResult.putObjects(outputKey, outputDef);
+        processedResult.putAttrs(outputKey, outputAttrs.build());
 
-        jobResult.addObjectIds(storageId);
-        jobResult.putObjects(storageKey, storageDef);
-        jobResult.putAttrs(storageKey, storageAttrs.build());
+        processedResult.addObjectIds(storageId);
+        processedResult.putObjects(storageKey, storageDef);
+        processedResult.putAttrs(storageKey, storageAttrs.build());
     }
 
-    private void checkResultAvailable(TagSelector selector, String outputKey, RuntimeJobResult jobResult) {
+    private void checkResultAvailable(TagSelector selector, String outputKey, JobResult jobResult) {
 
         var displayKey = MetadataUtil.objectKey(selector);
 

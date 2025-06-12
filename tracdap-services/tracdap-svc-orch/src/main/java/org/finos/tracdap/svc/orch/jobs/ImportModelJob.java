@@ -17,14 +17,14 @@
 
 package org.finos.tracdap.svc.orch.jobs;
 
-import org.finos.tracdap.api.internal.RuntimeJobResult;
-import org.finos.tracdap.api.internal.RuntimeJobResultAttrs;
 import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.exception.EExecutorValidation;
 import org.finos.tracdap.common.exception.EJobResult;
 import org.finos.tracdap.common.metadata.MetadataBundle;
 import org.finos.tracdap.common.metadata.MetadataUtil;
 import org.finos.tracdap.config.JobConfig;
+import org.finos.tracdap.config.JobResult;
+import org.finos.tracdap.config.JobResultAttrs;
 import org.finos.tracdap.config.TenantConfig;
 import org.finos.tracdap.metadata.*;
 
@@ -117,7 +117,7 @@ public class ImportModelJob implements IJobLogic {
     }
 
     @Override
-    public RuntimeJobResult processResult(JobConfig jobConfig, RuntimeJobResult runtimeResult, Map<String, TagHeader> resultIds) {
+    public JobResult processResult(JobConfig jobConfig, JobResult jobResult, Map<String, TagHeader> resultIds) {
 
         var modelIds = resultIds.values().stream()
                 .filter(objectId -> objectId.getObjectType() == ObjectType.MODEL)
@@ -132,11 +132,11 @@ public class ImportModelJob implements IJobLogic {
         var modelId = modelIds.get(0);
         var modelKey = MetadataUtil.objectKey(modelId);
 
-        if (!runtimeResult.containsObjects(modelKey))
+        if (!jobResult.containsObjects(modelKey))
             throw new EJobResult(String.format("Missing definition in job result: [%s]", modelKey));
 
-        var modelObj = runtimeResult.getObjectsOrThrow(modelKey);
-        var modelAttrs = runtimeResult.getAttrsOrDefault(modelKey, RuntimeJobResultAttrs.getDefaultInstance()).toBuilder();
+        var modelObj = jobResult.getObjectsOrThrow(modelKey);
+        var modelAttrs = jobResult.getAttrsOrDefault(modelKey, JobResultAttrs.getDefaultInstance()).toBuilder();
 
         // Add attrs defined in the job
         var suppliedAttrs = jobConfig.getJob().getImportModel().getModelAttrsList();
@@ -186,7 +186,7 @@ public class ImportModelJob implements IJobLogic {
                     .build());
         }
 
-        return RuntimeJobResult.newBuilder()
+        return JobResult.newBuilder()
                 .addObjectIds(modelId)
                 .putObjects(modelKey, modelObj)
                 .putAttrs(modelKey, modelAttrs.build())
