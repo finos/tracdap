@@ -309,7 +309,7 @@ public class JobProcessorHelpers {
 
         for (var resourceKey : requiredResources) {
 
-            if (tenantConfig.containsResources(resourceKey) || resourceKey.startsWith(ConfigKeys.TRAC_PREFIX)) {
+            if (tenantConfig.containsResources(resourceKey)) {
                 var resourceConfig = tenantConfig.getResourcesOrThrow(resourceKey);
                 var resource = translateResourceConfig(resourceKey, resourceConfig, jobState);
                 sysConfig.putResources(resourceKey, resource);
@@ -322,6 +322,14 @@ public class JobProcessorHelpers {
             }
         }
 
+        // Always send system resources to the runtime
+        for (var resourceKey : tenantConfig.getResourcesMap().keySet()) {
+            if (resourceKey.startsWith(ConfigKeys.TRAC_PREFIX)) {
+                var resourceConfig = tenantConfig.getResourcesOrThrow(resourceKey);
+                var resource = translateResourceConfig(resourceKey, resourceConfig, jobState);
+                sysConfig.putResources(resourceKey, resource);
+            }
+        }
 
         jobState.sysConfig = sysConfig.build();
 
