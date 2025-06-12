@@ -15,6 +15,7 @@
 
 import copy as cp
 import dataclasses as dc
+import datetime as dt
 import enum
 import io
 import pathlib
@@ -206,9 +207,10 @@ class TracEngine(_actors.Actor):
 
         self._log.info(f"Received a new job: [{job_key}]")
 
-        result_needed = bool(job_result_dir)
+        result_needed = bool(job_result_format)
         result_spec = _JobResultSpec(result_needed, job_result_dir, job_result_format)
-        job_log = _JobLog(log_file_needed=result_needed)
+        job_log_needed = bool(job_result_dir)
+        job_log = _JobLog(log_file_needed=job_log_needed)
 
         job_state = _JobState(job_config.jobId)
         job_state.job_log = job_log
@@ -354,15 +356,24 @@ class TracEngine(_actors.Actor):
 
         # It might be better abstract reporting of results, job status etc., perhaps with a job monitor
 
-        if job_state.result_spec.save_result:
+        if not job_state.result_spec.save_result:
+            return
 
-            result_format = job_state.result_spec.result_format
+        result_format = job_state.result_spec.result_format
+        result_content = _cfg_p.ConfigQuoter.quote(job_state.job_result, result_format)
+
+        result_file = f"job_result_{job_key}.{result_format}"
+        job_time = dt.datetime.fromisoformat(job_state.job_id.objectTimestamp.isoDatetime)
+
+        if self._storage.has_file_storage("trac_results"):
+            result_dir = f"{job_time.date().year}/{job_time.date().isoformat()}/{_util.object_key(job_state.job_id)}"
+            result_path = f"{result_dir}/{result_file}"
+            storage = self._storage.get_file_storage("trac_results")
+            storage.write_bytes(result_path, result_content.encode('utf-8'))
+        else:
             result_dir = job_state.result_spec.result_dir
-            result_file = f"job_result_{job_key}.{result_format}"
             result_path = pathlib.Path(result_dir).joinpath(result_file)
-
             with open(result_path, "xt") as result_stream:
-                result_content = _cfg_p.ConfigQuoter.quote(job_state.job_result, result_format)
                 result_stream.write(result_content)
 
     def _get_job_info(self, job_key: str, details: bool = False) -> tp.Optional[_cfg.JobResult]:

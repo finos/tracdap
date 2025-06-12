@@ -19,6 +19,8 @@ package org.finos.tracdap.common.config;
 
 public class ConfigKeys {
 
+    public static final String TRAC_PREFIX = "trac_";
+
     // Secondary config keys
     public static final String TENANTS_CONFIG_KEY = "tenants";
     public static final String LOGGING_CONFIG_KEY = "logging";

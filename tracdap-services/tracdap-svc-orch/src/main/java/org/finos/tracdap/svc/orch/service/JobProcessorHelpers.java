@@ -309,7 +309,7 @@ public class JobProcessorHelpers {
 
         for (var resourceKey : requiredResources) {
 
-            if (tenantConfig.containsResources(resourceKey)) {
+            if (tenantConfig.containsResources(resourceKey) || resourceKey.startsWith(ConfigKeys.TRAC_PREFIX)) {
                 var resourceConfig = tenantConfig.getResourcesOrThrow(resourceKey);
                 var resource = translateResourceConfig(resourceKey, resourceConfig, jobState);
                 sysConfig.putResources(resourceKey, resource);

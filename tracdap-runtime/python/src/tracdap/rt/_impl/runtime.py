@@ -281,7 +281,7 @@ class TracRuntime:
             self._log.info("TRAC runtime has gone down cleanly")
 
     def is_oneshot(self):
-        return not self._server_enabled
+        return True  # Always one-shot for now
 
     def run_until_done(self):
 
