@@ -291,69 +291,6 @@ public class JobExecutor<TBatchState extends Serializable> implements IJobExecut
         throw new ETracInternal("Not implemented yet");
     }
 
-    @Override
-    public RuntimeJobResult getJobResult(JobExecutorState<TBatchState> jobState) {
-
-        var batchStatus = batchExecutor.getBatchStatus(jobState.batchKey, jobState.batchState);
-        var batchCode = batchStatus.getStatusCode();
-
-        if (jobState.resultVolumeEnabled && (batchCode == BatchStatusCode.COMPLETE || batchCode== BatchStatusCode.SUCCEEDED))
-            return getResultFromResultFile(jobState);
-
-        // Currently results are not expected to be available if the job has failed
-        // In future we might give a job result for failed jobs using the error status info
-
-        var message = String.format("Job result is not available for [%s] (this is a bug)", jobState.batchKey);
-        log.error(message);
-        throw new ETracInternal(message);
-    }
-
-    private RuntimeJobResult getResultFromResultFile(JobExecutorState<TBatchState> jobState) {
-
-        var resultFile = String.format("job_result_%s.json", jobState.batchKey);
-
-        try {
-
-            var batchResultBytes = batchExecutor.getOutputFile(jobState.batchKey, jobState.batchState, "result", resultFile);
-            var batchResult = configParser.parseConfig(batchResultBytes, ConfigFormat.JSON, JobResult.class);
-
-            return convertBatchResult(batchResult);
-        }
-        catch (EConfigParse parseError) {
-
-            // Parsing and validation failures mean the job has definitely failed
-            // Handle these as part of the result processing
-            // These are not executor / communication errors and should not be retried
-
-            var errorMessage = parseError.getMessage();
-            var shortMessage = errorMessage.lines().findFirst().orElse("No details available");
-
-            log.error("Invalid job result recorded in [{}]: {}", resultFile, shortMessage, parseError);
-
-            throw new EExecutorFailure("Invalid job result: " + shortMessage, parseError);
-        }
-    }
-
-
-
-    private static RuntimeJobResult convertBatchResult(JobResult batchResult) {
-
-        var runtimeResult = RuntimeJobResult.newBuilder()
-                .setJobId(batchResult.getJobId())
-                .setResultId(batchResult.getResultId())
-                .setResult(batchResult.getResult())
-                .addAllObjectIds(batchResult.getObjectIdsList())
-                .putAllObjects(batchResult.getObjectsMap());
-
-        for (var entry : batchResult.getAttrsMap().entrySet()) {
-            var objectKey = entry.getKey();
-            var attrs = entry.getValue().getAttrsList();
-            runtimeResult.putAttrs(objectKey, RuntimeJobResultAttrs.newBuilder().addAllAttrs(attrs).build());
-        }
-
-        return runtimeResult.build();
-    }
-
     private JobStatusCode mapStatusCode(BatchStatusCode batchStatusCode) {
 
         switch (batchStatusCode) {
