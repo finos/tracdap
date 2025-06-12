@@ -369,7 +369,13 @@ public class JobProcessor {
             var jobResultFile = client.readSmallFile(request);
             var jobResult = configParser.parseConfig(jobResultFile.getContent().toByteArray(), ConfigFormat.JSON, JobResult.class);
 
-            validator.validateFixedObject(jobResult);
+            if (jobResult.getResult().hasLogFileId() && jobResult.getResult().getLogFileId().getObjectId().isBlank()) {
+
+                jobResult = jobResult.toBuilder()
+                        .setResult(jobResult.getResult().toBuilder()
+                        .clearLogFileId())
+                        .build();
+            }
 
             var newState = jobState.clone();
             newState.runtimeResult = jobResult;

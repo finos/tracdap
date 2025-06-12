@@ -19,8 +19,6 @@ package org.finos.tracdap.svc.orch.service;
 
 import org.finos.tracdap.api.*;
 import org.finos.tracdap.api.internal.InternalMetadataApiGrpc;
-import org.finos.tracdap.api.internal.RuntimeJobResult;
-import org.finos.tracdap.api.internal.RuntimeJobResultAttrs;
 import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.exception.EConsistencyValidation;
@@ -408,6 +406,8 @@ public class JobProcessorHelpers {
         // A result is available and ready to be processed
         var runtimeResult = jobState.runtimeResult;
 
+        log.info(runtimeResult.toString());
+
         // Apply validation to the runtime result - partially consistent results will be rejected
         // This is safest, but has the potential to lose useful error info in some cases
         validator.validateFixedObject(runtimeResult);
@@ -463,27 +463,29 @@ public class JobProcessorHelpers {
 
         // Add FILE and STORAGE objects for the job log
 
-        var logFileSelector = runtimeResult.getResult().getLogFileId();
-        var logFileId = resultIds.get(logFileSelector.getObjectId());
-        var logFileKey = logFileId != null ? MetadataUtil.objectKey(logFileId) : null;
+        if (finalResult.getResult().hasLogFileId()) {
 
-        checkResultAvailable(logFileSelector, logFileKey, runtimeResult);
+            var logFileSelector = runtimeResult.getResult().getLogFileId();
+            var logFileId = resultIds.get(logFileSelector.getObjectId());
+            var logFileKey = logFileId != null ? MetadataUtil.objectKey(logFileId) : null;
 
-        var logFileDef = runtimeResult.getObjectsOrThrow(logFileKey);
+            checkResultAvailable(logFileSelector, logFileKey, runtimeResult);
 
-        var logStorageSelector = logFileDef.getFile().getStorageId();
-        var logStorageId = resultIds.get(logStorageSelector.getObjectId());
-        var logStorageKey = logStorageId != null ? MetadataUtil.objectKey(logStorageId) : null;
+            var logFileDef = runtimeResult.getObjectsOrThrow(logFileKey);
 
-        checkResultAvailable(logStorageSelector, logStorageKey, runtimeResult);
+            var logStorageSelector = logFileDef.getFile().getStorageId();
+            var logStorageId = resultIds.get(logStorageSelector.getObjectId());
+            var logStorageKey = logStorageId != null ? MetadataUtil.objectKey(logStorageId) : null;
 
-        var logStorageDef = runtimeResult.getObjectsOrThrow(logStorageKey);
+            checkResultAvailable(logStorageSelector, logStorageKey, runtimeResult);
 
-        finalResult.addObjectIds(logFileId);
-        finalResult.addObjectIds(logStorageId);
-        finalResult.putObjects(logFileKey, logFileDef);
-        finalResult.putObjects(logStorageKey, logStorageDef);
+            var logStorageDef = runtimeResult.getObjectsOrThrow(logStorageKey);
 
+            finalResult.addObjectIds(logFileId);
+            finalResult.addObjectIds(logStorageId);
+            finalResult.putObjects(logFileKey, logFileDef);
+            finalResult.putObjects(logStorageKey, logStorageDef);
+        }
 
         // Include controlled job attrs on all outputs
 

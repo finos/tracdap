@@ -17,12 +17,12 @@
 
 package org.finos.tracdap.common.validation.api;
 
-import org.finos.tracdap.api.internal.RuntimeJobResult;
-import org.finos.tracdap.api.internal.RuntimeJobResultAttrs;
 import org.finos.tracdap.common.validation.core.ValidationContext;
 import org.finos.tracdap.common.validation.core.ValidationType;
 import org.finos.tracdap.common.validation.core.Validator;
 import org.finos.tracdap.common.validation.static_.*;
+import org.finos.tracdap.config.JobResult;
+import org.finos.tracdap.config.JobResultAttrs;
 import org.finos.tracdap.metadata.*;
 
 import com.google.protobuf.Descriptors;
@@ -33,69 +33,69 @@ import static org.finos.tracdap.common.validation.core.ValidatorUtils.field;
 public class RuntimeResultsValidator {
 
     private static final Descriptors.Descriptor RUNTIME_JOB_RESULT;
-    private static final Descriptors.FieldDescriptor RJR_JOB_ID;
-    private static final Descriptors.FieldDescriptor RJR_RESULT_ID;
-    private static final Descriptors.FieldDescriptor RJR_RESULT;
-    private static final Descriptors.FieldDescriptor RJR_OBJECT_IDS;
-    private static final Descriptors.FieldDescriptor RJR_OBJECTS;
-    private static final Descriptors.FieldDescriptor RJR_ATTRS;
+    private static final Descriptors.FieldDescriptor JR_JOB_ID;
+    private static final Descriptors.FieldDescriptor JR_RESULT_ID;
+    private static final Descriptors.FieldDescriptor JR_RESULT;
+    private static final Descriptors.FieldDescriptor JR_OBJECT_IDS;
+    private static final Descriptors.FieldDescriptor JR_OBJECTS;
+    private static final Descriptors.FieldDescriptor JR_ATTRS;
 
     private static final Descriptors.Descriptor RUNTIME_JOB_ATTRS;
-    private static final Descriptors.FieldDescriptor RJA_ATTRS;
+    private static final Descriptors.FieldDescriptor JRA_ATTRS;
 
     static {
 
-        RUNTIME_JOB_RESULT = RuntimeJobResult.getDescriptor();
-        RJR_JOB_ID = field(RUNTIME_JOB_RESULT, RuntimeJobResult.JOBID_FIELD_NUMBER);
-        RJR_RESULT_ID = field(RUNTIME_JOB_RESULT, RuntimeJobResult.RESULTID_FIELD_NUMBER);
-        RJR_RESULT = field(RUNTIME_JOB_RESULT, RuntimeJobResult.RESULT_FIELD_NUMBER);
-        RJR_OBJECT_IDS = field(RUNTIME_JOB_RESULT, RuntimeJobResult.OBJECTIDS_FIELD_NUMBER);
-        RJR_OBJECTS = field(RUNTIME_JOB_RESULT, RuntimeJobResult.OBJECTS_FIELD_NUMBER);
-        RJR_ATTRS = field(RUNTIME_JOB_RESULT, RuntimeJobResult.ATTRS_FIELD_NUMBER);
+        RUNTIME_JOB_RESULT = JobResult.getDescriptor();
+        JR_JOB_ID = field(RUNTIME_JOB_RESULT, JobResult.JOBID_FIELD_NUMBER);
+        JR_RESULT_ID = field(RUNTIME_JOB_RESULT, JobResult.RESULTID_FIELD_NUMBER);
+        JR_RESULT = field(RUNTIME_JOB_RESULT, JobResult.RESULT_FIELD_NUMBER);
+        JR_OBJECT_IDS = field(RUNTIME_JOB_RESULT, JobResult.OBJECTIDS_FIELD_NUMBER);
+        JR_OBJECTS = field(RUNTIME_JOB_RESULT, JobResult.OBJECTS_FIELD_NUMBER);
+        JR_ATTRS = field(RUNTIME_JOB_RESULT, JobResult.ATTRS_FIELD_NUMBER);
 
-        RUNTIME_JOB_ATTRS = RuntimeJobResultAttrs.getDescriptor();
-        RJA_ATTRS = field(RUNTIME_JOB_ATTRS, RuntimeJobResultAttrs.ATTRS_FIELD_NUMBER);
+        RUNTIME_JOB_ATTRS = JobResultAttrs.getDescriptor();
+        JRA_ATTRS = field(RUNTIME_JOB_ATTRS, JobResultAttrs.ATTRS_FIELD_NUMBER);
     }
 
     @Validator
-    public static ValidationContext job(RuntimeJobResult msg, ValidationContext ctx) {
+    public static ValidationContext job(JobResult msg, ValidationContext ctx) {
 
-        ctx = ctx.push(RJR_JOB_ID)
+        ctx = ctx.push(JR_JOB_ID)
                 .apply(CommonValidators::required)
                 .apply(ObjectIdValidator::tagHeader, TagHeader.class)
                 .apply(ObjectIdValidator::headerType, TagHeader.class, ObjectType.JOB)
                 .pop();
 
-        ctx = ctx.push(RJR_RESULT_ID)
+        ctx = ctx.push(JR_RESULT_ID)
                 .apply(CommonValidators::required)
                 .apply(ObjectIdValidator::tagHeader, TagHeader.class)
                 .apply(ObjectIdValidator::headerType, TagHeader.class, ObjectType.RESULT)
                 .pop();
 
-        ctx.push(RJR_RESULT)
+        ctx.push(JR_RESULT)
                 .apply(CommonValidators::required)
                 .applyRegistered()
                 .pop();
 
-        ctx = ctx.pushRepeated(RJR_OBJECT_IDS)
+        ctx = ctx.pushRepeated(JR_OBJECT_IDS)
                 .applyRepeated(ObjectIdValidator::tagHeader, TagHeader.class)
                 .pop();
 
-        ctx = ctx.pushMap(RJR_OBJECTS)
+        ctx = ctx.pushMap(JR_OBJECTS)
                 .applyMapValues(ObjectValidator::objectDefinition, ObjectDefinition.class)
                 .pop();
 
-        ctx = ctx.pushMap(RJR_ATTRS)
-                .applyMapValues(RuntimeResultsValidator::runtimeJobAttrs, RuntimeJobResultAttrs.class)
+        ctx = ctx.pushMap(JR_ATTRS)
+                .applyMapValues(RuntimeResultsValidator::runtimeJobAttrs, JobResultAttrs.class)
                 .pop();
 
         return ctx;
     }
 
     @Validator
-    public static ValidationContext runtimeJobAttrs(RuntimeJobResultAttrs msg, ValidationContext ctx) {
+    public static ValidationContext runtimeJobAttrs(JobResultAttrs msg, ValidationContext ctx) {
 
-        return ctx.pushRepeated(RJA_ATTRS)
+        return ctx.pushRepeated(JRA_ATTRS)
                 .applyRepeated(TagUpdateValidator::tagUpdate, TagUpdate.class)
                 .pop();
     }
