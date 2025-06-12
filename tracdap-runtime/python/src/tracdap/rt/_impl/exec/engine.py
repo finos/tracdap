@@ -209,7 +209,8 @@ class TracEngine(_actors.Actor):
 
         result_needed = bool(job_result_format)
         result_spec = _JobResultSpec(result_needed, job_result_dir, job_result_format)
-        job_log = _JobLog(log_file_needed=result_needed)
+        job_log_needed = bool(job_result_dir)
+        job_log = _JobLog(log_file_needed=job_log_needed)
 
         job_state = _JobState(job_config.jobId)
         job_state.job_log = job_log
