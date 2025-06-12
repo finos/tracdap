@@ -292,15 +292,14 @@ public class JobProcessorHelpers {
         var metadata = new MetadataBundle(jobState.objectMapping, jobState.objects, jobState.tags);
         var tenantConfig = tenantState.getTenantConfig(jobState.tenant);
 
-        jobState.jobConfig = JobConfig.newBuilder()
+        var jobConfig = JobConfig.newBuilder()
                 .setJobId(jobState.jobId)
                 .setJob(jobState.definition)
                 .putAllObjectMapping(jobState.objectMapping)
                 .putAllObjects(jobState.objects)
                 .putAllTags(jobState.tags)
                 .setResultId(jobState.resultId)
-                .addAllPreallocatedIds(jobState.preallocatedIds)
-                .build();
+                .addAllPreallocatedIds(jobState.preallocatedIds);
 
         var requiredResources = jobLogic.requiredResources(jobState.definition, metadata, tenantConfig);
 
@@ -331,9 +330,18 @@ public class JobProcessorHelpers {
             }
         }
 
-        jobState.sysConfig = sysConfig.build();
+        var jobTimestamp = MetadataCodec.decodeDatetime(jobState.jobId.getObjectTimestamp());
+        var jobDate = MetadataCodec.ISO_DATE_FORMAT.format(jobTimestamp.toLocalDate());
+        var resultDir = String.format("%d/%s/%s", jobTimestamp.getYear(), jobDate, jobState.jobKey);
+        var resultFile = String.format("job_result_%s.json", jobState.jobKey);
+        var resultPath = resultDir + "/" + resultFile;
 
-        return jobState;
+        var newState = jobState.clone();
+        newState.sysConfig = sysConfig.build();
+        newState.jobConfig = jobConfig.build();
+        newState.jobResultPath = resultPath;
+
+        return newState;
     }
 
     private ResourceDefinition translateResourceConfig(String resourceKey, ResourceDefinition resource, JobState jobState) {
@@ -385,7 +393,7 @@ public class JobProcessorHelpers {
             else
                 result.setStatusMessage("No details available");
 
-            var jobResult = RuntimeJobResult.newBuilder()
+            var jobResult = JobResult.newBuilder()
                     .setJobId(jobState.jobId)
                     .setResultId(jobState.resultId)
                     .setResult(result);
@@ -426,8 +434,8 @@ public class JobProcessorHelpers {
         jobState.statusMessage = finalResult.getResult().getStatusMessage();
     }
 
-    private RuntimeJobResult addCommonOutputs(
-            RuntimeJobResult jobResult, RuntimeJobResult runtimeResult,
+    private JobResult addCommonOutputs(
+            JobResult jobResult, JobResult runtimeResult,
             Map<String, TagHeader> resultIds, JobState jobState) {
 
         var resultDef = runtimeResult.getResult().toBuilder();
@@ -483,7 +491,7 @@ public class JobProcessorHelpers {
             var objectKey = MetadataUtil.objectKey(objectId);
 
             var attrs = finalResult
-                    .getAttrsOrDefault(objectKey, RuntimeJobResultAttrs.getDefaultInstance())
+                    .getAttrsOrDefault(objectKey, JobResultAttrs.getDefaultInstance())
                     .toBuilder();
 
             attrs.addAttrs(TagUpdate.newBuilder()
@@ -504,7 +512,7 @@ public class JobProcessorHelpers {
         return finalResult.build();
     }
 
-    private void checkResultAvailable(TagSelector selector, String outputKey, RuntimeJobResult jobResult) {
+    private void checkResultAvailable(TagSelector selector, String outputKey, JobResult jobResult) {
 
         var displayKey = MetadataUtil.objectKey(selector);
 
@@ -515,11 +523,11 @@ public class JobProcessorHelpers {
             throw new EJobResult(String.format("Missing definition in job result: [%s]", displayKey));
     }
 
-    private Map<String, TagHeader> buildResultLookup(RuntimeJobResult runtimeResult) {
+    private Map<String, TagHeader> buildResultLookup(JobResult jobResult) {
 
         var duplicates = new HashSet<String>();
 
-        var resultLookup = runtimeResult
+        var resultLookup = jobResult
                 .getObjectIdsList().stream()
                 .collect(Collectors.toMap(TagHeader::getObjectId, Function.identity(),
                 (id1, id2) -> { duplicates.add(MetadataUtil.objectKey(id2)); return id1; }));

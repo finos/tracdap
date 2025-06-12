@@ -17,13 +17,12 @@
 
 package org.finos.tracdap.svc.orch.service;
 
-import io.grpc.Context;
-import org.finos.tracdap.api.JobRequest;
-import org.finos.tracdap.api.JobStatus;
-import org.finos.tracdap.api.MetadataWriteRequest;
+import org.finos.tracdap.api.*;
 import org.finos.tracdap.api.internal.RuntimeJobStatus;
 import org.finos.tracdap.api.internal.InternalMetadataApiGrpc.InternalMetadataApiBlockingStub;
 import org.finos.tracdap.common.cache.CacheEntry;
+import org.finos.tracdap.common.config.ConfigFormat;
+import org.finos.tracdap.common.config.ConfigParser;
 import org.finos.tracdap.common.exception.*;
 import org.finos.tracdap.common.grpc.RequestMetadata;
 import org.finos.tracdap.common.grpc.UserMetadata;
@@ -35,10 +34,12 @@ import org.finos.tracdap.common.plugin.PluginRegistry;
 import org.finos.tracdap.common.service.TenantConfigManager;
 import org.finos.tracdap.common.validation.Validator;
 import org.finos.tracdap.common.metadata.MetadataBundle;
+import org.finos.tracdap.config.JobResult;
 import org.finos.tracdap.metadata.JobStatusCode;
 import org.finos.tracdap.metadata.ObjectType;
 import org.finos.tracdap.metadata.TagUpdate;
 
+import io.grpc.Context;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 
@@ -54,11 +55,18 @@ import static org.finos.tracdap.common.metadata.MetadataConstants.TRAC_JOB_STATU
 
 public class JobProcessor {
 
+    public static final String TRAC_RESULTS = "trac_results";
+
     private final Logger log = LoggerFactory.getLogger(getClass());
 
     private final TenantConfigManager tenantState;
+    private final GrpcConcern commonConcerns;
+
     private final InternalMetadataApiBlockingStub metaClient;
+    private final TracStorageApiGrpc.TracStorageApiBlockingStub storageClient;
     private final IJobExecutor<?> executor;
+
+    private final ConfigParser configParser = new ConfigParser();
     private final Validator validator = new Validator();
 
     // TODO: Refactor into this class
@@ -71,7 +79,10 @@ public class JobProcessor {
             PluginRegistry registry) {
 
         this.tenantState = tenantState;
+        this.commonConcerns = commonConcerns;
+
         this.metaClient = registry.getSingleton(InternalMetadataApiBlockingStub.class);
+        this.storageClient = registry.getSingleton(TracStorageApiGrpc.TracStorageApiBlockingStub.class);
         this.executor = registry.getSingleton(JobExecutor.class);
 
         this.lifecycle = new JobProcessorHelpers(tenantState, commonConcerns, registry);
@@ -344,31 +355,24 @@ public class JobProcessor {
 
     public JobState fetchJobResult(JobState jobState) {
 
-        // TODO: Handle errors decoding the executor state, in stronglyTypeState()
-        // This could happen if e.g. the platform configuration is changed with a new executor
-        // Probably the job should be failed and removed from the cache
-
-        var jobExecutor = stronglyTypedExecutor();
-        var executorState = stronglyTypedState(jobExecutor, jobState.executorState);
-
-        if (jobState.executorState == null) {
-
-            log.info("Cannot fetch job result: [{}] Executor state is not available", jobState.jobKey);
-
-            var newState = jobState.clone();
-            newState.tracStatus = JobStatusCode.FAILED;
-            newState.cacheStatus = CacheStatus.RESULTS_INVALID;
-            newState.statusMessage = "executor state is not available";
-
-            return newState;
-        }
-
         try {
 
-            var runtimeResult = jobExecutor.getJobResult(executorState);
+            var clientState = commonConcerns.prepareClientCall(Context.ROOT);
+            var client = clientState.configureClient(storageClient);
+
+            var request = StorageReadRequest.newBuilder()
+                    .setTenant(jobState.tenant)
+                    .setStorageKey(TRAC_RESULTS)
+                    .setStoragePath(jobState.jobResultPath)
+                    .build();
+
+            var jobResultFile = client.readSmallFile(request);
+            var jobResult = configParser.parseConfig(jobResultFile.getContent().toByteArray(), ConfigFormat.JSON, JobResult.class);
+
+            validator.validateFixedObject(jobResult);
 
             var newState = jobState.clone();
-            newState.runtimeResult = runtimeResult;
+            newState.runtimeResult = jobResult;
             newState.tracStatus = JobStatusCode.FINISHING;
             newState.cacheStatus = CacheStatus.RESULTS_RECEIVED;
 

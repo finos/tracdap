@@ -18,6 +18,7 @@
 package org.finos.tracdap.svc.orch;
 
 import org.finos.tracdap.api.OrchestratorServiceProto;
+import org.finos.tracdap.api.TracStorageApiGrpc;
 import org.finos.tracdap.api.internal.InternalMessagingProto;
 import org.finos.tracdap.api.internal.InternalMetadataApiGrpc;
 import org.finos.tracdap.common.cache.IJobCacheManager;
@@ -79,8 +80,6 @@ public class TracOrchestratorService extends TracServiceBase {
 
     private Server server;
     private ManagedChannel clientChannel;
-    private  InternalMetadataApiGrpc.InternalMetadataApiBlockingStub metaClient;
-    private GrpcConcern commonConcerns;
 
     private IBatchExecutor<? extends Serializable> batchExecutor;
     private JobManager jobManager;
@@ -143,16 +142,16 @@ public class TracOrchestratorService extends TracServiceBase {
             serviceGroup = new NioEventLoopGroup(CONCURRENT_REQUESTS, new DefaultThreadFactory("orch-svc"));
             registry.addSingleton(ScheduledExecutorService.class, serviceGroup);
 
-            // Common framework for cross-cutting concerns
-            commonConcerns = buildCommonConcerns();
-            registry.addSingleton(GrpcConcern.class, commonConcerns);
-
-            // Metadata client
+            // Set up API clients and cross-cutting concerns
             var clientChannelFactory = new ClientChannelFactory(clientChannelType);
-            metaClient = prepareMetadataClient(platformConfig, clientChannelFactory, commonConcerns);
+            var commonConcerns = buildCommonConcerns();
+            var metaClient = prepareMetadataClient(platformConfig, clientChannelFactory, commonConcerns);
+            var storageClient = prepareStorageClient(platformConfig, clientChannelFactory, commonConcerns);
 
             registry.addSingleton(GrpcChannelFactory.class, clientChannelFactory);
+            registry.addSingleton(GrpcConcern.class, commonConcerns);
             registry.addSingleton(InternalMetadataApiGrpc.InternalMetadataApiBlockingStub.class, metaClient);
+            registry.addSingleton(TracStorageApiGrpc.TracStorageApiBlockingStub.class, storageClient);
 
             // Load dynamic config and resources
             var tenantState = new TenantConfigManager(tenantConfigMap, configManager, metaClient, commonConcerns);
@@ -319,6 +318,22 @@ public class TracOrchestratorService extends TracServiceBase {
         var metadataClient = InternalMetadataApiGrpc.newBlockingStub(clientChannel);
 
         return commonConcerns.configureClient(metadataClient);
+    }
+
+    private TracStorageApiGrpc.TracStorageApiBlockingStub prepareStorageClient(
+            PlatformConfig platformConfig, GrpcChannelFactory channelFactory,
+            GrpcConcern commonConcerns) {
+
+        var storageTarget = RoutingUtils.serviceTarget(platformConfig, ConfigKeys.DATA_SERVICE_KEY);
+
+        log.info("Using data service at [{}:{}]",
+                storageTarget.getHost(), storageTarget.getPort());
+
+        clientChannel = channelFactory.createChannel(storageTarget.getHost(), storageTarget.getPort());
+
+        var storageClient = TracStorageApiGrpc.newBlockingStub(clientChannel);
+
+        return commonConcerns.configureClient(storageClient);
     }
 
     private class ClientChannelFactory implements GrpcChannelFactory {

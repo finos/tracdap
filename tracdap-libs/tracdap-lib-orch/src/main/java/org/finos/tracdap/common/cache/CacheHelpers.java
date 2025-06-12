@@ -157,7 +157,7 @@ public class CacheHelpers {
             var message = "The job cache references code for an unknown class [" + e.getMessage() + "]";
             throw new ECacheCorruption(message, e);
         }
-        catch (IOException e) {
+        catch (IOException | IllegalStateException e) {
             var message = "The job cache contains a corrupt entry that cannot be decoded";
             throw new ECacheCorruption(message, e);
         }
