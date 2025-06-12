@@ -1,0 +1,121 @@
+/*
+ * Licensed to the Fintech Open Source Foundation (FINOS) under one or
+ * more contributor license agreements. See the NOTICE file distributed
+ * with this work for additional information regarding copyright ownership.
+ * FINOS licenses this file to you under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with the
+ * License. You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+syntax = "proto3";
+package tracdap.api;
+
+option java_package = "org.finos.tracdap.api";
+option java_outer_classname = "StorageServiceProto";
+option java_multiple_files = true;
+
+import "tracdap/metadata/type.proto";
+
+
+service TracStorageApi {
+
+  rpc exists(StorageRequest) returns (StorageExistsResponse);
+
+  rpc size(StorageRequest) returns (StorageExistsResponse);
+
+  rpc stat(StorageRequest) returns (StorageStatResponse);
+
+  rpc ls(StorageRequest) returns (StorageLsResponse);
+
+  rpc mkdir(StorageRequest) returns (StorageOkResponse);
+
+  rpc rm(StorageRequest) returns (StorageOkResponse);
+
+  rpc rmdir(StorageRequest) returns (StorageOkResponse);
+
+  rpc readFile(StorageReadRequest) returns (stream StorageReadResponse);
+
+  rpc readSmallFile(StorageReadRequest) returns (StorageReadResponse);
+
+  rpc writeFile(stream StorageWriteRequest) returns (StorageOkResponse);
+
+  rpc writeSmallFile(StorageWriteRequest) returns (StorageOkResponse);
+}
+
+message StorageRequest {
+
+  string tenant = 1;
+  string storageKey = 2;
+  string storagePath = 3;
+}
+
+message StorageReadRequest {
+
+  string tenant = 1;
+  string storageKey = 2;
+  string storagePath = 3;
+}
+
+message StorageWriteRequest {
+
+  string tenant = 1;
+  string storageKey = 2;
+  string storagePath = 3;
+
+  bytes content = 4;
+}
+
+message StorageExistsResponse {
+
+  bool exists = 1;
+}
+
+message StorageSizeResponse {
+
+  int64 size = 1;
+}
+
+message StorageStatResponse {
+
+  FileStat stat = 1;
+}
+
+message StorageLsResponse {
+
+  repeated FileStat stat = 1;
+}
+
+message StorageReadResponse {
+
+  bytes content = 1;
+}
+
+message StorageOkResponse {
+
+  bool ok = 1;
+}
+
+message FileStat {
+
+  string storagePath = 1;
+  string fileName = 2;
+  FileType fileType = 3;
+  int64 fileSize = 4;
+
+  metadata.DatetimeValue mtime = 5;
+  metadata.DatetimeValue atime = 6;
+}
+
+enum FileType {
+  FILE_TYPE_NOT_SET = 0;
+  FILE = 1;
+  DIRECTORY = 2;
+}
