@@ -17,28 +17,21 @@ tenants:
   ACME_CORP:
 
     properties:
-      storage.default.location: default_storage
+      storage.default.location: STORAGE_INTEGRATION
       storage.default.format: ARROW_FILE
 
     resources:
 
-      default_storage:
+      STORAGE_INTEGRATION:
         resourceType: INTERNAL_STORAGE
         protocol: S3
         properties:
-          region: eu-west-2
-          bucket: my-bucket
-          prefix: default_storage/
-          endpoint: endpoint.com
-
-      trac_results:
-        resourceType: INTERNAL_STORAGE
-        protocol: S3
-        properties:
-          region: eu-west-2
-          bucket: my-bucket
-          prefix: trac_job_results/
-          endpoint: endpoint.com
+          region: ${TRAC_AWS_REGION}
+          bucket: ${TRAC_AWS_BUCKET}
+          prefix: int_storage_${TRAC_TEST_ID}/
+          credentials: ${TRAC_AWS_CREDENTIALS}
+          accessKeyId: ${TRAC_AWS_ACCESS_KEY_ID}
+          secretAccessKey: ${TRAC_AWS_SECRET_ACCESS_KEY}
 
       UNIT_TEST_REPO:
         resourceType: MODEL_REPOSITORY
