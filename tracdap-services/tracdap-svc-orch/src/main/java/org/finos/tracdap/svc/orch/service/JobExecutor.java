@@ -47,6 +47,8 @@ import java.util.regex.Pattern;
 
 public class JobExecutor<TBatchState extends Serializable> implements IJobExecutor<JobExecutorState<TBatchState>> {
 
+    private static final String TRAC_RESULTS = "trac_results";
+
     private static final short DEFAULT_RUNTIME_API_PORT = 9000;
 
     private static final Pattern TRAC_ERROR_LINE = Pattern.compile("tracdap.rt.exceptions.(E\\w+): (.+)");
@@ -125,7 +127,11 @@ public class JobExecutor<TBatchState extends Serializable> implements IJobExecut
                             LaunchArg.string("--job-config"), LaunchArg.path("config", "job_config.json"),
                             LaunchArg.string("--scratch-dir"), LaunchArg.path("scratch", ".")));
 
-            if (resultVolumeEnabled) {
+            if (sysConfig.containsResources(TRAC_RESULTS)) {
+                batchConfig.addExtraArgs(List.of(
+                        LaunchArg.string("--job-result-format"), LaunchArg.string("json")));
+            }
+            else if (resultVolumeEnabled) {
                 batchState = batchExecutor.addVolume(batchKey, batchState, "result", BatchVolumeType.OUTPUT_VOLUME);
                 batchConfig.addExtraArgs(List.of(
                         LaunchArg.string("--job-result-dir"), LaunchArg.path("result", "."),
