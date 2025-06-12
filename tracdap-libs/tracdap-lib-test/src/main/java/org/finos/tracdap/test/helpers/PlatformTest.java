@@ -78,6 +78,7 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
             "TracAdminService", ConfigKeys.ADMIN_SERVICE_KEY);
 
     public static final String TRAC_EXEC_DIR = "TRAC_EXEC_DIR";
+    public static final String TRAC_RESULTS_DIR = "trac_results";
     public static final String STORAGE_ROOT_DIR = "storage_root";
     public static final String DEFAULT_STORAGE_FORMAT = "ARROW_FILE";
 
@@ -208,6 +209,7 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
 
     private String testId;
     private Path workingDir;
+    private Path resultsDir;
     private Path storageDir;
     private Path executorDir;
     private Path tracRepoDir;
@@ -424,6 +426,9 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         storageDir = workingDir.resolve(STORAGE_ROOT_DIR);
         Files.createDirectory(storageDir);
 
+        resultsDir = workingDir.resolve(TRAC_RESULTS_DIR);
+        Files.createDirectory(resultsDir);
+
         executorDir = System.getenv().containsKey(TRAC_EXEC_DIR)
                 ? Paths.get(System.getenv(TRAC_EXEC_DIR))
                 : workingDir;
@@ -465,6 +470,7 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         // The substitutions have some special handling in PlatformTest to set them up
         var staticSubstitutions = Map.of(
                 "${TRAC_DIR}", workingDir.toString().replace("\\", "\\\\"),
+                "${TRAC_RESULTS_DIR}", resultsDir.toString().replace("\\", "\\\\"),
                 "${TRAC_STORAGE_DIR}", storageDir.toString().replace("\\", "\\\\"),
                 "${TRAC_STORAGE_FORMAT}", storageFormat,
                 "${TRAC_EXEC_DIR}", executorDir.toString().replace("\\", "\\\\"),
