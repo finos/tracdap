@@ -98,14 +98,19 @@ public class StorageService {
 
     private static FileStat convertFileStat(org.finos.tracdap.common.storage.FileStat fileStat) {
 
-        return FileStat.newBuilder()
+        var stat = FileStat.newBuilder()
                 .setStoragePath(fileStat.storagePath)
                 .setFileName(fileStat.fileName)
                 .setFileType(convertFileType(fileStat.fileType))
-                .setFileSize(fileStat.size)
-                .setMtime(MetadataCodec.encodeDatetime(fileStat.mtime))
-                .setAtime(MetadataCodec.encodeDatetime(fileStat.atime))
-                .build();
+                .setFileSize(fileStat.size);
+
+        if (fileStat.mtime != null)
+            stat.setMtime(MetadataCodec.encodeDatetime(fileStat.mtime));
+
+        if (fileStat.atime != null)
+            stat.setAtime(MetadataCodec.encodeDatetime(fileStat.atime));
+
+        return stat.build();
     }
 
     public void readFile(
