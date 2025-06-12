@@ -245,6 +245,7 @@ public class JobProcessorHelpers {
                 .build();
 
         jobState.jobId = client.createObject(jobWriteReq);
+        jobState.jobKey = MetadataUtil.objectKey(jobState.jobId);
 
         return jobState;
     }

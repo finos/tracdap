@@ -176,7 +176,6 @@ public class JobManager {
             newState_.cacheStatus = CacheStatus.QUEUED_IN_TRAC;
 
             var newState = processor.saveInitialMetadata(newState_);
-            newState.jobKey = MetadataUtil.objectKey(newState.jobId);
 
             try (var ticket = cache.openNewTicket(newState.jobKey, cacheTicketDuration)) {
 
