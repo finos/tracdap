@@ -78,11 +78,7 @@ class CoreJobsTest(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmpdir:
 
-            trac_runtime = runtime.TracRuntime(
-                self.sys_config,
-                job_result_dir=tmpdir,
-                job_result_format="json")
-
+            trac_runtime = runtime.TracRuntime(self.sys_config, scratch_dir=tmpdir)
             trac_runtime.pre_start()
 
             with trac_runtime as rt:
@@ -101,11 +97,7 @@ class CoreJobsTest(unittest.TestCase):
             translator = dev_mode.DevModeTranslator(self.sys_config, None, scratch_dir)  # No config mgr
             job_config = translator.translate_job_config(job_config)
 
-            trac_runtime = runtime.TracRuntime(
-                self.sys_config,
-                job_result_dir=tmpdir,
-                job_result_format="json")
-
+            trac_runtime = runtime.TracRuntime(self.sys_config)
             trac_runtime.pre_start()
 
             with trac_runtime as rt:
@@ -138,11 +130,7 @@ class CoreJobsTest(unittest.TestCase):
 
             # Now continue with the job as normal
 
-            trac_runtime = runtime.TracRuntime(
-                self.sys_config,
-                job_result_dir=tmpdir,
-                job_result_format="json")
-
+            trac_runtime = runtime.TracRuntime(self.sys_config)
             trac_runtime.pre_start()
 
             with trac_runtime as rt:
