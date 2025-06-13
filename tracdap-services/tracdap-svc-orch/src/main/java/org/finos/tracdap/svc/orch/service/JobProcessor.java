@@ -22,6 +22,8 @@ import org.finos.tracdap.api.internal.RuntimeJobStatus;
 import org.finos.tracdap.api.internal.InternalMetadataApiGrpc.InternalMetadataApiBlockingStub;
 import org.finos.tracdap.common.cache.CacheEntry;
 import org.finos.tracdap.common.config.ConfigFormat;
+import org.finos.tracdap.common.config.ConfigHelpers;
+import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.config.ConfigParser;
 import org.finos.tracdap.common.exception.*;
 import org.finos.tracdap.common.grpc.RequestMetadata;
@@ -54,8 +56,6 @@ import static org.finos.tracdap.common.metadata.MetadataConstants.TRAC_JOB_STATU
 
 
 public class JobProcessor {
-
-    public static final String TRAC_RESULTS = "trac_results";
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
@@ -360,22 +360,18 @@ public class JobProcessor {
             var clientState = commonConcerns.prepareClientCall(Context.ROOT);
             var client = clientState.configureClient(storageClient);
 
+            var storageKey = ConfigHelpers.readString("job config", jobState.jobConfig.getPropertiesMap(), ConfigKeys.RESULT_STORAGE_LOCATION);
+            var storagePath = ConfigHelpers.readString("job config", jobState.jobConfig.getPropertiesMap(), ConfigKeys.RESULT_STORAGE_PATH);
+            var format = ConfigHelpers.readString("job config", jobState.jobConfig.getPropertiesMap(), ConfigKeys.RESULT_FORMAT);
+
             var request = StorageReadRequest.newBuilder()
                     .setTenant(jobState.tenant)
-                    .setStorageKey(TRAC_RESULTS)
-                    .setStoragePath(jobState.jobResultPath)
+                    .setStorageKey(storageKey)
+                    .setStoragePath(storagePath)
                     .build();
 
             var jobResultFile = client.readSmallFile(request);
-            var jobResult = configParser.parseConfig(jobResultFile.getContent().toByteArray(), ConfigFormat.JSON, JobResult.class);
-
-            if (jobResult.getResult().hasLogFileId() && jobResult.getResult().getLogFileId().getObjectId().isBlank()) {
-
-                jobResult = jobResult.toBuilder()
-                        .setResult(jobResult.getResult().toBuilder()
-                        .clearLogFileId())
-                        .build();
-            }
+            var jobResult = configParser.parseConfig(jobResultFile.getContent().toByteArray(), ConfigFormat.valueOf(format), JobResult.class);
 
             var newState = jobState.clone();
             newState.runtimeResult = jobResult;
