@@ -51,6 +51,13 @@ class ConfigKeys:
     STORAGE_DEFAULT_FORMAT = "storage.default.format"
     STORAGE_DEFAULT_LAYOUT = "storage.default.layout"
 
+    RESULT_ENABLED = "result.enabled"
+    RESULT_LOGS_ENABLED = "result.logs.enabled"
+    RESULT_STORAGE_LOCATION = "result.storage.location"
+    RESULT_STORAGE_PATH = "result.storage.path"
+    RESULT_FORMAT = "result.format"
+
+
 
 class ConfigKDefaults:
 
