@@ -455,7 +455,6 @@ public class RunFlowTest {
     }
 
     @Test @Order(6)
-    @Disabled
     void checkResultAndLogFile() {
 
         var metaClient = platform.metaClientBlocking();

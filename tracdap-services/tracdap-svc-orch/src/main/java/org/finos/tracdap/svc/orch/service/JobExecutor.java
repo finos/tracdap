@@ -82,7 +82,6 @@ public class JobExecutor<TBatchState extends Serializable> implements IJobExecut
 
             var runtimeApiEnabled = batchExecutor.hasFeature(IBatchExecutor.Feature.EXPOSE_PORT);
             var storageMappingEnabled = batchExecutor.hasFeature(IBatchExecutor.Feature.STORAGE_MAPPING);
-            var resultVolumeEnabled = batchExecutor.hasFeature(IBatchExecutor.Feature.OUTPUT_VOLUMES);
             var logVolumeEnabled = batchExecutor.hasFeature(IBatchExecutor.Feature.OUTPUT_VOLUMES);
 
             if (runtimeApiEnabled) {
@@ -119,17 +118,6 @@ public class JobExecutor<TBatchState extends Serializable> implements IJobExecut
                             LaunchArg.string("--job-config"), LaunchArg.path("config", "job_config.json"),
                             LaunchArg.string("--scratch-dir"), LaunchArg.path("scratch", ".")));
 
-            if (sysConfig.containsResources(TRAC_RESULTS)) {
-                batchConfig.addExtraArgs(List.of(
-                        LaunchArg.string("--job-result-format"), LaunchArg.string("json")));
-            }
-            else if (resultVolumeEnabled) {
-                batchState = batchExecutor.addVolume(batchKey, batchState, "result", BatchVolumeType.OUTPUT_VOLUME);
-                batchConfig.addExtraArgs(List.of(
-                        LaunchArg.string("--job-result-dir"), LaunchArg.path("result", "."),
-                        LaunchArg.string("--job-result-format"), LaunchArg.string("json")));
-            }
-
             if (logVolumeEnabled) {
                 batchState = batchExecutor.addVolume(batchKey, batchState, "log", BatchVolumeType.OUTPUT_VOLUME);
                 batchConfig.addLoggingRedirect(
@@ -143,7 +131,6 @@ public class JobExecutor<TBatchState extends Serializable> implements IJobExecut
             jobState.batchKey = batchKey;
             jobState.batchState = batchState;
             jobState.runtimeApiEnabled = runtimeApiEnabled;
-            jobState.resultVolumeEnabled = resultVolumeEnabled;
             jobState.logVolumeEnabled = logVolumeEnabled;
 
             return jobState;

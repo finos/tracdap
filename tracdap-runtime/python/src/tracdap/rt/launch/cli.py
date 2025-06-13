@@ -36,14 +36,6 @@ def _cli_args(programmatic_args = None):
         help="Enable development mode config translation")
 
     parser.add_argument(
-        "--job-result-dir", dest="job_result_dir", type=pathlib.Path, required=False,
-        help="Output the result metadata for a batch job to the given directory")
-
-    parser.add_argument(
-        "--job-result-format", dest="job_result_format", choices=["json", "yaml", "proto"], default="json",
-        help="Output format for the result metadata (only meaningful if --job-result-dir is set)")
-
-    parser.add_argument(
         "--scratch-dir", dest="scratch_dir", type=pathlib.Path, required=False,
         help="Scratch directory for working files" +
              " (if not supplied the system's temp location will be used)")

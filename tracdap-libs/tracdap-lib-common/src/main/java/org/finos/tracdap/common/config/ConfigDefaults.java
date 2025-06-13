@@ -33,4 +33,6 @@ public class ConfigDefaults {
 
     public static final String STORAGE_DEFAULT_FORMAT = "ARROW_FILE";
     public static final StorageLayout STORAGE_DEFAULT_LAYOUT = StorageLayout.OBJECT_ID_LAYOUT;
+
+    public static final String RESULT_STORAGE_LOCATION = "trac_results";
 }

@@ -63,8 +63,6 @@ class TracRuntime:
     def __init__(
             self,
             sys_config: tp.Union[str, pathlib.Path, _cfg.RuntimeConfig],
-            job_result_dir: tp.Union[str, pathlib.Path, None] = None,
-            job_result_format: tp.Optional[str] = None,
             scratch_dir: tp.Union[str, pathlib.Path, None] = None,
             scratch_dir_persist: bool = False,
             plugin_packages: tp.List[str] = None,
@@ -91,8 +89,6 @@ class TracRuntime:
 
         self._sys_config = sys_config if isinstance(sys_config, _cfg.RuntimeConfig) else None
         self._sys_config_path = sys_config if not self._sys_config else None
-        self._job_result_dir = job_result_dir
-        self._job_result_format = job_result_format
         self._scratch_dir = scratch_dir
         self._scratch_dir_provided = True if scratch_dir is not None else False
         self._scratch_dir_persist = scratch_dir_persist
@@ -363,10 +359,7 @@ class TracRuntime:
         job_key = _util.object_key(job_config.jobId)
         self._jobs[job_key] = _RuntimeJobInfo()
 
-        self._system.send_main(
-            "submit_job", job_config,
-            str(self._job_result_dir) if self._job_result_dir else "",
-            self._job_result_format if self._job_result_format else "")
+        self._system.send_main("submit_job", job_config)
 
     def wait_for_job(self, job_id: _api.TagHeader):
 

@@ -15,10 +15,8 @@
 
 import copy as cp
 import dataclasses as dc
-import datetime as dt
 import enum
 import io
-import pathlib
 import typing as tp
 
 import tracdap.rt.metadata as _meta
@@ -85,14 +83,6 @@ class _EngineContext:
 
 
 @dc.dataclass
-class _JobResultSpec:
-
-    save_result: bool = False
-    result_dir: tp.Union[str, pathlib.Path] = None
-    result_format: str = None
-
-
-@dc.dataclass
 class _JobLog:
 
     log_init: "dc.InitVar[tp.Optional[_JobLog]]" = None
@@ -118,18 +108,15 @@ class _JobLog:
 class _JobState:
 
     job_id: _meta.TagHeader
+    job_config: _cfg.JobConfig = None
+    parent_key: str = None
 
     actor_id: _actors.ActorId = None
     monitors: tp.List[_actors.ActorId] = dc.field(default_factory=list)
+    job_log: _JobLog = None
 
-    job_config: _cfg.JobConfig = None
     job_result: _cfg.JobResult = None
     job_error: Exception = None
-
-    parent_key: str = None
-    result_spec: _JobResultSpec = None
-
-    job_log: _JobLog = None
 
 
 class TracEngine(_actors.Actor):
@@ -198,26 +185,25 @@ class TracEngine(_actors.Actor):
         return super().on_signal(signal)
 
     @_actors.Message
-    def submit_job(
-            self, job_config: _cfg.JobConfig,
-            job_result_dir: str,
-            job_result_format: str):
+    def submit_job(self, job_config: _cfg.JobConfig):
 
         job_key = _util.object_key(job_config.jobId)
 
         self._log.info(f"Received a new job: [{job_key}]")
 
-        result_needed = bool(job_result_format)
-        result_spec = _JobResultSpec(result_needed, job_result_dir, job_result_format)
-        job_log_needed = bool(job_result_dir)
-        job_log = _JobLog(log_file_needed=job_log_needed)
-
         job_state = _JobState(job_config.jobId)
-        job_state.job_log = job_log
+        job_state.job_config = job_config
+
+        job_logs_enabled = _util.read_property(
+            job_config.properties,
+            _cfg_p.ConfigKeys.RESULT_LOGS_ENABLED,
+            False, bool)
+
+        job_log = _JobLog(log_file_needed=job_logs_enabled)
 
         job_processor = JobProcessor(
             self._sys_config, self._models, self._storage,
-            job_key, job_config, graph_spec=None, job_log=job_state.job_log)
+            job_key, job_config, graph_spec=None, job_log=job_log)
 
         job_actor_id = self.actors().spawn(job_processor)
 
@@ -228,8 +214,7 @@ class TracEngine(_actors.Actor):
 
         job_state.actor_id = job_actor_id
         job_state.monitors.append(job_monitor_id)
-        job_state.job_config = job_config
-        job_state.result_spec = result_spec
+        job_state.job_log = job_log
 
         self._jobs[job_key] = job_state
 
@@ -247,6 +232,10 @@ class TracEngine(_actors.Actor):
 
         self._log.info(f"Received a child job: [{child_key}] for parent [{parent_key}]")
 
+        # Copy job config properties from parent job
+        child_config = _cfg.JobConfig()
+        child_config.properties.update(parent_state.job_config.properties)
+
         child_job_log = _JobLog(parent_state.job_log)
 
         child_processor = JobProcessor(
@@ -256,11 +245,11 @@ class TracEngine(_actors.Actor):
         child_actor_id = self.actors().spawn(child_processor)
 
         child_state = _JobState(child_id)
-        child_state.job_log = child_job_log
+        child_state.job_config = child_config
+        child_state.parent_key = parent_key
         child_state.actor_id = child_actor_id
         child_state.monitors.append(monitor_id)
-        child_state.parent_key = parent_key
-        child_state.result_spec = _JobResultSpec(False)  # Do not output separate results for child jobs
+        child_state.job_log = child_job_log
 
         self._jobs[child_key] = child_state
 
@@ -334,8 +323,13 @@ class TracEngine(_actors.Actor):
 
         job_state = self._jobs.get(job_key)
 
-        # Record output metadata if required (not needed for local runs or when using API server)
-        if job_state.parent_key is None and job_state.result_spec.save_result:
+        result_enabled = _util.read_property(
+            job_state.job_config.properties,
+            _cfg_p.ConfigKeys.RESULT_ENABLED,
+            False, bool)
+
+        # Record output metadata if required
+        if result_enabled and job_state.parent_key is None:
             self._save_job_result(job_key, job_state)
 
         # Stop any monitors that were created directly by the engine
@@ -354,27 +348,13 @@ class TracEngine(_actors.Actor):
 
         self._log.info(f"Saving job result for [{job_key}]")
 
-        # It might be better abstract reporting of results, job status etc., perhaps with a job monitor
-
-        if not job_state.result_spec.save_result:
-            return
-
-        result_format = job_state.result_spec.result_format
+        storage_key = _util.read_property(job_state.job_config.properties, _cfg_p.ConfigKeys.RESULT_STORAGE_LOCATION)
+        storage_path = _util.read_property(job_state.job_config.properties, _cfg_p.ConfigKeys.RESULT_STORAGE_PATH)
+        result_format = _util.read_property(job_state.job_config.properties, _cfg_p.ConfigKeys.RESULT_FORMAT, "JSON")
         result_content = _cfg_p.ConfigQuoter.quote(job_state.job_result, result_format)
 
-        result_file = f"job_result_{job_key}.{result_format}"
-        job_time = dt.datetime.fromisoformat(job_state.job_id.objectTimestamp.isoDatetime)
-
-        if self._storage.has_file_storage("trac_results"):
-            result_dir = f"{job_time.date().year}/{job_time.date().isoformat()}/{_util.object_key(job_state.job_id)}"
-            result_path = f"{result_dir}/{result_file}"
-            storage = self._storage.get_file_storage("trac_results")
-            storage.write_bytes(result_path, result_content.encode('utf-8'))
-        else:
-            result_dir = job_state.result_spec.result_dir
-            result_path = pathlib.Path(result_dir).joinpath(result_file)
-            with open(result_path, "xt") as result_stream:
-                result_stream.write(result_content)
+        storage = self._storage.get_file_storage(storage_key)
+        storage.write_bytes(storage_path, result_content.encode('utf-8'))
 
     def _get_job_info(self, job_key: str, details: bool = False) -> tp.Optional[_cfg.JobResult]:
 
@@ -466,7 +446,7 @@ class JobProcessor(_actors.Actor):
         self._models = models
         self._storage = storage
 
-        self._job_log = job_log or _JobLog()
+        self._job_log = job_log if job_log is not None else _JobLog()
         self._log_provider = self._job_log.log_provider
         self._log = self._job_log.log_provider.logger_for_object(self)
 
@@ -543,7 +523,8 @@ class JobProcessor(_actors.Actor):
         # This will be the last message in the job log file
         self._log.info(f"Job succeeded [{self.job_key}]")
 
-        self._save_job_log_file(job_result)
+        if self._job_log.log_file_needed:
+            self._save_job_log_file(job_result)
 
         self.actors().stop(self.actors().sender)
         self.actors().send_parent("job_succeeded", self.job_key, job_result)
@@ -567,7 +548,8 @@ class JobProcessor(_actors.Actor):
             result_def.statusMessage = str(error)
             job_result = _cfg.JobResult(job_id, result_id, result_def)
 
-            self._save_job_log_file(job_result)
+            if self._job_log.log_file_needed:
+                self._save_job_log_file(job_result)
 
             self.actors().send_parent("job_failed", self.job_key, error, job_result)
 
@@ -578,16 +560,17 @@ class JobProcessor(_actors.Actor):
 
     def _save_job_log_file(self, job_result: _cfg.JobResult):
 
-        # Do not save log files for child jobs, or if a log is not available
+        # Do not fail the job if log content is not available
         if self._job_log.log_buffer is None:
-            if self._job_log.log_file_needed:
-                self._log.warning(f"Job log not available for [{self.job_key}]")
+            self._log.warning(f"Job log not available for [{self.job_key}]")
             return
 
         # Saving log files could go into a separate actor
 
         file_id = self._allocate_id(_meta.ObjectType.FILE)
         storage_id = self._allocate_id(_meta.ObjectType.STORAGE)
+
+        self._log.info(f"Saving job log [{_util.object_key(file_id)}]")
 
         file_name = "trac_job_log_file"
         file_type = _meta.FileType("TXT", "text/plain")

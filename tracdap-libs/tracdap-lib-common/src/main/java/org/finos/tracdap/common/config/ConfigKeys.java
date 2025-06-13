@@ -49,6 +49,13 @@ public class ConfigKeys {
     public static final String STORAGE_DEFAULT_FORMAT = "storage.default.format";
     public static final String STORAGE_DEFAULT_LAYOUT = "storage.default.layout";
 
+    // Runtime results
+    public static final String RESULT_ENABLED = "result.enabled";
+    public static final String RESULT_LOGS_ENABLED = "result.logs.enabled";
+    public static final String RESULT_STORAGE_LOCATION = "result.storage.location";
+    public static final String RESULT_STORAGE_PATH = "result.storage.path";
+    public static final String RESULT_FORMAT = "result.format";
+
     // Well-known config classes
     public static final String TRAC_CONFIG = "trac_config";
     public static final String TRAC_RESOURCES = "trac_resources";

@@ -19,8 +19,7 @@ package org.finos.tracdap.svc.orch.service;
 
 import org.finos.tracdap.api.*;
 import org.finos.tracdap.api.internal.InternalMetadataApiGrpc;
-import org.finos.tracdap.common.config.ConfigKeys;
-import org.finos.tracdap.common.config.ConfigManager;
+import org.finos.tracdap.common.config.*;
 import org.finos.tracdap.common.exception.EConsistencyValidation;
 import org.finos.tracdap.common.exception.EJobResult;
 import org.finos.tracdap.common.exception.EUnexpected;
@@ -50,6 +49,8 @@ import static org.finos.tracdap.common.metadata.MetadataConstants.*;
 
 
 public class JobProcessorHelpers {
+
+    public static final String RESULT_PATH_TEMPLATE = "%d/%s/%s/trac_job_result.json";
 
     private final Logger log = LoggerFactory.getLogger(JobProcessorHelpers.class);
 
@@ -300,10 +301,23 @@ public class JobProcessorHelpers {
                 .setResultId(jobState.resultId)
                 .addAllPreallocatedIds(jobState.preallocatedIds);
 
-        var requiredResources = jobLogic.requiredResources(jobState.definition, metadata, tenantConfig);
+        var resultLocation = ConfigHelpers.readStringOrDefault(
+                jobState.tenant, tenantConfig.getPropertiesMap(),
+                ConfigKeys.RESULT_STORAGE_LOCATION,
+                ConfigDefaults.RESULT_STORAGE_LOCATION);
+
+        var resultPath = buildResultPath(jobState);
+
+        jobConfig.putProperties(ConfigKeys.RESULT_ENABLED, Boolean.TRUE.toString());
+        jobConfig.putProperties(ConfigKeys.RESULT_LOGS_ENABLED, Boolean.TRUE.toString());
+        jobConfig.putProperties(ConfigKeys.RESULT_STORAGE_LOCATION, resultLocation);
+        jobConfig.putProperties(ConfigKeys.RESULT_STORAGE_PATH, resultPath);
+        jobConfig.putProperties(ConfigKeys.RESULT_FORMAT, ConfigFormat.JSON.toString());
 
         var sysConfig = RuntimeConfig.newBuilder();
         sysConfig.putAllProperties(tenantConfig.getPropertiesMap());
+
+        var requiredResources = jobLogic.requiredResources(jobState.definition, metadata, tenantConfig);
 
         for (var resourceKey : requiredResources) {
 
@@ -329,18 +343,22 @@ public class JobProcessorHelpers {
             }
         }
 
-        var jobTimestamp = MetadataCodec.decodeDatetime(jobState.jobId.getObjectTimestamp());
-        var jobDate = MetadataCodec.ISO_DATE_FORMAT.format(jobTimestamp.toLocalDate());
-        var resultDir = String.format("%d/%s/%s", jobTimestamp.getYear(), jobDate, jobState.jobKey);
-        var resultFile = String.format("job_result_%s.json", jobState.jobKey);
-        var resultPath = resultDir + "/" + resultFile;
-
         var newState = jobState.clone();
         newState.sysConfig = sysConfig.build();
         newState.jobConfig = jobConfig.build();
-        newState.jobResultPath = resultPath;
 
         return newState;
+    }
+
+    private String buildResultPath(JobState jobState) {
+
+        var jobTimestamp = MetadataCodec.decodeDatetime(jobState.jobId.getObjectTimestamp());
+
+        return String.format(
+                RESULT_PATH_TEMPLATE,
+                jobTimestamp.getYear(),
+                MetadataCodec.ISO_DATE_FORMAT.format(jobTimestamp.toLocalDate()),
+                jobState.jobKey);
     }
 
     private ResourceDefinition translateResourceConfig(String resourceKey, ResourceDefinition resource, JobState jobState) {
@@ -406,8 +424,6 @@ public class JobProcessorHelpers {
         // A result is available and ready to be processed
         var runtimeResult = jobState.runtimeResult;
 
-        log.info(runtimeResult.toString());
-
         // Apply validation to the runtime result - partially consistent results will be rejected
         // This is safest, but has the potential to lose useful error info in some cases
         validator.validateFixedObject(runtimeResult);
@@ -463,7 +479,7 @@ public class JobProcessorHelpers {
 
         // Add FILE and STORAGE objects for the job log
 
-        if (finalResult.getResult().hasLogFileId()) {
+        if (!finalResult.getResult().getLogFileId().getObjectId().isBlank()) {
 
             var logFileSelector = runtimeResult.getResult().getLogFileId();
             var logFileId = resultIds.get(logFileSelector.getObjectId());

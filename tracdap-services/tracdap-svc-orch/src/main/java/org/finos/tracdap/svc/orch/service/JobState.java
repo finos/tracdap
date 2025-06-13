@@ -18,7 +18,6 @@
 package org.finos.tracdap.svc.orch.service;
 
 import org.finos.tracdap.api.JobRequest;
-import org.finos.tracdap.api.internal.RuntimeJobResult;
 import org.finos.tracdap.api.internal.RuntimeJobStatus;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.grpc.RequestMetadata;
@@ -70,7 +69,7 @@ public class JobState implements Serializable, Cloneable {
     int retries;
 
     // Job definition and referenced metadata, built up by the job logic
-    JobDefinition definition;;
+    JobDefinition definition;
     Map<String, TagHeader> objectMapping = new HashMap<>();
     Map<String, ObjectDefinition> objects = new HashMap<>();
     Map<String, Tag> tags = new HashMap<>();
@@ -87,8 +86,6 @@ public class JobState implements Serializable, Cloneable {
 
     // Status and result received back from the runtime
     RuntimeJobStatus runtimeStatus;
-
-    String jobResultPath;
     JobResult runtimeResult;
 
     // Final result after post-processing

@@ -298,14 +298,23 @@ def filter_model_stack_trace(full_stack: tb.StackSummary, checkout_directory: pa
     return full_stack[first_model_frame:last_model_frame+1]
 
 
-def read_property(properties: tp.Dict[str, str], key: str, default: tp.Optional[str] = None):
+__T = tp.TypeVar("__T")
+
+def read_property(properties: tp.Dict[str, str], key: str, default: tp.Optional[__T] = None, convert: tp.Optional[tp.Type[__T]] = str) -> __T:
 
     value = properties.get(key)
 
-    if value is not None:
-        return value
+    if value is None:
+        if default is not None:
+            value = default
+        else:
+            raise ex.EConfigParse(f"Missing required property: [{key}]")
 
-    if default is not None:
-        return default
+    try:
+        if convert is bool and isinstance(value, str):
+            return True if value.lower() == "true" else False
+        else:
+            return convert(value)
 
-    raise ex.EConfigParse(f"Missing required property: [{key}]")
+    except (ValueError, TypeError):
+        raise ex.EConfigParse(f"Wrong property type: [{key}] = [{value}], expected type is [{convert}]")
