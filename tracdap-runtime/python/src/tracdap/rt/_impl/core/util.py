@@ -311,7 +311,7 @@ def read_property(properties: tp.Dict[str, str], key: str, default: tp.Optional[
             raise ex.EConfigParse(f"Missing required property: [{key}]")
 
     try:
-        if convert is bool:
+        if convert is bool and isinstance(value, str):
             return True if value.lower() == "true" else False
         else:
             return convert(value)
