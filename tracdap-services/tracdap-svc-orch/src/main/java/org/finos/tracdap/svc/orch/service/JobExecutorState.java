@@ -26,6 +26,5 @@ public class JobExecutorState<TBatchState extends Serializable> implements Seria
     TBatchState batchState;
 
     boolean runtimeApiEnabled;
-    boolean resultVolumeEnabled;
     boolean logVolumeEnabled;
 }
