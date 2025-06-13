@@ -42,4 +42,7 @@ message JobConfig {
     // Preallocated IDs for job outputs
     metadata.TagHeader resultId = 6;
     repeated metadata.TagHeader preallocatedIds = 7;
+
+    // Allow setting per-job configuration
+    map<string, string> properties = 8;
 }
