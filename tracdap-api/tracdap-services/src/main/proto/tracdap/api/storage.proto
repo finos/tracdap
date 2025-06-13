@@ -112,7 +112,7 @@ message FileStat {
   int64 fileSize = 4;
 
   metadata.DatetimeValue mtime = 5;
-  metadata.DatetimeValue atime = 6;
+  optional metadata.DatetimeValue atime = 6;
 }
 
 enum FileType {
