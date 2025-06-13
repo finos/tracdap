@@ -36,7 +36,7 @@ def _resolve_config_file(
     if isinstance(config_path, str):
         scheme_sep = config_path.find(":")
         # Single letter scheme is a Windows file path (C:\...)
-        scheme = scheme = config_path[:scheme_sep] if scheme_sep > 1 else "file"
+        scheme = config_path[:scheme_sep] if scheme_sep > 1 else "file"
         if scheme != "file":
             return config_path
 
@@ -191,8 +191,6 @@ def launch_cli(programmatic_args: _tp.Optional[_tp.List[str]] = None):
     runtime_instance = _runtime.TracRuntime(
         _sys_config,
         dev_mode=launch_args.dev_mode,
-        job_result_dir=launch_args.job_result_dir,
-        job_result_format=launch_args.job_result_format,
         scratch_dir=launch_args.scratch_dir,
         scratch_dir_persist=launch_args.scratch_dir_persist,
         plugin_packages=launch_args.plugin_packages)
