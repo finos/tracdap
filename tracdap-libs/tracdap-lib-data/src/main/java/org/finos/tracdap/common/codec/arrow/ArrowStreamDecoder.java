@@ -17,8 +17,8 @@
 
 package org.finos.tracdap.common.codec.arrow;
 
-import org.apache.arrow.vector.ipc.message.MessageStreamReader;
 import org.finos.tracdap.common.codec.StreamingDecoder;
+import org.finos.tracdap.common.data.ArrowVsrContext;
 import org.finos.tracdap.common.data.DataPipeline;
 import org.finos.tracdap.common.exception.EDataCorruption;
 import org.finos.tracdap.common.exception.ETracInternal;
@@ -26,9 +26,9 @@ import org.finos.tracdap.common.exception.ETracInternal;
 import org.apache.arrow.flatbuf.MessageHeader;
 import org.apache.arrow.memory.ArrowBuf;
 import org.apache.arrow.memory.BufferAllocator;
-import org.apache.arrow.vector.VectorSchemaRoot;
 import org.apache.arrow.vector.ipc.ArrowReader;
 import org.apache.arrow.vector.ipc.ArrowStreamReader;
+import org.apache.arrow.vector.ipc.message.MessageStreamReader;
 
 import java.io.IOException;
 
@@ -43,7 +43,7 @@ public class ArrowStreamDecoder extends StreamingDecoder implements DataPipeline
 
     private MessageStreamReader messageReader;
     private ArrowReader arrowReader;
-    private VectorSchemaRoot root;
+    private ArrowVsrContext context;
 
     public ArrowStreamDecoder(BufferAllocator allocator) {
         this.allocator = allocator;
@@ -51,8 +51,16 @@ public class ArrowStreamDecoder extends StreamingDecoder implements DataPipeline
 
     @Override
     public void onStart() {
-        messageReader = new MessageStreamReader(allocator);
-        arrowReader = new ArrowStreamReader(messageReader, allocator);
+
+        try {
+
+            messageReader = new MessageStreamReader(allocator);
+            arrowReader = new ArrowStreamReader(messageReader, allocator);
+        }
+        catch (Throwable e) {
+            var error = ArrowErrorMapping.mapDecodingError(e);
+            onError(error);
+        }
     }
 
     @Override
@@ -116,14 +124,14 @@ public class ArrowStreamDecoder extends StreamingDecoder implements DataPipeline
 
     private void sendBatches() throws IOException {
 
-        if (!consumerReady() || isDone())
+        if (isDone())
             return;
 
-        if (root == null) {
+        if (context == null) {
 
             if (messageReader.hasMessage()) {
-                root = arrowReader.getVectorSchemaRoot();
-                consumer().onStart(root);
+                context = ArrowVsrContext.forSource(arrowReader.getVectorSchemaRoot(), arrowReader, allocator);
+                consumer().onStart(context);
             }
             else if (messageReader.hasEos()) {
                 var error = new EDataCorruption("Arrow decoding failed, data stream is empty");
@@ -135,22 +143,37 @@ public class ArrowStreamDecoder extends StreamingDecoder implements DataPipeline
             }
         }
 
-        while (consumerReady() && messageReader.hasMessage(MessageHeader.RecordBatch)) {
-            arrowReader.loadNextBatch();
-            consumer().onBatch();
-        }
+        if (context.readyToFlip())
+            context.flip();
 
-        if (consumerReady() && messageReader.hasEos()) {
+        if (context.readyToLoad()) {
 
-            if (messageReader.hasMessage()) {
-                var error = new EDataCorruption("Arrow decoding failed, unexpected messages after EOS marker");
-                onError(error);
-                return;
+            if (messageReader.hasMessage(MessageHeader.RecordBatch)) {
+
+                arrowReader.loadNextBatch();
+                context.setLoaded();
+
+                if (context.readyToFlip())
+                    context.flip();
             }
+            else if (messageReader.hasEos()) {
 
-            markAsDone();
-            consumer().onComplete();
+                if (messageReader.hasMessage()) {
+                    var error = new EDataCorruption("Arrow decoding failed, unexpected messages after EOS marker");
+                    onError(error);
+                    return;
+                }
+
+                if (!isDone())
+                    markAsDone();
+            }
         }
+
+        if (context.readyToUnload() && consumerReady())
+            consumer().onBatch();
+
+        if (isDone() && !context.readyToUnload())
+            consumer().onComplete();
     }
 
     @Override
@@ -168,9 +191,9 @@ public class ArrowStreamDecoder extends StreamingDecoder implements DataPipeline
                 messageReader = null;
             }
 
-            if (root != null) {
-                root.close();
-                root = null;
+            if (context != null) {
+                context.close();
+                context = null;
             }
         }
         catch (Exception e) {

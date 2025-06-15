@@ -19,8 +19,8 @@ package org.finos.tracdap.common.codec.json;
 
 import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.core.JsonParser;
-import org.apache.arrow.vector.VectorSchemaRoot;
-import org.apache.arrow.vector.types.pojo.Schema;
+import org.finos.tracdap.common.data.ArrowVsrContext;
+import org.finos.tracdap.common.data.ArrowVsrSchema;
 
 import java.io.IOException;
 import java.util.Map;
@@ -32,7 +32,7 @@ import java.util.stream.IntStream;
 
 class JsonTableHandler implements JsonStreamParser.Handler {
 
-    private final VectorSchemaRoot root;
+    private final ArrowVsrContext context;
     private final Consumer<Void> batchSignal;
 
     // Batch signal notifies the pipeline that a batch is ready to be processed
@@ -46,14 +46,14 @@ class JsonTableHandler implements JsonStreamParser.Handler {
     private int batchRow;
 
     JsonTableHandler(
-            VectorSchemaRoot root, Consumer<Void> batchSignal,
+            ArrowVsrContext context, Consumer<Void> batchSignal,
             int batchSize, boolean isCaseSensitive) {
 
-        this.root = root;
+        this.context = context;
         this.batchSignal = batchSignal;
 
         this.batchSize = batchSize;
-        this.fieldMap = buildFieldMap(root.getSchema(), isCaseSensitive);
+        this.fieldMap = buildFieldMap(context.getSchema(), isCaseSensitive);
     }
 
     @Override
@@ -108,7 +108,7 @@ class JsonTableHandler implements JsonStreamParser.Handler {
     public void handleFieldValue(JsonParser lexer, JsonStreamParser.ParseState state, int depth) throws IOException {
 
         var col = fieldMap.get(state.fieldName);
-        var vector = root.getVector(col);
+        var vector = context.getStagingVector(col);
 
         JacksonValues.parseAndSet(vector, batchRow, lexer, lexer.currentToken());
     }
@@ -123,14 +123,16 @@ class JsonTableHandler implements JsonStreamParser.Handler {
     @Override
     public void close() {
 
-        root.close();
+        context.close();
     }
 
-    private static Map<String, Integer> buildFieldMap(Schema arrowSchema, boolean isCaseSensitive) {
+    private static Map<String, Integer> buildFieldMap(ArrowVsrSchema arrowSchema, boolean isCaseSensitive) {
 
-        var casedMap = IntStream.range(0, arrowSchema.getFields().size())
+        var concreteSchema = arrowSchema.decoded();
+
+        var casedMap = IntStream.range(0, concreteSchema.getFields().size())
                 .boxed().collect(Collectors.toMap(
-                i -> arrowSchema.getFields().get(i).getName(),
+                i -> concreteSchema.getFields().get(i).getName(),
                 i -> i));
 
         if (isCaseSensitive)
@@ -147,7 +149,7 @@ class JsonTableHandler implements JsonStreamParser.Handler {
 
     private void checkRequiredFields(JsonParser lexer) throws IOException {
 
-        for (var vector : root.getFieldVectors()) {
+        for (var vector : context.getBackBuffer().getFieldVectors()) {
             if (!vector.getField().isNullable()) {
 
                 if (vector.isNull(batchRow)) {
@@ -160,7 +162,10 @@ class JsonTableHandler implements JsonStreamParser.Handler {
 
     private void dispatchBatch() {
 
-        root.setRowCount(batchRow);
+        context.setRowCount(batchRow);
+        context.encodeDictionaries();
+        context.setLoaded();
+
         batchSignal.accept(null);
     }
 }

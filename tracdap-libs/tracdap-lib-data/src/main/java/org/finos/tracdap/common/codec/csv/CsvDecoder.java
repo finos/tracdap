@@ -18,7 +18,8 @@
 package org.finos.tracdap.common.codec.csv;
 
 import org.finos.tracdap.common.codec.BufferDecoder;
-import org.finos.tracdap.common.data.ArrowSchema;
+import org.finos.tracdap.common.data.ArrowVsrContext;
+import org.finos.tracdap.common.data.ArrowVsrSchema;
 import org.finos.tracdap.common.codec.json.JacksonValues;
 import org.finos.tracdap.common.data.util.ByteSeekableChannel;
 import org.finos.tracdap.common.data.util.Bytes;
@@ -29,8 +30,6 @@ import org.finos.tracdap.common.exception.EUnexpected;
 
 import org.apache.arrow.memory.ArrowBuf;
 import org.apache.arrow.memory.BufferAllocator;
-import org.apache.arrow.vector.VectorSchemaRoot;
-import org.apache.arrow.vector.types.pojo.Schema;
 import org.apache.arrow.vector.types.Types;
 
 import com.fasterxml.jackson.core.JacksonException;
@@ -57,14 +56,15 @@ public class CsvDecoder extends BufferDecoder {
     private final Logger log = LoggerFactory.getLogger(getClass());
 
     private final BufferAllocator arrowAllocator;
-    private final Schema arrowSchema;
+    private final ArrowVsrSchema arrowSchema;
 
     private List<ArrowBuf> buffer;
     private CsvParser csvParser;
     private CsvSchema csvSchema;
-    private VectorSchemaRoot root;
 
-    public CsvDecoder(BufferAllocator arrowAllocator, Schema arrowSchema) {
+    private ArrowVsrContext context;
+
+    public CsvDecoder(BufferAllocator arrowAllocator, ArrowVsrSchema arrowSchema) {
 
         this.arrowAllocator = arrowAllocator;
 
@@ -111,7 +111,7 @@ public class CsvDecoder extends BufferDecoder {
 
             csvParser = csvFactory.createParser(stream);
             csvSchema = CsvSchemaMapping
-                    .arrowToCsv(this.arrowSchema)
+                    .arrowToCsv(arrowSchema.decoded())
                     //.setNullValue("")
                     .build();
             csvSchema = DEFAULT_HEADER_FLAG
@@ -119,13 +119,12 @@ public class CsvDecoder extends BufferDecoder {
                     : csvSchema.withoutHeader();
             csvParser.setSchema(csvSchema);
 
-
-            root = ArrowSchema.createRoot(arrowSchema, arrowAllocator, BATCH_SIZE);
-            consumer().onStart(root);
+            context = ArrowVsrContext.forSchema(arrowSchema, arrowAllocator);
+            consumer().onStart(context);
 
             // Call the parsing function - this may result in a partial parse
 
-            var isComplete = doParse(csvParser, csvSchema, root);
+            var isComplete = doParse(csvParser, csvSchema, context);
 
             // If the parse is done, emit the EOS signal and clean up resources
             // Otherwise, wait until a callback on pump()
@@ -160,12 +159,12 @@ public class CsvDecoder extends BufferDecoder {
     public void pump() {
 
         // Don't try to pump if the data hasn't arrived yet, or if it has already gone
-        if (csvParser == null || root == null)
+        if (csvParser == null || context == null)
             return;
 
         handleErrors(() -> {
 
-            var isComplete = doParse(csvParser, csvSchema, root);
+            var isComplete = doParse(csvParser, csvSchema, context);
 
             // If the parse is done, emit the EOS signal and clean up resources
             // Otherwise, wait until a callback on pump()
@@ -180,7 +179,7 @@ public class CsvDecoder extends BufferDecoder {
         });
     }
 
-    boolean doParse(CsvParser parser, CsvSchema csvSchema, VectorSchemaRoot root) throws Exception {
+    boolean doParse(CsvParser parser, CsvSchema csvSchema, ArrowVsrContext context) throws Exception {
 
         // CSV codec uses buffering so all the data arrives at once
         // Still, it is probably not helpful to send it all out as fast as the CPU will run!
@@ -206,7 +205,7 @@ public class CsvDecoder extends BufferDecoder {
 
                     // Special handling to differentiate between null and empty strings
 
-                    var nullVector = root.getVector(col);
+                    var nullVector = context.getStagingVector(col);
                     var minorType = nullVector.getMinorType();
 
                     if (minorType == Types.MinorType.VARCHAR) {
@@ -237,7 +236,7 @@ public class CsvDecoder extends BufferDecoder {
                 case VALUE_NUMBER_INT:
                 case VALUE_NUMBER_FLOAT:
 
-                    var vector = root.getVector(col);
+                    var vector = context.getStagingVector(col);
                     JacksonValues.parseAndSet(vector, row, parser, token);
                     col++;
 
@@ -246,8 +245,7 @@ public class CsvDecoder extends BufferDecoder {
                 case START_OBJECT:
 
                     if (row == 0)
-                        for (var vector_ : root.getFieldVectors())
-                            vector_.allocateNew();
+                        context.getBackBuffer().allocateNew();  // TODO: Is this right?
 
                     break;
 
@@ -258,7 +256,10 @@ public class CsvDecoder extends BufferDecoder {
 
                     if (row == BATCH_SIZE) {
 
-                        root.setRowCount(row);
+                        context.setRowCount(row);
+                        context.encodeDictionaries();
+                        context.setLoaded();
+
                         consumer().onBatch();
 
                         if (!consumerReady())
@@ -280,7 +281,10 @@ public class CsvDecoder extends BufferDecoder {
 
         if (row > 0 || col > 0) {
 
-            root.setRowCount(row);
+            context.setRowCount(row);
+            context.encodeDictionaries();
+            context.setLoaded();
+
             consumer().onBatch();
         }
 
@@ -337,9 +341,9 @@ public class CsvDecoder extends BufferDecoder {
 
         try {
 
-            if (root != null) {
-                root.close();
-                root = null;
+            if (context != null) {
+                context.close();
+                context = null;
             }
 
             if (csvParser != null) {

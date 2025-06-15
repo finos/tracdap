@@ -18,15 +18,14 @@
 package org.finos.tracdap.common.codec.json;
 
 import org.finos.tracdap.common.codec.StreamingDecoder;
-import org.finos.tracdap.common.data.ArrowSchema;
+import org.finos.tracdap.common.data.ArrowVsrContext;
+import org.finos.tracdap.common.data.ArrowVsrSchema;
 import org.finos.tracdap.common.exception.EDataCorruption;
 import org.finos.tracdap.common.exception.ETrac;
 import org.finos.tracdap.common.exception.EUnexpected;
 
 import org.apache.arrow.memory.ArrowBuf;
 import org.apache.arrow.memory.BufferAllocator;
-import org.apache.arrow.vector.VectorSchemaRoot;
-import org.apache.arrow.vector.types.pojo.Schema;
 
 import com.fasterxml.jackson.core.JacksonException;
 import com.fasterxml.jackson.core.JsonFactory;
@@ -44,19 +43,16 @@ public class JsonDecoder extends StreamingDecoder {
     private static final boolean CASE_INSENSITIVE = false;
 
     private final Logger log = LoggerFactory.getLogger(getClass());
-    private VectorSchemaRoot root;
+    private ArrowVsrContext context;
     private JsonStreamParser parser;
     private long bytesConsumed;
 
-    public JsonDecoder(BufferAllocator arrowAllocator, Schema arrowSchema) {
+    public JsonDecoder(BufferAllocator arrowAllocator, ArrowVsrSchema arrowSchema) {
 
         // Allocate memory once, and reuse it for every batch (i.e. do not clear/allocate per batch)
         // This memory is released in close(), which calls root.close()
 
-        this.root = ArrowSchema.createRoot(arrowSchema, arrowAllocator, BATCH_SIZE);
-
-        for (var vector : root.getFieldVectors())
-            vector.allocateNew();
+        this.context = ArrowVsrContext.forSchema(arrowSchema, arrowAllocator);
     }
 
     @Override
@@ -68,11 +64,11 @@ public class JsonDecoder extends StreamingDecoder {
                 log.trace("JSON DECODER: onStart()");
 
             var factory = new JsonFactory();
-            var tableHandler = new JsonTableHandler(root, batch -> consumer().onBatch(), BATCH_SIZE, CASE_INSENSITIVE);
+            var tableHandler = new JsonTableHandler(context, batch -> consumer().onBatch(), BATCH_SIZE, CASE_INSENSITIVE);
 
             this.parser = new JsonStreamParser(factory, tableHandler);
 
-            consumer().onStart(root);
+            consumer().onStart(context);
         }
         catch (IOException e) {
 
@@ -185,9 +181,9 @@ public class JsonDecoder extends StreamingDecoder {
                 parser = null;
             }
 
-            if (root != null) {
-                root.close();
-                root = null;
+            if (context != null) {
+                context.close();
+                context = null;
             }
         }
         catch (IOException e) {

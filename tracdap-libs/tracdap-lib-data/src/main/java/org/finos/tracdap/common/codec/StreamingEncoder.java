@@ -17,6 +17,7 @@
 
 package org.finos.tracdap.common.codec;
 
+import org.finos.tracdap.common.data.ArrowVsrContext;
 import org.finos.tracdap.common.data.DataPipeline;
 import org.finos.tracdap.common.data.pipeline.BaseDataProducer;
 
@@ -26,6 +27,8 @@ public abstract class StreamingEncoder
     implements
         ICodec.Encoder<DataPipeline.StreamApi>,
         DataPipeline.ArrowApi {
+
+    protected ArrowVsrContext context;
 
     protected StreamingEncoder() {
         super(DataPipeline.StreamApi.class);
@@ -43,6 +46,11 @@ public abstract class StreamingEncoder
 
     @Override
     public void pump() {
-        /* no-op, immediate stage */
+
+        if (context == null)
+            return;
+
+        if (context.readyToUnload() && consumerReady())
+            onBatch();
     }
 }
