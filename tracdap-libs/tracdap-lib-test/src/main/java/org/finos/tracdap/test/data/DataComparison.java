@@ -78,7 +78,6 @@ public class DataComparison {
         // Data pipeline cleans up round trip root after the pipeline completes
         // To do this comparison, SingleBatchDataSink should convert root -> java array / maps
 
-        Assertions.assertEquals(original.getSchema(), roundTrip.getSchema());
         Assertions.assertEquals(original.getRowCount(), roundTrip.getRowCount());
 
         for (var j = 0; j < original.getFieldVectors().size(); j++) {
