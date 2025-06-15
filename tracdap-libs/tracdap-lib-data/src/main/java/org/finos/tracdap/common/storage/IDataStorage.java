@@ -17,12 +17,12 @@
 
 package org.finos.tracdap.common.storage;
 
+import org.finos.tracdap.common.data.ArrowVsrSchema;
 import org.finos.tracdap.common.data.DataPipeline;
 import org.finos.tracdap.common.data.IDataContext;
 import org.finos.tracdap.metadata.StorageCopy;
 
 import io.netty.channel.EventLoopGroup;
-import org.apache.arrow.vector.types.pojo.Schema;
 
 import java.util.concurrent.CompletableFuture;
 
@@ -38,7 +38,7 @@ public interface IDataStorage extends AutoCloseable {
 
     default DataPipeline pipelineReader(
             StorageCopy storageCopy,
-            Schema requiredSchema,
+            ArrowVsrSchema requiredSchema,
             IDataContext dataContext) {
 
         return pipelineReader(storageCopy, requiredSchema, dataContext, 0, 0);
@@ -46,13 +46,13 @@ public interface IDataStorage extends AutoCloseable {
 
     DataPipeline pipelineReader(
             StorageCopy storageCopy,
-            Schema requiredSchema,
+            ArrowVsrSchema requiredSchema,
             IDataContext dataContext,
             long offset, long limit);
 
     DataPipeline pipelineWriter(
             StorageCopy storageCopy,
-            Schema requiredSchema,
+            ArrowVsrSchema requiredSchema,
             IDataContext dataContext,
             DataPipeline pipeline,
             CompletableFuture<Long> signal);

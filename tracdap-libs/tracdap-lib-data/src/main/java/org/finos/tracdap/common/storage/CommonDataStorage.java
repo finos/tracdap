@@ -17,10 +17,10 @@
 
 package org.finos.tracdap.common.storage;
 
-import io.netty.channel.EventLoopGroup;
 import org.finos.tracdap.common.codec.ICodec;
 import org.finos.tracdap.common.codec.ICodecManager;
 import org.finos.tracdap.common.async.Flows;
+import org.finos.tracdap.common.data.ArrowVsrSchema;
 import org.finos.tracdap.common.data.DataPipeline;
 import org.finos.tracdap.common.data.IDataContext;
 import org.finos.tracdap.common.data.pipeline.RangeSelector;
@@ -28,7 +28,8 @@ import org.finos.tracdap.common.exception.EStorageValidation;
 import org.finos.tracdap.config.PluginConfig;
 import org.finos.tracdap.metadata.StorageCopy;
 
-import org.apache.arrow.vector.types.pojo.Schema;
+import io.netty.channel.EventLoopGroup;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -76,7 +77,7 @@ public class CommonDataStorage implements IDataStorage {
 
     @Override
     public DataPipeline pipelineReader(
-            StorageCopy storageCopy, Schema requiredSchema, IDataContext dataContext,
+            StorageCopy storageCopy, ArrowVsrSchema requiredSchema, IDataContext dataContext,
             long offset, long limit) {
 
         var codec = formats.getCodec(storageCopy.getStorageFormat());
@@ -101,13 +102,13 @@ public class CommonDataStorage implements IDataStorage {
 
     @Override
     public DataPipeline pipelineWriter(
-            StorageCopy storageCopy, Schema requiredSchema,
+            StorageCopy storageCopy, ArrowVsrSchema requiredSchema,
             IDataContext dataContext, DataPipeline pipeline,
             CompletableFuture<Long> signal) {
 
         var codec = formats.getCodec(storageCopy.getStorageFormat());
         var options = Map.<String, String>of();
-        var encoder = codec.getEncoder(dataContext.arrowAllocator(), requiredSchema, options);
+        var encoder = codec.getEncoder(dataContext.arrowAllocator(), options);
 
         pipeline = pipeline.addStage(encoder);
 
