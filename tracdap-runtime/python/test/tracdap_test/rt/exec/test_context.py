@@ -74,18 +74,6 @@ class TracContextTest(unittest.TestCase):
         "gross_profit": [decimal.Decimal("150000.00"), decimal.Decimal("214489.54")]
     })
 
-    @classmethod
-    def setUpClass(cls):
-
-        # Test requires categorical data handling to be enabled
-        _data.DataMapping.enable_categorical(True)
-
-    @classmethod
-    def tearDownClass(cls):
-
-        # Do not impact other tests with categorical data handling
-        _data.DataMapping.enable_categorical(False)
-
     def setUp(self):
 
         native_params = {

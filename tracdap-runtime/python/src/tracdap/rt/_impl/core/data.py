@@ -694,15 +694,6 @@ class DataMapping:
         pa.date64(): _meta.BasicType.DATE
     }
 
-    # For now, categorical handling is disabled by default and enabled by this setting
-    # The default will change to "true" for the 0.9 release
-    CATEGORICAL_CONFIG_KEY = "trac.runtime.categorical"
-    __categorical_enabled = False
-
-    @classmethod
-    def enable_categorical(cls, enabled: bool):
-        cls.__categorical_enabled = enabled
-
     @classmethod
     def arrow_to_python_type(cls, arrow_type: pa.DataType) -> type:
 
@@ -792,7 +783,7 @@ class DataMapping:
 
         # Categorical data uses an unordered dictionary with int32 index, ordered encoding not (currently) supported
         # For legacy compatability, only use dictionary encoding if the categorical feature is enabled
-        if trac_field.categorical and cls.__categorical_enabled:
+        if trac_field.categorical:
             arrow_type = pa.dictionary(pa.int32(), arrow_type, False)
 
         nullable = not (trac_field.notNull or trac_field.businessKey)
@@ -1709,8 +1700,11 @@ class DataConformance:
 
                 # Special handling for chunked dictionaries
                 elif isinstance(vector, pa.ChunkedArray):
-                    chunks = [cls._coerce_dictionary(chunk, field) for chunk in vector.chunks]
-                    return pa.chunked_array(chunks)
+                    if any(vector.chunks):
+                        chunks = [cls._coerce_dictionary(chunk, field) for chunk in vector.chunks]
+                        return pa.chunked_array(chunks)
+                    else:
+                        return pa.array([], type=field.type, size=0)  # noqa
 
                 # Vector type not recognized, coercion is not possible
                 else:

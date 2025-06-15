@@ -20,7 +20,9 @@ package org.finos.tracdap.svc.orch.jobs;
 import org.apache.arrow.memory.ArrowBuf;
 import org.apache.arrow.vector.ipc.ArrowFileWriter;
 import org.finos.tracdap.api.*;
-import org.finos.tracdap.common.data.ArrowSchema;
+import org.finos.tracdap.common.data.ArrowVsrContext;
+import org.finos.tracdap.common.data.ArrowVsrSchema;
+import org.finos.tracdap.common.data.SchemaMapping;
 import org.finos.tracdap.common.data.util.Bytes;
 import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.metadata.MetadataUtil;
@@ -33,15 +35,14 @@ import org.finos.tracdap.svc.admin.TracAdminService;
 import org.finos.tracdap.svc.data.TracDataService;
 import org.finos.tracdap.svc.meta.TracMetadataService;
 import org.finos.tracdap.svc.orch.TracOrchestratorService;
+import org.finos.tracdap.test.data.DataComparison;
 import org.finos.tracdap.test.data.SampleData;
 import org.finos.tracdap.test.helpers.GitHelpers;
 import org.finos.tracdap.test.helpers.PlatformTest;
 
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.memory.RootAllocator;
-import org.apache.arrow.vector.VectorSchemaRoot;
 import org.apache.arrow.vector.ipc.ArrowFileReader;
-import org.apache.arrow.vector.types.pojo.Schema;
 import com.google.protobuf.ByteString;
 
 import org.junit.jupiter.api.*;
@@ -194,7 +195,7 @@ public abstract class DataRoundTripTest {
     @Test
     void basicData() throws Exception {
 
-        var schema = ArrowSchema.tracToArrow(SampleData.BASIC_TABLE_SCHEMA);
+        var schema = SchemaMapping.tracToArrow(SampleData.BASIC_TABLE_SCHEMA);
         var data = SampleData.generateBasicData(ALLOCATOR);
 
         doRoundTrip(schema, data, "basicData", dataFramework());
@@ -203,14 +204,14 @@ public abstract class DataRoundTripTest {
     @Test
     void nullFirstRow() throws Exception {
 
-        var schema = ArrowSchema.tracToArrow(SampleData.BASIC_TABLE_SCHEMA);
+        var schema = SchemaMapping.tracToArrow(SampleData.BASIC_TABLE_SCHEMA);
         var data = SampleData.generateBasicData(ALLOCATOR);
 
         // This is a quick way of nulling a value in an Arrow vector
         // Unsetting the first bit of the validity buffer makes the first value null
-        for (var col = 0; col < data.getSchema().getFields().size(); ++col) {
+        for (var col = 0; col < data.getBackBuffer().getSchema().getFields().size(); ++col) {
 
-            var vector = data.getVector(col);
+            var vector = data.getBackBuffer().getVector(col);
             var validityMask0 = vector.getValidityBuffer().getByte(0);
             validityMask0 = (byte) (validityMask0 & (byte) 0xfe);
 
@@ -224,13 +225,13 @@ public abstract class DataRoundTripTest {
     @Test
     void nullEntireTable() throws Exception {
 
-        var schema = ArrowSchema.tracToArrow(SampleData.BASIC_TABLE_SCHEMA);
+        var schema = SchemaMapping.tracToArrow(SampleData.BASIC_TABLE_SCHEMA);
         var data = SampleData.generateBasicData(ALLOCATOR);
 
         // This is a quick way of nulling an entire vector, by setting the validity buffer to zero
-        for (var col = 0; col < data.getSchema().getFields().size(); ++col) {
+        for (var col = 0; col < data.getBackBuffer().getSchema().getFields().size(); ++col) {
 
-            var vector = data.getVector(0);
+            var vector = data.getBackBuffer().getVector(0);
             vector.getValidityBuffer().setZero(0, vector.getValidityBuffer().capacity());
             Assertions.assertEquals(vector.getValueCount(), vector.getNullCount());
         }
@@ -241,7 +242,7 @@ public abstract class DataRoundTripTest {
     @Test
     void emptyTable() throws Exception {
 
-        var schema = ArrowSchema.tracToArrow(SampleData.BASIC_TABLE_SCHEMA);
+        var schema = SchemaMapping.tracToArrow(SampleData.BASIC_TABLE_SCHEMA);
         var data = SampleData.convertData(schema, Map.of(), 0, ALLOCATOR);
 
         doRoundTrip(schema, data, "emptyTable", dataFramework());
@@ -353,37 +354,24 @@ public abstract class DataRoundTripTest {
             }
         }
 
-        var schema = ArrowSchema.tracToArrow(SampleData.BASIC_TABLE_SCHEMA);
+        var schema = SchemaMapping.tracToArrow(SampleData.BASIC_TABLE_SCHEMA);
         var data = SampleData.convertData(schema, javaData, edgeCases.size(), ALLOCATOR);
 
         doRoundTrip(schema, data, "edgeCase:" + fieldName, dataFramework());
     }
 
-    void doRoundTrip(Schema schema, VectorSchemaRoot inputData, String testName, String dataFramework) throws Exception {
+    void doRoundTrip(ArrowVsrSchema schema, ArrowVsrContext inputData, String testName, String dataFramework) throws Exception {
 
-        VectorSchemaRoot outputData = null;
+        ArrowVsrContext outputData = null;
 
         try {
 
-            var inputDataId = saveInputData(schema, inputData, testName);
+            var inputDataId = saveInputData(inputData, testName);
             var outputDataId = runModel(inputDataId, testName, dataFramework);
             outputData = loadOutputData(outputDataId);
 
-            Assertions.assertEquals(inputData.getSchema(), outputData.getSchema());
-            Assertions.assertEquals(inputData.getRowCount(), outputData.getRowCount());
-
-            for (var field : outputData.getSchema().getFields()) {
-
-                for (var i = 0; i < outputData.getRowCount(); i++) {
-
-                    var original = inputData.getVector(field).getObject(i);
-                    var rt = outputData.getVector(field).getObject(i);
-
-                    Assertions.assertEquals(
-                            original, rt,
-                            String.format("Difference in column [%s] row [%d]", field.getName(), i));
-                }
-            }
+            DataComparison.compareSchemas(inputData.getSchema(), outputData.getSchema());
+            DataComparison.compareBatches(inputData, outputData);
         }
         finally {
 
@@ -395,12 +383,12 @@ public abstract class DataRoundTripTest {
         }
     }
 
-    TagHeader saveInputData(Schema schema, VectorSchemaRoot data, String testName) throws Exception {
+    TagHeader saveInputData(ArrowVsrContext inputData, String testName) throws Exception {
 
         var buf = new ArrayList<ArrowBuf>();
 
         try (var channel = new ByteOutputChannel(ALLOCATOR, buf::add);
-             var writer = new ArrowFileWriter(data, null,  channel)) {
+             var writer = new ArrowFileWriter(inputData.getFrontBuffer(), inputData.getDictionaries(), channel)) {
 
             writer.start();
             writer.writeBatch();
@@ -476,7 +464,7 @@ public abstract class DataRoundTripTest {
         return dataSearchResult.getSearchResult(0).getHeader();
     }
 
-    VectorSchemaRoot loadOutputData(TagHeader outputDataId) throws Exception {
+    ArrowVsrContext loadOutputData(TagHeader outputDataId) throws Exception {
 
         var readRequest = DataReadRequest.newBuilder()
                 .setTenant(TEST_TENANT)
@@ -495,10 +483,13 @@ public abstract class DataRoundTripTest {
         var reader = new ArrowFileReader(new ByteSeekableChannel(List.of(arrowBuf)), allocator);
         reader.loadNextBatch();
 
-        var root = reader.getVectorSchemaRoot();
+        var root = ArrowVsrContext.forSource(
+                reader.getVectorSchemaRoot(),
+                reader, allocator, /* takeOwnership = */ true);
 
-        var arrowSchema = ArrowSchema.tracToArrow(dataResponse.getSchema());
-        Assertions.assertEquals(arrowSchema, root.getSchema());
+        var arrowSchema = SchemaMapping.tracToArrow(dataResponse.getSchema());
+
+        DataComparison.compareSchemas(arrowSchema, root.getSchema());
 
         return root;
     }

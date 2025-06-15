@@ -18,13 +18,14 @@
 package org.finos.tracdap.common.codec.arrow;
 
 import org.finos.tracdap.common.codec.BufferDecoder;
+import org.finos.tracdap.common.data.ArrowVsrContext;
 import org.finos.tracdap.common.data.DataPipeline;
 import org.finos.tracdap.common.data.util.Bytes;
 import org.finos.tracdap.common.exception.EDataCorruption;
 import org.finos.tracdap.common.exception.EUnexpected;
 
 import org.apache.arrow.memory.ArrowBuf;
-import org.apache.arrow.vector.VectorSchemaRoot;
+import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.ipc.ArrowReader;
 
 import org.slf4j.Logger;
@@ -39,12 +40,14 @@ public abstract class ArrowDecoder extends BufferDecoder implements DataPipeline
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
+    private final BufferAllocator allocator;
+    private ArrowVsrContext context;
+
     private List<ArrowBuf> buffer;
     private ArrowReader reader;
-    private VectorSchemaRoot root;
 
-    public ArrowDecoder() {
-
+    public ArrowDecoder(BufferAllocator allocator) {
+        this.allocator = allocator;
     }
 
     protected abstract ArrowReader createReader(List<ArrowBuf> buffer) throws IOException;
@@ -65,9 +68,12 @@ public abstract class ArrowDecoder extends BufferDecoder implements DataPipeline
 
             this.buffer = buffer;
             this.reader = createReader(buffer);
-            this.root = reader.getVectorSchemaRoot();
 
-            consumer().onStart(root);
+            this.context = ArrowVsrContext.forSource(
+                    reader.getVectorSchemaRoot(),
+                    reader, allocator);
+
+            consumer().onStart(context);
 
             var isComplete = sendBatches();
 
@@ -103,7 +109,7 @@ public abstract class ArrowDecoder extends BufferDecoder implements DataPipeline
         handleErrors(() -> {
 
             // Don't try to pump if the stage isn't active yet
-            if (root == null)
+            if (context == null)
                 return null;
 
             var isComplete = sendBatches();
@@ -123,16 +129,26 @@ public abstract class ArrowDecoder extends BufferDecoder implements DataPipeline
         // Data arrives in one big buffer, so don't send it all at once
         // PUsh what the consumer requests, then wait for another call to pump()
 
-        while (consumerReady()) {
+        while (context.readyToFlip() || context.readyToLoad()) {
 
-            var batchAvailable = reader.loadNextBatch();
+            if (context.readyToFlip())
+                context.flip();
 
-            if (batchAvailable) {
+            if (context.readyToLoad()) {
+
+                var batchAvailable = reader.loadNextBatch();
+
+                if (!batchAvailable)
+                    return true;
+
+                context.setLoaded();
+
+                if (context.readyToFlip())
+                    context.flip();
+            }
+
+            if (context.readyToUnload() && consumerReady())
                 consumer().onBatch();
-            }
-            else {
-                return true;
-            }
         }
 
         return false;
@@ -157,9 +173,9 @@ public abstract class ArrowDecoder extends BufferDecoder implements DataPipeline
 
         try {
 
-            if (root != null) {
-                root.close();
-                root = null;
+            if (context != null) {
+                context.close();
+                context = null;
             }
 
             if (reader != null) {

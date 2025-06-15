@@ -19,9 +19,9 @@ package org.finos.tracdap.svc.data.service;
 
 import org.finos.tracdap.api.*;
 import org.finos.tracdap.api.internal.InternalMetadataApiGrpc;
+import org.finos.tracdap.common.data.SchemaMapping;
 import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.common.async.Futures;
-import org.finos.tracdap.common.data.ArrowSchema;
 import org.finos.tracdap.common.data.DataPipeline;
 import org.finos.tracdap.common.exception.EMetadataDuplicate;
 import org.finos.tracdap.common.codec.ICodec;
@@ -669,10 +669,10 @@ public class DataService {
                 .getTenantStorage(state.tenant)
                 .getDataStorage(state.copy.getStorageKey());
 
-        var arrowSchema = ArrowSchema.tracToArrow(state.schema);
-        var encoder = codec.getEncoder(dataCtx.arrowAllocator(), arrowSchema, codecOptions);
+        var schema = SchemaMapping.tracToArrow(state.schema);
+        var encoder = codec.getEncoder(dataCtx.arrowAllocator(), codecOptions);
 
-        var pipeline = storage.pipelineReader(state.copy, arrowSchema, dataCtx, state.offset, state.limit);
+        var pipeline = storage.pipelineReader(state.copy, schema, dataCtx, state.offset, state.limit);
         pipeline.addStage(encoder);
         pipeline.addSink(contentStream);
 
@@ -688,13 +688,13 @@ public class DataService {
                 .getTenantStorage(state.tenant)
                 .getDataStorage(state.copy.getStorageKey());
 
-        var arrowSchema = ArrowSchema.tracToArrow(state.schema);
-        var decoder = codec.getDecoder(dataCtx.arrowAllocator(), arrowSchema, codecOptions);
+        var schema = SchemaMapping.tracToArrow(state.schema);
+        var decoder = codec.getDecoder(dataCtx.arrowAllocator(), schema, codecOptions);
 
         var signal = new CompletableFuture<Long>();
         var pipeline = DataPipeline.forSource(contentStream, dataCtx);
         pipeline.addStage(decoder);
-        pipeline = storage.pipelineWriter(state.copy, arrowSchema, dataCtx, pipeline, signal);
+        pipeline = storage.pipelineWriter(state.copy, schema, dataCtx, pipeline, signal);
 
         pipeline.execute();
 

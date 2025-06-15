@@ -772,8 +772,10 @@ public class RunFlowTest {
 
         // Check the dynamic filter was applied successfully
 
+        // Filtered categorical vars present in aggregation, should have zero value
         Assertions.assertTrue(csvText.contains("leinster"));
-        Assertions.assertFalse(csvText.contains("munster"));
+        Assertions.assertFalse(csvText.contains("leinster,0\n"));
+        Assertions.assertTrue(csvText.contains("munster,0\n"));
 
         var readRequest2 = DataReadRequest.newBuilder()
                 .setTenant(TEST_TENANT)

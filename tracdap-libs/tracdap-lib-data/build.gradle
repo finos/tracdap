@@ -38,6 +38,7 @@ dependencies {
         exclude group: 'com.fasterxml.jackson.core', module: 'jackson-databind'
     }
 
+    api group: 'org.apache.arrow', name: 'arrow-algorithm', version: "$arrow_version"
     api group: 'org.apache.arrow', name: 'arrow-memory-netty', version: "$arrow_version"
 
     // Netty - data lib uses Netty event loops / executors

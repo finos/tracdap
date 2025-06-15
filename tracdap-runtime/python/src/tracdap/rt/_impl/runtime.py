@@ -164,13 +164,6 @@ class TracRuntime:
             else:
                 self._log.info("Using embedded system config")
 
-            # Check whether to enable categorical processing in the data layer
-
-            if _data.DataMapping.CATEGORICAL_CONFIG_KEY in self._sys_config.properties:
-                categorical_prop = self._sys_config.properties[_data.DataMapping.CATEGORICAL_CONFIG_KEY]
-                categorical_flag = categorical_prop and categorical_prop.lower() == "true"
-                _data.DataMapping.enable_categorical(categorical_flag)
-
             # Dev mode translation is controlled by the dev mode flag
             # I.e. it can be applied to embedded configs
 

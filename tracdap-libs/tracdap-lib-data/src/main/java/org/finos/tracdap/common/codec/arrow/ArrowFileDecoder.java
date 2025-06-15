@@ -32,6 +32,7 @@ public class ArrowFileDecoder extends ArrowDecoder {
     private final BufferAllocator arrowAllocator;
 
     public ArrowFileDecoder(BufferAllocator arrowAllocator) {
+        super(arrowAllocator);
         this.arrowAllocator = arrowAllocator;
     }
 

@@ -20,7 +20,6 @@ package org.finos.tracdap.common.data;
 import org.finos.tracdap.common.data.pipeline.DataPipelineImpl;
 
 import org.apache.arrow.memory.ArrowBuf;
-import org.apache.arrow.vector.VectorSchemaRoot;
 
 import java.util.List;
 import java.util.concurrent.CompletionStage;
@@ -88,7 +87,6 @@ public interface DataPipeline {
     // PIPELINE STAGE INTERFACES
     // -----------------------------------------------------------------------------------------------------------------
 
-
     interface DataInterface <API_T>  {
 
         API_T dataInterface();
@@ -96,7 +94,7 @@ public interface DataPipeline {
 
     interface ArrowApi extends DataInterface<ArrowApi> {
 
-        void onStart(VectorSchemaRoot root);
+        void onStart(ArrowVsrContext context);
         void onBatch();
         void onComplete();
         void onError(Throwable error);
