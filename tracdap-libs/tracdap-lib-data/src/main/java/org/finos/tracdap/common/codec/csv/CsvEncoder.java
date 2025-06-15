@@ -17,14 +17,13 @@
 
 package org.finos.tracdap.common.codec.csv;
 
-import org.apache.arrow.memory.BufferAllocator;
 import org.finos.tracdap.common.codec.StreamingEncoder;
 import org.finos.tracdap.common.codec.json.JacksonValues;
+import org.finos.tracdap.common.data.ArrowVsrContext;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.data.util.ByteOutputStream;
 
-import org.apache.arrow.vector.VectorSchemaRoot;
-import org.apache.arrow.vector.types.pojo.Schema;
+import org.apache.arrow.memory.BufferAllocator;
 
 import com.fasterxml.jackson.core.JsonEncoding;
 import com.fasterxml.jackson.dataformat.csv.CsvFactory;
@@ -42,9 +41,7 @@ public class CsvEncoder extends StreamingEncoder implements AutoCloseable {
 
     private final BufferAllocator allocator;
 
-    private VectorSchemaRoot root;
-    private Schema actualSchema;
-
+    private ArrowVsrContext context;
     private OutputStream out;
     private CsvGenerator generator;
 
@@ -54,7 +51,7 @@ public class CsvEncoder extends StreamingEncoder implements AutoCloseable {
     }
 
     @Override
-    public void onStart(VectorSchemaRoot root) {
+    public void onStart(ArrowVsrContext context) {
 
         try {
 
@@ -63,15 +60,15 @@ public class CsvEncoder extends StreamingEncoder implements AutoCloseable {
 
             consumer().onStart();
 
-            this.root = root;
-            this.actualSchema = root.getSchema();
+            this.context = context;
 
             var factory = new CsvFactory()
                     // Make sure empty strings are quoted, so they can be distinguished from nulls
                     .enable(CsvGenerator.Feature.ALWAYS_QUOTE_EMPTY_STRINGS);
 
+            var arrowSchema = context.getSchema();
             var csvSchema = CsvSchemaMapping
-                    .arrowToCsv(actualSchema)
+                    .arrowToCsv(arrowSchema.decoded())
                     .build()
                     .withHeader();
 
@@ -101,8 +98,11 @@ public class CsvEncoder extends StreamingEncoder implements AutoCloseable {
             if (log.isTraceEnabled())
                 log.trace("CSV ENCODER: onNext()");
 
-            var nRows = root.getRowCount();
-            var nCols = actualSchema.getFields().size();
+            var batch = context.getFrontBuffer();
+            var dictionaries = context.getDictionaries();
+
+            var nRows = batch.getRowCount();
+            var nCols = batch.getFieldVectors().size();
 
             for (var row = 0; row < nRows; row++) {
 
@@ -110,12 +110,14 @@ public class CsvEncoder extends StreamingEncoder implements AutoCloseable {
 
                 for (var col = 0; col < nCols; col++) {
 
-                    var vector = root.getVector(col);
-                    JacksonValues.getAndGenerate(vector, row, generator);
+                    var vector = batch.getVector(col);
+                    JacksonValues.getAndGenerate(vector, row, dictionaries, generator);
                 }
 
                 generator.writeEndArray();
             }
+
+            context.setUnloaded();
         }
         catch (IOException e) {
 
@@ -192,10 +194,10 @@ public class CsvEncoder extends StreamingEncoder implements AutoCloseable {
                 out = null;
             }
 
-            // Encoder does not own root, do not try to close it
+            // Encoder does not own context, do not try to close it
 
-            if (root != null) {
-                root = null;
+            if (context != null) {
+                context = null;
             }
         }
         catch (IOException e) {
