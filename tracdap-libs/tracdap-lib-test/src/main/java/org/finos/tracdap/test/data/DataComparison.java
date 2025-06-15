@@ -102,6 +102,9 @@ public class DataComparison {
 
     public static Object getArrowValue(FieldVector vector, int row, DictionaryProvider dictionaries) {
 
+        if (vector.isNull(row))
+            return null;
+
         if (vector.getField().getDictionary() != null) {
             var encoding = vector.getField().getDictionary();
             var dictionary = dictionaries.lookup(encoding.getId());
