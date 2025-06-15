@@ -20,6 +20,7 @@ package org.finos.tracdap.common.data.pipeline;
 import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.VectorSchemaRoot;
 import org.apache.arrow.vector.util.TransferPair;
+import org.finos.tracdap.common.data.ArrowVsrContext;
 import org.finos.tracdap.common.data.DataPipeline;
 import org.finos.tracdap.common.exception.EUnexpected;
 
@@ -38,8 +39,8 @@ public class RangeSelector
     private final long limit;
     private long currentRow;
 
-    private VectorSchemaRoot incomingRoot;
-    private VectorSchemaRoot sliceRoot;
+    private ArrowVsrContext incomingRoot;
+    private ArrowVsrContext sliceRoot;
     private ArrayList<TransferPair> sliceTransfers;
 
     public RangeSelector(long offset, long limit) {
@@ -53,13 +54,24 @@ public class RangeSelector
 
     @Override
     public boolean isReady() {
-        return consumerReady();
+
+        if (sliceRoot != null)
+            return sliceRoot.readyToFlip() || sliceRoot.readyToLoad();
+        else
+            return consumerReady();
     }
 
     @Override
     public void pump() {
 
-        // No-op, data is mapped in each call to onBatch()
+        if (incomingRoot == null)
+            return;
+
+        if (incomingRoot.readyToUnload())
+            flipBatch();
+
+        if (consumerReady() && sliceRoot.readyToUnload())
+            consumer().onBatch();
     }
 
     @Override
@@ -74,7 +86,7 @@ public class RangeSelector
     }
 
     @Override
-    public void onStart(VectorSchemaRoot root) {
+    public void onStart(ArrowVsrContext context) {
 
         if (incomingRoot != null)
             throw new EUnexpected();
@@ -82,7 +94,7 @@ public class RangeSelector
         var sliceTransfers = new ArrayList<TransferPair>();
         var sliceVectors = new ArrayList<FieldVector>();
 
-        for (var vector : root.getFieldVectors()) {
+        for (var vector : context.getFrontBuffer().getFieldVectors()) {
 
             var transfer = vector.getTransferPair(vector.getAllocator());
             var sliceVector = (FieldVector) transfer.getTo();
@@ -91,9 +103,13 @@ public class RangeSelector
             sliceVectors.add(sliceVector);
         }
 
-        this.incomingRoot = root;
-        this.sliceRoot = new VectorSchemaRoot(root.getSchema(), sliceVectors, 0);
+        this.incomingRoot = context;
+
         this.sliceTransfers = sliceTransfers;
+        this.sliceRoot = ArrowVsrContext.forSource(
+                new VectorSchemaRoot(sliceVectors),
+                context.getDictionaries(),
+                context.getAllocator());
 
         consumer().onStart(sliceRoot);
     }
@@ -104,30 +120,49 @@ public class RangeSelector
         if (incomingRoot == null)
             throw new EUnexpected();
 
-        var batchSize = incomingRoot.getRowCount();
-        var batchStartRow = currentRow;
-        var batchEndRow = currentRow + batchSize;
+        flipBatch();
 
-        if (batchStartRow >= offset && (batchEndRow < offset + limit || limit == 0)) {
-
-            sliceTransfers.forEach(TransferPair::transfer);
-            sliceRoot.setRowCount(incomingRoot.getRowCount());
-
+        if (consumerReady() && sliceRoot.readyToUnload())
             consumer().onBatch();
+    }
+
+    private void flipBatch() {
+
+        if (sliceRoot.readyToFlip())
+            sliceRoot.flip();
+
+        if (sliceRoot.readyToLoad()) {
+
+            var batchSize = incomingRoot.getFrontBuffer().getRowCount();
+            var batchStartRow = currentRow;
+            var batchEndRow = currentRow + batchSize;
+
+            if (batchStartRow >= offset && (batchEndRow < offset + limit || limit == 0)) {
+
+                sliceTransfers.forEach(TransferPair::transfer);
+
+                sliceRoot.setRowCount(batchSize);
+                sliceRoot.setLoaded();
+            }
+            else if (batchEndRow >= offset && (batchStartRow < offset + limit || limit == 0)) {
+
+                var sliceStart = (int) (offset - batchStartRow);
+                var sliceEnd = (int) Math.min(offset + limit - batchStartRow, batchSize);
+                var sliceLength = sliceEnd - sliceStart;
+
+                sliceTransfers.forEach(slice -> slice.splitAndTransfer(sliceStart, sliceLength));
+
+                sliceRoot.setRowCount(sliceLength);
+                sliceRoot.setLoaded();
+            }
+
+            incomingRoot.setUnloaded();
+            currentRow += batchSize;
         }
-        else if (batchEndRow >= offset && (batchStartRow < offset + limit || limit == 0)) {
 
-            var sliceStart = (int) (offset - batchStartRow);
-            var sliceEnd = (int) Math.min(offset + limit - batchStartRow, incomingRoot.getRowCount());
-            var sliceLength = sliceEnd - sliceStart;
+        if (sliceRoot.readyToFlip())
+            sliceRoot.flip();
 
-            sliceTransfers.forEach(slice -> slice.splitAndTransfer(sliceStart, sliceLength));
-            sliceRoot.setRowCount(sliceLength);
-
-            consumer().onBatch();
-        }
-
-        currentRow += batchSize;
 
         // TODO: if (batchStartRow >= offset + limit && limit != 0) {
         //      pipeline.cancel()
