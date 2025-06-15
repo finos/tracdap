@@ -1700,8 +1700,11 @@ class DataConformance:
 
                 # Special handling for chunked dictionaries
                 elif isinstance(vector, pa.ChunkedArray):
-                    chunks = [cls._coerce_dictionary(chunk, field) for chunk in vector.chunks]
-                    return pa.chunked_array(chunks)
+                    if any(vector.chunks):
+                        chunks = [cls._coerce_dictionary(chunk, field) for chunk in vector.chunks]
+                        return pa.chunked_array(chunks)
+                    else:
+                        return pa.array([], type=field.type, size=0)  # noqa
 
                 # Vector type not recognized, coercion is not possible
                 else:
