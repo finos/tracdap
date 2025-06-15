@@ -28,17 +28,20 @@ import org.finos.tracdap.test.grpc.GrpcTestStreams;
 import org.finos.tracdap.metadata.BasicType;
 import org.finos.tracdap.metadata.SchemaDefinition;
 import org.finos.tracdap.metadata.TagHeader;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.dataformat.csv.CsvMapper;
-import com.fasterxml.jackson.dataformat.csv.CsvParser;
-import com.google.protobuf.ByteString;
-import io.grpc.stub.StreamObserver;
+
 import org.apache.arrow.memory.RootAllocator;
 import org.apache.arrow.vector.ipc.ArrowFileReader;
 import org.apache.arrow.vector.ipc.ArrowStreamReader;
 import org.apache.arrow.vector.types.Types;
 import org.apache.arrow.vector.util.Text;
+
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.dataformat.csv.CsvMapper;
+import com.fasterxml.jackson.dataformat.csv.CsvParser;
+
+import com.google.protobuf.ByteString;
+import io.grpc.stub.StreamObserver;
 
 import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
@@ -164,7 +167,7 @@ public class DataApiTestHelpers {
                     var arrowCol = rtBatch.getVector(j);
 
                     for (int i = 0; i < rtBatch.getRowCount(); i++) {
-                        var arrowValue = arrowCol.getObject(i);
+                        var arrowValue = DataComparison.getArrowValue(arrowCol, i, reader);
                         if (arrowValue instanceof Text)
                             resultCol.add(arrowValue.toString());
                         else if (arrowCol.getMinorType() == Types.MinorType.DATEDAY)
@@ -233,7 +236,7 @@ public class DataApiTestHelpers {
                     var arrowCol = rtBatch.getVector(j);
 
                     for (int i = 0; i < rtBatch.getRowCount(); i++) {
-                        var arrowValue = arrowCol.getObject(i);
+                        var arrowValue = DataComparison.getArrowValue(arrowCol, i, reader);
                         if (arrowValue instanceof Text)
                             resultCol.add(arrowValue.toString());
                         else if (arrowCol.getMinorType() == Types.MinorType.DATEDAY)

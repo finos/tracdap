@@ -17,7 +17,7 @@
 
 package org.finos.tracdap.test.data;
 
-import org.apache.arrow.vector.VectorSchemaRoot;
+import org.finos.tracdap.common.data.ArrowVsrContext;
 import org.finos.tracdap.common.data.DataPipeline;
 import org.finos.tracdap.common.data.pipeline.BaseDataProducer;
 
@@ -26,9 +26,9 @@ public class SingleBatchDataSource
         extends BaseDataProducer<DataPipeline.ArrowApi>
         implements DataPipeline.SourceStage {
 
-    private final VectorSchemaRoot root;
+    private final ArrowVsrContext root;
 
-    public SingleBatchDataSource(VectorSchemaRoot root) {
+    public SingleBatchDataSource(ArrowVsrContext root) {
         super(DataPipeline.ArrowApi.class);
         this.root = root;
     }

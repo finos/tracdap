@@ -17,8 +17,9 @@
 
 package org.finos.tracdap.test.data;
 
-import org.apache.arrow.vector.types.pojo.Schema;
-import org.finos.tracdap.common.data.ArrowSchema;
+import org.finos.tracdap.common.data.ArrowVsrContext;
+import org.finos.tracdap.common.data.ArrowVsrSchema;
+import org.finos.tracdap.common.data.SchemaMapping;
 import org.finos.tracdap.common.exception.ETracInternal;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.metadata.*;
@@ -189,7 +190,7 @@ public class SampleData {
                     .setNode("sample_output_data")))
             .build();
 
-    public static VectorSchemaRoot generateBasicData(BufferAllocator arrowAllocator) {
+    public static ArrowVsrContext generateBasicData(BufferAllocator arrowAllocator) {
 
         var javaData = new HashMap<String, List<Object>>();
 
@@ -257,34 +258,36 @@ public class SampleData {
         }
     }
 
-    public static VectorSchemaRoot convertData(
+    public static ArrowVsrContext convertData(
             SchemaDefinition schema, Map<String, List<Object>> data,
             int size, BufferAllocator arrowAllocator) {
 
-        return convertData(ArrowSchema.tracToArrow(schema), data, size, arrowAllocator);
+        return convertData(SchemaMapping.tracToArrow(schema), data, size, arrowAllocator);
     }
 
-    public static VectorSchemaRoot convertData(
-            Schema schema, Map<String, List<Object>> data,
+    public static ArrowVsrContext convertData(
+            ArrowVsrSchema schema, Map<String, List<Object>> data,
             int size, BufferAllocator arrowAllocator) {
 
         for (var fieldName : data.keySet()) {
-            if (schema.findField(fieldName) == null) {
+            if (schema.physical().findField(fieldName) == null) {
                 throw new ETracInternal("Sample data field " + fieldName + " is not present in the schema");
             }
         }
 
-        var vectors = new ArrayList<FieldVector>(schema.getFields().size());
+        var context = ArrowVsrContext.forSchema(schema, arrowAllocator);
 
         FieldVector vector;
         BiConsumer<Integer, Object> setFunc;
 
-        for (var field : schema.getFields()) {
+        for (int col = 0, nCols = schema.decoded().getFields().size(); col < nCols; col++) {
+
+            var field = schema.decoded().getFields().get(col);
 
             switch (field.getType().getTypeID()) {
 
                 case Bool:
-                    var booleanVec = new BitVector(field, arrowAllocator);
+                    var booleanVec = (BitVector) context.getStagingVector(col);
                     vector = booleanVec;
                     setFunc = (i, o) -> {
                         if (o == null)
@@ -297,7 +300,7 @@ public class SampleData {
                     break;
 
                 case Int:
-                    var intVec = new BigIntVector(field, arrowAllocator);
+                    var intVec = (BigIntVector) context.getStagingVector(col);
                     vector = intVec;
                     setFunc = (i, o) -> {
                         if (o == null)
@@ -312,7 +315,7 @@ public class SampleData {
                     break;
 
                 case FloatingPoint:
-                    var floatVec = new Float8Vector(field, arrowAllocator);
+                    var floatVec = (Float8Vector) context.getStagingVector(col);
                     vector = floatVec;
                     setFunc = (i, o) -> {
                         if (o == null)
@@ -327,7 +330,7 @@ public class SampleData {
                     break;
 
                 case Decimal:
-                    var decimalVec = new DecimalVector(field, arrowAllocator);
+                    var decimalVec = (DecimalVector) context.getStagingVector(col);
                     vector = decimalVec;
                     setFunc = (i, o) -> {
                         if (o == null)
@@ -340,7 +343,7 @@ public class SampleData {
                     break;
 
                 case Utf8:
-                    var stringVec = new VarCharVector(field, arrowAllocator);
+                    var stringVec = (VarCharVector) context.getStagingVector(col);
                     vector = stringVec;
                     setFunc = (i, o) -> {
                         if (o == null)
@@ -353,7 +356,7 @@ public class SampleData {
                     break;
 
                 case Date:
-                    var dateVec = new DateDayVector(field, arrowAllocator);
+                    var dateVec = (DateDayVector) context.getStagingVector(col);
                     vector = dateVec;
                     setFunc = (i, o) -> {
                         if (o == null)
@@ -366,7 +369,7 @@ public class SampleData {
                     break;
 
                 case Timestamp:
-                    var timestampVec = new TimeStampMilliVector(field, arrowAllocator);
+                    var timestampVec = (TimeStampMilliVector) context.getStagingVector(col);
                     vector = timestampVec;
                     setFunc = (i, o) -> {
                         if (o == null)
@@ -398,13 +401,14 @@ public class SampleData {
             for (int i = 0; i < size; i++) {
                 setFunc.accept(i, values.get(i));
             }
-
-            vectors.add(vector);
         }
 
-        var root = new VectorSchemaRoot(schema.getFields(), vectors);
-        root.setRowCount(size);
+        context.setRowCount(size);
+        context.encodeDictionaries();
+        context.setLoaded();
 
-        return root;
+        // Do not flip, client code may modify back buffer before flipping
+
+        return context;
     }
 }
