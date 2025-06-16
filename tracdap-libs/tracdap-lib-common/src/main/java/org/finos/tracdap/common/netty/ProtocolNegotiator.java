@@ -206,6 +206,7 @@ public class ProtocolNegotiator extends ChannelInitializer<SocketChannel> {
             if (log.isTraceEnabled())
                 log.trace("WebsocketUpgradeCodec upgradeTo: conn = {}", ConnectionId.get(ctx.channel()));
 
+            ctx.pipeline().remove(HTTP_1_INITIALIZER);
             ctx.pipeline().addAfter(ctx.name(), WS_INITIALIZER, new WebSocketInitializer());
         }
     }
@@ -373,7 +374,6 @@ public class ProtocolNegotiator extends ChannelInitializer<SocketChannel> {
                     pipeline.addLast(primaryHandler);
 
                     pipeline.remove(this);
-                    pipeline.remove(HTTP_1_INITIALIZER);
 
                     // During the upgrade process, the original upgrade response was intercepted and discarded
                     // The websocket protocol handler expects to see the upgrade request and respond to it
