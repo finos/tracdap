@@ -109,7 +109,8 @@ public class RangeSelector
         this.sliceRoot = ArrowVsrContext.forSource(
                 new VectorSchemaRoot(sliceVectors),
                 context.getDictionaries(),
-                context.getAllocator());
+                context.getAllocator(),
+                /* takeOwnership = */ true);
 
         consumer().onStart(sliceRoot);
     }
