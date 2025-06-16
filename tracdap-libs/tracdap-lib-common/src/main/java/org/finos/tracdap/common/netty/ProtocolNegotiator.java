@@ -206,7 +206,6 @@ public class ProtocolNegotiator extends ChannelInitializer<SocketChannel> {
             if (log.isTraceEnabled())
                 log.trace("WebsocketUpgradeCodec upgradeTo: conn = {}", ConnectionId.get(ctx.channel()));
 
-            ctx.pipeline().remove(HTTP_1_INITIALIZER);
             ctx.pipeline().addAfter(ctx.name(), WS_INITIALIZER, new WebSocketInitializer());
         }
     }
@@ -301,11 +300,22 @@ public class ProtocolNegotiator extends ChannelInitializer<SocketChannel> {
 
                     logNewUpgradeConnection(channel, "HTTP/2.0", upgrade);
 
+                    // Some load balancers can re-use existing connections after one or more HTTP exchanges
+                    // If that happens, the upgrade handler needs to reset the channel for the new protocol
+
+                    // Remove any existing handlers apart from this one and the HTTP/2 frame codec
+                    for (var handlerName : pipeline.names()) {
+                        var handler = pipeline.get(handlerName);
+                        if (handler != null && handler != this && !(handler instanceof Http2FrameCodec)) {
+                            pipeline.remove(handler);
+                        }
+                    }
+
                     // Depending on how HTTP/2 is set up, the codec may or may not have been installed
                     var http2Codec = pipeline.get(Http2FrameCodec.class);
 
                     if (http2Codec == null)
-                        pipeline.addAfter(ctx.name(), HTTP_2_CODEC, Http2FrameCodecBuilder.forServer().build());
+                        pipeline.addLast(HTTP_2_CODEC, Http2FrameCodecBuilder.forServer().build());
 
                     // Use common framework for cross-cutting concerns
                     commonConcerns.configureInboundChannel(pipeline, SupportedProtocol.HTTP_2);
@@ -315,7 +325,6 @@ public class ProtocolNegotiator extends ChannelInitializer<SocketChannel> {
                     pipeline.addLast(primaryHandler);
 
                     pipeline.remove(this);
-                    pipeline.remove(HTTP_1_INITIALIZER);
 
                     // The HTTP/2 pipeline does not expect to see the original HTTP/1 upgrade request
                     // This has already been responded to by the upgrade handler
@@ -354,9 +363,19 @@ public class ProtocolNegotiator extends ChannelInitializer<SocketChannel> {
 
                     logNewUpgradeConnection(channel, "WebSocket", upgrade);
 
-                    // HTTP codec is needed to bootstrap WS protocol
-                    // The WS upgrade handler seems to remove it...
-                    pipeline.addAfter(ctx.name(), HTTP_1_CODEC, new HttpServerCodec());
+                    // Some load balancers can re-use existing connections after one or more HTTP exchanges
+                    // If that happens, the upgrade handler needs to reset the channel for the new protocol
+
+                    // Remove any existing handlers apart from this one and the special tail handler
+                    for (var handlerName : pipeline.names()) {
+                        var handler = pipeline.get(handlerName);
+                        if (handler != null && handler != this) {
+                            pipeline.remove(handler);
+                        }
+                    }
+
+                    // HTTP codec is still needed to bootstrap WS protocol
+                    pipeline.addLast(HTTP_1_CODEC, new HttpServerCodec());
 
                     // Configure the WS protocol handler - path must match the URI in the upgrade request
                     // Do not auto-reply to close frames as this can lead to protocol errors
