@@ -20,7 +20,9 @@ import tracdap.rt.metadata as _meta
 import tracdap.rt.config as _cfg
 import tracdap.rt.exceptions as _ex
 import tracdap.rt._impl.core.data as _data
+import tracdap.rt._impl.core.type_system as _type_system
 import tracdap.rt._impl.core.util as _util
+import tracdap.rt.api as _api
 
 from .graph import *
 
@@ -484,6 +486,7 @@ class GraphBuilder:
     def _build_data_input(self, input_name, input_selector, nodes, outputs, explicit_deps):
 
         data_spec = self._build_data_spec(input_selector)
+        data_spec = self._attach_metadata(data_spec, input_selector)
 
         # Physical load of data items from disk
         # Currently one item per input, since inputs are single part/delta
@@ -567,6 +570,7 @@ class GraphBuilder:
     def _build_file_input(self, input_name, input_selector, nodes, outputs, explicit_deps):
 
         file_spec = self._build_file_spec(input_selector)
+        file_spec = self._attach_metadata(file_spec, input_selector)
 
         file_load_id = NodeId.of(f"{input_name}:LOAD", self._job_namespace, _data.DataItem)
         nodes[file_load_id] = LoadDataNode(file_load_id, spec=file_spec, explicit_deps=explicit_deps)
@@ -1027,6 +1031,19 @@ class GraphBuilder:
             return _util.new_object_version(preallocated_ids.pop())
         else:
             return _util.new_object_id(object_type)
+
+    def _attach_metadata(self, obj: _tp.Any, selector: _meta.TagSelector):
+
+        item_id = _util.get_job_mapping(selector, self._job_config)
+        tag = _util.get_job_metadata_tag(selector, self._job_config, optional=True)
+
+        attributes = dict() if tag is None else dict(
+            (attr_name, _type_system.MetadataCodec.decode_value(attr_value))
+            for attr_name, attr_value in tag.attrs.items())
+
+        metadata = _api.RuntimeMetadata(objectId=item_id, attributes=attributes)
+
+        return _util.attach_runtime_metadata(obj, metadata)
 
     def _join_sections(self, *sections: GraphSection, allow_partial_inputs: bool = False):
 
