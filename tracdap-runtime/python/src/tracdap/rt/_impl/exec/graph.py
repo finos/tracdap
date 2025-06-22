@@ -47,7 +47,7 @@ class NodeNamespace:
     def __repr__(self):
         return repr(self.components())
 
-    def components(self) -> [str]:
+    def components(self) -> _tp.List[str]:
         if self == self.__ROOT:
             return ["ROOT"]
         elif self.parent is self.__ROOT or self.parent is None:
