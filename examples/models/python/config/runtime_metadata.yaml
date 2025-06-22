@@ -1,0 +1,13 @@
+
+
+job:
+  runModel:
+
+    parameters:
+
+    inputs:
+      customer_loans: "inputs/loan_final313_100.csv"
+      account_filter: "inputs/account_filter.csv"
+
+    outputs:
+      data_report: "outputs/data_report.md"
