@@ -21,6 +21,7 @@ import re
 import typing as tp
 import uuid
 
+import tracdap.rt.api as api
 import tracdap.rt.exceptions as ex
 import tracdap.rt.metadata as meta
 import tracdap.rt.config as cfg
@@ -121,30 +122,6 @@ def selector_for_latest(object_id: meta.TagHeader) -> meta.TagSelector:
         latestTag=True)
 
 
-def get_job_metadata(
-        selector: tp.Union[meta.TagHeader, meta.TagSelector],
-        job_config: cfg.JobConfig,
-        optional: bool = False) \
-        -> tp.Optional[meta.ObjectDefinition]:
-
-    obj_key = object_key(selector)
-    obj_id = job_config.objectMapping.get(obj_key)
-
-    if obj_id is not None:
-        obj_key = object_key(obj_id)
-
-    obj = job_config.objects.get(obj_key)
-
-    if obj is not None:
-        return obj
-
-    if optional:
-        return None
-
-    err = f"Missing required {selector.objectType.name} object for [{object_key(selector)}]"
-    raise ex.ERuntimeValidation(err)
-
-
 def get_job_mapping(
         selector: tp.Union[meta.TagHeader, meta.TagSelector],
         job_config: cfg.JobConfig) \
@@ -170,6 +147,78 @@ def get_job_mapping(
     return meta.TagHeader(
         meta.ObjectType.__members__[obj_type], obj_id,
         int(obj_ver), obj_ts, 1, obj_ts)
+
+
+def get_job_metadata(
+        selector: tp.Union[meta.TagHeader, meta.TagSelector],
+        job_config: cfg.JobConfig,
+        optional: bool = False) \
+        -> tp.Optional[meta.ObjectDefinition]:
+
+    return __get_job_metadata_item(selector, job_config, job_config.objects, "object", optional)
+
+
+def get_job_metadata_tag(
+        selector: tp.Union[meta.TagHeader, meta.TagSelector],
+        job_config: cfg.JobConfig,
+        optional: bool = False) \
+        -> tp.Optional[meta.Tag]:
+
+    return __get_job_metadata_item(selector, job_config, job_config.tags, "tag", optional)
+
+
+__METADATA_TYPE = tp.TypeVar("__METADATA_TYPE")
+
+
+def __get_job_metadata_item(
+        selector: tp.Union[meta.TagHeader, meta.TagSelector], job_config: cfg.JobConfig,
+        metadata: tp.Dict[str, __METADATA_TYPE], metadata_type: str,
+        optional: bool = False) \
+        -> tp.Optional[__METADATA_TYPE]:
+
+    obj_key = object_key(selector)
+    obj_id = job_config.objectMapping.get(obj_key)
+
+    if obj_id is not None:
+        obj_key = object_key(obj_id)
+
+    item = metadata.get(obj_key)
+
+    if item is not None:
+        return item
+
+    if optional:
+        return None
+
+    err = f"Missing required {selector.objectType.name} {metadata_type} for [{object_key(selector)}]"
+    raise ex.ERuntimeValidation(err)
+
+
+def attach_runtime_metadata(obj: tp.Any, metadata: api.RuntimeMetadata):
+
+    if hasattr(obj, "with_metadata"):
+        attach_func = getattr(obj, "with_metadata")
+        if isinstance(attach_func, tp.Callable):
+            return attach_func(metadata)
+
+    setattr(obj, "_metadata", metadata)
+
+    return obj
+
+
+def retrieve_runtime_metadata(obj: tp.Any) -> tp.Optional[api.RuntimeMetadata]:
+
+    if hasattr(obj, "metadata"):
+        metadata = getattr(obj, "metadata")
+        if isinstance(metadata, api.RuntimeMetadata):
+            return metadata
+
+    if hasattr(obj, "_metadata"):
+        metadata = getattr(obj, "_metadata")
+        if isinstance(metadata, api.RuntimeMetadata):
+            return metadata
+
+    return None
 
 
 def get_origin(metaclass: type):

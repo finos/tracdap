@@ -156,6 +156,9 @@ class DevModeTranslator:
             job_config, job_def = self.translate_job_def(job_config, job_def, model_class)
             job_config.job = job_def
 
+            # Include some basic tags and attributes in the generated metadata
+            job_config = self.generate_dev_mode_tags(job_config)
+
             return job_config
 
         finally:
@@ -214,6 +217,8 @@ class DevModeTranslator:
             -> _cfg.JobConfig:
 
         obj_key = _util.object_key(obj_id)
+
+        job_config.objectMapping[obj_key] = obj_id
         job_config.objects[obj_key] = obj
 
         return job_config
@@ -788,7 +793,6 @@ class DevModeTranslator:
         else:
             return job_config, job_def
 
-        job_metadata = job_config.objects
         job_inputs = job_detail.inputs
         job_outputs = job_detail.outputs
         job_prior_outputs = job_detail.priorOutputs
@@ -799,7 +803,7 @@ class DevModeTranslator:
                     raise _ex.EJobValidation(f"Missing required input [{key}]")
                 continue
             supplied_input = job_inputs.pop(key) if key in job_inputs else None
-            input_selector = self._process_socket(key, schema, supplied_input, job_metadata, is_output=False)
+            input_selector = self._process_socket(key, schema, supplied_input, job_config, is_output=False)
             if input_selector is not None:
                 job_inputs[key] = input_selector
 
@@ -807,28 +811,28 @@ class DevModeTranslator:
             if key not in job_outputs:
                 raise _ex.EJobValidation(f"Missing required output [{key}]")
             supplied_output = job_outputs.pop(key)
-            output_selector = self._process_socket(key, schema, supplied_output, job_metadata, is_output=True)
+            output_selector = self._process_socket(key, schema, supplied_output, job_config, is_output=True)
             if output_selector is not None:
                 job_prior_outputs[key] = output_selector
 
         return job_config, job_def
 
-    def _process_socket(self, key, socket, supplied_value, job_metadata, is_output) -> _meta.TagSelector:
+    def _process_socket(self, key, socket, supplied_value, job_config, is_output) -> _meta.TagSelector:
 
         if socket.objectType == _meta.ObjectType.DATA:
             schema = socket.schema if socket and not socket.dynamic else None
-            return self._process_data_socket(key, supplied_value, schema, job_metadata, is_output)
+            return self._process_data_socket(key, supplied_value, schema, job_config, is_output)
 
         elif socket.objectType == _meta.ObjectType.FILE:
             file_type = socket.fileType
-            return self._process_file_socket(key, supplied_value, file_type, job_metadata, is_output)
+            return self._process_file_socket(key, supplied_value, file_type, job_config, is_output)
 
         else:
             raise _ex.EUnexpected()
 
     def _process_data_socket(
             self, data_key, data_value, schema: tp.Optional[_meta.SchemaDefinition],
-            job_metadata: tp.Dict[str, _meta.ObjectDefinition], is_output: bool)\
+            job_config: _cfg.JobConfig, is_output: bool)\
             -> _meta.TagSelector:
 
         data_id = _util.new_object_id(_meta.ObjectType.DATA)
@@ -884,14 +888,14 @@ class DevModeTranslator:
             storage_id, storage_key, storage_path, storage_format,
             data_item, incarnation_index)
 
-        job_metadata[_util.object_key(data_id)] = data_obj
-        job_metadata[_util.object_key(storage_id)] = storage_obj
+        self._add_job_metadata(job_config, data_id, data_obj)
+        self._add_job_metadata(job_config, storage_id, storage_obj)
 
         return _util.selector_for(data_id)
 
     def _process_file_socket(
             self, file_key, file_value, file_type: _meta.FileType,
-            job_metadata: tp.Dict[str, _meta.ObjectDefinition], is_output: bool) \
+            job_config: _cfg.JobConfig, is_output: bool) \
             -> tp.Optional[_meta.TagSelector]:
 
         file_id = _util.new_object_id(_meta.ObjectType.FILE)
@@ -945,8 +949,8 @@ class DevModeTranslator:
             storage_id, storage_key, storage_path, storage_format,
             data_item, incarnation_index=0)
 
-        job_metadata[_util.object_key(file_id)] = file_obj
-        job_metadata[_util.object_key(storage_id)] = storage_obj
+        self._add_job_metadata(job_config, file_id, file_obj)
+        self._add_job_metadata(job_config, storage_id, storage_obj)
 
         return _util.selector_for(file_id)
 
@@ -1060,6 +1064,20 @@ class DevModeTranslator:
 
         return _meta.ObjectDefinition(objectType=_meta.ObjectType.STORAGE, storage=storage_def)
 
+    @classmethod
+    def generate_dev_mode_tags(cls, job_config: _cfg.JobConfig) -> _cfg.JobConfig:
+
+        job_config = copy.copy(job_config)
+
+        for key, object_id in job_config.objectMapping.items():
+            if key not in job_config.tags:
+
+                tag = _meta.Tag(header=object_id)
+                tag.attrs["trac_dev_mode"] = _types.MetadataCodec.encode_value(True)
+
+                job_config.tags[key] = tag
+
+        return job_config
 
 
 DevModeTranslator._log = _logging.logger_for_class(DevModeTranslator)

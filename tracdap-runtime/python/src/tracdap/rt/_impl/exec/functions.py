@@ -269,7 +269,9 @@ class DataViewFunc(NodeFunction[_data.DataView]):
             arrow_schema = root_item.schema
             data_view = _data.DataView.for_arrow_schema(arrow_schema)
 
-        data_view = _data.DataMapping.add_item_to_view(data_view, root_part_key, root_item)
+        data_view = _data.DataMapping \
+            .add_item_to_view(data_view, root_part_key, root_item) \
+            .with_metadata(root_item.metadata)
 
         return data_view
 
@@ -394,7 +396,9 @@ class LoadDataFunc( _LoadSaveDataFunc, NodeFunction[_data.DataItem],):
             data_copy.storagePath, data_copy.storageFormat, arrow_schema,
             storage_options=storage_options)
 
-        return _data.DataItem.for_table(table, table.schema, trac_schema)
+        return _data.DataItem \
+            .for_table(table, table.schema, trac_schema) \
+            .with_metadata(data_spec.metadata)
 
     def _load_struct(self, data_copy):
 

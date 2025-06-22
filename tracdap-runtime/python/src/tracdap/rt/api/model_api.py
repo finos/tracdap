@@ -14,6 +14,7 @@
 #  limitations under the License.
 
 import abc as _abc
+import dataclasses as _dc
 import typing as _tp
 import logging as _logging
 
@@ -33,6 +34,25 @@ if _tp.TYPE_CHECKING:
         import polars
     except ModuleNotFoundError:
         pass
+
+
+@_dc.dataclass(frozen=True)
+class RuntimeMetadata:
+
+    """
+    The metadata associated with a TRAC object, made available for models at runtime
+
+    The metadata available for a particular object depends on the current job configuration, as
+    well as the type of object. For example, a model input supplied from a TRAC dataset will
+    have the metadata of that dataset available, but data passed into a model as an intermediate
+    dataset in a flow might not have an ID or any attributes.
+    """
+
+    objectId: _tp.Optional[TagHeader] = None
+    """TRAC object ID of the current object (if available)"""
+
+    attributes: _tp.Dict[str, _tp.Any] = _dc.field(default_factory=dict)
+    """TRAC metadata attributes of the current object (if available)"""
 
 
 class TracContext(metaclass=_abc.ABCMeta):
@@ -199,6 +219,31 @@ class TracContext(metaclass=_abc.ABCMeta):
         pass
 
     def get_file_stream(self, file_name: str) -> _tp.ContextManager[_tp.BinaryIO]:
+
+        pass
+
+    def get_metadata(self, item_name: str) -> _tp.Optional[RuntimeMetadata]:
+
+        """
+        Get the TRAC metadata associated with a model input.
+
+        Metadata is available for inputs supplied from real TRAC objects, including
+        both :py:attr:`DATA <tracdap.rt.metadata.ObjectType.DATA>` and
+        :py:attr:`FILE <tracdap.rt.metadata.ObjectType.DATA>` objects.
+
+        Calling :py:meth:`get_metadata()` for objects that are not inputs will return null,
+        since parameters have no metadata and output metadata does not exist until after a job completes.
+        :py:meth:`get_metadata()` will also return null for inputs supplied from other models
+        as intermediates in a flow, since these also have no persistent metadata.
+
+        Attempting to access metadata for objects that do not exist, including outputs that
+        have not been put yet, is an error.
+
+        :param item_name: The name of the file or dataset to get metadata for
+        :return: Runtime metadata for the named item, or None if no metadata is available
+        :type item_name: str
+        :rtype: :py:class:`RuntimeMetadata <tracdap.rt.api.RuntimeMetadata>`
+        """
 
         pass
 

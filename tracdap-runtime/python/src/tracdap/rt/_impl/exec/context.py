@@ -118,6 +118,19 @@ class TracContextImpl(_api.TracContext):
 
         return not data_view.is_empty()
 
+    def get_metadata(self, item_name: str) -> tp.Optional[_api.RuntimeMetadata]:
+
+        _val.validate_signature(self.get_metadata, item_name)
+
+        self.__val.check_item_valid_identifier(item_name, TracContextValidator.ITEM)
+        self.__val.check_item_defined_in_model(item_name, TracContextValidator.ITEM)
+        self.__val.check_item_available_in_context(item_name, TracContextValidator.ITEM)
+
+        obj = self.__local_ctx.get(item_name)
+
+        # Can be none if no metadata is attached
+        return _util.retrieve_runtime_metadata(obj)
+
     def get_schema(self, dataset_name: str) -> _meta.SchemaDefinition:
 
         _val.validate_signature(self.get_schema, dataset_name)
@@ -371,16 +384,25 @@ class TracContextImpl(_api.TracContext):
         self.__val.check_item_valid_identifier(file_name, TracContextValidator.FILE)
         self.__val.check_item_is_model_output(file_name, TracContextValidator.FILE)
 
+        class DelayedClose(io.BytesIO):
+
+            def __init__(self):
+                super().__init__()
+
+            def close(self):
+                super().flush()
+
         @contextlib.contextmanager
         def memory_stream(stream: io.BytesIO):
             try:
                 yield stream
-                buffer = stream.getbuffer().tobytes()
-                self.put_file(file_name, buffer)
             finally:
-                stream.close()
+                with stream.getbuffer() as buffer:
+                    self.put_file(file_name, bytes(buffer))
+                if not stream.closed:
+                    io.BytesIO.close(stream)
 
-        return memory_stream(io.BytesIO())
+        return memory_stream(DelayedClose())
 
     def log(self) -> logging.Logger:
 
@@ -816,6 +838,7 @@ class TracContextErrorReporter:
 
 class TracContextValidator(TracContextErrorReporter):
 
+    ITEM = "Item"
     PARAMETER = "Parameter"
     DATASET = "Dataset"
     FILE = "File"
