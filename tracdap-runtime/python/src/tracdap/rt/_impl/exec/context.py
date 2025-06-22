@@ -118,6 +118,19 @@ class TracContextImpl(_api.TracContext):
 
         return not data_view.is_empty()
 
+    def get_metadata(self, item_name: str) -> tp.Optional[_api.RuntimeMetadata]:
+
+        _val.validate_signature(self.get_metadata, item_name)
+
+        self.__val.check_item_valid_identifier(item_name, TracContextValidator.ITEM)
+        self.__val.check_item_defined_in_model(item_name, TracContextValidator.ITEM)
+        self.__val.check_item_available_in_context(item_name, TracContextValidator.ITEM)
+
+        obj = self.__local_ctx.get(item_name)
+
+        # Can be none if no metadata is attached
+        return _util.retrieve_runtime_metadata(obj)
+
     def get_schema(self, dataset_name: str) -> _meta.SchemaDefinition:
 
         _val.validate_signature(self.get_schema, dataset_name)
@@ -816,6 +829,7 @@ class TracContextErrorReporter:
 
 class TracContextValidator(TracContextErrorReporter):
 
+    ITEM = "Item"
     PARAMETER = "Parameter"
     DATASET = "Dataset"
     FILE = "File"
