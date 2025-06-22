@@ -36,7 +36,7 @@ if _tp.TYPE_CHECKING:
         pass
 
 
-@_dc.dataclass(frozen=True, kw_only=True)
+@_dc.dataclass(frozen=True)
 class RuntimeMetadata:
 
     """
