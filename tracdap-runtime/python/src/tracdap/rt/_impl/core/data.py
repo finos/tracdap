@@ -71,6 +71,8 @@ class DataSpec:
     schema_id: tp.Optional[_meta.TagHeader] = None
     context_key: tp.Optional[str] = None
 
+    metadata: tp.Optional[_api.RuntimeMetadata] = None
+
     @staticmethod
     def create_data_spec(
             data_item: str,
@@ -109,16 +111,20 @@ class DataSpec:
             schema_id: tp.Optional[_meta.TagHeader] = None,
             context_key: tp.Optional[str] = None):
 
-        return DataSpec(
-            self.object_type, self.schema_type, self.data_item,
-            self.definition, self.storage, self.schema,
-            primary_id, storage_id, schema_id, context_key)
+        return dc.replace(self,
+            primary_id=primary_id,
+            storage_id=storage_id,
+            schema_id=schema_id,
+            context_key=context_key)
+            
+    def with_metadata(self, metadata: tp.Optional[_api.RuntimeMetadata]):
+        return dc.replace(self, metadata=metadata)
 
     def is_empty(self):
         return self.data_item is None or len(self.data_item) == 0
 
 
-class StorageLayout:
+class StorageLayout(metaclass=abc.ABCMeta):
 
     __LAYOUTS: "tp.Dict[str, StorageLayout]" = dict()
 
@@ -181,7 +187,7 @@ class StorageLayout:
         pass
 
 
-class BaseLayout(StorageLayout):
+class BaseLayout(StorageLayout, metaclass=abc.ABCMeta):
 
     __DATA_ITEM_TEMPLATE = "data/{}/{}/{}/snap-{:d}/delta-{:d}"
     __FILE_ITEM_TEMPLATE = "file/{}/version-{}"
@@ -502,36 +508,43 @@ def build_data_spec(
         data_id: _meta.TagHeader, storage_id: _meta.TagHeader,
         context_key: tp.Optional[str], trac_schema: _meta.SchemaDefinition,
         sys_config: _cfg.RuntimeConfig,
-        prior_spec: tp.Optional[DataSpec] = None) \
+        prior_spec: tp.Optional[DataSpec] = None,
+        metadata: tp.Optional[_api.RuntimeMetadata] = None) \
         -> DataSpec:
 
     if prior_spec is None:
         layout_key = _util.read_property(sys_config.properties, _cfg_p.ConfigKeys.STORAGE_DEFAULT_LAYOUT, _cfg_p.ConfigKDefaults.STORAGE_DEFAULT_LAYOUT)
         layout = StorageLayout.select(layout_key)
-        return layout.new_data_spec(data_id, storage_id, context_key, trac_schema, sys_config)
-
+        spec = layout.new_data_spec(data_id, storage_id, context_key, trac_schema, sys_config)
     else:
         layout_key = prior_spec.storage.layout
         layout = StorageLayout.select(layout_key)
-        return layout.new_data_version(data_id, storage_id, context_key, trac_schema, prior_spec)
+        spec = layout.new_data_version(data_id, storage_id, context_key, trac_schema, prior_spec)
+
+    # Attach metadata if it is available
+    return spec.with_metadata(metadata) if metadata is not None else spec
 
 
 def build_file_spec(
         file_id: _meta.TagHeader, storage_id: _meta.TagHeader,
         context_key: tp.Optional[str],  file_type: _meta.FileType,
         sys_config: _cfg.RuntimeConfig,
-        prior_spec: tp.Optional[DataSpec] = None) \
+        prior_spec: tp.Optional[DataSpec] = None,
+        metadata: tp.Optional[_api.RuntimeMetadata] = None) \
         -> DataSpec:
 
     if prior_spec is None:
         layout_key = _util.read_property(sys_config.properties, _cfg_p.ConfigKeys.STORAGE_DEFAULT_LAYOUT, _cfg_p.ConfigKDefaults.STORAGE_DEFAULT_LAYOUT)
         layout = StorageLayout.select(layout_key)
-        return layout.new_file_spec(file_id, storage_id, context_key, file_type, sys_config)
+        spec = layout.new_file_spec(file_id, storage_id, context_key, file_type, sys_config)
 
     else:
         layout_key = prior_spec.storage.layout
         layout = StorageLayout.select(layout_key)
-        return layout.new_file_version(file_id, storage_id, context_key, file_type, prior_spec)
+        spec = layout.new_file_version(file_id, storage_id, context_key, file_type, prior_spec)
+
+    # Attach metadata if it is available
+    return spec.with_metadata(metadata) if metadata is not None else spec
 
 
 @dc.dataclass(frozen=True)
@@ -550,6 +563,8 @@ class DataItem:
     # TODO: Remove legacy API and use content / native_schema instead
     schema: pa.Schema = None
     table: tp.Optional[pa.Table] = None
+
+    metadata: tp.Optional[_api.RuntimeMetadata] = None
 
     def is_empty(self) -> bool:
         return self.content is None
@@ -587,6 +602,9 @@ class DataItem:
             _meta.ObjectType.FILE, _meta.SchemaType.SCHEMA_TYPE_NOT_SET,
             content=content, content_type=bytes)
 
+    def with_metadata(self, metadata: _api.RuntimeMetadata) -> "DataItem":
+        return dc.replace(self, metadata=metadata)
+
 
 @dc.dataclass(frozen=True)
 class DataView:
@@ -598,6 +616,8 @@ class DataView:
 
     parts: tp.Dict[DataPartKey, tp.List[DataItem]] = None
     file_item: tp.Optional[DataItem] = None
+
+    metadata: tp.Optional[_api.RuntimeMetadata] = None
 
     @staticmethod
     def create_empty(object_type: _meta.ObjectType = _meta.ObjectType.DATA) -> "DataView":
@@ -625,15 +645,30 @@ class DataView:
 
     def with_trac_schema(self, trac_schema: _meta.SchemaDefinition):
         arrow_schema = DataMapping.trac_to_arrow_schema(trac_schema)
-        return DataView(_meta.ObjectType.DATA, trac_schema, arrow_schema, self.parts)
+        return dc.replace(self, trac_schema=trac_schema, arrow_schema=arrow_schema)
 
     def with_part(self, part_key: DataPartKey, part: DataItem):
-        new_parts = copy.copy(self.parts)
+        new_parts = copy.copy(self.parts) if self.parts is not None else {}
         new_parts[part_key] = [part]
-        return DataView(self.object_type, self.trac_schema, self.arrow_schema, new_parts)
+        return dc.replace(self, parts=new_parts)
 
     def with_file_item(self, file_item: DataItem):
-        return DataView(self.object_type, file_item=file_item)
+        return dc.replace(self, file_item=file_item)
+
+    def with_metadata(self, metadata: _api.RuntimeMetadata) -> "DataView":
+        return dc.replace(self, metadata=metadata)
+
+    def get_metadata(self) -> tp.Optional[_api.RuntimeMetadata]:
+        if self.metadata:
+            return self.metadata
+        if self.object_type == _meta.ObjectType.FILE and self.file_item:
+            return self.file_item.metadata
+        if self.parts:
+            for items in self.parts.values():
+                for item in items:
+                    if item and item.metadata:
+                        return item.metadata
+        return None
 
     def is_empty(self) -> bool:
         if self.object_type == _meta.ObjectType.FILE:
@@ -924,7 +959,7 @@ T_INTERNAL_DATA = tp.TypeVar("T_INTERNAL_DATA")
 T_INTERNAL_SCHEMA = tp.TypeVar("T_INTERNAL_SCHEMA")
 
 
-class DataConverter(tp.Generic[T_DATA_API, T_INTERNAL_DATA, T_INTERNAL_SCHEMA]):
+class DataConverter(tp.Generic[T_DATA_API, T_INTERNAL_DATA, T_INTERNAL_SCHEMA], metaclass=abc.ABCMeta):
 
     # Available per-framework args, to enable framework-specific type-checking in public APIs
     # These should (for a purist point of view) be in the individual converter classes
