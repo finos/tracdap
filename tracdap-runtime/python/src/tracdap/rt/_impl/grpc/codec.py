@@ -61,16 +61,6 @@ __METADATA_MAPPING = {
 }
 
 
-_T_MSG = tp.TypeVar('_T_MSG', bound=_message.Message)
-
-
-def encode_message(msg_class: _T_MSG.__class__, obj: tp.Any) -> _T_MSG:
-
-    attrs = dict((k, encode(v)) for k, v in obj.__dict__.items())
-
-    return msg_class(**attrs)
-
-
 def encode(obj: tp.Any) -> tp.Any:
 
     # Translate TRAC domain objects into generic dict / list structures
@@ -97,6 +87,9 @@ def encode(obj: tp.Any) -> tp.Any:
     if msg_class is None:
         raise ex.ETracInternal(f"No gRPC metadata mapping is available for type {type(obj).__name__}")
 
-    attrs = dict((k, encode(v)) for k, v in obj.__dict__.items() if v is not None)
+    if hasattr(obj, "__slots__"):
+        attrs = dict((k, encode(getattr(obj, k))) for k in obj.__slots__)
+    else:
+        attrs = dict((k, encode(v)) for k, v in obj.__dict__.items() if v is not None)
 
     return msg_class(**attrs)

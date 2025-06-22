@@ -499,10 +499,16 @@ class ConfigParser(tp.Generic[_T]):
         # Now go back over the members and look for any that weren't declared in __init__
         # Members with non-generic default values can still be read from the input stream
 
-        for member_name in obj.__dict__:
+        def member_names():
+            if hasattr(obj, "__slots__"):
+                return filter(lambda s: hasattr(obj, s), obj.__slots__)
+            else:
+                return dir(obj)
+
+        for member_name in member_names():
 
             member_location = self._child_location(location, member_name)
-            default_value = obj.__dict__[member_name]
+            default_value = getattr(obj, member_name)
 
             if member_name in init_signature.parameters or member_name.startswith("_"):
                 continue
@@ -530,7 +536,7 @@ class ConfigParser(tp.Generic[_T]):
 
         for raw_name in raw_dict.keys():
 
-            if raw_name not in obj.__dict__:
+            if not hasattr(obj, raw_name):
                 self._error(location, f"Unrecognised config parameter '{raw_name}'")
 
             if raw_name == "self" or raw_name.startswith("_"):
