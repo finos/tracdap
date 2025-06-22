@@ -384,16 +384,25 @@ class TracContextImpl(_api.TracContext):
         self.__val.check_item_valid_identifier(file_name, TracContextValidator.FILE)
         self.__val.check_item_is_model_output(file_name, TracContextValidator.FILE)
 
+        class DelayedClose(io.BytesIO):
+
+            def __init__(self):
+                super().__init__()
+
+            def close(self):
+                super().flush()
+
         @contextlib.contextmanager
         def memory_stream(stream: io.BytesIO):
             try:
                 yield stream
-                buffer = stream.getbuffer().tobytes()
-                self.put_file(file_name, buffer)
             finally:
-                stream.close()
+                with stream.getbuffer() as buffer:
+                    self.put_file(file_name, bytes(buffer))
+                if not stream.closed:
+                    io.BytesIO.close(stream)
 
-        return memory_stream(io.BytesIO())
+        return memory_stream(DelayedClose())
 
     def log(self) -> logging.Logger:
 
