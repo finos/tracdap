@@ -195,3 +195,12 @@ class TutorialModelsTest(unittest.TestCase):
         sys_config = self.examples_root.joinpath("config/sys_config.yaml")
 
         launch.launch_model(StructModel, job_config, sys_config, dev_mode=True)
+
+    def test_runtime_metadata(self):
+
+        from tutorial.runtime_metadata import RuntimeMetadataReport  # noqa
+
+        job_config = self.examples_root.joinpath("config/runtime_metadata.yaml")
+        sys_config = self.examples_root.joinpath("config/sys_config.yaml")
+
+        launch.launch_model(RuntimeMetadataReport, job_config, sys_config, dev_mode=True)
