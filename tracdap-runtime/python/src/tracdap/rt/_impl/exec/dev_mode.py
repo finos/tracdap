@@ -1073,7 +1073,20 @@ class DevModeTranslator:
             if key not in job_config.tags:
 
                 tag = _meta.Tag(header=object_id)
+
+                timestamp = _types.MetadataCodec.convert_datetime_value(object_id.objectTimestamp.isoDatetime)
+                user_id = _types.MetadataCodec.encode_value("local_user")
+                user_name = _types.MetadataCodec.encode_value("Local User")
+
                 tag.attrs["trac_dev_mode"] = _types.MetadataCodec.encode_value(True)
+
+                tag.attrs["trac_create_time"] = timestamp
+                tag.attrs["trac_create_user_id"] = user_id
+                tag.attrs["trac_create_user_name"] = user_name
+
+                tag.attrs["trac_update_time"] = timestamp
+                tag.attrs["trac_update_user_id"] = user_id
+                tag.attrs["trac_update_user_name"] = user_name
 
                 job_config.tags[key] = tag
 
