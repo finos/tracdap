@@ -92,9 +92,9 @@ class RuntimeMetadataReport(trac.TracModel):
         report.write("| ------ | --------- | ----------- | ------------ |\n")
 
         for field in schema.table.fields:
-            report.write(f"| {field.fieldName} | {field.fieldType.name} | {field.categorical} | {dataset[field.fieldName].dtype}\n")
+            report.write(f"| {field.fieldName} | {field.fieldType.name} | {field.categorical} | {dataset[field.fieldName].dtype} |\n")
 
-        report.write(f"Rows: {len(dataset)  }\n")
+        report.write(f"\nRows: {len(dataset)  }\n\n")
 
 
 if __name__ == "__main__":

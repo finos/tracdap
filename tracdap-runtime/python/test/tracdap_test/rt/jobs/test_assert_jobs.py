@@ -13,6 +13,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import datetime as dt
 import pathlib
 import typing as _tp
 import unittest
@@ -57,7 +58,11 @@ class RuntimeMetadataTest(api.TracModel):
 
         self.TEST_CASE.assertEqual(api.ObjectType.DATA, metadata.objectId.objectType)
         self.TEST_CASE.assertTrue("trac_dev_mode" in metadata.attributes)
+        self.TEST_CASE.assertTrue("trac_create_time" in metadata.attributes)
+        self.TEST_CASE.assertTrue("trac_update_user_id" in metadata.attributes)
         self.TEST_CASE.assertEqual(True, metadata.attributes["trac_dev_mode"])
+        self.TEST_CASE.assertEqual(dt.date.today(), metadata.attributes["trac_create_time"].date())
+        self.TEST_CASE.assertEqual("local_user", metadata.attributes["trac_update_user_id"])
 
         # Trying to get metadata for an item that doesn't exist is an error
         self.TEST_CASE.assertRaises(ex.ERuntimeValidation, lambda: ctx.get_metadata("data_report"))
