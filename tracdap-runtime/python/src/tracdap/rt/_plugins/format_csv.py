@@ -385,9 +385,9 @@ class CsvStorageFormat(IDataFormat):
 
             if python_type == bool:
                 if isinstance(raw_value, str):
-                    if raw_value.lower() in self.__TRUE_VALUES:
+                    if raw_value.strip().lower()in self.__TRUE_VALUES:
                         return True
-                    if raw_value.lower() in self.__FALSE_VALUES:
+                    if raw_value.strip().lower() in self.__FALSE_VALUES:
                         return False
                 if isinstance(raw_value, int) or isinstance(raw_value, float):
                     if raw_value == 1:
