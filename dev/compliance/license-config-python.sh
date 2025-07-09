@@ -45,3 +45,13 @@ IGNORE_LICENSE=certifi
 # https://pypi.org/project/aiohappyeyeballs/
 
 IGNORE_LICENSE="${IGNORE_LICENSE} aiohappyeyeballs"
+
+# The click library is licensed under the BSD 3-clause license
+# License info is no longer correctly detected
+# This is happening for more packages due to a recent standards change for Python license metadata
+# A tool is needed that understands the new format but not yet available
+
+# Here is the license info for click:
+# https://github.com/pallets/click/?tab=BSD-3-Clause-1-ov-file#readme
+
+IGNORE_LICENSE="${IGNORE_LICENSE} click"
