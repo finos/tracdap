@@ -79,6 +79,7 @@ enum RoutingProtocol {
   GRPC = 2;
   GRPC_WEB = 3;
   REST = 4;
+  INTERNAL = 5;
 }
 
 message RoutingMatch {
