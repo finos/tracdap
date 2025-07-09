@@ -25,6 +25,7 @@ import org.finos.tracdap.gateway.proxy.grpc.GrpcProtocol;
 import org.finos.tracdap.gateway.proxy.http.Http1ProxyBuilder;
 import org.finos.tracdap.gateway.proxy.grpc.GrpcProxyBuilder;
 import org.finos.tracdap.gateway.proxy.http.HttpProtocol;
+import org.finos.tracdap.gateway.proxy.internal.InternalProxyBuilder;
 import org.finos.tracdap.gateway.proxy.rest.RestApiProxyBuilder;
 
 import io.netty.channel.*;
@@ -292,6 +293,12 @@ public class Http1Router extends CoreRouter {
             Route routeConfig) {
 
         switch (routeConfig.getConfig().getRouteType()) {
+
+            case INTERNAL:
+
+                return new InternalProxyBuilder(
+                        routeConfig.getConfig(), link, connId,
+                        HttpProtocol.HTTP_1_1);
 
             case HTTP:
 
