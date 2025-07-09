@@ -33,7 +33,7 @@ import java.util.List;
 public class RouteBuilder {
 
     public static final String HEALTH_CHECK_NAME = "Health Check";
-    public static final String HEALTH_CHECK_KEY = "healtha";
+    public static final String HEALTH_CHECK_KEY = "healthz";
     public static final String HEALTH_CHECK_PATH = "/healthz";
 
     private static final Logger log = LoggerFactory.getLogger(RouteBuilder.class);
