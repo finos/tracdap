@@ -17,6 +17,8 @@
 
 package org.finos.tracdap.gateway.routing;
 
+import io.netty.channel.embedded.EmbeddedChannel;
+import org.finos.tracdap.config.RoutingProtocol;
 import org.finos.tracdap.gateway.exec.Redirect;
 import org.finos.tracdap.gateway.exec.Route;
 
@@ -173,16 +175,46 @@ abstract class CoreRouter extends ChannelDuplexHandler {
         // It will insert the router link as the last handler in the chain
         var channelInit = initializeProxyRoute(ctx, routerLink, route);
 
-        target.channelOpenFuture = bootstrap
-                .handler(channelInit)
-                .connect(targetConfig.getHost(), targetConfig.getPort());
+        if (route.getConfig().getRouteType() == RoutingProtocol.INTERNAL) {
 
-        target.channel = target.channelOpenFuture.channel();
-        target.channelActiveFuture = routerLinkFuture;
-        target.channelCloseFuture = target.channel.closeFuture();
+            try {
+
+                // Internal routes use an embedded channel instead of a real connection
+                // Channel init will run synchronously
+                var channel = new EmbeddedChannel(channelInit);
+                target.channel = channel;
+
+                // Embedded channel is already in opened state
+                target.channelOpenFuture = ctx.newSucceededFuture();
+                target.channelActiveFuture = routerLinkFuture;
+                target.channelCloseFuture = channel.closeFuture();
+            }
+            catch (Throwable t) {
+
+                // If there are errors during init, the cleanup actions still need to run
+                // Set up the channel futures to make that happen
+                target.channel = null;
+                target.channelOpenFuture = ctx.newFailedFuture(t);
+                target.channelActiveFuture = ctx.newFailedFuture(t);
+                target.channelCloseFuture = ctx.newSucceededFuture();
+            }
+        }
+        else {
+
+            // Regular proxy connections are started with a client channel bootstrap
+            target.channelOpenFuture = bootstrap
+                    .handler(channelInit)
+                    .connect(targetConfig.getHost(), targetConfig.getPort());
+
+            // Set up channel event futures - init will run on successful open
+            target.channel = target.channelOpenFuture.channel();
+            target.channelActiveFuture = routerLinkFuture;
+            target.channelCloseFuture = target.channel.closeFuture();
+        }
 
         target.routeIndex = route.getIndex();
 
+        // Set up handlers for channel lifecycle events
         target.channelOpenFuture.addListener(future -> proxyChannelOpen(ctx, target, future));
         target.channelActiveFuture.addListener(future -> proxyChannelActive(ctx, target, future));
         target.channelCloseFuture.addListener(future -> proxyChannelClosed(ctx, target, future));
