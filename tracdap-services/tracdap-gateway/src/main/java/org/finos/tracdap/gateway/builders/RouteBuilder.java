@@ -17,6 +17,7 @@
 
 package org.finos.tracdap.gateway.builders;
 
+import io.netty.handler.codec.http.HttpMethod;
 import org.finos.tracdap.common.util.RoutingUtils;
 import org.finos.tracdap.config.*;
 import org.finos.tracdap.gateway.exec.IRouteMatcher;
@@ -30,6 +31,10 @@ import java.util.List;
 
 
 public class RouteBuilder {
+
+    public static final String HEALTH_CHECK_NAME = "Health Check";
+    public static final String HEALTH_CHECK_KEY = "healtha";
+    public static final String HEALTH_CHECK_PATH = "/healthz";
 
     private static final Logger log = LoggerFactory.getLogger(RouteBuilder.class);
 
@@ -51,6 +56,13 @@ public class RouteBuilder {
 
         var nRoutes = services.size() * 2 + customRoutes.size();
         var routes = new ArrayList<Route>(nRoutes);
+
+        var customHealth = customRoutes.stream().anyMatch(route -> route.getRouteKey().equals(HEALTH_CHECK_KEY));
+
+        if (!customHealth) {
+            var healthCheckRoute = buildHealthCheckRoute();
+            routes.add(healthCheckRoute);
+        }
 
         for (var serviceInfo : services) {
             if (serviceInfo.hasGrpc()) {
@@ -88,6 +100,28 @@ public class RouteBuilder {
         }
 
         return routes;
+    }
+
+    private Route buildHealthCheckRoute() {
+
+        var routeIndex =nextRouteIndex++;
+
+        var routeConfig = RouteConfig.newBuilder()
+                .setRouteKey(HEALTH_CHECK_KEY)
+                .setRouteName(HEALTH_CHECK_NAME)
+                .setRouteType(RoutingProtocol.INTERNAL)
+                .addProtocols(RoutingProtocol.HTTP)
+                .setMatch(RoutingMatch.newBuilder()
+                        .setPath(HEALTH_CHECK_PATH))
+                .setTarget(RoutingTarget.newBuilder()
+                        .setScheme(HEALTH_CHECK_KEY))
+                .build();
+
+        var matcher = (IRouteMatcher) (method, url) ->
+                url.getPath().equals(HEALTH_CHECK_PATH) &&
+                (method == HttpMethod.HEAD || method == HttpMethod.GET);
+
+        return new Route(routeIndex, routeConfig, matcher);
     }
 
     private Route buildGrpcServiceRoute(PlatformConfig platformConfig, ServiceInfo serviceInfo) {

@@ -71,6 +71,8 @@ message RouteConfig {
 
   RoutingMatch match = 5;
   RoutingTarget target = 6;
+
+  string routeKey = 7;
 }
 
 enum RoutingProtocol {
