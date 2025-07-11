@@ -23,18 +23,19 @@ from tracdap.rt.ext.storage import *
 
 import pyarrow.fs as afs
 
-try:
-    # These dependencies are provided by the optional [azure] feature
-    # For local development, pip install -r requirements_plugins.txt
-    import azure.storage.blob as az_blob  # noqa
-    import adlfs  # noqa
-    __azure_available = True
-except ImportError:
-    adlfs = None
-    __azure_available = False
-
 # Set of common helpers across the core plugins (do not reference rt._impl)
 from . import _helpers
+
+
+def _azure_fsspec_available():
+    try:
+        # These dependencies are provided by the optional [azure] feature
+        # For local development, pip install -r requirements_plugins.txt
+        import azure.storage.blob as az_blob  # noqa
+        import adlfs  # noqa
+        return True
+    except ImportError:
+        return False
 
 
 class AzureBlobStorageProvider(IStorageProvider):
@@ -100,6 +101,11 @@ class AzureBlobStorageProvider(IStorageProvider):
 
     def create_fsspec(self) -> afs.FileSystem:
 
+        if not _azure_fsspec_available():
+            raise ex.EStorage(f"Azure storage setup failed: Plugin for [{self.RUNTIME_FS_FSSPEC}] is not available")
+
+        import adlfs  # noqa
+
         azure_fsspec_args = self.setup_client_args()
         azure_fsspec = adlfs.AzureBlobFileSystem(**azure_fsspec_args)
 
@@ -152,5 +158,5 @@ class AzureBlobStorageProvider(IStorageProvider):
 
 
 # Only register the plugin if the [azure] feature is available
-if __azure_available:
+if _azure_fsspec_available():
     plugins.PluginManager.register_plugin(IStorageProvider, AzureBlobStorageProvider, ["BLOB"])
