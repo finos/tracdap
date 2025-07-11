@@ -37,7 +37,7 @@ def _aws_arrow_available():
     except ImportError:
         return False
 
-def _aws_native_available():
+def _aws_boto3_available():
     try:
         # AWS SDK
         # These dependencies are provided by the optional [aws] feature
@@ -99,7 +99,7 @@ class AwsStorageProvider(IStorageProvider):
 
     def has_file_storage(self) -> bool:
 
-        return _aws_native_available()
+        return _aws_boto3_available()
 
     def get_arrow_native(self) -> afs.SubTreeFileSystem:
 
@@ -123,7 +123,7 @@ class AwsStorageProvider(IStorageProvider):
 
     def get_file_storage(self) -> IFileStorage:
 
-        if not _aws_native_available():
+        if not _aws_boto3_available():
             raise ex.EStorage(f"AWS storage setup failed: Plugin for [{self.RUNTIME_FS_BOTO3}] is not available")
 
         client_args = self.setup_client_args(self.BOTO_CLIENT_ARGS)
@@ -184,7 +184,7 @@ class AwsStorageProvider(IStorageProvider):
         raise ex.EStartup(message)
 
 
-if _aws_arrow_available() or _aws_native_available():
+if _aws_arrow_available() or _aws_boto3_available():
     plugins.PluginManager.register_plugin(IStorageProvider, AwsStorageProvider, ["S3"])
 
 
@@ -195,7 +195,7 @@ if _aws_arrow_available() or _aws_native_available():
 # This is the old implementation that was used before Arrow native was made available
 # It is likely to be removed in a future release
 
-if _aws_native_available():
+if _aws_boto3_available():
 
     # These dependencies are provided by the optional [aws] feature
     # For local development, pip install -r requirements_plugins.txt

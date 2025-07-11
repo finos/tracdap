@@ -35,7 +35,7 @@ def _gcp_arrow_available():
     except ImportError:
         return False
 
-def _gcp_native_available():
+def _gcp_fsspec_available():
     try:
         # These dependencies are provided by the optional [gcp] feature
         # For local development, pip install -r requirements_plugins.txt
@@ -125,7 +125,7 @@ class GcpStorageProvider(IStorageProvider):
 
     def create_fsspec(self) -> pa_fs.FileSystem:
 
-        if not _gcp_native_available():
+        if not _gcp_fsspec_available():
             raise ex.EStorage(f"GCS storage setup failed: Plugin for [{self.RUNTIME_FS_FSSPEC}] is not available")
 
         import gcsfs  # noqa
@@ -189,5 +189,5 @@ class GcpStorageProvider(IStorageProvider):
         raise ex.EStartup(message)
 
 
-if _gcp_arrow_available() or _gcp_native_available():
+if _gcp_arrow_available() or _gcp_fsspec_available():
     plugins.PluginManager.register_plugin(IStorageProvider, GcpStorageProvider, ["GCS"])
