@@ -28,16 +28,22 @@ from pyarrow import fs as pa_fs
 from . import _helpers
 
 
-try:
-    # These dependencies are provided by the optional [gcp] feature
-    # For local development, pip install -r requirements_plugins.txt
-    import google.cloud.storage as gcs  # noqa
-    import gcsfs  # noqa
-    __gcp_available = True
-except ImportError:
-    gcs = None
-    gcsfs = None
-    __gcp_available = False
+def _gcp_arrow_available():
+    try:
+        # Shipped as part of PyArrow, but may not be available on all platforms
+        return pa_fs.GcsFileSystem is not None
+    except ImportError:
+        return False
+
+def _gcp_fsspec_available():
+    try:
+        # These dependencies are provided by the optional [gcp] feature
+        # For local development, pip install -r requirements_plugins.txt
+        import google.cloud.storage as gcs  # noqa
+        import gcsfs  # noqa
+        return True
+    except ImportError:
+        return False
 
 
 class GcpStorageProvider(IStorageProvider):
@@ -71,11 +77,6 @@ class GcpStorageProvider(IStorageProvider):
         ENDPOINT_PROPERTY: "endpoint_url"
     }
 
-    try:
-        __arrow_available = pa_fs.GcsFileSystem is not None
-    except ImportError:
-        __arrow_available = False
-
     def __init__(self, properties: tp.Dict[str, str]):
 
         self._log = _helpers.logger_for_object(self)
@@ -91,7 +92,7 @@ class GcpStorageProvider(IStorageProvider):
     def get_arrow_native(self) -> pa_fs.SubTreeFileSystem:
 
         if self._runtime_fs == self.RUNTIME_FS_AUTO:
-            gcs_fs = self.create_arrow() if self.__arrow_available else self.create_fsspec()
+            gcs_fs = self.create_arrow() if _gcp_arrow_available() else self.create_fsspec()
         elif self._runtime_fs == self.RUNTIME_FS_ARROW:
             gcs_fs = self.create_arrow()
         elif self._runtime_fs == self.RUNTIME_FS_FSSPEC:
@@ -115,11 +116,19 @@ class GcpStorageProvider(IStorageProvider):
 
     def create_arrow(self) -> pa_fs.FileSystem:
 
+        if not _gcp_arrow_available():
+            raise ex.EStorage(f"GCS storage setup failed: Plugin for [{self.RUNTIME_FS_ARROW}] is not available")
+
         gcs_arrow_args = self.setup_client_args(self.ARROW_CLIENT_ARGS)
 
         return pa_fs.GcsFileSystem(**gcs_arrow_args)
 
     def create_fsspec(self) -> pa_fs.FileSystem:
+
+        if not _gcp_fsspec_available():
+            raise ex.EStorage(f"GCS storage setup failed: Plugin for [{self.RUNTIME_FS_FSSPEC}] is not available")
+
+        import gcsfs  # noqa
 
         gcs_fsspec_args = self.setup_client_args(self.FSSPEC_CLIENT_ARGS)
         gcs_fsspec = gcsfs.GCSFileSystem(**gcs_fsspec_args)
@@ -180,5 +189,5 @@ class GcpStorageProvider(IStorageProvider):
         raise ex.EStartup(message)
 
 
-if __gcp_available:
+if _gcp_arrow_available() or _gcp_fsspec_available():
     plugins.PluginManager.register_plugin(IStorageProvider, GcpStorageProvider, ["GCS"])

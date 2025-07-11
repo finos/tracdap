@@ -120,11 +120,12 @@ class StorageManager:
 
         provider = plugins.PluginManager.load_plugin(IStorageProvider, storage_config)
 
-        if provider.has_file_storage():
-            file_storage = provider.get_file_storage()
-        elif provider.has_arrow_native():
+        # Prefer arrow native FS if it is available
+        if provider.has_arrow_native():
             fs = provider.get_arrow_native()
             file_storage = CommonFileStorage(storage_key, storage_config, fs)
+        elif provider.has_file_storage():
+            file_storage = provider.get_file_storage()
         else:
             file_storage = None
 
