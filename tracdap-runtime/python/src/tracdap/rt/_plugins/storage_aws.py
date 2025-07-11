@@ -99,6 +99,10 @@ class AwsStorageProvider(IStorageProvider):
 
     def has_file_storage(self) -> bool:
 
+        # Do not advertise the custom storage implementation if arrow native is available
+        if _aws_arrow_available():
+            return False
+
         return _aws_boto3_available()
 
     def get_arrow_native(self) -> afs.SubTreeFileSystem:
