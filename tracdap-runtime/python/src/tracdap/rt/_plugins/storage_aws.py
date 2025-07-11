@@ -104,7 +104,7 @@ class AwsStorageProvider(IStorageProvider):
     def get_arrow_native(self) -> afs.SubTreeFileSystem:
 
         if not _aws_arrow_available():
-            raise ex.EStorage(f"AWS storage setup failed: Plugin for [{self.RUNTIME_FS_ARROW}] is not available")
+            raise ex.EStorage(f"S3 storage setup failed: Plugin for [{self.RUNTIME_FS_ARROW}] is not available")
 
         s3fs_args = self.setup_client_args(self.ARROW_CLIENT_ARGS)
         s3fs = afs.S3FileSystem(**s3fs_args)
@@ -124,7 +124,7 @@ class AwsStorageProvider(IStorageProvider):
     def get_file_storage(self) -> IFileStorage:
 
         if not _aws_boto3_available():
-            raise ex.EStorage(f"AWS storage setup failed: Plugin for [{self.RUNTIME_FS_BOTO3}] is not available")
+            raise ex.EStorage(f"S3 storage setup failed: Plugin for [{self.RUNTIME_FS_BOTO3}] is not available")
 
         client_args = self.setup_client_args(self.BOTO_CLIENT_ARGS)
         client_args["service_name"] = "s3"

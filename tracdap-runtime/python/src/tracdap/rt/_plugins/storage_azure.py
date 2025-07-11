@@ -102,7 +102,7 @@ class AzureBlobStorageProvider(IStorageProvider):
     def create_fsspec(self) -> afs.FileSystem:
 
         if not _azure_fsspec_available():
-            raise ex.EStorage(f"Azure storage setup failed: Plugin for [{self.RUNTIME_FS_FSSPEC}] is not available")
+            raise ex.EStorage(f"BLOB storage setup failed: Plugin for [{self.RUNTIME_FS_FSSPEC}] is not available")
 
         import adlfs  # noqa
 
