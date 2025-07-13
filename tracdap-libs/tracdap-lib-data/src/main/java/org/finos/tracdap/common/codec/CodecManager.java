@@ -23,25 +23,39 @@ import org.finos.tracdap.common.plugin.IPluginManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
+
 
 public class CodecManager implements ICodecManager {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
-    private final IPluginManager plugins;
-    private final ConfigManager configManager;
+    private final Map<String, ICodec> codecs;
 
     public CodecManager(IPluginManager plugins, ConfigManager configManager) {
-        this.plugins = plugins;
-        this.configManager = configManager;
+
+        var protocols = plugins.availableProtocols(ICodec.class);
+        var codecs = new HashMap<String, ICodec>();
+
+        for (var protocol : protocols) {
+            var codec = plugins.createService(ICodec.class, protocol, configManager);
+            codecs.put(protocol.toLowerCase(), codec);
+        }
+
+        this.codecs = Collections.unmodifiableMap(codecs);
     }
 
     @Override
     public ICodec getCodec(String format) {
 
-        if (plugins.isServiceAvailable(ICodec.class, format))
-            return plugins.createService(ICodec.class, format, configManager);
+        var protocol = format.toLowerCase();
 
+        if (codecs.containsKey(protocol)) {
+
+            return codecs.get(protocol);
+        }
         else {
 
             // Make a slightly prettier message that the regular plugin not available message
