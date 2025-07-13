@@ -262,7 +262,7 @@ abstract class MetadataDalSearchTest implements IMetadataStoreTest {
 
     @ParameterizedTest
     @EnumSource(value = BasicType.class, mode = EnumSource.Mode.EXCLUDE,
-            names = {"BASIC_TYPE_NOT_SET", "UNRECOGNIZED", "ARRAY", "MAP"})
+            names = {"BASIC_TYPE_NOT_SET", "UNRECOGNIZED", "ARRAY", "MAP", "STRUCT"})
     void searchTerm_exists_typed(BasicType basicType) {
 
         var attrToLookFor = "existence_search_test_" + basicType.name();
@@ -289,7 +289,7 @@ abstract class MetadataDalSearchTest implements IMetadataStoreTest {
 
     @ParameterizedTest
     @EnumSource(value = BasicType.class, mode = EnumSource.Mode.EXCLUDE,
-            names = {"BASIC_TYPE_NOT_SET", "UNRECOGNIZED", "ARRAY", "MAP"})
+            names = {"BASIC_TYPE_NOT_SET", "UNRECOGNIZED", "ARRAY", "MAP", "STRUCT"})
     void searchTerm_exists_not_typed(BasicType basicType) {
 
         var attrToLookFor = "existence_search_test_no_type_" + basicType.name();
@@ -318,7 +318,7 @@ abstract class MetadataDalSearchTest implements IMetadataStoreTest {
 
     @ParameterizedTest
     @EnumSource(value = BasicType.class, mode = EnumSource.Mode.EXCLUDE,
-                names = {"BASIC_TYPE_NOT_SET", "UNRECOGNIZED", "ARRAY", "MAP"})
+                names = {"BASIC_TYPE_NOT_SET", "UNRECOGNIZED", "ARRAY", "MAP", "STRUCT"})
     void searchTerm_eq(BasicType basicType) {
 
         var attrToLookFor = "eq_search_test_" + basicType.name();
@@ -352,7 +352,7 @@ abstract class MetadataDalSearchTest implements IMetadataStoreTest {
 
     @ParameterizedTest
     @EnumSource(value = BasicType.class, mode = EnumSource.Mode.EXCLUDE,
-                names = {"BASIC_TYPE_NOT_SET", "UNRECOGNIZED", "BOOLEAN", "ARRAY", "MAP"})
+                names = {"BASIC_TYPE_NOT_SET", "UNRECOGNIZED", "BOOLEAN", "ARRAY", "MAP", "STRUCT"})
     void searchTerm_eqArray(BasicType basicType) {
 
         // Note: Boolean array attrs are not allowed
@@ -388,7 +388,7 @@ abstract class MetadataDalSearchTest implements IMetadataStoreTest {
 
     @ParameterizedTest
     @EnumSource(value = BasicType.class, mode = EnumSource.Mode.EXCLUDE,
-                names = {"BASIC_TYPE_NOT_SET", "UNRECOGNIZED", "ARRAY", "MAP"})
+                names = {"BASIC_TYPE_NOT_SET", "UNRECOGNIZED", "ARRAY", "MAP", "STRUCT"})
     void searchTerm_ne(BasicType basicType) {
 
         var markerAttr = "ne_search_marker_" + basicType.name();
@@ -440,7 +440,7 @@ abstract class MetadataDalSearchTest implements IMetadataStoreTest {
 
     @ParameterizedTest
     @EnumSource(value = BasicType.class, mode = EnumSource.Mode.EXCLUDE,
-                names = {"BASIC_TYPE_NOT_SET", "UNRECOGNIZED", "BOOLEAN", "ARRAY", "MAP"})
+                names = {"BASIC_TYPE_NOT_SET", "UNRECOGNIZED", "BOOLEAN", "ARRAY", "MAP", "STRUCT"})
     void searchTerm_neArray(BasicType basicType) {
 
         // Note: Boolean array attrs are not allowed
@@ -832,7 +832,7 @@ abstract class MetadataDalSearchTest implements IMetadataStoreTest {
 
     @ParameterizedTest
     @EnumSource(value = BasicType.class, mode = EnumSource.Mode.EXCLUDE,
-                names = {"BASIC_TYPE_NOT_SET", "UNRECOGNIZED", "BOOLEAN", "ARRAY", "MAP"})
+                names = {"BASIC_TYPE_NOT_SET", "UNRECOGNIZED", "BOOLEAN", "ARRAY", "MAP", "STRUCT"})
     void searchTerm_in(BasicType basicType) {
 
         // Note: IN query for BOOLEAN attr is not allowed
@@ -884,7 +884,7 @@ abstract class MetadataDalSearchTest implements IMetadataStoreTest {
 
     @ParameterizedTest
     @EnumSource(value = BasicType.class, mode = EnumSource.Mode.EXCLUDE,
-                names = {"BASIC_TYPE_NOT_SET", "UNRECOGNIZED", "BOOLEAN", "ARRAY", "MAP"})
+                names = {"BASIC_TYPE_NOT_SET", "UNRECOGNIZED", "BOOLEAN", "ARRAY", "MAP", "STRUCT"})
     void searchTerm_inArray(BasicType basicType) {
 
         // Note: IN query for BOOLEAN attr is not allowed
