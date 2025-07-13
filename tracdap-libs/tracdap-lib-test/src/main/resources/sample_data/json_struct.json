@@ -1,0 +1,46 @@
+{
+  "boolField": true,
+  "intField": 2,
+  "floatField": 2.0,
+  "decimalField": "2.000000000000",
+  "strField": "Hello world 2",
+  "dateField": "1970-01-03",
+  "datetimeField": "1970-01-01T00:00:02.000",
+  "enumField": "GREEN",
+  "quotedField": "Hello world 2",
+  "optionalField": "Hello world 2",
+  "optionalQuotedField": "Hello world 2",
+  "listField": [0, 1, 2, 3, 4],
+  "dictField": {
+    "key_2": "1970-01-01T00:00:02.000",
+    "key_1": "1970-01-01T00:00:01.000",
+    "key_0": "1970-01-01T00:00:00.000"
+  },
+  "anonymousStructField": {
+    "field1": "Hello world 2",
+    "field2": 2,
+    "enumField": "GREEN"
+  },
+  "structField": {
+    "field1": "Hello world 2",
+    "field2": 2,
+    "enumField": "GREEN"
+  },
+  "nestedStructField": {
+    "key_2": {
+      "field1": "Hello world 2",
+      "field2": 2,
+      "enumField": "GREEN"
+    },
+    "key_1": {
+      "field1": "Hello world 1",
+      "field2": 1,
+      "enumField": "BLUE"
+    },
+    "key_0": {
+      "field1": "Hello world 0",
+      "field2": 0,
+      "enumField": "RED"
+    }
+  }
+}
