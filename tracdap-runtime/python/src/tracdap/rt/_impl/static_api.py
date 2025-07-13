@@ -155,30 +155,29 @@ class StaticApiImpl(_StaticApiHook):
 
         _val.validate_signature(self.define_struct, python_type)
 
-        struct_schema = _struct.StructProcessor.define_struct(python_type)
-        return _meta.SchemaDefinition(schemaType=_meta.SchemaType.STRUCT, struct=struct_schema)
+        return _struct.StructProcessor.define_struct(python_type)
 
     def define_schema(
             self, *fields: _tp.Union[_meta.FieldSchema, _tp.List[_meta.FieldSchema]],
-            schema_type: _meta.SchemaType = _meta.SchemaType.TABLE, dynamic: bool = False) \
+            schema_type: _meta.SchemaType = _meta.SchemaType.TABLE_SCHEMA, dynamic: bool = False) \
             -> _meta.SchemaDefinition:
 
         _val.validate_signature(self.define_schema, *fields, schema_type=schema_type, dynamic=dynamic)
 
-        if schema_type == _meta.SchemaType.TABLE:
+        if schema_type == _meta.SchemaType.TABLE_SCHEMA:
 
             if dynamic and not fields:
                 table_schema = None
             else:
                 table_schema = self._build_table_schema(*fields)
 
-            return _meta.SchemaDefinition(_meta.SchemaType.TABLE, table=table_schema)
+            return _meta.SchemaDefinition(_meta.SchemaType.TABLE_SCHEMA, table=table_schema)
 
         raise _ex.ERuntimeValidation(f"Invalid schema type [{schema_type.name}]")
 
     def load_schema(
             self, package: _tp.Union[_ts.ModuleType, str], schema_file: str,
-            schema_type: _meta.SchemaType = _meta.SchemaType.TABLE) \
+            schema_type: _meta.SchemaType = _meta.SchemaType.TABLE_SCHEMA) \
             -> _meta.SchemaDefinition:
 
         _val.validate_signature(self.load_schema, package, schema_file, schema_type)

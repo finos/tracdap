@@ -256,7 +256,7 @@ class DataViewFunc(NodeFunction[_data.DataView]):
 
         # TODO: Generalize processing across DataView / DataItem types
 
-        if root_item.schema_type == _meta.SchemaType.STRUCT:
+        if root_item.schema_type == _meta.SchemaType.STRUCT_SCHEMA:
             view = _data.DataView.for_trac_schema(self.node.schema)
             view.parts[root_part_key] = [root_item]
             return view
@@ -361,10 +361,10 @@ class LoadDataFunc( _LoadSaveDataFunc, NodeFunction[_data.DataItem],):
         if data_spec.object_type == _api.ObjectType.FILE:
             return self._load_file(data_copy)
 
-        elif data_spec.schema_type == _api.SchemaType.TABLE:
+        elif data_spec.schema_type == _api.SchemaType.TABLE_SCHEMA:
             return self._load_table(data_spec, data_copy)
 
-        elif data_spec.schema_type == _api.SchemaType.STRUCT:
+        elif data_spec.schema_type == _api.SchemaType.STRUCT_SCHEMA:
             return self._load_struct(data_copy)
 
         # TODO: Handle dynamic inputs, they should work for any schema type
@@ -433,10 +433,10 @@ class SaveDataFunc(_LoadSaveDataFunc, NodeFunction[_data.DataSpec]):
         if data_item.object_type == _api.ObjectType.FILE:
             return self._save_file(data_item, data_spec, data_copy)
 
-        elif data_item.schema_type == _api.SchemaType.TABLE:
+        elif data_item.schema_type == _api.SchemaType.TABLE_SCHEMA:
             return self._save_table(data_item, data_spec, data_copy)
 
-        elif data_item.schema_type == _api.SchemaType.STRUCT:
+        elif data_item.schema_type == _api.SchemaType.STRUCT_SCHEMA:
             return self._save_struct(data_item, data_spec, data_copy)
 
         else:

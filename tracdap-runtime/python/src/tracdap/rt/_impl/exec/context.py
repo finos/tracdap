@@ -914,10 +914,10 @@ class TracContextValidator(TracContextErrorReporter):
         if schema is None:
             self._report_error(f"Schema not defined for dataset {dataset_name} in the current context")
 
-        if schema.schemaType == _meta.SchemaType.TABLE and (schema.table is None or not schema.table.fields):
+        if schema.schemaType == _meta.SchemaType.TABLE_SCHEMA and (schema.table is None or not schema.table.fields):
             self._report_error(f"Schema not defined for dataset {dataset_name} in the current context")
 
-        if schema.schemaType == _meta.SchemaType.STRUCT and (schema.struct is None or not schema.struct.fields):
+        if schema.schemaType == _meta.SchemaType.STRUCT_SCHEMA and not schema.fields:
             self._report_error(f"Schema not defined for dataset {dataset_name} in the current context")
 
     def check_dataset_schema_not_defined(self, dataset_name: str, data_view: _data.DataView):
