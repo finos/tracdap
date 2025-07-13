@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.codec.json;
+package org.finos.tracdap.common.codec.text;
 
 import org.finos.tracdap.common.codec.StreamingDecoder;
 import org.finos.tracdap.common.data.ArrowVsrContext;
@@ -24,35 +24,49 @@ import org.finos.tracdap.common.exception.EDataCorruption;
 import org.finos.tracdap.common.exception.ETrac;
 import org.finos.tracdap.common.exception.EUnexpected;
 
+import com.fasterxml.jackson.core.*;
 import org.apache.arrow.memory.ArrowBuf;
 import org.apache.arrow.memory.BufferAllocator;
-
-import com.fasterxml.jackson.core.JacksonException;
-import com.fasterxml.jackson.core.JsonFactory;
-import com.fasterxml.jackson.core.JsonToken;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.function.BiConsumer;
 
 
-public class JsonDecoder extends StreamingDecoder {
-
-    private static final int BATCH_SIZE = 1024;
-    private static final boolean CASE_INSENSITIVE = false;
+public class BaseTextDecoder extends StreamingDecoder {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
+
+    private final ArrowVsrSchema schema;
+    private final BufferAllocator allocator;
+    private final TextFileConfig config;
+    private final BiConsumer<JsonParser, ArrowVsrContext> parserSetup;
+
+    private TextFileReader reader;
     private ArrowVsrContext context;
-    private JsonStreamParser parser;
+
     private long bytesConsumed;
+    private boolean done;
 
-    public JsonDecoder(BufferAllocator arrowAllocator, ArrowVsrSchema arrowSchema) {
+    public BaseTextDecoder(
+            ArrowVsrSchema schema,
+            BufferAllocator allocator,
+            TextFileConfig config) {
 
-        // Allocate memory once, and reuse it for every batch (i.e. do not clear/allocate per batch)
-        // This memory is released in close(), which calls root.close()
+        this(schema, allocator, config, null);
+    }
 
-        this.context = ArrowVsrContext.forSchema(arrowSchema, arrowAllocator);
+    public BaseTextDecoder(
+            ArrowVsrSchema schema,
+            BufferAllocator allocator,
+            TextFileConfig config,
+            BiConsumer<JsonParser, ArrowVsrContext> parserSetup) {
+
+        this.schema = schema;
+        this.allocator = allocator;
+        this.config = config;
+        this.parserSetup = parserSetup;
     }
 
     @Override
@@ -63,10 +77,18 @@ public class JsonDecoder extends StreamingDecoder {
             if (log.isTraceEnabled())
                 log.trace("JSON DECODER: onStart()");
 
-            var factory = new JsonFactory();
-            var tableHandler = new JsonTableHandler(context, batch -> consumer().onBatch(), BATCH_SIZE, CASE_INSENSITIVE);
+            this.reader = new TextFileReader(
+                    schema.physical(),
+                    schema.dictionaryFields(),
+                    schema.dictionaries(),
+                    allocator, config);
 
-            this.parser = new JsonStreamParser(factory, tableHandler);
+            this.context = ArrowVsrContext.forSource(
+                    reader.getVectorSchemaRoot(),
+                    reader, allocator);
+
+            if (parserSetup != null)
+                parserSetup.accept(reader.getParser(), context);
 
             consumer().onStart(context);
         }
@@ -86,13 +108,14 @@ public class JsonDecoder extends StreamingDecoder {
             if (log.isTraceEnabled())
                 log.trace("JSON DECODER: onNext()");
 
-            parser.feedInput(chunk.nioBuffer());
-            bytesConsumed += chunk.readableBytes();
+            // Empty chunks are allowed in the stream but should be ignored
+            if (chunk.readableBytes() > 0) {
 
-            JsonToken token;
+                reader.feedInput(chunk.nioBuffer());
+                bytesConsumed += chunk.readableBytes();
 
-            while ((token = parser.nextToken()) != JsonToken.NOT_AVAILABLE)
-                parser.acceptToken(token);
+                done = doParse();
+            }
         }
         catch (ETrac e) {
 
@@ -145,8 +168,14 @@ public class JsonDecoder extends StreamingDecoder {
                 log.error(error.getMessage(), error);
                 consumer().onError(error);
             }
+            else if (!done) {
+                var error = new EDataCorruption("JSON data is incomplete");
+                log.error(error.getMessage(), error);
+                consumer().onError(error);
+            }
             else {
 
+                markAsDone();
                 consumer().onComplete();
             }
         }
@@ -163,7 +192,6 @@ public class JsonDecoder extends StreamingDecoder {
             if (log.isTraceEnabled())
                 log.trace("JSON DECODER: onError()");
 
-            // TODO: Should datapipeline handle this?
             consumer().onError(error);
         }
         finally {
@@ -171,14 +199,36 @@ public class JsonDecoder extends StreamingDecoder {
         }
     }
 
+    boolean doParse() throws IOException {
+
+        do {
+
+            if (context.readyToFlip())
+                context.flip();
+
+            if (context.readyToUnload() && consumerReady())
+                consumer().onBatch();
+
+            if (context.readyToLoad() && reader.hasBatch()) {
+                if (reader.readBatch())
+                    context.setLoaded();
+                else
+                    return false;
+            }
+
+        } while (context.readyToFlip());
+
+        return ! reader.hasBatch();
+    }
+
     @Override
     public void close() {
 
         try {
 
-            if (parser != null) {
-                parser.close();
-                parser = null;
+            if (reader != null) {
+                reader.close();
+                reader = null;
             }
 
             if (context != null) {

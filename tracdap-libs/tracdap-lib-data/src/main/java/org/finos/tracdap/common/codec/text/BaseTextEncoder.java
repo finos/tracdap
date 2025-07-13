@@ -15,37 +15,48 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.codec.json;
+package org.finos.tracdap.common.codec.text;
 
+import com.fasterxml.jackson.core.JsonGenerator;
 import org.finos.tracdap.common.codec.StreamingEncoder;
 import org.finos.tracdap.common.data.ArrowVsrContext;
+import org.finos.tracdap.common.data.ArrowVsrSchema;
 import org.finos.tracdap.common.data.util.ByteOutputStream;
 import org.finos.tracdap.common.exception.EUnexpected;
 
 import org.apache.arrow.memory.BufferAllocator;
-
-import com.fasterxml.jackson.core.JsonEncoding;
-import com.fasterxml.jackson.core.JsonFactory;
-import com.fasterxml.jackson.core.JsonGenerator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.function.BiConsumer;
 
 
-public class JsonEncoder extends StreamingEncoder implements AutoCloseable {
+public class BaseTextEncoder extends StreamingEncoder implements AutoCloseable {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
     private final BufferAllocator allocator;
+    private final TextFileConfig config;
+
+    private final BiConsumer<JsonGenerator, ArrowVsrContext> generatorSetup;
 
     private ArrowVsrContext context;
     private OutputStream out;
-    private JsonGenerator generator;
+    private TextFileWriter writer;
 
-    public JsonEncoder(BufferAllocator allocator) {
+    public BaseTextEncoder(BufferAllocator allocator, TextFileConfig config) {
+        this(allocator, config, null);
+    }
+
+    public BaseTextEncoder(
+            BufferAllocator allocator, TextFileConfig config,
+            BiConsumer<JsonGenerator, ArrowVsrContext> generatorSetup) {
+
         this.allocator = allocator;
+        this.config = config;
+        this.generatorSetup = generatorSetup;
     }
 
     @Override
@@ -59,14 +70,19 @@ public class JsonEncoder extends StreamingEncoder implements AutoCloseable {
             consumer().onStart();
 
             this.context = context;
+            this.out = new ByteOutputStream(allocator, consumer()::onNext);
 
-            out = new ByteOutputStream(allocator, consumer()::onNext);
+            this.writer = new TextFileWriter(
+                    context.getFrontBuffer(),
+                    context.getDictionaries(),
+                    this.out,
+                    configForSchema(this.config, context.getSchema()));
 
-            var factory = new JsonFactory();
-            generator = factory.createGenerator(out, JsonEncoding.UTF8);
+            // Allow individual codecs to customize the generator
+            if (generatorSetup != null)
+                generatorSetup.accept(writer.getGenerator(), context);
 
-            // Tell Jackson to start the main array of records
-            generator.writeStartArray();
+            writer.writeStart();
         }
         catch (IOException e) {
 
@@ -79,6 +95,15 @@ public class JsonEncoder extends StreamingEncoder implements AutoCloseable {
         }
     }
 
+    private TextFileConfig configForSchema(TextFileConfig baseConfig, ArrowVsrSchema schema) {
+
+        return new TextFileConfig(
+                baseConfig.getJsonFactory(),
+                baseConfig.getFormatSchema(),
+                baseConfig.getBatchSize(),
+                schema.isSingleRecord());
+    }
+
     @Override
     public void onBatch() {
 
@@ -88,26 +113,9 @@ public class JsonEncoder extends StreamingEncoder implements AutoCloseable {
                 log.trace("JSON ENCODER: onNext()");
 
             var batch = context.getFrontBuffer();
-            var dictionaries = context.getDictionaries();
 
-            var nRows = batch.getRowCount();
-            var nCols = batch.getFieldVectors().size();
-
-            for (var row = 0; row < nRows; row++) {
-
-                generator.writeStartObject();
-
-                for (var col = 0; col < nCols; col++) {
-
-                    var vector = batch.getVector(col);
-                    var fieldName = vector.getName();
-
-                    generator.writeFieldName(fieldName);
-                    JacksonValues.getAndGenerate(vector, row, dictionaries, generator);
-                }
-
-                generator.writeEndObject();
-            }
+            writer.resetBatch(batch);
+            writer.writeBatch();
 
             context.setUnloaded();
         }
@@ -130,16 +138,8 @@ public class JsonEncoder extends StreamingEncoder implements AutoCloseable {
             if (log.isTraceEnabled())
                 log.trace("JSON ENCODER: onComplete()");
 
-            // Tell Jackson to end the main array of records
-            generator.writeEndArray();
-
-            // Flush and close output
-
-            generator.close();
-            generator = null;
-
-            out.flush();
-            out = null;
+            writer.writeEnd();
+            writer.flush();
 
             markAsDone();
             consumer().onComplete();
@@ -177,9 +177,11 @@ public class JsonEncoder extends StreamingEncoder implements AutoCloseable {
 
         try {
 
-            if (generator != null) {
-                generator.close();
-                generator = null;
+            if (writer != null) {
+                writer.close();
+                writer = null;
+                // Do not close the out stream twice
+                out = null;
             }
 
             if (out != null) {
