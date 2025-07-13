@@ -149,7 +149,7 @@ public class SchemaValidator {
         }
         else {
             ctx = ctx.pushMap(SD_NAMED_TYPES)
-                    .apply(CommonValidators::omitted)
+                    .applyMapKeys(CommonValidators::omitted)
                     .pop();
         }
 
@@ -161,7 +161,7 @@ public class SchemaValidator {
         }
         else {
             ctx = ctx.pushMap(SD_NAMED_ENUMS)
-                    .apply(CommonValidators::omitted)
+                    .applyMapKeys(CommonValidators::omitted)
                     .pop();
         }
 
@@ -274,21 +274,22 @@ public class SchemaValidator {
     @Validator
     public static ValidationContext fieldSchema(FieldSchema field, ValidationContext ctx) {
 
-        return fieldSchema(field, NO_NAMED_TYPES, NO_NAMED_ENUMS, ctx);
+        return fieldSchema(field, NO_NAMED_TYPES, NO_NAMED_ENUMS, SchemaType.TABLE_SCHEMA, ctx);
     }
 
     public static ValidationContext fieldSchema(FieldSchema field, SchemaDefinition root, ValidationContext ctx) {
 
         if (root != null)
-            return fieldSchema(field, root.getNamedTypesMap(), root.getNamedEnumsMap(), ctx);
+            return fieldSchema(field, root.getNamedTypesMap(), root.getNamedEnumsMap(), root.getSchemaType(), ctx);
         else
-            return fieldSchema(field, NO_NAMED_TYPES, NO_NAMED_ENUMS, ctx);
+            return fieldSchema(field, NO_NAMED_TYPES, NO_NAMED_ENUMS, SchemaType.TABLE_SCHEMA, ctx);
     }
 
     public static ValidationContext fieldSchema(
             FieldSchema field,
             Map<String, SchemaDefinition> namedTypes,
             Map<String, EnumValues> namedEnums,
+            SchemaType schemaType,
             ValidationContext ctx) {
 
         ctx = ctx.push(FS_FIELD_NAME)
@@ -305,7 +306,7 @@ public class SchemaValidator {
         ctx = ctx.push(FS_FIELD_TYPE)
                 .apply(CommonValidators::required)
                 .apply(CommonValidators::recognizedEnum, BasicType.class)
-                .apply(CommonValidators::primitiveType, BasicType.class)
+                .applyIf(schemaType == SchemaType.TABLE_SCHEMA, CommonValidators::primitiveType, BasicType.class)
                 .pop();
 
         ctx = ctx.push(FS_LABEL)

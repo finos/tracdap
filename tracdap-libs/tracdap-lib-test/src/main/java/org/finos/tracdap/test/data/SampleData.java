@@ -502,6 +502,7 @@ public class SampleData {
         }
 
         staging.forEach(ArrowVsrStaging::encodeVector);
+        staging.forEach(staged -> staged.getStagingVector().close());
         vectors.forEach(vector -> vector.setValueCount(data.size()));
 
         var context = ArrowVsrContext.forSource(vsr, dictionaries, arrowAllocator, /* ownership = */ true);
