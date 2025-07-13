@@ -21,6 +21,7 @@ import org.apache.arrow.vector.BaseIntVector;
 import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.compare.Range;
 import org.apache.arrow.vector.compare.RangeEqualsVisitor;
+import org.apache.arrow.vector.dictionary.DictionaryEncoder;
 import org.apache.arrow.vector.dictionary.DictionaryProvider;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.finos.tracdap.common.data.ArrowVsrContext;
@@ -110,12 +111,37 @@ public class DataComparison {
             var originalVec = original.getVector(j);
             var rtVec = roundTrip.getVector(j);
 
-            // Create a visitor that will do the comparison
-            RangeEqualsVisitor visitor = new RangeEqualsVisitor(originalVec, rtVec);
+            if (field.getDictionary() == null) {
 
-            Assertions.assertTrue(
-                    visitor.rangeEquals(new Range(0, 0, originalVec.getValueCount())),
-                    "Vectors not equal for field " + field.getName());
+                // Use Arrow visitor to do the comparison (this is strict, e.g. map order matters)
+                RangeEqualsVisitor visitor = new RangeEqualsVisitor(originalVec, rtVec);
+
+                Assertions.assertTrue(
+                        visitor.rangeEquals(new Range(0, 0, originalVec.getValueCount())),
+                        "Vectors not equal for field " + field.getName());
+            }
+            else {
+
+                // Decode dictionary fields for comparison
+                // Encoded values may differ depending on dictionary ordering
+
+                var originalDict = originalContext.getDictionaries().lookup(originalVec.getField().getDictionary().getId());
+                var originalDecoded =  DictionaryEncoder.decode(originalVec, originalDict);
+
+                var rtDict = roundTripContext.getDictionaries().lookup(rtVec.getField().getDictionary().getId());
+                var rtDecoded = DictionaryEncoder.decode(rtVec, rtDict);
+
+                // Null out the type compartor
+                // Field names for dict encoded fields get mangled by Arrow and will not match reliably
+                RangeEqualsVisitor visitor = new RangeEqualsVisitor(originalDecoded, rtDecoded, null);
+
+                Assertions.assertTrue(
+                        visitor.rangeEquals(new Range(0, 0, originalDecoded.getValueCount())),
+                        "Vectors not equal for field " + field.getName());
+
+                originalDecoded.close();
+                rtDecoded.close();
+            }
         }
     }
 
