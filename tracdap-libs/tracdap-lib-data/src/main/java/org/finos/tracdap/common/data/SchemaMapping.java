@@ -231,7 +231,8 @@ public class SchemaMapping {
 
     private List<Field> tracToArrowListChildren(FieldSchema tracField) {
 
-        var tracItems = tracField.getChildren().getArrayItems();
+        // List children are items = 0
+        var tracItems = tracField.getChildren(0);
         var arrowItems = tracToArrowField(tracItems, ListVector.DATA_VECTOR_NAME);
 
         return List.of(arrowItems);
@@ -239,11 +240,9 @@ public class SchemaMapping {
 
     private List<Field> tracToArrowMapChildren(FieldSchema tracField) {
 
-        var tracKeys = tracField.getChildren().hasMapKeys()
-                ? tracField.getChildren().getMapKeys()
-                : DEFAULT_MAP_KEY_FIELD;
-
-        var tracValues = tracField.getChildren().getMapValues();
+        // Map children are keys = 0, values = 1
+        var tracKeys = tracField.getChildren(0);
+        var tracValues = tracField.getChildren(1);
         var arrowKeys = tracToArrowField(tracKeys, MapVector.KEY_NAME);
         var arrowValues = tracToArrowField(tracValues, MapVector.VALUE_NAME);
 
@@ -275,9 +274,9 @@ public class SchemaMapping {
         }
         else {
 
-            var childFields = new ArrayList<Field>(tracField.getChildren().getStructFieldsCount());
+            var childFields = new ArrayList<Field>(tracField.getChildrenCount());
 
-            for (var tracChildField : tracField.getChildren().getStructFieldsList()) {
+            for (var tracChildField : tracField.getChildrenList()) {
                 var arrowChildField = tracToArrowField(tracChildField);
                 childFields.add(arrowChildField);
             }
