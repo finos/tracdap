@@ -68,13 +68,15 @@ class StructProcessor:
 
 
     @classmethod
-    def define_struct(cls, python_type: type) -> _meta.StructSchema:
+    def define_struct(cls, python_type: type) -> _meta.SchemaDefinition:
+
+        named_types = dict()
 
         if _dc.is_dataclass(python_type):
-            return cls._define_struct_for_dataclass(python_type)
+            return cls._define_struct_for_dataclass(python_type, named_types, type_stack=[])
 
         if _pyd and issubclass(python_type, _pyd.BaseModel):
-            return cls._define_struct_for_pydantic(python_type)
+            return cls._define_struct_for_pydantic(python_type, named_types, type_stack=[])
 
         raise _ex.EUnexpected()
 
@@ -113,110 +115,268 @@ class StructProcessor:
         StructQuoter.quote(struct, dst, dst_format)
 
     @classmethod
-    def parse_struct(cls, data: dict, schema: _meta.StructSchema = None, python_type: type = None) -> object:
+    def parse_struct(cls, data: dict, schema: _meta.SchemaDefinition = None, python_type: type = None) -> object:
 
         parser = StructParser()
         return parser.parse(python_type, data)
 
     @classmethod
-    def _define_struct_for_dataclass(cls, python_type: _dc.dataclass) -> _meta.StructSchema:
+    def _define_struct_for_dataclass(
+            cls, python_type: _dc.dataclass,
+            named_types: _tp.Dict[str, _meta.SchemaDefinition],
+            type_stack: _tp.List[str]) \
+            -> _meta.SchemaDefinition:
 
-        type_hints = _tp.get_type_hints(python_type)
-        trac_fields = dict()
+        try:
 
-        for dc_field in _dc.fields(python_type):
+            type_stack.append(cls._qualified_type_name(python_type))
 
-            field_name = dc_field.name
-            python_type = type_hints[field_name]
+            type_hints = _tp.get_type_hints(python_type)
+            trac_fields = list()
 
-            trac_field = cls._define_field(python_type, dc_field=dc_field)
-            trac_fields[field_name] = trac_field
+            for field_index, dc_field in enumerate(_dc.fields(python_type)):
 
-        return _meta.StructSchema(fields=trac_fields)
+                field_name = dc_field.name
+                python_type = type_hints[field_name]
+
+                trac_field = cls._define_field(
+                    field_name, field_index, python_type, dc_field=dc_field,
+                    named_types=named_types, type_stack=type_stack)
+
+                trac_fields.append(trac_field)
+
+            if len(type_stack) == 1:
+                return _meta.SchemaDefinition(schemaType=_meta.SchemaType.STRUCT_SCHEMA, fields=trac_fields, namedTypes=named_types)
+            else:
+                return _meta.SchemaDefinition(schemaType=_meta.SchemaType.STRUCT_SCHEMA, fields=trac_fields)
+
+        finally:
+
+            type_stack.pop()
 
     @classmethod
-    def _define_struct_for_pydantic(cls, python_type: "type[_pyd.BaseModel]") -> _meta.StructSchema:
+    def _define_struct_for_pydantic(
+            cls, python_type: "type[_pyd.BaseModel]",
+            named_types: _tp.Dict[str, _meta.SchemaDefinition],
+            type_stack: _tp.List[str]) \
+            -> _meta.SchemaDefinition:
 
-        type_hints = _tp.get_type_hints(python_type)
-        trac_fields = dict()
+        try:
 
-        for field_name, pyd_field in python_type.model_fields.items():
+            type_stack.append(cls._qualified_type_name(python_type))
 
-            python_type = type_hints[field_name]
+            type_hints = _tp.get_type_hints(python_type)
+            trac_fields = list()
 
-            trac_field = cls._define_field(python_type, pyd_field=pyd_field)
+            field_index = 0
 
-            if trac_field is not None:
-                trac_fields[field_name] = trac_field
+            for field_name, pyd_field in python_type.model_fields.items():
 
-        return _meta.StructSchema(fields=trac_fields)
+                python_type = type_hints[field_name]
+
+                trac_field = cls._define_field(
+                    field_name, field_index, python_type, pyd_field=pyd_field,
+                    named_types=named_types, type_stack=type_stack)
+
+                if trac_field is not None:
+                    trac_fields.append(trac_field)
+                    field_index += 1
+
+            if len(type_stack) == 1:
+                return _meta.SchemaDefinition(schemaType=_meta.SchemaType.STRUCT_SCHEMA, fields=trac_fields, namedTypes=named_types)
+            else:
+                return _meta.SchemaDefinition(schemaType=_meta.SchemaType.STRUCT_SCHEMA, fields=trac_fields)
+
+        finally:
+
+            type_stack.pop()
 
     @classmethod
     def _define_field(
-            cls, python_type: type, *,
-            dc_field: _dc.Field = None,
-            pyd_field: "_pyd.fields.FieldInfo" = None) \
-            -> _meta.StructField:
+            cls, name, index, python_type: type, optional=False, *,
+            named_types: _tp.Dict[str, _meta.SchemaDefinition], type_stack: _tp.List[str],
+            dc_field: _dc.Field = None, pyd_field: "_pyd.fields.FieldInfo" = None) \
+            -> _meta.FieldSchema:
 
         if python_type in cls.__primitive_types:
-            return cls._define_primitive_field(python_type, dc_field=dc_field, pyd_field=pyd_field)
+
+            return cls._define_primitive_field(
+                name, index, python_type, optional,
+                dc_field=dc_field, pyd_field=pyd_field)
+
+        if isinstance(python_type, _enum.EnumMeta):
+
+            return cls._define_enum_field(
+                name, index, python_type, optional,
+                dc_field=dc_field, pyd_field=pyd_field)
 
         elif any(map(lambda _t: isinstance(python_type, _t), cls.__generic_types)):
-            return cls._define_generic_field(python_type, pyd_field=pyd_field)
 
-        elif dc_field is not None and _dc.is_dataclass(python_type):
-            pass
+            return cls._define_generic_field(
+                name, index, python_type,
+                dc_field=dc_field, pyd_field=pyd_field,
+                named_types=named_types, type_stack=type_stack)
 
-        elif pyd_field is not None and issubclass(python_type, _pyd.BaseModel):
-            pass
+        elif _dc.is_dataclass(python_type):
+
+            type_name = cls._qualified_type_name(python_type)
+
+            if type_name in type_stack:
+                raise _ex.EValidation("Recursive types are not supported")
+
+            if type_name not in named_types:
+                struct_type = cls._define_struct_for_dataclass(python_type, named_types, type_stack)
+                named_types[type_name] = struct_type
+
+            return _meta.FieldSchema(
+                fieldName=name,
+                fieldOrder=index,
+                fieldType=_meta.BasicType.STRUCT,
+                notNull=not optional,
+                namedType=type_name)
+
+        elif issubclass(python_type, _pyd.BaseModel):
+
+            type_name = cls._qualified_type_name(python_type)
+
+            if type_name in type_stack:
+                raise _ex.EValidation("Recursive types are not supported")
+
+            if type_name not in named_types:
+                struct_type = cls._define_struct_for_pydantic(python_type, named_types, type_stack)
+                named_types[type_name] = struct_type
+
+            return _meta.FieldSchema(
+                fieldName=name,
+                fieldOrder=index,
+                fieldType=_meta.BasicType.STRUCT,
+                notNull=not optional,
+                namedType=type_name)
 
         else:
             raise _ex.ETracInternal("Cannot encode field type: " + str(python_type))
 
     @classmethod
     def _define_primitive_field(
-            cls, python_type: type, optional=False, *,
-            dc_field: _dc.Field = None,
-            pyd_field: "_pyd.fields.FieldInfo" = None) \
-            -> _meta.StructField:
+            cls, name: str, index: int, python_type: type, optional=False, *,
+            dc_field: _dc.Field = None, pyd_field: "_pyd.fields.FieldInfo" = None) \
+            -> _meta.FieldSchema:
 
-        struct_field = _meta.StructField()
-        struct_field.fieldType = _meta.TypeDescriptor(basicType=cls.__primitive_types[python_type])
-        struct_field.notNull = not optional
+        default_value = None
 
-        if dc_field is not None and  dc_field.default is not _dc.MISSING:
-            struct_field.defaultValue = _meta_types.MetadataCodec.encode_value(dc_field.default)
+        if dc_field is not None:
+            if dc_field.default not in [_dc.MISSING, None]:
+                default_value = _meta_types.MetadataCodec.encode_value(dc_field.default)
+            elif dc_field.default_factory not in [_dc.MISSING, None]:
+                native_value = dc_field.default_factory()
+                default_value = _meta_types.MetadataCodec.encode_value(native_value)
 
-        if pyd_field is not None and pyd_field.default is not _pyd.fields.PydanticUndefined:
-            struct_field.defaultValue = _meta_types.MetadataCodec.encode_value(pyd_field.default)
+        elif pyd_field is not None:
+            if pyd_field.default not in [_pyd.fields.PydanticUndefined, None]:
+                default_value = _meta_types.MetadataCodec.encode_value(pyd_field.default)
+            elif pyd_field.default_factory not in [_pyd.fields.PydanticUndefined, None]:
+                native_value = pyd_field.default_factory()
+                default_value = _meta_types.MetadataCodec.encode_value(native_value)
 
-        return struct_field
+        return _meta.FieldSchema(
+            fieldName=name,
+            fieldOrder=index,
+            fieldType=cls.__primitive_types[python_type],
+            notNull=not optional,
+            defaultValue=default_value)
+
+    @classmethod
+    def _define_enum_field(
+            cls, name: str, index: int, enum_type: _enum.EnumMeta, optional=False, *,
+            dc_field: _dc.Field = None, pyd_field: "_pyd.fields.FieldInfo" = None) \
+            -> _meta.FieldSchema:
+
+        default_value = None
+
+        if dc_field is not None and  dc_field.default not in [_dc.MISSING, None]:
+            default_value = _meta_types.MetadataCodec.encode_value(dc_field.default.name)
+
+        if pyd_field is not None and pyd_field.default not in [_pyd.fields.PydanticUndefined, None]:
+            default_value = _meta_types.MetadataCodec.encode_value(pyd_field.default.name)
+
+        return _meta.FieldSchema(
+            fieldName=name,
+            fieldOrder=index,
+            fieldType=_meta.BasicType.STRING,
+            categorical=True,
+            notNull=not optional,
+            namedEnum=cls._qualified_type_name(enum_type),
+            defaultValue=default_value)
 
     @classmethod
     def _define_generic_field(
-            cls, python_type: type, *,
-            dc_field: _dc.Field = None,
-            pyd_field: "_pyd.fields.FieldInfo" = None) -> _meta.StructField:
+            cls, name, index, python_type: type, *,
+            named_types: _tp.Dict[str, _meta.SchemaDefinition], type_stack: _tp.List[str],
+            dc_field: _dc.Field = None, pyd_field: "_pyd.fields.FieldInfo" = None) \
+            -> _meta.FieldSchema:
 
         origin = _tp.get_origin(python_type)
         args = _tp.get_args(python_type)
 
         # types.NoneType not available in Python 3.9, so use type(None) instead
-        if origin in cls.__union_types and len(args) == 2 and args[1] is type(None):
-            optional_type = args[0]
-            return cls._define_primitive_field(optional_type, optional=True, dc_field=dc_field, pyd_field=pyd_field)
+        if origin in cls.__union_types and len(args) == 2 and type(None) in args:
+            optional_type = args[0] if args[1] is type(None) else args[1]
+            return cls._define_field(
+                name, index, optional_type, optional=True,
+                dc_field=dc_field, pyd_field=pyd_field,
+                named_types=named_types, type_stack=type_stack)
 
         elif origin in [list, _tp.List]:
-            list_type = args[0]
-            pass
+
+            item_type = args[0]
+            item_field = cls._define_field(
+                "item", 0, item_type, optional=False,
+                named_types=named_types, type_stack=type_stack)
+
+            return _meta.FieldSchema(
+                fieldName=name,
+                fieldOrder=index,
+                fieldType=_meta.BasicType.ARRAY,
+                notNull=True,
+                children=[item_field])
 
         elif origin in [dict, _tp.Dict]:
+
             key_type = args[0]
+            key_field = _meta.FieldSchema(
+                fieldName="key",
+                fieldOrder=0,
+                fieldType=_meta.BasicType.STRING,
+                notNull=True)
+
             value_type = args[1]
-            pass
+            value_field = cls._define_field(
+                "value", 1, value_type, optional=False,
+                named_types=named_types, type_stack=type_stack)
+
+            return _meta.FieldSchema(
+                fieldName=name,
+                fieldOrder=index,
+                fieldType=_meta.BasicType.MAP,
+                notNull=True,
+                children=[key_field, value_field])
 
         else:
             raise _ex.ETracInternal("Cannot encode field type: " + str(python_type))
+
+    @classmethod
+    def _qualified_type_name(cls, python_type: type):
+
+        name = python_type.__name__
+        module = python_type.__module__
+
+        if module.startswith(cls.__SHIM_PREFIX):
+            shim_root_index = module.index(".", len(cls.__SHIM_PREFIX)) + 1
+            module = module[shim_root_index:]
+
+        return f"{module}.{name}"
+
+    __SHIM_PREFIX = "tracdap.shim."
 
 
 class StructParser:
