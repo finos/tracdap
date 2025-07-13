@@ -19,21 +19,22 @@ package org.finos.tracdap.test.data;
 
 import org.apache.arrow.vector.BaseIntVector;
 import org.apache.arrow.vector.FieldVector;
+import org.apache.arrow.vector.compare.Range;
+import org.apache.arrow.vector.compare.RangeEqualsVisitor;
 import org.apache.arrow.vector.dictionary.DictionaryProvider;
+import org.apache.arrow.vector.types.pojo.Field;
 import org.finos.tracdap.common.data.ArrowVsrContext;
 import org.finos.tracdap.common.data.ArrowVsrSchema;
 
 import org.junit.jupiter.api.Assertions;
-
-import java.math.BigDecimal;
 
 
 public class DataComparison {
 
     public static void compareSchemas(ArrowVsrSchema expected, ArrowVsrSchema actual) {
 
-        if (expected.decoded() == null) {
-            Assertions.assertNull(actual.decoded());
+        if (expected.logical() == null) {
+            Assertions.assertNull(actual.logical());
             Assertions.assertEquals(expected.physical(), actual.physical());
             return;
         }
@@ -45,26 +46,49 @@ public class DataComparison {
             var expectedField = expected.physical().getFields().get(col);
             var actualField = actual.physical().getFields().get(col);
 
-            if (expectedField.getDictionary() == null) {
+            var expectedConcreteField = expected.physical().getFields().get(col);
+            var actualConcreteField = actual.physical().getFields().get(col);
 
-                var actualConcreteField = actual.decoded().getFields().get(col);
+            compareFields(expectedField, actualField, expectedConcreteField, actualConcreteField);
+        }
+    }
 
-                Assertions.assertEquals(expectedField, actualField);
-                Assertions.assertEquals(expectedField, actualConcreteField);
+    public static void compareFields(Field expectedField, Field actualField, Field expectedConcreteField, Field actualConcreteField) {
+
+        if (expectedField.getChildren() != null && !expectedField.getChildren().isEmpty()) {
+
+            Assertions.assertEquals(expectedField.getName(), actualField.getName());
+            Assertions.assertEquals(expectedField.getType(), actualField.getType());
+
+            var expectedChildren = expectedField.getChildren();
+            var actualChildren = actualField.getChildren();
+
+            Assertions.assertEquals(expectedChildren.size(), actualChildren.size());
+
+            for (int i = 0; i < expectedChildren.size(); i++) {
+
+                var expectedChild = expectedChildren.get(i);
+                var actualChild = actualChildren.get(i);
+                var expectedConcreteChild = expectedConcreteField.getChildren().get(i);
+                var actualConcreteChild = actualConcreteField.getChildren().get(i);
+
+                compareFields(expectedChild, actualChild, expectedConcreteChild, actualConcreteChild);
             }
-            else {
 
-                Assertions.assertEquals(expectedField.getName(), actualField.getName());
-                Assertions.assertEquals(expectedField.getType(), actualField.getType());
-                Assertions.assertEquals(expectedField.isNullable(), actualField.getFieldType().isNullable());
-                Assertions.assertEquals(expectedField.getChildren(), actualField.getChildren());
+            return;
+        }
 
-                var expectedDictField = expected.decoded().getFields().get(col);
-                var actualDictField = actual.decoded().getFields().get(col);
+        if (expectedField.getDictionary() == null) {
 
-                Assertions.assertEquals(expectedDictField.getFieldType(), actualDictField.getFieldType());
-                Assertions.assertEquals(expectedDictField.isNullable(), actualDictField.isNullable());
-            }
+            Assertions.assertEquals(expectedField, actualField);
+            Assertions.assertEquals(expectedField, actualConcreteField);
+        }
+        else {
+
+            Assertions.assertEquals(expectedField.getName(), actualField.getName());
+            Assertions.assertEquals(expectedField.getType(), actualField.getType());
+            Assertions.assertEquals(expectedField.isNullable(), actualField.getFieldType().isNullable());
+            Assertions.assertEquals(expectedField.getChildren(), actualField.getChildren());
         }
     }
 
@@ -86,17 +110,12 @@ public class DataComparison {
             var originalVec = original.getVector(j);
             var rtVec = roundTrip.getVector(j);
 
-            for (int i = 0; i < original.getRowCount(); i++) {
+            // Create a visitor that will do the comparison
+            RangeEqualsVisitor visitor = new RangeEqualsVisitor(originalVec, rtVec);
 
-                var originalVal = getArrowValue(originalVec, i, originalContext.getDictionaries());
-                var rtVal = getArrowValue(rtVec, i, roundTripContext.getDictionaries());
-
-                // Decimals must be checked using compareTo, equals() does not handle equal values with different scale
-                if (originalVal instanceof BigDecimal)
-                    Assertions.assertEquals(0, ((BigDecimal) originalVal).compareTo((BigDecimal) rtVal), String.format("Mismatch in field [%s] row [%d]", field.getName(), i));
-                else
-                    Assertions.assertEquals(originalVal, rtVal, String.format("Mismatch in field [%s] row [%d]", field.getName(), i));
-            }
+            Assertions.assertTrue(
+                    visitor.rangeEquals(new Range(0, 0, originalVec.getValueCount())),
+                    "Vectors not equal for field " + field.getName());
         }
     }
 

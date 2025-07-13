@@ -96,9 +96,14 @@ public class SingleBatchDataSink
         batchCount += 1;
         rowCount += root.getFrontBuffer().getRowCount();
 
-        callback.accept(root);
-
-        root.setUnloaded();
+        try {
+            callback.accept(root);
+            root.setUnloaded();
+        }
+        catch (Throwable t) {
+            markAsDone();
+            reportRegularError(t);
+        }
     }
 
     @Override

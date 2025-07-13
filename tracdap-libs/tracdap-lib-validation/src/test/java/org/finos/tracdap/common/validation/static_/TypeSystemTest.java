@@ -149,7 +149,7 @@ class TypeSystemTest extends BaseValidatorTest {
 
     @ParameterizedTest
     @EnumSource(value = BasicType.class, mode = EnumSource.Mode.EXCLUDE,
-            names = {"BASIC_TYPE_NOT_SET", "UNRECOGNIZED", "ARRAY", "MAP"})
+            names = {"BASIC_TYPE_NOT_SET", "UNRECOGNIZED", "ARRAY", "MAP", "STRUCT"})
     void primitive_typeExplicit(BasicType basicType) {
 
         // Basic primitive values
@@ -160,7 +160,7 @@ class TypeSystemTest extends BaseValidatorTest {
 
     @ParameterizedTest
     @EnumSource(value = BasicType.class, mode = EnumSource.Mode.EXCLUDE,
-            names = {"BASIC_TYPE_NOT_SET", "UNRECOGNIZED", "ARRAY", "MAP"})
+            names = {"BASIC_TYPE_NOT_SET", "UNRECOGNIZED", "ARRAY", "MAP", "STRUCT"})
     void primitive_typeInferred(BasicType basicType) {
 
         // If a primitive value is supplied, type can be omitted and will be inferred
@@ -188,7 +188,7 @@ class TypeSystemTest extends BaseValidatorTest {
 
     @ParameterizedTest
     @EnumSource(value = BasicType.class, mode = EnumSource.Mode.EXCLUDE,
-            names = {"BASIC_TYPE_NOT_SET", "UNRECOGNIZED", "ARRAY", "MAP"})
+            names = {"BASIC_TYPE_NOT_SET", "UNRECOGNIZED", "ARRAY", "MAP", "STRUCT"})
     void primitive_null(BasicType basicType) {
 
         // All primitive type values can be set to null, so long as a type descriptor is supplied
