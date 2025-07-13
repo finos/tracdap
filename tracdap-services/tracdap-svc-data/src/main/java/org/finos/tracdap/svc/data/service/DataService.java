@@ -19,7 +19,6 @@ package org.finos.tracdap.svc.data.service;
 
 import org.finos.tracdap.api.*;
 import org.finos.tracdap.api.internal.InternalMetadataApiGrpc;
-import org.finos.tracdap.common.data.SchemaMapping;
 import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.common.async.Futures;
 import org.finos.tracdap.common.data.DataPipeline;
@@ -669,10 +668,9 @@ public class DataService {
                 .getTenantStorage(state.tenant)
                 .getDataStorage(state.copy.getStorageKey());
 
-        var schema = SchemaMapping.tracToArrow(state.schema);
+        var pipeline = storage.pipelineReader(state.copy, state.schema, dataCtx, state.offset, state.limit);
         var encoder = codec.getEncoder(dataCtx.arrowAllocator(), codecOptions);
 
-        var pipeline = storage.pipelineReader(state.copy, schema, dataCtx, state.offset, state.limit);
         pipeline.addStage(encoder);
         pipeline.addSink(contentStream);
 
@@ -688,13 +686,12 @@ public class DataService {
                 .getTenantStorage(state.tenant)
                 .getDataStorage(state.copy.getStorageKey());
 
-        var schema = SchemaMapping.tracToArrow(state.schema);
-        var decoder = codec.getDecoder(dataCtx.arrowAllocator(), schema, codecOptions);
-
-        var signal = new CompletableFuture<Long>();
         var pipeline = DataPipeline.forSource(contentStream, dataCtx);
+        var decoder = codec.getDecoder(state.schema, dataCtx.arrowAllocator(), codecOptions);
+        var signal = new CompletableFuture<Long>();
+
         pipeline.addStage(decoder);
-        pipeline = storage.pipelineWriter(state.copy, schema, dataCtx, pipeline, signal);
+        pipeline = storage.pipelineWriter(state.copy, dataCtx, pipeline, signal);
 
         pipeline.execute();
 

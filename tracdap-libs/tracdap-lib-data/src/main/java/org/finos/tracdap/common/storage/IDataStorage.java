@@ -17,9 +17,9 @@
 
 package org.finos.tracdap.common.storage;
 
-import org.finos.tracdap.common.data.ArrowVsrSchema;
 import org.finos.tracdap.common.data.DataPipeline;
 import org.finos.tracdap.common.data.IDataContext;
+import org.finos.tracdap.metadata.SchemaDefinition;
 import org.finos.tracdap.metadata.StorageCopy;
 
 import io.netty.channel.EventLoopGroup;
@@ -38,7 +38,7 @@ public interface IDataStorage extends AutoCloseable {
 
     default DataPipeline pipelineReader(
             StorageCopy storageCopy,
-            ArrowVsrSchema requiredSchema,
+            SchemaDefinition requiredSchema,
             IDataContext dataContext) {
 
         return pipelineReader(storageCopy, requiredSchema, dataContext, 0, 0);
@@ -46,13 +46,12 @@ public interface IDataStorage extends AutoCloseable {
 
     DataPipeline pipelineReader(
             StorageCopy storageCopy,
-            ArrowVsrSchema requiredSchema,
+            SchemaDefinition requiredSchema,
             IDataContext dataContext,
             long offset, long limit);
 
     DataPipeline pipelineWriter(
             StorageCopy storageCopy,
-            ArrowVsrSchema requiredSchema,
             IDataContext dataContext,
             DataPipeline pipeline,
             CompletableFuture<Long> signal);
