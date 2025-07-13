@@ -17,11 +17,20 @@
 
 package org.finos.tracdap.common.codec.json;
 
-import org.finos.tracdap.common.codec.ICodec;
 
-import org.apache.arrow.memory.BufferAllocator;
+import org.finos.tracdap.common.codec.ICodec;
+import org.finos.tracdap.common.codec.text.BaseTextDecoder;
+import org.finos.tracdap.common.codec.text.BaseTextEncoder;
+import org.finos.tracdap.common.codec.text.TextFileConfig;
 import org.finos.tracdap.common.data.ArrowVsrSchema;
 import org.finos.tracdap.common.data.DataPipeline;
+import org.finos.tracdap.common.data.SchemaMapping;
+import org.finos.tracdap.common.exception.EDataConstraint;
+import org.finos.tracdap.metadata.SchemaDefinition;
+
+import com.fasterxml.jackson.core.JsonFactory;
+import com.fasterxml.jackson.core.StreamReadFeature;
+import org.apache.arrow.memory.BufferAllocator;
 
 import java.util.List;
 import java.util.Map;
@@ -30,6 +39,11 @@ import java.util.Map;
 public class JsonCodec implements ICodec {
 
     private static final String DEFAULT_FILE_EXTENSION = "json";
+    private static final int BATCH_SIZE = 1024;
+
+    private static final JsonFactory jsonFactory = new JsonFactory()
+            // Show source in error messages
+            .enable(StreamReadFeature.INCLUDE_SOURCE_IN_LOCATION.mappedFeature());
 
     @Override
     public List<String> options() {
@@ -44,12 +58,29 @@ public class JsonCodec implements ICodec {
     @Override
     public Encoder<DataPipeline.StreamApi>
     getEncoder(BufferAllocator allocator, Map<String, String> options) {
-        return new JsonEncoder(allocator);
+
+        var config = new TextFileConfig(jsonFactory, BATCH_SIZE);
+        return new BaseTextEncoder(allocator, config);
     }
 
     @Override
-    public Decoder<DataPipeline.StreamApi>
-    getDecoder(BufferAllocator allocator, ArrowVsrSchema schema, Map<String, String> options) {
-        return new JsonDecoder(allocator, schema);
+    public Decoder<?> getDecoder(BufferAllocator allocator, Map<String, String> options) {
+
+        throw new EDataConstraint("JSON decoder requires a TRAC schema");
+    }
+
+    @Override
+    public Decoder<?> getDecoder(SchemaDefinition tracSchema, BufferAllocator allocator, Map<String, String> options) {
+
+        var arrowSchema = SchemaMapping.tracToArrow(tracSchema, allocator);
+        return getDecoder(arrowSchema, allocator, options);
+    }
+
+    @Override
+    public Decoder<?> getDecoder(ArrowVsrSchema arrowSchema, BufferAllocator allocator, Map<String, String> options) {
+
+        var config = new TextFileConfig(jsonFactory, null, BATCH_SIZE, arrowSchema.isSingleRecord());
+        return new BaseTextDecoder(arrowSchema, allocator, config);
     }
 }
+
