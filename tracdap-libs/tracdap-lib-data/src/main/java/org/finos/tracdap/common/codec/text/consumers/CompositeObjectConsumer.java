@@ -99,7 +99,10 @@ public class CompositeObjectConsumer {
 
                 if (!midValue) {
                     var fieldName = parser.currentName();
-                    currentFieldIndex = fieldNameMap.get(fieldName);
+                    var fieldIndex = fieldNameMap.get(fieldName);
+                    if (fieldIndex == null)
+                        throw new EDataCorruption("Unknown field name: " + fieldName);
+                    currentFieldIndex = fieldIndex;
                 }
 
                 var delegate = delegates.get(currentFieldIndex);
