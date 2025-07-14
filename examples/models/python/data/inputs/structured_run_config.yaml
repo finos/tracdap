@@ -4,11 +4,6 @@ base_scenario:
   default_weight: 1.0
   evolution_model: "perturb"
   apply_smoothing: true
-  correlated_scenario:
-    scenario_name: "correlated"
-    default_weight: 1.0
-    evolution_model: "perturb_smooth"
-    apply_smoothing: false
 
 stress_scenarios:
   downturn:
