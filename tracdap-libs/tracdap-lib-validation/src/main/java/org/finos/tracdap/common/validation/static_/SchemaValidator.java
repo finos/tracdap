@@ -143,7 +143,8 @@ public class SchemaValidator {
 
         if (allowNamedTypes) {
             ctx = ctx.pushMap(SD_NAMED_TYPES)
-                    .applyMapKeys(CommonValidators::identifier)
+                    .applyMapKeys(CommonValidators::qualifiedIdentifier)
+                    .applyMapKeys(CommonValidators::notTracReserved)
                     .applyMapValues(SchemaValidator::schema, SchemaDefinition.class, parentSchema)
                     .pop();
         }
@@ -155,7 +156,8 @@ public class SchemaValidator {
 
         if (allowNamedEnums) {
             ctx = ctx.pushMap(SD_NAMED_ENUMS)
-                    .applyMapKeys(CommonValidators::identifier)
+                    .applyMapKeys(CommonValidators::qualifiedIdentifier)
+                    .applyMapKeys(CommonValidators::notTracReserved)
                     .applyMapValues(SchemaValidator::enumValues, EnumValues.class)
                     .pop();
         }

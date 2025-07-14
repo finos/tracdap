@@ -320,6 +320,13 @@ public class CommonValidators {
                 "is not a valid identifier", value, ctx);
     }
 
+    public static ValidationContext qualifiedIdentifier(String value, ValidationContext ctx) {
+
+        return regexMatch(
+                MetadataConstants.QUALIFIED_IDENTIFIER, true,
+                "is not a qualified identifier", value, ctx);
+    }
+
     public static ValidationContext configKey(String value, ValidationContext ctx) {
 
         return regexMatch(
