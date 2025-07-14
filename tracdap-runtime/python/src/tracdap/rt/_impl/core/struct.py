@@ -71,12 +71,13 @@ class StructProcessor:
     def define_struct(cls, python_type: type) -> _meta.SchemaDefinition:
 
         named_types = dict()
+        named_enums = dict()
 
         if _dc.is_dataclass(python_type):
-            return cls._define_struct_for_dataclass(python_type, named_types, type_stack=[])
+            return cls._define_struct_for_dataclass(python_type, named_types, named_enums, type_stack=[])
 
         if _pyd and issubclass(python_type, _pyd.BaseModel):
-            return cls._define_struct_for_pydantic(python_type, named_types, type_stack=[])
+            return cls._define_struct_for_pydantic(python_type, named_types, named_enums, type_stack=[])
 
         raise _ex.EUnexpected()
 
@@ -124,6 +125,7 @@ class StructProcessor:
     def _define_struct_for_dataclass(
             cls, python_type: _dc.dataclass,
             named_types: _tp.Dict[str, _meta.SchemaDefinition],
+            named_enums: _tp.Dict[str, _meta.EnumValues],
             type_stack: _tp.List[str]) \
             -> _meta.SchemaDefinition:
 
@@ -141,14 +143,17 @@ class StructProcessor:
 
                 trac_field = cls._define_field(
                     field_name, field_index, python_type, dc_field=dc_field,
-                    named_types=named_types, type_stack=type_stack)
+                    named_types=named_types, named_enums=named_enums, type_stack=type_stack)
 
                 trac_fields.append(trac_field)
 
             if len(type_stack) == 1:
-                return _meta.SchemaDefinition(schemaType=_meta.SchemaType.STRUCT_SCHEMA, fields=trac_fields, namedTypes=named_types)
+                return _meta.SchemaDefinition(
+                    schemaType=_meta.SchemaType.STRUCT_SCHEMA, fields=trac_fields,
+                    namedTypes=named_types, namedEnums=named_enums)
             else:
-                return _meta.SchemaDefinition(schemaType=_meta.SchemaType.STRUCT_SCHEMA, fields=trac_fields)
+                return _meta.SchemaDefinition(
+                    schemaType=_meta.SchemaType.STRUCT_SCHEMA, fields=trac_fields)
 
         finally:
 
@@ -158,6 +163,7 @@ class StructProcessor:
     def _define_struct_for_pydantic(
             cls, python_type: "type[_pyd.BaseModel]",
             named_types: _tp.Dict[str, _meta.SchemaDefinition],
+            named_enums: _tp.Dict[str, _meta.EnumValues],
             type_stack: _tp.List[str]) \
             -> _meta.SchemaDefinition:
 
@@ -176,16 +182,19 @@ class StructProcessor:
 
                 trac_field = cls._define_field(
                     field_name, field_index, python_type, pyd_field=pyd_field,
-                    named_types=named_types, type_stack=type_stack)
+                    named_types=named_types, named_enums=named_enums, type_stack=type_stack)
 
                 if trac_field is not None:
                     trac_fields.append(trac_field)
                     field_index += 1
 
             if len(type_stack) == 1:
-                return _meta.SchemaDefinition(schemaType=_meta.SchemaType.STRUCT_SCHEMA, fields=trac_fields, namedTypes=named_types)
+                return _meta.SchemaDefinition(
+                    schemaType=_meta.SchemaType.STRUCT_SCHEMA, fields=trac_fields,
+                    namedTypes=named_types, namedEnums=named_enums)
             else:
-                return _meta.SchemaDefinition(schemaType=_meta.SchemaType.STRUCT_SCHEMA, fields=trac_fields)
+                return _meta.SchemaDefinition(
+                    schemaType=_meta.SchemaType.STRUCT_SCHEMA, fields=trac_fields)
 
         finally:
 
@@ -194,7 +203,9 @@ class StructProcessor:
     @classmethod
     def _define_field(
             cls, name, index, python_type: type, optional=False, *,
-            named_types: _tp.Dict[str, _meta.SchemaDefinition], type_stack: _tp.List[str],
+            named_types: _tp.Dict[str, _meta.SchemaDefinition],
+            named_enums: _tp.Dict[str, _meta.EnumValues],
+            type_stack: _tp.List[str],
             dc_field: _dc.Field = None, pyd_field: "_pyd.fields.FieldInfo" = None) \
             -> _meta.FieldSchema:
 
@@ -204,18 +215,25 @@ class StructProcessor:
                 name, index, python_type, optional,
                 dc_field=dc_field, pyd_field=pyd_field)
 
-        if isinstance(python_type, _enum.EnumMeta):
-
-            return cls._define_enum_field(
-                name, index, python_type, optional,
-                dc_field=dc_field, pyd_field=pyd_field)
-
         elif any(map(lambda _t: isinstance(python_type, _t), cls.__generic_types)):
 
             return cls._define_generic_field(
                 name, index, python_type,
                 dc_field=dc_field, pyd_field=pyd_field,
-                named_types=named_types, type_stack=type_stack)
+                named_types=named_types, named_enums=named_enums,
+                type_stack=type_stack)
+
+        elif isinstance(python_type, _enum.EnumMeta):
+
+            type_name = cls._qualified_type_name(python_type)
+
+            if type_name not in named_enums:
+                enum_values = cls._define_enum_values(python_type)
+                named_enums[type_name] = enum_values
+
+            return cls._define_enum_field(
+                name, index, python_type, optional,
+                dc_field=dc_field, pyd_field=pyd_field)
 
         elif _dc.is_dataclass(python_type):
 
@@ -225,7 +243,7 @@ class StructProcessor:
                 raise _ex.EValidation("Recursive types are not supported")
 
             if type_name not in named_types:
-                struct_type = cls._define_struct_for_dataclass(python_type, named_types, type_stack)
+                struct_type = cls._define_struct_for_dataclass(python_type, named_types, named_enums, type_stack)
                 named_types[type_name] = struct_type
 
             return _meta.FieldSchema(
@@ -243,7 +261,7 @@ class StructProcessor:
                 raise _ex.EValidation("Recursive types are not supported")
 
             if type_name not in named_types:
-                struct_type = cls._define_struct_for_pydantic(python_type, named_types, type_stack)
+                struct_type = cls._define_struct_for_pydantic(python_type, named_types, named_enums, type_stack)
                 named_types[type_name] = struct_type
 
             return _meta.FieldSchema(
@@ -309,9 +327,17 @@ class StructProcessor:
             defaultValue=default_value)
 
     @classmethod
+    def _define_enum_values(cls, enum_type: _enum.EnumMeta) -> _meta.EnumValues:
+
+        values = list(map(lambda value: value.name, enum_type))
+        return _meta.EnumValues(values=values)
+
+    @classmethod
     def _define_generic_field(
             cls, name, index, python_type: type, *,
-            named_types: _tp.Dict[str, _meta.SchemaDefinition], type_stack: _tp.List[str],
+            named_types: _tp.Dict[str, _meta.SchemaDefinition],
+            named_enums: _tp.Dict[str, _meta.EnumValues],
+            type_stack: _tp.List[str],
             dc_field: _dc.Field = None, pyd_field: "_pyd.fields.FieldInfo" = None) \
             -> _meta.FieldSchema:
 
@@ -324,14 +350,16 @@ class StructProcessor:
             return cls._define_field(
                 name, index, optional_type, optional=True,
                 dc_field=dc_field, pyd_field=pyd_field,
-                named_types=named_types, type_stack=type_stack)
+                named_types=named_types, named_enums=named_enums,
+                type_stack=type_stack)
 
         elif origin in [list, _tp.List]:
 
             item_type = args[0]
             item_field = cls._define_field(
                 "item", 0, item_type, optional=False,
-                named_types=named_types, type_stack=type_stack)
+                named_types=named_types, named_enums=named_enums,
+                type_stack=type_stack)
 
             return _meta.FieldSchema(
                 fieldName=name,
@@ -352,7 +380,8 @@ class StructProcessor:
             value_type = args[1]
             value_field = cls._define_field(
                 "value", 1, value_type, optional=False,
-                named_types=named_types, type_stack=type_stack)
+                named_types=named_types, named_enums=named_enums,
+                type_stack=type_stack)
 
             return _meta.FieldSchema(
                 fieldName=name,
