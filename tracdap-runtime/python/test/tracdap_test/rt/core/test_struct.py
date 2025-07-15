@@ -305,7 +305,13 @@ def define_struct_schema(sub_struct_type: type):
 
                     _meta.FieldSchema(
                         fieldName="enumField", fieldOrder=2, fieldType=_meta.BasicType.STRING, categorical=True, notNull=False,
-                        label="", namedEnum=f"{ExampleEnum.__module__}.{ExampleEnum.__name__}")])}
+                        label="", namedEnum=f"{ExampleEnum.__module__}.{ExampleEnum.__name__}")])},
+
+        namedEnums={
+            f"{ExampleEnum.__module__}.{ExampleEnum.__name__}": _meta.EnumValues(
+                values=["VALUE1", "VALUE2", "VALUE3"]
+            )
+        }
     )
 
 
