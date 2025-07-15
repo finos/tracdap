@@ -112,6 +112,8 @@ public class JobConsistencyValidator {
     }
 
     @Validator
+    // Suppression is needed because validator method reference accepts a generic type (Map)
+    @SuppressWarnings("unchecked")
     public static ValidationContext runModelJob(RunModelJob job, ValidationContext ctx) {
 
         var metadata = ctx.getMetadataBundle();
@@ -147,6 +149,8 @@ public class JobConsistencyValidator {
     }
 
     @Validator
+    // Suppression is needed because validator method reference accepts a generic type (Map)
+    @SuppressWarnings("unchecked")
     public static ValidationContext runFlowJob(RunFlowJob job, ValidationContext ctx) {
 
         ctx.push(RFJ_FLOW)
