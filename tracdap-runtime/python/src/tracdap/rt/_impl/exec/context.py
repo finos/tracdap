@@ -214,8 +214,12 @@ class TracContextImpl(_api.TracContext):
         self.__val.check_context_data_view_type(struct_name, data_view, _meta.ObjectType.DATA)
         self.__val.check_dataset_schema_defined(struct_name, data_view)
 
-        struct_data: dict = data_view.parts[part_key][0].content
-        return _struct.StructProcessor.parse_struct(struct_data, None, python_class)
+        struct_data = data_view.parts[part_key][0].content
+
+        if isinstance(struct_data, python_class):
+            return struct_data
+        else:
+            return _struct.StructProcessor.parse_struct(struct_data, None, python_class)
 
     def get_file(self, file_name: str) -> bytes:
 
