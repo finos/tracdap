@@ -902,8 +902,6 @@ public class RunModelTest {
         var readResponse = dataClient.readSmallDataset(readRequest);
         var jsonText = readResponse.getContent().toString(StandardCharsets.UTF_8);
 
-        System.out.println(jsonText);
-
         // Model should have added this scenario, just look for its name
         Assertions.assertTrue(jsonText.contains("hpi_shock"));
     }

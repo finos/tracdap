@@ -27,6 +27,7 @@ import org.finos.tracdap.svc.admin.TracAdminService;
 import org.finos.tracdap.svc.data.TracDataService;
 import org.finos.tracdap.svc.meta.TracMetadataService;
 import org.finos.tracdap.svc.orch.TracOrchestratorService;
+import org.finos.tracdap.test.helpers.GitHelpers;
 import org.finos.tracdap.test.helpers.PlatformTest;
 
 import com.google.protobuf.ByteString;
@@ -62,6 +63,7 @@ public class RunFlowTest {
     private static final String LOANS_INPUT_PATH = "examples/models/python/data/inputs/loan_final313_100_shortform.csv";
     private static final String CURRENCY_INPUT_PATH = "examples/models/python/data/inputs/currency_data_sample.csv";
     private static final String ACCOUNT_FILTER_INPUT_PATH = "examples/models/python/data/inputs/account_filter.csv";
+    private static final String STRUCT_INPUT_PATH = "examples/models/python/data/inputs/structured_run_config.json";
     public static final String ANALYSIS_TYPE = "analysis_type";
 
     // Only test E2E run model using the local repo
@@ -102,6 +104,12 @@ public class RunFlowTest {
     static TagHeader pnlAggregationModelId;
     static TagHeader profitByRegionDataId;
     static TagHeader exclusionsDataId;
+
+    static TagHeader structFlowId;
+    static TagHeader structModelId;
+    static SchemaDefinition structModelInputSchema;
+    static TagHeader structInputDataId;
+    static TagHeader structOutputDataId;
 
     @Test @Order(1)
     void createFlow() {
@@ -797,6 +805,215 @@ public class RunFlowTest {
         // At least one exclusion row after the header
 
         Assertions.assertTrue(csvLines2.length >= 2);
+    }
+
+    @Test @Order(13)
+    void struct_createFlow() {
+
+        var metaClient = platform.metaClientBlocking();
+
+        var flowDef = FlowDefinition.newBuilder()
+                .putNodes("run_config", FlowNode.newBuilder().setNodeType(FlowNodeType.INPUT_NODE).build())
+                .putNodes("model_1", FlowNode.newBuilder()
+                        .setNodeType(FlowNodeType.MODEL_NODE)
+                        .addInputs("run_config")
+                        .addOutputs("modified_config")
+                        .build())
+                .putNodes("model_2", FlowNode.newBuilder()
+                        .setNodeType(FlowNodeType.MODEL_NODE)
+                        .addInputs("run_config")
+                        .addOutputs("modified_config")
+                        .build())
+                .putNodes("modified_config", FlowNode.newBuilder()
+                        .setNodeType(FlowNodeType.OUTPUT_NODE)
+                        .build())
+                .addEdges(FlowEdge.newBuilder()
+                        .setSource(FlowSocket.newBuilder().setNode("run_config"))
+                        .setTarget(FlowSocket.newBuilder().setNode("model_1").setSocket("run_config")))
+                .addEdges(FlowEdge.newBuilder()
+                        .setSource(FlowSocket.newBuilder().setNode("model_1").setSocket("modified_config"))
+                        .setTarget(FlowSocket.newBuilder().setNode("model_2").setSocket("run_config")))
+                .addEdges(FlowEdge.newBuilder()
+                        .setSource(FlowSocket.newBuilder().setNode("model_2").setSocket("modified_config"))
+                        .setTarget(FlowSocket.newBuilder().setNode("modified_config")))
+                .build();
+
+        var createReq = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.FLOW)
+                .setDefinition(ObjectDefinition.newBuilder().setObjectType(ObjectType.FLOW).setFlow(flowDef))
+                .build();
+
+        structFlowId = metaClient.createObject(createReq);
+    }
+
+    @Test @Order(14)
+    void struct_importModel() throws Exception {
+
+        log.info("Running IMPORT_MODEL job for struct...");
+
+        var modelVersion = GitHelpers.getCurrentCommit();
+        var modelStub = ModelDefinition.newBuilder()
+                .setLanguage("python")
+                .setRepository(useTracRepo())
+                .setPath("examples/models/python/src")
+                .setEntryPoint("tutorial.structured_objects.StructModel")
+                .setVersion(modelVersion)
+                .build();
+
+        var modelAttrs = List.of(TagUpdate.newBuilder()
+                .setAttrName("e2e_test_model")
+                .setValue(MetadataCodec.encodeValue("run_flow:struct"))
+                .build());
+
+        var jobAttrs = List.of(TagUpdate.newBuilder()
+                .setAttrName("e2e_test_job")
+                .setValue(MetadataCodec.encodeValue("run_flow:struct_import_model"))
+                .build());
+
+        var modelTag = ImportModelTest.doImportModel(platform, TEST_TENANT, modelStub, modelAttrs, jobAttrs);
+        var modelDef = modelTag.getDefinition().getModel();
+        var modelAttr = modelTag.getAttrsOrThrow("e2e_test_model");
+
+        Assertions.assertEquals("run_flow:struct", MetadataCodec.decodeStringValue(modelAttr));
+        Assertions.assertEquals("tutorial.structured_objects.StructModel", modelDef.getEntryPoint());
+        Assertions.assertTrue(modelDef.getInputsMap().containsKey("run_config"));
+        Assertions.assertTrue(modelDef.getOutputsMap().containsKey("modified_config"));
+
+        structModelId = modelTag.getHeader();
+        structModelInputSchema = modelDef.getInputsOrThrow("run_config").getSchema();
+    }
+
+    @Test @Order(15)
+    void struct_loadInputData() throws Exception {
+
+        log.info("Loading struct input data...");
+
+        var metaClient = platform.metaClientBlocking();
+        var dataClient = platform.dataClientBlocking();
+
+        var inputPath = platform.tracRepoDir().resolve(STRUCT_INPUT_PATH);
+        var inputBytes = Files.readAllBytes(inputPath);
+
+        var writeRequest = DataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSchema(structModelInputSchema)
+                .setFormat("text/json")
+                .setContent(ByteString.copyFrom(inputBytes))
+                .addTagUpdates(TagUpdate.newBuilder()
+                        .setAttrName("e2e_test_dataset")
+                        .setValue(MetadataCodec.encodeValue("run_flow:run_config")))
+                .build();
+
+        structInputDataId = dataClient.createSmallDataset(writeRequest);
+
+        var dataSelector = MetadataUtil.selectorFor(structInputDataId);
+        var dataRequest = MetadataReadRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSelector(dataSelector)
+                .build();
+
+        var dataTag = metaClient.readObject(dataRequest);
+
+        var datasetAttr = dataTag.getAttrsOrThrow("e2e_test_dataset");
+        var datasetSchema = dataTag.getDefinition().getData().getSchema();
+
+        Assertions.assertEquals("run_flow:run_config", MetadataCodec.decodeStringValue(datasetAttr));
+        Assertions.assertEquals(SchemaType.STRUCT_SCHEMA, datasetSchema.getSchemaType());
+        Assertions.assertEquals(4, datasetSchema.getFieldsCount());
+
+        log.info("Struct input data loaded, data ID = [{}]", dataTag.getHeader().getObjectId());
+    }
+
+    @Test @Order(16)
+    void struct_runFlow() {
+
+        var metaClient = platform.metaClientBlocking();
+        var orchClient = platform.orchClientBlocking();
+
+        var runFlow = RunFlowJob.newBuilder()
+                .setFlow(MetadataUtil.selectorFor(structFlowId))
+                .putParameters("t0_date", MetadataCodec.encodeValue(LocalDate.now()))
+                .putParameters("projection_period", MetadataCodec.encodeValue(365))
+                .putInputs("run_config", MetadataUtil.selectorFor(structInputDataId))
+                .putModels("model_1", MetadataUtil.selectorFor(structModelId))
+                .putModels("model_2", MetadataUtil.selectorFor(structModelId))
+                .addOutputAttrs(TagUpdate.newBuilder()
+                        .setAttrName("e2e_test_data")
+                        .setValue(MetadataCodec.encodeValue("run_flow:struct_data_output")))
+                .build();
+
+        var jobRequest = JobRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setJob(JobDefinition.newBuilder()
+                        .setJobType(JobType.RUN_FLOW)
+                        .setRunFlow(runFlow))
+                .addJobAttrs(TagUpdate.newBuilder()
+                        .setAttrName("e2e_test_job")
+                        .setValue(MetadataCodec.encodeValue("run_flow:struct_run_flow")))
+                .build();
+
+        var jobStatus = runJob(orchClient, jobRequest);
+
+        jobId = jobStatus.getJobId();
+
+        Assertions.assertEquals(JobStatusCode.SUCCEEDED, jobStatus.getStatusCode());
+
+        var dataSearch = MetadataSearchRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSearchParams(SearchParameters.newBuilder()
+                        .setObjectType(ObjectType.DATA)
+                        .setSearch(SearchExpression.newBuilder()
+                                .setTerm(SearchTerm.newBuilder()
+                                        .setAttrName("trac_create_job")
+                                        .setAttrType(BasicType.STRING)
+                                        .setOperator(SearchOperator.EQ)
+                                        .setSearchValue(MetadataCodec.encodeValue(MetadataUtil.objectKey(jobId))))))
+                .build();
+
+        var dataSearchResult = metaClient.search(dataSearch);
+
+        Assertions.assertEquals(1, dataSearchResult.getSearchResultCount());
+
+        var indexedResult = dataSearchResult.getSearchResultList().stream()
+                .collect(Collectors.toMap(RunFlowTest::getJobOutput, Function.identity()));
+
+        var searchResult = indexedResult.get("modified_config");
+
+        var dataReq = MetadataReadRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSelector(MetadataUtil.selectorFor(searchResult.getHeader()))
+                .build();
+
+        var dataTag = metaClient.readObject(dataReq);
+        var dataDef = dataTag.getDefinition().getData();
+        var outputAttr = dataTag.getAttrsOrThrow("e2e_test_data");
+
+        Assertions.assertEquals("run_flow:struct_data_output", MetadataCodec.decodeStringValue(outputAttr));
+        Assertions.assertEquals(1, dataDef.getPartsCount());
+
+        structOutputDataId = dataTag.getHeader();
+    }
+
+    @Test @Order(17)
+    void struct_checkOutputData() {
+
+        log.info("Checking struct output data...");
+
+        var dataClient = platform.dataClientBlocking();
+
+        var readRequest = DataReadRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSelector(MetadataUtil.selectorFor(structOutputDataId))
+                .setFormat("text/json")
+                .build();
+
+
+        var readResponse = dataClient.readSmallDataset(readRequest);
+        var jsonText = readResponse.getContent().toString(StandardCharsets.UTF_8);
+
+        // Model should have added this scenario, just look for its name
+        Assertions.assertTrue(jsonText.contains("hpi_shock"));
     }
 
 }
