@@ -37,6 +37,12 @@ import tracdap.rt._impl.core.type_system as _meta_types
 
 class StructProcessor:
 
+    JSON_FORMAT = "text/json"
+    JSON_ALT_FORMATS = ["JSON", ".json"]
+
+    YAML_FORMAT = "text/yaml"
+    YAML_ALT_FORMATS = ["YAML", ".yaml", "yml"]
+
     __primitive_types: dict[type, _meta.BasicType] = {
         bool: _meta.BasicType.BOOLEAN,
         int: _meta.BasicType.INTEGER,
@@ -86,10 +92,10 @@ class StructProcessor:
 
         try:
 
-            if src_format == "yaml" or src_format == "yml":
+            if src_format == cls.YAML_FORMAT or src_format in cls.YAML_ALT_FORMATS:
                 config_dict = _yaml.safe_load(src)
 
-            elif src_format == "json":
+            elif src_format == cls.JSON_FORMAT or src_format in cls.JSON_ALT_FORMATS:
                 config_dict = _json.load(src)
 
             else:
@@ -665,18 +671,17 @@ class StructQuoter:
     # New implementation of STRUCT quoting, copied from config_parser
     # After a period of stabilization, config_parser will switch to this implementation
 
-    JSON_FORMAT = "json"
-    YAML_FORMAT = "yaml"
     INDENT = 3
 
     @classmethod
     def quote(cls, obj: _tp.Any, dst: _tp.TextIO, dst_format: str):
 
-        if dst_format.lower() == cls.JSON_FORMAT:
-            return cls.quote_json(obj, dst)
 
-        if dst_format.lower() == cls.YAML_FORMAT:
+        if dst_format == StructProcessor.YAML_FORMAT or dst_format in StructProcessor.YAML_ALT_FORMATS:
             return cls.quote_yaml(obj, dst)
+
+        if dst_format == StructProcessor.JSON_FORMAT or dst_format in StructProcessor.JSON_ALT_FORMATS:
+            return cls.quote_json(obj, dst)
 
         # TODO :This is probably an error in the user-supplied parameters
         raise _ex.ETracInternal(f"Unsupported output format [{dst_format}]")
