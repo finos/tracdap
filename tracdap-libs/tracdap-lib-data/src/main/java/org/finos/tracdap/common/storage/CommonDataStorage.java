@@ -109,16 +109,22 @@ public class CommonDataStorage implements IDataStorage {
 
         var codec = formats.getCodec(storageCopy.getStorageFormat());
         var options = Map.<String, String>of();
-        var encoder = codec.getEncoder(dataContext.arrowAllocator(), options);
 
+        var encoder = codec.getEncoder(dataContext.arrowAllocator(), options);
         pipeline = pipeline.addStage(encoder);
 
+        var storagePath = storageCopy.getStoragePath();
         var chunkPath = chunkPath(storageCopy, codec);
-        var mkdir = fileStorage.mkdir(storageCopy.getStoragePath(), /* recursive = */ true, dataContext);
         var save = fileStorage.writer(chunkPath, signal, dataContext);
-        var mkdirAndSave = Flows.waitForSignal(save, mkdir);
 
-        return pipeline.addSink(mkdirAndSave);
+        if (chunkPath.length() > storagePath.length()) {
+            var mkdir = fileStorage.mkdir(storagePath, /* recursive = */ true, dataContext);
+            var mkdirAndSave = Flows.waitForSignal(save, mkdir);
+            return pipeline.addSink(mkdirAndSave);
+        }
+        else {
+            return pipeline.addSink(save);
+        }
     }
 
     private String chunkPath(StorageCopy storageCopy, ICodec codec) {
@@ -126,7 +132,10 @@ public class CommonDataStorage implements IDataStorage {
         var storagePath = storageCopy.getStoragePath();
         var extension = codec.defaultFileExtension();
 
-        return storagePath + String.format(CHUNK_ZERO_STORAGE_PATH, extension);
+        if (storagePath.endsWith(extension))
+            return storagePath;
+        else
+            return storagePath + String.format(CHUNK_ZERO_STORAGE_PATH, extension);
     }
 
     private long checkSizeBeforeLoad(long fileSize) {

@@ -56,6 +56,11 @@ public class DataService {
     private static final String DATA_ITEM_TEMPLATE = "data/%s/%s/%s/snap-%d/delta-%d";
     private static final String STORAGE_PATH_TEMPLATE = "data/%s/%s/%s/snap-%d/delta-%d-x%06x";
 
+    // TODO: Storage layout plugins to replace specialized logic
+    private static final String STRUCT_STORAGE_FORMAT = "text/json";
+    private static final String STRUCT_STORAGE_EXTENSION = "json";
+    private static final String STRICT_STORAGE_PATH_TEMPLATE = "data/%s/%s/%s/snap-%d/delta-%d-x%06x.%s";
+
     private final Logger log = LoggerFactory.getLogger(getClass());
 
     private final TenantStorageManager storageManager;
@@ -490,10 +495,20 @@ public class DataService {
         var partKey = state.part.getOpaqueKey();
         var suffixBytes = random.nextInt(1 << 24);
 
-        return String.format(STORAGE_PATH_TEMPLATE,
-                dataType, objectId,
-                partKey, state.snap, state.delta,
-                suffixBytes);
+        if (state.schema.getSchemaType() == SchemaType.STRUCT_SCHEMA) {
+
+            return String.format(STRICT_STORAGE_PATH_TEMPLATE,
+                    dataType, objectId,
+                    partKey, state.snap, state.delta,
+                    suffixBytes, STRUCT_STORAGE_EXTENSION);
+        }
+        else {
+
+            return String.format(STORAGE_PATH_TEMPLATE,
+                    dataType, objectId,
+                    partKey, state.snap, state.delta,
+                    suffixBytes);
+        }
     }
 
     private DataDefinition createDataDef(DataWriteRequest request, RequestState state, String dataItem) {
@@ -597,7 +612,10 @@ public class DataService {
 
         var tenantStorage = storageManager.getTenantStorage(state.tenant);
         var location = tenantStorage.defaultLocation();
-        var format = tenantStorage.defaultFormat();
+
+        var format = state.schema.getSchemaType() == SchemaType.STRUCT_SCHEMA
+                ? STRUCT_STORAGE_FORMAT
+                : tenantStorage.defaultFormat();
 
         // For the time being, data has one incarnation and a single storage copy
 
