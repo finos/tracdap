@@ -55,6 +55,7 @@ import java.util.stream.Collectors;
 import static org.finos.tracdap.test.concurrent.ConcurrentTestHelpers.getResultOf;
 import static org.finos.tracdap.test.concurrent.ConcurrentTestHelpers.waitFor;
 import static org.finos.tracdap.test.data.SampleData.generateBasicData;
+import static org.finos.tracdap.test.data.SampleData.generateStructData;
 
 
 public abstract class CodecTestSuite {
@@ -64,30 +65,48 @@ public abstract class CodecTestSuite {
     static class ArrowStreamTest extends CodecTestSuite { @BeforeAll static void setup() {
         codec = new ArrowStreamCodec();
         basicData = null;
+        structData = null;
+        structSupport = true;
     } }
 
     static class ArrowFileTest extends CodecTestSuite { @BeforeAll static void setup() {
         codec = new ArrowFileCodec();
         basicData = null;
+        structData = null;
+        structSupport = true;
     } }
 
     static class CSVTest extends CodecTestSuite { @BeforeAll static void setup() {
         codec = new CsvCodec();
         basicData = SampleData.BASIC_CSV_DATA_RESOURCE;
+        structData = null;
+        structSupport = false;
     } }
 
     static class JSONTest extends CodecTestSuite { @BeforeAll static void setup() {
         codec = new JsonCodec();
         basicData = SampleData.BASIC_JSON_DATA_RESOURCE;
+        structData = SampleData.STRUCT_JSON_DATA_RESOURCE;
+        structSupport = true;
     } }
 
     private static final Duration TEST_TIMEOUT = Duration.ofSeconds(20);
 
     static ICodec codec;
     static String basicData;
+    static String structData;
+    static boolean structSupport;
 
     private boolean basicDataAvailable() {
         return basicData != null;
+    }
+
+    private boolean structDataAvailable() {
+        return structData != null;
+    }
+
+    private boolean structSupported() {
+        return structSupport;
     }
 
     @Test
@@ -128,6 +147,17 @@ public abstract class CodecTestSuite {
             }
         }
 
+        inputData.flip();
+
+        roundTrip_impl(inputData, allocator);
+    }
+
+    @Test
+    @EnabledIf(value = "structSupported", disabledReason = "This codec does not support STRUCT data")
+    void roundTrip_struct() {
+
+        var allocator = new RootAllocator();
+        var inputData = generateStructData(allocator);
         inputData.flip();
 
         roundTrip_impl(inputData, allocator);
@@ -360,13 +390,24 @@ public abstract class CodecTestSuite {
         var pipeline = DataPipeline.forSource(dataSrc, ctx);
 
         pipeline.addStage(codec.getEncoder(allocator, Map.of()));
-        pipeline.addStage(codec.getDecoder(allocator, inputData.getSchema(), Map.of()));
+        pipeline.addStage(codec.getDecoder(inputData.getSchema(), allocator, Map.of()));
 
         var dataSink = new SingleBatchDataSink(pipeline, batch -> DataComparison.compareBatches(inputData, batch));
         pipeline.addSink(dataSink);
 
         var exec = pipeline.execute();
         waitFor(TEST_TIMEOUT, exec);
+
+        // Ensure errors are reported (pipeline errors or validation failures)
+        try {
+            getResultOf(exec);
+        }
+        catch(Exception e) {
+            if (e instanceof RuntimeException)
+                throw (RuntimeException) e;
+            else
+                throw new RuntimeException(e);
+        }
 
         var rtSchema = dataSink.getSchema();
         var rtRowCount = dataSink.getRowCount();
@@ -381,7 +422,7 @@ public abstract class CodecTestSuite {
 
     @Test
     @EnabledIf(value = "basicDataAvailable", disabledReason = "Pre-saved test data not available for this format")
-    void decode_basic() {
+    void decode_basic() throws Exception {
 
         var allocator = new RootAllocator();
         var inputData = generateBasicData(allocator);
@@ -393,7 +434,7 @@ public abstract class CodecTestSuite {
         var dataCtx = new DataContext(new DefaultEventExecutor(), allocator);
         var pipeline = DataPipeline.forSource(testDataStream, dataCtx);
 
-        var decoder = codec.getDecoder(allocator, inputData.getSchema(), Map.of());
+        var decoder = codec.getDecoder(inputData.getSchema(), allocator, Map.of());
         pipeline.addStage(decoder);
 
         var dataSink = new SingleBatchDataSink(pipeline, batch -> DataComparison.compareBatches(inputData, batch));
@@ -401,6 +442,7 @@ public abstract class CodecTestSuite {
 
         var exec = pipeline.execute();
         waitFor(TEST_TIMEOUT, exec);
+        getResultOf(exec);
 
         var rtSchema = dataSink.getSchema();
         var rtRowCount = dataSink.getRowCount();
@@ -411,6 +453,40 @@ public abstract class CodecTestSuite {
         Assertions.assertEquals(inputData.getFrontBuffer().getRowCount(), rtRowCount);
 
         inputData.close();
+    }
+
+    @Test
+    @EnabledIf(value = "structDataAvailable", disabledReason = "Pre-saved struct data not available for this format")
+    void decode_struct() throws Exception {
+
+        var allocator = new RootAllocator();
+        var structSchema = SchemaMapping.tracToArrow(SampleData.BASIC_STRUCT_SCHEMA, allocator);
+        var structExpectedResult = generateStructData(allocator);
+
+        var testData = ResourceHelpers.loadResourceAsBytes(structData);
+        var testDataBuf = Bytes.copyToBuffer(testData, allocator);
+        var testDataStream = Flows.publish(List.of(testDataBuf));
+
+        var dataCtx = new DataContext(new DefaultEventExecutor(), allocator);
+        var pipeline = DataPipeline.forSource(testDataStream, dataCtx);
+
+        var decoder = codec.getDecoder(structSchema, allocator, Map.of());
+        pipeline.addStage(decoder);
+
+        var dataSink = new SingleBatchDataSink(pipeline, batch -> DataComparison.compareBatches(structExpectedResult, batch));
+        pipeline.addSink(dataSink);
+
+        var exec = pipeline.execute();
+        waitFor(TEST_TIMEOUT, exec);
+        getResultOf(exec);
+
+        var rtSchema = dataSink.getSchema();
+        var rtRowCount = dataSink.getRowCount();
+
+        DataComparison.compareSchemas(structSchema, rtSchema);
+
+        Assertions.assertEquals(1, dataSink.getBatchCount());
+        Assertions.assertEquals(1, rtRowCount);
     }
 
     @Test
@@ -426,7 +502,7 @@ public abstract class CodecTestSuite {
         var dataCtx = new DataContext(new DefaultEventExecutor(), allocator);
         var pipeline = DataPipeline.forSource(noBufStream, dataCtx);
 
-        var decoder = codec.getDecoder(allocator, arrowSchema, Map.of());
+        var decoder = codec.getDecoder(arrowSchema, allocator, Map.of());
         pipeline.addStage(decoder);
 
         var dataSink = new SingleBatchDataSink(pipeline);
@@ -449,7 +525,7 @@ public abstract class CodecTestSuite {
         var dataCtx2 = new DataContext(new DefaultEventExecutor(), allocator);
         var pipeline2 = DataPipeline.forSource(emptyBufStream, dataCtx2);
 
-        var decoder2 = codec.getDecoder(allocator, arrowSchema, Map.of());
+        var decoder2 = codec.getDecoder(arrowSchema, allocator, Map.of());
         pipeline2.addStage(decoder2);
 
         var dataSink2 = new SingleBatchDataSink(pipeline2);
@@ -462,7 +538,7 @@ public abstract class CodecTestSuite {
     }
 
     @Test
-    void decode_garbled() {
+    void decode_garbled() throws Exception {
 
         // Send a stream of random bytes - 3 chunks worth
 
@@ -487,7 +563,7 @@ public abstract class CodecTestSuite {
         var dataCtx = new DataContext(new DefaultEventExecutor(), allocator);
         var pipeline = DataPipeline.forSource(testDataStream, dataCtx);
 
-        var decoder = codec.getDecoder(allocator, arrowSchema, Map.of());
+        var decoder = codec.getDecoder(arrowSchema, allocator, Map.of());
         pipeline.addStage(decoder);
 
         var dataSink = new SingleBatchDataSink(pipeline);
@@ -529,7 +605,7 @@ public abstract class CodecTestSuite {
         var dataCtx = new DataContext(new DefaultEventExecutor(), allocator);
         var pipeline = DataPipeline.forSource(testDataStream, dataCtx);
 
-        var decoder = codec.getDecoder(allocator, arrowSchema, Map.of());
+        var decoder = codec.getDecoder(arrowSchema, allocator, Map.of());
         pipeline.addStage(decoder);
 
         var dataSink = new SingleBatchDataSink(pipeline);

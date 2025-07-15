@@ -19,7 +19,6 @@ package org.finos.tracdap.svc.data.service;
 
 import org.finos.tracdap.api.*;
 import org.finos.tracdap.api.internal.InternalMetadataApiGrpc;
-import org.finos.tracdap.common.data.SchemaMapping;
 import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.common.async.Futures;
 import org.finos.tracdap.common.data.DataPipeline;
@@ -56,6 +55,11 @@ public class DataService {
 
     private static final String DATA_ITEM_TEMPLATE = "data/%s/%s/%s/snap-%d/delta-%d";
     private static final String STORAGE_PATH_TEMPLATE = "data/%s/%s/%s/snap-%d/delta-%d-x%06x";
+
+    // TODO: Storage layout plugins to replace specialized logic
+    private static final String STRUCT_STORAGE_FORMAT = "text/json";
+    private static final String STRUCT_STORAGE_EXTENSION = "json";
+    private static final String STRICT_STORAGE_PATH_TEMPLATE = "data/%s/%s/%s/snap-%d/delta-%d-x%06x.%s";
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
@@ -491,10 +495,20 @@ public class DataService {
         var partKey = state.part.getOpaqueKey();
         var suffixBytes = random.nextInt(1 << 24);
 
-        return String.format(STORAGE_PATH_TEMPLATE,
-                dataType, objectId,
-                partKey, state.snap, state.delta,
-                suffixBytes);
+        if (state.schema.getSchemaType() == SchemaType.STRUCT_SCHEMA) {
+
+            return String.format(STRICT_STORAGE_PATH_TEMPLATE,
+                    dataType, objectId,
+                    partKey, state.snap, state.delta,
+                    suffixBytes, STRUCT_STORAGE_EXTENSION);
+        }
+        else {
+
+            return String.format(STORAGE_PATH_TEMPLATE,
+                    dataType, objectId,
+                    partKey, state.snap, state.delta,
+                    suffixBytes);
+        }
     }
 
     private DataDefinition createDataDef(DataWriteRequest request, RequestState state, String dataItem) {
@@ -598,7 +612,10 @@ public class DataService {
 
         var tenantStorage = storageManager.getTenantStorage(state.tenant);
         var location = tenantStorage.defaultLocation();
-        var format = tenantStorage.defaultFormat();
+
+        var format = state.schema.getSchemaType() == SchemaType.STRUCT_SCHEMA
+                ? STRUCT_STORAGE_FORMAT
+                : tenantStorage.defaultFormat();
 
         // For the time being, data has one incarnation and a single storage copy
 
@@ -669,10 +686,9 @@ public class DataService {
                 .getTenantStorage(state.tenant)
                 .getDataStorage(state.copy.getStorageKey());
 
-        var schema = SchemaMapping.tracToArrow(state.schema);
+        var pipeline = storage.pipelineReader(state.copy, state.schema, dataCtx, state.offset, state.limit);
         var encoder = codec.getEncoder(dataCtx.arrowAllocator(), codecOptions);
 
-        var pipeline = storage.pipelineReader(state.copy, schema, dataCtx, state.offset, state.limit);
         pipeline.addStage(encoder);
         pipeline.addSink(contentStream);
 
@@ -688,13 +704,12 @@ public class DataService {
                 .getTenantStorage(state.tenant)
                 .getDataStorage(state.copy.getStorageKey());
 
-        var schema = SchemaMapping.tracToArrow(state.schema);
-        var decoder = codec.getDecoder(dataCtx.arrowAllocator(), schema, codecOptions);
-
-        var signal = new CompletableFuture<Long>();
         var pipeline = DataPipeline.forSource(contentStream, dataCtx);
+        var decoder = codec.getDecoder(state.schema, dataCtx.arrowAllocator(), codecOptions);
+        var signal = new CompletableFuture<Long>();
+
         pipeline.addStage(decoder);
-        pipeline = storage.pipelineWriter(state.copy, schema, dataCtx, pipeline, signal);
+        pipeline = storage.pipelineWriter(state.copy, dataCtx, pipeline, signal);
 
         pipeline.execute();
 

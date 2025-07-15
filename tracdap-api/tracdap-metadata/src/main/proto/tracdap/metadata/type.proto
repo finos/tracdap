@@ -103,15 +103,16 @@ enum BasicType {
     /**
      * An key-value map with string keys, values may be primitive or composite values.
      *
-     * Maps may be uniform, in which case all the values are of the same type, or non-
-     * uniform in which case values can be of any type. For uniform maps the type
-     * descriptor will specify the type contained in the map. For non-uniform maps the
-     * type descriptor can only specify that the map is non-uniform, values must be
-     * examined at run time to determine their type.
+     * All values in a map must have the same type (i.e. the same type descriptor).
      *
      * @see TypeDescriptor
      */
     MAP = 9;
+
+    /**
+     * A nested structure with a named set of fields, which may be primitive or composite values.
+     */
+    STRUCT = 10;
 }
 
 
@@ -140,6 +141,13 @@ message TypeDescriptor {
      * be inspected individually to determine their type.
      */
     optional TypeDescriptor mapType = 3;
+
+    reserved 4;
+    reserved "mapKeyType";
+
+    map<string, TypeDescriptor> structTypes = 5;
+
+    optional string typeName = 6;
 }
 
 

@@ -561,10 +561,18 @@ public class JobConsistencyValidator {
                     suppliedSchema.getSchemaType()));
         }
 
-        if (requiredSchema.getSchemaType() != SchemaType.TABLE)
-            throw new ETracInternal("Schema type " + requiredSchema.getSchemaType() + " is not supported");
+        var suppliedFields = requiredSchema.getSchemaType() == SchemaType.TABLE_SCHEMA
+                ? suppliedSchema.getTable().getFieldsList()
+                : suppliedSchema.getFieldsList();
 
-        return checkTableSchema(suppliedSchema.getTable(), requiredSchema.getTable(), ctx);
+        var requiredFields = suppliedSchema.getSchemaType() == SchemaType.TABLE_SCHEMA
+                ? requiredSchema.getTable().getFieldsList()
+                : requiredSchema.getFieldsList();
+
+        return checkFieldSchemas(
+                suppliedFields, suppliedSchema,
+                requiredFields, requiredSchema,
+                List.of(), ctx);
     }
 
     private static ValidationContext checkDynamicDataSchema(DataDefinition suppliedData, SchemaDefinition requiredSchema, ValidationContext ctx) {
@@ -583,23 +591,22 @@ public class JobConsistencyValidator {
                     suppliedSchema.getSchemaType()));
         }
 
-        if (requiredSchema.getSchemaType() != SchemaType.TABLE)
-            throw new ETracInternal("Schema type " + requiredSchema.getSchemaType() + " is not supported");
-
         return ctx;
     }
 
-    private static ValidationContext checkTableSchema(TableSchema suppliedSchema, TableSchema requiredSchema, ValidationContext ctx) {
+    private static ValidationContext checkFieldSchemas(
+            List<FieldSchema> suppliedFields, SchemaDefinition suppliedRootSchema,
+            List<FieldSchema> requiredFields, SchemaDefinition requiredRootSchema,
+            List<String> fieldPath, ValidationContext ctx) {
 
         // Mapping of supplied fields by lower case name
-        var suppliedMapping = new HashMap<String, FieldSchema>(suppliedSchema.getFieldsCount());
+        var suppliedMapping = new HashMap<String, FieldSchema>(suppliedFields.size());
 
-        for (var fieldIndex = 0; fieldIndex < suppliedSchema.getFieldsCount(); fieldIndex++) {
-            var field = suppliedSchema.getFields(fieldIndex);
+        for (var field : suppliedFields) {
             suppliedMapping.put(field.getFieldName().toLowerCase(), field);
         }
 
-        for (var requiredField : requiredSchema.getFieldsList()) {
+        for (var requiredField : requiredFields) {
 
             var fieldName = requiredField.getFieldName();
             var suppliedField = suppliedMapping.get(fieldName.toLowerCase());
@@ -607,13 +614,16 @@ public class JobConsistencyValidator {
             if (suppliedField == null)
                 ctx = ctx.error(String.format("Field [%s] is not available in the supplied dataset", fieldName));
             else
-                ctx = checkFieldSchema(suppliedField, requiredField, ctx);
+                ctx = checkFieldSchema(suppliedField, suppliedRootSchema, requiredField, requiredRootSchema, fieldPath, ctx);
         }
 
         return ctx;
     }
 
-    private static ValidationContext checkFieldSchema(FieldSchema suppliedField, FieldSchema requiredField, ValidationContext ctx) {
+    private static ValidationContext checkFieldSchema(
+            FieldSchema suppliedField, SchemaDefinition suppliedRootSchema,
+            FieldSchema requiredField, SchemaDefinition requiredRootSchema,
+            List<String> fieldPath, ValidationContext ctx) {
 
         if (requiredField.getFieldType() != suppliedField.getFieldType()) {
             return ctx.error(String.format(
@@ -642,7 +652,69 @@ public class JobConsistencyValidator {
                     requiredField.getFieldName()));
         }
 
-        return ctx;
+        if (requiredField.getChildrenCount() == 0 && ! requiredField.hasNamedType()) {
+
+            if (suppliedField.getChildrenCount() > 0 || suppliedField.hasNamedType()) {
+                return ctx.error(String.format(
+                        "Field [%s] should not have children or a named type",
+                        requiredField.getFieldName()));
+            }
+
+            return ctx;
+        }
+
+        var childFieldPath = new ArrayList<>(fieldPath);
+        childFieldPath.add(suppliedField.getFieldName());
+
+        if (requiredField.getFieldType() == BasicType.ARRAY) {
+
+            var suppliedItemField = suppliedField.getChildren(0);
+            var requiredItemField = requiredField.getChildren(0);
+
+            return checkFieldSchema(
+                    suppliedItemField, suppliedRootSchema,
+                    requiredItemField, requiredRootSchema,
+                    childFieldPath, ctx);
+        }
+
+        if (requiredField.getFieldType() == BasicType.MAP) {
+
+            var suppliedKeyField = suppliedField.getChildren(0);
+            var suppliedValueField = suppliedField.getChildren(1);
+            var requiredKeyField = requiredField.getChildren(0);
+            var requiredValueField = requiredField.getChildren(1);
+
+            ctx = checkFieldSchema(
+                    suppliedKeyField, requiredRootSchema,
+                    requiredKeyField, suppliedRootSchema,
+                    childFieldPath, ctx);
+
+            ctx = checkFieldSchema(
+                    suppliedValueField, requiredRootSchema,
+                    requiredValueField, suppliedRootSchema,
+                    childFieldPath, ctx);
+
+            return ctx;
+        }
+
+        if (requiredField.getFieldType() == BasicType.STRUCT) {
+
+            var suppliedChildren = suppliedField.hasNamedType()
+                    ? suppliedRootSchema.getNamedTypesOrThrow(suppliedField.getNamedType()).getFieldsList()
+                    : requiredField.getChildrenList();
+
+            var requiredChildren =  requiredField.hasNamedType()
+                    ? requiredRootSchema.getNamedTypesOrThrow(requiredField.getNamedType()).getFieldsList()
+                    : requiredField.getChildrenList();
+
+            return checkFieldSchemas(
+                    suppliedChildren, suppliedRootSchema,
+                    requiredChildren, requiredRootSchema,
+                    childFieldPath, ctx);
+        }
+
+        // Unexpected children (should be prevented by static validation)
+        throw new EUnexpected();
     }
 
     private static SchemaDefinition findSchema(DataDefinition dataset, MetadataBundle resources) {

@@ -214,8 +214,12 @@ class TracContextImpl(_api.TracContext):
         self.__val.check_context_data_view_type(struct_name, data_view, _meta.ObjectType.DATA)
         self.__val.check_dataset_schema_defined(struct_name, data_view)
 
-        struct_data: dict = data_view.parts[part_key][0].content
-        return _struct.StructProcessor.parse_struct(struct_data, None, python_class)
+        struct_data = data_view.parts[part_key][0].content
+
+        if isinstance(struct_data, python_class):
+            return struct_data
+        else:
+            return _struct.StructProcessor.parse_struct(struct_data, None, python_class)
 
     def get_file(self, file_name: str) -> bytes:
 
@@ -914,10 +918,10 @@ class TracContextValidator(TracContextErrorReporter):
         if schema is None:
             self._report_error(f"Schema not defined for dataset {dataset_name} in the current context")
 
-        if schema.schemaType == _meta.SchemaType.TABLE and (schema.table is None or not schema.table.fields):
+        if schema.schemaType == _meta.SchemaType.TABLE_SCHEMA and (schema.table is None or not schema.table.fields):
             self._report_error(f"Schema not defined for dataset {dataset_name} in the current context")
 
-        if schema.schemaType == _meta.SchemaType.STRUCT and (schema.struct is None or not schema.struct.fields):
+        if schema.schemaType == _meta.SchemaType.STRUCT_SCHEMA and not schema.fields:
             self._report_error(f"Schema not defined for dataset {dataset_name} in the current context")
 
     def check_dataset_schema_not_defined(self, dataset_name: str, data_view: _data.DataView):

@@ -63,7 +63,7 @@ ext {
 
     aws_sdk_version = '2.31.59'
     gcp_sdk_version = '26.61.0'
-    azure_sdk_version = '1.2.35'
+    azure_sdk_version = '1.2.36'
 
     apache_sshd_version = "2.12.1"
 

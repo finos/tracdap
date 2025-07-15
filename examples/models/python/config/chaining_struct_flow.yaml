@@ -1,0 +1,29 @@
+
+nodes:
+
+  run_config:
+    nodeType: "INPUT_NODE"
+
+  model_1:
+    nodeType: "MODEL_NODE"
+    inputs: [run_config]
+    outputs: [modified_config]
+
+  model_2:
+    nodeType: "MODEL_NODE"
+    inputs: [run_config]
+    outputs: [modified_config]
+
+  modified_config:
+    nodeType: "OUTPUT_NODE"
+
+edges:
+
+  - source: { node: run_config }
+    target: { node: model_1, socket: run_config }
+
+  - source: { node: model_1, socket: modified_config }
+    target: { node: model_2, socket: run_config }
+
+  - source: { node: model_2, socket: modified_config }
+    target: { node: modified_config }

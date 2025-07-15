@@ -1,0 +1,19 @@
+
+job:
+  runFlow:
+
+    flow: ./chaining_struct_flow.yaml
+
+    parameters:
+      t0_date: "2025-07-01"
+      projection_period: 365
+
+    inputs:
+      run_config: "inputs/structured_run_config.yaml"
+
+    outputs:
+      modified_config: "outputs/chaining/modified_run_config.yaml"
+
+    models:
+      model_1: tutorial.structured_objects.StructModel
+      model_2: tutorial.structured_objects.StructModel

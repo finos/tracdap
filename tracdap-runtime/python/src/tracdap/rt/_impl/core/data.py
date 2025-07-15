@@ -226,10 +226,10 @@ class BaseLayout(StorageLayout, metaclass=abc.ABCMeta):
 
         # Take default location from the storage config
         storage_key = _util.read_property(sys_config.properties, _cfg_p.ConfigKeys.STORAGE_DEFAULT_LOCATION)
-        if trac_schema.schemaType == _meta.SchemaType.STRUCT:
-            storage_format = "JSON"
+        if trac_schema.schemaType == _meta.SchemaType.STRUCT_SCHEMA:
+            storage_format = "text/json"
         else:
-            storage_format = _util.read_property(sys_config.properties, _cfg_p.ConfigKeys.STORAGE_DEFAULT_FORMAT, "CSV")
+            storage_format = _util.read_property(sys_config.properties, _cfg_p.ConfigKeys.STORAGE_DEFAULT_FORMAT, "text/csv")
         storage_path = self._data_storage_path(data_id, context_key, trac_schema, part_key, snap_index, 0, storage_format, prior_copy=None)
 
         storage_copy = _meta.StorageCopy(
@@ -442,10 +442,16 @@ class ObjectIdLayout(BaseLayout):
         schema_type = trac_schema.schemaType.name.lower()
         version_suffix = self.__random.randint(0, 1 << 24)
 
-        return self.__DATA_STORAGE_TEMPLATE.format(
+        base_path = self.__DATA_STORAGE_TEMPLATE.format(
             schema_type, data_id.objectId,
             part_key.opaqueKey, snap_index, delta_index,
             version_suffix)
+
+        # STRUCT stored as a single file, not directory layout
+        if trac_schema.schemaType == _meta.SchemaType.STRUCT_SCHEMA:
+            return base_path + ".json"
+        else:
+            return base_path
 
     def _file_storage_path(self, file_id, file_def, prior_copy):
 
@@ -583,7 +589,7 @@ class DataItem:
     def for_table(table: pa.Table, schema: pa.Schema, trac_schema: _meta.SchemaDefinition) -> "DataItem":
 
         return DataItem(
-            _meta.ObjectType.DATA, _meta.SchemaType.TABLE,
+            _meta.ObjectType.DATA, _meta.SchemaType.TABLE_SCHEMA,
             content=table, content_type=pa.Table,
             trac_schema=trac_schema, native_schema=schema,
             table=table, schema=schema)
@@ -592,7 +598,7 @@ class DataItem:
     def for_struct(content: tp.Any):
 
         return DataItem(
-            _meta.ObjectType.DATA, _meta.SchemaType.STRUCT,
+            _meta.ObjectType.DATA, _meta.SchemaType.STRUCT_SCHEMA,
             content=content, content_type=type(content))
 
     @staticmethod

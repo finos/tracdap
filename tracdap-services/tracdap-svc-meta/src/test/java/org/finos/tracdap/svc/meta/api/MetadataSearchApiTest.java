@@ -433,8 +433,8 @@ abstract class MetadataSearchApiTest {
     }
 
     @ParameterizedTest
-    @EnumSource(value = BasicType.class, mode = EnumSource.Mode.EXCLUDE,
-                names = {"BASIC_TYPE_NOT_SET", "UNRECOGNIZED", "ARRAY", "MAP", "FLOAT", "DECIMAL", "DATETIME"})
+    @EnumSource(value = BasicType.class, mode = EnumSource.Mode.INCLUDE,
+                names = {"BOOLEAN", "INTEGER", "STRING", "DATE"})
     void discreteAttrTypes(BasicType attrType) {
 
         var attrToLookFor = "discreteTypes_" + attrType.name();

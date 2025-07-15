@@ -17,6 +17,7 @@
 
 package org.finos.tracdap.svc.data.api;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.finos.tracdap.api.*;
 import org.finos.tracdap.common.data.DataContext;
 import org.finos.tracdap.common.async.Flows;
@@ -46,9 +47,11 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.nio.ByteBuffer;
 import java.nio.channels.WritableByteChannel;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.Flow;
+import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.stream.Stream;
 
@@ -134,6 +137,7 @@ abstract class DataRoundTripTest {
 
     private static final String BASIC_CSV_DATA = SampleData.BASIC_CSV_DATA_RESOURCE;
     private static final String BASIC_JSON_DATA = SampleData.BASIC_JSON_DATA_RESOURCE;
+    private static final String STRUCT_JSON_DATA = SampleData.STRUCT_JSON_DATA_RESOURCE;
     private static final String LARGE_CSV_DATA = "/large_csv_data_100000.csv";
 
     private static final byte[] BASIC_CSV_CONTENT = ResourceHelpers.loadResourceAsBytes(BASIC_CSV_DATA);
@@ -290,6 +294,39 @@ abstract class DataRoundTripTest {
         }
     }
 
+    @Test
+    void roundTrip_jsonStruct() throws Exception {
+
+        try (var testDataStream = getClass().getResourceAsStream(STRUCT_JSON_DATA)) {
+
+            if (testDataStream == null)
+                throw new RuntimeException("Test data not found");
+
+            var testDataBytes = testDataStream.readAllBytes();
+            var testData = List.of(ByteString.copyFrom(testDataBytes));
+
+            var jsonComparison = (BiConsumer<byte[], byte[]>) (expected, actual) -> {
+
+                try {
+
+                    var mapper = new ObjectMapper();
+                    var expectedTree = mapper.readTree(new String(expected, StandardCharsets.UTF_8));
+                    var roundTripTree = mapper.readTree(new String(actual, StandardCharsets.UTF_8));
+
+                    Assertions.assertEquals(expectedTree, roundTripTree);
+                }
+                catch (Exception e) {
+
+                    Assertions.fail(e);
+                }
+            };
+
+            var mimeType = "text/json";
+            roundTripComparison(testData, mimeType, mimeType, jsonComparison, true);
+            roundTripComparison(testData, mimeType, mimeType, jsonComparison, false);
+        }
+    }
+
     private void roundTripTest(
             List<ByteString> content, String writeFormat, String readFormat,
             BiFunction<SchemaDefinition, List<ByteString>, List<Vector<Object>>> decodeFunc,
@@ -329,12 +366,12 @@ abstract class DataRoundTripTest {
 
         Assertions.assertEquals(SampleData.BASIC_TABLE_SCHEMA, roundTripSchema);
 
-        for (int i = 0; i < roundTripSchema.getTable().getFieldsCount(); i++) {
+        for (int col = 0; col < roundTripSchema.getTable().getFieldsCount(); col++) {
 
             for (var row = 0; row < DataRoundTripTest.BASIC_TEST_DATA.size(); row++) {
 
-                var expectedVal = DataRoundTripTest.BASIC_TEST_DATA.get(i).get(row);
-                var roundTripVal = roundTripData.get(i).get(row);
+                var expectedVal = DataRoundTripTest.BASIC_TEST_DATA.get(col).get(row);
+                var roundTripVal = roundTripData.get(col).get(row);
 
                 // Allow comparing big decimals with different scales
                 if (expectedVal instanceof BigDecimal)
@@ -343,6 +380,47 @@ abstract class DataRoundTripTest {
                 Assertions.assertEquals(expectedVal, roundTripVal);
             }
         }
+    }
+
+    private void roundTripComparison(
+            List<ByteString> content, String writeFormat, String readFormat,
+            BiConsumer<byte[], byte[]> comparison,
+            boolean dataInChunkZero) throws Exception {
+
+        var requestParams = DataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSchema(SampleData.BASIC_STRUCT_SCHEMA)
+                .setFormat(writeFormat)
+                .build();
+
+        var createDatasetRequest = dataWriteRequest(requestParams, content, dataInChunkZero);
+        var createDataset = DataApiTestHelpers.clientStreaming(dataClient::createDataset, createDatasetRequest);
+
+        waitFor(TEST_TIMEOUT, createDataset);
+        var objHeader = resultOf(createDataset);
+
+        var dataRequest = DataReadRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSelector(selectorFor(objHeader))
+                .setFormat(readFormat)
+                .build();
+
+        var readResponse = Flows.<DataReadResponse>hub(execContext.eventLoopExecutor());
+        var readResponse0 = Flows.first(readResponse);
+        var readByteStream = Flows.map(readResponse, DataReadResponse::getContent);
+        var readBytes = Flows.fold(readByteStream, ByteString::concat, ByteString.EMPTY);
+
+        DataApiTestHelpers.serverStreaming(dataClient::readDataset, dataRequest, readResponse);
+
+        waitFor(Duration.ofMinutes(20), readResponse0, readBytes);
+        var roundTripBytes = resultOf(readBytes);
+
+        var originalBytes = ByteString.empty();
+        for (var chunk : content) {
+            originalBytes = originalBytes.concat(chunk);
+        }
+
+        comparison.accept(originalBytes.toByteArray(), roundTripBytes.toByteArray());
     }
 
     private Flow.Publisher<DataWriteRequest> dataWriteRequest(

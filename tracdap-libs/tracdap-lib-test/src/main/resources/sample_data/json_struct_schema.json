@@ -1,0 +1,83 @@
+{
+  "fields": [
+    {"fieldName": "boolField", "fieldType": "BOOLEAN", "notNull": true},
+    {"fieldName": "intField", "fieldType": "INTEGER", "notNull": true},
+    {"fieldName": "floatField", "fieldType": "FLOAT", "notNull": true},
+    {"fieldName": "decimalField", "fieldType": "DECIMAL", "notNull": true},
+    {"fieldName": "strField", "fieldType": "STRING", "notNull": true},
+    {"fieldName": "dateField", "fieldType": "DATE", "notNull": true},
+    {"fieldName": "datetimeField", "fieldType": "DATETIME", "notNull": true},
+    {"fieldName": "enumField", "fieldType": "STRING", "categorical": true, "notNull": true, "namedEnum": "ExampleEnum"},
+
+    {"fieldName": "quotedField", "fieldType": "STRING", "notNull": true},
+    {"fieldName": "optionalField", "fieldType": "STRING", "notNull": false},
+    {"fieldName": "optionalQuotedField", "fieldType": "STRING", "notNull": false},
+
+    {
+      "fieldName": "listField",
+      "fieldType": "ARRAY",
+      "notNull": true,
+
+      "children": {
+        "arrayItems": { "fieldType": "INTEGER", "notNull": true }
+      }
+    },
+
+    {
+      "fieldName": "dictField",
+      "fieldType": "MAP",
+      "notNull": true,
+
+      "children": {
+        "mapValues": { "fieldType": "DATETIME", "notNull:": true }
+      }
+    },
+
+    {
+      "fieldName": "structField",
+      "fieldType": "STRUCT",
+      "namedType": "DataClassSubStruct"
+    },
+
+    {
+      "fieldName": "anonymousStructField",
+      "fieldType": "STRUCT",
+
+      "children": {
+        "structFields": [
+          {"fieldName": "field1", "fieldType": "STRING", "notNull": true},
+          {"fieldName": "field2", "fieldType": "INTEGER", "notNull": true},
+          {"fieldName":  "enumField", "fieldType": "STRING", "categorical": true, "notNull": true, "namedEnum": "ExampleEnum"}
+        ]
+      }
+    },
+
+    {
+      "fieldName": "nestedStructField",
+      "fieldType": "MAP",
+
+      "mapValues": { "fieldType": "STRUCT", "namedType": "DataClassSubStruct", "notNull:": true }
+    }
+  ],
+
+  "namedTypes": {
+    "DataClassSubStruct": {
+      "schemaType": "STRUCT",
+      "fields": [
+        {"fieldName": "field1", "fieldType": "STRING", "notNull": true},
+        {"fieldName": "field2", "fieldType": "INTEGER", "notNull": true},
+        {"fieldName":  "enumField", "fieldType": "STRING", "categorical": true, "notNull": true, "namedEnum": "ExampleEnum"}
+      ]
+    }
+  },
+
+  "namedEnums:": {
+    "ExampleEnum": {
+      "values:": [
+        { "stringValue": "VALUE1" },
+        { "stringValue": "VALUE2" },
+        { "stringValue": "VALUE3" }
+      ]
+    }
+  }
+}

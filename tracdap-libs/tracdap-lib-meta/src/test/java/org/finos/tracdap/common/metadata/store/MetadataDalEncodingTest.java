@@ -87,7 +87,7 @@ abstract class MetadataDalEncodingTest implements IMetadataStoreTest {
 
     @ParameterizedTest
     @EnumSource(value = BasicType.class, mode = EnumSource.Mode.EXCLUDE,
-                names = {"BASIC_TYPE_NOT_SET", "UNRECOGNIZED", "ARRAY", "MAP"})
+                names = {"BASIC_TYPE_NOT_SET", "UNRECOGNIZED", "ARRAY", "MAP", "STRUCT"})
     void roundTrip_allAttrTypesOk(BasicType attrType) {
 
         var origDef = dummyDataDef();

@@ -243,7 +243,7 @@ public abstract class DataRoundTripTest {
     void emptyTable() throws Exception {
 
         var schema = SchemaMapping.tracToArrow(SampleData.BASIC_TABLE_SCHEMA);
-        var data = SampleData.convertData(schema, Map.of(), 0, ALLOCATOR);
+        var data = SampleData.convertData(schema, List.of(), ALLOCATOR);
 
         doRoundTrip(schema, data, "emptyTable", dataFramework());
     }
@@ -341,21 +341,28 @@ public abstract class DataRoundTripTest {
 
     void doEdgeCaseTest(String fieldName, List<Object> edgeCases) throws Exception {
 
-        var javaData = new HashMap<String, List<Object>>();
+        var javaData = new ArrayList<Map<String, Object>>();
 
-        for (var field : SampleData.BASIC_TABLE_SCHEMA.getTable().getFieldsList()) {
+        for (int row = 0; row < edgeCases.size(); row++) {
 
-            if (field.getFieldName().equals(fieldName)) {
-                javaData.put(field.getFieldName(), edgeCases);
+            var record = new HashMap<String, Object>();
+
+            for (var field : SampleData.BASIC_TABLE_SCHEMA.getTable().getFieldsList()) {
+
+                if (field.getFieldName().equals(fieldName)) {
+                    record.put(field.getFieldName(), edgeCases.get(row));
+                }
+                else {
+                    var javaValue = SampleData.generateJavaPrimitive(field.getFieldType(), field.getCategorical(), row, null);
+                    record.put(field.getFieldName(), javaValue);
+                }
             }
-            else {
-                var javaValues = SampleData.generateJavaValues(field.getFieldType(), field.getCategorical(), edgeCases.size());
-                javaData.put(field.getFieldName(), javaValues);
-            }
+
+            javaData.add(record);
         }
 
         var schema = SchemaMapping.tracToArrow(SampleData.BASIC_TABLE_SCHEMA);
-        var data = SampleData.convertData(schema, javaData, edgeCases.size(), ALLOCATOR);
+        var data = SampleData.convertData(schema, javaData,  ALLOCATOR);
 
         doRoundTrip(schema, data, "edgeCase:" + fieldName, dataFramework());
     }
